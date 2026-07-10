@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Next.js build output
+app/.next/
+app/out/
+
+# Persistent data — lives on the Railway volume, never in the repo
+app/data/
+# NOTE: app/public/sites/<slug>/ (per-site static assets, ~16MB) IS committed
+# so client websites render on deploy without re-running the importer.
+
+# Secrets / env
+.env
+.env.*
+!.env.example
+
+# Logs / OS
+*.log
+.DS_Store
+
+# Local scratch
+*.bak-*

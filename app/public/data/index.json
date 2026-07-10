@@ -1,0 +1,34 @@
+{
+  "therapies": [
+    {
+      "id": "hbot",
+      "label": "HBOT",
+      "icon": "",
+      "accent": "#2c6ce0",
+      "accentBg": "rgba(44,108,224,0.10)",
+      "totalAds": 157,
+      "advertisers": 40,
+      "scripts": 30
+    },
+    {
+      "id": "ir",
+      "label": "Infrared",
+      "icon": "",
+      "accent": "#d2691e",
+      "accentBg": "rgba(210,105,30,0.10)",
+      "totalAds": 14,
+      "advertisers": 3,
+      "scripts": 100
+    },
+    {
+      "id": "pemf",
+      "label": "PEMF",
+      "icon": "",
+      "accent": "#8a3fd1",
+      "accentBg": "rgba(138,63,209,0.10)",
+      "totalAds": 28,
+      "advertisers": 7,
+      "scripts": 93
+    }
+  ]
+}

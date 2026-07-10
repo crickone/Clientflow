@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 193.95 39.69">
+  <defs>
+    <style>
+      .cls-1 {
+        font-size: 41.76px;
+      }
+
+      .cls-1, .cls-2 {
+        font-family: Nebula, Nebula;
+      }
+
+      .cls-2 {
+        font-size: 16.09px;
+      }
+
+      .cls-3 {
+        letter-spacing: -.42em;
+      }
+
+      .cls-4 {
+        letter-spacing: -.27em;
+      }
+    </style>
+  </defs>
+  <text class="cls-2" transform="translate(.63 39.32)"><tspan x="0" y="0">CELLULAR HEA</tspan><tspan class="cls-4" x="158.43" y="0">L</tspan><tspan x="167.68" y="0">TH</tspan></text>
+  <text class="cls-1" transform="translate(1.26 21.76)"><tspan x="0" y="0">RENO</tspan><tspan class="cls-3" x="140.99" y="0">V</tspan><tspan x="160.43" y="0">A</tspan></text>
+</svg>

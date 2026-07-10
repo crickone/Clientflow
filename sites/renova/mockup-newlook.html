@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Renova — new look mockup</title>
+<style>
+  /* Real display face from the app */
+  @font-face {
+    font-family: "Nebula";
+    src: url("app/src/app/fonts/Nebula-Regular.otf") format("opentype");
+    font-display: swap;
+  }
+
+  :root {
+    --canvas: #e7e7ea;          /* light-grey page canvas */
+    --cell: #ffffff;            /* white modular cells */
+    --cell-2: #f3f3f5;
+    --grid: rgba(0,0,0,0.11);   /* visible modular grid lines */
+    --hair: rgba(0,0,0,0.10);
+    --hair-strong: rgba(0,0,0,0.20);
+    --ink: #0c0c0d;
+    --ink-2: rgba(12,12,13,0.60);
+    --ink-3: rgba(12,12,13,0.42);
+    --accent: #ef5a24;          /* single orange brand accent */
+    --accent-ink: #c2440f;
+    --accent-soft: rgba(239,90,36,0.10);
+    --display: "Nebula", "Arial Black", system-ui, sans-serif;
+    --mono: "DM Mono", "Space Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+    --sans: "Hanken Grotesk", -apple-system, system-ui, sans-serif;
+    --r: 2px;                   /* near-square corners */
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: -0.011em;
+  }
+  .mono { font-family: var(--mono); letter-spacing: 0; }
+  .uc { text-transform: uppercase; }
+
+  .shell { display:flex; min-height:100vh; }
+
+  /* ---------------- Sidebar ---------------- */
+  .side {
+    width: 240px; min-width:240px;
+    background: var(--cell);
+    border-right: 1px solid var(--grid);
+    display:flex; flex-direction:column;
+    position: sticky; top:0; height:100vh;
+  }
+  .brand {
+    padding: 22px 20px;
+    border-bottom: 1px solid var(--grid);
+    display:flex; align-items:center; gap:10px;
+  }
+  .brand .logomark {
+    width:26px; height:26px; background:var(--accent);
+    display:flex; align-items:center; justify-content:center;
+    color:#fff; font-family:var(--display); font-size:15px; line-height:1;
+  }
+  .brand .name { font-family:var(--display); font-size:15px; letter-spacing:0.02em; }
+  .brand .name span { color: var(--accent); }
+  nav { padding: 10px 8px; flex:1; }
+  .nav-sec {
+    font-family:var(--mono); font-size:10px; letter-spacing:0.14em;
+    color:var(--ink-3); padding: 14px 12px 6px;
+  }
+  .nav-item {
+    position:relative; display:flex; align-items:center; gap:11px;
+    padding: 9px 12px; margin:1px 0; color:var(--ink-2);
+    font-family:var(--mono); font-size:12px; letter-spacing:0.01em;
+    cursor:pointer; border-radius: var(--r);
+  }
+  .nav-item .ic { width:15px; height:15px; border:1.5px solid currentColor; border-radius:2px; opacity:.7; flex:none; }
+  .nav-item:hover { background: var(--cell-2); color: var(--ink); }
+  .nav-item.active { color: var(--accent); background: var(--accent-soft); }
+  .nav-item.active::before {
+    content:""; position:absolute; left:0; top:5px; bottom:5px; width:3px; background:var(--accent);
+  }
+  .side-foot {
+    border-top:1px solid var(--grid); padding:12px 16px;
+    display:flex; align-items:center; gap:10px;
+  }
+  .avatar {
+    width:30px;height:30px;background:var(--cell-2);border:1px solid var(--grid);
+    display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;
+  }
+  .side-foot .nm { font-size:12px; font-weight:600; }
+  .side-foot .rl { font-family:var(--mono); font-size:10px; color:var(--ink-3); letter-spacing:0.1em; }
+
+  /* ---------------- Main ---------------- */
+  .main { flex:1; min-width:0; }
+  .page { max-width: 1180px; margin:0 auto; padding: 40px 40px 80px; }
+
+  .pagehead { display:flex; justify-content:space-between; align-items:flex-end;
+    padding-bottom:22px; margin-bottom:26px; border-bottom:1px solid var(--grid); }
+  .eyebrow { font-family:var(--mono); font-size:11px; letter-spacing:0.16em; color:var(--accent); margin-bottom:10px; }
+  .ptitle { font-family:var(--display); font-size:46px; line-height:0.92; letter-spacing:0.01em; }
+  .psub { font-family:var(--mono); font-size:12px; color:var(--ink-3); margin-top:10px; }
+
+  .btn {
+    font-family:var(--mono); font-size:12px; letter-spacing:0.04em; text-transform:uppercase;
+    background:var(--accent); color:#fff; border:none; padding:0 18px; height:42px;
+    display:inline-flex; align-items:center; gap:9px; cursor:pointer; border-radius: var(--r);
+  }
+  .btn .plus { font-size:15px; }
+  .btn.ghost { background:transparent; color:var(--ink); border:1px solid var(--hair-strong); }
+
+  /* Modular grid — gap shows as grid lines */
+  .label { font-family:var(--mono); font-size:10px; letter-spacing:0.14em; color:var(--ink-3); }
+  .secline { font-family:var(--mono); font-size:11px; letter-spacing:0.16em; color:var(--ink-3); margin: 26px 0 1px; }
+
+  .grid {
+    display:grid; gap:1px; background:var(--grid);
+    border:1px solid var(--grid); border-radius:var(--r); overflow:hidden; margin-top:1px;
+  }
+  .g3 { grid-template-columns: repeat(3, 1fr); }
+  .cell { background:var(--cell); padding:22px 22px 24px; }
+  .cell .v { font-family:var(--display); font-size:42px; line-height:1; margin-top:14px; }
+  .cell .v.accent { color:var(--accent); }
+  .cell .hint { font-family:var(--mono); font-size:11px; color:var(--ink-3); margin-top:12px; }
+
+  .row2 { display:grid; grid-template-columns: 1.45fr 1fr; gap:16px; margin-top:16px; }
+  .panel { background:var(--cell); border:1px solid var(--grid); border-radius:var(--r); padding:22px; position:relative; }
+  .panel .ph { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+  .linkbtn { font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--accent); cursor:pointer; }
+
+  /* corner registration brackets */
+  .brackets::before, .brackets::after,
+  .brackets > .bk-tl, .brackets > .bk-tr { content:""; position:absolute; width:12px; height:12px; pointer-events:none; }
+  .brackets::before { top:8px; left:8px; border-top:1.5px solid var(--ink-3); border-left:1.5px solid var(--ink-3); }
+  .brackets::after  { bottom:8px; right:8px; border-bottom:1.5px solid var(--ink-3); border-right:1.5px solid var(--ink-3); }
+  .bk-tr { top:8px; right:8px; border-top:1.5px solid var(--ink-3); border-right:1.5px solid var(--ink-3); }
+  .bk-bl { bottom:8px; left:8px; border-bottom:1.5px solid var(--ink-3); border-left:1.5px solid var(--ink-3); }
+
+  .appt { display:flex; align-items:center; gap:14px; padding:13px 14px; border:1px solid var(--grid); border-radius:var(--r); margin-bottom:8px; }
+  .appt .t { font-family:var(--display); font-size:17px; min-width:64px; }
+  .appt .who { font-size:14px; font-weight:600; }
+  .badge { font-family:var(--mono); font-size:10px; letter-spacing:0.06em; text-transform:uppercase;
+    padding:3px 8px; border-radius:var(--r); background:var(--accent-soft); color:var(--accent-ink); border:1px solid rgba(239,90,36,0.25); }
+  .badge.hbot { background:rgba(44,108,224,0.10); color:#1f56b8; border-color:rgba(44,108,224,0.25); }
+  .status { font-family:var(--mono); font-size:10px; letter-spacing:0.08em; text-transform:uppercase; padding:3px 9px; border-radius:var(--r);
+    background:var(--cell-2); color:var(--ink-2); border:1px solid var(--grid); }
+  .status.ok { background:rgba(22,163,74,0.10); color:#15803d; border-color:rgba(22,163,74,0.25); }
+
+  .act { display:flex; justify-content:space-between; gap:12px; padding:9px 0; border-bottom:1px solid var(--grid); }
+  .act:last-child { border-bottom:none; }
+  .act .m { font-size:13px; color:var(--ink-2); }
+  .act .ago { font-family:var(--mono); font-size:10px; color:var(--ink-3); white-space:nowrap; }
+
+  .chart { display:flex; align-items:flex-end; gap:6px; height:150px; margin-top:18px; padding-top:8px; }
+  .bar { flex:1; background:var(--accent); border-radius:1px 1px 0 0; opacity:0.85; }
+  .bar:nth-child(even){ opacity:0.55; }
+
+  .note { font-family:var(--mono); font-size:11px; color:var(--ink-3); margin-top:30px; text-align:center; letter-spacing:0.04em; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <!-- Sidebar -->
+  <aside class="side">
+    <div class="brand">
+      <div class="logomark">R</div>
+      <div class="name">RENOVA<span>.</span></div>
+    </div>
+    <nav>
+      <div class="nav-item active"><span class="ic"></span> Dashboard</div>
+      <div class="nav-item"><span class="ic"></span> Leads</div>
+      <div class="nav-item"><span class="ic"></span> Clients</div>
+      <div class="nav-item"><span class="ic"></span> Appointments</div>
+      <div class="nav-item"><span class="ic"></span> Packages</div>
+      <div class="nav-item"><span class="ic"></span> Gift Vouchers</div>
+      <div class="nav-sec uc">Growth</div>
+      <div class="nav-item"><span class="ic"></span> Reports</div>
+      <div class="nav-item"><span class="ic"></span> Marketing</div>
+      <div class="nav-item"><span class="ic"></span> Content Studio</div>
+      <div class="nav-item"><span class="ic"></span> Training</div>
+      <div class="nav-item"><span class="ic"></span> Settings</div>
+    </nav>
+    <div class="side-foot">
+      <div class="avatar">C</div>
+      <div style="flex:1; min-width:0;">
+        <div class="nm">Chris</div>
+        <div class="rl uc">Admin</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="page">
+      <div class="pagehead">
+        <div>
+          <div class="eyebrow uc">// Today</div>
+          <div class="ptitle uc">Dashboard</div>
+          <div class="psub">Saturday, 23 May 2026</div>
+        </div>
+        <button class="btn"><span class="plus">+</span> Book appointment</button>
+      </div>
+
+      <div class="secline uc">Operations</div>
+      <div class="grid g3">
+        <div class="cell">
+          <div class="label uc">Today's appointments</div>
+          <div class="v">8</div>
+          <div class="hint">6 confirmed · 2 pending</div>
+        </div>
+        <div class="cell">
+          <div class="label uc">Active clients</div>
+          <div class="v">142</div>
+          <div class="hint">visited in last 90 days</div>
+        </div>
+        <div class="cell">
+          <div class="label uc">Packages expiring</div>
+          <div class="v accent">3</div>
+          <div class="hint">in next 30 days</div>
+        </div>
+      </div>
+
+      <div class="secline uc">Revenue</div>
+      <div class="grid g3">
+        <div class="cell">
+          <div class="label uc">Today's earnings</div>
+          <div class="v">€640</div>
+          <div class="hint">from sessions completed today</div>
+        </div>
+        <div class="cell">
+          <div class="label uc">Cash today</div>
+          <div class="v">€310</div>
+          <div class="hint">payments recorded today (till)</div>
+        </div>
+        <div class="cell">
+          <div class="label uc">Deferred revenue</div>
+          <div class="v">€4,180</div>
+          <div class="hint">unused credits + open vouchers</div>
+        </div>
+      </div>
+
+      <div class="row2">
+        <div class="panel">
+          <div class="ph">
+            <div class="label uc">Today's schedule</div>
+            <div class="linkbtn">Book +</div>
+          </div>
+          <div class="appt">
+            <div class="t">09:30</div>
+            <div style="flex:1">
+              <div class="who">Aoife Brennan</div>
+              <div style="margin-top:5px; display:flex; gap:6px;"><span class="badge hbot">HBOT</span></div>
+            </div>
+            <div class="status ok">Confirmed</div>
+          </div>
+          <div class="appt">
+            <div class="t">11:00</div>
+            <div style="flex:1">
+              <div class="who">Liam Walsh</div>
+              <div style="margin-top:5px; display:flex; gap:6px;"><span class="badge">Infrared</span></div>
+            </div>
+            <div class="status ok">Confirmed</div>
+          </div>
+          <div class="appt">
+            <div class="t">14:15</div>
+            <div style="flex:1">
+              <div class="who">Saoirse Murphy</div>
+              <div style="margin-top:5px; display:flex; gap:6px;"><span class="badge">PEMF</span></div>
+            </div>
+            <div class="status">Pending</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="label uc" style="margin-bottom:14px;">Recent activity</div>
+          <div class="act"><div class="m">New lead — Facebook form</div><div class="ago">4m</div></div>
+          <div class="act"><div class="m">Package sold · 10× HBOT</div><div class="ago">1h</div></div>
+          <div class="act"><div class="m">Appointment completed</div><div class="ago">2h</div></div>
+          <div class="act"><div class="m">Gift voucher redeemed</div><div class="ago">3h</div></div>
+          <div class="act"><div class="m">New client added</div><div class="ago">5h</div></div>
+        </div>
+      </div>
+
+      <div class="panel brackets" style="margin-top:16px;">
+        <span class="bk-tr"></span><span class="bk-bl"></span>
+        <div class="label uc">Revenue · last 30 days</div>
+        <div class="chart">
+          <div class="bar" style="height:40%"></div><div class="bar" style="height:65%"></div>
+          <div class="bar" style="height:52%"></div><div class="bar" style="height:80%"></div>
+          <div class="bar" style="height:48%"></div><div class="bar" style="height:70%"></div>
+          <div class="bar" style="height:90%"></div><div class="bar" style="height:60%"></div>
+          <div class="bar" style="height:75%"></div><div class="bar" style="height:55%"></div>
+          <div class="bar" style="height:85%"></div><div class="bar" style="height:62%"></div>
+          <div class="bar" style="height:45%"></div><div class="bar" style="height:72%"></div>
+        </div>
+      </div>
+
+      <div class="note">// MOCKUP — proposed "inspired evolution" look. Real Nebula display font loaded; mono = system fallback (real app would ship Space Mono / DM Mono).</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,24 @@
+:root {
+  --font-heading: Helvetica;
+  --font-body: Helvetica;
+  --space-1: 1px;
+  --space-2: 3px;
+  --space-3: 3.99994px;
+  --space-4: 6.66662px;
+  --space-5: 7px;
+  --space-6: 9.33331px;
+  --space-7: 10.6668px;
+  --space-8: 12px;
+  --space-9: 13.3332px;
+  --space-10: 14px;
+  --space-11: 14.6667px;
+  --space-12: 15px;
+  --space-13: 20.0001px;
+  --space-14: 26.6667px;
+  --space-15: 33.3333px;
+  --space-16: 48px;
+  --space-17: 50.6667px;
+  --space-18: 98.6667px;
+  --space-19: 170.667px;
+  --space-20: 213.333px;
+}

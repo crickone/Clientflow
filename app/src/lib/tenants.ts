@@ -1,0 +1,194 @@
+import "server-only";
+
+import type { Database as BetterSqlite3 } from "better-sqlite3";
+import { eq } from "drizzle-orm";
+
+import { controlDb } from "@/lib/db/control";
+import { memberships, tenants, users, type Tenant } from "@/lib/db/schema";
+import { openTenantDb } from "@/lib/db/tenant";
+import { hashPassword } from "@/lib/auth";
+
+/**
+ * Tenant registry + provisioning. A tenant is a business with its own SQLite
+ * file. Identity (users) lives in the control plane and points back at a tenant
+ * via `users.tenant_id`.
+ */
+
+export function listTenants(): Tenant[] {
+  return controlDb.select().from(tenants).all();
+}
+
+export function getTenantBySlug(slug: string): Tenant | undefined {
+  return controlDb.select().from(tenants).where(eq(tenants.slug, slug)).get();
+}
+
+/**
+ * Seed a tenant's business defaults (therapies, settings, core inbox tags).
+ * Idempotent — count/IGNORE guarded. NO user is seeded here; users are
+ * control-plane (see createTenantAdmin / the boot migration).
+ */
+export function seedTenant(sqlite: BetterSqlite3): void {
+  const therapyCount = (
+    sqlite.prepare("SELECT COUNT(*) AS c FROM therapies").get() as { c: number }
+  ).c;
+  if (therapyCount === 0) {
+    const insert = sqlite.prepare(
+      "INSERT INTO therapies (name, colour_hex, default_duration_minutes, default_price_eur, description) VALUES (?, ?, ?, ?, ?)",
+    );
+    const seed: Array<[string, string, number, number, string]> = [
+      [
+        "HBOT",
+        "#58a6ff",
+        60,
+        95,
+        "Hyperbaric Oxygen Therapy — pressurised oxygen for cellular recovery",
+      ],
+      [
+        "Infrared Therapy",
+        "#f0883e",
+        15,
+        65,
+        "Full-body infrared bed for circulation, recovery, and detox",
+      ],
+      [
+        "PEMF Therapy",
+        "#a855f7",
+        30,
+        65,
+        "PEMF chair — pulsed electromagnetic field therapy for nervous-system regulation",
+      ],
+    ];
+    for (const row of seed) insert.run(...row);
+  }
+
+  const setIf = sqlite.prepare(
+    "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",
+  );
+  setIf.run(
+    "opening_hours",
+    JSON.stringify([
+      { dow: 0, closed: true },
+      { dow: 1, closed: false, open: "08:00", close: "20:00" },
+      { dow: 2, closed: false, open: "08:00", close: "20:00" },
+      { dow: 3, closed: false, open: "08:00", close: "20:00" },
+      { dow: 4, closed: false, open: "08:00", close: "20:00" },
+      { dow: 5, closed: false, open: "08:00", close: "20:00" },
+      { dow: 6, closed: false, open: "09:00", close: "16:00" },
+    ]),
+  );
+  setIf.run("slot_length_minutes", "15");
+  setIf.run("multi_therapy_concurrent", "true");
+  setIf.run("buffer_minutes", "0");
+  setIf.run("venue_type", JSON.stringify("clinic"));
+
+  const tagCount = (
+    sqlite.prepare("SELECT COUNT(*) AS c FROM tags").get() as { c: number }
+  ).c;
+  if (tagCount === 0) {
+    const insertTag = sqlite.prepare(
+      "INSERT INTO tags (label, slug, color, is_core) VALUES (?, ?, ?, 1)",
+    );
+    const coreTags: Array<[string, string, string]> = [
+      ["HBOT", "hbot", "#58a6ff"],
+      ["PEMF", "pemf", "#a855f7"],
+      ["Infrared", "infrared", "#f0883e"],
+      ["Pricing", "pricing", "#2ed8c3"],
+      ["Hours", "hours", "#8b949e"],
+      ["Booking", "booking", "#3fb950"],
+      ["Urgent", "urgent", "#f85149"],
+      ["Upset", "upset", "#db61a2"],
+      ["VIP", "vip", "#d29922"],
+    ];
+    for (const [label, slug, color] of coreTags) insertTag.run(label, slug, color);
+  }
+}
+
+export interface CreateTenantInput {
+  slug: string;
+  name: string;
+  /**
+   * Optional first admin for the tenant. If the email already belongs to an
+   * existing identity, that identity is reused and just granted an admin
+   * membership (password ignored). For a brand-new email, a password is required.
+   */
+  admin?: { email: string; password?: string; name?: string };
+}
+
+/**
+ * Provision a brand-new tenant: register it, create + seed its DB, and
+ * optionally create its first admin user. Renova is NOT provisioned this way —
+ * it is migrated in place by the boot migration (its db_file is the existing
+ * clinic.db).
+ */
+export function createTenant(input: CreateTenantInput): Tenant {
+  const slug = input.slug.trim().toLowerCase();
+  if (!/^[a-z0-9-]+$/.test(slug)) {
+    throw new Error(`Invalid tenant slug: ${slug}`);
+  }
+  if (getTenantBySlug(slug)) {
+    throw new Error(`Tenant already exists: ${slug}`);
+  }
+
+  const dbFile = `tenants/${slug}/${slug}.db`;
+  const tenant = controlDb
+    .insert(tenants)
+    .values({ slug, name: input.name, dbFile })
+    .returning()
+    .get();
+
+  // Create + seed the tenant DB.
+  const { sqlite } = openTenantDb(dbFile);
+  seedTenant(sqlite);
+
+  if (input.admin) {
+    createTenantAdmin(tenant.id, input.admin);
+  }
+
+  return tenant;
+}
+
+/**
+ * Ensure an admin for a tenant: reuse the identity if the email already exists
+ * (multi-account — one person can admin several clinics), otherwise create it.
+ * Then grant an admin membership (idempotent via the UNIQUE(user_id, tenant_id)
+ * index). A password is only needed when creating a new identity.
+ */
+export function createTenantAdmin(
+  tenantId: number,
+  admin: { email: string; password?: string; name?: string },
+): void {
+  const email = admin.email.trim().toLowerCase();
+
+  let user = controlDb
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.email, email))
+    .get();
+
+  if (!user) {
+    if (!admin.password || admin.password.length < 8) {
+      throw new Error(
+        "A password (at least 8 characters) is required to create a new admin.",
+      );
+    }
+    user = controlDb
+      .insert(users)
+      .values({
+        email,
+        name: admin.name ?? null,
+        passwordHash: hashPassword(admin.password),
+        // legacy column mirror; membership is the source of truth
+        role: "admin",
+        isPlatformAdmin: false,
+        mustChangePassword: false,
+      })
+      .returning({ id: users.id })
+      .get();
+  }
+
+  controlDb
+    .insert(memberships)
+    .values({ userId: user.id, tenantId, role: "admin", isActive: true })
+    .onConflictDoNothing()
+    .run();
+}

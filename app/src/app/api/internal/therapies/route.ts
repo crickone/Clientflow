@@ -1,0 +1,17 @@
+import { guard } from "@/lib/api/guard";
+import { NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
+import { db, schema } from "@/lib/db";
+
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  const __auth = await guard("admin");
+  if (__auth) return __auth;
+  const rows = db
+    .select()
+    .from(schema.therapies)
+    .where(eq(schema.therapies.isActive, true))
+    .all();
+  return NextResponse.json(rows);
+}
