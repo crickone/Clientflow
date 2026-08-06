@@ -79,12 +79,56 @@ const TOOL_LABEL: Record<string, string> = {
   cancel_membership: "Cancelling membership",
   assign_package: "Assigning package",
   create_form: "Building form",
+  list_leads: "Checking the pipeline",
+  get_lead_health: "Checking lead health",
+  draft_lead_reply: "Drafting a reply",
+  send_whatsapp: "Sending WhatsApp",
+  set_lead_stage: "Updating pipeline stage",
+  log_lead_touch: "Logging a touch",
 };
 
-export function AssistantChat({ tenantId, height }: { tenantId: number; height?: string }) {
+const DEFAULT_ENDPOINT = "/api/assistant/chat";
+
+export function AssistantChat({
+  tenantId,
+  height,
+  endpoint = DEFAULT_ENDPOINT,
+  title = "Assistant",
+  subtitle = "knows your emails, WhatsApp, clients & money",
+  emptyTitle = "Ask me anything about your business",
+  emptyBody = "I can read your inbox and WhatsApp, summarise what matters, check your income, and bundle invoices for download.",
+  suggestions = SUGGESTIONS,
+  placeholder = "Ask your assistant…  (Enter to send)",
+}: {
+  tenantId: number;
+  height?: string;
+  /**
+   * POST target for a chat turn. Defaults to the shared Dashboard assistant
+   * route, so omitting this prop leaves the Dashboard assistant's behaviour
+   * 100% unchanged. A scoped specialist (e.g. the Sales agent) passes its own
+   * `/api/agents/<key>/chat` here instead. The Approve flow always POSTs to
+   * `/api/assistant/execute` regardless of this prop — see `approve()` below,
+   * which this parameterisation does not touch.
+   */
+  endpoint?: string;
+  title?: string;
+  subtitle?: string;
+  emptyTitle?: string;
+  emptyBody?: string;
+  suggestions?: string[];
+  placeholder?: string;
+}) {
   // Per-account chat HISTORY in localStorage (survives browser close). Each entry
   // is a saved conversation; "New chat" opens a fresh one and keeps the old ones.
-  const storeKey = `cf_assistant_chats_v2_${tenantId}`;
+  // The default endpoint keeps the EXACT pre-existing key (so the Dashboard
+  // assistant's saved history is untouched); a non-default endpoint — a scoped
+  // specialist chat — gets its own bucket, otherwise it would silently share
+  // one history with the Dashboard assistant despite using different tools
+  // and a different system prompt.
+  const storeKey =
+    endpoint === DEFAULT_ENDPOINT
+      ? `cf_assistant_chats_v2_${tenantId}`
+      : `cf_assistant_chats_v2_${tenantId}_${endpoint.replace(/[^a-zA-Z0-9]+/g, "-")}`;
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string>("");
   const [input, setInput] = useState("");
@@ -179,7 +223,7 @@ export function AssistantChat({ tenantId, height }: { tenantId: number; height?:
       );
 
     try {
-      const res = await fetch("/api/assistant/chat", {
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: [...history, { role: "user", content: q }] }),
@@ -350,8 +394,8 @@ export function AssistantChat({ tenantId, height }: { tenantId: number; height?:
     >
       <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--hairline)", display: "flex", alignItems: "center", gap: 8 }}>
         <Sparkles size={16} strokeWidth={1.75} style={{ color: "var(--accent)" }} />
-        <strong style={{ fontSize: 14, color: "var(--text-primary)" }}>Assistant</strong>
-        <span style={{ fontSize: 12, color: "var(--text-tertiary)" }} className="ai-subtitle">knows your emails, WhatsApp, clients & money</span>
+        <strong style={{ fontSize: 14, color: "var(--text-primary)" }}>{title}</strong>
+        <span style={{ fontSize: 12, color: "var(--text-tertiary)" }} className="ai-subtitle">{subtitle}</span>
         <div style={{ marginLeft: "auto", display: "flex", gap: 2, position: "relative" }}>
           <Button variant="ghost" size="sm" onClick={() => setHistoryOpen((v) => !v)}>
             <History size={14} /> History{historyList.length ? ` (${historyList.length})` : ""}
@@ -425,13 +469,13 @@ export function AssistantChat({ tenantId, height }: { tenantId: number; height?:
           <div style={{ margin: "auto", textAlign: "center", maxWidth: 460 }}>
             <Sparkles size={26} strokeWidth={1.5} style={{ color: "var(--accent)", marginBottom: 10 }} />
             <div style={{ fontSize: 15, color: "var(--text-primary)", fontWeight: 600, marginBottom: 6 }}>
-              Ask me anything about your business
+              {emptyTitle}
             </div>
             <div style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 18, lineHeight: 1.5 }}>
-              I can read your inbox and WhatsApp, summarise what matters, check your income, and bundle invoices for download.
+              {emptyBody}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {SUGGESTIONS.map((s) => (
+              {suggestions.map((s) => (
                 <button
                   key={s}
                   onClick={() => send(s)}
@@ -476,7 +520,7 @@ export function AssistantChat({ tenantId, height }: { tenantId: number; height?:
             }
           }}
           rows={1}
-          placeholder="Ask your assistant…  (Enter to send)"
+          placeholder={placeholder}
           disabled={busy}
           style={{
             flex: 1,
