@@ -1,0 +1,94 @@
+// Run: npm test -- src/lib/db/agentsTable.test.ts
+//
+// Verifies Task 4 (agents registry table, tenant plane): opening a scratch
+// tenant DB runs ensureTenantTables() and creates the `agents` table + its
+// idx_agents_key index.
+import assert from "node:assert/strict";
+import type { Database as BetterSqlite3 } from "better-sqlite3";
+import Module from "node:module";
+import { createRequire } from "node:module";
+import fs from "node:fs";
+import path from "node:path";
+
+// lib/db/tenant.ts imports React's server-only `cache` at module load. Under
+// the runner's `--conditions=react-server`, npm's react "react-server" entry
+// point is a stub that THROWS on load (same issue + fix as
+// platform/analytics.test.ts). Shim `react` with an identity `cache` BEFORE
+// tenant.ts is required, so the real code path loads unchanged. Installed via
+// a dynamic require (below) rather than a static import, since a static
+// `import ... from "./tenant"` would be hoisted and evaluated before this
+// shim runs.
+type Loader = (request: string, ...rest: unknown[]) => unknown;
+const mod = Module as unknown as { _load: Loader };
+const realLoad = mod._load;
+mod._load = function (this: unknown, request: string, ...rest: unknown[]) {
+  if (request === "react") return { cache: (fn: unknown) => fn };
+  return realLoad.call(this, request, ...rest);
+};
+
+const requireLocal = createRequire(import.meta.url);
+
+// Wrapped in an async IIFE (not top-level await): this project's package.json
+// has no "type": "module", so tsx/esbuild compiles .ts files to CJS, where
+// top-level await is unsupported (same reasoning as apiKeys.test.ts).
+(async () => {
+  const { controlSqlite } =
+    requireLocal("./control") as typeof import("./control");
+  const { openTenantDb } =
+    requireLocal("./tenant") as typeof import("./tenant");
+
+  // ── scratch tenant (control row + a real tenant DB file, so
+  // ensureTenantTables() actually runs against it) ──
+  const slug = "agents-table-test";
+  const dbFile = `tenants/${slug}/${slug}.db`;
+  controlSqlite.prepare("DELETE FROM tenants WHERE slug = ?").run(slug);
+  const t = controlSqlite
+    .prepare(
+      "INSERT INTO tenants (slug, name, db_file, is_active) VALUES (?, ?, ?, 1) RETURNING id",
+    )
+    .get(slug, "Agents Table Test", dbFile) as { id: number };
+  const tid = t.id;
+
+  let sqlite: BetterSqlite3 | undefined;
+  const cleanup = () => {
+    try {
+      sqlite?.close();
+    } catch {
+      // best effort
+    }
+    controlSqlite.prepare("DELETE FROM tenants WHERE id = ?").run(tid);
+    try {
+      fs.rmSync(path.join(process.cwd(), "data", "tenants", slug), {
+        recursive: true,
+        force: true,
+      });
+    } catch {
+      // best effort
+    }
+  };
+
+  try {
+    // Opens (and creates) the scratch tenant DB — this runs
+    // ensureTenantTables() idempotently, same as any real tenant open.
+    const conn = openTenantDb(dbFile);
+    sqlite = conn.sqlite;
+
+    const table = sqlite
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='agents'",
+      )
+      .get();
+    assert.ok(table, "agents table exists");
+
+    const index = sqlite
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_agents_key'",
+      )
+      .get();
+    assert.ok(index, "idx_agents_key index exists");
+
+    console.log("agentsTable.test.ts: all assertions passed");
+  } finally {
+    cleanup();
+  }
+})();

@@ -1116,6 +1116,21 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     CREATE INDEX IF NOT EXISTS idx_sessions_client ON sessions(client_id);
     CREATE INDEX IF NOT EXISTS idx_packages_client ON packages(client_id);
     CREATE INDEX IF NOT EXISTS idx_payments_client ON payments(client_id);
+
+    -- ── Agentic OS: agent registry ──────────────────────────────────────────
+    -- One row per role-based agent this tenant can run. 'instructions' is a
+    -- tenant-editable custom layer over that agent's built-in system prompt;
+    -- 'status' gates whether it's actually invoked (later tasks wire this up).
+    CREATE TABLE IF NOT EXISTS agents (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      key           TEXT NOT NULL UNIQUE,     -- 'orchestrator'|'sales'|'seo'|'marketing'|'operations'|'finance'
+      name          TEXT NOT NULL,
+      status        TEXT NOT NULL DEFAULT 'dormant', -- 'active'|'dormant'
+      instructions  TEXT NOT NULL DEFAULT '',  -- tenant-editable custom layer
+      model         TEXT NOT NULL DEFAULT 'claude-sonnet-5',
+      updated_at    INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_agents_key ON agents(key);
   `);
 
   // Column-add migrations for older DBs. Each runs once; PRAGMA tells us if the

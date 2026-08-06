@@ -1860,3 +1860,19 @@ export const clientWorkoutPrograms = sqliteTable(
 
 export type ClientNutritionPlan = typeof clientNutritionPlans.$inferSelect;
 export type ClientWorkoutProgram = typeof clientWorkoutPrograms.$inferSelect;
+
+// ── Agentic OS: agent registry ────────────────────────────────────────────────
+// One row per role-based agent this tenant can run. `instructions` is a
+// tenant-editable custom layer over that agent's built-in system prompt;
+// `status` gates whether it's actually invoked (later tasks wire this up).
+export const agents = sqliteTable("agents", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  key: text("key").notNull().unique(),
+  name: text("name").notNull(),
+  status: text("status", { enum: ["active", "dormant"] }).notNull().default("dormant"),
+  instructions: text("instructions").notNull().default(""),
+  model: text("model").notNull().default("claude-sonnet-5"),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull().default(sql`(unixepoch() * 1000)`),
+});
+export type Agent = typeof agents.$inferSelect;
+export type NewAgent = typeof agents.$inferInsert;
