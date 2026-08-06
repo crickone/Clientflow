@@ -44,6 +44,15 @@ import {
 import { uploadFilesToDrive } from "@/lib/google/drive";
 import { saveDownload } from "@/lib/assistant/downloadStore";
 import { sendClientEmail } from "@/lib/clientEmail";
+import {
+  SALES_TOOLS,
+  draftLeadReplyTool,
+  getLeadHealthTool,
+  listLeadsTool,
+  logLeadTouchTool,
+  sendWhatsappTool,
+  setLeadStageTool,
+} from "@/lib/agents/tools.sales";
 
 export type ToolArtifact = { url: string; filename: string; label: string };
 export type ToolResult = { text: string; artifact?: ToolArtifact };
@@ -66,6 +75,9 @@ export const WRITE_TOOLS = new Set<string>([
   "update_client", "cancel_appointment", "reschedule_appointment", "cancel_class",
   "cancel_booking", "cancel_membership", "assign_package", "create_form",
   "upload_invoices_to_drive",
+  // Sales agent (Task 7): WhatsApp send + lead-mutating tools — never
+  // auto-execute; deferred to the Approve card like every other write above.
+  "send_whatsapp", "set_lead_stage", "log_lead_touch",
 ]);
 
 export function isWriteTool(name: string): boolean {
@@ -97,6 +109,9 @@ const WRITE_LABELS: Record<string, string> = {
   assign_package: "Assign package",
   create_form: "Create form",
   upload_invoices_to_drive: "Upload invoices to Google Drive",
+  send_whatsapp: "Send WhatsApp",
+  set_lead_stage: "Change lead stage",
+  log_lead_touch: "Log lead touch",
 };
 
 /** One-line, human-readable description of a pending write, for the Approve card. */
@@ -152,6 +167,12 @@ export function summarizeToolAction(name: string, input: Record<string, unknown>
       return `Add exercise “${v("name")}” to the library`;
     case "upload_invoices_to_drive":
       return "Upload the invoices to your Google Drive";
+    case "send_whatsapp":
+      return `Send a WhatsApp to ${who || `lead #${v("leadId") || "?"}`}${v("text") ? ` — “${v("text")}”` : ""}`;
+    case "set_lead_stage":
+      return `Move ${who || `lead #${v("leadId") || "?"}`} to "${v("stage") || "a new stage"}"`;
+    case "log_lead_touch":
+      return `Log a touch for ${who || `lead #${v("leadId") || "?"}`}`;
     default:
       return WRITE_LABELS[name] ?? name.replace(/_/g, " ");
   }
@@ -706,6 +727,9 @@ export const TOOLS: Anthropic.Tool[] = [
       required: ["type", "title"],
     },
   },
+
+  // ── Sales agent (Task 7): leads pipeline ────────────────────────────────
+  ...SALES_TOOLS,
 ];
 
 // ─── Executors ───────────────────────────────────────────────────────────────
@@ -783,6 +807,18 @@ export async function executeTool(
         return { text: assignPackage(ctx, input) };
       case "create_form":
         return { text: createForm(ctx, input) };
+      case "list_leads":
+        return listLeadsTool(ctx, input);
+      case "get_lead_health":
+        return getLeadHealthTool(ctx, input);
+      case "draft_lead_reply":
+        return await draftLeadReplyTool(ctx, input);
+      case "send_whatsapp":
+        return await sendWhatsappTool(ctx, input);
+      case "set_lead_stage":
+        return setLeadStageTool(ctx, input);
+      case "log_lead_touch":
+        return logLeadTouchTool(ctx, input);
       default:
         return { text: `Unknown tool: ${name}` };
     }
