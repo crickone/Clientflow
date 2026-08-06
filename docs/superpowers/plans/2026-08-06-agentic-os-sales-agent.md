@@ -18,6 +18,7 @@
 - **Injection defence:** all lead/message content returned to a model is wrapped with `fenceUntrusted()`.
 - **Locked context layers:** an agent's base playbook + safety rails are code-owned and can never be overridden by tenant-editable instructions.
 - **No new deploy mechanics:** ship via the team's existing `railway up` flow; verify on the **Inspire** tenant in prod (tenant_id 580) as the team already does.
+- **TEST CONVENTION (the repo has NO vitest/jest):** tests are plain `import assert from "node:assert/strict"` scripts wrapped in an **async IIFE** `(async () => { … })()` (no top-level await — CJS), run via `npm test -- src/…/x.test.ts` (custom runner `scripts/test.mjs`; exit-code = pass/fail). **DB-touching tests** create a **scratch tenant** via `controlSqlite.prepare("INSERT INTO tenants (slug,name,db_file,is_active) …")` with a unique slug (e.g. `'agents-test'`) and **CLEAN UP in a `finally`** (delete the rows + any scratch tenant DB file); use `getTenantDbById(scratchId)` for tenant-plane tables (point `db_file` at a real scratch path like `tenants/agents-test/test.db`). **Reference: `src/lib/apiKeys.test.ts`.** The vitest-style snippets in the tasks below are ILLUSTRATIVE of the assertions only — translate them to this convention.
 
 ---
 
