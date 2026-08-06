@@ -1,0 +1,804 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ClientFlow — Run and Grow Your Gym or Clinic</title>
+<meta name="description" content="One platform, one flat €200/month. CRM, scheduling, billing, a branded app, AI marketing and a real website — built and hosted in Ireland.">
+<meta name="theme-color" content="#0b0c0f">
+
+<!-- Critical, above-the-fold CSS (tokens + nav + hero shell) for instant first paint.
+     Full design system loads via assets/site.css as the first <body> element. -->
+<style>
+:root{
+  --bg:#0b0c0f;--bg-2:#0e0f13;--surface:#15161b;--surface-2:#1c1e25;--surface-3:#23252e;
+  --hair:rgba(255,255,255,.08);--hair-2:rgba(255,255,255,.15);
+  --text:#f2f3f6;--text-2:#a2abb8;--text-3:#8b94a1;
+  --accent:#ff6a32;--accent-2:#ff8a5c;--accent-soft:rgba(255,106,50,.14);--accent-line:rgba(255,106,50,.35);
+  --glow-soft:0 10px 40px -12px rgba(255,106,50,.35);
+  --font-display:'Space Grotesk',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  --font-body:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  --font-brand:'Nebula','Space Grotesk',system-ui,sans-serif;
+  --fs-display:clamp(2.6rem,6.5vw,5.25rem);--fs-lead:clamp(1.06rem,1.6vw,1.35rem);--fs-xs:.78rem;--fs-sm:.9rem;
+  --maxw:1180px;--nav-h:68px;--r-pill:999px;
+  --ease:cubic-bezier(0.2,0.8,0.2,1);--d:240ms;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:1.02rem;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:radial-gradient(60% 40% at 78% -5%,rgba(255,106,50,.10),transparent 60%),radial-gradient(50% 45% at 8% 8%,rgba(255,106,50,.05),transparent 55%),var(--bg)}
+h1{font-family:var(--font-display);font-weight:700;line-height:1.05;letter-spacing:-.02em;margin:0}
+a{color:inherit;text-decoration:none}
+.wrap{width:100%;max-width:var(--maxw);margin-inline:auto;padding-inline:clamp(1.1rem,4vw,2rem)}
+.nav{position:sticky;top:0;z-index:60;height:var(--nav-h);display:flex;align-items:center;border-bottom:1px solid transparent}
+.nav .wrap{display:flex;align-items:center;gap:1.5rem;width:100%}
+.brand{display:inline-flex;align-items:center;gap:.6em}
+.brand .mark{font-family:var(--font-brand);font-size:1.35rem;color:var(--text);line-height:1}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.55em;font-family:var(--font-display);font-weight:600;font-size:.98rem;padding:.82em 1.35em;border-radius:var(--r-pill);border:1px solid transparent;background:rgba(255,255,255,.05);color:var(--text)}
+.btn-primary{background:linear-gradient(180deg,var(--accent-2),var(--accent));color:#180a03;border-color:rgba(255,106,50,.5);box-shadow:var(--glow-soft)}
+.hero{position:relative;padding-top:clamp(2.5rem,6vw,4.5rem);padding-bottom:clamp(3rem,7vw,6rem);overflow:clip}
+.hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(1.5rem,4vw,3rem);align-items:center}
+.hero h1{font-size:var(--fs-display);letter-spacing:-.03em;margin-bottom:1.5rem;text-wrap:balance}
+.hero .lead{font-size:var(--fs-lead);color:var(--text-2);max-width:60ch;margin:0 0 2rem}
+.eyebrow{display:inline-flex;align-items:center;gap:.5em;font-family:var(--font-display);font-weight:500;font-size:var(--fs-xs);letter-spacing:.16em;text-transform:uppercase;color:var(--accent-2)}
+.g-accent{background:linear-gradient(100deg,var(--accent),var(--accent-2) 60%,#ffd0b8);-webkit-background-clip:text;background-clip:text;color:transparent}
+@media (max-width:940px){.hero-grid{grid-template-columns:1fr}}
+</style>
+
+<!-- Page-specific composition CSS (bento, calendar, payments table, price bars, badges) -->
+<style>
+.section-lead{color:var(--text-2);font-size:var(--fs-lead);max-width:60ch}
+.eyebrow.center-e{justify-content:center}
+.eyebrow.center-e::before{display:none}
+
+/* trust strip */
+.trust-strip{border-block:1px solid var(--hair);background:var(--bg-2)}
+.trust-strip .wrap{display:flex;flex-wrap:wrap;gap:.6rem 1.4rem;justify-content:center;align-items:center;padding-block:1rem}
+.trust-strip .t{display:inline-flex;align-items:center;gap:.55em;font-family:var(--font-display);font-weight:500;font-size:var(--fs-sm);color:var(--text-2)}
+.trust-strip .t b{color:var(--text)}
+.trust-strip .t .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+
+/* receipt reveal helper (staggered) */
+.receipt .r-line.rv,.receipt .r-total.rv{will-change:opacity,transform}
+
+/* pillar media order flip */
+@media (min-width:941px){.order-first{order:-1}}
+
+/* price-contrast chips */
+.vs-chips{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:var(--s5)}
+.vs-chip{display:inline-flex;align-items:center;gap:.5em;padding:.5em 1em;border-radius:var(--r-pill);font-family:var(--font-display);font-weight:600;font-size:var(--fs-sm);border:1px solid var(--hair-2);background:var(--surface-2);color:var(--text-2)}
+.vs-chip.win{background:var(--good-soft);border-color:rgba(62,207,142,.35);color:var(--good)}
+.vs-chip .lbl{font-weight:500;color:var(--text-3)}
+.vs-chip.win .lbl{color:var(--good)}
+
+/* app-store badges (CSS/SVG only) */
+.store-row{display:flex;flex-wrap:wrap;gap:.7rem;margin-top:var(--s5)}
+.store{display:inline-flex;align-items:center;gap:.6em;padding:.55em 1em;border-radius:12px;border:1px solid var(--hair-2);background:var(--surface-2);color:var(--text)}
+.store svg{width:20px;height:20px;flex:none;color:var(--text)}
+.store .s-col{display:flex;flex-direction:column;line-height:1.15}
+.store .s-sm{font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3)}
+.store .s-lg{font-family:var(--font-display);font-weight:600;font-size:.92rem}
+
+/* bento — run it all */
+.bento{display:grid;gap:clamp(1rem,2.2vw,1.4rem);grid-template-columns:repeat(3,1fr);
+  grid-template-areas:"visual visual crm" "sched bill report"}
+.bento .b-visual{grid-area:visual}
+.bento .b-crm{grid-area:crm}
+.bento .b-sched{grid-area:sched}
+.bento .b-bill{grid-area:bill}
+.bento .b-report{grid-area:report}
+.bento .b-visual{display:flex;align-items:center;justify-content:center;padding:clamp(1.2rem,2.5vw,2rem);background:linear-gradient(160deg,var(--surface-2),var(--surface))}
+@media (max-width:900px){.bento{grid-template-columns:1fr 1fr;grid-template-areas:"visual visual" "crm sched" "bill report"}}
+@media (max-width:560px){.bento{grid-template-columns:1fr;grid-template-areas:"visual" "crm" "sched" "bill" "report"}}
+
+/* booking-calendar mockup (pure CSS) */
+.cal{width:100%;max-width:420px;background:var(--bg-2);border:1px solid var(--hair-2);border-radius:14px;padding:14px;box-shadow:var(--shadow-2,0 30px 80px -40px rgba(0,0,0,.9))}
+.cal-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.cal-title{font-family:var(--font-display);font-weight:600;font-size:.95rem}
+.cal-nav{display:flex;gap:6px}
+.cal-nav i{width:22px;height:22px;border-radius:6px;background:var(--surface-2);border:1px solid var(--hair);display:block}
+.cal-dow,.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.cal-dow span{text-align:center;font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);font-family:var(--font-display)}
+.cal-grid{margin-top:6px}
+.cal-cell{aspect-ratio:1;border-radius:7px;background:var(--surface);border:1px solid var(--hair);display:flex;align-items:flex-start;justify-content:flex-end;padding:4px;font-size:.58rem;color:var(--text-3);font-family:var(--font-display);position:relative}
+.cal-cell.muted{opacity:.4}
+.cal-cell.slot{background:linear-gradient(180deg,var(--accent-soft),transparent);border-color:var(--accent-line);color:var(--accent-2)}
+.cal-cell.slot::before{content:"";position:absolute;left:4px;bottom:4px;width:12px;height:4px;border-radius:3px;background:linear-gradient(90deg,var(--accent),var(--accent-2))}
+.cal-cell.today{border-color:var(--hair-2);color:var(--text);box-shadow:0 0 0 1px var(--hair-2) inset}
+
+/* payments mini table */
+.mini-tbl{width:100%;border-collapse:collapse;font-size:var(--fs-sm)}
+.mini-tbl caption{caption-side:bottom;text-align:left;padding-top:.9rem;color:var(--text-3);font-size:var(--fs-xs)}
+.mini-tbl th,.mini-tbl td{padding:.8rem .95rem;text-align:left;border-bottom:1px solid var(--hair)}
+.mini-tbl thead th{font-family:var(--font-display);font-weight:600;color:var(--text);font-size:.82rem}
+.mini-tbl thead th.us{color:var(--accent-2)}
+.mini-tbl tbody th{font-weight:500;color:var(--text-2);font-family:var(--font-body)}
+.mini-tbl td.us{color:var(--text);font-weight:600}
+.mini-tbl td.them{color:var(--text-3)}
+.mini-tbl tr:last-child th,.mini-tbl tr:last-child td{border-bottom:none}
+
+/* pricing compare bars */
+.barcmp{display:grid;gap:1rem;margin-top:var(--s3)}
+.barcmp-row .bl{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.4rem;font-family:var(--font-display)}
+.barcmp-row .bl .name{font-weight:600;font-size:.95rem}
+.barcmp-row .bl .amt{font-weight:700;letter-spacing:-.02em}
+.barcmp-row .bl .amt.dimv{color:var(--text-3)}
+.bar{height:30px;border-radius:8px;background:var(--surface-3);overflow:hidden}
+.bar .fill{height:100%;border-radius:8px}
+.bar.us .fill{width:37%;background:linear-gradient(90deg,var(--accent),var(--accent-2))}
+.bar.them .fill{width:100%;background:repeating-linear-gradient(45deg,var(--surface-2),var(--surface-2) 8px,var(--surface-3) 8px,var(--surface-3) 16px)}
+.barcmp-note{margin-top:var(--s4);color:var(--text-3);font-size:var(--fs-xs)}
+
+/* AI studio panel */
+.studio{background:var(--surface);border:1px solid var(--hair-2);border-radius:16px;padding:16px;box-shadow:var(--shadow-2,0 30px 80px -40px rgba(0,0,0,.9))}
+.studio-top{display:flex;align-items:center;gap:.6rem;margin-bottom:12px}
+.studio-top .dotset{display:flex;gap:5px}
+.studio-top .dotset i{width:8px;height:8px;border-radius:50%;background:var(--surface-3)}
+.studio-top .dotset i:first-child{background:var(--accent)}
+.studio-prompt{display:flex;align-items:center;gap:.6rem;background:var(--bg-2);border:1px solid var(--hair);border-radius:10px;padding:.7rem .8rem;font-family:var(--font-display);font-size:.85rem;color:var(--text-2)}
+.studio-prompt .gen{margin-left:auto;flex:none;padding:.35em .8em;border-radius:999px;background:linear-gradient(180deg,var(--accent-2),var(--accent));color:#180a03;font-weight:700;font-size:.72rem}
+.studio-out{margin-top:12px;background:var(--bg-2);border:1px solid var(--hair);border-radius:10px;padding:.9rem}
+.studio-out .ln{height:9px;border-radius:5px;background:var(--surface-3);margin-bottom:8px}
+.studio-out .ln.t{height:12px;width:60%;background:linear-gradient(90deg,var(--accent),var(--accent-2))}
+.studio-out .ln.w90{width:90%}.studio-out .ln.w75{width:75%}.studio-out .ln.w80{width:80%}
+.studio-out .pubrow{display:flex;align-items:center;gap:.5rem;margin-top:10px}
+.studio-out .pub{padding:.3em .7em;border-radius:999px;background:var(--good-soft);color:var(--good);border:1px solid rgba(62,207,142,.35);font-family:var(--font-display);font-weight:600;font-size:.68rem}
+.studio-out .site{font-size:.7rem;color:var(--text-3);font-family:ui-monospace,Menlo,monospace}
+
+/* compare teaser cards */
+.cmp-card{display:flex;flex-direction:column;gap:.6rem;height:100%}
+.cmp-card .rival{font-family:var(--font-display);font-weight:700;font-size:1.15rem}
+.cmp-card p{color:var(--text-2);font-size:var(--fs-sm);flex:1}
+.cmp-card .link-arrow{margin-top:auto}
+
+/* founder split */
+.founder-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(1.5rem,3.5vw,3rem);align-items:center}
+@media (max-width:860px){.founder-grid{grid-template-columns:1fr}}
+.g-foot{margin-top:var(--s4);padding-top:var(--s4);border-top:1px solid var(--hair);color:var(--text-2);font-size:var(--fs-sm);display:inline-flex;align-items:center;gap:.5em}
+</style>
+</head>
+<body>
+<link rel="stylesheet" href="assets/site.css">
+<script>document.documentElement.classList.add('js')</script>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<!-- ============================================================ NAV -->
+<nav class="nav" aria-label="Primary">
+  <div class="wrap">
+    <a class="brand" href="/" aria-label="ClientFlow home">
+      <span class="mark">ClientFlow</span>
+      <span class="tag">Platform</span>
+    </a>
+    <button class="nav-toggle" aria-label="Menu" aria-expanded="false" aria-controls="nav-links">
+      <svg class="bars" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      <svg class="x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <div class="nav-links" id="nav-links">
+      <a href="/product">Product</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/gyms">For Gyms</a>
+      <a href="/wellness-clinics">For Clinics</a>
+      <a href="/compare">Compare</a>
+      <a href="/about">About</a>
+      <span class="nav-cta"><a class="btn btn-primary btn-sm" href="/book-a-demo">Book a demo</a></span>
+    </div>
+  </div>
+</nav>
+
+<main id="main">
+
+<!-- ============================================================ HERO -->
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <span class="eyebrow rv rv-fade">One platform · one bill · built in Ireland 🇮🇪</span>
+        <h1 class="rv rv-d1">Run your gym. <span class="g-accent">Grow your gym.</span> One flat price.</h1>
+        <p class="lead rv rv-d2">Booking, billing, a branded app and a real website. All included.</p>
+        <div class="btn-row rv rv-d3">
+          <a class="btn btn-primary btn-lg" href="/book-a-demo">Book a demo</a>
+          <a class="btn btn-line btn-lg" href="/pricing">See pricing</a>
+        </div>
+      </div>
+
+      <!-- HERO SCENE: pointer-tilt + scroll-assemble CSS-3D device trio -->
+      <div class="hero-scene rv rv-d2" aria-hidden="true">
+        <div class="scene-inner">
+          <svg class="scene-thread" viewBox="0 0 400 400" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="cf-thread" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#ff6a32" stop-opacity="0"/>
+                <stop offset=".5" stop-color="#ff8a5c"/>
+                <stop offset="1" stop-color="#ff6a32" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path d="M120 150 C 220 120, 300 160, 330 90"/>
+            <path d="M150 210 C 250 260, 320 240, 350 320"/>
+          </svg>
+
+          <!-- laptop = the gym's website -->
+          <div class="scene-obj scene-laptop float">
+            <div class="device laptop">
+              <div class="screen">
+                <div class="viewport">
+                  <div class="ui">
+                    <div class="ui-top"><span class="ui-dots"><i></i><i></i><i></i></span><span class="ui-bar soft ui-w40" style="height:6px"></span></div>
+                    <div class="ui-hero-img"></div>
+                    <div class="ui-row"><span class="ui-pill">Join now</span><span class="ui-bar soft ui-w30" style="align-self:center"></span></div>
+                    <div class="ui-row"><span class="ui-bar soft ui-w70"></span></div>
+                    <div class="ui-bar soft ui-w55"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="base"></div>
+            </div>
+          </div>
+
+          <!-- tablet/card = owner dashboard -->
+          <div class="scene-obj scene-dash float-2">
+            <div class="device slab">
+              <div class="screen">
+                <div class="viewport">
+                  <div class="ui">
+                    <div class="ui-row">
+                      <div class="ui-nav"><i class="on"></i><i></i><i></i><i></i></div>
+                      <div class="ui-col">
+                        <div class="ui-row">
+                          <div class="ui-card hi"><span class="ui-label">MRR</span><span class="ui-num">€14,280</span></div>
+                          <div class="ui-card"><span class="ui-label">Members</span><span class="ui-num">312</span></div>
+                        </div>
+                        <div class="ui-card"><span class="ui-label">This week</span><div class="ui-chart"><span></span><span class="a"></span><span></span><span class="a"></span><span></span><span class="a"></span><span></span></div></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- phone = branded client app -->
+          <div class="scene-obj scene-phone float">
+            <div class="device phone">
+              <div class="screen">
+                <div class="viewport">
+                  <div class="ui" style="gap:9px">
+                    <div class="ui-row" style="align-items:center;margin-top:14px"><span class="ui-avatar"></span><div class="ui-col" style="gap:4px"><span class="ui-bar soft ui-w70" style="height:6px"></span><span class="ui-bar soft ui-w40" style="height:5px"></span></div></div>
+                    <div class="ui-card hi"><span class="ui-chip">Booked</span><span class="ui-num" style="font-size:12px">Strength · 6:00pm</span></div>
+                    <div class="ui-card"><span class="ui-bar soft ui-w85"></span><span class="ui-bar soft ui-w55"></span></div>
+                    <div class="ui-pill" style="align-self:stretch;justify-content:center">Check in</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ============================================================ TRUST STRIP -->
+<section class="trust-strip" aria-label="Why ClientFlow">
+  <div class="wrap">
+    <span class="t"><span class="dot"></span><b>€200/month</b> flat</span>
+    <span class="t"><span class="dot"></span>No lock-in</span>
+    <span class="t"><span class="dot"></span>Website built for you</span>
+    <span class="t"><span class="dot"></span>Built in Ireland 🇮🇪</span>
+  </div>
+</section>
+
+<!-- ============================================================ ADD-ON TRAP / RECEIPT -->
+<section class="section section-t" id="add-on-trap">
+  <div class="wrap">
+    <div class="sec-head center rv">
+      <span class="eyebrow center-e">The add-on trap</span>
+      <h2>Your software bill has a hidden receipt.</h2>
+      <p>Most tools quote one price, then bolt on the rest.</p>
+    </div>
+
+    <div class="grid g-2 mt-7" style="align-items:center">
+      <!-- rival receipt -->
+      <div class="receipt rv rv-left">
+        <h3>Your "€99" Plan</h3>
+        <div class="r-sub">A rival · monthly · researched Jul 2026</div>
+        <div class="r-line rv" style="transition-delay:60ms"><span>Base subscription</span><span class="amt">from €99</span></div>
+        <div class="r-line add rv" style="transition-delay:120ms"><span>Branded app add-on</span><span class="amt">€99–349</span></div>
+        <div class="r-line add rv" style="transition-delay:180ms"><span>Website builder</span><span class="amt">extra</span></div>
+        <div class="r-line add rv" style="transition-delay:240ms"><span>CRM add-on</span><span class="amt">extra</span></div>
+        <div class="r-line add rv" style="transition-delay:300ms"><span>Payment markup + commission</span><span class="amt">+ fees</span></div>
+        <div class="r-total rv" style="transition-delay:380ms"><span>Their real total</span><span class="amt">€300–580</span></div>
+        <div class="r-stamp">Add-on creep</div>
+      </div>
+
+      <!-- our counter-receipt -->
+      <div class="receipt ours rv rv-right">
+        <h3>ClientFlow</h3>
+        <div class="r-sub">Everything · month-to-month</div>
+        <div class="r-line rv" style="transition-delay:60ms"><span>CRM + scheduling + billing</span><span class="amt">✓</span></div>
+        <div class="r-line rv" style="transition-delay:120ms"><span>Branded app + real website</span><span class="amt">✓</span></div>
+        <div class="r-line rv" style="transition-delay:180ms"><span>AI marketing studio</span><span class="amt">✓</span></div>
+        <div class="r-line rv" style="transition-delay:240ms"><span>Marketplace commission</span><span class="amt">€0</span></div>
+        <div class="r-total rv" style="transition-delay:320ms"><span>Everything, one bill</span><span class="amt">€200</span></div>
+        <div class="r-stamp">One bill, no games</div>
+      </div>
+    </div>
+
+    <p class="center muted mt-6 rv" style="font-family:var(--font-display);font-size:var(--fs-lead)">One price. Everything on. No surprises.</p>
+  </div>
+</section>
+
+<!-- ============================================================ PILLAR — WEBSITE -->
+<section class="section section-t" id="website">
+  <div class="wrap">
+    <div class="grid g-2" style="align-items:center">
+      <div class="rv rv-left">
+        <span class="eyebrow">The website</span>
+        <h2 class="mt-3">A real website. Not a booking widget.</h2>
+        <p class="section-lead mt-4">We design, build and host it. You own it.</p>
+        <p class="muted mt-4"><b style="color:var(--text)">25 of 37 rivals</b> give you widgets. We give you a site.</p>
+        <div class="btn-row mt-6">
+          <a class="btn btn-line" href="/product">See how it works</a>
+        </div>
+      </div>
+      <div class="rv rv-right order-first" aria-hidden="true">
+        <div class="device laptop">
+          <div class="screen">
+            <div class="viewport">
+              <div class="ui">
+                <div class="ui-top"><span class="ui-dots"><i></i><i></i><i></i></span><span class="ui-bar soft ui-w40" style="height:6px"></span></div>
+                <div class="ui-hero-img"></div>
+                <div class="ui-row"><span class="ui-pill">Join the gym</span><span class="ui-bar soft ui-w30" style="align-self:center"></span></div>
+                <div class="ui-row"><span class="ui-card" style="flex:1;padding:6px"><span class="ui-bar soft ui-w70"></span><span class="ui-bar soft ui-w40"></span></span><span class="ui-card" style="flex:1;padding:6px"><span class="ui-bar soft ui-w70"></span><span class="ui-bar soft ui-w55"></span></span></div>
+              </div>
+            </div>
+          </div>
+          <div class="base"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ PILLAR — BRANDED APP -->
+<section class="section section-t" id="branded-app">
+  <div class="wrap">
+    <div class="grid g-2" style="align-items:center">
+      <div class="rv rv-left">
+        <span class="eyebrow">Branded app</span>
+        <h2 class="mt-3">Your app in the app stores. Day one.</h2>
+        <p class="section-lead mt-4">Your name, your logo, on your members' phones.</p>
+        <div class="vs-chips">
+          <span class="vs-chip win"><span class="lbl">ClientFlow</span> €0 included</span>
+          <span class="vs-chip"><span class="lbl">Rivals</span> €99–€349/month add-on</span>
+        </div>
+        <p class="muted mt-5">TeamUp, Gymdesk, Mindbody all charge extra. We don't.</p>
+        <div class="store-row" aria-hidden="true">
+          <span class="store">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.05 12.04c-.03-2.6 2.13-3.85 2.22-3.91-1.21-1.77-3.09-2.02-3.76-2.05-1.6-.16-3.12.94-3.93.94-.81 0-2.06-.92-3.39-.9-1.74.03-3.35 1.01-4.25 2.57-1.81 3.14-.46 7.78 1.3 10.33.86 1.25 1.88 2.65 3.22 2.6 1.29-.05 1.78-.83 3.34-.83 1.56 0 2 .83 3.37.81 1.39-.03 2.27-1.27 3.12-2.53.98-1.45 1.39-2.85 1.41-2.92-.03-.01-2.7-1.04-2.73-4.13zM14.6 4.6c.71-.86 1.19-2.06 1.06-3.25-1.02.04-2.26.68-2.99 1.54-.66.76-1.23 1.98-1.08 3.15 1.14.09 2.3-.58 3.01-1.44z"/></svg>
+            <span class="s-col"><span class="s-sm">On the</span><span class="s-lg">App Store</span></span>
+          </span>
+          <span class="store">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 3l14 9-14 9z"/></svg>
+            <span class="s-col"><span class="s-sm">Get it on</span><span class="s-lg">Google Play</span></span>
+          </span>
+        </div>
+      </div>
+      <div class="rv rv-right order-first" aria-hidden="true" style="display:flex;justify-content:center">
+        <div class="device phone" style="max-width:230px">
+          <div class="screen">
+            <div class="viewport">
+              <div class="ui" style="gap:9px">
+                <div class="ui-row" style="align-items:center;margin-top:16px"><span class="ui-avatar"></span><div class="ui-col" style="gap:4px"><span class="ui-bar soft ui-w70" style="height:6px"></span><span class="ui-bar soft ui-w40" style="height:5px"></span></div></div>
+                <div class="ui-card hi"><span class="ui-chip">Booked</span><span class="ui-num" style="font-size:12px">Strength · 6:00pm</span></div>
+                <div class="ui-card"><span class="ui-bar soft ui-w85"></span><span class="ui-bar soft ui-w55"></span></div>
+                <div class="ui-card"><span class="ui-bar soft ui-w70"></span><span class="ui-bar soft ui-w40"></span></div>
+                <div class="ui-pill" style="align-self:stretch;justify-content:center">Check in</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ PILLAR — RUN IT ALL (bento) -->
+<section class="section section-t" id="run-it-all">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <span class="eyebrow">Run it all</span>
+      <h2>The boring stuff, handled beautifully.</h2>
+    </div>
+
+    <div class="bento mt-6">
+      <!-- big visual cell: booking calendar -->
+      <div class="card b-visual rv" aria-hidden="true">
+        <div class="cal">
+          <div class="cal-top">
+            <span class="cal-title">This week</span>
+            <span class="cal-nav"><i></i><i></i></span>
+          </div>
+          <div class="cal-dow"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+          <div class="cal-grid">
+            <div class="cal-cell slot">1</div>
+            <div class="cal-cell">2</div>
+            <div class="cal-cell slot">3</div>
+            <div class="cal-cell today">4</div>
+            <div class="cal-cell slot">5</div>
+            <div class="cal-cell">6</div>
+            <div class="cal-cell muted">7</div>
+            <div class="cal-cell slot">8</div>
+            <div class="cal-cell slot">9</div>
+            <div class="cal-cell">10</div>
+            <div class="cal-cell slot">11</div>
+            <div class="cal-cell">12</div>
+            <div class="cal-cell slot">13</div>
+            <div class="cal-cell muted">14</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CRM -->
+      <div class="card card-feature b-crm rv rv-d1">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13A4 4 0 0 1 16 11"/></svg></div>
+        <h3>CRM</h3>
+        <p class="muted">Every lead, member and note in one place.</p>
+      </div>
+
+      <!-- Scheduling -->
+      <div class="card card-feature b-sched rv rv-d2">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div>
+        <h3>Scheduling</h3>
+        <p class="muted">Classes, appointments and waitlists, booked in seconds.</p>
+      </div>
+
+      <!-- Billing -->
+      <div class="card card-feature b-bill rv rv-d3">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg></div>
+        <h3>Billing</h3>
+        <p class="muted">Memberships and packages bill themselves on time.</p>
+      </div>
+
+      <!-- Reporting -->
+      <div class="card card-feature b-report rv rv-d4">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></div>
+        <h3>Reporting</h3>
+        <p class="muted">Revenue, attendance and churn, at a glance.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ PAYMENTS STRIP -->
+<section class="section section-t" id="payments">
+  <div class="wrap">
+    <div class="grid g-2" style="align-items:center">
+      <div class="rv rv-left">
+        <span class="eyebrow">Payments</span>
+        <h2 class="mt-3">Payments that work for you, not on you.</h2>
+        <p class="section-lead mt-4">Rates around 40% below Stripe. No stacking.</p>
+        <p class="muted mt-4"><b style="color:var(--text)">No 20% commission</b> on your new clients. Ever.</p>
+        <div class="card card-2 mt-6" style="border-color:var(--accent-line)">
+          <p style="color:var(--text)">A new €600 client on a marketplace? They keep €120.
+            <span class="accent" style="font-family:var(--font-display);font-weight:600">You keep it here.</span></p>
+        </div>
+      </div>
+      <div class="rv rv-right">
+        <div class="card" style="padding:0;overflow:hidden">
+          <table class="mini-tbl">
+            <caption>Payments comparison · researched July 2026 · rival figures are researched estimates.</caption>
+            <thead>
+              <tr><th scope="col">What it costs you</th><th scope="col" class="us">ClientFlow</th><th scope="col">Typical rival</th></tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">Card processing rate</th><td class="us">~40% below Stripe</td><td class="them">Stripe rates</td></tr>
+              <tr><th scope="row">New-client commission</th><td class="us">€0 — ever</td><td class="them">up to 20%</td></tr>
+              <tr><th scope="row">Stacked processor markup</th><td class="us">None</td><td class="them">Yes</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ AI MARKETING STUDIO -->
+<section class="section section-t" id="ai-studio">
+  <div class="wrap">
+    <div class="grid g-2" style="align-items:center">
+      <div class="rv rv-left">
+        <span class="eyebrow">AI marketing studio</span>
+        <h2 class="mt-3">Marketing that publishes to a site you own.</h2>
+        <p class="section-lead mt-4">Draft posts, blogs and campaigns in minutes.</p>
+        <p class="muted mt-4">It fills your website — not someone else's platform.</p>
+        <div class="btn-row mt-6"><a class="btn btn-line" href="/product">See the studio</a></div>
+      </div>
+      <div class="rv rv-right order-first" aria-hidden="true">
+        <div class="studio">
+          <div class="studio-top"><span class="dotset"><i></i><i></i><i></i></span><span class="studio-title" style="font-family:var(--font-display);font-size:.82rem;color:var(--text-3)">Marketing studio</span></div>
+          <div class="studio-prompt"><span>Write a January "new year" offer post…</span><span class="gen">Generate</span></div>
+          <div class="studio-out">
+            <div class="ln t"></div>
+            <div class="ln w90"></div>
+            <div class="ln w75"></div>
+            <div class="ln w80"></div>
+            <div class="pubrow"><span class="pub">Published</span><span class="site">yourgym.ie/blog</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ PRICING TEASER -->
+<section class="section section-t" id="pricing-teaser">
+  <div class="wrap">
+    <div class="sec-head center rv">
+      <span class="eyebrow center-e">Pricing</span>
+      <h2>€200 a month. Everything. Month to month.</h2>
+      <p>No tiers. No add-on creep. No lock-in.</p>
+    </div>
+
+    <div class="grid g-2 mt-7" style="align-items:stretch">
+      <!-- €200 card -->
+      <div class="price-card rv rv-left">
+        <span class="badge">Everything included</span>
+        <div class="price-tag"><span class="amt">€200</span><span class="per">/month, flat</span></div>
+        <ul class="checks good mt-4">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> CRM, scheduling, memberships &amp; billing</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> Branded app + a real website, built for you</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> AI marketing studio + cheaper payments</li>
+        </ul>
+        <div class="btn-row mt-6"><a class="btn btn-primary btn-lg" href="/pricing">See what's included</a></div>
+      </div>
+
+      <!-- greyed typical-stack bar -->
+      <div class="card rv rv-right" style="display:flex;flex-direction:column;justify-content:center">
+        <span class="badge badge-neutral">The typical stack</span>
+        <div class="barcmp mt-4">
+          <div class="barcmp-row">
+            <div class="bl"><span class="name">ClientFlow</span><span class="amt accent">€200</span></div>
+            <div class="bar us"><span class="fill"></span></div>
+          </div>
+          <div class="barcmp-row">
+            <div class="bl"><span class="name" style="color:var(--text-3)">Rivals, all in</span><span class="amt dimv">€300–580</span></div>
+            <div class="bar them"><span class="fill"></span></div>
+          </div>
+        </div>
+        <p class="barcmp-note">Feature-parity monthly totals for rivals are researched estimates, July 2026.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ COMPARE TEASER -->
+<section class="section section-t" id="compare-teaser">
+  <div class="wrap">
+    <div class="sec-head center rv">
+      <span class="eyebrow center-e">Compare</span>
+      <h2>We did the homework on 37 competitors.</h2>
+      <p>Verified prices, honest gaps, no cherry-picking.</p>
+    </div>
+
+    <div class="grid g-3 mt-7">
+      <a class="card card-hover cmp-card rv rv-d1" href="/compare-mindbody-alternative">
+        <span class="rival">vs Mindbody</span>
+        <p>Powerful, but pricey — and no website product. See the numbers, side by side.</p>
+        <span class="link-arrow">See the comparison <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </a>
+      <a class="card card-hover cmp-card rv rv-d2" href="/compare-glofox-alternative">
+        <span class="rival">vs Glofox</span>
+        <p>Solid gym tool — but the app and CRM are add-ons, and there's no real website.</p>
+        <span class="link-arrow">See the comparison <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </a>
+      <a class="card card-hover cmp-card rv rv-d3" href="/compare-legitfit-alternative">
+        <span class="rival">vs LegitFit</span>
+        <p>Irish and well-loved — but no website, with the app and AI as paid extras.</p>
+        <span class="link-arrow">See the comparison <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </a>
+    </div>
+    <div class="center mt-6 rv"><a class="btn btn-line btn-lg" href="/compare">Compare us openly</a></div>
+  </div>
+</section>
+
+<!-- ============================================================ FOUNDER / TRUST + GUARANTEE -->
+<section class="section section-t" id="founder">
+  <div class="wrap">
+    <div class="founder-grid">
+      <div class="rv rv-left">
+        <span class="eyebrow">Built in Ireland 🇮🇪</span>
+        <h2 class="mt-3">Built in Ireland, by people who ran your business.</h2>
+        <p class="section-lead mt-4">We marketed gyms and clinics for years. Then built this.</p>
+        <p class="muted mt-4">Month to month. Free migration. Cancel anytime.</p>
+        <div class="btn-row mt-6"><a class="btn btn-line" href="/about">Our story</a></div>
+      </div>
+
+      <div class="guarantee rv rv-right">
+        <div class="seal">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2l7 3v6c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V5z"/><path d="M9 12l2 2 4-4"/></svg>
+        </div>
+        <div>
+          <h3>Our no-games promise.</h3>
+          <ul class="checks">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> Flat €200/month — published, not "contact sales."</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> Month-to-month — cancel anytime, no lock-in.</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> Free migration in, full export out — you own your data.</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> No commission on your new clients. Ever.</li>
+          </ul>
+          <p class="g-foot">Built and supported in Ireland 🇮🇪</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ FAQ -->
+<section class="section section-t" id="faq">
+  <div class="wrap narrow">
+    <div class="sec-head center rv">
+      <span class="eyebrow center-e">FAQ</span>
+      <h2>The questions everyone asks first.</h2>
+    </div>
+
+    <div class="faq mt-6 rv">
+      <details open>
+        <summary><span class="q">Is it really €200 flat?</span><span class="pm" aria-hidden="true"></span></summary>
+        <div class="a">Yes. One price, everything included. No tiers.</div>
+      </details>
+      <details>
+        <summary><span class="q">Are there contracts?</span><span class="pm" aria-hidden="true"></span></summary>
+        <div class="a">No. Month to month. Leave whenever you want.</div>
+      </details>
+      <details>
+        <summary><span class="q">Do I really get a website?</span><span class="pm" aria-hidden="true"></span></summary>
+        <div class="a">Yes. We design, build and host a real one.</div>
+      </details>
+      <details>
+        <summary><span class="q">What does the branded app cost?</span><span class="pm" aria-hidden="true"></span></summary>
+        <div class="a">Nothing extra. It's included from day one.</div>
+      </details>
+      <details>
+        <summary><span class="q">Will you move my data over?</span><span class="pm" aria-hidden="true"></span></summary>
+        <div class="a">Yes. Free migration from your current tool.</div>
+      </details>
+      <details>
+        <summary><span class="q">What are the payment fees?</span><span class="pm" aria-hidden="true"></span></summary>
+        <div class="a">Around 40% below Stripe. No marketplace commission.</div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ FINAL CTA BAND -->
+<section class="section-sm"><div class="wrap">
+  <div class="cta-band rv">
+    <span class="eyebrow center-e">See it live</span>
+    <h2>See it running. Twenty minutes. No pressure.</h2>
+    <p>A live demo with the people who built it.</p>
+    <div class="btn-row">
+      <a class="btn btn-primary btn-lg" href="/book-a-demo">Book a demo</a>
+      <a class="btn btn-line btn-lg" href="/pricing">See pricing</a>
+    </div>
+    <p class="cta-note">Built in Ireland · month-to-month · free migration</p>
+  </div>
+</div></section>
+
+</main>
+
+<!-- ============================================================ FOOTER -->
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <a class="brand" href="/" aria-label="ClientFlow home"><span class="mark">ClientFlow</span><span class="tag">Platform</span></a>
+        <p class="f-blurb">Run your gym or clinic — and grow it — from one place. €200/month, everything in.</p>
+      </div>
+      <nav aria-label="Product">
+        <h3>Product</h3>
+        <ul>
+          <li><a href="/product">Product overview</a></li>
+          <li><a href="/pricing">Pricing</a></li>
+          <li><a href="/gyms">For Gyms</a></li>
+          <li><a href="/wellness-clinics">For Clinics</a></li>
+          <li><a href="/book-a-demo">Book a demo</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Compare">
+        <h3>Compare</h3>
+        <ul>
+          <li><a href="/compare">Compare hub</a></li>
+          <li><a href="/compare-mindbody-alternative">vs Mindbody</a></li>
+          <li><a href="/compare-glofox-alternative">vs Glofox</a></li>
+          <li><a href="/compare-legitfit-alternative">vs LegitFit</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Company">
+        <h3>Company</h3>
+        <ul>
+          <li><a href="/about">About</a></li>
+          <li><a href="/blog">Blog</a></li>
+          <li><a href="/book-a-demo">Book a demo</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Legal">
+        <h3>Legal</h3>
+        <ul>
+          <li><a href="/privacy">Privacy Policy</a></li>
+          <li><a href="/terms">Terms of Service</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 ClientFlow. All rights reserved. · Prices ex-VAT. Comparison figures researched July 2026; estimates flagged.</span>
+      <span class="ie">Built in Ireland 🇮🇪</span>
+    </div>
+  </div>
+</footer>
+
+<!-- ============================================================ COOKIE BANNER -->
+<div class="cookie" role="dialog" aria-label="Cookie notice" aria-live="polite">
+  <p>We use a couple of cookies to keep the site working and see what's useful. Read our <a href="/privacy">Privacy Policy</a>.</p>
+  <button class="btn btn-primary btn-sm" data-cookie-accept>Grand, got it</button>
+</div>
+
+<!-- ============================================================ STRUCTURED DATA -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "ClientFlow",
+  "url": "https://clientflow.ie/",
+  "slogan": "Run your gym. Grow your gym. One flat price.",
+  "description": "All-in-one platform that runs and grows a gym or clinic: CRM, scheduling, billing, a branded app, AI marketing and a real website — one flat €200/month, built in Ireland.",
+  "foundingCountry": "IE",
+  "areaServed": ["IE", "GB"],
+  "knowsAbout": ["Gym management software", "Wellness clinic software", "Membership billing", "Branded fitness apps", "Website design"]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "ClientFlow",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Web, iOS, Android",
+  "description": "One platform for gyms and clinics: CRM, scheduling, memberships and billing, a branded app in the app stores, an AI marketing studio and a real website we design and host.",
+  "url": "https://clientflow.ie/",
+  "offers": {
+    "@type": "Offer",
+    "price": "200",
+    "priceCurrency": "EUR",
+    "priceSpecification": {
+      "@type": "UnitPriceSpecification",
+      "price": "200",
+      "priceCurrency": "EUR",
+      "referenceQuantity": {
+        "@type": "QuantitativeValue",
+        "value": "1",
+        "unitCode": "MON"
+      }
+    },
+    "availability": "https://schema.org/InStock"
+  }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type": "Question", "name": "Is it really €200 flat?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. One price, everything included. No tiers."}},
+    {"@type": "Question", "name": "Are there contracts?", "acceptedAnswer": {"@type": "Answer", "text": "No. Month to month. Leave whenever you want."}},
+    {"@type": "Question", "name": "Do I really get a website?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. We design, build and host a real one."}},
+    {"@type": "Question", "name": "What does the branded app cost?", "acceptedAnswer": {"@type": "Answer", "text": "Nothing extra. It's included from day one."}},
+    {"@type": "Question", "name": "Will you move my data over?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Free migration from your current tool."}},
+    {"@type": "Question", "name": "What are the payment fees?", "acceptedAnswer": {"@type": "Answer", "text": "Around 40% below Stripe. No marketplace commission."}}
+  ]
+}
+</script>
+
+<script src="assets/site.js" defer></script>
+</body>
+</html>

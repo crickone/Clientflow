@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ClientFlow — Canonical Partials (not imported)</title>
+<meta name="description" content="Copy-paste partials for ClientFlow page builders. Excluded from import.">
+<style>
+  /* mockup-partials.html is EXCLUDED from CMS import (filename starts with mockup-).
+     It exists so page-builder agents can copy canonical, class-correct markup.
+     Each partial is wrapped in <template> so it renders inert; copy the inner HTML. */
+  body{font-family:system-ui;background:#0b0c0f;color:#f2f3f6;margin:0;padding:2rem;line-height:1.6}
+  h2.doc{font-family:'Space Grotesk',system-ui;color:#ff8a5c;border-bottom:1px solid rgba(255,255,255,.12);
+    padding-bottom:.4rem;margin:2.4rem 0 1rem}
+  p.doc{color:#a2abb8;max-width:70ch}
+  pre{background:#15161b;border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:1rem 1.2rem;
+    overflow:auto;font-size:.82rem;line-height:1.6;color:#cfd6df}
+  code{font-family:ui-monospace,Menlo,monospace}
+  .note{color:#6c7480;font-size:.85rem}
+</style>
+</head>
+<body>
+
+<h1 style="font-family:'Space Grotesk',system-ui">ClientFlow — Canonical Partials</h1>
+<p class="doc">Reference markup for page builders. Copy the inner HTML of each <code>&lt;template&gt;</code>.
+Always: <code>&lt;link rel="stylesheet" href="assets/site.css"&gt;</code> as the FIRST element inside
+<code>&lt;body&gt;</code>, and <code>&lt;script src="assets/site.js" defer&gt;&lt;/script&gt;</code> as the LAST.</p>
+
+<!-- ======================================================= SKIP LINK -->
+<h2 class="doc">0 · Skip link (first focusable, right after site.css link)</h2>
+<template id="skip">
+<a class="skip" href="#main">Skip to content</a>
+</template>
+<pre><code>&lt;a class="skip" href="#main"&gt;Skip to content&lt;/a&gt;</code></pre>
+
+<!-- ======================================================= NAV -->
+<h2 class="doc">1 · Nav — <span class="note">&lt;nav class="nav"&gt; sticky, blur-on-scroll (site.js adds .stuck)</span></h2>
+<template id="nav">
+<nav class="nav" aria-label="Primary">
+  <div class="wrap">
+    <a class="brand" href="/" aria-label="ClientFlow home">
+      <span class="mark">ClientFlow</span>
+      <span class="tag">Platform</span>
+    </a>
+    <button class="nav-toggle" aria-label="Menu" aria-expanded="false" aria-controls="nav-links">
+      <svg class="bars" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      <svg class="x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <div class="nav-links" id="nav-links">
+      <a href="/product">Product</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/gyms">For Gyms</a>
+      <a href="/wellness-clinics">For Clinics</a>
+      <a href="/compare">Compare</a>
+      <a href="/about">About</a>
+      <span class="nav-cta"><a class="btn btn-primary btn-sm" href="/book-a-demo">Book a demo</a></span>
+    </div>
+  </div>
+</nav>
+</template>
+
+<!-- ======================================================= HERO + SCENE -->
+<h2 class="doc">2 · Hero + Hero Scene <span class="note">(H1 is LCP; scene is decorative)</span></h2>
+<template id="hero">
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <span class="eyebrow rv rv-fade">One platform · one bill · built in Ireland</span>
+        <h1 class="rv rv-d1">Everything your gym needs to <span class="g-accent">run and grow</span> — for €200 a month, flat.</h1>
+        <p class="lead rv rv-d2">CRM, scheduling, memberships, a branded app in the stores, an AI marketing studio and a real website we design and host. One price. Month-to-month. No lock-in.</p>
+        <div class="btn-row rv rv-d3">
+          <a class="btn btn-primary btn-lg" href="/book-a-demo">Book a demo</a>
+          <a class="btn btn-line btn-lg" href="/pricing">See pricing</a>
+        </div>
+        <div class="hero-proof rv rv-d4">
+          <span class="p muted"><b>€200</b>/mo, everything in</span>
+          <span class="p muted"><b>~40%</b> cheaper payments</span>
+          <span class="p muted"><b>0</b> lock-in, cancel anytime</span>
+        </div>
+      </div>
+
+      <!-- HERO SCENE: pointer-tilt + scroll-assemble CSS-3D device trio -->
+      <div class="hero-scene" aria-hidden="true">
+        <div class="scene-inner">
+          <!-- SVG light-threads connecting the devices -->
+          <svg class="scene-thread" viewBox="0 0 400 400" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="cf-thread" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#ff6a32" stop-opacity="0"/>
+                <stop offset=".5" stop-color="#ff8a5c"/>
+                <stop offset="1" stop-color="#ff6a32" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path d="M120 150 C 220 120, 300 160, 330 90"/>
+            <path d="M150 210 C 250 260, 320 240, 350 320"/>
+          </svg>
+
+          <!-- laptop = the gym's website -->
+          <div class="scene-obj scene-laptop float">
+            <div class="device laptop">
+              <div class="screen">
+                <div class="viewport">
+                  <div class="ui">
+                    <div class="ui-top"><span class="ui-dots"><i></i><i></i><i></i></span><span class="ui-bar soft ui-w40" style="height:6px"></span></div>
+                    <div class="ui-hero-img"></div>
+                    <div class="ui-row"><span class="ui-pill">Join now</span><span class="ui-bar soft ui-w30" style="align-self:center"></span></div>
+                    <div class="ui-row"><span class="ui-bar soft ui-w70"></span></div>
+                    <div class="ui-bar soft ui-w55"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="base"></div>
+            </div>
+          </div>
+
+          <!-- tablet/card = owner dashboard -->
+          <div class="scene-obj scene-dash float-2">
+            <div class="device slab">
+              <div class="screen">
+                <div class="viewport">
+                  <div class="ui">
+                    <div class="ui-row">
+                      <div class="ui-nav"><i class="on"></i><i></i><i></i><i></i></div>
+                      <div class="ui-col">
+                        <div class="ui-row">
+                          <div class="ui-card hi"><span class="ui-label">MRR</span><span class="ui-num">€14,280</span></div>
+                          <div class="ui-card"><span class="ui-label">Members</span><span class="ui-num">312</span></div>
+                        </div>
+                        <div class="ui-card"><span class="ui-label">This week</span><div class="ui-chart"><span></span><span class="a"></span><span></span><span class="a"></span><span></span><span class="a"></span><span></span></div></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- phone = branded client app -->
+          <div class="scene-obj scene-phone float">
+            <div class="device phone">
+              <div class="screen">
+                <div class="viewport">
+                  <div class="ui" style="gap:9px">
+                    <div class="ui-row" style="align-items:center;margin-top:14px"><span class="ui-avatar"></span><div class="ui-col" style="gap:4px"><span class="ui-bar soft ui-w70" style="height:6px"></span><span class="ui-bar soft ui-w40" style="height:5px"></span></div></div>
+                    <div class="ui-card hi"><span class="ui-chip">Booked</span><span class="ui-num" style="font-size:12px">Strength · 6:00pm</span></div>
+                    <div class="ui-card"><span class="ui-bar soft ui-w85"></span><span class="ui-bar soft ui-w55"></span></div>
+                    <div class="ui-pill" style="align-self:stretch;justify-content:center">Check in</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+</template>
+
+<!-- ======================================================= DEVICE TRIO (standalone) -->
+<h2 class="doc">3 · Device-frame trio (standalone, e.g. product page)</h2>
+<template id="devices">
+<div class="grid g-3">
+  <div class="device laptop"><div class="screen"><div class="viewport"><div class="ui"><div class="ui-top"><span class="ui-dots"><i></i><i></i><i></i></span></div><div class="ui-hero-img"></div><div class="ui-bar soft ui-w70"></div></div></div></div><div class="base"></div></div>
+  <div class="device slab"><div class="screen"><div class="viewport"><div class="ui"><div class="ui-card hi"><span class="ui-label">MRR</span><span class="ui-num">€14,280</span></div></div></div></div></div>
+  <div class="device phone" style="max-width:190px;margin-inline:auto"><div class="screen"><div class="viewport"><div class="ui" style="margin-top:14px"><div class="ui-card hi"><span class="ui-chip">Booked</span></div></div></div></div></div>
+</div>
+</template>
+
+<!-- ======================================================= COMPARISON TABLE -->
+<h2 class="doc">4 · Comparison table <span class="note">(scrolls x on mobile; date-stamp the caption)</span></h2>
+<template id="cmp">
+<div class="cmp-wrap">
+  <table class="cmp">
+    <caption>Feature-parity comparison · figures researched July 2026 · ~ = researched estimate, others verified from public pricing.</caption>
+    <thead>
+      <tr>
+        <th scope="col">What you get</th>
+        <th scope="col" class="us">ClientFlow</th>
+        <th scope="col">Mindbody</th>
+        <th scope="col">Glofox</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><th scope="row">Website built &amp; hosted</th><td class="us"><span class="tick">✓</span> Included</td><td><span class="cross">✕</span> None</td><td><span class="cross">✕</span> Widgets only</td></tr>
+      <tr><th scope="row">Branded app in the stores</th><td class="us"><span class="tick">✓</span> Day one</td><td><span class="est">$249–299/mo</span></td><td><span class="est">Add-on</span></td></tr>
+      <tr><th scope="row">Published flat price</th><td class="us"><span class="tick">✓</span> €200/mo</td><td>$79 <span class="est">to $259–699</span></td><td>$99 <span class="est">then opaque</span></td></tr>
+      <tr><th scope="row">Marketplace commission</th><td class="us"><span class="tick">✓</span> None</td><td>20% new-client</td><td>—</td></tr>
+      <tr><th scope="row">Month-to-month, no lock-in</th><td class="us"><span class="tick">✓</span></td><td><span class="cross">✕</span></td><td><span class="cross">✕</span></td></tr>
+    </tbody>
+  </table>
+</div>
+<div class="cmp-legend">
+  <span><span class="tick">✓</span> Included</span>
+  <span><span class="cross">✕</span> Not offered</span>
+  <span><span class="est">~</span> Researched estimate (Jul 2026)</span>
+</div>
+</template>
+
+<!-- ======================================================= RECEIPT (add-on trap) -->
+<h2 class="doc">5 · Receipt component <span class="note">(the "real bill" vs .receipt.ours)</span></h2>
+<template id="receipt">
+<div class="grid g-2" style="align-items:center">
+  <div class="receipt">
+    <h4>Your "$79" Plan</h4>
+    <div class="r-sub">Competitor · monthly · researched Jul 2026</div>
+    <div class="r-line"><span>Base subscription</span><span class="amt">€99</span></div>
+    <div class="r-line add"><span>Branded app add-on</span><span class="amt">€249</span></div>
+    <div class="r-line add"><span>CRM / automation tier</span><span class="amt">€80</span></div>
+    <div class="r-line add"><span>Website (not offered)</span><span class="amt">€150</span></div>
+    <div class="r-line add"><span>20% new-client commission</span><span class="amt">€90</span></div>
+    <div class="r-total"><span>Real monthly</span><span class="amt">€668</span></div>
+    <div class="r-stamp">Add-on creep</div>
+  </div>
+  <div class="receipt ours">
+    <h4>ClientFlow</h4>
+    <div class="r-sub">Everything · month-to-month</div>
+    <div class="r-line"><span>CRM + scheduling + billing</span><span class="amt">✓</span></div>
+    <div class="r-line"><span>Branded app + website</span><span class="amt">✓</span></div>
+    <div class="r-line"><span>AI marketing studio</span><span class="amt">✓</span></div>
+    <div class="r-line"><span>Marketplace commission</span><span class="amt">€0</span></div>
+    <div class="r-total"><span>Flat monthly</span><span class="amt">€200</span></div>
+    <div class="r-stamp">One bill, no games</div>
+  </div>
+</div>
+</template>
+
+<!-- ======================================================= GUARANTEE CARD -->
+<h2 class="doc">6 · Guarantee card</h2>
+<template id="guarantee">
+<div class="guarantee">
+  <div class="seal">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2l7 3v6c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V5z"/><path d="M9 12l2 2 4-4"/></svg>
+  </div>
+  <div>
+    <h3>Our month-to-month promise</h3>
+    <p>No contracts, no lock-in, no surprise hikes. If we ever raise your price, you're free to walk — same day.</p>
+    <ul class="checks">
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> Free migration from your current tool</li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> Cancel any time, keep your data</li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> One flat price, published on this page</li>
+    </ul>
+  </div>
+</div>
+</template>
+
+<!-- ======================================================= FAQ -->
+<h2 class="doc">7 · FAQ accordion <span class="note">(single-open via site.js; native details fallback)</span></h2>
+<template id="faq">
+<div class="faq">
+  <details open>
+    <summary><span class="q">Is €200 really the whole price?</span><span class="pm" aria-hidden="true"></span></summary>
+    <div class="a">Yes. €200/month, flat, month-to-month. CRM, scheduling, memberships and billing, your branded app, the AI marketing studio and a real website we design and host — all in. No add-on tiers, no per-seat creep.</div>
+  </details>
+  <details>
+    <summary><span class="q">What about payment fees?</span><span class="pm" aria-hidden="true"></span></summary>
+    <div class="a">Embedded payments run about 40% below Stripe's headline rate, with zero marketplace commission — we never take a cut of your new clients.</div>
+  </details>
+  <details>
+    <summary><span class="q">Can I leave whenever I want?</span><span class="pm" aria-hidden="true"></span></summary>
+    <div class="a">Any time. It's month-to-month with no lock-in, and you keep your data and your website domain.</div>
+  </details>
+</div>
+</template>
+
+<!-- ======================================================= CTA BAND -->
+<h2 class="doc">8 · CTA band</h2>
+<template id="cta">
+<section class="section-sm"><div class="wrap">
+  <div class="cta-band rv">
+    <span class="eyebrow center-e">See it on your own gym</span>
+    <h2>Let's put your gym on the platform.</h2>
+    <p>A 20-minute demo on your real numbers. No slides, no pressure — just your website, your app and your dashboard, live.</p>
+    <div class="btn-row">
+      <a class="btn btn-primary btn-lg" href="/book-a-demo">Book a demo</a>
+      <a class="btn btn-line btn-lg" href="/pricing">See pricing</a>
+    </div>
+    <p class="cta-note">Built in Ireland · month-to-month · free migration</p>
+  </div>
+</div></section>
+</template>
+
+<!-- ======================================================= COOKIE BANNER -->
+<h2 class="doc">9 · Cookie consent <span class="note">(site.js toggles .show; localStorage cf_cookie_ok)</span></h2>
+<template id="cookie">
+<div class="cookie" role="dialog" aria-label="Cookie notice" aria-live="polite">
+  <p>We use a couple of cookies to keep the site working and see what's useful. See our <a href="/privacy">privacy policy</a>.</p>
+  <button class="btn btn-primary btn-sm" data-cookie-accept>Grand, got it</button>
+</div>
+</template>
+
+<!-- ======================================================= FOOTER -->
+<h2 class="doc">10 · Footer <span class="note">(4 link columns + brand + Built in Ireland)</span></h2>
+<template id="footer">
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <a class="brand" href="/" aria-label="ClientFlow home"><span class="mark">ClientFlow</span><span class="tag">Platform</span></a>
+        <p class="f-blurb">Run your gym or clinic — and grow it — from one place. €200/month, everything in.</p>
+      </div>
+      <nav aria-label="Product">
+        <h3>Product</h3>
+        <ul>
+          <li><a href="/product">Product tour</a></li>
+          <li><a href="/pricing">Pricing</a></li>
+          <li><a href="/gyms">For gyms</a></li>
+          <li><a href="/wellness-clinics">For clinics</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Compare">
+        <h3>Compare</h3>
+        <ul>
+          <li><a href="/compare">All comparisons</a></li>
+          <li><a href="/compare-mindbody-alternative">vs Mindbody</a></li>
+          <li><a href="/compare-glofox-alternative">vs Glofox</a></li>
+          <li><a href="/compare-legitfit-alternative">vs LegitFit</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Company">
+        <h3>Company</h3>
+        <ul>
+          <li><a href="/about">About</a></li>
+          <li><a href="/blog">Blog</a></li>
+          <li><a href="/book-a-demo">Book a demo</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Legal">
+        <h3>Legal</h3>
+        <ul>
+          <li><a href="/privacy">Privacy</a></li>
+          <li><a href="/terms">Terms</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="footer-bottom">
+      <span>© ClientFlow 2026</span>
+      <span class="ie">Built in Ireland 🇮🇪</span>
+    </div>
+  </div>
+</footer>
+</template>
+
+<p class="doc" style="margin-top:3rem">See <code>mockup-styleguide.html</code> for all of these rendered live against <code>assets/site.css</code>.</p>
+
+</body>
+</html>

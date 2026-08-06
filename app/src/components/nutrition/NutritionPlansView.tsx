@@ -19,7 +19,9 @@ import {
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
+import { Reveal, RevealGroup } from "@/components/motion/Reveal";
 import { Input } from "@/components/ui/Input";
 import { PLAN_TYPE_LABEL, type MacroMode, type Macros, type PlanStatus, type PlanType } from "@/lib/nutritionModel";
 import {
@@ -123,6 +125,7 @@ export function NutritionPlansView({ plans }: { plans: PlanRow[] }) {
 }
 
 function PlanRowItem({ plan, onGo }: { plan: PlanRow; onGo: () => void }) {
+  const confirm = useConfirm();
   const router = useRouter();
   const [pending, start] = useTransition();
   const dt = fmtDate(plan.updatedAt);
@@ -143,7 +146,7 @@ function PlanRowItem({ plan, onGo }: { plan: PlanRow; onGo: () => void }) {
     });
   const remove = () =>
     start(async () => {
-      if (!confirm(`Delete "${plan.title}"? This cannot be undone.`)) return;
+      if (!(await confirm({ title: `Delete "${plan.title}"?`, body: "This cannot be undone.", destructive: true }))) return;
       await deletePlanAction(plan.id);
       toast.success("Plan deleted.");
       router.refresh();
@@ -362,44 +365,54 @@ function CreateTypeDialog({ open, onClose }: { open: boolean; onClose: () => voi
         width={700}
       >
         {step === "type" ? (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 14 }}>
-            <TypeCard
-              icon={<UtensilsCrossed size={22} />}
-              title="Full Meal Plan"
-              desc="Days, meals and foods with per-food macros."
-              cta="Create Full Plan"
-              onClick={() => go("type=full")}
-            />
-            <TypeCard
-              icon={<ListChecks size={22} />}
-              title="Macro Only Plan"
-              desc="Set protein / carbs / fat / calories targets."
-              cta="Create Macro Plan"
-              onClick={() => setStep("macro")}
-            />
-            <TypeCard
-              icon={<FileUp size={22} />}
-              title="Upload Plan"
-              desc="Attach an existing PDF or Excel document."
-              cta="Upload"
-              onClick={() => go("type=upload")}
-            />
-          </div>
+          <RevealGroup style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 14 }}>
+            <Reveal key="full">
+              <TypeCard
+                icon={<UtensilsCrossed size={22} />}
+                title="Full Meal Plan"
+                desc="Days, meals and foods with per-food macros."
+                cta="Create Full Plan"
+                onClick={() => go("type=full")}
+              />
+            </Reveal>
+            <Reveal key="macro">
+              <TypeCard
+                icon={<ListChecks size={22} />}
+                title="Macro Only Plan"
+                desc="Set protein / carbs / fat / calories targets."
+                cta="Create Macro Plan"
+                onClick={() => setStep("macro")}
+              />
+            </Reveal>
+            <Reveal key="upload">
+              <TypeCard
+                icon={<FileUp size={22} />}
+                title="Upload Plan"
+                desc="Attach an existing PDF or Excel document."
+                cta="Upload"
+                onClick={() => go("type=upload")}
+              />
+            </Reveal>
+          </RevealGroup>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 }}>
-            <TypeCard
-              title="Total For Day"
-              desc="One set of macro totals for the whole day."
-              cta="Total For Day"
-              onClick={() => go("type=macro&mode=daily")}
-            />
-            <TypeCard
-              title="Each Meal"
-              desc="Macro targets per meal, summed into the day."
-              cta="Each Meal"
-              onClick={() => go("type=macro&mode=per_meal")}
-            />
-          </div>
+          <RevealGroup style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 }}>
+            <Reveal key="daily">
+              <TypeCard
+                title="Total For Day"
+                desc="One set of macro totals for the whole day."
+                cta="Total For Day"
+                onClick={() => go("type=macro&mode=daily")}
+              />
+            </Reveal>
+            <Reveal key="per-meal">
+              <TypeCard
+                title="Each Meal"
+                desc="Macro targets per meal, summed into the day."
+                cta="Each Meal"
+                onClick={() => go("type=macro&mode=per_meal")}
+              />
+            </Reveal>
+          </RevealGroup>
         )}
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>
           <Button variant="ghost" onClick={step === "macro" ? () => setStep("type") : onClose}>

@@ -3,6 +3,7 @@ import "server-only";
 import { asc, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
+import { getTenantDbById } from "@/lib/db/tenant";
 import { exerciseLibrary } from "@/lib/db/schema";
 
 export interface ExerciseLibInput {
@@ -71,4 +72,41 @@ export function saveExercise(input: ExerciseLibInput): number {
 
 export function deleteExercise(id: number) {
   db.delete(exerciseLibrary).where(eq(exerciseLibrary.id, id)).run();
+}
+
+/** Set just the video URL for one exercise (used by the bulk auto-find). */
+export function setExerciseVideoUrl(id: number, url: string): void {
+  db.update(exerciseLibrary)
+    .set({ videoUrl: url, updatedAt: new Date() })
+    .where(eq(exerciseLibrary.id, id))
+    .run();
+}
+
+// ── Tenant-explicit variants (for background jobs with no request scope) ──────
+
+export function listExercisesForTenant(tenantId: number): ExerciseLibRow[] {
+  const tdb = getTenantDbById(tenantId);
+  return tdb
+    .select()
+    .from(exerciseLibrary)
+    .orderBy(asc(exerciseLibrary.id))
+    .all()
+    .map((e) => ({
+      id: e.id,
+      name: e.name,
+      category: e.category,
+      muscleGroups: parse(e.muscleGroups),
+      equipment: e.equipment,
+      videoUrl: e.videoUrl,
+      imageUrl: e.imageUrl,
+      instructions: e.instructions,
+    }));
+}
+
+export function setExerciseVideoUrlForTenant(tenantId: number, id: number, url: string): void {
+  const tdb = getTenantDbById(tenantId);
+  tdb.update(exerciseLibrary)
+    .set({ videoUrl: url, updatedAt: new Date() })
+    .where(eq(exerciseLibrary.id, id))
+    .run();
 }

@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 import type { Lead, LeadMessage } from "@/lib/db/schema";
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Card, CardLabel } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Textarea } from "@/components/ui/Input";
@@ -40,6 +41,7 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages }: Pro
   const [messages, setMessages] = useState(initialMessages);
   const [drafting, setDrafting] = useState(false);
   const [pending, start] = useTransition();
+  const confirm = useConfirm();
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
   const [replyOpen, setReplyOpen] = useState(false);
@@ -182,8 +184,8 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages }: Pro
     });
   }
 
-  function remove() {
-    if (!confirm(`Delete lead "${fullName}"? This cannot be undone.`)) return;
+  async function remove() {
+    if (!(await confirm({ title: `Delete lead "${fullName}"?`, body: "This cannot be undone.", destructive: true }))) return;
     start(async () => {
       await deleteLeadAction(lead.id);
     });

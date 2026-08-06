@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { ProgressRing } from "@/components/training/ProgressRing";
 import { useProgress } from "@/lib/training/progress";
 
@@ -35,6 +36,7 @@ interface Props {
 
 export function OverviewClient({ lessons, totalFlashcards, totalRoleplays }: Props) {
   const { progress, hydrated, reset } = useProgress();
+  const confirm = useConfirm();
 
   const stats = useMemo(() => {
     const moduleEntries = Object.values(progress.modules);
@@ -90,7 +92,7 @@ export function OverviewClient({ lessons, totalFlashcards, totalRoleplays }: Pro
               Quiz: {stats.totalQuizScore}/{stats.totalQuizMax} {stats.totalQuizMax > 0 && `(${Math.round((stats.totalQuizScore / stats.totalQuizMax) * 100)}%)`}
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => { if (confirm("Reset all training progress?")) reset(); }}>
+          <Button variant="ghost" size="sm" onClick={async () => { if (await confirm({ title: "Reset all training progress?", destructive: true, confirmLabel: "Reset" })) reset(); }}>
             Reset progress
           </Button>
         </div>

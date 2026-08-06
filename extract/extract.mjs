@@ -15,6 +15,17 @@ const SRC = path.join(ROOT, "OHR_HBOT_Ad_Library_Full_Report.html");
 const OUT = path.join(ROOT, "app", "public", "data");
 fs.mkdirSync(OUT, { recursive: true });
 
+// The source report is an optional, one-off input. Its extracted output
+// (app/public/data/*.json) is committed to the repo, so when the source HTML
+// isn't present (e.g. a deploy build context that doesn't include it) we skip
+// regeneration and keep the committed output rather than failing the build.
+if (!fs.existsSync(SRC)) {
+  console.warn(
+    `[extract] source report not found at ${SRC} — skipping extraction; using committed output in ${OUT}.`,
+  );
+  process.exit(0);
+}
+
 const html = fs.readFileSync(SRC, "utf8");
 
 /** Find the inner HTML of the first <div> matching the open-tag regex. */

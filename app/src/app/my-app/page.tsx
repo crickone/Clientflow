@@ -17,27 +17,10 @@ export default async function MyAppPage() {
         subtitle="A branded mobile app where your clients see their dashboard, book classes, and track attendance, nutrition & workouts. It uses your theme and logo, and updates live from this dashboard."
       />
 
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(280px, 340px) 1fr", gap: 28, alignItems: "start" }}>
-        {/* phone preview */}
-        <div style={{ display: "flex", justifyContent: "center" }}>
-          <div
-            style={{
-              width: 320,
-              height: 660,
-              borderRadius: 40,
-              border: "10px solid #0b0b0d",
-              boxShadow: "0 24px 60px -24px rgba(0,0,0,0.6)",
-              overflow: "hidden",
-              background: "var(--bg)",
-            }}
-          >
-            <iframe src="/app/login" title="Client app preview" style={{ width: "100%", height: "100%", border: "none" }} />
-          </div>
-        </div>
-
-        {/* info */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <Card style={{ padding: 22 }}>
+      <div className="myapp-grid">
+        {/* Open app + phone preview */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+          <Card style={{ padding: 22, width: "100%" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
               <Smartphone size={20} style={{ color: "var(--accent-ink)" }} />
               <div style={{ fontSize: 16, fontWeight: 600, color: "var(--text-primary)" }}>Open the client app</div>
@@ -51,7 +34,24 @@ export default async function MyAppPage() {
               </Button>
             </a>
           </Card>
+          <div
+            style={{
+              width: "min(320px, 86vw)",
+              aspectRatio: "320 / 660",
+              boxSizing: "border-box",
+              borderRadius: 40,
+              border: "10px solid #0b0b0d",
+              boxShadow: "0 24px 60px -24px rgba(0,0,0,0.6)",
+              overflow: "hidden",
+              background: "var(--bg)",
+            }}
+          >
+            <iframe src="/app/login" title="Client app preview" style={{ width: "100%", height: "100%", border: "none" }} />
+          </div>
+        </div>
 
+        {/* info */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <Card style={{ padding: 22 }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", marginBottom: 10 }}>What clients can do</div>
             <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.9 }}>

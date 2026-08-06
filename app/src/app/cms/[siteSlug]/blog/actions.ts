@@ -58,6 +58,7 @@ export async function savePostAction(
   formData: FormData,
 ): Promise<{ ok: boolean; error?: string }> {
   const site = await siteOrThrow(siteSlug);
+  const cover = String(formData.get("coverImageUrl") ?? "").trim();
   updateBlogMeta(site.id, postId, {
     title: String(formData.get("title") ?? "").trim() || undefined,
     slug: String(formData.get("slug") ?? "").trim() || undefined,
@@ -65,6 +66,9 @@ export async function savePostAction(
     seoTitle: String(formData.get("seoTitle") ?? "").trim() || null,
     seoDescription: String(formData.get("seoDescription") ?? "").trim() || null,
     content: String(formData.get("content") ?? ""),
+    coverImageUrl: cover || null,
+    coverAspect: cover ? String(formData.get("coverAspect") ?? "").trim() || null : null,
+    coverPosition: cover ? String(formData.get("coverPosition") ?? "").trim() || null : null,
   });
   revalidatePath(`/cms/${siteSlug}/blog/${postId}`);
   revalidatePath(`/cms/${siteSlug}/blog`);

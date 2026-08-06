@@ -6,6 +6,8 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { authDb } from "@/lib/db/control";
 import { memberships, users } from "@/lib/db/schema";
 import { getCurrentMembership, requireAdminPage } from "@/lib/auth";
+import { listPendingInviteEmails } from "@/lib/invites";
+import { isEmailConfigured } from "@/lib/email";
 import { UsersManager } from "@/components/settings/UsersManager";
 
 export const dynamic = "force-dynamic";
@@ -35,10 +37,14 @@ export default async function UsersPage() {
     .orderBy(desc(memberships.createdAt))
     .all();
 
+  const pendingInvites = listPendingInviteEmails(tenantId);
+  const emailReady = isEmailConfigured();
+
   const serialised = all.map((u) => ({
     ...u,
     lastLoginAt: u.lastLoginAt ? u.lastLoginAt.getTime() : null,
     createdAt: u.createdAt.getTime(),
+    invitePending: pendingInvites.has(u.email.toLowerCase()),
   }));
 
   return (
@@ -63,7 +69,11 @@ export default async function UsersPage() {
         title="Users & permissions"
         subtitle="Manage staff and admin accounts."
       />
-      <UsersManager users={serialised} currentUserId={me.id} />
+      <UsersManager
+        users={serialised}
+        currentUserId={me.id}
+        emailReady={emailReady}
+      />
     </div>
   );
 }

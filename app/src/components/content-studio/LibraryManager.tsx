@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Film, ImageIcon, Loader2, Trash2, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 type Asset = {
   id: number;
@@ -41,6 +42,7 @@ function readImageDimensions(
 }
 
 export function LibraryManager({ initialAssets }: { initialAssets: Asset[] }) {
+  const confirm = useConfirm();
   const [assets, setAssets] = useState<Asset[]>(initialAssets);
   const [filter, setFilter] = useState<Filter>("all");
   const [uploading, setUploading] = useState(false);
@@ -95,7 +97,7 @@ export function LibraryManager({ initialAssets }: { initialAssets: Asset[] }) {
   }
 
   async function remove(id: number) {
-    if (!confirm("Delete this file from your library? This can't be undone.")) return;
+    if (!(await confirm({ title: "Delete this file from your library?", body: "This can't be undone.", destructive: true }))) return;
     setBusyId(id);
     try {
       const res = await fetch(`/api/content-studio/image-library/${id}`, {

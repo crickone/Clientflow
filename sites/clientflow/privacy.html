@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy Policy — ClientFlow</title>
+<meta name="description" content="How ClientFlow collects, uses and protects personal data under GDPR and Irish law — data we hold, lawful bases, our processors, retention and your rights.">
+<meta name="theme-color" content="#0b0c0f">
+
+<!-- Critical, above-the-fold CSS (tokens + nav + hero shell) for instant first paint.
+     Full design system loads via assets/site.css as the first <body> element. -->
+<style>
+:root{
+  --bg:#0b0c0f;--bg-2:#0e0f13;--surface:#15161b;--surface-2:#1c1e25;--surface-3:#23252e;
+  --hair:rgba(255,255,255,.08);--hair-2:rgba(255,255,255,.15);
+  --text:#f2f3f6;--text-2:#a2abb8;--text-3:#8b94a1;
+  --accent:#ff6a32;--accent-2:#ff8a5c;--accent-soft:rgba(255,106,50,.14);--accent-line:rgba(255,106,50,.35);
+  --glow-soft:0 10px 40px -12px rgba(255,106,50,.35);
+  --font-display:'Space Grotesk',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  --font-body:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  --font-brand:'Nebula','Space Grotesk',system-ui,sans-serif;
+  --fs-display:clamp(2.6rem,6.5vw,5.25rem);--fs-lead:clamp(1.06rem,1.6vw,1.35rem);--fs-xs:.78rem;--fs-sm:.9rem;
+  --maxw:1180px;--maxw-narrow:820px;--nav-h:68px;--r-pill:999px;
+  --ease:cubic-bezier(0.2,0.8,0.2,1);--d:240ms;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:1.02rem;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:radial-gradient(60% 40% at 78% -5%,rgba(255,106,50,.10),transparent 60%),radial-gradient(50% 45% at 8% 8%,rgba(255,106,50,.05),transparent 55%),var(--bg)}
+h1{font-family:var(--font-display);font-weight:700;line-height:1.05;letter-spacing:-.02em;margin:0}
+a{color:inherit;text-decoration:none}
+.wrap{width:100%;max-width:var(--maxw);margin-inline:auto;padding-inline:clamp(1.1rem,4vw,2rem)}
+.narrow{max-width:var(--maxw-narrow)}
+.nav{position:sticky;top:0;z-index:60;height:var(--nav-h);display:flex;align-items:center;border-bottom:1px solid transparent}
+.nav .wrap{display:flex;align-items:center;gap:1.5rem;width:100%}
+.brand{display:inline-flex;align-items:center;gap:.6em}
+.brand .mark{font-family:var(--font-brand);font-size:1.35rem;color:var(--text);line-height:1}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.55em;font-family:var(--font-display);font-weight:600;font-size:.98rem;padding:.82em 1.35em;border-radius:var(--r-pill);border:1px solid transparent;background:rgba(255,255,255,.05);color:var(--text)}
+.btn-primary{background:linear-gradient(180deg,var(--accent-2),var(--accent));color:#180a03;border-color:rgba(255,106,50,.5);box-shadow:var(--glow-soft)}
+.hero{position:relative;padding-top:clamp(2.5rem,6vw,4.5rem);padding-bottom:clamp(3rem,7vw,6rem);overflow:clip}
+.hero h1{font-size:var(--fs-display);letter-spacing:-.03em;margin-bottom:1.5rem;text-wrap:balance}
+.hero .lead{font-size:var(--fs-lead);color:var(--text-2);max-width:60ch}
+.eyebrow{display:inline-flex;align-items:center;gap:.5em;font-family:var(--font-display);font-weight:500;font-size:var(--fs-xs);letter-spacing:.16em;text-transform:uppercase;color:var(--accent-2)}
+.g-accent{background:linear-gradient(100deg,var(--accent),var(--accent-2) 60%,#ffd0b8);-webkit-background-clip:text;background-clip:text;color:transparent}
+</style>
+
+<!-- Page-specific composition CSS (legal layout: sticky TOC + prose, placeholder flags) -->
+<style>
+.eyebrow.center-e{justify-content:center}
+.eyebrow.center-e::before{display:none}
+
+/* sticky in-page table of contents + prose column */
+.legal-grid{display:grid;grid-template-columns:232px 1fr;gap:clamp(1.5rem,4vw,3rem);align-items:start}
+@media (max-width:900px){.legal-grid{grid-template-columns:1fr}}
+.legal-toc{position:sticky;top:calc(var(--nav-h) + 1.5rem)}
+@media (max-width:900px){.legal-toc{position:static}}
+.legal-toc-inner{background:var(--surface);border:1px solid var(--hair);border-radius:var(--r-lg);padding:1.2rem}
+.legal-toc .eyebrow{margin-bottom:.8rem}
+.legal-toc ul{list-style:none;margin:0;padding:0;display:grid;gap:.1rem}
+.legal-toc a{display:block;padding:.5em .6em;border-radius:var(--r-sm);font-family:var(--font-display);font-weight:500;font-size:var(--fs-sm);color:var(--text-2);transition:background var(--d) var(--ease),color var(--d) var(--ease)}
+.legal-toc a:hover{background:var(--surface-2);color:var(--text)}
+.legal-content h2{scroll-margin-top:calc(var(--nav-h) + 1.3rem)}
+
+/* placeholder flags — reuse the --warn token already used for "estimated" elsewhere */
+.ph{display:inline-block;background:rgba(255,207,106,.14);border:1px dashed rgba(255,207,106,.45);border-radius:4px;padding:.05em .4em;color:var(--warn);font-weight:600}
+.ph-note{color:var(--warn);font-size:.85em}
+</style>
+</head>
+<body>
+<link rel="stylesheet" href="assets/site.css">
+<script>document.documentElement.classList.add('js')</script>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<!-- ============================================================ NAV -->
+<nav class="nav" aria-label="Primary">
+  <div class="wrap">
+    <a class="brand" href="/" aria-label="ClientFlow home">
+      <span class="mark">ClientFlow</span>
+      <span class="tag">Platform</span>
+    </a>
+    <button class="nav-toggle" aria-label="Menu" aria-expanded="false" aria-controls="nav-links">
+      <svg class="bars" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      <svg class="x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <div class="nav-links" id="nav-links">
+      <a href="/product">Product</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/gyms">For Gyms</a>
+      <a href="/wellness-clinics">For Clinics</a>
+      <a href="/compare">Compare</a>
+      <a href="/about">About</a>
+      <span class="nav-cta"><a class="btn btn-primary btn-sm" href="/book-a-demo">Book a demo</a></span>
+    </div>
+  </div>
+</nav>
+
+<main id="main">
+
+<!-- ============================================================ HERO -->
+<header class="hero">
+  <div class="wrap narrow">
+    <span class="eyebrow rv rv-fade">Legal</span>
+    <h1 class="rv rv-d1">Privacy Policy</h1>
+    <p class="lead rv rv-d2">This policy explains how <strong>[COMPANY LEGAL NAME]</strong> ("ClientFlow", "we", "us") collects, uses and protects personal data. We are the <strong>data controller</strong> for personal data about our own account holders and website visitors. For personal data about your members and clients, <strong>you are the controller and we are your processor</strong> — see <a href="#member-data" style="color:var(--accent-2);text-decoration:underline;text-underline-offset:3px">Member and client data</a> below.</p>
+    <p class="muted mt-4 rv rv-d3">We comply with the EU General Data Protection Regulation (GDPR), the Irish Data Protection Act 2018, and, where relevant, UK GDPR.</p>
+    <div class="rv rv-d4 mt-6"><span class="chip"><span class="dot"></span>Last updated 26 July 2026</span></div>
+  </div>
+</header>
+
+<!-- ============================================================ POLICY BODY: TOC + PROSE -->
+<section class="section section-t" id="policy">
+  <div class="wrap">
+    <div class="legal-grid">
+
+      <aside class="legal-toc rv rv-left" aria-label="Table of contents">
+        <div class="legal-toc-inner">
+          <span class="eyebrow">On this page</span>
+          <nav aria-label="Sections on this page">
+            <ul>
+              <li><a href="#who-we-are">Who we are</a></li>
+              <li><a href="#data-we-collect">Data we collect</a></li>
+              <li><a href="#lawful-bases">Lawful bases</a></li>
+              <li><a href="#processors">Processors we use</a></li>
+              <li><a href="#retention">How long we keep data</a></li>
+              <li><a href="#your-rights">Your rights</a></li>
+              <li><a href="#cookies">Cookies</a></li>
+              <li><a href="#changes">Changes to this policy</a></li>
+              <li><a href="#contact">Contact</a></li>
+            </ul>
+          </nav>
+        </div>
+      </aside>
+
+      <div class="prose legal-content rv rv-right">
+
+        <h2 id="who-we-are">Who we are</h2>
+        <p><strong><span class="ph">[COMPANY LEGAL NAME]</span></strong><br><span class="ph">[REGISTERED ADDRESS]</span><br>Email: <a href="mailto:privacy@clientflow.ie">privacy@clientflow.ie</a> <span class="ph-note">(placeholder — confirm before launch)</span></p>
+        <p>If you have questions about this policy or your data, contact us at the address above.</p>
+
+        <h2 id="data-we-collect">Data we collect</h2>
+        <p><strong>Account and business data.</strong> When you sign up, book a demo or contact us, we collect your name, business name, email, phone number, business type, billing details and login credentials.</p>
+        <p id="member-data"><strong>Member and client data (processed on behalf of gyms and clinics).</strong> When you use ClientFlow to run your business, you upload personal data about your members and clients — names, contact details, bookings, attendance, memberships, packages, payment records and notes. We process this <strong>only</strong> to provide the service to you, under your instructions.</p>
+        <p><strong>Payment data.</strong> Card and payment details are collected and processed by our payment processor (see <a href="#processors">Processors we use</a>). We do not store full card numbers on our own systems.</p>
+        <p><strong>Usage and analytics data.</strong> With your consent where required, we collect analytics about how our website and platform are used — pages viewed, device and browser type, and general location derived from IP. Non-essential analytics run only after you consent via our cookie banner.</p>
+        <p><strong>Cookies.</strong> We use strictly necessary cookies to keep you logged in and secure, and — with consent — analytics cookies. See <a href="#cookies">Cookies</a> below.</p>
+        <p><strong>Communications.</strong> If you connect an email inbox (e.g. Gmail) or message clients through the platform, we process the content of those communications to deliver the messaging features you've enabled.</p>
+
+        <h2 id="lawful-bases">Lawful bases</h2>
+        <p>We rely on the following GDPR lawful bases:</p>
+        <ul>
+          <li><strong>Contract</strong> — to provide the platform, manage your subscription and support you.</li>
+          <li><strong>Legitimate interests</strong> — to secure our systems, prevent fraud, and improve the product, balanced against your rights.</li>
+          <li><strong>Consent</strong> — for non-essential analytics cookies and certain marketing communications. You can withdraw consent at any time.</li>
+          <li><strong>Legal obligation</strong> — to meet accounting, tax and other legal requirements.</li>
+        </ul>
+        <p>For member and client data you upload, your lawful basis as controller is your responsibility; we process it under our data processing terms with you.</p>
+
+        <h2 id="processors">Processors we use</h2>
+        <p>We share personal data only with vetted sub-processors who help us run the service. Current processors include:</p>
+        <ul>
+          <li><strong>Railway (hosting, EU-West region)</strong> — application and database hosting.</li>
+          <li><strong>Anthropic (AI processing)</strong> — powers AI marketing and assistant features. Content sent for AI processing is used to generate your output and is not used to train models under our terms.</li>
+          <li><strong>Resend (email delivery)</strong> — sending transactional and marketing email.</li>
+          <li><strong>Google / Gmail (where you connect it)</strong> — to provide two-way email inbox features you enable.</li>
+          <li><strong>Payment processor — CreatePay / Cardstream</strong> — to process card payments securely.</li>
+        </ul>
+        <p>We put appropriate data processing agreements and safeguards in place with each. Where any transfer outside the EEA occurs, we rely on adequacy decisions or Standard Contractual Clauses.</p>
+
+        <h2 id="retention">How long we keep data</h2>
+        <ul>
+          <li><strong>Account data</strong> — for the life of your subscription and up to 7 years afterward where required for tax and accounting.</li>
+          <li><strong>Member and client data</strong> — kept while you use the platform; on termination we return or delete it per our terms and your instructions.</li>
+          <li><strong>Analytics data</strong> — retained in aggregated or limited form per our analytics settings.</li>
+          <li><strong>Support and communications</strong> — kept as long as needed to resolve queries and meet legal obligations.</li>
+        </ul>
+
+        <h2 id="your-rights">Your rights</h2>
+        <p>Under GDPR you have the right to: access your data; correct inaccurate data; erase data ("right to be forgotten"); restrict or object to processing; data portability; and withdraw consent at any time. You also have the right to lodge a complaint with the <strong>Irish Data Protection Commission</strong> (<a href="https://www.dataprotection.ie" target="_blank" rel="noopener noreferrer">dataprotection.ie</a>) or your local supervisory authority.</p>
+        <p>If you are a member or client of a gym or clinic that uses ClientFlow, please direct requests to that business first — they are the controller of your data. We will assist them in responding.</p>
+        <p>To exercise your rights against us as controller, contact <a href="mailto:privacy@clientflow.ie">privacy@clientflow.ie</a> <span class="ph-note">(placeholder)</span>.</p>
+
+        <h2 id="cookies">Cookies</h2>
+        <p>We use strictly necessary cookies (login, security and session) that don't require consent, and — only where you accept our cookie banner — a small number of analytics cookies. Clearing your cookies for this site will show the banner again, so you can change your mind at any time.</p>
+
+        <h2 id="changes">Changes to this policy</h2>
+        <p>We may update this policy. We'll post the new version here with a revised "Last updated" date and, for material changes, notify account holders.</p>
+
+        <h2 id="contact">Contact</h2>
+        <p><span class="ph">[COMPANY LEGAL NAME]</span>, <span class="ph">[REGISTERED ADDRESS]</span> — <a href="mailto:privacy@clientflow.ie">privacy@clientflow.ie</a> <span class="ph-note">(placeholder)</span>.</p>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ CTA BAND -->
+<section class="section-sm"><div class="wrap">
+  <div class="cta-band rv">
+    <span class="eyebrow center-e">See it live</span>
+    <h2>See it live before you decide a single thing.</h2>
+    <p>Twenty minutes with the team that built it. No hard sell.</p>
+    <div class="btn-row">
+      <a class="btn btn-primary btn-lg" href="/book-a-demo">Book a demo</a>
+      <a class="btn btn-line btn-lg" href="/compare">Compare us openly</a>
+    </div>
+    <p class="cta-note">Built in Ireland · month-to-month · free migration</p>
+  </div>
+</div></section>
+
+</main>
+
+<!-- ============================================================ FOOTER -->
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <a class="brand" href="/" aria-label="ClientFlow home"><span class="mark">ClientFlow</span><span class="tag">Platform</span></a>
+        <p class="f-blurb">Run your gym or clinic — and grow it — from one place. €200/month, everything in.</p>
+      </div>
+      <nav aria-label="Product">
+        <h3>Product</h3>
+        <ul>
+          <li><a href="/product">Product overview</a></li>
+          <li><a href="/pricing">Pricing</a></li>
+          <li><a href="/gyms">For Gyms</a></li>
+          <li><a href="/wellness-clinics">For Clinics</a></li>
+          <li><a href="/book-a-demo">Book a demo</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Compare">
+        <h3>Compare</h3>
+        <ul>
+          <li><a href="/compare">Compare hub</a></li>
+          <li><a href="/compare-mindbody-alternative">vs Mindbody</a></li>
+          <li><a href="/compare-glofox-alternative">vs Glofox</a></li>
+          <li><a href="/compare-legitfit-alternative">vs LegitFit</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Company">
+        <h3>Company</h3>
+        <ul>
+          <li><a href="/about">About</a></li>
+          <li><a href="/blog">Blog</a></li>
+          <li><a href="/book-a-demo">Book a demo</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Legal">
+        <h3>Legal</h3>
+        <ul>
+          <li><a href="/privacy">Privacy Policy</a></li>
+          <li><a href="/terms">Terms of Service</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 ClientFlow. All rights reserved. · Prices ex-VAT. Comparison figures researched July 2026; estimates flagged.</span>
+      <span class="ie">Built in Ireland 🇮🇪</span>
+    </div>
+  </div>
+</footer>
+
+<!-- ============================================================ COOKIE BANNER -->
+<div class="cookie" role="dialog" aria-label="Cookie notice" aria-live="polite">
+  <p>We use a couple of cookies to keep the site working and see what's useful. Read our <a href="/privacy">Privacy Policy</a>.</p>
+  <button class="btn btn-primary btn-sm" data-cookie-accept>Grand, got it</button>
+</div>
+
+<!-- ============================================================ STRUCTURED DATA -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://clientflow.ie/"},
+    {"@type": "ListItem", "position": 2, "name": "Privacy Policy", "item": "https://clientflow.ie/privacy"}
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  "name": "Privacy Policy — ClientFlow",
+  "url": "https://clientflow.ie/privacy",
+  "description": "How ClientFlow collects, uses and protects personal data under GDPR and Irish law — data we hold, lawful bases, our processors, retention and your rights.",
+  "dateModified": "2026-07-26",
+  "inLanguage": "en-IE",
+  "isPartOf": {"@type": "WebSite", "name": "ClientFlow", "url": "https://clientflow.ie/"}
+}
+</script>
+
+<script src="assets/site.js" defer></script>
+</body>
+</html>

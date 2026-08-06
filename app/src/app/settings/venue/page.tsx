@@ -5,14 +5,17 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { requireAdminPage } from "@/lib/auth";
-import { getVenueType } from "@/lib/settings";
+import { CardLabel } from "@/components/ui/Card";
+import { getSchedulingMode, getVenueType } from "@/lib/settings";
 import { VenueTypeForm } from "@/components/settings/VenueTypeForm";
+import { SchedulingModeForm } from "@/components/settings/SchedulingModeForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function VenueTypeSettingsPage() {
   await requireAdminPage();
   const current = getVenueType();
+  const scheduling = getSchedulingMode();
 
   return (
     <div className="app-page" style={{ maxWidth: 720 }}>
@@ -31,6 +34,14 @@ export default async function VenueTypeSettingsPage() {
       />
       <Card style={{ padding: 28 }}>
         <VenueTypeForm current={current} />
+      </Card>
+
+      <Card style={{ padding: 28, marginTop: 16 }}>
+        <CardLabel>Scheduling</CardLabel>
+        <p style={{ color: "var(--text-secondary)", fontSize: 13.5, lineHeight: 1.55, margin: "8px 0 18px" }}>
+          Choose how this business schedules. Only the one you pick shows in the sidebar.
+        </p>
+        <SchedulingModeForm current={scheduling} />
       </Card>
     </div>
   );

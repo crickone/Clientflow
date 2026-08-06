@@ -20,6 +20,7 @@ import {
   Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import {
   Dialog,
   DialogContent,
@@ -109,6 +110,7 @@ export function ImageDesigner({
   brand,
 }: Props) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [name, setName] = useState(initialName);
   const [slides, setSlides] = useState<CarouselSlide[]>(initialSlides);
   const [activeIdx, setActiveIdx] = useState(0);
@@ -326,7 +328,7 @@ export function ImageDesigner({
       );
       return;
     }
-    if (!confirm("Delete this slide?")) return;
+    if (!(await confirm({ title: "Delete this slide?", destructive: true }))) return;
     try {
       const res = await fetch(
         `/api/content-studio/carousels/${designId}/slides/${activeSlide.id}`,
@@ -462,7 +464,7 @@ export function ImageDesigner({
   }
 
   async function deleteDesign() {
-    if (!confirm("Delete this design? This can't be undone.")) return;
+    if (!(await confirm({ title: "Delete this design?", body: "This can't be undone.", destructive: true }))) return;
     try {
       const res = await fetch(`/api/content-studio/carousels/${designId}`, {
         method: "DELETE",
@@ -507,7 +509,7 @@ export function ImageDesigner({
   }
 
   async function deleteAsset(assetId: number) {
-    if (!confirm("Remove this photo from the library?")) return;
+    if (!(await confirm({ title: "Remove this photo from the library?", destructive: true }))) return;
     try {
       const res = await fetch(`/api/content-studio/image-library/${assetId}`, {
         method: "DELETE",

@@ -1,25 +1,24 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 
 import { setActiveTenant } from "@/lib/auth";
 
 /**
- * Set the active clinic for the current session, then send the user to their
- * dashboard. `setActiveTenant` re-validates membership server-side, so this is
- * safe even though the tenant id comes from the client. On success it redirects
- * (never returns); on failure it returns the error for the UI to surface.
+ * Set the active clinic for the current session. `setActiveTenant` re-validates
+ * membership server-side, so this is safe even though the tenant id comes from
+ * the client. Returns ok/err — the CLIENT then does a FULL reload to /dashboard.
+ *
+ * A full reload (not a soft redirect) is required: the per-tenant theme + logo
+ * are injected once in the ROOT layout, which Next does NOT re-render on a soft
+ * navigation — so a soft switch would keep the previous clinic's theme until a
+ * hard reload. Reloading guarantees the new tenant's chrome renders correctly.
  */
 export async function chooseAccount(
   tenantId: number,
-): Promise<{ ok: false; error: string } | void> {
+): Promise<{ ok: true } | { ok: false; error: string }> {
   const res = await setActiveTenant(tenantId);
   if (!res.ok) return res;
-  // Every admin page is tenant-scoped and cached per route. Switching the active
-  // clinic changes what the whole tree should render, so bust the Full Route +
-  // client Router Cache — otherwise the previous clinic's cached pages are shown
-  // after the switch (you pick Inspire but still see Renova until a hard reload).
   revalidatePath("/", "layout");
-  redirect("/dashboard");
+  return { ok: true };
 }

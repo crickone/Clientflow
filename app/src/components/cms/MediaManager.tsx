@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Trash2, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { updateAltAction, deleteMediaAction } from "@/app/cms/[siteSlug]/media/actions";
@@ -26,6 +27,7 @@ export function MediaManager({
   items: MediaItem[];
 }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [, startTransition] = useTransition();
@@ -117,7 +119,7 @@ export function MediaManager({
                 size="sm"
                 onClick={() =>
                   startTransition(async () => {
-                    if (confirm("Delete this image?")) {
+                    if (await confirm({ title: "Delete this image?", destructive: true })) {
                       await deleteMediaAction(siteSlug, m.id);
                       router.refresh();
                     }

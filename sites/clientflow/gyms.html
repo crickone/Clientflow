@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>For Gyms &amp; Studios — ClientFlow</title>
+<meta name="description" content="Everything a boutique gym, PT studio or CrossFit box needs to run and grow — CRM, classes, billing, a branded app and a real website — €200/month flat.">
+<meta name="theme-color" content="#0b0c0f">
+
+<!-- Critical, above-the-fold CSS (tokens + nav + hero shell) for instant first paint.
+     Full design system loads via assets/site.css as the first <body> element. -->
+<style>
+:root{
+  --bg:#0b0c0f;--bg-2:#0e0f13;--surface:#15161b;--surface-2:#1c1e25;--surface-3:#23252e;
+  --hair:rgba(255,255,255,.08);--hair-2:rgba(255,255,255,.15);
+  --text:#f2f3f6;--text-2:#a2abb8;--text-3:#8b94a1;
+  --accent:#ff6a32;--accent-2:#ff8a5c;--accent-soft:rgba(255,106,50,.14);--accent-line:rgba(255,106,50,.35);
+  --glow-soft:0 10px 40px -12px rgba(255,106,50,.35);
+  --font-display:'Space Grotesk',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  --font-body:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  --font-brand:'Nebula','Space Grotesk',system-ui,sans-serif;
+  --fs-display:clamp(2.6rem,6.5vw,5.25rem);--fs-lead:clamp(1.06rem,1.6vw,1.35rem);--fs-xs:.78rem;--fs-sm:.9rem;
+  --maxw:1180px;--nav-h:68px;--r-pill:999px;
+  --ease:cubic-bezier(0.2,0.8,0.2,1);--d:240ms;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:1.02rem;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:radial-gradient(60% 40% at 78% -5%,rgba(255,106,50,.10),transparent 60%),radial-gradient(50% 45% at 8% 8%,rgba(255,106,50,.05),transparent 55%),var(--bg)}
+h1{font-family:var(--font-display);font-weight:700;line-height:1.05;letter-spacing:-.02em;margin:0}
+a{color:inherit;text-decoration:none}
+.wrap{width:100%;max-width:var(--maxw);margin-inline:auto;padding-inline:clamp(1.1rem,4vw,2rem)}
+.nav{position:sticky;top:0;z-index:60;height:var(--nav-h);display:flex;align-items:center;border-bottom:1px solid transparent}
+.nav .wrap{display:flex;align-items:center;gap:1.5rem;width:100%}
+.brand{display:inline-flex;align-items:center;gap:.6em}
+.brand .mark{font-family:var(--font-brand);font-size:1.35rem;color:var(--text);line-height:1}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.55em;font-family:var(--font-display);font-weight:600;font-size:.98rem;padding:.82em 1.35em;border-radius:var(--r-pill);border:1px solid transparent;background:rgba(255,255,255,.05);color:var(--text)}
+.btn-primary{background:linear-gradient(180deg,var(--accent-2),var(--accent));color:#180a03;border-color:rgba(255,106,50,.5);box-shadow:var(--glow-soft)}
+.hero{position:relative;padding-top:clamp(2.5rem,6vw,4.5rem);padding-bottom:clamp(3rem,7vw,6rem);overflow:clip}
+.hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(1.5rem,4vw,3rem);align-items:center}
+.hero h1{font-size:var(--fs-display);letter-spacing:-.03em;margin-bottom:1.5rem;text-wrap:balance}
+.hero .lead{font-size:var(--fs-lead);color:var(--text-2);max-width:60ch;margin:0 0 2rem}
+.eyebrow{display:inline-flex;align-items:center;gap:.5em;font-family:var(--font-display);font-weight:500;font-size:var(--fs-xs);letter-spacing:.16em;text-transform:uppercase;color:var(--accent-2)}
+.g-accent{background:linear-gradient(100deg,var(--accent),var(--accent-2) 60%,#ffd0b8);-webkit-background-clip:text;background-clip:text;color:transparent}
+@media (max-width:940px){.hero-grid{grid-template-columns:1fr}}
+</style>
+
+<!-- Page-specific composition CSS (local-SEO map mockup, lead paragraph helper) -->
+<style>
+.section-lead{color:var(--text-2);font-size:var(--fs-lead);max-width:60ch}
+.eyebrow.center-e{justify-content:center}
+.eyebrow.center-e::before{display:none}
+
+/* local SEO — mini "map pack" mockup (pure CSS, decorative) */
+.localpack{display:flex;flex-direction:column;gap:.6rem;max-width:360px}
+.lp-map{position:relative;height:120px;border-radius:12px;margin-bottom:.2rem;
+  background:radial-gradient(75% 65% at 30% 22%,rgba(255,106,50,.16),transparent 62%),var(--surface-2);
+  border:1px solid var(--hair)}
+.lp-pin{position:absolute;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;
+  background:var(--surface-3);border:1px solid var(--hair-2)}
+.lp-pin.you{width:14px;height:14px;margin:-7px 0 0 -7px;background:var(--accent);
+  border-color:var(--accent);box-shadow:0 0 10px var(--accent)}
+.lp-row{display:flex;align-items:center;gap:.6rem}
+
+/* timeline items use h3 (not h4) to keep a logical h1>h2>h3 heading order;
+   this restores the same compact look site.css defines for .tl-item h4 */
+.timeline .tl-item h3{margin:.2rem 0 .3rem;font-size:1.15rem;letter-spacing:-.02em}
+</style>
+</head>
+<body>
+<link rel="stylesheet" href="assets/site.css">
+<script>document.documentElement.classList.add('js')</script>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<!-- ============================================================ NAV -->
+<nav class="nav" aria-label="Primary">
+  <div class="wrap">
+    <a class="brand" href="/" aria-label="ClientFlow home">
+      <span class="mark">ClientFlow</span>
+      <span class="tag">Platform</span>
+    </a>
+    <button class="nav-toggle" aria-label="Menu" aria-expanded="false" aria-controls="nav-links">
+      <svg class="bars" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      <svg class="x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <div class="nav-links" id="nav-links">
+      <a href="/product">Product</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/gyms" aria-current="page">For Gyms</a>
+      <a href="/wellness-clinics">For Clinics</a>
+      <a href="/compare">Compare</a>
+      <a href="/about">About</a>
+      <span class="nav-cta"><a class="btn btn-primary btn-sm" href="/book-a-demo">Book a demo</a></span>
+    </div>
+  </div>
+</nav>
+
+<main id="main">
+
+<!-- ============================================================ HERO -->
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <span class="eyebrow rv rv-fade">For gyms, studios &amp; boxes · built in Ireland 🇮🇪</span>
+        <h1 class="rv rv-d1">The whole gym, <span class="g-accent">run from one place</span> — and grown from it too.</h1>
+        <p class="lead rv rv-d2">Boutique studios, PT gyms and CrossFit boxes: booking, billing, your own app and a website that actually ranks. One flat €200/month.</p>
+        <div class="btn-row rv rv-d3">
+          <a class="btn btn-primary btn-lg" href="/book-a-demo">Book a demo</a>
+          <a class="btn btn-line btn-lg" href="/pricing">See pricing</a>
+        </div>
+      </div>
+
+      <!-- HERO SCENE: pointer-tilt + scroll-assemble CSS-3D device trio -->
+      <div class="hero-scene rv rv-d2" aria-hidden="true">
+        <div class="scene-inner">
+          <svg class="scene-thread" viewBox="0 0 400 400" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="cf-thread" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#ff6a32" stop-opacity="0"/>
+                <stop offset=".5" stop-color="#ff8a5c"/>
+                <stop offset="1" stop-color="#ff6a32" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path d="M120 150 C 220 120, 300 160, 330 90"/>
+            <path d="M150 210 C 250 260, 320 240, 350 320"/>
+          </svg>
+
+          <!-- laptop = the gym's website -->
+          <div class="scene-obj scene-laptop float">
+            <div class="device laptop">
+              <div class="screen">
+                <div class="viewport">
+                  <div class="ui">
+                    <div class="ui-top"><span class="ui-dots"><i></i><i></i><i></i></span><span class="ui-bar soft ui-w40" style="height:6px"></span></div>
+                    <div class="ui-hero-img"></div>
+                    <div class="ui-row"><span class="ui-pill">Join now</span><span class="ui-bar soft ui-w30" style="align-self:center"></span></div>
+                    <div class="ui-row"><span class="ui-bar soft ui-w70"></span></div>
+                    <div class="ui-bar soft ui-w55"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="base"></div>
+            </div>
+          </div>
+
+          <!-- tablet/card = owner dashboard -->
+          <div class="scene-obj scene-dash float-2">
+            <div class="device slab">
+              <div class="screen">
+                <div class="viewport">
+                  <div class="ui">
+                    <div class="ui-row">
+                      <div class="ui-nav"><i class="on"></i><i></i><i></i><i></i></div>
+                      <div class="ui-col">
+                        <div class="ui-row">
+                          <div class="ui-card hi"><span class="ui-label">MRR</span><span class="ui-num">€14,280</span></div>
+                          <div class="ui-card"><span class="ui-label">Members</span><span class="ui-num">312</span></div>
+                        </div>
+                        <div class="ui-card"><span class="ui-label">This week</span><div class="ui-chart"><span></span><span class="a"></span><span></span><span class="a"></span><span></span><span class="a"></span><span></span></div></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- phone = branded client app -->
+          <div class="scene-obj scene-phone float">
+            <div class="device phone">
+              <div class="screen">
+                <div class="viewport">
+                  <div class="ui" style="gap:9px">
+                    <div class="ui-row" style="align-items:center;margin-top:14px"><span class="ui-avatar"></span><div class="ui-col" style="gap:4px"><span class="ui-bar soft ui-w70" style="height:6px"></span><span class="ui-bar soft ui-w40" style="height:5px"></span></div></div>
+                    <div class="ui-card hi"><span class="ui-chip">Booked</span><span class="ui-num" style="font-size:12px">Strength · 6:00pm</span></div>
+                    <div class="ui-card"><span class="ui-bar soft ui-w85"></span><span class="ui-bar soft ui-w55"></span></div>
+                    <div class="ui-pill" style="align-self:stretch;justify-content:center">Check in</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ============================================================ DAY IN THE LIFE -->
+<section class="section section-t" id="day-in-the-life">
+  <div class="wrap narrow">
+    <div class="sec-head center rv">
+      <span class="eyebrow center-e">A day in the life</span>
+      <h2>Follow one member from stranger to regular.</h2>
+    </div>
+
+    <div class="timeline mt-7 rv">
+      <div class="line-fill"></div>
+      <div class="tl-item">
+        <span class="node" aria-hidden="true"></span>
+        <span class="time">Step 1 · Discovery</span>
+        <h3>Lead lands.</h3>
+        <p>Someone finds your website on Google and enquires. It drops straight into your CRM.</p>
+      </div>
+      <div class="tl-item">
+        <span class="node" aria-hidden="true"></span>
+        <span class="time">Step 2 · Nurture</span>
+        <h3>Nurtured.</h3>
+        <p>An automated follow-up and a personal note turn the enquiry into a booked trial.</p>
+      </div>
+      <div class="tl-item">
+        <span class="node" aria-hidden="true"></span>
+        <span class="time">Step 3 · Booking</span>
+        <h3>Booked into a class.</h3>
+        <p>They reserve a spot in your app. The waitlist fills the room behind them.</p>
+      </div>
+      <div class="tl-item">
+        <span class="node" aria-hidden="true"></span>
+        <span class="time">Step 4 · Billing</span>
+        <h3>Billed.</h3>
+        <p>They join on a recurring membership that bills itself on time — no chasing.</p>
+      </div>
+      <div class="tl-item">
+        <span class="node" aria-hidden="true"></span>
+        <span class="time">Step 5 · Retention</span>
+        <h3>Retained.</h3>
+        <p>Attendance and check-ins flag who's slipping, so you win them back before they churn.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ GYM FEATURES -->
+<section class="section section-t" id="gym-features">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <span class="eyebrow">Built for gyms</span>
+      <h2>Built for how a gym actually runs.</h2>
+    </div>
+
+    <div class="grid g-4 mt-6">
+      <div class="card card-feature rv rv-d1">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div>
+        <h3>Class scheduling &amp; waitlists</h3>
+        <p class="muted">Set the timetable once; the room fills itself.</p>
+      </div>
+      <div class="card card-feature rv rv-d2">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg></div>
+        <h3>Memberships &amp; billing</h3>
+        <p class="muted">Recurring plans, packages, credits and deposits, all automatic.</p>
+      </div>
+      <div class="card card-feature rv rv-d3">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg></div>
+        <h3>Your branded app</h3>
+        <p class="muted">Members book and check in with your name on their phone.</p>
+      </div>
+      <div class="card card-feature rv rv-d4">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13A4 4 0 0 1 16 11"/></svg></div>
+        <h3>CRM &amp; lead nurture</h3>
+        <p class="muted">Every enquiry tracked, every follow-up prompted.</p>
+      </div>
+      <div class="card card-feature rv rv-d1">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M14.5 8.2a3.8 3.8 0 1 0 0 7.6M8.5 10.4h5M8.5 13h4.2"/></svg></div>
+        <h3>Payments</h3>
+        <p class="muted">Card rates ~40% below Stripe, no commission on new members.</p>
+      </div>
+      <div class="card card-feature rv rv-d2">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg></div>
+        <h3>Reporting</h3>
+        <p class="muted">MRR, attendance, retention and churn at a glance.</p>
+      </div>
+      <div class="card card-feature rv rv-d3">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/><path d="M19 15.5l.6 1.9 1.9.6-1.9.6-.6 1.9-.6-1.9-1.9-.6 1.9-.6z"/></svg></div>
+        <h3>AI marketing studio</h3>
+        <p class="muted">Promos and blogs, published to your own site.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ LOCAL SEO -->
+<section class="section section-t" id="local-seo">
+  <div class="wrap">
+    <div class="grid g-2" style="align-items:center">
+      <div class="rv rv-left">
+        <span class="eyebrow">Local SEO</span>
+        <h2 class="mt-3">Your gym, ranking #1 in your town — because we build the website too.</h2>
+        <p class="section-lead mt-4">Widgets don't rank on Google. Websites do. We design, build and host a real, fast, SEO-ready site for your gym, then the AI studio keeps it fed with local content.</p>
+        <p class="muted mt-4">When someone searches "gym near me" in your town, <b style="color:var(--text)">you're the one they find</b> — and the booking happens on your turf, not a marketplace.</p>
+        <div class="btn-row mt-6"><a class="btn btn-line" href="/product">See how the website works</a></div>
+      </div>
+      <div class="rv rv-right" aria-hidden="true">
+        <div class="card localpack">
+          <span class="chip">Search · "gym near me"</span>
+          <div class="lp-map">
+            <span class="lp-pin you" style="left:32%;top:58%"></span>
+            <span class="lp-pin" style="left:60%;top:28%"></span>
+            <span class="lp-pin" style="left:76%;top:64%"></span>
+          </div>
+          <div class="lp-row"><span class="chip chip-accent">1</span><span class="ui-bar accent ui-w70" style="flex:1"></span></div>
+          <div class="lp-row"><span class="chip">2</span><span class="ui-bar soft ui-w55" style="flex:1"></span></div>
+          <div class="lp-row"><span class="chip">3</span><span class="ui-bar soft ui-w40" style="flex:1"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ MINI PRICING RECAP -->
+<section class="section section-t" id="pricing-recap">
+  <div class="wrap">
+    <div class="sec-head center rv">
+      <span class="eyebrow center-e">Pricing</span>
+      <h2>One price, everything on.</h2>
+    </div>
+
+    <div class="price-card mt-7 rv" style="max-width:520px;margin-inline:auto">
+      <span class="badge">Everything included</span>
+      <div class="price-tag"><span class="amt">€200</span><span class="per">/month, flat</span></div>
+      <p class="lead">CRM, classes, billing, branded app, website and AI marketing — all included.</p>
+      <p class="muted mt-3">Month to month, no lock-in, free migration.</p>
+      <div class="btn-row mt-6"><a class="btn btn-primary btn-lg" href="/pricing">See full pricing</a></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ FAQ -->
+<section class="section section-t" id="faq">
+  <div class="wrap narrow">
+    <div class="sec-head center rv">
+      <span class="eyebrow center-e">FAQ</span>
+      <h2>What gym owners ask us first.</h2>
+    </div>
+
+    <div class="faq mt-6 rv">
+      <details open>
+        <summary><span class="q">Do you handle drop-ins and class packs?</span><span class="pm" aria-hidden="true"></span></summary>
+        <div class="a">Yes — recurring memberships, prepaid class packs, credits and drop-ins all built in.</div>
+      </details>
+      <details>
+        <summary><span class="q">Can members book from their phone?</span><span class="pm" aria-hidden="true"></span></summary>
+        <div class="a">Yes, in your own branded app — included, not a €99–€349/month add-on.</div>
+      </details>
+      <details>
+        <summary><span class="q">Will you move us off our current gym software?</span><span class="pm" aria-hidden="true"></span></summary>
+        <div class="a">Yes. Free migration of members, classes and history from tools like Glofox or TeamUp.</div>
+      </details>
+      <details>
+        <summary><span class="q">Do I get a real website or just a booking page?</span><span class="pm" aria-hidden="true"></span></summary>
+        <div class="a">A real website — designed, built and hosted by us, and owned by you.</div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ CLOSING CTA -->
+<section class="section-sm"><div class="wrap">
+  <div class="cta-band rv">
+    <span class="eyebrow center-e">See it on your gym</span>
+    <h2>See your gym running on it. Twenty minutes.</h2>
+    <p>A live walkthrough on your real numbers — your website, your app and your dashboard, live. No slides, no pressure.</p>
+    <div class="btn-row">
+      <a class="btn btn-primary btn-lg" href="/book-a-demo">Book a demo</a>
+      <a class="btn btn-line btn-lg" href="/pricing">See pricing</a>
+    </div>
+    <p class="cta-note">Built in Ireland · month-to-month · free migration</p>
+  </div>
+</div></section>
+
+</main>
+
+<!-- ============================================================ FOOTER -->
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <a class="brand" href="/" aria-label="ClientFlow home"><span class="mark">ClientFlow</span><span class="tag">Platform</span></a>
+        <p class="f-blurb">Run your gym or clinic — and grow it — from one place. €200/month, everything in.</p>
+      </div>
+      <nav aria-label="Product">
+        <h3>Product</h3>
+        <ul>
+          <li><a href="/product">Product overview</a></li>
+          <li><a href="/pricing">Pricing</a></li>
+          <li><a href="/gyms">For Gyms</a></li>
+          <li><a href="/wellness-clinics">For Clinics</a></li>
+          <li><a href="/book-a-demo">Book a demo</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Compare">
+        <h3>Compare</h3>
+        <ul>
+          <li><a href="/compare">Compare hub</a></li>
+          <li><a href="/compare-mindbody-alternative">vs Mindbody</a></li>
+          <li><a href="/compare-glofox-alternative">vs Glofox</a></li>
+          <li><a href="/compare-legitfit-alternative">vs LegitFit</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Company">
+        <h3>Company</h3>
+        <ul>
+          <li><a href="/about">About</a></li>
+          <li><a href="/blog">Blog</a></li>
+          <li><a href="/book-a-demo">Book a demo</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Legal">
+        <h3>Legal</h3>
+        <ul>
+          <li><a href="/privacy">Privacy Policy</a></li>
+          <li><a href="/terms">Terms of Service</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 ClientFlow. All rights reserved. · Prices ex-VAT. Comparison figures researched July 2026; estimates flagged.</span>
+      <span class="ie">Built in Ireland 🇮🇪</span>
+    </div>
+  </div>
+</footer>
+
+<!-- ============================================================ COOKIE BANNER -->
+<div class="cookie" role="dialog" aria-label="Cookie notice" aria-live="polite">
+  <p>We use a couple of cookies to keep the site working and see what's useful. Read our <a href="/privacy">Privacy Policy</a>.</p>
+  <button class="btn btn-primary btn-sm" data-cookie-accept>Grand, got it</button>
+</div>
+
+<!-- ============================================================ STRUCTURED DATA -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://clientflow.ie/"},
+    {"@type": "ListItem", "position": 2, "name": "For Gyms", "item": "https://clientflow.ie/gyms"}
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type": "Question", "name": "Do you handle drop-ins and class packs?", "acceptedAnswer": {"@type": "Answer", "text": "Yes — recurring memberships, prepaid class packs, credits and drop-ins all built in."}},
+    {"@type": "Question", "name": "Can members book from their phone?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, in your own branded app — included, not a €99–€349/month add-on."}},
+    {"@type": "Question", "name": "Will you move us off our current gym software?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Free migration of members, classes and history from tools like Glofox or TeamUp."}},
+    {"@type": "Question", "name": "Do I get a real website or just a booking page?", "acceptedAnswer": {"@type": "Answer", "text": "A real website — designed, built and hosted by us, and owned by you."}}
+  ]
+}
+</script>
+
+<script src="assets/site.js" defer></script>
+</body>
+</html>

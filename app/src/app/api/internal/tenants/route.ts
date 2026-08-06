@@ -13,6 +13,7 @@ const schema = z.object({
     .max(40)
     .regex(/^[a-z0-9-]+$/, "slug must be lowercase letters, digits, hyphens"),
   name: z.string().min(1).max(120),
+  venueType: z.enum(["clinic", "gym"]).optional(),
   admin: z
     .object({
       email: z.string().email(),

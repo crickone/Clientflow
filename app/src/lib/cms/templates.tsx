@@ -59,8 +59,8 @@ const basicPage: TemplateDef = {
 };
 
 // --- Imported HTML page (controlled-HTML bridge for migrated bespoke pages) ---
-const renovaHtml: TemplateDef = {
-  id: "renova-html",
+const importedHtml: TemplateDef = {
+  id: "clientflow-html",
   label: "Imported page (HTML body)",
   blocks: [{ name: "body", kind: "html", label: "Page HTML", fallback: "" }],
   Component: ({ ctx }) => <Block ctx={ctx} name="body" kind="html" />,
@@ -68,7 +68,7 @@ const renovaHtml: TemplateDef = {
 
 const REGISTRY: Record<string, TemplateDef> = {
   [basicPage.id]: basicPage,
-  [renovaHtml.id]: renovaHtml,
+  [importedHtml.id]: importedHtml,
 };
 
 export function getTemplate(id: string): TemplateDef | null {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { KeyRound, Pencil, Plus, UserMinus } from "lucide-react";
+import { KeyRound, Mail, Pencil, Plus, UserMinus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/Badge";
@@ -18,6 +18,7 @@ import {
   createUserAction,
   lookupIdentityAction,
   removeMembershipAction,
+  resendInviteAction,
   resetPasswordAction,
   updateUserAction,
 } from "@/app/settings/users/actions";
@@ -34,26 +35,43 @@ export type UserRow = {
   mustChangePassword: boolean;
   lastLoginAt: number | null;
   createdAt: number;
+  /** A live (unaccepted) email invite is outstanding for this person. */
+  invitePending: boolean;
 };
 
 export function UsersManager({
   users,
   currentUserId,
+  emailReady,
 }: {
   users: UserRow[];
   currentUserId: number;
+  emailReady: boolean;
 }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {users.map((u) => (
-        <UserRow key={u.userId} user={u} isMe={u.userId === currentUserId} />
+        <UserRow
+          key={u.userId}
+          user={u}
+          isMe={u.userId === currentUserId}
+          emailReady={emailReady}
+        />
       ))}
-      <NewUserButton />
+      <NewUserButton emailReady={emailReady} />
     </div>
   );
 }
 
-function UserRow({ user, isMe }: { user: UserRow; isMe: boolean }) {
+function UserRow({
+  user,
+  isMe,
+  emailReady,
+}: {
+  user: UserRow;
+  isMe: boolean;
+  emailReady: boolean;
+}) {
   return (
     <Card style={{ display: "flex", alignItems: "center", gap: 16, padding: 18 }}>
       <div
@@ -89,8 +107,12 @@ function UserRow({ user, isMe }: { user: UserRow; isMe: boolean }) {
             {user.role}
           </Badge>
           {!user.isActive && <Badge tone="red">No access</Badge>}
-          {user.mustChangePassword && (
-            <Badge tone="amber">Password reset pending</Badge>
+          {user.invitePending ? (
+            <Badge tone="amber">Invite pending</Badge>
+          ) : (
+            user.mustChangePassword && (
+              <Badge tone="amber">Password reset pending</Badge>
+            )
           )}
           {isMe && <Badge tone="green">You</Badge>}
         </div>
@@ -114,6 +136,7 @@ function UserRow({ user, isMe }: { user: UserRow; isMe: boolean }) {
         </div>
       </div>
       <div style={{ display: "flex", gap: 6 }}>
+        {user.invitePending && <ResendInviteButton user={user} disabled={!emailReady} />}
         <ResetPasswordDialog user={user} />
         <EditUserDialog user={user} isMe={isMe} />
         <RemoveMemberButton user={user} disabled={isMe} />
@@ -122,13 +145,38 @@ function UserRow({ user, isMe }: { user: UserRow; isMe: boolean }) {
   );
 }
 
-function NewUserButton() {
+function ResendInviteButton({ user, disabled }: { user: UserRow; disabled: boolean }) {
+  const [pending, start] = useTransition();
+  function resend() {
+    start(async () => {
+      const res = await resendInviteAction(user.userId);
+      if (!res.ok) { toast.error(res.error); return; }
+      toast.success(`Invite re-sent to ${user.email}`);
+    });
+  }
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      title={disabled ? "Configure email in Settings → Email first" : "Resend invite email"}
+      onClick={resend}
+      disabled={pending || disabled}
+      style={disabled ? { opacity: 0.4, cursor: "not-allowed" } : undefined}
+    >
+      <Mail size={14} strokeWidth={1.75} />
+    </Button>
+  );
+}
+
+function NewUserButton({ emailReady }: { emailReady: boolean }) {
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [role, setRole] = useState<Role>("staff");
   const [password, setPassword] = useState("");
+  // "invite" emails a set-password link; "password" sets one to hand over.
+  const [mode, setMode] = useState<"invite" | "password">("invite");
   // null = not yet checked; otherwise the lookup result for the typed email.
   const [lookup, setLookup] = useState<
     { exists: boolean; alreadyMember: boolean; name: string | null } | null
@@ -140,6 +188,7 @@ function NewUserButton() {
     setName("");
     setRole("staff");
     setPassword("");
+    setMode("invite");
     setLookup(null);
   }
 
@@ -161,6 +210,7 @@ function NewUserButton() {
 
   const isNew = lookup !== null && !lookup.exists;
   const alreadyMember = lookup?.alreadyMember ?? false;
+  const inviteMode = isNew && mode === "invite";
 
   function submit() {
     start(async () => {
@@ -168,13 +218,14 @@ function NewUserButton() {
         email,
         role,
         name: isNew ? name : undefined,
-        password: isNew ? password : undefined,
+        password: isNew && mode === "password" ? password : undefined,
+        mode: isNew ? mode : undefined,
       });
       if (!res.ok) {
         toast.error(res.error);
         return;
       }
-      toast.success(isNew ? "User created and added" : "User added to clinic");
+      toast.success(res.note ?? (isNew ? "User created and added" : "User added to clinic"));
       setOpen(false);
       reset();
     });
@@ -218,7 +269,7 @@ function NewUserButton() {
                   : lookup?.exists
                     ? `Existing user${lookup.name ? ` (${lookup.name})` : ""} — they'll be added to this clinic with the role below.`
                     : isNew
-                      ? "New email — set a name and a temporary password below."
+                      ? "New email — invite them to set their own password, or set one manually."
                       : "Enter the person's email."}
             </div>
           </div>
@@ -226,28 +277,54 @@ function NewUserButton() {
           {isNew && (
             <>
               <div>
-                <Label htmlFor="new-name">Name</Label>
+                <Label htmlFor="new-name">Name {mode === "invite" ? "(optional)" : ""}</Label>
                 <Input
                   id="new-name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
+                  placeholder={mode === "invite" ? "They can set this themselves" : ""}
                   disabled={pending}
                 />
               </div>
-              <div>
-                <Label htmlFor="new-password">Temporary password</Label>
-                <Input
-                  id="new-password"
-                  type="text"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="At least 8 characters"
+
+              {/* Invite vs manual-password toggle */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <ModeRadio
+                  checked={mode === "invite"}
+                  onChange={() => setMode("invite")}
                   disabled={pending}
+                  title="Email an invite"
+                  desc={
+                    emailReady
+                      ? "They get a link to set their own password."
+                      : "Requires email set-up (Settings → Email) to actually send."
+                  }
                 />
-                <div style={{ color: "var(--text-tertiary)", fontSize: 12, marginTop: 6 }}>
-                  They&apos;ll be required to change this on first sign-in.
+                <ModeRadio
+                  checked={mode === "password"}
+                  onChange={() => setMode("password")}
+                  disabled={pending}
+                  title="Set a password manually"
+                  desc="You choose a temporary password to hand over."
+                />
+              </div>
+
+              {mode === "password" && (
+                <div>
+                  <Label htmlFor="new-password">Temporary password</Label>
+                  <Input
+                    id="new-password"
+                    type="text"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="At least 8 characters"
+                    disabled={pending}
+                  />
+                  <div style={{ color: "var(--text-tertiary)", fontSize: 12, marginTop: 6 }}>
+                    They&apos;ll be required to change this on first sign-in.
+                  </div>
                 </div>
-              </div>
+              )}
             </>
           )}
 
@@ -263,12 +340,63 @@ function NewUserButton() {
               </Button>
             </DialogClose>
             <Button onClick={submit} disabled={pending || alreadyMember || !email.trim()}>
-              {pending ? "Adding…" : isNew ? "Create & add" : "Add to clinic"}
+              {pending
+                ? "Adding…"
+                : !isNew
+                  ? "Add to clinic"
+                  : inviteMode
+                    ? "Send invite"
+                    : "Create & add"}
             </Button>
           </div>
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function ModeRadio({
+  checked,
+  onChange,
+  disabled,
+  title,
+  desc,
+}: {
+  checked: boolean;
+  onChange: () => void;
+  disabled?: boolean;
+  title: string;
+  desc: string;
+}) {
+  return (
+    <label
+      style={{
+        display: "flex",
+        gap: 10,
+        alignItems: "flex-start",
+        padding: "10px 12px",
+        border: `1px solid ${checked ? "var(--accent)" : "var(--hairline)"}`,
+        borderRadius: "var(--radius)",
+        cursor: disabled ? "default" : "pointer",
+        background: checked ? "var(--surface-2)" : "transparent",
+      }}
+    >
+      <input
+        type="radio"
+        checked={checked}
+        onChange={onChange}
+        disabled={disabled}
+        style={{ marginTop: 2 }}
+      />
+      <span>
+        <span style={{ display: "block", color: "var(--text-primary)", fontSize: 14, fontWeight: 500 }}>
+          {title}
+        </span>
+        <span style={{ display: "block", color: "var(--text-tertiary)", fontSize: 12, marginTop: 2 }}>
+          {desc}
+        </span>
+      </span>
+    </label>
   );
 }
 

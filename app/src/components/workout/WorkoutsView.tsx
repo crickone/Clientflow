@@ -6,6 +6,7 @@ import { Copy, Eye, MoreHorizontal, Pencil, Plus, Search, Trash2 } from "lucide-
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Input } from "@/components/ui/Input";
 import { deleteWorkoutAction, duplicateWorkoutAction } from "@/app/workout/workouts/actions";
 
@@ -79,6 +80,7 @@ export function WorkoutsView({ workouts }: { workouts: WorkoutRow[] }) {
 function WorkoutRowItem({ workout }: { workout: WorkoutRow }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const confirm = useConfirm();
   const onEdit = () => router.push(`/workout/workouts/${workout.id}`);
   const onView = () => router.push(`/workout/workouts/${workout.id}/preview`);
 
@@ -92,7 +94,7 @@ function WorkoutRowItem({ workout }: { workout: WorkoutRow }) {
     });
   const remove = () =>
     start(async () => {
-      if (!confirm(`Delete "${workout.name}"? This cannot be undone.`)) return;
+      if (!(await confirm({ title: `Delete "${workout.name}"?`, body: "This cannot be undone.", destructive: true }))) return;
       await deleteWorkoutAction(workout.id);
       toast.success("Workout deleted.");
       router.refresh();

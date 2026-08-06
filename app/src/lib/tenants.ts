@@ -7,6 +7,7 @@ import { controlDb } from "@/lib/db/control";
 import { memberships, tenants, users, type Tenant } from "@/lib/db/schema";
 import { openTenantDb } from "@/lib/db/tenant";
 import { hashPassword } from "@/lib/auth";
+import { createBillingRow } from "@/lib/billing/engine";
 
 /**
  * Tenant registry + provisioning. A tenant is a business with its own SQLite
@@ -26,39 +27,48 @@ export function getTenantBySlug(slug: string): Tenant | undefined {
  * Seed a tenant's business defaults (therapies, settings, core inbox tags).
  * Idempotent — count/IGNORE guarded. NO user is seeded here; users are
  * control-plane (see createTenantAdmin / the boot migration).
+ *
+ * `venueType` branches the defaults: a clinic gets the therapy catalogue +
+ * therapy-oriented inbox tags; a gym gets NO therapies and membership/class
+ * oriented tags. The `venue_type` setting drives venue-aware UI downstream.
  */
-export function seedTenant(sqlite: BetterSqlite3): void {
-  const therapyCount = (
-    sqlite.prepare("SELECT COUNT(*) AS c FROM therapies").get() as { c: number }
-  ).c;
-  if (therapyCount === 0) {
-    const insert = sqlite.prepare(
-      "INSERT INTO therapies (name, colour_hex, default_duration_minutes, default_price_eur, description) VALUES (?, ?, ?, ?, ?)",
-    );
-    const seed: Array<[string, string, number, number, string]> = [
-      [
-        "HBOT",
-        "#58a6ff",
-        60,
-        95,
-        "Hyperbaric Oxygen Therapy — pressurised oxygen for cellular recovery",
-      ],
-      [
-        "Infrared Therapy",
-        "#f0883e",
-        15,
-        65,
-        "Full-body infrared bed for circulation, recovery, and detox",
-      ],
-      [
-        "PEMF Therapy",
-        "#a855f7",
-        30,
-        65,
-        "PEMF chair — pulsed electromagnetic field therapy for nervous-system regulation",
-      ],
-    ];
-    for (const row of seed) insert.run(...row);
+export function seedTenant(
+  sqlite: BetterSqlite3,
+  venueType: "clinic" | "gym" = "clinic",
+): void {
+  if (venueType === "clinic") {
+    const therapyCount = (
+      sqlite.prepare("SELECT COUNT(*) AS c FROM therapies").get() as { c: number }
+    ).c;
+    if (therapyCount === 0) {
+      const insert = sqlite.prepare(
+        "INSERT INTO therapies (name, colour_hex, default_duration_minutes, default_price_eur, description) VALUES (?, ?, ?, ?, ?)",
+      );
+      const seed: Array<[string, string, number, number, string]> = [
+        [
+          "HBOT",
+          "#58a6ff",
+          60,
+          95,
+          "Hyperbaric Oxygen Therapy — pressurised oxygen for cellular recovery",
+        ],
+        [
+          "Infrared Therapy",
+          "#f0883e",
+          15,
+          65,
+          "Full-body infrared bed for circulation, recovery, and detox",
+        ],
+        [
+          "PEMF Therapy",
+          "#a855f7",
+          30,
+          65,
+          "PEMF chair — pulsed electromagnetic field therapy for nervous-system regulation",
+        ],
+      ];
+      for (const row of seed) insert.run(...row);
+    }
   }
 
   const setIf = sqlite.prepare(
@@ -79,7 +89,7 @@ export function seedTenant(sqlite: BetterSqlite3): void {
   setIf.run("slot_length_minutes", "15");
   setIf.run("multi_therapy_concurrent", "true");
   setIf.run("buffer_minutes", "0");
-  setIf.run("venue_type", JSON.stringify("clinic"));
+  setIf.run("venue_type", JSON.stringify(venueType));
 
   const tagCount = (
     sqlite.prepare("SELECT COUNT(*) AS c FROM tags").get() as { c: number }
@@ -88,17 +98,29 @@ export function seedTenant(sqlite: BetterSqlite3): void {
     const insertTag = sqlite.prepare(
       "INSERT INTO tags (label, slug, color, is_core) VALUES (?, ?, ?, 1)",
     );
-    const coreTags: Array<[string, string, string]> = [
-      ["HBOT", "hbot", "#58a6ff"],
-      ["PEMF", "pemf", "#a855f7"],
-      ["Infrared", "infrared", "#f0883e"],
-      ["Pricing", "pricing", "#2ed8c3"],
-      ["Hours", "hours", "#8b949e"],
-      ["Booking", "booking", "#3fb950"],
-      ["Urgent", "urgent", "#f85149"],
-      ["Upset", "upset", "#db61a2"],
-      ["VIP", "vip", "#d29922"],
-    ];
+    const coreTags: Array<[string, string, string]> =
+      venueType === "gym"
+        ? [
+            ["Membership", "membership", "#58a6ff"],
+            ["Classes", "classes", "#3fb950"],
+            ["PT", "pt", "#a855f7"],
+            ["Billing", "billing", "#2ed8c3"],
+            ["Hours", "hours", "#8b949e"],
+            ["Urgent", "urgent", "#f85149"],
+            ["Upset", "upset", "#db61a2"],
+            ["VIP", "vip", "#d29922"],
+          ]
+        : [
+            ["HBOT", "hbot", "#58a6ff"],
+            ["PEMF", "pemf", "#a855f7"],
+            ["Infrared", "infrared", "#f0883e"],
+            ["Pricing", "pricing", "#2ed8c3"],
+            ["Hours", "hours", "#8b949e"],
+            ["Booking", "booking", "#3fb950"],
+            ["Urgent", "urgent", "#f85149"],
+            ["Upset", "upset", "#db61a2"],
+            ["VIP", "vip", "#d29922"],
+          ];
     for (const [label, slug, color] of coreTags) insertTag.run(label, slug, color);
   }
 }
@@ -106,6 +128,10 @@ export function seedTenant(sqlite: BetterSqlite3): void {
 export interface CreateTenantInput {
   slug: string;
   name: string;
+  /** Business kind — branches the seeded defaults (see seedTenant). */
+  venueType?: "clinic" | "gym";
+  /** Platform billing options for the new tenant's billing row. */
+  billing?: { exempt?: boolean };
   /**
    * Optional first admin for the tenant. If the email already belongs to an
    * existing identity, that identity is reused and just granted an admin
@@ -138,7 +164,12 @@ export function createTenant(input: CreateTenantInput): Tenant {
 
   // Create + seed the tenant DB.
   const { sqlite } = openTenantDb(dbFile);
-  seedTenant(sqlite);
+  seedTenant(sqlite, input.venueType ?? "clinic");
+
+  // Billing: every provisioned tenant gets a billing row (pending_payment unless
+  // exempt). Legacy tenants (e.g. Renova, migrated in place) have no row and so
+  // are never gated.
+  createBillingRow(tenant.id, { exempt: input.billing?.exempt ?? false });
 
   if (input.admin) {
     createTenantAdmin(tenant.id, input.admin);

@@ -35,6 +35,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Input } from "@/components/ui/Input";
 import {
   ImagePicker,
@@ -86,6 +87,7 @@ function ToolButton({
 
 export function BlogEditor({ initial }: { initial: BlogPost }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [post, setPost] = useState<BlogPost>(initial);
   const [title, setTitle] = useState(initial.title);
   // `content` mirrors the editor as markdown — the source of truth we save,
@@ -228,9 +230,11 @@ export function BlogEditor({ initial }: { initial: BlogPost }) {
 
   async function regenerate() {
     if (
-      !confirm(
-        "Regenerate this post? Your current draft will be replaced once it's done.",
-      )
+      !(await confirm({
+        title: "Regenerate this post?",
+        body: "Your current draft will be replaced once it's done.",
+        confirmLabel: "Regenerate",
+      }))
     ) {
       return;
     }
@@ -254,7 +258,7 @@ export function BlogEditor({ initial }: { initial: BlogPost }) {
   }
 
   async function remove() {
-    if (!confirm("Delete this blog post? This can't be undone.")) {
+    if (!(await confirm({ title: "Delete this blog post?", body: "This can't be undone.", destructive: true }))) {
       return;
     }
     try {

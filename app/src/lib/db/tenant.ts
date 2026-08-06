@@ -6,7 +6,7 @@ import {
   drizzle,
   type BetterSQLite3Database,
 } from "drizzle-orm/better-sqlite3";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { AsyncLocalStorage } from "node:async_hooks";
@@ -31,7 +31,7 @@ interface TenantConn {
 }
 
 const DATA_DIR = path.join(process.cwd(), "data");
-const DEFAULT_TENANT_SLUG = process.env.DEFAULT_TENANT_SLUG || "renova";
+export const DEFAULT_TENANT_SLUG = process.env.DEFAULT_TENANT_SLUG || "renova";
 
 // Process-level connection cache, keyed by db_file. better-sqlite3 connections
 // are long-lived; one per tenant file for the life of the server.
@@ -152,13 +152,39 @@ export const getCurrentTenant = cache(() => {
 
   if (token) {
     const row = controlDb
-      .select({ activeTenantId: schema.authSessions.activeTenantId })
+      .select({
+        activeTenantId: schema.authSessions.activeTenantId,
+        userId: schema.authSessions.userId,
+        expiresAt: schema.authSessions.expiresAt,
+      })
       .from(schema.authSessions)
       .where(eq(schema.authSessions.id, token))
       .get();
-    if (row?.activeTenantId != null) {
-      const t = getTenantById(row.activeTenantId);
-      if (t) return t;
+    if (row && row.expiresAt.getTime() > Date.now()) {
+      let tid = row.activeTenantId;
+      // MUST mirror getCurrentMembership(): a session that never picked an active
+      // tenant still resolves when the user has exactly one active membership.
+      // Without this, requireUser() passes as tenant B (single membership) while
+      // the db proxy silently falls through to the DEFAULT tenant below — a
+      // cross-tenant read/write. 0 or >1 memberships → leave unresolved (the
+      // request is rejected by requireUser; only /select-account chrome renders).
+      if (tid == null) {
+        const ms = controlDb
+          .select({ tenantId: schema.memberships.tenantId })
+          .from(schema.memberships)
+          .where(
+            and(
+              eq(schema.memberships.userId, row.userId),
+              eq(schema.memberships.isActive, true),
+            ),
+          )
+          .all();
+        if (ms.length === 1) tid = ms[0].tenantId;
+      }
+      if (tid != null) {
+        const t = getTenantById(tid);
+        if (t) return t;
+      }
     }
   }
 
@@ -233,6 +259,57 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
       updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
+
+    CREATE TABLE IF NOT EXISTS calendar_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      description TEXT,
+      date TEXT NOT NULL,
+      start_time TEXT,
+      end_time TEXT,
+      all_day INTEGER NOT NULL DEFAULT 0,
+      location TEXT,
+      color TEXT,
+      created_by_user_id INTEGER,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_calendar_events_date ON calendar_events(date);
+
+    CREATE TABLE IF NOT EXISTS client_emails (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      to_email TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      body TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'sent',
+      provider_id TEXT,
+      error TEXT,
+      sent_by_user_id INTEGER,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_client_emails_client ON client_emails(client_id);
+
+    CREATE TABLE IF NOT EXISTS email_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      gmail_message_id TEXT NOT NULL UNIQUE,
+      gmail_thread_id TEXT,
+      direction TEXT NOT NULL,
+      from_email TEXT,
+      from_name TEXT,
+      to_email TEXT,
+      subject TEXT,
+      snippet TEXT,
+      body_html TEXT,
+      body_text TEXT,
+      client_id INTEGER,
+      internal_date INTEGER,
+      is_read INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_email_messages_thread ON email_messages(gmail_thread_id);
+    CREATE INDEX IF NOT EXISTS idx_email_messages_client ON email_messages(client_id);
+    CREATE INDEX IF NOT EXISTS idx_email_messages_date ON email_messages(internal_date);
 
     CREATE TABLE IF NOT EXISTS therapies (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

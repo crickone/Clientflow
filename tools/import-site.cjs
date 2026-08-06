@@ -5,13 +5,13 @@
  * Imports a folder of static HTML pages into the CMS as a Site: creates the site
  * if needed, copies its assets into the app's public dir (namespaced per site),
  * rewrites asset + internal-link URLs, keeps page scripts (animations), and maps
- * <title>/<meta description> into SEO. Pages are published on the "renova-live"
+ * <title>/<meta description> into SEO. Pages are published on the "clientflow-live"
  * template (verbatim first-party HTML with its own styles/scripts).
  *
  * Usage:
  *   node tools/import-site.cjs --slug acme --name "Acme Wellness" [--dir sites/acme]
  *
- * Defaults: --dir sites/<slug>, --db app/data/clinic.db, --template renova-live
+ * Defaults: --dir sites/<slug>, --db app/data/clinic.db, --template clientflow-live
  */
 const path = require("path");
 const fs = require("fs");
@@ -33,7 +33,7 @@ if (!slug) {
 const name = arg("name", slug);
 const dir = path.resolve(ROOT, arg("dir", path.join("sites", slug)));
 const dbPath = path.resolve(ROOT, arg("db", path.join("app", "data", "clinic.db")));
-const template = arg("template", "renova-live");
+const template = arg("template", "clientflow-live");
 
 if (!fs.existsSync(dir)) {
   console.error(`Source dir not found: ${dir}`);

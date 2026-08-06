@@ -17,6 +17,7 @@ export const SheetContent = React.forwardRef<
 >(({ children, title, width = 460, ...props }, ref) => (
   <DialogPrimitive.Portal>
     <DialogPrimitive.Overlay
+      className="anim-overlay"
       style={{
         position: "fixed",
         inset: 0,
@@ -24,12 +25,12 @@ export const SheetContent = React.forwardRef<
         backdropFilter: "blur(4px)",
         WebkitBackdropFilter: "blur(4px)",
         zIndex: 60,
-        animation: "fade-up 0.15s var(--ease)",
       }}
     />
     <DialogPrimitive.Content
       ref={ref}
       aria-describedby={undefined}
+      className="anim-sheet"
       {...props}
       style={{
         position: "fixed",
@@ -43,7 +44,6 @@ export const SheetContent = React.forwardRef<
         zIndex: 70,
         display: "flex",
         flexDirection: "column",
-        animation: "sheet-in 0.24s var(--ease)",
       }}
     >
       <div

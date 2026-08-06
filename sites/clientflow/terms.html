@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Terms of Service — ClientFlow</title>
+<meta name="description" content="ClientFlow's terms of service: the €200/month month-to-month subscription, cancellation, your ownership of your data and website, acceptable use and Irish law.">
+<meta name="theme-color" content="#0b0c0f">
+
+<!-- Critical, above-the-fold CSS (tokens + nav + hero shell) for instant first paint.
+     Full design system loads via assets/site.css as the first <body> element. -->
+<style>
+:root{
+  --bg:#0b0c0f;--bg-2:#0e0f13;--surface:#15161b;--surface-2:#1c1e25;--surface-3:#23252e;
+  --hair:rgba(255,255,255,.08);--hair-2:rgba(255,255,255,.15);
+  --text:#f2f3f6;--text-2:#a2abb8;--text-3:#8b94a1;
+  --accent:#ff6a32;--accent-2:#ff8a5c;--accent-soft:rgba(255,106,50,.14);--accent-line:rgba(255,106,50,.35);
+  --glow-soft:0 10px 40px -12px rgba(255,106,50,.35);
+  --font-display:'Space Grotesk',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  --font-body:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  --font-brand:'Nebula','Space Grotesk',system-ui,sans-serif;
+  --fs-display:clamp(2.6rem,6.5vw,5.25rem);--fs-lead:clamp(1.06rem,1.6vw,1.35rem);--fs-xs:.78rem;--fs-sm:.9rem;
+  --maxw:1180px;--maxw-narrow:820px;--nav-h:68px;--r-pill:999px;
+  --ease:cubic-bezier(0.2,0.8,0.2,1);--d:240ms;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:1.02rem;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:radial-gradient(60% 40% at 78% -5%,rgba(255,106,50,.10),transparent 60%),radial-gradient(50% 45% at 8% 8%,rgba(255,106,50,.05),transparent 55%),var(--bg)}
+h1{font-family:var(--font-display);font-weight:700;line-height:1.05;letter-spacing:-.02em;margin:0}
+a{color:inherit;text-decoration:none}
+.wrap{width:100%;max-width:var(--maxw);margin-inline:auto;padding-inline:clamp(1.1rem,4vw,2rem)}
+.narrow{max-width:var(--maxw-narrow)}
+.nav{position:sticky;top:0;z-index:60;height:var(--nav-h);display:flex;align-items:center;border-bottom:1px solid transparent}
+.nav .wrap{display:flex;align-items:center;gap:1.5rem;width:100%}
+.brand{display:inline-flex;align-items:center;gap:.6em}
+.brand .mark{font-family:var(--font-brand);font-size:1.35rem;color:var(--text);line-height:1}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.55em;font-family:var(--font-display);font-weight:600;font-size:.98rem;padding:.82em 1.35em;border-radius:var(--r-pill);border:1px solid transparent;background:rgba(255,255,255,.05);color:var(--text)}
+.btn-primary{background:linear-gradient(180deg,var(--accent-2),var(--accent));color:#180a03;border-color:rgba(255,106,50,.5);box-shadow:var(--glow-soft)}
+.hero{position:relative;padding-top:clamp(2.5rem,6vw,4.5rem);padding-bottom:clamp(3rem,7vw,6rem);overflow:clip}
+.hero h1{font-size:var(--fs-display);letter-spacing:-.03em;margin-bottom:1.5rem;text-wrap:balance}
+.hero .lead{font-size:var(--fs-lead);color:var(--text-2);max-width:60ch}
+.eyebrow{display:inline-flex;align-items:center;gap:.5em;font-family:var(--font-display);font-weight:500;font-size:var(--fs-xs);letter-spacing:.16em;text-transform:uppercase;color:var(--accent-2)}
+.g-accent{background:linear-gradient(100deg,var(--accent),var(--accent-2) 60%,#ffd0b8);-webkit-background-clip:text;background-clip:text;color:transparent}
+</style>
+
+<!-- Page-specific composition CSS -->
+<style>
+.eyebrow.center-e{justify-content:center}
+.eyebrow.center-e::before{display:none}
+
+/* "on this page" quick-jump chips */
+.toc{display:flex;flex-wrap:wrap;gap:.5rem}
+.toc a.chip{transition:border-color var(--d) var(--ease),color var(--d) var(--ease),background var(--d) var(--ease)}
+.toc a.chip:hover,.toc a.chip:focus-visible{border-color:var(--accent-line);color:var(--text);background:var(--surface-3)}
+
+/* legal meta line */
+.legal-meta time{font-variant-numeric:tabular-nums}
+
+/* guarantee card footer line (matches index.html's founder section) */
+.g-foot{margin-top:var(--s4);padding-top:var(--s4);border-top:1px solid var(--hair);color:var(--text-2);font-size:var(--fs-sm);display:inline-flex;align-items:center;gap:.5em}
+
+/* tighten prose heading rhythm for a long numbered legal doc */
+.prose h2{scroll-margin-top:calc(var(--nav-h) + 1rem)}
+</style>
+</head>
+<body>
+<link rel="stylesheet" href="assets/site.css">
+<script>document.documentElement.classList.add('js')</script>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<!-- ============================================================ NAV -->
+<nav class="nav" aria-label="Primary">
+  <div class="wrap">
+    <a class="brand" href="/" aria-label="ClientFlow home">
+      <span class="mark">ClientFlow</span>
+      <span class="tag">Platform</span>
+    </a>
+    <button class="nav-toggle" aria-label="Menu" aria-expanded="false" aria-controls="nav-links">
+      <svg class="bars" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      <svg class="x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <div class="nav-links" id="nav-links">
+      <a href="/product">Product</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/gyms">For Gyms</a>
+      <a href="/wellness-clinics">For Clinics</a>
+      <a href="/compare">Compare</a>
+      <a href="/about">About</a>
+      <span class="nav-cta"><a class="btn btn-primary btn-sm" href="/book-a-demo">Book a demo</a></span>
+    </div>
+  </div>
+</nav>
+
+<main id="main">
+
+<!-- ============================================================ HERO -->
+<header class="hero">
+  <div class="wrap narrow">
+    <span class="eyebrow rv rv-fade">Legal</span>
+    <h1 class="rv rv-d1">Terms of Service</h1>
+    <p class="legal-meta dim mt-3 rv rv-d1">Last updated: <time datetime="2026-07-26">26 July 2026</time></p>
+    <p class="lead mt-5 rv rv-d2">These Terms govern your use of the ClientFlow platform provided by <strong style="color:var(--text)">[COMPANY LEGAL NAME]</strong> ("ClientFlow", "we", "us"), registered at <strong style="color:var(--text)">[REGISTERED ADDRESS]</strong>. By using the service, you agree to these Terms.</p>
+
+    <nav class="toc mt-6 rv rv-d3" aria-label="On this page">
+      <a class="chip" href="#the-service">1. The service</a>
+      <a class="chip" href="#subscription-and-payment">2. Subscription and payment</a>
+      <a class="chip" href="#cancellation">3. Cancellation</a>
+      <a class="chip" href="#free-migration">4. Free migration</a>
+      <a class="chip" href="#data-ownership">5. Data ownership</a>
+      <a class="chip" href="#acceptable-use">6. Acceptable use</a>
+      <a class="chip" href="#availability-and-support">7. Availability and support</a>
+      <a class="chip" href="#liability">8. Liability</a>
+      <a class="chip" href="#termination-by-us">9. Termination by us</a>
+      <a class="chip" href="#changes-to-these-terms">10. Changes to these Terms</a>
+      <a class="chip" href="#governing-law">11. Governing law</a>
+      <a class="chip" href="#contact">12. Contact</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ============================================================ TERMS BODY -->
+<section class="section section-t" id="terms-body">
+  <div class="wrap narrow">
+    <div class="prose rv">
+
+      <h2 id="the-service">1. The service</h2>
+      <p>ClientFlow is a multi-tenant platform for gyms, studios and wellness clinics that combines a CRM, scheduling, memberships and billing, a branded client app, embedded payments, an AI marketing studio, and a website we design, build and host for you. Features may evolve over time; we'll give reasonable notice of material changes.</p>
+
+      <h2 id="subscription-and-payment">2. Subscription and payment</h2>
+      <p><strong>Price.</strong> The subscription is <strong>€200 per month</strong>, exclusive of VAT, which is added per applicable Irish and EU rules. The price is flat and published; we will not increase it without giving you clear advance notice, and any increase will not apply retroactively.</p>
+      <p><strong>Billing.</strong> Fees are billed monthly in advance. Card payments are processed by our payment processor; card processing fees for transactions you take from your members are disclosed separately and are not part of the €200.</p>
+      <p><strong>Month-to-month.</strong> There is no fixed-term contract or lock-in. Your subscription renews each month until cancelled.</p>
+
+      <h2 id="cancellation">3. Cancellation</h2>
+      <p>You may cancel at any time, effective at the end of your current billing month. We don't charge cancellation fees. On cancellation you can export your data and website content (see <a href="#data-ownership">Section 5</a>), and we will help you off the platform. We do not provide pro-rata refunds for partial months unless required by law.</p>
+
+      <h2 id="free-migration">4. Free migration</h2>
+      <p>Where we offer to migrate your data from a previous provider, we do so on a best-efforts basis at no additional charge. You are responsible for ensuring you have the right to transfer that data to us.</p>
+
+      <h2 id="data-ownership">5. Data ownership</h2>
+      <p><strong>Your data is yours.</strong> You retain all rights to your business data, your member and client data, and your website content. We claim no ownership of it. We process it to provide the service and under our <a href="/privacy">Privacy Policy</a> and data processing terms, in which you are the controller and we are your processor for member/client data.</p>
+      <p><strong>Your website.</strong> The website we build for you, and its content, belong to you. On termination you may export your content, and we'll cooperate reasonably with a transfer.</p>
+      <p><strong>Export and deletion.</strong> You can export your data at any time. After termination we will return or delete your data per our retention terms and your instructions.</p>
+
+      <h2 id="acceptable-use">6. Acceptable use</h2>
+      <p>You agree not to: use the service unlawfully or to process data you have no right to process; send spam or unlawful communications; attempt to breach security, reverse-engineer, or disrupt the platform; upload malicious code; or use the service to harm others. You are responsible for your users' conduct and for obtaining any consents needed from your members and clients.</p>
+
+      <h2 id="availability-and-support">7. Availability and support</h2>
+      <p>We aim for high availability but do not guarantee uninterrupted service. We provide support to account holders as described on our website. Planned maintenance will be notified where practicable.</p>
+
+      <h2 id="liability">8. Liability</h2>
+      <p>To the fullest extent permitted by law, our total liability arising from the service is limited to the fees you paid in the 12 months before the event giving rise to the claim. We are not liable for indirect or consequential losses, loss of profits, or loss of data beyond our obligations under data protection law. Nothing in these Terms excludes liability that cannot be excluded by law.</p>
+
+      <h2 id="termination-by-us">9. Termination by us</h2>
+      <p>We may suspend or terminate your access for material breach of these Terms (including non-payment or prohibited use), giving notice and an opportunity to cure where reasonable. On termination, <a href="#data-ownership">Section 5</a> (data ownership and export) continues to apply.</p>
+
+      <h2 id="changes-to-these-terms">10. Changes to these Terms</h2>
+      <p>We may update these Terms. We'll post the revised version with a new "Last updated" date and notify account holders of material changes. Continued use after changes take effect means you accept them.</p>
+
+      <h2 id="governing-law">11. Governing law</h2>
+      <p>These Terms are governed by the laws of <strong>Ireland</strong>, and the courts of Ireland have exclusive jurisdiction over any dispute, without prejudice to any mandatory consumer protections available to you.</p>
+
+      <h2 id="contact">12. Contact</h2>
+      <p><strong>[COMPANY LEGAL NAME]</strong>, <strong>[REGISTERED ADDRESS]</strong> — <a href="mailto:hello@clientflow.ie">hello@clientflow.ie</a> <span class="dim">(placeholder — confirm before launch)</span>.</p>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ IN PLAIN ENGLISH / GUARANTEE -->
+<section class="section section-t" id="promise">
+  <div class="wrap narrow">
+    <div class="center mb-6 rv">
+      <span class="eyebrow center-e">In plain English</span>
+    </div>
+    <div class="guarantee rv">
+      <div class="seal">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2l7 3v6c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V5z"/><path d="M9 12l2 2 4-4"/></svg>
+      </div>
+      <div>
+        <h3>Our no-games promise.</h3>
+        <ul class="checks">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> Flat €200/month — published, not "contact sales."</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> Month-to-month — cancel anytime, no lock-in.</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> Free migration in, full export out — you own your data.</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> No commission on your new clients. Ever.</li>
+        </ul>
+        <p class="g-foot">Built and supported in Ireland 🇮🇪</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ FINAL CTA BAND -->
+<section class="section-sm"><div class="wrap">
+  <div class="cta-band rv">
+    <span class="eyebrow center-e">Still have questions?</span>
+    <h2>Happy to talk you through it.</h2>
+    <p>Twenty minutes with the team that wrote these terms. Plain English, no hard sell.</p>
+    <div class="btn-row">
+      <a class="btn btn-primary btn-lg" href="/book-a-demo">Book a demo</a>
+      <a class="btn btn-line btn-lg" href="/pricing">See pricing</a>
+    </div>
+    <p class="cta-note">Built in Ireland · month-to-month · free migration</p>
+  </div>
+</div></section>
+
+</main>
+
+<!-- ============================================================ FOOTER -->
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <a class="brand" href="/" aria-label="ClientFlow home"><span class="mark">ClientFlow</span><span class="tag">Platform</span></a>
+        <p class="f-blurb">Run your gym or clinic — and grow it — from one place. €200/month, everything in.</p>
+      </div>
+      <nav aria-label="Product">
+        <h3>Product</h3>
+        <ul>
+          <li><a href="/product">Product overview</a></li>
+          <li><a href="/pricing">Pricing</a></li>
+          <li><a href="/gyms">For Gyms</a></li>
+          <li><a href="/wellness-clinics">For Clinics</a></li>
+          <li><a href="/book-a-demo">Book a demo</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Compare">
+        <h3>Compare</h3>
+        <ul>
+          <li><a href="/compare">Compare hub</a></li>
+          <li><a href="/compare-mindbody-alternative">vs Mindbody</a></li>
+          <li><a href="/compare-glofox-alternative">vs Glofox</a></li>
+          <li><a href="/compare-legitfit-alternative">vs LegitFit</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Company">
+        <h3>Company</h3>
+        <ul>
+          <li><a href="/about">About</a></li>
+          <li><a href="/blog">Blog</a></li>
+          <li><a href="/book-a-demo">Book a demo</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Legal">
+        <h3>Legal</h3>
+        <ul>
+          <li><a href="/privacy">Privacy Policy</a></li>
+          <li><a href="/terms" aria-current="page">Terms of Service</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 ClientFlow. All rights reserved. · Prices ex-VAT. Comparison figures researched July 2026; estimates flagged.</span>
+      <span class="ie">Built in Ireland 🇮🇪</span>
+    </div>
+  </div>
+</footer>
+
+<!-- ============================================================ COOKIE BANNER -->
+<div class="cookie" role="dialog" aria-label="Cookie notice" aria-live="polite">
+  <p>We use a couple of cookies to keep the site working and see what's useful. Read our <a href="/privacy">Privacy Policy</a>.</p>
+  <button class="btn btn-primary btn-sm" data-cookie-accept>Grand, got it</button>
+</div>
+
+<!-- ============================================================ STRUCTURED DATA -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://clientflow.ie/"},
+    {"@type": "ListItem", "position": 2, "name": "Terms of Service", "item": "https://clientflow.ie/terms"}
+  ]
+}
+</script>
+
+<script src="assets/site.js" defer></script>
+</body>
+</html>

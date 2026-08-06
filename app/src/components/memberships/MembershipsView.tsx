@@ -10,6 +10,7 @@ import { Sheet, SheetContent } from "@/components/ui/Sheet";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { Input, Label, Textarea } from "@/components/ui/Input";
 import { Avatar } from "@/components/ui/Avatar";
+import { Reveal, RevealGroup } from "@/components/motion/Reveal";
 import { initialsOf } from "@/lib/utils";
 import type { PurchasedDetail } from "@/lib/memberships";
 import {
@@ -156,7 +157,7 @@ export function MembershipsView({
             No memberships yet. Create your first recurring plan.
           </div>
         ) : (
-          <div
+          <RevealGroup
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
@@ -164,41 +165,43 @@ export function MembershipsView({
             }}
           >
             {catalog.map((m) => (
-              <button key={m.id} onClick={() => openEdit(m)} style={card}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                  <div style={{ fontSize: 15, fontWeight: 500, color: "var(--text-primary)" }}>{m.name}</div>
-                  <div style={{ fontFamily: "var(--font-heading), sans-serif", fontSize: 18 }}>
-                    {euros(m.priceCents)}
+              <Reveal key={m.id}>
+                <button onClick={() => openEdit(m)} style={{ ...card, width: "100%", height: "100%" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                    <div style={{ fontSize: 15, fontWeight: 500, color: "var(--text-primary)" }}>{m.name}</div>
+                    <div style={{ fontFamily: "var(--font-heading), sans-serif", fontSize: 18 }}>
+                      {euros(m.priceCents)}
+                    </div>
                   </div>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 6 }}>
-                  <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>{sessionsLabel(m)}</div>
-                  <div style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>{durationLabel(m)}</div>
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginTop: 14,
-                  }}
-                >
-                  {m.forSale ? (
-                    <span style={pill("rgba(34,197,94,0.14)", "#22c55e")}>For sale</span>
-                  ) : (
-                    <span style={pill("rgba(255,255,255,0.06)", "var(--text-tertiary)")}>Not for sale</span>
-                  )}
-                  <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-                    {plural(m.activePayments, "active payment")}
-                  </span>
-                </div>
-                <ChevronRight
-                  size={16}
-                  style={{ position: "absolute", right: 12, bottom: 12, color: "var(--text-tertiary)" }}
-                />
-              </button>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 6 }}>
+                    <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>{sessionsLabel(m)}</div>
+                    <div style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>{durationLabel(m)}</div>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginTop: 14,
+                    }}
+                  >
+                    {m.forSale ? (
+                      <span style={pill("rgba(34,197,94,0.14)", "#22c55e")}>For sale</span>
+                    ) : (
+                      <span style={pill("rgba(255,255,255,0.06)", "var(--text-tertiary)")}>Not for sale</span>
+                    )}
+                    <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                      {plural(m.activePayments, "active payment")}
+                    </span>
+                  </div>
+                  <ChevronRight
+                    size={16}
+                    style={{ position: "absolute", right: 12, bottom: 12, color: "var(--text-tertiary)" }}
+                  />
+                </button>
+              </Reveal>
             ))}
-          </div>
+          </RevealGroup>
         )}
       </div>
 

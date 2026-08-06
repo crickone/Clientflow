@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pricing — €200/month, Everything Included | ClientFlow</title>
+<meta name="description" content="€200 a month, flat. CRM, scheduling, billing, a branded app, AI marketing and a real website — all in. Month-to-month, no lock-in, free migration.">
+<meta name="theme-color" content="#0b0c0f">
+
+<!-- Critical, above-the-fold CSS (tokens + nav + hero shell) for instant first paint.
+     Full design system loads via assets/site.css as the first <body> element. -->
+<style>
+:root{
+  --bg:#0b0c0f;--bg-2:#0e0f13;--surface:#15161b;--surface-2:#1c1e25;--surface-3:#23252e;
+  --hair:rgba(255,255,255,.08);--hair-2:rgba(255,255,255,.15);
+  --text:#f2f3f6;--text-2:#a2abb8;--text-3:#8b94a1;
+  --accent:#ff6a32;--accent-2:#ff8a5c;--accent-soft:rgba(255,106,50,.14);--accent-line:rgba(255,106,50,.35);
+  --glow-soft:0 10px 40px -12px rgba(255,106,50,.35);
+  --font-display:'Space Grotesk',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  --font-body:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  --font-brand:'Nebula','Space Grotesk',system-ui,sans-serif;
+  --fs-display:clamp(2.6rem,6.5vw,5.25rem);--fs-lead:clamp(1.06rem,1.6vw,1.35rem);--fs-xs:.78rem;--fs-sm:.9rem;
+  --maxw:1180px;--nav-h:68px;--r-pill:999px;
+  --ease:cubic-bezier(0.2,0.8,0.2,1);--d:240ms;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:1.02rem;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:radial-gradient(60% 40% at 78% -5%,rgba(255,106,50,.10),transparent 60%),radial-gradient(50% 45% at 8% 8%,rgba(255,106,50,.05),transparent 55%),var(--bg)}
+h1{font-family:var(--font-display);font-weight:700;line-height:1.05;letter-spacing:-.02em;margin:0}
+a{color:inherit;text-decoration:none}
+.wrap{width:100%;max-width:var(--maxw);margin-inline:auto;padding-inline:clamp(1.1rem,4vw,2rem)}
+.nav{position:sticky;top:0;z-index:60;height:var(--nav-h);display:flex;align-items:center;border-bottom:1px solid transparent}
+.nav .wrap{display:flex;align-items:center;gap:1.5rem;width:100%}
+.brand{display:inline-flex;align-items:center;gap:.6em}
+.brand .mark{font-family:var(--font-brand);font-size:1.35rem;color:var(--text);line-height:1}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.55em;font-family:var(--font-display);font-weight:600;font-size:.98rem;padding:.82em 1.35em;border-radius:var(--r-pill);border:1px solid transparent;background:rgba(255,255,255,.05);color:var(--text)}
+.btn-primary{background:linear-gradient(180deg,var(--accent-2),var(--accent));color:#180a03;border-color:rgba(255,106,50,.5);box-shadow:var(--glow-soft)}
+.hero{position:relative;padding-top:clamp(2.5rem,6vw,4.5rem);padding-bottom:clamp(3rem,7vw,6rem);overflow:clip}
+.hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(1.5rem,4vw,3rem);align-items:center}
+.hero h1{font-size:var(--fs-display);letter-spacing:-.03em;margin-bottom:1.5rem;text-wrap:balance}
+.hero .lead{font-size:var(--fs-lead);color:var(--text-2);max-width:60ch;margin:0 0 2rem}
+.eyebrow{display:inline-flex;align-items:center;gap:.5em;font-family:var(--font-display);font-weight:500;font-size:var(--fs-xs);letter-spacing:.16em;text-transform:uppercase;color:var(--accent-2)}
+.g-accent{background:linear-gradient(100deg,var(--accent),var(--accent-2) 60%,#ffd0b8);-webkit-background-clip:text;background-clip:text;color:transparent}
+@media (max-width:940px){.hero-grid{grid-template-columns:1fr}}
+</style>
+
+<!-- Page-specific composition CSS (included checklist grid, stack-math table
+     highlight, savings-calculator sliders) -->
+<style>
+.section-lead{color:var(--text-2);font-size:var(--fs-lead);max-width:60ch}
+.eyebrow.center-e{justify-content:center}
+.eyebrow.center-e::before{display:none}
+
+/* "what's included" checklist: two columns on wider screens (compound
+   selector keeps this correct regardless of stylesheet load order) */
+.checks.check-grid{grid-template-columns:repeat(2,1fr);column-gap:2.2rem;row-gap:.65rem}
+@media (max-width:680px){.checks.check-grid{grid-template-columns:1fr}}
+
+/* stack-math table: highlight the ClientFlow row header to match td.us */
+.cmp tbody th.us{color:var(--text);font-weight:600}
+
+/* savings calculator */
+.calc-shell{max-width:640px;margin-inline:auto}
+.calc-field{margin-bottom:1.2rem}
+.calc-field .calc-row{border-bottom:none;padding-bottom:.3rem}
+.calc input[type=range]{
+  -webkit-appearance:none;appearance:none;display:block;width:100%;height:6px;border-radius:999px;
+  background:var(--surface-3);outline:none;margin:.2rem 0 .1rem;
+}
+.calc input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;width:20px;height:20px;border-radius:50%;
+  background:linear-gradient(180deg,var(--accent-2),var(--accent));border:2px solid #180a03;
+  box-shadow:0 2px 8px rgba(255,106,50,.5);cursor:pointer;
+}
+.calc input[type=range]::-moz-range-thumb{
+  width:20px;height:20px;border-radius:50%;background:linear-gradient(180deg,var(--accent-2),var(--accent));
+  border:2px solid #180a03;box-shadow:0 2px 8px rgba(255,106,50,.5);cursor:pointer;
+}
+.calc input[type=range]::-moz-range-track{background:var(--surface-3);height:6px;border-radius:999px}
+.calc input[type=range]:focus-visible{outline:2px solid var(--accent-2);outline-offset:4px}
+.calc-note{margin-top:var(--s4);color:var(--text-3);font-size:var(--fs-xs)}
+</style>
+</head>
+<body>
+<link rel="stylesheet" href="assets/site.css">
+<script>document.documentElement.classList.add('js')</script>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<!-- ============================================================ NAV -->
+<nav class="nav" aria-label="Primary">
+  <div class="wrap">
+    <a class="brand" href="/" aria-label="ClientFlow home">
+      <span class="mark">ClientFlow</span>
+      <span class="tag">Platform</span>
+    </a>
+    <button class="nav-toggle" aria-label="Menu" aria-expanded="false" aria-controls="nav-links">
+      <svg class="bars" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      <svg class="x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <div class="nav-links" id="nav-links">
+      <a href="/product">Product</a>
+      <a href="/pricing" aria-current="page">Pricing</a>
+      <a href="/gyms">For Gyms</a>
+      <a href="/wellness-clinics">For Clinics</a>
+      <a href="/compare">Compare</a>
+      <a href="/about">About</a>
+      <span class="nav-cta"><a class="btn btn-primary btn-sm" href="/book-a-demo">Book a demo</a></span>
+    </div>
+  </div>
+</nav>
+
+<main id="main">
+
+<!-- ============================================================ HERO -->
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <span class="eyebrow rv rv-fade">Pricing · no tiers, no surprises</span>
+        <h1 class="rv rv-d1">€200 a month. Everything. <span class="g-accent">That's the whole pricing page.</span></h1>
+        <p class="lead rv rv-d2">No tiers. No add-ons. No "contact sales." Month to month, cancel anytime.</p>
+        <div class="btn-row rv rv-d3">
+          <a class="btn btn-primary btn-lg" href="/book-a-demo">Book a demo</a>
+          <a class="btn btn-line btn-lg" href="#included">See what's included</a>
+        </div>
+        <div class="hero-proof rv rv-d4">
+          <span class="p muted"><b>€200</b>/mo, everything in</span>
+          <span class="p muted"><b>0</b> tiers, 0 add-ons</span>
+          <span class="p muted">Cancel <b>anytime</b></span>
+        </div>
+      </div>
+
+      <div class="rv rv-right rv-d2">
+        <div class="price-card">
+          <span class="badge">Everything included</span>
+          <div class="price-tag"><span class="amt">€200</span><span class="per">/month, flat</span></div>
+          <ul class="checks good mt-4">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> CRM, scheduling, memberships &amp; billing</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> Branded app + a real website, built for you</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> AI marketing studio + cheaper payments</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ============================================================ WHAT'S INCLUDED -->
+<section class="section section-t" id="included">
+  <div class="wrap">
+    <div class="sec-head center rv">
+      <span class="eyebrow center-e">What's included</span>
+      <h2>One price. All of it on.</h2>
+    </div>
+
+    <div class="price-card mt-7 rv" style="max-width:800px;margin-inline:auto">
+      <span class="badge">€200/month, flat</span>
+      <div class="price-tag"><span class="amt">€200</span><span class="per">/month, everything in</span></div>
+      <ul class="checks good check-grid mt-5">
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> A real website — designed, built and hosted by us</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> Your own branded app (App Store + Google Play)</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> CRM and lead management</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> Class &amp; appointment scheduling with waitlists</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> Recurring memberships and billing</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> Prepaid packages, credits and deposits</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> Embedded card payments (~40% below Stripe)</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> Zero marketplace commission on your clients</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> AI marketing studio (blogs, posts, campaigns)</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> Reporting: revenue, attendance, churn</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> Combined inbox (email + WhatsApp)</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> Free migration from your current tool</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> Ongoing support from the team in Ireland</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg> Every future update, no upsell</li>
+      </ul>
+      <div class="btn-row mt-6" style="justify-content:center">
+        <a class="btn btn-primary btn-lg" href="/book-a-demo">Book a demo</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ THE STACK MATH -->
+<section class="section section-t" id="stack-math">
+  <div class="wrap">
+    <span class="eyebrow">The stack math</span>
+    <h2 class="mt-3">What the same job costs elsewhere.</h2>
+    <p class="section-lead mt-4">To match ClientFlow, most owners stack a base plan, a branded-app add-on, a website and payment fees. Here's the honest comparison.</p>
+
+    <div class="cmp-wrap mt-7 rv">
+      <table class="cmp">
+        <caption>Feature-parity comparison · figures researched July 2026 · rival totals are researched estimates in source currency and vary by tier and add-ons; ClientFlow's price is fixed, published and quoted in EUR.</caption>
+        <thead>
+          <tr>
+            <th scope="col">Platform</th>
+            <th scope="col">Typical all-in monthly</th>
+            <th scope="col">Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">Mindbody</th><td><span class="est">$510–580</span></td><td>Upper tiers are contact-sales; branded-app add-on est. $249–299/mo</td></tr>
+          <tr><th scope="row">PushPress</th><td><span class="est">$559</span></td><td>With comparable add-ons for app and website</td></tr>
+          <tr><th scope="row">Gymdesk</th><td><span class="est">$300</span></td><td>Branded app roughly $100/mo on top</td></tr>
+          <tr><th scope="row">TeamUp</th><td><span class="est">$320–350</span></td><td>Branded app roughly $99/mo on top</td></tr>
+          <tr><th scope="row" class="us">ClientFlow</th><td class="us"><span class="tick">✓</span> €200 flat</td><td class="us">Everything above, one bill</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="cmp-legend rv">
+      <span><span class="tick">✓</span> Published &amp; fixed</span>
+      <span><span class="est">~</span> Researched estimate (Jul 2026)</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ SAVINGS CALCULATOR -->
+<section class="section section-t" id="calculator">
+  <div class="wrap narrow">
+    <div class="sec-head center rv">
+      <span class="eyebrow center-e">Savings calculator</span>
+      <h2>Do your own maths. It's not close.</h2>
+      <p>Drag the sliders to your numbers — payment fees and the typical stack above, side by side with ours.</p>
+    </div>
+
+    <div class="calc-shell mt-7 rv" data-savings-calc data-rate-rival="2.9" data-rate-us="0.9" data-stack-saving="235">
+      <div class="calc">
+        <div class="calc-field">
+          <div class="calc-row">
+            <label class="lbl" for="sc-members">Members</label>
+            <span class="val" aria-hidden="true"><span data-sc-out="members">150</span></span>
+          </div>
+          <input type="range" id="sc-members" min="20" max="600" step="10" value="150" data-sc="members">
+        </div>
+        <div class="calc-field">
+          <div class="calc-row">
+            <label class="lbl" for="sc-fee">Avg monthly fee per member</label>
+            <span class="val" aria-hidden="true"><span data-sc-out="fee">€80</span></span>
+          </div>
+          <input type="range" id="sc-fee" min="20" max="200" step="5" value="80" data-sc="fee">
+        </div>
+
+        <div class="calc-results" aria-live="polite">
+          <div class="calc-row">
+            <span class="lbl">Monthly payment volume</span>
+            <span class="val" data-sc-out="volume">€12,000</span>
+          </div>
+          <div class="calc-row">
+            <span class="lbl">Payment-fee saving (2.9% rail → our ~0.9%)</span>
+            <span class="val" data-sc-out="payment-saving">€240</span>
+          </div>
+          <div class="calc-row">
+            <span class="lbl">Software-stack saving vs the average above</span>
+            <span class="val" data-sc-out="stack-saving">€235</span>
+          </div>
+          <div class="calc-total">
+            <span>Estimated monthly saving</span>
+            <span class="val" data-sc-out="total">€475</span>
+          </div>
+          <p class="calc-save">≈ <span data-sc-out="annual">€5,700</span> a year back in the business.</p>
+        </div>
+
+        <p class="calc-note">Estimates use published and researched rates, July 2026. Payment-fee saving assumes a 2.9% typical card rate vs ClientFlow's ~0.9% embedded rate; the stack saving compares to the rival averages in the table above.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ ONBOARDING TIMELINE -->
+<section class="section section-t" id="onboarding">
+  <div class="wrap narrow">
+    <div class="sec-head center rv">
+      <span class="eyebrow center-e">Onboarding</span>
+      <h2>From sign-up to live in four steps.</h2>
+    </div>
+
+    <div class="timeline mt-7 rv">
+      <div class="line-fill"></div>
+      <div class="tl-item on">
+        <div class="node"></div>
+        <span class="time">Day 1</span>
+        <h3>Demo &amp; decision</h3>
+        <p>A 20-minute live walkthrough. You decide, no pressure.</p>
+      </div>
+      <div class="tl-item">
+        <div class="node"></div>
+        <span class="time">Week 1</span>
+        <h3>Migration</h3>
+        <p>We move your members, classes and data across, free.</p>
+      </div>
+      <div class="tl-item">
+        <div class="node"></div>
+        <span class="time">Week 1–2</span>
+        <h3>Your website &amp; app</h3>
+        <p>We design and build your site and brand your app.</p>
+      </div>
+      <div class="tl-item">
+        <div class="node"></div>
+        <span class="time">Go live</span>
+        <h3>You're live</h3>
+        <p>Taking bookings and payments, with support on hand.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ FAQ -->
+<section class="section section-t" id="faq">
+  <div class="wrap narrow">
+    <div class="sec-head center rv">
+      <span class="eyebrow center-e">FAQ</span>
+      <h2>The questions everyone asks first.</h2>
+    </div>
+
+    <div class="faq mt-6 rv">
+      <details open>
+        <summary><span class="q">Is there really no contract?</span><span class="pm" aria-hidden="true"></span></summary>
+        <div class="a">Correct. Month to month. Give notice anytime and you're free to go.</div>
+      </details>
+      <details>
+        <summary><span class="q">What does migration cost?</span><span class="pm" aria-hidden="true"></span></summary>
+        <div class="a">Nothing. We move your members, classes and history from your old tool for free.</div>
+      </details>
+      <details>
+        <summary><span class="q">Is VAT included in the €200?</span><span class="pm" aria-hidden="true"></span></summary>
+        <div class="a">Price is quoted ex-VAT. Irish VAT is added per standard rules on your invoice.</div>
+      </details>
+      <details>
+        <summary><span class="q">What are the card payment fees?</span><span class="pm" aria-hidden="true"></span></summary>
+        <div class="a">Around 40% below Stripe, with no marketplace commission on your clients. Exact rate shown on the demo.</div>
+      </details>
+      <details>
+        <summary><span class="q">Are there setup or onboarding fees?</span><span class="pm" aria-hidden="true"></span></summary>
+        <div class="a">No. Setup, migration and building your website are all included in the €200.</div>
+      </details>
+      <details>
+        <summary><span class="q">What if I add more members or classes?</span><span class="pm" aria-hidden="true"></span></summary>
+        <div class="a">Nothing changes. €200 is flat — you're not billed per member or per booking.</div>
+      </details>
+      <details>
+        <summary><span class="q">Will the price go up later?</span><span class="pm" aria-hidden="true"></span></summary>
+        <div class="a">No surprise hikes. We built this brand on the opposite of that. Any change is opt-in.</div>
+      </details>
+      <details>
+        <summary><span class="q">What if I want to leave?</span><span class="pm" aria-hidden="true"></span></summary>
+        <div class="a">You export your data and your site content — you own both. We help you off, no hostage-taking.</div>
+      </details>
+      <details>
+        <summary><span class="q">Do I need technical skills?</span><span class="pm" aria-hidden="true"></span></summary>
+        <div class="a">No. We build the website and brand the app for you. You run your business, not the software.</div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ CLOSING CTA -->
+<section class="section-sm"><div class="wrap">
+  <div class="cta-band rv">
+    <span class="eyebrow center-e">See it live</span>
+    <h2>€200. Everything. See it live first.</h2>
+    <p>Twenty minutes with the team that built it. No hard sell — just your numbers, live.</p>
+    <div class="btn-row">
+      <a class="btn btn-primary btn-lg" href="/book-a-demo">Book a demo</a>
+      <a class="btn btn-line btn-lg" href="/compare">Compare us openly</a>
+    </div>
+    <p class="cta-note">Built in Ireland · month-to-month · free migration</p>
+  </div>
+</div></section>
+
+</main>
+
+<!-- ============================================================ FOOTER -->
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <a class="brand" href="/" aria-label="ClientFlow home"><span class="mark">ClientFlow</span><span class="tag">Platform</span></a>
+        <p class="f-blurb">Run your gym or clinic — and grow it — from one place. €200/month, everything in.</p>
+      </div>
+      <nav aria-label="Product">
+        <h3>Product</h3>
+        <ul>
+          <li><a href="/product">Product overview</a></li>
+          <li><a href="/pricing">Pricing</a></li>
+          <li><a href="/gyms">For Gyms</a></li>
+          <li><a href="/wellness-clinics">For Clinics</a></li>
+          <li><a href="/book-a-demo">Book a demo</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Compare">
+        <h3>Compare</h3>
+        <ul>
+          <li><a href="/compare">Compare hub</a></li>
+          <li><a href="/compare-mindbody-alternative">vs Mindbody</a></li>
+          <li><a href="/compare-glofox-alternative">vs Glofox</a></li>
+          <li><a href="/compare-legitfit-alternative">vs LegitFit</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Company">
+        <h3>Company</h3>
+        <ul>
+          <li><a href="/about">About</a></li>
+          <li><a href="/blog">Blog</a></li>
+          <li><a href="/book-a-demo">Book a demo</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Legal">
+        <h3>Legal</h3>
+        <ul>
+          <li><a href="/privacy">Privacy Policy</a></li>
+          <li><a href="/terms">Terms of Service</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 ClientFlow. All rights reserved. · Prices ex-VAT. Comparison figures researched July 2026; estimates flagged.</span>
+      <span class="ie">Built in Ireland 🇮🇪</span>
+    </div>
+  </div>
+</footer>
+
+<!-- ============================================================ COOKIE BANNER -->
+<div class="cookie" role="dialog" aria-label="Cookie notice" aria-live="polite">
+  <p>We use a couple of cookies to keep the site working and see what's useful. Read our <a href="/privacy">Privacy Policy</a>.</p>
+  <button class="btn btn-primary btn-sm" data-cookie-accept>Grand, got it</button>
+</div>
+
+<!-- ============================================================ STRUCTURED DATA -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Product",
+  "name": "ClientFlow",
+  "description": "All-in-one platform that runs and grows a gym or clinic: a real website, a branded app, CRM, scheduling, memberships and billing, an AI marketing studio and embedded payments — one flat monthly price.",
+  "brand": { "@type": "Brand", "name": "ClientFlow" },
+  "offers": {
+    "@type": "Offer",
+    "url": "https://clientflow.ie/pricing",
+    "price": "200",
+    "priceCurrency": "EUR",
+    "priceValidUntil": "2027-07-26",
+    "priceSpecification": {
+      "@type": "UnitPriceSpecification",
+      "price": "200",
+      "priceCurrency": "EUR",
+      "referenceQuantity": { "@type": "QuantitativeValue", "value": "1", "unitCode": "MON" }
+    },
+    "availability": "https://schema.org/InStock"
+  }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type": "Question", "name": "Is there really no contract?", "acceptedAnswer": {"@type": "Answer", "text": "Correct. Month to month. Give notice anytime and you're free to go."}},
+    {"@type": "Question", "name": "What does migration cost?", "acceptedAnswer": {"@type": "Answer", "text": "Nothing. We move your members, classes and history from your old tool for free."}},
+    {"@type": "Question", "name": "Is VAT included in the €200?", "acceptedAnswer": {"@type": "Answer", "text": "Price is quoted ex-VAT. Irish VAT is added per standard rules on your invoice."}},
+    {"@type": "Question", "name": "What are the card payment fees?", "acceptedAnswer": {"@type": "Answer", "text": "Around 40% below Stripe, with no marketplace commission on your clients. Exact rate shown on the demo."}},
+    {"@type": "Question", "name": "Are there setup or onboarding fees?", "acceptedAnswer": {"@type": "Answer", "text": "No. Setup, migration and building your website are all included in the €200."}},
+    {"@type": "Question", "name": "What if I add more members or classes?", "acceptedAnswer": {"@type": "Answer", "text": "Nothing changes. €200 is flat — you're not billed per member or per booking."}},
+    {"@type": "Question", "name": "Will the price go up later?", "acceptedAnswer": {"@type": "Answer", "text": "No surprise hikes. We built this brand on the opposite of that. Any change is opt-in."}},
+    {"@type": "Question", "name": "What if I want to leave?", "acceptedAnswer": {"@type": "Answer", "text": "You export your data and your site content — you own both. We help you off, no hostage-taking."}},
+    {"@type": "Question", "name": "Do I need technical skills?", "acceptedAnswer": {"@type": "Answer", "text": "No. We build the website and brand the app for you. You run your business, not the software."}}
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://clientflow.ie/"},
+    {"@type": "ListItem", "position": 2, "name": "Pricing", "item": "https://clientflow.ie/pricing"}
+  ]
+}
+</script>
+
+<script src="assets/site.js" defer></script>
+</body>
+</html>

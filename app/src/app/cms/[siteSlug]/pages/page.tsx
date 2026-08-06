@@ -9,6 +9,10 @@ import { requireAdminPage } from "@/lib/auth";
 import { getSiteBySlug } from "@/lib/cms/sites";
 import { listPages } from "@/lib/cms/pages";
 import { listTemplates } from "@/lib/cms/templates";
+// Side-effect: registers the site-specific templates (incl. "clientflow-live") so
+// listTemplates() knows their friendly labels — without this the list falls back
+// to showing the raw template id.
+import "@/lib/cms/registerTemplates";
 import { NewPageForm } from "@/components/cms/NewPageForm";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +27,7 @@ export default async function SitePagesList({
   if (!site) notFound();
   const pages = listPages(site.id);
   const templates = listTemplates().map((t) => ({ id: t.id, label: t.label }));
+  const templateLabel = new Map(templates.map((t) => [t.id, t.label]));
 
   return (
     <div className="app-page">
@@ -45,7 +50,7 @@ export default async function SitePagesList({
                     {p.title || p.path}
                   </div>
                   <div style={{ color: "var(--text-tertiary)", fontSize: 12 }}>
-                    {p.path} · {p.templateId}
+                    {p.path} · {templateLabel.get(p.templateId) ?? p.templateId}
                   </div>
                 </div>
                 <Badge colour={p.status === "published" ? "#3fb950" : "#8b949e"}>

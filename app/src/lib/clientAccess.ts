@@ -1,5 +1,6 @@
 import "server-only";
 
+import crypto from "node:crypto";
 import { and, asc, desc, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
@@ -55,6 +56,59 @@ export function enableClientLogin(clientId: number, email: string, password: str
     authDb.insert(clientCredentials).values({ email: normEmail, passwordHash, tenantId, clientId, isActive: true }).run();
   }
   return { ok: true };
+}
+
+export type CreateCredentialResult =
+  | { ok: true; credentialId: number; created: boolean }
+  | { ok: false; reason: "no-email" | "email-taken" };
+
+/**
+ * Ensure a client has an app credential in the given tenant, for bulk onboarding.
+ * If they already have one (this tenant + client), returns it with created:false.
+ * Otherwise mints one with a RANDOM (unknowable) temp password and
+ * must_change_password=1 — the member sets a real password via the reset/invite
+ * link. tenantId is always supplied by the caller (the authed admin's tenant),
+ * never client-supplied. Refuses when the email is already taken by a DIFFERENT
+ * login (client_credentials.email is globally unique).
+ */
+export function createClientCredential(
+  tenantId: number,
+  clientId: number,
+  email: string,
+): CreateCredentialResult {
+  const normEmail = email.trim().toLowerCase();
+  if (!normEmail.includes("@")) return { ok: false, reason: "no-email" };
+
+  const existingForClient = authDb
+    .select()
+    .from(clientCredentials)
+    .where(and(eq(clientCredentials.tenantId, tenantId), eq(clientCredentials.clientId, clientId)))
+    .get();
+  if (existingForClient) {
+    return { ok: true, credentialId: existingForClient.id, created: false };
+  }
+
+  const existingEmail = authDb
+    .select()
+    .from(clientCredentials)
+    .where(eq(clientCredentials.email, normEmail))
+    .get();
+  if (existingEmail) return { ok: false, reason: "email-taken" };
+
+  const tempPassword = "cf-" + crypto.randomBytes(24).toString("hex");
+  const [row] = authDb
+    .insert(clientCredentials)
+    .values({
+      email: normEmail,
+      passwordHash: hashPassword(tempPassword),
+      tenantId,
+      clientId,
+      isActive: true,
+      mustChangePassword: true,
+    })
+    .returning({ id: clientCredentials.id })
+    .all();
+  return { ok: true, credentialId: row.id, created: true };
 }
 
 export function resetClientPassword(clientId: number, password: string): LoginResult {

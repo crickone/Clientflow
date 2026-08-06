@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { and, gte, lte, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { formatDate, formatEur } from "@/lib/utils";
-import { getSessionUser } from "@/lib/auth";
+import { guard } from "@/lib/api/guard";
 
 export const dynamic = "force-dynamic";
 
@@ -20,18 +20,21 @@ function rows(headers: string[], data: (string | number | null)[][]) {
 }
 
 export async function GET(req: NextRequest) {
-  const user = await getSessionUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (user.role !== "admin")
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  // Membership-validated admin (getSessionUser's legacy users.role could pass an
+  // ex-admin whose per-tenant role is now staff, exporting the default tenant's
+  // full clients/payments CSV — see audit TEN-5).
+  const denied = await guard("admin");
+  if (denied) return denied;
 
   const url = req.nextUrl;
   const type = url.searchParams.get("type") ?? "";
   const start = url.searchParams.get("start") ?? "";
   const end = url.searchParams.get("end") ?? "";
 
+  // Sanitize reflected params before they land in the Content-Disposition header.
+  const safe = (s: string) => s.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 40);
   let body = "";
-  let filename = `${type}-${start}-${end}.csv`;
+  let filename = `${safe(type)}-${safe(start)}-${safe(end)}.csv`;
 
   if (type === "appointments") {
     const appts = db

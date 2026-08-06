@@ -42,6 +42,9 @@ import {
   getClientLogin,
 } from "@/lib/clientAccess";
 import { ClientAppAccess } from "@/components/clients/ClientAppAccess";
+import { ClientEmailPanel } from "@/components/clients/ClientEmailPanel";
+import { listClientEmails } from "@/lib/clientEmail";
+import { isEmailConfigured } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +67,8 @@ export default async function ClientProfile({
       getTherapyMap(),
     ]);
   const messages = getClientMessages(id);
+  const clientEmailHistory = listClientEmails(id);
+  const emailReady = isEmailConfigured();
   const clientLogin = getClientLogin(id);
   const assignedNut = assignedNutrition(id);
   const availNut = availableNutrition();
@@ -163,6 +168,9 @@ export default async function ClientProfile({
           </TabsTrigger>
           <TabsTrigger value="messages">
             Messages ({messages.length})
+          </TabsTrigger>
+          <TabsTrigger value="email">
+            Email ({clientEmailHistory.length})
           </TabsTrigger>
           <TabsTrigger value="app">App &amp; Plans</TabsTrigger>
         </TabsList>
@@ -434,6 +442,15 @@ export default async function ClientProfile({
               sentAt: m.sentAt,
               createdAt: m.createdAt,
             }))}
+          />
+        </TabsContent>
+
+        <TabsContent value="email">
+          <ClientEmailPanel
+            clientId={id}
+            clientEmail={client.email}
+            emailReady={emailReady}
+            history={clientEmailHistory}
           />
         </TabsContent>
 

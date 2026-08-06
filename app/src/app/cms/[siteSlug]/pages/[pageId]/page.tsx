@@ -8,6 +8,9 @@ import { getPage } from "@/lib/cms/pages";
 import { listBlocksForPage } from "@/lib/cms/blocks";
 import { getSeo } from "@/lib/cms/seo";
 import { getTemplate } from "@/lib/cms/templates";
+// Side-effect: register site-specific templates so getTemplate("clientflow-live")
+// resolves to its friendly label instead of undefined (→ raw id).
+import "@/lib/cms/registerTemplates";
 
 export const dynamic = "force-dynamic";
 

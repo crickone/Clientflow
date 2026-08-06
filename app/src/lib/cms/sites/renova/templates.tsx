@@ -5,11 +5,12 @@ import { getBlockValue } from "@/lib/cms/blocks";
 import { sanitizeHtmlKeepStyles } from "@/lib/cms/html";
 
 /**
- * Renova migration templates (controlled-HTML bridge).
+ * Bespoke-site templates (controlled-HTML bridge) — shared by every imported
+ * client site, not tied to any one client.
  *
- * - "renova-page": static render with scripts stripped (safe for any imported
+ * - "clientflow-page": static render with scripts stripped (safe for any imported
  *   HTML; styles kept, no JS).
- * - "renova-live": renders the page's first-party HTML verbatim INCLUDING its
+ * - "clientflow-live": renders the page's first-party HTML verbatim INCLUDING its
  *   own <style> and <script> (GSAP / Lenis / ScrollTrigger + the inline init).
  *   Because the page is server-rendered, those scripts are in the initial
  *   document and the browser executes them on load — so the helix video, scroll
@@ -18,8 +19,8 @@ import { sanitizeHtmlKeepStyles } from "@/lib/cms/html";
  */
 
 registerTemplate({
-  id: "renova-page",
-  label: "Renova page (static HTML)",
+  id: "clientflow-page",
+  label: "Imported page (static HTML)",
   blocks: [{ name: "body", kind: "html", label: "Page HTML", fallback: "" }],
   Component: ({ ctx }) => {
     const row = getBlockValue(ctx.db, ctx.siteId, ctx.pageId, "body");
@@ -28,8 +29,10 @@ registerTemplate({
 });
 
 registerTemplate({
-  id: "renova-live",
-  label: "Renova page (live — animations)",
+  id: "clientflow-live",
+  // Shared by every bespoke imported site — keep the label brand-neutral so it
+  // never shows a client's name under another client's pages.
+  label: "Bespoke site (live — animations)",
   blocks: [{ name: "body", kind: "html", label: "Page HTML (with scripts)", fallback: "" }],
   Component: ({ ctx }) => {
     const row = getBlockValue(ctx.db, ctx.siteId, ctx.pageId, "body");

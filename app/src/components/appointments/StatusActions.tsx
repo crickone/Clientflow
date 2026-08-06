@@ -10,6 +10,7 @@ import {
   DialogClose,
 } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Label, Textarea } from "@/components/ui/Input";
 import { useVocab } from "@/components/providers/VocabProvider";
 import {
@@ -34,6 +35,7 @@ export function StatusActions({
   packageNames,
 }: Props) {
   const [pending, start] = useTransition();
+  const confirm = useConfirm();
   const [openComplete, setOpenComplete] = useState(false);
   const vocab = useVocab();
 
@@ -44,23 +46,21 @@ export function StatusActions({
     });
   }
 
-  function remove() {
-    if (
-      !confirm(
-        `Delete this ${vocab.booking.toLowerCase()}? This cannot be undone.`,
-      )
-    )
-      return;
+  async function remove() {
+    if (!(await confirm({ title: `Delete this ${vocab.booking.toLowerCase()}?`, body: "This cannot be undone.", destructive: true }))) return;
     start(async () => {
       await deleteAppointmentAction(appointmentId);
     });
   }
 
-  function undoComplete() {
+  async function undoComplete() {
     if (
-      !confirm(
-        `Undo completion?\n\nThis will delete the session log(s), refund any ${vocab.plan.toLowerCase()} credit used, and move the ${vocab.booking.toLowerCase()} back to Scheduled.`,
-      )
+      !(await confirm({
+        title: "Undo completion?",
+        body: `This will delete the session log(s), refund any ${vocab.plan.toLowerCase()} credit used, and move the ${vocab.booking.toLowerCase()} back to Scheduled.`,
+        confirmLabel: "Undo",
+        destructive: true,
+      }))
     )
       return;
     start(async () => {
@@ -122,8 +122,8 @@ export function StatusActions({
           variant="outline"
           size="sm"
           disabled={pending}
-          onClick={() => {
-            if (confirm(`Cancel this ${vocab.booking.toLowerCase()}?`))
+          onClick={async () => {
+            if (await confirm({ title: `Cancel this ${vocab.booking.toLowerCase()}?`, confirmLabel: "Cancel booking", cancelLabel: "Keep" }))
               update("cancelled");
           }}
         >

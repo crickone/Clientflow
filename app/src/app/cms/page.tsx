@@ -117,7 +117,7 @@ export default async function CmsSitesPage({
                   flexWrap: "wrap",
                 }}
               >
-                <Link href={`/cms/${s.slug}`} style={{ fontSize: 13, color: "var(--accent)" }}>
+                <Link href={`/cms/${s.slug}/studio`} style={{ fontSize: 13, color: "var(--accent)" }}>
                   Manage →
                 </Link>
                 <a

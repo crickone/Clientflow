@@ -1,6 +1,6 @@
 import "server-only";
 
-import { readKey, setKey } from "@/lib/settings";
+import { readKey, readKeyForTenant, setKey } from "@/lib/settings";
 
 /**
  * Editable business identity. Replaces hardcoded "Renova" across the AI prompts
@@ -50,6 +50,12 @@ const DEFAULT_PROFILE: BusinessProfile = {
 
 export function getBusinessProfile(): BusinessProfile {
   const stored = readKey<Partial<BusinessProfile>>("business_profile", {});
+  return { ...DEFAULT_PROFILE, ...stored };
+}
+
+/** Business profile for an explicit tenant (background jobs). */
+export function getBusinessProfileForTenant(tenantId: number): BusinessProfile {
+  const stored = readKeyForTenant<Partial<BusinessProfile>>(tenantId, "business_profile", {});
   return { ...DEFAULT_PROFILE, ...stored };
 }
 

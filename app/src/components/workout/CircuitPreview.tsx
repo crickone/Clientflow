@@ -6,6 +6,7 @@ import { ArrowLeft, Dumbbell, Pencil, RefreshCw, Timer, Trash2 } from "lucide-re
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { deleteCircuitAction } from "@/app/workout/circuits/actions";
 import { dayVolume, fmtRest, type CircuitInput } from "@/lib/workoutModel";
 
@@ -14,11 +15,12 @@ const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 export function CircuitPreview({ circuit, media }: { circuit: CircuitInput; media: Record<number, string | null> }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const confirm = useConfirm();
   const volume = dayVolume(circuit);
 
   const remove = () =>
     start(async () => {
-      if (!confirm(`Delete "${circuit.name}"? This cannot be undone.`)) return;
+      if (!(await confirm({ title: `Delete "${circuit.name}"?`, body: "This cannot be undone.", destructive: true }))) return;
       await deleteCircuitAction(circuit.id!);
       toast.success("Circuit deleted.");
       router.push("/workout/circuits");

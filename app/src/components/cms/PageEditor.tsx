@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Eye, EyeOff, ExternalLink, Save, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Card, CardLabel } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Input, Label, Textarea } from "@/components/ui/Input";
@@ -54,6 +55,7 @@ export function PageEditor({
   previewUrl: string;
 }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [pending, startTransition] = useTransition();
   const [saving, setSaving] = useState(false);
   const [seoTitle, setSeoTitle] = useState(seo.seoTitle);
@@ -237,7 +239,7 @@ export function PageEditor({
             disabled={pending}
             onClick={() =>
               startTransition(async () => {
-                if (confirm("Delete this page permanently?")) {
+                if (await confirm({ title: "Delete this page permanently?", destructive: true })) {
                   await deletePageAction(siteSlug, page.id);
                 }
               })

@@ -1,5 +1,5 @@
 import { PageHeader } from "@/components/layout/PageHeader";
-import { requireUser } from "@/lib/auth";
+import { requireAdminPage } from "@/lib/auth";
 import { listStaff, payrollMetrics, performanceMetrics } from "@/lib/staff";
 import { addDaysIso, todayIso } from "@/lib/timetable";
 import { StaffView } from "@/components/staff/StaffView";
@@ -13,7 +13,7 @@ interface Props {
 }
 
 export default async function StaffPage({ searchParams }: Props) {
-  await requireUser();
+  await requireAdminPage();
 
   const today = todayIso();
   const monthStart = `${today.slice(0, 7)}-01`;

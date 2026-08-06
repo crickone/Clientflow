@@ -10,6 +10,7 @@ import { Sheet, SheetContent } from "@/components/ui/Sheet";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { Input, Label, Textarea } from "@/components/ui/Input";
 import { Avatar } from "@/components/ui/Avatar";
+import { Reveal, RevealGroup } from "@/components/motion/Reveal";
 import { initialsOf } from "@/lib/utils";
 import type { Pace, PurchasedPackageDetail } from "@/lib/sessionPackages";
 import {
@@ -168,34 +169,36 @@ export function PackagesView({
         {catalog.length === 0 ? (
           <div style={emptyBox}>No packages yet. Create your first prepaid bundle.</div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
+          <RevealGroup style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
             {catalog.map((m) => (
-              <button key={m.id} onClick={() => { setEditing(m); setSheetOpen(true); }} style={card}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                  <div style={{ fontSize: 15, fontWeight: 500, color: "var(--text-primary)" }}>{m.name}</div>
-                  <div style={{ fontFamily: "var(--font-heading), sans-serif", fontSize: 18 }}>{euros(m.priceCents)}</div>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 6, fontSize: 12.5 }}>
-                  <span style={{ color: "var(--text-tertiary)" }}>{m.category || "—"}</span>
-                  <span style={{ color: "var(--text-secondary)" }}>{sessionsLabel(m)}</span>
-                </div>
-                <div style={{ fontSize: 12.5, color: "var(--text-tertiary)", marginTop: 4 }}>{durationLabel(m)}</div>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
-                  {m.singlePurchase && <span style={pill("rgba(255,255,255,0.06)", "var(--text-tertiary)")}>Single purchase</span>}
-                  {m.activateOnFirstBooking && <span style={pill("rgba(255,255,255,0.06)", "var(--text-tertiary)")}>Activates on booking</span>}
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
-                  {m.forSale ? (
-                    <span style={pill("rgba(34,197,94,0.14)", "#22c55e")}>For sale</span>
-                  ) : (
-                    <span style={pill("rgba(255,255,255,0.06)", "var(--text-tertiary)")}>Not for sale</span>
-                  )}
-                  <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{plural(m.activePayments, "active")}</span>
-                </div>
-                <ChevronRight size={16} style={{ position: "absolute", right: 12, bottom: 12, color: "var(--text-tertiary)" }} />
-              </button>
+              <Reveal key={m.id}>
+                <button onClick={() => { setEditing(m); setSheetOpen(true); }} style={{ ...card, width: "100%", height: "100%" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+                    <div style={{ fontSize: 15, fontWeight: 500, color: "var(--text-primary)" }}>{m.name}</div>
+                    <div style={{ fontFamily: "var(--font-heading), sans-serif", fontSize: 18 }}>{euros(m.priceCents)}</div>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginTop: 6, fontSize: 12.5 }}>
+                    <span style={{ color: "var(--text-tertiary)" }}>{m.category || "—"}</span>
+                    <span style={{ color: "var(--text-secondary)" }}>{sessionsLabel(m)}</span>
+                  </div>
+                  <div style={{ fontSize: 12.5, color: "var(--text-tertiary)", marginTop: 4 }}>{durationLabel(m)}</div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+                    {m.singlePurchase && <span style={pill("rgba(255,255,255,0.06)", "var(--text-tertiary)")}>Single purchase</span>}
+                    {m.activateOnFirstBooking && <span style={pill("rgba(255,255,255,0.06)", "var(--text-tertiary)")}>Activates on booking</span>}
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
+                    {m.forSale ? (
+                      <span style={pill("rgba(34,197,94,0.14)", "#22c55e")}>For sale</span>
+                    ) : (
+                      <span style={pill("rgba(255,255,255,0.06)", "var(--text-tertiary)")}>Not for sale</span>
+                    )}
+                    <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{plural(m.activePayments, "active")}</span>
+                  </div>
+                  <ChevronRight size={16} style={{ position: "absolute", right: 12, bottom: 12, color: "var(--text-tertiary)" }} />
+                </button>
+              </Reveal>
             ))}
-          </div>
+          </RevealGroup>
         )}
       </div>
 

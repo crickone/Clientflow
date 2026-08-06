@@ -51,7 +51,7 @@ export function NewPageForm({
               padding: "10px 12px",
               borderRadius: 8,
               border: "1px solid var(--hairline)",
-              background: "var(--surface)",
+              background: "var(--surface-1)",
               color: "var(--text-primary)",
               fontSize: 14,
             }}

@@ -2,10 +2,11 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Dumbbell, KeyRound, Plus, Salad, Smartphone, Trash2, X } from "lucide-react";
+import { Dumbbell, KeyRound, Plus, Salad, Send, Smartphone, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Input, Label } from "@/components/ui/Input";
 import {
   assignNutritionAction,
@@ -13,6 +14,7 @@ import {
   enableClientLoginAction,
   removeClientLoginAction,
   resetClientPasswordAction,
+  sendClientLoginEmailAction,
   setClientLoginActiveAction,
   unassignNutritionAction,
   unassignWorkoutAction,
@@ -78,6 +80,7 @@ export function ClientAppAccess({
 function LoginCard({ clientId, clientEmail, login }: { clientId: number; clientEmail: string | null; login: LoginInfo | null }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const confirm = useConfirm();
   const [email, setEmail] = useState(clientEmail ?? "");
   const [password, setPassword] = useState(genPassword());
   const [resetting, setResetting] = useState(false);
@@ -107,10 +110,18 @@ function LoginCard({ clientId, clientEmail, login }: { clientId: number; clientE
     });
   const remove = () =>
     start(async () => {
-      if (!confirm("Remove this client's app login?")) return;
+      if (!(await confirm({ title: "Remove this client's app login?", destructive: true }))) return;
       await removeClientLoginAction(clientId);
       toast.success("Login removed.");
       router.refresh();
+    });
+  const sendLogin = () =>
+    start(async () => {
+      const res = await sendClientLoginEmailAction(clientId);
+      if (res.ok) {
+        toast.success(`App login emailed to ${login!.email}`);
+        router.refresh();
+      } else toast.error(res.error);
     });
 
   return (
@@ -163,6 +174,9 @@ function LoginCard({ clientId, clientEmail, login }: { clientId: number; clientE
             </div>
           ) : (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Button size="sm" onClick={sendLogin} disabled={pending}>
+                <Send size={13} /> {pending ? "Sending…" : "Email app login"}
+              </Button>
               <Button size="sm" variant="outline" onClick={() => { setNewPass(genPassword()); setResetting(true); }}>
                 <KeyRound size={13} /> Reset password
               </Button>

@@ -11,6 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Card, CardLabel } from "@/components/ui/Card";
 import { Input, Label, Textarea } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
@@ -112,6 +113,7 @@ function Row({
   const [editOpen, setEditOpen] = useState(false);
   const [pending, start] = useTransition();
   const vocab = useVocab();
+  const confirm = useConfirm();
 
   return (
     <>
@@ -203,9 +205,9 @@ function Row({
           size="sm"
           aria-label="Delete"
           disabled={pending}
-          onClick={(e) => {
+          onClick={async (e) => {
             e.stopPropagation();
-            if (!confirm(`Delete template "${template.name}"?`)) return;
+            if (!(await confirm({ title: `Delete template "${template.name}"?`, destructive: true }))) return;
             start(async () => {
               await deletePackageTemplateAction(template.id);
               toast.success("Template removed.");

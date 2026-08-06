@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import type { Lead } from "@/lib/db/schema";
 import { Card } from "@/components/ui/Card";
+import { Reveal, RevealGroup } from "@/components/motion/Reveal";
 import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { StageChip } from "@/components/pipeline/StageChip";
@@ -171,7 +172,7 @@ export function LeadList({ leads }: Props) {
           {q ? `No leads match "${q}".` : "No leads in this view."}
         </div>
       ) : (
-        <div
+        <RevealGroup
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
@@ -184,8 +185,9 @@ export function LeadList({ leads }: Props) {
             const initials =
               initialsOf(l.firstName ?? "?", l.lastName ?? "") || "??";
             return (
-              <Link key={l.id} href={`/leads/${l.id}`}>
-                <Card>
+              <Reveal key={l.id}>
+              <Link href={`/leads/${l.id}`}>
+                <Card interactive>
                   <div
                     style={{
                       display: "flex",
@@ -278,9 +280,10 @@ export function LeadList({ leads }: Props) {
                   </div>
                 </Card>
               </Link>
+              </Reveal>
             );
           })}
-        </div>
+        </RevealGroup>
       )}
     </>
   );

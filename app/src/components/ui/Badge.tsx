@@ -5,11 +5,13 @@ interface Props extends React.HTMLAttributes<HTMLSpanElement> {
   tone?: "neutral" | "amber" | "green" | "red";
 }
 
+// Inks brightened for the dark surface — the previous values (#b45309 / #047857 /
+// #b91c1c) were light-theme inks and read as muddy dark-on-dark.
 const tones: Record<NonNullable<Props["tone"]>, { bg: string; fg: string }> = {
   neutral: { bg: "var(--surface-2)", fg: "var(--text-secondary)" },
-  amber: { bg: "rgba(217, 119, 6, 0.12)", fg: "#b45309" },
-  green: { bg: "rgba(16, 185, 129, 0.12)", fg: "#047857" },
-  red: { bg: "rgba(220, 38, 38, 0.12)", fg: "#b91c1c" },
+  amber: { bg: "rgba(251, 191, 36, 0.15)", fg: "#fbbf24" },
+  green: { bg: "rgba(74, 222, 128, 0.15)", fg: "#4ade80" },
+  red: { bg: "rgba(248, 113, 113, 0.15)", fg: "#f87171" },
 };
 
 export function Badge({ colour, tone = "neutral", children, style, ...rest }: Props) {

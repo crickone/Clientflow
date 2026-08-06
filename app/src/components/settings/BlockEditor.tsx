@@ -11,6 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Card, CardLabel } from "@/components/ui/Card";
 import { Input, Label } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
@@ -129,6 +130,7 @@ function BlockList({ items }: { items: BlockOut[] }) {
 function BlockRow({ block }: { block: BlockOut }) {
   const [editOpen, setEditOpen] = useState(false);
   const [pending, start] = useTransition();
+  const confirm = useConfirm();
   const days = daysForBlock(block);
 
   return (
@@ -194,9 +196,9 @@ function BlockRow({ block }: { block: BlockOut }) {
           size="sm"
           aria-label="Delete"
           disabled={pending}
-          onClick={(e) => {
+          onClick={async (e) => {
             e.stopPropagation();
-            if (!confirm("Delete this block-out?")) return;
+            if (!(await confirm({ title: "Delete this block-out?", destructive: true }))) return;
             start(async () => {
               await deleteBlockAction(block.id);
               toast.success("Block removed.");

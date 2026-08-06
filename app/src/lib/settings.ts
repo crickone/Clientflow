@@ -1,6 +1,7 @@
 import "server-only";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
+import { getTenantDbById } from "./db/tenant";
 import { settings } from "./db/schema";
 import type { VenueType } from "./vocabulary";
 import {
@@ -44,6 +45,21 @@ export function readKey<T>(key: string, fallback: T): T {
   const row = db.select().from(settings).where(eq(settings.key, key)).get();
   if (!row) return fallback;
   try {
+    return JSON.parse(row.value) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * Read a settings key for an EXPLICIT tenant (not the request-scoped one). Used
+ * by background jobs (schedulers) that have no request/cookie context.
+ */
+export function readKeyForTenant<T>(tenantId: number, key: string, fallback: T): T {
+  try {
+    const tdb = getTenantDbById(tenantId);
+    const row = tdb.select().from(settings).where(eq(settings.key, key)).get();
+    if (!row) return fallback;
     return JSON.parse(row.value) as T;
   } catch {
     return fallback;
@@ -98,6 +114,23 @@ export function setVenueType(v: VenueType) {
 }
 
 /**
+ * Scheduling model for this account. Clinics book 1:1 "Appointments"; gyms run a
+ * group-class "Timetable". Most accounts want only one — this drives which
+ * appears in the nav. Defaults from the venue type when never explicitly set.
+ */
+export type SchedulingMode = "appointments" | "timetable";
+
+export function getSchedulingMode(): SchedulingMode {
+  const v = readKey<string>("scheduling_mode", "");
+  if (v === "appointments" || v === "timetable") return v;
+  return getVenueType() === "gym" ? "timetable" : "appointments";
+}
+
+export function setSchedulingMode(m: SchedulingMode) {
+  setKey("scheduling_mode", m);
+}
+
+/**
  * Account-level default fonts for Content Studio. New designs and any slide
  * without an explicit override render with these. Stored as font option ids
  * (see src/lib/image/fonts.ts); fall back to the global defaults when unset.
@@ -119,8 +152,7 @@ export function setBrandFontIds(input: { heading: string; body: string }) {
  * palette is derived from these two colours (see @/lib/theme). Unset → the
  * default dark-premium theme.
  */
-export function getTheme(): ThemeConfig {
-  const raw = readKey<Partial<ThemeConfig> | null>("theme", null);
+function themeFromRaw(raw: Partial<ThemeConfig> | null): ThemeConfig {
   const validFont = new Set(HEADING_FONTS.map((f) => f.id));
   return {
     bg: raw && isHexColor(raw.bg) ? raw.bg : DEFAULT_THEME.bg,
@@ -130,6 +162,15 @@ export function getTheme(): ThemeConfig {
         ? raw.headingFont
         : DEFAULT_THEME.headingFont,
   };
+}
+
+export function getTheme(): ThemeConfig {
+  return themeFromRaw(readKey<Partial<ThemeConfig> | null>("theme", null));
+}
+
+/** Theme for an explicit tenant (background jobs). */
+export function getThemeForTenant(tenantId: number): ThemeConfig {
+  return themeFromRaw(readKeyForTenant<Partial<ThemeConfig> | null>(tenantId, "theme", null));
 }
 
 export function setTheme(cfg: ThemeConfig) {

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Sheet, SheetContent } from "@/components/ui/Sheet";
 import { Input, Label, Textarea } from "@/components/ui/Input";
 import { Avatar } from "@/components/ui/Avatar";
+import { Reveal, RevealGroup } from "@/components/motion/Reveal";
 import { initialsOf } from "@/lib/utils";
 import type { PayrollRow, PerformanceRow } from "@/lib/staff";
 import {
@@ -108,30 +109,32 @@ export function StaffView({
         {roster.length === 0 ? (
           <div style={emptyBox}>No staff yet. Add your instructors to track payroll and performance.</div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
+          <RevealGroup style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
             {roster.map((s) => (
-              <button key={s.id} onClick={() => { setEditing(s); setSheetOpen(true); }} style={card}>
-                <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
-                  <Avatar initials={initials(s.name)} size={40} />
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 14.5, fontWeight: 500, color: "var(--text-primary)", ...clip }}>{s.name}</div>
-                    <div style={{ fontSize: 12, color: "var(--text-tertiary)", ...clip }}>{s.title || "Instructor"}</div>
+              <Reveal key={s.id}>
+                <button onClick={() => { setEditing(s); setSheetOpen(true); }} style={{ ...card, width: "100%", height: "100%" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+                    <Avatar initials={initials(s.name)} size={40} />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 14.5, fontWeight: 500, color: "var(--text-primary)", ...clip }}>{s.name}</div>
+                      <div style={{ fontSize: 12, color: "var(--text-tertiary)", ...clip }}>{s.title || "Instructor"}</div>
+                    </div>
                   </div>
-                </div>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 12 }}>
-                  {s.isActive
-                    ? <span style={pill("rgba(34,197,94,0.14)", "#22c55e")}>Active</span>
-                    : <span style={pill("rgba(255,255,255,0.06)", "var(--text-tertiary)")}>Inactive</span>}
-                  {s.isApproved
-                    ? <span style={pill("rgba(59,130,246,0.16)", "#60a5fa")}>Approved</span>
-                    : <span style={pill("rgba(234,179,8,0.14)", "#eab308")}>Pending</span>}
-                </div>
-                <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 10 }}>
-                  {PAY_TYPE_LABEL[s.payType]} · {euros(s.payRateCents)}
-                </div>
-              </button>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 12 }}>
+                    {s.isActive
+                      ? <span style={pill("rgba(34,197,94,0.14)", "#22c55e")}>Active</span>
+                      : <span style={pill("rgba(255,255,255,0.06)", "var(--text-tertiary)")}>Inactive</span>}
+                    {s.isApproved
+                      ? <span style={pill("rgba(59,130,246,0.16)", "#60a5fa")}>Approved</span>
+                      : <span style={pill("rgba(234,179,8,0.14)", "#eab308")}>Pending</span>}
+                  </div>
+                  <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 10 }}>
+                    {PAY_TYPE_LABEL[s.payType]} · {euros(s.payRateCents)}
+                  </div>
+                </button>
+              </Reveal>
             ))}
-          </div>
+          </RevealGroup>
         )}
       </div>
 

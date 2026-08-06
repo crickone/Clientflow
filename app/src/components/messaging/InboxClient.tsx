@@ -265,6 +265,7 @@ export function InboxClient({
       </div>
 
       <div
+        className="inbox-split"
         style={{
           display: "flex",
           height: "calc(100vh - 300px)",
@@ -275,6 +276,7 @@ export function InboxClient({
       >
         {/* Left: conversation list */}
         <div
+          className="inbox-list"
           style={{
             width: 340,
             flexShrink: 0,

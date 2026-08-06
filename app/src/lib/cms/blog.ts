@@ -94,6 +94,9 @@ export interface BlogMetaPatch {
   seoDescription?: string | null;
   content?: string;
   ogImageAssetId?: number | null;
+  coverImageUrl?: string | null;
+  coverAspect?: string | null;
+  coverPosition?: string | null;
 }
 
 export function updateBlogMeta(

@@ -18,6 +18,7 @@ export const DialogContent = React.forwardRef<
 >(({ children, title, description, width = 560, ...props }, ref) => (
   <DialogPrimitive.Portal>
     <DialogPrimitive.Overlay
+      className="anim-overlay"
       style={{
         position: "fixed",
         inset: 0,
@@ -25,11 +26,11 @@ export const DialogContent = React.forwardRef<
         backdropFilter: "blur(6px)",
         WebkitBackdropFilter: "blur(6px)",
         zIndex: 60,
-        animation: "fade-up 0.18s var(--ease)",
       }}
     />
     <DialogPrimitive.Content
       ref={ref}
+      className="anim-dialog"
       {...props}
       style={{
         position: "fixed",
@@ -45,7 +46,6 @@ export const DialogContent = React.forwardRef<
         boxShadow: "var(--shadow-2)",
         zIndex: 70,
         padding: 28,
-        animation: "fade-up 0.22s var(--ease)",
       }}
     >
       {title && (

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { requireUser } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth";
 import { createStaff, deleteStaff, updateStaff, type StaffInput } from "@/lib/staff";
 
 const staffSchema = z.object({
@@ -27,7 +27,7 @@ function revalidate() {
 }
 
 export async function createStaffAction(raw: unknown): Promise<StaffResult> {
-  await requireUser();
+  await requireAdmin();
   const parsed = staffSchema.safeParse(raw);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
@@ -38,7 +38,7 @@ export async function createStaffAction(raw: unknown): Promise<StaffResult> {
 }
 
 export async function updateStaffAction(id: number, raw: unknown): Promise<StaffResult> {
-  await requireUser();
+  await requireAdmin();
   const sid = idSchema.safeParse(id);
   const parsed = staffSchema.safeParse(raw);
   if (!sid.success || !parsed.success) {
@@ -50,7 +50,7 @@ export async function updateStaffAction(id: number, raw: unknown): Promise<Staff
 }
 
 export async function deleteStaffAction(id: number) {
-  await requireUser();
+  await requireAdmin();
   const sid = idSchema.safeParse(id);
   if (!sid.success) return;
   deleteStaff(sid.data);
@@ -63,7 +63,7 @@ export async function setStaffPayAction(
   payType: "per_session" | "per_hour" | "fixed",
   payRateCents: number,
 ): Promise<StaffResult> {
-  await requireUser();
+  await requireAdmin();
   const sid = idSchema.safeParse(id);
   const pt = z.enum(["per_session", "per_hour", "fixed"]).safeParse(payType);
   const rate = z.coerce.number().int().min(0).max(10_000_00).safeParse(payRateCents);

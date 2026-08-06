@@ -1,0 +1,40 @@
+name: CI
+
+# Enforces what was previously a manual pre-deploy step: type-checking and
+# tests must pass before code merges. The Docker/Railway build intentionally
+# skips tsc (see next.config.mjs — it OOMs on the Railway builder), so this is
+# the gate that guarantees types are actually validated before deploy.
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+defaults:
+  run:
+    working-directory: app
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Lint
+        run: npm run lint
+        continue-on-error: true

@@ -6,7 +6,9 @@ import { Card } from "@/components/ui/Card";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Reveal, RevealGroup } from "@/components/motion/Reveal";
 import { ClientSearch } from "@/components/clients/ClientSearch";
+import { ClientsToolbar } from "@/components/clients/ClientsToolbar";
 import { FilterTabs } from "@/components/clients/FilterTabs";
 import {
   listClients,
@@ -57,14 +59,7 @@ export default async function ClientsPage({ searchParams }: Props) {
       <PageHeader
         eyebrow="People"
         title={vocab.members}
-        actions={
-          <Link href="/clients/new">
-            <Button>
-              <UserPlus size={15} />
-              Add {vocab.member.toLowerCase()}
-            </Button>
-          </Link>
-        }
+        actions={<ClientsToolbar addLabel={`Add ${vocab.member.toLowerCase()}`} />}
       />
 
       <div
@@ -107,7 +102,7 @@ export default async function ClientsPage({ searchParams }: Props) {
           }
         />
       ) : (
-        <div
+        <RevealGroup
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
@@ -118,16 +113,12 @@ export default async function ClientsPage({ searchParams }: Props) {
             const lastVisit = lastVisitMap.get(c.id);
             const tids = [...(therapiesByClient.get(c.id) ?? [])];
             return (
+              <Reveal key={c.id}>
               <Link
-                key={c.id}
                 href={`/clients/${c.id}`}
                 style={{ display: "block" }}
               >
-                <Card
-                  style={{
-                    transition: "border-color 0.15s var(--ease), transform 0.15s var(--ease)",
-                  }}
-                >
+                <Card interactive>
                   <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                     <Avatar initials={initialsOf(c.firstName, c.lastName)} size={44} />
                     <div style={{ minWidth: 0, flex: 1 }}>
@@ -199,9 +190,10 @@ export default async function ClientsPage({ searchParams }: Props) {
                   </div>
                 </Card>
               </Link>
+              </Reveal>
             );
           })}
-        </div>
+        </RevealGroup>
       )}
     </div>
   );

@@ -10,6 +10,7 @@ import { Input, Label, Textarea } from "@/components/ui/Input";
 import { Switch } from "@/components/automations/TriggerListView";
 import { saveTriggerAction } from "@/app/automations/actions";
 import {
+  applyShortcodes,
   blankMessage,
   CHANNEL_LABEL,
   SHORTCODES,
@@ -27,7 +28,7 @@ interface Detail {
   messages: MessageInput[];
 }
 
-export function TriggerEditor({ initial }: { initial: Detail }) {
+export function TriggerEditor({ initial, businessName }: { initial: Detail; businessName: string }) {
   const router = useRouter();
   const [enabled, setEnabled] = useState(initial.enabled);
   const [externalEnabled, setExternalEnabled] = useState(initial.externalEnabled);
@@ -100,6 +101,7 @@ export function TriggerEditor({ initial }: { initial: Detail }) {
           canRemove={messages.length > 1}
           onPatch={(p) => patch(i, p)}
           onRemove={() => removeMsg(i)}
+          businessName={businessName}
         />
       ))}
 
@@ -127,12 +129,14 @@ function MessageCard({
   canRemove,
   onPatch,
   onRemove,
+  businessName,
 }: {
   index: number;
   message: MessageInput;
   canRemove: boolean;
   onPatch: (p: Partial<MessageInput>) => void;
   onRemove: () => void;
+  businessName: string;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -206,6 +210,16 @@ function MessageCard({
           Personalise with short-codes: {SHORTCODES.map((s) => <code key={s} style={codeTag}>{s}</code>)}
         </div>
         <Textarea value={message.template} onChange={(e) => onPatch({ template: e.target.value })} rows={6} placeholder="Hi [FIRST_NAME], …" />
+        {message.template.trim() && (
+          <div style={{ marginTop: 8, padding: "10px 12px", border: "1px dashed var(--hairline)", borderRadius: "var(--radius)", background: "var(--surface-2)" }}>
+            <div style={{ fontSize: 10.5, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-tertiary)", marginBottom: 4 }}>
+              Preview (example client)
+            </div>
+            <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+              {applyShortcodes(message.template, { firstName: "Aoife", lastName: "Brennan", businessName })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* attachment */}

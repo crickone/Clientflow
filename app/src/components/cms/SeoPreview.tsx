@@ -60,7 +60,7 @@ export function SeoPreview({
       </div>
 
       {/* Social card */}
-      <div style={{ maxWidth: 420, border: "1px solid var(--hairline)", borderRadius: 10, overflow: "hidden", background: "var(--surface)" }}>
+      <div style={{ maxWidth: 420, border: "1px solid var(--hairline)", borderRadius: 10, overflow: "hidden", background: "var(--surface-1)" }}>
         <div style={{ aspectRatio: "1.91/1", background: "linear-gradient(135deg,#1b1b1f,#2a2a30)", display: "grid", placeItems: "center", color: "var(--text-tertiary)", fontSize: 12 }}>
           social image
         </div>

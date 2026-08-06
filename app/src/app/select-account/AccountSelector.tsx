@@ -21,11 +21,13 @@ export function AccountSelector({
     setSelecting(tenantId);
     start(async () => {
       const res = await chooseAccount(tenantId);
-      // chooseAccount redirects on success and only returns on failure.
-      if (res && !res.ok) {
+      if (!res.ok) {
         toast.error(res.error);
         setSelecting(null);
+        return;
       }
+      // Full reload so the root layout renders the chosen tenant's theme/chrome.
+      window.location.assign("/dashboard");
     });
   }
 

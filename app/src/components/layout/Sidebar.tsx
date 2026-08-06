@@ -3,8 +3,20 @@
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { type CSSProperties, useEffect, useState, useTransition } from "react";
+import { motion } from "motion/react";
+import { cn } from "@/lib/utils";
+import { EASE, DUR } from "@/lib/motion";
+import { Tooltip } from "@/components/ui/Tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/DropdownMenu";
 import {
   BarChart3,
+  CalendarClock,
   CalendarDays,
   CalendarRange,
   Check,
@@ -30,6 +42,7 @@ import {
   Sparkles,
   UserCog,
   Users,
+  X,
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -58,6 +71,10 @@ type NavLink = {
   label: string;
   icon: typeof LayoutDashboard;
   adminOnly?: boolean;
+  /** Restrict this item to specific tenant slugs (e.g. Renova-only modules). */
+  tenants?: string[];
+  /** Show only when this scheduling mode is active (Appointments vs Timetable). */
+  mode?: "appointments" | "timetable";
   /** Highlight only on an exact path match (not startsWith). */
   exact?: boolean;
   /** When set, the label is taken from the active venue vocabulary. */
@@ -73,77 +90,116 @@ type NavEntry = NavLink | NavGroup;
 
 const isGroup = (e: NavEntry): e is NavGroup => "children" in e;
 
-const NAV: NavEntry[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/leads", label: "Leads", icon: Sparkles },
-  { href: "/communication", label: "Communication", icon: MessagesSquare },
-  { href: "/clients", label: "Clients", icon: Users, labelKey: "members" },
-  { href: "/appointments", label: "Appointments", icon: CalendarDays, labelKey: "bookings" },
-  { href: "/timetable", label: "Timetable", icon: CalendarRange },
-  { href: "/attendance", label: "Attendance", icon: ClipboardCheck },
+/** A labelled block of nav entries. An empty heading = the top (unlabelled) block. */
+type NavSection = { heading?: string; items: NavEntry[] };
+
+const NAV: NavSection[] = [
   {
-    label: "Nutrition",
-    icon: Salad,
-    children: [
-      { href: "/nutrition", label: "Plans", icon: Salad, exact: true },
-      { href: "/nutrition/meals", label: "Meals", icon: Salad },
-      { href: "/nutrition/foods", label: "Foods", icon: Salad },
+    items: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }],
+  },
+  {
+    heading: "Clients",
+    items: [
+      { href: "/clients", label: "Clients", icon: Users, labelKey: "members" },
+      { href: "/leads", label: "Leads", icon: Sparkles },
+      { href: "/communication", label: "Communication", icon: MessagesSquare },
+      { href: "/calendar", label: "Calendar", icon: CalendarClock },
+      { href: "/appointments", label: "Appointments", icon: CalendarDays, labelKey: "bookings", mode: "appointments" },
     ],
   },
   {
-    label: "Workout",
-    icon: Dumbbell,
-    children: [
-      { href: "/workout", label: "Programs", icon: Dumbbell, exact: true },
-      { href: "/workout/workouts", label: "Workouts", icon: Dumbbell },
-      { href: "/workout/exercises", label: "Exercise Library", icon: Dumbbell },
-      { href: "/workout/circuits", label: "Circuits", icon: Dumbbell },
+    heading: "Coaching",
+    items: [
+      { href: "/timetable", label: "Timetable", icon: CalendarRange, mode: "timetable" },
+      { href: "/attendance", label: "Attendance", icon: ClipboardCheck },
+      {
+        label: "Nutrition",
+        icon: Salad,
+        children: [
+          { href: "/nutrition", label: "Plans", icon: Salad, exact: true },
+          { href: "/nutrition/meals", label: "Meals", icon: Salad },
+          { href: "/nutrition/foods", label: "Foods", icon: Salad },
+        ],
+      },
+      {
+        label: "Workout",
+        icon: Dumbbell,
+        children: [
+          { href: "/workout", label: "Programs", icon: Dumbbell, exact: true },
+          { href: "/workout/workouts", label: "Workouts", icon: Dumbbell },
+          { href: "/workout/exercises", label: "Exercise Library", icon: Dumbbell },
+          { href: "/workout/circuits", label: "Circuits", icon: Dumbbell },
+        ],
+      },
+      {
+        label: "Forms",
+        icon: ClipboardList,
+        children: [
+          { href: "/forms/initial", label: "Initial Questionnaire", icon: ClipboardList },
+          { href: "/forms/checkin", label: "Check In Form", icon: ClipboardList },
+          { href: "/forms/habits", label: "Daily Habits", icon: ClipboardList },
+          { href: "/forms/contact", label: "Contact Forms", icon: ClipboardList },
+          { href: "/forms/terms", label: "Terms & Conditions", icon: ClipboardList },
+        ],
+      },
+      { href: "/automations", label: "Automation", icon: Zap },
     ],
   },
   {
-    label: "Products",
-    icon: ShoppingBag,
-    children: [
-      { href: "/memberships", label: "Memberships", icon: CreditCard },
-      { href: "/session-packages", label: "Packages", icon: PackageIcon },
-      { href: "/packages", label: "Session bundles", icon: PackageIcon },
-      { href: "/vouchers", label: "Gift Vouchers", icon: Gift },
+    heading: "Business",
+    items: [
+      {
+        label: "Products",
+        icon: ShoppingBag,
+        children: [
+          { href: "/memberships", label: "Memberships", icon: CreditCard },
+          { href: "/session-packages", label: "Packages", icon: PackageIcon },
+          { href: "/packages", label: "Session bundles", icon: PackageIcon },
+          { href: "/vouchers", label: "Gift Vouchers", icon: Gift },
+        ],
+      },
+      { href: "/staff", label: "Staff", icon: UserCog, adminOnly: true },
+      { href: "/reports", label: "Reports", icon: BarChart3, adminOnly: true },
     ],
   },
-  { href: "/automations", label: "Automation", icon: Zap },
   {
-    label: "Forms",
-    icon: ClipboardList,
-    children: [
-      { href: "/forms/initial", label: "Initial Questionnaire", icon: ClipboardList },
-      { href: "/forms/checkin", label: "Check In Form", icon: ClipboardList },
-      { href: "/forms/habits", label: "Daily Habits", icon: ClipboardList },
-      { href: "/forms/contact", label: "Contact Forms", icon: ClipboardList },
-      { href: "/forms/terms", label: "Terms & Conditions", icon: ClipboardList },
+    heading: "Marketing",
+    items: [
+      { href: "/marketing", label: "Marketing", icon: Megaphone },
+      { href: "/cms", label: "Sites", icon: Globe, adminOnly: true },
+      { href: "/content-studio", label: "Content Studio", icon: Clapperboard },
     ],
   },
-  { href: "/staff", label: "Staff", icon: UserCog, adminOnly: true },
-  { href: "/reports", label: "Reports", icon: BarChart3, adminOnly: true },
-  { href: "/marketing", label: "Marketing", icon: Megaphone },
-  { href: "/cms", label: "Sites", icon: Globe, adminOnly: true },
-  { href: "/content-studio", label: "Content Studio", icon: Clapperboard },
-  { href: "/training", label: "Training", icon: GraduationCap },
-  { href: "/my-app", label: "My App", icon: Smartphone },
-  { href: "/settings", label: "Settings", icon: SettingsIcon, adminOnly: true },
+  {
+    heading: "System",
+    items: [
+      { href: "/my-app", label: "My App", icon: Smartphone },
+      { href: "/training", label: "Training", icon: GraduationCap, tenants: ["renova"] },
+      { href: "/settings", label: "Settings", icon: SettingsIcon, adminOnly: true },
+    ],
+  },
 ];
 
 export function Sidebar({
   user,
   accounts,
   activeTenantId,
+  tenantSlug,
+  schedulingMode,
   logoSrc,
   businessName,
+  open = false,
+  onClose,
 }: {
   user: SidebarUser;
   accounts: SidebarAccount[];
   activeTenantId: number | null;
+  tenantSlug: string;
+  schedulingMode: "appointments" | "timetable";
   logoSrc: string | null;
   businessName: string;
+  open?: boolean;
+  onClose?: () => void;
 }) {
   const vocab = useVocab();
   const router = useRouter();
@@ -159,14 +215,22 @@ export function Sidebar({
   }, []);
 
   const isAdmin = user.role === "admin";
-  const visibleNav = NAV.map((e) => {
+  const linkAllowed = (l: NavLink) =>
+    (!l.adminOnly || isAdmin) &&
+    (!l.tenants || l.tenants.includes(tenantSlug)) &&
+    (!l.mode || l.mode === schedulingMode);
+  const filterEntry = (e: NavEntry): NavEntry | null => {
     if (isGroup(e)) {
       if (e.adminOnly && !isAdmin) return null;
-      const children = e.children.filter((c) => !c.adminOnly || isAdmin);
+      const children = e.children.filter(linkAllowed);
       return children.length ? { ...e, children } : null;
     }
-    return !e.adminOnly || isAdmin ? e : null;
-  }).filter((e): e is NavEntry => e !== null);
+    return linkAllowed(e) ? e : null;
+  };
+  const visibleSections = NAV.map((section) => ({
+    heading: section.heading,
+    items: section.items.map(filterEntry).filter((e): e is NavEntry => e !== null),
+  })).filter((s) => s.items.length > 0);
 
   async function signOut() {
     setSigningOut(true);
@@ -202,24 +266,18 @@ export function Sidebar({
       <Link
         key={item.href}
         href={item.href}
+        className={cn("nav-link", active && "nav-link--active")}
         style={{
           ...navRowStyle,
           paddingLeft: indent ? 34 : 13,
-          color: active ? "var(--accent)" : "var(--text-secondary)",
-          background: active ? "var(--accent-soft)" : "transparent",
         }}
       >
         {active && (
-          <span
+          <motion.span
+            layoutId="nav-active-bar"
             aria-hidden
-            style={{
-              position: "absolute",
-              left: 0,
-              top: 5,
-              bottom: 5,
-              width: 3,
-              background: "var(--accent)",
-            }}
+            style={{ position: "absolute", left: 0, top: 5, bottom: 5, width: 3, background: "var(--accent)" }}
+            transition={{ duration: DUR.base, ease: [...EASE] }}
           />
         )}
         <Icon size={indent ? 15 : 16} strokeWidth={1.75} />
@@ -229,19 +287,14 @@ export function Sidebar({
   }
 
   return (
-    <aside
-      style={{
-        width: 240,
-        minWidth: 240,
-        borderRight: "1px solid var(--hairline)",
-        background: "var(--surface-1)",
-        display: "flex",
-        flexDirection: "column",
-        position: "sticky",
-        top: 0,
-        height: "100vh",
-      }}
-    >
+    <aside className={`app-sidebar${open ? " is-open" : ""}`}>
+      <button
+        className="app-sidebar-close"
+        onClick={onClose}
+        aria-label="Close menu"
+      >
+        <X size={20} strokeWidth={2} />
+      </button>
       <div
         style={{
           padding: "20px 16px 24px",
@@ -262,44 +315,60 @@ export function Sidebar({
         )}
       </div>
 
-      <nav style={{ padding: "12px 8px", flex: 1, overflowY: "auto" }}>
-        {visibleNav.map((entry) => {
-          if (!isGroup(entry)) return renderLink(entry);
-
-          const Icon = entry.icon;
-          const childActive = entry.children.some((c) => pathname?.startsWith(c.href));
-          const expanded = openGroups[entry.label] ?? childActive;
-          return (
-            <div key={entry.label}>
-              <button
-                onClick={() =>
-                  setOpenGroups((s) => ({ ...s, [entry.label]: !expanded }))
-                }
+      <nav style={{ padding: "8px 8px 12px", flex: 1, overflowY: "auto" }}>
+        {visibleSections.map((section, si) => (
+          <div key={section.heading ?? `top-${si}`} style={{ marginTop: si === 0 ? 0 : 14 }}>
+            {section.heading && (
+              <div
                 style={{
-                  ...navRowStyle,
-                  width: "100%",
-                  border: "none",
-                  cursor: "pointer",
-                  background: "transparent",
-                  color: childActive ? "var(--text-primary)" : "var(--text-secondary)",
+                  padding: "6px 13px 5px",
+                  fontSize: 9.5,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.12em",
+                  color: "var(--text-tertiary)",
+                  fontFamily: "var(--font-mono), ui-monospace, monospace",
+                  opacity: 0.6,
                 }}
               >
-                <Icon size={16} strokeWidth={1.75} />
-                <span style={{ flex: 1, textAlign: "left" }}>{entry.label}</span>
-                <ChevronDown
-                  size={14}
-                  style={{
-                    transition: "transform 0.15s var(--ease)",
-                    transform: expanded ? "rotate(0deg)" : "rotate(-90deg)",
-                    opacity: 0.6,
-                  }}
-                />
-              </button>
-              {expanded &&
-                entry.children.map((c) => renderLink(c, true))}
-            </div>
-          );
-        })}
+                {section.heading}
+              </div>
+            )}
+            {section.items.map((entry) => {
+              if (!isGroup(entry)) return renderLink(entry);
+
+              const Icon = entry.icon;
+              const childActive = entry.children.some((c) => pathname?.startsWith(c.href));
+              const expanded = openGroups[entry.label] ?? childActive;
+              return (
+                <div key={entry.label}>
+                  <button
+                    onClick={() => setOpenGroups((s) => ({ ...s, [entry.label]: !expanded }))}
+                    className="nav-link"
+                    style={{
+                      ...navRowStyle,
+                      width: "100%",
+                      border: "none",
+                      cursor: "pointer",
+                      ...(childActive ? { color: "var(--text-primary)" } : {}),
+                    }}
+                  >
+                    <Icon size={16} strokeWidth={1.75} />
+                    <span style={{ flex: 1, textAlign: "left" }}>{entry.label}</span>
+                    <ChevronDown
+                      size={14}
+                      style={{
+                        transition: "transform 0.15s var(--ease)",
+                        transform: expanded ? "rotate(0deg)" : "rotate(-90deg)",
+                        opacity: 0.6,
+                      }}
+                    />
+                  </button>
+                  {expanded && entry.children.map((c) => renderLink(c, true))}
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       <div
@@ -356,26 +425,25 @@ export function Sidebar({
             {user.role}
           </div>
         </div>
-        <button
-          onClick={signOut}
-          disabled={signingOut}
-          title="Sign out"
-          aria-label="Sign out"
-          style={{
-            background: "transparent",
-            border: "1px solid transparent",
-            borderRadius: "var(--radius)",
-            padding: 6,
-            color: "var(--text-secondary)",
-            cursor: signingOut ? "default" : "pointer",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            transition: "background 0.15s var(--ease), color 0.15s var(--ease)",
-          }}
-        >
-          <LogOut size={15} strokeWidth={1.75} />
-        </button>
+        <Tooltip label="Sign out">
+          <button
+            onClick={signOut}
+            disabled={signingOut}
+            aria-label="Sign out"
+            className="nav-link"
+            style={{
+              border: "1px solid transparent",
+              borderRadius: "var(--radius)",
+              padding: 6,
+              cursor: signingOut ? "default" : "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <LogOut size={15} strokeWidth={1.75} />
+          </button>
+        </Tooltip>
       </div>
 
       <div
@@ -430,168 +498,86 @@ function AccountSwitcher({
   logoSrc: string | null;
   businessName: string;
 }) {
-  const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const [switching, setSwitching] = useState<number | null>(null);
 
   function switchTo(tenantId: number) {
-    setOpen(false);
     if (tenantId === activeTenantId) return;
     setSwitching(tenantId);
     start(async () => {
       const res = await chooseAccount(tenantId);
-      // chooseAccount redirects on success and only returns on failure.
-      if (res && !res.ok) {
+      if (!res.ok) {
         toast.error(res.error);
         setSwitching(null);
+        return;
       }
+      // Full reload so the ROOT layout re-renders with the new tenant's theme,
+      // logo and nav (a soft nav would keep the previous tenant's chrome).
+      window.location.assign("/dashboard");
     });
   }
 
   return (
-    <div style={{ position: "relative" }}>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        disabled={pending}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        title="Switch account"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          width: "100%",
-          background: open ? "var(--surface-2)" : "transparent",
-          border: "1px solid",
-          borderColor: open ? "var(--hairline)" : "transparent",
-          borderRadius: "var(--radius)",
-          padding: "8px 10px",
-          cursor: pending ? "default" : "pointer",
-          textAlign: "left",
-          transition: "background 0.15s var(--ease), border-color 0.15s var(--ease)",
-        }}
-      >
-        <span style={{ flex: 1, minWidth: 0 }}>
-          <Logo src={logoSrc} alt={businessName} height={24} />
-        </span>
-        <ChevronsUpDown
-          size={15}
-          strokeWidth={1.75}
-          style={{ color: "var(--text-tertiary)", flexShrink: 0 }}
-        />
-      </button>
-
-      {open && (
-        <>
-          {/* click-away overlay */}
-          <div
-            onClick={() => setOpen(false)}
-            style={{ position: "fixed", inset: 0, zIndex: 40 }}
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          disabled={pending}
+          aria-label="Switch account"
+          className="account-trigger"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            width: "100%",
+            borderRadius: "var(--radius)",
+            padding: "8px 10px",
+            cursor: pending ? "default" : "pointer",
+            textAlign: "left",
+            transition: "background 0.15s var(--ease), border-color 0.15s var(--ease)",
+          }}
+        >
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <Logo src={logoSrc} alt={businessName} height={24} />
+          </span>
+          <ChevronsUpDown
+            size={15}
+            strokeWidth={1.75}
+            style={{ color: "var(--text-tertiary)", flexShrink: 0 }}
           />
-          <div
-            role="menu"
-            style={{
-              position: "absolute",
-              top: "calc(100% + 6px)",
-              left: 0,
-              right: 0,
-              zIndex: 41,
-              background: "var(--surface-1)",
-              border: "1px solid var(--hairline)",
-              borderRadius: "var(--radius)",
-              boxShadow: "0 8px 28px rgba(0,0,0,0.28)",
-              padding: 6,
-            }}
-          >
-            {accounts.map((a) => {
-              const active = a.tenantId === activeTenantId;
-              const busy = pending && switching === a.tenantId;
-              return (
-                <button
-                  key={a.tenantId}
-                  role="menuitem"
-                  onClick={() => switchTo(a.tenantId)}
-                  disabled={pending}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    width: "100%",
-                    textAlign: "left",
-                    background: "transparent",
-                    border: "none",
-                    borderRadius: "var(--radius)",
-                    padding: "8px 8px",
-                    cursor: pending ? "default" : "pointer",
-                    color: "var(--text-primary)",
-                    fontFamily: "inherit",
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 16,
-                      flexShrink: 0,
-                      display: "inline-flex",
-                      justifyContent: "center",
-                      color: "var(--accent)",
-                    }}
-                  >
-                    {active && <Check size={14} strokeWidth={2} />}
-                  </span>
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span
-                      style={{
-                        display: "block",
-                        fontSize: 13,
-                        fontWeight: 500,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {a.name}
-                    </span>
-                    <span
-                      style={{
-                        display: "block",
-                        fontFamily: "var(--font-mono), ui-monospace, monospace",
-                        fontSize: 10,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.08em",
-                        color: "var(--text-tertiary)",
-                      }}
-                    >
-                      {busy ? "Opening…" : a.role}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
-            <div
-              style={{
-                height: 1,
-                background: "var(--hairline)",
-                margin: "6px 4px",
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" style={{ width: "var(--radix-dropdown-menu-trigger-width)" }}>
+        {accounts.map((a) => {
+          const active = a.tenantId === activeTenantId;
+          const busy = pending && switching === a.tenantId;
+          return (
+            <DropdownMenuItem
+              key={a.tenantId}
+              onSelect={(e) => {
+                e.preventDefault();
+                switchTo(a.tenantId);
               }}
-            />
-            <Link
-              href="/select-account"
-              onClick={() => setOpen(false)}
-              role="menuitem"
-              style={{
-                display: "block",
-                padding: "8px 8px",
-                borderRadius: "var(--radius)",
-                fontSize: 12,
-                color: "var(--text-secondary)",
-                fontFamily: "var(--font-mono), ui-monospace, monospace",
-              }}
+              style={{ color: "var(--text-primary)" }}
             >
-              Manage accounts →
-            </Link>
-          </div>
-        </>
-      )}
-    </div>
+              <span style={{ width: 16, flexShrink: 0, display: "inline-flex", justifyContent: "center", color: "var(--accent)" }}>
+                {active && <Check size={14} strokeWidth={2} />}
+              </span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: "block", fontSize: 13, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {a.name}
+                </span>
+                <span style={{ display: "block", fontFamily: "var(--font-mono), ui-monospace, monospace", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-tertiary)" }}>
+                  {busy ? "Opening…" : a.role}
+                </span>
+              </span>
+            </DropdownMenuItem>
+          );
+        })}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild style={{ fontFamily: "var(--font-mono), ui-monospace, monospace", fontSize: 12 }}>
+          <Link href="/select-account">Manage accounts →</Link>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

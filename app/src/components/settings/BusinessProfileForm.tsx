@@ -7,6 +7,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Card, CardLabel } from "@/components/ui/Card";
 import { Input, Label, Textarea } from "@/components/ui/Input";
 import { updateBusinessProfile } from "@/app/settings/business/actions";
@@ -49,6 +50,7 @@ Never:
 export function BusinessProfileForm({ initial }: { initial: BusinessProfile }) {
   const [profile, setProfile] = useState<BusinessProfile>(initial);
   const [isPending, startTransition] = useTransition();
+  const confirm = useConfirm();
   const router = useRouter();
 
   function set<K extends keyof BusinessProfile>(key: K, value: string) {
@@ -137,10 +139,10 @@ export function BusinessProfileForm({ initial }: { initial: BusinessProfile }) {
         <div style={{ marginTop: 10 }}>
           <Button
             variant="outline"
-            onClick={() => {
+            onClick={async () => {
               if (
                 profile.marketingBrain.trim() &&
-                !confirm("Replace the current marketing brain with the starter template?")
+                !(await confirm({ title: "Replace the marketing brain?", body: "This overwrites your current marketing brain with the starter template.", confirmLabel: "Replace" }))
               )
                 return;
               set("marketingBrain", MARKETING_BRAIN_TEMPLATE);

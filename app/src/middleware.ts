@@ -1,14 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login"];
+const PUBLIC_PATHS = ["/login", "/accept-invite"];
 // Logo is shown on the (logged-out) login screen and isn't sensitive.
 // The WhatsApp webhook is a server-to-server callback; it's secret-verified
 // inside the route handler.
 const PUBLIC_API_PREFIXES = [
   "/api/auth/",
   "/api/leads/inbound",
+  "/api/site-demo-lead", // clientflow.ie demo form → ClientFlow-tenant lead (rate-limited, no key)
   "/api/branding/logo",
   "/api/whatsapp/webhook",
+  "/api/cron/", // self-authorizes via CRON_SECRET or an admin session
+  "/api/platform/", // self-authorizes: service key + platform-admin session
 ];
 
 // Host → site-slug map for serving public CMS sites at their domain root. The
@@ -83,8 +86,13 @@ export function middleware(req: NextRequest) {
   }
 
   // Client mobile app (`/app`). Its own auth cookie + login page; validation is
-  // server-side. The login page and client-auth API are public.
-  if (pathname === "/app/login" || pathname.startsWith("/api/client-auth/")) {
+  // server-side. The login page, the forgot/set-password reset page, and the
+  // client-auth API are public (reached before the member is signed in).
+  if (
+    pathname === "/app/login" ||
+    pathname === "/app/reset" ||
+    pathname.startsWith("/api/client-auth/")
+  ) {
     return pass();
   }
   if (pathname === "/app" || pathname.startsWith("/app/")) {

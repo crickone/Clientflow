@@ -41,7 +41,7 @@ Clonmel, Co. Tipperary — optimalhealthatinspire.ie · ☎ 083 867 2844).
   host (prod) or `?site=`/path (dev) via `src/lib/cms/resolveHost.ts`. NEVER uses
   the cookie `db` proxy. Per-host `sitemap.xml` + `robots.txt`.
 - **Templates:** `src/lib/cms/templates.tsx` registry; bespoke imported pages use
-  the `renova-live` template (renders first-party HTML verbatim incl. its own
+  the `clientflow-live` template (renders first-party HTML verbatim incl. its own
   styles + scripts, so GSAP/Lenis animations run).
 - **AI blog** reuses `src/lib/ai/draftBlog.ts` + `src/lib/blog/generator.ts`.
 

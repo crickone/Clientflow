@@ -6,6 +6,7 @@ import { Copy, Eye, MoreHorizontal, Pencil, Plus, Search, Trash2 } from "lucide-
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Input } from "@/components/ui/Input";
 import { deleteCircuitAction, duplicateCircuitAction } from "@/app/workout/circuits/actions";
 
@@ -77,6 +78,7 @@ export function CircuitsView({ circuits }: { circuits: CircuitRow[] }) {
 }
 
 function CircuitRowItem({ circuit }: { circuit: CircuitRow }) {
+  const confirm = useConfirm();
   const router = useRouter();
   const [pending, start] = useTransition();
   const onEdit = () => router.push(`/workout/circuits/${circuit.id}`);
@@ -92,7 +94,7 @@ function CircuitRowItem({ circuit }: { circuit: CircuitRow }) {
     });
   const remove = () =>
     start(async () => {
-      if (!confirm(`Delete "${circuit.name}"? This cannot be undone.`)) return;
+      if (!(await confirm({ title: `Delete "${circuit.name}"?`, body: "This cannot be undone.", destructive: true }))) return;
       await deleteCircuitAction(circuit.id);
       toast.success("Circuit deleted.");
       router.refresh();

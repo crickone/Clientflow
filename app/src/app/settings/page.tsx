@@ -11,7 +11,9 @@ import {
   Image as ImageIcon,
   Palette,
   MessageCircle,
+  Mail,
   Bot,
+  KeyRound,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardLabel } from "@/components/ui/Card";
@@ -66,6 +68,12 @@ function buildSections(vocab: ReturnType<typeof getVocab>) {
     desc: "Manage staff and admin accounts. Add, edit, deactivate, reset passwords.",
   },
   {
+    href: "/settings/api-keys",
+    icon: KeyRound,
+    title: "API keys",
+    desc: "Per-tenant keys for inbound integrations (Zapier, Make, Facebook lead-gen) that post leads into this account.",
+  },
+  {
     href: "/settings/appearance",
     icon: Palette,
     title: "Appearance",
@@ -76,6 +84,12 @@ function buildSections(vocab: ReturnType<typeof getVocab>) {
     icon: ImageIcon,
     title: "Branding",
     desc: "Content Studio fonts, and the same business logo used on intro/outro cards.",
+  },
+  {
+    href: "/settings/email",
+    icon: Mail,
+    title: "Email",
+    desc: "Send staff invites and email clients from your own verified domain (Resend).",
   },
   {
     href: "/settings/integrations/whatsapp",

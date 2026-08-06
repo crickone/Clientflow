@@ -64,17 +64,32 @@ export function editBodyHtml(pc: PageContext): string {
   return sanitizeHtmlKeepStyles(row?.value ?? "");
 }
 
+/** Per-site default OpenGraph image (a static asset shipped with the site),
+ *  used when a page has no explicit media-library OG image. Scoped by slug so
+ *  other tenants are unaffected. */
+const SITE_OG_DEFAULTS: Record<string, string> = {
+  clientflow: "/sites/clientflow/assets/og.png",
+};
+
 export function buildPageMetadata(pc: PageContext): Metadata {
   const seo = getSeoPublic(pc.resolved.db, pc.resolved.site.id, pc.page.id);
   const title = seo?.seoTitle || pc.page.title || pc.resolved.site.name;
   const description = seo?.seoDescription || undefined;
   const canonical = seo?.canonicalUrl || siteUrl(pc.resolved, pc.path, pc.host);
+  // Per-page OG image (media library asset) wins; otherwise a site can ship a
+  // default share image at /sites/<slug>/assets/og.png (see SITE_OG_DEFAULTS).
   const ogImages = seo?.ogImageAssetId
     ? [absoluteUrl(pc.resolved, `/site-media/${pc.resolved.site.slug}/${seo.ogImageAssetId}`, pc.host)]
-    : undefined;
+    : SITE_OG_DEFAULTS[pc.resolved.site.slug]
+      ? [absoluteUrl(pc.resolved, SITE_OG_DEFAULTS[pc.resolved.site.slug], pc.host)]
+      : undefined;
   return {
-    title:
-      title === pc.resolved.site.name ? title : `${title} — ${pc.resolved.site.name}`,
+    // Suffix the site name only when the title doesn't already carry it —
+    // imported pages often brand their own <title> ("Pricing … | ClientFlow"),
+    // and a blind suffix would double-brand ("… | ClientFlow — ClientFlow").
+    title: title.toLowerCase().includes(pc.resolved.site.name.toLowerCase())
+      ? title
+      : `${title} — ${pc.resolved.site.name}`,
     description,
     alternates: { canonical },
     robots: seo?.robots || undefined,

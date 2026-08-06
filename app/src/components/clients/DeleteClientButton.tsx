@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { useVocab } from "@/components/providers/VocabProvider";
 import { deleteClientAction } from "@/app/clients/actions";
 
@@ -22,8 +23,9 @@ export function DeleteClientButton({
 }: Props) {
   const [pending, start] = useTransition();
   const vocab = useVocab();
+  const confirm = useConfirm();
 
-  function onClick() {
+  async function onClick() {
     const extras: string[] = [];
     if (appointmentCount > 0)
       extras.push(
@@ -33,13 +35,13 @@ export function DeleteClientButton({
       extras.push(
         `${packageCount} ${(packageCount === 1 ? vocab.plan : vocab.plans).toLowerCase()}`,
       );
-    const tail = extras.length
-      ? `\n\nThis will also delete ${extras.join(" and ")}.`
-      : "";
+    const also = extras.length ? `This will also delete ${extras.join(" and ")}. ` : "";
     if (
-      !confirm(
-        `Delete ${clientName}?${tail}\n\nThis cannot be undone.`,
-      )
+      !(await confirm({
+        title: `Delete ${clientName}?`,
+        body: `${also}This cannot be undone.`,
+        destructive: true,
+      }))
     )
       return;
     start(async () => {

@@ -63,7 +63,7 @@ export function PageHeader({ eyebrow, title, subtitle, actions }: Props) {
           </p>
         )}
       </div>
-      {actions && <div style={{ display: "flex", gap: 8 }}>{actions}</div>}
+      {actions && <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{actions}</div>}
     </div>
   );
 }

@@ -21,20 +21,12 @@ const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 export type Role = "admin" | "staff";
 
-export function hashPassword(password: string): string {
-  const salt = crypto.randomBytes(16);
-  const hash = crypto.scryptSync(password, salt, 64);
-  return `scrypt$${salt.toString("hex")}$${hash.toString("hex")}`;
-}
-
-export function verifyPassword(password: string, stored: string): boolean {
-  const parts = stored.split("$");
-  if (parts.length !== 3 || parts[0] !== "scrypt") return false;
-  const salt = Buffer.from(parts[1], "hex");
-  const expected = Buffer.from(parts[2], "hex");
-  const actual = crypto.scryptSync(password, salt, expected.length);
-  return crypto.timingSafeEqual(expected, actual);
-}
+// Password hashing/verification lives in the leaf module `@/lib/password`
+// (pure node:crypto, no react/next imports) so it can be shared with
+// `@/lib/platform/auth.ts`, which must stay importable under the plain-tsx
+// test runner (this file pulls in react's `cache` + next/headers' `cookies`,
+// which don't resolve outside Next's bundler).
+export { hashPassword, verifyPassword } from "@/lib/password";
 
 export async function createSession(
   userId: number,

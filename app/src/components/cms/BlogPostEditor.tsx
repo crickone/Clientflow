@@ -6,9 +6,14 @@ import { toast } from "sonner";
 import { ExternalLink, Eye, EyeOff, Loader2, Save, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Card, CardLabel } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Input, Label, Textarea } from "@/components/ui/Input";
+import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
+import { CoverImageField } from "@/components/content-studio/CoverImageField";
+import { ImagePicker } from "@/components/content-studio/ImagePicker";
+import { ImagePlus } from "lucide-react";
 import { SeoPreview } from "@/components/cms/SeoPreview";
 import {
   savePostAction,
@@ -25,10 +30,16 @@ type EditorPost = {
   content: string;
   seoTitle: string;
   seoDescription: string;
+  coverImageUrl: string | null;
+  coverAspect: string | null;
+  coverPosition: string | null;
   status: "generating" | "ready" | "failed";
   publishState: "draft" | "scheduled" | "published";
   error: string | null;
 };
+
+const COVER_ASPECT_DEFAULT = "16 / 9";
+const COVER_POSITION_DEFAULT = "50% 50%";
 
 export function BlogPostEditor({
   siteSlug,
@@ -40,11 +51,19 @@ export function BlogPostEditor({
   siteBaseUrl: string;
 }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [pending, startTransition] = useTransition();
   const [saving, setSaving] = useState(false);
   const [slug, setSlug] = useState(post.slug);
   const [seoTitle, setSeoTitle] = useState(post.seoTitle);
   const [seoDescription, setSeoDescription] = useState(post.seoDescription);
+  // WYSIWYG edits visually but stores markdown; a hidden input carries it into
+  // the form so savePostAction still reads formData.get("content").
+  const [content, setContent] = useState(post.content);
+  const [coverUrl, setCoverUrl] = useState<string | null>(post.coverImageUrl);
+  const [coverAspect, setCoverAspect] = useState(post.coverAspect ?? COVER_ASPECT_DEFAULT);
+  const [coverPosition, setCoverPosition] = useState(post.coverPosition ?? COVER_POSITION_DEFAULT);
+  const [coverPickerOpen, setCoverPickerOpen] = useState(false);
 
   // While the AI is generating, refresh the server component to pick up content.
   useEffect(() => {
@@ -83,12 +102,38 @@ export function BlogPostEditor({
       <form action={onSave}>
         <Card style={{ display: "grid", gap: 16 }}>
           <div>
+            <Label>Cover image</Label>
+            {coverUrl ? (
+              <CoverImageField
+                url={coverUrl}
+                aspect={coverAspect}
+                position={coverPosition}
+                onAspect={setCoverAspect}
+                onPosition={setCoverPosition}
+                onChangeImage={() => setCoverPickerOpen(true)}
+                onRemove={() => {
+                  setCoverUrl(null);
+                  setCoverAspect(COVER_ASPECT_DEFAULT);
+                  setCoverPosition(COVER_POSITION_DEFAULT);
+                }}
+              />
+            ) : (
+              <Button type="button" variant="outline" onClick={() => setCoverPickerOpen(true)}>
+                <ImagePlus size={15} /> Add cover image
+              </Button>
+            )}
+            <input type="hidden" name="coverImageUrl" value={coverUrl ?? ""} />
+            <input type="hidden" name="coverAspect" value={coverAspect} />
+            <input type="hidden" name="coverPosition" value={coverPosition} />
+          </div>
+          <div>
             <Label htmlFor="title">Title</Label>
             <Input id="title" name="title" defaultValue={post.title} />
           </div>
           <div>
-            <Label htmlFor="content">Content (markdown)</Label>
-            <Textarea id="content" name="content" defaultValue={post.content} rows={22} />
+            <Label htmlFor="content">Content</Label>
+            <MarkdownEditor value={post.content} onChange={setContent} placeholder="Write your post — or use the toolbar above." />
+            <input type="hidden" name="content" value={content} />
           </div>
           {/* SEO fields submit with the same form */}
           <input type="hidden" name="_seo" value="1" />
@@ -197,7 +242,7 @@ export function BlogPostEditor({
             disabled={pending}
             onClick={() =>
               startTransition(async () => {
-                if (confirm("Delete this post permanently?")) {
+                if (await confirm({ title: "Delete this post permanently?", destructive: true })) {
                   await deletePostAction(siteSlug, post.id);
                 }
               })
@@ -208,6 +253,20 @@ export function BlogPostEditor({
           </Button>
         </Card>
       </div>
+
+      {/* Rendered outside the <form> so the picker's buttons never submit it. */}
+      {coverPickerOpen && (
+        <ImagePicker
+          title="Choose a cover image"
+          onSelect={(image) => {
+            setCoverUrl(image.url);
+            setCoverAspect(COVER_ASPECT_DEFAULT);
+            setCoverPosition(COVER_POSITION_DEFAULT);
+            setCoverPickerOpen(false);
+          }}
+          onClose={() => setCoverPickerOpen(false)}
+        />
+      )}
     </div>
   );
 }

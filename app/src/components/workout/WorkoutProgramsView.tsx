@@ -19,7 +19,9 @@ import {
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
+import { Reveal, RevealGroup } from "@/components/motion/Reveal";
 import { Input } from "@/components/ui/Input";
 import { PROGRAM_TYPE_LABEL, type ProgramStatus, type ProgramType } from "@/lib/workoutModel";
 import {
@@ -105,6 +107,7 @@ export function WorkoutProgramsView({ programs }: { programs: ProgramRow[] }) {
 }
 
 function ProgramRowItem({ program, onGo }: { program: ProgramRow; onGo: () => void }) {
+  const confirm = useConfirm();
   const router = useRouter();
   const [pending, start] = useTransition();
   const isUpload = program.type === "upload";
@@ -124,7 +127,7 @@ function ProgramRowItem({ program, onGo }: { program: ProgramRow; onGo: () => vo
     });
   const remove = () =>
     start(async () => {
-      if (!confirm(`Delete "${program.title}"? This cannot be undone.`)) return;
+      if (!(await confirm({ title: `Delete "${program.title}"?`, body: "This cannot be undone.", destructive: true }))) return;
       await deleteProgramAction(program.id);
       toast.success("Program deleted.");
       router.refresh();
@@ -289,29 +292,35 @@ function CreateTypeDialog({ open, onClose }: { open: boolean; onClose: () => voi
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent title="What type of workout do you want to add?" width={720}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 14 }}>
-          <TypeCard
-            icon={<FileText size={22} />}
-            title="Simple Program"
-            desc="Copy & paste notes or type out a workout."
-            cta="Create Simple"
-            onClick={() => go("simple")}
-          />
-          <TypeCard
-            icon={<Dumbbell size={22} />}
-            title="Detailed Program"
-            desc="Days, sections & exercises with sets, reps, RIR/RPE."
-            cta="Create Detailed"
-            onClick={() => go("detailed")}
-          />
-          <TypeCard
-            icon={<FileUp size={22} />}
-            title="Upload Plan"
-            desc="Attach an existing PDF or Excel document."
-            cta="Upload"
-            onClick={() => go("upload")}
-          />
-        </div>
+        <RevealGroup style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 14 }}>
+          <Reveal key="simple">
+            <TypeCard
+              icon={<FileText size={22} />}
+              title="Simple Program"
+              desc="Copy & paste notes or type out a workout."
+              cta="Create Simple"
+              onClick={() => go("simple")}
+            />
+          </Reveal>
+          <Reveal key="detailed">
+            <TypeCard
+              icon={<Dumbbell size={22} />}
+              title="Detailed Program"
+              desc="Days, sections & exercises with sets, reps, RIR/RPE."
+              cta="Create Detailed"
+              onClick={() => go("detailed")}
+            />
+          </Reveal>
+          <Reveal key="upload">
+            <TypeCard
+              icon={<FileUp size={22} />}
+              title="Upload Plan"
+              desc="Attach an existing PDF or Excel document."
+              cta="Upload"
+              onClick={() => go("upload")}
+            />
+          </Reveal>
+        </RevealGroup>
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>
           <Button variant="ghost" onClick={onClose}>
             Cancel

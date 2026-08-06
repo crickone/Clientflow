@@ -1,27 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
-import crypto from "node:crypto";
 import { z } from "zod";
 
+import { verifyApiKey } from "@/lib/apiKeys";
+import { runWithTenant } from "@/lib/db/tenant";
 import { logActivity } from "@/lib/queries";
 import { upsertLead } from "@/lib/leads";
 import { rateLimit, clientIp } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 
-// Optional shared secret. When LEADS_INBOUND_TOKEN is set, callers must send it
-// as the `x-webhook-token` header; until it's configured the endpoint stays open
-// (so existing Zapier/Make integrations keep working) but warns in production.
-const INBOUND_TOKEN = process.env.LEADS_INBOUND_TOKEN;
 const MAX_BODY_BYTES = 32 * 1024; // generous for a single lead; blocks disk-fill floods
 const RATE_LIMIT = 60; // requests per IP…
 const RATE_WINDOW_MS = 60 * 1000; // …per minute
-
-function timingSafeEq(a: string, b: string): boolean {
-  const ab = Buffer.from(a);
-  const bb = Buffer.from(b);
-  if (ab.length !== bb.length) return false;
-  return crypto.timingSafeEqual(ab, bb);
-}
 
 /**
  * Source-agnostic lead intake. Zapier / Make.com / Facebook / a manual cURL
@@ -29,6 +19,7 @@ function timingSafeEq(a: string, b: string): boolean {
  *
  *   POST /api/leads/inbound
  *   Content-Type: application/json
+ *   x-api-key: cf_live_…                // the caller's PER-TENANT key
  *   {
  *     "source": "zapier",            // optional, defaults to "manual"
  *     "sourceLeadId": "fb-leadgen-123", // optional, used for dedup
@@ -44,6 +35,12 @@ function timingSafeEq(a: string, b: string): boolean {
  *
  * The endpoint is intentionally permissive — every field except the body
  * being JSON is optional. Re-posting the same source+sourceLeadId is a no-op.
+ *
+ * TENANCY: the request has no session cookie, so it MUST NOT touch the
+ * request-scoped `db` proxy directly (that falls back to the DEFAULT tenant —
+ * the bug this endpoint used to have, writing every gym's leads into renova's
+ * DB). Integrations now send their own per-tenant API key; we resolve the
+ * owning tenant from it and run the upsert inside runWithTenant(tenantId, …).
  */
 const schema = z.object({
   source: z.string().optional(),
@@ -68,16 +65,22 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 2. Shared-secret gate (enforced only once LEADS_INBOUND_TOKEN is configured).
-  if (INBOUND_TOKEN) {
-    const provided = req.headers.get("x-webhook-token") ?? "";
-    if (!timingSafeEq(provided, INBOUND_TOKEN)) {
-      return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
-    }
-  } else if (process.env.NODE_ENV === "production") {
-    console.warn(
-      "[leads/inbound] LEADS_INBOUND_TOKEN is not set — the inbound lead webhook " +
-        "is unauthenticated. Set it and send it as the x-webhook-token header.",
+  // 2. Per-tenant API-key gate. The key both AUTHENTICATES the caller and, by
+  //    resolving to its owning tenant, ROUTES the lead into the right DB. The
+  //    legacy global LEADS_INBOUND_TOKEN + default-tenant fallback is gone.
+  const providedKey = req.headers.get("x-api-key") ?? "";
+  const verified = verifyApiKey(providedKey);
+  if (!verified) {
+    return NextResponse.json(
+      { ok: false, error: "Missing or invalid API key." },
+      { status: 401 },
+    );
+  }
+  const scopeList = verified.scopes.split(",").map((s) => s.trim());
+  if (!scopeList.includes("leads")) {
+    return NextResponse.json(
+      { ok: false, error: "This API key is not scoped for leads." },
+      { status: 401 },
     );
   }
 
@@ -115,36 +118,42 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { lead, created } = upsertLead({
-    source: parsed.data.source,
-    sourceLeadId: parsed.data.sourceLeadId,
-    campaign: parsed.data.campaign,
-    firstName: parsed.data.firstName,
-    lastName: parsed.data.lastName,
-    email: parsed.data.email || null,
-    phone: parsed.data.phone,
-    therapyInterest: parsed.data.therapyInterest,
-    notes: parsed.data.notes,
-    rawPayload: parsed.data.raw ?? body,
-  });
+  // 4. Run the upsert (+ activity log) bound to the key's tenant, so every `db`
+  //    access inside resolves to THAT tenant's DB — never the default.
+  const result = await runWithTenant(verified.tenantId, async () => {
+    const { lead, created } = upsertLead({
+      source: parsed.data.source,
+      sourceLeadId: parsed.data.sourceLeadId,
+      campaign: parsed.data.campaign,
+      firstName: parsed.data.firstName,
+      lastName: parsed.data.lastName,
+      email: parsed.data.email || null,
+      phone: parsed.data.phone,
+      therapyInterest: parsed.data.therapyInterest,
+      notes: parsed.data.notes,
+      rawPayload: parsed.data.raw ?? body,
+    });
 
-  if (created) {
-    const name =
-      [lead.firstName, lead.lastName].filter(Boolean).join(" ").trim() ||
-      lead.email ||
-      lead.phone ||
-      "anonymous";
-    await logActivity(
-      "lead.new",
-      `New lead via ${lead.source}: ${name}` +
-        (lead.therapyInterest ? ` · ${lead.therapyInterest}` : ""),
-      { leadId: lead.id },
-    );
-  }
+    if (created) {
+      const name =
+        [lead.firstName, lead.lastName].filter(Boolean).join(" ").trim() ||
+        lead.email ||
+        lead.phone ||
+        "anonymous";
+      await logActivity(
+        "lead.new",
+        `New lead via ${lead.source}: ${name}` +
+          (lead.therapyInterest ? ` · ${lead.therapyInterest}` : ""),
+        { leadId: lead.id },
+      );
+    }
+
+    return { leadId: lead.id, created };
+  });
 
   return NextResponse.json({
     ok: true,
-    leadId: lead.id,
-    created,
+    leadId: result.leadId,
+    created: result.created,
   });
 }

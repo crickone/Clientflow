@@ -40,7 +40,18 @@ let failed = 0;
 for (const file of files) {
   const rel = file.replace(cwd + "/", "");
   console.log(`\n▶ ${rel}`);
-  const res = spawnSync(tsx, [file], { stdio: "inherit" });
+  // `--conditions=react-server` lets modules that `import "server-only"` load
+  // under plain Node/tsx (the package's react-server export is a no-op; its
+  // default export throws). Next.js applies the same condition for server code.
+  const res = spawnSync(tsx, [file], {
+    stdio: "inherit",
+    env: {
+      ...process.env,
+      NODE_OPTIONS: [process.env.NODE_OPTIONS, "--conditions=react-server"]
+        .filter(Boolean)
+        .join(" "),
+    },
+  });
   if (res.status !== 0) {
     failed++;
     console.log(`✗ FAILED: ${rel}`);

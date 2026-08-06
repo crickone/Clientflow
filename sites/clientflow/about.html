@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>About ClientFlow — Built in Ireland, for Gyms &amp; Clinics</title>
+<meta name="description" content="We ran marketing for gyms and clinics, built the platform for our own clients, then productised it. Flat pricing as a principle. Built in Ireland.">
+<meta name="theme-color" content="#0b0c0f">
+
+<!-- Critical, above-the-fold CSS (tokens + nav + hero shell) for instant first paint.
+     Full design system loads via assets/site.css as the first <body> element. -->
+<style>
+:root{
+  --bg:#0b0c0f;--bg-2:#0e0f13;--surface:#15161b;--surface-2:#1c1e25;--surface-3:#23252e;
+  --hair:rgba(255,255,255,.08);--hair-2:rgba(255,255,255,.15);
+  --text:#f2f3f6;--text-2:#a2abb8;--text-3:#8b94a1;
+  --accent:#ff6a32;--accent-2:#ff8a5c;--accent-soft:rgba(255,106,50,.14);--accent-line:rgba(255,106,50,.35);
+  --glow-soft:0 10px 40px -12px rgba(255,106,50,.35);
+  --font-display:'Space Grotesk',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  --font-body:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  --font-brand:'Nebula','Space Grotesk',system-ui,sans-serif;
+  --fs-display:clamp(2.6rem,6.5vw,5.25rem);--fs-lead:clamp(1.06rem,1.6vw,1.35rem);--fs-xs:.78rem;--fs-sm:.9rem;
+  --maxw:1180px;--nav-h:68px;--r-pill:999px;
+  --ease:cubic-bezier(0.2,0.8,0.2,1);--d:240ms;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:1.02rem;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:radial-gradient(60% 40% at 78% -5%,rgba(255,106,50,.10),transparent 60%),radial-gradient(50% 45% at 8% 8%,rgba(255,106,50,.05),transparent 55%),var(--bg)}
+h1{font-family:var(--font-display);font-weight:700;line-height:1.05;letter-spacing:-.02em;margin:0}
+a{color:inherit;text-decoration:none}
+.wrap{width:100%;max-width:var(--maxw);margin-inline:auto;padding-inline:clamp(1.1rem,4vw,2rem)}
+.nav{position:sticky;top:0;z-index:60;height:var(--nav-h);display:flex;align-items:center;border-bottom:1px solid transparent}
+.nav .wrap{display:flex;align-items:center;gap:1.5rem;width:100%}
+.brand{display:inline-flex;align-items:center;gap:.6em}
+.brand .mark{font-family:var(--font-brand);font-size:1.35rem;color:var(--text);line-height:1}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.55em;font-family:var(--font-display);font-weight:600;font-size:.98rem;padding:.82em 1.35em;border-radius:var(--r-pill);border:1px solid transparent;background:rgba(255,255,255,.05);color:var(--text)}
+.btn-primary{background:linear-gradient(180deg,var(--accent-2),var(--accent));color:#180a03;border-color:rgba(255,106,50,.5);box-shadow:var(--glow-soft)}
+.hero{position:relative;padding-top:clamp(2.5rem,6vw,4.5rem);padding-bottom:clamp(3rem,7vw,6rem);overflow:clip}
+.hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(1.5rem,4vw,3rem);align-items:center}
+.hero h1{font-size:var(--fs-display);letter-spacing:-.03em;margin-bottom:1.5rem;text-wrap:balance}
+.hero .lead{font-size:var(--fs-lead);color:var(--text-2);max-width:60ch;margin:0}
+.eyebrow{display:inline-flex;align-items:center;gap:.5em;font-family:var(--font-display);font-weight:500;font-size:var(--fs-xs);letter-spacing:.16em;text-transform:uppercase;color:var(--accent-2)}
+.g-accent{background:linear-gradient(100deg,var(--accent),var(--accent-2) 60%,#ffd0b8);-webkit-background-clip:text;background-clip:text;color:transparent}
+@media (max-width:940px){.hero-grid{grid-template-columns:1fr}}
+</style>
+
+<!-- Page-specific composition CSS (journey timeline label, beliefs list, chip row) -->
+<style>
+.eyebrow.center-e{justify-content:center}
+.eyebrow.center-e::before{display:none}
+
+/* founder journey timeline (hero, right column) — non-heading title to keep h1→h2 order intact */
+.tl-item .tl-h{font-family:var(--font-display);font-weight:700;line-height:1.05;letter-spacing:-.02em;margin:.2rem 0 .3rem;font-size:1.15rem;color:var(--text)}
+
+/* five beliefs — numbered editorial list */
+.beliefs{display:flex;flex-direction:column;list-style:none;margin:0;padding:0}
+.belief{display:flex;gap:1.5rem;align-items:flex-start;padding-block:1.5rem;border-top:1px solid var(--hair)}
+.belief:first-child{border-top:none;padding-top:0}
+.belief-num{flex:none;width:2.6ch;font-family:var(--font-display);font-weight:700;font-size:clamp(1.8rem,3vw,2.4rem);letter-spacing:-.02em;line-height:1}
+
+/* honesty card — left-aligned chip row (pill-strip is centered) */
+.chip-row{display:flex;flex-wrap:wrap;gap:.6rem}
+</style>
+</head>
+<body>
+<link rel="stylesheet" href="assets/site.css">
+<script>document.documentElement.classList.add('js')</script>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<!-- ============================================================ NAV -->
+<nav class="nav" aria-label="Primary">
+  <div class="wrap">
+    <a class="brand" href="/" aria-label="ClientFlow home">
+      <span class="mark">ClientFlow</span>
+      <span class="tag">Platform</span>
+    </a>
+    <button class="nav-toggle" aria-label="Menu" aria-expanded="false" aria-controls="nav-links">
+      <svg class="bars" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      <svg class="x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <div class="nav-links" id="nav-links">
+      <a href="/product">Product</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/gyms">For Gyms</a>
+      <a href="/wellness-clinics">For Clinics</a>
+      <a href="/compare">Compare</a>
+      <a href="/about" aria-current="page">About</a>
+      <span class="nav-cta"><a class="btn btn-primary btn-sm" href="/book-a-demo">Book a demo</a></span>
+    </div>
+  </div>
+</nav>
+
+<main id="main">
+
+<!-- ============================================================ HERO — FOUNDER STORY -->
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <span class="eyebrow rv rv-fade">About ClientFlow</span>
+        <h1 class="rv rv-d1">We built this for our own clients first. <span class="g-accent">Then we opened the doors.</span></h1>
+        <p class="lead rv rv-d2">ClientFlow didn't start as software. It started as an agency running marketing for gyms and wellness clinics around Ireland. We built their websites, filled their classes, chased their leads and watched their bills — and we kept hitting the same wall: the tools they paid for were expensive, splintered across five vendors, quick to hike prices, and none of them could give a client a real website. So we built our own platform to run our clients' businesses properly. It worked. Owners kept asking if they could just have the thing we'd built. Eventually we said yes, and productised it. That's ClientFlow.</p>
+      </div>
+
+      <!-- abstract CSS art: the founder journey, as a scroll-lit timeline (no team photos) -->
+      <div class="card card-pad-lg rv rv-right">
+        <span class="eyebrow">Our path</span>
+        <div class="timeline mt-5">
+          <div class="line-fill"></div>
+          <div class="tl-item">
+            <span class="node"></span>
+            <span class="time">Before</span>
+            <p class="tl-h">An agency, not a platform</p>
+            <p>Running marketing for gyms and wellness clinics around Ireland.</p>
+          </div>
+          <div class="tl-item">
+            <span class="node"></span>
+            <span class="time">The wall</span>
+            <p class="tl-h">Same wall, every client</p>
+            <p>Expensive tools, five vendors, prices that crept, no real website.</p>
+          </div>
+          <div class="tl-item">
+            <span class="node"></span>
+            <span class="time">The fix</span>
+            <p class="tl-h">We built our own</p>
+            <p>A platform to run clients' businesses properly. It worked.</p>
+          </div>
+          <div class="tl-item">
+            <span class="node"></span>
+            <span class="time">The ask</span>
+            <p class="tl-h">Owners wanted in</p>
+            <p>They kept asking for the thing we'd built.</p>
+          </div>
+          <div class="tl-item">
+            <span class="node"></span>
+            <span class="time">Today</span>
+            <p class="tl-h">ClientFlow</p>
+            <p>We said yes, and productised it.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ============================================================ WHY FLAT PRICING -->
+<section class="section section-t" id="flat-pricing">
+  <div class="wrap">
+    <div class="grid g-2" style="align-items:center">
+      <div class="rv rv-left">
+        <span class="eyebrow">Why flat pricing</span>
+        <h2 class="mt-3">€200, flat, forever-honest — on purpose.</h2>
+        <p class="lead mt-4">We've sat on the customer side of the add-on trap. We've watched "starter" prices quietly become €400 bills, and month-to-month promises turn into contracts. So flat, published, month-to-month pricing isn't a marketing angle for us — it's a reaction to everything we hated. One price. Everything on. Cancel whenever. If we ever have to raise it, you'll opt in, not get ambushed.</p>
+      </div>
+      <div class="card card-glow card-pad-lg rv rv-right">
+        <span class="eyebrow">Published on this page</span>
+        <div class="stat mt-4">€200</div>
+        <p class="stat-label">Flat, per month — never "starting at," never "contact sales."</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ BUILT IN IRELAND -->
+<section class="section section-t" id="ireland">
+  <div class="wrap">
+    <div class="sec-head center rv">
+      <span class="eyebrow center-e">Built in Ireland</span>
+      <h2>Made in Ireland 🇮🇪, for Ireland and the UK.</h2>
+      <p>We're built and based in Ireland, and we understand the market our customers work in — VAT, local SEO, the way a Clonmel gym or a Cork clinic actually wins customers. When you call support, you're talking to the people who built the product, not a queue three time zones away.</p>
+    </div>
+    <div class="pill-strip mt-7 rv">
+      <span class="chip"><span class="dot"></span>Based in Ireland</span>
+      <span class="chip"><span class="dot"></span>Same time zone as you</span>
+      <span class="chip"><span class="dot"></span>VAT &amp; local rules, understood</span>
+      <span class="chip"><span class="dot"></span>Local SEO know-how</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ PRODUCT BELIEFS -->
+<section class="section section-t" id="beliefs">
+  <div class="wrap narrow">
+    <div class="sec-head rv">
+      <span class="eyebrow">What we believe</span>
+      <h2>Five things we won't compromise on.</h2>
+    </div>
+
+    <ol class="beliefs mt-7">
+      <li class="belief rv rv-d1">
+        <span class="belief-num g-accent" aria-hidden="true">01</span>
+        <div>
+          <h3>One bill, everything on.</h3>
+          <p class="muted">No add-on creep, no tier games.</p>
+        </div>
+      </li>
+      <li class="belief rv rv-d2">
+        <span class="belief-num g-accent" aria-hidden="true">02</span>
+        <div>
+          <h3>You own your stuff.</h3>
+          <p class="muted">Your data, your website, your clients — always exportable.</p>
+        </div>
+      </li>
+      <li class="belief rv rv-d3">
+        <span class="belief-num g-accent" aria-hidden="true">03</span>
+        <div>
+          <h3>No tax on your growth.</h3>
+          <p class="muted">We never take a commission on your new clients.</p>
+        </div>
+      </li>
+      <li class="belief rv rv-d4">
+        <span class="belief-num g-accent" aria-hidden="true">04</span>
+        <div>
+          <h3>A real website, not a widget.</h3>
+          <p class="muted">If it doesn't rank, it doesn't count.</p>
+        </div>
+      </li>
+      <li class="belief rv" style="transition-delay:400ms">
+        <span class="belief-num g-accent" aria-hidden="true">05</span>
+        <div>
+          <h3>Honesty over hype.</h3>
+          <p class="muted">We'll tell you when a competitor suits you better.</p>
+        </div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============================================================ HONEST WHERE WE ARE -->
+<section class="section section-t" id="honest">
+  <div class="wrap narrow">
+    <div class="sec-head center rv">
+      <span class="eyebrow center-e">Honest, on purpose</span>
+      <h2>We're pre-launch, and we won't fake it.</h2>
+    </div>
+
+    <div class="card card-glow card-pad-lg mt-7 rv">
+      <span class="eyebrow">No smoke, no mirrors</span>
+      <p class="lead mt-4">We're being straight: we're early. You won't find invented reviews, fake five-star ratings or borrowed customer logos on this site, because we don't have a wall of them yet — and we'd rather earn your trust than fabricate it. What we can offer instead is real: a live demo with the founders, month-to-month with no lock-in, free migration, and integrations like Xero, Zapier and an open API being honest about their near-term-roadmap status. Judge us on the demo.</p>
+      <div class="chip-row mt-6">
+        <span class="chip">Xero <span class="dim">— near-term roadmap</span></span>
+        <span class="chip">Zapier <span class="dim">— near-term roadmap</span></span>
+        <span class="chip">Open API <span class="dim">— near-term roadmap</span></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ CLOSING CTA -->
+<section class="section-sm"><div class="wrap">
+  <div class="cta-band rv">
+    <span class="eyebrow center-e">Meet the team</span>
+    <h2>Meet the people who built it. Twenty minutes.</h2>
+    <p>No slides, no pressure — just the platform, live, on your own numbers.</p>
+    <div class="btn-row">
+      <a class="btn btn-primary btn-lg" href="/book-a-demo">Book a demo</a>
+      <a class="btn btn-line btn-lg" href="/pricing">See pricing</a>
+    </div>
+    <p class="cta-note">Built in Ireland · month-to-month · free migration</p>
+  </div>
+</div></section>
+
+</main>
+
+<!-- ============================================================ FOOTER -->
+<footer class="footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <a class="brand" href="/" aria-label="ClientFlow home"><span class="mark">ClientFlow</span><span class="tag">Platform</span></a>
+        <p class="f-blurb">Run your gym or clinic — and grow it — from one place. €200/month, everything in.</p>
+      </div>
+      <nav aria-label="Product">
+        <h3>Product</h3>
+        <ul>
+          <li><a href="/product">Product overview</a></li>
+          <li><a href="/pricing">Pricing</a></li>
+          <li><a href="/gyms">For Gyms</a></li>
+          <li><a href="/wellness-clinics">For Clinics</a></li>
+          <li><a href="/book-a-demo">Book a demo</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Compare">
+        <h3>Compare</h3>
+        <ul>
+          <li><a href="/compare">Compare hub</a></li>
+          <li><a href="/compare-mindbody-alternative">vs Mindbody</a></li>
+          <li><a href="/compare-glofox-alternative">vs Glofox</a></li>
+          <li><a href="/compare-legitfit-alternative">vs LegitFit</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Company">
+        <h3>Company</h3>
+        <ul>
+          <li><a href="/about">About</a></li>
+          <li><a href="/blog">Blog</a></li>
+          <li><a href="/book-a-demo">Book a demo</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Legal">
+        <h3>Legal</h3>
+        <ul>
+          <li><a href="/privacy">Privacy</a></li>
+          <li><a href="/terms">Terms</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 ClientFlow. All rights reserved. · Prices ex-VAT. Comparison figures researched July 2026; estimates flagged.</span>
+      <span class="ie">Built in Ireland 🇮🇪</span>
+    </div>
+  </div>
+</footer>
+
+<!-- ============================================================ COOKIE BANNER -->
+<div class="cookie" role="dialog" aria-label="Cookie notice" aria-live="polite">
+  <p>We use a couple of cookies to keep the site working and see what's useful. Read our <a href="/privacy">Privacy Policy</a>.</p>
+  <button class="btn btn-primary btn-sm" data-cookie-accept>Grand, got it</button>
+</div>
+
+<!-- ============================================================ STRUCTURED DATA -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "AboutPage",
+  "name": "About ClientFlow",
+  "url": "https://clientflow.ie/about",
+  "description": "We ran marketing for gyms and clinics, built the platform for our own clients, then productised it. Flat pricing as a principle. Built in Ireland.",
+  "about": {
+    "@type": "Organization",
+    "name": "ClientFlow",
+    "url": "https://clientflow.ie/",
+    "foundingCountry": "IE",
+    "areaServed": ["IE", "GB"],
+    "slogan": "Run your gym. Grow your gym. One flat price."
+  }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://clientflow.ie/"},
+    {"@type": "ListItem", "position": 2, "name": "About", "item": "https://clientflow.ie/about"}
+  ]
+}
+</script>
+
+<script src="assets/site.js" defer></script>
+</body>
+</html>

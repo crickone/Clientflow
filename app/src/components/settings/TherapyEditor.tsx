@@ -11,6 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Card } from "@/components/ui/Card";
 import { Input, Label, Textarea } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
@@ -34,6 +35,7 @@ export function TherapyList({ items }: { items: Therapy[] }) {
 }
 
 function TherapyRow({ therapy }: { therapy: Therapy }) {
+  const confirm = useConfirm();
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const vocab = useVocab();
@@ -120,8 +122,8 @@ function TherapyRow({ therapy }: { therapy: Therapy }) {
         variant="ghost"
         size="sm"
         disabled={pending}
-        onClick={() => {
-          if (!confirm(`Delete "${therapy.name}"? This cannot be undone.`)) return;
+        onClick={async () => {
+          if (!(await confirm({ title: `Delete "${therapy.name}"?`, body: "This cannot be undone.", destructive: true }))) return;
           start(async () => {
             const res = await deleteTherapyAction(therapy.id);
             if (res.ok) toast.success(`${vocab.service} deleted.`);

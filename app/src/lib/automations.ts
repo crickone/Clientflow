@@ -3,8 +3,10 @@ import "server-only";
 import { asc, desc, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { automationLog, automationMessages, automationTriggers } from "@/lib/db/schema";
+import { automationLog, automationMessages, automationTriggers, clients } from "@/lib/db/schema";
 import {
+  applyShortcodes,
+  DEFAULT_MESSAGES,
   TRIGGER_CATALOG,
   TRIGGER_LABELS,
   type Channel,
@@ -12,6 +14,9 @@ import {
   type MessageInput,
   type TriggerInput,
 } from "@/lib/automationModel";
+import { getBusinessProfile } from "@/lib/businessProfile";
+import { getTheme } from "@/lib/settings";
+import { renderEmailShell, sendEmail, textToParagraphs } from "@/lib/email";
 
 const VALID_KEYS = new Set(TRIGGER_CATALOG.map((t) => t.key));
 
@@ -55,22 +60,27 @@ export function getTrigger(key: string): TriggerDetail | null {
     .where(eq(automationMessages.triggerKey, key))
     .orderBy(asc(automationMessages.position))
     .all();
+  // No message configured yet → offer a ready-made starter template.
+  const mapped =
+    messages.length > 0
+      ? messages.map((m) => ({
+          id: m.id,
+          channel: m.channel as Channel,
+          subject: m.subject,
+          template: m.template ?? "",
+          attachmentFilename: m.attachmentFilename,
+          attachmentOriginal: m.attachmentOriginal,
+          delayValue: m.delayValue,
+          delayUnit: m.delayUnit as IntervalUnit,
+        }))
+      : (DEFAULT_MESSAGES[key] ?? []).map((m) => ({ ...m }));
   return {
     key,
     label: def.label,
     description: def.description,
     enabled: state?.enabled ?? false,
     externalEnabled: state?.externalEnabled ?? false,
-    messages: messages.map((m) => ({
-      id: m.id,
-      channel: m.channel as Channel,
-      subject: m.subject,
-      template: m.template ?? "",
-      attachmentFilename: m.attachmentFilename,
-      attachmentOriginal: m.attachmentOriginal,
-      delayValue: m.delayValue,
-      delayUnit: m.delayUnit as IntervalUnit,
-    })),
+    messages: mapped,
   };
 }
 
@@ -152,4 +162,73 @@ export function listSent(): SentRow[] {
       status: r.status,
       sentAt: r.sentAt.getTime(),
     }));
+}
+
+// ── Sending engine (email channel) ──────────────────────────────────────────
+
+/**
+ * Fire an automation trigger for a client. v1 delivers the EMAIL-channel
+ * messages with no delay, personalising short-codes and logging each send.
+ * Never throws — a failed automation must not break the action that called it.
+ * (Push/chat channels and delayed messages need the client-app + scheduler and
+ * are skipped for now.)
+ */
+export async function fireTrigger(triggerKey: string, clientId: number): Promise<void> {
+  try {
+    if (!VALID_KEYS.has(triggerKey)) return;
+    const state = db.select().from(automationTriggers).where(eq(automationTriggers.key, triggerKey)).get();
+    if (!state?.enabled) return;
+
+    // Configured messages, or the ready-made default if none saved.
+    const saved = db
+      .select()
+      .from(automationMessages)
+      .where(eq(automationMessages.triggerKey, triggerKey))
+      .orderBy(asc(automationMessages.position))
+      .all();
+    const messages: Pick<MessageInput, "channel" | "subject" | "template" | "delayValue">[] =
+      saved.length > 0
+        ? saved.map((m) => ({ channel: m.channel as Channel, subject: m.subject, template: m.template ?? "", delayValue: m.delayValue }))
+        : (DEFAULT_MESSAGES[triggerKey] ?? []).map((m) => ({ channel: m.channel, subject: m.subject, template: m.template, delayValue: m.delayValue }));
+
+    const emailMessages = messages.filter((m) => m.channel === "email" && m.delayValue === 0 && m.template.trim());
+    if (emailMessages.length === 0) return;
+
+    const client = db
+      .select({ firstName: clients.firstName, lastName: clients.lastName, email: clients.email })
+      .from(clients)
+      .where(eq(clients.id, clientId))
+      .get();
+    if (!client?.email) return; // no address to send to
+
+    const businessName = getBusinessProfile().businessName;
+    const accent = getTheme().accent;
+    const label = TRIGGER_LABELS[triggerKey] ?? triggerKey;
+    const vars = { firstName: client.firstName, lastName: client.lastName, businessName };
+
+    for (const m of emailMessages) {
+      const subject = applyShortcodes((m.subject ?? "").trim() || `A message from ${businessName}`, vars);
+      const bodyText = applyShortcodes(m.template, vars);
+      const html = renderEmailShell({
+        businessName,
+        accent,
+        bodyHtml: textToParagraphs(bodyText),
+        footer: `Sent by ${businessName}.`,
+      });
+      const res = await sendEmail({ to: client.email, subject, html, text: bodyText });
+      db.insert(automationLog)
+        .values({
+          triggerKey,
+          triggerName: label,
+          channel: "email",
+          subject,
+          sentTo: client.email,
+          status: res.ok ? "sent" : "failed",
+          sentAt: new Date(),
+        })
+        .run();
+    }
+  } catch {
+    // swallow — never break the calling action
+  }
 }

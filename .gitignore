@@ -11,6 +11,12 @@ app/data/
 # NOTE: app/public/sites/<slug>/ (per-site static assets, ~16MB) IS committed
 # so client websites render on deploy without re-running the importer.
 
+# Seed/template SQLite DBs — these contained live secrets + PII and must never
+# be committed. Ship seed data as code (a seed script), not as a binary DB.
+app/seed/**/*.db
+app/seed/**/*.db-shm
+app/seed/**/*.db-wal
+
 # Secrets / env
 .env
 .env.*

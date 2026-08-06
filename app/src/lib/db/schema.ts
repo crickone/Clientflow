@@ -29,6 +29,65 @@ export const clients = sqliteTable("clients", {
     .default(sql`(unixepoch() * 1000)`),
 });
 
+// Synced Gmail messages (both inbound + outbound) for the Communication inbox
+// when a tenant connects Gmail. Deduped on gmail_message_id. Linked to a client
+// by matching the counterparty address when possible.
+export const emailMessages = sqliteTable("email_messages", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  gmailMessageId: text("gmail_message_id").notNull().unique(),
+  gmailThreadId: text("gmail_thread_id"),
+  direction: text("direction", { enum: ["in", "out"] }).notNull(),
+  fromEmail: text("from_email"),
+  fromName: text("from_name"),
+  toEmail: text("to_email"),
+  subject: text("subject"),
+  snippet: text("snippet"),
+  bodyHtml: text("body_html"),
+  bodyText: text("body_text"),
+  clientId: integer("client_id"),
+  internalDate: integer("internal_date", { mode: "timestamp_ms" }),
+  isRead: integer("is_read", { mode: "boolean" }).notNull().default(false),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
+// General-purpose calendar: meetings and any events not tied to the booking
+// system. Independent of appointments/timetable.
+export const calendarEvents = sqliteTable("calendar_events", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  title: text("title").notNull(),
+  description: text("description"),
+  date: text("date").notNull(), // YYYY-MM-DD
+  startTime: text("start_time"), // HH:mm (null when all-day)
+  endTime: text("end_time"),
+  allDay: integer("all_day", { mode: "boolean" }).notNull().default(false),
+  location: text("location"),
+  color: text("color"), // hex accent for the pill
+  createdByUserId: integer("created_by_user_id"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().default(sql`(unixepoch() * 1000)`),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull().default(sql`(unixepoch() * 1000)`),
+});
+
+// One-to-one emails sent to a client from the app. Kept as a sent log per client
+// so staff can see what was sent, and to feed the Communication Email tab.
+export const clientEmails = sqliteTable("client_emails", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  clientId: integer("client_id")
+    .notNull()
+    .references(() => clients.id, { onDelete: "cascade" }),
+  toEmail: text("to_email").notNull(),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  status: text("status", { enum: ["sent", "failed"] }).notNull().default("sent"),
+  providerId: text("provider_id"),
+  error: text("error"),
+  sentByUserId: integer("sent_by_user_id"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
 export const therapies = sqliteTable("therapies", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
@@ -444,6 +503,92 @@ export const clientSessions = sqliteTable("client_sessions", {
   expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().default(sql`(unixepoch() * 1000)`),
 });
+
+// Client-app password resets + first-password invites. A single-use, expiring
+// token bound to a client_credentials row. Powers both the migration bulk-invite
+// ("set your password") and the client forgot-password flow. Mirrors the shape
+// of user_invites; lives in the control plane.
+export const clientPasswordResets = sqliteTable("client_password_resets", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  credentialId: integer("credential_id")
+    .notNull()
+    .references(() => clientCredentials.id, { onDelete: "cascade" }),
+  token: text("token").notNull().unique(),
+  expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+  usedAt: integer("used_at", { mode: "timestamp_ms" }),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
+export type ClientPasswordReset = typeof clientPasswordResets.$inferSelect;
+export type NewClientPasswordReset = typeof clientPasswordResets.$inferInsert;
+
+// Staff invitations: a pending "set your password" link emailed to a new team
+// member. The identity + membership are created up-front (so they show in the
+// roster as pending); accepting the invite just sets their password + activates.
+export const userInvites = sqliteTable("user_invites", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  token: text("token").notNull().unique(),
+  email: text("email").notNull(),
+  tenantId: integer("tenant_id")
+    .notNull()
+    .references(() => tenants.id, { onDelete: "cascade" }),
+  userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
+  role: text("role", { enum: ["admin", "staff"] }).notNull().default("staff"),
+  invitedByUserId: integer("invited_by_user_id").references(() => users.id),
+  expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+  acceptedAt: integer("accepted_at", { mode: "timestamp_ms" }),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
+// A tenant's connected Google/Gmail account (OAuth). One per tenant. Tokens are
+// stored ENCRYPTED (see lib/google/tokenCrypto). Used to send + read email so a
+// business can use their own Gmail as the comms address.
+export const gmailConnections = sqliteTable("gmail_connections", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  tenantId: integer("tenant_id")
+    .notNull()
+    .unique()
+    .references(() => tenants.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  accessToken: text("access_token"),
+  tokenExpiry: integer("token_expiry", { mode: "timestamp_ms" }),
+  scope: text("scope"),
+  historyId: text("history_id"),
+  lastSyncAt: integer("last_sync_at", { mode: "timestamp_ms" }),
+  connectedByUserId: integer("connected_by_user_id").references(() => users.id),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
+// Control-plane: per-tenant API keys for server-to-server integrations
+// (Zapier/Make/Facebook lead-gen → the inbound-leads webhook). Only the sha256
+// HASH of a key is stored (key_hash); the raw key is shown to the admin once at
+// creation. key_prefix is the non-secret leading slice for identifying a key in
+// the UI. A verified key routes an inbound request to its owning tenant.
+export const apiKeys = sqliteTable("api_keys", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  tenantId: integer("tenant_id")
+    .notNull()
+    .references(() => tenants.id, { onDelete: "cascade" }),
+  keyHash: text("key_hash").notNull().unique(),
+  keyPrefix: text("key_prefix").notNull(),
+  label: text("label"),
+  scopes: text("scopes").notNull().default("leads"),
+  lastUsedAt: integer("last_used_at", { mode: "timestamp_ms" }),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+  revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
+});
+
+export type ApiKey = typeof apiKeys.$inferSelect;
+export type NewApiKey = typeof apiKeys.$inferInsert;
 
 export type ClientCredential = typeof clientCredentials.$inferSelect;
 export type ClientSession = typeof clientSessions.$inferSelect;

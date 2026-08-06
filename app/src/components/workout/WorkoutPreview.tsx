@@ -6,6 +6,7 @@ import { ArrowLeft, Dumbbell, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { deleteWorkoutAction } from "@/app/workout/workouts/actions";
 import { dayVolume, fmtRest, SECTIONS, type WorkoutInput } from "@/lib/workoutModel";
 
@@ -14,11 +15,12 @@ const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 export function WorkoutPreview({ workout, media }: { workout: WorkoutInput; media: Record<number, string | null> }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const confirm = useConfirm();
   const volume = dayVolume(workout);
 
   const remove = () =>
     start(async () => {
-      if (!confirm(`Delete "${workout.name}"? This cannot be undone.`)) return;
+      if (!(await confirm({ title: `Delete "${workout.name}"?`, body: "This cannot be undone.", destructive: true }))) return;
       await deleteWorkoutAction(workout.id!);
       toast.success("Workout deleted.");
       router.push("/workout/workouts");

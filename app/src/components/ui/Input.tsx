@@ -9,7 +9,7 @@ export const Input = React.forwardRef<
 >(({ className, style, ...rest }, ref) => (
   <input
     ref={ref}
-    className={cn(className)}
+    className={cn("field", className)}
     style={{
       width: "100%",
       background: "var(--surface-1)",
@@ -20,7 +20,7 @@ export const Input = React.forwardRef<
       fontSize: 14,
       outline: "none",
       fontFamily: "inherit",
-      transition: "border-color 0.15s var(--ease)",
+      transition: "border-color 0.15s var(--ease), box-shadow 0.15s var(--ease)",
       ...style,
     }}
     {...rest}
@@ -34,7 +34,7 @@ export const Textarea = React.forwardRef<
 >(({ className, style, ...rest }, ref) => (
   <textarea
     ref={ref}
-    className={cn(className)}
+    className={cn("field", className)}
     style={{
       width: "100%",
       background: "var(--surface-1)",
@@ -47,7 +47,7 @@ export const Textarea = React.forwardRef<
       fontFamily: "inherit",
       minHeight: 90,
       resize: "vertical",
-      transition: "border-color 0.15s var(--ease)",
+      transition: "border-color 0.15s var(--ease), box-shadow 0.15s var(--ease)",
       ...style,
     }}
     {...rest}

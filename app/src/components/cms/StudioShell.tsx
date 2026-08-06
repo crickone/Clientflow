@@ -7,9 +7,13 @@ import {
   ArrowLeft,
   Check,
   ExternalLink,
+  FileText,
+  Globe,
+  Image as ImageIcon,
   Images,
   Loader2,
   Monitor,
+  Newspaper,
   Save,
   Smartphone,
   Tablet,
@@ -201,14 +205,15 @@ export function StudioShell({
           gap: 14,
           padding: "0 16px",
           borderBottom: "1px solid var(--hairline)",
-          background: "var(--surface)",
+          background: "var(--surface-1)",
         }}
       >
         <Link
-          href={`/cms/${siteSlug}`}
-          style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--text-secondary)", fontSize: 13 }}
+          href="/cms"
+          className="nav-link"
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--text-secondary)", fontSize: 13, padding: "5px 8px", borderRadius: 6 }}
         >
-          <ArrowLeft size={16} /> Exit
+          <ArrowLeft size={16} /> Sites
         </Link>
         <strong style={{ fontSize: 14 }}>Visual editor</strong>
         <span style={{ color: "var(--text-tertiary)", fontSize: 13 }}>{path}</span>
@@ -277,9 +282,40 @@ export function StudioShell({
           minHeight: 0,
         }}
       >
-        <aside style={{ borderRight: "1px solid var(--hairline)", padding: 14, overflowY: "auto", background: "var(--surface)" }}>
+        <aside style={{ borderRight: "1px solid var(--hairline)", padding: 14, overflowY: "auto", background: "var(--surface-1)" }}>
+          {/* Site management — jump to the content/SEO, blog, media and domain
+              sections without leaving the editor context. */}
+          <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".12em", color: "var(--text-tertiary)", marginBottom: 8 }}>
+            Manage site
+          </div>
+          <div style={{ display: "grid", gap: 2, marginBottom: 18 }}>
+            {[
+              { key: "pages", label: "Pages & SEO", icon: FileText },
+              { key: "blog", label: "Blog", icon: Newspaper },
+              { key: "media", label: "Media", icon: ImageIcon },
+              { key: "domains", label: "Domains", icon: Globe },
+            ].map(({ key, label, icon: Icon }) => (
+              <Link
+                key={key}
+                href={`/cms/${siteSlug}/${key}`}
+                className="nav-link"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 9,
+                  padding: "8px 10px",
+                  borderRadius: 6,
+                  fontSize: 13,
+                }}
+              >
+                <Icon size={15} strokeWidth={1.75} />
+                {label}
+              </Link>
+            ))}
+          </div>
+
           <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: ".12em", color: "var(--text-tertiary)", marginBottom: 10 }}>
-            Pages
+            Screens
           </div>
           <div style={{ display: "grid", gap: 2 }}>
             {pages.map((p) => (
@@ -324,7 +360,7 @@ export function StudioShell({
           <aside
             style={{
               borderLeft: "1px solid var(--hairline)",
-              background: "var(--surface)",
+              background: "var(--surface-1)",
               display: "grid",
               gridTemplateRows: "auto auto 1fr",
               minHeight: 0,
@@ -406,7 +442,7 @@ export function StudioShell({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ background: "var(--surface)", borderRadius: 12, padding: 20, width: "min(720px,92vw)", maxHeight: "80vh", overflow: "auto" }}
+            style={{ background: "var(--surface-1)", borderRadius: 12, padding: 20, width: "min(720px,92vw)", maxHeight: "80vh", overflow: "auto" }}
           >
             <div style={{ fontWeight: 600, marginBottom: 12 }}>Choose an image</div>
             {media.length === 0 ? (

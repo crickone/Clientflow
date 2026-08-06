@@ -6,6 +6,7 @@ import { Copy, Link2, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react"
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import type { FormTypeMeta, FormType } from "@/lib/formsModel";
 import {
   deleteFormAction,
@@ -128,6 +129,7 @@ function FormRowItem({
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const confirm = useConfirm();
   const [status, setStatus] = useState(form.status);
   const [trigger, setTrigger] = useState(form.triggerStatus);
   const d = fmtDate(form.createdAt);
@@ -165,7 +167,7 @@ function FormRowItem({
     });
   const remove = () =>
     start(async () => {
-      if (!confirm(`Delete "${form.title || "this form"}"?`)) return;
+      if (!(await confirm({ title: `Delete "${form.title || "this form"}"?`, destructive: true }))) return;
       await deleteFormAction(form.id, type);
       toast.success("Deleted.");
       router.refresh();

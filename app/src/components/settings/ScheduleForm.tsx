@@ -49,6 +49,7 @@ export function ScheduleForm({ settings }: Props) {
           {hours.map((h) => (
             <div
               key={h.dow}
+              className="schedule-row"
               style={{
                 display: "grid",
                 gridTemplateColumns: "120px auto 1fr 1fr",

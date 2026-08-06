@@ -9,6 +9,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { clients } from "@/lib/db/schema";
 import { logActivity } from "@/lib/queries";
+import { fireTrigger } from "@/lib/automations";
 import { sendWhatsApp } from "@/lib/whatsapp/send";
 
 export async function sendClientWhatsAppAction(
@@ -37,7 +38,13 @@ const clientSchema = z.object({
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email().optional().or(z.literal("")),
   phone: z.string().min(5, "Phone is required"),
-  dateOfBirth: z.string().optional().or(z.literal("")),
+  // Must be YYYY-MM-DD (or empty) — the birthday automation matches on this
+  // format; a stray "31/07/1990" would save fine but silently never fire.
+  dateOfBirth: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Date of birth must be YYYY-MM-DD")
+    .optional()
+    .or(z.literal("")),
   address: z.string().optional().or(z.literal("")),
   medicalNotes: z.string().optional().or(z.literal("")),
   emergencyContactName: z.string().optional().or(z.literal("")),
@@ -104,6 +111,7 @@ export async function createClientAction(
   await logActivity("client.new", `New client added: ${v.firstName} ${v.lastName}`, {
     clientId: id,
   });
+  await fireTrigger("new_client_created", id);
   revalidatePath("/clients");
   redirect(`/clients/${id}`);
 }

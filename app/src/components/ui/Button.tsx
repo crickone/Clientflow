@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Variant = "primary" | "secondary" | "ghost" | "destructive" | "outline";
@@ -9,70 +10,27 @@ type Size = "sm" | "md" | "lg" | "icon";
 interface Props extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
   size?: Size;
-  asChild?: boolean;
+  /** Shows a spinner and disables the button (prevents double-submit). */
+  loading?: boolean;
 }
 
-const baseStyle: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 8,
-  fontFamily: "var(--font-mono), ui-monospace, monospace",
-  fontWeight: 400,
-  letterSpacing: "0.04em",
-  textTransform: "uppercase",
-  borderRadius: "var(--radius)",
-  cursor: "pointer",
-  transition: "background 0.15s var(--ease), color 0.15s var(--ease), border-color 0.15s var(--ease)",
-  whiteSpace: "nowrap",
-  border: "1px solid transparent",
-};
-
-const sizes: Record<Size, React.CSSProperties> = {
-  sm: { fontSize: 11, padding: "6px 14px", height: 32 },
-  md: { fontSize: 12, padding: "9px 18px", height: 38 },
-  lg: { fontSize: 13, padding: "11px 22px", height: 44 },
-  icon: { padding: 0, width: 36, height: 36, borderRadius: "var(--radius)" },
-};
-
-const variants: Record<Variant, React.CSSProperties> = {
-  primary: {
-    background: "var(--accent)",
-    color: "#1a0a03",
-    boxShadow: "var(--accent-glow)",
-    fontWeight: 600,
-  },
-  secondary: {
-    background: "var(--surface-2)",
-    color: "var(--text-primary)",
-    borderColor: "var(--grid)",
-  },
-  outline: {
-    background: "transparent",
-    color: "var(--text-primary)",
-    borderColor: "var(--hairline-strong)",
-  },
-  ghost: {
-    background: "transparent",
-    color: "var(--text-secondary)",
-  },
-  destructive: {
-    background: "#dc2626",
-    color: "#ffffff",
-  },
-};
-
+/**
+ * The look lives in CSS (`.btn` + `.btn--{variant}` + `.btn--{size}` in
+ * globals.css) so hover / active / focus-visible / disabled actually work —
+ * inline styles can't express pseudo-classes. A caller's `style` prop still
+ * overrides, since inline styles beat classes.
+ */
 export const Button = React.forwardRef<HTMLButtonElement, Props>(
-  (
-    { variant = "primary", size = "md", className, style, ...rest },
-    ref,
-  ) => (
+  ({ variant = "primary", size = "md", loading = false, className, disabled, children, ...rest }, ref) => (
     <button
       ref={ref}
-      className={cn(className)}
-      style={{ ...baseStyle, ...sizes[size], ...variants[variant], ...style }}
+      className={cn("btn", `btn--${variant}`, `btn--${size}`, loading && "btn--loading", className)}
+      disabled={disabled || loading}
       {...rest}
-    />
+    >
+      {loading && <Loader2 className="spin" size={size === "sm" ? 13 : 15} aria-hidden />}
+      {children}
+    </button>
   ),
 );
 Button.displayName = "Button";

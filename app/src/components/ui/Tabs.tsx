@@ -17,6 +17,10 @@ export const TabsList = React.forwardRef<
       display: "flex",
       gap: 4,
       borderBottom: "1px solid var(--grid)",
+      // Tab strips (e.g. the 8-tab client profile) scroll horizontally instead of
+      // overflowing the page on mobile.
+      overflowX: "auto",
+      scrollbarWidth: "none",
       ...style,
     }}
     {...props}
@@ -30,11 +34,10 @@ export const TabsTrigger = React.forwardRef<
 >(({ className, style, ...props }, ref) => (
   <TabsPrimitive.Trigger
     ref={ref}
-    className={cn(className)}
+    className={cn("tab-trigger", className)}
     style={{
       padding: "12px 16px",
       cursor: "pointer",
-      color: "var(--text-secondary)",
       fontFamily: "var(--font-mono), ui-monospace, monospace",
       fontSize: 12,
       fontWeight: 400,
@@ -44,6 +47,7 @@ export const TabsTrigger = React.forwardRef<
       border: "none",
       borderBottom: "1px solid transparent",
       whiteSpace: "nowrap",
+      flexShrink: 0,
       marginBottom: -1,
       transition: "color 0.18s var(--ease), border-color 0.18s var(--ease)",
       ...style,

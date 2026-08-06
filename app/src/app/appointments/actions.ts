@@ -186,14 +186,19 @@ export async function completeAppointmentAction(formData: FormData) {
   if (!appt) throw new Error("Appointment not found");
 
   const therapyIds: number[] = JSON.parse(appt.therapyIds || "[]");
-  const ts = db
-    .select()
-    .from(therapies)
-    .where(sql`${therapies.id} IN (${sql.join(
-      therapyIds.map((id) => sql`${id}`),
-      sql`,`,
-    )})`)
-    .all();
+  // An empty list (e.g. an appointment booked via the AI assistant, which sets no
+  // therapies) would build `IN ()` — a SQLite syntax error that 500s the whole
+  // "Complete" action. Skip the lookup and just record the completion.
+  const ts = therapyIds.length
+    ? db
+        .select()
+        .from(therapies)
+        .where(sql`${therapies.id} IN (${sql.join(
+          therapyIds.map((id) => sql`${id}`),
+          sql`,`,
+        )})`)
+        .all()
+    : [];
   // Per-therapy duration distribution: divide total appointment minutes evenly
   const totalMins =
     minutesBetween(appt.startTime, appt.endTime) || (ts[0]?.defaultDurationMinutes ?? 30);

@@ -1,24 +1,42 @@
+"use client";
+
 import * as React from "react";
+import { motion } from "motion/react";
+
+import { DUR, EASE } from "@/lib/motion";
+
+const baseStyle: React.CSSProperties = {
+  background: "var(--surface-1)",
+  border: "1px solid var(--grid)",
+  borderRadius: "var(--radius)",
+  padding: 24,
+  boxShadow: "var(--shadow-1)",
+};
 
 export const Card = React.forwardRef<
   HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ children, style, ...rest }, ref) => (
-  <div
-    ref={ref}
-    style={{
-      background: "var(--surface-1)",
-      border: "1px solid var(--grid)",
-      borderRadius: "var(--radius)",
-      padding: 24,
-      boxShadow: "var(--shadow-1)",
-      ...style,
-    }}
-    {...rest}
-  >
-    {children}
-  </div>
-));
+  React.HTMLAttributes<HTMLDivElement> & { interactive?: boolean }
+>(({ children, style, interactive, ...rest }, ref) => {
+  if (!interactive) {
+    return (
+      <div ref={ref} style={{ ...baseStyle, ...style }} {...rest}>
+        {children}
+      </div>
+    );
+  }
+  return (
+    <motion.div
+      ref={ref}
+      style={{ ...baseStyle, cursor: "pointer", ...style }}
+      whileHover={{ y: -2, boxShadow: "var(--shadow-2)", borderColor: "var(--hairline-strong)" }}
+      whileTap={{ y: 1 }}
+      transition={{ duration: DUR.fast, ease: [...EASE] }}
+      {...(rest as React.ComponentProps<typeof motion.div>)}
+    >
+      {children}
+    </motion.div>
+  );
+});
 Card.displayName = "Card";
 
 export function CardLabel({
