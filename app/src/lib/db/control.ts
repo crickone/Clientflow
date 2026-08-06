@@ -171,6 +171,177 @@ export function ensureControlTables() {
       alt TEXT,
       created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
+
+    -- Staff invitations: a pending "set your password" link emailed to a new
+    -- team member. Identity + membership are created up-front; accepting sets
+    -- the password and clears must_change_password.
+    CREATE TABLE IF NOT EXISTS user_invites (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      token TEXT NOT NULL UNIQUE,
+      email TEXT NOT NULL,
+      tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      role TEXT NOT NULL DEFAULT 'staff',
+      invited_by_user_id INTEGER REFERENCES users(id),
+      expires_at INTEGER NOT NULL,
+      accepted_at INTEGER,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_user_invites_tenant ON user_invites(tenant_id);
+    CREATE INDEX IF NOT EXISTS idx_user_invites_email ON user_invites(email);
+
+    -- Small key/value store for background jobs (e.g. the daily scheduler's
+    -- last-run date, so it never runs twice a day even across restarts).
+    CREATE TABLE IF NOT EXISTS cron_state (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+
+    -- A tenant's connected Gmail account (OAuth). Tokens stored ENCRYPTED.
+    CREATE TABLE IF NOT EXISTS gmail_connections (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id INTEGER NOT NULL UNIQUE REFERENCES tenants(id) ON DELETE CASCADE,
+      email TEXT NOT NULL,
+      refresh_token TEXT NOT NULL,
+      access_token TEXT,
+      token_expiry INTEGER,
+      scope TEXT,
+      history_id TEXT,
+      last_sync_at INTEGER,
+      connected_by_user_id INTEGER REFERENCES users(id),
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+
+    -- ── Platform billing (spec 2026-07-21) ────────────────────────────────
+    -- One row per tenant that participates in billing. Legacy tenants without
+    -- a row are NOT gated. billing_exempt=1 → agency-run tenant: shown as
+    -- active, never charged, excluded from MRR.
+    CREATE TABLE IF NOT EXISTS tenant_billing (
+      tenant_id       INTEGER PRIMARY KEY REFERENCES tenants(id) ON DELETE CASCADE,
+      status          TEXT NOT NULL DEFAULT 'pending_payment'
+                      CHECK (status IN ('pending_payment','active','past_due','suspended','cancelled')),
+      billing_exempt  INTEGER NOT NULL DEFAULT 0,
+      card_token      TEXT,
+      card_last4      TEXT,
+      card_expiry     TEXT,
+      anchor_day      INTEGER,
+      next_renewal_at TEXT,
+      failed_attempts INTEGER NOT NULL DEFAULT 0,
+      last_failure_at INTEGER,
+      activated_at    INTEGER,
+      suspended_at    INTEGER,
+      created_at      INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+      updated_at      INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+
+    CREATE TABLE IF NOT EXISTS billing_invoices (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id       INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      period_start    TEXT NOT NULL,
+      period_end      TEXT NOT NULL,
+      net_cents       INTEGER NOT NULL,
+      vat_cents       INTEGER NOT NULL,
+      gross_cents     INTEGER NOT NULL,
+      vat_rate_bp     INTEGER NOT NULL,
+      currency        TEXT NOT NULL DEFAULT 'EUR',
+      status          TEXT NOT NULL DEFAULT 'pending'
+                      CHECK (status IN ('pending','paid','failed','waived','refunded')),
+      gateway_ref     TEXT,
+      attempt_count   INTEGER NOT NULL DEFAULT 0,
+      next_attempt_at TEXT,
+      -- Atomic per-invoice charge claim: set to Date.now() while a charge is
+      -- in flight, cleared (NULL) when it settles. A concurrent run can only
+      -- claim an invoice whose claim is NULL or older than the TTL (stale/crash).
+      charge_started_at INTEGER,
+      paid_at         INTEGER,
+      created_at      INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+      UNIQUE (tenant_id, period_start)
+    );
+    CREATE INDEX IF NOT EXISTS idx_billing_invoices_tenant ON billing_invoices(tenant_id);
+
+    CREATE TABLE IF NOT EXISTS billing_events (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id  INTEGER,
+      type       TEXT NOT NULL,
+      detail     TEXT,
+      actor      TEXT NOT NULL,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_billing_events_tenant ON billing_events(tenant_id, created_at);
+
+    CREATE TABLE IF NOT EXISTS platform_sessions (
+      token      TEXT PRIMARY KEY,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+
+    CREATE TABLE IF NOT EXISTS platform_settings (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+
+    -- A pending hosted-capture session (provider-agnostic): maps the provider's
+    -- session ref back to the tenant + purpose on callback/completion.
+    CREATE TABLE IF NOT EXISTS capture_sessions (
+      ref         TEXT PRIMARY KEY,
+      tenant_id   INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      purpose     TEXT NOT NULL CHECK (purpose IN ('activate','update_card','reactivate')),
+      amount_cents INTEGER,
+      invoice_id  INTEGER,
+      status      TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','complete','failed')),
+      created_at  INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+
+    -- Per-tenant API keys for server-to-server integrations (Zapier/Make/etc.).
+    -- The raw key is shown to the admin ONCE at creation; we persist only its
+    -- sha256 hash (key_hash) so a DB leak can't reveal usable keys. key_prefix
+    -- is the non-secret leading slice, shown in the UI to identify a key. A key
+    -- carries scopes (currently just 'leads') and routes an inbound request to
+    -- its OWNING tenant — the fix for the tenant-blind inbound-leads webhook.
+    CREATE TABLE IF NOT EXISTS api_keys (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      key_hash TEXT NOT NULL UNIQUE,
+      key_prefix TEXT NOT NULL,
+      label TEXT,
+      scopes TEXT NOT NULL DEFAULT 'leads',
+      last_used_at INTEGER,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch()*1000),
+      revoked_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
+
+    -- Client-app password resets + first-password invites. A single-use,
+    -- expiring token tied to a client_credentials row. Used by both the
+    -- migration bulk-invite ("set your password") and the client forgot-password
+    -- flow. Cascades away with the credential.
+    CREATE TABLE IF NOT EXISTS client_password_resets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      credential_id INTEGER NOT NULL REFERENCES client_credentials(id) ON DELETE CASCADE,
+      token TEXT NOT NULL UNIQUE,
+      expires_at INTEGER NOT NULL,
+      used_at INTEGER,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_client_password_resets_cred ON client_password_resets(credential_id);
+
+    -- ── AI usage metering (agentic-OS) ────────────────────────────────────
+    -- Per-tenant AI spend metering (central so the platform can see + bill cross-gym spend).
+    CREATE TABLE IF NOT EXISTS ai_usage (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id     INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      yyyymm        TEXT NOT NULL,           -- billing bucket, e.g. '2026-08'
+      agent_key     TEXT NOT NULL,           -- 'sales' | 'assistant' | ...
+      model         TEXT NOT NULL,
+      input_tokens      INTEGER NOT NULL DEFAULT 0,
+      output_tokens     INTEGER NOT NULL DEFAULT 0,
+      cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+      cache_create_tokens INTEGER NOT NULL DEFAULT 0,
+      cost_cents    REAL NOT NULL DEFAULT 0,
+      created_at    INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_ai_usage_tenant_month ON ai_usage(tenant_id, yyyymm);
   `);
 
   // Existing control DBs predate auth_sessions.active_tenant_id; the CREATE above
@@ -191,12 +362,44 @@ export function ensureControlTables() {
       err,
     );
   }
+
+  // Existing control DBs predate billing_invoices.charge_started_at (the atomic
+  // per-invoice charge claim). The CREATE above only applies to fresh installs,
+  // so add it once on older DBs (PRAGMA-guarded, mirroring the migration above).
+  try {
+    const cols = controlSqlite
+      .prepare("PRAGMA table_info(billing_invoices)")
+      .all() as Array<{ name: string }>;
+    if (!cols.find((c) => c.name === "charge_started_at")) {
+      controlSqlite.exec(
+        "ALTER TABLE billing_invoices ADD COLUMN charge_started_at INTEGER",
+      );
+    }
+  } catch (err) {
+    console.error(
+      "[control] billing_invoices charge_started_at migration failed:",
+      err,
+    );
+  }
 }
 
 // NB: ensureControlTables() is invoked lazily by rawControl() on first open —
 // NOT here. Calling it at module load would open the DB during `next build`.
 
 export const controlDb = drizzle(controlSqlite, { schema });
+
+/** Tiny key/value store for background-job state (see cron_state table). */
+export function getCronState(key: string): string | null {
+  const row = controlSqlite.prepare("SELECT value FROM cron_state WHERE key = ?").get(key) as
+    | { value: string }
+    | undefined;
+  return row?.value ?? null;
+}
+export function setCronState(key: string, value: string): void {
+  controlSqlite
+    .prepare("INSERT INTO cron_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+    .run(key, value);
+}
 
 /**
  * Auth + user management read/write identity, which lives in the control plane.
