@@ -4,6 +4,8 @@ import { type NextRequest } from "next/server";
 import { requireUser, getCurrentMembership } from "@/lib/auth";
 import { buildAssistantSystem } from "@/lib/assistant/system";
 import { executeTool, isWriteTool, summarizeToolAction, TOOLS } from "@/lib/assistant/tools";
+import { getAnthropic, MODELS } from "@/lib/ai/client";
+import { assertUnderCap, recordUsage, AiCapError } from "@/lib/ai/usage";
 import { runWithTenant } from "@/lib/db/tenant";
 import { getSchedulingMode } from "@/lib/settings";
 import { isDriveConnected } from "@/lib/gmail";
@@ -60,13 +62,28 @@ export async function POST(req: NextRequest) {
   // deep inside tools like send_client_email (which use request-scoped helpers).
   void runWithTenant(tenantId, async () => {
     try {
-      const anthropic = new Anthropic();
+      const anthropic = getAnthropic();
       const convo: Anthropic.MessageParam[] = history.map((m) => ({ role: m.role, content: m.content }));
+
+      // Enforce the per-gym monthly AI spend cap before burning any tokens on
+      // this request. Reuses the route's existing send()/writer-close
+      // mechanics: return here lets the outer finally below close the writer,
+      // same as every other exit path in this function.
+      try {
+        assertUnderCap(tenantId);
+      } catch (e) {
+        if (e instanceof AiCapError) {
+          await send({ type: "error", error: e.message });
+          await send({ type: "done" });
+          return;
+        }
+        throw e;
+      }
 
       for (let turn = 0; turn < 8; turn++) {
         if (req.signal.aborted) break; // client disconnected — stop burning tokens
         const stream = anthropic.messages.stream({
-          model: "claude-opus-4-8",
+          model: MODELS.sonnet,
           // Full nutrition/workout plans serialise to large tool inputs; 4096 was
           // truncating them mid-JSON, which failed and made the model retry.
           max_tokens: 16000,
@@ -78,6 +95,12 @@ export async function POST(req: NextRequest) {
           void send({ type: "text", text: delta });
         });
         const final = await stream.finalMessage();
+        recordUsage(tenantId, "assistant", MODELS.sonnet, {
+          inputTokens: final.usage.input_tokens,
+          outputTokens: final.usage.output_tokens,
+          cacheReadTokens: (final.usage as any).cache_read_input_tokens ?? 0,
+          cacheCreateTokens: (final.usage as any).cache_creation_input_tokens ?? 0,
+        });
         convo.push({ role: "assistant", content: final.content });
 
         // A tool call that got cut off by the token limit is malformed — don't
