@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/DropdownMenu";
 import {
   BarChart3,
+  Bot,
   CalendarClock,
   CalendarDays,
   CalendarRange,
@@ -160,6 +161,12 @@ const NAV: NavSection[] = [
       },
       { href: "/staff", label: "Staff", icon: UserCog, adminOnly: true },
       { href: "/reports", label: "Reports", icon: BarChart3, adminOnly: true },
+    ],
+  },
+  {
+    heading: "AI",
+    items: [
+      { href: "/agents", label: "Agents", icon: Bot, adminOnly: true },
     ],
   },
   {

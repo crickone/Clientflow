@@ -1,0 +1,414 @@
+"use client";
+
+import Link from "next/link";
+import {
+  Bot,
+  ClipboardCheck,
+  Handshake,
+  Megaphone,
+  Search,
+  Wallet,
+  Workflow,
+} from "lucide-react";
+
+import { Card, CardLabel } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { Reveal, RevealGroup } from "@/components/motion/Reveal";
+import { formatEur } from "@/lib/utils";
+import type { Agent } from "@/lib/db/schema";
+
+interface Props {
+  agents: Agent[];
+  usageByAgent: Record<string, number>;
+  capCents: number;
+  monthCents: number;
+}
+
+/**
+ * Display copy for the org chart. Mirrors AGENT_CATALOG's `mandate` field in
+ * `@/lib/agents/registry` — duplicated (not imported) because that module is
+ * `server-only` (DB access) and this component runs on the client.
+ */
+const MANDATE: Record<string, string> = {
+  orchestrator: "Routes work to the right specialist.",
+  sales: "Works leads: instant replies + relentless follow-up.",
+  seo: "Publishes + optimises content for organic growth.",
+  marketing: "Runs the Marketing Brain: campaigns + social.",
+  operations: "No-shows, class fill, attendance, admin.",
+  finance: "Guards the cash: overdue + failed payments.",
+};
+
+/** Per-agent icon — purely presentational, keyed by agent key. */
+const ICON: Record<string, typeof Bot> = {
+  orchestrator: Workflow,
+  sales: Handshake,
+  seo: Search,
+  marketing: Megaphone,
+  operations: ClipboardCheck,
+  finance: Wallet,
+};
+
+/**
+ * claude-* model ids -> short display labels. Duplicated from (not imported
+ * from) `@/lib/ai/client`'s MODELS map for the same server-only reason as
+ * MANDATE above.
+ */
+const MODEL_LABEL: Record<string, string> = {
+  "claude-sonnet-5": "Sonnet 5",
+  "claude-opus-4-8": "Opus 4.8",
+  "claude-haiku-4-5-20251001": "Haiku 4.5",
+};
+
+function modelLabel(model: string): string {
+  return MODEL_LABEL[model] ?? model;
+}
+
+/**
+ * The "AI staff org chart": one Orchestrator node on top, five specialist
+ * nodes below it in a responsive grid, connected by SVG lines so the whole
+ * thing reads as a hierarchy rather than a list or table.
+ */
+export function AgentOrgChart({ agents, usageByAgent, capCents, monthCents }: Props) {
+  const orchestrator = agents.find((a) => a.key === "orchestrator");
+  const specialists = agents.filter((a) => a.key !== "orchestrator");
+
+  return (
+    <div>
+      <Card style={{ marginBottom: 40 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 20,
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <CardLabel style={{ marginBottom: 8 }}>Tenant AI usage — this month</CardLabel>
+            <div
+              style={{
+                fontFamily: "var(--font-heading), sans-serif",
+                fontSize: 26,
+                color: "var(--text-primary)",
+                textTransform: "uppercase",
+              }}
+            >
+              {formatEur(monthCents / 100)}{" "}
+              <span
+                style={{
+                  fontFamily: "var(--font-mono), ui-monospace, monospace",
+                  fontSize: 13,
+                  color: "var(--text-tertiary)",
+                  textTransform: "none",
+                }}
+              >
+                / {formatEur(capCents / 100)} cap
+              </span>
+            </div>
+          </div>
+          <div style={{ flex: "1 1 240px", maxWidth: 380 }}>
+            <UsageMeter valueCents={monthCents} capCents={capCents} />
+          </div>
+        </div>
+      </Card>
+
+      <div className="agent-orgchart">
+        {orchestrator && (
+          <AgentCard
+            agent={orchestrator}
+            usageCents={usageByAgent[orchestrator.key] ?? 0}
+            capCents={capCents}
+            variant="orchestrator"
+          />
+        )}
+
+        {/* Decorative connectors: a fan-out SVG at wide viewports (synced to
+            the fixed 5-column grid below), collapsing to a single trunk line
+            once the grid reflows and per-card x-positions are no longer
+            known. Either way it sits behind the cards (z-index 0). */}
+        <div className="agent-orgchart-links" aria-hidden="true">
+          <svg
+            className="agent-orgchart-svg"
+            viewBox="0 0 100 48"
+            preserveAspectRatio="none"
+          >
+            {specialists.map((s, i) => {
+              const x = ((i + 0.5) / specialists.length) * 100;
+              return (
+                <path
+                  key={s.key}
+                  d={`M 50 0 C 50 24, ${x} 20, ${x} 48`}
+                  fill="none"
+                  stroke="var(--hairline)"
+                  strokeWidth={1}
+                  vectorEffect="non-scaling-stroke"
+                />
+              );
+            })}
+          </svg>
+          <div className="agent-orgchart-trunk" />
+        </div>
+
+        <div className="agent-orgchart-grid">
+          {/* display:contents unwraps RevealGroup's own box so its Reveal
+              children become direct items of the CSS grid below, while still
+              getting the group's in-view stagger. */}
+          <RevealGroup style={{ display: "contents" }}>
+            {specialists.map((agent) => (
+              <Reveal key={agent.key}>
+                <AgentCard
+                  agent={agent}
+                  usageCents={usageByAgent[agent.key] ?? 0}
+                  capCents={capCents}
+                  variant="specialist"
+                />
+              </Reveal>
+            ))}
+          </RevealGroup>
+        </div>
+      </div>
+
+      <style jsx>{`
+        .agent-orgchart {
+          position: relative;
+        }
+        .agent-orgchart-links {
+          position: relative;
+          height: 48px;
+        }
+        .agent-orgchart-svg {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          z-index: 0;
+          display: none;
+        }
+        .agent-orgchart-trunk {
+          position: absolute;
+          left: 50%;
+          top: 0;
+          bottom: 0;
+          width: 1px;
+          background: var(--hairline);
+          transform: translateX(-50%);
+        }
+        .agent-orgchart-grid {
+          position: relative;
+          z-index: 1;
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 16px;
+        }
+        @media (min-width: 1300px) {
+          .agent-orgchart-svg {
+            display: block;
+          }
+          .agent-orgchart-trunk {
+            display: none;
+          }
+          .agent-orgchart-grid {
+            grid-template-columns: repeat(5, 1fr);
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function AgentCard({
+  agent,
+  usageCents,
+  capCents,
+  variant,
+}: {
+  agent: Agent;
+  usageCents: number;
+  capCents: number;
+  variant: "orchestrator" | "specialist";
+}) {
+  const active = agent.status === "active";
+  const Icon = ICON[agent.key] ?? Bot;
+  const isOrchestrator = variant === "orchestrator";
+  const mandate = MANDATE[agent.key] || agent.instructions || "AI specialist.";
+
+  return (
+    <Link
+      href={`/agents/${agent.key}`}
+      style={
+        isOrchestrator
+          ? {
+              display: "block",
+              width: "min(360px, 100%)",
+              margin: "0 auto",
+              textDecoration: "none",
+              color: "inherit",
+            }
+          : { display: "block", textDecoration: "none", color: "inherit" }
+      }
+    >
+      <Card
+        interactive
+        style={{ borderColor: isOrchestrator ? "var(--hairline-strong)" : undefined }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: 12,
+            marginBottom: 12,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 32,
+                height: 32,
+                borderRadius: "var(--radius)",
+                background: active ? "var(--accent-soft)" : "var(--surface-2)",
+                color: active ? "var(--accent-ink)" : "var(--text-secondary)",
+                flexShrink: 0,
+              }}
+            >
+              <Icon size={16} strokeWidth={1.75} />
+            </span>
+            <span
+              style={{
+                fontFamily: "var(--font-heading), sans-serif",
+                fontSize: isOrchestrator ? 19 : 16,
+                color: "var(--text-primary)",
+                textTransform: "uppercase",
+                letterSpacing: "-0.005em",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {agent.name}
+            </span>
+          </div>
+          <StatusPill active={active} />
+        </div>
+
+        <p
+          style={{
+            color: "var(--text-secondary)",
+            fontSize: 13,
+            lineHeight: 1.5,
+            margin: "0 0 12px",
+          }}
+        >
+          {mandate}
+        </p>
+
+        {!active && (
+          <div
+            style={{
+              fontSize: 11,
+              fontStyle: "italic",
+              color: "var(--text-tertiary)",
+              marginBottom: 12,
+            }}
+          >
+            Not yet running
+          </div>
+        )}
+
+        <div style={{ marginBottom: 10 }}>
+          <Badge>{modelLabel(agent.model)}</Badge>
+        </div>
+
+        <UsageMeter valueCents={usageCents} capCents={capCents} compact />
+      </Card>
+    </Link>
+  );
+}
+
+function StatusPill({ active }: { active: boolean }) {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        padding: "3px 9px",
+        borderRadius: "var(--radius)",
+        fontFamily: "var(--font-mono), ui-monospace, monospace",
+        fontSize: 10,
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+        whiteSpace: "nowrap",
+        flexShrink: 0,
+        background: active ? "var(--accent-soft)" : "var(--surface-2)",
+        color: active ? "var(--accent-ink)" : "var(--text-tertiary)",
+        boxShadow: active ? "var(--accent-glow)" : "none",
+      }}
+    >
+      <span
+        aria-hidden
+        style={{
+          width: 5,
+          height: 5,
+          borderRadius: "50%",
+          background: active ? "var(--accent)" : "var(--text-tertiary)",
+        }}
+      />
+      {active ? "Active" : "Dormant"}
+    </span>
+  );
+}
+
+function UsageMeter({
+  valueCents,
+  capCents,
+  compact,
+}: {
+  valueCents: number;
+  capCents: number;
+  compact?: boolean;
+}) {
+  const pct = capCents > 0 ? Math.min(100, (valueCents / capCents) * 100) : 0;
+  return (
+    <div>
+      <div
+        role="progressbar"
+        aria-valuenow={Math.round(pct)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        style={{
+          height: compact ? 4 : 6,
+          borderRadius: 999,
+          background: "var(--surface-2)",
+          overflow: "hidden",
+          marginBottom: 6,
+        }}
+      >
+        <div
+          style={{
+            height: "100%",
+            width: `${pct}%`,
+            borderRadius: 999,
+            background: "var(--accent)",
+          }}
+        />
+      </div>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          fontFamily: "var(--font-mono), ui-monospace, monospace",
+          fontSize: compact ? 10.5 : 11,
+          color: "var(--text-tertiary)",
+        }}
+      >
+        <span>{formatEur(valueCents / 100)}</span>
+        <span>/ {formatEur(capCents / 100)}</span>
+      </div>
+    </div>
+  );
+}
