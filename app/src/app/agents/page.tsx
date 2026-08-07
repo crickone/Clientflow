@@ -24,7 +24,7 @@ export default async function AgentsPage() {
       <PageHeader
         eyebrow="AI Staff"
         title="Agents"
-        subtitle="One orchestrator routing work to five always-on specialists."
+        subtitle="One orchestrator routing work to your specialist agents."
       />
       <AgentOrgChart
         agents={agents}

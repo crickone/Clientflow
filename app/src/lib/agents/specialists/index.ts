@@ -18,7 +18,7 @@ export interface SpecialistConfig {
  * just a new `specialists/<key>.ts` file + an entry here (plus flipping its
  * `AGENT_CATALOG` status to "active" when it's ready to go live).
  *
- * Dormant/unmodeled agents (seo, finance today) are deliberately absent —
+ * Dormant/unmodeled agents (finance today) are deliberately absent —
  * callers fall back to a generic playbook / empty tool slice, and the chat
  * route 404s before ever reaching a specialist lookup for a non-active agent.
  *

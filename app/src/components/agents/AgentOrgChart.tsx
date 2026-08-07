@@ -1,12 +1,12 @@
 "use client";
 
+import { type CSSProperties } from "react";
 import Link from "next/link";
 import {
   Bot,
   ClipboardCheck,
   Handshake,
   Megaphone,
-  Search,
   Wallet,
   Workflow,
 } from "lucide-react";
@@ -32,7 +32,6 @@ interface Props {
 const MANDATE: Record<string, string> = {
   orchestrator: "Routes work to the right specialist.",
   sales: "Works leads: instant replies + relentless follow-up.",
-  seo: "Publishes + optimises content for organic growth.",
   marketing: "Runs the Marketing Brain: campaigns + social.",
   operations: "No-shows, class fill, attendance, admin.",
   finance: "Guards the cash: overdue + failed payments.",
@@ -42,7 +41,6 @@ const MANDATE: Record<string, string> = {
 const ICON: Record<string, typeof Bot> = {
   orchestrator: Workflow,
   sales: Handshake,
-  seo: Search,
   marketing: Megaphone,
   operations: ClipboardCheck,
   finance: Wallet,
@@ -150,7 +148,7 @@ export function AgentOrgChart({ agents, usageByAgent, capCents, monthCents }: Pr
           <div className="agent-orgchart-trunk" />
         </div>
 
-        <div className="agent-orgchart-grid">
+        <div className="agent-orgchart-grid" style={{ "--cols": specialists.length } as CSSProperties}>
           {/* Each specialist card is a STANDALONE Reveal (fades/rises on
               scroll-into-view; ones already in view appear on load). Do NOT
               wrap these in a <RevealGroup style={{display:"contents"}}> — a
@@ -210,7 +208,7 @@ export function AgentOrgChart({ agents, usageByAgent, capCents, monthCents }: Pr
             display: none;
           }
           .agent-orgchart-grid {
-            grid-template-columns: repeat(5, 1fr);
+            grid-template-columns: repeat(var(--cols, 5), 1fr);
           }
         }
       `}</style>

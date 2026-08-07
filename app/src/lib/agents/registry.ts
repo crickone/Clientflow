@@ -1,14 +1,13 @@
 import "server-only";
 import { getTenantDbById } from "@/lib/db/tenant";
 import { agents, type Agent } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { MODELS } from "@/lib/ai/client";
 
 export interface AgentDef { key: string; name: string; mandate: string; status: "active" | "dormant"; defaultModel: string; }
 export const AGENT_CATALOG: AgentDef[] = [
   { key: "orchestrator", name: "Orchestrator", mandate: "Routes work to the right specialist.", status: "active", defaultModel: MODELS.sonnet },
   { key: "sales", name: "Sales", mandate: "Works leads: instant replies + relentless follow-up.", status: "active", defaultModel: MODELS.sonnet },
-  { key: "seo", name: "SEO", mandate: "Publishes + optimises content for organic growth.", status: "dormant", defaultModel: MODELS.sonnet },
   { key: "marketing", name: "Marketing", mandate: "Runs the Marketing Brain: campaigns + social.", status: "active", defaultModel: MODELS.sonnet },
   { key: "operations", name: "Operations", mandate: "No-shows, class fill, attendance, admin.", status: "active", defaultModel: MODELS.sonnet },
   { key: "finance", name: "Finance", mandate: "Guards the cash: overdue + failed payments.", status: "dormant", defaultModel: MODELS.sonnet },
@@ -33,6 +32,15 @@ export function ensureAgents(tenantId: number): void {
       // and must never be overwritten by a reconcile.
       db.update(agents).set({ status: a.status }).where(eq(agents.key, a.key)).run();
     }
+  }
+  // Prune agents removed from AGENT_CATALOG (e.g. SEO): the seed loop never
+  // deletes, so a tenant seeded under an older catalog keeps stale rows that
+  // would still render on the org chart. Safe: agent rows only ever originate
+  // from the catalog, so anything not in it is stale.
+  const catalogKeys = new Set(AGENT_CATALOG.map((a) => a.key));
+  const stale = existingRows.filter((r) => !catalogKeys.has(r.key)).map((r) => r.key);
+  if (stale.length > 0) {
+    db.delete(agents).where(inArray(agents.key, stale)).run();
   }
 }
 export function listAgents(tenantId: number): Agent[] {
