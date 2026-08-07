@@ -8,11 +8,10 @@ import type { Agent } from "@/lib/db/schema";
 
 /**
  * Per-agent copy layered onto the shared AssistantChat shell (see that
- * component's `endpoint`/`title`/... props). Only "sales" has copy today
- * because it's the only active agent in AGENT_CATALOG
- * (@/lib/agents/registry) — any other agent that goes active later just
- * falls back to AssistantChat's own generic defaults until it gets its own
- * entry here.
+ * component's `endpoint`/`title`/... props). Sales and Marketing (the two
+ * active agents in AGENT_CATALOG, @/lib/agents/registry) each have an entry
+ * in CHAT_COPY; any other agent that goes active later falls back to
+ * AssistantChat's own generic defaults until it gets its own entry here.
  */
 const SALES_CHAT_COPY = {
   subtitle: "drafts replies + follow-ups for your leads, across email and WhatsApp",
@@ -26,6 +25,25 @@ const SALES_CHAT_COPY = {
     "Show me everyone currently in the pipeline",
   ],
   placeholder: "Ask the Sales agent…  (Enter to send)",
+};
+
+const MARKETING_CHAT_COPY = {
+  subtitle: "drafts on-brand blogs + carousels from your Marketing Brain — you approve before anything saves or publishes",
+  emptyTitle: "Ask the Marketing agent to draft content",
+  emptyBody:
+    "It can draft an on-brand blog or carousel, save a draft, and publish a blog to your live site — nothing saves or publishes until you click Approve. It can't post to social or schedule posts yet.",
+  suggestions: [
+    "Draft a blog post about our newest class, in our voice",
+    "Draft a 5-slide carousel on why strength training matters",
+    "What blog posts do we have, and what's their status?",
+    "Draft a blog and get it ready for me to publish",
+  ],
+  placeholder: "Ask the Marketing agent…  (Enter to send)",
+};
+
+const CHAT_COPY: Record<string, typeof SALES_CHAT_COPY> = {
+  sales: SALES_CHAT_COPY,
+  marketing: MARKETING_CHAT_COPY,
 };
 
 /**
@@ -59,7 +77,7 @@ export function AgentChatPanel({ agent, tenantId }: { agent: Agent; tenantId: nu
     );
   }
 
-  const copy = agent.key === "sales" ? SALES_CHAT_COPY : null;
+  const copy = CHAT_COPY[agent.key] ?? null;
 
   return (
     <AssistantChat
