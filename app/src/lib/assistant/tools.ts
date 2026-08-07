@@ -1,6 +1,7 @@
 import "server-only";
 
 import type Anthropic from "@anthropic-ai/sdk";
+import type { PendingWrite } from "@/lib/agents/runAgentTurn";
 import JSZip from "jszip";
 import { and, desc, eq, gte, like, lte, ne, or, sql } from "drizzle-orm";
 
@@ -67,9 +68,27 @@ import {
   listNoShowsTool,
   sendClientWhatsappTool,
 } from "@/lib/agents/tools.operations";
+import {
+  ORCHESTRATOR_TOOLS,
+  delegateToMarketingTool,
+  delegateToOperationsTool,
+  delegateToSalesTool,
+} from "@/lib/agents/tools.orchestrator";
 
 export type ToolArtifact = { url: string; filename: string; label: string };
-export type ToolResult = { text: string; artifact?: ToolArtifact };
+export type ToolResult = {
+  text: string;
+  artifact?: ToolArtifact;
+  // Set ONLY by a delegate_to_<specialist> tool (@/lib/agents/tools.orchestrator):
+  // that tool is a READ (it never itself mutates anything) that runs a
+  // specialist's nested runAgentTurn inline, and if the specialist's own model
+  // proposed any writes, those are deferred (never executed — same guarantee
+  // as every other write) and surface here so the orchestrator's OWN
+  // runAgentTurn can fold them into its own pendingWrites and hand them to the
+  // operator's Approve card, same as a direct write. Every other tool leaves
+  // this undefined.
+  pendingWrites?: PendingWrite[];
+};
 export type ToolContext = { tenantId: number; userId?: number };
 
 /**
@@ -103,6 +122,12 @@ export const WRITE_TOOLS = new Set<string>([
   // The 2 read tools (list_no_shows, list_lapsed_members) are NOT here and
   // run freely.
   "send_client_whatsapp",
+  // Orchestrator agent (Orchestrator Task 2): delegate_to_sales/marketing/
+  // operations are intentionally NOT here — delegating never itself mutates
+  // anything. A delegated specialist's real writes are already-gated tools
+  // (the entries above) that the specialist's own nested runAgentTurn defers
+  // exactly like a direct call would; they reach the operator via
+  // ToolResult.pendingWrites, not by being added to this set.
 ]);
 
 export function isWriteTool(name: string): boolean {
@@ -770,6 +795,14 @@ export const TOOLS: Anthropic.Tool[] = [
 
   // ── Operations agent (Operations Task 1): no-show + lapsed-member tools ──
   ...OPERATIONS_TOOLS,
+
+  // ── Orchestrator agent (Orchestrator Task 2): delegate to a specialist ──
+  // These 3 are READS (deliberately NOT in WRITE_TOOLS below) — delegating
+  // doesn't itself mutate anything; a delegated specialist's own writes are
+  // deferred exactly like every other write and surface via
+  // ToolResult.pendingWrites (see the type above + runAgentTurn.ts's READ
+  // branch, which folds them into the turn's own pendingWrites).
+  ...ORCHESTRATOR_TOOLS,
 ];
 
 // ─── Executors ───────────────────────────────────────────────────────────────
@@ -875,6 +908,12 @@ export async function executeTool(
         return await listLapsedMembersTool(ctx, input);
       case "send_client_whatsapp":
         return await sendClientWhatsappTool(ctx, input);
+      case "delegate_to_sales":
+        return await delegateToSalesTool(ctx, input);
+      case "delegate_to_marketing":
+        return await delegateToMarketingTool(ctx, input);
+      case "delegate_to_operations":
+        return await delegateToOperationsTool(ctx, input);
       default:
         return { text: `Unknown tool: ${name}` };
     }

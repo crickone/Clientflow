@@ -6,7 +6,7 @@ import { MODELS } from "@/lib/ai/client";
 
 export interface AgentDef { key: string; name: string; mandate: string; status: "active" | "dormant"; defaultModel: string; }
 export const AGENT_CATALOG: AgentDef[] = [
-  { key: "orchestrator", name: "Orchestrator", mandate: "Routes work to the right specialist.", status: "dormant", defaultModel: MODELS.sonnet },
+  { key: "orchestrator", name: "Orchestrator", mandate: "Routes work to the right specialist.", status: "active", defaultModel: MODELS.sonnet },
   { key: "sales", name: "Sales", mandate: "Works leads: instant replies + relentless follow-up.", status: "active", defaultModel: MODELS.sonnet },
   { key: "seo", name: "SEO", mandate: "Publishes + optimises content for organic growth.", status: "dormant", defaultModel: MODELS.sonnet },
   { key: "marketing", name: "Marketing", mandate: "Runs the Marketing Brain: campaigns + social.", status: "active", defaultModel: MODELS.sonnet },

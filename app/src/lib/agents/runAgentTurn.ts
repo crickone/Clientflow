@@ -51,10 +51,27 @@ export interface RunAgentTurnArgs {
  * `isWriteTool`/`WRITE_TOOLS` set; that endpoint is untouched by this
  * refactor.
  *
+ * Orchestrator Task 2: a READ tool's result can ITSELF carry `pendingWrites`
+ * (`ToolResult.pendingWrites?`, @/lib/assistant/tools) — this is how a
+ * `delegate_to_<specialist>` tool (@/lib/agents/tools.orchestrator) surfaces
+ * writes a DELEGATED specialist's nested `runAgentTurn` deferred. Delegation
+ * never bypasses this function's write gate: the specialist's own nested loop
+ * defers its writes exactly the same way (delegate tools call this same
+ * `runAgentTurn`, recursively), so by the time a write reaches the outer
+ * loop's `pendingWrites`, it has already passed through this exact NEVER-
+ * execute-a-write branch at least once, possibly twice. The read branch below
+ * folds any such nested writes into THIS turn's own `pendingWrites`, so the
+ * SAME `if (pendingWrites.length > 0) break` + confirm/Approve path handles a
+ * delegated write identically to a direct one — the caller (the chat route)
+ * needs no delegation-specific code at all.
+ *
  * `assertUnderCap` runs once, before the first model call, and its
  * `AiCapError` is deliberately left to propagate — this function knows
  * nothing about SSE, so callers that need the error+done framing (the chat
- * route) catch `AiCapError` themselves around this call.
+ * route) catch `AiCapError` themselves around this call. A delegated
+ * specialist's nested `runAgentTurn` call runs this same check again at ITS
+ * OWN start, so the cap is enforced at every level of a delegation, not just
+ * the top.
  */
 export async function runAgentTurn(
   args: RunAgentTurnArgs,
@@ -129,6 +146,14 @@ export async function runAgentTurn(
             onTool?.(block.name);
             const r = await executeTool(block.name, input, { tenantId, userId });
             if (r.artifact) onArtifact?.(r.artifact);
+            // A delegate_to_<specialist> tool is a READ (it never itself
+            // mutates anything) whose result can carry the DELEGATED
+            // specialist's own deferred writes — fold them into this turn's
+            // pendingWrites so they hit the same confirm/Approve path as a
+            // direct write below. The model still sees the normal tool_result
+            // text either way (the human-readable summary), so it can keep
+            // reasoning/synthesising across delegations before this turn ends.
+            if (r.pendingWrites?.length) pendingWrites.push(...r.pendingWrites);
             results.push({ type: "tool_result", tool_use_id: block.id, content: r.text });
           }
         }

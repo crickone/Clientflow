@@ -4,12 +4,15 @@
 // specialist registered in SPECIALISTS (@/lib/agents/specialists) has a
 // toolNames list where every entry resolves to a real tool in TOOLS — the
 // same per-name check salesToolSlice.test.ts (Task 8) did for sales alone,
-// now run for every specialist so a typo in sales.ts, marketing.ts, OR
-// operations.ts is caught. Also pins the sales tool slice to the EXACT same
-// 9 names it had before this generalization (Sales must behave identically),
-// pins Marketing's shape + the required "can't post/schedule" honesty line
-// in its base playbook, and (Operations Task 1) pins Operations' shape + its
-// "does not mark attendance itself" honesty line.
+// now run for every specialist so a typo in sales.ts, marketing.ts,
+// operations.ts, OR orchestrator.ts is caught. Also pins the sales tool slice
+// to the EXACT same 9 names it had before this generalization (Sales must
+// behave identically), pins Marketing's shape + the required "can't post/
+// schedule" honesty line in its base playbook, (Operations Task 1) pins
+// Operations' shape + its "does not mark attendance itself" honesty line,
+// and (Orchestrator Task 2) pins Orchestrator's shape — exactly the 3
+// delegate_to_<specialist> tools, no domain tools of its own — + its
+// "requires the operator's approval" honesty line.
 //
 // This matters because `Array.prototype.filter` silently drops any name that
 // doesn't match — a typo in a specialist's toolNames (or a tool renamed in
@@ -63,14 +66,14 @@ const requireLocal = createRequire(import.meta.url);
 
   const toolsByName = new Map(TOOLS.map((t) => [t.name, t]));
 
-  // ── (a) SPECIALISTS registers exactly the three agents active today. This
+  // ── (a) SPECIALISTS registers exactly the four agents active today. This
   // is an intentional pin, not an assumption: a future task activating
   // another specialist (e.g. SEO) is expected to update this line alongside
   // it. ──
   assert.deepEqual(
     Object.keys(SPECIALISTS).sort(),
-    ["marketing", "operations", "sales"],
-    "SPECIALISTS registers exactly sales + marketing + operations",
+    ["marketing", "operations", "orchestrator", "sales"],
+    "SPECIALISTS registers exactly sales + marketing + operations + orchestrator",
   );
 
   // ── (b) for EVERY specialist, every toolNames entry resolves to a real
@@ -169,6 +172,39 @@ const requireLocal = createRequire(import.meta.url);
     SPECIALISTS.operations.basePlaybook.includes("you do not mark attendance yourself"),
     "OPERATIONS_SPECIALIST.basePlaybook contains the required honesty line about not marking attendance itself",
   );
+
+  // ── (f) Orchestrator's shape is pinned too (Orchestrator Task 2): exactly
+  // the 3 delegate_to_<specialist> tools — no domain tools of its own, since
+  // it routes rather than does — and its base playbook contains, verbatim,
+  // the honesty line that a specialist's proposed writes still require the
+  // operator's approval (the same "never claim work is done" spirit as
+  // Marketing's post/schedule line and Operations' attendance line above,
+  // specific to a THIN routing agent whose only real actions happen inside
+  // delegated specialist turns). Also confirms delegation can't recurse: the
+  // orchestrator does not appear in its own toolNames or any other
+  // specialist's — enforced at runtime by tools.orchestrator.ts's
+  // DELEGATABLE allowlist (see tools.orchestrator.test.ts), pinned here as a
+  // static cross-check that no specialist (including orchestrator itself)
+  // is ever given a delegate_to_* tool. ──
+  assert.equal(SPECIALISTS.orchestrator.toolNames.length, 3, "ORCHESTRATOR_SPECIALIST.toolNames has exactly 3 entries");
+  assert.deepEqual(
+    [...SPECIALISTS.orchestrator.toolNames].sort(),
+    ["delegate_to_marketing", "delegate_to_operations", "delegate_to_sales"],
+    "ORCHESTRATOR_SPECIALIST.toolNames is exactly the 3 delegate tools",
+  );
+  assert.ok(
+    SPECIALISTS.orchestrator.basePlaybook.includes(
+      "still requires the operator's approval",
+    ),
+    "ORCHESTRATOR_SPECIALIST.basePlaybook contains the required honesty line about needing operator approval",
+  );
+  for (const [key, spec] of Object.entries(SPECIALISTS)) {
+    if (key === "orchestrator") continue; // orchestrator legitimately holds all 3 — pinned exactly, above
+    assert.ok(
+      !spec.toolNames.some((n) => n.startsWith("delegate_to_")),
+      `${key}: no specialist other than orchestrator may hold a delegate_to_* tool — that would allow recursive/nested delegation`,
+    );
+  }
 
   console.log("specialistToolSlice.test.ts: all assertions passed");
 })();

@@ -8,11 +8,26 @@ import type { Agent } from "@/lib/db/schema";
 
 /**
  * Per-agent copy layered onto the shared AssistantChat shell (see that
- * component's `endpoint`/`title`/... props). Sales, Marketing and Operations
- * (the active agents in AGENT_CATALOG, @/lib/agents/registry) each have an
- * entry in CHAT_COPY; any other agent that goes active later falls back to
- * AssistantChat's own generic defaults until it gets its own entry here.
+ * component's `endpoint`/`title`/... props). Orchestrator, Sales, Marketing
+ * and Operations (the active agents in AGENT_CATALOG, @/lib/agents/registry)
+ * each have an entry in CHAT_COPY; any other agent that goes active later
+ * falls back to AssistantChat's own generic defaults until it gets its own
+ * entry here.
  */
+const ORCHESTRATOR_CHAT_COPY = {
+  subtitle: "routes work to Sales, Marketing and Operations and reports back — you approve before anything sends, saves, or publishes",
+  emptyTitle: "Ask the Orchestrator to run the business",
+  emptyBody:
+    "It breaks a request into sub-tasks, delegates each to the right specialist, and summarises what came back — nothing any specialist drafts sends, saves, or publishes until you click Approve.",
+  suggestions: [
+    "Work my leads and win back anyone who's gone quiet",
+    "Draft a blog about our new class and line up a win-back for last week's no-shows",
+    "What should I focus on today?",
+    "Get Marketing to draft a post and Sales to chase new leads",
+  ],
+  placeholder: "Ask the Orchestrator…  (Enter to send)",
+};
+
 const SALES_CHAT_COPY = {
   subtitle: "drafts replies + follow-ups for your leads, across email and WhatsApp",
   emptyTitle: "Ask the Sales agent to work your leads",
@@ -56,6 +71,7 @@ const OPERATIONS_CHAT_COPY = {
 };
 
 const CHAT_COPY: Record<string, typeof SALES_CHAT_COPY> = {
+  orchestrator: ORCHESTRATOR_CHAT_COPY,
   sales: SALES_CHAT_COPY,
   marketing: MARKETING_CHAT_COPY,
   operations: OPERATIONS_CHAT_COPY,
