@@ -802,6 +802,12 @@ export const TOOLS: Anthropic.Tool[] = [
   // deferred exactly like every other write and surface via
   // ToolResult.pendingWrites (see the type above + runAgentTurn.ts's READ
   // branch, which folds them into the turn's own pendingWrites).
+  // Cycle safety: tools.orchestrator.ts imports TOOLS back from this file,
+  // but (see its "CIRCULAR IMPORT" comment) only ever touches it inside
+  // delegateTo's function body — never at module top level. This spread is
+  // the ONE cross-cycle reference that isn't deferred into a function; it's
+  // safe only because this file is the module-graph root, so every cross-ref
+  // in tools.orchestrator.ts is runtime-only by the time it matters here.
   ...ORCHESTRATOR_TOOLS,
 ];
 

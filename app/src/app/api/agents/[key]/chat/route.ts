@@ -14,11 +14,12 @@ import { runAgentTurn, type PendingWrite } from "@/lib/agents/runAgentTurn";
 /**
  * Scoped specialist chat route — the same streaming tool-loop as
  * `/api/assistant/chat`, but pinned to ONE named agent's playbook + tool
- * slice instead of the full general-purpose assistant. Only the agents
- * registered in `SPECIALISTS` (@/lib/agents/specialists) AND marked "active"
- * in `AGENT_CATALOG` are reachable — sales and marketing today; every other
- * AGENT_CATALOG key (orchestrator, seo, operations, finance) is seeded
- * "dormant" and 404s below before any tool slice or system prompt is built.
+ * slice instead of the full general-purpose assistant. Only agents in
+ * `SPECIALISTS` (@/lib/agents/specialists) that are marked "active" in
+ * `AGENT_CATALOG` are reachable — any other AGENT_CATALOG key 404s below
+ * before any tool slice or system prompt is built, whether because it's
+ * still seeded "dormant" there or because it has no matching `SPECIALISTS`
+ * entry yet.
  *
  * Everything except the system prompt, tool slice, model, and metering key is
  * copied verbatim from `/api/assistant/chat` — see that file for the
@@ -44,10 +45,11 @@ export async function POST(
   // Gate: only an agent that is BOTH marked "active" in the registry AND has
   // a SPECIALISTS entry (its tool slice + playbook) is reachable here.
   // getAgent takes an explicit tenantId (not the ambient one) so this is safe
-  // to resolve before entering runWithTenant below. Dormant specialists
-  // (everything but sales/marketing today) 404 instead of silently running
-  // with no playbook/tool slice — same for a hypothetical active row with no
-  // matching SPECIALISTS entry (shouldn't happen, but fails closed).
+  // to resolve before entering runWithTenant below. Any agent that's still
+  // "dormant" in AGENT_CATALOG (@/lib/agents/registry) 404s instead of
+  // silently running with no playbook/tool slice — same for a hypothetical
+  // active row with no matching SPECIALISTS entry (shouldn't happen, but
+  // fails closed).
   const key = params.key;
   const agent = getAgent(tenantId, key);
   const spec = SPECIALISTS[key];

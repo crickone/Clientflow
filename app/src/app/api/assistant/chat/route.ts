@@ -41,6 +41,15 @@ export async function POST(req: NextRequest) {
   const APPT_ONLY = new Set(["create_appointment", "cancel_appointment", "reschedule_appointment"]);
   const TIMETABLE_ONLY = new Set(["create_class", "list_classes", "book_client_into_class", "cancel_class", "cancel_booking"]);
   const tools = TOOLS.filter((t) => {
+    // Orchestrator-only: delegate_to_<specialist> runs a nested specialist
+    // runAgentTurn whose own proposed writes come back as
+    // ToolResult.pendingWrites. This route's loop below (unlike
+    // runAgentTurn's READ branch) never reads that field, so a delegated
+    // write would be silently dropped instead of reaching an Approve card.
+    // Never offer these to the general assistant — only the orchestrator's
+    // own tool slice (SPECIALISTS["orchestrator"].toolNames) should include
+    // them.
+    if (t.name.startsWith("delegate_to_")) return false;
     if (APPT_ONLY.has(t.name)) return schedulingMode === "appointments";
     if (TIMETABLE_ONLY.has(t.name)) return schedulingMode === "timetable";
     if (t.name === "upload_invoices_to_drive") return driveConnected;
