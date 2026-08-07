@@ -79,10 +79,26 @@ export default async function DashboardPage() {
         }
       />
 
-      {/* AI daily brief (auto) + assistant */}
+      {/* AI daily brief (auto) + the Orchestrator (single front door: it routes
+          to the right specialist, or to the general Concierge toolkit). */}
       <DailyBrief tenantId={tenantId} />
       <div style={{ marginBottom: 20 }}>
-        <AssistantChat tenantId={tenantId} height="clamp(360px, 44vh, 560px)" />
+        <AssistantChat
+          tenantId={tenantId}
+          endpoint="/api/agents/orchestrator/chat"
+          title="Orchestrator"
+          subtitle="routes any request to the right agent — sales, marketing, ops, or your general concierge"
+          emptyTitle="Ask for anything — I'll route it"
+          emptyBody="Tell me what you need and I'll hand it to the right agent: chasing leads, drafting content, recovering no-shows, or the general stuff — your inbox, invoices, money, and plans. Nothing sends or changes without your approval."
+          suggestions={[
+            "Give me a breakdown of everything important today",
+            "Work my leads and win back anyone who's gone quiet",
+            "Pull together this month's invoices",
+            "Draft a blog about our newest class",
+          ]}
+          placeholder="Ask the Orchestrator…  (Enter to send)"
+          height="clamp(360px, 44vh, 560px)"
+        />
       </div>
 
       {!briefComplete && (
