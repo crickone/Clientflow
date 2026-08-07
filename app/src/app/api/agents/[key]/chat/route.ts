@@ -8,15 +8,16 @@ import { assertUnderCap, recordUsage, AiCapError } from "@/lib/ai/usage";
 import { runWithTenant } from "@/lib/db/tenant";
 import { getAgent } from "@/lib/agents/registry";
 import { composeAgentSystem } from "@/lib/agents/context";
-import { SALES_SPECIALIST } from "@/lib/agents/specialists/sales";
+import { SPECIALISTS } from "@/lib/agents/specialists";
 
 /**
  * Scoped specialist chat route — the same streaming tool-loop as
  * `/api/assistant/chat`, but pinned to ONE named agent's playbook + tool
- * slice instead of the full general-purpose assistant. Only `SALES_SPECIALIST`
- * is wired today; every other AGENT_CATALOG key (orchestrator, seo,
- * marketing, operations, finance) is seeded "dormant" and 404s below before
- * any tool slice or system prompt is built.
+ * slice instead of the full general-purpose assistant. Only the agents
+ * registered in `SPECIALISTS` (@/lib/agents/specialists) AND marked "active"
+ * in `AGENT_CATALOG` are reachable — sales and marketing today; every other
+ * AGENT_CATALOG key (orchestrator, seo, operations, finance) is seeded
+ * "dormant" and 404s below before any tool slice or system prompt is built.
  *
  * Everything except the system prompt, tool slice, model, and metering key is
  * copied verbatim from `/api/assistant/chat` — see that file for the
@@ -39,13 +40,17 @@ export async function POST(
   const tenantId = membership.tenant.id;
   const userId = me.id;
 
-  // Gate: only an ACTIVE agent is reachable here. getAgent takes an explicit
-  // tenantId (not the ambient one) so this is safe to resolve before entering
-  // runWithTenant below. Dormant specialists (everything but "sales" today)
-  // 404 instead of silently running with no playbook/tool slice.
+  // Gate: only an agent that is BOTH marked "active" in the registry AND has
+  // a SPECIALISTS entry (its tool slice + playbook) is reachable here.
+  // getAgent takes an explicit tenantId (not the ambient one) so this is safe
+  // to resolve before entering runWithTenant below. Dormant specialists
+  // (everything but sales/marketing today) 404 instead of silently running
+  // with no playbook/tool slice — same for a hypothetical active row with no
+  // matching SPECIALISTS entry (shouldn't happen, but fails closed).
   const key = params.key;
   const agent = getAgent(tenantId, key);
-  if (!agent || agent.status !== "active") return new Response("Agent not available", { status: 404 });
+  const spec = SPECIALISTS[key];
+  if (!agent || agent.status !== "active" || !spec) return new Response("Agent not available", { status: 404 });
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return new Response("AI is not configured (missing ANTHROPIC_API_KEY).", { status: 503 });
@@ -64,7 +69,7 @@ export async function POST(
   // static TOOLS registry — so it's safe to compute here.
   // Set<string> (not the inferred literal-union type): compared below against
   // t.name, which is a plain `string` on the Anthropic.Tool type.
-  const allowed = new Set<string>(SALES_SPECIALIST.toolNames); // per-agent tool slice
+  const allowed = new Set<string>(spec.toolNames); // per-agent tool slice
   const tools = TOOLS.filter((t) => allowed.has(t.name));
   const model = agent.model; // registry model: Sonnet default, Opus if upgraded — never hardcoded
 

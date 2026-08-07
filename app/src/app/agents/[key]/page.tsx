@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { requireAdminPage, getCurrentMembership } from "@/lib/auth";
 import { AGENT_CATALOG, getAgent } from "@/lib/agents/registry";
 import { SAFETY_RAILS } from "@/lib/agents/context";
-import { SALES_SPECIALIST } from "@/lib/agents/specialists/sales";
+import { SPECIALISTS } from "@/lib/agents/specialists";
 import { getBusinessContext } from "@/lib/ai/businessContext";
 import { getMonthlyUsageByAgent, MONTHLY_CAP_CENTS } from "@/lib/ai/usage";
 import { AgentDetail } from "@/components/agents/AgentDetail";
@@ -23,6 +23,10 @@ export default async function AgentDetailPage({ params }: { params: { key: strin
   if (!agent) notFound();
 
   const catalogEntry = AGENT_CATALOG.find((a) => a.key === key);
+  // Same registry composeAgentSystem (@/lib/agents/context) reads from — see
+  // that file's `SPECIALISTS[key]?.basePlaybook ?? "..."` fallback, mirrored
+  // exactly below so this page never drifts from what a real chat run sends.
+  const spec = SPECIALISTS[key];
 
   // The 4 raw composition layers, sourced exactly the way composeAgentSystem
   // (@/lib/agents/context) builds them for a real run — but kept SEPARATE
@@ -39,7 +43,7 @@ export default async function AgentDetailPage({ params }: { params: { key: strin
   // session/membership — so calling it directly here, with no
   // runWithTenant(), is correct.
   const layers = {
-    base: key === "sales" ? SALES_SPECIALIST.basePlaybook : "You are a helpful business agent.",
+    base: spec?.basePlaybook ?? "You are a helpful business agent.",
     businessContext: getBusinessContext(),
     operator: agent.instructions,
     rails: SAFETY_RAILS,
@@ -74,7 +78,7 @@ export default async function AgentDetailPage({ params }: { params: { key: strin
         key={agent.key}
         agent={agent}
         layers={layers}
-        toolNames={key === "sales" ? SALES_SPECIALIST.toolNames : []}
+        toolNames={spec?.toolNames ?? []}
         usageCents={usageCents}
         capCents={MONTHLY_CAP_CENTS}
         tenantId={tenantId}

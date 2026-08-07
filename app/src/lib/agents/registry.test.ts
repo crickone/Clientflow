@@ -13,6 +13,7 @@ import Module from "node:module";
 import { createRequire } from "node:module";
 import fs from "node:fs";
 import path from "node:path";
+import { eq } from "drizzle-orm";
 
 import { MODELS } from "../ai/client";
 
@@ -42,6 +43,8 @@ const requireLocal = createRequire(import.meta.url);
     requireLocal("../db/control") as typeof import("../db/control");
   const { getTenantDbById } =
     requireLocal("../db/tenant") as typeof import("../db/tenant");
+  const { agents } =
+    requireLocal("../db/schema") as typeof import("../db/schema");
   const {
     AGENT_CATALOG,
     ensureAgents,
@@ -116,6 +119,61 @@ const requireLocal = createRequire(import.meta.url);
       getAgent(tid, "sales")!.model,
       MODELS.opus,
       "rejected model update did not mutate the row",
+    );
+
+    // ── status-reconcile (Marketing Task 2): AGENT_CATALOG is the single
+    // source of truth for `status` — there is no UI/API to change it
+    // directly (unlike instructions/model above), so a tenant whose row was
+    // seeded under an OLDER catalog (Marketing used to default to "dormant")
+    // needs ensureAgents to bring status in line on every call. Force the
+    // marketing row back to a stale "dormant" via a raw update — bypassing
+    // ensureAgents entirely — and set distinctive tenant-owned
+    // instructions/model, so the assertions below can prove the reconcile
+    // touches ONLY `status` and leaves those two alone. ──
+    const marketingTenantDb = getTenantDbById(tid);
+    marketingTenantDb
+      .update(agents)
+      .set({ status: "dormant", instructions: "KEEP ME", model: "claude-opus-4-8" })
+      .where(eq(agents.key, "marketing"))
+      .run();
+    // Confirm the forced write landed by reading the raw row DIRECTLY —
+    // deliberately NOT via getAgent()/listAgents(), since both call
+    // ensureAgents() as their first line and would immediately reconcile
+    // status back to "active" before this setup check ever ran, defeating
+    // the point of it.
+    const beforeReconcile = marketingTenantDb.select().from(agents).where(eq(agents.key, "marketing")).get();
+    assert.equal(
+      beforeReconcile?.status,
+      "dormant",
+      "setup: marketing row forced back to a stale \"dormant\" directly (bypassing ensureAgents)",
+    );
+
+    ensureAgents(tid); // the function under test — must reconcile the stale row above
+
+    const marketing = getAgent(tid, "marketing")!;
+    assert.equal(
+      marketing.status,
+      "active",
+      "ensureAgents reconciles an existing row's status to match AGENT_CATALOG (marketing dormant -> active)",
+    );
+    assert.equal(
+      marketing.instructions,
+      "KEEP ME",
+      "ensureAgents' status reconcile does NOT touch tenant-owned instructions",
+    );
+    assert.equal(
+      marketing.model,
+      "claude-opus-4-8",
+      "ensureAgents' status reconcile does NOT touch tenant-owned model",
+    );
+
+    // Sales was already correct ("active") throughout — the reconcile must
+    // be a no-op for rows that already match the catalog, not just harmless
+    // for the one row that changed.
+    assert.equal(
+      getAgent(tid, "sales")!.status,
+      "active",
+      "sales status is untouched by the marketing reconcile",
     );
 
     console.log("registry.test.ts: all assertions passed");

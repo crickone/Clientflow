@@ -9,17 +9,29 @@ export const AGENT_CATALOG: AgentDef[] = [
   { key: "orchestrator", name: "Orchestrator", mandate: "Routes work to the right specialist.", status: "dormant", defaultModel: MODELS.sonnet },
   { key: "sales", name: "Sales", mandate: "Works leads: instant replies + relentless follow-up.", status: "active", defaultModel: MODELS.sonnet },
   { key: "seo", name: "SEO", mandate: "Publishes + optimises content for organic growth.", status: "dormant", defaultModel: MODELS.sonnet },
-  { key: "marketing", name: "Marketing", mandate: "Runs the Marketing Brain: campaigns + social.", status: "dormant", defaultModel: MODELS.sonnet },
+  { key: "marketing", name: "Marketing", mandate: "Runs the Marketing Brain: campaigns + social.", status: "active", defaultModel: MODELS.sonnet },
   { key: "operations", name: "Operations", mandate: "No-shows, class fill, attendance, admin.", status: "dormant", defaultModel: MODELS.sonnet },
   { key: "finance", name: "Finance", mandate: "Guards the cash: overdue + failed payments.", status: "dormant", defaultModel: MODELS.sonnet },
 ];
 
 export function ensureAgents(tenantId: number): void {
   const db = getTenantDbById(tenantId);
-  const existing = new Set(db.select({ key: agents.key }).from(agents).all().map(r => r.key));
+  const existingRows = db.select({ key: agents.key, status: agents.status }).from(agents).all();
+  const existingStatus = new Map(existingRows.map(r => [r.key, r.status]));
   for (const a of AGENT_CATALOG) {
-    if (!existing.has(a.key)) {
+    if (!existingStatus.has(a.key)) {
       db.insert(agents).values({ key: a.key, name: a.name, status: a.status, model: a.defaultModel, instructions: "" }).run();
+    } else if (existingStatus.get(a.key) !== a.status) {
+      // Catalog-driven status reconcile: a tenant's row can have been seeded
+      // under an older AGENT_CATALOG (e.g. Marketing was "dormant" before it
+      // went live), and the insert-only loop above never touches existing
+      // rows — so without this, that tenant's Marketing row would stay
+      // dormant forever. There's no UI to change status directly, so the
+      // catalog is the single source of truth for it; bring the row in line
+      // on every call. Deliberately narrow: ONLY `status` is written here —
+      // `instructions`/`model` are tenant-owned (edited from the Agents tab)
+      // and must never be overwritten by a reconcile.
+      db.update(agents).set({ status: a.status }).where(eq(agents.key, a.key)).run();
     }
   }
 }
