@@ -13,7 +13,7 @@ import {
 
 import { Card, CardLabel } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { Reveal, RevealGroup } from "@/components/motion/Reveal";
+import { Reveal } from "@/components/motion/Reveal";
 import { formatEur } from "@/lib/utils";
 import type { Agent } from "@/lib/db/schema";
 
@@ -151,21 +151,22 @@ export function AgentOrgChart({ agents, usageByAgent, capCents, monthCents }: Pr
         </div>
 
         <div className="agent-orgchart-grid">
-          {/* display:contents unwraps RevealGroup's own box so its Reveal
-              children become direct items of the CSS grid below, while still
-              getting the group's in-view stagger. */}
-          <RevealGroup style={{ display: "contents" }}>
-            {specialists.map((agent) => (
-              <Reveal key={agent.key}>
-                <AgentCard
-                  agent={agent}
-                  usageCents={usageByAgent[agent.key] ?? 0}
-                  capCents={capCents}
-                  variant="specialist"
-                />
-              </Reveal>
-            ))}
-          </RevealGroup>
+          {/* Each specialist card is a STANDALONE Reveal (fades/rises on
+              scroll-into-view; ones already in view appear on load). Do NOT
+              wrap these in a <RevealGroup style={{display:"contents"}}> — a
+              display:contents element generates no box, so RevealGroup's
+              whileInView IntersectionObserver never fires and every child
+              stays hidden (opacity 0). That's the bug this replaces. */}
+          {specialists.map((agent) => (
+            <Reveal key={agent.key}>
+              <AgentCard
+                agent={agent}
+                usageCents={usageByAgent[agent.key] ?? 0}
+                capCents={capCents}
+                variant="specialist"
+              />
+            </Reveal>
+          ))}
         </div>
       </div>
 
