@@ -2,13 +2,14 @@ import Anthropic from "@anthropic-ai/sdk";
 import { type NextRequest } from "next/server";
 
 import { requireUser, getCurrentMembership } from "@/lib/auth";
-import { executeTool, isWriteTool, summarizeToolAction, TOOLS } from "@/lib/assistant/tools";
+import { TOOLS } from "@/lib/assistant/tools";
 import { getAnthropic } from "@/lib/ai/client";
-import { assertUnderCap, recordUsage, AiCapError } from "@/lib/ai/usage";
+import { AiCapError } from "@/lib/ai/usage";
 import { runWithTenant } from "@/lib/db/tenant";
 import { getAgent } from "@/lib/agents/registry";
 import { composeAgentSystem } from "@/lib/agents/context";
 import { SPECIALISTS } from "@/lib/agents/specialists";
+import { runAgentTurn, type PendingWrite } from "@/lib/agents/runAgentTurn";
 
 /**
  * Scoped specialist chat route — the same streaming tool-loop as
@@ -96,15 +97,32 @@ export async function POST(
       // whatever tenant the ambient context happens to resolve to, with no
       // error thrown. See the doc comment on composeAgentSystem.
       const system = composeAgentSystem(tenantId, key);
-      const anthropic = getAnthropic();
       const convo: Anthropic.MessageParam[] = history.map((m) => ({ role: m.role, content: m.content }));
 
-      // Enforce the per-gym monthly AI spend cap before burning any tokens on
-      // this request. Reuses the route's existing send()/writer-close
-      // mechanics: return here lets the outer finally below close the writer,
-      // same as every other exit path in this function.
+      // The tool-use loop (model call -> read tools execute inline, write
+      // tools deferred -> repeat) lives in the shared runAgentTurn (same loop
+      // the orchestrator's future delegate tools will call). It enforces the
+      // per-tenant monthly AI spend cap (assertUnderCap) before its first
+      // model call and lets AiCapError propagate here, so this route keeps
+      // its existing error+done SSE framing; any other error propagates past
+      // this catch to the outer one below, same as before this loop was
+      // extracted.
+      let pendingWrites: PendingWrite[] = [];
       try {
-        assertUnderCap(tenantId);
+        ({ pendingWrites } = await runAgentTurn({
+          anthropic: getAnthropic(),
+          tenantId,
+          agentKey: key,
+          userId,
+          model,
+          system,
+          tools,
+          messages: convo,
+          signal: req.signal,
+          onText: (t) => void send({ type: "text", text: t }),
+          onTool: (n) => void send({ type: "tool", name: n }),
+          onArtifact: (a) => void send({ type: "artifact", ...a }),
+        }));
       } catch (e) {
         if (e instanceof AiCapError) {
           await send({ type: "error", error: e.message });
@@ -114,66 +132,7 @@ export async function POST(
         throw e;
       }
 
-      for (let turn = 0; turn < 8; turn++) {
-        if (req.signal.aborted) break; // client disconnected — stop burning tokens
-        const stream = anthropic.messages.stream({
-          model,
-          // Full nutrition/workout plans serialise to large tool inputs; 4096 was
-          // truncating them mid-JSON, which failed and made the model retry.
-          max_tokens: 16000,
-          system,
-          tools,
-          messages: convo,
-        });
-        stream.on("text", (delta) => {
-          void send({ type: "text", text: delta });
-        });
-        const final = await stream.finalMessage();
-        recordUsage(tenantId, key, model, {
-          inputTokens: final.usage.input_tokens,
-          outputTokens: final.usage.output_tokens,
-          cacheReadTokens: (final.usage as any).cache_read_input_tokens ?? 0,
-          cacheCreateTokens: (final.usage as any).cache_creation_input_tokens ?? 0,
-        });
-        convo.push({ role: "assistant", content: final.content });
-
-        // A tool call that got cut off by the token limit is malformed — don't
-        // feed it back (that just loops). Tell the user and stop cleanly.
-        if (final.stop_reason === "max_tokens") {
-          await send({ type: "text", text: "\n\n_(That response was longer than expected — please ask me to continue or narrow it down.)_" });
-          break;
-        }
-
-        if (final.stop_reason === "tool_use") {
-          const results: Anthropic.ToolResultBlockParam[] = [];
-          const pending: { name: string; input: Record<string, unknown>; summary: string }[] = [];
-          for (const block of final.content) {
-            if (block.type === "tool_use") {
-              const input = block.input as Record<string, unknown>;
-              if (isWriteTool(block.name)) {
-                // NEVER execute a write in the chat loop. Collect it and hand it
-                // to the UI for an explicit Approve click — this is the code-level
-                // guard against prompt injection driving a real action. Approval
-                // POSTs to the shared /api/assistant/execute, which re-validates
-                // via this same isWriteTool/WRITE_TOOLS set.
-                pending.push({ name: block.name, input, summary: summarizeToolAction(block.name, input) });
-              } else {
-                await send({ type: "tool", name: block.name });
-                const r = await executeTool(block.name, input, { tenantId, userId });
-                if (r.artifact) await send({ type: "artifact", ...r.artifact });
-                results.push({ type: "tool_result", tool_use_id: block.id, content: r.text });
-              }
-            }
-          }
-          if (pending.length > 0) {
-            await send({ type: "confirm", actions: pending });
-            break; // wait for the user to approve/cancel in the UI
-          }
-          convo.push({ role: "user", content: results });
-          continue;
-        }
-        break;
-      }
+      if (pendingWrites.length > 0) await send({ type: "confirm", actions: pendingWrites });
       await send({ type: "done" });
     } catch (err) {
       // Keep the real error server-side; never leak internal paths/hostnames.
