@@ -244,12 +244,17 @@ function AgentCard({
               textDecoration: "none",
               color: "inherit",
             }
-          : { display: "block", textDecoration: "none", color: "inherit" }
+          : { display: "block", height: "100%", textDecoration: "none", color: "inherit" }
       }
     >
       <Card
         interactive
-        style={{ borderColor: isOrchestrator ? "var(--hairline-strong)" : undefined }}
+        style={{
+          borderColor: isOrchestrator ? "var(--hairline-strong)" : undefined,
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+        }}
       >
         <div
           style={{
@@ -318,7 +323,7 @@ function AgentCard({
           </div>
         )}
 
-        <div style={{ marginBottom: 10 }}>
+        <div style={{ marginTop: "auto", marginBottom: 10 }}>
           <Badge>{modelLabel(agent.model)}</Badge>
         </div>
 
