@@ -4,11 +4,12 @@
 // specialist registered in SPECIALISTS (@/lib/agents/specialists) has a
 // toolNames list where every entry resolves to a real tool in TOOLS — the
 // same per-name check salesToolSlice.test.ts (Task 8) did for sales alone,
-// now run for every specialist so a typo in either sales.ts OR marketing.ts
-// is caught. Also pins the sales tool slice to the EXACT same 9 names it had
-// before this generalization (Sales must behave identically), and pins
-// Marketing's shape + the required "can't post/schedule" honesty line in its
-// base playbook.
+// now run for every specialist so a typo in sales.ts, marketing.ts, OR
+// operations.ts is caught. Also pins the sales tool slice to the EXACT same
+// 9 names it had before this generalization (Sales must behave identically),
+// pins Marketing's shape + the required "can't post/schedule" honesty line
+// in its base playbook, and (Operations Task 1) pins Operations' shape + its
+// "does not mark attendance itself" honesty line.
 //
 // This matters because `Array.prototype.filter` silently drops any name that
 // doesn't match — a typo in a specialist's toolNames (or a tool renamed in
@@ -62,13 +63,14 @@ const requireLocal = createRequire(import.meta.url);
 
   const toolsByName = new Map(TOOLS.map((t) => [t.name, t]));
 
-  // ── (a) SPECIALISTS registers exactly the two agents active today. This is
-  // an intentional pin, not an assumption: a future task activating a third
-  // specialist (e.g. SEO) is expected to update this line alongside it. ──
+  // ── (a) SPECIALISTS registers exactly the three agents active today. This
+  // is an intentional pin, not an assumption: a future task activating
+  // another specialist (e.g. SEO) is expected to update this line alongside
+  // it. ──
   assert.deepEqual(
     Object.keys(SPECIALISTS).sort(),
-    ["marketing", "sales"],
-    "SPECIALISTS registers exactly sales + marketing",
+    ["marketing", "operations", "sales"],
+    "SPECIALISTS registers exactly sales + marketing + operations",
   );
 
   // ── (b) for EVERY specialist, every toolNames entry resolves to a real
@@ -142,6 +144,30 @@ const requireLocal = createRequire(import.meta.url);
       "You CANNOT post to social media or schedule posts yet",
     ),
     "MARKETING_SPECIALIST.basePlaybook contains the required honesty line about not being able to post/schedule",
+  );
+
+  // ── (e) Operations' shape is pinned too (Operations Task 1): exactly the
+  // 10 tools named in OPERATIONS_SPECIALIST.toolNames — the 2 new read tools
+  // (list_no_shows, list_lapsed_members, from @/lib/agents/tools.operations)
+  // plus 8 reused as-is from the general assistant registry — and its base
+  // playbook contains, verbatim, the honesty line that it never marks
+  // attendance itself, only surfaces no-shows staff already recorded (the
+  // same "never claim an action happened" spirit as Marketing's post/
+  // schedule line above, specific to Operations' domain). ──
+  assert.equal(SPECIALISTS.operations.toolNames.length, 10, "OPERATIONS_SPECIALIST.toolNames has exactly 10 entries");
+  assert.deepEqual(
+    [...SPECIALISTS.operations.toolNames].sort(),
+    [
+      "list_no_shows", "list_lapsed_members",
+      "list_classes", "list_appointments", "get_client", "business_overview",
+      "send_client_email", "send_client_whatsapp",
+      "reschedule_appointment", "book_client_into_class",
+    ].sort(),
+    "OPERATIONS_SPECIALIST.toolNames is exactly the 10 expected tools",
+  );
+  assert.ok(
+    SPECIALISTS.operations.basePlaybook.includes("you do not mark attendance yourself"),
+    "OPERATIONS_SPECIALIST.basePlaybook contains the required honesty line about not marking attendance itself",
   );
 
   console.log("specialistToolSlice.test.ts: all assertions passed");

@@ -61,6 +61,12 @@ import {
   publishBlogPostTool,
   saveBlogPostTool,
 } from "@/lib/agents/tools.marketing";
+import {
+  OPERATIONS_TOOLS,
+  listLapsedMembersTool,
+  listNoShowsTool,
+  sendClientWhatsappTool,
+} from "@/lib/agents/tools.operations";
 
 export type ToolArtifact = { url: string; filename: string; label: string };
 export type ToolResult = { text: string; artifact?: ToolArtifact };
@@ -91,6 +97,12 @@ export const WRITE_TOOLS = new Set<string>([
   // Approve click. The 3 read tools (list_blog_posts, draft_blog_post,
   // draft_carousel) are NOT here and run freely.
   "save_blog_post", "publish_blog_post",
+  // Operations agent (Operations Task 1): WhatsApp send to a CLIENT (distinct
+  // from the sales agent's lead-scoped send_whatsapp above) — never
+  // auto-executes; deferred to the Approve card like every other write above.
+  // The 2 read tools (list_no_shows, list_lapsed_members) are NOT here and
+  // run freely.
+  "send_client_whatsapp",
 ]);
 
 export function isWriteTool(name: string): boolean {
@@ -127,6 +139,7 @@ const WRITE_LABELS: Record<string, string> = {
   log_lead_touch: "Log lead touch",
   save_blog_post: "Save blog post draft",
   publish_blog_post: "Publish blog post",
+  send_client_whatsapp: "Send WhatsApp",
 };
 
 /** One-line, human-readable description of a pending write, for the Approve card. */
@@ -184,6 +197,8 @@ export function summarizeToolAction(name: string, input: Record<string, unknown>
       return "Upload the invoices to your Google Drive";
     case "send_whatsapp":
       return `Send a WhatsApp to ${who || `lead #${v("leadId") || "?"}`}${v("text") ? ` — “${v("text")}”` : ""}`;
+    case "send_client_whatsapp":
+      return `Send a WhatsApp to ${who || `client #${v("clientId") || "?"}`}${v("text") ? ` — “${v("text")}”` : ""}`;
     case "set_lead_stage":
       return `Move ${who || `lead #${v("leadId") || "?"}`} to "${v("stage") || "a new stage"}"`;
     case "log_lead_touch":
@@ -752,6 +767,9 @@ export const TOOLS: Anthropic.Tool[] = [
 
   // ── Marketing agent (Marketing Task 1): blog + carousel drafting ────────
   ...MARKETING_TOOLS,
+
+  // ── Operations agent (Operations Task 1): no-show + lapsed-member tools ──
+  ...OPERATIONS_TOOLS,
 ];
 
 // ─── Executors ───────────────────────────────────────────────────────────────
@@ -851,6 +869,12 @@ export async function executeTool(
         return publishBlogPostTool(ctx, input);
       case "draft_carousel":
         return await draftCarouselTool(ctx, input);
+      case "list_no_shows":
+        return listNoShowsTool(ctx, input);
+      case "list_lapsed_members":
+        return await listLapsedMembersTool(ctx, input);
+      case "send_client_whatsapp":
+        return await sendClientWhatsappTool(ctx, input);
       default:
         return { text: `Unknown tool: ${name}` };
     }

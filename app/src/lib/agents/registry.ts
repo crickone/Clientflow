@@ -10,7 +10,7 @@ export const AGENT_CATALOG: AgentDef[] = [
   { key: "sales", name: "Sales", mandate: "Works leads: instant replies + relentless follow-up.", status: "active", defaultModel: MODELS.sonnet },
   { key: "seo", name: "SEO", mandate: "Publishes + optimises content for organic growth.", status: "dormant", defaultModel: MODELS.sonnet },
   { key: "marketing", name: "Marketing", mandate: "Runs the Marketing Brain: campaigns + social.", status: "active", defaultModel: MODELS.sonnet },
-  { key: "operations", name: "Operations", mandate: "No-shows, class fill, attendance, admin.", status: "dormant", defaultModel: MODELS.sonnet },
+  { key: "operations", name: "Operations", mandate: "No-shows, class fill, attendance, admin.", status: "active", defaultModel: MODELS.sonnet },
   { key: "finance", name: "Finance", mandate: "Guards the cash: overdue + failed payments.", status: "dormant", defaultModel: MODELS.sonnet },
 ];
 

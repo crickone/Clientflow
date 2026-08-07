@@ -1,5 +1,6 @@
 import { SALES_SPECIALIST } from "./sales";
 import { MARKETING_SPECIALIST } from "./marketing";
+import { OPERATIONS_SPECIALIST } from "./operations";
 
 export interface SpecialistConfig {
   key: string;
@@ -16,12 +17,13 @@ export interface SpecialistConfig {
  * just a new `specialists/<key>.ts` file + an entry here (plus flipping its
  * `AGENT_CATALOG` status to "active" when it's ready to go live).
  *
- * Dormant/unmodeled agents (orchestrator, seo, operations, finance today)
- * are deliberately absent — callers fall back to a generic playbook / empty
+ * Dormant/unmodeled agents (orchestrator, seo, finance today) are
+ * deliberately absent — callers fall back to a generic playbook / empty
  * tool slice, and the chat route 404s before ever reaching a specialist
  * lookup for a non-active agent.
  */
 export const SPECIALISTS: Record<string, SpecialistConfig> = {
   sales: SALES_SPECIALIST,
   marketing: MARKETING_SPECIALIST,
+  operations: OPERATIONS_SPECIALIST,
 };

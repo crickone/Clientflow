@@ -8,9 +8,9 @@ import type { Agent } from "@/lib/db/schema";
 
 /**
  * Per-agent copy layered onto the shared AssistantChat shell (see that
- * component's `endpoint`/`title`/... props). Sales and Marketing (the two
- * active agents in AGENT_CATALOG, @/lib/agents/registry) each have an entry
- * in CHAT_COPY; any other agent that goes active later falls back to
+ * component's `endpoint`/`title`/... props). Sales, Marketing and Operations
+ * (the active agents in AGENT_CATALOG, @/lib/agents/registry) each have an
+ * entry in CHAT_COPY; any other agent that goes active later falls back to
  * AssistantChat's own generic defaults until it gets its own entry here.
  */
 const SALES_CHAT_COPY = {
@@ -41,9 +41,24 @@ const MARKETING_CHAT_COPY = {
   placeholder: "Ask the Marketing agent…  (Enter to send)",
 };
 
+const OPERATIONS_CHAT_COPY = {
+  subtitle: "recovers no-shows + wins back quiet members, across WhatsApp and email",
+  emptyTitle: "Ask the Operations agent to fill gaps and win people back",
+  emptyBody:
+    "It can find recent no-shows, spot members who've gone quiet, and draft a WhatsApp or email nudge or rebooking for one — nothing sends or books until you click Approve.",
+  suggestions: [
+    "Who no-showed in the last 2 weeks?",
+    "Which members have gone quiet?",
+    "Draft a win-back message for my lapsed members",
+    "Which classes this week are under-filled?",
+  ],
+  placeholder: "Ask the Operations agent…  (Enter to send)",
+};
+
 const CHAT_COPY: Record<string, typeof SALES_CHAT_COPY> = {
   sales: SALES_CHAT_COPY,
   marketing: MARKETING_CHAT_COPY,
+  operations: OPERATIONS_CHAT_COPY,
 };
 
 /**
