@@ -70,6 +70,7 @@ import {
 } from "@/lib/agents/tools.operations";
 import {
   ORCHESTRATOR_TOOLS,
+  delegateToConciergeTool,
   delegateToMarketingTool,
   delegateToOperationsTool,
   delegateToSalesTool,
@@ -88,6 +89,17 @@ export type ToolResult = {
   // operator's Approve card, same as a direct write. Every other tool leaves
   // this undefined.
   pendingWrites?: PendingWrite[];
+  // Concierge Task 1: the delegate-only mirror of `pendingWrites`, one field
+  // over, for artifacts instead of writes. Set ONLY by a delegate_to_<*> tool
+  // — the DELEGATED run's own nested runAgentTurn already collected every
+  // `artifact` its tools produced (e.g. delegate_to_concierge running
+  // bundle_invoices) into ITS `artifacts` list; this field is how that whole
+  // list bubbles up through the delegate's single ToolResult, so the caller's
+  // OWN runAgentTurn (see its READ branch) can fold each entry into its own
+  // `artifacts` — same bubble-up shape as `pendingWrites`. A normal (non-
+  // delegate) tool that produces at most one artifact keeps using the plain
+  // `artifact` field above and leaves this undefined.
+  artifacts?: ToolArtifact[];
 };
 export type ToolContext = { tenantId: number; userId?: number };
 
@@ -796,12 +808,15 @@ export const TOOLS: Anthropic.Tool[] = [
   // ── Operations agent (Operations Task 1): no-show + lapsed-member tools ──
   ...OPERATIONS_TOOLS,
 
-  // ── Orchestrator agent (Orchestrator Task 2): delegate to a specialist ──
-  // These 3 are READS (deliberately NOT in WRITE_TOOLS below) — delegating
+  // ── Orchestrator agent (Orchestrator Task 2 + Concierge Task 1): delegate
+  // to a specialist, or to the Concierge (the general assistant's own full
+  // toolkit) ──
+  // These 4 are READS (deliberately NOT in WRITE_TOOLS below) — delegating
   // doesn't itself mutate anything; a delegated specialist's own writes are
   // deferred exactly like every other write and surface via
   // ToolResult.pendingWrites (see the type above + runAgentTurn.ts's READ
-  // branch, which folds them into the turn's own pendingWrites).
+  // branch, which folds them into the turn's own pendingWrites). Same for
+  // artifacts (ToolResult.artifacts, e.g. a Concierge-produced invoice ZIP).
   // Cycle safety: tools.orchestrator.ts imports TOOLS back from this file,
   // but (see its "CIRCULAR IMPORT" comment) only ever touches it inside
   // delegateTo's function body — never at module top level. This spread is
@@ -810,6 +825,48 @@ export const TOOLS: Anthropic.Tool[] = [
   // in tools.orchestrator.ts is runtime-only by the time it matters here.
   ...ORCHESTRATOR_TOOLS,
 ];
+
+/**
+ * The general assistant's tool slice — every `TOOLS` entry scoped to the
+ * account's scheduling mode (1:1 Appointments vs group-class Timetable) and
+ * Google Drive connection state, with every `delegate_to_*` tool excluded.
+ * Extracted (Concierge Task 1) from the inline filter `/api/assistant/chat`
+ * used to compute for itself — SAME two Sets, SAME three conditions, SAME
+ * fallback, so its resulting tool list is byte-for-byte identical to what
+ * that route always built inline. Keep this the one place that logic lives.
+ *
+ * Two callers share it, and must stay in lockstep:
+ *  1. `/api/assistant/chat` (the Dashboard/Communication assistant) — this
+ *     chat loop predates `runAgentTurn` and does NOT read a tool result's
+ *     `pendingWrites` (only `runAgentTurn`'s READ branch does — see
+ *     runAgentTurn.ts), so offering it a `delegate_to_*` tool would silently
+ *     DROP any write a delegated specialist proposed instead of surfacing it
+ *     on an Approve card. Never offer these here — the exclusion below is
+ *     load-bearing, not tidiness.
+ *  2. `delegate_to_concierge` (@/lib/agents/tools.orchestrator) — the
+ *     Orchestrator's general-purpose delegate. This one DOES run through
+ *     `runAgentTurn`, which folds a nested result's `pendingWrites`/
+ *     `artifacts` into its own, so the exclusion isn't load-bearing there —
+ *     but it's what keeps delegation exactly one level deep: a Concierge run
+ *     via delegation never itself has a `delegate_to_*` tool to call, so it
+ *     can never delegate further (no path back into tools.orchestrator.ts).
+ *     This is the SAME slice either way — "what can the Concierge do" has
+ *     one definition, not two that could drift apart.
+ */
+export function conciergeToolSlice(
+  schedulingMode: "appointments" | "timetable",
+  driveConnected: boolean,
+): Anthropic.Tool[] {
+  const APPT_ONLY = new Set(["create_appointment", "cancel_appointment", "reschedule_appointment"]);
+  const TIMETABLE_ONLY = new Set(["create_class", "list_classes", "book_client_into_class", "cancel_class", "cancel_booking"]);
+  return TOOLS.filter((t) => {
+    if (t.name.startsWith("delegate_to_")) return false;
+    if (APPT_ONLY.has(t.name)) return schedulingMode === "appointments";
+    if (TIMETABLE_ONLY.has(t.name)) return schedulingMode === "timetable";
+    if (t.name === "upload_invoices_to_drive") return driveConnected;
+    return true;
+  });
+}
 
 // ─── Executors ───────────────────────────────────────────────────────────────
 
@@ -920,6 +977,8 @@ export async function executeTool(
         return await delegateToMarketingTool(ctx, input);
       case "delegate_to_operations":
         return await delegateToOperationsTool(ctx, input);
+      case "delegate_to_concierge":
+        return await delegateToConciergeTool(ctx, input);
       default:
         return { text: `Unknown tool: ${name}` };
     }

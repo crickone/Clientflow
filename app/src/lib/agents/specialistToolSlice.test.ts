@@ -23,6 +23,12 @@
 // Replaces salesToolSlice.test.ts (Task 8) — same checks, generalized to
 // every entry in SPECIALISTS instead of hardcoding SALES_SPECIALIST.
 //
+// Concierge Task 1: orchestrator's toolNames grows a 4th delegate,
+// delegate_to_concierge (checks (f) below updated 3 -> 4 accordingly). The
+// Concierge itself is deliberately NOT a SPECIALISTS entry — see check (g) —
+// its system/tools are computed at runtime by conciergeToolSlice, not a
+// registered playbook + toolNames list like every other specialist here.
+//
 // NOTE: this repo does NOT use vitest — tests are plain node:assert/strict
 // scripts run via `npm test -- <path>` (see scripts/test.mjs). Mirrors the
 // Module._load shim pattern from tools.sales.test.ts / context.test.ts
@@ -173,24 +179,25 @@ const requireLocal = createRequire(import.meta.url);
     "OPERATIONS_SPECIALIST.basePlaybook contains the required honesty line about not marking attendance itself",
   );
 
-  // ── (f) Orchestrator's shape is pinned too (Orchestrator Task 2): exactly
-  // the 3 delegate_to_<specialist> tools — no domain tools of its own, since
-  // it routes rather than does — and its base playbook contains, verbatim,
-  // the honesty line that a specialist's proposed writes still require the
-  // operator's approval (the same "never claim work is done" spirit as
-  // Marketing's post/schedule line and Operations' attendance line above,
-  // specific to a THIN routing agent whose only real actions happen inside
-  // delegated specialist turns). Also confirms delegation can't recurse: the
-  // orchestrator does not appear in its own toolNames or any other
-  // specialist's — enforced at runtime by tools.orchestrator.ts's
-  // DELEGATABLE allowlist (see tools.orchestrator.test.ts), pinned here as a
-  // static cross-check that no specialist (including orchestrator itself)
-  // is ever given a delegate_to_* tool. ──
-  assert.equal(SPECIALISTS.orchestrator.toolNames.length, 3, "ORCHESTRATOR_SPECIALIST.toolNames has exactly 3 entries");
+  // ── (f) Orchestrator's shape is pinned too (Orchestrator Task 2; Concierge
+  // Task 1 adds the 4th): exactly the 4 delegate_to_<specialist> tools — no
+  // domain tools of its own, since it routes rather than does — and its base
+  // playbook contains, verbatim, the honesty line that a specialist's
+  // proposed writes still require the operator's approval (the same "never
+  // claim work is done" spirit as Marketing's post/schedule line and
+  // Operations' attendance line above, specific to a THIN routing agent whose
+  // only real actions happen inside delegated specialist turns). Also
+  // confirms delegation can't recurse: the orchestrator does not appear in
+  // its own toolNames or any other specialist's — enforced at runtime by
+  // tools.orchestrator.ts's DELEGATABLE allowlist (see
+  // tools.orchestrator.test.ts), pinned here as a static cross-check that no
+  // specialist (including orchestrator itself) is ever given a
+  // delegate_to_* tool. ──
+  assert.equal(SPECIALISTS.orchestrator.toolNames.length, 4, "ORCHESTRATOR_SPECIALIST.toolNames has exactly 4 entries");
   assert.deepEqual(
     [...SPECIALISTS.orchestrator.toolNames].sort(),
-    ["delegate_to_marketing", "delegate_to_operations", "delegate_to_sales"],
-    "ORCHESTRATOR_SPECIALIST.toolNames is exactly the 3 delegate tools",
+    ["delegate_to_concierge", "delegate_to_marketing", "delegate_to_operations", "delegate_to_sales"],
+    "ORCHESTRATOR_SPECIALIST.toolNames is exactly the 4 delegate tools",
   );
   assert.ok(
     SPECIALISTS.orchestrator.basePlaybook.includes(
@@ -198,13 +205,26 @@ const requireLocal = createRequire(import.meta.url);
     ),
     "ORCHESTRATOR_SPECIALIST.basePlaybook contains the required honesty line about needing operator approval",
   );
+  assert.ok(
+    SPECIALISTS.orchestrator.basePlaybook.includes("Concierge"),
+    "ORCHESTRATOR_SPECIALIST.basePlaybook mentions the Concierge as where general/admin/money/inbox/plan work is routed",
+  );
   for (const [key, spec] of Object.entries(SPECIALISTS)) {
-    if (key === "orchestrator") continue; // orchestrator legitimately holds all 3 — pinned exactly, above
+    if (key === "orchestrator") continue; // orchestrator legitimately holds all 4 — pinned exactly, above
     assert.ok(
       !spec.toolNames.some((n) => n.startsWith("delegate_to_")),
       `${key}: no specialist other than orchestrator may hold a delegate_to_* tool — that would allow recursive/nested delegation`,
     );
   }
+
+  // ── (g) The Concierge is deliberately NOT a SPECIALISTS entry — unlike
+  // Sales/Marketing/Operations/Orchestrator, it has no fixed playbook or
+  // toolNames list registered here; delegate_to_concierge
+  // (@/lib/agents/tools.orchestrator) computes its system + tools at runtime
+  // instead (buildAssistantSystem + conciergeToolSlice, the same pair
+  // `/api/assistant/chat` uses per-request). Pinned so a future refactor
+  // doesn't accidentally register one. ──
+  assert.ok(!("concierge" in SPECIALISTS), "concierge is not a SPECIALISTS entry");
 
   console.log("specialistToolSlice.test.ts: all assertions passed");
 })();

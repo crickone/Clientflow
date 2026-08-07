@@ -19,6 +19,24 @@
 //   4. `assertUnderCap` gates BEFORE the first model call: once a tenant is
 //      over its monthly cap, `runAgentTurn` rejects with `AiCapError` and the
 //      (fake) model is never invoked at all.
+//   5. (Concierge Task 1) `artifacts` — the delegate-only mirror of
+//      `pendingWrites`, one field over — is ALWAYS present on the return
+//      value as an array (never undefined), proven for real against all
+//      three real-executeTool/real-text scenarios above (empty in every
+//      case, since none of set_lead_stage/business_overview/plain-text
+//      produce one). The accumulation lines themselves (`if (r.artifact) ...`
+//      / `if (r.artifacts?.length) ...`) are NOT independently exercised
+//      end-to-end here: the only tool in the whole registry that ever sets
+//      `ToolResult.artifact` (bundle_invoices) needs a live Gmail connection
+//      to reach the code path that sets it, and the only way to make
+//      `executeTool` see `ToolResult.artifacts` (plural) for real is a
+//      delegate_to_<*> tool's nested runAgentTurn, which needs a live Claude
+//      call — both outside what this test file may do (no network, no live
+//      Claude — see the file-level rule below). This is a deliberate, noted
+//      gap: the accumulation code is a one-line-each mirror of the
+//      already-proven-above `pendingWrites` collection (same `if (cond)
+//      push(...)` shape, same call site), reviewed rather than independently
+//      runtime-proven — see the task report for the explicit callout.
 // Only Anthropic is stubbed (a fake `messages.stream()` returning scripted
 // `finalMessage()`s and recording every call's `messages` param) — nothing
 // here makes a real network call. `executeTool`, `isWriteTool`,
@@ -204,6 +222,7 @@ const requireLocal = createRequire(import.meta.url);
     );
 
     assert.equal(writeCalls.length, 1, "the loop stopped after collecting the write — it never asked the model again");
+    assert.deepEqual(writeResult.artifacts, [], "artifacts is an empty array, not undefined — a write tool_use never reaches executeTool, so nothing could have produced one");
     assert.equal(writeResult.pendingWrites.length, 1, "the write tool_use lands in pendingWrites");
     assert.equal(writeResult.pendingWrites[0].name, "set_lead_stage");
     assert.deepEqual(writeResult.pendingWrites[0].input, writeInput, "the tool's input is preserved verbatim for the Approve UI");
@@ -265,6 +284,7 @@ const requireLocal = createRequire(import.meta.url);
 
     assert.equal(readCalls.length, 2, "the loop asked the model a second time after the read tool's result came back");
     assert.deepEqual(toolsSeenDuringRead, ["business_overview"], "onTool fired for the read tool — the executeTool path WAS taken");
+    assert.deepEqual(readResult.artifacts, [], "artifacts is an empty array — business_overview's real ToolResult carries no artifact, so nothing was collected");
     assert.equal(readResult.pendingWrites.length, 0, "no writes were involved in this turn");
     assert.equal(readResult.text, "You have 1 client.", "the final turn's text is returned");
 
@@ -320,6 +340,7 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(textCalls.length, 1);
     assert.equal(textResult.text, "Hello, world!");
     assert.equal(textResult.pendingWrites.length, 0);
+    assert.deepEqual(textResult.artifacts, [], "artifacts is an empty array — no tool ran at all this turn");
     assert.deepEqual(receivedDeltas, ["Hello", ", world!"], "onText receives every delta, in order, as they streamed");
 
     // ════════════════════════════════════════════════════════════════════

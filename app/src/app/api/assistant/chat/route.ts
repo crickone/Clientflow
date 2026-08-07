@@ -3,7 +3,7 @@ import { type NextRequest } from "next/server";
 
 import { requireUser, getCurrentMembership } from "@/lib/auth";
 import { buildAssistantSystem } from "@/lib/assistant/system";
-import { executeTool, isWriteTool, summarizeToolAction, TOOLS } from "@/lib/assistant/tools";
+import { executeTool, isWriteTool, summarizeToolAction, conciergeToolSlice } from "@/lib/assistant/tools";
 import { getAnthropic, MODELS } from "@/lib/ai/client";
 import { assertUnderCap, recordUsage, AiCapError } from "@/lib/ai/usage";
 import { runWithTenant } from "@/lib/db/tenant";
@@ -37,24 +37,14 @@ export async function POST(req: NextRequest) {
   const schedulingMode = getSchedulingMode();
   const driveConnected = isDriveConnected(tenantId);
   const system = buildAssistantSystem(schedulingMode, driveConnected);
-  // Scope scheduling tools to the account's mode: 1:1 appointments vs group classes.
-  const APPT_ONLY = new Set(["create_appointment", "cancel_appointment", "reschedule_appointment"]);
-  const TIMETABLE_ONLY = new Set(["create_class", "list_classes", "book_client_into_class", "cancel_class", "cancel_booking"]);
-  const tools = TOOLS.filter((t) => {
-    // Orchestrator-only: delegate_to_<specialist> runs a nested specialist
-    // runAgentTurn whose own proposed writes come back as
-    // ToolResult.pendingWrites. This route's loop below (unlike
-    // runAgentTurn's READ branch) never reads that field, so a delegated
-    // write would be silently dropped instead of reaching an Approve card.
-    // Never offer these to the general assistant — only the orchestrator's
-    // own tool slice (SPECIALISTS["orchestrator"].toolNames) should include
-    // them.
-    if (t.name.startsWith("delegate_to_")) return false;
-    if (APPT_ONLY.has(t.name)) return schedulingMode === "appointments";
-    if (TIMETABLE_ONLY.has(t.name)) return schedulingMode === "timetable";
-    if (t.name === "upload_invoices_to_drive") return driveConnected;
-    return true;
-  });
+  // This route IS the Concierge — its tool slice (scoped to the account's
+  // scheduling mode + Drive connection, delegate_to_* excluded) is the single
+  // `conciergeToolSlice` also used by the orchestrator's delegate_to_concierge
+  // tool (@/lib/agents/tools.orchestrator), so both run the Concierge on the
+  // exact same tools. See that function's doc comment for why delegate_to_*
+  // must never be offered here specifically (this loop doesn't read a tool
+  // result's pendingWrites the way runAgentTurn's READ branch does).
+  const tools = conciergeToolSlice(schedulingMode, driveConnected);
 
   const encoder = new TextEncoder();
   const { readable, writable } = new TransformStream();

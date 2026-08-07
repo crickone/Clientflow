@@ -231,14 +231,18 @@ const requireLocal = createRequire(import.meta.url);
     // ════════════════════════════════════════════════════════════════════
     // 3. Orchestrator's own wiring
     // ════════════════════════════════════════════════════════════════════
-    // toolNames all resolve in TOOLS, and are exactly the 3 delegate tools.
+    // toolNames all resolve in TOOLS. Concierge Task 1 added a 4th delegate,
+    // delegate_to_concierge — it doesn't go through delegateTo/DELEGATABLE
+    // (see tools.concierge.test.ts for its own registration + guard
+    // coverage), so DELEGATE_NAMES above stays the 3 delegateTo-backed
+    // targets; the orchestrator's real toolNames is that set PLUS it.
     for (const name of ORCHESTRATOR_SPECIALIST.toolNames) {
       assert.ok(toolsByName.has(name), `ORCHESTRATOR_SPECIALIST.toolNames entry "${name}" resolves in TOOLS`);
     }
     assert.deepEqual(
       [...ORCHESTRATOR_SPECIALIST.toolNames].sort(),
-      [...DELEGATE_NAMES].sort(),
-      "ORCHESTRATOR_SPECIALIST.toolNames is exactly the 3 delegate tools — the orchestrator owns no domain tools",
+      [...DELEGATE_NAMES, "delegate_to_concierge"].sort(),
+      "ORCHESTRATOR_SPECIALIST.toolNames is exactly the 3 delegateTo-backed tools plus delegate_to_concierge — the orchestrator owns no domain tools of its own",
     );
 
     // orchestrator active in AGENT_CATALOG (flipped from "dormant" by this task).

@@ -2,7 +2,7 @@ import "server-only";
 
 import Anthropic from "@anthropic-ai/sdk";
 
-import { executeTool, isWriteTool, summarizeToolAction } from "@/lib/assistant/tools";
+import { executeTool, isWriteTool, summarizeToolAction, type ToolArtifact } from "@/lib/assistant/tools";
 import { assertUnderCap, recordUsage } from "@/lib/ai/usage";
 
 /**
@@ -65,6 +65,19 @@ export interface RunAgentTurnArgs {
  * delegated write identically to a direct one — the caller (the chat route)
  * needs no delegation-specific code at all.
  *
+ * Concierge Task 1: `artifacts` mirrors `pendingWrites` exactly, one field
+ * over, for downloadable/viewable outputs (an invoice-bundle ZIP, a plan doc)
+ * instead of deferred writes. A READ tool's single `ToolResult.artifact` AND
+ * a delegate's possibly-multiple `ToolResult.artifacts` (bubbled up from a
+ * NESTED `runAgentTurn` — e.g. `delegate_to_concierge` running `bundle_invoices`
+ * inline) both accumulate into THIS turn's own `artifacts` array, in addition
+ * to firing the existing `onArtifact` callback (unchanged — the specialist
+ * chat route's SSE stream still gets them live, one at a time, as before).
+ * The return value additionally hands the caller the full collected list —
+ * new, since previously only `onArtifact` ever saw them — so a delegate tool
+ * (which has no SSE stream of its own to push onto) can hand its artifacts
+ * back up through its own `ToolResult`, exactly like `pendingWrites`.
+ *
  * `assertUnderCap` runs once, before the first model call, and its
  * `AiCapError` is deliberately left to propagate — this function knows
  * nothing about SSE, so callers that need the error+done framing (the chat
@@ -75,7 +88,7 @@ export interface RunAgentTurnArgs {
  */
 export async function runAgentTurn(
   args: RunAgentTurnArgs,
-): Promise<{ text: string; pendingWrites: PendingWrite[] }> {
+): Promise<{ text: string; pendingWrites: PendingWrite[]; artifacts: ToolArtifact[] }> {
   const {
     anthropic,
     tenantId,
@@ -100,6 +113,7 @@ export async function runAgentTurn(
   const convo: Anthropic.MessageParam[] = [...messages];
   let fullText = "";
   const pendingWrites: PendingWrite[] = [];
+  const artifacts: ToolArtifact[] = [];
 
   for (let turn = 0; turn < maxTurns; turn++) {
     if (signal?.aborted) break; // caller disconnected — stop burning tokens
@@ -145,7 +159,12 @@ export async function runAgentTurn(
           } else {
             onTool?.(block.name);
             const r = await executeTool(block.name, input, { tenantId, userId });
-            if (r.artifact) onArtifact?.(r.artifact);
+            if (r.artifact) { artifacts.push(r.artifact); onArtifact?.(r.artifact); }
+            // A delegate_to_<specialist> tool's result can carry MULTIPLE
+            // artifacts (its own nested runAgentTurn's whole `artifacts`
+            // list) rather than the single `r.artifact` a normal tool
+            // produces — fold each into this turn's own list, same as below.
+            if (r.artifacts?.length) { for (const a of r.artifacts) { artifacts.push(a); onArtifact?.(a); } }
             // A delegate_to_<specialist> tool is a READ (it never itself
             // mutates anything) whose result can carry the DELEGATED
             // specialist's own deferred writes — fold them into this turn's
@@ -166,5 +185,5 @@ export async function runAgentTurn(
     break;
   }
 
-  return { text: fullText, pendingWrites };
+  return { text: fullText, pendingWrites, artifacts };
 }
