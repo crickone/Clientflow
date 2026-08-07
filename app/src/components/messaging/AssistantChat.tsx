@@ -675,9 +675,18 @@ function inline(text: string, keyBase: string): React.ReactNode[] {
   const nodes: React.ReactNode[] = [];
   let k = 0;
   const pushText = (s: string) => {
-    for (const seg of s.split(/(\*\*[^*]+\*\*)/g)) {
+    for (const seg of s.split(/(\*\*[^*]+\*\*|`[^`]+`)/g)) {
       if (!seg) continue;
       if (/^\*\*[^*]+\*\*$/.test(seg)) nodes.push(<strong key={`${keyBase}-${k++}`}>{seg.slice(2, -2)}</strong>);
+      else if (/^`[^`]+`$/.test(seg))
+        nodes.push(
+          <code
+            key={`${keyBase}-${k++}`}
+            style={{ fontFamily: "var(--font-mono), ui-monospace, monospace", fontSize: "0.88em", background: "var(--surface-2)", padding: "1px 5px", borderRadius: 4 }}
+          >
+            {seg.slice(1, -1)}
+          </code>,
+        );
       else nodes.push(<span key={`${keyBase}-${k++}`}>{seg}</span>);
     }
   };
@@ -697,25 +706,49 @@ function inline(text: string, keyBase: string): React.ReactNode[] {
   return nodes;
 }
 
-/** Lightweight markdown-ish renderer (bold, bullets, headings, links). */
+/** Lightweight markdown-ish renderer (headings w/ hierarchy, bold, inline code,
+ *  bullet + numbered lists, horizontal rules, links). Builds React nodes (no
+ *  raw HTML) so untrusted content the agent summarises can't inject markup. */
 function RichText({ text }: { text: string }) {
   const lines = text.split("\n");
   return (
-    <div style={{ display: "flex", flexDirection: "column" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
       {lines.map((ln, i) => {
-        const t = ln.trimStart();
+        const t = ln.trim();
         if (t === "") return <div key={i} style={{ height: 6 }} />;
-        const h = t.match(/^#{1,3}\s+(.*)/);
-        if (h) return <div key={i} style={{ fontWeight: 700, marginTop: 4 }}>{inline(h[1], `h${i}`)}</div>;
-        if (t.startsWith("- ") || t.startsWith("* ")) {
+        // Horizontal rule: ---, ***, ___ (render as a divider, not literal text).
+        if (/^([-*_])\1{2,}$/.test(t)) return <div key={i} style={{ borderTop: "1px solid var(--hairline)", margin: "8px 0" }} />;
+        // Headings with a visible size hierarchy.
+        const h = t.match(/^(#{1,3})\s+(.*)/);
+        if (h) {
+          const level = h[1].length;
+          const size = level === 1 ? 16 : level === 2 ? 14 : 13;
           return (
-            <div key={i} style={{ display: "flex", gap: 8 }}>
-              <span style={{ color: "var(--text-tertiary)" }}>•</span>
-              <span>{inline(t.slice(2), `b${i}`)}</span>
+            <div key={i} style={{ fontFamily: "var(--font-heading), sans-serif", fontWeight: 700, fontSize: size, color: "var(--text-primary)", marginTop: i === 0 ? 0 : 12, marginBottom: 2 }}>
+              {inline(h[2], `h${i}`)}
             </div>
           );
         }
-        return <div key={i}>{inline(ln, `p${i}`)}</div>;
+        // Bullet list.
+        if (/^[-*]\s+/.test(t)) {
+          return (
+            <div key={i} style={{ display: "flex", gap: 8, paddingLeft: 2 }}>
+              <span style={{ color: "var(--text-tertiary)", lineHeight: 1.55 }}>•</span>
+              <span style={{ flex: 1, lineHeight: 1.55 }}>{inline(t.replace(/^[-*]\s+/, ""), `b${i}`)}</span>
+            </div>
+          );
+        }
+        // Numbered list.
+        const num = t.match(/^(\d{1,2})\.\s+(.*)/);
+        if (num) {
+          return (
+            <div key={i} style={{ display: "flex", gap: 8, paddingLeft: 2 }}>
+              <span style={{ color: "var(--text-tertiary)", fontVariantNumeric: "tabular-nums", lineHeight: 1.55 }}>{num[1]}.</span>
+              <span style={{ flex: 1, lineHeight: 1.55 }}>{inline(num[2], `n${i}`)}</span>
+            </div>
+          );
+        }
+        return <div key={i} style={{ lineHeight: 1.55 }}>{inline(t, `p${i}`)}</div>;
       })}
     </div>
   );

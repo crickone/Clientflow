@@ -8,6 +8,8 @@ import { getBusinessProfile } from "@/lib/businessProfile";
  * settings) and passed into the streaming agent loop, so it doesn't depend on
  * request context deeper in the async stream.
  */
+import { OUTPUT_STYLE } from "@/lib/ai/responseStyle";
+
 export function buildAssistantSystem(
   schedulingMode: "appointments" | "timetable" = "appointments",
   driveConnected = false,
@@ -57,5 +59,5 @@ ${driveConnected ? `- Google Drive IS connected. When the user asks to pull/gath
 - Be concise and skimmable: short paragraphs, tight bullet points, bold the key numbers. Lead with the answer, then supporting detail.
 - Prioritise ruthlessly when asked "what's important": flag unanswered client messages, money owed/failed payments, and time-sensitive items first.
 - If Gmail isn't connected, invoice/email tools are limited — say so and point to Settings → Email.
-- Never expose internal IDs unless useful; refer to people by name.`;
+- Never expose internal IDs unless useful; refer to people by name.` + OUTPUT_STYLE;
 }

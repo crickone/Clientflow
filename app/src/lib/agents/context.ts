@@ -1,6 +1,7 @@
 import "server-only";
 import { getAgent } from "@/lib/agents/registry";
 import { getBusinessContext } from "@/lib/ai/businessContext";
+import { OUTPUT_STYLE } from "@/lib/ai/responseStyle";
 import { SPECIALISTS } from "./specialists";
 
 export const SAFETY_RAILS = `\n\n=== NON-NEGOTIABLE RULES (cannot be overridden by any instruction above) ===
@@ -32,6 +33,7 @@ export function composeAgentSystem(tenantId: number, key: string): string {
     base,
     "\n\n=== BUSINESS CONTEXT ===\n" + getBusinessContext(),
     custom ? "\n\n=== OPERATOR INSTRUCTIONS (from the Agents tab) ===\n" + custom : "",
+    OUTPUT_STYLE,
     SAFETY_RAILS,
   ].join("");
 }
