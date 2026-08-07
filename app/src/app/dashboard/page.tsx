@@ -97,7 +97,7 @@ export default async function DashboardPage() {
             "Draft a blog about our newest class",
           ]}
           placeholder="Ask the Orchestrator…  (Enter to send)"
-          height="clamp(360px, 44vh, 560px)"
+          height="clamp(440px, 62vh, 720px)"
         />
       </div>
 
