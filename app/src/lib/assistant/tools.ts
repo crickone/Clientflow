@@ -53,6 +53,14 @@ import {
   sendWhatsappTool,
   setLeadStageTool,
 } from "@/lib/agents/tools.sales";
+import {
+  MARKETING_TOOLS,
+  draftBlogPostTool,
+  draftCarouselTool,
+  listBlogPostsTool,
+  publishBlogPostTool,
+  saveBlogPostTool,
+} from "@/lib/agents/tools.marketing";
 
 export type ToolArtifact = { url: string; filename: string; label: string };
 export type ToolResult = { text: string; artifact?: ToolArtifact };
@@ -78,6 +86,11 @@ export const WRITE_TOOLS = new Set<string>([
   // Sales agent (Task 7): WhatsApp send + lead-mutating tools — never
   // auto-execute; deferred to the Approve card like every other write above.
   "send_whatsapp", "set_lead_stage", "log_lead_touch",
+  // Marketing agent (Marketing Task 1): persisting a draft is low-stakes, but
+  // publishing pushes to the LIVE public site — both require an operator
+  // Approve click. The 3 read tools (list_blog_posts, draft_blog_post,
+  // draft_carousel) are NOT here and run freely.
+  "save_blog_post", "publish_blog_post",
 ]);
 
 export function isWriteTool(name: string): boolean {
@@ -112,6 +125,8 @@ const WRITE_LABELS: Record<string, string> = {
   send_whatsapp: "Send WhatsApp",
   set_lead_stage: "Change lead stage",
   log_lead_touch: "Log lead touch",
+  save_blog_post: "Save blog post draft",
+  publish_blog_post: "Publish blog post",
 };
 
 /** One-line, human-readable description of a pending write, for the Approve card. */
@@ -173,6 +188,10 @@ export function summarizeToolAction(name: string, input: Record<string, unknown>
       return `Move ${who || `lead #${v("leadId") || "?"}`} to "${v("stage") || "a new stage"}"`;
     case "log_lead_touch":
       return `Log a touch for ${who || `lead #${v("leadId") || "?"}`}`;
+    case "save_blog_post":
+      return `Save blog post "${v("title") || "Untitled"}" as a draft`;
+    case "publish_blog_post":
+      return `Publish blog post ${v("title") ? `"${v("title")}"` : `#${v("postId") || "?"}`} to the live site`;
     default:
       return WRITE_LABELS[name] ?? name.replace(/_/g, " ");
   }
@@ -730,6 +749,9 @@ export const TOOLS: Anthropic.Tool[] = [
 
   // ── Sales agent (Task 7): leads pipeline ────────────────────────────────
   ...SALES_TOOLS,
+
+  // ── Marketing agent (Marketing Task 1): blog + carousel drafting ────────
+  ...MARKETING_TOOLS,
 ];
 
 // ─── Executors ───────────────────────────────────────────────────────────────
@@ -819,6 +841,16 @@ export async function executeTool(
         return setLeadStageTool(ctx, input);
       case "log_lead_touch":
         return logLeadTouchTool(ctx, input);
+      case "list_blog_posts":
+        return listBlogPostsTool(ctx, input);
+      case "draft_blog_post":
+        return await draftBlogPostTool(ctx, input);
+      case "save_blog_post":
+        return saveBlogPostTool(ctx, input);
+      case "publish_blog_post":
+        return publishBlogPostTool(ctx, input);
+      case "draft_carousel":
+        return await draftCarouselTool(ctx, input);
       default:
         return { text: `Unknown tool: ${name}` };
     }
