@@ -2,7 +2,7 @@ import "server-only";
 
 import type Anthropic from "@anthropic-ai/sdk";
 
-import { getAnthropic, MODELS } from "@/lib/ai/client";
+import { MODELS } from "@/lib/ai/client";
 import { getAgent } from "@/lib/agents/registry";
 import { composeAgentSystem } from "@/lib/agents/context";
 import { SPECIALISTS } from "@/lib/agents/specialists";
@@ -125,7 +125,6 @@ export async function delegateTo(
     const allowed = new Set<string>(spec.toolNames); // the SAME per-agent tool slice the chat route builds
     const tools = TOOLS.filter((t) => allowed.has(t.name));
     const { text, pendingWrites, artifacts } = await runAgentTurn({
-      anthropic: getAnthropic(),
       tenantId: ctx.tenantId,
       agentKey: specialistKey, // metering: the delegated specialist's OWN key, not "orchestrator"
       userId: ctx.userId,
@@ -194,7 +193,6 @@ async function delegateToConcierge(ctx: ToolContext, input: Record<string, unkno
     const mode = getSchedulingMode();
     const drive = isDriveConnected(ctx.tenantId);
     const { text, pendingWrites, artifacts } = await runAgentTurn({
-      anthropic: getAnthropic(),
       tenantId: ctx.tenantId,
       agentKey: "concierge",
       userId: ctx.userId,

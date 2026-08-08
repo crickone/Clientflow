@@ -222,10 +222,12 @@ const requireLocal = createRequire(import.meta.url);
     }
     // Confirm the restore actually took, by re-reading the registry directly
     // — deliberately NOT by calling delegateToSalesTool again: past the
-    // dormant guard, delegateTo proceeds to getAnthropic()/runAgentTurn, and
-    // if ANTHROPIC_API_KEY happened to be set in whatever environment runs
-    // this suite, that would be a real, live Claude call — exactly what this
-    // test file must never do (see the file-level comment).
+    // dormant guard, delegateTo proceeds to runAgentTurn (MP1: which resolves
+    // a ModelProvider and, for a claude-* model, that provider calls
+    // getAnthropic()), and if ANTHROPIC_API_KEY happened to be set in
+    // whatever environment runs this suite, that would be a real, live Claude
+    // call — exactly what this test file must never do (see the file-level
+    // comment).
     assert.equal(getAgent(tid, "sales")?.status, "active", "restoring AGENT_CATALOG reconciles the row back to active");
 
     // ════════════════════════════════════════════════════════════════════

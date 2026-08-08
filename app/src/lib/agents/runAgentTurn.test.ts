@@ -37,11 +37,26 @@
 //      already-proven-above `pendingWrites` collection (same `if (cond)
 //      push(...)` shape, same call site), reviewed rather than independently
 //      runtime-proven — see the task report for the explicit callout.
-// Only Anthropic is stubbed (a fake `messages.stream()` returning scripted
-// `finalMessage()`s and recording every call's `messages` param) — nothing
-// here makes a real network call. `executeTool`, `isWriteTool`,
-// `assertUnderCap`, and `recordUsage` are all REAL, run against a scratch
-// tenant, exactly like tools.sales.test.ts / context.test.ts / usage.test.ts.
+//
+// MP1 (multi-provider model choice): the model call moved from an inline
+// `anthropic.messages.stream(...)` to an injected `ModelProvider` (see
+// @/lib/ai/providers and .superpowers/sdd/multiprovider-task-1-brief.md).
+// This file's fake now stubs THAT seam — a fake `ModelProvider.streamTurn()`
+// returning scripted `ProviderTurnResult`s and recording every call's
+// provider-neutral `messages` — instead of a fake Anthropic client. That is
+// the point of the seam: every assertion below (the write gate, the read
+// tool executing + looping, plain text, the cap) is unchanged and re-proven
+// here WITHOUT any Anthropic SDK type or shape in this file at all, showing
+// the loop itself is genuinely provider-agnostic now. The real
+// `AnthropicProvider` wire conversion (NeutralMessage <-> Anthropic content
+// blocks, incl. the `providerRaw` fidelity round-trip) is exercised
+// separately in @/lib/ai/providers/anthropic.test.ts — nothing here proves
+// THAT class's behaviour, only that runAgentTurn drives whatever
+// `ModelProvider` it's given correctly.
+// Only the ModelProvider is stubbed — nothing here makes a real network
+// call. `executeTool`, `isWriteTool`, `assertUnderCap`, and `recordUsage` are
+// all REAL, run against a scratch tenant, exactly like tools.sales.test.ts /
+// context.test.ts / usage.test.ts.
 //
 // NOTE: this repo does NOT use vitest — tests are plain node:assert/strict
 // scripts run via `npm test -- <path>` (see scripts/test.mjs). Mirrors the
@@ -101,45 +116,62 @@ const requireLocal = createRequire(import.meta.url);
   const { recordUsage, AiCapError } =
     requireLocal("../ai/usage") as typeof import("../ai/usage");
 
-  // ── fake Anthropic ──
-  // Scripts a queue of finalMessage()s, one per expected `.stream()` call.
-  // Records each call's `messages` param so tests can inspect exactly what
-  // was fed back to the model after a tool ran, plus how many turns
-  // happened. Faithful to the real `Anthropic.MessageStream` surface
-  // runAgentTurn actually uses: `.on("text", cb)` and `.finalMessage()`.
-  type FakeTurn = { textDeltas?: string[]; finalMessage: Record<string, unknown> };
-  function makeFakeAnthropic(turns: FakeTurn[]) {
-    const calls: { messages: unknown }[] = [];
+  // ── fake ModelProvider ──
+  // Scripts a queue of ProviderTurnResults, one per expected `streamTurn()`
+  // call. Records each call's provider-neutral `messages` so tests can
+  // inspect exactly what was fed back after a tool ran, plus how many turns
+  // happened. This implements the ACTUAL `ModelProvider` interface (@/lib/ai/
+  // providers/types) runAgentTurn now depends on — not a stand-in for the
+  // Anthropic SDK — which is the point: it proves the loop only ever talks
+  // to that interface, never anything Anthropic-shaped.
+  type FakeTurn = {
+    textDeltas?: string[];
+    toolCalls?: { id: string; name: string; input: Record<string, unknown> }[];
+    usage?: { inputTokens: number; outputTokens: number; cacheReadTokens?: number; cacheCreateTokens?: number };
+    stopReason: "tool_use" | "end" | "max_tokens";
+  };
+  function makeFakeProvider(turns: FakeTurn[]) {
+    const calls: { messages: unknown[] }[] = [];
     let i = 0;
-    const anthropic = {
-      messages: {
-        stream(params: { messages: unknown[] }) {
-          // Snapshot, not a reference: runAgentTurn keeps ONE `convo` array
-          // and mutates it in place (`.push(...)`) across turns, then passes
-          // that same array to every `.stream()` call. Storing the reference
-          // here would make every recorded call retroactively show the
-          // array's FINAL state once the whole loop finished — copy the
-          // array now so each call's snapshot reflects what the model
-          // actually saw at that point in the loop.
-          calls.push({ messages: [...params.messages] });
-          const turn = turns[i++];
-          if (!turn) throw new Error(`fake anthropic: no scripted turn for call #${calls.length} — the loop asked the model again when it shouldn't have`);
-          return {
-            on(event: string, cb: (...args: unknown[]) => void) {
-              if (event === "text") for (const d of turn.textDeltas ?? []) cb(d, d);
-              return this;
-            },
-            finalMessage: async () => turn.finalMessage,
-          };
-        },
+    const provider = {
+      async streamTurn(args: { messages: unknown[]; onText?: (delta: string) => void }) {
+        // Snapshot, not a reference: runAgentTurn keeps ONE `convo` array
+        // and mutates it in place (`.push(...)`) across turns, then passes
+        // that same array to every `streamTurn()` call. Storing the
+        // reference here would make every recorded call retroactively show
+        // the array's FINAL state once the whole loop finished — copy the
+        // array now so each call's snapshot reflects what the model
+        // actually saw at that point in the loop.
+        calls.push({ messages: [...args.messages] });
+        const turn = turns[i++];
+        if (!turn) throw new Error(`fake provider: no scripted turn for call #${calls.length} — the loop asked the model again when it shouldn't have`);
+        for (const d of turn.textDeltas ?? []) args.onText?.(d);
+        return {
+          text: (turn.textDeltas ?? []).join(""),
+          toolCalls: turn.toolCalls ?? [],
+          usage: {
+            inputTokens: turn.usage?.inputTokens ?? 0,
+            outputTokens: turn.usage?.outputTokens ?? 0,
+            cacheReadTokens: turn.usage?.cacheReadTokens ?? 0,
+            cacheCreateTokens: turn.usage?.cacheCreateTokens ?? 0,
+          },
+          stopReason: turn.stopReason,
+          // Deliberately no `assistantRaw`: runAgentTurn will store
+          // `providerRaw: undefined` on the assistant NeutralMessage it
+          // appends, proving the loop never REQUIRES a provider to support
+          // the providerRaw fidelity optimisation — only AnthropicProvider
+          // needs it, to keep ITS OWN wire request byte-for-byte identical
+          // (see @/lib/ai/providers/anthropic.test.ts).
+        };
       },
     };
-    // Cast through `any`: the fake deliberately implements only the two
-    // MessageStream members runAgentTurn actually calls (`.on("text", cb)` +
-    // `.finalMessage()`), not the full Anthropic client surface — same
-    // `as any`-at-the-boundary style the original route uses for
-    // `final.usage as any` a few lines into runAgentTurn.ts.
-    return { anthropic: anthropic as any, calls };
+    // Cast through `any`: the fake implements only the one ModelProvider
+    // member runAgentTurn actually calls (`streamTurn`), typed loosely here
+    // so this file needs no direct import of the real ModelProvider/
+    // NeutralMessage types — `runAgentTurn`'s own typed signature (recovered
+    // via the `typeof import("./runAgentTurn")` cast above) is what actually
+    // checks this fake is an acceptable `provider` at each call site below.
+    return { provider: provider as any, calls };
   }
 
   // ── scratch tenant (control row + a real tenant DB file, so
@@ -189,14 +221,11 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(leadRow.pipelineStage, "new_lead", "seeded lead starts at the default stage");
 
     const writeInput = { leadId: leadRow.id, stage: "hot_lead" };
-    const { anthropic: writeAnthropic, calls: writeCalls } = makeFakeAnthropic([
+    const { provider: writeProvider, calls: writeCalls } = makeFakeProvider([
       {
-        finalMessage: {
-          id: "msg_write",
-          content: [{ type: "tool_use", id: "tu_write", name: "set_lead_stage", input: writeInput }],
-          stop_reason: "tool_use",
-          usage: { input_tokens: 20, output_tokens: 8 },
-        },
+        toolCalls: [{ id: "tu_write", name: "set_lead_stage", input: writeInput }],
+        stopReason: "tool_use",
+        usage: { inputTokens: 20, outputTokens: 8 },
       },
     ]);
     const toolsSeenDuringWrite: string[] = [];
@@ -210,7 +239,7 @@ const requireLocal = createRequire(import.meta.url);
     // "no ambient tenant" crash unrelated to the property under test.
     const writeResult = await runWithTenant(tid, () =>
       runAgentTurn({
-        anthropic: writeAnthropic,
+        provider: writeProvider,
         tenantId: tid,
         agentKey: "sales",
         model: MODELS.sonnet,
@@ -249,29 +278,22 @@ const requireLocal = createRequire(import.meta.url);
     // ════════════════════════════════════════════════════════════════════
     db.insert(clients).values({ firstName: "Cara", lastName: "Client", phone: "0870000000" }).run();
 
-    const { anthropic: readAnthropic, calls: readCalls } = makeFakeAnthropic([
+    const { provider: readProvider, calls: readCalls } = makeFakeProvider([
       {
-        finalMessage: {
-          id: "msg_read",
-          content: [{ type: "tool_use", id: "tu_read", name: "business_overview", input: {} }],
-          stop_reason: "tool_use",
-          usage: { input_tokens: 15, output_tokens: 6 },
-        },
+        toolCalls: [{ id: "tu_read", name: "business_overview", input: {} }],
+        stopReason: "tool_use",
+        usage: { inputTokens: 15, outputTokens: 6 },
       },
       {
         textDeltas: ["You have 1 client."],
-        finalMessage: {
-          id: "msg_read_2",
-          content: [{ type: "text", text: "You have 1 client." }],
-          stop_reason: "end_turn",
-          usage: { input_tokens: 12, output_tokens: 4 },
-        },
+        stopReason: "end",
+        usage: { inputTokens: 12, outputTokens: 4 },
       },
     ]);
     const toolsSeenDuringRead: string[] = [];
     const readResult = await runWithTenant(tid, () =>
       runAgentTurn({
-        anthropic: readAnthropic,
+        provider: readProvider,
         tenantId: tid,
         agentKey: "sales",
         model: MODELS.sonnet,
@@ -289,44 +311,43 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(readResult.text, "You have 1 client.", "the final turn's text is returned");
 
     // The real proof the read actually ran (not just that onTool fired):
-    // inspect what the SECOND .stream() call was actually given. Its last
-    // message must be the tool_result for tu_read, carrying business_overview's
+    // inspect what the SECOND streamTurn() call was actually given. Its last
+    // message must carry the toolResult for tu_read, with business_overview's
     // REAL output against our REAL seeded tenant (1 client) — not a stub.
-    const secondCallMessages = readCalls[1].messages as { role: string; content: unknown }[];
+    const secondCallMessages = readCalls[1].messages as {
+      role: string;
+      content: string;
+      toolResults?: { toolCallId: string; content: string }[];
+    }[];
     const fedBack = secondCallMessages[secondCallMessages.length - 1];
     assert.equal(fedBack.role, "user");
-    const toolResultBlocks = fedBack.content as { type: string; tool_use_id: string; content: string }[];
+    const toolResultBlocks = fedBack.toolResults ?? [];
     assert.equal(toolResultBlocks.length, 1);
-    assert.equal(toolResultBlocks[0].type, "tool_result");
-    assert.equal(toolResultBlocks[0].tool_use_id, "tu_read", "the tool_result is wired to the exact tool_use block that requested it");
+    assert.equal(toolResultBlocks[0].toolCallId, "tu_read", "the tool result is wired to the exact tool call that requested it");
     const overviewPayload = JSON.parse(toolResultBlocks[0].content);
-    assert.equal(overviewPayload.clients, 1, "the tool_result carries business_overview's REAL count from the scratch tenant");
+    assert.equal(overviewPayload.clients, 1, "the tool result carries business_overview's REAL count from the scratch tenant");
     // Conversation accumulation matches the spec: assistant tool_use message,
-    // then a user tool_result message, appended between the two model calls.
+    // then a user tool-results message, appended between the two model calls.
     assert.equal(
       secondCallMessages.length,
       (readCalls[0].messages as unknown[]).length + 2,
-      "convo grew by exactly the assistant message + the tool_result message between turns",
+      "convo grew by exactly the assistant message + the tool-results message between turns",
     );
 
     // ════════════════════════════════════════════════════════════════════
     // 3. Plain text: no tools, single turn, onText receives every delta
     // ════════════════════════════════════════════════════════════════════
-    const { anthropic: textAnthropic, calls: textCalls } = makeFakeAnthropic([
+    const { provider: textProvider, calls: textCalls } = makeFakeProvider([
       {
         textDeltas: ["Hello", ", world!"],
-        finalMessage: {
-          id: "msg_text",
-          content: [{ type: "text", text: "Hello, world!" }],
-          stop_reason: "end_turn",
-          usage: { input_tokens: 5, output_tokens: 3 },
-        },
+        stopReason: "end",
+        usage: { inputTokens: 5, outputTokens: 3 },
       },
     ]);
     const receivedDeltas: string[] = [];
     const textResult = await runWithTenant(tid, () =>
       runAgentTurn({
-        anthropic: textAnthropic,
+        provider: textProvider,
         tenantId: tid,
         agentKey: "sales",
         model: MODELS.sonnet,
@@ -351,21 +372,18 @@ const requireLocal = createRequire(import.meta.url);
     // 20,000,000 output tokens on sonnet ($15/1M out list price) = 30,000c,
     // comfortably over the $25 (2,500c) monthly cap.
     recordUsage(tid, "sales", MODELS.sonnet, { inputTokens: 0, outputTokens: 20_000_000 });
-    const { anthropic: overCapAnthropic, calls: overCapCalls } = makeFakeAnthropic([
+    const { provider: overCapProvider, calls: overCapCalls } = makeFakeProvider([
       {
-        finalMessage: {
-          id: "should_never_be_reached",
-          content: [{ type: "text", text: "should never run" }],
-          stop_reason: "end_turn",
-          usage: { input_tokens: 1, output_tokens: 1 },
-        },
+        textDeltas: ["should never run"],
+        stopReason: "end",
+        usage: { inputTokens: 1, outputTokens: 1 },
       },
     ]);
     await assert.rejects(
       () =>
         runWithTenant(tid, () =>
           runAgentTurn({
-            anthropic: overCapAnthropic,
+            provider: overCapProvider,
             tenantId: tid,
             agentKey: "sales",
             model: MODELS.sonnet,

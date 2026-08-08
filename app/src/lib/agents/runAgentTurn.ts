@@ -1,9 +1,10 @@
 import "server-only";
 
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
 
 import { executeTool, isWriteTool, summarizeToolAction, type ToolArtifact } from "@/lib/assistant/tools";
 import { assertUnderCap, recordUsage } from "@/lib/ai/usage";
+import { getProvider, type ModelProvider, type NeutralMessage } from "@/lib/ai/providers";
 
 /**
  * One write tool call collected instead of executed. Same `{ name, input,
@@ -13,23 +14,29 @@ import { assertUnderCap, recordUsage } from "@/lib/ai/usage";
 export type PendingWrite = { name: string; input: Record<string, unknown>; summary: string };
 
 export interface RunAgentTurnArgs {
-  // Injected rather than constructed in here — the route passes the real
-  // getAnthropic() client, tests pass a stub. This is what makes the loop
-  // testable without an actual Anthropic API call.
-  anthropic: Anthropic;
   tenantId: number;
   agentKey: string; // metering key for recordUsage — the specialist's registry key
   userId?: number;
   model: string;
   system: string;
   tools: Anthropic.Tool[];
-  messages: Anthropic.MessageParam[]; // initial conversation
+  // Plain text initial conversation — what every caller already builds
+  // (a one-off task message, or a client-supplied chat history). Converted to
+  // NeutralMessage[] internally; the wire shape any particular ModelProvider
+  // needs (Anthropic content blocks, OpenAI tool_calls, ...) is that
+  // provider's own concern, never this function's or its callers'.
+  messages: { role: "user" | "assistant"; content: string }[];
   signal?: AbortSignal;
   onText?: (delta: string) => void;
   onTool?: (name: string) => void;
   onArtifact?: (artifact: Record<string, unknown>) => void;
   maxTurns?: number; // default 8
   maxTokens?: number; // default 16000
+  // MP1 testing hook — defaults to the real provider for `model`
+  // (@/lib/ai/providers). Injecting a fake ModelProvider is what makes this
+  // loop testable without an actual Anthropic API call or any SDK at all —
+  // see runAgentTurn.test.ts.
+  provider?: ModelProvider;
 }
 
 /**
@@ -85,12 +92,23 @@ export interface RunAgentTurnArgs {
  * specialist's nested `runAgentTurn` call runs this same check again at ITS
  * OWN start, so the cap is enforced at every level of a delegation, not just
  * the top.
+ *
+ * MP1 (multi-provider model choice): the actual model call used to be inline
+ * here (`anthropic.messages.stream(...)`) — it now goes through an injected
+ * `ModelProvider` (`provider` arg, default `getProvider(model)`; see
+ * @/lib/ai/providers), so this loop no longer hard-codes the Anthropic SDK.
+ * Nothing else on this page changed: the loop still drives a
+ * provider-neutral `NeutralMessage[]` conversation, and tool dispatch / the
+ * write gate / metering / artifact collection all still live HERE, not in any
+ * provider. See .superpowers/sdd/multiprovider-task-1-brief.md for the
+ * fidelity mechanism (`NeutralMessage.providerRaw`) that keeps
+ * AnthropicProvider's actual wire request byte-for-byte what this function
+ * used to send directly.
  */
 export async function runAgentTurn(
   args: RunAgentTurnArgs,
 ): Promise<{ text: string; pendingWrites: PendingWrite[]; artifacts: ToolArtifact[] }> {
   const {
-    anthropic,
     tenantId,
     agentKey,
     userId,
@@ -104,13 +122,14 @@ export async function runAgentTurn(
     onArtifact,
     maxTurns = 8,
     maxTokens = 16000,
+    provider = getProvider(model),
   } = args;
 
   // Enforce the per-tenant monthly AI spend cap before burning any tokens on
   // this turn. Not caught here — see the doc comment above.
   assertUnderCap(tenantId);
 
-  const convo: Anthropic.MessageParam[] = [...messages];
+  const convo: NeutralMessage[] = messages.map((m) => ({ role: m.role, content: m.content }));
   let fullText = "";
   const pendingWrites: PendingWrite[] = [];
   const artifacts: ToolArtifact[] = [];
@@ -118,67 +137,47 @@ export async function runAgentTurn(
   for (let turn = 0; turn < maxTurns; turn++) {
     if (signal?.aborted) break; // caller disconnected — stop burning tokens
 
-    const stream = anthropic.messages.stream({
-      model,
-      // Full nutrition/workout plans serialise to large tool inputs; 4096 was
-      // truncating them mid-JSON, which failed and made the model retry.
-      max_tokens: maxTokens,
-      system,
-      tools,
-      messages: convo,
-    });
-    stream.on("text", (delta) => {
-      fullText += delta;
-      onText?.(delta);
-    });
-    const final = await stream.finalMessage();
-    recordUsage(tenantId, agentKey, model, {
-      inputTokens: final.usage.input_tokens,
-      outputTokens: final.usage.output_tokens,
-      cacheReadTokens: (final.usage as any).cache_read_input_tokens ?? 0,
-      cacheCreateTokens: (final.usage as any).cache_creation_input_tokens ?? 0,
-    });
-    convo.push({ role: "assistant", content: final.content });
+    const r = await provider.streamTurn({ model, system, tools, messages: convo, maxTokens, signal, onText });
+    recordUsage(tenantId, agentKey, model, r.usage);
+    convo.push({ role: "assistant", content: r.text, toolCalls: r.toolCalls, providerRaw: r.assistantRaw });
+    fullText += r.text;
 
     // A tool call that got cut off by the token limit is malformed — don't
     // feed it back (that just loops). Tell the caller and stop cleanly.
-    if (final.stop_reason === "max_tokens") {
+    if (r.stopReason === "max_tokens") {
       onText?.("\n\n_(That response was longer than expected — please ask me to continue or narrow it down.)_");
       break;
     }
 
-    if (final.stop_reason === "tool_use") {
-      const results: Anthropic.ToolResultBlockParam[] = [];
-      for (const block of final.content) {
-        if (block.type === "tool_use") {
-          const input = block.input as Record<string, unknown>;
-          if (isWriteTool(block.name)) {
-            // NEVER execute a write in the loop. Collect it and hand it back
-            // to the caller for an explicit Approve click.
-            pendingWrites.push({ name: block.name, input, summary: summarizeToolAction(block.name, input) });
-          } else {
-            onTool?.(block.name);
-            const r = await executeTool(block.name, input, { tenantId, userId });
-            if (r.artifact) { artifacts.push(r.artifact); onArtifact?.(r.artifact); }
-            // A delegate_to_<specialist> tool's result can carry MULTIPLE
-            // artifacts (its own nested runAgentTurn's whole `artifacts`
-            // list) rather than the single `r.artifact` a normal tool
-            // produces — fold each into this turn's own list, same as below.
-            if (r.artifacts?.length) { for (const a of r.artifacts) { artifacts.push(a); onArtifact?.(a); } }
-            // A delegate_to_<specialist> tool is a READ (it never itself
-            // mutates anything) whose result can carry the DELEGATED
-            // specialist's own deferred writes — fold them into this turn's
-            // pendingWrites so they hit the same confirm/Approve path as a
-            // direct write below. The model still sees the normal tool_result
-            // text either way (the human-readable summary), so it can keep
-            // reasoning/synthesising across delegations before this turn ends.
-            if (r.pendingWrites?.length) pendingWrites.push(...r.pendingWrites);
-            results.push({ type: "tool_result", tool_use_id: block.id, content: r.text });
-          }
+    if (r.stopReason === "tool_use") {
+      const toolResults: { toolCallId: string; content: string }[] = [];
+      for (const call of r.toolCalls) {
+        if (isWriteTool(call.name)) {
+          // NEVER execute a write in the loop. Collect it and hand it back
+          // to the caller for an explicit Approve click.
+          pendingWrites.push({ name: call.name, input: call.input, summary: summarizeToolAction(call.name, call.input) });
+        } else {
+          onTool?.(call.name);
+          const tr = await executeTool(call.name, call.input, { tenantId, userId });
+          if (tr.artifact) { artifacts.push(tr.artifact); onArtifact?.(tr.artifact); }
+          // A delegate_to_<specialist> tool's result can carry MULTIPLE
+          // artifacts (its own nested runAgentTurn's whole `artifacts`
+          // list) rather than the single `tr.artifact` a normal tool
+          // produces — fold each into this turn's own list, same as below.
+          if (tr.artifacts?.length) { for (const a of tr.artifacts) { artifacts.push(a); onArtifact?.(a); } }
+          // A delegate_to_<specialist> tool is a READ (it never itself
+          // mutates anything) whose result can carry the DELEGATED
+          // specialist's own deferred writes — fold them into this turn's
+          // pendingWrites so they hit the same confirm/Approve path as a
+          // direct write below. The model still sees the normal tool_result
+          // text either way (the human-readable summary), so it can keep
+          // reasoning/synthesising across delegations before this turn ends.
+          if (tr.pendingWrites?.length) pendingWrites.push(...tr.pendingWrites);
+          toolResults.push({ toolCallId: call.id, content: tr.text });
         }
       }
       if (pendingWrites.length > 0) break; // wait for the caller to approve/cancel
-      convo.push({ role: "user", content: results });
+      convo.push({ role: "user", content: "", toolResults });
       continue;
     }
 

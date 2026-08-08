@@ -1,9 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { type NextRequest } from "next/server";
 
 import { requireUser, getCurrentMembership } from "@/lib/auth";
 import { TOOLS } from "@/lib/assistant/tools";
-import { getAnthropic } from "@/lib/ai/client";
 import { AiCapError } from "@/lib/ai/usage";
 import { runWithTenant } from "@/lib/db/tenant";
 import { getAgent } from "@/lib/agents/registry";
@@ -99,7 +97,10 @@ export async function POST(
       // whatever tenant the ambient context happens to resolve to, with no
       // error thrown. See the doc comment on composeAgentSystem.
       const system = composeAgentSystem(tenantId, key);
-      const convo: Anthropic.MessageParam[] = history.map((m) => ({ role: m.role, content: m.content }));
+      // Already the exact shape runAgentTurn's `messages` wants (plain
+      // {role, content: string}[]) — no Anthropic-specific conversion here;
+      // that is entirely the chosen ModelProvider's concern now (MP1).
+      const convo = history;
 
       // The tool-use loop (model call -> read tools execute inline, write
       // tools deferred -> repeat) lives in the shared runAgentTurn (same loop
@@ -112,7 +113,6 @@ export async function POST(
       let pendingWrites: PendingWrite[] = [];
       try {
         ({ pendingWrites } = await runAgentTurn({
-          anthropic: getAnthropic(),
           tenantId,
           agentKey: key,
           userId,
