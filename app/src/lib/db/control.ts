@@ -402,6 +402,20 @@ export function setCronState(key: string, value: string): void {
 }
 
 /**
+ * Pure decision helper for the cron_state date-guard pattern (Batch 1 —
+ * production safety net, improvement-plan-2026-08.md Theme A5): given the UTC
+ * calendar date (`YYYY-MM-DD`) a once-a-day job last completed — or `null` if
+ * it never has — should it run now? Kept free of `Date.now()`/DB access so
+ * it's trivially unit-testable; every "did today already run?" check (the
+ * daily automations tick, the backup + lapse boot-time catch-ups) should call
+ * this instead of re-deriving the date-string comparison inline.
+ */
+export function shouldRunToday(lastRunDateUtc: string | null, nowMs: number): boolean {
+  const today = new Date(nowMs).toISOString().slice(0, 10);
+  return lastRunDateUtc !== today;
+}
+
+/**
  * Auth + user management read/write identity, which lives in the control plane.
  * They use THIS connection, never the per-request tenant `db` proxy.
  */

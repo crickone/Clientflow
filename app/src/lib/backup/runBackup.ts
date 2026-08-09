@@ -93,6 +93,17 @@ function makeTargets(): BackupTarget[] {
 }
 
 /**
+ * True when at least one backup target is fully configured (i.e. `runBackup()`
+ * would actually upload somewhere instead of short-circuiting to
+ * `{ok:false, error:"Backup storage not configured"}`). Exported so callers
+ * (the nightly scheduler's startup alarm — Batch 1, improvement-plan-2026-08.md
+ * A1/A3) can check this without duplicating the env-var gate in `makeTarget`.
+ */
+export function isBackupConfigured(): boolean {
+  return makeTargets().length > 0;
+}
+
+/**
  * Take a consistent online snapshot of each SQLite database and upload it to
  * EVERY configured off-volume target under a timestamped key, then prune each
  * target to the most recent KEEP. Safe against the live DBs (SQLite online
