@@ -21,17 +21,23 @@
  *   the `clientflow-page` template AND the Studio's in-place edit canvas
  *   (`lib/cms/render.ts#editBodyHtml`, rendered by `RenovaEditCanvas`) for
  *   pages on EITHER bespoke template. This is not rich text — it's a full
- *   page body (header/nav/section/svg/video/forms/tables + the page's own
- *   `<style>` block), authored by the agency, not by tenant end-users. The
- *   Studio save path (`cms/[siteSlug]/studio/actions.ts`) round-trips the
- *   edited canvas HTML back into the page's PERMANENT stored `body` block
- *   (re-appending only the original `<script>` tags), so an allow-list that's
- *   too narrow here would silently amputate live site markup the next time
- *   an admin edits and saves the page. So this allow-list is broad
- *   (structural/semantic HTML5 + SVG + the page's `<style>` block), while
- *   still excluding every script-execution vector: no `<script>`, no event
- *   handlers, no `javascript:`/`vbscript:` URLs, no `<iframe>`/`<object>`/
- *   `<embed>`.
+ *   page body (header/nav/section/svg/video/forms/tables), authored by the
+ *   agency, not by tenant end-users. The Studio save path
+ *   (`cms/[siteSlug]/studio/actions.ts`) round-trips the edited canvas HTML
+ *   back into the page's PERMANENT stored `body` block (re-appending only
+ *   the original `<script>` tags), so an allow-list that's too narrow here
+ *   would silently amputate live site markup the next time an admin edits
+ *   and saves the page. So this allow-list is broad (structural/semantic
+ *   HTML5 + SVG), while still excluding every script-execution vector: no
+ *   `<script>`, no `<style>` (a `<style>` element is NOT in the allow-list —
+ *   allowing it, even without event handlers of its own, is a documented
+ *   mutation-XSS vector: `<svg><foreignObject><style>` smuggles markup that
+ *   this sanitizer's parser treats as inert rawtext CSS but that a browser
+ *   re-parses as live elements once inserted via `dangerouslySetInnerHTML`
+ *   — see html.test.ts for the payload), no event handlers, no
+ *   `javascript:`/`vbscript:` URLs, no `<iframe>`/`<object>`/`<embed>`.
+ *   Inline `style=""` attributes are a separate, per-property-filtered path
+ *   (`allowedStyles` / `BESPOKE_STYLES` below) and are unaffected.
  *
  *   IMPORTANT: the `clientflow-live` template's actual PUBLIC render
  *   (`lib/cms/sites/renova/templates.tsx`) does NOT call either function —
@@ -114,9 +120,12 @@ const BESPOKE_TAGS = [
   "form", "input", "label", "select", "option", "optgroup", "textarea", "button", "fieldset", "legend",
   // misc structural
   "details", "summary", "template", "time",
-  // "head-ish" — import-site.cjs prepends Google Fonts <link> + the page's own
-  // <style> block onto the body fragment, so both must survive.
-  "link", "style",
+  // "head-ish" — import-site.cjs prepends a Google Fonts <link> onto the body
+  // fragment, so it must survive. NOTE: "style" is deliberately NOT in this
+  // list — see the file doc comment above (mutation-XSS via
+  // <svg><foreignObject><style>) and html.test.ts. The page's own <style>
+  // block is dropped entirely by this sanitizer, same as the old regex one.
+  "link",
   // svg (the bespoke sites use inline SVG for icons/gradients/decorative art).
   // NOTE: htmlparser2 lowercases every tag/attribute name in HTML mode (the
   // mode sanitize-html always runs in), so camelCase SVG names below are
@@ -196,8 +205,9 @@ const BESPOKE_ATTRIBUTES: sanitizeHtmlLib.IOptions["allowedAttributes"] = {
  *  may be anything EXCEPT the known script-execution escapes — this is
  *  intentionally broad (first-party agency-authored CSS, not tenant text)
  *  but still a real allow-list per-property, per the brief (not a raw
- *  passthrough). The page's own `<style>` BLOCK is handled separately below
- *  (`allowVulnerableTags`) and is not subject to this per-property filter. */
+ *  passthrough). This governs ONLY the inline `style=""` attribute — the
+ *  page's own `<style>` BLOCK element is not in `BESPOKE_TAGS` at all (see
+ *  above), so it never reaches this filter: it's discarded outright. */
 const SAFE_STYLE_VALUE = [/^(?!.*(javascript:|expression\(|-moz-binding|behaviou?r\s*:|vbscript:)).*$/i];
 const STYLE_PROPS = [
   "color", "background", "background-color", "background-image", "background-position",
@@ -233,14 +243,6 @@ export function sanitizeHtmlKeepStyles(html: string | null | undefined): string 
     allowedSchemes: SAFE_SCHEMES,
     allowProtocolRelative: true,
     parseStyleAttributes: true,
-    // The page's own <style> block is first-party CSS (not tenant text); the
-    // CURRENT regex sanitizer already passes its contents through completely
-    // unvetted (it only ever strips <script>), so allowing the tag here is a
-    // lateral move, not a new gap — and the CSS-only "escapes" this would
-    // theoretically guard against (expression()/-moz-binding/behavior:) are
-    // dead IE/legacy-Firefox mechanisms with no effect in any current
-    // evergreen browser.
-    allowVulnerableTags: true,
     transformTags: { a: FORCE_SAFE_REL },
   });
 }

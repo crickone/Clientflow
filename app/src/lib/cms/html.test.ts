@@ -114,10 +114,10 @@ ok(
   })(),
 );
 ok(
-  "sanitizeHtmlKeepStyles: keeps <style> block content verbatim (page CSS)",
+  "sanitizeHtmlKeepStyles: strips <style> block entirely, keeps sibling markup (Batch 2a mXSS fix)",
   (() => {
     const out = sanitizeHtmlKeepStyles("<style>.hero{color:red}</style><div class=\"hero\">hi</div>");
-    return /<style>[\s\S]*\.hero\{color:red\}[\s\S]*<\/style>/.test(out);
+    return !/<style/i.test(out) && !/\.hero\{color:red\}/.test(out) && /<div class="hero">hi<\/div>/.test(out);
   })(),
 );
 ok(
@@ -161,8 +161,68 @@ ok(
   })(),
 );
 ok(
-  "sanitizeHtmlKeepStyles: still strips <script> even though it keeps <style>",
-  !/<script/i.test(sanitizeHtmlKeepStyles("<style>.a{color:red}</style><script>alert(1)</script>")),
+  "sanitizeHtmlKeepStyles: strips both <style> and <script> from the same input",
+  (() => {
+    const out = sanitizeHtmlKeepStyles("<style>.a{color:red}</style><script>alert(1)</script>");
+    return !/<script/i.test(out) && !/<style/i.test(out);
+  })(),
+);
+
+// ---------------------------------------------------------------------------
+// sanitizeHtmlKeepStyles — mutation-XSS regression (Batch 2a review fix).
+//
+// The previous config set `allowVulnerableTags: true` and included "style" in
+// the allow-list. sanitize-html/htmlparser2 tokenizes an allowed <style>
+// element's content as inert rawtext CSS, so it never re-examines that text
+// for banned tags/attributes — but a browser parsing the SAME sanitized
+// string via `dangerouslySetInnerHTML` (templates.tsx:27, render.ts:64) does
+// NOT treat <style> content as inert once it's nested inside an SVG
+// <foreignObject>: the browser's foreign-content tree-construction tokenizes
+// the "rawtext" back into live elements/attributes, so a payload smuggled
+// through <svg><foreignObject><style>…</style></foreignObject></svg> comes
+// out the other side as real, executing markup. Confirmed against the
+// pre-fix code: all three payloads below survived with their dangerous
+// substrings intact (e.g. the first produced the literal string
+// `<svg><style><img src=x onerror=alert(document.domain)></style></svg>`).
+//
+// Fix: "style" is no longer an allowed tag (so it — and, per sanitize-html's
+// default `nonTextTags`, its entire text content — is discarded, closing the
+// smuggling channel structurally) and `allowVulnerableTags` is removed since
+// nothing needs it anymore. This restores the old regex sanitizer's
+// behaviour of stripping <style> blocks outright. Inline style="" attributes
+// are a separate, per-property-filtered code path (`allowedStyles` /
+// `BESPOKE_STYLES`) and are deliberately unaffected — asserted below.
+// ---------------------------------------------------------------------------
+ok(
+  "sanitizeHtmlKeepStyles: mXSS bypass — svg>foreignObject>style>img[onerror] is fully neutralised",
+  (() => {
+    const out = sanitizeHtmlKeepStyles(
+      "<svg><foreignObject><style><img src=x onerror=alert(document.domain)></style></foreignObject></svg>",
+    );
+    return !/<style/i.test(out) && !/onerror/i.test(out) && !/<script/i.test(out);
+  })(),
+);
+ok(
+  "sanitizeHtmlKeepStyles: mXSS bypass — svg>foreignObject>style>script is fully neutralised",
+  (() => {
+    const out = sanitizeHtmlKeepStyles(
+      "<svg><foreignObject><style><script>alert(document.domain)</script></style></foreignObject></svg>",
+    );
+    return !/<style/i.test(out) && !/<script/i.test(out) && !/alert\(document\.domain\)/.test(out);
+  })(),
+);
+ok(
+  "sanitizeHtmlKeepStyles: mXSS bypass — svg>foreignObject>style>svg[onload] is fully neutralised",
+  (() => {
+    const out = sanitizeHtmlKeepStyles(
+      "<svg><foreignObject><style><svg onload=alert(document.domain)></style></foreignObject></svg>",
+    );
+    return !/<style/i.test(out) && !/onload/i.test(out) && !/<script/i.test(out);
+  })(),
+);
+ok(
+  "sanitizeHtmlKeepStyles: legit inline style=\"color:red\" still survives the mXSS fix",
+  /<p style="color:red">hi<\/p>/.test(sanitizeHtmlKeepStyles('<p style="color:red">hi</p>')),
 );
 
 console.log(`\nhtml sanitizers: ${passed} checks passed.`);
