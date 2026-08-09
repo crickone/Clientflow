@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { guard } from "@/lib/api/guard";
 import { getCurrentTenant } from "@/lib/db/tenant";
 import { getPlan } from "@/lib/nutrition";
+import { mediaSecurityHeaders } from "@/lib/api/mediaSecurityHeaders";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,7 @@ export async function GET(req: Request) {
       "Content-Length": String(stat.size),
       "Content-Disposition": `inline; filename="${downloadName.replace(/"/g, "")}"`,
       "Cache-Control": "no-store",
+      ...mediaSecurityHeaders(),
     },
   });
 }

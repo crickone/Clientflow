@@ -3,6 +3,7 @@ import path from "node:path";
 import { NextResponse } from "next/server";
 
 import { guard } from "@/lib/api/guard";
+import { mediaSecurityHeaders } from "@/lib/api/mediaSecurityHeaders";
 
 import {
   brandingDir,
@@ -45,6 +46,7 @@ export async function GET() {
       "Content-Type": contentType,
       "Content-Length": String(stat.size),
       "Cache-Control": "no-store",
+      ...mediaSecurityHeaders(),
     },
   });
 }

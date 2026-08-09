@@ -1,5 +1,6 @@
 import { getLibraryAsset } from "@/lib/cms/library";
 import { getObject } from "@/lib/cms/storage";
+import { mediaSecurityHeaders } from "@/lib/api/mediaSecurityHeaders";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,7 @@ export async function GET(
       "Content-Type": asset.mimeType || "application/octet-stream",
       "Cache-Control": "public, max-age=3600",
       "Content-Length": String(bytes.length),
+      ...mediaSecurityHeaders(),
     },
   });
 }

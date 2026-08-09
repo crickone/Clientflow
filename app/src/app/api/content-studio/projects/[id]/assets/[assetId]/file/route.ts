@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { db, schema } from "@/lib/db";
 import { and, eq } from "drizzle-orm";
 import { uploadDir } from "@/lib/video/projects";
+import { mediaSecurityHeaders } from "@/lib/api/mediaSecurityHeaders";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +65,7 @@ export async function GET(
           headers: {
             "Content-Range": `bytes */${total}`,
             "Accept-Ranges": "bytes",
+            ...mediaSecurityHeaders(),
           },
         });
       }
@@ -79,6 +81,7 @@ export async function GET(
           "Content-Length": String(chunkSize),
           "Content-Type": mime,
           "Cache-Control": "private, max-age=300",
+          ...mediaSecurityHeaders(),
         },
       });
     }
@@ -91,6 +94,7 @@ export async function GET(
       "Content-Length": String(total),
       "Accept-Ranges": "bytes",
       "Cache-Control": "private, max-age=300",
+      ...mediaSecurityHeaders(),
     },
   });
 }

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import fs from "node:fs";
 import path from "node:path";
 import { libraryFilePath } from "@/lib/image/library";
+import { mediaSecurityHeaders } from "@/lib/api/mediaSecurityHeaders";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,7 @@ export async function GET(
         "Accept-Ranges": "bytes",
         "Content-Length": String(chunk.length),
         "Cache-Control": "private, max-age=300",
+        ...mediaSecurityHeaders(),
       },
     });
   }
@@ -67,6 +69,7 @@ export async function GET(
       "Content-Type": mime,
       "Cache-Control": "private, max-age=300",
       ...(VIDEO_EXT.has(ext) ? { "Accept-Ranges": "bytes" } : {}),
+      ...mediaSecurityHeaders(),
     },
   });
 }

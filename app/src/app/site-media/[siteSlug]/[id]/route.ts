@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 
 import { resolvePublicSite } from "@/lib/cms/resolveHost";
 import { getMediaAssetPublic, mediaFilePath } from "@/lib/cms/media";
+import { mediaSecurityHeaders } from "@/lib/api/mediaSecurityHeaders";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,7 @@ export async function GET(
     headers: {
       "Content-Type": asset.mimeType || "application/octet-stream",
       "Cache-Control": "public, max-age=3600",
+      ...mediaSecurityHeaders(),
     },
   });
 }
