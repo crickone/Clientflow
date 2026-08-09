@@ -1,38 +1,31 @@
-// The daily automation scheduler + the backup/lapse schedulers are started via
-// side-effect imports elsewhere (src/lib/db/index.ts, gated to production —
-// see that file), which keeps better-sqlite3/the S3 client out of the
-// edge/instrumentation bundle. This file is ONLY the process-level crash
-// guard (Batch 1 — production safety net, improvement-plan-2026-08.md Theme
-// A4). Next.js calls `register()` once per runtime when the server process
-// starts, for BOTH the nodejs and edge runtimes — hence the runtime guard
-// below, so nothing here ever touches the edge bundle.
+// Process-level crash guards (Batch 1 — production safety net,
+// improvement-plan-2026-08.md Theme A4). Next.js calls `register()` once per
+// runtime at server start, for BOTH nodejs and edge — so this file is compiled
+// into the edge bundle too and must NOT statically or dynamically reference any
+// Node-only/native module. In particular it must never reach better-sqlite3:
+// the crash alert therefore hits Resend's REST API via plain `fetch` rather than
+// "@/lib/billing/emails" (which pulls "@/lib/db/control" → better-sqlite3 →
+// "Can't resolve 'fs'/'path'" in the edge build). A crash handler wants the
+// fewest possible dependencies anyway — no DB layer, no boot migration side
+// effects, just fetch + env.
 
-// Module-level guard: `register()` is documented as a one-time call, but has
-// been observed firing more than once under `next dev`'s Fast Refresh/rebuild
-// cycle. Without this flag, a second call would attach a second pair of
-// `process.on` listeners — not a crash risk (Node allows multiple listeners),
-// just double-logged events. This buys idempotency, nothing more.
+// `register()` is documented as one-time but has been observed firing more than
+// once under `next dev` Fast Refresh; this makes handler installation idempotent.
 let registered = false;
 
-// ── Crash-survived operator alert (Batch 1 fix wave, review finding #2) ────
-// Logging alone is invisible unless someone is tailing Railway logs. Both
-// crash handlers below ALWAYS console.error unconditionally (never
-// rate-limited — that's the durable record); this adds a best-effort email
-// on top so a survived crash doesn't go unnoticed for days.
-//
-// Rate-limit / crash-loop guard: a module-level last-alert timestamp plus a
-// minimum interval, so a rejection storm (the same bug firing hundreds of
-// times a second) can't send hundreds of emails. Only the EMAIL is
-// throttled — console.error above always fires.
+// ── Crash-survived operator alert ────────────────────────────────────────────
+// Both handlers ALWAYS console.error unconditionally (the durable record); this
+// best-effort email on top means a survived crash isn't invisible. Rate-limited
+// by a module-level last-sent timestamp + minimum interval so a rejection storm
+// can't send hundreds of emails — only the EMAIL is throttled, never the log.
 const CRASH_ALERT_MIN_INTERVAL_MS = 10 * 60_000; // 10 minutes
 let lastCrashAlertMs: number | null = null;
 
 /**
  * Pure decision helper: given the last time we actually SENT a crash-survived
- * alert email (ms epoch, or null/undefined if we never have), should we send
- * another one right now? No Date.now()/env/network access, so it's trivially
- * unit-testable (see instrumentation.test.ts) independent of the handlers,
- * timers, or mail provider.
+ * alert (ms epoch, or null/undefined if never), should we send another now? No
+ * Date.now()/env/network access, so it's trivially unit-testable
+ * (instrumentation.test.ts) independent of handlers, timers, or mail provider.
  */
 export function shouldSendAlert(
   lastAlertMs: number | null | undefined,
@@ -44,16 +37,10 @@ export function shouldSendAlert(
 }
 
 /**
- * Actually send the "process survived a crash" email. Split out from
- * alertOnSurvivedCrash (below) so the dynamic import + send live inside ONE
- * async try/catch: importing "@/lib/billing/emails" pulls in
- * "@/lib/db/control" (better-sqlite3 + a boot migration that touches disk),
- * which must NEVER happen at instrumentation.ts's own module-load time — only
- * lazily, here, on the rare path where a crash actually occurred. The dynamic
- * import itself sits inside this try/catch (not just the send call) because a
- * broken module graph can throw before any code in the imported module runs —
- * mirrors the identical precedent/comment in lib/backup/scheduler.ts's
- * alertBackupFailure.
+ * Send the "process survived a crash" email via Resend's REST API directly.
+ * Uses `fetch` (edge-safe, zero native deps) so this module never drags
+ * better-sqlite3 into the instrumentation/edge bundle. Everything is wrapped so
+ * a throw can never propagate back into the crash handler that called it.
  */
 async function sendCrashAlertEmail(
   kind: "unhandledRejection" | "uncaughtException",
@@ -61,35 +48,40 @@ async function sendCrashAlertEmail(
   atMs: number,
 ): Promise<void> {
   const to = process.env.ALERT_EMAIL;
-  if (!to) return; // opt-in alarm; silent no-op when unset — never throws, never logs (the console.error above already recorded the crash itself)
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!to || !apiKey) return; // opt-in alarm; silent no-op when unset (console.error already recorded the crash)
+  // Verified platform sender; override via ALERT_EMAIL_FROM if billing_from_email differs.
+  const from = process.env.ALERT_EMAIL_FROM || "ClientFlow Alerts <billing@clientflow.ie>";
+  const safeStack = (err.stack ?? err.message).replace(/</g, "&lt;");
   try {
-    const { sendPlatformEmail } = await import("@/lib/billing/emails");
-    await sendPlatformEmail(
-      to,
-      `[ClientFlow] Server process survived a crash (${kind})`,
-      `<p>The ClientFlow server process caught a fatal <strong>${kind}</strong> at ${new Date(atMs).toISOString()} and stayed up (deliberate log-and-continue tradeoff — see the comment above the crash guards in instrumentation.ts).</p><pre>${(err.stack ?? err.message).replace(/</g, "&lt;")}</pre>`,
-    );
+    await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from,
+        to,
+        subject: `[ClientFlow] Server process survived a crash (${kind})`,
+        html: `<p>The ClientFlow server process caught a fatal <strong>${kind}</strong> at ${new Date(atMs).toISOString()} and stayed up (deliberate log-and-continue tradeoff — see instrumentation.ts).</p><pre>${safeStack}</pre>`,
+      }),
+    });
   } catch (sendErr) {
     console.error("[fatal-guard] crash alert email itself failed to send:", sendErr);
   }
 }
 
 /**
- * Synchronous, throw-proof dispatcher called directly from the process.on
- * handlers below. A throw *inside* a process-level crash handler is
- * unrecoverable — there is no handler above it to catch it — so every branch
- * here, sync or async, must be structurally incapable of propagating an
- * exception back to the caller. `sendCrashAlertEmail` already catches
- * everything internally; the `.catch` below is a last-resort net in case a
- * future edit ever removes that, so a rejected promise here can never surface
- * as a fresh unhandledRejection (which would otherwise re-enter this exact
- * handler).
+ * Throw-proof dispatcher called from the process.on handlers. A throw *inside* a
+ * crash handler is unrecoverable, so every branch here must be incapable of
+ * propagating an exception back to the caller.
  */
 function alertOnSurvivedCrash(kind: "unhandledRejection" | "uncaughtException", err: Error): void {
   try {
     const now = Date.now();
     if (!shouldSendAlert(lastCrashAlertMs, now, CRASH_ALERT_MIN_INTERVAL_MS)) return;
-    lastCrashAlertMs = now; // set BEFORE the async work so a burst of crashes in the same tick can't all slip through the gate
+    lastCrashAlertMs = now; // set BEFORE the async work so a same-tick burst can't all slip through
     void sendCrashAlertEmail(kind, err, now).catch((e) => {
       console.error("[fatal-guard] crash alert dispatch rejected unexpectedly:", e);
     });
@@ -107,19 +99,13 @@ export function register() {
   // This app runs as a SINGLE persistent `next start` Node process serving
   // EVERY tenant (Railway, better-sqlite3, no per-request process isolation).
   // One bad background task — an agent's detached run IIFE, a scheduler tick,
-  // any stray un-awaited promise anywhere in the app — must not be able to
-  // kill the process for every other tenant.
-  //
-  // Node's own docs on 'uncaughtException' are explicit that resuming after
-  // one is risky: "Attempting to resume normally after an uncaught exception
-  // can be similar to pulling the power cord out... the correct use ... is to
-  // perform synchronous cleanup of allocated resources ... and then ... shut
-  // down the process" (https://nodejs.org/api/process.html#event-uncaughtexception).
-  // We deliberately choose the opposite tradeoff here: for a single process
-  // multiplexing many tenants, keeping the OTHER tenants online outweighs the
-  // (already-a-bug) risk of leaked state in the one request/job that failed —
-  // log loudly and keep serving. GET /api/health + Railway's restart policy
-  // remain the backstop if the process ever gets truly wedged.
+  // any stray un-awaited promise — must not kill the process for every other
+  // tenant. Node's docs warn resuming after 'uncaughtException' is risky
+  // (https://nodejs.org/api/process.html#event-uncaughtexception); we
+  // deliberately choose the opposite tradeoff for a multi-tenant single process:
+  // keeping the OTHER tenants online outweighs the (already-a-bug) risk of leaked
+  // state in the one request/job that failed. GET /api/health + Railway's restart
+  // policy remain the backstop if the process ever gets truly wedged.
   process.on("unhandledRejection", (reason) => {
     const err = reason instanceof Error ? reason : new Error(String(reason));
     console.error("[fatal-guard] unhandledRejection:", err.stack ?? err.message);
