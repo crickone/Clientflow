@@ -27,6 +27,13 @@ const nextConfig = {
   // (OOM on Railway's builder) — keeping production builds reliable.
   typescript: { ignoreBuildErrors: true },
   experimental: {
+    // Batch 1 fix wave (review finding #1, CRITICAL): on Next 14, `register()`
+    // in src/instrumentation.ts is ONLY invoked — and the file is only emitted
+    // into the standalone build at all — when this flag is set. Without it the
+    // process-level crash guards (unhandledRejection/uncaughtException) never
+    // install in production; they'd silently be dead code on Railway. Stable
+    // (no flag needed) from Next 15 onward — remove this once upgraded past 14.
+    instrumentationHook: true,
     // better-sqlite3 ships native bindings — keep it server-only.
     serverComponentsExternalPackages: [
       "better-sqlite3",

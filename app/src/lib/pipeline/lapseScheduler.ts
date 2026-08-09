@@ -19,12 +19,22 @@ const CRON_KEY = "lapse_last_run";
  */
 function runDailyLapseIfNeeded(): void {
   if (running) return;
-  if (!shouldRunToday(getCronState(CRON_KEY), Date.now())) return;
+  // Review finding #4 (midnight-straddle): captured ONCE per invocation and
+  // reused for both the guard check and the setCronState write below, rather
+  // than re-deriving the date separately at each site (which is how the
+  // sibling bug in lib/backup/scheduler.ts happened — a run straddling UTC
+  // midnight could record a different day than the one the guard checked, so
+  // that day's run then got wrongly skipped). recomputeLapsedAllTenants() is
+  // synchronous so the window is negligible here in practice, but the fix
+  // mirrors lib/automations/scheduler.ts's `tick` for consistency: compute
+  // `today` once, use it everywhere in this invocation.
+  const now = Date.now();
+  if (!shouldRunToday(getCronState(CRON_KEY), now)) return;
   running = true;
   try {
     const r = recomputeLapsedAllTenants();
     console.log("[pipeline] daily lapse:", JSON.stringify(r));
-    setCronState(CRON_KEY, new Date().toISOString().slice(0, 10));
+    setCronState(CRON_KEY, new Date(now).toISOString().slice(0, 10));
   } catch (e) {
     console.error("[pipeline] daily lapse failed:", e);
   } finally {

@@ -14,6 +14,90 @@
 // just double-logged events. This buys idempotency, nothing more.
 let registered = false;
 
+// ── Crash-survived operator alert (Batch 1 fix wave, review finding #2) ────
+// Logging alone is invisible unless someone is tailing Railway logs. Both
+// crash handlers below ALWAYS console.error unconditionally (never
+// rate-limited — that's the durable record); this adds a best-effort email
+// on top so a survived crash doesn't go unnoticed for days.
+//
+// Rate-limit / crash-loop guard: a module-level last-alert timestamp plus a
+// minimum interval, so a rejection storm (the same bug firing hundreds of
+// times a second) can't send hundreds of emails. Only the EMAIL is
+// throttled — console.error above always fires.
+const CRASH_ALERT_MIN_INTERVAL_MS = 10 * 60_000; // 10 minutes
+let lastCrashAlertMs: number | null = null;
+
+/**
+ * Pure decision helper: given the last time we actually SENT a crash-survived
+ * alert email (ms epoch, or null/undefined if we never have), should we send
+ * another one right now? No Date.now()/env/network access, so it's trivially
+ * unit-testable (see instrumentation.test.ts) independent of the handlers,
+ * timers, or mail provider.
+ */
+export function shouldSendAlert(
+  lastAlertMs: number | null | undefined,
+  nowMs: number,
+  minIntervalMs: number,
+): boolean {
+  if (lastAlertMs == null) return true;
+  return nowMs - lastAlertMs >= minIntervalMs;
+}
+
+/**
+ * Actually send the "process survived a crash" email. Split out from
+ * alertOnSurvivedCrash (below) so the dynamic import + send live inside ONE
+ * async try/catch: importing "@/lib/billing/emails" pulls in
+ * "@/lib/db/control" (better-sqlite3 + a boot migration that touches disk),
+ * which must NEVER happen at instrumentation.ts's own module-load time — only
+ * lazily, here, on the rare path where a crash actually occurred. The dynamic
+ * import itself sits inside this try/catch (not just the send call) because a
+ * broken module graph can throw before any code in the imported module runs —
+ * mirrors the identical precedent/comment in lib/backup/scheduler.ts's
+ * alertBackupFailure.
+ */
+async function sendCrashAlertEmail(
+  kind: "unhandledRejection" | "uncaughtException",
+  err: Error,
+  atMs: number,
+): Promise<void> {
+  const to = process.env.ALERT_EMAIL;
+  if (!to) return; // opt-in alarm; silent no-op when unset — never throws, never logs (the console.error above already recorded the crash itself)
+  try {
+    const { sendPlatformEmail } = await import("@/lib/billing/emails");
+    await sendPlatformEmail(
+      to,
+      `[ClientFlow] Server process survived a crash (${kind})`,
+      `<p>The ClientFlow server process caught a fatal <strong>${kind}</strong> at ${new Date(atMs).toISOString()} and stayed up (deliberate log-and-continue tradeoff — see the comment above the crash guards in instrumentation.ts).</p><pre>${(err.stack ?? err.message).replace(/</g, "&lt;")}</pre>`,
+    );
+  } catch (sendErr) {
+    console.error("[fatal-guard] crash alert email itself failed to send:", sendErr);
+  }
+}
+
+/**
+ * Synchronous, throw-proof dispatcher called directly from the process.on
+ * handlers below. A throw *inside* a process-level crash handler is
+ * unrecoverable — there is no handler above it to catch it — so every branch
+ * here, sync or async, must be structurally incapable of propagating an
+ * exception back to the caller. `sendCrashAlertEmail` already catches
+ * everything internally; the `.catch` below is a last-resort net in case a
+ * future edit ever removes that, so a rejected promise here can never surface
+ * as a fresh unhandledRejection (which would otherwise re-enter this exact
+ * handler).
+ */
+function alertOnSurvivedCrash(kind: "unhandledRejection" | "uncaughtException", err: Error): void {
+  try {
+    const now = Date.now();
+    if (!shouldSendAlert(lastCrashAlertMs, now, CRASH_ALERT_MIN_INTERVAL_MS)) return;
+    lastCrashAlertMs = now; // set BEFORE the async work so a burst of crashes in the same tick can't all slip through the gate
+    void sendCrashAlertEmail(kind, err, now).catch((e) => {
+      console.error("[fatal-guard] crash alert dispatch rejected unexpectedly:", e);
+    });
+  } catch (dispatchErr) {
+    console.error("[fatal-guard] crash alert dispatch failed:", dispatchErr);
+  }
+}
+
 export function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   if (registered) return;
@@ -39,10 +123,12 @@ export function register() {
   process.on("unhandledRejection", (reason) => {
     const err = reason instanceof Error ? reason : new Error(String(reason));
     console.error("[fatal-guard] unhandledRejection:", err.stack ?? err.message);
+    alertOnSurvivedCrash("unhandledRejection", err);
   });
 
   process.on("uncaughtException", (err) => {
     console.error("[fatal-guard] uncaughtException:", err.stack ?? err.message);
+    alertOnSurvivedCrash("uncaughtException", err);
   });
 
   console.log("[fatal-guard] process-level crash guards installed");
