@@ -160,8 +160,14 @@ export function ensureControlTables() {
     -- single pool of images is usable across EVERY site and tenant. Bytes are
     -- stored by the storage layer (data/cms-library/<storage_key>, R2-ready) and
     -- served publicly by /library-media/<id>. alt is auto-generated on upload.
+    -- tenant_id (Batch 2c, improvement-plan-2026-08.md Theme B2) stamps the
+    -- uploading tenant so the admin LIST can be scoped per-tenant; it's nullable
+    -- because rows created before this column existed have no recoverable owner
+    -- — those legacy rows stay visible to every tenant (see
+    -- listLibraryAssets()), only NEW uploads are isolated.
     CREATE TABLE IF NOT EXISTS cms_library_assets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id INTEGER REFERENCES tenants(id),
       storage_key TEXT NOT NULL,
       original_name TEXT NOT NULL,
       mime_type TEXT NOT NULL,
@@ -378,6 +384,35 @@ export function ensureControlTables() {
   } catch (err) {
     console.error(
       "[control] billing_invoices charge_started_at migration failed:",
+      err,
+    );
+  }
+
+  // Existing control DBs predate cms_library_assets.tenant_id (Batch 2c,
+  // improvement-plan-2026-08.md Theme B2 — the shared media library leaked
+  // every tenant's uploads to every other tenant's admin). The CREATE above
+  // only applies to fresh installs, so add the column once on older DBs
+  // (PRAGMA-guarded, mirroring the migrations above). The index is created
+  // unconditionally afterwards (IF NOT EXISTS): by that point the column
+  // exists on every DB, old (just migrated) or new (created inline above), so
+  // it's safe to run every boot — doing it here rather than in the CREATE-TABLE
+  // block above avoids a "no such column" failure on an old DB that hasn't run
+  // the ALTER yet when this whole function's first exec() runs.
+  try {
+    const cols = controlSqlite
+      .prepare("PRAGMA table_info(cms_library_assets)")
+      .all() as Array<{ name: string }>;
+    if (!cols.find((c) => c.name === "tenant_id")) {
+      controlSqlite.exec(
+        "ALTER TABLE cms_library_assets ADD COLUMN tenant_id INTEGER REFERENCES tenants(id)",
+      );
+    }
+    controlSqlite.exec(
+      "CREATE INDEX IF NOT EXISTS idx_cms_library_assets_tenant ON cms_library_assets(tenant_id)",
+    );
+  } catch (err) {
+    console.error(
+      "[control] cms_library_assets tenant_id migration failed:",
       err,
     );
   }

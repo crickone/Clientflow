@@ -14,6 +14,7 @@ import { putObject, deleteObject } from "@/lib/cms/storage";
 
 export interface LibraryAsset {
   id: number;
+  tenantId: number | null;
   storageKey: string;
   originalName: string;
   mimeType: string;
@@ -26,6 +27,7 @@ export interface LibraryAsset {
 
 type Row = {
   id: number;
+  tenant_id: number | null;
   storage_key: string;
   original_name: string;
   mime_type: string;
@@ -38,6 +40,7 @@ type Row = {
 
 const toAsset = (r: Row): LibraryAsset => ({
   id: r.id,
+  tenantId: r.tenant_id,
   storageKey: r.storage_key,
   originalName: r.original_name,
   mimeType: r.mime_type,
@@ -64,6 +67,14 @@ export interface AddLibraryInput {
   width?: number | null;
   height?: number | null;
   alt?: string | null;
+  /**
+   * The uploading tenant (Batch 2c, improvement-plan-2026-08.md Theme B2).
+   * Optional only so legacy/internal callers don't break at the type level;
+   * every real HTTP upload path must pass the caller's tenant id so the row
+   * isn't left NULL (NULL means "legacy, shared with everyone" — see
+   * listLibraryAssets()).
+   */
+  tenantId?: number | null;
 }
 
 export async function addLibraryAsset(
@@ -79,10 +90,11 @@ export async function addLibraryAsset(
   const info = controlSqlite
     .prepare(
       `INSERT INTO cms_library_assets
-         (storage_key, original_name, mime_type, size_bytes, width, height, alt)
-       VALUES (?,?,?,?,?,?,?)`,
+         (tenant_id, storage_key, original_name, mime_type, size_bytes, width, height, alt)
+       VALUES (?,?,?,?,?,?,?,?)`,
     )
     .run(
+      input.tenantId ?? null,
       storageKey,
       input.originalName,
       input.mimeType,
@@ -95,11 +107,22 @@ export async function addLibraryAsset(
   return getLibraryAsset(Number(info.lastInsertRowid))!;
 }
 
-export function listLibraryAssets(): LibraryAsset[] {
+/**
+ * The admin LIST, scoped to the calling tenant (Batch 2c, tenant isolation
+ * fix): a tenant sees its own uploads plus any legacy row with tenant_id IS
+ * NULL (pre-migration rows with no recoverable owner — kept visible to
+ * everyone rather than silently disappearing). It does NOT see another
+ * tenant's post-migration uploads.
+ */
+export function listLibraryAssets(tenantId: number): LibraryAsset[] {
   return (
     controlSqlite
-      .prepare("SELECT * FROM cms_library_assets ORDER BY created_at DESC")
-      .all() as Row[]
+      .prepare(
+        `SELECT * FROM cms_library_assets
+         WHERE tenant_id = ? OR tenant_id IS NULL
+         ORDER BY created_at DESC`,
+      )
+      .all(tenantId) as Row[]
   ).map(toAsset);
 }
 

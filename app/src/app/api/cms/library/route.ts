@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin, getCurrentMembership } from "@/lib/auth";
 import {
   addLibraryAsset,
   listLibraryAssets,
@@ -31,14 +31,25 @@ const toJson = (a: LibraryAsset) => ({
   height: a.height,
 });
 
-/** Shared media library — list every asset (usable across all sites). */
+/**
+ * Shared media library — list the caller's tenant's assets (usable across all
+ * of that tenant's sites), plus any legacy pre-tenant-scoping row. See
+ * listLibraryAssets() (Batch 2c, improvement-plan-2026-08.md Theme B2).
+ */
 export async function GET() {
   try {
     await requireAdmin();
   } catch {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 403 });
   }
-  return NextResponse.json({ ok: true, assets: listLibraryAssets().map(toJson) });
+  const membership = getCurrentMembership();
+  if (!membership) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 403 });
+  }
+  return NextResponse.json({
+    ok: true,
+    assets: listLibraryAssets(membership.tenant.id).map(toJson),
+  });
 }
 
 /** Upload one or more images; alt text is auto-generated from the image. */
@@ -48,6 +59,11 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 403 });
   }
+  const membership = getCurrentMembership();
+  if (!membership) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 403 });
+  }
+  const tenantId = membership.tenant.id;
 
   let form: FormData;
   try {
@@ -83,6 +99,7 @@ export async function POST(req: Request) {
       mimeType: mime || "application/octet-stream",
       bytes,
       alt,
+      tenantId,
     });
     created.push(toJson(asset));
   }
