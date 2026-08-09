@@ -5,7 +5,7 @@ import {
   getMonthlyUsageByAgent,
   getMonthlyUsageByModel,
   getMonthlyUsageCents,
-  MONTHLY_CAP_CENTS,
+  getTenantCapCents,
 } from "@/lib/ai/usage";
 import { AgentOrgChart } from "@/components/agents/AgentOrgChart";
 
@@ -20,6 +20,7 @@ export default async function AgentsPage() {
   const usageByAgent = getMonthlyUsageByAgent(tenantId);
   const usageByModel = getMonthlyUsageByModel(tenantId);
   const monthCents = getMonthlyUsageCents(tenantId);
+  const capCents = getTenantCapCents(tenantId);
 
   return (
     <div className="app-page">
@@ -32,7 +33,7 @@ export default async function AgentsPage() {
         agents={agents}
         usageByAgent={usageByAgent}
         usageByModel={usageByModel}
-        capCents={MONTHLY_CAP_CENTS}
+        capCents={capCents}
         monthCents={monthCents}
       />
     </div>

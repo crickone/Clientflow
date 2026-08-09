@@ -291,6 +291,93 @@ async function* sseLines(body: ReadableStream<Uint8Array>): AsyncGenerator<strin
 }
 
 /**
+ * C3 (Batch 3bc — .superpowers/sdd/batch3bc-brief.md, improvement-plan-2026-08.md
+ * Theme C3): the Anthropic SDK retries 408/409/429/5xx twice by default;
+ * OpenRouter-backed models (DeepSeek/Kimi/GPT-5/Gemini/Qwen) had NO retry at
+ * all — `streamTurn` threw immediately on any non-OK response, failing a
+ * whole agent turn on one transient blip. This is that same safety net,
+ * scoped ENTIRELY to this provider's own HTTP call: it doesn't touch the
+ * streaming contract (`ProviderTurnResult`) or `runAgentTurn` — the
+ * write-approval gate and the per-tenant cap upstream neither know nor care
+ * how this provider got its response.
+ *
+ * Retries up to 2 times (3 attempts total) on HTTP 429 or any 5xx, and on a
+ * network-level `fetch` failure (DNS/connection reset/etc.) — but NEVER on
+ * any other 4xx (400/401/403/404/...: not transient, retrying just repeats
+ * the same error) and NEVER once the caller's own `AbortSignal` has fired (a
+ * deliberate cancellation is not a blip to retry through). Backoff is
+ * exponential with full jitter (attempt 0: 0-300ms, attempt 1: 0-600ms)
+ * UNLESS the response carries a `Retry-After` header, which — being the
+ * server's own authoritative wait — is honoured instead of the computed
+ * backoff. On final failure this throws the EXACT SAME error shape
+ * `streamTurn` always has for an HTTP failure; a network failure rethrows
+ * whatever `fetch` itself threw (there was never an existing "shape" for
+ * that case to preserve).
+ */
+const MAX_ATTEMPTS = 3; // 1 initial call + 2 retries
+const BASE_DELAY_MS = 300;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** 429 or any 5xx is treated as transient; every OTHER 4xx is not. */
+function isRetryableStatus(status: number): boolean {
+  return status === 429 || status >= 500;
+}
+
+/** RFC 7231 Retry-After: either delta-seconds or an HTTP-date. Null when absent/unparseable — the caller falls back to its own backoff. */
+function retryAfterMs(headers: Headers): number | null {
+  const raw = headers.get("retry-after");
+  if (!raw) return null;
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+  const dateMs = Date.parse(raw);
+  return Number.isNaN(dateMs) ? null : Math.max(0, dateMs - Date.now());
+}
+
+/** Exponential backoff with full jitter: attempt 0 -> 0-300ms, attempt 1 -> 0-600ms, ... */
+function backoffMs(attempt: number): number {
+  return Math.random() * BASE_DELAY_MS * 2 ** attempt;
+}
+
+/**
+ * POSTs to OpenRouter with up to `MAX_ATTEMPTS` tries — see the retry policy
+ * doc comment above. Not exported: `streamTurn` below is the only caller;
+ * openrouter.test.ts exercises the policy through `OpenRouterProvider` itself
+ * (injecting a fake `globalThis.fetch`), the same black-box way every other
+ * provider-level behaviour in this file is tested.
+ */
+async function fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    if (init.signal?.aborted) throw new DOMException("The operation was aborted.", "AbortError");
+
+    const lastAttempt = attempt === MAX_ATTEMPTS - 1;
+    let res: Response;
+    try {
+      res = await fetch(url, init);
+    } catch (err) {
+      if (lastAttempt || init.signal?.aborted) throw err;
+      await sleep(backoffMs(attempt));
+      continue;
+    }
+
+    if (res.ok) return res;
+    if (lastAttempt || !isRetryableStatus(res.status)) {
+      const detail = await res.text().catch(() => "");
+      throw new Error(`OpenRouter request failed (${res.status} ${res.statusText})${detail ? `: ${detail}` : ""}`);
+    }
+    // Discarding this response (we're about to retry past it) — release its
+    // unread body rather than leave it for GC to eventually close.
+    await res.body?.cancel().catch(() => {});
+    await sleep(retryAfterMs(res.headers) ?? backoffMs(attempt));
+  }
+  // Unreachable: every loop iteration above either returns or throws by the
+  // time `attempt` reaches `MAX_ATTEMPTS - 1`. Keeps TypeScript satisfied.
+  throw new Error("OpenRouter request failed after retries");
+}
+
+/**
  * Routes non-Anthropic models through OpenRouter's OpenAI-compatible API.
  * Stateless — identical reasoning to AnthropicProvider (see ./index.ts): all
  * per-call state lives in `StreamTurnArgs`, never on the instance — so one
@@ -309,7 +396,7 @@ export class OpenRouterProvider implements ModelProvider {
     const slug = model.startsWith("openrouter:") ? model.slice("openrouter:".length) : model;
     const openAITools = toOpenAITools(tools);
 
-    const res = await fetch(OPENROUTER_URL, {
+    const res = await fetchWithRetry(OPENROUTER_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -333,9 +420,12 @@ export class OpenRouterProvider implements ModelProvider {
       signal,
     });
 
-    if (!res.ok || !res.body) {
-      const detail = await res.text().catch(() => "");
-      throw new Error(`OpenRouter request failed (${res.status} ${res.statusText})${detail ? `: ${detail}` : ""}`);
+    // fetchWithRetry only ever resolves with an `ok` response (anything else
+    // throws inside it, after the retry policy above has run its course) — an
+    // ok response with no body at all is still theoretically possible, so
+    // this guard stays as the original code's last line of defense.
+    if (!res.body) {
+      throw new Error(`OpenRouter request failed (${res.status} ${res.statusText}): empty response body`);
     }
 
     return parseOpenRouterStream(sseLines(res.body), onText);

@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { type NextRequest } from "next/server";
 
 import { requireUser, getCurrentMembership } from "@/lib/auth";
+import { rateLimit } from "@/lib/rateLimit";
 import { TOOLS, type ToolArtifact } from "@/lib/assistant/tools";
 import { AiCapError } from "@/lib/ai/usage";
 import { runWithTenant } from "@/lib/db/tenant";
@@ -56,6 +57,20 @@ export async function POST(
   if (!membership) return new Response("No active account", { status: 401 });
   const tenantId = membership.tenant.id;
   const userId = me.id;
+
+  // C4b (burst ceiling — improvement-plan-2026-08.md Theme C4/C4b): the
+  // monthly €/tenant cap (assertUnderCap, inside runAgentTurn below) is the
+  // MONEY ceiling; this bounds how fast one signed-in user can fire requests
+  // at it. Keyed by user (not tenant) so one chatty teammate can't starve a
+  // colleague signed into the same account. 20/min is generous — normal chat
+  // pace never gets close.
+  const rl = rateLimit(`agent-chat:${userId}`, 20, 60_000);
+  if (!rl.ok) {
+    return new Response("Too many requests — please slow down and try again shortly.", {
+      status: 429,
+      headers: { "Retry-After": String(rl.retryAfterSec) },
+    });
+  }
 
   // Gate: only an agent that is BOTH marked "active" in the registry AND has
   // a SPECIALISTS entry (its tool slice + playbook) is reachable here.

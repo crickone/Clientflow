@@ -9,6 +9,10 @@ import {
   assertUnderCap,
   AiCapError,
   MONTHLY_CAP_CENTS,
+  getTenantCapCents,
+  setTenantCapCents,
+  MIN_CAP_CENTS,
+  MAX_CAP_CENTS,
 } from "./usage";
 import { MODELS } from "./client";
 
@@ -100,5 +104,56 @@ import { MODELS } from "./client";
     console.log("ai/usage.test.ts: all assertions passed");
   } finally {
     cleanup();
+  }
+
+  // ── Batch 3bc (C4): per-tenant cap override ──
+  // Own scratch tenant (separate from the one above) so this block's cap
+  // manipulation can't interact with the default-cap assertions already
+  // proven against `tid`.
+  controlSqlite.prepare("DELETE FROM tenants WHERE slug = 'aiusage-cap-test'").run();
+  const t2 = controlSqlite
+    .prepare(
+      "INSERT INTO tenants (slug, name, db_file, is_active) VALUES ('aiusage-cap-test','AI Cap Test','tenants/aiusage-cap-test/void.db',1) RETURNING id",
+    )
+    .get() as { id: number };
+  const tid2 = t2.id;
+  const cleanup2 = () => {
+    controlSqlite.prepare("DELETE FROM ai_usage WHERE tenant_id = ?").run(tid2);
+    controlSqlite.prepare("DELETE FROM tenant_ai_cap WHERE tenant_id = ?").run(tid2);
+    controlSqlite.prepare("DELETE FROM tenants WHERE id = ?").run(tid2);
+  };
+
+  try {
+    // Unset -> assertUnderCap falls back to the DEFAULT MONTHLY_CAP_CENTS.
+    assert.equal(getTenantCapCents(tid2), MONTHLY_CAP_CENTS, "no tenant_ai_cap row -> reads the default");
+
+    // Same math the top-of-file test already proved: 1,000,000 sonnet output
+    // tokens -> ~1500c — comfortably under the $25 default, nowhere near it.
+    recordUsage(tid2, "sales", MODELS.sonnet, { inputTokens: 0, outputTokens: 1_000_000 });
+    const spend = getMonthlyUsageCents(tid2);
+    assert.ok(spend > 0 && spend < MONTHLY_CAP_CENTS, `expected spend under the ${MONTHLY_CAP_CENTS}c default, got ${spend}`);
+    assert.doesNotThrow(() => assertUnderCap(tid2), "spend under the DEFAULT cap doesn't throw");
+
+    // Configuring a cap BELOW that spend trips it — even though the tenant is
+    // nowhere near the $25 default. This is the whole point of C4: the cap is
+    // no longer one hardcoded number for every tenant.
+    setTenantCapCents(tid2, MIN_CAP_CENTS); // €1 — comfortably below ~$15 of spend
+    assert.equal(getTenantCapCents(tid2), MIN_CAP_CENTS, "configured cap is read back verbatim");
+    assert.throws(() => assertUnderCap(tid2), AiCapError, "spend over the CONFIGURED (low) cap throws");
+
+    // Raising the cap back above spend clears the trip — proves assertUnderCap
+    // re-reads the live configured value every call, not a cached snapshot.
+    setTenantCapCents(tid2, MONTHLY_CAP_CENTS);
+    assert.doesNotThrow(() => assertUnderCap(tid2), "raising the cap again un-trips it");
+
+    // setTenantCapCents validates bounds itself — the SAME guarantee for
+    // every caller (admin action, script, test), not just the UI layer.
+    assert.throws(() => setTenantCapCents(tid2, 0), "0 rejected — below MIN_CAP_CENTS");
+    assert.throws(() => setTenantCapCents(tid2, MAX_CAP_CENTS + 1), "above MAX_CAP_CENTS rejected");
+    assert.throws(() => setTenantCapCents(tid2, 150.5), "non-integer cents rejected");
+
+    console.log("ai/usage.test.ts: per-tenant cap assertions passed");
+  } finally {
+    cleanup2();
   }
 })();

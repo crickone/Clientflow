@@ -17,6 +17,7 @@ import { Reveal } from "@/components/motion/Reveal";
 import { formatEur } from "@/lib/utils";
 import type { Agent } from "@/lib/db/schema";
 import { modelLabel } from "@/lib/ai/modelCatalog";
+import { CapEditor } from "./CapEditor";
 
 interface Props {
   agents: Agent[];
@@ -91,6 +92,7 @@ export function AgentOrgChart({ agents, usageByAgent, usageByModel, capCents, mo
                 / {formatEur(capCents / 100)} cap
               </span>
             </div>
+            <CapEditor capCents={capCents} />
           </div>
           <div style={{ flex: "1 1 240px", maxWidth: 380 }}>
             <UsageMeter valueCents={monthCents} capCents={capCents} />

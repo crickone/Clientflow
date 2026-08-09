@@ -1,6 +1,7 @@
 import { type NextRequest } from "next/server";
 
 import { requireUser, getCurrentMembership } from "@/lib/auth";
+import { rateLimit } from "@/lib/rateLimit";
 import { executeTool, isWriteTool, type ToolArtifact } from "@/lib/assistant/tools";
 import { runWithTenant } from "@/lib/db/tenant";
 
@@ -21,6 +22,18 @@ export async function POST(req: NextRequest) {
   if (!membership) return new Response("No active account", { status: 401 });
   const tenantId = membership.tenant.id;
   const userId = me.id;
+
+  // C4b (burst ceiling — improvement-plan-2026-08.md Theme C4/C4b): see the
+  // identical comment in /api/agents/[key]/chat — same reasoning, its own
+  // bucket (per-user, per-route). Writes only run after an explicit operator
+  // Approve click, so normal use is a handful of these per minute at most.
+  const rl = rateLimit(`assistant-execute:${userId}`, 20, 60_000);
+  if (!rl.ok) {
+    return Response.json(
+      { ok: false, error: "Too many requests — please slow down and try again shortly." },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
+    );
+  }
 
   const body = (await req.json().catch(() => ({}))) as { actions?: Action[] };
   const actions = Array.isArray(body.actions) ? body.actions.slice(0, 20) : [];

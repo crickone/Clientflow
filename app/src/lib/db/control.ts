@@ -348,6 +348,18 @@ export function ensureControlTables() {
       created_at    INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
     CREATE INDEX IF NOT EXISTS idx_ai_usage_tenant_month ON ai_usage(tenant_id, yyyymm);
+
+    -- Per-tenant override of the monthly AI spend cap (Batch 3bc,
+    -- improvement-plan-2026-08.md Theme C4). Deliberately sparse: a tenant
+    -- that has never customized its cap has NO row here at all and falls
+    -- back to the DEFAULT MONTHLY_CAP_CENTS — see getTenantCapCents /
+    -- assertUnderCap in @/lib/ai/usage.ts. PK lookup keeps the hot-path read
+    -- (every AI call goes through assertUnderCap) a single indexed row fetch.
+    CREATE TABLE IF NOT EXISTS tenant_ai_cap (
+      tenant_id  INTEGER PRIMARY KEY REFERENCES tenants(id) ON DELETE CASCADE,
+      cap_cents  INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
   `);
 
   // Existing control DBs predate auth_sessions.active_tenant_id; the CREATE above

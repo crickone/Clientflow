@@ -8,7 +8,7 @@ import { AGENT_CATALOG, getAgent } from "@/lib/agents/registry";
 import { SAFETY_RAILS } from "@/lib/agents/context";
 import { SPECIALISTS } from "@/lib/agents/specialists";
 import { getBusinessContext } from "@/lib/ai/businessContext";
-import { getMonthlyUsageByAgent, MONTHLY_CAP_CENTS } from "@/lib/ai/usage";
+import { getMonthlyUsageByAgent, getTenantCapCents } from "@/lib/ai/usage";
 import { AgentDetail } from "@/components/agents/AgentDetail";
 
 export const dynamic = "force-dynamic";
@@ -50,6 +50,7 @@ export default async function AgentDetailPage({ params }: { params: { key: strin
   };
 
   const usageCents = getMonthlyUsageByAgent(tenantId)[key] ?? 0;
+  const capCents = getTenantCapCents(tenantId);
 
   // Computed here (server component — process.env is safe to read) and
   // passed down as a plain boolean prop: AgentDetail is "use client" and
@@ -88,7 +89,7 @@ export default async function AgentDetailPage({ params }: { params: { key: strin
         layers={layers}
         toolNames={spec?.toolNames ?? []}
         usageCents={usageCents}
-        capCents={MONTHLY_CAP_CENTS}
+        capCents={capCents}
         tenantId={tenantId}
         openRouterConfigured={openRouterConfigured}
       />

@@ -304,5 +304,123 @@ async function* toAsyncIterable<T>(items: T[]): AsyncGenerator<T> {
     }
   }
 
+  // ════════════════════════════════════════════════════════════════════
+  // C3 (Batch 3bc — .superpowers/sdd/batch3bc-brief.md): streamTurn's retry
+  // policy. Exercised black-box, through the real `OpenRouterProvider`, by
+  // temporarily replacing the global `fetch` — there's no dependency
+  // injection seam here (deliberately: streamTurn calls the ambient `fetch`
+  // exactly like the rest of the app does), so this is the same technique
+  // the file's OPENROUTER_API_KEY tests already use for `process.env`
+  // (save the original, restore it in `finally`). Every response below sets
+  // `Retry-After: 0` so a "retry" test never actually waits out a real
+  // backoff — the policy is exercised, the test just isn't slow.
+  // ════════════════════════════════════════════════════════════════════
+
+  const minimalArgs = {
+    model: "openrouter:x/y",
+    system: "s",
+    tools: [],
+    messages: [{ role: "user" as const, content: "hi" }],
+    maxTokens: 100,
+  };
+
+  // 429 (with Retry-After: 0) then 200 -> succeeds after exactly one retry.
+  {
+    const originalKey = process.env.OPENROUTER_API_KEY;
+    const originalFetch = globalThis.fetch;
+    try {
+      process.env.OPENROUTER_API_KEY = "test-openrouter-key";
+      let calls = 0;
+      globalThis.fetch = (async () => {
+        calls++;
+        if (calls === 1) {
+          return new Response("rate limited", {
+            status: 429,
+            statusText: "Too Many Requests",
+            headers: { "Retry-After": "0" },
+          });
+        }
+        const sse = [`data: ${JSON.stringify({ choices: [{ delta: { content: "hi" }, finish_reason: "stop" }] })}`, "data: [DONE]"].join(
+          "\n",
+        );
+        return new Response(sse, { status: 200 });
+      }) as typeof fetch;
+
+      const result = await new OpenRouterProvider().streamTurn(minimalArgs);
+
+      assert.equal(calls, 2, "429 then 200 -> exactly 2 fetch attempts (1 retry)");
+      assert.equal(result.text, "hi", "the successful retry's stream is parsed normally");
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalKey === undefined) delete process.env.OPENROUTER_API_KEY;
+      else process.env.OPENROUTER_API_KEY = originalKey;
+    }
+  }
+
+  // A 400 is NOT retried — it throws immediately, after exactly one attempt,
+  // with the same error shape streamTurn has always thrown for an HTTP failure.
+  {
+    const originalKey = process.env.OPENROUTER_API_KEY;
+    const originalFetch = globalThis.fetch;
+    try {
+      process.env.OPENROUTER_API_KEY = "test-openrouter-key";
+      let calls = 0;
+      globalThis.fetch = (async () => {
+        calls++;
+        return new Response("bad request detail", { status: 400, statusText: "Bad Request" });
+      }) as typeof fetch;
+
+      await assert.rejects(
+        new OpenRouterProvider().streamTurn(minimalArgs),
+        (err: unknown) => {
+          assert.ok(err instanceof Error);
+          assert.match(err.message, /400/, "error message includes the status code");
+          assert.match(err.message, /bad request detail/, "error message includes the response body detail");
+          return true;
+        },
+        "a 400 rejects with the formatted error",
+      );
+      assert.equal(calls, 1, "400 is not retryable -> exactly one fetch attempt");
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalKey === undefined) delete process.env.OPENROUTER_API_KEY;
+      else process.env.OPENROUTER_API_KEY = originalKey;
+    }
+  }
+
+  // A persistent 5xx exhausts all retries (3 attempts total: 1 initial + 2
+  // retries) and THEN throws — never retries forever.
+  {
+    const originalKey = process.env.OPENROUTER_API_KEY;
+    const originalFetch = globalThis.fetch;
+    try {
+      process.env.OPENROUTER_API_KEY = "test-openrouter-key";
+      let calls = 0;
+      globalThis.fetch = (async () => {
+        calls++;
+        return new Response("server exploded", {
+          status: 500,
+          statusText: "Internal Server Error",
+          headers: { "Retry-After": "0" },
+        });
+      }) as typeof fetch;
+
+      await assert.rejects(
+        new OpenRouterProvider().streamTurn(minimalArgs),
+        (err: unknown) => {
+          assert.ok(err instanceof Error);
+          assert.match(err.message, /500/, "error message includes the status code");
+          return true;
+        },
+        "exhausted retries reject with the formatted error",
+      );
+      assert.equal(calls, 3, "3 total attempts (1 initial + 2 retries) before giving up");
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalKey === undefined) delete process.env.OPENROUTER_API_KEY;
+      else process.env.OPENROUTER_API_KEY = originalKey;
+    }
+  }
+
   console.log("ai/providers/openrouter.test.ts: all assertions passed");
 })();

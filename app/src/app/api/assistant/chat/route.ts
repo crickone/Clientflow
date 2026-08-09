@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { type NextRequest } from "next/server";
 
 import { requireUser, getCurrentMembership } from "@/lib/auth";
+import { rateLimit } from "@/lib/rateLimit";
 import { buildAssistantSystem } from "@/lib/assistant/system";
 import { executeTool, isWriteTool, summarizeToolAction, conciergeToolSlice } from "@/lib/assistant/tools";
 import { getAnthropic, MODELS } from "@/lib/ai/client";
@@ -21,6 +22,18 @@ export async function POST(req: NextRequest) {
   if (!membership) return new Response("No active account", { status: 401 });
   const tenantId = membership.tenant.id;
   const userId = me.id;
+
+  // C4b (burst ceiling — improvement-plan-2026-08.md Theme C4/C4b): see the
+  // identical comment in /api/agents/[key]/chat — same reasoning, its own
+  // bucket (per-user, per-route) so the two chat surfaces don't share a
+  // budget.
+  const rl = rateLimit(`assistant-chat:${userId}`, 20, 60_000);
+  if (!rl.ok) {
+    return new Response("Too many requests — please slow down and try again shortly.", {
+      status: 429,
+      headers: { "Retry-After": String(rl.retryAfterSec) },
+    });
+  }
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return new Response("AI is not configured (missing ANTHROPIC_API_KEY).", { status: 503 });

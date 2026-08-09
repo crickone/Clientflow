@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireAdmin, getCurrentMembership } from "@/lib/auth";
 import { AGENT_CATALOG, updateAgentInstructions, updateAgentModel } from "@/lib/agents/registry";
+import { setTenantCapCents } from "@/lib/ai/usage";
 
 /**
  * Admin-gated server actions for the Agent detail page (/agents/[key]).
@@ -44,4 +45,20 @@ export async function saveModel(key: string, model: string): Promise<void> {
   // normal use this never throws.
   updateAgentModel(tenantId, key, model);
   revalidatePath(`/agents/${key}`);
+}
+
+/**
+ * Batch 3bc (C4): the one admin control for the per-tenant monthly AI spend
+ * cap — the agent pages' usage copy has long promised "raise the cap in
+ * Settings" with nothing actually behind it (see AiCapError in
+ * @/lib/ai/usage). `eur` is whatever the CapEditor's number input holds;
+ * `setTenantCapCents` does the real bounds validation (€1-€1000, whole cents)
+ * and its thrown error is left to propagate to the client's catch, same
+ * pattern as `saveModel` above letting "Unsupported model" propagate.
+ */
+export async function saveCapEur(eur: number): Promise<void> {
+  await requireAdmin();
+  const tenantId = getCurrentMembership()!.tenant.id;
+  setTenantCapCents(tenantId, Math.round(eur * 100));
+  revalidatePath("/agents");
 }
