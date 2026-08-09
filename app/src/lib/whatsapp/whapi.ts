@@ -1,5 +1,7 @@
 import "server-only";
 
+import { timingSafeEqual } from "node:crypto";
+
 import { normalizePhone } from "./phone";
 import type {
   ConnectionStatus,
@@ -138,7 +140,16 @@ export class WhapiBridge implements WhatsAppBridge {
 
   verifyWebhook(providedSecret: string | null): boolean {
     if (!this.webhookSecret) return false; // fail closed if unconfigured
-    return providedSecret != null && providedSecret === this.webhookSecret;
+    if (providedSecret == null) return false;
+    // Constant-time compare (mirrors the cron routes' secretMatches): a naive
+    // `===` short-circuits on the first mismatched byte, letting a remote
+    // attacker time their way to the webhook secret. Length is checked first
+    // (timingSafeEqual throws on a length mismatch rather than returning
+    // false), so an unequal-length guess never throws and always reports false.
+    const a = Buffer.from(providedSecret);
+    const b = Buffer.from(this.webhookSecret);
+    if (a.length !== b.length) return false;
+    return timingSafeEqual(a, b);
   }
 }
 

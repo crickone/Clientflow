@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import { and, eq, gt, isNull } from "drizzle-orm";
 
 import { authDb } from "@/lib/db/control";
-import { memberships, userInvites, users } from "@/lib/db/schema";
+import { authSessions, memberships, userInvites, users } from "@/lib/db/schema";
 import { getTenantById } from "@/lib/db/tenant";
 import { hashPassword } from "@/lib/auth";
 import { getAppBaseUrl } from "@/lib/appUrl";
@@ -163,6 +163,11 @@ export function acceptInvite(
       .set({ acceptedAt: new Date() })
       .where(eq(userInvites.id, inv.id))
       .run();
+    // This is a token-bearer flow (unauthenticated), not a cookie session, so
+    // there's no "current session" to spare — an invite can also be a re-invite
+    // for an existing identity (e.g. re-activated staff), so revoke any
+    // sessions that predate this password being set.
+    tx.delete(authSessions).where(eq(authSessions.userId, inv.userId!)).run();
   });
   return { ok: true };
 }

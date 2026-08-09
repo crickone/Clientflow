@@ -3,15 +3,9 @@ import { and, gte, lte, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { formatDate, formatEur } from "@/lib/utils";
 import { guard } from "@/lib/api/guard";
+import { csvEscape } from "@/lib/csv";
 
 export const dynamic = "force-dynamic";
-
-function csvEscape(v: string | number | null | undefined): string {
-  if (v == null) return "";
-  const s = String(v);
-  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
-}
 
 function rows(headers: string[], data: (string | number | null)[][]) {
   const lines = [headers.map(csvEscape).join(",")];

@@ -4,16 +4,29 @@ import crypto from "node:crypto";
 
 /**
  * AES-256-GCM encryption for OAuth tokens at rest. The key is derived (scrypt)
- * from a server secret — EMAIL_TOKEN_SECRET if set, otherwise GOOGLE_CLIENT_SECRET
- * (always present when Gmail is configured). Format: base64(salt|iv|tag|ciphertext).
+ * from a server secret — EMAIL_TOKEN_SECRET if set, otherwise (non-production
+ * only) GOOGLE_CLIENT_SECRET or a hardcoded dev fallback. Format:
+ * base64(salt|iv|tag|ciphertext).
  */
 
 function deriveKey(salt: Buffer): Buffer {
-  const secret =
-    process.env.EMAIL_TOKEN_SECRET ||
-    process.env.GOOGLE_CLIENT_SECRET ||
-    "clientflow-dev-only-secret";
-  return crypto.scryptSync(secret, salt, 32);
+  const secret = process.env.EMAIL_TOKEN_SECRET;
+  if (secret) return crypto.scryptSync(secret, salt, 32);
+
+  // Fail closed in production: silently keying off GOOGLE_CLIENT_SECRET means
+  // a routine OAuth-secret rotation would rotate the token-encryption key too
+  // and permanently break decryption of every tenant's already-stored tokens;
+  // falling back further to a hardcoded constant would make the encryption
+  // meaningless. Both are only acceptable for local dev, never prod.
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "EMAIL_TOKEN_SECRET is not set. Refusing to derive the OAuth token " +
+        "encryption key from GOOGLE_CLIENT_SECRET or a dev constant in " +
+        "production — set EMAIL_TOKEN_SECRET.",
+    );
+  }
+  const devSecret = process.env.GOOGLE_CLIENT_SECRET || "clientflow-dev-only-secret";
+  return crypto.scryptSync(devSecret, salt, 32);
 }
 
 export function encryptToken(plain: string): string {

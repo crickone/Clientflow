@@ -133,6 +133,19 @@ export function getLibraryAsset(id: number): LibraryAsset | null {
   return r ? toAsset(r) : null;
 }
 
+/**
+ * Whether `tenantId` may mutate/delete `asset` — the same "own rows + shared
+ * legacy rows" rule as listLibraryAssets() (Batch 2c) applied to a single
+ * asset, for the id-scoped PATCH/DELETE routes (the gap flagged in the Batch
+ * 2c report: the list was tenant-scoped but edit/delete-by-id weren't). A
+ * NULL tenant_id is a pre-migration row with no recoverable owner, so — like
+ * the list — it stays editable by everyone rather than becoming stuck forever.
+ * Only a row explicitly owned by ANOTHER tenant is blocked.
+ */
+export function canManageLibraryAsset(asset: LibraryAsset, tenantId: number): boolean {
+  return asset.tenantId === null || asset.tenantId === tenantId;
+}
+
 export function updateLibraryAlt(id: number, alt: string): void {
   controlSqlite
     .prepare("UPDATE cms_library_assets SET alt=? WHERE id=?")

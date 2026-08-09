@@ -8,10 +8,19 @@
 //   2. listLibraryAssets(tenantId) returns that tenant's own rows plus any
 //      legacy row (tenant_id IS NULL — pre-migration, no recoverable owner),
 //      but NOT another tenant's rows.
+//
+// Batch 2d (tenant-check library asset PATCH/DELETE — the gap flagged as a
+// follow-up in the Batch 2c report): the LIST was tenant-scoped but the
+// id-scoped PATCH/DELETE routes (api/cms/library/[id]/route.ts) had NO tenant
+// check at all. Those routes call getCurrentMembership()/cookies(), which
+// can't run outside a real request under this plain-tsx test runner, so this
+// file instead covers canManageLibraryAsset() — the extracted helper the
+// routes gate on — using the same scratch rows as the list test above.
 import assert from "node:assert/strict";
 import { controlSqlite } from "../db/control";
 import {
   addLibraryAsset,
+  canManageLibraryAsset,
   deleteLibraryAsset,
   getLibraryAsset,
   listLibraryAssets,
@@ -122,6 +131,38 @@ import {
     assert.ok(listB.includes(legacy.id), "tenant B ALSO sees the legacy (tenant_id NULL) row");
     assert.ok(listB.includes(noTenant.id), "tenant B ALSO sees the NULL-tenant upload");
     assert.ok(!listB.includes(uploaded.id), "tenant B does NOT see tenant A's upload");
+
+    // ── canManageLibraryAsset: the ownership rule behind the id-scoped
+    // PATCH/DELETE routes' tenant check (Batch 2d) ──
+    const uploadedAsset = getLibraryAsset(uploaded.id)!;
+    const legacyAsset = getLibraryAsset(legacy.id)!;
+    const bOwnedAsset = getLibraryAsset(bOwned.id)!;
+    assert.equal(
+      canManageLibraryAsset(uploadedAsset, tenantA),
+      true,
+      "A can manage its own upload",
+    );
+    assert.equal(
+      canManageLibraryAsset(uploadedAsset, tenantB),
+      false,
+      "B canNOT manage A's upload — cross-tenant PATCH/DELETE must be rejected",
+    );
+    assert.equal(canManageLibraryAsset(bOwnedAsset, tenantB), true, "B can manage its own asset");
+    assert.equal(
+      canManageLibraryAsset(bOwnedAsset, tenantA),
+      false,
+      "A canNOT manage B's asset — cross-tenant PATCH/DELETE must be rejected",
+    );
+    assert.equal(
+      canManageLibraryAsset(legacyAsset, tenantA),
+      true,
+      "a legacy (tenant_id NULL) row is manageable by tenant A too — shared, not orphaned",
+    );
+    assert.equal(
+      canManageLibraryAsset(legacyAsset, tenantB),
+      true,
+      "a legacy (tenant_id NULL) row is manageable by tenant B too — shared, not orphaned",
+    );
 
     console.log("cms/library.test.ts: all assertions passed");
   } finally {

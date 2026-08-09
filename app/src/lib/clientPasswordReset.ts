@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import { and, eq, isNull, lt } from "drizzle-orm";
 
 import { authDb } from "@/lib/db/control";
-import { clientCredentials, clientPasswordResets } from "@/lib/db/schema";
+import { clientCredentials, clientPasswordResets, clientSessions } from "@/lib/db/schema";
 import { hashPassword } from "@/lib/auth";
 import { getAppBaseUrl } from "@/lib/appUrl";
 import {
@@ -134,6 +134,15 @@ export function completeClientReset(token: string, newPassword: string): ResetRe
       .update(clientPasswordResets)
       .set({ usedAt: new Date() })
       .where(eq(clientPasswordResets.id, row.id))
+      .run();
+    // Revoke every existing app session for this credential. This flow is
+    // token-bearer-authenticated, not cookie-authenticated, so there's no
+    // "current session" to preserve — a password reset/first-set should log
+    // out any other device using the old (or, for an invite, a not-yet-known)
+    // password.
+    tx
+      .delete(clientSessions)
+      .where(eq(clientSessions.credentialId, row.credentialId))
       .run();
   });
   return { ok: true };
