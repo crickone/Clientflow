@@ -8,8 +8,18 @@ const nextConfig = {
   async headers() {
     // Conservative, high-value headers applied everywhere. SAMEORIGIN (not DENY)
     // keeps our own iframes working (client-app preview, Studio preview);
-    // nosniff stops MIME-confusion on served uploads. No global CSP — the public
-    // CMS sites render first-party HTML/GSAP that a strict CSP would break.
+    // nosniff stops MIME-confusion on served uploads.
+    //
+    // CSP (Batch 2b): a DELIBERATELY PARTIAL policy — only the directives that
+    // are safe for BOTH the admin app (3k+ inline styles, Next's inline
+    // bootstrap scripts, Framer Motion) AND the public CMS sites (first-party
+    // GSAP/Lenis). object-src 'none' kills flash/embed XSS; base-uri 'self'
+    // blocks <base> injection; frame-ancestors 'self' is the modern clickjacking
+    // guard (mirrors X-Frame-Options). We intentionally do NOT set script-src /
+    // style-src here: a real script-src CSP needs nonce-based inline handling
+    // (would otherwise break Next's inline scripts + the inline styles + GSAP) —
+    // that's a separate, larger follow-up gated on reducing inline usage (F5).
+    const csp = "object-src 'none'; base-uri 'self'; frame-ancestors 'self'";
     return [
       {
         source: "/:path*",
@@ -18,6 +28,11 @@ const nextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "X-DNS-Prefetch-Control", value: "off" },
+          // HSTS: force HTTPS for 1y incl. subdomains (app + custom client
+          // domains are HTTPS-only on Railway). No `preload` — that's a registry
+          // commitment we don't want to make implicitly.
+          { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+          { key: "Content-Security-Policy", value: csp },
         ],
       },
     ];
