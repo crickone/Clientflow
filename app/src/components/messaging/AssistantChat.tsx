@@ -16,7 +16,24 @@ type ChatMessage = {
   artifacts: Artifact[];
   pending?: Pending | null;
 };
-type Conversation = { id: string; title: string; messages: ChatMessage[]; updatedAt: number };
+type Conversation = {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  updatedAt: number;
+  /**
+   * DR2 (.superpowers/sdd/durableruns-design.md): the id of this
+   * conversation's in-flight specialist run, if any — captured from the
+   * leading `{type:"run", runId}` SSE frame (DR1) and cleared once that run
+   * reaches a terminal state (`done`/`error`). Persists with the conversation
+   * in localStorage via the existing persist effect, so a reload/navigate
+   * knows which run (if any) to resume by polling
+   * `GET /api/agents/run/[id]`. The Communication endpoint
+   * (`/api/assistant/chat`) never emits a `run` frame, so this stays
+   * `undefined` for any conversation created there — resume is a no-op.
+   */
+  activeRunId?: string;
+};
 
 function newId(): string {
   try {
@@ -36,6 +53,23 @@ function ago(ts: number): string {
   const d = Math.floor(h / 24);
   if (d < 7) return `${d}d ago`;
   return new Date(ts).toLocaleDateString();
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * DR2: merge a resumed run's server-known artifacts into a message's list
+ * without duplicating ones already attached from a live `artifact` SSE event
+ * before the disconnect (matched by url — the same field the live path keys
+ * download links on).
+ */
+function mergeArtifacts(existing: Artifact[], incoming: Artifact[]): Artifact[] {
+  if (!incoming.length) return existing;
+  const seen = new Set(existing.map((a) => a.url));
+  const additions = incoming.filter((a) => a && a.url && !seen.has(a.url));
+  return additions.length ? [...existing, ...additions] : existing;
 }
 
 const SUGGESTIONS = [
@@ -89,6 +123,17 @@ const TOOL_LABEL: Record<string, string> = {
 
 const DEFAULT_ENDPOINT = "/api/assistant/chat";
 
+// DR2 (.superpowers/sdd/durableruns-design.md) resume-on-reload tuning. DR1
+// made the specialist chat route (/api/agents/[key]/chat) persist an
+// in-flight run and survive a client disconnect; these constants control how
+// this component polls `GET /api/agents/run/[id]` to pick a run back up
+// after a refresh/navigate. The Communication endpoint (DEFAULT_ENDPOINT)
+// never emits the `run` frame this depends on, so none of it ever engages
+// for that assistant — see the `activeRunId` doc comment on `Conversation`.
+const RESUME_POLL_MS = 1500;
+const RESUME_MAX_MS = 2 * 60 * 1000; // belt-and-suspenders vs. the server's own ~3min stale guard
+const RESUME_ERROR_RECHECK_MS = 5000; // one more look before trusting a stale-guard "error"
+
 export function AssistantChat({
   tenantId,
   height,
@@ -138,6 +183,16 @@ export function AssistantChat({
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastUserRef = useRef<HTMLDivElement | null>(null);
   const scrollPending = useRef(false);
+  // DR2 resume-on-reload: which conversation (if any) is currently being
+  // polled back to life. Deliberately separate from `busy` — which still
+  // gates the live-stream input exactly as before — so the input stays
+  // usable while an old run resumes in the background; see resumeRun()'s
+  // cancellation guard for what happens if the user sends a new message into
+  // the conversation being resumed. `resumeAttempted` ensures the mount
+  // effect below only ever starts (at most) one resume per component mount.
+  const [resumingConvId, setResumingConvId] = useState<string | null>(null);
+  const resumeAttempted = useRef(false);
+  const resumeCancelRef = useRef<Record<string, boolean>>({});
 
   const active = conversations.find((c) => c.id === activeId) ?? null;
   const messages = active?.messages ?? [];
@@ -175,6 +230,145 @@ export function AssistantChat({
     }
   }, [conversations, activeId, loaded, storeKey]);
 
+  /**
+   * DR2: pick a run back up after a refresh/navigate. `convId`/`runId` come
+   * from the conversation's persisted `activeRunId` (see the mount effect
+   * below) — polls `GET /api/agents/run/[id]` (tenant-scoped, membership
+   * guarded server-side) until the run reaches a terminal state, growing the
+   * last assistant message's text on every tick exactly like the brief
+   * describes. Mirrors send()'s own `patch`/`patchConv` helpers but is a
+   * free function (not a send() closure) since it can start independently of
+   * any live send() call, keyed off an explicit `convId` parameter instead.
+   */
+  async function resumeRun(convId: string, runId: string) {
+    // A new turn already started in this conversation before this resume got
+    // a chance to run (e.g. the user typed and hit send within the same
+    // instant the mount effect fired) — the run we'd be resuming is now
+    // stale; send()'s own `run` frame has already taken over `activeRunId`.
+    if (resumeCancelRef.current[convId]) return;
+    setResumingConvId(convId);
+
+    const patchLast = (fn: (m: ChatMessage) => ChatMessage) =>
+      setConversations((prev) =>
+        prev.map((c) => {
+          if (c.id !== convId || c.messages.length === 0) return c;
+          const msgs = [...c.messages];
+          msgs[msgs.length - 1] = fn(msgs[msgs.length - 1]);
+          return { ...c, messages: msgs, updatedAt: Date.now() };
+        }),
+      );
+    const clearRunId = () =>
+      setConversations((prev) => prev.map((c) => (c.id === convId ? { ...c, activeRunId: undefined } : c)));
+
+    type RunPayload = {
+      status?: string;
+      text?: string;
+      pending?: PendingAction[];
+      artifacts?: Artifact[];
+      error?: string | null;
+    };
+
+    const startedAt = Date.now();
+    let staleErrorSeen = false;
+    try {
+      for (;;) {
+        if (resumeCancelRef.current[convId]) break; // user sent a new message into this conversation
+        if (Date.now() - startedAt > RESUME_MAX_MS) break; // belt-and-suspenders — a future reload can try again
+
+        let data: RunPayload | null = null;
+        let notFound = false;
+        try {
+          const res = await fetch(`/api/agents/run/${runId}`);
+          if (res.status === 404) notFound = true;
+          else if (res.ok) data = await res.json().catch(() => null);
+        } catch {
+          /* transient network blip — retry next tick */
+        }
+
+        if (notFound) {
+          // Run pruned/unknown: nothing to show beyond what's already saved.
+          clearRunId();
+          break;
+        }
+        if (!data || !data.status) {
+          await sleep(RESUME_POLL_MS);
+          continue;
+        }
+
+        if (typeof data.text === "string") {
+          const text = data.text;
+          patchLast((m) => ({ ...m, content: text }));
+        }
+
+        if (data.status === "done") {
+          patchLast((m) => ({ ...m, steps: m.steps.map((s) => ({ ...s, done: true })) }));
+          clearRunId();
+          break;
+        }
+
+        if (data.status === "awaiting_approval") {
+          const actions = data.pending ?? [];
+          const arts = data.artifacts ?? [];
+          // Same `pending` shape a live `confirm` frame builds — the Approve
+          // card this renders POSTs to /api/assistant/execute exactly like
+          // the live path (approve() below doesn't know or care whether the
+          // run that proposed it was live or resumed).
+          patchLast((m) => ({
+            ...m,
+            steps: m.steps.map((s) => ({ ...s, done: true })),
+            pending: actions.length ? { actions, status: "awaiting" } : m.pending,
+            artifacts: mergeArtifacts(m.artifacts, arts),
+          }));
+          clearRunId();
+          break;
+        }
+
+        if (data.status === "error") {
+          // DR1 review note: a genuinely slow single step (>3min, no interim
+          // text) can trip the server's stale guard while the run is still
+          // actually finishing. Give it one more look before surfacing the
+          // error, in case the real result lands in the meantime.
+          if (!staleErrorSeen) {
+            staleErrorSeen = true;
+            await sleep(RESUME_ERROR_RECHECK_MS);
+            continue;
+          }
+          const arts = data.artifacts ?? [];
+          const errText = data.error ?? "Assistant error";
+          patchLast((m) => ({
+            ...m,
+            content: m.content + `\n\n_Error: ${errText}_`,
+            artifacts: mergeArtifacts(m.artifacts, arts),
+          }));
+          clearRunId();
+          break;
+        }
+
+        // status === "running" (or anything else unexpected) — keep polling.
+        staleErrorSeen = false;
+        await sleep(RESUME_POLL_MS);
+      }
+    } finally {
+      setResumingConvId((cur) => (cur === convId ? null : cur));
+    }
+  }
+
+  // DR2: after the initial conversations-load effect restores `conversations`
+  // + `activeId` from localStorage, resume whichever run (if any) was
+  // in-flight for the active conversation when the page last went away. Runs
+  // at most once per mount (`resumeAttempted` ref guard) — the effect itself
+  // may re-fire as `conversations` changes during any later live stream, but
+  // those re-entries are no-ops. For the Communication assistant
+  // (`/api/assistant/chat`), `activeRunId` is never set on any conversation
+  // (that route never emits a `run` frame), so `conv?.activeRunId` is always
+  // falsy there and this cleanly does nothing.
+  useEffect(() => {
+    if (!loaded || resumeAttempted.current) return;
+    resumeAttempted.current = true;
+    const conv = conversations.find((c) => c.id === activeId);
+    if (conv?.activeRunId) void resumeRun(conv.id, conv.activeRunId);
+  }, [loaded, activeId, conversations]);
+
   // After sending, bring the user's question to the TOP of the view so the reply
   // streams in below it and reads from the start (instead of pinning to bottom).
   useLayoutEffect(() => {
@@ -194,6 +388,10 @@ export function AssistantChat({
     if (!q || busy || !activeId) return;
     setInput("");
     const convId = activeId; // pin updates to THIS chat, even if the user switches
+    // DR2: a fresh turn supersedes any resume still polling for this same
+    // conversation (e.g. the user chose not to wait) — stop it so it can't
+    // later clobber the new turn's message with stale/unrelated run data.
+    resumeCancelRef.current[convId] = true;
     const history = messages.map((m) => ({ role: m.role, content: m.content }));
     const nextUser: ChatMessage = { role: "user", content: q, steps: [], artifacts: [] };
     const assistant: ChatMessage = { role: "assistant", content: "", steps: [], artifacts: [], pending: null };
@@ -221,12 +419,23 @@ export function AssistantChat({
           return { ...c, messages: msgs, updatedAt: Date.now() };
         }),
       );
+    // DR2: conversation-level patch (vs. `patch`'s last-message patch), used
+    // to set/clear `activeRunId` as the `run`/`done`/`error` frames arrive.
+    const patchConv = (fn: (c: Conversation) => Conversation) =>
+      setConversations((prev) => prev.map((c) => (c.id === convId ? fn(c) : c)));
 
     try {
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: [...history, { role: "user", content: q }] }),
+        // DR1/DR2 (.superpowers/sdd/durableruns-design.md): a stable
+        // conversationId lets the specialist route (/api/agents/[key]/chat)
+        // group this turn's durable run under the same conversation DR2's
+        // resume flow keys off of. The Communication route
+        // (/api/assistant/chat) doesn't read this field at all — an unread
+        // extra body field is harmless there, so sending it unconditionally
+        // for both endpoints is safe.
+        body: JSON.stringify({ messages: [...history, { role: "user", content: q }], conversationId: convId }),
       });
       if (!res.ok || !res.body) {
         patch((m) => ({ ...m, content: `Sorry — the assistant is unavailable (${res.status}).` }));
@@ -244,13 +453,20 @@ export function AssistantChat({
           const raw = buf.slice(0, idx).replace(/^data: /, "");
           buf = buf.slice(idx + 2);
           if (!raw) continue;
-          let evt: { type: string; text?: string; name?: string; error?: string; actions?: PendingAction[] } & Partial<Artifact>;
+          let evt: { type: string; text?: string; name?: string; error?: string; actions?: PendingAction[]; runId?: string } & Partial<Artifact>;
           try {
             evt = JSON.parse(raw);
           } catch {
             continue;
           }
-          if (evt.type === "confirm" && evt.actions?.length) {
+          if (evt.type === "run" && evt.runId) {
+            // DR1's leading frame: capture + persist this turn's run id on
+            // the conversation so a reload/navigate can resume it (DR2). The
+            // live render below is completely unaffected by this — it's
+            // purely bookkeeping for a future reconnect.
+            const runId = evt.runId;
+            patchConv((c) => ({ ...c, activeRunId: runId }));
+          } else if (evt.type === "confirm" && evt.actions?.length) {
             // The assistant proposed one or more WRITE actions. Nothing has run —
             // show an Approve/Cancel card; execution happens only on approve.
             const actions = evt.actions;
@@ -278,8 +494,15 @@ export function AssistantChat({
             patch((m) => ({ ...m, artifacts: [...m.artifacts, art] }));
           } else if (evt.type === "error") {
             patch((m) => ({ ...m, content: m.content + `\n\n_Error: ${evt.error}_` }));
+            // DR2: the turn ended (in error) — nothing left to resume.
+            patchConv((c) => ({ ...c, activeRunId: undefined }));
           } else if (evt.type === "done") {
             patch((m) => ({ ...m, steps: m.steps.map((s) => ({ ...s, done: true })) }));
+            // DR2: the turn ended normally — nothing left to resume. (Also
+            // reached, harmlessly, right after the `error` branch above on
+            // the AiCapError path, which sends both — clearing twice is a
+            // no-op.)
+            patchConv((c) => ({ ...c, activeRunId: undefined }));
           }
         }
       }
@@ -500,7 +723,16 @@ export function AssistantChat({
             <div key={i} ref={i === lastUserIdx ? lastUserRef : undefined}>
               <MessageBubble
                 m={m}
-                streaming={busy && i === messages.length - 1}
+                // DR2: while `resumingConvId` is null (no resume in flight —
+                // the overwhelming common case, and the ONLY case for the
+                // Communication assistant) this is exactly the original
+                // `busy && i === messages.length - 1`, so the live-connected
+                // path renders byte-for-byte as before. It only additionally
+                // lights up for the last message while a reconnect poll is
+                // actively resuming THIS conversation, giving it the same
+                // "still working" affordance (thinking dots / caret) as a
+                // live stream.
+                streaming={(busy || resumingConvId === activeId) && i === messages.length - 1}
                 onApprove={() => m.pending && approve(activeId, i, m.pending.actions)}
                 onCancel={() => cancelPending(activeId, i)}
               />
