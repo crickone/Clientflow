@@ -724,7 +724,7 @@ function RichText({ text }: { text: string }) {
           const level = h[1].length;
           const size = level === 1 ? 16 : level === 2 ? 14 : 13;
           return (
-            <div key={i} style={{ fontFamily: "var(--font-heading), sans-serif", fontWeight: 700, fontSize: size, color: "var(--text-primary)", marginTop: i === 0 ? 0 : 12, marginBottom: 2 }}>
+            <div key={i} style={{ fontWeight: 700, fontSize: size, color: "var(--text-primary)", marginTop: i === 0 ? 0 : 12, marginBottom: 2 }}>
               {inline(h[2], `h${i}`)}
             </div>
           );

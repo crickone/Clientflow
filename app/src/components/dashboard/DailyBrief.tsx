@@ -4,10 +4,7 @@ import { useEffect, useState } from "react";
 import { Sparkles, RefreshCw } from "lucide-react";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-function todayKey(): string {
-  const d = new Date();
-  return `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`;
-}
+const BRIEF_TTL_MS = 10 * 60 * 1000; // 10 minutes
 function heading(): string {
   const d = new Date();
   const h = d.getHours();
@@ -26,8 +23,8 @@ export function DailyBrief({ tenantId }: { tenantId: number }) {
       try {
         const raw = sessionStorage.getItem(storeKey);
         if (raw) {
-          const parsed = JSON.parse(raw) as { day: string; brief: string };
-          if (parsed.day === todayKey()) {
+          const parsed = JSON.parse(raw) as { ts: number; brief: string };
+          if (Date.now() - parsed.ts < BRIEF_TTL_MS) {
             setBrief(parsed.brief);
             setLoading(false);
             return;
@@ -43,7 +40,7 @@ export function DailyBrief({ tenantId }: { tenantId: number }) {
       const b = data.brief ?? "";
       setBrief(b);
       try {
-        sessionStorage.setItem(storeKey, JSON.stringify({ day: todayKey(), brief: b }));
+        sessionStorage.setItem(storeKey, JSON.stringify({ ts: Date.now(), brief: b }));
       } catch {
         /* ignore */
       }

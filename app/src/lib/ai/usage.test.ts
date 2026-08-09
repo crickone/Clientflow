@@ -5,6 +5,7 @@ import {
   recordUsage,
   getMonthlyUsageCents,
   getMonthlyUsageByAgent,
+  getMonthlyUsageByModel,
   assertUnderCap,
   AiCapError,
   MONTHLY_CAP_CENTS,
@@ -68,6 +69,30 @@ import { MODELS } from "./client";
       Math.abs(byAgent2.assistant - 100) < 0.01,
       `expected assistant bucket ~100c, got ${byAgent2.assistant}`,
     );
+
+    // per-model breakdown: the two 'sales' calls (both sonnet) collapse into
+    // one model bucket, the 'assistant'/haiku call is its own — grouped by
+    // model instead of agent_key, over the SAME rows. It must reconcile to
+    // the tenant total (no double-count) and sort by cents desc.
+    const byModel = getMonthlyUsageByModel(tid);
+    const totalNow = getMonthlyUsageCents(tid);
+    assert.equal(byModel.length, 2, "two distinct models seeded (sonnet, haiku)");
+    const sonnetRow = byModel.find((r) => r.model === MODELS.sonnet);
+    const haikuRow = byModel.find((r) => r.model === MODELS.haiku);
+    assert.ok(
+      sonnetRow && Math.abs(sonnetRow.cents - afterSecond) < 0.01,
+      `expected sonnet bucket ~${afterSecond}c, got ${sonnetRow?.cents}`,
+    );
+    assert.ok(
+      haikuRow && Math.abs(haikuRow.cents - 100) < 0.01,
+      `expected haiku bucket ~100c, got ${haikuRow?.cents}`,
+    );
+    const sumByModel = byModel.reduce((s, r) => s + r.cents, 0);
+    assert.ok(
+      Math.abs(sumByModel - totalNow) < 0.01,
+      `by-model sum (${sumByModel}) must equal the tenant total (${totalNow}) — no double-count`,
+    );
+    assert.ok(byModel[0].cents >= byModel[1].cents, "sorted by cents desc");
 
     // yyyymm buckets are independent: an unrelated historical month has no spend
     assert.equal(getMonthlyUsageCents(tid, "2020-01"), 0);

@@ -4,6 +4,7 @@ import { requireUser, getCurrentMembership } from "@/lib/auth";
 import { getBusinessProfile } from "@/lib/businessProfile";
 import { getGymDashboard, getNeedsAttention } from "@/lib/dashboard";
 import { getSchedulingMode } from "@/lib/settings";
+import { isGmailConnected, syncGmailInbox } from "@/lib/gmail";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -15,6 +16,21 @@ export async function GET() {
   if (!membership) return Response.json({ brief: "" });
   if (!process.env.ANTHROPIC_API_KEY) {
     return Response.json({ brief: "" });
+  }
+
+  // Pull in any new mail before summarising so getNeedsAttention() reflects
+  // the current inbox, not whatever was last synced. This route runs
+  // synchronously inside a single request (cookies() is live throughout), so
+  // the ambient `db` proxy that syncGmailInbox writes through already
+  // resolves to this same tenant via the session cookie — no runWithTenant
+  // needed. Best-effort + bounded: never let a Gmail hiccup break the brief,
+  // and no-op cleanly when Gmail isn't connected.
+  try {
+    if (isGmailConnected(membership.tenant.id)) {
+      await syncGmailInbox(membership.tenant.id, { days: 7, max: 15 });
+    }
+  } catch (err) {
+    console.error("[assistant/brief] gmail sync failed:", err);
   }
 
   const business = getBusinessProfile().businessName;

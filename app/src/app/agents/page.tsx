@@ -3,6 +3,7 @@ import { requireAdminPage, getCurrentMembership } from "@/lib/auth";
 import { listAgents } from "@/lib/agents/registry";
 import {
   getMonthlyUsageByAgent,
+  getMonthlyUsageByModel,
   getMonthlyUsageCents,
   MONTHLY_CAP_CENTS,
 } from "@/lib/ai/usage";
@@ -17,6 +18,7 @@ export default async function AgentsPage() {
 
   const agents = listAgents(tenantId);
   const usageByAgent = getMonthlyUsageByAgent(tenantId);
+  const usageByModel = getMonthlyUsageByModel(tenantId);
   const monthCents = getMonthlyUsageCents(tenantId);
 
   return (
@@ -29,6 +31,7 @@ export default async function AgentsPage() {
       <AgentOrgChart
         agents={agents}
         usageByAgent={usageByAgent}
+        usageByModel={usageByModel}
         capCents={MONTHLY_CAP_CENTS}
         monthCents={monthCents}
       />

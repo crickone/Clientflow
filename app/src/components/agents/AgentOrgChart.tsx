@@ -21,6 +21,7 @@ import { modelLabel } from "@/lib/ai/modelCatalog";
 interface Props {
   agents: Agent[];
   usageByAgent: Record<string, number>;
+  usageByModel: { model: string; cents: number }[];
   capCents: number;
   monthCents: number;
 }
@@ -52,7 +53,7 @@ const ICON: Record<string, typeof Bot> = {
  * nodes below it in a responsive grid, connected by SVG lines so the whole
  * thing reads as a hierarchy rather than a list or table.
  */
-export function AgentOrgChart({ agents, usageByAgent, capCents, monthCents }: Props) {
+export function AgentOrgChart({ agents, usageByAgent, usageByModel, capCents, monthCents }: Props) {
   const orchestrator = agents.find((a) => a.key === "orchestrator");
   const specialists = agents.filter((a) => a.key !== "orchestrator");
 
@@ -69,7 +70,7 @@ export function AgentOrgChart({ agents, usageByAgent, capCents, monthCents }: Pr
           }}
         >
           <div>
-            <CardLabel style={{ marginBottom: 8 }}>Tenant AI usage — this month</CardLabel>
+            <CardLabel style={{ marginBottom: 8 }}>All AI usage — this month</CardLabel>
             <div
               style={{
                 fontFamily: "var(--font-heading), sans-serif",
@@ -95,6 +96,50 @@ export function AgentOrgChart({ agents, usageByAgent, capCents, monthCents }: Pr
             <UsageMeter valueCents={monthCents} capCents={capCents} />
           </div>
         </div>
+
+        {usageByModel.length > 0 && (
+          <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--hairline)" }}>
+            <div
+              style={{
+                fontFamily: "var(--font-mono), ui-monospace, monospace",
+                fontSize: 10.5,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                color: "var(--text-tertiary)",
+                marginBottom: 10,
+              }}
+            >
+              By model
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {usageByModel.map((row) => {
+                const pct = monthCents > 0 ? Math.min(100, (row.cents / monthCents) * 100) : 0;
+                return (
+                  <div key={row.model}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: 12,
+                        fontSize: 12.5,
+                        color: "var(--text-secondary)",
+                        marginBottom: 4,
+                      }}
+                    >
+                      <span>{modelLabel(row.model)}</span>
+                      <span style={{ fontFamily: "var(--font-mono), ui-monospace, monospace", color: "var(--text-tertiary)" }}>
+                        {formatEur(row.cents / 100)}
+                      </span>
+                    </div>
+                    <div style={{ height: 3, borderRadius: 999, background: "var(--surface-2)", overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${pct}%`, borderRadius: 999, background: "var(--accent)" }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </Card>
 
       <div className="agent-orgchart">

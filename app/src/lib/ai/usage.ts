@@ -76,6 +76,23 @@ export function getMonthlyUsageByAgent(
   return Object.fromEntries(rows.map((r) => [r.agent_key, r.c]));
 }
 
+/**
+ * Same total, broken down by model — an operator-facing spend breakdown that
+ * reconciles to `getMonthlyUsageCents` (same rows as `getMonthlyUsageByAgent`,
+ * just grouped by `model` instead of `agent_key`). Sorted by cents desc.
+ */
+export function getMonthlyUsageByModel(
+  tenantId: number,
+  yyyymm = currentMonth(),
+): { model: string; cents: number }[] {
+  const rows = controlSqlite
+    .prepare(
+      "SELECT model, COALESCE(SUM(cost_cents),0) c FROM ai_usage WHERE tenant_id = ? AND yyyymm = ? GROUP BY model ORDER BY c DESC",
+    )
+    .all(tenantId, yyyymm) as { model: string; c: number }[];
+  return rows.map((r) => ({ model: r.model, cents: r.c }));
+}
+
 /** Throws AiCapError when the tenant is at/over its monthly AI spend cap. */
 export function assertUnderCap(tenantId: number): void {
   if (getMonthlyUsageCents(tenantId) >= MONTHLY_CAP_CENTS) throw new AiCapError();

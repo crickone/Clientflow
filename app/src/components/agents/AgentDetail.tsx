@@ -267,7 +267,7 @@ function UsageCard({ usageCents, capCents }: { usageCents: number; capCents: num
     <Card>
       <CardLabel>
         <Gauge size={11} style={{ display: "inline", verticalAlign: -1, marginRight: 6 }} />
-        Usage this month
+        This agent — this month
       </CardLabel>
       <div
         role="progressbar"
