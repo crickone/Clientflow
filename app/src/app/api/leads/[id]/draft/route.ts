@@ -1,7 +1,9 @@
 import { guard } from "@/lib/api/guard";
 import { NextResponse } from "next/server";
+import { getCurrentMembership } from "@/lib/auth";
 import { addMessage, getLead, getLeadMessages } from "@/lib/leads";
 import { draftFollowup } from "@/lib/ai/draftFollowup";
+import { AiCapError } from "@/lib/ai/usage";
 import { logActivity } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +14,10 @@ export async function POST(
 ) {
   const __auth = await guard("user");
   if (__auth) return __auth;
+  const membership = getCurrentMembership();
+  if (!membership) {
+    return NextResponse.json({ ok: false, error: "No active account" }, { status: 401 });
+  }
   const id = Number(params.id);
   const lead = getLead(id);
   if (!lead) {
@@ -24,8 +30,13 @@ export async function POST(
 
   let draft;
   try {
-    draft = await draftFollowup({ lead, history });
+    draft = await draftFollowup({ lead, history, tenantId: membership.tenant.id });
   } catch (err) {
+    // AiCapError (tenant over its monthly AI spend cap) surfaces as a clean
+    // 429, not a 500 — matches the assistant chat route's cap handling.
+    if (err instanceof AiCapError) {
+      return NextResponse.json({ ok: false, error: err.message }, { status: 429 });
+    }
     const message =
       err instanceof Error ? err.message : "AI drafting failed.";
     return NextResponse.json({ ok: false, error: message }, { status: 500 });

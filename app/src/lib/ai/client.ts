@@ -15,14 +15,6 @@ export const PRICING: Record<string, { inCents: number; outCents: number }> = {
   [MODELS.haiku]: { inCents: 100, outCents: 500 },
   [MODELS.sonnet]: { inCents: 300, outCents: 1500 },
   [MODELS.opus]: { inCents: 500, outCents: 2500 },
-  // Not a selectable gym-facing tier (see MODELS above) — this is the model
-  // @/lib/ai/draftBlog.ts and @/lib/ai/generateCarousel.ts call directly via
-  // their OWN Anthropic client, bypassing getAnthropic(). Priced identically
-  // to claude-opus-4-8 so the Marketing tools' tool-boundary metering
-  // (tools.marketing.ts, recordUsage(..., "claude-opus-4-7", usage)) prices
-  // it accurately instead of falling back to the sonnet default in
-  // estCostCents.
-  "claude-opus-4-7": { inCents: 500, outCents: 2500 },
   // OpenRouter DeepSeek V4 Flash (dated snapshot "0731" — matches the catalog
   // id in @/lib/ai/modelCatalog's MODEL_CATALOG; pinned rather than the
   // "-latest" alias so this price can't silently drift if OpenRouter

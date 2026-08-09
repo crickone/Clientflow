@@ -246,7 +246,13 @@ export async function draftLeadReplyTool(ctx: ToolContext, input: Record<string,
     .all();
 
   try {
-    const draft = await draftFollowup({ lead, history });
+    // draftFollowup meters itself (assertUnderCap + recordUsage, agentKey
+    // "followup") — see @/lib/ai/draftFollowup.ts (Batch 3a). A capped
+    // tenant's AiCapError is caught below like any other error: its own
+    // message becomes this READ tool's {error} result, which the agent can
+    // relay to the operator in its next turn — the same clean, non-crashing
+    // surface every other error from this tool already gets.
+    const draft = await draftFollowup({ lead, history, tenantId: ctx.tenantId });
     return {
       text: JSON.stringify({
         result: "Draft prepared — this has NOT been sent. Share it with the user and get approval before calling send_whatsapp.",

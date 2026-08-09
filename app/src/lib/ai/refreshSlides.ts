@@ -1,6 +1,8 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { getBusinessContext } from "@/lib/ai/businessContext";
+import { MODELS } from "@/lib/ai/client";
+import { assertUnderCap, recordUsage } from "@/lib/ai/usage";
 
 // Slide-refresh task + format rules. Business identity, services, and voice come
 // from getBusinessContext() (venue-aware) and are prepended at call time.
@@ -54,6 +56,8 @@ export interface RefreshInput {
   designName?: string | null;
   /** Optional tone override */
   tone?: string | null;
+  /** The real current tenant — required so the €25/month AI cap is checked and metered against the right gym. */
+  tenantId: number;
 }
 
 export interface RefreshedSlide {
@@ -141,6 +145,9 @@ function extractPayload(
 export async function refreshCaptionOnly(
   input: RefreshInput,
 ): Promise<{ caption: string; usage: RefreshResult["usage"] }> {
+  // Checked first — see the matching comment on refreshSlidesContent below.
+  assertUnderCap(input.tenantId);
+
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error("ANTHROPIC_API_KEY is not set.");
   }
@@ -169,7 +176,7 @@ export async function refreshCaptionOnly(
   );
 
   const message = await client.messages.create({
-    model: "claude-opus-4-7",
+    model: MODELS.opus,
     max_tokens: 1024,
     thinking: { type: "adaptive" },
     system: [
@@ -188,6 +195,13 @@ export async function refreshCaptionOnly(
     .join("\n")
     .trim();
 
+  recordUsage(input.tenantId, "carousel", MODELS.opus, {
+    inputTokens: message.usage.input_tokens,
+    outputTokens: message.usage.output_tokens,
+    cacheReadTokens: message.usage.cache_read_input_tokens ?? 0,
+    cacheCreateTokens: message.usage.cache_creation_input_tokens ?? 0,
+  });
+
   return {
     caption,
     usage: {
@@ -202,6 +216,11 @@ export async function refreshCaptionOnly(
 export async function refreshSlidesContent(
   input: RefreshInput,
 ): Promise<RefreshResult> {
+  // Checked first (before the API-key/input-shape guards below) so a capped
+  // tenant never burns a token and the cap trips deterministically regardless
+  // of environment/input state.
+  assertUnderCap(input.tenantId);
+
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error(
       "ANTHROPIC_API_KEY is not set. Add it to .env.local in the app/ folder.",
@@ -217,7 +236,7 @@ export async function refreshSlidesContent(
   const client = new Anthropic();
 
   const message = await client.messages.create({
-    model: "claude-opus-4-7",
+    model: MODELS.opus,
     max_tokens: 4096,
     thinking: { type: "adaptive" },
     system: [
@@ -241,6 +260,13 @@ export async function refreshSlidesContent(
     .join("\n");
 
   const { slides, caption } = extractPayload(text, input.slides.length);
+
+  recordUsage(input.tenantId, "carousel", MODELS.opus, {
+    inputTokens: message.usage.input_tokens,
+    outputTokens: message.usage.output_tokens,
+    cacheReadTokens: message.usage.cache_read_input_tokens ?? 0,
+    cacheCreateTokens: message.usage.cache_creation_input_tokens ?? 0,
+  });
 
   return {
     slides,

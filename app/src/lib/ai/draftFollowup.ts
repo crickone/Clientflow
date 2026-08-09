@@ -2,6 +2,8 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import type { Lead, LeadMessage } from "@/lib/db/schema";
 import { getBusinessContext } from "@/lib/ai/businessContext";
+import { MODELS } from "@/lib/ai/client";
+import { assertUnderCap, recordUsage } from "@/lib/ai/usage";
 
 /**
  * Follow-up writing rules. The business identity, services and voice/marketing
@@ -36,6 +38,8 @@ function buildSystemPrompt(): string {
 export interface DraftInput {
   lead: Lead;
   history: LeadMessage[];
+  /** The real current tenant — required so the €25/month AI cap is checked and metered against the right gym. */
+  tenantId: number;
 }
 
 export interface DraftResult {
@@ -92,7 +96,13 @@ function buildUserPrompt(lead: Lead, history: LeadMessage[]): string {
 export async function draftFollowup({
   lead,
   history,
+  tenantId,
 }: DraftInput): Promise<DraftResult> {
+  // Checked first (before the API-key guard below) so a capped tenant never
+  // burns a token even in a misconfigured environment, and so the cap trips
+  // deterministically regardless of whether ANTHROPIC_API_KEY happens to be set.
+  assertUnderCap(tenantId);
+
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error(
       "ANTHROPIC_API_KEY is not set. Add it to .env.local in the app/ folder.",
@@ -102,7 +112,7 @@ export async function draftFollowup({
   const client = new Anthropic();
 
   const message = await client.messages.create({
-    model: "claude-opus-4-7",
+    model: MODELS.opus,
     max_tokens: 512,
     thinking: { type: "adaptive" },
     system: [
@@ -125,6 +135,13 @@ export async function draftFollowup({
     .map((b) => b.text)
     .join("\n")
     .trim();
+
+  recordUsage(tenantId, "followup", MODELS.opus, {
+    inputTokens: message.usage.input_tokens,
+    outputTokens: message.usage.output_tokens,
+    cacheReadTokens: message.usage.cache_read_input_tokens ?? 0,
+    cacheCreateTokens: message.usage.cache_creation_input_tokens ?? 0,
+  });
 
   return {
     text,

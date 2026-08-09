@@ -191,14 +191,26 @@ async function runTriageBound(
   args: RunTriageArgs,
 ): Promise<RunTriageOutcome> {
   const { ownerType, ownerId, messageId, messageText, channel } = args;
+  // Available because runTriage always calls this via runWithTenant(tenantId, ...)
+  // — see runTriage below. Threaded into triageMessage so its cap-check/metering
+  // is against the right gym, never a default.
+  const tenantId = getCurrentTenant().id;
   const ctx = gatherContext(ownerType, ownerId, messageId);
 
+  // NOTE on AiCapError: triageMessage's assertUnderCap is deliberately left to
+  // propagate from here — same reference pattern as runAgentTurn.ts. Both of
+  // this function's callers already handle it correctly for their context:
+  // the WhatsApp webhook's fire-and-forget `runTriage(...).catch(...)` (auto
+  // triage on inbound mail — background, never crashes, already logs) and the
+  // "re-run AI" server action's try/catch (interactive — surfaces
+  // AiCapError's own friendly message to the operator, not a 500/crash).
   const triage = await triageMessage({
     messageText,
     channel,
     isExistingClient: ctx.isExistingClient,
     senderName: ctx.senderName,
     history: ctx.history,
+    tenantId,
   });
 
   const decision = decideAutoReply(

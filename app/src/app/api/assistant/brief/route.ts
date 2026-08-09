@@ -1,10 +1,10 @@
-import Anthropic from "@anthropic-ai/sdk";
-
 import { requireUser, getCurrentMembership } from "@/lib/auth";
 import { getBusinessProfile } from "@/lib/businessProfile";
 import { getGymDashboard, getNeedsAttention } from "@/lib/dashboard";
 import { getSchedulingMode } from "@/lib/settings";
 import { isGmailConnected, syncGmailInbox } from "@/lib/gmail";
+import { getAnthropic, MODELS } from "@/lib/ai/client";
+import { assertUnderCap, recordUsage, AiCapError } from "@/lib/ai/usage";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -14,8 +14,25 @@ export async function GET() {
   await requireUser();
   const membership = getCurrentMembership();
   if (!membership) return Response.json({ brief: "" });
+  const tenantId = membership.tenant.id;
   if (!process.env.ANTHROPIC_API_KEY) {
     return Response.json({ brief: "" });
+  }
+
+  // Checked before doing any of the (best-effort) Gmail sync / dashboard
+  // aggregation work below — this route runs on every dashboard load, so a
+  // capped tenant must fail fast and cleanly rather than paying for all that
+  // work only to then also fail the model call. DailyBrief.tsx renders
+  // `data.brief` verbatim as the widget's content regardless of HTTP status
+  // (it never checks res.ok), so returning AiCapError's own friendly message
+  // here IS the clean, non-500 surface — no frontend change needed.
+  try {
+    assertUnderCap(tenantId);
+  } catch (e) {
+    if (e instanceof AiCapError) {
+      return Response.json({ brief: e.message }, { status: 429 });
+    }
+    throw e;
   }
 
   // Pull in any new mail before summarising so getNeedsAttention() reflects
@@ -52,9 +69,9 @@ export async function GET() {
   };
 
   try {
-    const anthropic = new Anthropic();
+    const anthropic = getAnthropic();
     const res = await anthropic.messages.create({
-      model: "claude-opus-4-8",
+      model: MODELS.opus,
       max_tokens: 500,
       system: `You write a short, friendly MORNING BRIEF for the owner of ${business}, a ${mode === "timetable" ? "gym/studio" : "clinic"}, shown at the top of their dashboard.
 - 3 to 5 short bullet points, Irish English.
@@ -65,6 +82,12 @@ export async function GET() {
       messages: [{ role: "user", content: `Today's live data:\n${JSON.stringify(data, null, 2)}` }],
     });
     const brief = res.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim();
+    recordUsage(tenantId, "brief", MODELS.opus, {
+      inputTokens: res.usage.input_tokens,
+      outputTokens: res.usage.output_tokens,
+      cacheReadTokens: res.usage.cache_read_input_tokens ?? 0,
+      cacheCreateTokens: res.usage.cache_creation_input_tokens ?? 0,
+    });
     return Response.json({ brief });
   } catch {
     return Response.json({ brief: "" });

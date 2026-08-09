@@ -1,10 +1,12 @@
 import { guard } from "@/lib/api/guard";
 import { NextResponse } from "next/server";
+import { getCurrentMembership } from "@/lib/auth";
 import { getCarousel, updateSlide } from "@/lib/image/carousels";
 import {
   refreshCaptionOnly,
   refreshSlidesContent,
 } from "@/lib/ai/refreshSlides";
+import { AiCapError } from "@/lib/ai/usage";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -15,6 +17,11 @@ export async function POST(
 ) {
   const __auth = await guard("user");
   if (__auth) return __auth;
+  const membership = getCurrentMembership();
+  if (!membership) {
+    return NextResponse.json({ ok: false, error: "No active account" }, { status: 401 });
+  }
+  const tenantId = membership.tenant.id;
   const carouselId = Number(params.id);
   const carousel = getCarousel(carouselId);
   if (!carousel) {
@@ -66,6 +73,7 @@ export async function POST(
         })),
         designName: carousel.name,
         tone,
+        tenantId,
       });
       updateSlide(slotSlides[0].id, { caption: result.caption });
       return NextResponse.json({
@@ -74,6 +82,11 @@ export async function POST(
         usage: result.usage,
       });
     } catch (err) {
+      // AiCapError (tenant over its monthly AI spend cap) surfaces as a clean
+      // 429, not a 500 — matches the assistant chat route's cap handling.
+      if (err instanceof AiCapError) {
+        return NextResponse.json({ ok: false, error: err.message }, { status: 429 });
+      }
       const message =
         err instanceof Error ? err.message : "Caption refresh failed.";
       console.error("[carousel-refresh-caption] error:", err);
@@ -91,8 +104,12 @@ export async function POST(
       })),
       designName: carousel.name,
       tone,
+      tenantId,
     });
   } catch (err) {
+    if (err instanceof AiCapError) {
+      return NextResponse.json({ ok: false, error: err.message }, { status: 429 });
+    }
     const message =
       err instanceof Error ? err.message : "Refresh failed.";
     console.error("[carousel-refresh] error:", err);

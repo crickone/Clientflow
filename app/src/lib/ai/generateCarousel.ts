@@ -1,6 +1,7 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { getBusinessContext } from "@/lib/ai/businessContext";
+import { MODELS } from "@/lib/ai/client";
 
 // Carousel-specific task + format rules. Business identity, services, and voice
 // come from getBusinessContext() (venue-aware) and are prepended at call time.
@@ -231,7 +232,7 @@ export async function generateCarouselSlides(
   const systemPrompt = `${getBusinessContext()}\n\n${CAROUSEL_FORMAT_RULES}`;
 
   const message = await client.messages.create({
-    model: "claude-opus-4-7",
+    model: MODELS.opus,
     max_tokens: 4096,
     thinking: { type: "adaptive" },
     system: [

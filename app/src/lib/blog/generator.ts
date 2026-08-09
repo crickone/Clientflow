@@ -6,6 +6,8 @@ import { eq } from "drizzle-orm";
 import { draftBlogPost, type BlogDraftInput } from "@/lib/ai/draftBlog";
 import { getBlogPost, updateBlogContent } from "@/lib/blog/posts";
 import type { Transcript } from "@/lib/ai/transcribe";
+import { MODELS } from "@/lib/ai/client";
+import { assertUnderCap, recordUsage, AiCapError } from "@/lib/ai/usage";
 
 function loadTherapy(id: number | null) {
   if (!id) return null;
@@ -44,6 +46,20 @@ function loadVideoContext(id: number | null): {
 /**
  * Fire-and-forget: writes the generated content (or an error) back to the
  * blog_posts row. Safe to call without awaiting from an API route.
+ *
+ * Metering: `draftBlogPost` constructs its OWN Anthropic client (it does NOT
+ * go through the shared metered `getAnthropic()`), so — same as the Marketing
+ * agent's `draft_blog_post` tool (@/lib/agents/tools.marketing.ts) — this is
+ * metered at the CALLING boundary: `assertUnderCap` before, `recordUsage`
+ * after. This is a SEPARATE, non-agent call path to the same generator (the
+ * CMS blog editor's "Generate" button, not the Marketing agent chat), so it
+ * uses its own agentKey ("blog") rather than "marketing" — the per-agent
+ * spend breakdown stays meaningful. AiCapError is left to propagate into the
+ * catch below, which ALREADY converts any error (missing key, model failure,
+ * ...) into `status: "failed"` + a operator-visible `error` message — for a
+ * capped tenant that message is AiCapError's own clean text, which is
+ * exactly the "surface it, don't crash" outcome this fire-and-forget flow
+ * needs (never any different from how every other failure here is handled).
  */
 export function runBlogGeneration(postId: number) {
   // Capture the tenant while still in the request; the detached body below runs
@@ -54,6 +70,7 @@ export function runBlogGeneration(postId: number) {
     const post = getBlogPost(postId);
     if (!post) return;
     try {
+      assertUnderCap(tenantId);
       const therapy = loadTherapy(post.sourceTherapyId);
       const video = loadVideoContext(post.sourceVideoProjectId);
 
@@ -69,6 +86,12 @@ export function runBlogGeneration(postId: number) {
       };
 
       const result = await draftBlogPost(draftInput);
+      recordUsage(tenantId, "blog", MODELS.opus, {
+        inputTokens: result.usage.inputTokens,
+        outputTokens: result.usage.outputTokens,
+        cacheReadTokens: result.usage.cacheReadInputTokens,
+        cacheCreateTokens: result.usage.cacheCreationInputTokens,
+      });
       updateBlogContent(postId, {
         content: result.content,
         status: "ready",
@@ -77,7 +100,11 @@ export function runBlogGeneration(postId: number) {
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Blog generation failed.";
-      console.error(`[blog] generation failed for post ${postId}:`, err);
+      if (err instanceof AiCapError) {
+        console.error(`[blog] generation skipped for post ${postId} — tenant is over its monthly AI cap`);
+      } else {
+        console.error(`[blog] generation failed for post ${postId}:`, err);
+      }
       updateBlogContent(postId, {
         status: "failed",
         error: message,

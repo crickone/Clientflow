@@ -19,6 +19,22 @@ import {
 import { logActivity } from "@/lib/queries";
 import { runTriage } from "@/lib/inbox/triagePipeline";
 import { onInboundFromClient, onInboundFromLead } from "@/lib/pipeline/stage";
+import { AiCapError } from "@/lib/ai/usage";
+
+/**
+ * Distinguishes an expected "tenant is over its monthly AI cap" skip from a
+ * genuine triage failure in the logs — both are already non-fatal here (this
+ * `.catch()` is what keeps a triage error from ever breaking inbound-message
+ * processing), but conflating the two would make a capped tenant look like a
+ * recurring bug every time WhatsApp messages come in.
+ */
+function logTriageOutcome(context: string, err: unknown): void {
+  if (err instanceof AiCapError) {
+    console.error(`[triage] ${context} skipped — tenant is over its monthly AI cap`);
+  } else {
+    console.error(`[triage] ${context} failed:`, err);
+  }
+}
 
 export const dynamic = "force-dynamic";
 
@@ -100,9 +116,7 @@ export async function POST(req: NextRequest) {
           messageId: inboundMsg.id,
           messageText: inbound.text,
           channel: "whatsapp",
-        }).catch((err) =>
-          console.error("[triage] client inbound failed:", err),
-        );
+        }).catch((err) => logTriageOutcome("client inbound", err));
       } else {
         let lead = findLeadByPhone(inbound.fromPhone);
         if (!lead) {
@@ -137,7 +151,7 @@ export async function POST(req: NextRequest) {
           messageId: inboundMsg.id,
           messageText: inbound.text,
           channel: "whatsapp",
-        }).catch((err) => console.error("[triage] lead inbound failed:", err));
+        }).catch((err) => logTriageOutcome("lead inbound", err));
       }
     }
 

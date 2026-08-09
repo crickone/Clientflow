@@ -2,6 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import type { Therapy } from "@/lib/db/schema";
 import { getBusinessContext } from "@/lib/ai/businessContext";
+import { MODELS } from "@/lib/ai/client";
 
 // Blog-specific task + format rules. The business identity, services, and voice
 // are supplied by getBusinessContext() (venue-aware) and prepended at call time.
@@ -106,7 +107,7 @@ export async function draftBlogPost(
   const systemPrompt = `${getBusinessContext()}\n\n${BLOG_FORMAT_RULES}`;
 
   const message = await client.messages.create({
-    model: "claude-opus-4-7",
+    model: MODELS.opus,
     max_tokens: 4096,
     thinking: { type: "adaptive" },
     system: [

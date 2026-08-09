@@ -12,6 +12,22 @@ import { renderProject } from "@/lib/video/render";
 import { parseTimeline, type MainSegment } from "@/lib/video/timeline";
 import { resolveTrackPath } from "@/lib/video/music";
 import { resolveLogoPath } from "@/lib/branding";
+import { AiCapError } from "@/lib/ai/usage";
+
+/**
+ * Distinguishes an expected "tenant is over its monthly AI cap" skip from a
+ * genuine planning failure in the logs — both already land the project on
+ * "failed" with a message the operator can read (see setStatus calls below),
+ * but conflating the two in server logs would make a capped tenant look like
+ * a recurring bug every time planning/rendering runs.
+ */
+function logPlanOutcome(projectId: number, err: unknown): void {
+  if (err instanceof AiCapError) {
+    console.error(`[content-studio] plan skipped for ${projectId} — tenant is over its monthly AI cap`);
+  } else {
+    console.error(`[content-studio] plan failed for ${projectId}:`, err);
+  }
+}
 
 const UPLOAD_ROOT = path.join(process.cwd(), "data", "uploads");
 
@@ -197,6 +213,7 @@ export function runPlan(projectId: number): void {
           durationSeconds: b.durationSeconds ?? 0,
         })),
         toneNotes: project.toneNotes ?? null,
+        tenantId,
       });
       setStatus(projectId, "transcribed", {
         planJson: JSON.stringify(plan),
@@ -204,7 +221,7 @@ export function runPlan(projectId: number): void {
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error(`[content-studio] plan failed for ${projectId}:`, err);
+      logPlanOutcome(projectId, err);
       setStatus(projectId, "failed", { error: message });
     }
   });
@@ -297,6 +314,7 @@ export function runRender(
             durationSeconds: b.durationSeconds ?? 0,
           })),
           toneNotes: project.toneNotes ?? null,
+          tenantId,
         });
         setStatus(projectId, "rendering", {
           planJson: JSON.stringify(plan),
@@ -346,7 +364,11 @@ export function runRender(
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error(`[content-studio] render failed for ${projectId}:`, err);
+      if (err instanceof AiCapError) {
+        console.error(`[content-studio] render skipped for ${projectId} — tenant is over its monthly AI cap`);
+      } else {
+        console.error(`[content-studio] render failed for ${projectId}:`, err);
+      }
       setStatus(projectId, "failed", { error: message });
     }
   });

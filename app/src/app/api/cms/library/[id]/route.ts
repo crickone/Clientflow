@@ -49,7 +49,7 @@ export async function PATCH(
   if (body.regenerate) {
     const bytes = await getObject(asset.storageKey);
     const alt = bytes
-      ? await genAlt(bytes, asset.mimeType, asset.originalName)
+      ? await genAlt(bytes, asset.mimeType, asset.originalName, membership.tenant.id)
       : null;
     if (alt) updateLibraryAlt(id, alt);
     return NextResponse.json({ ok: true, alt: alt ?? asset.alt });

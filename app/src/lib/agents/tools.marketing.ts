@@ -6,6 +6,7 @@ import { getTenantDbById } from "@/lib/db/tenant";
 import { sites } from "@/lib/db/schema";
 import { draftBlogPost } from "@/lib/ai/draftBlog";
 import { generateCarouselSlides } from "@/lib/ai/generateCarousel";
+import { MODELS } from "@/lib/ai/client";
 import { assertUnderCap, recordUsage } from "@/lib/ai/usage";
 import {
   createSiteBlogPost,
@@ -33,15 +34,20 @@ import { updateBlogContent } from "@/lib/blog/posts";
  * structural typing makes these interchangeable at every call site.
  *
  * Metering (IMPORTANT): `draftBlogPost` and `generateCarouselSlides`
- * construct their OWN `Anthropic` client and call `claude-opus-4-7` directly
+ * construct their OWN `Anthropic` client and call `MODELS.opus` directly
  * — they do NOT go through the shared metered `getAnthropic()` client, so
  * they'd otherwise dodge the tenant's monthly AI cap entirely. Both
  * generator-calling tools below therefore meter at the TOOL boundary:
  * `assertUnderCap` before the call, `recordUsage(tenantId, "marketing",
- * "claude-opus-4-7", usage)` after — mapping the generator's returned usage
- * shape to the shared metering `Usage` shape via `toMeteredUsage`.
- * `claude-opus-4-7` is mirrored into `PRICING` in `@/lib/ai/client.ts` (same
- * rates as `claude-opus-4-8`) so `estCostCents` prices it correctly.
+ * MARKETING_MODEL, usage)` after — mapping the generator's returned usage
+ * shape to the shared metering `Usage` shape via `toMeteredUsage`. Two OTHER,
+ * non-agent call paths to these same generators exist (the CMS blog editor's
+ * "Generate" button -> `runBlogGeneration` in `@/lib/blog/generator.ts`, and
+ * Content Studio's carousel "Generate" route,
+ * `api/content-studio/carousels/[id]/generate/route.ts`) — each meters
+ * itself the same way, at its OWN calling boundary, under its own agentKey
+ * ("blog" / "carousel") so the per-agent spend breakdown stays meaningful;
+ * this file's tool-boundary metering is NOT shared with them (Batch 3a).
  */
 type ToolArtifact = { url: string; filename: string; label: string };
 export type ToolResult = { text: string; artifact?: ToolArtifact };
@@ -51,9 +57,10 @@ function tdb(ctx: ToolContext) {
   return getTenantDbById(ctx.tenantId);
 }
 
-// Must match the literal model id `draftBlogPost`/`generateCarouselSlides`
-// call internally (see @/lib/ai/draftBlog.ts, @/lib/ai/generateCarousel.ts).
-const MARKETING_MODEL = "claude-opus-4-7";
+// Must match the model id `draftBlogPost`/`generateCarouselSlides` call
+// internally (see @/lib/ai/draftBlog.ts, @/lib/ai/generateCarousel.ts) —
+// both now call MODELS.opus directly (Batch 3a, C2).
+const MARKETING_MODEL: string = MODELS.opus;
 
 type GeneratorUsage = {
   inputTokens: number;

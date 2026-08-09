@@ -92,7 +92,7 @@ export async function POST(req: Request) {
     }
     const bytes = Buffer.from(await file.arrayBuffer());
     const alt = autoAlt
-      ? await generateAltText(bytes, mime, file.name || undefined)
+      ? await generateAltText(bytes, mime, file.name || undefined, tenantId)
       : null;
     const asset = await addLibraryAsset({
       originalName: file.name || "upload",

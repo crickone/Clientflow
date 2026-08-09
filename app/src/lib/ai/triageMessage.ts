@@ -5,6 +5,8 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { tags as tagsTable } from "@/lib/db/schema";
 import { getBusinessName, getInboxBusinessFacts } from "@/lib/ai/businessContext";
+import { MODELS } from "@/lib/ai/client";
+import { assertUnderCap, recordUsage } from "@/lib/ai/usage";
 
 export type TriageCategory =
   | "new_lead"
@@ -38,6 +40,8 @@ export interface TriageInput {
   isExistingClient: boolean;
   senderName?: string | null;
   history?: TriageHistoryItem[];
+  /** The real current tenant — required so the €25/month AI cap is checked and metered against the right gym. */
+  tenantId: number;
 }
 
 export interface TriageResult {
@@ -170,6 +174,10 @@ function clamp01(n: unknown): number {
 export async function triageMessage(
   input: TriageInput,
 ): Promise<TriageResult> {
+  // Checked first — see the matching comment on draftFollowup for why this
+  // runs before the API-key guard below.
+  assertUnderCap(input.tenantId);
+
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error(
       "ANTHROPIC_API_KEY is not set. Add it to .env.local in the app/ folder.",
@@ -185,7 +193,7 @@ export async function triageMessage(
 
   const client = new Anthropic();
   const message = await client.messages.create({
-    model: "claude-opus-4-7",
+    model: MODELS.opus,
     max_tokens: 1024,
     system: [
       {
@@ -231,6 +239,13 @@ export async function triageMessage(
   const sensitive = Boolean(raw.sensitive);
   const reply =
     typeof raw.suggestedReply === "string" ? raw.suggestedReply.trim() : "";
+
+  recordUsage(input.tenantId, "triage", MODELS.opus, {
+    inputTokens: message.usage.input_tokens,
+    outputTokens: message.usage.output_tokens,
+    cacheReadTokens: message.usage.cache_read_input_tokens ?? 0,
+    cacheCreateTokens: message.usage.cache_creation_input_tokens ?? 0,
+  });
 
   return {
     category,
