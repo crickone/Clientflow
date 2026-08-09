@@ -1131,6 +1131,26 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       updated_at    INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
     CREATE INDEX IF NOT EXISTS idx_agents_key ON agents(key);
+
+    -- ── Agentic OS: durable runs (DR1) ───────────────────────────────────────
+    -- One row per agent run on the specialist chat route
+    -- (/api/agents/[key]/chat). Persists progress + the final result/pending
+    -- writes so a run survives a client disconnect (refresh/navigate/close) —
+    -- see src/lib/agents/runStore.ts.
+    CREATE TABLE IF NOT EXISTS agent_runs (
+      id              TEXT PRIMARY KEY,
+      conversation_id TEXT NOT NULL,
+      agent_key       TEXT NOT NULL,
+      model           TEXT NOT NULL,
+      status          TEXT NOT NULL DEFAULT 'running',  -- 'running'|'awaiting_approval'|'done'|'error'
+      text            TEXT NOT NULL DEFAULT '',
+      pending         TEXT,        -- JSON PendingWrite[]
+      artifacts       TEXT,        -- JSON ToolArtifact[]
+      error           TEXT,
+      created_at      INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+      updated_at      INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_runs_convo ON agent_runs(conversation_id, created_at);
   `);
 
   // Column-add migrations for older DBs. Each runs once; PRAGMA tells us if the
