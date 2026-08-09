@@ -36,11 +36,12 @@ export async function saveModel(key: string, model: string): Promise<void> {
   await requireAdmin();
   assertKnownAgent(key);
   const tenantId = getCurrentMembership()!.tenant.id;
-  // Throws "Unsupported model" for anything outside {sonnet,opus,haiku} — in
-  // particular Fable is permanently rejected here, and we deliberately let
-  // that throw propagate rather than swallowing it into a result object.
-  // This is a backstop only: the picker in AgentDetail/ModelCard never offers
-  // anything but Sonnet 5 / Opus 4.8, so in normal use this never throws.
+  // Throws "Unsupported model" for anything outside MODEL_CATALOG (the picker's
+  // own list) — in particular Fable is permanently rejected here, and we
+  // deliberately let that throw propagate rather than swallowing it into a
+  // result object. This is a backstop only: the picker in AgentDetail offers
+  // exactly the catalog (Sonnet 5, Opus 4.8, DeepSeek via OpenRouter), so in
+  // normal use this never throws.
   updateAgentModel(tenantId, key, model);
   revalidatePath(`/agents/${key}`);
 }
