@@ -6,7 +6,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 
 import { authDb } from "@/lib/db/control";
-import { memberships, users } from "@/lib/db/schema";
+import { authSessions, memberships, users } from "@/lib/db/schema";
 import { getCurrentMembership, hashPassword, requireAdmin } from "@/lib/auth";
 import { createInvite, sendInviteEmail } from "@/lib/invites";
 
@@ -312,6 +312,10 @@ export async function resetPasswordAction(
     })
     .where(eq(users.id, userId))
     .run();
+  // Admin-initiated reset = a lock-out action; revoke ALL of the target user's
+  // sessions (the acting admin is a different user, so there's no current
+  // session to preserve). Mirrors the self-service revoke in change-password.
+  authDb.delete(authSessions).where(eq(authSessions.userId, userId)).run();
   revalidatePath("/settings/users");
   return { ok: true };
 }

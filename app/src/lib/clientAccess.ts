@@ -9,6 +9,7 @@ import { getCurrentTenant } from "@/lib/db/tenant";
 import {
   clientCredentials,
   clientNutritionPlans,
+  clientSessions,
   clientWorkoutPrograms,
   nutritionPlans,
   workoutPrograms,
@@ -119,6 +120,18 @@ export function resetClientPassword(clientId: number, password: string): LoginRe
     .set({ passwordHash: hashPassword(password) })
     .where(and(eq(clientCredentials.tenantId, tenantId), eq(clientCredentials.clientId, clientId)))
     .run();
+  // Revoke every existing app session for this client's credential(s). An
+  // admin-initiated reset is a lock-out action (member left / fraud / stolen
+  // token), so no prior session may survive it — mirrors the self-service reset
+  // in clientPasswordReset.ts.
+  const creds = authDb
+    .select({ id: clientCredentials.id })
+    .from(clientCredentials)
+    .where(and(eq(clientCredentials.tenantId, tenantId), eq(clientCredentials.clientId, clientId)))
+    .all();
+  for (const c of creds) {
+    authDb.delete(clientSessions).where(eq(clientSessions.credentialId, c.id)).run();
+  }
   return { ok: true };
 }
 
