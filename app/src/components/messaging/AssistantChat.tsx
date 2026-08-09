@@ -301,7 +301,16 @@ export function AssistantChat({
         }
 
         if (data.status === "done") {
-          patchLast((m) => ({ ...m, steps: m.steps.map((s) => ({ ...s, done: true })) }));
+          // A read tool (e.g. bundle_invoices) can attach an artifact to a
+          // run that finishes cleanly, same as awaiting_approval/error below
+          // — merge it in so a resumed client doesn't silently drop a
+          // download link the server already has.
+          const arts = data.artifacts ?? [];
+          patchLast((m) => ({
+            ...m,
+            steps: m.steps.map((s) => ({ ...s, done: true })),
+            artifacts: mergeArtifacts(m.artifacts, arts),
+          }));
           clearRunId();
           break;
         }
