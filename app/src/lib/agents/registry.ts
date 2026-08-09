@@ -3,6 +3,7 @@ import { getTenantDbById } from "@/lib/db/tenant";
 import { agents, type Agent } from "@/lib/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { MODELS } from "@/lib/ai/client";
+import { MODEL_CATALOG } from "@/lib/ai/modelCatalog";
 
 export interface AgentDef { key: string; name: string; mandate: string; status: "active" | "dormant"; defaultModel: string; }
 export const AGENT_CATALOG: AgentDef[] = [
@@ -57,7 +58,11 @@ export function updateAgentInstructions(tenantId: number, key: string, instructi
   getTenantDbById(tenantId).update(agents).set({ instructions: instructions.slice(0, 8000), updatedAt: new Date() }).where(eq(agents.key, key)).run();
 }
 export function updateAgentModel(tenantId: number, key: string, model: string): void {
-  const allowed = new Set<string>([MODELS.sonnet, MODELS.opus, MODELS.haiku]); // NEVER Fable
+  // Allowlist == the picker's own catalog (@/lib/ai/modelCatalog), so a
+  // model can only ever be saved if it's actually offered in the UI. NEVER
+  // Fable: it's not (and must never be) in MODEL_CATALOG, so it can never
+  // land in this Set — this line is the enforcement point for that promise.
+  const allowed = new Set<string>(MODEL_CATALOG.map((m) => m.id));
   if (!allowed.has(model)) throw new Error("Unsupported model");
   getTenantDbById(tenantId).update(agents).set({ model, updatedAt: new Date() }).where(eq(agents.key, key)).run();
 }

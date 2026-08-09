@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Reveal } from "@/components/motion/Reveal";
 import { formatEur } from "@/lib/utils";
 import type { Agent } from "@/lib/db/schema";
+import { modelLabel } from "@/lib/ai/modelCatalog";
 
 interface Props {
   agents: Agent[];
@@ -45,21 +46,6 @@ const ICON: Record<string, typeof Bot> = {
   operations: ClipboardCheck,
   finance: Wallet,
 };
-
-/**
- * claude-* model ids -> short display labels. Duplicated from (not imported
- * from) `@/lib/ai/client`'s MODELS map for the same server-only reason as
- * MANDATE above.
- */
-const MODEL_LABEL: Record<string, string> = {
-  "claude-sonnet-5": "Sonnet 5",
-  "claude-opus-4-8": "Opus 4.8",
-  "claude-haiku-4-5-20251001": "Haiku 4.5",
-};
-
-function modelLabel(model: string): string {
-  return MODEL_LABEL[model] ?? model;
-}
 
 /**
  * The "AI staff org chart": one Orchestrator node on top, five specialist

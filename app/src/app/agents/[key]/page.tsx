@@ -51,6 +51,14 @@ export default async function AgentDetailPage({ params }: { params: { key: strin
 
   const usageCents = getMonthlyUsageByAgent(tenantId)[key] ?? 0;
 
+  // Computed here (server component — process.env is safe to read) and
+  // passed down as a plain boolean prop: AgentDetail is "use client" and
+  // must never read process.env itself (env vars aren't guaranteed to be
+  // inlined for client bundles the way NEXT_PUBLIC_* ones are), and the key
+  // itself must never reach the client at all. This is the only thing the
+  // picker needs to know to gate the DeepSeek/OpenRouter option.
+  const openRouterConfigured = !!process.env.OPENROUTER_API_KEY;
+
   return (
     <div className="app-page">
       <Link
@@ -82,6 +90,7 @@ export default async function AgentDetailPage({ params }: { params: { key: strin
         usageCents={usageCents}
         capCents={MONTHLY_CAP_CENTS}
         tenantId={tenantId}
+        openRouterConfigured={openRouterConfigured}
       />
     </div>
   );

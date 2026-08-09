@@ -9,24 +9,10 @@ import { Badge } from "@/components/ui/Badge";
 import { Reveal, RevealGroup } from "@/components/motion/Reveal";
 import { formatEur } from "@/lib/utils";
 import type { Agent } from "@/lib/db/schema";
+import { MODEL_CATALOG, isCatalogModel, type ModelChoice } from "@/lib/ai/modelCatalog";
 import { saveModel } from "@/app/agents/actions";
 import { AgentContextEditor } from "./AgentContextEditor";
 import { AgentChatPanel } from "./AgentChatPanel";
-
-/**
- * claude-* model ids the picker is allowed to offer, with display copy.
- * Hardcoded here (not imported from `@/lib/ai/client`'s MODELS map) because
- * that module is `server-only` and this is a client component — same reason
- * AgentOrgChart.tsx duplicates its own MODEL_LABEL map instead of importing
- * MODELS. Fable and Haiku are deliberately absent from this list: the picker
- * can only ever send one of these two ids to `saveModel`, so a bad value
- * can't reach it from this UI — `updateAgentModel`'s own allow-list is the
- * (never-exercised-from-here) backstop.
- */
-const MODEL_OPTIONS: { id: string; label: string; desc: string }[] = [
-  { id: "claude-sonnet-5", label: "Sonnet 5", desc: "Fast and capable — the default for every agent." },
-  { id: "claude-opus-4-8", label: "Opus 4.8", desc: "Slower and more thorough, for harder judgement calls." },
-];
 
 interface Layers {
   base: string;
@@ -42,6 +28,8 @@ interface Props {
   usageCents: number;
   capCents: number;
   tenantId: number;
+  /** Whether `OPENROUTER_API_KEY` is set — computed server-side (page.tsx) and passed down so a client component never has to guess at env state. Gates the DeepSeek/OpenRouter option in the model picker below. */
+  openRouterConfigured: boolean;
 }
 
 /**
@@ -50,12 +38,12 @@ interface Props {
  * `composeAgentSystem` — @/lib/agents/context — actually concatenates them
  * for a live run), and the agent's working chat (or a dormant placeholder).
  */
-export function AgentDetail({ agent, layers, toolNames, usageCents, capCents, tenantId }: Props) {
+export function AgentDetail({ agent, layers, toolNames, usageCents, capCents, tenantId, openRouterConfigured }: Props) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 36 }}>
       <RevealGroup style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
         <Reveal>
-          <ModelCard agent={agent} />
+          <ModelCard agent={agent} openRouterConfigured={openRouterConfigured} />
         </Reveal>
         <Reveal>
           <ToolsCard toolNames={toolNames} />
@@ -159,18 +147,19 @@ function EditableLayer({ index, agentKey, initial }: { index: number; agentKey: 
   );
 }
 
-function ModelCard({ agent }: { agent: Agent }) {
+function ModelCard({ agent, openRouterConfigured }: { agent: Agent; openRouterConfigured: boolean }) {
   const [model, setModel] = useState(agent.model);
   const [pending, startTransition] = useTransition();
 
-  function pick(id: string) {
-    if (pending || id === model) return;
+  function pick(choice: ModelChoice) {
+    if (pending || choice.id === model) return;
+    if (choice.needsOpenRouter && !openRouterConfigured) return; // locked — the button below is also `disabled`, this is just belt-and-suspenders
     const prev = model;
-    setModel(id); // optimistic
+    setModel(choice.id); // optimistic
     startTransition(async () => {
       try {
-        await saveModel(agent.key, id);
-        toast.success(`Model switched to ${MODEL_OPTIONS.find((m) => m.id === id)?.label ?? id}.`);
+        await saveModel(agent.key, choice.id);
+        toast.success(`Model switched to ${choice.label}.`);
       } catch (err) {
         setModel(prev); // revert — saveModel/updateAgentModel rejected it
         toast.error(err instanceof Error ? err.message : "Could not switch model.");
@@ -178,7 +167,7 @@ function ModelCard({ agent }: { agent: Agent }) {
     });
   }
 
-  const known = MODEL_OPTIONS.some((m) => m.id === model);
+  const known = isCatalogModel(model);
 
   return (
     <Card>
@@ -187,30 +176,49 @@ function ModelCard({ agent }: { agent: Agent }) {
         Model
       </CardLabel>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {MODEL_OPTIONS.map((o) => {
-          const selected = model === o.id;
+        {MODEL_CATALOG.map((choice) => {
+          const selected = model === choice.id;
+          const locked = Boolean(choice.needsOpenRouter) && !openRouterConfigured;
           return (
             <button
-              key={o.id}
+              key={choice.id}
               type="button"
-              onClick={() => pick(o.id)}
-              disabled={pending}
+              onClick={() => pick(choice)}
+              disabled={pending || locked}
+              title={locked ? "Requires an OpenRouter API key" : undefined}
               style={{
                 textAlign: "left",
                 padding: "10px 12px",
                 borderRadius: "var(--radius)",
                 border: `1px solid ${selected ? "var(--accent)" : "var(--hairline)"}`,
                 background: selected ? "var(--accent-soft)" : "transparent",
-                cursor: pending ? "default" : "pointer",
+                cursor: pending || locked ? "default" : "pointer",
+                opacity: locked ? 0.55 : 1,
                 display: "flex",
                 flexDirection: "column",
                 gap: 2,
               }}
             >
-              <span style={{ fontSize: 13.5, fontWeight: 600, color: selected ? "var(--accent-ink)" : "var(--text-primary)" }}>
-                {o.label}
+              <span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <span style={{ fontSize: 13.5, fontWeight: 600, color: selected ? "var(--accent-ink)" : "var(--text-primary)" }}>
+                  {choice.label}
+                </span>
+                {choice.provider === "openrouter" && (
+                  <Badge
+                    tone={locked ? "amber" : undefined}
+                    style={locked ? undefined : { background: "var(--surface-2)", color: "var(--text-tertiary)" }}
+                  >
+                    {locked ? (
+                      <>
+                        <Lock size={9} strokeWidth={2} /> Needs OpenRouter key
+                      </>
+                    ) : (
+                      "OpenRouter"
+                    )}
+                  </Badge>
+                )}
               </span>
-              <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", lineHeight: 1.4 }}>{o.desc}</span>
+              <span style={{ fontSize: 11.5, color: "var(--text-tertiary)", lineHeight: 1.4 }}>{choice.note}</span>
             </button>
           );
         })}

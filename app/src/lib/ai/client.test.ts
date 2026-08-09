@@ -6,7 +6,8 @@
  */
 import assert from "node:assert/strict";
 
-import { MODELS, estCostCents } from "./client";
+import { MODELS, PRICING, estCostCents } from "./client";
+import { MODEL_CATALOG } from "./modelCatalog";
 
 let passed = 0;
 function check(name: string, actual: unknown, expected: unknown) {
@@ -55,5 +56,31 @@ check(
   }),
   30,
 );
+
+// MP3: DeepSeek (via OpenRouter) must be priced for real, not silently
+// falling back to the Sonnet default in estCostCents (that fallback is meant
+// for genuinely-unpriced/legacy ids, not a model the picker actively
+// offers) — otherwise the €25/tenant cap is wrong for every agent someone
+// switches to it. Read the id from MODEL_CATALOG rather than hardcoding it a
+// second time, so a future slug change can't silently desync the two files.
+{
+  const deepseek = MODEL_CATALOG.find((m) => m.provider === "openrouter");
+  assert.ok(deepseek, "MODEL_CATALOG has an OpenRouter (DeepSeek) entry");
+  const id = deepseek!.id;
+  ok(`PRICING has a dedicated entry for ${id}`, id in PRICING);
+  ok(
+    "that entry is NOT the Sonnet fallback values (300/1500) — it's priced for real",
+    PRICING[id].inCents !== PRICING[MODELS.sonnet].inCents || PRICING[id].outCents !== PRICING[MODELS.sonnet].outCents,
+  );
+  ok(
+    "DeepSeek is in fact cheaper than Sonnet on both input and output (the point of offering a low-cost option)",
+    PRICING[id].inCents < PRICING[MODELS.sonnet].inCents && PRICING[id].outCents < PRICING[MODELS.sonnet].outCents,
+  );
+  check(
+    "1M input + 1M output tokens on DeepSeek costs 42c (14c in + 28c out per 1M)",
+    estCostCents(id, { inputTokens: 1_000_000, outputTokens: 1_000_000 }),
+    42,
+  );
+}
 
 console.log(`\nai/client.test.ts: ${passed} checks passed.`);

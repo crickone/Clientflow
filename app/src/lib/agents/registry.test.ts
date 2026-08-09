@@ -5,6 +5,12 @@
 // dormant), the instructions mutation persists, and the model mutation
 // persists allowed tiers while permanently rejecting Fable.
 //
+// Extended for multi-provider Task 3 (MP3): updateAgentModel's allowlist is
+// now MODEL_CATALOG (@/lib/ai/modelCatalog) itself, not a hand-maintained
+// {sonnet,opus,haiku} Set — so it must also accept the DeepSeek/OpenRouter
+// catalog id, and still reject anything NOT in the catalog (Fable, and any
+// other unknown id).
+//
 // NOTE: this repo does NOT use vitest — tests are plain node:assert/strict
 // scripts run via `npm test -- <path>` (see scripts/test.mjs). This mirrors
 // the exact pattern of src/lib/apiKeys.test.ts and src/lib/db/agentsTable.test.ts.
@@ -16,6 +22,7 @@ import path from "node:path";
 import { eq } from "drizzle-orm";
 
 import { MODELS } from "../ai/client";
+import { MODEL_CATALOG } from "../ai/modelCatalog";
 
 // registry.ts imports @/lib/db/tenant, which imports React's server-only
 // `cache` at module load. Under the runner's `--conditions=react-server`,
@@ -119,6 +126,29 @@ const requireLocal = createRequire(import.meta.url);
       getAgent(tid, "sales")!.model,
       MODELS.opus,
       "rejected model update did not mutate the row",
+    );
+
+    // ── MP3: the allowlist IS the catalog — the DeepSeek/OpenRouter catalog
+    // id must succeed exactly like an Anthropic tier does, and a made-up id
+    // that was never in either the old {sonnet,opus,haiku} Set or the new
+    // catalog must still be rejected (not just Fable specifically) ──
+    const openRouterEntry = MODEL_CATALOG.find((m) => m.provider === "openrouter");
+    assert.ok(openRouterEntry, "MODEL_CATALOG has an OpenRouter (DeepSeek) entry to test against");
+    updateAgentModel(tid, "sales", openRouterEntry!.id);
+    assert.equal(
+      getAgent(tid, "sales")!.model,
+      openRouterEntry!.id,
+      "updateAgentModel persists the DeepSeek/OpenRouter catalog id",
+    );
+    assert.throws(
+      () => updateAgentModel(tid, "sales", "not-a-real-model-id"),
+      /Unsupported model/,
+      "updateAgentModel throws on an id that is in neither the catalog nor any legacy allowlist",
+    );
+    assert.equal(
+      getAgent(tid, "sales")!.model,
+      openRouterEntry!.id,
+      "rejected unknown-model update did not mutate the row",
     );
 
     // ── status-reconcile (Marketing Task 2): AGENT_CATALOG is the single
