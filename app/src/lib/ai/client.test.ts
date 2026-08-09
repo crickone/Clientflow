@@ -2,6 +2,11 @@
  * Unit tests for the shared Claude client + model tiers: the pinned model IDs
  * (incl. the "never Fable" cost guard) and the cents-per-1M cost estimator.
  * Pure, no I/O — never touches ANTHROPIC_API_KEY or the network.
+ *
+ * Extended for multi-provider Task 4 (MP4): pins the real OpenRouter rates
+ * for the four new catalog models (Kimi K2, Qwen3, GPT-5, Gemini), and adds
+ * a coverage guard proving every MODEL_CATALOG id has a dedicated PRICING
+ * entry — see that block below for why this matters.
  * Run: npx tsx src/lib/ai/client.test.ts
  */
 import assert from "node:assert/strict";
@@ -81,6 +86,45 @@ check(
     estCostCents(id, { inputTokens: 1_000_000, outputTokens: 1_000_000 }),
     42,
   );
+}
+
+// MP4: Kimi K2, Qwen3, GPT-5, and Gemini (all via OpenRouter) — same
+// "priced for real, not the Sonnet fallback" guarantee as DeepSeek above,
+// pinned per model (rather than looped generically) so a future price edit
+// to one model can't silently break another's without a named failure.
+// Rates sourced live from openrouter.ai/api/v1/models on 2026-08-09 — see
+// modelCatalog.ts's per-entry comments for the exact-slug rationale.
+{
+  const newModelRates: Record<string, { inCents: number; outCents: number }> = {
+    "openrouter:moonshotai/kimi-k2-0905": { inCents: 60, outCents: 250 },
+    "openrouter:qwen/qwen3-235b-a22b-2507": { inCents: 9, outCents: 55 },
+    "openrouter:openai/gpt-5": { inCents: 125, outCents: 1000 },
+    "openrouter:google/gemini-3.1-pro-preview": { inCents: 200, outCents: 1200 },
+  };
+  for (const [id, expected] of Object.entries(newModelRates)) {
+    ok(`MODEL_CATALOG includes ${id}`, MODEL_CATALOG.some((m) => m.id === id));
+    check(`PRICING[${id}] matches the sourced OpenRouter rate`, PRICING[id], expected);
+    check(
+      `1M input + 1M output tokens on ${id} costs ${expected.inCents + expected.outCents}c`,
+      estCostCents(id, { inputTokens: 1_000_000, outputTokens: 1_000_000 }),
+      expected.inCents + expected.outCents,
+    );
+  }
+}
+
+// MP4 coverage guard: every MODEL_CATALOG id must have a dedicated PRICING
+// entry. This is the backstop against ANY catalog model — today's four new
+// ones, or the next one anybody adds later — silently falling back to the
+// Sonnet rate in estCostCents and mis-metering the €25/tenant cap (the exact
+// failure mode the DeepSeek entry above was added to prevent, generalised
+// to the whole catalog). Deliberately loops over MODEL_CATALOG itself
+// rather than a hardcoded id list, so this keeps enforcing itself the next
+// time the catalog grows.
+{
+  ok("MODEL_CATALOG has at least 7 entries for this guard to be meaningful", MODEL_CATALOG.length >= 7);
+  for (const { id } of MODEL_CATALOG) {
+    ok(`PRICING has a dedicated entry for catalog model ${id}`, id in PRICING);
+  }
 }
 
 console.log(`\nai/client.test.ts: ${passed} checks passed.`);

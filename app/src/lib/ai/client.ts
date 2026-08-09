@@ -37,6 +37,39 @@ export const PRICING: Record<string, { inCents: number; outCents: number }> = {
   // at the Sonnet fallback rate above (~21x too high on input, ~54x too high
   // on output), undermining the €25/tenant cap.
   "openrouter:deepseek/deepseek-v4-flash-0731": { inCents: 14, outCents: 28 },
+  // OpenRouter Kimi K2 (dated refresh "0905" — matches the catalog id in
+  // @/lib/ai/modelCatalog's MODEL_CATALOG). $0.60 in / $2.50 out per 1M
+  // tokens is OpenRouter's listed price for moonshotai/kimi-k2-0905, sourced
+  // live from openrouter.ai/api/v1/models on 2026-08-09. Without this entry
+  // estCostCents would silently price every Kimi K2 run at the Sonnet
+  // fallback rate above (5x too high on input, 6x too high on output),
+  // undermining the €25/tenant cap.
+  "openrouter:moonshotai/kimi-k2-0905": { inCents: 60, outCents: 250 },
+  // OpenRouter Qwen3 235B A22B Instruct ("-2507" dated refresh — matches the
+  // catalog id). $0.09 in / $0.55 out per 1M tokens, sourced live from
+  // openrouter.ai/api/v1/models on 2026-08-09 — the cheapest model in the
+  // whole catalog. Without this entry it would silently fall back to the
+  // Sonnet rate above (~33x too high on input, ~27x too high on output).
+  "openrouter:qwen/qwen3-235b-a22b-2507": { inCents: 9, outCents: 55 },
+  // OpenRouter GPT-5 (OpenAI's flagship, bare "gpt-5" id — see the matching
+  // catalog comment for why this id and not -mini/-nano/-pro/-codex or the
+  // newer 5.1/5.2/... line). $1.25 in / $10.00 out per 1M tokens, sourced
+  // live from openrouter.ai/api/v1/models on 2026-08-09. Without this entry
+  // it would silently fall back to the Sonnet rate above, under-pricing
+  // every GPT-5 run against the €25/tenant cap.
+  "openrouter:openai/gpt-5": { inCents: 125, outCents: 1000 },
+  // OpenRouter Gemini 3.1 Pro Preview (Google's current flagship "Pro" tier
+  // — see the matching catalog comment for why it's still "-preview" naming
+  // and why this is the current best pick). $2.00 in / $12.00 out per 1M
+  // tokens is OpenRouter's BASE-tier list price (prompts <200K tokens),
+  // sourced live from openrouter.ai/api/v1/models on 2026-08-09; OpenRouter
+  // roughly doubles both rates above 200K prompt tokens ($4.00/$18.00),
+  // which this flat per-model rate can't represent — a known
+  // under-estimate for very-long-context Gemini runs against the
+  // €25/tenant cap, same class of simplification the rest of this table
+  // already makes (no per-tier or cache-write-tier pricing anywhere else
+  // either).
+  "openrouter:google/gemini-3.1-pro-preview": { inCents: 200, outCents: 1200 },
 };
 
 export interface Usage {

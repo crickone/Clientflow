@@ -6,6 +6,12 @@
  * assertions). Pure, no I/O, zero imports in the module under test — this
  * file just proves that contract holds and stays importable from a
  * "use client" component.
+ *
+ * Extended for multi-provider Task 4 (MP4): the catalog grew from 3 to 7
+ * entries (Sonnet 5 + Opus 4.8 native, plus DeepSeek/Kimi K2/Qwen3/GPT-5/
+ * Gemini via OpenRouter) — every OpenRouter entry must carry
+ * needsOpenRouter:true and resolve a label, and Fable must still never
+ * appear.
  * Run: npm test -- src/lib/ai/modelCatalog.test.ts
  */
 import assert from "node:assert/strict";
@@ -24,7 +30,7 @@ function ok(name: string, cond: boolean) {
 // match) without ever surfacing as an error.
 {
   const ids = MODEL_CATALOG.map((m) => m.id);
-  ok("MODEL_CATALOG is non-empty", ids.length > 0);
+  ok("MODEL_CATALOG has exactly 7 entries (2 Anthropic + 5 OpenRouter)", ids.length === 7);
   ok("every MODEL_CATALOG id is unique", new Set(ids).size === ids.length);
 }
 
@@ -57,22 +63,47 @@ ok("no catalog id contains the substring 'fable' (case-insensitive)", !/fable/i.
   const sonnet = MODEL_CATALOG.find((m) => m.id === "claude-sonnet-5");
   ok("claude-sonnet-5 is present and provider:anthropic", sonnet?.provider === "anthropic");
   ok("claude-sonnet-5 does not require OpenRouter", !sonnet?.needsOpenRouter);
+  ok("claude-sonnet-5 is first in the catalog (the default)", MODEL_CATALOG[0]?.id === "claude-sonnet-5");
 }
 
-// Exactly one OpenRouter (DeepSeek) entry, flagged needsOpenRouter: true —
-// this is what lets AgentDetail render it disabled until OPENROUTER_API_KEY
-// is set, and its id must carry the "openrouter:" prefix getProvider
-// (@/lib/ai/providers) dispatches on.
+// MP4: five OpenRouter entries now (DeepSeek + Kimi K2 + Qwen3 + GPT-5 +
+// Gemini) — every one of them must be flagged needsOpenRouter: true (this is
+// what lets AgentDetail render it disabled until OPENROUTER_API_KEY is set),
+// carry the "openrouter:" prefix getProvider (@/lib/ai/providers) dispatches
+// on, have a non-empty picker note, and resolve a real label via
+// modelLabel(). Looping over every OpenRouter entry (rather than hardcoding
+// "the one DeepSeek entry" like this block used to) means the next model
+// added to the catalog is covered automatically.
 {
   const openRouterEntries = MODEL_CATALOG.filter((m) => m.provider === "openrouter");
-  ok("exactly one openrouter-provider entry in the catalog", openRouterEntries.length === 1);
-  const deepseek = openRouterEntries[0];
-  ok("the OpenRouter entry has needsOpenRouter: true", deepseek?.needsOpenRouter === true);
-  ok(
-    "the OpenRouter entry's id carries the 'openrouter:' prefix getProvider dispatches on",
-    Boolean(deepseek?.id.startsWith("openrouter:")),
-  );
-  ok("the OpenRouter entry has a non-empty picker note", Boolean(deepseek?.note && deepseek.note.length > 0));
+  ok("exactly five openrouter-provider entries in the catalog", openRouterEntries.length === 5);
+  for (const entry of openRouterEntries) {
+    ok(`${entry.id}: needsOpenRouter is true`, entry.needsOpenRouter === true);
+    ok(`${entry.id}: id carries the "openrouter:" prefix`, entry.id.startsWith("openrouter:"));
+    ok(`${entry.id}: has a non-empty picker note`, Boolean(entry.note && entry.note.length > 0));
+    ok(`${entry.id}: modelLabel resolves to its own label, not the raw id`, modelLabel(entry.id) === entry.label);
+  }
+}
+
+// MP4: the four models added in this task, pinned by exact id — each was
+// verified live against OpenRouter's model list (see modelCatalog.ts's
+// per-entry comments for the sourcing/rationale). Asserting the literal ids
+// here means a future accidental rename (e.g. repointing to a "-latest"
+// alias, or picking a different Kimi/Qwen/Gemini variant) fails a test
+// instead of silently drifting.
+{
+  const expectedLabels: Record<string, string> = {
+    "openrouter:moonshotai/kimi-k2-0905": "Kimi K2",
+    "openrouter:qwen/qwen3-235b-a22b-2507": "Qwen3 235B",
+    "openrouter:openai/gpt-5": "GPT-5",
+    "openrouter:google/gemini-3.1-pro-preview": "Gemini 3.1 Pro",
+  };
+  for (const [id, label] of Object.entries(expectedLabels)) {
+    const entry = MODEL_CATALOG.find((m) => m.id === id);
+    ok(`${id} is present in MODEL_CATALOG`, Boolean(entry));
+    ok(`${id}: provider is openrouter`, entry?.provider === "openrouter");
+    ok(`modelLabel(${id}) is "${label}"`, modelLabel(id) === label);
+  }
 }
 
 console.log(`\nai/modelCatalog.test.ts: ${passed} checks passed.`);
