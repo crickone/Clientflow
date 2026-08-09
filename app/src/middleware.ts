@@ -12,6 +12,7 @@ const PUBLIC_API_PREFIXES = [
   "/api/whatsapp/webhook",
   "/api/cron/", // self-authorizes via CRON_SECRET or an admin session
   "/api/platform/", // self-authorizes: service key + platform-admin session
+  "/api/health", // unauthenticated liveness probe (control-DB ping; leaks nothing) — must not 307→/login for uptime monitors
 ];
 
 // Host → site-slug map for serving public CMS sites at their domain root. The
