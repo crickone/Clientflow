@@ -13,13 +13,14 @@ import {
   DialogContent,
   DialogTrigger,
 } from "@/components/ui/Dialog";
-import { Input, Label } from "@/components/ui/Input";
+import { FieldError, Input, Label } from "@/components/ui/Input";
 import {
   createUserAction,
   lookupIdentityAction,
   removeMembershipAction,
   resendInviteAction,
   resetPasswordAction,
+  updateMemberEmailAction,
   updateUserAction,
 } from "@/app/settings/users/actions";
 
@@ -403,17 +404,29 @@ function ModeRadio({
 function EditUserDialog({ user, isMe }: { user: UserRow; isMe: boolean }) {
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
+  const [email, setEmail] = useState(user.email);
+  const [emailError, setEmailError] = useState<string | undefined>();
   const [role, setRole] = useState<Role>(user.role);
   const [isActive, setIsActive] = useState(user.isActive);
 
   function submit() {
+    setEmailError(undefined);
     start(async () => {
+      const nextEmail = email.trim();
+      const emailChanged = nextEmail !== user.email;
+      if (emailChanged) {
+        const emailRes = await updateMemberEmailAction(user.userId, nextEmail);
+        if (!emailRes.ok) {
+          setEmailError(emailRes.error);
+          return; // leave the modal open — role/active aren't saved either
+        }
+      }
       const res = await updateUserAction(user.userId, { role, isActive });
       if (!res.ok) {
         toast.error(res.error);
         return;
       }
-      toast.success("Membership updated");
+      toast.success(emailChanged ? "Membership and login email updated" : "Membership updated");
       setOpen(false);
     });
   }
@@ -424,6 +437,8 @@ function EditUserDialog({ user, isMe }: { user: UserRow; isMe: boolean }) {
       onOpenChange={(v) => {
         setOpen(v);
         if (v) {
+          setEmail(user.email);
+          setEmailError(undefined);
           setRole(user.role);
           setIsActive(user.isActive);
         }
@@ -434,8 +449,26 @@ function EditUserDialog({ user, isMe }: { user: UserRow; isMe: boolean }) {
           <Pencil size={14} strokeWidth={1.75} />
         </Button>
       </DialogTrigger>
-      <DialogContent title="Edit membership" description={user.email}>
+      <DialogContent title="Edit membership">
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div>
+            <Label htmlFor={`edit-email-${user.userId}`}>Login email</Label>
+            <Input
+              id={`edit-email-${user.userId}`}
+              type="email"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (emailError) setEmailError(undefined);
+              }}
+              disabled={pending}
+            />
+            <FieldError message={emailError} />
+            <div style={{ color: "var(--text-tertiary)", fontSize: 12, marginTop: 6 }}>
+              This is their sign-in email. Changing it updates how they log in
+              to <strong>all</strong> of their accounts, not just this one.
+            </div>
+          </div>
           <div>
             <Label htmlFor={`edit-name-${user.userId}`}>Name</Label>
             <Input
@@ -445,8 +478,8 @@ function EditUserDialog({ user, isMe }: { user: UserRow; isMe: boolean }) {
               readOnly
             />
             <div style={{ color: "var(--text-tertiary)", fontSize: 12, marginTop: 6 }}>
-              Name &amp; email are part of the person&apos;s account and shared
-              across their clinics — managed on their profile, not here.
+              Name is part of the person&apos;s account and shared across
+              their clinics — managed on their profile, not here.
             </div>
           </div>
           <div>
@@ -491,7 +524,7 @@ function EditUserDialog({ user, isMe }: { user: UserRow; isMe: boolean }) {
                 Cancel
               </Button>
             </DialogClose>
-            <Button onClick={submit} disabled={pending}>
+            <Button onClick={submit} disabled={pending || !email.trim()}>
               {pending ? "Saving…" : "Save changes"}
             </Button>
           </div>

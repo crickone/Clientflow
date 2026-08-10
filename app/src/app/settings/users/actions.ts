@@ -277,6 +277,84 @@ export async function updateUserAction(
   return { ok: true };
 }
 
+const memberEmailSchema = z.string().email();
+
+/**
+ * Guards 2–6 of updateMemberEmailAction (tenant-scope, validate/normalize,
+ * no-op, uniqueness, update) — factored out from the "use server" action so
+ * it's callable directly in tests without a request-scoped session/cookie
+ * (requireAdmin/getCurrentMembership need `cookies()`, which only resolves
+ * under Next's server runtime). See the co-located test file.
+ *
+ * `async` even though the body is entirely synchronous (better-sqlite3):
+ * every export of a "use server" file is compiled as a Server Action
+ * reference, and Next requires those to be async functions.
+ */
+export async function applyMemberEmailUpdate(
+  tenantId: number,
+  userId: number,
+  rawEmail: string,
+): Promise<ActionResult> {
+  // 2. Tenant-scope the target: an admin may only change the email of someone
+  // who is actually a member of THEIR active clinic — never an arbitrary
+  // identity elsewhere in the control plane. Joining to `users` here also
+  // gets us the current email for the no-op check below in one query.
+  const target = authDb
+    .select({ email: users.email })
+    .from(memberships)
+    .innerJoin(users, eq(users.id, memberships.userId))
+    .where(and(eq(memberships.userId, userId), eq(memberships.tenantId, tenantId)))
+    .get();
+  if (!target) return { ok: false, error: "Not a member of this account" };
+
+  // 3. Validate + normalize.
+  const parsed = memberEmailSchema.safeParse(rawEmail);
+  if (!parsed.success) return { ok: false, error: "Invalid email" };
+  const email = parsed.data.trim().toLowerCase();
+
+  // 4. No-op guard: nothing to do.
+  if (email === target.email) return { ok: true };
+
+  // 5. Uniqueness: `users.email` is the login identity, globally unique across
+  // every tenant. Check it here so a collision is a clean error, not a raw
+  // unique-constraint crash (500) — and so we never silently hijack another
+  // identity's login email.
+  const clash = authDb
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.email, email), ne(users.id, userId)))
+    .get();
+  if (clash) {
+    return { ok: false, error: "That email is already in use by another account" };
+  }
+
+  // 6. Update the identity. `users.email` is shared by every membership this
+  // person has, so this changes their sign-in EVERYWHERE, not just the active
+  // clinic — deliberately not touching password/sessions here.
+  authDb
+    .update(users)
+    .set({ email, updatedAt: new Date() })
+    .where(eq(users.id, userId))
+    .run();
+  return { ok: true };
+}
+
+/**
+ * Change a member's login email. Auth-sensitive: `users.email` is the
+ * identity key on the control-plane `users` table — globally unique and
+ * shared across every tenant the person belongs to. Password + sessions are
+ * untouched (an email change is not a credential reset).
+ */
+export async function updateMemberEmailAction(
+  userId: number,
+  newEmail: string,
+): Promise<ActionResult> {
+  const { tenantId } = await adminContext(); // 1. requireAdmin() in the active tenant
+  const result = await applyMemberEmailUpdate(tenantId, userId, newEmail);
+  if (result.ok) revalidatePath("/settings/users");
+  return result;
+}
+
 const resetSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
   mustChange: z.boolean().optional(),
