@@ -137,6 +137,37 @@ a {
   .schedule-row > :first-child {
     grid-column: 1 / -1;
   }
+  .schedule-row .schedule-copydown {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+
+/* Fill-down button on each opening-hours row — copies that day's hours to the
+   days below. Class-based so :hover / :focus-visible work (inline can't). */
+.schedule-copydown {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 8px 10px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  background: transparent;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.schedule-copydown:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+.schedule-copydown:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 /* ── Interaction layer ───────────────────────────────────────────────────────

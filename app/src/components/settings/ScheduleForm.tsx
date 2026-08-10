@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { ArrowDownToLine } from "lucide-react";
 import { toast } from "sonner";
 import type { ClinicSettings } from "@/lib/settings";
 import { Button } from "@/components/ui/Button";
@@ -28,6 +29,19 @@ export function ScheduleForm({ settings }: Props) {
     }),
   );
 
+  /** Spreadsheet-style fill-down: copy this day's hours (incl. closed state) to
+   *  every day below it, so a whole week can be set from one row. */
+  function copyDown(fromDow: number) {
+    setHours((prev) => {
+      const src = prev.find((p) => p.dow === fromDow);
+      if (!src) return prev;
+      return prev.map((p) =>
+        p.dow > fromDow ? { ...p, closed: src.closed, open: src.open, close: src.close } : p,
+      );
+    });
+    toast.success(`Copied ${DAY_LABELS[fromDow]}'s hours to the days below.`);
+  }
+
   function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
@@ -52,7 +66,7 @@ export function ScheduleForm({ settings }: Props) {
               className="schedule-row"
               style={{
                 display: "grid",
-                gridTemplateColumns: "120px auto 1fr 1fr",
+                gridTemplateColumns: "120px auto 1fr 1fr 110px",
                 gap: 12,
                 alignItems: "center",
                 padding: "10px 0",
@@ -113,6 +127,20 @@ export function ScheduleForm({ settings }: Props) {
                 disabled={h.closed}
                 style={{ opacity: h.closed ? 0.4 : 1 }}
               />
+              {h.dow < 6 ? (
+                <button
+                  type="button"
+                  className="schedule-copydown"
+                  onClick={() => copyDown(h.dow)}
+                  title={`Copy ${DAY_LABELS[h.dow]}'s hours to every day below`}
+                  aria-label={`Copy ${DAY_LABELS[h.dow]}'s hours to every day below`}
+                >
+                  <ArrowDownToLine size={14} aria-hidden />
+                  Copy down
+                </button>
+              ) : (
+                <span aria-hidden />
+              )}
             </div>
           ))}
         </div>
