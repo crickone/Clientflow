@@ -2,44 +2,26 @@
 //
 // Tests the decision logic of updateMemberEmailAction (guards 2–6: tenant-
 // scope, validate/normalize, no-op, uniqueness, update) via the pure helper
-// it's built on, applyMemberEmailUpdate — exported from actions.ts
-// specifically so this is testable without a request-scoped session/cookie.
-// Guard 1 (requireAdmin, resolving the active tenant) lives in the "use
-// server" wrapper and isn't re-tested here: it's the same adminContext()
-// helper every other action in this file already relies on.
+// it's built on, applyMemberEmailUpdate (@/lib/users/emailUpdate) — a plain,
+// non-"use server" module (see that file for why: co-exporting it from the
+// "use server" actions.ts previously made it a live, unauthenticated Server
+// Action endpoint). Guard 1 (requireAdmin, resolving the active tenant)
+// lives in the "use server" wrapper, updateMemberEmailAction, and isn't
+// re-tested here: it's the same adminContext() helper every other action in
+// actions.ts already relies on.
 //
-// actions.ts -> @/lib/auth (react `cache`, next/headers, next/navigation
-// `redirect`) and -> @/lib/invites -> @/lib/db/tenant (react `cache`,
-// next/headers) -> ..., and actions.ts itself -> next/cache (revalidatePath,
-// which also pulls in react's package.json "react-server" entry internally).
-// Under the runner's `--conditions=react-server`, that entry point throws on
-// load — same issue + fix as tenant.test.ts / tools.marketing.test.ts: shim
-// `request === "react"` (verified this also covers next/cache's internal
-// react import) and stub next/navigation's `redirect` (never actually called
-// in this test's code path — applyMemberEmailUpdate doesn't call
-// requireAdminPage). Installed via a dynamic require (below) rather than a
-// static import, since a static `import ... from "./actions"` would be
-// hoisted and evaluated before this shim runs.
+// emailUpdate.ts only pulls in drizzle-orm, zod, and @/lib/db/{control,schema}
+// — none of which touch react/next/navigation — so, unlike a require of
+// actions.ts itself (which drags in @/lib/auth and @/lib/invites, and so
+// react `cache` / next/headers / next/navigation `redirect`), no module
+// shimming is needed here. `server-only`'s throwing default export is also a
+// non-issue: the test runner sets `--conditions=react-server`, which resolves
+// it to the package's no-op `react-server` entry instead (see scripts/test.mjs).
+//
+// Still loaded via a dynamic require (below), matching the controlSqlite
+// require right beside it, rather than a static top-level import.
 import assert from "node:assert/strict";
-import Module from "node:module";
 import { createRequire } from "node:module";
-
-type Loader = (request: string, ...rest: unknown[]) => unknown;
-const mod = Module as unknown as { _load: Loader };
-const realLoad = mod._load;
-mod._load = function (this: unknown, request: string, ...rest: unknown[]) {
-  if (request === "react") return { cache: (fn: unknown) => fn };
-  if (request === "next/navigation") {
-    return {
-      redirect: () => {
-        throw new Error(
-          "next/navigation.redirect() stub called unexpectedly in updateMemberEmail.test.ts",
-        );
-      },
-    };
-  }
-  return realLoad.call(this, request, ...rest);
-};
 
 const requireLocal = createRequire(import.meta.url);
 
@@ -49,8 +31,8 @@ const requireLocal = createRequire(import.meta.url);
 (async () => {
   const { controlSqlite } = requireLocal("../../../lib/db/control") as
     typeof import("../../../lib/db/control");
-  const { applyMemberEmailUpdate } = requireLocal("./actions") as
-    typeof import("./actions");
+  const { applyMemberEmailUpdate } = requireLocal("../../../lib/users/emailUpdate") as
+    typeof import("../../../lib/users/emailUpdate");
 
   const slug = "clf-test-member-email-tenant";
   const emailA = "clf-test-member-email-a@x.ie"; // member of the tenant — the one we edit
