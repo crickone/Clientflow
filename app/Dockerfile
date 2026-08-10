@@ -51,11 +51,14 @@ COPY --from=builder /app/node_modules/sharp ./node_modules/sharp
 COPY --from=builder /app/node_modules/@img ./node_modules/@img
 
 # IMAP email connector: imapflow/nodemailer/mailparser are serverComponentsExternalPackages
-# (see next.config.mjs), so output-file-tracing copies most of their closure into
-# .next/standalone/node_modules — but it misses these 6 transitive deps (htmlparser2 +
-# its family, pulled by mailparser's html-to-text via a computed require; process-warning,
-# pulled by imapflow). Without them, parsing an HTML email throws "Cannot find module" at
-# runtime. Copy them explicitly (versions follow whatever npm ci installed in the builder).
+# (see next.config.mjs), so output-file-tracing copies their closure into
+# .next/standalone/node_modules. Empirically it misses ONE runtime-required dep,
+# `process-warning` (imapflow -> pino requires it at runtime) — without it, connecting an
+# IMAP mailbox throws "Cannot find module 'process-warning'". That COPY is load-bearing.
+# The htmlparser2/dom* copies are belt-and-suspenders: mailparser's html-to-text resolves
+# its OWN nested copies (which tracing already emits), so these top-level ones are unused
+# today, but carried in case the runtime npm tree ever resolves them at top level.
+# Versions follow whatever npm ci installed in the builder.
 COPY --from=builder /app/node_modules/htmlparser2 ./node_modules/htmlparser2
 COPY --from=builder /app/node_modules/domhandler ./node_modules/domhandler
 COPY --from=builder /app/node_modules/domutils ./node_modules/domutils
