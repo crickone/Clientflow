@@ -41,6 +41,6 @@ export async function provisionGym(_prev: ProvisionState, formData: FormData): P
     });
     return { ok: true, tenantId: res.tenantId, tempPassword: res.tempPassword, name, ownerEmail };
   } catch (err) {
-    return { ok: false, error: err instanceof ApiError ? err.message : "Failed to provision gym." };
+    return { ok: false, error: err instanceof ApiError ? err.message : "Failed to provision business." };
   }
 }

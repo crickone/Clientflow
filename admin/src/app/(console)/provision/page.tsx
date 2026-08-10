@@ -21,7 +21,7 @@ function SubmitButton() {
   const { pending } = useFormStatus();
   return (
     <button className="btn btn--primary btn--md" type="submit" disabled={pending}>
-      {pending ? "Creating…" : "Create gym"}
+      {pending ? "Creating…" : "Create business"}
     </button>
   );
 }
@@ -37,7 +37,7 @@ export default function ProvisionPage() {
   if (state.ok) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 480 }}>
-        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>Provision gym</h1>
+        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>Provision business</h1>
         <div className="glass" style={{ padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ fontSize: 16, fontWeight: 600, color: "var(--green)" }}>✓ {state.name} is live</div>
           <div style={{ fontSize: 13.5, color: "var(--text-secondary)" }}>
@@ -66,7 +66,7 @@ export default function ProvisionPage() {
           </p>
           <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
             <a className="btn btn--primary btn--md" href={`/gyms/${state.tenantId}`}>
-              View gym
+              View business
             </a>
             <a className="btn btn--secondary btn--md" href="/provision">
               Provision another
@@ -79,7 +79,7 @@ export default function ProvisionPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 480 }}>
-      <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>Provision gym</h1>
+      <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>Provision business</h1>
       <form action={formAction} className="glass" style={{ padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
         <label style={label}>
           <span style={labelText}>Name</span>
