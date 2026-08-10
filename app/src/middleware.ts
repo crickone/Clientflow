@@ -61,6 +61,7 @@ export function middleware(req: NextRequest) {
     !pathname.startsWith("/site-media/") &&
     !pathname.startsWith("/api/") &&
     !pathname.startsWith("/_next") &&
+    !pathname.startsWith("/f/") && // public form share links must resolve on a client's own mapped domain too
     pathname !== "/sitemap.xml" &&
     pathname !== "/robots.txt"
   ) {
@@ -77,6 +78,13 @@ export function middleware(req: NextRequest) {
     pathname === "/sitemap.xml" ||
     pathname === "/robots.txt"
   ) {
+    return pass();
+  }
+
+  // Public form share links (`/f/<slug>` render + its `/f/<slug>/submit`
+  // handler) — unauthenticated lead-capture pages. Tenant is resolved
+  // server-side from the slug (lib/publicForms.ts), never from a session.
+  if (pathname.startsWith("/f/")) {
     return pass();
   }
 

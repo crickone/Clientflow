@@ -1047,6 +1047,33 @@ export const siteDomains = sqliteTable(
   }),
 );
 
+// Public form-share routing (Batch 4c, improvement-plan-2026-08.md Theme D5) —
+// the same problem as site_domains above, one level down: a contact form's
+// `share_slug` (tenant db: forms.share_slug) is only unique WITHIN its own
+// tenant's forms table, so an unauthenticated `/f/<slug>` request can't know
+// which tenant DB to open from the slug alone. This control-plane table maps
+// the (globally unique) slug straight to {tenantId, formId} — one indexed
+// read, no scanning every tenant. Kept in sync by saveForm()/deleteForm()
+// (lib/forms.ts) whenever a contact form's share_slug is created/rotated/removed.
+export const formShareLinks = sqliteTable(
+  "form_share_links",
+  {
+    shareSlug: text("share_slug").primaryKey(),
+    tenantId: integer("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    formId: integer("form_id").notNull(), // logical ref into that tenant db's forms table
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => ({
+    byTenantForm: index("idx_form_share_links_tenant_form").on(t.tenantId, t.formId),
+  }),
+);
+
+export type FormShareLink = typeof formShareLinks.$inferSelect;
+
 export type Client = typeof clients.$inferSelect;
 export type NewClient = typeof clients.$inferInsert;
 export type Therapy = typeof therapies.$inferSelect;
@@ -1815,6 +1842,35 @@ export const formQuestions = sqliteTable(
 
 export type FormRow = typeof forms.$inferSelect;
 export type FormQuestionRow = typeof formQuestions.$inferSelect;
+
+// A public submission to a contact form (Batch 4c, improvement-plan-2026-08.md
+// Theme D5 — the /f/<slug> public render + submissions gap). Lives in the
+// TENANT db (same file as `forms`), so `tenant_id` here is a logical stamp of
+// the server-resolved owner at submit time (defence in depth / auditability)
+// rather than an FK — the control plane's `tenants` table is a different
+// physical SQLite file, same reasoning as site_domains.site_id below.
+export const formSubmissions = sqliteTable(
+  "form_submissions",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    formId: integer("form_id")
+      .notNull()
+      .references(() => forms.id, { onDelete: "cascade" }),
+    tenantId: integer("tenant_id").notNull(),
+    submitterName: text("submitter_name"),
+    submitterEmail: text("submitter_email"),
+    // JSON: { answers: [{ questionId, section, label, fieldType, value }] } —
+    // a label/type snapshot at submit time, so the admin view still reads
+    // sensibly even if the question is later edited or removed.
+    payload: text("payload").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => ({ byForm: index("idx_form_submissions_form").on(t.formId) }),
+);
+
+export type FormSubmissionRow = typeof formSubmissions.$inferSelect;
 
 // ── Per-client assignment (nutrition plans + workout programs) ────────────────
 

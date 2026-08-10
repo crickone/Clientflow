@@ -156,6 +156,19 @@ export function ensureControlTables() {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_site_domains_host ON site_domains(host);
     CREATE INDEX IF NOT EXISTS idx_site_domains_tenant_site ON site_domains(tenant_id, site_id);
 
+    -- Public form-share routing (Batch 4c, improvement-plan-2026-08.md Theme
+    -- D5): maps a contact form's (globally unique) share_slug straight to its
+    -- owning tenant + form id, so an unauthenticated /f/<slug> request can
+    -- resolve its tenant WITHOUT scanning every tenant db. See
+    -- schema.ts's formShareLinks comment / lib/forms.ts's saveForm/deleteForm.
+    CREATE TABLE IF NOT EXISTS form_share_links (
+      share_slug TEXT PRIMARY KEY,
+      tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      form_id INTEGER NOT NULL,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_form_share_links_tenant_form ON form_share_links(tenant_id, form_id);
+
     -- Shared CMS media library ("the CDN"). Lives in the control plane so a
     -- single pool of images is usable across EVERY site and tenant. Bytes are
     -- stored by the storage layer (data/cms-library/<storage_key>, R2-ready) and

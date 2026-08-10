@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Plus, X } from "lucide-react";
+import { ArrowLeft, Inbox, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
@@ -20,7 +20,16 @@ import {
   type QuestionInput,
 } from "@/lib/formsModel";
 
-export function ContactFormBuilder({ initial, meta }: { initial: FormInput; meta: FormTypeMeta }) {
+export function ContactFormBuilder({
+  initial,
+  meta,
+  submissionCount = 0,
+}: {
+  initial: FormInput;
+  meta: FormTypeMeta;
+  /** Only meaningful for an already-saved form — see the "View submissions" link below. */
+  submissionCount?: number;
+}) {
   const router = useRouter();
   const [title, setTitle] = useState(initial.title);
   const [status, setStatus] = useState(initial.status);
@@ -53,6 +62,16 @@ export function ContactFormBuilder({ initial, meta }: { initial: FormInput; meta
           <ArrowLeft size={16} />
         </Button>
         <h1 style={{ margin: 0, fontFamily: "var(--font-heading), sans-serif", fontSize: 22, textTransform: "uppercase" }}>{meta.builderTitle}</h1>
+        {initial.id != null && (
+          <Button
+            variant="outline"
+            size="sm"
+            style={{ marginLeft: "auto" }}
+            onClick={() => router.push(`/forms/contact/${initial.id}/submissions`)}
+          >
+            <Inbox size={14} /> View submissions ({submissionCount})
+          </Button>
+        )}
       </div>
 
       <div style={card}>

@@ -1,7 +1,5 @@
 import "server-only";
 
-import type { NextRequest } from "next/server";
-
 /**
  * Minimal in-memory fixed-window rate limiter. The app runs as a single Node
  * process (one Railway instance — SQLite is single-writer, we never scale > 1),
@@ -70,9 +68,11 @@ export function resetRateLimit(key: string): void {
  * Best-effort client IP. Behind Railway's proxy the real client is the first
  * entry of `x-forwarded-for`; fall back to the platform value or a sentinel.
  * A spoofed XFF only lets an attacker rate-limit *themselves*, so this is safe
- * for throttling.
+ * for throttling. Typed as the standard `Request` (NextRequest satisfies it —
+ * it extends Request) rather than importing `next/server` for a function that
+ * only ever reads `.headers`.
  */
-export function clientIp(req: NextRequest): string {
+export function clientIp(req: Request): string {
   const xff = req.headers.get("x-forwarded-for");
   if (xff) return xff.split(",")[0]!.trim();
   return req.headers.get("x-real-ip")?.trim() || "unknown";

@@ -58,12 +58,16 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Render WITHOUT the admin shell for: public CMS-served sites (/site/*) and the
-  // full-screen visual editor (/cms/<slug>/studio). The studio still enforces
-  // admin auth in its own page; the public routes are allow-listed in middleware.
+  // Render WITHOUT the admin shell for: public CMS-served sites (/site/*), public
+  // form share links (/f/<slug> — Batch 4c), and the full-screen visual editor
+  // (/cms/<slug>/studio). The studio still enforces admin auth in its own page;
+  // the public routes are allow-listed in middleware. Without this, an anonymous
+  // visitor hitting a share link would be wrapped in the logged-out admin
+  // sidebar chrome (and getCurrentTenant() below would resolve the unrelated
+  // DEFAULT tenant) instead of seeing a standalone branded form.
   const pathname = headers().get("x-pathname") ?? "";
   const isStudio = /^\/cms\/[^/]+\/studio(\/|$)/.test(pathname);
-  if (pathname.startsWith("/site/") || isStudio) {
+  if (pathname.startsWith("/site/") || pathname.startsWith("/f/") || isStudio) {
     return (
       <html lang="en" className={FONT_VARS}>
         <body>{children}</body>

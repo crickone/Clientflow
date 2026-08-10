@@ -3,7 +3,9 @@ import "server-only";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { formQuestions, forms } from "@/lib/db/schema";
+import { controlDb } from "@/lib/db/control";
+import { getCurrentTenant } from "@/lib/db/tenant";
+import { formQuestions, formShareLinks, formSubmissions, forms } from "@/lib/db/schema";
 import type { FieldType, FormInput, FormType, QuestionInput } from "@/lib/formsModel";
 
 function parseOpts(csv: string | null): string[] {
@@ -88,11 +90,13 @@ function randomSlug(): string {
 }
 
 export function saveForm(input: FormInput): number {
-  return db.transaction((tx) => {
+  let slugOut: string | null = null;
+  const savedFormId = db.transaction((tx) => {
     const slug =
       input.type === "contact"
         ? tx.select({ s: forms.shareSlug }).from(forms).where(eq(forms.id, input.id ?? 0)).get()?.s || randomSlug()
         : null;
+    slugOut = slug;
     const base = {
       type: input.type,
       title: input.title.trim(),
@@ -136,10 +140,38 @@ export function saveForm(input: FormInput): number {
     });
     return formId;
   });
+  // Contact forms are the only public form type (see FORM_TYPE_META.contact).
+  // Keep the control-plane share-link mapping (the public /f/<slug> resolver's
+  // source of truth — see lib/publicForms.ts) in sync with this tenant db's
+  // row, mirroring the CMS's site_domains host-routing pattern.
+  if (input.type === "contact" && slugOut) syncFormShareLink(slugOut, savedFormId);
+  return savedFormId;
+}
+
+/** Upsert the control-plane slug->{tenant,form} mapping a saved contact form
+ *  needs to be publicly resolvable. Only ever called from a live admin
+ *  request (saveForm <- saveFormAction, after requireUser()), so the current
+ *  tenant is always resolvable here. */
+function syncFormShareLink(shareSlug: string, formId: number): void {
+  const tenantId = getCurrentTenant().id;
+  controlDb
+    .insert(formShareLinks)
+    .values({ shareSlug, tenantId, formId })
+    .onConflictDoUpdate({ target: formShareLinks.shareSlug, set: { tenantId, formId } })
+    .run();
 }
 
 export function deleteForm(id: number) {
+  // formId alone isn't globally unique (each tenant db autoincrements its own
+  // forms table), so the control-plane cleanup must be scoped to THIS tenant —
+  // otherwise it could delete another tenant's identically-numbered form's
+  // mapping row.
+  const tenantId = getCurrentTenant().id;
   db.delete(forms).where(eq(forms.id, id)).run();
+  controlDb
+    .delete(formShareLinks)
+    .where(and(eq(formShareLinks.tenantId, tenantId), eq(formShareLinks.formId, id)))
+    .run();
 }
 
 export function setFormStatus(id: number, status: boolean) {
@@ -163,4 +195,59 @@ export function duplicateForm(id: number): number | null {
   const f = getForm(id);
   if (!f) return null;
   return saveForm({ ...f, id: undefined, title: `${f.title || "Form"} (copy)`, isDefault: false });
+}
+
+// ── Submissions (admin, read-only — Batch 4c) ──────────────────────────────
+// Written by the public /f/<slug> submit route (lib/publicForms.ts,
+// insertFormSubmission) via the tenant it resolved server-side; read here
+// through the ordinary ambient `db` since these pages are session-gated.
+
+export interface SubmissionAnswer {
+  questionId: number;
+  section: string;
+  label: string;
+  fieldType: FieldType;
+  value: string;
+}
+
+export interface FormSubmissionListRow {
+  id: number;
+  submitterName: string | null;
+  submitterEmail: string | null;
+  answers: SubmissionAnswer[];
+  createdAt: number;
+}
+
+export function getFormSubmissions(formId: number): FormSubmissionListRow[] {
+  const rows = db
+    .select()
+    .from(formSubmissions)
+    .where(eq(formSubmissions.formId, formId))
+    .orderBy(desc(formSubmissions.createdAt))
+    .all();
+  return rows.map((r) => {
+    let answers: SubmissionAnswer[] = [];
+    try {
+      const parsed = JSON.parse(r.payload) as { answers?: SubmissionAnswer[] };
+      if (Array.isArray(parsed?.answers)) answers = parsed.answers;
+    } catch {
+      // Corrupt/legacy payload — surface no answers rather than throwing and
+      // taking the whole admin list down with it.
+    }
+    return {
+      id: r.id,
+      submitterName: r.submitterName,
+      submitterEmail: r.submitterEmail,
+      answers,
+      createdAt: r.createdAt.getTime(),
+    };
+  });
+}
+
+export function getFormSubmissionCount(formId: number): number {
+  return db
+    .select({ id: formSubmissions.id })
+    .from(formSubmissions)
+    .where(eq(formSubmissions.formId, formId))
+    .all().length;
 }

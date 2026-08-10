@@ -836,6 +836,20 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     );
     CREATE INDEX IF NOT EXISTS idx_form_questions_form ON form_questions(form_id);
 
+    -- Public submissions to a contact form (Batch 4c, improvement-plan-2026-08.md
+    -- Theme D5). tenant_id is a logical stamp (server-resolved at submit time,
+    -- never client input) — see schema.ts's formSubmissions comment.
+    CREATE TABLE IF NOT EXISTS form_submissions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      form_id INTEGER NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
+      tenant_id INTEGER NOT NULL,
+      submitter_name TEXT,
+      submitter_email TEXT,
+      payload TEXT NOT NULL,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_form_submissions_form ON form_submissions(form_id);
+
     CREATE TABLE IF NOT EXISTS client_nutrition_plans (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
