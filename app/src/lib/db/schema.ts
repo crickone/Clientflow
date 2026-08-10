@@ -591,6 +591,35 @@ export const gmailConnections = sqliteTable("gmail_connections", {
     .default(sql`(unixepoch() * 1000)`),
 });
 
+// A tenant's connected IMAP/SMTP mailbox (generic, non-Gmail) — the "bring
+// your own mailbox" alternative to gmail_connections above, for businesses on
+// e.g. Microsoft 365 or cPanel/Hostinger hosted email. One per tenant. The
+// mailbox password is stored ENCRYPTED (see lib/google/tokenCrypto — the same
+// AES-256-GCM helper Gmail's OAuth tokens use, applied to a plain password
+// here instead of a token).
+export const imapConnections = sqliteTable("imap_connections", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  tenantId: integer("tenant_id")
+    .notNull()
+    .unique()
+    .references(() => tenants.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  imapHost: text("imap_host").notNull(),
+  imapPort: integer("imap_port").notNull(),
+  imapSecure: integer("imap_secure", { mode: "boolean" }).notNull().default(true),
+  smtpHost: text("smtp_host").notNull(),
+  smtpPort: integer("smtp_port").notNull(),
+  smtpSecure: integer("smtp_secure", { mode: "boolean" }).notNull().default(true),
+  username: text("username").notNull(),
+  passwordEnc: text("password_enc").notNull(),
+  fromName: text("from_name"),
+  lastSyncAt: integer("last_sync_at", { mode: "timestamp_ms" }),
+  connectedByUserId: integer("connected_by_user_id").references(() => users.id),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
 // Control-plane: per-tenant API keys for server-to-server integrations
 // (Zapier/Make/Facebook lead-gen → the inbound-leads webhook). Only the sha256
 // HASH of a key is stored (key_hash); the raw key is shown to the admin once at

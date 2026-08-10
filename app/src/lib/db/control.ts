@@ -250,6 +250,27 @@ export function ensureControlTables() {
       created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
 
+    -- A tenant's connected IMAP/SMTP mailbox (generic, non-Gmail). Password
+    -- stored ENCRYPTED. Parallels gmail_connections above for businesses on a
+    -- non-Google mailbox (e.g. Microsoft 365, cPanel/Hostinger hosted email).
+    CREATE TABLE IF NOT EXISTS imap_connections (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id INTEGER NOT NULL UNIQUE REFERENCES tenants(id) ON DELETE CASCADE,
+      email TEXT NOT NULL,
+      imap_host TEXT NOT NULL,
+      imap_port INTEGER NOT NULL,
+      imap_secure INTEGER NOT NULL DEFAULT 1,
+      smtp_host TEXT NOT NULL,
+      smtp_port INTEGER NOT NULL,
+      smtp_secure INTEGER NOT NULL DEFAULT 1,
+      username TEXT NOT NULL,
+      password_enc TEXT NOT NULL,
+      from_name TEXT,
+      last_sync_at INTEGER,
+      connected_by_user_id INTEGER REFERENCES users(id),
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+
     -- ── Platform billing (spec 2026-07-21) ────────────────────────────────
     -- One row per tenant that participates in billing. Legacy tenants without
     -- a row are NOT gated. billing_exempt=1 → agency-run tenant: shown as
