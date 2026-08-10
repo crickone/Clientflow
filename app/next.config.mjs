@@ -41,6 +41,17 @@ const nextConfig = {
   // deploy. Skip the in-Docker type-check, which is redundant and has flaked
   // (OOM on Railway's builder) — keeping production builds reliable.
   typescript: { ignoreBuildErrors: true },
+  // ESLint (Batch 7a, improvement-plan-2026-08.md Theme G1): app/.eslintrc.json
+  // was added as a REPORTING gate — `npm run lint` / CI's non-blocking Lint
+  // step — against an unaddressed pre-existing backlog (17 errors/6 warnings
+  // at the time this was added). Next's build step runs its own internal
+  // ESLint pass and FAILS the build on any error-level rule by default; without
+  // this flag, simply adding a valid config would turn `next build` (and every
+  // deploy) red overnight. Same rationale/pattern as `typescript.ignoreBuildErrors`
+  // above — the real gate is the separate `next lint` step, not the build.
+  // Revisit once the backlog is cleared (see the Lint step's comment in
+  // .github/workflows/ci.yml).
+  eslint: { ignoreDuringBuilds: true },
   experimental: {
     // Batch 1 fix wave (review finding #1, CRITICAL): on Next 14, `register()`
     // in src/instrumentation.ts is ONLY invoked — and the file is only emitted

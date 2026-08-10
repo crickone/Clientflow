@@ -48,5 +48,12 @@ jobs:
         run: npm run build:prod
 
       - name: Lint
+        # Reporting-only gate (Batch 7a, improvement-plan-2026-08.md Theme G1):
+        # `next lint` had no config until this batch, so the existing warning/
+        # error backlog is unknown and unaddressed. continue-on-error keeps
+        # this step visible in the CI summary without failing the run or
+        # blocking deploys. Once the backlog is cleared (or intentionally
+        # accepted via .eslintrc overrides), drop continue-on-error to make
+        # lint a real gate.
         run: npm run lint
         continue-on-error: true

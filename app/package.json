@@ -1,5 +1,5 @@
 {
-  "name": "renova-cellular-health",
+  "name": "clientflow",
   "version": "1.0.0",
   "private": true,
   "engines": {
@@ -77,6 +77,8 @@
     "autoprefixer": "^10.4.20",
     "cross-env": "^7.0.3",
     "drizzle-kit": "^0.31.10",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "14.2.35",
     "playwright-core": "^1.60.0",
     "postcss": "^8.4.45",
     "tailwindcss": "^3.4.10",

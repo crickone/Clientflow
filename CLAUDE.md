@@ -5,7 +5,9 @@
 **ClientFlow** is a multi-tenant platform (Next.js 14, App Router) that the agency
 uses to run client businesses and **build/manage their websites** under one roof.
 It combines a CRM (clients, appointments, leads, packages, content studio) with a
-**multi-site CMS** (pages, blog, SEO, media, a visual editor, and per-site domains).
+**multi-site CMS** (pages, blog, SEO, media, a visual editor, and per-site domains)
+and an **AI agent layer** (an Orchestrator + domain specialists that work a
+tenant's own data, gated by an operator-approval step — see "Agents & AI" below).
 
 The first managed website is **Renova Cellular Health** (a wellness clinic in
 Clonmel, Co. Tipperary — optimalhealthatinspire.ie · ☎ 083 867 2844).
@@ -17,16 +19,25 @@ Clonmel, Co. Tipperary — optimalhealthatinspire.ie · ☎ 083 867 2844).
 
 ```
 <root>/
-  app/                      ← the ClientFlow platform (Next.js CMS + CRM)
+  app/                      ← the ClientFlow platform (Next.js CRM + CMS + AI agents)
     src/                    ← app code
-    data/                   ← SQLite DBs (control.db, clinic.db, tenants/<slug>/…)
+    data/                   ← SQLite DBs: control.db (control plane: users, sessions, tenant
+                               registry, domain routing, AI usage) + tenants/<slug>/<slug>.db,
+                               one file per business (e.g. tenants/inspire/inspire.db). The
+                               original tenant (Renova) is still special-cased to legacy
+                               data/clinic.db — see src/lib/db/tenant.ts.
     public/sites/<slug>/    ← per-site static assets (namespaced)
+  admin/                    ← separate Next.js app: the platform console (subscriptions/
+                               billing, admin.clientflow.ie) — its own package.json, deployed
+                               as its own Railway service. Not part of the app/ CRM+CMS.
   sites/
-    renova/                 ← Renova bespoke website SOURCE (static HTML, assets, …)
-    <client>/               ← future client site source folders
+    renova/, inspire/, clientflow/, clientflow-web/  ← bespoke website SOURCE per client
+                               (static HTML, assets, …), imported into the CMS (see below)
   tools/
     import-site.cjs         ← import a site folder's HTML into the CMS
-  extract/                  ← legacy OHR ad-library extractor (referenced by app build)
+  extract/                  ← legacy ad-library HTML extractor that predates ClientFlow. Only
+                               wired into the dev-only `npm run build` — NOT `build:prod`,
+                               which is what CI/Docker/Railway actually run.
 ```
 
 ## The CMS (in `app/src`)
@@ -44,6 +55,39 @@ Clonmel, Co. Tipperary — optimalhealthatinspire.ie · ☎ 083 867 2844).
   the `clientflow-live` template (renders first-party HTML verbatim incl. its own
   styles + scripts, so GSAP/Lenis animations run).
 - **AI blog** reuses `src/lib/ai/draftBlog.ts` + `src/lib/blog/generator.ts`.
+
+## Agents & AI (in `app/src/lib/agents` + `app/src/lib/ai`)
+
+- **Orchestrator + specialists:** the Orchestrator (`src/lib/agents/specialists/orchestrator.ts`)
+  is a thin chief-of-staff — it does no domain work itself, only routes a
+  request to the right specialist (Sales, Marketing, Operations — see
+  `AGENT_CATALOG` in `src/lib/agents/registry.ts`; Finance is modeled but
+  dormant) or to the **Concierge**, a general-purpose assistant (the same
+  system/tools as `/api/assistant/chat`, computed at runtime rather than a
+  fixed catalog entry) for anything else — inbox, WhatsApp, invoices,
+  nutrition/workout plans, general admin. All of them share one loop
+  (`runAgentTurn`); reachable from `/agents` (org chart + per-agent detail)
+  or `/api/agents/[key]/chat`.
+- **Write-approval gate:** no agent call ever executes a write inline —
+  every write tool call is collected as a `pendingWrite` and returned for
+  the operator to explicitly approve before it runs. This holds through
+  delegation too: a specialist (or the Concierge) invoked BY the
+  Orchestrator still can't write on its own.
+- **Metered spend cap:** every paid AI call is metered per tenant
+  (`src/lib/ai/usage.ts`) against a monthly cap — €25/tenant by default,
+  admin-adjustable €1–€1000 from the Agents page (`CapEditor`). Call sites
+  check `assertUnderCap()` before calling out and `recordUsage()` after.
+- **Multi-provider models:** `src/lib/ai/providers/` resolves a model id to
+  the provider that runs it — native Anthropic models, or `openrouter:`-prefixed
+  ids via `OpenRouterProvider` (e.g. DeepSeek, Kimi, GPT-5) — behind one
+  provider-neutral turn loop, so tool dispatch/approval/metering never see a
+  provider-specific wire format.
+- **Durable runs:** the specialist chat route runs `runAgentTurn` in a
+  detached, tenant-bound continuation that keeps going after the response
+  has streamed back (Railway runs this app as a persistent `next start`
+  process, not serverless); `src/lib/agents/runStore.ts` persists run
+  progress so a client that disconnects mid-run can reconnect instead of
+  losing it.
 
 ## Adding a new client website
 
@@ -64,11 +108,24 @@ Clonmel, Co. Tipperary — optimalhealthatinspire.ie · ☎ 083 867 2844).
   `--surface-*`, `--accent`, `color-scheme: dark`). The public Renova site keeps
   its own styles (independent of the admin theme).
 
-## OHR business details (Renova ad copy)
+## Deployment
 
-```
-Business:  Optimal Health & Recovery / Renova Cellular Health
-Location:  Ard Gaoithe Business Park, Clonmel, Co. Tipperary
-Website:   optimalhealthatinspire.ie   ☎ 083 867 2844
-Therapies: HBOT · Infrared · PEMF   (no standalone Red Light Therapy)
-```
+- **Railway**, running this app as a persistent Node process (`next start`
+  against the `output: "standalone"` build) — not serverless — built from
+  `app/Dockerfile` (multi-stage: installs + `build:prod`, then a slim
+  runtime image with the standalone server plus native deps it can't
+  auto-trace: better-sqlite3, ffmpeg-static/ffprobe-static).
+- **Deploy is `railway up`, always run from inside `app/`** — `cd app`
+  first; the Railway service is rooted there (the sibling `admin/` app is
+  its own, separately deployed Railway service).
+- Before deploying: `npx next build` must succeed locally (the Docker build
+  intentionally skips `tsc` — see `next.config.mjs`'s
+  `typescript.ignoreBuildErrors` comment — it OOMs on Railway's builder),
+  plus `npm run typecheck` and `npm test`. CI (`.github/workflows/ci.yml`)
+  runs all three (typecheck, test, `build:prod`) on every push/PR to `main`,
+  plus a non-blocking `npm run lint` — but CI does not deploy; `railway up`
+  is still a separate, manual step.
+- `main` is the source of truth — land changes there before deploying, even
+  though the deploy command itself doesn't currently enforce that.
+- `/api/health` is the unauthenticated liveness probe (checks the control
+  DB) that Railway/uptime monitoring hits.
