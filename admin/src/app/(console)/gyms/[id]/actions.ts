@@ -37,3 +37,27 @@ export async function tenantAction(
     return { ok: false, error: err instanceof ApiError ? err.message : "Action failed" };
   }
 }
+
+/**
+ * "Open business": a dedicated action (not `tenantAction`) because success
+ * hands back a one-time login URL rather than a bare `{ok}` — the platform
+ * API mints the token server-side (guarded, service key + platform-admin
+ * session) and this just relays it. The CLIENT is responsible for opening
+ * that URL in a new tab; this action never redirects the console itself.
+ */
+export async function openTenant(
+  id: number,
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  try {
+    const res = await api<{ ok: true; url: string }>(`/tenants/${id}/open`, {
+      method: "POST",
+      body: {},
+    });
+    revalidatePath(`/gyms/${id}`); // the "opened_by_admin" event now shows in Events
+    revalidatePath("/gyms");
+    revalidatePath("/");
+    return { ok: true, url: res.url };
+  } catch (err) {
+    return { ok: false, error: err instanceof ApiError ? err.message : "Action failed" };
+  }
+}

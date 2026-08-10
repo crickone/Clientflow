@@ -3,6 +3,8 @@ import { z } from "zod";
 
 import { guardPlatform } from "@/lib/platform/auth";
 import { setTenantVenueType } from "@/lib/platform/queries";
+import { grantAdminMembership } from "@/lib/platform/access";
+import { createOpenToken } from "@/lib/platform/openToken";
 import {
   chargeOutstanding,
   compMonths,
@@ -12,6 +14,7 @@ import {
   setBillingExempt,
   suspendTenant,
   waiveInvoice,
+  logEvent,
 } from "@/lib/billing/engine";
 
 export const dynamic = "force-dynamic";
@@ -64,6 +67,19 @@ export async function POST(
         const b = z.object({ venueType: z.enum(["gym", "clinic"]) }).parse(await req.json());
         setTenantVenueType(id, b.venueType);
         break;
+      }
+      case "open": {
+        // "Open business": grant the PLATFORM ADMIN'S OWN identity (g.userId —
+        // never a fake/owner user) a real, idempotent admin membership in this
+        // tenant, audit it, then mint a one-time token the app's public /open
+        // route exchanges for a normal login session. Never returns a session
+        // or token-minting capability to the client directly — only a URL
+        // carrying an opaque, single-use, ≤60s token.
+        grantAdminMembership(id, g.userId);
+        logEvent(id, "opened_by_admin", null, actor);
+        const token = createOpenToken(g.userId, id);
+        const appUrl = (process.env.APP_URL ?? "https://app.clientflow.ie").replace(/\/+$/, "");
+        return NextResponse.json({ ok: true, url: `${appUrl}/open?token=${token}` });
       }
       case "offboard":
         offboardTenant(id, actor);

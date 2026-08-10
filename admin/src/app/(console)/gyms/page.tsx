@@ -4,7 +4,9 @@ import { api } from "@/lib/api";
 import { fmtDate, fmtDay } from "@/lib/format";
 import { StatusChip } from "@/components/StatusChip";
 import { Card } from "@/components/ui/Card";
+import { OpenBusinessButton } from "@/components/OpenBusinessButton";
 import type { TenantsResponse } from "@/lib/types";
+import { openTenant } from "./[id]/actions";
 
 export default async function GymsPage({ searchParams }: { searchParams: { q?: string } }) {
   const q = searchParams.q ?? "";
@@ -39,6 +41,7 @@ export default async function GymsPage({ searchParams }: { searchParams: { q?: s
                 <th>Status</th>
                 <th>Next renewal</th>
                 <th>Joined</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -56,6 +59,9 @@ export default async function GymsPage({ searchParams }: { searchParams: { q?: s
                   </td>
                   <td>{fmtDay(t.billing?.nextRenewalAt ?? null)}</td>
                   <td>{fmtDate(t.createdAt)}</td>
+                  <td>
+                    <OpenBusinessButton action={openTenant.bind(null, t.id)} />
+                  </td>
                 </tr>
               ))}
             </tbody>

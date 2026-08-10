@@ -10,9 +10,12 @@ import { Logo } from "@/components/ui/Logo";
 export function LoginForm({
   logoSrc,
   businessName,
+  notice,
 }: {
   logoSrc: string | null;
   businessName: string;
+  /** A non-error, informational banner (e.g. an expired one-time link). */
+  notice?: string | null;
 }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -95,6 +98,22 @@ export function LoginForm({
         >
           Access your dashboard.
         </p>
+
+        {notice && (
+          <div
+            style={{
+              background: "var(--accent-soft)",
+              border: "1px solid rgba(255, 106, 50, 0.3)",
+              color: "var(--accent-ink)",
+              fontSize: 13,
+              padding: "8px 12px",
+              borderRadius: "var(--radius)",
+              marginBottom: 14,
+            }}
+          >
+            {notice}
+          </div>
+        )}
 
         <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>

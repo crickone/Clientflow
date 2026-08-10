@@ -1,6 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/accept-invite"];
+// "/open" is the platform "Open business" token handoff: pre-session (no
+// cookie yet when it's first hit) but does nothing without a valid one-time
+// token — see app/open/route.ts.
+const PUBLIC_PATHS = ["/login", "/accept-invite", "/open"];
 // Logo is shown on the (logged-out) login screen and isn't sensitive.
 // The WhatsApp webhook is a server-to-server callback; it's secret-verified
 // inside the route handler.

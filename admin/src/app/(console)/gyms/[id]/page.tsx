@@ -5,9 +5,10 @@ import { api, ApiError } from "@/lib/api";
 import { fmtCents, fmtDate, fmtDay } from "@/lib/format";
 import { StatusChip } from "@/components/StatusChip";
 import { ConfirmButton } from "@/components/ConfirmButton";
+import { OpenBusinessButton } from "@/components/OpenBusinessButton";
 import { Card } from "@/components/ui/Card";
 import type { InvoiceRow, TenantDetail } from "@/lib/types";
-import { tenantAction } from "./actions";
+import { tenantAction, openTenant } from "./actions";
 
 /** Invoice statuses are a different vocabulary from billing statuses, so they
  *  don't reuse the `.chip.<status>` CSS — colour them inline instead. */
@@ -59,6 +60,13 @@ export default async function GymDetailPage({ params }: { params: { id: string }
           <StatusChip status={status} exempt={billing?.billingExempt} />
           <span style={{ fontFamily: "var(--font-mono), ui-monospace, monospace", fontSize: 11, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--text-secondary)", background: "var(--surface-2)", border: "1px solid var(--grid)", borderRadius: 999, padding: "3px 10px" }}>
             {tenant.venueType ?? "Not set"}
+          </span>
+          <span style={{ marginLeft: "auto" }}>
+            <OpenBusinessButton
+              action={openTenant.bind(null, tenant.id)}
+              label="Open business"
+              className="btn btn--primary btn--sm"
+            />
           </span>
         </div>
         <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>

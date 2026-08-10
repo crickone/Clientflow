@@ -319,6 +319,23 @@ export function ensureControlTables() {
       value TEXT NOT NULL
     );
 
+    -- One-time, short-lived, single-use token for the platform "Open business"
+    -- login handoff (console → app — different origins, no shared cookie). Bound
+    -- to a specific (user_id, tenant_id): the app's /open route trusts ONLY a
+    -- valid token, never a query userId/tenantId directly. used_at is set
+    -- atomically by the same UPDATE that validates the token (see
+    -- consumeOpenToken in lib/platform/openToken.ts), so a token can never be
+    -- replayed. Rows are opportunistically pruned once expired.
+    CREATE TABLE IF NOT EXISTS platform_open_tokens (
+      token      TEXT PRIMARY KEY,
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      tenant_id  INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      expires_at INTEGER NOT NULL,
+      used_at    INTEGER,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_open_tokens_expires ON platform_open_tokens(expires_at);
+
     -- A pending hosted-capture session (provider-agnostic): maps the provider's
     -- session ref back to the tenant + purpose on callback/completion.
     CREATE TABLE IF NOT EXISTS capture_sessions (
