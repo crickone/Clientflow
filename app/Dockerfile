@@ -43,6 +43,12 @@ COPY --from=builder /app/node_modules/bindings ./node_modules/bindings
 COPY --from=builder /app/node_modules/file-uri-to-path ./node_modules/file-uri-to-path
 COPY --from=builder /app/node_modules/ffmpeg-static ./node_modules/ffmpeg-static
 COPY --from=builder /app/node_modules/ffprobe-static ./node_modules/ffprobe-static
+# sharp (Batch 5c) is a serverComponentsExternalPackage (NOT bundled by Next) and
+# ships its native libvips binary under @img/*, which standalone tracing misses —
+# without these the image-resize upload path throws "Cannot find module 'sharp'"
+# at runtime. Copy sharp + its @img platform binaries explicitly.
+COPY --from=builder /app/node_modules/sharp ./node_modules/sharp
+COPY --from=builder /app/node_modules/@img ./node_modules/@img
 
 # The persistent volume mounts here at runtime (DBs + uploads + media). Creating
 # it keeps a no-volume run from crashing on first write.
