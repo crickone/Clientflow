@@ -11,6 +11,17 @@ export const AGENT_CATALOG: AgentDef[] = [
   { key: "sales", name: "Sales", mandate: "Works leads: instant replies + relentless follow-up.", status: "active", defaultModel: MODELS.sonnet },
   { key: "marketing", name: "Marketing", mandate: "Runs the Marketing Brain: campaigns + social.", status: "active", defaultModel: MODELS.sonnet },
   { key: "operations", name: "Operations", mandate: "No-shows, class fill, attendance, admin.", status: "active", defaultModel: MODELS.sonnet },
+  // First-class Concierge (.superpowers/sdd/concierge-agent-brief.md): the
+  // general-purpose worker the Orchestrator's `delegate_to_concierge` tool
+  // hands off to (@/lib/agents/tools.orchestrator) for everything outside
+  // Sales/Marketing/Operations. Unlike those three it has no fixed
+  // `SPECIALISTS` playbook/tool slice — its system + tools are computed at
+  // RUNTIME by `buildAssistantSystem`/`conciergeToolSlice` — but it gets a
+  // real row here so it gets its own card/org-chart node, model picker, and
+  // editable instructions exactly like every other active agent. Seeded by
+  // the loop below for every tenant (new + existing, on next `ensureAgents`
+  // call) and never pruned, same as any other catalog entry.
+  { key: "concierge", name: "Concierge", mandate: "Inbox/email + WhatsApp, invoices & money, nutrition/workout plans, admin.", status: "active", defaultModel: MODELS.sonnet },
   { key: "finance", name: "Finance", mandate: "Guards the cash: overdue + failed payments.", status: "dormant", defaultModel: MODELS.sonnet },
 ];
 

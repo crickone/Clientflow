@@ -14,19 +14,22 @@ import { isDriveConnected } from "@/lib/gmail";
 
 /**
  * Orchestrator delegation tools (Orchestrator Task 2; Concierge Task 1 adds a
- * 4th). The Orchestrator is a THIN routing agent — these `delegate_to_*`
- * tools are its ONLY tools (see `specialists/orchestrator.ts`). Three of them
- * (`delegate_to_sales/marketing/operations`) run that specialist's OWN loop
- * (the shared `runAgentTurn`, extracted in Task 1) on a sub-task, using the
- * specialist's own playbook + tool slice + configured model, via the shared
- * `delegateTo` helper below. The 4th, `delegate_to_concierge`, is different:
- * it doesn't go through `delegateTo`/`SPECIALISTS` at all — it runs the
- * EXISTING general assistant (`/api/assistant/chat`'s own system + full tool
- * set, i.e. `buildAssistantSystem` + `conciergeToolSlice`) through the same
- * `runAgentTurn`, so the Orchestrator can hand off anything general/admin/
- * money/invoice/inbox/plan-shaped that doesn't fit Sales/Marketing/
- * Operations — see `delegateToConcierge` below. Either way, the orchestrator
- * itself owns no domain tools and does no domain work directly.
+ * 4th; the first-class-Concierge task, .superpowers/sdd/concierge-agent-brief.md,
+ * gives that 4th its own model + editable context). The Orchestrator is a
+ * THIN routing agent — these `delegate_to_*` tools are its ONLY tools (see
+ * `specialists/orchestrator.ts`). Three of them (`delegate_to_sales/
+ * marketing/operations`) run that specialist's OWN loop (the shared
+ * `runAgentTurn`, extracted in Task 1) on a sub-task, using the specialist's
+ * own playbook + tool slice + configured model, via the shared `delegateTo`
+ * helper below. The 4th, `delegate_to_concierge`, is different: it doesn't go
+ * through `delegateTo`/`SPECIALISTS` at all — it runs the general assistant's
+ * OWN runtime-computed system + full tool set (`buildAssistantSystem` +
+ * `conciergeToolSlice`, layered with the Concierge's own model + saved
+ * instructions — see `resolveConciergeModel`/`buildConciergeSystem` below)
+ * through the same `runAgentTurn`, so the Orchestrator can hand off anything
+ * general/admin/money/invoice/inbox/plan-shaped that doesn't fit Sales/
+ * Marketing/Operations — see `delegateToConcierge` below. Either way, the
+ * orchestrator itself owns no domain tools and does no domain work directly.
  *
  * WRITE-APPROVAL GATE THROUGH DELEGATION — the property this file exists to
  * preserve. Every `delegate_to_*` tool is registered as a READ (NOT in
@@ -56,9 +59,9 @@ import { isDriveConnected } from "@/lib/gmail";
  * `delegate_to_concierge` doesn't add a path either, despite not going
  * through `DELEGATABLE`: the Concierge's own tool slice (`conciergeToolSlice`)
  * unconditionally excludes every `delegate_to_*` tool by name prefix, so a
- * Concierge run — whether from `/api/assistant/chat` or from THIS delegate —
- * never has a delegate tool of its own to call. Delegation stays exactly one
- * level deep in every direction.
+ * Concierge run — whether reached via THIS delegate (its only caller today)
+ * or a future direct route — never has a delegate tool of its own to call.
+ * Delegation stays exactly one level deep in every direction.
  *
  * ⚠ CIRCULAR IMPORT — @/lib/assistant/tools (tools.ts) registers these tools
  * by importing `ORCHESTRATOR_TOOLS` + the 4 executors from THIS file; this
@@ -162,29 +165,87 @@ export async function delegateTo(
 }
 
 /**
- * Runs the EXISTING general assistant — the same system prompt
- * (`buildAssistantSystem`) and tool slice (`conciergeToolSlice`) that power
- * `/api/assistant/chat` today — on `task`, via the shared `runAgentTurn`, and
- * returns its result as a plain tool result for the orchestrator's model to
- * relay/synthesise. This is how the Orchestrator becomes a full replacement
- * for the Dashboard assistant: anything general/admin/money/invoice/inbox/
- * plan-shaped that doesn't belong to Sales/Marketing/Operations comes here.
+ * Model resolution for a Concierge delegation (first-class-Concierge task,
+ * .superpowers/sdd/concierge-agent-brief.md, Requirement 2): the Concierge
+ * now has its own `AGENT_CATALOG`/`agents` row (Requirement 1), so — exactly
+ * like `agent.model` does for sales/marketing/operations in `delegateTo`
+ * above — its OWN configured model (set via its Agents-tab model picker,
+ * changeable anytime) is what actually runs it, taking priority over
+ * everything else. The two fallbacks only matter if that row is somehow
+ * unavailable: `ctx.callerModel` (the Orchestrator's own model — the OLD
+ * behaviour, kept as a defensive fallback, not the primary path anymore) and
+ * finally a hardcoded Sonnet so this can never throw for a misconfigured
+ * tenant. `getAgent`'s internal `ensureAgents()` call means the Concierge row
+ * should always exist for any real tenant, so the first fallback is a
+ * belt-and-suspenders case in practice, not the expected path.
+ *
+ * Extracted as its own function (rather than inlined in `delegateToConcierge`)
+ * so it's directly unit-testable without a nested `runAgentTurn`/live Claude
+ * call — see tools.orchestrator.test.ts.
+ */
+export function resolveConciergeModel(ctx: ToolContext): string {
+  return getAgent(ctx.tenantId, "concierge")?.model ?? ctx.callerModel ?? MODELS.sonnet;
+}
+
+/**
+ * The Concierge's live system prompt (Requirement 5): `buildAssistantSystem`'s
+ * runtime-computed output — UNCHANGED, business context is already baked in
+ * by that function — with the tenant's saved Concierge instructions (edited
+ * in AgentDetail's "Operator instructions" layer, the exact same UI every
+ * other specialist uses) appended in the SAME labelled-block shape
+ * `composeAgentSystem` (@/lib/agents/context) uses for a specialist's
+ * editable layer, so an operator's edit here "actually applies" to a real
+ * Concierge run just like it does for Sales/Marketing/Operations. Empty/
+ * never-edited instructions add nothing — same as `composeAgentSystem`'s
+ * `custom ? "...": ""` behaviour — so this is a no-op for every tenant until
+ * they actually type something in the Concierge's context editor.
+ *
+ * Deliberately NOT a call to `composeAgentSystem` itself: the Concierge has
+ * no fixed `SPECIALISTS["concierge"]` base playbook to layer onto (see
+ * `specialistToolSlice.test.ts`'s pinned `!("concierge" in SPECIALISTS)`
+ * assertion — permanent by design, not a gap to close), so this function
+ * mirrors that layering shape by hand instead, on top of the Concierge's own
+ * runtime-computed base.
+ */
+export function buildConciergeSystem(
+  tenantId: number,
+  mode: "appointments" | "timetable",
+  driveConnected: boolean,
+): string {
+  const base = buildAssistantSystem(mode, driveConnected);
+  const custom = (getAgent(tenantId, "concierge")?.instructions ?? "").trim();
+  return custom ? base + "\n\n=== OPERATOR INSTRUCTIONS (from the Agents tab) ===\n" + custom : base;
+}
+
+/**
+ * Runs the EXISTING general assistant — `buildConciergeSystem`'s system
+ * prompt (`buildAssistantSystem` plus the Concierge's own saved instructions,
+ * see above) and tool slice (`conciergeToolSlice`) — on `task`, via the
+ * shared `runAgentTurn`, and returns its result as a plain tool result for
+ * the orchestrator's model to relay/synthesise. This is how the Orchestrator
+ * becomes a full replacement for the Dashboard assistant: anything general/
+ * admin/money/invoice/inbox/plan-shaped that doesn't belong to Sales/
+ * Marketing/Operations comes here.
  *
  * Deliberately NOT `delegateTo("concierge", ...)` — the Concierge isn't a
  * `SPECIALISTS` entry (there is no fixed playbook/tool slice registered under
- * a "concierge" key); its system + tools are computed at RUNTIME from the
- * account's current scheduling mode + Drive connection, exactly as
- * `/api/assistant/chat` computes them per-request. `ctx` must come from a
- * call already scoped by `runWithTenant(ctx.tenantId, ...)` — same
- * ambient-tenant contract `delegateTo` relies on above (`getSchedulingMode`
+ * a "concierge" key, and Requirement 5 above is what wires its editable
+ * instructions in WITHOUT one); its system + tools are computed at RUNTIME
+ * from the account's current scheduling mode + Drive connection. It DOES,
+ * however, now have a real `AGENT_CATALOG`/`agents` row (Requirement 1) —
+ * that's what `resolveConciergeModel`/`buildConciergeSystem` read from, via
+ * plain `getAgent` calls, so no `runWithTenant` gymnastics are needed beyond
+ * what this function already required for `getSchedulingMode`. `ctx` must
+ * come from a call already scoped by `runWithTenant(ctx.tenantId, ...)` —
+ * same ambient-tenant contract `delegateTo` relies on above (`getSchedulingMode`
  * reads the ambient tenant; guaranteed here for the same reason: only ever
  * reached via `executeTool` inside `runAgentTurn` inside the chat route's
  * `runWithTenant`).
  *
  * Metering: `runAgentTurn` records this turn's usage under agentKey
  * `"concierge"` (not `"orchestrator"` or `"assistant"`) — a distinct bucket
- * from both the Orchestrator's own turns and `/api/assistant/chat`'s direct
- * turns, even though all three ultimately run the same tool-use loop.
+ * from both the Orchestrator's own turns and any other caller, even though
+ * all of them ultimately run the same tool-use loop.
  */
 async function delegateToConcierge(ctx: ToolContext, input: Record<string, unknown>): Promise<ToolResult> {
   const task = String(input.task || "").trim();
@@ -196,12 +257,8 @@ async function delegateToConcierge(ctx: ToolContext, input: Record<string, unkno
       tenantId: ctx.tenantId,
       agentKey: "concierge",
       userId: ctx.userId,
-      // Inherit the Orchestrator's configured model (set in the Agents UI) so a
-      // general/admin task the operator routed through the Dashboard actually
-      // runs on the model they chose — the Concierge has no agent record/card of
-      // its own, so without this it silently ran on hardcoded Sonnet regardless.
-      model: ctx.callerModel ?? MODELS.sonnet,
-      system: buildAssistantSystem(mode, drive),
+      model: resolveConciergeModel(ctx), // the Concierge's OWN configured model — see doc comment above
+      system: buildConciergeSystem(ctx.tenantId, mode, drive), // buildAssistantSystem + the Concierge's own saved instructions
       tools: conciergeToolSlice(mode, drive),
       messages: [{ role: "user", content: task }],
       maxTurns: 6, // same bound as delegateTo — one sub-task, not an open-ended session

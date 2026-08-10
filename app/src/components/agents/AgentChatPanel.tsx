@@ -1,6 +1,7 @@
 "use client";
 
-import { Bot } from "lucide-react";
+import Link from "next/link";
+import { Bot, ConciergeBell } from "lucide-react";
 
 import { Card } from "@/components/ui/Card";
 import { AssistantChat } from "@/components/messaging/AssistantChat";
@@ -81,9 +82,21 @@ const CHAT_COPY: Record<string, typeof SALES_CHAT_COPY> = {
  * The agent's working chat. Reuses AssistantChat byte-for-byte for the
  * SSE + Approve-card + `/api/assistant/execute` mechanics (see that
  * component's `endpoint` prop doc) — only the endpoint + cosmetic copy differ
- * per agent. Dormant agents (everything but Sales today) get a "coming soon"
- * placeholder instead of a chat, since their `/api/agents/<key>/chat` route
- * 404s (no playbook/tool slice wired yet).
+ * per agent. Dormant agents (Finance today) get a "coming soon" placeholder
+ * instead of a chat, since their `/api/agents/<key>/chat` route 404s (no
+ * playbook/tool slice wired yet).
+ *
+ * The Concierge is active but is its OWN separate case (checked first,
+ * below): it deliberately has no `SPECIALISTS` entry (see
+ * specialistToolSlice.test.ts's pinned assertion), so `/api/agents/concierge/
+ * chat` 404s too — not because it isn't running, but because it only ever
+ * runs through the Orchestrator's `delegate_to_concierge` tool
+ * (@/lib/agents/tools.orchestrator), never its own direct chat route. Without
+ * this case AssistantChat would render a live-looking chat box that replies
+ * "Sorry — the assistant is unavailable (404)" to every message — pointing
+ * the operator at the Orchestrator instead is the honest version of the same
+ * "coming soon" idea. Its model + editable instructions (above, on this same
+ * page) still apply the moment it actually runs via delegation.
  */
 export function AgentChatPanel({ agent, tenantId }: { agent: Agent; tenantId: number }) {
   if (agent.status !== "active") {
@@ -104,6 +117,46 @@ export function AgentChatPanel({ agent, tenantId }: { agent: Agent; tenantId: nu
         <p style={{ color: "var(--text-tertiary)", fontSize: 13, lineHeight: 1.5, maxWidth: 420, margin: "0 auto" }}>
           This agent isn&apos;t running yet — there&apos;s nothing to chat with until {agent.name} is switched on.
         </p>
+      </Card>
+    );
+  }
+
+  if (agent.key === "concierge") {
+    return (
+      <Card style={{ textAlign: "center", padding: "56px 28px" }}>
+        <ConciergeBell size={26} strokeWidth={1.5} style={{ color: "var(--text-tertiary)", marginBottom: 14 }} />
+        <div
+          style={{
+            fontFamily: "var(--font-heading), sans-serif",
+            fontSize: 18,
+            textTransform: "uppercase",
+            color: "var(--text-primary)",
+            marginBottom: 8,
+          }}
+        >
+          Runs through the Orchestrator
+        </div>
+        <p style={{ color: "var(--text-tertiary)", fontSize: 13, lineHeight: 1.5, maxWidth: 440, margin: "0 auto 18px" }}>
+          The Concierge has no chat of its own — hand it a general, inbox, money, or plan task from the Orchestrator&apos;s
+          chat and it delegates automatically. Its model and instructions above still apply whenever it runs.
+        </p>
+        <Link
+          href="/agents/orchestrator"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 12.5,
+            color: "var(--accent-ink)",
+            background: "var(--accent-soft)",
+            border: "1px solid var(--accent)",
+            borderRadius: "var(--radius)",
+            padding: "8px 16px",
+            textDecoration: "none",
+          }}
+        >
+          Open the Orchestrator
+        </Link>
       </Card>
     );
   }

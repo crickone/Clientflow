@@ -9,6 +9,9 @@ import { SAFETY_RAILS } from "@/lib/agents/context";
 import { SPECIALISTS } from "@/lib/agents/specialists";
 import { getBusinessContext } from "@/lib/ai/businessContext";
 import { getMonthlyUsageByAgent, getTenantCapCents } from "@/lib/ai/usage";
+import { conciergeToolSlice } from "@/lib/assistant/tools";
+import { getSchedulingMode } from "@/lib/settings";
+import { isDriveConnected } from "@/lib/gmail";
 import { AgentDetail } from "@/components/agents/AgentDetail";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +31,24 @@ export default async function AgentDetailPage({ params }: { params: { key: strin
   // exactly below so this page never drifts from what a real chat run sends.
   const spec = SPECIALISTS[key];
 
+  // The Concierge is deliberately NOT a SPECIALISTS entry (see
+  // specialistToolSlice.test.ts's pinned `!("concierge" in SPECIALISTS)`
+  // assertion) — its base "playbook" + tool slice are computed at RUNTIME by
+  // buildAssistantSystem/conciergeToolSlice (@/lib/agents/tools.orchestrator's
+  // delegateToConcierge) rather than a fixed registry entry, so `spec` above
+  // is `undefined` for it. Without this, the generic fallbacks below would
+  // show a meaningless "You are a helpful business agent." line and falsely
+  // claim it has NO tools ("this agent isn't running") for an agent that
+  // actually has the full general toolkit — handled gracefully here instead,
+  // per Requirement 5 (.superpowers/sdd/concierge-agent-brief.md): the base
+  // layer explains its remit + that it's the general toolkit, and the Tools
+  // card gets its REAL current tool slice, computed the exact same way
+  // `delegateToConcierge` computes it for a live run.
+  const isConcierge = key === "concierge";
+  const conciergeToolNames = isConcierge
+    ? conciergeToolSlice(getSchedulingMode(), isDriveConnected(tenantId)).map((t) => t.name)
+    : [];
+
   // The 4 raw composition layers, sourced exactly the way composeAgentSystem
   // (@/lib/agents/context) builds them for a real run — but kept SEPARATE
   // (rather than calling composeAgentSystem and getting one flattened
@@ -41,9 +62,15 @@ export default async function AgentDetailPage({ params }: { params: { key: strin
   // server-page request that ambient tenant IS the admin's active tenant —
   // both `tenantId` above and the ambient one resolve from the same signed-in
   // session/membership — so calling it directly here, with no
-  // runWithTenant(), is correct.
+  // runWithTenant(), is correct. `getSchedulingMode()` (@/lib/settings) reads
+  // that same ambient tenant the same way; `isDriveConnected(tenantId)` takes
+  // an explicit tenantId and has no ambient dependency at all.
   const layers = {
-    base: spec?.basePlaybook ?? "You are a helpful business agent.",
+    base:
+      spec?.basePlaybook ??
+      (isConcierge
+        ? "You are the Concierge — the general business assistant: inbox/email + WhatsApp, invoices & money, nutrition/workout plans, admin, and anything else outside Sales/Marketing/Operations. You have no single fixed playbook — your system prompt and full toolkit (see Tools, right) are computed fresh for every task from this account's current scheduling mode and Google Drive connection."
+        : "You are a helpful business agent."),
     businessContext: getBusinessContext(),
     operator: agent.instructions,
     rails: SAFETY_RAILS,
@@ -87,7 +114,7 @@ export default async function AgentDetailPage({ params }: { params: { key: strin
         key={agent.key}
         agent={agent}
         layers={layers}
-        toolNames={spec?.toolNames ?? []}
+        toolNames={isConcierge ? conciergeToolNames : spec?.toolNames ?? []}
         usageCents={usageCents}
         capCents={capCents}
         tenantId={tenantId}

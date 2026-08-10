@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   Bot,
   ClipboardCheck,
+  ConciergeBell,
   Handshake,
   Megaphone,
   Wallet,
@@ -37,6 +38,7 @@ const MANDATE: Record<string, string> = {
   sales: "Works leads: instant replies + relentless follow-up.",
   marketing: "Runs the Marketing Brain: campaigns + social.",
   operations: "No-shows, class fill, attendance, admin.",
+  concierge: "Inbox/email + WhatsApp, invoices & money, nutrition/workout plans, admin.",
   finance: "Guards the cash: overdue + failed payments.",
 };
 
@@ -46,6 +48,7 @@ const ICON: Record<string, typeof Bot> = {
   sales: Handshake,
   marketing: Megaphone,
   operations: ClipboardCheck,
+  concierge: ConciergeBell,
   finance: Wallet,
 };
 
