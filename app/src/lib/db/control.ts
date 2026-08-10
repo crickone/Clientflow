@@ -7,6 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import * as schema from "./schema";
+import { CONTROL_MIGRATIONS, runMigrations } from "./migrations";
 // Cycle-safe: migrate.ts imports controlSqlite but only dereferences it inside
 // runBootMigration(), which we call at the bottom of this module after
 // controlSqlite is initialised.
@@ -61,6 +62,10 @@ function rawControl(): BetterSqlite3 {
   sqlite.pragma("foreign_keys = ON");
   _control = sqlite; // set first so ensureControlTables' proxy resolves to it
   ensureControlTables();
+  // Batch 6b (improvement-plan-2026-08.md Theme E1): versioned migrations for
+  // schema EVOLUTION (non-additive changes), run after the additive
+  // bootstrap above. See migrations/index.ts for the division of labour.
+  runMigrations(sqlite, CONTROL_MIGRATIONS);
   return sqlite;
 }
 
@@ -455,6 +460,19 @@ export function ensureControlTables() {
       err,
     );
   }
+
+  // Batch 6b (improvement-plan-2026-08.md Theme E1): tracking table for the
+  // versioned migration runner (./migrations) — separate from everything
+  // above, which is the additive bootstrap. Created here too (in addition to
+  // runMigrations() creating it defensively) so it exists alongside every
+  // other control table from the very first open, even before the first
+  // runMigrations() call.
+  controlSqlite.exec(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      id TEXT PRIMARY KEY,
+      applied_at INTEGER NOT NULL
+    );
+  `);
 }
 
 // NB: ensureControlTables() is invoked lazily by rawControl() on first open —

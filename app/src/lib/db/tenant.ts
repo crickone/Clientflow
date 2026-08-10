@@ -14,6 +14,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import * as schema from "./schema";
+import { runMigrations, TENANT_MIGRATIONS } from "./migrations";
 import { CLIENT_SESSION_COOKIE, controlDb, controlSqlite, SESSION_COOKIE } from "./control";
 
 /**
@@ -116,6 +117,10 @@ export function openTenantDb(dbFile: string): TenantConn {
   }
   sqlite.pragma("foreign_keys = ON");
   ensureTenantTables(sqlite);
+  // Batch 6b (improvement-plan-2026-08.md Theme E1): versioned migrations for
+  // schema EVOLUTION (non-additive changes), run after the additive
+  // bootstrap above. See migrations/index.ts for the division of labour.
+  runMigrations(sqlite, TENANT_MIGRATIONS);
   const conn: TenantConn = { sqlite, db: drizzle(sqlite, { schema }) };
   connCache.set(dbFile, conn);
 
@@ -1618,4 +1623,17 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
   } catch (err) {
     console.error("[db] blog_posts cms-cols migration failed:", err);
   }
+
+  // Batch 6b (improvement-plan-2026-08.md Theme E1): tracking table for the
+  // versioned migration runner (./migrations) — separate from everything
+  // above, which is the additive bootstrap. Created here too (in addition to
+  // runMigrations() creating it defensively) so it exists alongside every
+  // other tenant table from the very first open, even before the first
+  // runMigrations() call.
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      id TEXT PRIMARY KEY,
+      applied_at INTEGER NOT NULL
+    );
+  `);
 }
