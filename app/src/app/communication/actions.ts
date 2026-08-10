@@ -21,7 +21,8 @@ import {
   syncGmailInbox,
   type EmailMessageRow,
 } from "@/lib/gmail";
-import { renderEmailShell, sendEmail, textToParagraphs } from "@/lib/email";
+import { syncImapInbox } from "@/lib/imapEmail";
+import { getEmailProvider, renderEmailShell, sendEmail, textToParagraphs } from "@/lib/email";
 import { getBusinessProfile } from "@/lib/businessProfile";
 import { getTheme } from "@/lib/settings";
 
@@ -65,24 +66,51 @@ export async function replyEmailAction(
     subject: subject ? `Re: ${subject}` : "Re:",
     html,
     text: parsed.data.body,
-    gmailThread: msg.gmailThreadId ? { threadId: msg.gmailThreadId } : undefined,
+    // Threading headers so the reply lands in the same conversation on the
+    // recipient's side over SMTP too, not just Gmail (gmailSend already
+    // accepted inReplyTo/references — harmless to pass them there as well).
+    gmailThread: {
+      threadId: msg.gmailThreadId ?? undefined,
+      inReplyTo: msg.gmailMessageId,
+      references: msg.gmailThreadId ?? msg.gmailMessageId,
+    },
   });
   if (!res.ok) return res;
 
-  await syncGmailInbox(currentTenantId(), { days: 1, max: 10 });
+  // Pull the just-sent message back down so it appears in the thread. Gmail
+  // never records its own "out" row on send (see gmailSend), so it needs this
+  // re-sync; IMAP/SMTP already inserted its own "out" row inside smtpSend, so
+  // skip it there (and for "resend"/"none", there's nothing to re-sync).
+  if (getEmailProvider() === "gmail") {
+    await syncGmailInbox(currentTenantId(), { days: 1, max: 10 });
+  }
   revalidatePath("/communication");
   return { ok: true };
 }
 
-/** Manual "refresh" of the inbox from the Communication page. */
+/** Manual "refresh" of the inbox from the Communication page — provider-aware. */
 export async function refreshInboxAction(): Promise<
   { ok: true; synced: number } | { ok: false; error: string }
 > {
   await requireUser();
-  const res = await syncGmailInbox(currentTenantId());
-  if (!res.ok) return res;
-  revalidatePath("/communication");
-  return { ok: true, synced: res.synced };
+  const provider = getEmailProvider();
+
+  if (provider === "gmail") {
+    const res = await syncGmailInbox(currentTenantId());
+    if (!res.ok) return res;
+    revalidatePath("/communication");
+    return { ok: true, synced: res.synced };
+  }
+
+  if (provider === "imap") {
+    const res = await syncImapInbox(currentTenantId());
+    if (!res.ok) return res;
+    revalidatePath("/communication");
+    return { ok: true, synced: res.synced };
+  }
+
+  // "resend" (send-only) or "none" — nothing to pull.
+  return { ok: true, synced: 0 };
 }
 
 /** Load every message in a thread (full bodies) and mark it read. */
