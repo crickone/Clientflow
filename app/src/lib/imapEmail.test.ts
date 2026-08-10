@@ -28,7 +28,9 @@ const {
   getImapConnection,
   getImapCredentials,
   isImapConnected,
+  normalizeAddress,
   saveImapConnection,
+  snippetOf,
   threadKeyFor,
 } = requireLocal("./imapEmail") as typeof import("./imapEmail");
 
@@ -95,6 +97,71 @@ assert.equal(
 );
 
 console.log("imapEmail.test.ts: threadKeyFor assertions passed");
+
+// ─── normalizeAddress (pure — no DB, no network) ──────────────────────────
+
+assert.deepEqual(
+  normalizeAddress({ name: "Jane Doe", address: "Jane.Doe@Example.com" }),
+  { name: "Jane Doe", email: "jane.doe@example.com" },
+  "name+addr: display name kept as-is (trimmed), email lowercased",
+);
+
+assert.deepEqual(
+  normalizeAddress({ address: "solo@example.com" }),
+  { name: "", email: "solo@example.com" },
+  "bare addr (no name key at all): name defaults to empty string",
+);
+
+assert.deepEqual(
+  normalizeAddress({ name: null, address: "solo2@example.com" }),
+  { name: "", email: "solo2@example.com" },
+  "bare addr (name explicitly null): name defaults to empty string",
+);
+
+assert.deepEqual(
+  normalizeAddress({ name: "  Shouty Sender  ", address: "  SHOUT@EXAMPLE.COM  " }),
+  { name: "Shouty Sender", email: "shout@example.com" },
+  "lowercasing: email is lowercased; display name case is preserved (both trimmed)",
+);
+
+assert.deepEqual(normalizeAddress(null), { name: "", email: "" }, "null -> empty name/email");
+assert.deepEqual(normalizeAddress(undefined), { name: "", email: "" }, "undefined -> empty name/email");
+assert.deepEqual(
+  normalizeAddress({}),
+  { name: "", email: "" },
+  "empty object (no name/address keys) -> empty name/email",
+);
+
+console.log("imapEmail.test.ts: normalizeAddress assertions passed");
+
+// ─── snippetOf (pure — no DB, no network) ─────────────────────────────────
+
+{
+  const longText = "a".repeat(200);
+  const snippet = snippetOf(longText);
+  assert.equal(snippet.length, 140, "truncation at 140: default n caps the result length");
+  assert.equal(snippet, "a".repeat(140), "truncation at 140: result is a straight 140-char prefix");
+}
+
+assert.equal(
+  snippetOf("Hello there, this is short."),
+  "Hello there, this is short.",
+  "shorter passthrough: text under the limit is returned unchanged",
+);
+
+assert.equal(
+  snippetOf("line one\n\n  line   two  "),
+  "line one line two",
+  "internal whitespace (newlines, runs of spaces) collapses to single spaces, ends trimmed",
+);
+
+assert.equal(snippetOf(null), "", "null -> empty string");
+assert.equal(snippetOf(undefined), "", "undefined -> empty string");
+assert.equal(snippetOf(""), "", "empty string -> empty string");
+assert.equal(snippetOf("   "), "", "whitespace-only -> empty string");
+assert.equal(snippetOf("exactly seven", 7), "exactly", "custom n is honored");
+
+console.log("imapEmail.test.ts: snippetOf assertions passed");
 
 // Wrapped in an async IIFE (not top-level await): this project's package.json
 // has no "type": "module", so tsx/esbuild compiles .ts files to CJS, where
