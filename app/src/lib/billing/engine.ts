@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { controlSqlite } from "@/lib/db/control";
-import { closeTenantConn } from "@/lib/db/tenant";
+import { closeTenantConn, openTenantDb } from "@/lib/db/tenant";
 import { getPaymentProvider, type PaymentProvider, type ChargeResult } from "@/lib/payments/provider";
 import { computeVat } from "./money";
 import { addMonthClamped, addDays, cmpDate, dublinDayOfMonth, dublinToday } from "./dates";
@@ -345,9 +345,15 @@ export function setBillingExempt(tenantId: number, exempt: boolean, actor: strin
  * must never leave un-archived data deleted:
  *
  *   1. Load the tenant + gather its manifest content (members, invoices).
- *   2. Archive: copy the live tenant DB (if present) + write manifest.json.
- *      If ANYTHING here throws, we return/throw before step 3 ever runs —
- *      nothing has been deleted yet.
+ *   2. Archive: WAL-checkpoint the live tenant DB (TRUNCATE) so any row
+ *      committed but still sitting only in its -wal file (tenant DBs run in
+ *      WAL mode — see db/tenant.ts) is folded into the main .db FIRST, then
+ *      copy that now-consistent .db (if present) + write manifest.json,
+ *      under a per-call unique archive dir (slug + date + a call-time
+ *      timestamp, so a same-day re-provision + re-offboard of a reused slug
+ *      can never overwrite an earlier archive). If ANYTHING here throws —
+ *      including an incomplete checkpoint — we throw before step 3 ever
+ *      runs: nothing has been deleted yet.
  *   3. Log the "offboarded" event (billing_events.tenant_id carries no FK to
  *      tenants — see control.ts — so this row is untouched by step 4 and
  *      survives as a permanent, if orphaned, audit trail).
@@ -358,13 +364,17 @@ export function setBillingExempt(tenantId: number, exempt: boolean, actor: strin
  *      simply ends up with an identity and no memberships).
  *   5. Remove the live tenant DB: evict/close its cached connection first
  *      (an open handle can keep the file locked or recreate -wal/-shm on
- *      next access), then delete the file (+ its per-tenant dir, when it has
- *      one) — the archived copy from step 2 is untouched. Best-effort: by
- *      this point the control rows are already gone, so a filesystem error
- *      here is logged, not thrown.
+ *      next access — this also closes whatever connection step 2's
+ *      checkpoint opened or reused), then delete the file (+ its per-tenant
+ *      dir, when it has one) — the archived copy from step 2 is untouched.
+ *      Best-effort: by this point the control rows are already gone, so a
+ *      filesystem error here is logged, not thrown.
  *
  * All deletes are keyed by this `tenantId` alone — never touches another
- * tenant's rows.
+ * tenant's rows; the archive/delete path itself is additionally guarded to
+ * stay inside THIS tenant's own data/tenants/<slug>/ directory (or the
+ * legacy default tenant's root-level clinic.db) even if `db_file` were ever
+ * corrupted or overlapped with another tenant's.
  */
 export function offboardTenant(tenantId: number, actor: string): { archiveDir: string } {
   const t = controlSqlite.prepare("SELECT slug, name, db_file FROM tenants WHERE id = ?").get(tenantId) as
@@ -380,23 +390,62 @@ export function offboardTenant(tenantId: number, actor: string): { archiveDir: s
     .all(tenantId) as Array<{ email: string; role: string }>;
   const invoices = listInvoices(tenantId);
 
-  // 2) Archive FIRST. If this throws (disk full, permissions, …) it propagates
-  // straight out of offboardTenant — steps 3-5 never run, so nothing is ever
-  // deleted without a backup that succeeded.
+  // 2) Archive FIRST. If this throws (disk full, permissions, an incomplete
+  // WAL checkpoint, …) it propagates straight out of offboardTenant — steps
+  // 3-5 never run, so nothing is ever deleted without a backup that
+  // succeeded.
   const dataDir = path.join(process.cwd(), "data");
-  const archiveDir = path.join(dataDir, "archive", `${t.slug}-${dublinToday()}`);
-  fs.mkdirSync(archiveDir, { recursive: true });
   const dbPath = path.join(dataDir, t.db_file);
   // db_file is registry data (set once, by provisioning, never user input at
   // request time) — but this function both READS and later DELETES whatever
-  // it points at, so refuse to touch anything outside data/ at all, rather
-  // than trust that invariant implicitly. Guards step 5's rmSync below just
-  // as much as this copy: a corrupted db_file (e.g. a stray "../") must never
-  // let either step escape the data directory.
-  if (!dbPath.startsWith(dataDir + path.sep)) {
-    throw new Error(`[billing] offboardTenant: refusing db_file outside the data dir: ${t.db_file}`);
+  // it points at, so refuse to touch anything outside THIS tenant's own
+  // directory, rather than trust that invariant implicitly. A provisioned
+  // tenant's db_file must resolve under its own data/tenants/<slug>/ dir; the
+  // only other legitimate shape is the legacy default tenant's data-root-level
+  // clinic.db (predates per-tenant subdirectories — see db/tenant.ts's
+  // getCurrentTenant() fallback). Anything else is refused. This is what
+  // stops a corrupted/overlapping db_file from ever letting this function
+  // archive-then-rmSync a DIFFERENT tenant's directory, even if db_file
+  // values ever collided — tighter than merely checking "somewhere under
+  // data/". Guards step 5's rmSync below just as much as this copy.
+  const ownTenantDir = path.join(dataDir, "tenants", t.slug) + path.sep;
+  const legacyRootFile = path.join(dataDir, "clinic.db");
+  if (dbPath !== legacyRootFile && !dbPath.startsWith(ownTenantDir)) {
+    throw new Error(
+      `[billing] offboardTenant: refusing db_file outside tenant ${t.slug}'s own directory: ${t.db_file}`,
+    );
   }
-  if (fs.existsSync(dbPath)) fs.copyFileSync(dbPath, path.join(archiveDir, path.basename(t.db_file)));
+  // Unique per call: date-only would let a same-day re-provision + re-offboard
+  // of a reused slug silently overwrite the earlier archive — defeating the
+  // entire point of archiving. Computed here (call time), not hoisted.
+  const archiveDir = path.join(dataDir, "archive", `${t.slug}-${dublinToday()}-${Date.now()}`);
+  fs.mkdirSync(archiveDir, { recursive: true });
+  if (fs.existsSync(dbPath)) {
+    // Tenant DBs run in WAL mode (openTenantDb() in db/tenant.ts): a row
+    // committed moments ago can still be sitting ONLY in the -wal file, not
+    // yet folded into dbPath itself. A plain fs.copyFileSync of dbPath alone
+    // would then silently produce an archive missing that row (or even a
+    // whole table) — and step 5 below deletes the live .db + its -wal right
+    // after, losing it for good despite a "successful" offboard. Checkpoint
+    // FIRST so the copy is a complete, consistent snapshot: this archive is
+    // the ONLY safety net before permanent deletion. Reuses the same
+    // db_file-keyed accessor step 5's closeTenantConn(t.db_file) evicts
+    // below, so this never leaves a second, untracked connection open —
+    // either it reuses whatever was already cached for this tenant, or opens
+    // one that step 5 still closes before the file delete.
+    const { sqlite } = openTenantDb(t.db_file);
+    const [{ busy }] = sqlite.pragma("wal_checkpoint(TRUNCATE)") as Array<{
+      busy: number;
+      log: number;
+      checkpointed: number;
+    }>;
+    if (busy) {
+      throw new Error(
+        `[billing] offboardTenant: wal_checkpoint(TRUNCATE) did not fully flush tenant ${tenantId}'s WAL before archiving — refusing to archive a possibly-incomplete copy`,
+      );
+    }
+    fs.copyFileSync(dbPath, path.join(archiveDir, path.basename(t.db_file)));
+  }
   fs.writeFileSync(
     path.join(archiveDir, "manifest.json"),
     JSON.stringify(

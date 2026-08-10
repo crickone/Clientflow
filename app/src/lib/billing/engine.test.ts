@@ -443,3 +443,116 @@ const requireLocal = createRequire(import.meta.url);
     cleanup();
   }
 })();
+
+// ── DATA-FIDELITY: the archive is a WAL-checkpointed, COMPLETE copy — not
+// just "a file exists" (proves FIX 1) ───────────────────────────────────────
+// The bug: `fs.copyFileSync` of ONLY the main .db file, while a WAL-mode
+// connection has a row committed but not yet checkpointed, silently omits
+// that row (sometimes even the whole table — WAL mode buffers DDL too) from
+// the copy. This test reproduces that failure BY HAND first (the "pre-fix
+// control" assertion below) to prove it's real and that this test isn't
+// vacuous, then runs the REAL offboardTenant (which must checkpoint before
+// copying) and asserts its archive — unlike the by-hand copy — actually has
+// the row.
+(() => {
+  const { controlSqlite } = requireLocal("../db/control") as typeof import("../db/control");
+  const { openTenantDb } = requireLocal("../db/tenant") as typeof import("../db/tenant");
+  const { offboardTenant } = requireLocal("./engine") as typeof import("./engine");
+  const SqliteCtor = requireLocal("better-sqlite3") as unknown as new (
+    filename: string,
+    options?: { readonly?: boolean },
+  ) => ReturnType<typeof openTenantDb>["sqlite"];
+
+  const slug = "offboard-wal-fidelity-test";
+  const dbFile = `tenants/${slug}/${slug}.db`;
+  const dataDir = path.join(process.cwd(), "data");
+  const liveDbPath = path.join(dataDir, dbFile);
+
+  controlSqlite.prepare("DELETE FROM tenants WHERE slug = ?").run(slug);
+  fs.rmSync(path.join(dataDir, "tenants", slug), { recursive: true, force: true });
+
+  const tenant = controlSqlite
+    .prepare("INSERT INTO tenants (slug, name, db_file, is_active) VALUES (?, ?, ?, 1) RETURNING id")
+    .get(slug, "Offboard WAL Fidelity Test", dbFile) as { id: number };
+  const tenantId = tenant.id;
+
+  const cleanup = () => {
+    controlSqlite.prepare("DELETE FROM tenants WHERE id = ?").run(tenantId);
+    fs.rmSync(path.join(dataDir, "tenants", slug), { recursive: true, force: true });
+  };
+
+  let result: { archiveDir: string } | undefined;
+  let sqlite: ReturnType<typeof openTenantDb>["sqlite"] | undefined;
+  try {
+    ({ sqlite } = openTenantDb(dbFile));
+    assert.equal(
+      sqlite.pragma("journal_mode", { simple: true }),
+      "wal",
+      "precondition: the tenant connection is genuinely in WAL mode (else this test proves nothing)",
+    );
+
+    // Committed — better-sqlite3 auto-commits a single .run() outside an
+    // explicit transaction — but DELIBERATELY never checkpointed before
+    // offboarding. This is the row that must survive into the archive.
+    sqlite
+      .prepare("INSERT INTO clients (first_name, last_name, phone) VALUES ('WalFidelity', 'Probe', '000')")
+      .run();
+
+    // Pre-fix reproduction: copy ONLY the main .db file by hand (exactly what
+    // the old `fs.copyFileSync(dbPath, …)` did) and confirm the row — or even
+    // the table, since WAL mode buffers DDL too — is genuinely absent. If
+    // this assertion ever fails, the connection auto-checkpointed before we
+    // could test anything and the rest of this test would prove nothing.
+    const preFixCopyPath = path.join(dataDir, `${slug}-prefix-copy.db`);
+    fs.copyFileSync(liveDbPath, preFixCopyPath);
+    const preFixDb = new SqliteCtor(preFixCopyPath, { readonly: true });
+    let preFixRowCount = 0;
+    try {
+      const row = preFixDb
+        .prepare("SELECT COUNT(*) AS n FROM clients WHERE first_name = 'WalFidelity'")
+        .get() as { n: number };
+      preFixRowCount = row.n;
+    } catch {
+      // "no such table: clients" is an even stronger confirmation (the whole
+      // table was still WAL-resident) — either way, the row isn't there.
+      preFixRowCount = 0;
+    } finally {
+      preFixDb.close();
+      fs.rmSync(preFixCopyPath, { force: true });
+    }
+    assert.equal(
+      preFixRowCount,
+      0,
+      "pre-fix control: a raw copy of only the main .db file is missing the uncheckpointed row",
+    );
+
+    // The real fix: offboardTenant must checkpoint before it copies.
+    result = offboardTenant(tenantId, "test:admin");
+    const archivedDbPath = path.join(result.archiveDir, path.basename(dbFile));
+    const archivedDb = new SqliteCtor(archivedDbPath, { readonly: true });
+    let archivedRowCount: number;
+    try {
+      const row = archivedDb
+        .prepare("SELECT COUNT(*) AS n FROM clients WHERE first_name = 'WalFidelity'")
+        .get() as { n: number };
+      archivedRowCount = row.n;
+    } finally {
+      archivedDb.close();
+    }
+    assert.equal(
+      archivedRowCount,
+      1,
+      "FIX 1: offboardTenant's archive DOES contain the committed-but-uncheckpointed row — the WAL was flushed before copying",
+    );
+
+    console.log("engine.test.ts: WAL data-fidelity assertions passed");
+  } finally {
+    try {
+      sqlite?.close();
+    } catch {
+      // already closed by offboardTenant on the success path
+    }
+    if (result?.archiveDir) fs.rmSync(result.archiveDir, { recursive: true, force: true });
+    cleanup();
+  }
+})();
