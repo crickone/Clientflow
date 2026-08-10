@@ -158,7 +158,10 @@ export async function runAgentTurn(
           pendingWrites.push({ name: call.name, input: call.input, summary: summarizeToolAction(call.name, call.input) });
         } else {
           onTool?.(call.name);
-          const tr = await executeTool(call.name, call.input, { tenantId, userId });
+          // Pass this loop's `model` as `callerModel` so a delegate that runs a
+          // nested loop without its own agent record (delegate_to_concierge)
+          // inherits THIS agent's configured model instead of a hardcoded one.
+          const tr = await executeTool(call.name, call.input, { tenantId, userId, callerModel: model });
           if (tr.artifact) { artifacts.push(tr.artifact); onArtifact?.(tr.artifact); }
           // A delegate_to_<specialist> tool's result can carry MULTIPLE
           // artifacts (its own nested runAgentTurn's whole `artifacts`

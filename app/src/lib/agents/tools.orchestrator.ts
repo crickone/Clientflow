@@ -196,7 +196,11 @@ async function delegateToConcierge(ctx: ToolContext, input: Record<string, unkno
       tenantId: ctx.tenantId,
       agentKey: "concierge",
       userId: ctx.userId,
-      model: MODELS.sonnet,
+      // Inherit the Orchestrator's configured model (set in the Agents UI) so a
+      // general/admin task the operator routed through the Dashboard actually
+      // runs on the model they chose — the Concierge has no agent record/card of
+      // its own, so without this it silently ran on hardcoded Sonnet regardless.
+      model: ctx.callerModel ?? MODELS.sonnet,
       system: buildAssistantSystem(mode, drive),
       tools: conciergeToolSlice(mode, drive),
       messages: [{ role: "user", content: task }],

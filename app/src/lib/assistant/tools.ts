@@ -101,7 +101,12 @@ export type ToolResult = {
   // `artifact` field above and leaves this undefined.
   artifacts?: ToolArtifact[];
 };
-export type ToolContext = { tenantId: number; userId?: number };
+// `callerModel` is the model of the agent whose runAgentTurn loop is executing
+// this tool. It exists so a delegate that spins up a NESTED runAgentTurn without
+// its own agent record — specifically `delegate_to_concierge` — can inherit the
+// caller's (the Orchestrator's) configured model instead of a hardcoded default.
+// Undefined for non-delegating tools / callers that don't set it.
+export type ToolContext = { tenantId: number; userId?: number; callerModel?: string };
 
 /**
  * Tools that MUTATE data or cause external side effects. These never auto-execute
