@@ -177,7 +177,7 @@ export default async function DashboardPage() {
                   <td>
                     <Link href={`/gyms/${g.tenantId}`}>{g.name}</Link>
                   </td>
-                  <td style={{ color: "var(--text-secondary)", textTransform: "capitalize" }}>{g.venueType}</td>
+                  <td style={{ color: "var(--text-secondary)", textTransform: "capitalize" }}>{g.venueType ?? "Not set"}</td>
                   <td>
                     <StatusChip status={g.status === "none" ? null : g.status} exempt={g.exempt} />
                   </td>

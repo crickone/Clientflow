@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { guardPlatform } from "@/lib/platform/auth";
+import { setTenantVenueType } from "@/lib/platform/queries";
 import {
   chargeOutstanding,
   compMonths,
@@ -57,6 +58,11 @@ export async function POST(
       case "comp": {
         const b = z.object({ months: z.number().int().min(1).max(12) }).parse(await req.json());
         compMonths(id, b.months, actor);
+        break;
+      }
+      case "venue-type": {
+        const b = z.object({ venueType: z.enum(["gym", "clinic"]) }).parse(await req.json());
+        setTenantVenueType(id, b.venueType);
         break;
       }
       case "offboard":

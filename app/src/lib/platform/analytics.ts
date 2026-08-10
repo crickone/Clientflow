@@ -97,7 +97,8 @@ export interface PerGymRow {
   tenantId: number;
   name: string;
   slug: string;
-  venueType: string;
+  /** `null` when never set — do NOT default this to "clinic" (see readVenueType). */
+  venueType: string | null;
   status: string;
   exempt: boolean;
   members: number;
@@ -139,15 +140,24 @@ export interface PlatformAnalytics {
 
 // ── Per-tenant metric readers (defensive: any failure → 0 / empty) ──────────
 
-/** venue_type is stored JSON-encoded in the tenant `settings` table (e.g. "gym"). */
-function readVenueType(tdb: TenantDb): string {
+/**
+ * venue_type is stored JSON-encoded in the tenant `settings` table (e.g.
+ * "gym"). Unset, an unreachable row, or an unparseable/non-string value all
+ * mean "we don't actually know" — return `null` rather than guessing
+ * "clinic" (that silently mislabelled unset accounts, e.g. Inspire — a gym —
+ * as a clinic on the dashboard). The main app's OWN `getVenueType()`
+ * (lib/settings.ts) intentionally keeps its "clinic" default — that drives
+ * vocab/scheduling for the tenant itself — this is only the platform
+ * dashboard's read, which must stay honest instead.
+ */
+function readVenueType(tdb: TenantDb): string | null {
   try {
     const row = tdb.select({ value: settings.value }).from(settings).where(eq(settings.key, "venue_type")).get();
-    if (!row?.value) return "clinic";
+    if (!row?.value) return null;
     const parsed = JSON.parse(row.value);
-    return typeof parsed === "string" ? parsed : "clinic";
+    return typeof parsed === "string" ? parsed : null;
   } catch {
-    return "clinic";
+    return null;
   }
 }
 

@@ -14,7 +14,8 @@ export interface TenantSummary {
   id: number;
   slug: string;
   name: string;
-  venueType: string;
+  /** `null` when never set on that tenant — render as "Not set", never "clinic". */
+  venueType: string | null;
   isActive: boolean;
   createdAt: number;
   billing: TenantBilling | null;
@@ -99,7 +100,8 @@ export interface PerGymRow {
   tenantId: number;
   name: string;
   slug: string;
-  venueType: string;
+  /** `null` when never set on that tenant — render as "Not set", never "clinic". */
+  venueType: string | null;
   status: string;
   exempt: boolean;
   members: number;

@@ -7,6 +7,8 @@
 import assert from "node:assert/strict";
 import Module from "node:module";
 import { createRequire } from "node:module";
+import fs from "node:fs";
+import path from "node:path";
 
 // getTenantDbById lives in lib/db/tenant, which imports React's server-only
 // `cache` at module load. Under the runner's `--conditions=react-server`, npm's
@@ -85,12 +87,71 @@ const requireLocal = createRequire(import.meta.url);
     finiteNonNeg(row.tenantId, "perGym.tenantId");
     assert.equal(typeof row.name, "string", "perGym.name is a string");
     assert.equal(typeof row.slug, "string", "perGym.slug is a string");
-    assert.equal(typeof row.venueType, "string", "perGym.venueType is a string");
+    // null when that tenant's venue_type was never set — must NOT default to
+    // "clinic" (that silently mislabelled real unset accounts, e.g. Inspire,
+    // a gym, as a clinic).
+    assert.ok(
+      row.venueType === null || typeof row.venueType === "string",
+      "perGym.venueType is a string or null",
+    );
     assert.equal(typeof row.status, "string", "perGym.status is a string");
     assert.equal(typeof row.exempt, "boolean", "perGym.exempt is a boolean");
     for (const k of ["members", "activeMembers", "gmvCentsMonthly", "revenueCentsThisMonth"] as const) {
       finiteNonNeg(row[k], `perGym.${k}`);
     }
+  }
+
+  // ── deterministic venueType coverage: set → value, unset → null ─────────
+  // The loop above only proves the real dev tenants' rows are well-formed
+  // (their set/unset mix isn't guaranteed); scratch tenants pin down the
+  // actual set → value / unset → null behaviour deterministically.
+  const { controlSqlite } = requireLocal("../db/control") as typeof import("../db/control");
+  const { getTenantDbById, closeTenantConn } = requireLocal("../db/tenant") as typeof import("../db/tenant");
+  const { settings } = requireLocal("../db/schema") as typeof import("../db/schema");
+
+  const mkScratchTenant = (slug: string, name: string) => {
+    const dbFile = `tenants/${slug}/${slug}.db`;
+    controlSqlite.prepare("DELETE FROM tenants WHERE slug = ?").run(slug);
+    const row = controlSqlite
+      .prepare(
+        "INSERT INTO tenants (slug, name, db_file, is_active) VALUES (?, ?, ?, 1) RETURNING id",
+      )
+      .get(slug, name, dbFile) as { id: number };
+    return { id: row.id, dbFile };
+  };
+  const rmScratchTenant = (id: number, slug: string, dbFile: string) => {
+    closeTenantConn(dbFile);
+    controlSqlite.prepare("DELETE FROM tenants WHERE id = ?").run(id);
+    try {
+      fs.rmSync(path.join(process.cwd(), "data", "tenants", slug), { recursive: true, force: true });
+    } catch {
+      // best effort
+    }
+  };
+
+  const setTenant = mkScratchTenant("analytics-venuetype-set", "Analytics VenueType Set");
+  const unsetTenant = mkScratchTenant("analytics-venuetype-unset", "Analytics VenueType Unset");
+  try {
+    const json = JSON.stringify("gym");
+    getTenantDbById(setTenant.id)
+      .insert(settings)
+      .values({ key: "venue_type", value: json })
+      .onConflictDoUpdate({ target: settings.key, set: { value: json } })
+      .run();
+    // unsetTenant: opened but never given a venue_type row — getTenantDbById
+    // still needs to run once so the tenant DB (+ its `settings` table) exists.
+    getTenantDbById(unsetTenant.id);
+
+    const a2 = getPlatformAnalytics();
+    const setRow = a2.gyms.perGym.find((r) => r.tenantId === setTenant.id);
+    const unsetRow = a2.gyms.perGym.find((r) => r.tenantId === unsetTenant.id);
+    assert.ok(setRow, "the explicitly-set scratch tenant appears in perGym");
+    assert.ok(unsetRow, "the unset scratch tenant appears in perGym");
+    assert.equal(setRow!.venueType, "gym", "perGym.venueType is the real value when set");
+    assert.equal(unsetRow!.venueType, null, 'perGym.venueType is null when unset, not "clinic"');
+  } finally {
+    rmScratchTenant(setTenant.id, "analytics-venuetype-set", setTenant.dbFile);
+    rmScratchTenant(unsetTenant.id, "analytics-venuetype-unset", unsetTenant.dbFile);
   }
 
   console.log("analytics.test.ts: all assertions passed");

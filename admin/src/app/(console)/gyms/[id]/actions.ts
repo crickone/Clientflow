@@ -13,6 +13,7 @@ export type TenantActionName =
   | "mark-paid"
   | "waive"
   | "comp"
+  | "venue-type"
   | "offboard";
 
 /**

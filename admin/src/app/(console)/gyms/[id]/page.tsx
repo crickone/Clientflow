@@ -58,7 +58,7 @@ export default async function GymDetailPage({ params }: { params: { id: string }
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>{tenant.name}</h1>
           <StatusChip status={status} exempt={billing?.billingExempt} />
           <span style={{ fontFamily: "var(--font-mono), ui-monospace, monospace", fontSize: 11, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--text-secondary)", background: "var(--surface-2)", border: "1px solid var(--grid)", borderRadius: 999, padding: "3px 10px" }}>
-            {tenant.venueType}
+            {tenant.venueType ?? "Not set"}
           </span>
         </div>
         <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
@@ -149,6 +149,36 @@ export default async function GymDetailPage({ params }: { params: { id: string }
             </p>
           </div>
         )}
+      </Card>
+
+      {/* Venue type */}
+      <Card style={{ padding: 24, display: "flex", flexDirection: "column", gap: 14 }}>
+        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>Venue type</h2>
+        <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
+          <div>
+            <div className="mono-label" style={{ marginBottom: 6 }}>
+              Current
+            </div>
+            <div style={{ fontSize: 14, textTransform: "capitalize" }}>
+              {tenant.venueType ?? <span style={{ color: "var(--text-tertiary)", textTransform: "none" }}>Not set</span>}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <ConfirmButton
+              label="Gym"
+              className={tenant.venueType === "gym" ? "btn btn--primary btn--sm" : "btn btn--secondary btn--sm"}
+              action={tenantAction.bind(null, tenant.id, "venue-type", { venueType: "gym" })}
+            />
+            <ConfirmButton
+              label="Clinic"
+              className={tenant.venueType === "clinic" ? "btn btn--primary btn--sm" : "btn btn--secondary btn--sm"}
+              action={tenantAction.bind(null, tenant.id, "venue-type", { venueType: "clinic" })}
+            />
+          </div>
+        </div>
+        <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>
+          Drives this business&apos;s own app vocabulary and scheduling mode (Clients/Appointments vs Members/Classes).
+        </p>
       </Card>
 
       {/* Invoices */}

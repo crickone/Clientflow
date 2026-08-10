@@ -48,7 +48,9 @@ export default async function GymsPage({ searchParams }: { searchParams: { q?: s
                     <Link href={`/gyms/${t.id}`}>{t.name}</Link>
                   </td>
                   <td>{t.slug}</td>
-                  <td>{t.venueType}</td>
+                  <td>
+                    {t.venueType ?? <span style={{ color: "var(--text-tertiary)" }}>Not set</span>}
+                  </td>
                   <td>
                     <StatusChip status={t.billing?.status ?? null} exempt={t.billing?.billingExempt} />
                   </td>

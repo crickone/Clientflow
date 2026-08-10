@@ -9,14 +9,17 @@ import { getMonthlyPriceCents } from "@/lib/billing/settings";
 
 /**
  * Read-only projections the platform admin app consumes. Field names here are a
- * wire contract — do NOT rename without updating the admin app.
+ * wire contract — do NOT rename without updating the admin app. The one
+ * exception is `setTenantVenueType` below — a narrow, validated cross-tenant
+ * WRITE backing the console's venue-type control.
  */
 
 export interface TenantSummary {
   id: number;
   slug: string;
   name: string;
-  venueType: string;
+  /** `null` when never set — do NOT default this to "clinic" (see readVenueType). */
+  venueType: string | null;
   isActive: boolean;
   createdAt: number;
   billing: {
@@ -54,10 +57,16 @@ function toSummary(r: Record<string, unknown>): TenantSummary {
 /**
  * venue_type lives in the tenant DB's `settings` table, JSON-encoded (e.g. the
  * literal string `"gym"`). Read it via the same cross-tenant accessor the
- * scheduler uses (`getTenantDbById` → drizzle handle → SELECT). Any failure
- * (missing DB, missing row, bad JSON) falls back to "clinic".
+ * scheduler uses (`getTenantDbById` → drizzle handle → SELECT). Unset (no
+ * row), an unreachable tenant DB, or a present-but-unparseable/non-string
+ * value all mean "we don't actually know" — return `null` rather than
+ * guessing "clinic" (that silently mislabelled every unset account, e.g.
+ * Inspire — a gym — as a clinic in the console). Contrast with the main app's
+ * OWN `getVenueType()` (lib/settings.ts), which intentionally still defaults
+ * unset to "clinic" to drive that tenant's own vocab/scheduling — this is the
+ * platform console's read, which must stay honest instead.
  */
-function readVenueType(tenantId: number): string {
+function readVenueType(tenantId: number): string | null {
   try {
     const tdb = getTenantDbById(tenantId);
     const row = tdb
@@ -65,12 +74,35 @@ function readVenueType(tenantId: number): string {
       .from(settings)
       .where(eq(settings.key, "venue_type"))
       .get();
-    if (!row?.value) return "clinic";
+    if (!row?.value) return null;
     const parsed = JSON.parse(row.value);
-    return typeof parsed === "string" ? parsed : "clinic";
+    return typeof parsed === "string" ? parsed : null;
   } catch {
-    return "clinic";
+    return null;
   }
+}
+
+/**
+ * Cross-tenant venue-type setter for the platform-admin console. Writes into
+ * the TARGET tenant's own `settings` table (via `getTenantDbById`, never the
+ * request-scoped `db` proxy), JSON-encoded exactly the way `setVenueType()` /
+ * `getVenueType()` (lib/settings.ts) write and read it for the ambient
+ * tenant — so the change takes effect immediately for that tenant's own app
+ * vocab/scheduling, not just the platform console's display. Guarded by the
+ * caller (the platform API route's `guardPlatform`); this function only
+ * validates the venue type itself.
+ */
+export function setTenantVenueType(tenantId: number, venueType: "gym" | "clinic"): void {
+  if (venueType !== "gym" && venueType !== "clinic") {
+    throw new Error(`Invalid venue type: ${String(venueType)}`);
+  }
+  const tdb = getTenantDbById(tenantId);
+  const value = JSON.stringify(venueType);
+  tdb
+    .insert(settings)
+    .values({ key: "venue_type", value })
+    .onConflictDoUpdate({ target: settings.key, set: { value } })
+    .run();
 }
 
 /** COUNT(*) of clients in a tenant's own DB (same accessor as the scheduler). */
