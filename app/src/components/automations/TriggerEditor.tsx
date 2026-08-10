@@ -77,17 +77,18 @@ export function TriggerEditor({ initial, businessName }: { initial: Detail; busi
         </div>
       </div>
 
-      {/* External automation (Zapier) */}
-      <div style={{ ...card, flexDirection: "row", alignItems: "center", gap: 16 }}>
+      {/* External automation (Zapier) — not wired to any dispatcher yet, so the
+          toggle is disabled + labelled honestly rather than silently inert. */}
+      <div style={{ ...card, flexDirection: "row", alignItems: "center", gap: 16, opacity: 0.7 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
-            External automation {externalEnabled ? "enabled" : "disabled"}
+            External automation (Zapier) <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.04em" }}>· Coming soon</span>
           </div>
           <div style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.5, marginTop: 3 }}>
-            Connect Zapier to trigger routine, repetitive tasks automatically when this event fires.
+            Outbound Zapier webhooks aren't connected yet — this toggle won't do anything until they are.
           </div>
         </div>
-        <Switch on={externalEnabled} onClick={() => setExternalEnabled((v) => !v)} />
+        <Switch on={externalEnabled} onClick={() => setExternalEnabled((v) => !v)} disabled />
       </div>
 
       {/* Name */}
