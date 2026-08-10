@@ -48,16 +48,12 @@ and `npm test` don't need any keys.
 | Script | What it does |
 |---|---|
 | `npm run dev` | Dev server (`next dev`). |
-| `npm run build` | Local/dev convenience only — runs a legacy `extract` step (see below), then `next build`. |
-| `npm run build:prod` | Plain `next build` — what CI and the Docker image actually run. |
+| `npm run build` | Plain `next build`. |
+| `npm run build:prod` | Same as `npm run build` — kept as an explicit alias since it's what CI and the Docker image call by name. |
 | `npm start` | `next start` (the standalone server, post-build). |
 | `npm run lint` | `next lint` — a reporting-only gate today. There's an unaddressed pre-existing backlog (errors included, not just warnings); CI runs it non-blocking (`continue-on-error`) rather than failing on it — see `CLAUDE.md`. |
 | `npm run typecheck` | `tsc --noEmit`. |
 | `npm test` | Runs every `src/**/*.test.ts` with `tsx` — a minimal assertion-based runner, no framework (`scripts/test.mjs`). |
-
-`../extract/` is a legacy ad-library HTML extractor that predates ClientFlow.
-`npm run build` still shells out to it for historical reasons, but the real
-deploy path (`build:prod`, Docker, CI) never touches it.
 
 ## Deployment
 

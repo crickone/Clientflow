@@ -17,11 +17,9 @@ RUN apt-get update \
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# App source (data/ + node_modules excluded via .dockerignore). The baked
-# read-only public/data/*.json (Marketing data) IS copied — it's not ignored.
+# App source (data/ + node_modules excluded via .dockerignore).
 COPY . .
 
-# Production build WITHOUT the `extract` step (no sibling ../extract context).
 RUN npm run build:prod
 
 # ---- runtime ----------------------------------------------------------------

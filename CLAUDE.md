@@ -35,9 +35,6 @@ Clonmel, Co. Tipperary — optimalhealthatinspire.ie · ☎ 083 867 2844).
                                (static HTML, assets, …), imported into the CMS (see below)
   tools/
     import-site.cjs         ← import a site folder's HTML into the CMS
-  extract/                  ← legacy ad-library HTML extractor that predates ClientFlow. Only
-                               wired into the dev-only `npm run build` — NOT `build:prod`,
-                               which is what CI/Docker/Railway actually run.
 ```
 
 ## The CMS (in `app/src`)
