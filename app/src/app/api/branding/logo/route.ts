@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { guard } from "@/lib/api/guard";
 import { mediaSecurityHeaders } from "@/lib/api/mediaSecurityHeaders";
+import { processImageUpload } from "@/lib/image/processUpload";
 
 import {
   brandingDir,
@@ -106,8 +107,15 @@ export async function POST(req: Request) {
 
   const filename = `${LOGO_BASENAME}${ext}`;
   const dest = path.join(dir, filename);
-  const buf = Buffer.from(await file.arrayBuffer());
-  fs.writeFileSync(dest, buf);
+  const rawBuf = Buffer.from(await file.arrayBuffer());
+  // Batch 5c: downscale + re-encode (never upscale; SVG N/A here — logos are
+  // PNG/JPG/WEBP only per isAllowedLogoExt). Failure-safe — falls back to
+  // rawBuf untouched if sharp can't decode it.
+  const { buffer: processedBuf } = await processImageUpload(
+    rawBuf,
+    MIME_BY_EXT[ext] ?? "application/octet-stream",
+  );
+  fs.writeFileSync(dest, processedBuf);
   setKey("branding_logo_filename", filename);
 
   // Invalidate the cached intro/outro cards so they re-render with the new

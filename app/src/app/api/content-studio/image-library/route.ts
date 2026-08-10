@@ -8,6 +8,7 @@ import {
   libraryDir,
   listLibraryAssets,
 } from "@/lib/image/library";
+import { processImageUpload } from "@/lib/image/processUpload";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -79,10 +80,21 @@ export async function POST(req: Request) {
     const ext = (isVideo ? VIDEO_EXT[mime] : path.extname(file.name)) || (isVideo ? ".mp4" : ".jpg");
     const filename = `${prefix}-${Date.now()}-${crypto.randomBytes(4).toString("hex")}${ext}`;
     const dest = path.join(dir, filename);
-    const buf = Buffer.from(await file.arrayBuffer());
+    const rawBuf = Buffer.from(await file.arrayBuffer());
+    // Batch 5c: downscale + re-encode image uploads (background photos for
+    // the carousel/card designer). Video/broll clips are left completely
+    // untouched. Failure-safe — falls back to rawBuf if sharp can't decode.
+    const { buffer: buf, width: procWidth, height: procHeight } = isVideo
+      ? { buffer: rawBuf, width: null as number | null, height: null as number | null }
+      : await processImageUpload(rawBuf, mime || "image/jpeg");
     fs.writeFileSync(dest, buf);
-    const width = Number.isFinite(widthsRaw[i]) ? widthsRaw[i] : null;
-    const height = Number.isFinite(heightsRaw[i]) ? heightsRaw[i] : null;
+    // Prefer the actual (post-resize) dimensions; fall back to the client-
+    // reported ones (measured pre-upload) for video, or if sharp couldn't
+    // decode the image.
+    const clientWidth = Number.isFinite(widthsRaw[i]) ? widthsRaw[i] : null;
+    const clientHeight = Number.isFinite(heightsRaw[i]) ? heightsRaw[i] : null;
+    const width = procWidth ?? clientWidth;
+    const height = procHeight ?? clientHeight;
     const row = addLibraryAsset({
       filename,
       originalName: file.name,

@@ -8,6 +8,7 @@ import {
   type LibraryAsset,
 } from "@/lib/cms/library";
 import { generateAltText } from "@/lib/ai/altText";
+import { processImageUpload } from "@/lib/image/processUpload";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -90,7 +91,15 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    const bytes = Buffer.from(await file.arrayBuffer());
+    const rawBytes = Buffer.from(await file.arrayBuffer());
+    // Batch 5c: downscale + re-encode raster uploads; SVG/GIF/unknown mimes
+    // pass through unchanged. Alt-text runs on the (smaller) processed bytes
+    // — same visual content, cheaper vision call. Failure-safe fallback to
+    // rawBytes if sharp can't decode them.
+    const { buffer: bytes, width, height } = await processImageUpload(
+      rawBytes,
+      mime || "application/octet-stream",
+    );
     const alt = autoAlt
       ? await generateAltText(bytes, mime, file.name || undefined, tenantId)
       : null;
@@ -98,6 +107,8 @@ export async function POST(req: Request) {
       originalName: file.name || "upload",
       mimeType: mime || "application/octet-stream",
       bytes,
+      width,
+      height,
       alt,
       tenantId,
     });

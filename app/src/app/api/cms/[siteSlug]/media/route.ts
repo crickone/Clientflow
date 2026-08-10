@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { getSiteBySlug } from "@/lib/cms/sites";
 import { addMediaAsset, listMedia } from "@/lib/cms/media";
+import { processImageUpload } from "@/lib/image/processUpload";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -66,13 +67,22 @@ export async function POST(
         { status: 400 },
       );
     }
-    const bytes = Buffer.from(await file.arrayBuffer());
+    const rawBytes = Buffer.from(await file.arrayBuffer());
+    // Batch 5c: downscale + re-encode raster uploads; SVG/GIF/unknown mimes
+    // pass through unchanged. Failure-safe — falls back to rawBytes if sharp
+    // can't decode them.
+    const { buffer: bytes, width, height } = await processImageUpload(
+      rawBytes,
+      mime || "application/octet-stream",
+    );
     created.push(
       addMediaAsset({
         siteId: site.id,
         originalName: file.name || "upload",
         mimeType: mime || "application/octet-stream",
         bytes,
+        width,
+        height,
         alt: null,
       }),
     );

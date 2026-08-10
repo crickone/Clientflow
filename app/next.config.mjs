@@ -49,11 +49,15 @@ const nextConfig = {
     // install in production; they'd silently be dead code on Railway. Stable
     // (no flag needed) from Next 15 onward — remove this once upgraded past 14.
     instrumentationHook: true,
-    // better-sqlite3 ships native bindings — keep it server-only.
+    // better-sqlite3/sharp ship native bindings — keep them server-only.
+    // sharp (Batch 5c, improvement-plan-2026-08.md Theme F4): downscales +
+    // re-encodes uploaded raster images. Never import it from a client
+    // component — see src/lib/image/processUpload.ts.
     serverComponentsExternalPackages: [
       "better-sqlite3",
       "ffmpeg-static",
       "ffprobe-static",
+      "sharp",
     ],
   },
 };
