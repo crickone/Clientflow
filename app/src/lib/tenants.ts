@@ -1,12 +1,13 @@
 import "server-only";
 
+import crypto from "node:crypto";
 import type { Database as BetterSqlite3 } from "better-sqlite3";
 import { eq } from "drizzle-orm";
 
 import { controlDb } from "@/lib/db/control";
 import { memberships, tenants, users, type Tenant } from "@/lib/db/schema";
 import { openTenantDb } from "@/lib/db/tenant";
-import { hashPassword } from "@/lib/auth";
+import { hashPassword } from "@/lib/password";
 import { createBillingRow } from "@/lib/billing/engine";
 
 /**
@@ -183,10 +184,12 @@ export function createTenant(input: CreateTenantInput): Tenant {
  * (multi-account — one person can admin several clinics), otherwise create it.
  * Then grant an admin membership (idempotent via the UNIQUE(user_id, tenant_id)
  * index). A password is only needed when creating a new identity.
+ * `mustChangePassword` only applies to a brand-new identity — an existing one
+ * is never touched here (default false preserves prior callers' behaviour).
  */
 export function createTenantAdmin(
   tenantId: number,
-  admin: { email: string; password?: string; name?: string },
+  admin: { email: string; password?: string; name?: string; mustChangePassword?: boolean },
 ): void {
   const email = admin.email.trim().toLowerCase();
 
@@ -211,7 +214,7 @@ export function createTenantAdmin(
         // legacy column mirror; membership is the source of truth
         role: "admin",
         isPlatformAdmin: false,
-        mustChangePassword: false,
+        mustChangePassword: admin.mustChangePassword ?? false,
       })
       .returning({ id: users.id })
       .get();
@@ -222,4 +225,59 @@ export function createTenantAdmin(
     .values({ userId: user.id, tenantId, role: "admin", isActive: true })
     .onConflictDoNothing()
     .run();
+}
+
+/** ~12-char URL-safe temp password for a brand-new provisioned identity. */
+function generateTempPassword(): string {
+  return crypto.randomBytes(9).toString("base64url");
+}
+
+export interface TenantAdminResult {
+  email: string;
+  /** Present only when a brand-new identity was created for this admin. */
+  tempPassword?: string;
+  /** True when this email already had an identity — membership-only grant. */
+  existing: boolean;
+  /** True for the first entry in the input list — the tenant's primary owner. */
+  owner: boolean;
+}
+
+/**
+ * Create-or-grant admin access for an ORDERED list of admins on a tenant — the
+ * FIRST entry is the owner. For each, in order:
+ *  - a brand-new email gets a new identity (generated temp password +
+ *    must_change_password, so they're forced to set their own on first
+ *    sign-in) plus an admin membership;
+ *  - an email that already has an identity is simply granted an admin
+ *    membership on this tenant (createTenantAdmin's ON CONFLICT DO NOTHING —
+ *    idempotent) — its password is never touched, and no temp password is
+ *    generated for it.
+ *
+ * Callers are responsible for validating/deduping the input list (case-
+ * insensitively) first — this just create-or-grants each entry as given.
+ * Used by the platform provisioning API so a business can be created with
+ * several account admins at once (e.g. the agency + the client's own staff).
+ */
+export function provisionTenantAdmins(
+  tenantId: number,
+  admins: Array<{ email: string; name?: string }>,
+): TenantAdminResult[] {
+  return admins.map((admin, i) => {
+    const email = admin.email.trim().toLowerCase();
+    const alreadyExists = !!controlDb
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, email))
+      .get();
+
+    const tempPassword = alreadyExists ? undefined : generateTempPassword();
+    createTenantAdmin(tenantId, {
+      email,
+      password: tempPassword,
+      name: admin.name,
+      mustChangePassword: !alreadyExists,
+    });
+
+    return { email, tempPassword, existing: alreadyExists, owner: i === 0 };
+  });
 }

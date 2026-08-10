@@ -1,10 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
-import crypto from "node:crypto";
 import { z } from "zod";
 
 import { guardPlatform } from "@/lib/platform/auth";
-import { controlSqlite } from "@/lib/db/control";
-import { createTenant } from "@/lib/tenants";
+import { createTenant, provisionTenantAdmins } from "@/lib/tenants";
+import { grantAdminMembership } from "@/lib/platform/access";
 import { logEvent } from "@/lib/billing/engine";
 import { sendPlatformEmail } from "@/lib/billing/emails";
 import { listTenantSummaries } from "@/lib/platform/queries";
@@ -28,6 +27,11 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ tenants: listTenantSummaries(q) });
 }
 
+const adminSchema = z.object({
+  email: z.string().email(),
+  name: z.string().max(120).optional(),
+});
+
 const schema = z.object({
   name: z.string().min(1).max(120),
   slug: z
@@ -36,11 +40,19 @@ const schema = z.object({
     .max(40)
     .regex(/^[a-z0-9-]+$/, "slug must be lowercase letters, digits, hyphens"),
   venueType: z.enum(["gym", "clinic"]),
-  ownerEmail: z.string().email(),
-  ownerName: z.string().max(120).optional(),
+  admins: z.array(adminSchema).min(1, "At least one admin is required"),
+  /** Grant the provisioning platform admin (g.userId) admin access too. */
+  addMe: z.boolean().optional(),
 });
 
-/** Provision a new tenant + its first admin, and email them sign-in details. */
+/**
+ * Provision a new tenant + its admins, and email each brand-new identity its
+ * sign-in details. `admins` is an ordered list — the FIRST is the owner. Each
+ * entry is create-or-granted: a new email gets a fresh identity + temp
+ * password, an existing email just gets a membership (see
+ * `provisionTenantAdmins`). If `addMe`, the calling platform admin also gets
+ * an admin membership in the new tenant (idempotent).
+ */
 export async function POST(req: NextRequest) {
   const g = guardPlatform(req);
   if (g instanceof Response) return g;
@@ -55,48 +67,63 @@ export async function POST(req: NextRequest) {
   }
   const p = parsed.data;
 
-  try {
-    const tempPassword = crypto.randomBytes(9).toString("base64url"); // ~12 chars
-    const tenant = createTenant({
-      slug: p.slug,
-      name: p.name,
-      venueType: p.venueType,
-      admin: { email: p.ownerEmail, password: tempPassword, name: p.ownerName },
+  // Dedupe admins case-insensitively — first occurrence wins, so the FIRST
+  // admin (the owner) stays first even if its email is repeated later.
+  const seen = new Set<string>();
+  const admins = p.admins
+    .map((a) => ({ email: a.email.trim(), name: a.name?.trim() || undefined }))
+    .filter((a) => {
+      const key = a.email.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
     });
+  if (admins.length === 0) {
+    return NextResponse.json({ error: "At least one admin is required" }, { status: 400 });
+  }
 
-    // Force a first-login password change for a BRAND-NEW identity only (an
-    // existing identity reused as this tenant's admin already has a password and
-    // has logged in — last_login_at IS NULL narrows it to the new one).
-    controlSqlite
-      .prepare(
-        "UPDATE users SET must_change_password = 1 WHERE email = ? AND last_login_at IS NULL",
-      )
-      .run(p.ownerEmail.toLowerCase());
+  try {
+    const tenant = createTenant({ slug: p.slug, name: p.name, venueType: p.venueType });
+    const results = provisionTenantAdmins(tenant.id, admins);
 
-    logEvent(tenant.id, "provisioned", { by: g.email, venueType: p.venueType }, actor);
+    if (p.addMe) {
+      grantAdminMembership(tenant.id, g.userId);
+    }
+
+    logEvent(
+      tenant.id,
+      "provisioned",
+      { by: g.email, venueType: p.venueType, admins: results.length, addMe: !!p.addMe },
+      actor,
+    );
 
     const appUrl = process.env.APP_URL ?? "https://app.clientflow.ie";
     const loginUrl = `${appUrl.replace(/\/$/, "")}/login`;
-    // The tenant + owner are already committed. sendPlatformEmail's actual send
-    // is try/catch-guarded, but its dynamic imports (`resend`, `@/lib/email`) sit
-    // outside that guard and CAN throw — so an import/send failure here must NOT
-    // report the provision as failed (that makes the admin retry into "Tenant
-    // already exists"). Log it and still return the temp password.
-    try {
-      await sendPlatformEmail(
-        p.ownerEmail,
-        "Your ClientFlow account is ready",
-        `<p>Your ClientFlow account for <strong>${esc(p.name)}</strong> is ready.</p>
-         <p>Sign in at <a href="${esc(loginUrl)}">${esc(loginUrl)}</a> using:</p>
-         <p><strong>Email:</strong> ${esc(p.ownerEmail)}<br/>
-            <strong>Temporary password:</strong> ${esc(tempPassword)}</p>
-         <p>You'll be asked to set your own password the first time you sign in.</p>`,
-      );
-    } catch (err) {
-      console.error("[platform] provision welcome email failed:", err);
+    // The tenant + all admins are already committed. sendPlatformEmail's actual
+    // send is try/catch-guarded, but its dynamic imports (`resend`,
+    // `@/lib/email`) sit outside that guard and CAN throw — so an import/send
+    // failure here must NOT report the provision as failed (that makes the
+    // admin retry into "Tenant already exists"). Log it and keep going.
+    // Only brand-new identities get an email — an existing identity already
+    // knows how to sign in, so there's nothing to send it.
+    for (const r of results) {
+      if (!r.tempPassword) continue;
+      try {
+        await sendPlatformEmail(
+          r.email,
+          "Your ClientFlow account is ready",
+          `<p>Your ClientFlow account for <strong>${esc(p.name)}</strong> is ready.</p>
+           <p>Sign in at <a href="${esc(loginUrl)}">${esc(loginUrl)}</a> using:</p>
+           <p><strong>Email:</strong> ${esc(r.email)}<br/>
+              <strong>Temporary password:</strong> ${esc(r.tempPassword)}</p>
+           <p>You'll be asked to set your own password the first time you sign in.</p>`,
+        );
+      } catch (err) {
+        console.error("[platform] provision welcome email failed:", err);
+      }
     }
 
-    return NextResponse.json({ ok: true, tenantId: tenant.id, tempPassword });
+    return NextResponse.json({ ok: true, tenantId: tenant.id, admins: results });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to provision tenant" },
