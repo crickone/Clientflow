@@ -173,6 +173,15 @@ export function acceptInvite(
 }
 
 /**
+ * The public accept-invite URL for a token — the exact link the email embeds.
+ * Exposed so callers can hand it over manually (copy/share) when email isn't
+ * set up for the tenant yet; the invite exists regardless of how it's delivered.
+ */
+export function inviteAcceptUrl(token: string): string {
+  return `${getAppBaseUrl()}/accept-invite?token=${encodeURIComponent(token)}`;
+}
+
+/**
  * Email the invite link. Uses the CURRENT tenant's sender identity (the admin
  * runs this from within their account). Returns the send result so the caller
  * can warn if the email couldn't go out (the invite still exists either way).
@@ -184,7 +193,7 @@ export async function sendInviteEmail(opts: {
   inviterName: string | null;
 }): Promise<SendResult> {
   const business = getBusinessProfile().businessName;
-  const link = `${getAppBaseUrl()}/accept-invite?token=${encodeURIComponent(opts.token)}`;
+  const link = inviteAcceptUrl(opts.token);
   const accent = getTheme().accent;
   const intro = opts.inviterName
     ? `${opts.inviterName} has invited you to join ${business} on ClientFlow as ${roleLabel(opts.role)}.`

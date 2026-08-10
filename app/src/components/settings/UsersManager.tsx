@@ -137,7 +137,7 @@ function UserRow({
         </div>
       </div>
       <div style={{ display: "flex", gap: 6 }}>
-        {user.invitePending && <ResendInviteButton user={user} disabled={!emailReady} />}
+        {user.invitePending && <ResendInviteButton user={user} emailReady={emailReady} />}
         <ResetPasswordDialog user={user} />
         <EditUserDialog user={user} isMe={isMe} />
         <RemoveMemberButton user={user} disabled={isMe} />
@@ -146,12 +146,32 @@ function UserRow({
   );
 }
 
-function ResendInviteButton({ user, disabled }: { user: UserRow; disabled: boolean }) {
+function ResendInviteButton({ user, emailReady }: { user: UserRow; emailReady: boolean }) {
   const [pending, start] = useTransition();
   function resend() {
     start(async () => {
       const res = await resendInviteAction(user.userId);
-      if (!res.ok) { toast.error(res.error); return; }
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      // Email isn't set up (or the send failed): offer the link to copy & share
+      // instead of a dead end.
+      if (res.emailSent === false && res.inviteLink) {
+        const link = res.inviteLink;
+        toast.warning("Email isn't set up — copy the invite link to share.", {
+          duration: 12000,
+          action: {
+            label: "Copy link",
+            onClick: () =>
+              navigator.clipboard.writeText(link).then(
+                () => toast.success("Invite link copied."),
+                () => toast.error("Couldn't copy — try again."),
+              ),
+          },
+        });
+        return;
+      }
       toast.success(`Invite re-sent to ${user.email}`);
     });
   }
@@ -159,10 +179,9 @@ function ResendInviteButton({ user, disabled }: { user: UserRow; disabled: boole
     <Button
       variant="ghost"
       size="icon"
-      title={disabled ? "Configure email in Settings → Email first" : "Resend invite email"}
+      title={emailReady ? "Resend invite email" : "Get invite link to share"}
       onClick={resend}
-      disabled={pending || disabled}
-      style={disabled ? { opacity: 0.4, cursor: "not-allowed" } : undefined}
+      disabled={pending}
     >
       <Mail size={14} strokeWidth={1.75} />
     </Button>
@@ -183,6 +202,9 @@ function NewUserButton({ emailReady }: { emailReady: boolean }) {
     { exists: boolean; alreadyMember: boolean; name: string | null } | null
   >(null);
   const [checking, setChecking] = useState(false);
+  // Set after an invite is created but its email couldn't be sent — the dialog
+  // then shows this link for the admin to share manually instead of the form.
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
 
   function reset() {
     setEmail("");
@@ -191,6 +213,17 @@ function NewUserButton({ emailReady }: { emailReady: boolean }) {
     setPassword("");
     setMode("invite");
     setLookup(null);
+    setInviteLink(null);
+  }
+
+  async function copyLink() {
+    if (!inviteLink) return;
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      toast.success("Invite link copied.");
+    } catch {
+      toast.error("Couldn't copy — select the link and copy it manually.");
+    }
   }
 
   async function checkEmail() {
@@ -226,6 +259,13 @@ function NewUserButton({ emailReady }: { emailReady: boolean }) {
         toast.error(res.error);
         return;
       }
+      // Invite created but email couldn't go out → keep the dialog open and show
+      // the link to share manually, and warn (not a green success) so it's clear.
+      if (res.emailSent === false && res.inviteLink) {
+        toast.warning("Account created — but email isn't set up, so share the invite link.");
+        setInviteLink(res.inviteLink);
+        return;
+      }
       toast.success(res.note ?? (isNew ? "User created and added" : "User added to clinic"));
       setOpen(false);
       reset();
@@ -246,7 +286,40 @@ function NewUserButton({ emailReady }: { emailReady: boolean }) {
           Add user
         </Button>
       </DialogTrigger>
-      <DialogContent title="Add user to this clinic">
+      <DialogContent title={inviteLink ? "Share this invite link" : "Add user to this clinic"}>
+        {inviteLink ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <p style={{ margin: 0, fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.55 }}>
+              The account was created, but email isn&apos;t set up for this business yet, so the invite
+              couldn&apos;t be sent. Copy this link and send it to them (WhatsApp, text, etc.) — it lets
+              them set their own password. It expires in 7 days.
+            </p>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <Input
+                readOnly
+                value={inviteLink}
+                onFocus={(e) => e.currentTarget.select()}
+                style={{ flex: 1 }}
+              />
+              <Button variant="secondary" onClick={copyLink}>
+                Copy
+              </Button>
+            </div>
+            <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>
+              Set up email in Settings → Email to send (and re-send) invites automatically.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
+              <Button
+                onClick={() => {
+                  setOpen(false);
+                  reset();
+                }}
+              >
+                Done
+              </Button>
+            </div>
+          </div>
+        ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
             <Label htmlFor="new-email">Email</Label>
@@ -351,6 +424,7 @@ function NewUserButton({ emailReady }: { emailReady: boolean }) {
             </Button>
           </div>
         </div>
+        )}
       </DialogContent>
     </Dialog>
   );

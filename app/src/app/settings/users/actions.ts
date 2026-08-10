@@ -8,13 +8,20 @@ import { z } from "zod";
 import { authDb } from "@/lib/db/control";
 import { authSessions, memberships, users } from "@/lib/db/schema";
 import { getCurrentMembership, hashPassword, requireAdmin } from "@/lib/auth";
-import { createInvite, sendInviteEmail } from "@/lib/invites";
+import { createInvite, inviteAcceptUrl, sendInviteEmail } from "@/lib/invites";
 import { applyMemberEmailUpdate } from "@/lib/users/emailUpdate";
 
 export type Role = "admin" | "staff";
 export type ActionResult = { ok: true } | { ok: false; error: string };
 export type CreateResult =
-  | { ok: true; note?: string }
+  | {
+      ok: true;
+      note?: string;
+      /** false when the invite couldn't be emailed (no provider / send failed). */
+      emailSent?: boolean;
+      /** The accept-invite link, so the admin can share it manually if needed. */
+      inviteLink?: string;
+    }
   | { ok: false; error: string };
 
 /**
@@ -190,18 +197,22 @@ export async function createUserAction(input: {
 
   const token = createInvite({ email, tenantId, userId: created.id, role, invitedByUserId: meId });
   const sent = await sendInviteEmail({ email, token, role, inviterName: meName });
+  const inviteLink = inviteAcceptUrl(token);
   revalidatePath("/settings/users");
   if (!sent.ok) {
     return {
       ok: true,
-      note: `User added, but the invite email failed to send (${sent.error}). Use "Resend invite" once email is configured.`,
+      emailSent: false,
+      inviteLink,
+      note: `Account created, but the invite email couldn't be sent (${sent.error}). Share the link below, or set up email in Settings → Email and use "Resend invite".`,
     };
   }
-  return { ok: true, note: `Invite email sent to ${email}.` };
+  return { ok: true, emailSent: true, inviteLink, note: `Invite email sent to ${email}.` };
 }
 
-/** Re-send (regenerate) a pending invite for a member who hasn't accepted yet. */
-export async function resendInviteAction(userId: number): Promise<ActionResult> {
+/** Re-send (regenerate) a pending invite for a member who hasn't accepted yet.
+ *  Returns the link too, so if email isn't set up the admin can still share it. */
+export async function resendInviteAction(userId: number): Promise<CreateResult> {
   const { meId, meName, tenantId } = await adminContext();
   const person = authDb
     .select({ email: users.email })
@@ -229,8 +240,16 @@ export async function resendInviteAction(userId: number): Promise<ActionResult> 
     role: mem.role,
     inviterName: meName,
   });
-  if (!sent.ok) return { ok: false, error: sent.error };
-  return { ok: true };
+  const inviteLink = inviteAcceptUrl(token);
+  if (!sent.ok) {
+    return {
+      ok: true,
+      emailSent: false,
+      inviteLink,
+      note: `Couldn't email the invite (${sent.error}). Share the link instead.`,
+    };
+  }
+  return { ok: true, emailSent: true, inviteLink, note: `Invite re-sent to ${person.email}.` };
 }
 
 const updateSchema = z.object({
