@@ -1,11 +1,14 @@
 import "server-only";
 
+import { getCurrentTenant, getTenantById } from "@/lib/db/tenant";
 import { readKey, readKeyForTenant, setKey } from "@/lib/settings";
 
 /**
- * Editable business identity. Replaces hardcoded "Renova" across the AI prompts
- * and the visible app name. Stored as one JSON value in the settings table
- * (single instance for now; becomes per-tenant in the tenancy phase).
+ * Editable business identity — the visible app name plus the details the AI
+ * prompts reference. Stored as one JSON value in each tenant's OWN settings
+ * table (per-tenant: readKey/readKeyForTenant are tenant-scoped). An un-set
+ * profile falls back to the tenant's own registry name, never another tenant's
+ * — see NEUTRAL_DEFAULT / resolveProfile.
  */
 export interface BusinessProfile {
   businessName: string;
@@ -33,13 +36,20 @@ export interface BusinessProfile {
   faqs: { q: string; a: string }[];
 }
 
-/** Defaults mirror Renova's current details, so an un-set profile == today. */
-const DEFAULT_PROFILE: BusinessProfile = {
-  businessName: "Renova Cellular Health",
-  tagline: "a recovery & wellness business",
-  location: "Ard Gaoithe Business Park, Clonmel, Co. Tipperary",
-  phone: "083 867 2844",
-  website: "renovacellularhealth.ie",
+/**
+ * Neutral defaults for a tenant that has NOT filled in its business profile.
+ * Everything blank except businessName, which is resolved to the tenant's OWN
+ * registry name at read time (see resolveProfile). This is the tenant-isolation
+ * guarantee: an un-configured tenant must NEVER inherit another tenant's
+ * identity — name, phone, website, or address — anywhere the profile surfaces
+ * (the chrome lockup, outbound client emails, the client app, AI content).
+ */
+const NEUTRAL_DEFAULT: BusinessProfile = {
+  businessName: "",
+  tagline: "",
+  location: "",
+  phone: "",
+  website: "",
   email: "",
   brief: "",
   voiceNotes: "",
@@ -48,15 +58,52 @@ const DEFAULT_PROFILE: BusinessProfile = {
   faqs: [],
 };
 
+/**
+ * Renova is the original tenant; its real details historically lived in the
+ * profile default (it never explicitly saved a business_profile). Preserve them
+ * as a slug-scoped base so the live clinic's identity is unchanged WITHOUT
+ * writing to its DB. Anything Renova later saves in Settings → Business still
+ * wins (stored is spread over this).
+ */
+const RENOVA_DEFAULTS: Partial<BusinessProfile> = {
+  businessName: "Renova Cellular Health",
+  tagline: "a recovery & wellness business",
+  location: "Ard Gaoithe Business Park, Clonmel, Co. Tipperary",
+  phone: "083 867 2844",
+  website: "renovacellularhealth.ie",
+};
+
+/** Baseline profile for a tenant, before its stored overrides are applied. */
+function baseProfile(slug: string | undefined): BusinessProfile {
+  return slug === "renova" ? { ...NEUTRAL_DEFAULT, ...RENOVA_DEFAULTS } : NEUTRAL_DEFAULT;
+}
+
+/**
+ * Merge stored overrides onto the baseline, then fall an unset businessName back
+ * to the tenant's OWN registry name (`name`) — never a hardcoded or other
+ * tenant's name. `slug`/`name` come from the control-plane tenant row.
+ */
+function resolveProfile(
+  slug: string | undefined,
+  name: string | undefined,
+  stored: Partial<BusinessProfile>,
+): BusinessProfile {
+  const merged = { ...baseProfile(slug), ...stored };
+  if (!merged.businessName) merged.businessName = name ?? "";
+  return merged;
+}
+
 export function getBusinessProfile(): BusinessProfile {
+  const tenant = getCurrentTenant();
   const stored = readKey<Partial<BusinessProfile>>("business_profile", {});
-  return { ...DEFAULT_PROFILE, ...stored };
+  return resolveProfile(tenant.slug, tenant.name, stored);
 }
 
 /** Business profile for an explicit tenant (background jobs). */
 export function getBusinessProfileForTenant(tenantId: number): BusinessProfile {
+  const tenant = getTenantById(tenantId);
   const stored = readKeyForTenant<Partial<BusinessProfile>>(tenantId, "business_profile", {});
-  return { ...DEFAULT_PROFILE, ...stored };
+  return resolveProfile(tenant?.slug, tenant?.name, stored);
 }
 
 export function setBusinessProfile(profile: BusinessProfile): void {
