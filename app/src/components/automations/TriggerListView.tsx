@@ -6,11 +6,13 @@ import { ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 
 import { toggleTriggerAction } from "@/app/automations/actions";
+import type { TriggerStatus } from "@/lib/automationModel";
 
 interface TriggerRow {
   key: string;
   label: string;
   description: string;
+  status: TriggerStatus;
   enabled: boolean;
   messageCount: number;
 }
@@ -37,8 +39,10 @@ function TriggerRowItem({ trigger }: { trigger: TriggerRow }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [on, setOn] = useState(trigger.enabled);
+  const comingSoon = trigger.status === "coming_soon";
 
   const toggle = () => {
+    if (comingSoon) return; // nothing to switch on yet — see ComingSoonBadge
     const next = !on;
     setOn(next);
     start(async () => {
@@ -51,37 +55,80 @@ function TriggerRowItem({ trigger }: { trigger: TriggerRow }) {
   return (
     <div style={{ ...row, opacity: pending ? 0.7 : 1 }}>
       <button onClick={open} style={{ textAlign: "left", background: "transparent", border: "none", cursor: "pointer", padding: 0, minWidth: 0 }}>
-        <div style={{ fontSize: 14, color: "var(--text-primary)", fontWeight: 500 }}>{trigger.label}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ fontSize: 14, color: "var(--text-primary)", fontWeight: 500 }}>{trigger.label}</div>
+          {comingSoon && <ComingSoonBadge />}
+        </div>
         <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-          {trigger.messageCount > 0 ? `${trigger.messageCount} message${trigger.messageCount === 1 ? "" : "s"}` : trigger.description}
+          {comingSoon
+            ? "Not wired up to send yet."
+            : trigger.messageCount > 0
+              ? `${trigger.messageCount} message${trigger.messageCount === 1 ? "" : "s"}`
+              : trigger.description}
         </div>
       </button>
       <div style={{ display: "flex", justifyContent: "center" }}>
-        <Switch on={on} onClick={toggle} />
+        <Switch on={on} onClick={toggle} disabled={comingSoon} />
       </div>
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <button
           onClick={open}
           style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 32, padding: "0 12px", borderRadius: "var(--radius)", border: "1px solid var(--hairline)", background: "transparent", color: "var(--text-secondary)", cursor: "pointer", fontSize: 13 }}
         >
-          Edit <ChevronRight size={14} />
+          {comingSoon ? "View" : "Edit"} <ChevronRight size={14} />
         </button>
       </div>
     </div>
   );
 }
 
-export function Switch({ on, onClick }: { on: boolean; onClick: () => void }) {
+export function Switch({ on, onClick, disabled = false }: { on: boolean; onClick: () => void; disabled?: boolean }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       role="switch"
       aria-checked={on}
-      style={{ width: 44, height: 25, borderRadius: 999, background: on ? "var(--accent)" : "var(--surface-3)", border: "1px solid var(--hairline)", position: "relative", cursor: "pointer", flexShrink: 0, transition: "background 0.15s var(--ease)" }}
+      style={{
+        width: 44,
+        height: 25,
+        borderRadius: 999,
+        background: on ? "var(--accent)" : "var(--surface-3)",
+        border: "1px solid var(--hairline)",
+        position: "relative",
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.5 : 1,
+        flexShrink: 0,
+        transition: "background 0.15s var(--ease)",
+      }}
     >
       <span style={{ position: "absolute", top: 2, left: on ? 21 : 2, width: 19, height: 19, borderRadius: "50%", background: "#fff", transition: "left 0.15s var(--ease)" }} />
     </button>
+  );
+}
+
+/** Small "Coming soon" pill — single visual marker for a coming_soon TriggerStatus, used on both the list row and the trigger editor (Theme D1). */
+export function ComingSoonBadge() {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        fontSize: 10,
+        fontWeight: 600,
+        letterSpacing: "0.04em",
+        textTransform: "uppercase",
+        color: "var(--text-tertiary)",
+        background: "var(--surface-2)",
+        border: "1px solid var(--hairline)",
+        borderRadius: 999,
+        padding: "2px 8px",
+        whiteSpace: "nowrap",
+      }}
+    >
+      Coming soon
+    </span>
   );
 }
 

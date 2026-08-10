@@ -3,31 +3,75 @@
 export type Channel = "email" | "push" | "chat";
 export type IntervalUnit = "minutes" | "hours" | "days";
 
+/**
+ * "active" triggers are actually dispatched today — by `fireTrigger()`
+ * (automations.ts) or the birthday job (automations/scheduler.ts).
+ * "coming_soon" triggers are fully configurable in the UI (enable, write a
+ * message series, etc.) but nothing in the app ever calls `fireTrigger()`
+ * for them, so enabling one would silently do nothing.
+ *
+ * This field is the SINGLE SOURCE OF TRUTH for that split
+ * (improvement-plan-2026-08.md Theme D1): every UI surface (TriggerListView,
+ * TriggerEditor, the trigger detail page) and the dispatch guard in
+ * `fireTrigger()` read it from here via `ACTIVE_TRIGGER_KEYS` below — none of
+ * them keep their own hardcoded copy of "which triggers are real."
+ */
+export type TriggerStatus = "active" | "coming_soon";
+
 export interface TriggerDef {
   key: string;
   label: string;
   description: string;
+  status: TriggerStatus;
 }
 
 /** Fixed catalog of event triggers (Kahunas "Trigger List"). */
 export const TRIGGER_CATALOG: TriggerDef[] = [
-  { key: "new_client_created", label: "New client created", description: "When a new client is added to your roster." },
-  { key: "client_check_in", label: "Client completes a check-in", description: "When a client submits a check-in." },
-  { key: "nutrition_plan_added", label: "Nutrition plan added to your client", description: "When a nutrition plan is assigned to a client." },
-  { key: "initial_qa_form", label: "Client completes initial Q&A form", description: "When a client completes their onboarding form." },
-  { key: "workout_plan_added", label: "Workout plan added to your client", description: "When a workout program is assigned to a client." },
-  { key: "supplement_plan_added", label: "Supplement plan added to your client", description: "When a supplement plan is assigned to a client." },
-  { key: "workout_plan_updated", label: "Workout plan updated", description: "When a client's workout program changes." },
-  { key: "nutrition_plan_updated", label: "Nutrition plan updated", description: "When a client's nutrition plan changes." },
-  { key: "client_missed_check_in", label: "Client misses a check-in", description: "When a client misses a scheduled check-in." },
-  { key: "client_check_in_reminder", label: "Client check-in reminder", description: "A reminder before a client's check-in is due." },
-  { key: "client_birthday", label: "Client's birthday", description: "On a client's birthday." },
-  { key: "supplement_plan_updated", label: "Supplement plan updated", description: "When a client's supplement plan changes." },
+  { key: "new_client_created", label: "New client created", description: "When a new client is added to your roster.", status: "active" },
+  { key: "client_check_in", label: "Client completes a check-in", description: "When a client submits a check-in.", status: "coming_soon" },
+  { key: "nutrition_plan_added", label: "Nutrition plan added to your client", description: "When a nutrition plan is assigned to a client.", status: "active" },
+  { key: "initial_qa_form", label: "Client completes initial Q&A form", description: "When a client completes their onboarding form.", status: "coming_soon" },
+  { key: "workout_plan_added", label: "Workout plan added to your client", description: "When a workout program is assigned to a client.", status: "active" },
+  { key: "supplement_plan_added", label: "Supplement plan added to your client", description: "When a supplement plan is assigned to a client.", status: "coming_soon" },
+  { key: "workout_plan_updated", label: "Workout plan updated", description: "When a client's workout program changes.", status: "coming_soon" },
+  { key: "nutrition_plan_updated", label: "Nutrition plan updated", description: "When a client's nutrition plan changes.", status: "coming_soon" },
+  { key: "client_missed_check_in", label: "Client misses a check-in", description: "When a client misses a scheduled check-in.", status: "coming_soon" },
+  { key: "client_check_in_reminder", label: "Client check-in reminder", description: "A reminder before a client's check-in is due.", status: "coming_soon" },
+  { key: "client_birthday", label: "Client's birthday", description: "On a client's birthday.", status: "active" },
+  { key: "supplement_plan_updated", label: "Supplement plan updated", description: "When a client's supplement plan changes.", status: "coming_soon" },
 ];
 
 export const TRIGGER_LABELS: Record<string, string> = Object.fromEntries(
   TRIGGER_CATALOG.map((t) => [t.key, t.label]),
 );
+
+/**
+ * Trigger keys that actually fire today — derived FROM the catalog's
+ * `status` field above (never a separately-maintained list), so it can't
+ * drift from what TRIGGER_CATALOG says. `fireTrigger()` (automations.ts)
+ * guards on this before doing anything else.
+ */
+export const ACTIVE_TRIGGER_KEYS: ReadonlySet<string> = new Set(
+  TRIGGER_CATALOG.filter((t) => t.status === "active").map((t) => t.key),
+);
+
+/**
+ * The only channel/delay combination that actually sends today — see
+ * `fireTrigger()` (automations.ts) and the birthday job
+ * (automations/scheduler.ts), both of which dispatch through
+ * `isMessageLive()` below instead of keeping their own copy of this rule.
+ * Push/chat and any delayed message are configurable in the message editor
+ * but are silently never sent otherwise (improvement-plan-2026-08.md Theme
+ * D1) — the editor's channel/delay restriction reads these same constants
+ * so the UI can never promise more than the dispatch code actually does.
+ */
+export const LIVE_CHANNEL: Channel = "email";
+export const LIVE_DELAY_VALUE = 0;
+
+/** True iff `m` would actually be dispatched by fireTrigger()/the birthday job — see LIVE_CHANNEL/LIVE_DELAY_VALUE above. */
+export function isMessageLive(m: { channel: Channel; delayValue: number }): boolean {
+  return m.channel === LIVE_CHANNEL && m.delayValue === LIVE_DELAY_VALUE;
+}
 
 /** Personalisation short-codes available in message templates. */
 export const SHORTCODES = ["[FIRST_NAME]", "[LAST_NAME]", "[BUSINESS_NAME]"];
@@ -71,12 +115,16 @@ export interface TriggerInput {
 
 export function blankMessage(): MessageInput {
   return {
-    channel: "chat",
+    // Default a brand-new message card to the one channel/delay combo that
+    // actually sends (was "chat" — a channel that's always silently dropped
+    // today, see LIVE_CHANNEL above) so a freshly-added message starts in a
+    // working state instead of a dead one.
+    channel: LIVE_CHANNEL,
     subject: null,
     template: "",
     attachmentFilename: null,
     attachmentOriginal: null,
-    delayValue: 0,
+    delayValue: LIVE_DELAY_VALUE,
     delayUnit: "minutes",
   };
 }

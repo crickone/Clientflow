@@ -5,7 +5,7 @@ import { and, asc, eq, gte } from "drizzle-orm";
 import { controlDb, getCronState, setCronState } from "@/lib/db/control";
 import { getTenantDbById } from "@/lib/db/tenant";
 import { automationLog, automationMessages, automationTriggers, clients, tenants } from "@/lib/db/schema";
-import { applyShortcodes, DEFAULT_MESSAGES } from "@/lib/automationModel";
+import { applyShortcodes, DEFAULT_MESSAGES, isMessageLive, type Channel } from "@/lib/automationModel";
 import { getBusinessProfileForTenant } from "@/lib/businessProfile";
 import { listExercisesForTenant, setExerciseVideoUrlForTenant } from "@/lib/exerciseLibrary";
 import { getThemeForTenant } from "@/lib/settings";
@@ -41,11 +41,11 @@ async function runBirthdayForTenant(tenantId: number): Promise<number> {
     .where(eq(automationMessages.triggerKey, "client_birthday"))
     .orderBy(asc(automationMessages.position))
     .all();
-  const messages =
+  const messages: { channel: Channel; subject: string | null; template: string; delayValue: number }[] =
     saved.length > 0
-      ? saved.map((m) => ({ channel: m.channel, subject: m.subject, template: m.template ?? "", delayValue: m.delayValue }))
+      ? saved.map((m) => ({ channel: m.channel as Channel, subject: m.subject, template: m.template ?? "", delayValue: m.delayValue }))
       : (DEFAULT_MESSAGES["client_birthday"] ?? []).map((m) => ({ channel: m.channel, subject: m.subject, template: m.template, delayValue: m.delayValue }));
-  const emailMessages = messages.filter((m) => m.channel === "email" && m.delayValue === 0 && m.template.trim());
+  const emailMessages = messages.filter((m) => isMessageLive(m) && m.template.trim());
   if (emailMessages.length === 0) return 0;
 
   const mmdds = birthdayMonthDays();

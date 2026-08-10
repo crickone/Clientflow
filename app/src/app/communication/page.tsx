@@ -43,7 +43,7 @@ export default async function CommunicationPage() {
       <PageHeader
         eyebrow="Inbox"
         title="Communication"
-        subtitle="All your conversations in one place — WhatsApp, email, and an AI assistant."
+        subtitle="All your conversations in one place — WhatsApp and email."
       />
 
       <Tabs defaultValue="combined">

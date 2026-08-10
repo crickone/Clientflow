@@ -13,8 +13,7 @@
 //      three specialist wrappers already have — see tools.orchestrator.test.ts
 //      — proven here for the 4th, differently-implemented delegate).
 //   3. `conciergeToolSlice(schedulingMode, driveConnected)` — the general
-//      assistant's tool slice, now shared by `/api/assistant/chat` and
-//      `delegate_to_concierge`:
+//      assistant's tool slice, used by `delegate_to_concierge`:
 //        - excludes EVERY `delegate_to_*` tool (all 4, including itself —
 //          the concrete proof the Concierge can never delegate further, so
 //          delegation stays exactly one level deep even via this path);
@@ -29,11 +28,17 @@
 //          EXACTLY TOOLS.length minus the excluded set for that combination
 //          (computed from TOOLS itself, not a hardcoded count, so this stays
 //          correct as unrelated tools are added over time);
-//      and the assistant route (`/api/assistant/chat`) source is confirmed to
-//      actually CALL this function (not a re-derived equivalent) — the
-//      concrete evidence the refactor didn't leave a second, driftable copy
-//      of this filter behind (brief: "Assert it matches what the assistant
-//      route now uses").
+//      and `delegateToConcierge`'s source (tools.orchestrator.ts) is
+//      confirmed to actually CALL this function (not a re-derived
+//      equivalent) — the concrete evidence there's no second, driftable copy
+//      of this filter behind. (Historical note — Batch 4a,
+//      improvement-plan-2026-08.md Theme D7: this assertion originally read
+//      `/api/assistant/chat/route.ts`, `conciergeToolSlice`'s OTHER caller at
+//      the time. That route was confirmed dead at runtime — both render
+//      sites always passed an explicit endpoint, so it was never reached —
+//      and was deleted; `delegate_to_concierge` is conciergeToolSlice's one
+//      remaining real caller, so the assertion below now targets it instead
+//      of being deleted outright.)
 //
 // NOT tested here (deliberately, per the task brief): the live-delegation
 // happy path (a real delegate_to_concierge call that reaches runAgentTurn and
@@ -220,20 +225,23 @@ const requireLocal = createRequire(import.meta.url);
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // 4. The assistant route actually USES conciergeToolSlice (not a
-    //    re-derived equivalent left behind by the refactor)
+    // 4. delegate_to_concierge's OWN implementation actually USES
+    //    conciergeToolSlice (not a re-derived equivalent) — see the Batch 4a
+    //    historical note in the file-level comment above for why this now
+    //    targets tools.orchestrator.ts instead of the deleted
+    //    /api/assistant/chat/route.ts.
     // ════════════════════════════════════════════════════════════════════
-    const routeSrc = fs.readFileSync(
-      path.join(process.cwd(), "src/app/api/assistant/chat/route.ts"),
+    const orchestratorSrc = fs.readFileSync(
+      path.join(process.cwd(), "src/lib/agents/tools.orchestrator.ts"),
       "utf8",
     );
     assert.ok(
-      /conciergeToolSlice\(\s*schedulingMode\s*,\s*driveConnected\s*\)/.test(routeSrc),
-      "/api/assistant/chat/route.ts calls conciergeToolSlice(schedulingMode, driveConnected) directly",
+      /conciergeToolSlice\(\s*mode\s*,\s*drive\s*\)/.test(orchestratorSrc),
+      "tools.orchestrator.ts's delegateToConcierge calls conciergeToolSlice(mode, drive) directly",
     );
     assert.ok(
-      !/APPT_ONLY/.test(routeSrc) && !/TIMETABLE_ONLY/.test(routeSrc),
-      "/api/assistant/chat/route.ts no longer has its own inline copy of the mode-scoping Sets — conciergeToolSlice is the ONE place that logic lives",
+      !/APPT_ONLY/.test(orchestratorSrc) && !/TIMETABLE_ONLY/.test(orchestratorSrc),
+      "tools.orchestrator.ts has no inline copy of the mode-scoping Sets — conciergeToolSlice (@/lib/assistant/tools) is the ONE place that logic lives",
     );
 
     console.log("tools.concierge.test.ts: all assertions passed");

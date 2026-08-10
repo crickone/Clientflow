@@ -5,14 +5,17 @@ import { asc, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { automationLog, automationMessages, automationTriggers, clients } from "@/lib/db/schema";
 import {
+  ACTIVE_TRIGGER_KEYS,
   applyShortcodes,
   DEFAULT_MESSAGES,
+  isMessageLive,
   TRIGGER_CATALOG,
   TRIGGER_LABELS,
   type Channel,
   type IntervalUnit,
   type MessageInput,
   type TriggerInput,
+  type TriggerStatus,
 } from "@/lib/automationModel";
 import { getBusinessProfile } from "@/lib/businessProfile";
 import { getTheme } from "@/lib/settings";
@@ -24,6 +27,7 @@ export interface TriggerListRow {
   key: string;
   label: string;
   description: string;
+  status: TriggerStatus;
   enabled: boolean;
   messageCount: number;
 }
@@ -40,6 +44,7 @@ export function listTriggers(): TriggerListRow[] {
     key: t.key,
     label: t.label,
     description: t.description,
+    status: t.status,
     enabled: stateByKey.get(t.key)?.enabled ?? false,
     messageCount: counts.get(t.key) ?? 0,
   }));
@@ -48,6 +53,7 @@ export function listTriggers(): TriggerListRow[] {
 export interface TriggerDetail extends TriggerInput {
   label: string;
   description: string;
+  status: TriggerStatus;
 }
 
 export function getTrigger(key: string): TriggerDetail | null {
@@ -78,6 +84,7 @@ export function getTrigger(key: string): TriggerDetail | null {
     key,
     label: def.label,
     description: def.description,
+    status: def.status,
     enabled: state?.enabled ?? false,
     externalEnabled: state?.externalEnabled ?? false,
     messages: mapped,
@@ -100,21 +107,27 @@ function upsertTriggerState(key: string, patch: { enabled?: boolean; externalEna
 
 export function setTriggerEnabled(key: string, enabled: boolean) {
   if (!VALID_KEYS.has(key)) return;
-  upsertTriggerState(key, { enabled });
+  // Coming-soon triggers can only ever be OFF — fireTrigger() already guards
+  // on ACTIVE_TRIGGER_KEYS so this can't cause a real send either way, but
+  // persisting `enabled: true` for one would still be a lie sitting in the
+  // DB (Theme D1). Turning one off is always allowed.
+  const persisted = enabled && ACTIVE_TRIGGER_KEYS.has(key);
+  upsertTriggerState(key, { enabled: persisted });
 }
 
 export function saveTrigger(input: TriggerInput) {
   if (!VALID_KEYS.has(input.key)) return;
+  const enabled = input.enabled && ACTIVE_TRIGGER_KEYS.has(input.key); // see setTriggerEnabled's comment
   db.transaction((tx) => {
     const existing = tx.select().from(automationTriggers).where(eq(automationTriggers.key, input.key)).get();
     if (existing) {
       tx.update(automationTriggers)
-        .set({ enabled: input.enabled, externalEnabled: input.externalEnabled, updatedAt: new Date() })
+        .set({ enabled, externalEnabled: input.externalEnabled, updatedAt: new Date() })
         .where(eq(automationTriggers.key, input.key))
         .run();
     } else {
       tx.insert(automationTriggers)
-        .values({ key: input.key, enabled: input.enabled, externalEnabled: input.externalEnabled })
+        .values({ key: input.key, enabled, externalEnabled: input.externalEnabled })
         .run();
     }
     tx.delete(automationMessages).where(eq(automationMessages.triggerKey, input.key)).run();
@@ -172,10 +185,16 @@ export function listSent(): SentRow[] {
  * Never throws — a failed automation must not break the action that called it.
  * (Push/chat channels and delayed messages need the client-app + scheduler and
  * are skipped for now.)
+ *
+ * Only dispatches ACTIVE_TRIGGER_KEYS (automationModel.ts) — the other 8
+ * catalog entries are "coming_soon": configurable in the UI, but nothing
+ * calls fireTrigger() for them, and even if something did, this guard stops
+ * it from silently doing anything (improvement-plan-2026-08.md Theme D1).
  */
 export async function fireTrigger(triggerKey: string, clientId: number): Promise<void> {
   try {
     if (!VALID_KEYS.has(triggerKey)) return;
+    if (!ACTIVE_TRIGGER_KEYS.has(triggerKey)) return;
     const state = db.select().from(automationTriggers).where(eq(automationTriggers.key, triggerKey)).get();
     if (!state?.enabled) return;
 
@@ -191,7 +210,7 @@ export async function fireTrigger(triggerKey: string, clientId: number): Promise
         ? saved.map((m) => ({ channel: m.channel as Channel, subject: m.subject, template: m.template ?? "", delayValue: m.delayValue }))
         : (DEFAULT_MESSAGES[triggerKey] ?? []).map((m) => ({ channel: m.channel, subject: m.subject, template: m.template, delayValue: m.delayValue }));
 
-    const emailMessages = messages.filter((m) => m.channel === "email" && m.delayValue === 0 && m.template.trim());
+    const emailMessages = messages.filter((m) => isMessageLive(m) && m.template.trim());
     if (emailMessages.length === 0) return;
 
     const client = db

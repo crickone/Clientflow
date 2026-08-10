@@ -830,28 +830,25 @@ export const TOOLS: Anthropic.Tool[] = [
  * The general assistant's tool slice — every `TOOLS` entry scoped to the
  * account's scheduling mode (1:1 Appointments vs group-class Timetable) and
  * Google Drive connection state, with every `delegate_to_*` tool excluded.
- * Extracted (Concierge Task 1) from the inline filter `/api/assistant/chat`
- * used to compute for itself — SAME two Sets, SAME three conditions, SAME
- * fallback, so its resulting tool list is byte-for-byte identical to what
- * that route always built inline. Keep this the one place that logic lives.
+ * Extracted (Concierge Task 1) from an inline filter a now-deleted route
+ * (`/api/assistant/chat`, confirmed dead at runtime and removed in Batch 4a —
+ * see improvement-plan-2026-08.md Theme D7) used to compute for itself —
+ * SAME two Sets, SAME three conditions, SAME fallback, so its resulting tool
+ * list was byte-for-byte identical to what that route always built inline.
+ * Keep this the one place that logic lives.
  *
- * Two callers share it, and must stay in lockstep:
- *  1. `/api/assistant/chat` (the Dashboard/Communication assistant) — this
- *     chat loop predates `runAgentTurn` and does NOT read a tool result's
- *     `pendingWrites` (only `runAgentTurn`'s READ branch does — see
- *     runAgentTurn.ts), so offering it a `delegate_to_*` tool would silently
- *     DROP any write a delegated specialist proposed instead of surfacing it
- *     on an Approve card. Never offer these here — the exclusion below is
- *     load-bearing, not tidiness.
- *  2. `delegate_to_concierge` (@/lib/agents/tools.orchestrator) — the
- *     Orchestrator's general-purpose delegate. This one DOES run through
- *     `runAgentTurn`, which folds a nested result's `pendingWrites`/
- *     `artifacts` into its own, so the exclusion isn't load-bearing there —
- *     but it's what keeps delegation exactly one level deep: a Concierge run
- *     via delegation never itself has a `delegate_to_*` tool to call, so it
- *     can never delegate further (no path back into tools.orchestrator.ts).
- *     This is the SAME slice either way — "what can the Concierge do" has
- *     one definition, not two that could drift apart.
+ * Current caller: `delegate_to_concierge` (@/lib/agents/tools.orchestrator)
+ * — the Orchestrator's general-purpose delegate. It runs through
+ * `runAgentTurn`, which folds a nested result's `pendingWrites`/`artifacts`
+ * into its own, so the `delegate_to_*` exclusion below isn't load-bearing
+ * for THIS caller the way it was for the deleted route (which predated
+ * `runAgentTurn` and never read a tool result's `pendingWrites`, so handing
+ * it a `delegate_to_*` tool would have silently dropped a delegated
+ * specialist's proposed write instead of surfacing it on an Approve card).
+ * It's still required, though: it's what keeps delegation exactly one level
+ * deep — a Concierge run via delegation never itself has a `delegate_to_*`
+ * tool to call, so it can never delegate further (no path back into
+ * tools.orchestrator.ts).
  */
 export function conciergeToolSlice(
   schedulingMode: "appointments" | "timetable",

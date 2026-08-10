@@ -7,22 +7,24 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Textarea } from "@/components/ui/Input";
-import { Switch } from "@/components/automations/TriggerListView";
+import { ComingSoonBadge, Switch } from "@/components/automations/TriggerListView";
 import { saveTriggerAction } from "@/app/automations/actions";
 import {
   applyShortcodes,
   blankMessage,
   CHANNEL_LABEL,
+  LIVE_CHANNEL,
   SHORTCODES,
   type Channel,
-  type IntervalUnit,
   type MessageInput,
+  type TriggerStatus,
 } from "@/lib/automationModel";
 
 interface Detail {
   key: string;
   label: string;
   description: string;
+  status: TriggerStatus;
   enabled: boolean;
   externalEnabled: boolean;
   messages: MessageInput[];
@@ -30,6 +32,7 @@ interface Detail {
 
 export function TriggerEditor({ initial, businessName }: { initial: Detail; businessName: string }) {
   const router = useRouter();
+  const comingSoon = initial.status === "coming_soon";
   const [enabled, setEnabled] = useState(initial.enabled);
   const [externalEnabled, setExternalEnabled] = useState(initial.externalEnabled);
   const [messages, setMessages] = useState<MessageInput[]>(
@@ -65,9 +68,12 @@ export function TriggerEditor({ initial, businessName }: { initial: Detail; busi
           <ArrowLeft size={16} />
         </Button>
         <h1 style={{ margin: 0, fontFamily: "var(--font-heading), sans-serif", fontSize: 24, textTransform: "uppercase" }}>Trigger</h1>
+        {comingSoon && <ComingSoonBadge />}
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>{enabled ? "Active" : "Inactive"}</span>
-          <Switch on={enabled} onClick={() => setEnabled((v) => !v)} />
+          <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
+            {comingSoon ? "Not available yet" : enabled ? "Active" : "Inactive"}
+          </span>
+          <Switch on={enabled} onClick={() => setEnabled((v) => !v)} disabled={comingSoon} />
         </div>
       </div>
 
@@ -93,23 +99,36 @@ export function TriggerEditor({ initial, businessName }: { initial: Detail; busi
       </div>
 
       {/* Message series */}
-      {messages.map((m, i) => (
-        <MessageCard
-          key={i}
-          index={i}
-          message={m}
-          canRemove={messages.length > 1}
-          onPatch={(p) => patch(i, p)}
-          onRemove={() => removeMsg(i)}
-          businessName={businessName}
-        />
-      ))}
+      {comingSoon ? (
+        <div style={card}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Nothing to configure here yet</div>
+          <div style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.6 }}>
+            This trigger isn&apos;t wired up to send anything yet — no message series exists for it today, so
+            there&apos;s nothing to write or schedule here. We&apos;ll open up sending for &ldquo;{initial.label}&rdquo; in a
+            future update.
+          </div>
+        </div>
+      ) : (
+        <>
+          {messages.map((m, i) => (
+            <MessageCard
+              key={i}
+              index={i}
+              message={m}
+              canRemove={messages.length > 1}
+              onPatch={(p) => patch(i, p)}
+              onRemove={() => removeMsg(i)}
+              businessName={businessName}
+            />
+          ))}
 
-      <div>
-        <Button variant="outline" onClick={addMsg}>
-          <Plus size={15} /> Add another message
-        </Button>
-      </div>
+          <div>
+            <Button variant="outline" onClick={addMsg}>
+              <Plus size={15} /> Add another message
+            </Button>
+          </div>
+        </>
+      )}
 
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
         <Button variant="ghost" onClick={() => router.push("/automations")} disabled={saving}>
@@ -178,22 +197,36 @@ function MessageCard({
           <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>What type of notification do you want to send?</div>
         </div>
         <div style={{ marginLeft: "auto", display: "inline-flex", border: "1px solid var(--hairline)", borderRadius: "var(--radius)", overflow: "hidden" }}>
-          {(["email", "push", "chat"] as Channel[]).map((c) => (
-            <button
-              key={c}
-              onClick={() => onPatch({ channel: c })}
-              style={{
-                padding: "8px 18px",
-                border: "none",
-                cursor: "pointer",
-                fontSize: 13,
-                background: message.channel === c ? "var(--accent)" : "transparent",
-                color: message.channel === c ? "#fff" : "var(--text-secondary)",
-              }}
-            >
-              {CHANNEL_LABEL[c]}
-            </button>
-          ))}
+          {(["email", "push", "chat"] as Channel[]).map((c) => {
+            // Only LIVE_CHANNEL ("email") is ever actually dispatched — see
+            // automationModel.ts's isMessageLive(). Push/chat stay visible
+            // (so a historically-saved value is still legible) but disabled,
+            // rather than silently accepting a choice that will never send
+            // (improvement-plan-2026-08.md Theme D1).
+            const live = c === LIVE_CHANNEL;
+            const selected = message.channel === c;
+            return (
+              <button
+                key={c}
+                type="button"
+                onClick={() => live && onPatch({ channel: c })}
+                disabled={!live}
+                title={live ? undefined : "Coming soon — only Email actually sends today"}
+                style={{
+                  padding: "8px 18px",
+                  border: "none",
+                  cursor: live ? "pointer" : "not-allowed",
+                  fontSize: 13,
+                  background: selected ? "var(--accent)" : "transparent",
+                  color: selected ? "#fff" : live ? "var(--text-secondary)" : "var(--text-tertiary)",
+                  opacity: live ? 1 : 0.6,
+                }}
+              >
+                {CHANNEL_LABEL[c]}
+                {!live && " (soon)"}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -253,24 +286,29 @@ function MessageCard({
         )}
       </div>
 
-      {/* timing */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-        <div>
-          <Label htmlFor={`delay-${index}`}>When do you want to send this message?</Label>
-          <Input id={`delay-${index}`} type="number" min={0} value={message.delayValue} onChange={(e) => onPatch({ delayValue: Number(e.target.value) || 0 })} />
+      {/* timing — disabled: every message sends immediately today (Theme D1) */}
+      <div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, opacity: 0.55 }}>
+          <div>
+            <Label htmlFor={`delay-${index}`}>When do you want to send this message?</Label>
+            <Input id={`delay-${index}`} type="number" min={0} value={message.delayValue} disabled style={{ cursor: "not-allowed" }} />
+          </div>
+          <div>
+            <Label htmlFor={`unit-${index}`}>Interval</Label>
+            <select
+              id={`unit-${index}`}
+              value={message.delayUnit}
+              disabled
+              style={{ width: "100%", height: 40, padding: "0 12px", borderRadius: "var(--radius)", border: "1px solid var(--hairline)", background: "var(--surface-1)", color: "var(--text-primary)", fontSize: 13, cursor: "not-allowed" }}
+            >
+              <option value="minutes">Minutes</option>
+              <option value="hours">Hours</option>
+              <option value="days">Days</option>
+            </select>
+          </div>
         </div>
-        <div>
-          <Label htmlFor={`unit-${index}`}>Interval</Label>
-          <select
-            id={`unit-${index}`}
-            value={message.delayUnit}
-            onChange={(e) => onPatch({ delayUnit: e.target.value as IntervalUnit })}
-            style={{ width: "100%", height: 40, padding: "0 12px", borderRadius: "var(--radius)", border: "1px solid var(--hairline)", background: "var(--surface-1)", color: "var(--text-primary)", fontSize: 13 }}
-          >
-            <option value="minutes">Minutes</option>
-            <option value="hours">Hours</option>
-            <option value="days">Days</option>
-          </select>
+        <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 6 }}>
+          Scheduled &amp; multi-channel sending coming soon — for now every message sends by Email, immediately.
         </div>
       </div>
 
