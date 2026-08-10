@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/Button";
 import { requireAdminPage, getCurrentMembership } from "@/lib/auth";
 import { getEmailSender, hasEmailApiKey, getEmailProvider } from "@/lib/email";
 import { getGmailConnection, isDriveConnected } from "@/lib/gmail";
+import { getImapConnection } from "@/lib/imapEmail";
 import { googleConfigured } from "@/lib/google/oauth";
 import { getBusinessProfile } from "@/lib/businessProfile";
 import { EmailSettingsForm } from "@/components/settings/EmailSettingsForm";
 import { GmailConnectCard } from "@/components/settings/GmailConnectCard";
+import { ImapConnectCard } from "@/components/settings/ImapConnectCard";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +27,7 @@ export default async function EmailSettingsPage({
   const business = getBusinessProfile();
   const gmail = getGmailConnection(tenantId);
   const driveConnected = isDriveConnected(tenantId);
+  const imap = getImapConnection(tenantId);
   const provider = getEmailProvider();
 
   return (
@@ -60,6 +63,10 @@ export default async function EmailSettingsPage({
         businessName={business.businessName}
         gmailActive={provider === "gmail"}
       />
+
+      <div style={{ height: 16 }} />
+
+      <ImapConnectCard connection={imap} active={provider === "imap"} />
     </div>
   );
 }

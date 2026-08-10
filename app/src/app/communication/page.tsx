@@ -12,6 +12,7 @@ import { requireUserPage, getCurrentMembership } from "@/lib/auth";
 import { listConversations } from "@/lib/conversations";
 import { listRecentClientEmails } from "@/lib/clientEmail";
 import { getGmailConnection, listEmailThreads } from "@/lib/gmail";
+import { getImapConnection } from "@/lib/imapEmail";
 import { listCombinedFeed } from "@/lib/combined";
 import { getVenueType } from "@/lib/settings";
 import { getVocab } from "@/lib/vocabulary";
@@ -32,10 +33,12 @@ export default async function CommunicationPage() {
   const conversations = listConversations();
   const tenantId = getCurrentMembership()!.tenant.id;
   const gmail = getGmailConnection(tenantId);
-  // With Gmail connected we show the synced two-way inbox; otherwise the sent log.
-  const threads = gmail ? listEmailThreads() : [];
-  const emails = gmail ? [] : listRecentClientEmails();
-  const emailCount = gmail ? threads.length : emails.length;
+  const imap = getImapConnection(tenantId);
+  const emailConn = gmail ?? imap; // whichever is connected
+  // With Gmail or IMAP connected we show the synced two-way inbox; otherwise the sent log.
+  const threads = emailConn ? listEmailThreads() : [];
+  const emails = emailConn ? [] : listRecentClientEmails();
+  const emailCount = emailConn ? threads.length : emails.length;
   const combined = listCombinedFeed();
 
   return (
@@ -72,13 +75,13 @@ export default async function CommunicationPage() {
         </TabsContent>
 
         <TabsContent value="email">
-          {gmail ? (
-            <EmailInbox threads={threads} connectedEmail={gmail.email} />
+          {emailConn ? (
+            <EmailInbox threads={threads} connectedEmail={emailConn.email} />
           ) : emails.length === 0 ? (
             <EmptyState
               icon={<Mail size={32} strokeWidth={1.4} />}
               title="No emails sent yet"
-              message={`Emails you send to a ${vocab.member.toLowerCase()} from their profile appear here. Connect Gmail in Settings → Email for a full two-way inbox.`}
+              message={`Emails you send to a ${vocab.member.toLowerCase()} from their profile appear here. Connect an email account in Settings → Email for a full two-way inbox.`}
             />
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
