@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { controlSqlite } from "@/lib/db/control";
+import { closeTenantConn } from "@/lib/db/tenant";
 import { getPaymentProvider, type PaymentProvider, type ChargeResult } from "@/lib/payments/provider";
 import { computeVat } from "./money";
 import { addMonthClamped, addDays, cmpDate, dublinDayOfMonth, dublinToday } from "./dates";
@@ -337,22 +338,128 @@ export function setBillingExempt(tenantId: number, exempt: boolean, actor: strin
   logEvent(tenantId, exempt ? "billing_exempted" : "billing_unexempted", null, actor);
 }
 
-/** Cancel + archive: copy the tenant DB into data/archive/, deactivate the tenant. */
+/**
+ * Fully remove a tenant's account (DESTRUCTIVE): archive first, then delete
+ * every control-plane row for this tenant + its live DB, so it's gone from
+ * the system and the slug is free to re-provision. Order matters — a failure
+ * must never leave un-archived data deleted:
+ *
+ *   1. Load the tenant + gather its manifest content (members, invoices).
+ *   2. Archive: copy the live tenant DB (if present) + write manifest.json.
+ *      If ANYTHING here throws, we return/throw before step 3 ever runs —
+ *      nothing has been deleted yet.
+ *   3. Log the "offboarded" event (billing_events.tenant_id carries no FK to
+ *      tenants — see control.ts — so this row is untouched by step 4 and
+ *      survives as a permanent, if orphaned, audit trail).
+ *   4. Delete this tenant's control-plane rows, ATOMICALLY (one
+ *      controlSqlite.transaction), in FK-safe order. `users` are NEVER
+ *      deleted — identities are shared across tenants; only this tenant's
+ *      `memberships` rows go (an owner whose only membership was this tenant
+ *      simply ends up with an identity and no memberships).
+ *   5. Remove the live tenant DB: evict/close its cached connection first
+ *      (an open handle can keep the file locked or recreate -wal/-shm on
+ *      next access), then delete the file (+ its per-tenant dir, when it has
+ *      one) — the archived copy from step 2 is untouched. Best-effort: by
+ *      this point the control rows are already gone, so a filesystem error
+ *      here is logged, not thrown.
+ *
+ * All deletes are keyed by this `tenantId` alone — never touches another
+ * tenant's rows.
+ */
 export function offboardTenant(tenantId: number, actor: string): { archiveDir: string } {
-  const t = controlSqlite.prepare("SELECT slug, db_file FROM tenants WHERE id = ?").get(tenantId) as
-    | { slug: string; db_file: string } | undefined;
+  const t = controlSqlite.prepare("SELECT slug, name, db_file FROM tenants WHERE id = ?").get(tenantId) as
+    | { slug: string; name: string; db_file: string } | undefined;
   if (!t) throw new Error("Tenant not found");
+
+  // 1) Manifest content, gathered up front (before anything destructive).
+  const members = controlSqlite
+    .prepare(
+      `SELECT u.email AS email, m.role AS role FROM memberships m
+       JOIN users u ON u.id = m.user_id WHERE m.tenant_id = ?`,
+    )
+    .all(tenantId) as Array<{ email: string; role: string }>;
+  const invoices = listInvoices(tenantId);
+
+  // 2) Archive FIRST. If this throws (disk full, permissions, …) it propagates
+  // straight out of offboardTenant — steps 3-5 never run, so nothing is ever
+  // deleted without a backup that succeeded.
   const dataDir = path.join(process.cwd(), "data");
   const archiveDir = path.join(dataDir, "archive", `${t.slug}-${dublinToday()}`);
   fs.mkdirSync(archiveDir, { recursive: true });
-  const src = path.join(dataDir, t.db_file);
-  if (fs.existsSync(src)) fs.copyFileSync(src, path.join(archiveDir, path.basename(t.db_file)));
+  const dbPath = path.join(dataDir, t.db_file);
+  // db_file is registry data (set once, by provisioning, never user input at
+  // request time) — but this function both READS and later DELETES whatever
+  // it points at, so refuse to touch anything outside data/ at all, rather
+  // than trust that invariant implicitly. Guards step 5's rmSync below just
+  // as much as this copy: a corrupted db_file (e.g. a stray "../") must never
+  // let either step escape the data directory.
+  if (!dbPath.startsWith(dataDir + path.sep)) {
+    throw new Error(`[billing] offboardTenant: refusing db_file outside the data dir: ${t.db_file}`);
+  }
+  if (fs.existsSync(dbPath)) fs.copyFileSync(dbPath, path.join(archiveDir, path.basename(t.db_file)));
   fs.writeFileSync(
     path.join(archiveDir, "manifest.json"),
-    JSON.stringify({ tenantId, slug: t.slug, offboardedAt: new Date().toISOString(), invoices: listInvoices(tenantId) }, null, 2),
+    JSON.stringify(
+      { tenantId, slug: t.slug, name: t.name, offboardedAt: new Date().toISOString(), members, invoices },
+      null,
+      2,
+    ),
   );
-  touch(tenantId, `status = 'cancelled'`);
-  controlSqlite.prepare("UPDATE tenants SET is_active = 0 WHERE id = ?").run(tenantId);
-  logEvent(tenantId, "offboarded", { archiveDir }, actor);
+
+  // 3) Log before deleting.
+  logEvent(tenantId, "offboarded", { archiveDir, memberCount: members.length }, actor);
+
+  // 4) Delete this tenant's control-plane rows, atomically, FK-safe order.
+  // Three columns reference tenants(id) WITHOUT `ON DELETE CASCADE`
+  // (users.tenant_id, auth_sessions.active_tenant_id,
+  // cms_library_assets.tenant_id — see control.ts) and must be nulled out
+  // first, or the final `DELETE FROM tenants` throws a foreign-key-constraint
+  // error the moment this tenant has ever had an active session (i.e. every
+  // real tenant). Nulling — never deleting — is what keeps those rows'
+  // *identities* intact: a `users` row stays a valid login with no tenant
+  // bound, an `auth_sessions` row stays a valid session that just has to
+  // reselect an account, a `cms_library_assets` row stays a valid shared
+  // media asset (un-scoped, same as the legacy pre-tenant_id rows already
+  // handled by listLibraryAssets()). Every OTHER tenant_id column in
+  // control.ts (client_credentials → client_sessions, gmail_connections,
+  // billing_invoices, capture_sessions, api_keys, tenant_ai_cap,
+  // form_share_links) IS `ON DELETE CASCADE` and is swept automatically by
+  // the final DELETE FROM tenants below — no need to enumerate them by hand.
+  const run = controlSqlite.transaction(() => {
+    controlSqlite.prepare("UPDATE users SET tenant_id = NULL WHERE tenant_id = ?").run(tenantId);
+    controlSqlite
+      .prepare("UPDATE auth_sessions SET active_tenant_id = NULL WHERE active_tenant_id = ?")
+      .run(tenantId);
+    controlSqlite.prepare("UPDATE cms_library_assets SET tenant_id = NULL WHERE tenant_id = ?").run(tenantId);
+    controlSqlite.prepare("DELETE FROM ai_usage WHERE tenant_id = ?").run(tenantId);
+    controlSqlite.prepare("DELETE FROM user_invites WHERE tenant_id = ?").run(tenantId);
+    controlSqlite.prepare("DELETE FROM site_domains WHERE tenant_id = ?").run(tenantId);
+    controlSqlite.prepare("DELETE FROM tenant_billing WHERE tenant_id = ?").run(tenantId);
+    controlSqlite.prepare("DELETE FROM memberships WHERE tenant_id = ?").run(tenantId);
+    controlSqlite.prepare("DELETE FROM tenants WHERE id = ?").run(tenantId);
+  });
+  run();
+
+  // 5) Remove the live tenant DB. Evict the cache BEFORE touching the
+  // filesystem. Provisioned tenants live under their own data/tenants/<slug>/
+  // dir — remove it recursively (sweeps any -wal/-shm siblings too). Never
+  // rmdir the shared data root itself: a root-level db_file (the legacy
+  // default tenant's clinic.db) must only lose its own file(s), or this
+  // would take out control.db and every other tenant's directory with it —
+  // a direct violation of "never touch a different tenant".
+  closeTenantConn(t.db_file);
+  const dbDir = path.dirname(dbPath);
+  try {
+    if (dbDir !== dataDir) {
+      fs.rmSync(dbDir, { recursive: true, force: true });
+    } else {
+      fs.rmSync(dbPath, { force: true });
+      fs.rmSync(`${dbPath}-wal`, { force: true });
+      fs.rmSync(`${dbPath}-shm`, { force: true });
+    }
+  } catch (err) {
+    console.error(`[billing] offboardTenant: failed to remove live DB for tenant ${tenantId}:`, err);
+  }
+
   return { archiveDir };
 }

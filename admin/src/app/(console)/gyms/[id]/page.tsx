@@ -246,7 +246,9 @@ export default async function GymDetailPage({ params }: { params: { id: string }
       <Card style={{ padding: 24, borderColor: "var(--red)" }}>
         <h2 style={{ margin: "0 0 6px", fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em", color: "var(--red)" }}>Danger zone</h2>
         <p style={{ margin: "0 0 14px", color: "var(--text-secondary)", fontSize: 13 }}>
-          Offboarding archives the business&apos;s data and deactivates the tenant. This cannot be undone from here.
+          Offboarding archives the business&apos;s data (DB + members + invoices), then permanently deletes the
+          account — tenant, billing, memberships, domains — and its live database. The slug is freed for
+          re-provisioning. This cannot be undone from here.
         </p>
         <ConfirmButton
           label="Offboard business"

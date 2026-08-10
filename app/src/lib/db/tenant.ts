@@ -146,6 +146,27 @@ export function openTenantDb(dbFile: string): TenantConn {
 }
 
 /**
+ * Evict + close ONE tenant's cached connection by its registry `db_file` (the
+ * same key openTenantDb() uses), if one is currently cached. Used by
+ * offboardTenant (billing/engine.ts) before it deletes that tenant's live DB
+ * file — a still-open better-sqlite3 handle can keep the file locked, or
+ * silently recreate empty `-wal`/`-shm` siblings on its next access, either of
+ * which would undermine "the live DB is gone". A no-op (never throws) when the
+ * connection was never opened / already evicted — mirrors the LRU eviction's
+ * own try/catch-and-log-only close() above.
+ */
+export function closeTenantConn(dbFile: string): void {
+  const existing = connCache.get(dbFile);
+  if (!existing) return;
+  connCache.delete(dbFile);
+  try {
+    existing.sqlite.close();
+  } catch (err) {
+    console.error(`[db] closeTenantConn: closing connection for ${dbFile} failed:`, err);
+  }
+}
+
+/**
  * Best-effort `PRAGMA wal_checkpoint(TRUNCATE)` over the control connection +
  * every currently-cached tenant connection (Batch 6a — improvement-plan-
  * 2026-08.md Theme E5). Auto-checkpointing (wal_autocheckpoint, set on every

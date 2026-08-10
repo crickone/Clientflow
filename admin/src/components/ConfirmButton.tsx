@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { cn } from "@/lib/cn";
@@ -30,16 +30,12 @@ export function ConfirmButton({
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [typed, setTyped] = useState("");
   const router = useRouter();
+  const inputId = useId();
 
-  function onClick() {
-    // Gate destructive actions before touching the server.
-    if (slug !== undefined) {
-      const typed = window.prompt(`Type the business's slug "${slug}" to confirm.`);
-      if (typed !== slug) return;
-    } else if (confirm && !window.confirm(confirm)) {
-      return;
-    }
+  function runAction() {
     setError(null);
     startTransition(async () => {
       const r = await action();
@@ -49,6 +45,77 @@ export function ConfirmButton({
       }
       if (redirectTo) router.push(redirectTo);
     });
+  }
+
+  function onClick() {
+    // Gate destructive actions before touching the server.
+    if (slug !== undefined) {
+      // Reveal the inline type-to-confirm field instead of a silent
+      // window.prompt — a mismatch here is visibly disabled, never a no-op.
+      setConfirming(true);
+      return;
+    }
+    if (confirm && !window.confirm(confirm)) return;
+    runAction();
+  }
+
+  function onCancel() {
+    setConfirming(false);
+    setTyped("");
+    setError(null);
+  }
+
+  function onConfirmTyped() {
+    if (typed !== slug) return; // belt-and-braces — the button is disabled until this matches
+    setConfirming(false);
+    setTyped("");
+    runAction();
+  }
+
+  if (slug !== undefined && confirming) {
+    const matches = typed === slug;
+    return (
+      <span style={{ display: "inline-flex", flexDirection: "column", gap: 6, maxWidth: 260 }}>
+        <label htmlFor={inputId} style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+          Type the slug <strong>{slug}</strong> to confirm.
+        </label>
+        <input
+          id={inputId}
+          type="text"
+          className="input"
+          value={typed}
+          onChange={(e) => setTyped(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && matches) onConfirmTyped();
+            else if (e.key === "Escape") onCancel();
+          }}
+          placeholder={slug}
+          autoFocus
+          autoComplete="off"
+          spellCheck={false}
+          style={{ fontSize: 13 }}
+        />
+        <span style={{ display: "inline-flex", gap: 8 }}>
+          <button
+            type="button"
+            className={className ?? cn("btn", danger ? "btn--destructive" : "btn--secondary", "btn--sm")}
+            onClick={onConfirmTyped}
+            disabled={pending || !matches}
+            style={pending || !matches ? { opacity: 0.6, cursor: pending ? "wait" : "not-allowed" } : undefined}
+          >
+            {pending ? "Working…" : label}
+          </button>
+          <button type="button" className="btn btn--secondary btn--sm" onClick={onCancel} disabled={pending}>
+            Cancel
+          </button>
+        </span>
+        {error && (
+          <span role="alert" style={{ color: "var(--red)", fontSize: 11.5, maxWidth: 220 }}>
+            {error}
+          </span>
+        )}
+      </span>
+    );
   }
 
   return (
