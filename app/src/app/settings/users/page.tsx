@@ -7,7 +7,6 @@ import { authDb } from "@/lib/db/control";
 import { memberships, users } from "@/lib/db/schema";
 import { getCurrentMembership, requireAdminPage } from "@/lib/auth";
 import { listPendingInviteEmails } from "@/lib/invites";
-import { isEmailConfigured } from "@/lib/email";
 import { UsersManager } from "@/components/settings/UsersManager";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +37,6 @@ export default async function UsersPage() {
     .all();
 
   const pendingInvites = listPendingInviteEmails(tenantId);
-  const emailReady = isEmailConfigured();
 
   const serialised = all.map((u) => ({
     ...u,
@@ -69,11 +67,7 @@ export default async function UsersPage() {
         title="Users & permissions"
         subtitle="Manage staff and admin accounts."
       />
-      <UsersManager
-        users={serialised}
-        currentUserId={me.id}
-        emailReady={emailReady}
-      />
+      <UsersManager users={serialised} currentUserId={me.id} />
     </div>
   );
 }

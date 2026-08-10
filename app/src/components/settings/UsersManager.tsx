@@ -43,23 +43,16 @@ export type UserRow = {
 export function UsersManager({
   users,
   currentUserId,
-  emailReady,
 }: {
   users: UserRow[];
   currentUserId: number;
-  emailReady: boolean;
 }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {users.map((u) => (
-        <UserRow
-          key={u.userId}
-          user={u}
-          isMe={u.userId === currentUserId}
-          emailReady={emailReady}
-        />
+        <UserRow key={u.userId} user={u} isMe={u.userId === currentUserId} />
       ))}
-      <NewUserButton emailReady={emailReady} />
+      <NewUserButton />
     </div>
   );
 }
@@ -67,11 +60,9 @@ export function UsersManager({
 function UserRow({
   user,
   isMe,
-  emailReady,
 }: {
   user: UserRow;
   isMe: boolean;
-  emailReady: boolean;
 }) {
   return (
     <Card style={{ display: "flex", alignItems: "center", gap: 16, padding: 18 }}>
@@ -137,7 +128,7 @@ function UserRow({
         </div>
       </div>
       <div style={{ display: "flex", gap: 6 }}>
-        {user.invitePending && <ResendInviteButton user={user} emailReady={emailReady} />}
+        {user.invitePending && <ResendInviteButton user={user} />}
         <ResetPasswordDialog user={user} />
         <EditUserDialog user={user} isMe={isMe} />
         <RemoveMemberButton user={user} disabled={isMe} />
@@ -146,7 +137,7 @@ function UserRow({
   );
 }
 
-function ResendInviteButton({ user, emailReady }: { user: UserRow; emailReady: boolean }) {
+function ResendInviteButton({ user }: { user: UserRow }) {
   const [pending, start] = useTransition();
   function resend() {
     start(async () => {
@@ -179,7 +170,7 @@ function ResendInviteButton({ user, emailReady }: { user: UserRow; emailReady: b
     <Button
       variant="ghost"
       size="icon"
-      title={emailReady ? "Resend invite email" : "Get invite link to share"}
+      title="Resend invite email"
       onClick={resend}
       disabled={pending}
     >
@@ -188,7 +179,7 @@ function ResendInviteButton({ user, emailReady }: { user: UserRow; emailReady: b
   );
 }
 
-function NewUserButton({ emailReady }: { emailReady: boolean }) {
+function NewUserButton() {
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const [email, setEmail] = useState("");
@@ -368,11 +359,7 @@ function NewUserButton({ emailReady }: { emailReady: boolean }) {
                   onChange={() => setMode("invite")}
                   disabled={pending}
                   title="Email an invite"
-                  desc={
-                    emailReady
-                      ? "They get a link to set their own password."
-                      : "Requires email set-up (Settings → Email) to actually send."
-                  }
+                  desc="They get an email (from ClientFlow) with a link to set their own password."
                 />
                 <ModeRadio
                   checked={mode === "password"}

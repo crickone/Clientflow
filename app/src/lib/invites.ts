@@ -9,8 +9,9 @@ import { getTenantById } from "@/lib/db/tenant";
 import { hashPassword } from "@/lib/auth";
 import { getAppBaseUrl } from "@/lib/appUrl";
 import {
+  getEmailSender,
   renderEmailShell,
-  sendEmail,
+  sendPlatformEmail,
   textToParagraphs,
   type SendResult,
 } from "@/lib/email";
@@ -213,10 +214,19 @@ export async function sendInviteEmail(opts: {
     bodyHtml,
     footer: `You're receiving this because someone at ${business} added you as a team member. If you weren't expecting it, you can ignore this email.`,
   });
-  return sendEmail({
+  // Staff invites are a PLATFORM email (joining a business ON ClientFlow), so they
+  // always go from ClientFlow's verified domain — reliable for every tenant, even
+  // one that hasn't set up its own email. The from-name still carries the business
+  // ("<Business> via ClientFlow") and replies route to the business if it has an
+  // address configured.
+  const sender = getEmailSender();
+  const replyTo = sender.replyTo || sender.fromEmail || undefined;
+  return sendPlatformEmail({
     to: opts.email,
     subject: `You've been invited to ${business}`,
     html,
+    fromName: `${business} via ClientFlow`,
+    replyTo,
   });
 }
 

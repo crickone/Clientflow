@@ -165,6 +165,51 @@ export async function sendEmailForTenant(tenantId: number, opts: SendOpts): Prom
   return sendVia(tenantId, getEmailSenderForTenant(tenantId), opts);
 }
 
+/**
+ * Send a PLATFORM email — one that's about the ClientFlow account itself (staff
+ * invites, team/account notices), NOT a business→customer email. Always sends
+ * from ClientFlow's OWN already-verified domain (clientflow.ie) via Resend, so
+ * it works for every tenant regardless of whether that tenant has connected its
+ * own email provider. Business→customer mail must keep using sendEmail /
+ * sendEmailForTenant (the tenant's own branded sender). Never throws.
+ *
+ * The default from-address relies on clientflow.ie being verified in Resend
+ * (the same domain billing emails already send from); override with
+ * PLATFORM_EMAIL_FROM if that ever changes.
+ */
+export async function sendPlatformEmail(opts: {
+  to: string | string[];
+  subject: string;
+  html: string;
+  text?: string;
+  /** Display name recipients see, e.g. "Optimal Health via ClientFlow". */
+  fromName?: string;
+  /** Where replies go (e.g. the business's own email). Omitted when blank. */
+  replyTo?: string;
+}): Promise<SendResult> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    return { ok: false, error: "Platform email isn't configured (missing RESEND_API_KEY)." };
+  }
+  const fromEmail = process.env.PLATFORM_EMAIL_FROM || "no-reply@clientflow.ie";
+  const from = `${sanitizeName(opts.fromName || "ClientFlow")} <${fromEmail}>`;
+  try {
+    const resend = new Resend(apiKey);
+    const { data, error } = await resend.emails.send({
+      from,
+      to: opts.to,
+      subject: opts.subject,
+      html: opts.html,
+      text: opts.text ?? htmlToText(opts.html),
+      ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
+    });
+    if (error) return { ok: false, error: error.message || "Resend rejected the message." };
+    return { ok: true, id: data?.id ?? "" };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Failed to send email." };
+  }
+}
+
 /** Strip characters that would break the `Name <addr>` from header. */
 function sanitizeName(name: string): string {
   return name.replace(/["<>\r\n]/g, "").trim() || "ClientFlow";
