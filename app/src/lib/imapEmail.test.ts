@@ -1,13 +1,100 @@
 // Run: npm test -- src/lib/imapEmail.test.ts
 import assert from "node:assert/strict";
-import { controlSqlite } from "./db/control";
-import {
+import Module from "node:module";
+import { createRequire } from "node:module";
+
+// imapEmail.ts now imports lib/db/tenant (getTenantDbById, for smtpSend's
+// bookkeeping insert), which imports React's server-only `cache` at module
+// load. Under the runner's `--conditions=react-server`, npm's react
+// "react-server" entry point is a stub that THROWS on load — shim `react`
+// with an identity `cache` BEFORE imapEmail.ts (or anything else) is
+// required, so the real code path loads unchanged (same issue + fix as
+// db/tenant.test.ts / platform/queries.test.ts). Installed via a dynamic
+// require (below) rather than a static import, since a static
+// `import ... from "./imapEmail"` would be hoisted and evaluated before
+// this shim runs.
+type Loader = (request: string, ...rest: unknown[]) => unknown;
+const mod = Module as unknown as { _load: Loader };
+const realLoad = mod._load;
+mod._load = function (this: unknown, request: string, ...rest: unknown[]) {
+  if (request === "react") return { cache: (fn: unknown) => fn };
+  return realLoad.call(this, request, ...rest);
+};
+
+const requireLocal = createRequire(import.meta.url);
+const { controlSqlite } = requireLocal("./db/control") as typeof import("./db/control");
+const {
   deleteImapConnection,
   getImapConnection,
   getImapCredentials,
   isImapConnected,
   saveImapConnection,
-} from "./imapEmail";
+  threadKeyFor,
+} = requireLocal("./imapEmail") as typeof import("./imapEmail");
+
+// ─── threadKeyFor (pure — no DB, no network) ──────────────────────────────
+// smtpSend/testImapConnection themselves are network paths, not unit-tested
+// here (see Task 2 brief) — but the pure logic they lean on is.
+
+assert.equal(
+  threadKeyFor({
+    messageId: "<new@x>",
+    inReplyTo: "<mid@x>",
+    references: ["<root@x>", "<mid@x>"],
+  }),
+  "<root@x>",
+  "references array → its root (first) entry, ahead of inReplyTo/messageId",
+);
+
+assert.equal(
+  threadKeyFor({
+    messageId: "<new@x>",
+    inReplyTo: "<mid@x>",
+    references: "<root@x> <mid@x> <new@x>",
+  }),
+  "<root@x>",
+  "string references → first whitespace-separated token",
+);
+
+assert.equal(
+  threadKeyFor({ messageId: "<new@x>", inReplyTo: "<parent@x>", references: null }),
+  "<parent@x>",
+  "no references → falls back to inReplyTo",
+);
+
+assert.equal(
+  threadKeyFor({ messageId: "<solo@x>", inReplyTo: null, references: null }),
+  "<solo@x>",
+  "no references/inReplyTo → falls back to messageId",
+);
+
+assert.equal(
+  threadKeyFor({ messageId: null, inReplyTo: null, references: null }),
+  null,
+  "nothing present → null",
+);
+
+assert.equal(threadKeyFor({}), null, "all fields omitted (undefined) → null");
+
+assert.equal(
+  threadKeyFor({ messageId: "<solo@x>", inReplyTo: "   ", references: [] }),
+  "<solo@x>",
+  "blank inReplyTo + empty references array both fall through → messageId",
+);
+
+assert.equal(
+  threadKeyFor({ messageId: "  <padded@x>  ", inReplyTo: null, references: undefined }),
+  "<padded@x>",
+  "surrounding whitespace is trimmed off the returned key",
+);
+
+assert.equal(
+  threadKeyFor({ messageId: "<solo@x>", inReplyTo: undefined, references: "   " }),
+  "<solo@x>",
+  "whitespace-only references string falls through → messageId",
+);
+
+console.log("imapEmail.test.ts: threadKeyFor assertions passed");
 
 // Wrapped in an async IIFE (not top-level await): this project's package.json
 // has no "type": "module", so tsx/esbuild compiles .ts files to CJS, where

@@ -6,6 +6,7 @@ import { readKey, readKeyForTenant, setKey } from "@/lib/settings";
 import { getBusinessProfile, getBusinessProfileForTenant } from "@/lib/businessProfile";
 import { getCurrentTenant } from "@/lib/db/tenant";
 import { getGmailConnection, gmailSend, isGmailConnected } from "@/lib/gmail";
+import { isImapConnected, smtpSend } from "@/lib/imapEmail";
 
 /**
  * Email sending via Resend. Two moving parts:
@@ -62,12 +63,17 @@ export function hasEmailApiKey(): boolean {
   return Boolean(process.env.RESEND_API_KEY);
 }
 
-export type EmailProvider = "gmail" | "resend" | "none";
+export type EmailProvider = "gmail" | "imap" | "resend" | "none";
 
-/** Which provider the CURRENT tenant will actually send through. Gmail wins. */
+/** Which provider the CURRENT tenant will actually send through. Gmail wins, then IMAP/SMTP, then Resend. */
 export function getEmailProvider(): EmailProvider {
   try {
     if (isGmailConnected(getCurrentTenant().id)) return "gmail";
+  } catch {
+    // no tenant context — fall through
+  }
+  try {
+    if (isImapConnected(getCurrentTenant().id)) return "imap";
   } catch {
     // no tenant context — fall through
   }
@@ -75,7 +81,7 @@ export function getEmailProvider(): EmailProvider {
   return "none";
 }
 
-/** Fully ready to send for the CURRENT tenant (Gmail connected OR Resend set up). */
+/** Fully ready to send for the CURRENT tenant (Gmail, IMAP/SMTP, or Resend set up). */
 export function isEmailConfigured(): boolean {
   return getEmailProvider() !== "none";
 }
@@ -99,7 +105,7 @@ export type SendOpts = {
   gmailThread?: { threadId?: string; inReplyTo?: string; references?: string };
 };
 
-/** Core send: Gmail if the tenant has it connected, else Resend. */
+/** Core send: Gmail if the tenant has it connected, else IMAP/SMTP if connected, else Resend. */
 async function sendVia(tenantId: number | null, sender: EmailSender, opts: SendOpts): Promise<SendResult> {
   if (tenantId !== null && isGmailConnected(tenantId)) {
     const conn = getGmailConnection(tenantId);
@@ -116,6 +122,17 @@ async function sendVia(tenantId: number | null, sender: EmailSender, opts: SendO
       });
       return res.ok ? { ok: true, id: res.id } : { ok: false, error: res.error };
     }
+  }
+
+  if (tenantId !== null && isImapConnected(tenantId)) {
+    return smtpSend(tenantId, {
+      fromName: sanitizeName(sender.fromName),
+      to: Array.isArray(opts.to) ? opts.to.join(", ") : opts.to,
+      subject: opts.subject, html: opts.html, text: opts.text,
+      replyTo: opts.replyTo || sender.replyTo || undefined,
+      inReplyTo: opts.gmailThread?.inReplyTo,
+      references: opts.gmailThread?.references,
+    });
   }
 
   const apiKey = process.env.RESEND_API_KEY;
