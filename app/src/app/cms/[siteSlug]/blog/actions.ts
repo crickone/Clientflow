@@ -10,6 +10,7 @@ import {
   updateBlogMeta,
   setPublishState,
   deleteSiteBlogPost,
+  parseScheduledFor,
 } from "@/lib/cms/blog";
 import { runBlogGeneration } from "@/lib/blog/generator";
 
@@ -87,6 +88,24 @@ export async function unpublishPostAction(siteSlug: string, postId: number) {
   setPublishState(site.id, postId, "draft");
   revalidatePath(`/cms/${siteSlug}/blog/${postId}`);
   revalidatePath(`/cms/${siteSlug}/blog`);
+}
+
+export async function schedulePostAction(
+  siteSlug: string,
+  postId: number,
+  scheduledForISO: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const site = await siteOrThrow(siteSlug);
+  let scheduledFor: Date;
+  try {
+    scheduledFor = parseScheduledFor(scheduledForISO);
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Invalid schedule date." };
+  }
+  setPublishState(site.id, postId, "scheduled", scheduledFor);
+  revalidatePath(`/cms/${siteSlug}/blog/${postId}`);
+  revalidatePath(`/cms/${siteSlug}/blog`);
+  return { ok: true };
 }
 
 export async function deletePostAction(siteSlug: string, postId: number) {

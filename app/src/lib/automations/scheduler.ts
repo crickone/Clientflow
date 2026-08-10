@@ -11,6 +11,7 @@ import { listExercisesForTenant, setExerciseVideoUrlForTenant } from "@/lib/exer
 import { getThemeForTenant } from "@/lib/settings";
 import { renderEmailShell, sendEmailForTenant, textToParagraphs } from "@/lib/email";
 import { parseYouTubeId, searchExerciseVideoDetailed } from "@/lib/youtube";
+import { publishDueScheduledPosts } from "@/lib/cms/blog";
 import { runBillingForDate } from "@/lib/billing/engine";
 import { dublinToday } from "@/lib/billing/dates";
 
@@ -93,6 +94,21 @@ async function runBirthdayForTenant(tenantId: number): Promise<number> {
   return sent;
 }
 
+/**
+ * Publish any due scheduled blog posts for one tenant. Tenant-explicit (no
+ * request scope), mirroring runBirthdayForTenant above: resolve the tenant's
+ * own DB by id and operate on it directly — never the request-scoped `db`
+ * proxy, which publishDueScheduledPosts() itself is built to avoid.
+ * v1 granularity: this only runs once/day (the daily tick below), so a post
+ * scheduled for e.g. 9am may not actually go live until the next tick after
+ * 8am UTC that day (or the following day's tick if scheduled after that).
+ * Good enough for the current use case; revisit if same-day precision matters.
+ */
+function runBlogScheduleForTenant(tenantId: number): number {
+  const tdb = getTenantDbById(tenantId);
+  return publishDueScheduledPosts(tdb, Date.now());
+}
+
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /**
@@ -131,10 +147,11 @@ async function backfillVideosForTenant(tenantId: number, max: number): Promise<n
 }
 
 /** Run all daily (time-based) automations across every active tenant. */
-export async function runDailyAutomations(): Promise<{ tenants: number; birthdaysSent: number; videosFilled: number }> {
+export async function runDailyAutomations(): Promise<{ tenants: number; birthdaysSent: number; videosFilled: number; postsPublished: number }> {
   const list = controlDb.select({ id: tenants.id }).from(tenants).where(eq(tenants.isActive, true)).all();
   let birthdaysSent = 0;
   let videosFilled = 0;
+  let postsPublished = 0;
   for (const t of list) {
     try {
       birthdaysSent += await runBirthdayForTenant(t.id);
@@ -145,6 +162,13 @@ export async function runDailyAutomations(): Promise<{ tenants: number; birthday
       videosFilled += await backfillVideosForTenant(t.id, 90);
     } catch {
       // video backfill is best-effort
+    }
+    try {
+      const published = runBlogScheduleForTenant(t.id);
+      if (published > 0) console.log(`[blog-schedule] tenant ${t.id}: published ${published} scheduled post(s)`);
+      postsPublished += published;
+    } catch (err) {
+      console.error(`[blog-schedule] tenant ${t.id} failed (will retry next daily tick):`, err);
     }
   }
 
@@ -162,7 +186,7 @@ export async function runDailyAutomations(): Promise<{ tenants: number; birthday
     }
   }
 
-  return { tenants: list.length, birthdaysSent, videosFilled };
+  return { tenants: list.length, birthdaysSent, videosFilled, postsPublished };
 }
 
 // ── In-process daily timer ────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, ne } from "drizzle-orm";
+import { and, desc, eq, lte, ne } from "drizzle-orm";
 
 import { db, schema } from "@/lib/db";
 import type { BlogPost } from "@/lib/db/schema";
@@ -131,6 +131,24 @@ export function setPublishState(
     .run();
 }
 
+/**
+ * Parse + validate a "schedule for later" datetime coming from the editor's
+ * <input type="datetime-local"> (converted to a full ISO string client-side
+ * before it reaches the server, so this is never ambiguous about timezone).
+ * Throws a short, UI-friendly message on an unparseable or non-future value —
+ * callers (schedulePostAction) catch it and surface `error` to the toast.
+ */
+export function parseScheduledFor(input: string, now: Date = new Date()): Date {
+  const date = new Date(input);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error("Enter a valid date and time.");
+  }
+  if (date.getTime() <= now.getTime()) {
+    throw new Error("Scheduled time must be in the future.");
+  }
+  return date;
+}
+
 export function deleteSiteBlogPost(siteId: number, id: number): void {
   db.delete(blogPosts)
     .where(and(eq(blogPosts.siteId, siteId), eq(blogPosts.id, id)))
@@ -175,4 +193,42 @@ export function getPublishedPostBySlug(
       )
       .get() ?? null
   );
+}
+
+// ---- WORKER: tenant-explicit writes (background jobs, no request/cookie context) ----
+
+/**
+ * Publish every post (across every site in this tenant) whose scheduledFor
+ * has arrived. Tenant-explicit — takes an already-resolved TenantDb — so it
+ * can run from the daily scheduler's out-of-request context: setPublishState()
+ * above uses the request-scoped cookie `db` proxy, which would resolve to the
+ * wrong tenant (or throw, per getCurrentTenant's guard) when called from a
+ * background job. Idempotent: only rows still in publishState "scheduled" are
+ * matched, so a post this function already flipped to "published" (or one an
+ * operator published manually in the meantime) is never touched again.
+ * Returns the number of posts published in this run.
+ */
+export function publishDueScheduledPosts(tenantDb: TenantDb, nowMs: number): number {
+  const due = tenantDb
+    .select({ id: blogPosts.id })
+    .from(blogPosts)
+    .where(
+      and(eq(blogPosts.publishState, "scheduled"), lte(blogPosts.scheduledFor, new Date(nowMs))),
+    )
+    .all();
+
+  for (const post of due) {
+    tenantDb
+      .update(blogPosts)
+      .set({
+        publishState: "published",
+        publishedAt: new Date(nowMs),
+        scheduledFor: null,
+        updatedAt: new Date(nowMs),
+      })
+      .where(eq(blogPosts.id, post.id))
+      .run();
+  }
+
+  return due.length;
 }

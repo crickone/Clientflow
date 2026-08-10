@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ExternalLink, Eye, EyeOff, Loader2, Save, Trash2 } from "lucide-react";
+import { Clock, ExternalLink, Eye, EyeOff, Loader2, Save, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
@@ -19,6 +19,7 @@ import {
   savePostAction,
   publishPostAction,
   unpublishPostAction,
+  schedulePostAction,
   deletePostAction,
 } from "@/app/cms/[siteSlug]/blog/actions";
 
@@ -35,11 +36,35 @@ type EditorPost = {
   coverPosition: string | null;
   status: "generating" | "ready" | "failed";
   publishState: "draft" | "scheduled" | "published";
+  scheduledFor: string | null;
   error: string | null;
 };
 
 const COVER_ASPECT_DEFAULT = "16 / 9";
 const COVER_POSITION_DEFAULT = "50% 50%";
+
+/** Local wall-clock value for <input type="datetime-local"> (no timezone). */
+function toDatetimeLocalValue(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+const SCHEDULE_BADGE_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/**
+ * Deterministic UTC formatting (no Intl/locale) for the "scheduled for…" badge
+ * text — this component is a Client Component, so anything locale- or
+ * timezone-dependent here would render differently on the server vs. the
+ * browser and trip a hydration mismatch. The <input> itself uses local time
+ * (via toDatetimeLocalValue, filled in post-mount below) since that's what
+ * the native picker expects.
+ */
+function formatScheduledFor(iso: string): string {
+  const d = new Date(iso);
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mm = String(d.getUTCMinutes()).padStart(2, "0");
+  return `${d.getUTCDate()} ${SCHEDULE_BADGE_MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}, ${hh}:${mm} UTC`;
+}
 
 export function BlogPostEditor({
   siteSlug,
@@ -64,6 +89,12 @@ export function BlogPostEditor({
   const [coverAspect, setCoverAspect] = useState(post.coverAspect ?? COVER_ASPECT_DEFAULT);
   const [coverPosition, setCoverPosition] = useState(post.coverPosition ?? COVER_POSITION_DEFAULT);
   const [coverPickerOpen, setCoverPickerOpen] = useState(false);
+  // Datetime-local value for the schedule picker. Always starts empty (server
+  // and first client render must match) — filled in from post.scheduledFor by
+  // the effect below, which only runs in the browser, so a scheduled post's
+  // existing time appears in the picker without any SSR/client mismatch risk
+  // from converting a UTC timestamp to the viewer's local wall-clock time.
+  const [scheduleInput, setScheduleInput] = useState("");
 
   // While the AI is generating, refresh the server component to pick up content.
   useEffect(() => {
@@ -71,6 +102,13 @@ export function BlogPostEditor({
     const id = setInterval(() => router.refresh(), 2500);
     return () => clearInterval(id);
   }, [post.status, router]);
+
+  useEffect(() => {
+    // Always sync both directions: a fresh schedule fills the picker, and
+    // Publish-now/Cancel-schedule clearing scheduledFor to null must clear the
+    // picker too — otherwise it'd keep showing a stale time after cancelling.
+    setScheduleInput(post.scheduledFor ? toDatetimeLocalValue(new Date(post.scheduledFor)) : "");
+  }, [post.scheduledFor]);
 
   if (post.status === "generating") {
     return (
@@ -95,7 +133,29 @@ export function BlogPostEditor({
     }
   }
 
+  function onSchedule() {
+    if (!scheduleInput) {
+      toast.error("Pick a date and time first.");
+      return;
+    }
+    // Convert the local wall-clock picker value to a full ISO string (with
+    // timezone) HERE, in the browser, using the browser's own timezone — so
+    // schedulePostAction's validation on the server is never ambiguous about
+    // which timezone the bare "YYYY-MM-DDTHH:mm" value meant.
+    const iso = new Date(scheduleInput).toISOString();
+    startTransition(async () => {
+      const res = await schedulePostAction(siteSlug, post.id, iso);
+      if (res.ok) {
+        toast.success("Scheduled");
+        router.refresh();
+      } else {
+        toast.error(res.error ?? "Could not schedule this post.");
+      }
+    });
+  }
+
   const published = post.publishState === "published";
+  const scheduled = post.publishState === "scheduled";
 
   return (
     <div style={{ display: "grid", gap: 16, gridTemplateColumns: "minmax(0,1fr) 320px" }}>
@@ -181,8 +241,13 @@ export function BlogPostEditor({
       <div style={{ display: "grid", gap: 16, alignContent: "start" }}>
         <Card style={{ display: "grid", gap: 12 }}>
           <CardLabel>Status</CardLabel>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <Badge colour={published ? "#3fb950" : "#8b949e"}>{post.publishState}</Badge>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <Badge colour={published ? "#3fb950" : scheduled ? "#d29922" : "#8b949e"}>{post.publishState}</Badge>
+            {scheduled && post.scheduledFor && (
+              <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                {formatScheduledFor(post.scheduledFor)}
+              </span>
+            )}
             {post.status === "failed" && <Badge colour="#f85149">generation failed</Badge>}
           </div>
           {post.error && (
@@ -205,19 +270,52 @@ export function BlogPostEditor({
                 Unpublish
               </Button>
             ) : (
-              <Button
-                disabled={pending}
-                onClick={() =>
-                  startTransition(async () => {
-                    await publishPostAction(siteSlug, post.id);
-                    toast.success("Published");
-                    router.refresh();
-                  })
-                }
-              >
-                <Eye size={15} />
-                Publish
-              </Button>
+              <>
+                <Button
+                  disabled={pending}
+                  onClick={() =>
+                    startTransition(async () => {
+                      await publishPostAction(siteSlug, post.id);
+                      toast.success("Published");
+                      router.refresh();
+                    })
+                  }
+                >
+                  <Eye size={15} />
+                  {scheduled ? "Publish now" : "Publish"}
+                </Button>
+
+                <div style={{ display: "grid", gap: 6, paddingTop: 8, borderTop: "1px solid var(--grid)" }}>
+                  <Label htmlFor="scheduledFor">{scheduled ? "Reschedule for" : "Schedule for later"}</Label>
+                  <Input
+                    id="scheduledFor"
+                    type="datetime-local"
+                    value={scheduleInput}
+                    onChange={(e) => setScheduleInput(e.target.value)}
+                  />
+                  <Button variant="outline" disabled={pending || !scheduleInput} onClick={onSchedule}>
+                    <Clock size={15} />
+                    {scheduled ? "Reschedule" : "Schedule"}
+                  </Button>
+                </div>
+
+                {scheduled && (
+                  <Button
+                    variant="ghost"
+                    disabled={pending}
+                    onClick={() =>
+                      startTransition(async () => {
+                        await unpublishPostAction(siteSlug, post.id);
+                        toast.success("Schedule cancelled");
+                        router.refresh();
+                      })
+                    }
+                  >
+                    <EyeOff size={15} />
+                    Cancel schedule
+                  </Button>
+                )}
+              </>
             )}
             <a
               href={`/site/${siteSlug}/blog/${post.slug}`}

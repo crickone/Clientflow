@@ -42,6 +42,7 @@ export default async function EditPostPage({
           coverPosition: post.coverPosition ?? null,
           status: post.status,
           publishState: post.publishState,
+          scheduledFor: post.scheduledFor ? post.scheduledFor.toISOString() : null,
           error: post.error ?? null,
         }}
       />
