@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { createSession } from "@/lib/auth";
+import { getAppBaseUrl } from "@/lib/appUrl";
 import { consumeOpenToken } from "@/lib/platform/openToken";
 
 export const dynamic = "force-dynamic";
@@ -23,14 +24,18 @@ export const dynamic = "force-dynamic";
  * cookie) rather than hand-rolling a divergent auth path.
  */
 export async function GET(req: NextRequest) {
+  // Build post-login redirects off the EXTERNAL host (forwarded), NOT
+  // req.nextUrl: behind the Railway proxy req.nextUrl is the internal
+  // 0.0.0.0:8080, so a cloned redirect sends the browser to a dead address
+  // (ERR_CONNECTION_REFUSED). Same fix as the Google OAuth routes — the query
+  // param is still read from req.nextUrl (path/query are correct; only the
+  // host is internal).
+  const base = getAppBaseUrl();
   const token = req.nextUrl.searchParams.get("token");
   const claim = token ? consumeOpenToken(token) : null;
 
   if (!claim) {
-    const url = req.nextUrl.clone();
-    url.pathname = "/login";
-    url.search = "?opened=expired";
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(new URL("/login?opened=expired", base));
   }
 
   // Identical session-mint to a normal login: an auth_sessions row for this
@@ -40,8 +45,5 @@ export async function GET(req: NextRequest) {
   // (getCurrentMembership) just works from here — no bypass, no special case.
   await createSession(claim.userId, claim.tenantId);
 
-  const url = req.nextUrl.clone();
-  url.pathname = "/dashboard";
-  url.search = "";
-  return NextResponse.redirect(url);
+  return NextResponse.redirect(new URL("/dashboard", base));
 }
