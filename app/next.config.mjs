@@ -64,11 +64,18 @@ const nextConfig = {
     // sharp (Batch 5c, improvement-plan-2026-08.md Theme F4): downscales +
     // re-encodes uploaded raster images. Never import it from a client
     // component — see src/lib/image/processUpload.ts.
+    // imapflow/nodemailer/mailparser (IMAP email connector): pure-JS but use
+    // dynamic require()s that webpack can bundle at build time yet break at
+    // runtime — keep them external so output-file-tracing copies the real
+    // packages into .next/standalone/node_modules (see src/lib/imapEmail.ts).
     serverComponentsExternalPackages: [
       "better-sqlite3",
       "ffmpeg-static",
       "ffprobe-static",
       "sharp",
+      "imapflow",
+      "nodemailer",
+      "mailparser",
     ],
   },
 };

@@ -50,6 +50,19 @@ COPY --from=builder /app/node_modules/ffprobe-static ./node_modules/ffprobe-stat
 COPY --from=builder /app/node_modules/sharp ./node_modules/sharp
 COPY --from=builder /app/node_modules/@img ./node_modules/@img
 
+# IMAP email connector: imapflow/nodemailer/mailparser are serverComponentsExternalPackages
+# (see next.config.mjs), so output-file-tracing copies most of their closure into
+# .next/standalone/node_modules — but it misses these 6 transitive deps (htmlparser2 +
+# its family, pulled by mailparser's html-to-text via a computed require; process-warning,
+# pulled by imapflow). Without them, parsing an HTML email throws "Cannot find module" at
+# runtime. Copy them explicitly (versions follow whatever npm ci installed in the builder).
+COPY --from=builder /app/node_modules/htmlparser2 ./node_modules/htmlparser2
+COPY --from=builder /app/node_modules/domhandler ./node_modules/domhandler
+COPY --from=builder /app/node_modules/domutils ./node_modules/domutils
+COPY --from=builder /app/node_modules/dom-serializer ./node_modules/dom-serializer
+COPY --from=builder /app/node_modules/domelementtype ./node_modules/domelementtype
+COPY --from=builder /app/node_modules/process-warning ./node_modules/process-warning
+
 # The persistent volume mounts here at runtime (DBs + uploads + media). Creating
 # it keeps a no-volume run from crashing on first write.
 RUN mkdir -p /app/data
