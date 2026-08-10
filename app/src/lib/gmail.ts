@@ -1,12 +1,20 @@
 import "server-only";
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { authDb } from "@/lib/db/control";
 import { db } from "@/lib/db";
 import { clients, emailMessages, gmailConnections } from "@/lib/db/schema";
 import { decryptToken, encryptToken } from "@/lib/google/tokenCrypto";
 import { refreshAccessToken } from "@/lib/google/oauth";
+import { mapWithConcurrency } from "@/lib/concurrency";
+import { GMAIL_SYNC_MIN_GAP_MS, isMessageRead, shouldSyncNow } from "@/lib/gmailSync";
+
+// Re-exported so `@/lib/gmail` stays the one import path for anything
+// Gmail-related — callers (e.g. the dashboard brief route) don't need to know
+// these particular decisions live in a separate dependency-free module (see
+// lib/gmailSync.ts for why they're split out).
+export { GMAIL_SYNC_MIN_GAP_MS, isMessageRead, shouldSyncNow };
 
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 
@@ -283,9 +291,33 @@ function parseAddress(raw: string): { name: string; email: string } {
 }
 
 /**
+ * Bounded concurrency for the per-message Gmail fetch during a sync — avoids
+ * hammering the API with a burst of 15+ simultaneous requests, and replaces
+ * the old fully-sequential N+1 (see mapWithConcurrency in lib/concurrency.ts).
+ */
+const GMAIL_SYNC_CONCURRENCY = 5;
+
+type SyncFetchResult =
+  | { kind: "new"; msg: GmailMessage }
+  | { kind: "existing"; gmailMessageId: string; labelIds: string[] | undefined };
+
+/**
  * Pull recent messages from Gmail into the tenant's email_messages store. Deduped
  * on gmail_message_id, so it's safe to run repeatedly. On-demand (no Pub/Sub).
- * Must run in the CURRENT tenant's context (writes go through the `db` proxy).
+ * Must run in the CURRENT tenant's context (writes go through the `db` proxy;
+ * a detached/fire-and-forget caller must wrap the call in runWithTenant — see
+ * its doc in lib/db/tenant.ts).
+ *
+ * Every listed message is fetched with BOUNDED concurrency (previously a
+ * sequential `for` loop awaiting one Google round-trip at a time — an N+1
+ * that could serialize ~15+ fetches on a single caller). Brand-new messages
+ * get the full body (format=full) so they can be inserted; messages already
+ * in the store only need their current labels, so they get the much lighter
+ * format=minimal — used to reconcile the local `is_read` flag against
+ * Gmail's UNREAD label on every sync (F6), so the app's unread count
+ * converges to Gmail's truth in both directions instead of only ever drifting
+ * stale after the initial insert. One message's fetch failing never aborts
+ * the rest (best-effort, same as before).
  */
 export async function syncGmailInbox(
   tenantId: number,
@@ -300,7 +332,22 @@ export async function syncGmailInbox(
     );
     if (!listRes.ok) return { ok: false, error: `Gmail list failed: ${listRes.status}` };
     const list = (await listRes.json()) as { messages?: { id: string; threadId: string }[] };
-    const ids = list.messages ?? [];
+    // Dedupe defensively: the existence check below now runs as ONE batched
+    // query up front (see existingRows) rather than a fresh per-iteration
+    // query, so a repeated id within a single list response could otherwise
+    // be treated as "new" twice and violate the gmail_message_id UNIQUE
+    // constraint on the second insert. Gmail's list API shouldn't repeat an
+    // id within one response, but this is a one-line guard against it.
+    const ids = Array.from(new Map((list.messages ?? []).map((m) => [m.id, m])).values());
+
+    if (ids.length === 0) {
+      authDb
+        .update(gmailConnections)
+        .set({ lastSyncAt: new Date() })
+        .where(eq(gmailConnections.tenantId, tenantId))
+        .run();
+      return { ok: true, synced: 0 };
+    }
 
     // Build a quick email→clientId map for linking.
     const clientRows = db
@@ -310,18 +357,52 @@ export async function syncGmailInbox(
     const clientByEmail = new Map<string, number>();
     for (const c of clientRows) if (c.email) clientByEmail.set(c.email.toLowerCase(), c.id);
 
-    let synced = 0;
-    for (const { id } of ids) {
-      const existing = db
-        .select({ id: emailMessages.id })
-        .from(emailMessages)
-        .where(eq(emailMessages.gmailMessageId, id))
-        .get();
-      if (existing) continue;
+    // One batched lookup (not N) for which listed ids are already synced, and
+    // their current local read-state (needed by the F6 reconcile below).
+    const existingRows = db
+      .select({ gmailMessageId: emailMessages.gmailMessageId, isRead: emailMessages.isRead })
+      .from(emailMessages)
+      .where(inArray(emailMessages.gmailMessageId, ids.map((m) => m.id)))
+      .all();
+    const existingByGmailId = new Map(existingRows.map((r) => [r.gmailMessageId, r]));
 
-      const msgRes = await gmailFetch(tenantId, `/messages/${id}?format=full`);
-      if (!msgRes.ok) continue;
-      const msg = (await msgRes.json()) as GmailMessage;
+    const fetched = await mapWithConcurrency<{ id: string; threadId: string }, SyncFetchResult>(
+      ids,
+      GMAIL_SYNC_CONCURRENCY,
+      async ({ id }) => {
+        const isExisting = existingByGmailId.has(id);
+        const res = await gmailFetch(
+          tenantId,
+          `/messages/${id}?format=${isExisting ? "minimal" : "full"}`,
+        );
+        if (!res.ok) throw new Error(`Gmail message fetch failed: ${res.status}`);
+        const msg = (await res.json()) as GmailMessage;
+        return isExisting
+          ? { kind: "existing", gmailMessageId: id, labelIds: msg.labelIds }
+          : { kind: "new", msg };
+      },
+    );
+
+    let synced = 0;
+    for (const result of fetched) {
+      if (!result.ok) continue; // best-effort: one bad fetch doesn't break the sync
+      const r = result.value;
+
+      if (r.kind === "existing") {
+        // F6: reconcile local read-state against Gmail's current labels —
+        // both directions (read -> unread and unread -> read).
+        const isRead = isMessageRead(r.labelIds);
+        const prior = existingByGmailId.get(r.gmailMessageId);
+        if (prior && prior.isRead !== isRead) {
+          db.update(emailMessages)
+            .set({ isRead })
+            .where(eq(emailMessages.gmailMessageId, r.gmailMessageId))
+            .run();
+        }
+        continue;
+      }
+
+      const msg = r.msg;
       const headers = msg.payload?.headers;
       const from = parseAddress(headerVal(headers, "From"));
       const to = parseAddress(headerVal(headers, "To"));
@@ -344,7 +425,7 @@ export async function syncGmailInbox(
           bodyText: text || null,
           clientId,
           internalDate: msg.internalDate ? new Date(Number(msg.internalDate)) : null,
-          isRead: direction === "out",
+          isRead: isMessageRead(msg.labelIds),
         })
         .run();
       synced++;

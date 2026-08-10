@@ -2,7 +2,14 @@ import { requireUser, getCurrentMembership } from "@/lib/auth";
 import { getBusinessProfile } from "@/lib/businessProfile";
 import { getGymDashboard, getNeedsAttention } from "@/lib/dashboard";
 import { getSchedulingMode } from "@/lib/settings";
-import { isGmailConnected, syncGmailInbox } from "@/lib/gmail";
+import {
+  getGmailConnection,
+  GMAIL_SYNC_MIN_GAP_MS,
+  isGmailConnected,
+  shouldSyncNow,
+  syncGmailInbox,
+} from "@/lib/gmail";
+import { runWithTenant } from "@/lib/db/tenant";
 import { getAnthropic, MODELS } from "@/lib/ai/client";
 import { assertUnderCap, recordUsage, AiCapError } from "@/lib/ai/usage";
 
@@ -35,19 +42,30 @@ export async function GET() {
     throw e;
   }
 
-  // Pull in any new mail before summarising so getNeedsAttention() reflects
-  // the current inbox, not whatever was last synced. This route runs
-  // synchronously inside a single request (cookies() is live throughout), so
-  // the ambient `db` proxy that syncGmailInbox writes through already
-  // resolves to this same tenant via the session cookie — no runWithTenant
-  // needed. Best-effort + bounded: never let a Gmail hiccup break the brief,
-  // and no-op cleanly when Gmail isn't connected.
-  try {
-    if (isGmailConnected(membership.tenant.id)) {
-      await syncGmailInbox(membership.tenant.id, { days: 7, max: 15 });
+  // Pull in any new mail so getNeedsAttention() eventually reflects a fresh
+  // inbox — but NEVER make the brief wait on Google. This used to `await
+  // syncGmailInbox` inline, so the brief could block for seconds on ~15
+  // serial Gmail round-trips every load (see lib/gmail.ts). Now the sync is
+  // fired best-effort and NOT awaited: the brief renders immediately from
+  // whatever's already in the DB, and the (now-parallelized) sync just
+  // refreshes it for the next load. Gated by shouldSyncNow so rapid
+  // dashboard reloads don't re-hit the Gmail API every time — manual "sync
+  // now" actions elsewhere (Communication refresh, Settings connect) call
+  // syncGmailInbox directly and intentionally bypass this gate. Detached from
+  // the request this way, it must bind its own tenant via runWithTenant: a
+  // fire-and-forget job loses the request's cookie context by the time its
+  // async work actually runs, so the request-scoped `db` proxy would
+  // otherwise silently fall back to the DEFAULT tenant (see runWithTenant's
+  // doc in lib/db/tenant.ts).
+  if (isGmailConnected(tenantId)) {
+    const lastSyncMs = getGmailConnection(tenantId)?.lastSyncAt ?? null;
+    if (shouldSyncNow(lastSyncMs, Date.now(), GMAIL_SYNC_MIN_GAP_MS)) {
+      runWithTenant(tenantId, () => syncGmailInbox(tenantId, { days: 7, max: 15 })).catch(
+        (err) => {
+          console.error("[assistant/brief] gmail sync failed:", err);
+        },
+      );
     }
-  } catch (err) {
-    console.error("[assistant/brief] gmail sync failed:", err);
   }
 
   const business = getBusinessProfile().businessName;

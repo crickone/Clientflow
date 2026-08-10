@@ -32,25 +32,35 @@ export const clients = sqliteTable("clients", {
 // Synced Gmail messages (both inbound + outbound) for the Communication inbox
 // when a tenant connects Gmail. Deduped on gmail_message_id. Linked to a client
 // by matching the counterparty address when possible.
-export const emailMessages = sqliteTable("email_messages", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  gmailMessageId: text("gmail_message_id").notNull().unique(),
-  gmailThreadId: text("gmail_thread_id"),
-  direction: text("direction", { enum: ["in", "out"] }).notNull(),
-  fromEmail: text("from_email"),
-  fromName: text("from_name"),
-  toEmail: text("to_email"),
-  subject: text("subject"),
-  snippet: text("snippet"),
-  bodyHtml: text("body_html"),
-  bodyText: text("body_text"),
-  clientId: integer("client_id"),
-  internalDate: integer("internal_date", { mode: "timestamp_ms" }),
-  isRead: integer("is_read", { mode: "boolean" }).notNull().default(false),
-  createdAt: integer("created_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch() * 1000)`),
-});
+export const emailMessages = sqliteTable(
+  "email_messages",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    gmailMessageId: text("gmail_message_id").notNull().unique(),
+    gmailThreadId: text("gmail_thread_id"),
+    direction: text("direction", { enum: ["in", "out"] }).notNull(),
+    fromEmail: text("from_email"),
+    fromName: text("from_name"),
+    toEmail: text("to_email"),
+    subject: text("subject"),
+    snippet: text("snippet"),
+    bodyHtml: text("body_html"),
+    bodyText: text("body_text"),
+    clientId: integer("client_id"),
+    internalDate: integer("internal_date", { mode: "timestamp_ms" }),
+    isRead: integer("is_read", { mode: "boolean" }).notNull().default(false),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  // Batch 5a (F2): matches the CREATE INDEX IF NOT EXISTS statements already
+  // in ensureTenantTables (lib/db/tenant.ts) — same names, kept in sync.
+  (t) => ({
+    byThread: index("idx_email_messages_thread").on(t.gmailThreadId),
+    byClient: index("idx_email_messages_client").on(t.clientId),
+    byDate: index("idx_email_messages_date").on(t.internalDate),
+  }),
+);
 
 // General-purpose calendar: meetings and any events not tied to the booking
 // system. Independent of appointments/timetable.
@@ -226,23 +236,28 @@ export const giftVouchers = sqliteTable("gift_vouchers", {
     .default(sql`(unixepoch() * 1000)`),
 });
 
-export const payments = sqliteTable("payments", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  clientId: integer("client_id")
-    .notNull()
-    .references(() => clients.id, { onDelete: "cascade" }),
-  appointmentId: integer("appointment_id").references(() => appointments.id),
-  packageId: integer("package_id").references(() => packages.id),
-  voucherId: integer("voucher_id").references(() => giftVouchers.id),
-  amountEur: real("amount_eur").notNull(),
-  paymentMethod: text("payment_method", {
-    enum: ["cash", "card", "voucher", "bank_transfer", "package"],
-  }).notNull(),
-  notes: text("notes"),
-  createdAt: integer("created_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch() * 1000)`),
-});
+export const payments = sqliteTable(
+  "payments",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    clientId: integer("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    appointmentId: integer("appointment_id").references(() => appointments.id),
+    packageId: integer("package_id").references(() => packages.id),
+    voucherId: integer("voucher_id").references(() => giftVouchers.id),
+    amountEur: real("amount_eur").notNull(),
+    paymentMethod: text("payment_method", {
+      enum: ["cash", "card", "voucher", "bank_transfer", "package"],
+    }).notNull(),
+    notes: text("notes"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  // Batch 5a (F2): matches idx_payments_client already in ensureTenantTables.
+  (t) => ({ byClient: index("idx_payments_client").on(t.clientId) }),
+);
 
 export const settings = sqliteTable("settings", {
   key: text("key").primaryKey(),
@@ -337,59 +352,69 @@ const triageColumns = () => ({
   aiSuggestedReply: text("ai_suggested_reply"),
 });
 
-export const leadMessages = sqliteTable("lead_messages", {
-  ...triageColumns(),
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  leadId: integer("lead_id")
-    .notNull()
-    .references(() => leads.id, { onDelete: "cascade" }),
-  direction: text("direction", {
-    enum: ["outbound", "inbound", "note"],
-  }).notNull(),
-  channel: text("channel", {
-    enum: ["email", "sms", "whatsapp", "call", "manual", "system"],
-  }),
-  content: text("content").notNull(),
-  aiGenerated: integer("ai_generated", { mode: "boolean" })
-    .notNull()
-    .default(false),
-  // Set when sent via a real transport (e.g. WhatsApp bridge). Null = log-only.
-  providerMessageId: text("provider_message_id"),
-  status: text("status", {
-    enum: ["queued", "sent", "delivered", "read", "failed"],
-  }),
-  sentAt: integer("sent_at", { mode: "timestamp_ms" }),
-  createdAt: integer("created_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch() * 1000)`),
-});
+export const leadMessages = sqliteTable(
+  "lead_messages",
+  {
+    ...triageColumns(),
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    leadId: integer("lead_id")
+      .notNull()
+      .references(() => leads.id, { onDelete: "cascade" }),
+    direction: text("direction", {
+      enum: ["outbound", "inbound", "note"],
+    }).notNull(),
+    channel: text("channel", {
+      enum: ["email", "sms", "whatsapp", "call", "manual", "system"],
+    }),
+    content: text("content").notNull(),
+    aiGenerated: integer("ai_generated", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    // Set when sent via a real transport (e.g. WhatsApp bridge). Null = log-only.
+    providerMessageId: text("provider_message_id"),
+    status: text("status", {
+      enum: ["queued", "sent", "delivered", "read", "failed"],
+    }),
+    sentAt: integer("sent_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  // Batch 5a (F2): matches idx_lead_messages_lead already in ensureTenantTables.
+  (t) => ({ byLead: index("idx_lead_messages_lead").on(t.leadId) }),
+);
 
 /** Conversation messages for clients/members (mirrors lead_messages). */
-export const clientMessages = sqliteTable("client_messages", {
-  ...triageColumns(),
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  clientId: integer("client_id")
-    .notNull()
-    .references(() => clients.id, { onDelete: "cascade" }),
-  direction: text("direction", {
-    enum: ["outbound", "inbound", "note"],
-  }).notNull(),
-  channel: text("channel", {
-    enum: ["email", "sms", "whatsapp", "call", "manual", "system"],
-  }),
-  content: text("content").notNull(),
-  aiGenerated: integer("ai_generated", { mode: "boolean" })
-    .notNull()
-    .default(false),
-  providerMessageId: text("provider_message_id"),
-  status: text("status", {
-    enum: ["queued", "sent", "delivered", "read", "failed"],
-  }),
-  sentAt: integer("sent_at", { mode: "timestamp_ms" }),
-  createdAt: integer("created_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch() * 1000)`),
-});
+export const clientMessages = sqliteTable(
+  "client_messages",
+  {
+    ...triageColumns(),
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    clientId: integer("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    direction: text("direction", {
+      enum: ["outbound", "inbound", "note"],
+    }).notNull(),
+    channel: text("channel", {
+      enum: ["email", "sms", "whatsapp", "call", "manual", "system"],
+    }),
+    content: text("content").notNull(),
+    aiGenerated: integer("ai_generated", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    providerMessageId: text("provider_message_id"),
+    status: text("status", {
+      enum: ["queued", "sent", "delivered", "read", "failed"],
+    }),
+    sentAt: integer("sent_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  // Batch 5a (F2): matches idx_client_messages_client already in ensureTenantTables.
+  (t) => ({ byClient: index("idx_client_messages_client").on(t.clientId) }),
+);
 
 /** AI inbox: tag vocabulary — controlled core tags plus AI-suggested tags. */
 export const tags = sqliteTable("tags", {
