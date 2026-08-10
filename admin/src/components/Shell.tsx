@@ -19,7 +19,7 @@ import type { AdminUser } from "@/lib/session";
 
 const NAV = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { href: "/gyms", label: "Gyms", icon: Dumbbell },
+  { href: "/gyms", label: "Businesses", icon: Dumbbell },
   { href: "/provision", label: "Provision", icon: Rocket },
   { href: "/settings", label: "Settings", icon: SettingsIcon },
 ];

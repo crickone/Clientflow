@@ -8,6 +8,7 @@ import {
   markPaid,
   offboardTenant,
   reactivateTenant,
+  setBillingExempt,
   suspendTenant,
   waiveInvoice,
 } from "@/lib/billing/engine";
@@ -31,6 +32,12 @@ export async function POST(
         break;
       case "reactivate":
         reactivateTenant(id, actor);
+        break;
+      case "exempt":
+        setBillingExempt(id, true, actor);
+        break;
+      case "unexempt":
+        setBillingExempt(id, false, actor);
         break;
       case "charge-now": {
         const r = await chargeOutstanding(id, actor);

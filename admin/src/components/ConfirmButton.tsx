@@ -35,7 +35,7 @@ export function ConfirmButton({
   function onClick() {
     // Gate destructive actions before touching the server.
     if (slug !== undefined) {
-      const typed = window.prompt(`Type the gym's slug "${slug}" to confirm.`);
+      const typed = window.prompt(`Type the business's slug "${slug}" to confirm.`);
       if (typed !== slug) return;
     } else if (confirm && !window.confirm(confirm)) {
       return;

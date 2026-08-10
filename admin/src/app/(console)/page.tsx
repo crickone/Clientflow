@@ -100,7 +100,7 @@ export default async function DashboardPage() {
             color: "var(--text-tertiary)",
           }}
         >
-          {gyms.tenantsCounted} gyms · {platform.gyms.total} tenants
+          {gyms.tenantsCounted} businesses · {platform.gyms.total} tenants
         </span>
       </div>
 
@@ -109,7 +109,7 @@ export default async function DashboardPage() {
         <StatCard label="MRR" value={fmtCents(platform.mrrCents)} sub={`ARR ${fmtCents(platform.arrCents)}`} />
         <StatCard label="ARR" value={fmtCents(platform.arrCents)} />
         <StatCard
-          label="Paying gyms"
+          label="Paying businesses"
           value={`${platform.gyms.paying}/${platform.gyms.total}`}
           sub={`${platform.gyms.exempt} exempt`}
         />
@@ -127,14 +127,14 @@ export default async function DashboardPage() {
           <RevenueCollectedChart data={revenueData} />
         </Card>
         <Card style={{ padding: 24 }}>
-          <PanelTitle>Gyms on platform</PanelTitle>
+          <PanelTitle>Businesses on platform</PanelTitle>
           <GymGrowthChart data={growthData} />
         </Card>
       </div>
 
       {/* 4 — Status breakdown */}
       <Card style={{ padding: 24 }}>
-        <PanelTitle>Gym status breakdown</PanelTitle>
+        <PanelTitle>Business status breakdown</PanelTitle>
         {statusData.length === 0 ? (
           <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: 13.5 }}>No billing rows yet.</p>
         ) : (
@@ -144,7 +144,7 @@ export default async function DashboardPage() {
 
       {/* 5 — Aggregate business figures across all gyms */}
       <div>
-        <PanelTitle>Across all gyms</PanelTitle>
+        <PanelTitle>Across all businesses</PanelTitle>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
           <StatCard label="Members" value={String(gyms.members)} />
           <StatCard label="Active members" value={String(gyms.activeMembers)} />
@@ -156,14 +156,14 @@ export default async function DashboardPage() {
 
       {/* 6 — Top gyms leaderboard */}
       <Card style={{ padding: 24 }}>
-        <PanelTitle>Top gyms</PanelTitle>
+        <PanelTitle>Top businesses</PanelTitle>
         {topGyms.length === 0 ? (
-          <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: 13.5 }}>No gyms yet.</p>
+          <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: 13.5 }}>No businesses yet.</p>
         ) : (
           <table className="tbl">
             <thead>
               <tr>
-                <th>Gym</th>
+                <th>Business</th>
                 <th>Type</th>
                 <th>Status</th>
                 <th style={{ textAlign: "right" }}>Members</th>

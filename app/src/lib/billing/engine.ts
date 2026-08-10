@@ -324,6 +324,19 @@ export function reactivateTenant(tenantId: number, actor: string): void {
   void sendBillingEmail(tenantId, "reactivated", {});
 }
 
+/**
+ * Mark a tenant billing-exempt (comp — usable, never billed) or restore normal
+ * billing. Exempting flips status to 'active' so it clears the payment gate
+ * immediately; the daily run's `billing_exempt = 0` filters (both the renewal
+ * and dunning-retry queries in `runBillingForDate`) then skip it going
+ * forward. Un-exempting returns it to 'pending_payment' so it re-enters the
+ * gate. Idempotent: safe to call with the same `exempt` value repeatedly.
+ */
+export function setBillingExempt(tenantId: number, exempt: boolean, actor: string): void {
+  touch(tenantId, `billing_exempt = ?, status = ?`, exempt ? 1 : 0, exempt ? "active" : "pending_payment");
+  logEvent(tenantId, exempt ? "billing_exempted" : "billing_unexempted", null, actor);
+}
+
 /** Cancel + archive: copy the tenant DB into data/archive/, deactivate the tenant. */
 export function offboardTenant(tenantId: number, actor: string): { archiveDir: string } {
   const t = controlSqlite.prepare("SELECT slug, db_file FROM tenants WHERE id = ?").get(tenantId) as

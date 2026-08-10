@@ -113,7 +113,7 @@ export function GymGrowthChart({
             contentStyle={TOOLTIP_CONTENT}
             labelStyle={TOOLTIP_LABEL}
             cursor={{ stroke: "var(--hairline)" }}
-            formatter={(v) => [String(v), "Gyms"]}
+            formatter={(v) => [String(v), "Businesses"]}
           />
           <Line
             type="monotone"

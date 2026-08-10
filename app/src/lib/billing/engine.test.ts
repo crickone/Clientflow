@@ -5,7 +5,7 @@ import { DEV_TOKENS, devProvider } from "../payments/devProvider";
 import {
   activateTenant, createBillingRow, getBilling, listInvoices, listEvents,
   runBillingForDate, saveCard, suspendTenant, reactivateTenant, markPaid,
-  chargeOutstanding,
+  chargeOutstanding, setBillingExempt,
 } from "./engine";
 
 // ── scratch tenant (control row only; no tenant DB needed by the engine) ──
@@ -127,6 +127,25 @@ import {
       .prepare("SELECT charge_started_at FROM billing_invoices WHERE tenant_id = ? AND period_start = '2026-04-30'")
       .get(tid) as { charge_started_at: number | null };
     assert.equal(claimRow.charge_started_at, null);
+
+    // ── Billing-exempt toggle (comp): exempt clears the gate, unexempt restores it ──
+    setBillingExempt(tid, true, "admin:1");
+    b = getBilling(tid)!;
+    assert.equal(b.billingExempt, true);
+    assert.equal(b.status, "active");
+    assert.ok(
+      listEvents(tid).some((e) => e.type === "billing_exempted" && e.actor === "admin:1"),
+      "billing_exempted event logged with actor admin:1",
+    );
+
+    setBillingExempt(tid, false, "admin:1");
+    b = getBilling(tid)!;
+    assert.equal(b.billingExempt, false);
+    assert.equal(b.status, "pending_payment");
+    assert.ok(
+      listEvents(tid).some((e) => e.type === "billing_unexempted" && e.actor === "admin:1"),
+      "billing_unexempted event logged with actor admin:1",
+    );
 
     console.log("engine.test.ts: all assertions passed");
   } finally {

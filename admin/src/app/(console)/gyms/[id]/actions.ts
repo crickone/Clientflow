@@ -7,6 +7,8 @@ import { api, ApiError } from "@/lib/api";
 export type TenantActionName =
   | "suspend"
   | "reactivate"
+  | "exempt"
+  | "unexempt"
   | "charge-now"
   | "mark-paid"
   | "waive"

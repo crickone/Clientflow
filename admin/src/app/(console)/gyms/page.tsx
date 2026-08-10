@@ -12,7 +12,7 @@ export default async function GymsPage({ searchParams }: { searchParams: { q?: s
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>Gyms</h1>
+      <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>Businesses</h1>
 
       <form method="GET" style={{ display: "flex", gap: 10 }}>
         <input
@@ -28,7 +28,7 @@ export default async function GymsPage({ searchParams }: { searchParams: { q?: s
 
       <Card style={{ padding: 20 }}>
         {data.tenants.length === 0 ? (
-          <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: 13.5 }}>No gyms match.</p>
+          <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: 13.5 }}>No businesses match.</p>
         ) : (
           <table className="tbl">
             <thead>

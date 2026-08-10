@@ -48,7 +48,7 @@ export default async function GymDetailPage({ params }: { params: { id: string }
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       <div>
         <Link href="/gyms" style={{ fontSize: 13, color: "var(--text-secondary)", textDecoration: "none" }}>
-          ← All gyms
+          ← All businesses
         </Link>
       </div>
 
@@ -89,40 +89,64 @@ export default async function GymDetailPage({ params }: { params: { id: string }
         </div>
 
         {billing === null ? (
-          <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: 13 }}>No billing configured for this gym.</p>
+          <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: 13 }}>No billing configured for this business.</p>
         ) : billing.billingExempt ? (
-          <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: 13 }}>Billing exempt (agency) — no charges apply.</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <span className="chip exempt">Exempt</span>
+              <span style={{ color: "var(--text-secondary)", fontSize: 13 }}>
+                Billing exempt (agency) — usable, never billed.
+              </span>
+            </div>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <ConfirmButton
+                label="Remove exemption"
+                confirm="Remove billing exemption for this business? It moves to Awaiting payment and re-enters the payment gate."
+                action={tenantAction.bind(null, tenant.id, "unexempt", {})}
+              />
+            </div>
+          </div>
         ) : (
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-start" }}>
-            {hasOutstanding && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-start" }}>
+              {hasOutstanding && (
+                <ConfirmButton
+                  label="Charge now"
+                  className="btn btn--primary btn--sm"
+                  confirm="Attempt to charge the card on file for the outstanding invoice now?"
+                  action={tenantAction.bind(null, tenant.id, "charge-now", {})}
+                />
+              )}
+              {status === "suspended" ? (
+                <ConfirmButton
+                  label="Reactivate"
+                  confirm="Reactivate this business?"
+                  action={tenantAction.bind(null, tenant.id, "reactivate", {})}
+                />
+              ) : status !== "cancelled" ? (
+                <ConfirmButton
+                  label="Suspend"
+                  danger
+                  confirm="Suspend this business? Members lose access until it is reactivated."
+                  action={tenantAction.bind(null, tenant.id, "suspend", {})}
+                />
+              ) : null}
+              {billing.nextRenewalAt && (
+                <ConfirmButton
+                  label="Comp 1 month"
+                  confirm="Comp one month? This pushes the next renewal date out by a month."
+                  action={tenantAction.bind(null, tenant.id, "comp", { months: 1 })}
+                />
+              )}
               <ConfirmButton
-                label="Charge now"
-                className="btn btn--primary btn--sm"
-                confirm="Attempt to charge the card on file for the outstanding invoice now?"
-                action={tenantAction.bind(null, tenant.id, "charge-now", {})}
+                label="Exempt (comp)"
+                confirm="Mark this business billing-exempt? It becomes usable and is never billed until exemption is removed."
+                action={tenantAction.bind(null, tenant.id, "exempt", {})}
               />
-            )}
-            {status === "suspended" ? (
-              <ConfirmButton
-                label="Reactivate"
-                confirm="Reactivate this gym?"
-                action={tenantAction.bind(null, tenant.id, "reactivate", {})}
-              />
-            ) : status !== "cancelled" ? (
-              <ConfirmButton
-                label="Suspend"
-                danger
-                confirm="Suspend this gym? Members lose access until it is reactivated."
-                action={tenantAction.bind(null, tenant.id, "suspend", {})}
-              />
-            ) : null}
-            {billing.nextRenewalAt && (
-              <ConfirmButton
-                label="Comp 1 month"
-                confirm="Comp one month? This pushes the next renewal date out by a month."
-                action={tenantAction.bind(null, tenant.id, "comp", { months: 1 })}
-              />
-            )}
+            </div>
+            <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>
+              Marks this business comp — usable, never billed.
+            </p>
           </div>
         )}
       </Card>
@@ -222,10 +246,10 @@ export default async function GymDetailPage({ params }: { params: { id: string }
       <Card style={{ padding: 24, borderColor: "var(--red)" }}>
         <h2 style={{ margin: "0 0 6px", fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em", color: "var(--red)" }}>Danger zone</h2>
         <p style={{ margin: "0 0 14px", color: "var(--text-secondary)", fontSize: 13 }}>
-          Offboarding archives the gym&apos;s data and deactivates the tenant. This cannot be undone from here.
+          Offboarding archives the business&apos;s data and deactivates the tenant. This cannot be undone from here.
         </p>
         <ConfirmButton
-          label="Offboard gym"
+          label="Offboard business"
           danger
           slug={tenant.slug}
           redirectTo="/gyms"
