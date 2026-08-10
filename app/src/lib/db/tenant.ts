@@ -14,7 +14,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import * as schema from "./schema";
-import { CLIENT_SESSION_COOKIE, controlDb, SESSION_COOKIE } from "./control";
+import { CLIENT_SESSION_COOKIE, controlDb, controlSqlite, SESSION_COOKIE } from "./control";
 
 /**
  * Per-tenant database plane. Each business has its own SQLite file holding all
@@ -34,8 +34,32 @@ const DATA_DIR = path.join(process.cwd(), "data");
 export const DEFAULT_TENANT_SLUG = process.env.DEFAULT_TENANT_SLUG || "renova";
 
 // Process-level connection cache, keyed by db_file. better-sqlite3 connections
-// are long-lived; one per tenant file for the life of the server.
+// are long-lived; one per tenant file for the life of the server. Iteration
+// order doubles as LRU order: openTenantDb() re-inserts a key on every cache
+// HIT (delete + set moves it to the end), so the Map's insertion order is
+// always least-recently-used → most-recently-used. See MAX_CACHED_CONNS below.
 const connCache = new Map<string, TenantConn>();
+
+// LRU cap on connCache (Batch 6a — improvement-plan-2026-08.md Theme E5).
+// Unbounded growth was fine at today's scale (2 tenants) but not forever —
+// every provisioned tenant left a native better-sqlite3 handle open for the
+// life of the process. 50 is comfortably above any current/near-term tenant
+// count, so this is inert today; it only bounds growth for later.
+const MAX_CACHED_CONNS = 50;
+
+/**
+ * Pure LRU-eviction decision: given cache keys in LEAST → MOST-recently-used
+ * order (connCache's iteration order — see its comment above) and the cap,
+ * return the one key to evict, or null if at/under the cap. Kept free of the
+ * Map/connection objects themselves so it's trivially unit-testable
+ * (tenant.test.ts) independent of real better-sqlite3 handles. Only ever
+ * needs to return a single key: openTenantDb calls this right after adding
+ * AT MOST one new entry, so size can never exceed cap+1 at the call site.
+ */
+export function pickLruEviction(keysLruToMru: readonly string[], cap: number): string | null {
+  if (keysLruToMru.length <= cap) return null;
+  return keysLruToMru[0] ?? null;
+}
 
 // Explicit tenant binding for detached background jobs. A fire-and-forget job
 // spawned from a request loses the request's cookie context by the time its
@@ -63,12 +87,28 @@ function resolveDbPath(dbFile: string): string {
 /** Open (or reuse) a tenant connection by its registry `db_file`. */
 export function openTenantDb(dbFile: string): TenantConn {
   const existing = connCache.get(dbFile);
-  if (existing) return existing;
+  if (existing) {
+    // Mark most-recently-used: delete + re-insert moves this key to the END
+    // of the Map's iteration order, which pickLruEviction relies on below to
+    // find the LEAST-recently-used key (index 0) in O(1) amortised work.
+    connCache.delete(dbFile);
+    connCache.set(dbFile, existing);
+    return existing;
+  }
 
   const fullPath = resolveDbPath(dbFile);
   fs.mkdirSync(path.dirname(fullPath), { recursive: true });
   const sqlite = new Database(fullPath);
+  // busy_timeout already exceeds the brief's suggested 5000ms floor (Batch 6a,
+  // improvement-plan-2026-08.md Theme E5) — 15000 is MORE forgiving under
+  // write contention, so it's left as-is rather than lowered (mirrors
+  // control.ts's rawControl()).
   sqlite.pragma("busy_timeout = 15000");
+  // WAL auto-checkpoint threshold in pages — SQLite's own default, set
+  // explicitly (see control.ts's rawControl() for the full rationale: this
+  // recycles WAL contents at the threshold but doesn't shrink the *-wal file
+  // on disk; checkpointAllOpenConnections below does that, daily).
+  sqlite.pragma("wal_autocheckpoint = 1000");
   // Skip the WAL mode-change during `next build` (see control.ts): parallel
   // page-data workers contend on the exclusive journal_mode switch → SQLITE_BUSY.
   if (process.env.NEXT_PHASE !== "phase-production-build") {
@@ -78,7 +118,55 @@ export function openTenantDb(dbFile: string): TenantConn {
   ensureTenantTables(sqlite);
   const conn: TenantConn = { sqlite, db: drizzle(sqlite, { schema }) };
   connCache.set(dbFile, conn);
+
+  // LRU eviction (Batch 6a, Theme E5): better-sqlite3 is fully synchronous,
+  // so a handle is never "in use" across an `await` — nothing else can run
+  // between this open completing and the eviction below, so closing the
+  // least-recently-used handle here can never race a query in flight on it.
+  // The connection just inserted above is structurally exempt: `.set()` on a
+  // brand-new key always lands at the END of iteration order (most-recently-
+  // used), so pickLruEviction's index-0 pick can never select it.
+  const evictKey = pickLruEviction([...connCache.keys()], MAX_CACHED_CONNS);
+  if (evictKey) {
+    const evicted = connCache.get(evictKey);
+    connCache.delete(evictKey);
+    try {
+      evicted?.sqlite.close();
+    } catch (err) {
+      console.error(`[db] LRU eviction: closing connection for ${evictKey} failed:`, err);
+    }
+  }
+
   return conn;
+}
+
+/**
+ * Best-effort `PRAGMA wal_checkpoint(TRUNCATE)` over the control connection +
+ * every currently-cached tenant connection (Batch 6a — improvement-plan-
+ * 2026-08.md Theme E5). Auto-checkpointing (wal_autocheckpoint, set on every
+ * open above / in control.ts) recycles the WAL's CONTENTS at the page
+ * threshold but does NOT shrink the `*-wal` file back down on disk — that's
+ * what this explicit TRUNCATE pass is for (control.db-wal was observed
+ * growing to ~4MB on a long-lived writer). Call this once/day from the
+ * in-process daily scheduler tick — NEVER from a request path, since a
+ * checkpoint briefly blocks writers on that connection. Per-connection
+ * try/catch: one busy/wedged connection must not skip the rest.
+ */
+export function checkpointAllOpenConnections(): { ok: string[]; failed: string[] } {
+  const ok: string[] = [];
+  const failed: string[] = [];
+  const attempt = (label: string, sqlite: BetterSqlite3) => {
+    try {
+      sqlite.pragma("wal_checkpoint(TRUNCATE)");
+      ok.push(label);
+    } catch (err) {
+      failed.push(label);
+      console.error(`[db] wal_checkpoint(TRUNCATE) failed for ${label}:`, err);
+    }
+  };
+  attempt("control", controlSqlite);
+  for (const [dbFile, conn] of connCache) attempt(dbFile, conn.sqlite);
+  return { ok, failed };
 }
 
 /** Explicit tenant resolution by slug (jobs, provisioning, fallback). */

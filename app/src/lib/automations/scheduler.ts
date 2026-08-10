@@ -2,8 +2,8 @@ import "server-only";
 
 import { and, asc, eq, gte } from "drizzle-orm";
 
-import { controlDb, getCronState, setCronState } from "@/lib/db/control";
-import { getTenantDbById } from "@/lib/db/tenant";
+import { claimDailyRun, controlDb, getCronState, resetDailyClaim, setCronState } from "@/lib/db/control";
+import { checkpointAllOpenConnections, getTenantDbById } from "@/lib/db/tenant";
 import { automationLog, automationMessages, automationTriggers, clients, tenants } from "@/lib/db/schema";
 import { applyShortcodes, DEFAULT_MESSAGES, isMessageLive, type Channel } from "@/lib/automationModel";
 import { getBusinessProfileForTenant } from "@/lib/businessProfile";
@@ -207,18 +207,37 @@ export function startScheduler(): void {
     const now = new Date();
     if (now.getUTCHours() < 8) return; // send from 08:00 UTC onwards
     const today = now.toISOString().slice(0, 10);
-    if (getCronState("last_daily_run") === today) return;
+    // Atomic claim (Batch 6a, improvement-plan-2026-08.md Theme E4) replaces
+    // the old read-then-write guard: on a single instance this behaves
+    // identically, but it also makes a future 2nd replica safe — only ONE
+    // caller can ever win "last_daily_run" for `today`, so two processes
+    // racing this tick can't both proceed.
+    if (!claimDailyRun("last_daily_run", today)) return;
     running = true;
     try {
       await runDailyAutomations();
-      // Mark the day done ONLY after a clean run. If the container is restarted
-      // mid-run, last_daily_run stays on yesterday, so the next tick re-runs and
-      // finishes the remaining tenants (all automations are idempotent).
-      setCronState("last_daily_run", today);
+      // Claim already marks today done (claimDailyRun wrote it above) — a
+      // SUCCESSFUL run leaves it as-is, same as the old "only setCronState on
+      // success" behaviour.
     } catch (err) {
       console.error("[scheduler] daily run failed; will retry next tick:", err);
+      // Preserve Batch 1's retry-on-failure: release the claim so the next
+      // tick (or, on a future 2nd replica, another instance) retries today
+      // instead of being wrongly skipped by an already-claimed-but-failed day.
+      resetDailyClaim("last_daily_run");
     } finally {
       running = false;
+    }
+
+    // Best-effort daily WAL maintenance (Batch 6a, Theme E5): runs once per
+    // WON claim (i.e. at most once/day per instance), regardless of whether
+    // the automations above succeeded — independent housekeeping, not part
+    // of "the job" that retries on failure. Never called from a request
+    // path (this is the in-process timer tick, not a route handler).
+    try {
+      checkpointAllOpenConnections();
+    } catch (err) {
+      console.error("[scheduler] WAL checkpoint pass failed:", err);
     }
   };
 

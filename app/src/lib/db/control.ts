@@ -36,7 +36,21 @@ function rawControl(): BetterSqlite3 {
   if (_control) return _control;
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   const sqlite = new Database(CONTROL_PATH);
+  // busy_timeout already exceeds the brief's suggested 5000ms floor (Batch 6a,
+  // improvement-plan-2026-08.md Theme E5: "set busy_timeout=5000 if not
+  // already set") — 15000 is MORE forgiving under write contention, so it's
+  // left as-is rather than lowered.
   sqlite.pragma("busy_timeout = 15000");
+  // WAL auto-checkpoint threshold in pages (Batch 6a, Theme E5). This is
+  // SQLite's own default, set explicitly so it's not left to chance across
+  // SQLite builds/versions. Auto-checkpoint (PASSIVE) recycles the WAL's
+  // CONTENTS at this threshold but does NOT shrink the *-wal file back down
+  // on disk — that's what the daily wal_checkpoint(TRUNCATE) pass (see
+  // lib/db/tenant.ts's checkpointAllOpenConnections, called from the daily
+  // scheduler) is for. Safe to set before WAL mode is even enabled — unlike
+  // `journal_mode = WAL` below, this pragma is connection-local state, not an
+  // exclusive-lock file operation, so it doesn't need the build-phase guard.
+  sqlite.pragma("wal_autocheckpoint = 1000");
   // Skip the WAL mode-change during `next build`: its parallel page-data workers
   // open the same fresh DB at once, and switching journal_mode needs exclusive
   // access that can't be waited out → SQLITE_BUSY. WAL is set at runtime, where
@@ -473,6 +487,58 @@ export function setCronState(key: string, value: string): void {
 export function shouldRunToday(lastRunDateUtc: string | null, nowMs: number): boolean {
   const today = new Date(nowMs).toISOString().slice(0, 10);
   return lastRunDateUtc !== today;
+}
+
+/**
+ * Atomically claim a once-a-day job (Batch 6a — improvement-plan-2026-08.md
+ * Theme E4, multi-instance scheduler locks). `shouldRunToday`'s read-then-write
+ * pattern (read cron_state, decide, THEN write cron_state later) is safe for
+ * one process but not two: both replicas' schedulers can read "not run yet"
+ * before either has written today's date, so both proceed — a double backup
+ * upload, a double birthday email pass, a double lapse recompute. This
+ * collapses claim + guard into a single atomic UPDATE so only ONE caller can
+ * ever win `key` for `todayUtc`, even with two processes racing this at the
+ * same instant.
+ *
+ * `INSERT OR IGNORE` first guarantees a row exists to UPDATE — a key with no
+ * row yet (never run before) would otherwise match nothing in the UPDATE's
+ * WHERE clause — WITHOUT clobbering a real value from a prior day (IGNORE
+ * means the insert no-ops if the row already exists). The sentinel `''` can
+ * never equal a real `todayUtc` (`YYYY-MM-DD`), so a brand-new key always
+ * loses to the UPDATE below on its very first claim. Mirrors the shape of
+ * billing's per-invoice atomic claim (`charge_started_at` in
+ * lib/billing/engine.ts's attemptCharge): claim via a conditional UPDATE,
+ * check `changes > 0` to know if you won.
+ *
+ * Only the winner (return value `true`) should run the job. The winner is
+ * responsible for calling `resetDailyClaim(key)` if the job then FAILS, so a
+ * later tick/replica/boot can retry today — see its doc below. A successful
+ * job leaves the claim as-is (today's value already written here) — that IS
+ * "done for today", exactly mirroring Batch 1's "only persist success"
+ * retry-on-failure behaviour, now race-safe across instances too.
+ */
+export function claimDailyRun(key: string, todayUtc: string): boolean {
+  controlSqlite.prepare("INSERT OR IGNORE INTO cron_state (key, value) VALUES (?, '')").run(key);
+  const result = controlSqlite
+    .prepare("UPDATE cron_state SET value = ? WHERE key = ? AND (value IS NULL OR value != ?)")
+    .run(todayUtc, key, todayUtc);
+  return result.changes > 0;
+}
+
+/**
+ * Release a claim previously won via claimDailyRun so a later tick/replica/
+ * boot can retry `key` today — call this when the job FAILS after winning
+ * the claim (see lib/backup/scheduler.ts, lib/pipeline/lapseScheduler.ts,
+ * lib/automations/scheduler.ts). Deletes the row outright rather than
+ * writing a sentinel back: an absent row and a fresh key both mean "never
+ * completed", which is exactly the state a failed run should return to. Do
+ * NOT call this after a successful run — leaving the claim (today's value)
+ * in place is what marks today done; the boot catch-up in each scheduler
+ * still runs a missed day, since a day with no successful claim is
+ * indistinguishable from a day nobody has attempted yet.
+ */
+export function resetDailyClaim(key: string): void {
+  controlSqlite.prepare("DELETE FROM cron_state WHERE key = ?").run(key);
 }
 
 /**

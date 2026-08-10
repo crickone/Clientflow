@@ -35,6 +35,18 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      - name: Build
+        # `build:prod` is plain `next build` (no `extract` prefix — see
+        # package.json / Dockerfile, which uses the same script for the actual
+        # Railway image). Catches webpack/edge-bundle breaks that `tsc` misses
+        # (e.g. a Node-only module like better-sqlite3 getting pulled into the
+        # edge bundle via instrumentation.ts). Runs as its own step (after
+        # typecheck+test) so a failure here is legible and clearly attributed.
+        # GitHub runners have more RAM than Railway's builder — see
+        # next.config.mjs's `typescript.ignoreBuildErrors` comment — so this
+        # should be fine; deploy itself is still `railway up` (unchanged).
+        run: npm run build:prod
+
       - name: Lint
         run: npm run lint
         continue-on-error: true

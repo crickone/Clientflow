@@ -11,6 +11,12 @@ import {
   DeleteObjectsCommand,
 } from "@aws-sdk/client-s3";
 
+// Re-exported for existing callers (lib/backup/scheduler.ts) — the actual
+// env-var presence check now lives in ./config, a dependency-free module
+// (Batch 6a) so the startup env check (lib/env.ts) can reuse it without
+// pulling better-sqlite3/@aws-sdk into instrumentation.ts's edge bundle.
+export { isBackupConfigured } from "./config";
+
 const DATA_DIR = path.join(process.cwd(), "data");
 const KEEP = 14; // retain the most recent N snapshots per database, per target
 
@@ -90,17 +96,6 @@ function makeTargets(): BackupTarget[] {
     makeTarget("S3", "BACKUP_S3_"),
     makeTarget("R2", "BACKUP_R2_"),
   ].filter((t): t is BackupTarget => t !== null);
-}
-
-/**
- * True when at least one backup target is fully configured (i.e. `runBackup()`
- * would actually upload somewhere instead of short-circuiting to
- * `{ok:false, error:"Backup storage not configured"}`). Exported so callers
- * (the nightly scheduler's startup alarm — Batch 1, improvement-plan-2026-08.md
- * A1/A3) can check this without duplicating the env-var gate in `makeTarget`.
- */
-export function isBackupConfigured(): boolean {
-  return makeTargets().length > 0;
 }
 
 /**

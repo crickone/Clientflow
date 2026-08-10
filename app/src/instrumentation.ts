@@ -9,6 +9,12 @@
 // fewest possible dependencies anyway — no DB layer, no boot migration side
 // effects, just fetch + env.
 
+// lib/env.ts is deliberately free of better-sqlite3/@aws-sdk (see its own
+// doc) so this static import is safe to compile into the edge bundle too —
+// logEnvCheck() itself is only ever CALLED below, inside the nodejs-only
+// branch of register().
+import { logEnvCheck } from "./lib/env";
+
 // `register()` is documented as one-time but has been observed firing more than
 // once under `next dev` Fast Refresh; this makes handler installation idempotent.
 let registered = false;
@@ -94,6 +100,18 @@ export function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   if (registered) return;
   registered = true;
+
+  // ── Boot-time env validation (Batch 6a — improvement-plan-2026-08.md Theme
+  // E5) ────────────────────────────────────────────────────────────────────
+  // Loud, grouped log of missing required/recommended env vars — never
+  // throws by design (see lib/env.ts's logEnvCheck doc), but wrapped anyway,
+  // mirroring this file's throw-proof-handler philosophy: nothing called
+  // from register() may ever turn into a boot crash-loop.
+  try {
+    logEnvCheck();
+  } catch (err) {
+    console.error("[env] startup check itself failed unexpectedly:", err);
+  }
 
   // ── Process-level crash guards ──────────────────────────────────────────
   // This app runs as a SINGLE persistent `next start` Node process serving

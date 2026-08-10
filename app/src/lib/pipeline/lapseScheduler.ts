@@ -1,7 +1,7 @@
 import "server-only";
 
 import { recomputeLapsedAllTenants } from "./lapse";
-import { getCronState, setCronState, shouldRunToday } from "@/lib/db/control";
+import { claimDailyRun, resetDailyClaim } from "@/lib/db/control";
 
 let armed = false;
 let running = false; // guards the boot-time catch-up and the 04:00 tick from ever overlapping
@@ -12,30 +12,38 @@ const CRON_KEY = "lapse_last_run";
 /**
  * Run the lapse recompute exactly once per UTC calendar day, whether triggered
  * by the boot-time catch-up or the fixed 04:00 tick (see scheduleDailyLapse
- * below) — mirrors the cron_state date-guard pattern in
- * lib/automations/scheduler.ts. `cron_state` is only written after a clean run
- * (no throw), so a failed attempt stays retryable rather than being silently
- * marked "done" for the day.
+ * below) — via the atomic claimDailyRun (Batch 6a, improvement-plan-2026-08.md
+ * Theme E4; replaces the old read-then-write shouldRunToday/getCronState
+ * guard so a future 2nd replica can't double-run this alongside the boot
+ * catch-up). The claim is only left set after a clean run (no throw); on
+ * failure it's released via resetDailyClaim, so a failed attempt stays
+ * retryable rather than being silently marked "done" for the day.
  */
 function runDailyLapseIfNeeded(): void {
   if (running) return;
   // Review finding #4 (midnight-straddle): captured ONCE per invocation and
-  // reused for both the guard check and the setCronState write below, rather
-  // than re-deriving the date separately at each site (which is how the
-  // sibling bug in lib/backup/scheduler.ts happened — a run straddling UTC
-  // midnight could record a different day than the one the guard checked, so
-  // that day's run then got wrongly skipped). recomputeLapsedAllTenants() is
+  // reused for both the claim and the date derivation below, rather than
+  // re-deriving the date separately at each site (which is how the sibling
+  // bug in lib/backup/scheduler.ts happened — a run straddling UTC midnight
+  // could record a different day than the one the guard checked, so that
+  // day's run then got wrongly skipped). recomputeLapsedAllTenants() is
   // synchronous so the window is negligible here in practice, but the fix
   // mirrors lib/automations/scheduler.ts's `tick` for consistency: compute
   // `today` once, use it everywhere in this invocation.
   const now = Date.now();
-  if (!shouldRunToday(getCronState(CRON_KEY), now)) return;
+  const today = new Date(now).toISOString().slice(0, 10);
+  if (!claimDailyRun(CRON_KEY, today)) return;
   running = true;
   try {
     const r = recomputeLapsedAllTenants();
     console.log("[pipeline] daily lapse:", JSON.stringify(r));
-    setCronState(CRON_KEY, new Date(now).toISOString().slice(0, 10));
+    // Claim already marks today done (claimDailyRun wrote it above).
   } catch (e) {
+    // Preserve Batch 1's retry-on-failure: release the claim so the next
+    // tick/boot (or, on a future 2nd replica, another instance) retries
+    // today instead of being wrongly skipped by an already-claimed-but-
+    // failed day.
+    resetDailyClaim(CRON_KEY);
     console.error("[pipeline] daily lapse failed:", e);
   } finally {
     running = false;

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { runBackup, isBackupConfigured } from "./runBackup";
-import { getCronState, setCronState, shouldRunToday } from "@/lib/db/control";
+import { claimDailyRun, getCronState, resetDailyClaim, setCronState, shouldRunToday } from "@/lib/db/control";
 import { sendPlatformEmail } from "@/lib/billing/emails";
 
 let armed = false;
@@ -75,11 +75,13 @@ async function alertBackupFailure(detail: string, now: number): Promise<void> {
 /**
  * Run the nightly backup exactly once per UTC calendar day, whether triggered
  * by the boot-time catch-up or the fixed 03:00 tick (see scheduleNightlyBackup
- * below) — mirrors the cron_state date-guard pattern in
- * lib/automations/scheduler.ts. `cron_state` is only written on a CLEAN run
- * (ok:true), same as that module's `last_daily_run`/`billing_last_run`: a
- * failed attempt stays retryable by the next boot or tick rather than being
- * silently marked "done" for the day.
+ * below) — via the atomic claimDailyRun (Batch 6a, improvement-plan-2026-08.md
+ * Theme E4; replaces the old read-then-write shouldRunToday/getCronState
+ * guard so a future 2nd replica can't double-run this alongside the boot
+ * catch-up). The claim is only left set after a CLEAN run (ok:true); on
+ * failure it's released via resetDailyClaim — same "only done on success"
+ * behaviour as Batch 1's original guard, still retryable by the next boot or
+ * tick rather than being silently marked "done" for the day.
  */
 async function runNightlyBackupIfNeeded(): Promise<void> {
   if (running) return;
@@ -91,19 +93,26 @@ async function runNightlyBackupIfNeeded(): Promise<void> {
   // recorded day N+1 while the guard above had checked day N, and day N+1's
   // run was then wrongly skipped. Mirrors lib/automations/scheduler.ts's
   // `tick`, which computes its own `today` once and reuses it for both the
-  // guard and the `setCronState` write.
+  // claim and the (now atomic) write.
   const now = Date.now();
-  if (!shouldRunToday(getCronState(CRON_KEY), now)) return;
+  const today = utcDateString(now);
+  if (!claimDailyRun(CRON_KEY, today)) return;
   running = true;
   try {
     const r = await runBackup();
     console.log("[backup] nightly:", JSON.stringify(r));
     if (r.ok) {
-      setCronState(CRON_KEY, utcDateString(now));
+      // Claim already marks today done (claimDailyRun wrote it above).
     } else {
+      // Preserve Batch 1's retry-on-failure: release the claim so the next
+      // tick/boot (or, on a future 2nd replica, another instance) retries
+      // today instead of being wrongly skipped by an already-claimed-but-
+      // failed day.
+      resetDailyClaim(CRON_KEY);
       await alertBackupFailure(r.error ?? "Unknown error (no detail returned)", now);
     }
   } catch (e) {
+    resetDailyClaim(CRON_KEY);
     console.error("[backup] nightly failed:", e);
     await alertBackupFailure(e instanceof Error ? e.message : String(e), now);
   } finally {
