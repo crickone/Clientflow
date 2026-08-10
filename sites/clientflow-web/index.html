@@ -1,0 +1,312 @@
+<style>
+  :root{
+    --graphite:#0F1114; --panel:#0c0e11; --slate:#161A20;
+    --chalk:#E9ECEF; --paper:#E7E9EE; --paper-2:#dfe2e8; --ink:#14171c;
+    --ash:#8B95A1; --ash-dim:#5b636d;
+    --ember:#FF5A1F; --ember-2:#ff7a45; --ember-deep:#B23A12; --good:#7bdca0; --steel:#4c6ef5;
+    --line:rgba(233,236,239,.08); --line-2:rgba(233,236,239,.15);
+    --disp:"Clash Display","Archivo","Helvetica Neue",system-ui,sans-serif;
+    --body:"Satoshi","Inter",system-ui,-apple-system,sans-serif;
+    --mono:"JetBrains Mono","SFMono-Regular",ui-monospace,monospace;
+    --nav-h:66px; --frame:clamp(14px,3vw,30px);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  body{margin:0;background:var(--graphite);color:var(--chalk);font-family:var(--body);-webkit-font-smoothing:antialiased;line-height:1.55;overflow-x:hidden}
+  a{color:inherit;text-decoration:none}.mono{font-family:var(--mono)}.ember{color:var(--ember)}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--ash)}
+  .h2{font-family:var(--disp);font-weight:600;letter-spacing:-.03em;line-height:1.02;font-size:clamp(30px,4.6vw,56px);margin:0}
+  .lead{max-width:60ch;color:var(--ash);font-size:clamp(15px,1.7vw,18px);margin:18px 0 0}
+  .wrap{max-width:1160px;margin:0 auto;padding:0 clamp(20px,5vw,48px)}
+  .skip{position:absolute;left:-999px;top:0;background:var(--ember);color:#140b06;padding:10px 16px;z-index:300;font-family:var(--mono);font-size:13px}.skip:focus{left:0}
+  :focus-visible{outline:2px solid var(--ember);outline-offset:3px;border-radius:4px}
+  .rv{opacity:0;transform:translateY(14px);transition:opacity .7s cubic-bezier(.2,.8,.2,1),transform .7s cubic-bezier(.2,.8,.2,1)}.rv.in{opacity:1;transform:none}
+  @media(prefers-reduced-motion:reduce){.rv{opacity:1!important;transform:none!important;transition:none}}
+
+  /* nav */
+  nav{position:fixed;top:0;left:0;right:0;height:var(--nav-h);z-index:200;display:flex;align-items:center;transition:background .35s,border-color .35s,color .35s;border-bottom:1px solid transparent;color:var(--ink)}
+  nav.solid{background:rgba(13,14,17,.82);backdrop-filter:blur(12px);border-bottom-color:var(--line);color:var(--chalk)}
+  nav .wrap{display:flex;align-items:center;justify-content:space-between;width:100%}
+  .brand{font-family:var(--disp);font-weight:600;font-size:19px;letter-spacing:-.02em;display:flex;align-items:center;gap:9px;color:inherit}
+  .brand .b-dot{width:8px;height:8px;border-radius:2px;background:var(--ember);box-shadow:0 0 0 4px rgba(255,90,31,.14)}
+  .nav-links{display:flex;gap:30px;align-items:center}
+  .nav-links a{font-size:14.5px;color:inherit;opacity:.72;transition:opacity .2s}.nav-links a:hover{opacity:1}
+  .btn{font-family:var(--mono);font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;padding:11px 18px;border-radius:999px;transition:transform .15s,box-shadow .2s;display:inline-flex;align-items:center;gap:8px;cursor:pointer;border:1px solid transparent}
+  .btn-primary{background:var(--ember);color:#140b06;box-shadow:0 8px 30px -10px rgba(255,90,31,.6);opacity:1!important}
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 14px 40px -12px rgba(255,90,31,.75)}
+  .btn-ghost{border-color:currentColor;color:inherit;opacity:.85}.btn-ghost:hover{opacity:1;transform:translateY(-2px)}
+  @media(max-width:860px){.nav-links a:not(.btn){display:none}}
+
+  /* HERO — clean panel that expands on scroll (no device) */
+  .hero{--exp:0;height:150vh;position:relative;background:radial-gradient(80% 60% at 50% 0%,var(--paper),var(--paper-2))}
+  .hero-pin{position:sticky;top:0;height:100vh;padding:calc(var(--nav-h) + (1 - var(--exp))*38px) calc((1 - var(--exp))*var(--frame)) calc((1 - var(--exp))*var(--frame))}
+  .hero-panel{position:relative;height:100%;background:var(--panel);border-radius:calc((1 - var(--exp))*30px);overflow:hidden;display:grid;place-items:center;box-shadow:0 40px 90px -50px rgba(20,23,28,.5)}
+  .aurora{position:absolute;inset:0;z-index:0;overflow:hidden}
+  .blob{position:absolute;border-radius:50%;filter:blur(72px);opacity:.82;mix-blend-mode:screen}
+  .b1{width:62vw;height:62vw;left:22%;top:6%;background:radial-gradient(circle,rgba(255,90,31,.55),transparent 62%);animation:d1 22s ease-in-out infinite}
+  .b2{width:54vw;height:54vw;left:-6%;top:24%;background:radial-gradient(circle,rgba(76,110,245,.4),transparent 60%);animation:d2 27s ease-in-out infinite}
+  .b3{width:46vw;height:46vw;right:-4%;top:0;background:radial-gradient(circle,rgba(178,58,18,.6),transparent 60%);animation:d3 19s ease-in-out infinite}
+  @keyframes d1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-8%,7%) scale(1.12)}}
+  @keyframes d2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(10%,-6%) scale(1.15)}}
+  @keyframes d3{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-6%,9%) scale(1.1)}}
+  @media(prefers-reduced-motion:reduce){.blob{animation:none}}
+  .aurora::after{content:"";position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 30%,transparent 40%,rgba(12,14,17,.5))}
+  .hero-inner{position:relative;z-index:2;text-align:center;padding:0 22px;max-width:920px}
+  .hero-mark{width:34px;height:34px;border-radius:9px;background:var(--ember);margin:0 auto 24px;display:grid;place-items:center;box-shadow:0 0 0 5px rgba(255,90,31,.16)}
+  .hero-mark span{width:12px;height:12px;border-radius:3px;background:#140b06}
+  .hero-eye{display:inline-flex;align-items:center;gap:9px;margin-bottom:24px}
+  .hero-eye .live-dot{width:6px;height:6px;border-radius:50%;background:var(--good);box-shadow:0 0 0 3px rgba(123,220,160,.2);animation:pulse 2.4s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  h1{font-family:var(--disp);font-weight:600;letter-spacing:-.035em;line-height:.94;font-size:clamp(46px,8vw,100px);margin:0;color:var(--chalk)}
+  h1 .l2{color:var(--ash)}
+  .hero-sub{max-width:52ch;margin:26px auto 0;font-size:clamp(16px,1.8vw,20px);color:#c4cad0}
+  .hero-cta{display:flex;gap:14px;margin:34px 0 0;justify-content:center;flex-wrap:wrap}
+  .scrollcue{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);z-index:2;font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--ash);opacity:calc(1 - var(--exp)*3);display:flex;flex-direction:column;align-items:center;gap:8px}
+  .scrollcue .ln{width:1px;height:26px;background:linear-gradient(var(--ash),transparent);animation:cue 1.8s ease-in-out infinite}
+  @keyframes cue{0%,100%{transform:scaleY(.5);opacity:.4;transform-origin:top}50%{transform:scaleY(1);opacity:1;transform-origin:top}}
+
+  /* PRODUCT — pinned device flowing through 6 screens */
+  .product{position:relative;background:linear-gradient(180deg,var(--graphite),#0c0e12)}
+  .product-head{text-align:center;padding:clamp(60px,9vw,100px) 20px 0}
+  .product-pin{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px}
+  .p-caption{text-align:center;min-height:52px}
+  .p-caption .idx{font-family:var(--mono);font-size:11px;color:var(--ember);letter-spacing:.14em}
+  .p-caption .lbl{font-family:var(--disp);font-weight:600;font-size:clamp(19px,2.6vw,26px);letter-spacing:-.02em;margin-top:6px;transition:opacity .3s}
+  .device{width:min(920px,92%);perspective:1800px}
+  .device-frame{background:#15181d;border:1px solid #2a2e36;border-radius:14px;padding:9px;box-shadow:0 50px 110px -40px rgba(0,0,0,.85),0 0 0 1px rgba(255,255,255,.03) inset}
+  .device-bar{display:flex;align-items:center;gap:6px;padding:3px 5px 9px}
+  .device-bar i{width:9px;height:9px;border-radius:50%}
+  .device-bar i:nth-child(1){background:#ff5f57}.device-bar i:nth-child(2){background:#febc2e}.device-bar i:nth-child(3){background:#28c840}
+  .device-bar .url{margin-left:10px;flex:1;height:18px;border-radius:6px;background:rgba(255,255,255,.05);display:flex;align-items:center;padding:0 10px;font-family:var(--mono);font-size:9px;color:var(--ash-dim)}
+  .device-screen{height:clamp(300px,54vh,520px);overflow:hidden;border-radius:8px;background:#0e0f12;position:relative}
+  .reel{display:flex;flex-direction:column;will-change:transform}
+  .screen{height:clamp(300px,54vh,520px);flex:none}
+  .p-dots{display:flex;gap:8px}
+  .p-dots i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.16);transition:background .3s,transform .3s}
+  .p-dots i.on{background:var(--ember);transform:scale(1.3)}
+  .device-glow{position:absolute;inset:auto 0 -10% 0;height:60%;z-index:-1;background:radial-gradient(50% 100% at 50% 100%,rgba(255,90,31,.16),transparent 70%);filter:blur(20px)}
+
+  /* app UI screens (charcoal + orange) */
+  .ui{display:grid;grid-template-columns:58px 1fr;height:100%;background:#0e0f12}
+  .ui-side{background:#121317;border-right:1px solid rgba(255,255,255,.06);padding:14px 0;display:flex;flex-direction:column;align-items:center;gap:15px}
+  .ui-side .logo{width:16px;height:16px;border-radius:5px;background:#ff6a32;box-shadow:0 0 0 3px rgba(255,106,50,.18)}
+  .ui-side .ic{width:18px;height:18px;border-radius:6px;background:rgba(255,255,255,.06)}
+  .ui-side .ic.on{background:rgba(255,106,50,.22);box-shadow:inset 0 0 0 1px rgba(255,106,50,.55)}
+  .ui-main{padding:18px 20px;overflow:hidden}
+  .ui-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}
+  .ui-h .ttl{font-family:var(--disp);font-weight:600;font-size:16px;color:#f4f5f7}
+  .ui-h .cap{font-family:var(--mono);font-size:10px;color:#8b95a1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.06);padding:4px 9px;border-radius:999px}
+  .ui-h .cap b{color:#ff8a5c}
+  .ui-agents{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px}
+  .ui-ag{background:#16181d;border:1px solid rgba(255,255,255,.06);border-radius:9px;padding:11px 12px}
+  .ui-ag .nm{font-family:var(--mono);font-size:9.5px;letter-spacing:.11em;text-transform:uppercase;color:#8b95a1;display:flex;align-items:center;gap:6px}
+  .ui-ag .nm::before{content:"";width:5px;height:5px;border-radius:50%;background:#7bdca0}
+  .ui-ag.warn .nm::before{background:#ff6a32;box-shadow:0 0 0 2px rgba(255,106,50,.2)}
+  .ui-ag .v{font-family:var(--disp);font-weight:600;font-size:21px;color:#f4f5f7;margin-top:7px;letter-spacing:-.02em}
+  .ui-ag .s{font-size:9.5px;color:#59616b;margin-top:2px}
+  .ui-feed{background:#121317;border:1px solid rgba(255,255,255,.06);border-radius:9px;padding:12px 13px}
+  .ui-feed .r{display:flex;gap:9px;align-items:center;padding:7px 0;border-top:1px solid rgba(255,255,255,.05);color:#b9c0c7;font-size:10.5px}
+  .ui-feed .r:first-child{border-top:0}.ui-feed .r .d{width:4px;height:4px;border-radius:50%;background:#ff6a32;flex:none}
+  .ui-feed .r .tm{margin-left:auto;font-family:var(--mono);font-size:9px;color:#59616b}
+  .ui-full{padding:18px 20px;height:100%;background:#0e0f12;overflow:hidden}
+  .ui-full .ttl{font-family:var(--disp);font-weight:600;font-size:16px;color:#f4f5f7;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
+  .ui-full .ttl .cap{font-family:var(--mono);font-size:10px;font-weight:400;color:#8b95a1}
+  .bub{max-width:80%;padding:10px 13px;border-radius:13px;font-size:12px;line-height:1.4;margin-bottom:10px}
+  .bub.me{margin-left:auto;background:#20252c;color:#e9ecef;border-bottom-right-radius:3px}
+  .bub.ai{background:rgba(255,106,50,.12);border:1px solid rgba(255,106,50,.25);color:#f0e3dc;border-bottom-left-radius:3px}
+  .bub .act{margin-top:8px;display:inline-flex;gap:6px;font-family:var(--mono);font-size:9.5px;color:#ff8a5c;border:1px solid rgba(255,106,50,.4);border-radius:6px;padding:4px 9px}
+  .cols{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .col .ch{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#8b95a1;margin-bottom:9px;display:flex;justify-content:space-between}
+  .lc{background:#16181d;border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:9px 10px;margin-bottom:8px}
+  .lc .n2{font-size:11px;color:#e9ecef}.lc .m2{font-family:var(--mono);font-size:8.5px;color:#59616b;margin-top:3px}
+  .lc.hot{border-color:rgba(255,106,50,.4)}
+  .cal{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;height:calc(100% - 34px)}
+  .cal .day{background:#121317;border:1px solid rgba(255,255,255,.05);border-radius:7px;padding:7px 6px}
+  .cal .day .dh{font-family:var(--mono);font-size:8px;color:#59616b;margin-bottom:6px;text-transform:uppercase}
+  .cls{font-size:8.5px;color:#e9ecef;background:rgba(255,106,50,.14);border-left:2px solid #ff6a32;border-radius:4px;padding:4px 5px;margin-bottom:5px;line-height:1.25}
+  .cls.b{background:rgba(76,110,245,.14);border-left-color:#6b8afd}
+  .post{display:flex;gap:11px;align-items:flex-start;background:#16181d;border:1px solid rgba(255,255,255,.06);border-radius:9px;padding:11px 12px;margin-bottom:9px}
+  .post .th{width:40px;height:40px;border-radius:7px;background:linear-gradient(135deg,#ff6a32,#b23a12);flex:none}
+  .post .pt{font-size:11px;color:#e9ecef;line-height:1.35}.post .pm{font-family:var(--mono);font-size:8.5px;color:#59616b;margin-top:5px}
+  .post .st{margin-left:auto;font-family:var(--mono);font-size:8.5px;color:#7bdca0;flex:none}
+  .fin{display:flex;justify-content:space-between;align-items:center;background:#16181d;border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:11px 13px;margin-bottom:8px}
+  .fin .who2{font-size:11px;color:#e9ecef}.fin .sub2{font-family:var(--mono);font-size:8.5px;color:#59616b;margin-top:3px}
+  .fin .amt{font-family:var(--disp);font-weight:600;font-size:14px;color:#f4f5f7}
+  .fin .tag{font-family:var(--mono);font-size:8px;color:#140b06;background:#7bdca0;border-radius:5px;padding:3px 7px;margin-left:10px}
+  .fin .tag.w{background:rgba(255,106,50,.2);color:#ff8a5c}
+
+  /* lower sections */
+  .band{padding:clamp(64px,10vw,120px) 0;position:relative}
+  .sec-eye{display:flex;align-items:center;gap:13px;margin-bottom:22px}
+  .sec-eye .k{font-family:var(--mono);font-size:11px;color:var(--ember);letter-spacing:.1em}
+  .sec-eye .t{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--ash)}
+  .cards{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:44px}@media(max-width:760px){.cards{grid-template-columns:1fr}}
+  .card{border:1px solid var(--line);border-radius:16px;padding:30px 28px;background:linear-gradient(180deg,var(--slate),rgba(22,26,32,.35));transition:transform .25s,border-color .25s}
+  .card:hover{transform:translateY(-4px);border-color:var(--line-2)}
+  .card .idx{font-family:var(--mono);font-size:11px;color:var(--ember);letter-spacing:.1em}
+  .card h3{font-family:var(--disp);font-weight:600;font-size:24px;letter-spacing:-.02em;margin:16px 0 10px}
+  .card p{color:var(--ash);font-size:15px;margin:0 0 16px}
+  .card ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+  .card li{font-size:13.5px;color:#b9c0c7;font-family:var(--mono);display:flex;gap:9px;align-items:flex-start}.card li::before{content:"▸";color:var(--ember);font-size:11px;line-height:1.5}
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:44px}@media(max-width:760px){.steps{grid-template-columns:1fr}}
+  .step{border-top:2px solid var(--ember);padding:24px 4px 0}
+  .step .num{font-family:var(--mono);font-size:11px;color:var(--ember);letter-spacing:.14em}
+  .step h4{font-family:var(--disp);font-weight:600;font-size:21px;letter-spacing:-.02em;margin:12px 0 8px}.step p{color:var(--ash);font-size:14.5px;margin:0}
+  .cta-band{padding:clamp(72px,11vw,128px) 0;text-align:center;position:relative;overflow:hidden}
+  .cta-band::before{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(60% 120% at 50% 120%,rgba(255,90,31,.22),transparent 60%)}
+  .cta-band h2{font-size:clamp(34px,6vw,68px)}.cta-band p{color:var(--ash);max-width:46ch;margin:20px auto 0;font-size:17px}.cta-band .hero-cta{justify-content:center}
+  footer{border-top:1px solid var(--line);padding:44px 0 40px}
+  footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;align-items:center}
+  footer .fmeta{font-family:var(--mono);font-size:12px;color:var(--ash-dim)}
+  footer .flinks{display:flex;gap:22px}footer .flinks a{font-size:13.5px;color:var(--ash)}footer .flinks a:hover{color:var(--chalk)}
+</style>
+
+<a class="skip" href="#product">Skip to content</a>
+<nav id="nav" aria-label="Primary"><div class="wrap">
+  <a class="brand" href="#" aria-label="ClientFlow home"><span class="b-dot" aria-hidden="true"></span>ClientFlow</a>
+  <div class="nav-links"><a href="#product">Product</a><a href="#services">Services</a><a href="#how">How it works</a><a class="btn btn-primary" href="#start">Get started</a></div>
+</div></nav>
+
+<main>
+  <!-- HERO -->
+  <section class="hero" id="hero">
+    <div class="hero-pin"><div class="hero-panel">
+      <div class="aurora" aria-hidden="true"><span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span></div>
+      <div class="hero-inner">
+        <div class="hero-mark" aria-hidden="true"><span></span></div>
+        <div class="hero-eye"><span class="live-dot" aria-hidden="true"></span><span class="eyebrow">The 24/7 operating system for gyms · Ireland</span></div>
+        <h1>Run the gym.<br><span class="l2">Not the admin.</span></h1>
+        <p class="hero-sub">A crew of AI agents that run your sales, marketing, comms and finance around the clock — so you can get back to coaching.</p>
+        <div class="hero-cta"><a class="btn btn-primary" href="#start">Get started <span aria-hidden="true">→</span></a><a class="btn btn-ghost" href="#product">See the product</a></div>
+      </div>
+      <div class="scrollcue" aria-hidden="true"><span>Scroll</span><span class="ln"></span></div>
+    </div></div>
+  </section>
+
+  <!-- PRODUCT: pinned device flowing through 6 screens -->
+  <section class="product" id="product" style="height:340vh">
+    <div class="product-head"><div class="sec-eye rv" style="justify-content:center"><span class="k">▶</span><span class="t">The product</span></div><h2 class="h2 rv">Everything your gym runs on.<br>One screen.</h2></div>
+    <div class="product-pin">
+      <div class="p-caption"><div class="idx" id="pIdx">01 / 06</div><div class="lbl" id="pLbl">The whole operation, one screen</div></div>
+      <div class="device"><div class="device-frame">
+        <div class="device-bar"><i></i><i></i><i></i><span class="url">app.clientflow.ie</span></div>
+        <div class="device-screen"><div class="reel" id="reel">
+          <!-- 1 Agents -->
+          <div class="screen"><div class="ui"><div class="ui-side"><div class="logo"></div><div class="ic on"></div><div class="ic"></div><div class="ic"></div><div class="ic"></div><div class="ic"></div></div><div class="ui-main">
+            <div class="ui-h"><span class="ttl">Agents</span><span class="cap">AI spend&nbsp; <b>€6.40</b> / €25</span></div>
+            <div class="ui-agents"><div class="ui-ag"><span class="nm">Sales</span><span class="v">37</span><span class="s">leads worked today</span></div><div class="ui-ag"><span class="nm">Marketing</span><span class="v">4</span><span class="s">posts scheduled</span></div><div class="ui-ag"><span class="nm">Comms</span><span class="v">19</span><span class="s">messages handled</span></div><div class="ui-ag warn"><span class="nm">Finance</span><span class="v">€1,240</span><span class="s">recovered this week</span></div></div>
+            <div class="ui-feed"><div class="r"><span class="d"></span>Sales · sent first reply to new lead<span class="tm">now</span></div><div class="r"><span class="d"></span>Finance · recovered failed DD €59<span class="tm">2m</span></div><div class="r"><span class="d"></span>Marketing · queued 07:30 post<span class="tm">6m</span></div></div>
+          </div></div></div>
+          <!-- 2 Assistant -->
+          <div class="screen"><div class="ui-full"><div class="ttl">Assistant <span class="cap">Sonnet · €0.02</span></div>
+            <div class="bub me">Who hasn't paid this month?</div>
+            <div class="bub ai">3 members failed a payment: Aoife B. (€59), Mark D. (€49), Sarah K. (€59). Finance retried all three overnight — 2 recovered.<span class="act">Chase the last one →</span></div>
+            <div class="bub me">Draft a win-back for lapsed members</div>
+            <div class="bub ai">Done — 12 lapsed members, a tailored offer each, ready on WhatsApp.<span class="act">Review &amp; send →</span></div>
+          </div></div>
+          <!-- 3 Pipeline -->
+          <div class="screen"><div class="ui-full"><div class="ttl">Sales pipeline <span class="cap">21 open</span></div>
+            <div class="cols">
+              <div class="col"><div class="ch"><span>New</span><span>8</span></div><div class="lc hot"><div class="n2">James O.</div><div class="m2">trial · replied 2m ago</div></div><div class="lc"><div class="n2">Niamh R.</div><div class="m2">web form · new</div></div><div class="lc"><div class="n2">Tom K.</div><div class="m2">DM · new</div></div></div>
+              <div class="col"><div class="ch"><span>Booked</span><span>5</span></div><div class="lc"><div class="n2">Cathal M.</div><div class="m2">tour · Sat 10:00</div></div><div class="lc"><div class="n2">Emma L.</div><div class="m2">trial · Mon 18:00</div></div></div>
+              <div class="col"><div class="ch"><span>Joined</span><span>+3</span></div><div class="lc"><div class="n2">Sean F.</div><div class="m2">€59/mo</div></div><div class="lc"><div class="n2">Orla D.</div><div class="m2">€49/mo</div></div></div>
+            </div>
+          </div></div>
+          <!-- 4 Calendar -->
+          <div class="screen"><div class="ui-full"><div class="ttl">Timetable <span class="cap">This week · 82% full</span></div>
+            <div class="cal">
+              <div class="day"><div class="dh">Mon</div><div class="cls">06:00 HIIT</div><div class="cls b">18:00 Strength</div><div class="cls">19:00 Spin</div></div>
+              <div class="day"><div class="dh">Tue</div><div class="cls b">07:00 Yoga</div><div class="cls">18:00 HIIT</div></div>
+              <div class="day"><div class="dh">Wed</div><div class="cls">06:00 HIIT</div><div class="cls">12:00 Lunch</div><div class="cls b">18:30 Strength</div></div>
+              <div class="day"><div class="dh">Thu</div><div class="cls b">07:00 Spin</div><div class="cls">19:00 Boxing</div></div>
+              <div class="day"><div class="dh">Fri</div><div class="cls">06:00 HIIT</div><div class="cls b">17:30 Open</div></div>
+            </div>
+          </div></div>
+          <!-- 5 Content -->
+          <div class="screen"><div class="ui-full"><div class="ttl">Content Studio <span class="cap">4 scheduled</span></div>
+            <div class="post"><div class="th"></div><div><div class="pt">"3 lifts that fix a weak deadlift" — blog</div><div class="pm">AI draft · SEO ✓</div></div><span class="st">Publishes 09:00</span></div>
+            <div class="post"><div class="th"></div><div><div class="pt">Member win: Aoife's 20kg PR 💪</div><div class="pm">IG + FB carousel</div></div><span class="st">Queued 07:30</span></div>
+            <div class="post"><div class="th"></div><div><div class="pt">New Saturday spin class — book now</div><div class="pm">IG story + email</div></div><span class="st">Queued 17:00</span></div>
+          </div></div>
+          <!-- 6 Finance -->
+          <div class="screen"><div class="ui-full"><div class="ttl">Finance <span class="cap">€1,240 recovered · this week</span></div>
+            <div class="fin"><div><div class="who2">Aoife Brennan</div><div class="sub2">membership · €59.00</div></div><div style="display:flex;align-items:center"><span class="amt">€59</span><span class="tag">Recovered</span></div></div>
+            <div class="fin"><div><div class="who2">Mark Doyle</div><div class="sub2">membership · €49.00</div></div><div style="display:flex;align-items:center"><span class="amt">€49</span><span class="tag">Recovered</span></div></div>
+            <div class="fin"><div><div class="who2">Sarah Kelly</div><div class="sub2">membership · €59.00 · retry 2/3</div></div><div style="display:flex;align-items:center"><span class="amt">€59</span><span class="tag w">Chasing</span></div></div>
+            <div class="fin"><div><div class="who2">Nightly reconciliation</div><div class="sub2">42 payments matched</div></div><div style="display:flex;align-items:center"><span class="tag">Done</span></div></div>
+          </div></div>
+        </div></div>
+        <div class="device-glow" aria-hidden="true"></div>
+      </div></div>
+      <div class="p-dots" id="pDots" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i><i></i><i></i></div>
+    </div>
+  </section>
+
+  <!-- SERVICES -->
+  <section class="band" id="services" style="border-top:1px solid var(--line)">
+    <div class="wrap">
+      <div class="sec-eye rv"><span class="k">01/</span><span class="t">The agents</span></div>
+      <h2 class="h2 rv">Four agents. One operating system.</h2>
+      <p class="lead rv">Not another dashboard to check. A team that does the work — supervised by you, never off the leash.</p>
+      <div class="cards">
+        <div class="card rv"><span class="idx">A/ SALES</span><h3>Fills the schedule</h3><p>Replies to every new lead in seconds, then follows up until they book — across email and WhatsApp.</p><ul><li>Instant first reply to enquiries</li><li>Relentless multi-touch follow-up</li><li>Books tours &amp; trials into your calendar</li></ul></div>
+        <div class="card rv"><span class="idx">B/ MARKETING</span><h3>Keeps you visible</h3><p>Drafts and schedules the posts, writes the blog, asks happy members for reviews — in your gym's voice.</p><ul><li>AI blog + social, on schedule</li><li>Review requests to the right members</li><li>Runs your Marketing Brain</li></ul></div>
+        <div class="card rv"><span class="idx">C/ COMMS</span><h3>Never leaves them waiting</h3><p>Answers member questions, triages the inbox, and re-books no-shows before they churn.</p><ul><li>WhatsApp + email, one inbox</li><li>No-show &amp; re-engagement nudges</li><li>Escalates only what needs you</li></ul></div>
+        <div class="card rv"><span class="idx">D/ FINANCE</span><h3>Guards the cash</h3><p>Chases failed payments, reminds the overdue, and reconciles the takings — plugging the leak most gyms never see.</p><ul><li>Auto-retry failed direct debits</li><li>Dunning on overdue memberships</li><li>Nightly reconciliation</li></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW -->
+  <section class="band" id="how" style="border-top:1px solid var(--line)">
+    <div class="wrap">
+      <div class="sec-eye rv"><span class="k">02/</span><span class="t">How it works</span></div>
+      <h2 class="h2 rv">Live in a day. Then it just runs.</h2>
+      <div class="steps">
+        <div class="step rv"><span class="num">STEP 01</span><h4>Connect</h4><p>We plug ClientFlow into your gym — members, calendar, payments, inbox. White-glove, under a day.</p></div>
+        <div class="step rv"><span class="num">STEP 02</span><h4>It works</h4><p>The agents start — drafting, following up, chasing, posting. You approve the first ones; then set them loose.</p></div>
+        <div class="step rv"><span class="num">STEP 03</span><h4>You coach</h4><p>You walk in to a business that already moved — and spend your day on the floor, not the laptop.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta-band" id="start">
+    <div class="wrap"><h2 class="h2 rv">Run the gym.<br>We'll run the rest.</h2><p class="rv">See ClientFlow run your sales, marketing, comms and finance — book a 20-minute walkthrough.</p><div class="hero-cta rv"><a class="btn btn-primary" href="#">Get started <span aria-hidden="true">→</span></a><a class="btn btn-ghost" href="#">Book a walkthrough</a></div></div>
+  </section>
+</main>
+
+<footer><div class="wrap">
+  <a class="brand" href="#" style="color:var(--chalk)"><span class="b-dot" aria-hidden="true"></span>ClientFlow</a>
+  <div class="flinks"><a href="#product">Product</a><a href="#services">Services</a><a href="#how">How it works</a><a href="#start">Contact</a></div>
+  <span class="fmeta">AI operations for gyms · Ireland</span>
+</div></footer>
+
+<script>
+(function(){
+  var reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var nav=document.getElementById('nav'),hero=document.getElementById('hero'),product=document.getElementById('product'),reel=document.getElementById('reel');
+  var pLbl=document.getElementById('pLbl'),pIdx=document.getElementById('pIdx'),dots=document.getElementById('pDots').children;
+  var LBLS=['The whole operation, one screen','Ask anything. It just does it.','Every lead, worked to a booking','Classes, tours &amp; trials — filled','Posts &amp; blogs, on brand, on time','Failed payments, chased &amp; recovered'];
+  var ticking=false;
+  function frame(){
+    ticking=false;var y=window.scrollY,vh=window.innerHeight;
+    var exp=Math.max(0,Math.min(1,y/(vh*0.8)));
+    hero.style.setProperty('--exp',exp.toFixed(3));
+    nav.classList.toggle('solid',exp>0.4);
+    if(product&&reel){
+      var r=product.getBoundingClientRect();
+      var prog=Math.max(0,Math.min(1,(-r.top)/(r.height-vh)));
+      var n=reel.children.length; // 6
+      // reel scrolls continuously; caption/dots snap to the dominant screen
+      var idx=Math.max(0,Math.min(n-1,Math.round(prog*n)));
+      var screenH=reel.children[0]?reel.children[0].offsetHeight:0;
+      reel.style.transform='translateY('+(-Math.min(prog*n,n-1)*screenH)+'px)';
+      if(pLbl.getAttribute('data-i')!=idx){pLbl.setAttribute('data-i',idx);pLbl.innerHTML=LBLS[idx];pIdx.textContent='0'+(idx+1)+' / 06';for(var i=0;i<dots.length;i++)dots[i].classList.toggle('on',i===idx);}
+    }
+  }
+  function onScroll(){if(!ticking){ticking=true;requestAnimationFrame(frame);}}
+  window.addEventListener('scroll',onScroll,{passive:true});window.addEventListener('resize',frame);frame();
+  if(!reduce&&'IntersectionObserver'in window){var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}});},{threshold:.12,rootMargin:'0px 0px -8% 0px'});document.querySelectorAll('.rv').forEach(function(el){io.observe(el);});}else{document.querySelectorAll('.rv').forEach(function(el){el.classList.add('in');});}
+})();
+</script>
