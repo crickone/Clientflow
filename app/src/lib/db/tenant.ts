@@ -1737,6 +1737,12 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     );
     CREATE INDEX IF NOT EXISTS idx_campaign_sends_campaign ON campaign_sends(campaign_id);
     CREATE INDEX IF NOT EXISTS idx_campaign_sends_msgid ON campaign_sends(provider_message_id);
+    -- Review fix (Task 5): guards against a racing double-send (two
+    -- overlapping runCampaignSend invocations) writing two campaign_sends
+    -- rows — and so double-charging — for the same recipient. send.ts's
+    -- insert uses onConflictDoNothing() against this. Same index name as
+    -- schema.ts's Drizzle mirror — kept in sync.
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_sends_unique ON campaign_sends(campaign_id, contact_id);
   `);
 
   // Batch 6b (improvement-plan-2026-08.md Theme E1): tracking table for the

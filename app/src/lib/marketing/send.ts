@@ -17,7 +17,6 @@ import {
 import { escapeHtml, renderEmailShell, textToParagraphs } from "@/lib/email";
 import { getBusinessProfileForTenant } from "@/lib/businessProfile";
 import { getThemeForTenant } from "@/lib/settings";
-import { getAppBaseUrl } from "@/lib/appUrl";
 
 /**
  * The send pipeline (Task 5) — ties together every earlier task into the
@@ -76,6 +75,20 @@ export function sanitizeHeader(s: string): string {
 function domainPart(email: string): string {
   const at = email.lastIndexOf("@");
   return at === -1 ? "" : email.slice(at + 1).toLowerCase();
+}
+
+/**
+ * True if a base URL points at localhost — used by precheckCampaign's
+ * production guard below. getAppBaseUrl() (lib/appUrl.ts) falls back to
+ * `http://localhost:3000` whenever APP_URL/NEXT_PUBLIC_APP_URL is unset AND
+ * there's no request to derive a forwarded host from — exactly the position
+ * runCampaignSend's DETACHED continuation is in, which is why that function
+ * never calls getAppBaseUrl() itself and instead takes baseUrl as a
+ * parameter computed in-request by sendCampaignAction (see the review-fix
+ * doc comments on precheckCampaign and runCampaignSend below).
+ */
+function isLocalhostUrl(baseUrl: string): boolean {
+  return /localhost/i.test(baseUrl);
 }
 
 /**
@@ -188,7 +201,11 @@ export type PrecheckResult =
  * read — never mutates anything, safe to call speculatively (e.g. to render
  * a cost preview) as well as right before sending.
  */
-export async function precheckCampaign(tenantId: number, campaignId: number): Promise<PrecheckResult> {
+export async function precheckCampaign(
+  tenantId: number,
+  campaignId: number,
+  baseUrl: string,
+): Promise<PrecheckResult> {
   try {
     const tdb = getTenantDbById(tenantId);
     const campaign = getCampaignRow(tdb, campaignId);
@@ -210,6 +227,18 @@ export async function precheckCampaign(tenantId: number, campaignId: number): Pr
 
     if (!process.env.EMAIL_TOKEN_SECRET) {
       return { ok: false, error: "Email sending isn't fully configured (missing EMAIL_TOKEN_SECRET)." };
+    }
+
+    // Review fix — belt-and-suspenders for the compliance-critical
+    // unsubscribe links the (detached) send builds: `baseUrl` is computed
+    // ONCE, in-request, by sendCampaignAction and reused for both this check
+    // and the actual send (runCampaignSend takes the identical value as a
+    // required parameter — see its doc comment below). In production, a
+    // localhost base means APP_URL/NEXT_PUBLIC_APP_URL isn't configured and
+    // there was no request to derive a host from — fail loudly here rather
+    // than silently shipping broken List-Unsubscribe/footer links.
+    if (process.env.NODE_ENV === "production" && isLocalhostUrl(baseUrl)) {
+      return { ok: false, error: "APP_URL not configured — cannot build unsubscribe links." };
     }
 
     const audience = parseAudienceStrict(campaign.audience);
@@ -341,6 +370,16 @@ export interface RunCampaignSendOpts {
  * getThemeForTenant) are already tenant-explicit regardless, so this stays
  * correct even without that wrapper.
  *
+ * `baseUrl` is REQUIRED and must be computed in-request by the caller
+ * (sendCampaignAction calls getAppBaseUrl() before kicking this off) — this
+ * function must NEVER call getAppBaseUrl() itself. It runs as a DETACHED
+ * continuation with no request scope, so getAppBaseUrl() can't read a
+ * forwarded host there and would silently fall back to
+ * `http://localhost:3000` whenever APP_URL/NEXT_PUBLIC_APP_URL is unset —
+ * shipping broken List-Unsubscribe/footer links in production. See
+ * precheckCampaign's matching production guard above for the "fail loudly
+ * instead" half of this fix.
+ *
  * NEVER throws to the caller — the whole body is wrapped in try/catch; any
  * unexpected failure marks the campaign 'failed' (best-effort) and logs,
  * rather than propagating into the detached continuation's void Promise
@@ -349,6 +388,7 @@ export interface RunCampaignSendOpts {
 export async function runCampaignSend(
   tenantId: number,
   campaignId: number,
+  baseUrl: string,
   opts: RunCampaignSendOpts = {},
 ): Promise<void> {
   try {
@@ -384,7 +424,6 @@ export async function runCampaignSend(
     const theme = getThemeForTenant(tenantId);
     const businessName = profile.businessName || "Our business";
     const fromName = sanitizeHeader(campaign.fromName);
-    const baseUrl = getAppBaseUrl();
 
     let cursor = campaign.cursor;
 
@@ -421,6 +460,17 @@ export async function runCampaignSend(
           bodyHtml,
           footer,
         });
+        // Plain-text part (review fix — deliverability): campaign.bodyHtml
+        // actually stores the RAW plain-text/light-markup body (see its
+        // column comment in db/schema.ts — it's wrapped via
+        // textToParagraphs -> renderEmailShell above only for the html
+        // part), so it doubles as the text part's content as-is, no
+        // escaping needed. Includes its own plain-text unsubscribe line so
+        // the compliance-critical unsubscribe mechanism isn't html-only.
+        const text =
+          `${campaign.bodyHtml}\n\n` +
+          `${businessName}${profile.location ? ` — ${profile.location}` : ""}\n` +
+          `Unsubscribe: ${unsubUrl}`;
 
         let res: CampaignSendResult;
         try {
@@ -432,6 +482,7 @@ export async function runCampaignSend(
               toName: contact.name ?? undefined,
               subject: campaign.subject,
               html,
+              text,
               headers: {
                 "List-Unsubscribe": `<${unsubUrl}>`,
                 "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
@@ -448,7 +499,17 @@ export async function runCampaignSend(
           res = { ok: false, error: err instanceof Error ? err.message : "Unexpected send error." };
         }
 
-        tdb
+        // Review fix — onConflictDoNothing: idx_campaign_sends_unique
+        // (UNIQUE(campaign_id, contact_id); see schema.ts + tenant.ts's
+        // ensureTenantTables) turns a racing duplicate write (e.g. two
+        // overlapping runCampaignSend invocations that both passed the
+        // resolveEligibleRecipients pre-filter above before either had
+        // inserted) into a DB no-op instead of a second row. `changes === 0`
+        // means THIS call's insert lost the race — a send record for this
+        // contact already exists — so this contact must NOT be (re-)counted
+        // into sentInBatch below, or it would be charged twice for one
+        // email actually sent once.
+        const insertResult = tdb
           .insert(campaignSends)
           .values({
             campaignId,
@@ -458,9 +519,10 @@ export async function runCampaignSend(
             status: res.ok ? "sent" : "failed",
             error: res.ok ? null : res.error,
           })
+          .onConflictDoNothing()
           .run();
 
-        if (res.ok) sentInBatch++;
+        if (res.ok && insertResult.changes > 0) sentInBatch++;
         cursor++;
       }
 

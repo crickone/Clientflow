@@ -1127,6 +1127,13 @@ export const campaignSends = sqliteTable(
   (t) => ({
     byCampaign: index("idx_campaign_sends_campaign").on(t.campaignId),
     byMsgId: index("idx_campaign_sends_msgid").on(t.providerMessageId),
+    // Review fix (Task 5): turns a racing double-send (two overlapping
+    // runCampaignSend invocations both passing the resolveEligibleRecipients
+    // pre-filter before either has inserted) into a DB no-op instead of a
+    // duplicate send+charge — see send.ts's onConflictDoNothing insert.
+    // Same index name as the CREATE UNIQUE INDEX in tenant.ts's
+    // ensureTenantTables — kept in sync.
+    campaignContactUnique: uniqueIndex("idx_campaign_sends_unique").on(t.campaignId, t.contactId),
   }),
 );
 

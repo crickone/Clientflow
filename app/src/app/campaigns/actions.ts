@@ -12,6 +12,7 @@ import {
 } from "@/lib/marketing/campaigns";
 import { markCampaignSending, precheckCampaign, runCampaignSend } from "@/lib/marketing/send";
 import { runWithTenant } from "@/lib/db/tenant";
+import { getAppBaseUrl } from "@/lib/appUrl";
 import { draftCampaignEmail } from "@/lib/ai/draftCampaign";
 import { MODELS } from "@/lib/ai/client";
 import { assertUnderCap, recordUsage } from "@/lib/ai/usage";
@@ -187,12 +188,21 @@ export type SendCampaignActionResult = { ok: true } | { ok: false; error: string
  * immediately; the send survives because Railway runs this app as a
  * persistent `next start` process, not serverless). Credits are metered
  * per BATCH inside runCampaignSend itself, never all-up-front here.
+ *
+ * Review fix: `baseUrl` is computed ONCE here, IN-REQUEST (this action runs
+ * inside the request, so getAppBaseUrl() can read the forwarded host), and
+ * reused for both precheckCampaign's production-localhost guard and the
+ * detached runCampaignSend call — neither of which may ever compute it
+ * themselves (runCampaignSend has no request scope once detached; see
+ * send.ts's doc comments on both functions for why that would silently ship
+ * broken unsubscribe links in production).
  */
 export async function sendCampaignAction(id: number): Promise<SendCampaignActionResult> {
   await requireAdmin();
   const tid = tenantId();
+  const baseUrl = getAppBaseUrl();
 
-  const pre = await precheckCampaign(tid, id);
+  const pre = await precheckCampaign(tid, id, baseUrl);
   if (!pre.ok) return pre;
 
   const marked = markCampaignSending(tid, id);
@@ -203,7 +213,7 @@ export async function sendCampaignAction(id: number): Promise<SendCampaignAction
   revalidatePath("/campaigns");
 
   // Fire-and-forget: intentionally not awaited. See the doc comment above.
-  void runWithTenant(tid, () => runCampaignSend(tid, id));
+  void runWithTenant(tid, () => runCampaignSend(tid, id, baseUrl));
 
   return { ok: true };
 }
