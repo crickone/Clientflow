@@ -644,6 +644,39 @@ export const apiKeys = sqliteTable("api_keys", {
 export type ApiKey = typeof apiKeys.$inferSelect;
 export type NewApiKey = typeof apiKeys.$inferInsert;
 
+// Control-plane: append-only ledger of email-credit balance changes (grants,
+// spends, adjustments, auto-topups) for the GHL-style email marketing add-on
+// (Task 1 — credit ledger + pricing; see lib/email/credits.ts). Every write
+// happens inside the SAME controlSqlite transaction as the email_credits
+// balance mutation it records, with balance_after_cents set to the resulting
+// balance — so replaying rows in id order always reconstructs a consistent
+// balance history. No FK on tenant_id (mirrors email_credits, both intentionally
+// unscoped by tenant lifecycle so the money trail outlives offboarding). Has a
+// Drizzle def (unlike email_credits, which stays raw-SQL/tenant_billing style)
+// because this table is queried richly — credits.ts itself still reads/writes
+// it via controlSqlite directly, matching ai/usage.ts's + apiKeys.ts's style.
+export const emailCreditLedger = sqliteTable(
+  "email_credit_ledger",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    tenantId: integer("tenant_id").notNull(),
+    deltaCents: integer("delta_cents").notNull(),
+    reason: text("reason").notNull(), // 'topup' | 'send' | 'adjustment' | 'refund' | 'auto_topup'
+    campaignId: integer("campaign_id"),
+    balanceAfterCents: integer("balance_after_cents").notNull(),
+    note: text("note"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => ({
+    tenantIdx: index("idx_email_credit_ledger_tenant").on(t.tenantId, t.createdAt),
+  }),
+);
+
+export type EmailCreditLedgerEntry = typeof emailCreditLedger.$inferSelect;
+export type NewEmailCreditLedgerEntry = typeof emailCreditLedger.$inferInsert;
+
 export type ClientCredential = typeof clientCredentials.$inferSelect;
 export type ClientSession = typeof clientSessions.$inferSelect;
 

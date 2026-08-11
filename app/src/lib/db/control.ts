@@ -430,6 +430,38 @@ export function ensureControlTables() {
       cap_cents  INTEGER NOT NULL,
       updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
+
+    -- ── Email marketing credits (GHL-style add-on, Task 1: ledger + pricing) ──
+    -- One sparse row per tenant that has ever had a balance or auto-topup
+    -- config touched (mirrors tenant_ai_cap's sparse-override shape): a tenant
+    -- with no row yet reads as balance 0 / auto-topup disabled — see
+    -- getEmailBalanceCents/getAutoTopup in @/lib/email/credits. Every write to
+    -- balance_cents happens inside a controlSqlite.transaction() alongside the
+    -- matching email_credit_ledger row (grantCredits/recordCreditSpend) so the
+    -- two can never drift apart, even under concurrent sends.
+    CREATE TABLE IF NOT EXISTS email_credits (
+      tenant_id INTEGER PRIMARY KEY,
+      balance_cents INTEGER NOT NULL DEFAULT 0,
+      auto_topup_enabled INTEGER NOT NULL DEFAULT 0,
+      auto_topup_threshold_cents INTEGER NOT NULL DEFAULT 0,
+      auto_topup_amount_cents INTEGER NOT NULL DEFAULT 0,
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+
+    -- Append-only audit trail of every email_credits.balance_cents change —
+    -- see the Drizzle def (emailCreditLedger) in ./schema.ts for the fuller
+    -- rationale (why no FK, why balance_after_cents is authoritative).
+    CREATE TABLE IF NOT EXISTS email_credit_ledger (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id INTEGER NOT NULL,
+      delta_cents INTEGER NOT NULL,
+      reason TEXT NOT NULL,          -- 'topup'|'send'|'adjustment'|'refund'|'auto_topup'
+      campaign_id INTEGER,
+      balance_after_cents INTEGER NOT NULL,
+      note TEXT,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_email_credit_ledger_tenant ON email_credit_ledger(tenant_id, created_at);
   `);
 
   // Existing control DBs predate auth_sessions.active_tenant_id; the CREATE above
