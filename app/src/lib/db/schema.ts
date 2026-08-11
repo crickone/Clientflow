@@ -1016,6 +1016,35 @@ export type NewContact = typeof contacts.$inferInsert;
 export type Suppression = typeof suppressions.$inferSelect;
 export type NewSuppression = typeof suppressions.$inferInsert;
 
+// Email marketing (Task 3 — CampaignSender adapter + Mailgun + sending-domain
+// connect; see lib/marketing/sender/ + lib/marketing/domains.ts). One row =
+// the tenant's one active sending domain. "One per tenant" is enforced at the
+// application layer (domains.ts's connectDomain: update-if-exists, else
+// insert) rather than a DB constraint — unlike gmail_connections/
+// imap_connections (control-plane, UNIQUE(tenant_id)), this table lives
+// INSIDE the tenant's own db file, so there's no tenant_id column to hang a
+// uniqueness constraint off; the file itself is already the tenant scope.
+// dns_records is the provider's returned sending DNS records (SPF/DKIM/
+// tracking CNAME), JSON-stringified verbatim so the UI can render exactly
+// what it asked the tenant to publish. Matches the CREATE TABLE already in
+// ensureTenantTables (lib/db/tenant.ts).
+export const sendingDomains = sqliteTable("sending_domains", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  domain: text("domain").notNull(),
+  mailgunDomainId: text("mailgun_domain_id"),
+  state: text("state", { enum: ["unverified", "verified", "failed"] })
+    .notNull()
+    .default("unverified"),
+  dnsRecords: text("dns_records"), // JSON string: {type,name,value}[]
+  verifiedAt: integer("verified_at", { mode: "timestamp_ms" }),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
+export type SendingDomain = typeof sendingDomains.$inferSelect;
+export type NewSendingDomain = typeof sendingDomains.$inferInsert;
+
 // ============ CMS (multi-site) — tenant plane ============
 
 export const sites = sqliteTable("sites", {

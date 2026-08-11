@@ -1676,6 +1676,27 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_suppressions_email ON suppressions(lower(email));
   `);
 
+  // Email marketing (Task 3 — CampaignSender adapter + Mailgun + sending-
+  // domain connect; see lib/marketing/sender/ + lib/marketing/domains.ts).
+  // One row = the tenant's one active sending domain — "one per tenant" is
+  // enforced at the application layer (domains.ts's connectDomain: update-
+  // if-exists, else insert), not a DB constraint: this table has no
+  // tenant_id column at all (it lives inside the tenant's OWN db file, so
+  // the file itself is already the tenant scope, unlike the control-plane
+  // gmail_connections/imap_connections tables). Drizzle mirror in
+  // schema.ts — same shape, kept in sync.
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS sending_domains (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      domain TEXT NOT NULL,
+      mailgun_domain_id TEXT,
+      state TEXT NOT NULL DEFAULT 'unverified', -- unverified|verified|failed
+      dns_records TEXT,                          -- JSON {type,name,value}[]
+      verified_at INTEGER,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+  `);
+
   // Batch 6b (improvement-plan-2026-08.md Theme E1): tracking table for the
   // versioned migration runner (./migrations) — separate from everything
   // above, which is the additive bootstrap. Created here too (in addition to
