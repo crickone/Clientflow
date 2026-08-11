@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, ChevronDown, Mail, Plug, Unplug } from "lucide-react";
+import { CheckCircle2, ChevronDown, Mail, Plug, ShieldCheck, Unplug } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
@@ -344,7 +344,48 @@ export function ImapConnectCard({
           </div>
         </form>
       )}
+
+      <DeliverabilityNote />
     </Card>
+  );
+}
+
+/** Standing reminder: shared-mailbox deliverability hinges on domain auth. Shown
+ *  in both connected and not-connected states — it's about the domain's DNS,
+ *  not the connection itself. Steps live in cPanel's Email Deliverability tool. */
+function DeliverabilityNote() {
+  return (
+    <div
+      style={{
+        border: "1px solid var(--hairline)",
+        borderRadius: "var(--radius)",
+        padding: "12px 14px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          fontSize: 12.5,
+          fontWeight: 600,
+          color: "var(--text-primary)",
+        }}
+      >
+        <ShieldCheck size={14} strokeWidth={1.75} />
+        Deliverability — set this up so email doesn&apos;t land in spam
+      </div>
+      <div style={{ fontSize: 12, color: "var(--text-tertiary)", lineHeight: 1.55 }}>
+        A shared mailbox reaches the inbox reliably only when the domain is authenticated. In your
+        hosting&apos;s <strong>cPanel → Email Deliverability</strong>, get <strong>SPF</strong>,{" "}
+        <strong>DKIM</strong> and <strong>DMARC</strong> all showing green — most hosts have a one-click{" "}
+        <strong>Repair</strong>. Ideal for 1-to-1 client email; for large marketing blasts use a dedicated
+        sending service instead.
+      </div>
+    </div>
   );
 }
 
