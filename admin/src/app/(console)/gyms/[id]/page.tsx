@@ -8,7 +8,7 @@ import { ConfirmButton } from "@/components/ConfirmButton";
 import { OpenBusinessButton } from "@/components/OpenBusinessButton";
 import { Card } from "@/components/ui/Card";
 import type { InvoiceRow, TenantDetail } from "@/lib/types";
-import { tenantAction, openTenant } from "./actions";
+import { tenantAction, openTenant, grantCreditsAction } from "./actions";
 
 /** Invoice statuses are a different vocabulary from billing statuses, so they
  *  don't reuse the `.chip.<status>` CSS — colour them inline instead. */
@@ -29,7 +29,13 @@ function InvoiceChip({ status }: { status: InvoiceRow["status"] }) {
   );
 }
 
-export default async function GymDetailPage({ params }: { params: { id: string } }) {
+export default async function GymDetailPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams: { error?: string; granted?: string };
+}) {
   const id = Number(params.id);
   let data: TenantDetail;
   try {
@@ -187,6 +193,86 @@ export default async function GymDetailPage({ params }: { params: { id: string }
         <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>
           Drives this business&apos;s own app vocabulary and scheduling mode (Clients/Appointments vs Members/Classes).
         </p>
+      </Card>
+
+      {/* Email marketing */}
+      <Card style={{ padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
+        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>Email marketing</h2>
+        <div style={{ display: "flex", gap: 40, flexWrap: "wrap" }}>
+          <div>
+            <div className="mono-label" style={{ marginBottom: 6 }}>
+              Credit balance
+            </div>
+            <div style={{ fontSize: 14 }}>{fmtCents(data.emailBalanceCents)}</div>
+          </div>
+          <div>
+            <div className="mono-label" style={{ marginBottom: 6 }}>
+              Auto top-up
+            </div>
+            <div style={{ fontSize: 14 }}>
+              {data.autoTopup.enabled
+                ? `On — tops up ${fmtCents(data.autoTopup.amountCents)} below ${fmtCents(data.autoTopup.thresholdCents)}`
+                : "Off"}
+            </div>
+          </div>
+          <div>
+            <div className="mono-label" style={{ marginBottom: 6 }}>
+              Status
+            </div>
+            <span className={`chip ${data.marketingSuspended ? "suspended" : "active"}`}>
+              {data.marketingSuspended ? "suspended" : "active"}
+            </span>
+          </div>
+        </div>
+
+        <form
+          action={grantCreditsAction.bind(null, tenant.id)}
+          style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}
+        >
+          <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Grant credits (EUR)</span>
+            <input
+              className="input"
+              type="number"
+              step="0.01"
+              min="0.01"
+              max="10000"
+              name="euros"
+              placeholder="50.00"
+              required
+              style={{ width: 140 }}
+            />
+          </label>
+          <button className="btn btn--primary btn--sm" type="submit">
+            Grant
+          </button>
+        </form>
+
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {data.marketingSuspended ? (
+            <ConfirmButton
+              label="Resume marketing"
+              confirm="Resume email marketing for this business? Campaigns can be sent again."
+              action={tenantAction.bind(null, tenant.id, "resume-marketing", {})}
+            />
+          ) : (
+            <ConfirmButton
+              label="Suspend marketing"
+              danger
+              confirm="Suspend email marketing for this business? No campaigns can be sent until resumed."
+              action={tenantAction.bind(null, tenant.id, "suspend-marketing", {})}
+            />
+          )}
+        </div>
+
+        {searchParams.error && (
+          <p role="alert" style={{ margin: 0, color: "var(--red)", fontSize: 13 }}>
+            {searchParams.error}
+          </p>
+        )}
+        {searchParams.granted && !searchParams.error && (
+          <p style={{ margin: 0, color: "var(--green)", fontSize: 13 }}>Credits granted.</p>
+        )}
       </Card>
 
       {/* Invoices */}

@@ -12,6 +12,7 @@ import {
   assertCreditsAvailable,
   costForRecipients,
   getEmailBalanceCents,
+  isMarketingSuspended,
   recordCreditSpend,
 } from "@/lib/email/credits";
 import { escapeHtml, renderEmailShell, textToParagraphs } from "@/lib/email";
@@ -195,11 +196,12 @@ export type PrecheckResult =
 
 /**
  * Everything the "Send" button must verify BEFORE anything is committed:
- * draft status, a verified sending domain the from-address actually lives
- * on, a recognized (fail-closed) audience shape, at least one eligible
- * recipient, and enough balance to cover them all at today's price. Pure
- * read — never mutates anything, safe to call speculatively (e.g. to render
- * a cost preview) as well as right before sending.
+ * the tenant's marketing isn't platform-suspended, draft status, a verified
+ * sending domain the from-address actually lives on, a recognized
+ * (fail-closed) audience shape, at least one eligible recipient, and enough
+ * balance to cover them all at today's price. Pure read — never mutates
+ * anything, safe to call speculatively (e.g. to render a cost preview) as
+ * well as right before sending.
  */
 export async function precheckCampaign(
   tenantId: number,
@@ -207,6 +209,14 @@ export async function precheckCampaign(
   baseUrl: string,
 ): Promise<PrecheckResult> {
   try {
+    // Account-level compliance/abuse gate (Task 8), checked FIRST and before
+    // any tenant-DB work: a platform admin can suspend a tenant's marketing
+    // independent of credit balance. Fails closed — reads only the control
+    // DB, so this can never be bypassed by a tenant-DB-side inconsistency.
+    if (isMarketingSuspended(tenantId)) {
+      return { ok: false, error: "Email marketing is suspended for this account. Contact support to resolve." };
+    }
+
     const tdb = getTenantDbById(tenantId);
     const campaign = getCampaignRow(tdb, campaignId);
     if (!campaign) return { ok: false, error: "Campaign not found." };
@@ -429,6 +439,16 @@ export async function runCampaignSend(
 
     for (let start = 0; start < recipients.length; start += BATCH_SIZE) {
       const batch = recipients.slice(start, start + BATCH_SIZE);
+
+      // Task 8 belt-and-suspenders: re-checked every batch, same reasoning as
+      // the credits re-check right below — a platform admin can suspend
+      // marketing (abuse/compliance) while a large campaign is already mid-
+      // send; this stops it before the next batch goes out instead of only
+      // blocking NEW sends via precheckCampaign's up-front gate.
+      if (isMarketingSuspended(tenantId)) {
+        pauseCampaign(tdb, campaignId, "Paused: marketing was suspended for this account mid-send.");
+        return;
+      }
 
       // Never send a batch we can't pay for — re-checked every batch (not
       // just once up-front) so a campaign that runs the balance dry mid-send

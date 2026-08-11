@@ -1,5 +1,6 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 import { api, ApiError } from "@/lib/api";
@@ -14,6 +15,9 @@ export type TenantActionName =
   | "waive"
   | "comp"
   | "venue-type"
+  | "grant-credits"
+  | "suspend-marketing"
+  | "resume-marketing"
   | "offboard";
 
 /**
@@ -60,4 +64,32 @@ export async function openTenant(
   } catch (err) {
     return { ok: false, error: err instanceof ApiError ? err.message : "Action failed" };
   }
+}
+
+/**
+ * Grant email-marketing credits to a tenant — the console's first free-
+ * numeric-input action (every other tenant action is a `ConfirmButton` with
+ * fixed, pre-bound params). Bound as `grantCreditsAction.bind(null, tenant.id)`
+ * so it drops straight into a `<form action={…}>` (the FormData becomes the
+ * action's final argument), same idiom as settings/actions.ts's
+ * `saveSettings`: parse the €-amount, convert to cents, call the tenant
+ * action funnel (`POST /tenants/:id/grant-credits`), and surface feedback via
+ * `?error=…` / `?granted=1` on the gym-detail page's own searchParams rather
+ * than inline state (this isn't a client component).
+ */
+export async function grantCreditsAction(id: number, formData: FormData): Promise<void> {
+  const eurosRaw = String(formData.get("euros") ?? "");
+  const euros = parseFloat(eurosRaw);
+
+  if (!Number.isFinite(euros) || euros <= 0) {
+    redirect(`/gyms/${id}?error=${encodeURIComponent("Enter a valid, positive credit amount.")}`);
+  }
+
+  const cents = Math.round(euros * 100);
+  const r = await tenantAction(id, "grant-credits", { cents });
+  if (!r.ok) {
+    redirect(`/gyms/${id}?error=${encodeURIComponent(r.error ?? "Failed to grant credits.")}`);
+  }
+
+  redirect(`/gyms/${id}?granted=1`);
 }

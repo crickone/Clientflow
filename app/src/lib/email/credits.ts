@@ -166,6 +166,42 @@ export function setAutoTopup(tenantId: number, cfg: AutoTopupConfig): void {
     .run(tenantId, enabled ? 1 : 0, thresholdCents, amountCents);
 }
 
+/**
+ * True if a platform admin has suspended this tenant's marketing (abuse/
+ * compliance kill switch — independent of balance/auto-topup). Sparse row: a
+ * tenant that's never been suspended has no row and reads as false. Checked
+ * by `precheckCampaign` (@/lib/marketing/send.ts), which fails closed.
+ */
+export function isMarketingSuspended(tenantId: number): boolean {
+  const row = controlSqlite
+    .prepare("SELECT marketing_suspended FROM email_credits WHERE tenant_id = ?")
+    .get(tenantId) as { marketing_suspended: number } | undefined;
+  return !!row?.marketing_suspended;
+}
+
+/**
+ * Admin-only setter — upserts WITHOUT touching balance_cents, same shape as
+ * `setAutoTopup` (config-only write, no ledger row, so it doesn't need the
+ * balance-mutation transaction treatment). `actor` is accepted (not stored —
+ * this table has no ledger/note column to carry it, unlike
+ * grantCredits/recordCreditSpend) purely so the call site reads as an
+ * audited admin action; the actual audit trail is the CALLER's job — the
+ * platform route logs it via `logEvent` (billing_events), same division of
+ * responsibility as `grant-credits`.
+ */
+export function setMarketingSuspended(tenantId: number, suspended: boolean, actor: string): void {
+  void actor;
+  controlSqlite
+    .prepare(
+      `INSERT INTO email_credits (tenant_id, marketing_suspended, updated_at)
+       VALUES (?, ?, unixepoch() * 1000)
+       ON CONFLICT(tenant_id) DO UPDATE SET
+         marketing_suspended = excluded.marketing_suspended,
+         updated_at = excluded.updated_at`,
+    )
+    .run(tenantId, suspended ? 1 : 0);
+}
+
 export interface LedgerRow {
   id: number;
   tenantId: number;

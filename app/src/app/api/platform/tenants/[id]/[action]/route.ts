@@ -16,6 +16,7 @@ import {
   waiveInvoice,
   logEvent,
 } from "@/lib/billing/engine";
+import { grantCredits, setMarketingSuspended } from "@/lib/email/credits";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +69,24 @@ export async function POST(
         setTenantVenueType(id, b.venueType);
         break;
       }
+      case "grant-credits": {
+        // Positive + capped (max €10,000 in one grant) so a fat-fingered
+        // amount can't silently hand out an unbounded balance.
+        const b = z
+          .object({ cents: z.number().int().positive().max(1_000_000) })
+          .parse(await req.json());
+        grantCredits(id, b.cents, actor);
+        logEvent(id, "email_credits_granted", { cents: b.cents }, actor);
+        break;
+      }
+      case "suspend-marketing":
+        setMarketingSuspended(id, true, actor);
+        logEvent(id, "marketing_suspended", null, actor);
+        break;
+      case "resume-marketing":
+        setMarketingSuspended(id, false, actor);
+        logEvent(id, "marketing_resumed", null, actor);
+        break;
       case "open": {
         // "Open business": grant the PLATFORM ADMIN'S OWN identity (g.userId —
         // never a fake/owner user) a real, idempotent admin membership in this

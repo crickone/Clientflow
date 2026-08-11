@@ -439,12 +439,23 @@ export function ensureControlTables() {
     -- balance_cents happens inside a controlSqlite.transaction() alongside the
     -- matching email_credit_ledger row (grantCredits/recordCreditSpend) so the
     -- two can never drift apart, even under concurrent sends.
+    -- marketing_suspended (Task 8): a platform-admin kill switch, independent
+    -- of balance/auto-topup — set via the admin console's Suspend/Resume
+    -- marketing buttons, enforced fail-closed by precheckCampaign
+    -- (@/lib/marketing/send.ts) before a campaign can be sent. Column is safe
+    -- to declare straight in this CREATE — nothing has been deployed to
+    -- PRODUCTION yet — but any dev/test control.db that already ran
+    -- ensureControlTables() under Tasks 1-7 has this table WITHOUT the
+    -- column, since CREATE TABLE IF NOT EXISTS is then a no-op; see the
+    -- PRAGMA-guarded ALTER TABLE further down (mirroring the other
+    -- column-add migrations in this function) that backfills those.
     CREATE TABLE IF NOT EXISTS email_credits (
       tenant_id INTEGER PRIMARY KEY,
       balance_cents INTEGER NOT NULL DEFAULT 0,
       auto_topup_enabled INTEGER NOT NULL DEFAULT 0,
       auto_topup_threshold_cents INTEGER NOT NULL DEFAULT 0,
       auto_topup_amount_cents INTEGER NOT NULL DEFAULT 0,
+      marketing_suspended INTEGER NOT NULL DEFAULT 0,
       updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
 
@@ -527,6 +538,27 @@ export function ensureControlTables() {
   } catch (err) {
     console.error(
       "[control] cms_library_assets tenant_id migration failed:",
+      err,
+    );
+  }
+
+  // Existing control DBs may predate email_credits.marketing_suspended (Task
+  // 8 — added after Tasks 1-7 already shipped email_credits without it, so
+  // any DB that ran ensureControlTables before this change has the table but
+  // not the column). The CREATE above only applies to fresh installs, so add
+  // it once on older DBs (PRAGMA-guarded, mirroring the migrations above).
+  try {
+    const cols = controlSqlite
+      .prepare("PRAGMA table_info(email_credits)")
+      .all() as Array<{ name: string }>;
+    if (!cols.find((c) => c.name === "marketing_suspended")) {
+      controlSqlite.exec(
+        "ALTER TABLE email_credits ADD COLUMN marketing_suspended INTEGER NOT NULL DEFAULT 0",
+      );
+    }
+  } catch (err) {
+    console.error(
+      "[control] email_credits marketing_suspended migration failed:",
       err,
     );
   }

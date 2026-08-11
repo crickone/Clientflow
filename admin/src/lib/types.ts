@@ -84,11 +84,24 @@ export interface EventRow {
   createdAt: number;
 }
 
+/** A tenant's auto-topup config — mirrors `AutoTopupConfig` in
+ *  app/src/lib/email/credits.ts EXACTLY. */
+export interface AutoTopup {
+  enabled: boolean;
+  thresholdCents: number;
+  amountCents: number;
+}
+
 export interface TenantDetail {
   tenant: TenantSummary;
   usage: { clients: number; staff: number };
   invoices: InvoiceRow[];
   events: EventRow[];
+  /** Email-marketing add-on state (Task 8) — prepaid credit balance, a
+   *  platform-admin suspend flag, and the tenant's auto-topup config. */
+  emailBalanceCents: number;
+  marketingSuspended: boolean;
+  autoTopup: AutoTopup;
 }
 
 /**

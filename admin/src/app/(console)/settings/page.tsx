@@ -4,6 +4,7 @@ import { saveSettings } from "./actions";
 interface Settings {
   monthlyPriceCents: number;
   vatRateBp: number;
+  emailCreditPricePer1000Cents: number;
   provider: string;
 }
 
@@ -46,6 +47,20 @@ export default async function SettingsPage({
             max="100"
             name="vatRate"
             defaultValue={(s.vatRateBp / 100).toFixed(2)}
+            required
+          />
+        </label>
+
+        <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Email credit price (EUR / 1000 recipients)</span>
+          <input
+            className="input"
+            type="number"
+            step="0.01"
+            min="0"
+            max="100"
+            name="emailPrice"
+            defaultValue={(s.emailCreditPricePer1000Cents / 100).toFixed(2)}
             required
           />
         </label>

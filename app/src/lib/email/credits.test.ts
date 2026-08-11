@@ -11,10 +11,12 @@ import {
   getEmailBalanceCents,
   getEmailPricePer1000Cents,
   grantCredits,
+  isMarketingSuspended,
   listLedger,
   recordCreditSpend,
   setAutoTopup,
   setEmailPricePer1000Cents,
+  setMarketingSuspended,
 } from "./credits";
 
 // Wrapped in an async IIFE (not top-level await): this project's package.json
@@ -149,6 +151,28 @@ import {
     );
     // bounds rejections must not have mutated the last-good config
     assert.deepEqual(getAutoTopup(tid), { enabled: true, thresholdCents: 1000, amountCents: 5000 });
+
+    // ── marketing suspend/resume (Task 8): sparse default + setter round-trip ──
+    assert.equal(isMarketingSuspended(tid), false, "a never-suspended tenant reads as false");
+    setMarketingSuspended(tid, true, "admin:chris@clientflow.ie");
+    assert.equal(isMarketingSuspended(tid), true);
+    assert.equal(getEmailBalanceCents(tid), 450, "suspending marketing doesn't touch balance");
+    setMarketingSuspended(tid, false, "admin:chris@clientflow.ie");
+    assert.equal(isMarketingSuspended(tid), false, "resume flips it back");
+    // a tenant with no email_credits row at all (never granted/topped-up/
+    // configured) must also read as NOT suspended — the fail-closed gate in
+    // precheckCampaign must never accidentally block a brand-new tenant.
+    controlSqlite.prepare("DELETE FROM tenants WHERE slug = 'email-credits-test-2'").run();
+    const t2 = controlSqlite
+      .prepare(
+        "INSERT INTO tenants (slug, name, db_file, is_active) VALUES ('email-credits-test-2','Email Credits Test 2','tenants/email-credits-test-2/void.db',1) RETURNING id",
+      )
+      .get() as { id: number };
+    try {
+      assert.equal(isMarketingSuspended(t2.id), false, "a tenant with no email_credits row at all reads as not suspended");
+    } finally {
+      controlSqlite.prepare("DELETE FROM tenants WHERE id = ?").run(t2.id);
+    }
 
     console.log("credits.test.ts: all assertions passed");
   } finally {
