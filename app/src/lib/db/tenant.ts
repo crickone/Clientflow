@@ -1645,6 +1645,37 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     console.error("[db] blog_posts cms-cols migration failed:", err);
   }
 
+  // Email marketing (Task 2 — contacts + suppressions + CSV import; Task 1
+  // built the money side, lib/email/credits.ts). `contacts` is the tenant's
+  // mailing list; `suppressions` is a hard do-not-email gate (unsubscribe/
+  // bounce/complaint/manual) that import — and later, sending — must always
+  // consult. Both keyed by lower(email) so case-insensitive matches can't
+  // create duplicate rows. Drizzle mirror in schema.ts — same index names,
+  // kept in sync.
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS contacts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL,
+      name TEXT, phone TEXT,
+      tags TEXT,                       -- JSON string[]
+      status TEXT NOT NULL DEFAULT 'subscribed', -- subscribed|unsubscribed|bounced|complained|cleaned
+      source TEXT,
+      subscribed_at INTEGER, unsubscribed_at INTEGER,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_email ON contacts(lower(email));
+    CREATE INDEX IF NOT EXISTS idx_contacts_status ON contacts(status);
+
+    CREATE TABLE IF NOT EXISTS suppressions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL,
+      reason TEXT NOT NULL,            -- unsubscribe|bounce|complaint|manual
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_suppressions_email ON suppressions(lower(email));
+  `);
+
   // Batch 6b (improvement-plan-2026-08.md Theme E1): tracking table for the
   // versioned migration runner (./migrations) — separate from everything
   // above, which is the additive bootstrap. Created here too (in addition to

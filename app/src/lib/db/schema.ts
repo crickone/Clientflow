@@ -955,6 +955,67 @@ export const activityLog = sqliteTable("activity_log", {
     .default(sql`(unixepoch() * 1000)`),
 });
 
+// ============ Email marketing (tenant plane) ============
+// GHL-style email marketing add-on (Task 2 — contacts + suppressions + CSV
+// import; Task 1 built the money side, lib/email/credits.ts). `contacts` is
+// the tenant's mailing list; `suppressions` is a hard do-not-email gate
+// (unsubscribe/bounce/complaint/manual) that import — and later, sending —
+// must always consult. Both keyed by lower(email) so case-insensitive
+// matches can't create duplicate rows.
+export const contacts = sqliteTable(
+  "contacts",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    email: text("email").notNull(),
+    name: text("name"),
+    phone: text("phone"),
+    tags: text("tags"), // JSON string[]
+    status: text("status", {
+      enum: ["subscribed", "unsubscribed", "bounced", "complained", "cleaned"],
+    })
+      .notNull()
+      .default("subscribed"),
+    source: text("source"),
+    subscribedAt: integer("subscribed_at", { mode: "timestamp_ms" }),
+    unsubscribedAt: integer("unsubscribed_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  // Matches the CREATE UNIQUE INDEX / CREATE INDEX statements already in
+  // ensureTenantTables (lib/db/tenant.ts) — same names, kept in sync (see the
+  // discipline comment on email_messages above).
+  (t) => ({
+    emailUnique: uniqueIndex("idx_contacts_email").on(sql`lower(${t.email})`),
+    byStatus: index("idx_contacts_status").on(t.status),
+  }),
+);
+
+export const suppressions = sqliteTable(
+  "suppressions",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    email: text("email").notNull(),
+    reason: text("reason", {
+      enum: ["unsubscribe", "bounce", "complaint", "manual"],
+    }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => ({
+    emailUnique: uniqueIndex("idx_suppressions_email").on(sql`lower(${t.email})`),
+  }),
+);
+
+export type Contact = typeof contacts.$inferSelect;
+export type NewContact = typeof contacts.$inferInsert;
+export type Suppression = typeof suppressions.$inferSelect;
+export type NewSuppression = typeof suppressions.$inferInsert;
+
 // ============ CMS (multi-site) — tenant plane ============
 
 export const sites = sqliteTable("sites", {
