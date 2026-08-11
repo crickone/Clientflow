@@ -12,6 +12,7 @@ import { Input, Textarea, Label } from "@/components/ui/Input";
 import {
   createCampaignAction,
   draftCampaignBodyAction,
+  sendCampaignAction,
   updateCampaignAction,
   type CampaignFormInput,
 } from "@/app/campaigns/actions";
@@ -82,7 +83,8 @@ export function CampaignEditor({
   const [error, setError] = useState<string | null>(null);
   const [saving, startSave] = useTransition();
   const [drafting, startDraft] = useTransition();
-  const busy = saving || drafting;
+  const [sending, startSend] = useTransition();
+  const busy = saving || drafting || sending;
 
   const canSave = name.trim() && subject.trim() && fromName.trim() && fromEmail.trim();
 
@@ -144,6 +146,23 @@ export function CampaignEditor({
       }
       setBody(res.content);
       toast.success("Draft generated — review and edit before saving.");
+    });
+  }
+
+  function send() {
+    if (!campaign) return;
+    const who = recipientCount != null ? `${recipientCount.toLocaleString()} recipient${recipientCount === 1 ? "" : "s"}` : "your audience";
+    if (!window.confirm(`Send "${campaign.name}" to ${who} now? This can't be undone.`)) {
+      return;
+    }
+    startSend(async () => {
+      const res = await sendCampaignAction(campaign.id);
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success("Sending — this can take a few minutes for larger lists.");
+      router.refresh();
     });
   }
 
@@ -363,11 +382,27 @@ export function CampaignEditor({
           <Button onClick={save} disabled={busy || !canSave || locked} loading={saving}>
             <Save size={14} /> {isNew ? "Create campaign" : "Save draft"}
           </Button>
-          <Button variant="secondary" disabled title="Sending isn't wired up yet — coming in a later update.">
-            <Send size={14} /> Send campaign
+          <Button
+            variant="secondary"
+            onClick={send}
+            disabled={isNew || locked || busy}
+            loading={sending}
+            title={
+              isNew
+                ? "Save the campaign as a draft first."
+                : locked
+                  ? `This campaign is already ${campaign!.status} and can't be sent again.`
+                  : undefined
+            }
+          >
+            <Send size={14} /> {sending ? "Sending…" : "Send campaign"}
           </Button>
           <div style={{ fontSize: 11, color: "var(--text-tertiary)", lineHeight: 1.5 }}>
-            Sending isn&apos;t available yet — this campaign can be composed and saved as a draft.
+            {isNew
+              ? "Save this campaign as a draft first, then come back to send it."
+              : locked
+                ? `This campaign is ${campaign!.status} and can't be sent again.`
+                : "Sends immediately to every eligible, subscribed recipient — this can't be undone."}
           </div>
         </Card>
       </div>

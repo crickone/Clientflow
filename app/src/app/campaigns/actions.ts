@@ -10,6 +10,8 @@ import {
   type CampaignAudience,
   type CampaignRecord,
 } from "@/lib/marketing/campaigns";
+import { markCampaignSending, precheckCampaign, runCampaignSend } from "@/lib/marketing/send";
+import { runWithTenant } from "@/lib/db/tenant";
 import { draftCampaignEmail } from "@/lib/ai/draftCampaign";
 import { MODELS } from "@/lib/ai/client";
 import { assertUnderCap, recordUsage } from "@/lib/ai/usage";
@@ -172,4 +174,36 @@ export async function draftCampaignBodyAction(
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Couldn't draft the email body." };
   }
+}
+
+export type SendCampaignActionResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Send a draft campaign (Task 5). Validates with precheckCampaign, then
+ * atomically flips draft -> sending (markCampaignSending), then kicks off
+ * the actual throttled batch send as a DETACHED continuation — `void
+ * runWithTenant(tenantId, () => runCampaignSend(...))`, the same
+ * fire-and-forget shape the agent chat route uses (the request returns
+ * immediately; the send survives because Railway runs this app as a
+ * persistent `next start` process, not serverless). Credits are metered
+ * per BATCH inside runCampaignSend itself, never all-up-front here.
+ */
+export async function sendCampaignAction(id: number): Promise<SendCampaignActionResult> {
+  await requireAdmin();
+  const tid = tenantId();
+
+  const pre = await precheckCampaign(tid, id);
+  if (!pre.ok) return pre;
+
+  const marked = markCampaignSending(tid, id);
+  if (!marked.ok) return marked;
+
+  await logActivity("campaigns.send", `Started sending campaign to ${pre.recipients} recipient(s)`);
+  revalidatePath(`/campaigns/${id}`);
+  revalidatePath("/campaigns");
+
+  // Fire-and-forget: intentionally not awaited. See the doc comment above.
+  void runWithTenant(tid, () => runCampaignSend(tid, id));
+
+  return { ok: true };
 }

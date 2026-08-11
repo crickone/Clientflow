@@ -19,19 +19,16 @@ import { suppress } from "@/lib/marketing/suppress";
 export const dynamic = "force-dynamic";
 
 /**
- * GET only: an unsubscribe link is something a mail client / a browser / a
- * link-scanning security proxy fetches with a plain navigation — there's no
- * form to submit and no reason to require POST here.
- *
- * NEVER throws to the caller: every failure path (bad/tampered token,
- * unknown tenant, unknown contact, an unexpected DB error) falls through to
- * the SAME generic "invalid" page, at 200 — so this endpoint can never be
- * used to probe whether a given token/tenant/contact exists. Idempotent:
- * suppress() is itself idempotent, so clicking twice is harmless.
+ * Shared GET+POST body. NEVER throws to the caller: every failure path
+ * (bad/tampered token, unknown tenant, unknown contact, an unexpected DB
+ * error) falls through to the SAME generic "invalid" page, at 200 — so this
+ * endpoint can never be used to probe whether a given token/tenant/contact
+ * exists. Idempotent: suppress() is itself idempotent, so clicking twice (or
+ * a GET followed by a provider's one-click POST) is harmless.
  */
-export async function GET(_request: Request, { params }: { params: { token: string } }) {
+async function handleUnsubscribe(token: string): Promise<NextResponse> {
   try {
-    const claim = parseUnsubscribeToken(params.token);
+    const claim = parseUnsubscribeToken(token);
     if (!claim) return invalidPage();
 
     // A tenant id can be well-formed (the token verified) yet no longer
@@ -60,6 +57,24 @@ export async function GET(_request: Request, { params }: { params: { token: stri
     console.error("[marketing] /u/[token] failed:", err);
     return invalidPage();
   }
+}
+
+/**
+ * GET: a mail client / a browser / a link-scanning security proxy fetching
+ * the link with a plain navigation.
+ */
+export async function GET(_request: Request, { params }: { params: { token: string } }) {
+  return handleUnsubscribe(params.token);
+}
+
+/**
+ * POST: RFC 8058 one-click unsubscribe. Mailbox providers that see this
+ * campaign's `List-Unsubscribe`/`List-Unsubscribe-Post` headers (Task 5) POST
+ * to this same URL instead of a browser GET — same token, same suppress(),
+ * same generic response either way, always 200.
+ */
+export async function POST(_request: Request, { params }: { params: { token: string } }) {
+  return handleUnsubscribe(params.token);
 }
 
 const PAGE_STYLE = `
