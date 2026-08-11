@@ -60,7 +60,7 @@ export async function sendTestEmailAction(to: string): Promise<ActionResult> {
     accent: getTheme().accent,
     heading: "Test email",
     bodyHtml: `<p style="margin:0 0 14px;">This is a test email from <strong>${business}</strong> to confirm your email sending is set up correctly.</p><p style="margin:0;">If you received this, replies will go to <strong>${sender.replyTo || sender.fromEmail}</strong>.</p>`,
-    footer: "Sent from ClientFlow to verify your email configuration.",
+    footer: "Sent from AdonisAgent to verify your email configuration.",
   });
   const res = await sendEmail({ to: addr.data, subject: `Test email from ${business}`, html });
   if (!res.ok) return res;

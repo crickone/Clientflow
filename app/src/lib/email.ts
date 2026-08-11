@@ -183,9 +183,9 @@ export async function sendEmailForTenant(tenantId: number, opts: SendOpts): Prom
 }
 
 /**
- * Send a PLATFORM email — one that's about the ClientFlow account itself (staff
+ * Send a PLATFORM email — one that's about the AdonisAgent account itself (staff
  * invites, team/account notices), NOT a business→customer email. Always sends
- * from ClientFlow's OWN already-verified domain (clientflow.ie) via Resend, so
+ * from AdonisAgent's OWN already-verified domain (clientflow.ie) via Resend, so
  * it works for every tenant regardless of whether that tenant has connected its
  * own email provider. Business→customer mail must keep using sendEmail /
  * sendEmailForTenant (the tenant's own branded sender). Never throws.
@@ -199,7 +199,7 @@ export async function sendPlatformEmail(opts: {
   subject: string;
   html: string;
   text?: string;
-  /** Display name recipients see, e.g. "Optimal Health via ClientFlow". */
+  /** Display name recipients see, e.g. "Optimal Health via AdonisAgent". */
   fromName?: string;
   /** Where replies go (e.g. the business's own email). Omitted when blank. */
   replyTo?: string;
@@ -209,7 +209,7 @@ export async function sendPlatformEmail(opts: {
     return { ok: false, error: "Platform email isn't configured (missing RESEND_API_KEY)." };
   }
   const fromEmail = process.env.PLATFORM_EMAIL_FROM || "no-reply@clientflow.ie";
-  const from = `${sanitizeName(opts.fromName || "ClientFlow")} <${fromEmail}>`;
+  const from = `${sanitizeName(opts.fromName || "AdonisAgent")} <${fromEmail}>`;
   try {
     const resend = new Resend(apiKey);
     const { data, error } = await resend.emails.send({
@@ -229,7 +229,7 @@ export async function sendPlatformEmail(opts: {
 
 /** Strip characters that would break the `Name <addr>` from header. */
 function sanitizeName(name: string): string {
-  return name.replace(/["<>\r\n]/g, "").trim() || "ClientFlow";
+  return name.replace(/["<>\r\n]/g, "").trim() || "AdonisAgent";
 }
 
 /** Very small HTML→text fallback for the plaintext part. */

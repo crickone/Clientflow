@@ -197,8 +197,8 @@ export async function sendInviteEmail(opts: {
   const link = inviteAcceptUrl(opts.token);
   const accent = getTheme().accent;
   const intro = opts.inviterName
-    ? `${opts.inviterName} has invited you to join ${business} on ClientFlow as ${roleLabel(opts.role)}.`
-    : `You've been invited to join ${business} on ClientFlow as ${roleLabel(opts.role)}.`;
+    ? `${opts.inviterName} has invited you to join ${business} on AdonisAgent as ${roleLabel(opts.role)}.`
+    : `You've been invited to join ${business} on AdonisAgent as ${roleLabel(opts.role)}.`;
   const bodyHtml = `
     ${textToParagraphs(intro)}
     <p style="margin:0 0 20px;">Click below to set your password and get started.</p>
@@ -214,10 +214,10 @@ export async function sendInviteEmail(opts: {
     bodyHtml,
     footer: `You're receiving this because someone at ${business} added you as a team member. If you weren't expecting it, you can ignore this email.`,
   });
-  // Staff invites are a PLATFORM email (joining a business ON ClientFlow), so they
-  // always go from ClientFlow's verified domain — reliable for every tenant, even
+  // Staff invites are a PLATFORM email (joining a business ON AdonisAgent), so they
+  // always go from AdonisAgent's verified domain — reliable for every tenant, even
   // one that hasn't set up its own email. The from-name still carries the business
-  // ("<Business> via ClientFlow") and replies route to the business if it has an
+  // ("<Business> via AdonisAgent") and replies route to the business if it has an
   // address configured.
   const sender = getEmailSender();
   const replyTo = sender.replyTo || sender.fromEmail || undefined;
@@ -225,7 +225,7 @@ export async function sendInviteEmail(opts: {
     to: opts.email,
     subject: `You've been invited to ${business}`,
     html,
-    fromName: `${business} via ClientFlow`,
+    fromName: `${business} via AdonisAgent`,
     replyTo,
   });
 }

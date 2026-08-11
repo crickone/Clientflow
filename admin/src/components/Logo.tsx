@@ -1,5 +1,5 @@
 /**
- * ClientFlow brand lockup — the "ClientFlow" wordmark set in the Nebula display
+ * AdonisAgent brand lockup — the "AdonisAgent" wordmark set in the Nebula display
  * face (var(--font-nebula)) with a "PLATFORM" label beneath in the mono face.
  * Mirrors the main app's null-src Logo lockup vibe (see app/src/components/ui/
  * Logo.tsx), re-skinned for the admin chrome. Pure presentational, no client
@@ -9,7 +9,7 @@ export function Logo({
   size = 18,
   dot = true,
 }: {
-  /** Font-size (px) of the "ClientFlow" wordmark; the sub-label scales from it. */
+  /** Font-size (px) of the "AdonisAgent" wordmark; the sub-label scales from it. */
   size?: number;
   /** Show the glowing accent dot before the wordmark. */
   dot?: boolean;
@@ -51,7 +51,7 @@ export function Logo({
             whiteSpace: "nowrap",
           }}
         >
-          ClientFlow
+          AdonisAgent
         </span>
       </span>
       <span

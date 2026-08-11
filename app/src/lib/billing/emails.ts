@@ -7,7 +7,7 @@ import { getPlatformSetting } from "./settings";
 type Kind = "receipt" | "charge_failed" | "suspended" | "reactivated";
 
 /**
- * Send a one-off platform email FROM ClientFlow (via Resend) — used for
+ * Send a one-off platform email FROM AdonisAgent (via Resend) — used for
  * provisioning welcome mail, billing notices, etc. `bodyHtml` is wrapped in the
  * shared email shell (heading = subject). No-ops without a RESEND_API_KEY so
  * callers never have to guard, and so pulling this module into a test env (no
@@ -31,10 +31,10 @@ export async function sendPlatformEmail(
       to,
       subject,
       html: renderEmailShell({
-        businessName: "ClientFlow",
+        businessName: "AdonisAgent",
         heading: subject,
         bodyHtml,
-        footer: "You received this because you're the account owner on ClientFlow.",
+        footer: "You received this because you're the account owner on AdonisAgent.",
       }),
     });
   } catch (err) {
@@ -46,7 +46,7 @@ export async function sendPlatformEmail(
  * Email the tenant's OWNER (first admin membership) about a billing event.
  *
  * Platform sender via Resend DIRECTLY (never the gym's own Gmail): billing mail
- * must come from ClientFlow. Heavy deps (`resend`, `@/lib/email` → gmail/oauth)
+ * must come from AdonisAgent. Heavy deps (`resend`, `@/lib/email` → gmail/oauth)
  * are imported lazily, AFTER the early return, so that pulling this module into
  * the engine (and thus into the engine's tsx test) never loads that chain — the
  * test env has no RESEND_API_KEY, so we return before any dynamic import.
@@ -69,18 +69,18 @@ export async function sendBillingEmail(
 
   const amount = data.grossCents != null ? formatCents(data.grossCents) : "";
   const subjects: Record<Kind, string> = {
-    receipt: `Receipt — ClientFlow subscription (${amount})`,
-    charge_failed: "Action needed — your ClientFlow payment failed",
-    suspended: "Your ClientFlow subscription is paused",
-    reactivated: "Your ClientFlow subscription is active again",
+    receipt: `Receipt — AdonisAgent subscription (${amount})`,
+    charge_failed: "Action needed — your AdonisAgent payment failed",
+    suspended: "Your AdonisAgent subscription is paused",
+    reactivated: "Your AdonisAgent subscription is active again",
   };
   const bodies: Record<Kind, string> = {
     receipt: `<p>Thanks — we've received your subscription payment of <strong>${amount}</strong>.</p><p>You can view invoices any time under Settings → Billing.</p>`,
-    charge_failed: `<p>We couldn't take your ClientFlow subscription payment${amount ? ` of <strong>${amount}</strong>` : ""}.</p><p>${
+    charge_failed: `<p>We couldn't take your AdonisAgent subscription payment${amount ? ` of <strong>${amount}</strong>` : ""}.</p><p>${
       data.nextAttemptAt ? `We'll retry on <strong>${escapeHtml(data.nextAttemptAt)}</strong>. ` : ""
     }Please check your card under Settings → Billing to avoid interruption.</p>`,
-    suspended: `<p>After several failed payment attempts your ClientFlow subscription is paused, and staff access is limited until payment is sorted.</p><p>Sign in and follow the payment screen to reactivate instantly.</p>`,
-    reactivated: `<p>Payment received — your ClientFlow subscription is active again. Welcome back!</p>`,
+    suspended: `<p>After several failed payment attempts your AdonisAgent subscription is paused, and staff access is limited until payment is sorted.</p><p>Sign in and follow the payment screen to reactivate instantly.</p>`,
+    reactivated: `<p>Payment received — your AdonisAgent subscription is active again. Welcome back!</p>`,
   };
 
   await sendPlatformEmail(owner.email, subjects[kind], bodies[kind]);

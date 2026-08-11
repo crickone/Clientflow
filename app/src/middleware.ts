@@ -10,7 +10,7 @@ const PUBLIC_PATHS = ["/login", "/accept-invite", "/open"];
 const PUBLIC_API_PREFIXES = [
   "/api/auth/",
   "/api/leads/inbound",
-  "/api/site-demo-lead", // clientflow.ie demo form → ClientFlow-tenant lead (rate-limited, no key)
+  "/api/site-demo-lead", // clientflow.ie demo form → AdonisAgent-tenant lead (rate-limited, no key)
   "/api/branding/logo",
   "/api/whatsapp/webhook",
   "/api/mailgun/webhook", // Mailgun delivery/engagement webhook — server-to-server, HMAC-signature-verified inside the route handler

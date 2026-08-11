@@ -10,7 +10,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Activate — ClientFlow" };
+export const metadata = { title: "Activate — AdonisAgent" };
 
 export default async function ActivatePage() {
   await requireUserPage();
@@ -34,7 +34,7 @@ export default async function ActivatePage() {
       <PageHeader
         eyebrow="Billing"
         title={`Activate ${m.tenant.name}`}
-        subtitle="Your ClientFlow subscription starts today — one flat monthly price, cancel any time."
+        subtitle="Your AdonisAgent subscription starts today — one flat monthly price, cancel any time."
       />
       <Card style={{ padding: 28 }}>
         <div
@@ -44,7 +44,7 @@ export default async function ActivatePage() {
             border: "1px solid var(--hairline)",
           }}
         >
-          <Row label="ClientFlow monthly subscription" value={formatCents(netCents)} />
+          <Row label="AdonisAgent monthly subscription" value={formatCents(netCents)} />
           <Row label="VAT" value={formatCents(vatCents)} />
           <Row label="Due today" value={formatCents(grossCents)} strong />
         </div>

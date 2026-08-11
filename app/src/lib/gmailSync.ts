@@ -34,7 +34,7 @@ export function shouldSyncNow(
  * Gmail's own label is the source of truth for local read-state (F6): a
  * message WITHOUT the UNREAD label is read; WITH it, unread. Used both when
  * inserting a newly-synced message and when reconciling an already-synced
- * one against its current Gmail labels, so ClientFlow's local unread count
+ * one against its current Gmail labels, so AdonisAgent's local unread count
  * converges to Gmail's truth in both directions instead of only ever going
  * from read -> unread on insert and never back.
  */

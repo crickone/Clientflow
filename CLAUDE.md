@@ -1,8 +1,8 @@
-# ClientFlow — Project Context for Claude Code
+# AdonisAgent — Project Context for Claude Code
 
 ## What this is
 
-**ClientFlow** is a multi-tenant platform (Next.js 14, App Router) that the agency
+**AdonisAgent** is a multi-tenant platform (Next.js 14, App Router) that the agency
 uses to run client businesses and **build/manage their websites** under one roof.
 It combines a CRM (clients, appointments, leads, packages, content studio) with a
 **multi-site CMS** (pages, blog, SEO, media, a visual editor, and per-site domains)
@@ -19,7 +19,7 @@ Clonmel, Co. Tipperary — optimalhealthatinspire.ie · ☎ 083 867 2844).
 
 ```
 <root>/
-  app/                      ← the ClientFlow platform (Next.js CRM + CMS + AI agents)
+  app/                      ← the AdonisAgent platform (Next.js CRM + CMS + AI agents)
     src/                    ← app code
     data/                   ← SQLite DBs: control.db (control plane: users, sessions, tenant
                                registry, domain routing, AI usage) + tenants/<slug>/<slug>.db,

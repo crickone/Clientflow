@@ -11,7 +11,7 @@ import { Card, CardLabel } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Billing — ClientFlow" };
+export const metadata = { title: "Billing — AdonisAgent" };
 
 const STATUS_LABEL: Record<BillingStatus, string> = {
   pending_payment: "Pending activation",
@@ -62,7 +62,7 @@ export default async function BillingSettingsPage() {
       <PageHeader
         eyebrow="Configure"
         title="Billing"
-        subtitle="Your ClientFlow subscription, payment card, and invoices."
+        subtitle="Your AdonisAgent subscription, payment card, and invoices."
       />
 
       {!b || b.billingExempt ? (

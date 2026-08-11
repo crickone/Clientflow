@@ -9,7 +9,7 @@
 
 // ── field model ───────────────────────────────────────────────────────────────
 
-/** The ClientFlow fields a CSV column can be mapped onto. */
+/** The AdonisAgent fields a CSV column can be mapped onto. */
 export type MemberField =
   | "firstName"
   | "lastName"
@@ -39,7 +39,7 @@ export const FIELD_LABELS: Record<MemberField, string> = {
   notes: "Notes",
 };
 
-/** A single CSV row projected onto the ClientFlow field model. */
+/** A single CSV row projected onto the AdonisAgent field model. */
 export interface MappedRow {
   firstName: string;
   lastName: string;
@@ -240,7 +240,7 @@ const SYNONYMS: Record<MemberField, string[]> = {
 };
 
 /**
- * Best-effort auto-map of CSV columns onto ClientFlow fields. Each column and
+ * Best-effort auto-map of CSV columns onto AdonisAgent fields. Each column and
  * each field is used at most once. Two passes: exact normalized match first,
  * then a `contains` fallback (e.g. "MemberEmailAddress" → email).
  */

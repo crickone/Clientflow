@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 import { body, heading, mono, nebula } from "./fonts";
 
-export const metadata = { title: "ClientFlow Platform" };
+export const metadata = { title: "AdonisAgent Platform" };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (

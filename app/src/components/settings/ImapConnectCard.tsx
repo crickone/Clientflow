@@ -198,7 +198,7 @@ export function ImapConnectCard({
           <div style={{ fontSize: 13, color: "var(--text-tertiary)", lineHeight: 1.55 }}>
             Send from your own mailbox — Microsoft 365, cPanel/Hostinger, or any
             other IMAP/SMTP provider. Emails go out over SMTP and replies sync
-            back into ClientFlow.
+            back into AdonisAgent.
           </div>
 
           <div>

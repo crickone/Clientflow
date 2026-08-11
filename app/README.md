@@ -1,6 +1,6 @@
-# ClientFlow
+# AdonisAgent
 
-**ClientFlow** is a multi-tenant platform (Next.js 14, App Router) that runs
+**AdonisAgent** is a multi-tenant platform (Next.js 14, App Router) that runs
 client businesses (gyms, clinics, wellness studios) and builds/manages their
 websites, in one app. It combines a CRM (clients, appointments, leads,
 packages, memberships, timetables, a content studio) with a multi-site CMS

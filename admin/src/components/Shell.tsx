@@ -159,7 +159,7 @@ export function Shell({ user, children }: { user: AdminUser; children: ReactNode
                 textTransform: "uppercase",
               }}
             >
-              ClientFlow
+              AdonisAgent
             </span>
           </span>
         </div>

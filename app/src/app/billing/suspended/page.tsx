@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Subscription paused — ClientFlow" };
+export const metadata = { title: "Subscription paused — AdonisAgent" };
 
 export default async function SuspendedPage({
   searchParams,
@@ -45,7 +45,7 @@ export default async function SuspendedPage({
       <PageHeader
         eyebrow="Billing"
         title="Your subscription needs attention"
-        subtitle="After several failed payment attempts your ClientFlow subscription is paused, and staff access is limited until payment is sorted."
+        subtitle="After several failed payment attempts your AdonisAgent subscription is paused, and staff access is limited until payment is sorted."
       />
       <Card style={{ padding: 28 }}>
         {failed && (

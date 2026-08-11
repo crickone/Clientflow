@@ -405,7 +405,7 @@ export class OpenRouterProvider implements ModelProvider {
         // calling app on openrouter.ai's dashboard/rankings) — optional but
         // good practice, per the task brief.
         "HTTP-Referer": "https://app.clientflow.ie",
-        "X-Title": "ClientFlow",
+        "X-Title": "AdonisAgent",
       },
       body: JSON.stringify({
         model: slug,

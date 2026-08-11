@@ -221,7 +221,7 @@ export default function ProvisionPage() {
             </button>
           </div>
           <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>
-            The first admin is the owner. An email that already has a ClientFlow login is just added to this
+            The first admin is the owner. An email that already has an AdonisAgent login is just added to this
             business — no new password.
           </p>
         </fieldset>

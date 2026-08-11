@@ -6,7 +6,7 @@ const DEFAULTS: Record<string, string> = {
   monthly_price_cents: "9900",
   vat_rate_bp: "2300",
   billing_from_email: "billing@clientflow.ie",
-  billing_from_name: "ClientFlow Billing",
+  billing_from_name: "AdonisAgent Billing",
 };
 
 export function getPlatformSetting(key: string): string | null {

@@ -340,7 +340,7 @@ function ThemePreview({ businessName }: { businessName: string }) {
               color: "var(--text-primary)",
             }}
           >
-            {businessName?.slice(0, 14) || "ClientFlow"}
+            {businessName?.slice(0, 14) || "AdonisAgent"}
           </div>
           <div style={{ height: 1, background: "var(--hairline)", margin: "2px 0" }} />
           <div style={{ ...navPill, background: "var(--accent-soft)", color: "var(--accent-ink)" }}>
@@ -450,7 +450,7 @@ function LogoManager({ hasLogo }: { hasLogo: boolean }) {
       <div style={{ display: "grid", gap: 16 }}>
         <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6 }}>
           Your business logo, shown at the top of the sidebar (and on Content Studio intro/outro
-          cards). When no logo is set, the ClientFlow wordmark is used.
+          cards). When no logo is set, the AdonisAgent wordmark is used.
         </div>
 
         {/* preview on the actual sidebar surface */}

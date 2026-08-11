@@ -359,7 +359,7 @@ function NewUserButton() {
                   onChange={() => setMode("invite")}
                   disabled={pending}
                   title="Email an invite"
-                  desc="They get an email (from ClientFlow) with a link to set their own password."
+                  desc="They get an email (from AdonisAgent) with a link to set their own password."
                 />
                 <ModeRadio
                   checked={mode === "password"}

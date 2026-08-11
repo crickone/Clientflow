@@ -99,7 +99,7 @@ export function GmailConnectCard({
         <>
           <div style={{ fontSize: 13, color: "var(--text-tertiary)", lineHeight: 1.55 }}>
             Send from your business Gmail — no domain or DNS setup. Emails go out
-            from your real inbox and replies come back to it and into ClientFlow.
+            from your real inbox and replies come back to it and into AdonisAgent.
           </div>
           {googleConfigured ? (
             <a href="/api/google/connect" style={{ alignSelf: "flex-start" }}>

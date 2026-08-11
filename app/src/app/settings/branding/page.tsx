@@ -21,7 +21,7 @@ export default async function BrandingSettingsPage() {
       <PageHeader
         eyebrow="Settings"
         title="Branding"
-        subtitle="Your business logo, used on Content Studio intro/outro cards and exports. (The app chrome shows the ClientFlow wordmark for now.)"
+        subtitle="Your business logo, used on Content Studio intro/outro cards and exports. (The app chrome shows the AdonisAgent wordmark for now.)"
         actions={
           <Link href="/settings">
             <Button variant="outline">

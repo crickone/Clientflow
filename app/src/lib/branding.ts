@@ -51,10 +51,10 @@ export function resolveLogoPath(): string | null {
 /**
  * The logo to show in the app chrome (sidebar, login, marketing header).
  *
- * For now this is always the ClientFlow Nebula wordmark — the Logo component
+ * For now this is always the AdonisAgent Nebula wordmark — the Logo component
  * renders the wordmark when the src is null. The current branding upload only
  * chrome. When the tenant has uploaded a business logo it's shown at the top of
- * the app; otherwise the Logo component falls back to the ClientFlow wordmark
+ * the app; otherwise the Logo component falls back to the AdonisAgent wordmark
  * (src === null). The `?v=<mtime>` cache-buster makes the sidebar pick up a
  * replaced logo. The same logo also drives the Content Studio intro/outro cards.
  */

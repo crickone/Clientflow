@@ -63,7 +63,7 @@ async function alertBackupFailure(detail: string, now: number): Promise<void> {
   try {
     await sendPlatformEmail(
       to,
-      "[ClientFlow] Nightly backup FAILED",
+      "[AdonisAgent] Nightly backup FAILED",
       `<p>The nightly database backup failed at ${new Date().toISOString()}.</p><p><strong>${detail.replace(/</g, "&lt;")}</strong></p>`,
     );
     setCronState(ALERT_CRON_KEY, utcDateString(now));

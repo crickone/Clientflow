@@ -111,8 +111,8 @@ export async function POST(req: NextRequest) {
       try {
         await sendPlatformEmail(
           r.email,
-          "Your ClientFlow account is ready",
-          `<p>Your ClientFlow account for <strong>${esc(p.name)}</strong> is ready.</p>
+          "Your AdonisAgent account is ready",
+          `<p>Your AdonisAgent account for <strong>${esc(p.name)}</strong> is ready.</p>
            <p>Sign in at <a href="${esc(loginUrl)}">${esc(loginUrl)}</a> using:</p>
            <p><strong>Email:</strong> ${esc(r.email)}<br/>
               <strong>Temporary password:</strong> ${esc(r.tempPassword)}</p>

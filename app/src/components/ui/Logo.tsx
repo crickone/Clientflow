@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 /**
  * App-chrome logo lockup. When `src` is null (the current default) it renders the
- * ClientFlow Nebula wordmark with the business name beneath it under a dash — the
+ * AdonisAgent Nebula wordmark with the business name beneath it under a dash — the
  * product mark co-branded with the tenant. When a business logo src is given it
  * renders that image, falling back to the lockup if the image fails to load.
  * `alt` carries the business name (used both as img alt and as the lockup sub-line).
@@ -54,7 +54,7 @@ export function Logo({
             color: "var(--text-primary)",
           }}
         >
-          ClientFlow
+          AdonisAgent
         </span>
         {alt && (
           <span

@@ -12,9 +12,9 @@ export const dynamic = "force-dynamic";
 /**
  * Public lead capture for the clientflow.ie marketing site's "Book a demo" form.
  * Unlike the per-tenant `/api/leads/inbound` webhook (which is keyed), this is a
- * single-purpose endpoint hard-bound to the ClientFlow tenant server-side — so
+ * single-purpose endpoint hard-bound to the AdonisAgent tenant server-side — so
  * NO API key is ever exposed in the browser. Rate-limited by IP. Demo requests
- * land as leads in ClientFlow's own CRM (we run on ClientFlow, too).
+ * land as leads in AdonisAgent's own CRM (we run on AdonisAgent, too).
  */
 const CLIENTFLOW_SLUG = "clientflow";
 const MAX_BODY_BYTES = 8 * 1024;

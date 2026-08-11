@@ -85,8 +85,8 @@ export function buildPageMetadata(pc: PageContext): Metadata {
       : undefined;
   return {
     // Suffix the site name only when the title doesn't already carry it —
-    // imported pages often brand their own <title> ("Pricing … | ClientFlow"),
-    // and a blind suffix would double-brand ("… | ClientFlow — ClientFlow").
+    // imported pages often brand their own <title> ("Pricing … | AdonisAgent"),
+    // and a blind suffix would double-brand ("… | AdonisAgent — AdonisAgent").
     title: title.toLowerCase().includes(pc.resolved.site.name.toLowerCase())
       ? title
       : `${title} — ${pc.resolved.site.name}`,
