@@ -1,5 +1,3 @@
-import { NextResponse, type NextRequest } from "next/server";
-
 import { runWithTenant } from "@/lib/db/tenant";
 import { parseMailgunEvent, verifyMailgunSignature } from "@/lib/marketing/sender/mailgun";
 import { applyEvent, resolveTenantIdForMailgunEvent } from "@/lib/marketing/events";
@@ -28,7 +26,12 @@ function str(v: unknown): string {
  * ONLY for a bad/unverifiable signature. Mailgun signs the WHOLE body
  * (`signature: {timestamp, token, signature}` alongside `event-data`), so a
  * body that isn't even valid JSON can't be verified either — that's treated
- * the same as a bad signature (401), not a silent 200.
+ * the same as a bad signature (401), not a silent 200. This "always 200 once
+ * verified" invariant covers BOTH tenant resolution and applyEvent below,
+ * each guarded by its own try/catch: resolveTenantIdForMailgunEvent does
+ * real I/O too (a control-DB lookup and, on the domain-fallback path,
+ * opening every active tenant's SQLite file), so a corrupt/locked DB or
+ * SQLITE_BUSY there must never surface as a 500 either.
  *
  * TENANCY: a server-to-server callback with no session cookie, so this must
  * never touch the ambient, request-scoped `db` proxy — see
@@ -36,15 +39,21 @@ function str(v: unknown): string {
  * how the tenant is resolved. If it can't be resolved, the event is ignored
  * (200) — NEVER a default-tenant shortcut, which would corrupt another
  * tenant's campaign_sends/suppressions.
+ *
+ * Deliberately typed against the standard Fetch API `Request`/`Response`
+ * rather than `next/server`'s `NextRequest`/`NextResponse` — this route
+ * needs neither, and it lets route.test.ts exercise POST directly with a
+ * real Request, no server needed (see api/health/route.ts and
+ * f/[slug]/submit/route.ts for the same choice).
  */
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   let payload: unknown;
   try {
     payload = await req.json();
   } catch {
     // Can't even extract a signature to check — treated as unverified, not a
     // silent no-op 200 (see the doc comment above).
-    return NextResponse.json({ ok: false }, { status: 401 });
+    return Response.json({ ok: false }, { status: 401 });
   }
 
   const sig = prop(payload, "signature");
@@ -52,7 +61,7 @@ export async function POST(req: NextRequest) {
   const token = str(prop(sig, "token"));
   const signature = str(prop(sig, "signature"));
   if (!verifyMailgunSignature(timestamp, token, signature)) {
-    return NextResponse.json({ ok: false }, { status: 401 });
+    return Response.json({ ok: false }, { status: 401 });
   }
 
   const event = parseMailgunEvent(payload);
@@ -60,12 +69,22 @@ export async function POST(req: NextRequest) {
     // Verified but not an event shape we act on (malformed, or a recognized-
     // but-uninteresting Mailgun event type) — 200 so Mailgun doesn't retry a
     // permanent no-op.
-    return NextResponse.json({ ok: true, ignored: "unrecognized event" });
+    return Response.json({ ok: true, ignored: "unrecognized event" });
   }
 
-  const tenantId = resolveTenantIdForMailgunEvent(event, payload);
+  // Tenant resolution is real I/O (see the doc comment above) — a
+  // corrupt/locked DB or SQLITE_BUSY here must come back 200, same as an
+  // applyEvent failure below, not a 500 (this is a verified, parseable
+  // call, so Mailgun must not retry it regardless).
+  let tenantId: number | null;
+  try {
+    tenantId = resolveTenantIdForMailgunEvent(event, payload);
+  } catch (err) {
+    console.error(`[mailgun webhook] resolveTenantIdForMailgunEvent failed:`, err);
+    return Response.json({ ok: true, ignored: "tenant resolution failed" });
+  }
   if (tenantId == null) {
-    return NextResponse.json({ ok: true, ignored: "tenant unresolved" });
+    return Response.json({ ok: true, ignored: "tenant unresolved" });
   }
 
   try {
@@ -76,5 +95,5 @@ export async function POST(req: NextRequest) {
     console.error(`[mailgun webhook] applyEvent failed (tenant ${tenantId}):`, err);
   }
 
-  return NextResponse.json({ ok: true });
+  return Response.json({ ok: true });
 }

@@ -29,7 +29,11 @@
 //      against the live tenant registry — a stale id falls through rather
 //      than being trusted); falls back to findTenantIdBySendingDomain via
 //      the raw payload's envelope.sender / message.headers.from; resolves to
-//      null (never a default tenant) when nothing matches.
+//      null (never a default tenant) when nothing matches. Also:
+//      findTenantIdBySendingDomain never matches an UNVERIFIED
+//      sending_domains row (only 'verified' is a safe cross-tenant match —
+//      see its doc comment in events.ts) but does match the same row once
+//      its state flips to 'verified'.
 //  10. The reputation guard: once the tenant's recent hard-bounce/complaint
 //      rate crosses threshold, EVERY 'sending' campaign (not just the one
 //      tied to the triggering event) is auto-paused with a note, one
@@ -337,6 +341,55 @@ import type { MailgunEvent } from "./sender/types";
       tid,
       "an unknown/stale event.tenantId falls through to the domain lookup instead of failing outright",
     );
+
+    // ── 9b. Fix: findTenantIdBySendingDomain must require a VERIFIED
+    // domain. Two tenants can both enter the SAME sending domain (only one
+    // DNS-verified) — an unverified row must never resolve a webhook event
+    // to the wrong tenant. Uses a dedicated scratch tenant + domain string
+    // (distinct from evtest7-mail.example.com above) so this doesn't
+    // interact with the fixture 9's assertions rely on, and cleans itself
+    // up regardless of outcome. ──
+    const domainGuardSlug = "marketing-events-test-domain-guard";
+    const domainGuardDbFile = `tenants/${domainGuardSlug}/${domainGuardSlug}.db`;
+    controlSqlite.prepare("DELETE FROM tenants WHERE slug = ?").run(domainGuardSlug);
+    const domainGuardTenant = controlSqlite
+      .prepare("INSERT INTO tenants (slug, name, db_file, is_active) VALUES (?, ?, ?, 1) RETURNING id")
+      .get(domainGuardSlug, "Domain Verification Guard Test", domainGuardDbFile) as { id: number };
+    const domainGuardTid = domainGuardTenant.id;
+    try {
+      const domainGuardTdb: TenantDb = getTenantDbById(domainGuardTid);
+      const guardedDomain = "guarded-fallback-domain.example.com";
+      const guardedDomainRow = domainGuardTdb
+        .insert(sendingDomains)
+        .values({ domain: guardedDomain, state: "unverified", dnsRecords: "[]" })
+        .returning()
+        .get();
+
+      assert.equal(
+        findTenantIdBySendingDomain(guardedDomain),
+        null,
+        "an UNVERIFIED sending_domains row must never match — only a verified domain is a safe cross-tenant match",
+      );
+
+      domainGuardTdb
+        .update(sendingDomains)
+        .set({ state: "verified" })
+        .where(eq(sendingDomains.id, guardedDomainRow.id))
+        .run();
+
+      assert.equal(
+        findTenantIdBySendingDomain(guardedDomain),
+        domainGuardTid,
+        "the SAME row, now verified, matches",
+      );
+    } finally {
+      controlSqlite.prepare("DELETE FROM tenants WHERE id = ?").run(domainGuardTid);
+      try {
+        fs.rmSync(path.join(process.cwd(), "data", "tenants", domainGuardSlug), { recursive: true, force: true });
+      } catch {
+        // best effort
+      }
+    }
 
     // ── 10. reputation guard: tenant-wide hard-bounce rate > 5% auto-pauses
     // EVERY 'sending' campaign (not just the one the triggering event

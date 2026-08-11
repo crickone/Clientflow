@@ -85,6 +85,13 @@ function extractSendingDomain(payload: unknown): string | null {
  * fires once per inbound webhook event, not in a hot request path).
  * Inactive tenants are skipped — an offboarded tenant must never receive
  * another tenant's — or its own stale — webhook traffic.
+ *
+ * Only matches a row whose `state` is `'verified'`. A domain string alone
+ * isn't a safe match: two tenants can each type the SAME domain into
+ * "connect a sending domain" (domains.ts's connectDomain) before either one
+ * finishes DNS verification, so matching on `domain` alone could resolve an
+ * event to the wrong (unverified) tenant. A verified domain is unique per
+ * Mailgun account, which makes it the only unambiguous match.
  */
 export function findTenantIdBySendingDomain(domain: string): number | null {
   const clean = domain.trim().toLowerCase();
@@ -94,7 +101,7 @@ export function findTenantIdBySendingDomain(domain: string): number | null {
   for (const t of rows) {
     if (!t.isActive) continue;
     const record = getSendingDomain(t.id);
-    if (record && record.domain === clean) return t.id;
+    if (record && record.domain === clean && record.state === "verified") return t.id;
   }
   return null;
 }
