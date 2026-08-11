@@ -1045,6 +1045,96 @@ export const sendingDomains = sqliteTable("sending_domains", {
 export type SendingDomain = typeof sendingDomains.$inferSelect;
 export type NewSendingDomain = typeof sendingDomains.$inferInsert;
 
+// Email marketing (Task 4 — campaign model + builder + AI draft; see
+// lib/marketing/campaigns.ts + lib/ai/draftCampaign.ts). One row per
+// campaign. `audience` is a small JSON discriminated union
+// ({kind:'all_subscribed'} | {kind:'tag',tag}) resolved against `contacts`
+// on demand by resolveAudience — never denormalized here. `body_html`
+// stores the RAW drafted/typed body (plain text or light markup), NOT the
+// final wrapped email — the later throttled-send task (Task 5+) is what
+// pipes it through textToParagraphs -> renderEmailShell (lib/email.ts) at
+// send time, so it stays editable in the composer. `cursor` is the resume
+// offset that same later task advances; `stats` is the JSON counts blob it
+// maintains — both inert until then. Draft-only editing (a 'sending'/'sent'
+// campaign is immutable) is enforced at the application layer
+// (campaigns.ts's updateCampaign), not a DB constraint. Matches the CREATE
+// TABLE already in ensureTenantTables (lib/db/tenant.ts).
+export const emailCampaigns = sqliteTable("email_campaigns", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  subject: text("subject").notNull(),
+  preheader: text("preheader"),
+  fromName: text("from_name").notNull(),
+  fromEmail: text("from_email").notNull(),
+  bodyHtml: text("body_html").notNull(),
+  audience: text("audience").notNull(), // JSON {kind:'all_subscribed'} | {kind:'tag', tag:'...'}
+  status: text("status", {
+    enum: ["draft", "sending", "sent", "paused", "failed"],
+  })
+    .notNull()
+    .default("draft"),
+  cursor: integer("cursor").notNull().default(0),
+  stats: text("stats"), // JSON counts, written by the later send task
+  scheduledAt: integer("scheduled_at", { mode: "timestamp_ms" }),
+  sentAt: integer("sent_at", { mode: "timestamp_ms" }),
+  // No .references() — created_by points at a control-plane users.id, which
+  // can't be a real FK from a tenant-plane table (different SQLite file);
+  // same reasoning as clientEmails.sentByUserId / calendarEvents.createdByUserId.
+  createdBy: integer("created_by"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
+// Per-recipient send record for a campaign — one row per contact/email a
+// campaign was (or will be) sent to. Written by the later throttled-send
+// task (Task 5+); this task only defines the shape. provider_message_id
+// (Mailgun's id) is how Task 7's webhook resolves an inbound delivery/open/
+// click/bounce/complaint/unsubscribe event back to this row (hence the
+// index). campaign_id/contact_id deliberately have NO .references() here,
+// verbatim to the brief's own DDL rather than "fixing" it — same "trust the
+// literal DDL over silently improving it" precedent Task 1 documented for
+// its own ledger tables. Matches the CREATE TABLE already in
+// ensureTenantTables (lib/db/tenant.ts).
+export const campaignSends = sqliteTable(
+  "campaign_sends",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    campaignId: integer("campaign_id").notNull(),
+    contactId: integer("contact_id"),
+    email: text("email").notNull(),
+    providerMessageId: text("provider_message_id"),
+    status: text("status", {
+      enum: [
+        "queued",
+        "sent",
+        "delivered",
+        "bounced",
+        "complained",
+        "opened",
+        "clicked",
+        "unsubscribed",
+        "failed",
+      ],
+    })
+      .notNull()
+      .default("queued"),
+    error: text("error"),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => ({
+    byCampaign: index("idx_campaign_sends_campaign").on(t.campaignId),
+    byMsgId: index("idx_campaign_sends_msgid").on(t.providerMessageId),
+  }),
+);
+
+export type EmailCampaign = typeof emailCampaigns.$inferSelect;
+export type NewEmailCampaign = typeof emailCampaigns.$inferInsert;
+export type CampaignSend = typeof campaignSends.$inferSelect;
+export type NewCampaignSend = typeof campaignSends.$inferInsert;
+
 // ============ CMS (multi-site) — tenant plane ============
 
 export const sites = sqliteTable("sites", {

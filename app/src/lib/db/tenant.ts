@@ -1697,6 +1697,48 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     );
   `);
 
+  // Email marketing (Task 4 — campaign model + builder + AI draft; see
+  // lib/marketing/campaigns.ts + lib/ai/draftCampaign.ts). email_campaigns is
+  // one row per campaign; body_html stores the RAW body (plain text/light
+  // markup) — the later throttled-send task (Task 5+) is what wraps it via
+  // textToParagraphs -> renderEmailShell at send time, so it stays editable
+  // here. `cursor` is that later task's resume offset and `stats` its JSON
+  // counts blob — both inert until then. Draft-only editing is enforced at
+  // the application layer (campaigns.ts's updateCampaign), not a DB
+  // constraint. campaign_sends is the per-recipient send record that same
+  // later task will populate; provider_message_id is how Task 7's webhook
+  // resolves an inbound Mailgun event back to a row (hence the index).
+  // Neither table declares a foreign key on campaign_id/contact_id/
+  // created_by — kept verbatim to the brief's DDL rather than "fixing" it
+  // (created_by points at a control-plane users.id, which can't be a real
+  // FK from this tenant-plane file anyway; same "follow the literal DDL"
+  // precedent Task 1 documented for its own ledger tables). Drizzle mirror
+  // in schema.ts — same shape + index names, kept in sync.
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS email_campaigns (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL, subject TEXT NOT NULL, preheader TEXT,
+      from_name TEXT NOT NULL, from_email TEXT NOT NULL,
+      body_html TEXT NOT NULL,
+      audience TEXT NOT NULL,           -- JSON {kind:'all_subscribed'} | {kind:'tag', tag:'...'}
+      status TEXT NOT NULL DEFAULT 'draft', -- draft|sending|sent|paused|failed
+      cursor INTEGER NOT NULL DEFAULT 0, -- resume offset for throttled send
+      stats TEXT,                        -- JSON counts
+      scheduled_at INTEGER, sent_at INTEGER,
+      created_by INTEGER,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE TABLE IF NOT EXISTS campaign_sends (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      campaign_id INTEGER NOT NULL, contact_id INTEGER, email TEXT NOT NULL,
+      provider_message_id TEXT,
+      status TEXT NOT NULL DEFAULT 'queued', -- queued|sent|delivered|bounced|complained|opened|clicked|unsubscribed|failed
+      error TEXT, updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_campaign_sends_campaign ON campaign_sends(campaign_id);
+    CREATE INDEX IF NOT EXISTS idx_campaign_sends_msgid ON campaign_sends(provider_message_id);
+  `);
+
   // Batch 6b (improvement-plan-2026-08.md Theme E1): tracking table for the
   // versioned migration runner (./migrations) — separate from everything
   // above, which is the additive bootstrap. Created here too (in addition to
