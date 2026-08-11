@@ -65,6 +65,7 @@ export function middleware(req: NextRequest) {
     !pathname.startsWith("/api/") &&
     !pathname.startsWith("/_next") &&
     !pathname.startsWith("/f/") && // public form share links must resolve on a client's own mapped domain too
+    !pathname.startsWith("/u/") && // public unsubscribe links must resolve on a client's own mapped domain too
     pathname !== "/sitemap.xml" &&
     pathname !== "/robots.txt"
   ) {
@@ -88,6 +89,15 @@ export function middleware(req: NextRequest) {
   // handler) — unauthenticated lead-capture pages. Tenant is resolved
   // server-side from the slug (lib/publicForms.ts), never from a session.
   if (pathname.startsWith("/f/")) {
+    return pass();
+  }
+
+  // Public unsubscribe links (`/u/<token>`) — unauthenticated, self-
+  // authorizing: the signed token embeds + verifies the tenant (see
+  // lib/marketing/unsubscribeToken.ts), so unlike every other admin route
+  // there's no session/cookie to check here at all. Same treatment as the
+  // public form share links above.
+  if (pathname.startsWith("/u/")) {
     return pass();
   }
 
