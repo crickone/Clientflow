@@ -179,6 +179,10 @@ const NAV: NavSection[] = [
       {
         label: "Campaigns",
         icon: Send,
+        // Admin-only: campaign pages/actions are all requireAdmin (credit spend,
+        // contact-list management, deliverability) — keep the nav consistent so
+        // staff don't see links that redirect to /dashboard.
+        adminOnly: true,
         children: [
           { href: "/campaigns", label: "Campaigns", icon: Send, exact: true },
           { href: "/campaigns/contacts", label: "Contacts", icon: Send },
