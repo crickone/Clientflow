@@ -36,6 +36,7 @@ import {
   Megaphone,
   MessagesSquare,
   Salad,
+  Send,
   Package as PackageIcon,
   Settings as SettingsIcon,
   ShoppingBag,
@@ -175,6 +176,15 @@ const NAV: NavSection[] = [
       { href: "/marketing", label: "Marketing", icon: Megaphone },
       { href: "/cms", label: "Sites", icon: Globe, adminOnly: true },
       { href: "/content-studio", label: "Content Studio", icon: Clapperboard },
+      {
+        label: "Campaigns",
+        icon: Send,
+        children: [
+          { href: "/campaigns", label: "Campaigns", icon: Send, exact: true },
+          { href: "/campaigns/contacts", label: "Contacts", icon: Send },
+          { href: "/campaigns/domains", label: "Sending domains", icon: Send, adminOnly: true },
+        ],
+      },
     ],
   },
   {

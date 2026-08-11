@@ -18,6 +18,9 @@ const FULL_ENV: Record<string, string> = {
   OPENROUTER_API_KEY: "or_x",
   ALERT_EMAIL: "ops@example.com",
   CMS_SITE_HOSTS: "example.com=slug",
+  MAILGUN_API_KEY: "key-x",
+  MAILGUN_WEBHOOK_SIGNING_KEY: "whsec_x",
+  APP_URL: "https://app.example.com",
 };
 
 /** Return a copy of `env` with `key` entirely absent (not merely undefined) —
@@ -65,11 +68,11 @@ assert.deepEqual(checkEnv(FULL_ENV, true), { missingRequired: [], missingRecomme
 }
 
 // Empty env entirely -> every required + recommended var missing, plus the
-// backup group (6 named recommended vars + 1 backup group = 7).
+// backup group (9 named recommended vars + 1 backup group = 10).
 {
   const result = checkEnv({}, false);
   assert.deepEqual(result.missingRequired, ["ANTHROPIC_API_KEY"]);
-  assert.equal(result.missingRecommended.length, 7);
+  assert.equal(result.missingRecommended.length, 10);
 }
 
 console.log("env.test.ts: all assertions passed");

@@ -5,6 +5,7 @@ import { api, ApiError } from "@/lib/api";
 import { fmtCents, fmtDate, fmtDay } from "@/lib/format";
 import { StatusChip } from "@/components/StatusChip";
 import { ConfirmButton } from "@/components/ConfirmButton";
+import { GrantCreditsForm } from "@/components/GrantCreditsForm";
 import { OpenBusinessButton } from "@/components/OpenBusinessButton";
 import { Card } from "@/components/ui/Card";
 import type { InvoiceRow, TenantDetail } from "@/lib/types";
@@ -225,28 +226,7 @@ export default async function GymDetailPage({
           </div>
         </div>
 
-        <form
-          action={grantCreditsAction.bind(null, tenant.id)}
-          style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}
-        >
-          <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Grant credits (EUR)</span>
-            <input
-              className="input"
-              type="number"
-              step="0.01"
-              min="0.01"
-              max="10000"
-              name="euros"
-              placeholder="50.00"
-              required
-              style={{ width: 140 }}
-            />
-          </label>
-          <button className="btn btn--primary btn--sm" type="submit">
-            Grant
-          </button>
-        </form>
+        <GrantCreditsForm action={grantCreditsAction.bind(null, tenant.id)} />
 
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           {data.marketingSuspended ? (

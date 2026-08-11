@@ -86,6 +86,32 @@ Clonmel, Co. Tipperary — optimalhealthatinspire.ie · ☎ 083 867 2844).
   progress so a client that disconnects mid-run can reconnect instead of
   losing it.
 
+## Email marketing (campaigns)
+
+- **Sending:** platform Mailgun behind a swappable `CampaignSender` interface
+  (`src/lib/marketing/sender/`) — one concrete impl today, `MailgunSender`,
+  raw `fetch` against Mailgun's HTTP API (deliberately no `mailgun.js` dep).
+  Every method returns a typed result instead of throwing.
+- **Per-tenant verified sending domains** (`src/lib/marketing/domains.ts`),
+  connected under `/campaigns/domains` (admin-only).
+- **Money:** prepaid credits at a per-1000-recipient price set with a margin
+  over Mailgun's underlying cost, metered in `src/lib/email/credits.ts` (a
+  control-plane ledger — balance can't go negative, one ledger row per
+  mutation inside a single transaction). Balances today only move via
+  explicit admin-console grants; real charging (card capture, auto-topup
+  execution) is deferred to CreatePay.
+- **Contacts:** CSV import + suppressions under `/campaigns/contacts`
+  (`src/lib/marketing/contactImport.ts` + `suppress.ts`).
+- **Campaigns UI** at `/campaigns` — builder + AI draft, list, per-campaign
+  stats.
+- **Compliance:** every send is checked against suppressions and carries a
+  `List-Unsubscribe` header + link; unsubscribing is a signed, unauthenticated
+  token link at `/u/[token]` (`src/lib/marketing/unsubscribeToken.ts`), and
+  the Mailgun webhook (`/api/mailgun/webhook`) records delivery/open/click/
+  complaint/unsubscribe events back onto the campaign.
+- **Admin console** (`admin/`) sets the global per-1000 price and
+  grants/suspends a tenant's credits from its gym detail page (`/gyms/[id]`).
+
 ## Adding a new client website
 
 1. **Create the site:** CMS → Sites → **Add site** (admin), or fulfil a **Request**.

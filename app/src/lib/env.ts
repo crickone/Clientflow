@@ -35,7 +35,19 @@ const RECOMMENDED_VARS = [
   "OPENROUTER_API_KEY", // non-Anthropic model fallback in the AI provider registry
   "ALERT_EMAIL", // opt-in ops alerting (crash-survived + backup-failure emails)
   "CMS_SITE_HOSTS", // public multi-site host→tenant routing (see middleware.ts)
+  "MAILGUN_API_KEY", // email marketing sends (lib/marketing/sender/mailgun.ts) — unset = every send fails closed
+  "MAILGUN_WEBHOOK_SIGNING_KEY", // verifies inbound Mailgun webhook signatures — unset = every webhook rejected (fails closed, never accepts unsigned events)
+  "APP_URL", // stable absolute origin for links that must work outside a request (unsubscribe links, invite emails); the campaign-send pipeline threads the in-request forwarded host through to its detached continuation as the primary mechanism, so this is belt-and-suspenders, not the only path — see lib/appUrl.ts
 ] as const;
+
+/**
+ * MAILGUN_REGION ("us" default | "eu") is deliberately NOT in the list above —
+ * unlike those vars, it has a safe, fully-working default (api.mailgun.net).
+ * Only set it to "eu" if the sending domain was created in Mailgun's EU
+ * region (api.eu.mailgun.net); getting this wrong doesn't no-op the feature,
+ * it just points requests at the wrong Mailgun API host. See the region
+ * comment on baseUrl() in lib/marketing/sender/mailgun.ts.
+ */
 
 /** Single grouped entry — isBackupConfigured() already encodes "at least one
  *  of the BACKUP_S3_ or BACKUP_R2_ groups is fully set", so listing the
