@@ -13,6 +13,7 @@ const PUBLIC_API_PREFIXES = [
   "/api/site-demo-lead", // clientflow.ie demo form → ClientFlow-tenant lead (rate-limited, no key)
   "/api/branding/logo",
   "/api/whatsapp/webhook",
+  "/api/mailgun/webhook", // Mailgun delivery/engagement webhook — server-to-server, HMAC-signature-verified inside the route handler
   "/api/cron/", // self-authorizes via CRON_SECRET or an admin session
   "/api/platform/", // self-authorizes: service key + platform-admin session
   "/api/health", // unauthenticated liveness probe (control-DB ping; leaks nothing) — must not 307→/login for uptime monitors
