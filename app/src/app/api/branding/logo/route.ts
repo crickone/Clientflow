@@ -32,7 +32,16 @@ const MIME_BY_EXT: Record<string, string> = {
 
 /** Streams the current logo for preview in the settings page + img tags. */
 export async function GET() {
-  const filePath = resolveLogoPath();
+  // Public route (allow-listed in middleware): with no resolvable tenant
+  // (logged out, forged cookie) there is no logo to serve — 404, never a
+  // default tenant's file. resolveLogoPath throws TenantResolutionError in
+  // that case since tenant resolution went fail-closed.
+  let filePath: string | null;
+  try {
+    filePath = resolveLogoPath();
+  } catch {
+    filePath = null;
+  }
   if (!filePath) {
     return NextResponse.json(
       { ok: false, error: "No logo uploaded." },

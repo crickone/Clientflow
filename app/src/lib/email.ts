@@ -77,7 +77,11 @@ export function getEmailProvider(): EmailProvider {
   } catch {
     // no tenant context — fall through
   }
-  if (hasEmailApiKey() && getEmailSender().fromEmail) return "resend";
+  try {
+    if (hasEmailApiKey() && getEmailSender().fromEmail) return "resend";
+  } catch {
+    // no tenant context — fall through
+  }
   return "none";
 }
 
@@ -170,6 +174,11 @@ export async function sendEmail(opts: SendOpts): Promise<SendResult> {
     tenantId = getCurrentTenant().id;
   } catch {
     tenantId = null;
+  }
+  // Fail-closed tenant resolution: with no tenant there is no sender identity
+  // to send as (getEmailSender() reads the tenant's settings and would throw).
+  if (tenantId === null) {
+    return { ok: false, error: "No tenant context — cannot resolve a sender." };
   }
   return sendVia(tenantId, getEmailSender(), opts);
 }

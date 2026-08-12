@@ -14,10 +14,10 @@ import {
 } from "@/lib/auth";
 import { getClientSession } from "@/lib/clientAuth";
 import type { SidebarAccount } from "@/components/layout/Sidebar";
-import { getCurrentTenant } from "@/lib/db/tenant";
+import { resolveCurrentTenant } from "@/lib/db/tenant";
 import { getTheme, getVenueType, getSchedulingMode } from "@/lib/settings";
 import { getVocab } from "@/lib/vocabulary";
-import { themeCss } from "@/lib/theme";
+import { DEFAULT_THEME, themeCss } from "@/lib/theme";
 import { getBusinessProfile } from "@/lib/businessProfile";
 import { getChromeLogoSrc } from "@/lib/branding";
 import { getBilling } from "@/lib/billing/engine";
@@ -43,6 +43,15 @@ import {
 import "./globals.css";
 
 export async function generateMetadata(): Promise<Metadata> {
+  // No resolvable tenant (logged out, mid-account-selection) → platform brand.
+  // Tenant resolution is fail-closed now, so never touch tenant settings here
+  // without checking first.
+  if (!resolveCurrentTenant()) {
+    return {
+      title: "AdonisAgent",
+      description: "AdonisAgent — management & marketing.",
+    };
+  }
   const profile = getBusinessProfile();
   return {
     title: profile.businessName,
@@ -79,9 +88,13 @@ export default async function RootLayout({
   // Client mobile app (`/app`) — its own branded, phone-width shell (no coach
   // chrome). Theme + logo resolve to the signed-in client's tenant.
   if (pathname === "/app" || pathname.startsWith("/app/")) {
-    const clientThemeStyle = themeCss(getTheme());
-    const clientLogo = getChromeLogoSrc();
-    const clientBusiness = getBusinessProfile().businessName;
+    // Tenant branding only resolves once a member is signed in (their session
+    // pins the tenant). Logged out (/app/login, /app/reset) there is NO tenant
+    // to brand for — render neutral chrome rather than any tenant's.
+    const clientTenant = resolveCurrentTenant();
+    const clientThemeStyle = themeCss(clientTenant ? getTheme() : DEFAULT_THEME);
+    const clientLogo = clientTenant ? getChromeLogoSrc() : null;
+    const clientBusiness = clientTenant ? getBusinessProfile().businessName : "";
 
     // Client-app billing gate (spec §6). A member's access follows their gym's
     // billing status, resolved from the CLIENT session's own tenant (never the
@@ -159,11 +172,11 @@ export default async function RootLayout({
   let accounts: SidebarAccount[] = [];
   let activeTenantId: number | null = null;
   let showPastDue = false;
+  const current = user ? getCurrentMembership() : null;
   if (user) {
     const bare = ["/login", "/change-password", "/select-account", "/accept-invite"].some(
       (p) => pathname === p || pathname.startsWith(`${p}/`),
     );
-    const current = getCurrentMembership();
     if (!bare && !current) {
       redirect("/select-account");
     }
@@ -194,12 +207,16 @@ export default async function RootLayout({
     }
   }
 
-  const vocab = getVocab(getVenueType());
-  const logoSrc = getChromeLogoSrc();
-  const businessName = getBusinessProfile().businessName;
-  const themeStyle = themeCss(getTheme());
-  const tenantSlug = getCurrentTenant().slug;
-  const schedulingMode = getSchedulingMode();
+  // Tenant chrome (theme, logo, vocabulary) resolves only with an active
+  // membership. Bare pages (login, select-account, change-password,
+  // accept-invite) render platform-neutral chrome — tenant resolution is
+  // fail-closed, so touching tenant settings here without a membership throws.
+  const vocab = getVocab(current ? getVenueType() : "clinic");
+  const logoSrc = current ? getChromeLogoSrc() : null;
+  const businessName = current ? getBusinessProfile().businessName : "";
+  const themeStyle = themeCss(current ? getTheme() : DEFAULT_THEME);
+  const tenantSlug = current ? current.tenant.slug : "";
+  const schedulingMode = current ? getSchedulingMode() : "appointments";
   return (
     <html lang="en" className={FONT_VARS}>
       <body>

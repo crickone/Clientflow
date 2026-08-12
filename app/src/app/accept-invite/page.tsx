@@ -1,5 +1,3 @@
-import { getChromeLogoSrc } from "@/lib/branding";
-import { getBusinessProfile } from "@/lib/businessProfile";
 import { getInviteByToken } from "@/lib/invites";
 import { AcceptInviteForm } from "@/components/auth/AcceptInviteForm";
 import { InviteMessage } from "@/components/auth/InviteMessage";
@@ -12,8 +10,11 @@ export default function AcceptInvitePage({
   searchParams: { token?: string };
 }) {
   const token = (searchParams.token ?? "").trim();
-  const logoSrc = getChromeLogoSrc();
-  const businessName = getBusinessProfile().businessName;
+  // Pre-session page: there is no resolvable tenant yet (and the invitee may
+  // not even have an account), so this is platform-branded — the invite's own
+  // tenantName still names the business they're joining in the form copy.
+  const logoSrc = null;
+  const businessName = "";
 
   if (!token) {
     return (

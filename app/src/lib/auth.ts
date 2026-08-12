@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { and, eq, lt } from "drizzle-orm";
 
 import { authDb, SESSION_COOKIE } from "@/lib/db/control";
+import { resolveSessionTenant } from "@/lib/db/tenant";
 import {
   authSessions,
   memberships,
@@ -103,43 +104,20 @@ export const getCurrentMembership = cache((): CurrentMembership | null => {
     .get();
   if (!user || !user.isActive) return null;
 
-  // Resolve the active tenant. If the session hasn't recorded one, a user with
-  // exactly one active membership auto-resolves to it; 0 or >1 → no resolution.
-  let activeTenantId = session.activeTenantId;
-  if (activeTenantId == null) {
-    const ms = authDb
-      .select({ tenantId: memberships.tenantId })
-      .from(memberships)
-      .where(
-        and(eq(memberships.userId, user.id), eq(memberships.isActive, true)),
-      )
-      .all();
-    if (ms.length === 1) activeTenantId = ms[0].tenantId;
-    else return null;
-  }
-
-  // Validate a live membership for the active tenant (revoke = fail closed).
-  const membership = authDb
-    .select({ role: memberships.role })
-    .from(memberships)
-    .where(
-      and(
-        eq(memberships.userId, user.id),
-        eq(memberships.tenantId, activeTenantId),
-        eq(memberships.isActive, true),
-      ),
-    )
-    .get();
-  if (!membership) return null;
+  // Resolve + authorize the active tenant (auto-resolve a single-membership
+  // session, validate a LIVE membership). Shared with the db-proxy resolution
+  // in lib/db/tenant so authorization and DB routing can never drift apart.
+  const resolved = resolveSessionTenant(user.id, session.activeTenantId);
+  if (!resolved) return null;
 
   const tenant = authDb
     .select()
     .from(tenants)
-    .where(eq(tenants.id, activeTenantId))
+    .where(eq(tenants.id, resolved.tenantId))
     .get();
   if (!tenant || !tenant.isActive) return null;
 
-  return { user, tenant, role: membership.role };
+  return { user, tenant, role: resolved.role };
 });
 
 export interface MembershipOption {

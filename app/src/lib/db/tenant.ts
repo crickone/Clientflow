@@ -226,16 +226,72 @@ export function getTenantDbById(id: number): TenantDb {
 }
 
 /**
- * The current request's tenant. Resolves cookie → control session →
- * session.active_tenant_id → tenant. Falls back to the default tenant when there
- * is no resolvable session or active tenant — this covers the public
- * server-to-server webhooks (no cookie) and a multi-clinic user who hasn't
- * chosen yet (their page request gets redirected to /select-account by the auth
- * guards before any business data renders). Safe because middleware redirects
- * every logged-out app request to /login. Memoised per request with React
- * cache().
+ * Thrown when the request-scoped `db` proxy is touched with no resolvable
+ * tenant. This is the FAIL-CLOSED replacement for the old default-tenant
+ * fallback, which silently pointed unresolved requests at the original
+ * (renova) tenant's live DB — any handler that forgot its auth guard exposed
+ * one business's data to another. Now such a request throws instead.
  */
-export const getCurrentTenant = cache(() => {
+export class TenantResolutionError extends Error {
+  constructor(message = "[tenant] no tenant resolved for this request") {
+    super(message);
+    this.name = "TenantResolutionError";
+  }
+}
+
+/**
+ * Resolve + AUTHORIZE the active tenant for a coach session: auto-resolves a
+ * session that never picked a tenant when the user has exactly one active
+ * membership (0 or >1 → null), then validates a LIVE membership in the target
+ * tenant (revoked access → null, even if session.active_tenant_id still points
+ * there). The single shared implementation behind BOTH getCurrentMembership
+ * (lib/auth) and the db-proxy resolution below — previously duplicated, and
+ * any drift between the two meant requireUser() could pass as tenant B while
+ * the proxy resolved a different tenant.
+ */
+export function resolveSessionTenant(
+  userId: number,
+  activeTenantId: number | null,
+): { tenantId: number; role: "admin" | "staff" } | null {
+  let tid = activeTenantId;
+  if (tid == null) {
+    const ms = controlDb
+      .select({ tenantId: schema.memberships.tenantId })
+      .from(schema.memberships)
+      .where(
+        and(
+          eq(schema.memberships.userId, userId),
+          eq(schema.memberships.isActive, true),
+        ),
+      )
+      .all();
+    if (ms.length !== 1) return null;
+    tid = ms[0].tenantId;
+  }
+  const m = controlDb
+    .select({ role: schema.memberships.role })
+    .from(schema.memberships)
+    .where(
+      and(
+        eq(schema.memberships.userId, userId),
+        eq(schema.memberships.tenantId, tid),
+        eq(schema.memberships.isActive, true),
+      ),
+    )
+    .get();
+  if (!m) return null;
+  return { tenantId: tid, role: m.role };
+}
+
+/**
+ * The current request's tenant, or NULL when none is resolvable — never a
+ * default. Resolution order: runWithTenant context → coach session (with live
+ * membership + tenant.isActive validation) → client-app session (with
+ * tenant.isActive validation). Chrome that legitimately renders without a
+ * tenant (login, select-account, invite pages) uses this and branches on null;
+ * data paths use getCurrentTenant() below, which throws instead.
+ */
+export const resolveCurrentTenant = cache((): schema.Tenant | null => {
   // A detached job bound via runWithTenant wins over cookie resolution.
   const ctxTenantId = tenantContext.getStore();
   if (ctxTenantId != null) {
@@ -251,9 +307,9 @@ export const getCurrentTenant = cache(() => {
     // cookies() throws only outside a request scope — a detached background job.
     // Had it bound a tenant via runWithTenant we'd have returned above, so
     // reaching here means a job used the request-scoped `db` proxy with no
-    // tenant context. Fail loud rather than silently writing to the default
-    // tenant (which would mix one clinic's data into another). `next build`
-    // static generation also runs outside a request — let it fall through.
+    // tenant context. Fail loud rather than silently writing to another
+    // tenant's DB. `next build` static generation also runs outside a request —
+    // let it resolve to null (getCurrentTenant substitutes a build-only stub).
     if (process.env.NEXT_PHASE !== "phase-production-build") {
       throw new Error(
         "[tenant] the request-scoped `db` was accessed outside a request " +
@@ -261,7 +317,7 @@ export const getCurrentTenant = cache(() => {
           "runWithTenant(tenantId, …) or use getTenantDbById(id).",
       );
     }
-    token = undefined;
+    return null;
   }
 
   if (token) {
@@ -275,29 +331,12 @@ export const getCurrentTenant = cache(() => {
       .where(eq(schema.authSessions.id, token))
       .get();
     if (row && row.expiresAt.getTime() > Date.now()) {
-      let tid = row.activeTenantId;
-      // MUST mirror getCurrentMembership(): a session that never picked an active
-      // tenant still resolves when the user has exactly one active membership.
-      // Without this, requireUser() passes as tenant B (single membership) while
-      // the db proxy silently falls through to the DEFAULT tenant below — a
-      // cross-tenant read/write. 0 or >1 memberships → leave unresolved (the
-      // request is rejected by requireUser; only /select-account chrome renders).
-      if (tid == null) {
-        const ms = controlDb
-          .select({ tenantId: schema.memberships.tenantId })
-          .from(schema.memberships)
-          .where(
-            and(
-              eq(schema.memberships.userId, row.userId),
-              eq(schema.memberships.isActive, true),
-            ),
-          )
-          .all();
-        if (ms.length === 1) tid = ms[0].tenantId;
-      }
-      if (tid != null) {
-        const t = getTenantById(tid);
-        if (t) return t;
+      const resolved = resolveSessionTenant(row.userId, row.activeTenantId);
+      if (resolved) {
+        const t = getTenantById(resolved.tenantId);
+        // Deactivated tenant fails closed here too — matching
+        // getCurrentMembership, which already refused it for authorization.
+        if (t && t.isActive) return t;
       }
     }
   }
@@ -318,26 +357,40 @@ export const getCurrentTenant = cache(() => {
       .get();
     if (cs && cs.expiresAt.getTime() > Date.now()) {
       const t = getTenantById(cs.tenantId);
-      if (t) return t;
+      if (t && t.isActive) return t;
     }
   }
 
-  const fallback = getTenantBySlug(DEFAULT_TENANT_SLUG);
-  if (fallback) return fallback;
+  return null;
+});
 
-  // Registry not yet populated — e.g. build-time static generation (the boot
-  // migration is skipped during `next build`) or a pre-migration boot. Resolve
-  // the default tenant to the legacy clinic.db directly so db access never hard
-  // fails. The synthetic id is never used: business tables carry no tenant_id,
-  // and identity queries go through the control plane, not this proxy.
-  return {
-    id: 0,
-    slug: DEFAULT_TENANT_SLUG,
-    name: "Default",
-    dbFile: "clinic.db",
-    isActive: true,
-    createdAt: new Date(),
-  };
+/**
+ * The current request's tenant — THROWS (TenantResolutionError) when none is
+ * resolvable. There is deliberately no default-tenant fallback: an unresolved
+ * or forged session must never be routed to a real tenant's data. Public
+ * server-to-server entry points (webhooks, cron, public sites, unsubscribe)
+ * never rely on this — they bind their tenant explicitly via
+ * runWithTenant/getTenantDbById after their own verification.
+ */
+export const getCurrentTenant = cache(() => {
+  const t = resolveCurrentTenant();
+  if (t) return t;
+
+  // `next build` static generation runs outside any request; give it an inert
+  // stub so build-time module evaluation that touches `db` doesn't explode.
+  // Never reachable at runtime (NEXT_PHASE is only set during the build).
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return {
+      id: 0,
+      slug: DEFAULT_TENANT_SLUG,
+      name: "Default",
+      dbFile: "clinic.db",
+      isActive: true,
+      createdAt: new Date(),
+    };
+  }
+
+  throw new TenantResolutionError();
 });
 
 /** The current request's tenant DB (see getCurrentTenant). */
