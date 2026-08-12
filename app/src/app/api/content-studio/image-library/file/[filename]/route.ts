@@ -1,7 +1,10 @@
 import { guard } from "@/lib/api/guard";
 import { NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
 import fs from "node:fs";
 import path from "node:path";
+import { db } from "@/lib/db";
+import { imageLibraryAssets } from "@/lib/db/schema";
 import { libraryFilePath } from "@/lib/image/library";
 import { mediaSecurityHeaders } from "@/lib/api/mediaSecurityHeaders";
 
@@ -25,6 +28,20 @@ export async function GET(
   const __auth = await guard("user");
   if (__auth) return __auth;
   const filename = decodeURIComponent(params.filename);
+  // Ownership check: the on-disk library dir is shared across tenants (legacy
+  // layout), so serving by filename alone would let one tenant's user fetch
+  // another tenant's upload. Only serve files this tenant's own DB row claims.
+  const owned = db
+    .select({ id: imageLibraryAssets.id })
+    .from(imageLibraryAssets)
+    .where(eq(imageLibraryAssets.filename, filename))
+    .get();
+  if (!owned) {
+    return NextResponse.json(
+      { ok: false, error: "Not found." },
+      { status: 404 },
+    );
+  }
   const filePath = libraryFilePath(filename);
   if (!fs.existsSync(filePath)) {
     return NextResponse.json(
