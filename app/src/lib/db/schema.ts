@@ -1309,6 +1309,11 @@ export const siteDomains = sqliteTable(
     isPrimary: integer("is_primary", { mode: "boolean" })
       .notNull()
       .default(false),
+    // Ownership proof: DNS TXT record `_adonisagent-verify.<host>` must carry
+    // verifyToken before resolveHost honours the mapping. NULL verifiedAt =
+    // pending (rows predating verification were grandfathered as verified).
+    verifyToken: text("verify_token"),
+    verifiedAt: integer("verified_at", { mode: "timestamp_ms" }),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireAdminPage, getCurrentMembership } from "@/lib/auth";
 import { getSiteBySlug } from "@/lib/cms/sites";
-import { addDomain, removeDomain, makePrimary } from "@/lib/cms/domains";
+import { addDomain, removeDomain, makePrimary, verifyDomain } from "@/lib/cms/domains";
 
 async function ctx(siteSlug: string) {
   await requireAdminPage();
@@ -44,4 +44,14 @@ export async function makePrimaryAction(siteSlug: string, id: number) {
   const { tenantId, site } = await ctx(siteSlug);
   makePrimary(tenantId, site.id, id);
   revalidatePath(`/cms/${siteSlug}/domains`);
+}
+
+export async function verifyDomainAction(
+  siteSlug: string,
+  id: number,
+): Promise<DomainState> {
+  const { tenantId, site } = await ctx(siteSlug);
+  const res = await verifyDomain(tenantId, site.id, id);
+  revalidatePath(`/cms/${siteSlug}/domains`);
+  return res.ok ? { ok: true } : { ok: false, error: res.error };
 }

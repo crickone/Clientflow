@@ -22,6 +22,8 @@ export default async function SiteDomainsPage({
     id: d.id,
     host: d.host,
     isPrimary: d.isPrimary,
+    verified: Boolean(d.verifiedAt),
+    verifyToken: d.verifyToken,
   }));
 
   return (

@@ -53,7 +53,9 @@ export function resolvePublicSite(opts: {
       .from(siteDomains)
       .where(eq(siteDomains.host, host))
       .get();
-    if (domain) {
+    // Only honour OWNERSHIP-VERIFIED mappings: an unverified row is a claim,
+    // not proof the tenant controls the hostname (see lib/cms/domains.ts).
+    if (domain && domain.verifiedAt) {
       const tenant = getTenantById(domain.tenantId);
       if (tenant) {
         const conn = openTenantDb(tenant.dbFile);

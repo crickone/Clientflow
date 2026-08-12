@@ -169,6 +169,12 @@ export function ensureControlTables() {
       tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
       site_id INTEGER NOT NULL,
       is_primary INTEGER NOT NULL DEFAULT 0,
+      -- Domain-ownership verification (P0 security sprint): a tenant admin must
+      -- prove control of a hostname (DNS TXT record carrying verify_token)
+      -- before public rendering honours the mapping. Unverified rows are
+      -- ignored by resolveHost. verified_at IS NULL = pending.
+      verify_token TEXT,
+      verified_at INTEGER,
       created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
 
@@ -474,6 +480,27 @@ export function ensureControlTables() {
     );
     CREATE INDEX IF NOT EXISTS idx_email_credit_ledger_tenant ON email_credit_ledger(tenant_id, created_at);
   `);
+
+  // Existing control DBs predate site_domains.verify_token/verified_at. The
+  // CREATE above only applies to fresh installs, so add them once on older DBs
+  // (PRAGMA-guarded). Rows that already exist were mapped by the operator
+  // before verification existed — grandfather them as verified AT MIGRATION
+  // TIME ONLY (inside this branch), so live client sites don't drop offline;
+  // every row added after this migration starts unverified.
+  try {
+    const cols = controlSqlite
+      .prepare("PRAGMA table_info(site_domains)")
+      .all() as Array<{ name: string }>;
+    if (!cols.find((c) => c.name === "verified_at")) {
+      controlSqlite.exec("ALTER TABLE site_domains ADD COLUMN verify_token TEXT");
+      controlSqlite.exec("ALTER TABLE site_domains ADD COLUMN verified_at INTEGER");
+      controlSqlite
+        .prepare("UPDATE site_domains SET verified_at = ? WHERE verified_at IS NULL")
+        .run(Date.now());
+    }
+  } catch (err) {
+    console.error("[control] site_domains verification migration failed:", err);
+  }
 
   // Existing control DBs predate auth_sessions.active_tenant_id; the CREATE above
   // only applies to fresh installs, so add it once on older DBs (PRAGMA-guarded,
