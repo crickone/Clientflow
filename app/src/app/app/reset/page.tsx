@@ -1,5 +1,6 @@
 import { getChromeLogoSrc } from "@/lib/branding";
 import { getBusinessProfile } from "@/lib/businessProfile";
+import { resolveCurrentTenant } from "@/lib/db/tenant";
 import { verifyResetToken } from "@/lib/clientPasswordReset";
 import { ClientResetForm, ClientResetMessage } from "@/components/clientapp/ClientResetForm";
 
@@ -11,8 +12,12 @@ export default function ClientResetPage({
   searchParams: { token?: string };
 }) {
   const token = (searchParams.token ?? "").trim();
-  const logoSrc = getChromeLogoSrc();
-  const businessName = getBusinessProfile().businessName;
+  // Pre-session page: tenant resolution is fail-closed, so there is usually no
+  // tenant to brand for here. The valid-token branch below still shows the
+  // link's own business name (resolved from the token, not the session).
+  const tenant = resolveCurrentTenant();
+  const logoSrc = tenant ? getChromeLogoSrc() : null;
+  const businessName = tenant ? getBusinessProfile().businessName : "";
 
   if (!token) {
     return (
