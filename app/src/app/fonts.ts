@@ -1,5 +1,6 @@
 import {
   Bebas_Neue,
+  Familjen_Grotesk,
   Hanken_Grotesk,
   Inter,
   Manrope,
@@ -33,6 +34,16 @@ export const heading = Space_Grotesk({
   weight: ["400", "500", "600", "700"],
   display: "swap",
   variable: "--font-heading",
+});
+
+// Familjen Grotesk — the marketing-site brand face. Loaded here so the app logo
+// (Logo.tsx) renders in the same font as adonisagent.ie, and so it's available
+// as `--font-familjen` for any app surface. Google-hosted; next/font self-hosts.
+export const familjen = Familjen_Grotesk({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+  variable: "--font-familjen",
 });
 
 // Local display fonts already shipped in /fonts. Nebula is the marketing/brand

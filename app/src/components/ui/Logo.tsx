@@ -73,7 +73,7 @@ export function Logo({
         >
           <span
             style={{
-              fontFamily: "var(--font-heading), sans-serif",
+              fontFamily: "var(--font-familjen), var(--font-heading), sans-serif",
               textTransform: "uppercase",
               fontSize: Math.round(height * 0.72),
               letterSpacing: "0.02em",

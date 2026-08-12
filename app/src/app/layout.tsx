@@ -30,6 +30,7 @@ import {
   bebasNeue,
   body,
   clashDisplay,
+  familjen,
   heading,
   inter,
   manrope,
@@ -51,7 +52,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export const dynamic = "force-dynamic";
 
-const FONT_VARS = `${body.variable} ${mono.variable} ${heading.variable} ${nebula.variable} ${nebulaHollow.variable} ${clashDisplay.variable} ${inter.variable} ${manrope.variable} ${spaceGrotesk.variable} ${playfairDisplay.variable} ${bebasNeue.variable}`;
+const FONT_VARS = `${body.variable} ${mono.variable} ${heading.variable} ${familjen.variable} ${nebula.variable} ${nebulaHollow.variable} ${clashDisplay.variable} ${inter.variable} ${manrope.variable} ${spaceGrotesk.variable} ${playfairDisplay.variable} ${bebasNeue.variable}`;
 
 export default async function RootLayout({
   children,
