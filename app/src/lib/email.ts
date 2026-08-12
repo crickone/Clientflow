@@ -194,14 +194,14 @@ export async function sendEmailForTenant(tenantId: number, opts: SendOpts): Prom
 /**
  * Send a PLATFORM email — one that's about the AdonisAgent account itself (staff
  * invites, team/account notices), NOT a business→customer email. Always sends
- * from AdonisAgent's OWN already-verified domain (clientflow.ie) via Resend, so
- * it works for every tenant regardless of whether that tenant has connected its
+ * from AdonisAgent's OWN verified domain (adonisagent.ie) via Resend, so it
+ * works for every tenant regardless of whether that tenant has connected its
  * own email provider. Business→customer mail must keep using sendEmail /
  * sendEmailForTenant (the tenant's own branded sender). Never throws.
  *
- * The default from-address relies on clientflow.ie being verified in Resend
- * (the same domain billing emails already send from); override with
- * PLATFORM_EMAIL_FROM if that ever changes.
+ * The default from-address (`no-reply@adonisagent.ie`) relies on adonisagent.ie
+ * being verified in Resend (the same domain billing emails send from); override
+ * with PLATFORM_EMAIL_FROM.
  */
 export async function sendPlatformEmail(opts: {
   to: string | string[];

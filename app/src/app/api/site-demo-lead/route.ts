@@ -10,7 +10,7 @@ import { logActivity } from "@/lib/queries";
 export const dynamic = "force-dynamic";
 
 /**
- * Public lead capture for the clientflow.ie marketing site's "Book a demo" form.
+ * Public lead capture for the AdonisAgent marketing site's (adonisagent.ie) "Book a demo" form.
  * Unlike the per-tenant `/api/leads/inbound` webhook (which is keyed), this is a
  * single-purpose endpoint hard-bound to the AdonisAgent tenant server-side — so
  * NO API key is ever exposed in the browser. Rate-limited by IP. Demo requests
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
   await runWithTenant(tenant.id, async () => {
     const { lead, created } = upsertLead({
       source: "website-demo",
-      campaign: "clientflow.ie",
+      campaign: "adonisagent.ie",
       firstName,
       lastName,
       email: d.email,
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
       rawPayload: body,
     });
     if (created) {
-      await logActivity("lead.new", `Demo request via clientflow.ie: ${d.name}${d.business ? ` (${d.business})` : ""}`, {
+      await logActivity("lead.new", `Demo request via adonisagent.ie: ${d.name}${d.business ? ` (${d.business})` : ""}`, {
         leadId: lead.id,
       });
     }
