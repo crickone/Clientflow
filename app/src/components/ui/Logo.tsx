@@ -33,44 +33,72 @@ export function Logo({
   }, [src]);
 
   if (!src || failed) {
+    const markSize = Math.round(height * 1.02);
     return (
       <span
         style={{
           display: "inline-flex",
-          flexDirection: "column",
-          gap: 3,
-          lineHeight: 1,
+          alignItems: "center",
+          gap: Math.round(height * 0.34),
           maxWidth: "100%",
           minWidth: 0,
+          color: "var(--text-primary)",
         }}
       >
+        {/* AdonisAgent Greek-key mark — same meander as the marketing site */}
+        <svg
+          width={markSize}
+          height={markSize}
+          viewBox="0 0 120 120"
+          aria-hidden="true"
+          style={{ flex: "none", display: "block" }}
+        >
+          <path
+            d="M20 20 L100 20 L100 100 L20 100 L20 40 L80 40 L80 80 L40 80 L40 60 L60 60"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={10}
+            strokeLinecap="square"
+            strokeLinejoin="miter"
+          />
+        </svg>
         <span
           style={{
-            fontFamily: "var(--font-heading), sans-serif",
-            textTransform: "uppercase",
-            fontSize: Math.round(height * 0.72),
-            letterSpacing: "0.02em",
+            display: "inline-flex",
+            flexDirection: "column",
+            gap: 3,
             lineHeight: 1,
-            color: "var(--text-primary)",
+            minWidth: 0,
           }}
         >
-          AdonisAgent
-        </span>
-        {alt && (
           <span
             style={{
-              fontFamily: "var(--font-mono), ui-monospace, monospace",
-              fontSize: Math.max(9, Math.round(height * 0.38)),
-              letterSpacing: "0.04em",
-              color: "var(--text-tertiary)",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
+              fontFamily: "var(--font-heading), sans-serif",
+              textTransform: "uppercase",
+              fontSize: Math.round(height * 0.72),
+              letterSpacing: "0.02em",
+              lineHeight: 1,
+              color: "var(--text-primary)",
             }}
           >
-            — {alt}
+            AdonisAgent
           </span>
-        )}
+          {alt && (
+            <span
+              style={{
+                fontFamily: "var(--font-mono), ui-monospace, monospace",
+                fontSize: Math.max(9, Math.round(height * 0.38)),
+                letterSpacing: "0.04em",
+                color: "var(--text-tertiary)",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              — {alt}
+            </span>
+          )}
+        </span>
       </span>
     );
   }
