@@ -5,6 +5,7 @@ interface Settings {
   monthlyPriceCents: number;
   vatRateBp: number;
   emailCreditPricePer1000Cents: number;
+  aiCreditMarginBp: number;
   provider: string;
 }
 
@@ -63,6 +64,23 @@ export default async function SettingsPage({
             defaultValue={(s.emailCreditPricePer1000Cents / 100).toFixed(2)}
             required
           />
+        </label>
+
+        <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>AI credit margin (%)</span>
+          <input
+            className="input"
+            type="number"
+            step="0.01"
+            min="0"
+            max="100"
+            name="aiMargin"
+            defaultValue={(s.aiCreditMarginBp / 100).toFixed(2)}
+            required
+          />
+          <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>
+            Markup over raw model cost, charged on AI usage beyond each business&apos;s free monthly allowance.
+          </p>
         </label>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>

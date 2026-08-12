@@ -9,7 +9,7 @@ import { GrantCreditsForm } from "@/components/GrantCreditsForm";
 import { OpenBusinessButton } from "@/components/OpenBusinessButton";
 import { Card } from "@/components/ui/Card";
 import type { InvoiceRow, TenantDetail } from "@/lib/types";
-import { tenantAction, openTenant, grantCreditsAction } from "./actions";
+import { tenantAction, openTenant, grantCreditsAction, grantAiCreditsAction } from "./actions";
 
 /** Invoice statuses are a different vocabulary from billing statuses, so they
  *  don't reuse the `.chip.<status>` CSS — colour them inline instead. */
@@ -35,7 +35,7 @@ export default async function GymDetailPage({
   searchParams,
 }: {
   params: { id: string };
-  searchParams: { error?: string; granted?: string };
+  searchParams: { error?: string; granted?: string; aiError?: string; aiGranted?: string };
 }) {
   const id = Number(params.id);
   let data: TenantDetail;
@@ -252,6 +252,108 @@ export default async function GymDetailPage({
         )}
         {searchParams.granted && !searchParams.error && (
           <p style={{ margin: 0, color: "var(--green)", fontSize: 13 }}>Credits granted.</p>
+        )}
+      </Card>
+
+      {/* AI credits */}
+      <Card style={{ padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
+        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>AI credits</h2>
+        <div style={{ display: "flex", gap: 40, flexWrap: "wrap" }}>
+          <div>
+            <div className="mono-label" style={{ marginBottom: 6 }}>
+              Free allowance (this month)
+            </div>
+            <div style={{ fontSize: 14 }}>
+              {fmtCents(Math.round(data.ai.monthlyUsedCents))} / {fmtCents(data.ai.freeTrancheCents)} used
+            </div>
+          </div>
+          <div>
+            <div className="mono-label" style={{ marginBottom: 6 }}>
+              Credit balance
+            </div>
+            <div style={{ fontSize: 14, color: data.ai.balanceCents < 0 ? "var(--red)" : undefined }}>
+              {fmtCents(data.ai.balanceCents)}
+            </div>
+          </div>
+          <div>
+            <div className="mono-label" style={{ marginBottom: 6 }}>
+              Auto top-up
+            </div>
+            <div style={{ fontSize: 14 }}>
+              {data.ai.autoTopup.enabled
+                ? `On — tops up ${fmtCents(data.ai.autoTopup.amountCents)} below ${fmtCents(data.ai.autoTopup.thresholdCents)}`
+                : "Off"}
+            </div>
+          </div>
+          <div>
+            <div className="mono-label" style={{ marginBottom: 6 }}>
+              Status
+            </div>
+            <span className={`chip ${data.ai.suspended ? "suspended" : "active"}`}>
+              {data.ai.suspended ? "suspended" : "active"}
+            </span>
+          </div>
+        </div>
+
+        <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>
+          The free allowance is absorbed by the platform; usage beyond it draws down prepaid credits (raw model cost + margin).
+        </p>
+
+        <GrantCreditsForm action={grantAiCreditsAction.bind(null, tenant.id)} noun="AI credits" />
+
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {data.ai.suspended ? (
+            <ConfirmButton
+              label="Resume AI"
+              confirm="Resume AI for this business? Its agents and content tools can run again."
+              action={tenantAction.bind(null, tenant.id, "resume-ai", {})}
+            />
+          ) : (
+            <ConfirmButton
+              label="Suspend AI"
+              danger
+              confirm="Suspend AI for this business? No agent or content-studio calls run until resumed."
+              action={tenantAction.bind(null, tenant.id, "suspend-ai", {})}
+            />
+          )}
+        </div>
+
+        {searchParams.aiError && (
+          <p role="alert" style={{ margin: 0, color: "var(--red)", fontSize: 13 }}>
+            {searchParams.aiError}
+          </p>
+        )}
+        {searchParams.aiGranted && !searchParams.aiError && (
+          <p style={{ margin: 0, color: "var(--green)", fontSize: 13 }}>AI credits granted.</p>
+        )}
+
+        {data.ai.ledger.length > 0 && (
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Movement</th>
+                <th>Amount</th>
+                <th>Balance</th>
+                <th>When</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.ai.ledger.map((r) => (
+                <tr key={r.id}>
+                  <td>
+                    {r.reason}
+                    {r.note ? <span style={{ color: "var(--muted-2)" }}> · {r.note}</span> : null}
+                  </td>
+                  <td style={{ color: r.deltaCents >= 0 ? "var(--green)" : "var(--red)" }}>
+                    {r.deltaCents >= 0 ? "+" : "−"}
+                    {fmtCents(Math.abs(r.deltaCents))}
+                  </td>
+                  <td>{fmtCents(r.balanceAfterCents)}</td>
+                  <td>{fmtDate(r.createdAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </Card>
 

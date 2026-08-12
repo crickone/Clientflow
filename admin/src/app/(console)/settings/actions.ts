@@ -14,10 +14,12 @@ export async function saveSettings(formData: FormData): Promise<void> {
   const priceRaw = String(formData.get("monthlyPrice") ?? "");
   const vatRaw = String(formData.get("vatRate") ?? "");
   const emailPriceRaw = String(formData.get("emailPrice") ?? "");
+  const aiMarginRaw = String(formData.get("aiMargin") ?? "");
 
   const priceEur = parseFloat(priceRaw);
   const vatPct = parseFloat(vatRaw);
   const emailPriceEur = parseFloat(emailPriceRaw);
+  const aiMarginPct = parseFloat(aiMarginRaw);
 
   if (!Number.isFinite(priceEur) || priceEur < 0) {
     redirect(`/settings?error=${encodeURIComponent("Enter a valid, non-negative monthly price.")}`);
@@ -28,16 +30,20 @@ export async function saveSettings(formData: FormData): Promise<void> {
   if (!Number.isFinite(emailPriceEur) || emailPriceEur < 0) {
     redirect(`/settings?error=${encodeURIComponent("Enter a valid, non-negative email credit price.")}`);
   }
+  if (!Number.isFinite(aiMarginPct) || aiMarginPct < 0) {
+    redirect(`/settings?error=${encodeURIComponent("Enter a valid, non-negative AI credit margin.")}`);
+  }
 
   const monthlyPriceCents = Math.round(priceEur * 100);
   const vatRateBp = Math.round(vatPct * 100);
   const emailCreditPricePer1000Cents = Math.round(emailPriceEur * 100);
+  const aiCreditMarginBp = Math.round(aiMarginPct * 100);
 
   let errorMsg: string | null = null;
   try {
     await api("/settings", {
       method: "PUT",
-      body: { monthlyPriceCents, vatRateBp, emailCreditPricePer1000Cents },
+      body: { monthlyPriceCents, vatRateBp, emailCreditPricePer1000Cents, aiCreditMarginBp },
     });
   } catch (err) {
     errorMsg = err instanceof ApiError ? err.message : "Failed to save settings.";

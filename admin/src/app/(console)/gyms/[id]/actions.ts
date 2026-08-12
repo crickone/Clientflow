@@ -18,6 +18,9 @@ export type TenantActionName =
   | "grant-credits"
   | "suspend-marketing"
   | "resume-marketing"
+  | "grant-ai-credits"
+  | "suspend-ai"
+  | "resume-ai"
   | "offboard";
 
 /**
@@ -92,4 +95,27 @@ export async function grantCreditsAction(id: number, formData: FormData): Promis
   }
 
   redirect(`/gyms/${id}?granted=1`);
+}
+
+/**
+ * Grant prepaid AI credits to a tenant — same shape as `grantCreditsAction`,
+ * just the AI ledger (`POST /tenants/:id/grant-ai-credits`). Uses its own
+ * `?aiError=` / `?aiGranted=1` searchParams so feedback lands under the AI card,
+ * not the email one. Bound as `grantAiCreditsAction.bind(null, tenant.id)`.
+ */
+export async function grantAiCreditsAction(id: number, formData: FormData): Promise<void> {
+  const eurosRaw = String(formData.get("euros") ?? "");
+  const euros = parseFloat(eurosRaw);
+
+  if (!Number.isFinite(euros) || euros <= 0) {
+    redirect(`/gyms/${id}?aiError=${encodeURIComponent("Enter a valid, positive credit amount.")}`);
+  }
+
+  const cents = Math.round(euros * 100);
+  const r = await tenantAction(id, "grant-ai-credits", { cents });
+  if (!r.ok) {
+    redirect(`/gyms/${id}?aiError=${encodeURIComponent(r.error ?? "Failed to grant AI credits.")}`);
+  }
+
+  redirect(`/gyms/${id}?aiGranted=1`);
 }

@@ -18,9 +18,12 @@ import { fmtCents } from "@/lib/format";
  */
 export function GrantCreditsForm({
   action,
+  noun = "credits",
 }: {
   /** `grantCreditsAction` bound to the tenant id (see ./actions.ts). */
   action: (formData: FormData) => void | Promise<void>;
+  /** What's being granted, for the label + confirm copy — e.g. "AI credits". Defaults to "credits". */
+  noun?: string;
 }) {
   const [euros, setEuros] = useState("");
 
@@ -31,14 +34,14 @@ export function GrantCreditsForm({
         const amount = parseFloat(euros);
         const label =
           Number.isFinite(amount) && amount > 0 ? fmtCents(Math.round(amount * 100)) : "this amount";
-        if (!window.confirm(`Grant ${label} in credits to this business? This can't be undone from here.`)) {
+        if (!window.confirm(`Grant ${label} in ${noun} to this business? This can't be undone from here.`)) {
           e.preventDefault();
         }
       }}
       style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}
     >
       <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Grant credits (EUR)</span>
+        <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Grant {noun} (EUR)</span>
         <input
           className="input"
           type="number"

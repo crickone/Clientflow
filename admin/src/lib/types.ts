@@ -92,6 +92,30 @@ export interface AutoTopup {
   amountCents: number;
 }
 
+/** One AI-credit ledger movement — mirrors `AiLedgerRow` in
+ *  app/src/lib/ai/creditsLedger.ts EXACTLY. */
+export interface AiLedgerRow {
+  id: number;
+  tenantId: number;
+  deltaCents: number;
+  reason: string;
+  balanceAfterCents: number;
+  note: string | null;
+  createdAt: number;
+}
+
+/** A tenant's AI-credit add-on state — mirrors the `ai` block returned by
+ *  `/tenants/:id` (app/src/app/api/platform/tenants/[id]/route.ts). The €25/mo
+ *  free tranche is absorbed by the operator; overflow bills the prepaid balance. */
+export interface AiCreditState {
+  balanceCents: number;
+  freeTrancheCents: number;
+  monthlyUsedCents: number;
+  suspended: boolean;
+  autoTopup: AutoTopup;
+  ledger: AiLedgerRow[];
+}
+
 export interface TenantDetail {
   tenant: TenantSummary;
   usage: { clients: number; staff: number };
@@ -102,6 +126,8 @@ export interface TenantDetail {
   emailBalanceCents: number;
   marketingSuspended: boolean;
   autoTopup: AutoTopup;
+  /** AI-credit add-on state — free-tranche usage + prepaid overflow balance. */
+  ai: AiCreditState;
 }
 
 /**
