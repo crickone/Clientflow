@@ -1,8 +1,8 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
 import { getBusinessContext } from "@/lib/ai/businessContext";
-import { MODELS } from "@/lib/ai/client";
-import { assertUnderCap, recordUsage } from "@/lib/ai/usage";
+import { CONTENT_MODEL } from "@/lib/ai/client";
+import { meteredCreate } from "@/lib/ai/metered";
 
 // Slide-refresh task + format rules. Business identity, services, and voice come
 // from getBusinessContext() (venue-aware) and are prepended at call time.
@@ -145,17 +145,9 @@ function extractPayload(
 export async function refreshCaptionOnly(
   input: RefreshInput,
 ): Promise<{ caption: string; usage: RefreshResult["usage"] }> {
-  // Checked first — see the matching comment on refreshSlidesContent below.
-  assertUnderCap(input.tenantId);
-
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error("ANTHROPIC_API_KEY is not set.");
-  }
   if (input.slides.length === 0) {
     throw new Error("No slides supplied.");
   }
-
-  const client = new Anthropic();
 
   const lines: string[] = [];
   if (input.designName) lines.push(`Design name: ${input.designName}`);
@@ -175,8 +167,11 @@ export async function refreshCaptionOnly(
     `Write a fresh Instagram / Facebook caption for this carousel, different from anything you might have written before. 80–200 words, hook + 2–4 short paragraphs of real value + a soft call to action mentioning the business by name. Plain text, no emojis. Return ONLY the caption text — no JSON, no markdown, no preamble.`,
   );
 
-  const message = await client.messages.create({
-    model: MODELS.opus,
+  // meteredCreate enforces the monthly AI cap FIRST, then records the
+  // "carousel" spend after; getBusinessContext (a tenant-DB read) is kept
+  // inside the params thunk so it can't run for a capped tenant.
+  const message = await meteredCreate({ tenantId: input.tenantId, agentKey: "carousel" }, () => ({
+    model: CONTENT_MODEL,
     max_tokens: 1024,
     thinking: { type: "adaptive" },
     system: [
@@ -187,20 +182,13 @@ export async function refreshCaptionOnly(
       },
     ],
     messages: [{ role: "user", content: lines.join("\n") }],
-  });
+  }));
 
   const caption = message.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
     .map((b) => b.text)
     .join("\n")
     .trim();
-
-  recordUsage(input.tenantId, "carousel", MODELS.opus, {
-    inputTokens: message.usage.input_tokens,
-    outputTokens: message.usage.output_tokens,
-    cacheReadTokens: message.usage.cache_read_input_tokens ?? 0,
-    cacheCreateTokens: message.usage.cache_creation_input_tokens ?? 0,
-  });
 
   return {
     caption,
@@ -216,16 +204,6 @@ export async function refreshCaptionOnly(
 export async function refreshSlidesContent(
   input: RefreshInput,
 ): Promise<RefreshResult> {
-  // Checked first (before the API-key/input-shape guards below) so a capped
-  // tenant never burns a token and the cap trips deterministically regardless
-  // of environment/input state.
-  assertUnderCap(input.tenantId);
-
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error(
-      "ANTHROPIC_API_KEY is not set. Add it to .env.local in the app/ folder.",
-    );
-  }
   if (input.slides.length === 0) {
     throw new Error("No slides supplied.");
   }
@@ -233,10 +211,11 @@ export async function refreshSlidesContent(
     throw new Error("Too many slides — refresh up to 12 at a time.");
   }
 
-  const client = new Anthropic();
-
-  const message = await client.messages.create({
-    model: MODELS.opus,
+  // meteredCreate enforces the monthly AI cap FIRST, then records the
+  // "carousel" spend after; getBusinessContext (a tenant-DB read) is kept
+  // inside the params thunk so it can't run for a capped tenant.
+  const message = await meteredCreate({ tenantId: input.tenantId, agentKey: "carousel" }, () => ({
+    model: CONTENT_MODEL,
     max_tokens: 4096,
     thinking: { type: "adaptive" },
     system: [
@@ -252,7 +231,7 @@ export async function refreshSlidesContent(
         content: buildUserPrompt(input),
       },
     ],
-  });
+  }));
 
   const text = message.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
@@ -260,13 +239,6 @@ export async function refreshSlidesContent(
     .join("\n");
 
   const { slides, caption } = extractPayload(text, input.slides.length);
-
-  recordUsage(input.tenantId, "carousel", MODELS.opus, {
-    inputTokens: message.usage.input_tokens,
-    outputTokens: message.usage.output_tokens,
-    cacheReadTokens: message.usage.cache_read_input_tokens ?? 0,
-    cacheCreateTokens: message.usage.cache_creation_input_tokens ?? 0,
-  });
 
   return {
     slides,

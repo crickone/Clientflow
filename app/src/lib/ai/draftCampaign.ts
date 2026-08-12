@@ -1,7 +1,8 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
 import { getBusinessContext } from "@/lib/ai/businessContext";
-import { MODELS } from "@/lib/ai/client";
+import { CONTENT_MODEL } from "@/lib/ai/client";
+import { meteredCreate, type MeterContext } from "@/lib/ai/metered";
 
 /**
  * Campaign-specific task + format rules. The business identity, services,
@@ -76,27 +77,25 @@ function buildUserPrompt(input: CampaignDraftInput): string {
   return lines.join("\n");
 }
 
+/**
+ * `meter` ({tenantId, agentKey}) is required because this generator is the
+ * actual paid model call — it goes through `meteredCreate`, which enforces the
+ * tenant's monthly AI cap and records the spend, so it can't be invoked
+ * unmetered. Its one caller (the campaign composer's Draft action) passes the
+ * "campaign_draft" agentKey.
+ */
 export async function draftCampaignEmail(
   input: CampaignDraftInput,
+  meter: MeterContext,
 ): Promise<CampaignDraftResult> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error(
-      "ANTHROPIC_API_KEY is not set. Add it to .env.local in the app/ folder.",
-    );
-  }
-
-  const client = new Anthropic();
-
-  const systemPrompt = `${getBusinessContext()}\n\n${CAMPAIGN_FORMAT_RULES}`;
-
-  const message = await client.messages.create({
-    model: MODELS.opus,
+  const message = await meteredCreate(meter, () => ({
+    model: CONTENT_MODEL,
     max_tokens: 4096,
     thinking: { type: "adaptive" },
     system: [
       {
         type: "text",
-        text: systemPrompt,
+        text: `${getBusinessContext()}\n\n${CAMPAIGN_FORMAT_RULES}`,
         cache_control: { type: "ephemeral" },
       },
     ],
@@ -106,7 +105,7 @@ export async function draftCampaignEmail(
         content: buildUserPrompt(input),
       },
     ],
-  });
+  }));
 
   const content = message.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")

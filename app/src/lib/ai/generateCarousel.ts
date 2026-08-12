@@ -1,7 +1,8 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
 import { getBusinessContext } from "@/lib/ai/businessContext";
-import { MODELS } from "@/lib/ai/client";
+import { CONTENT_MODEL } from "@/lib/ai/client";
+import { meteredCreate, type MeterContext } from "@/lib/ai/metered";
 
 // Carousel-specific task + format rules. Business identity, services, and voice
 // come from getBusinessContext() (venue-aware) and are prepended at call time.
@@ -215,30 +216,29 @@ function extractPayload(text: string): {
   return { slides, caption };
 }
 
+/**
+ * `meter` ({tenantId, agentKey}) is required because this generator is the
+ * actual paid model call — it goes through `meteredCreate`, which enforces the
+ * tenant's monthly AI cap and records the spend, so no caller can invoke it
+ * unmetered. Callers pass their own agentKey — "carousel" (Content Studio's
+ * Generate route) or "marketing" (the Marketing agent's draft_carousel tool).
+ */
 export async function generateCarouselSlides(
   input: GenerateInput,
+  meter: MeterContext,
 ): Promise<GenerateResult> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error(
-      "ANTHROPIC_API_KEY is not set. Add it to .env.local in the app/ folder.",
-    );
-  }
   if (input.slideCount < 2 || input.slideCount > 10) {
     throw new Error("Slide count must be between 2 and 10.");
   }
 
-  const client = new Anthropic();
-
-  const systemPrompt = `${getBusinessContext()}\n\n${CAROUSEL_FORMAT_RULES}`;
-
-  const message = await client.messages.create({
-    model: MODELS.opus,
+  const message = await meteredCreate(meter, () => ({
+    model: CONTENT_MODEL,
     max_tokens: 4096,
     thinking: { type: "adaptive" },
     system: [
       {
         type: "text",
-        text: systemPrompt,
+        text: `${getBusinessContext()}\n\n${CAROUSEL_FORMAT_RULES}`,
         cache_control: { type: "ephemeral" },
       },
     ],
@@ -248,7 +248,7 @@ export async function generateCarouselSlides(
         content: buildUserPrompt(input),
       },
     ],
-  });
+  }));
 
   const text = message.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")

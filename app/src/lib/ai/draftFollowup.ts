@@ -1,9 +1,9 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
 import type { Lead, LeadMessage } from "@/lib/db/schema";
 import { getBusinessContext } from "@/lib/ai/businessContext";
 import { MODELS } from "@/lib/ai/client";
-import { assertUnderCap, recordUsage } from "@/lib/ai/usage";
+import { meteredCreate } from "@/lib/ai/metered";
 
 /**
  * Follow-up writing rules. The business identity, services and voice/marketing
@@ -98,20 +98,11 @@ export async function draftFollowup({
   history,
   tenantId,
 }: DraftInput): Promise<DraftResult> {
-  // Checked first (before the API-key guard below) so a capped tenant never
-  // burns a token even in a misconfigured environment, and so the cap trips
-  // deterministically regardless of whether ANTHROPIC_API_KEY happens to be set.
-  assertUnderCap(tenantId);
-
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error(
-      "ANTHROPIC_API_KEY is not set. Add it to .env.local in the app/ folder.",
-    );
-  }
-
-  const client = new Anthropic();
-
-  const message = await client.messages.create({
+  // meteredCreate enforces the monthly AI cap FIRST — before the params thunk
+  // runs, so a capped tenant never burns a token (nor the business-context DB
+  // reads buildSystemPrompt pulls in) even in a misconfigured environment — and
+  // records the "followup"/opus spend after. AiCapError propagates to the caller.
+  const message = await meteredCreate({ tenantId, agentKey: "followup" }, () => ({
     model: MODELS.opus,
     max_tokens: 512,
     thinking: { type: "adaptive" },
@@ -128,20 +119,13 @@ export async function draftFollowup({
         content: buildUserPrompt(lead, history),
       },
     ],
-  });
+  }));
 
   const text = message.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
     .map((b) => b.text)
     .join("\n")
     .trim();
-
-  recordUsage(tenantId, "followup", MODELS.opus, {
-    inputTokens: message.usage.input_tokens,
-    outputTokens: message.usage.output_tokens,
-    cacheReadTokens: message.usage.cache_read_input_tokens ?? 0,
-    cacheCreateTokens: message.usage.cache_creation_input_tokens ?? 0,
-  });
 
   return {
     text,

@@ -10,8 +10,9 @@ import {
   syncGmailInbox,
 } from "@/lib/gmail";
 import { runWithTenant } from "@/lib/db/tenant";
-import { getAnthropic, MODELS } from "@/lib/ai/client";
-import { assertUnderCap, recordUsage, AiCapError } from "@/lib/ai/usage";
+import { MODELS } from "@/lib/ai/client";
+import { assertAiAllowed, AiCapError } from "@/lib/ai/usage";
+import { meteredCreate } from "@/lib/ai/metered";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -28,13 +29,13 @@ export async function GET() {
 
   // Checked before doing any of the (best-effort) Gmail sync / dashboard
   // aggregation work below — this route runs on every dashboard load, so a
-  // capped tenant must fail fast and cleanly rather than paying for all that
-  // work only to then also fail the model call. DailyBrief.tsx renders
-  // `data.brief` verbatim as the widget's content regardless of HTTP status
-  // (it never checks res.ok), so returning AiCapError's own friendly message
-  // here IS the clean, non-500 surface — no frontend change needed.
+  // blocked tenant (free tranche used up + no AI credits) must fail fast and
+  // cleanly rather than paying for all that work only to then also fail the
+  // model call. DailyBrief.tsx renders `data.brief` verbatim as the widget's
+  // content regardless of HTTP status (it never checks res.ok), so returning
+  // AiCapError's own friendly message here IS the clean, non-500 surface.
   try {
-    assertUnderCap(tenantId);
+    assertAiAllowed(tenantId);
   } catch (e) {
     if (e instanceof AiCapError) {
       return Response.json({ brief: e.message }, { status: 429 });
@@ -87,8 +88,10 @@ export async function GET() {
   };
 
   try {
-    const anthropic = getAnthropic();
-    const res = await anthropic.messages.create({
+    // meteredCreate re-checks the cap and records the "brief"/opus spend; the
+    // explicit assertAiAllowed above is the fast-path 429 that avoids the Gmail
+    // sync + dashboard aggregation for an already-capped tenant.
+    const res = await meteredCreate({ tenantId, agentKey: "brief" }, () => ({
       model: MODELS.opus,
       max_tokens: 500,
       system: `You write a short, friendly MORNING BRIEF for the owner of ${business}, a ${mode === "timetable" ? "gym/studio" : "clinic"}, shown at the top of their dashboard.
@@ -98,14 +101,8 @@ export async function GET() {
 - If there's genuinely nothing to flag, say it's a quiet day and suggest one useful thing to do.
 - Output ONLY the bullet points (each starting with "- "), no preamble or sign-off.`,
       messages: [{ role: "user", content: `Today's live data:\n${JSON.stringify(data, null, 2)}` }],
-    });
+    }));
     const brief = res.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim();
-    recordUsage(tenantId, "brief", MODELS.opus, {
-      inputTokens: res.usage.input_tokens,
-      outputTokens: res.usage.output_tokens,
-      cacheReadTokens: res.usage.cache_read_input_tokens ?? 0,
-      cacheCreateTokens: res.usage.cache_creation_input_tokens ?? 0,
-    });
     return Response.json({ brief });
   } catch {
     return Response.json({ brief: "" });

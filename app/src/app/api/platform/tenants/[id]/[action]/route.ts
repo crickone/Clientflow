@@ -17,6 +17,7 @@ import {
   logEvent,
 } from "@/lib/billing/engine";
 import { grantCredits, setMarketingSuspended } from "@/lib/email/credits";
+import { grantAiCredits, setAiSuspended } from "@/lib/ai/creditsLedger";
 
 export const dynamic = "force-dynamic";
 
@@ -86,6 +87,24 @@ export async function POST(
       case "resume-marketing":
         setMarketingSuspended(id, false, actor);
         logEvent(id, "marketing_resumed", null, actor);
+        break;
+      case "grant-ai-credits": {
+        // Same shape/guard as grant-credits: positive + capped (max €10,000 in
+        // one grant) so a fat-fingered amount can't hand out an unbounded balance.
+        const b = z
+          .object({ cents: z.number().int().positive().max(1_000_000) })
+          .parse(await req.json());
+        grantAiCredits(id, b.cents, actor);
+        logEvent(id, "ai_credits_granted", { cents: b.cents }, actor);
+        break;
+      }
+      case "suspend-ai":
+        setAiSuspended(id, true, actor);
+        logEvent(id, "ai_suspended", null, actor);
+        break;
+      case "resume-ai":
+        setAiSuspended(id, false, actor);
+        logEvent(id, "ai_resumed", null, actor);
         break;
       case "open": {
         // "Open business": grant the PLATFORM ADMIN'S OWN identity (g.userId —

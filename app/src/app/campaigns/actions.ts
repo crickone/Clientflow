@@ -14,8 +14,6 @@ import { markCampaignSending, precheckCampaign, runCampaignSend } from "@/lib/ma
 import { runWithTenant } from "@/lib/db/tenant";
 import { getAppBaseUrl } from "@/lib/appUrl";
 import { draftCampaignEmail } from "@/lib/ai/draftCampaign";
-import { MODELS } from "@/lib/ai/client";
-import { assertUnderCap, recordUsage } from "@/lib/ai/usage";
 
 /**
  * Server actions for the campaign composer (Task 4). Mirrors
@@ -136,10 +134,10 @@ export interface CampaignDraftFormInput {
 export type CampaignDraftActionResult = { ok: true; content: string } | { ok: false; error: string };
 
 /**
- * Draft an email body with AI. A paid call — bracketed by assertUnderCap
- * (before) / recordUsage (after), same pattern as runBlogGeneration /
- * draftBlogPostTool, under its own "campaign_draft" agentKey so the spend
- * breakdown on the Agents page stays meaningful. Never persists anything —
+ * Draft an email body with AI. draftCampaignEmail self-meters (assertUnderCap +
+ * recordUsage inside, via meteredCreate) under its own "campaign_draft"
+ * agentKey so the spend breakdown on the Agents page stays meaningful. Never
+ * persists anything —
  * the returned content is set into the composer's body field client-side;
  * the operator still has to Save.
  */
@@ -157,20 +155,16 @@ export async function draftCampaignBodyAction(
   const targetWords = Number.isFinite(targetWordsInput) && targetWordsInput > 0 ? Math.round(targetWordsInput) : 150;
 
   try {
-    assertUnderCap(tid);
-    const result = await draftCampaignEmail({
-      subject,
-      topic,
-      tone: input?.tone?.trim() || null,
-      audience: input?.audience?.trim() || null,
-      targetWords,
-    });
-    recordUsage(tid, "campaign_draft", MODELS.opus, {
-      inputTokens: result.usage.inputTokens,
-      outputTokens: result.usage.outputTokens,
-      cacheReadTokens: result.usage.cacheReadInputTokens,
-      cacheCreateTokens: result.usage.cacheCreationInputTokens,
-    });
+    const result = await draftCampaignEmail(
+      {
+        subject,
+        topic,
+        tone: input?.tone?.trim() || null,
+        audience: input?.audience?.trim() || null,
+        targetWords,
+      },
+      { tenantId: tid, agentKey: "campaign_draft" },
+    );
     return { ok: true, content: result.content };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Couldn't draft the email body." };

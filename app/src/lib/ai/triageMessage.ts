@@ -1,12 +1,12 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
 import { eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { tags as tagsTable } from "@/lib/db/schema";
 import { getBusinessName, getInboxBusinessFacts } from "@/lib/ai/businessContext";
 import { MODELS } from "@/lib/ai/client";
-import { assertUnderCap, recordUsage } from "@/lib/ai/usage";
+import { meteredCreate } from "@/lib/ai/metered";
 
 export type TriageCategory =
   | "new_lead"
@@ -174,37 +174,32 @@ function clamp01(n: unknown): number {
 export async function triageMessage(
   input: TriageInput,
 ): Promise<TriageResult> {
-  // Checked first — see the matching comment on draftFollowup for why this
-  // runs before the API-key guard below.
-  assertUnderCap(input.tenantId);
+  // meteredCreate enforces the monthly AI cap FIRST (before the params thunk
+  // below runs — so the controlled-tag lookup and prompt build never happen for
+  // a capped tenant) and records the "triage"/opus spend after. AiCapError
+  // propagates to the caller, same as before.
+  const message = await meteredCreate({ tenantId: input.tenantId, agentKey: "triage" }, () => {
+    const coreTags = db
+      .select()
+      .from(tagsTable)
+      .where(eq(tagsTable.isCore, true))
+      .all()
+      .map((t) => t.label);
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error(
-      "ANTHROPIC_API_KEY is not set. Add it to .env.local in the app/ folder.",
-    );
-  }
-
-  const coreTags = db
-    .select()
-    .from(tagsTable)
-    .where(eq(tagsTable.isCore, true))
-    .all()
-    .map((t) => t.label);
-
-  const client = new Anthropic();
-  const message = await client.messages.create({
-    model: MODELS.opus,
-    max_tokens: 1024,
-    system: [
-      {
-        type: "text",
-        text: buildSystemPrompt(coreTags),
-        cache_control: { type: "ephemeral" },
-      },
-    ],
-    tools: [TRIAGE_TOOL],
-    tool_choice: { type: "tool", name: "record_triage" },
-    messages: [{ role: "user", content: buildUserPrompt(input) }],
+    return {
+      model: MODELS.opus,
+      max_tokens: 1024,
+      system: [
+        {
+          type: "text",
+          text: buildSystemPrompt(coreTags),
+          cache_control: { type: "ephemeral" },
+        },
+      ],
+      tools: [TRIAGE_TOOL],
+      tool_choice: { type: "tool", name: "record_triage" },
+      messages: [{ role: "user", content: buildUserPrompt(input) }],
+    };
   });
 
   const toolUse = message.content.find(
@@ -239,13 +234,6 @@ export async function triageMessage(
   const sensitive = Boolean(raw.sensitive);
   const reply =
     typeof raw.suggestedReply === "string" ? raw.suggestedReply.trim() : "";
-
-  recordUsage(input.tenantId, "triage", MODELS.opus, {
-    inputTokens: message.usage.input_tokens,
-    outputTokens: message.usage.output_tokens,
-    cacheReadTokens: message.usage.cache_read_input_tokens ?? 0,
-    cacheCreateTokens: message.usage.cache_creation_input_tokens ?? 0,
-  });
 
   return {
     category,

@@ -3,7 +3,7 @@ import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 
 import { executeTool, isWriteTool, summarizeToolAction, type ToolArtifact } from "@/lib/assistant/tools";
-import { assertUnderCap, recordUsage } from "@/lib/ai/usage";
+import { assertAiAllowed, meterAndCharge } from "@/lib/ai/usage";
 import { getProvider, type ModelProvider, type NeutralMessage } from "@/lib/ai/providers";
 
 /**
@@ -85,13 +85,14 @@ export interface RunAgentTurnArgs {
  * (which has no SSE stream of its own to push onto) can hand its artifacts
  * back up through its own `ToolResult`, exactly like `pendingWrites`.
  *
- * `assertUnderCap` runs once, before the first model call, and its
- * `AiCapError` is deliberately left to propagate — this function knows
- * nothing about SSE, so callers that need the error+done framing (the chat
- * route) catch `AiCapError` themselves around this call. A delegated
- * specialist's nested `runAgentTurn` call runs this same check again at ITS
- * OWN start, so the cap is enforced at every level of a delegation, not just
- * the top.
+ * `assertAiAllowed` runs once, before the first model call (free monthly
+ * tranche, or prepaid AI credits), and its `AiCapError` is deliberately left to
+ * propagate — this function knows nothing about SSE, so callers that need the
+ * error+done framing (the chat route) catch `AiCapError` themselves around this
+ * call. A delegated specialist's nested `runAgentTurn` call runs this same
+ * check again at ITS OWN start, so the gate is enforced at every level of a
+ * delegation, not just the top. Per-turn `meterAndCharge` records usage and
+ * bills any overflow beyond the tranche to credits.
  *
  * MP1 (multi-provider model choice): the actual model call used to be inline
  * here (`anthropic.messages.stream(...)`) — it now goes through an injected
@@ -125,9 +126,9 @@ export async function runAgentTurn(
     provider = getProvider(model),
   } = args;
 
-  // Enforce the per-tenant monthly AI spend cap before burning any tokens on
-  // this turn. Not caught here — see the doc comment above.
-  assertUnderCap(tenantId);
+  // Gate the tenant (free monthly tranche, or prepaid AI credits) before
+  // burning any tokens on this turn. Not caught here — see the doc comment above.
+  assertAiAllowed(tenantId);
 
   const convo: NeutralMessage[] = messages.map((m) => ({ role: m.role, content: m.content }));
   let fullText = "";
@@ -138,7 +139,7 @@ export async function runAgentTurn(
     if (signal?.aborted) break; // caller disconnected — stop burning tokens
 
     const r = await provider.streamTurn({ model, system, tools, messages: convo, maxTokens, signal, onText });
-    recordUsage(tenantId, agentKey, model, r.usage);
+    meterAndCharge(tenantId, agentKey, model, r.usage);
     convo.push({ role: "assistant", content: r.text, toolCalls: r.toolCalls, providerRaw: r.assistantRaw });
     fullText += r.text;
 

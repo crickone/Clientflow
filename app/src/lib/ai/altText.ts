@@ -1,9 +1,10 @@
 import "server-only";
 
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
 
 import { MODELS } from "@/lib/ai/client";
-import { assertUnderCap, recordUsage, AiCapError } from "@/lib/ai/usage";
+import { AiCapError } from "@/lib/ai/usage";
+import { meteredCreate } from "@/lib/ai/metered";
 
 /**
  * Generate concise, descriptive alt text for an image using Claude vision.
@@ -36,15 +37,12 @@ export async function generateAltText(
   if (!VISION_MIME.has(mime)) return null;
 
   try {
-    // Checked first (before the API-key guard just below) so the cap trips
-    // deterministically regardless of environment — see the matching comment
-    // on draftFollowup.ts. A plain `return null` from inside a try is NOT
-    // caught by the catch below (only a throw is), so moving the key guard
-    // here changes nothing about its own behaviour.
-    assertUnderCap(tenantId);
-    if (!process.env.ANTHROPIC_API_KEY) return null;
-    const client = new Anthropic();
-    const resp = await client.messages.create({
+    // meteredCreate enforces the cap (assertUnderCap) FIRST — before it builds
+    // the params thunk below or touches the network — then records usage after,
+    // so this best-effort path can't dodge the tenant's monthly AI cap. A
+    // missing ANTHROPIC_API_KEY now throws from inside meteredCreate and is
+    // caught below (returned as null), same clean best-effort outcome as before.
+    const resp = await meteredCreate({ tenantId, agentKey: "media" }, () => ({
       model: MODELS.haiku,
       max_tokens: 120,
       system:
@@ -76,7 +74,7 @@ export async function generateAltText(
           ],
         },
       ],
-    });
+    }));
 
     const text = resp.content
       .filter((b): b is Anthropic.TextBlock => b.type === "text")
@@ -85,13 +83,6 @@ export async function generateAltText(
       .trim()
       .replace(/^["']|["']$/g, "")
       .slice(0, 160);
-
-    recordUsage(tenantId, "media", MODELS.haiku, {
-      inputTokens: resp.usage.input_tokens,
-      outputTokens: resp.usage.output_tokens,
-      cacheReadTokens: resp.usage.cache_read_input_tokens ?? 0,
-      cacheCreateTokens: resp.usage.cache_creation_input_tokens ?? 0,
-    });
 
     return text || null;
   } catch (err) {

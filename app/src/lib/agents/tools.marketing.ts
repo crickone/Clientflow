@@ -6,8 +6,6 @@ import { getTenantDbById } from "@/lib/db/tenant";
 import { sites } from "@/lib/db/schema";
 import { draftBlogPost } from "@/lib/ai/draftBlog";
 import { generateCarouselSlides } from "@/lib/ai/generateCarousel";
-import { MODELS } from "@/lib/ai/client";
-import { assertUnderCap, recordUsage } from "@/lib/ai/usage";
 import {
   createSiteBlogPost,
   getSiteBlogPost,
@@ -33,21 +31,15 @@ import { updateBlogContent } from "@/lib/blog/posts";
  * to register them, so importing back from it here would cycle. TypeScript's
  * structural typing makes these interchangeable at every call site.
  *
- * Metering (IMPORTANT): `draftBlogPost` and `generateCarouselSlides`
- * construct their OWN `Anthropic` client and call `MODELS.opus` directly
- * — they do NOT go through the shared metered `getAnthropic()` client, so
- * they'd otherwise dodge the tenant's monthly AI cap entirely. Both
- * generator-calling tools below therefore meter at the TOOL boundary:
- * `assertUnderCap` before the call, `recordUsage(tenantId, "marketing",
- * MARKETING_MODEL, usage)` after — mapping the generator's returned usage
- * shape to the shared metering `Usage` shape via `toMeteredUsage`. Two OTHER,
- * non-agent call paths to these same generators exist (the CMS blog editor's
- * "Generate" button -> `runBlogGeneration` in `@/lib/blog/generator.ts`, and
- * Content Studio's carousel "Generate" route,
- * `api/content-studio/carousels/[id]/generate/route.ts`) — each meters
- * itself the same way, at its OWN calling boundary, under its own agentKey
- * ("blog" / "carousel") so the per-agent spend breakdown stays meaningful;
- * this file's tool-boundary metering is NOT shared with them (Batch 3a).
+ * Metering: `draftBlogPost` and `generateCarouselSlides` now self-meter — each
+ * goes through `meteredCreate` (@/lib/ai/metered), which enforces the tenant's
+ * monthly AI cap and records the spend — so both tools below just pass their
+ * `{ tenantId, agentKey: "marketing" }` meter context in. The same generators
+ * are reached from two OTHER, non-agent call paths (the CMS blog editor's
+ * Generate button -> `runBlogGeneration`, and Content Studio's carousel
+ * Generate route) which pass their own agentKey ("blog" / "carousel"), so the
+ * per-agent spend breakdown stays meaningful. AiCapError surfaces through each
+ * tool's own try/catch below as a normal `{ error }` tool result.
  */
 type ToolArtifact = { url: string; filename: string; label: string };
 export type ToolResult = { text: string; artifact?: ToolArtifact };
@@ -55,28 +47,6 @@ export type ToolContext = { tenantId: number; userId?: number };
 
 function tdb(ctx: ToolContext) {
   return getTenantDbById(ctx.tenantId);
-}
-
-// Must match the model id `draftBlogPost`/`generateCarouselSlides` call
-// internally (see @/lib/ai/draftBlog.ts, @/lib/ai/generateCarousel.ts) —
-// both now call MODELS.opus directly (Batch 3a, C2).
-const MARKETING_MODEL: string = MODELS.opus;
-
-type GeneratorUsage = {
-  inputTokens: number;
-  outputTokens: number;
-  cacheCreationInputTokens: number;
-  cacheReadInputTokens: number;
-};
-
-/** Map a content generator's usage shape (BlogDraftResult/GenerateResult) to the shared metering Usage shape. */
-function toMeteredUsage(u: GeneratorUsage) {
-  return {
-    inputTokens: u.inputTokens,
-    outputTokens: u.outputTokens,
-    cacheReadTokens: u.cacheReadInputTokens,
-    cacheCreateTokens: u.cacheCreationInputTokens,
-  };
 }
 
 type ResolvedSite = { id: number; name: string; slug: string };
@@ -257,18 +227,19 @@ export async function draftBlogPostTool(ctx: ToolContext, input: Record<string, 
       : 700;
 
   try {
-    assertUnderCap(ctx.tenantId);
-    const draft = await draftBlogPost({
-      title,
-      inputMode: "prompt",
-      prompt: topic,
-      tone,
-      targetWords,
-      therapy: null,
-      videoTranscript: null,
-      videoProjectName: null,
-    });
-    recordUsage(ctx.tenantId, "marketing", MARKETING_MODEL, toMeteredUsage(draft.usage));
+    const draft = await draftBlogPost(
+      {
+        title,
+        inputMode: "prompt",
+        prompt: topic,
+        tone,
+        targetWords,
+        therapy: null,
+        videoTranscript: null,
+        videoProjectName: null,
+      },
+      { tenantId: ctx.tenantId, agentKey: "marketing" },
+    );
 
     return {
       text: JSON.stringify({
@@ -361,9 +332,10 @@ export async function draftCarouselTool(ctx: ToolContext, input: Record<string, 
       : 5;
 
   try {
-    assertUnderCap(ctx.tenantId);
-    const draft = await generateCarouselSlides({ topic, slideCount, tone });
-    recordUsage(ctx.tenantId, "marketing", MARKETING_MODEL, toMeteredUsage(draft.usage));
+    const draft = await generateCarouselSlides(
+      { topic, slideCount, tone },
+      { tenantId: ctx.tenantId, agentKey: "marketing" },
+    );
 
     return {
       text: JSON.stringify({

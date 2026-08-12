@@ -10,6 +10,17 @@ export const MODELS = {
 export type ModelTier = keyof typeof MODELS;
 export const DEFAULT_AGENT_MODEL: ModelTier = "sonnet";
 
+/**
+ * The model Content Studio's one-shot generators run on — blog posts,
+ * carousels, slide/caption refresh, campaign email bodies. Sonnet rather than
+ * Opus: these fire on every Generate/Refresh and are the platform's biggest
+ * AI-spend line, and Sonnet handles the copywriting well at a fraction of
+ * Opus's per-token cost. Kept as ONE constant so the "content model" is a
+ * single edit here (or, later, a per-tenant setting) rather than a value
+ * duplicated across the generators.
+ */
+export const CONTENT_MODEL: string = MODELS.sonnet;
+
 /** List price in CENTS per 1,000,000 tokens. */
 export const PRICING: Record<string, { inCents: number; outCents: number }> = {
   [MODELS.haiku]: { inCents: 100, outCents: 500 },

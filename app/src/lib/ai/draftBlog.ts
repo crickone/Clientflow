@@ -1,8 +1,9 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
 import type { Therapy } from "@/lib/db/schema";
 import { getBusinessContext } from "@/lib/ai/businessContext";
-import { MODELS } from "@/lib/ai/client";
+import { CONTENT_MODEL } from "@/lib/ai/client";
+import { meteredCreate, type MeterContext } from "@/lib/ai/metered";
 
 // Blog-specific task + format rules. The business identity, services, and voice
 // are supplied by getBusinessContext() (venue-aware) and prepended at call time.
@@ -93,27 +94,27 @@ function buildUserPrompt(input: BlogDraftInput): string {
   return lines.join("\n");
 }
 
+/**
+ * `meter` ({tenantId, agentKey}) is required because this generator is the
+ * actual paid model call — it goes through `meteredCreate`, which enforces the
+ * tenant's monthly AI cap and records the spend, so no caller can invoke it
+ * unmetered. The two callers pass different agentKeys — "blog" (the CMS blog
+ * editor's Generate button, via runBlogGeneration) and "marketing" (the
+ * Marketing agent's draft_blog_post tool) — so the per-agent spend breakdown
+ * stays meaningful.
+ */
 export async function draftBlogPost(
   input: BlogDraftInput,
+  meter: MeterContext,
 ): Promise<BlogDraftResult> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error(
-      "ANTHROPIC_API_KEY is not set. Add it to .env.local in the app/ folder.",
-    );
-  }
-
-  const client = new Anthropic();
-
-  const systemPrompt = `${getBusinessContext()}\n\n${BLOG_FORMAT_RULES}`;
-
-  const message = await client.messages.create({
-    model: MODELS.opus,
+  const message = await meteredCreate(meter, () => ({
+    model: CONTENT_MODEL,
     max_tokens: 4096,
     thinking: { type: "adaptive" },
     system: [
       {
         type: "text",
-        text: systemPrompt,
+        text: `${getBusinessContext()}\n\n${BLOG_FORMAT_RULES}`,
         cache_control: { type: "ephemeral" },
       },
     ],
@@ -123,7 +124,7 @@ export async function draftBlogPost(
         content: buildUserPrompt(input),
       },
     ],
-  });
+  }));
 
   const content = message.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")

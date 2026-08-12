@@ -1,10 +1,10 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
 
 import type { Transcript } from "@/lib/ai/transcribe";
 import { getBusinessName, getServicesList } from "@/lib/ai/businessContext";
 import { MODELS } from "@/lib/ai/client";
-import { assertUnderCap, recordUsage } from "@/lib/ai/usage";
+import { meteredCreate } from "@/lib/ai/metered";
 
 export interface BrollOption {
   assetId: number;
@@ -94,43 +94,36 @@ export async function planCut(input: {
   /** The real current tenant — required so the €25/month AI cap is checked and metered against the right gym. */
   tenantId: number;
 }): Promise<CutPlan> {
-  // Checked first — see the matching comment on draftFollowup for why this
-  // runs before the API-key guard below.
-  assertUnderCap(input.tenantId);
+  // meteredCreate enforces the monthly AI cap FIRST (before the params thunk
+  // builds the venue-aware system prompt) and records the "video"/opus spend
+  // after. AiCapError propagates to the caller.
+  const message = await meteredCreate({ tenantId: input.tenantId, agentKey: "video" }, () => {
+    const systemPrompt =
+      `You are a short-form video editor for ${getBusinessName()}.\n\n` +
+      `Services offered:\n${getServicesList()}\n\n` +
+      PLAN_CUT_RULES;
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error(
-      "ANTHROPIC_API_KEY is not set. Add it to .env.local in the app/ folder.",
-    );
-  }
-
-  const client = new Anthropic();
-
-  const systemPrompt =
-    `You are a short-form video editor for ${getBusinessName()}.\n\n` +
-    `Services offered:\n${getServicesList()}\n\n` +
-    PLAN_CUT_RULES;
-
-  const message = await client.messages.create({
-    model: MODELS.opus,
-    max_tokens: 2048,
-    system: [
-      {
-        type: "text",
-        text: systemPrompt,
-        cache_control: { type: "ephemeral" },
-      },
-    ],
-    messages: [
-      {
-        role: "user",
-        content: buildUserPrompt(
-          input.transcript,
-          input.broll,
-          input.toneNotes,
-        ),
-      },
-    ],
+    return {
+      model: MODELS.opus,
+      max_tokens: 2048,
+      system: [
+        {
+          type: "text",
+          text: systemPrompt,
+          cache_control: { type: "ephemeral" },
+        },
+      ],
+      messages: [
+        {
+          role: "user",
+          content: buildUserPrompt(
+            input.transcript,
+            input.broll,
+            input.toneNotes,
+          ),
+        },
+      ],
+    };
   });
 
   const text = message.content
@@ -138,13 +131,6 @@ export async function planCut(input: {
     .map((b) => b.text)
     .join("\n")
     .trim();
-
-  recordUsage(input.tenantId, "video", MODELS.opus, {
-    inputTokens: message.usage.input_tokens,
-    outputTokens: message.usage.output_tokens,
-    cacheReadTokens: message.usage.cache_read_input_tokens ?? 0,
-    cacheCreateTokens: message.usage.cache_creation_input_tokens ?? 0,
-  });
 
   // Strip code fences if Claude wrapped the JSON despite instructions.
   const stripped = text

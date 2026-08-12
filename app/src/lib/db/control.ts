@@ -437,6 +437,43 @@ export function ensureControlTables() {
       updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
 
+    -- ── AI credits (prepaid overflow beyond the monthly free tranche) ─────────
+    -- The €25/month free allowance (tenant_ai_cap.cap_cents, default
+    -- MONTHLY_CAP_CENTS) is absorbed by the operator; usage BEYOND it is billed
+    -- to this prepaid balance at raw provider cost + a small margin
+    -- (getAiMarginBp). Structurally a clone of email_credits (same sparse
+    -- one-row-per-tenant shape, same single-transaction balance+ledger
+    -- mutation) — a tenant with no row reads as balance 0, and a €0 balance
+    -- makes the whole thing behave EXACTLY like the old hard cap (over the
+    -- tranche + no credits = blocked), so this ships inert until credits are
+    -- granted/topped up. See @/lib/ai/creditsLedger + assertAiAllowed/
+    -- meterAndCharge in @/lib/ai/usage. ai_suspended is a platform-admin kill
+    -- switch independent of balance (parity with email's marketing_suspended).
+    CREATE TABLE IF NOT EXISTS ai_credits (
+      tenant_id INTEGER PRIMARY KEY REFERENCES tenants(id) ON DELETE CASCADE,
+      balance_cents INTEGER NOT NULL DEFAULT 0,
+      auto_topup_enabled INTEGER NOT NULL DEFAULT 0,
+      auto_topup_threshold_cents INTEGER NOT NULL DEFAULT 0,
+      auto_topup_amount_cents INTEGER NOT NULL DEFAULT 0,
+      ai_suspended INTEGER NOT NULL DEFAULT 0,
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+
+    -- Append-only audit trail of every ai_credits.balance_cents change — one
+    -- row per grant/top-up/usage-debit, carrying the authoritative
+    -- balance_after_cents (mirrors email_credit_ledger; no FK for the same
+    -- reason — the ledger must survive tenant deletion for reconciliation).
+    CREATE TABLE IF NOT EXISTS ai_credit_ledger (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id INTEGER NOT NULL,
+      delta_cents INTEGER NOT NULL,
+      reason TEXT NOT NULL,          -- 'topup'|'usage'|'adjustment'|'refund'|'auto_topup'
+      balance_after_cents INTEGER NOT NULL,
+      note TEXT,                     -- actor (grants) or context (usage: agentKey)
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_ai_credit_ledger_tenant ON ai_credit_ledger(tenant_id, created_at);
+
     -- ── Email marketing credits (GHL-style add-on, Task 1: ledger + pricing) ──
     -- One sparse row per tenant that has ever had a balance or auto-topup
     -- config touched (mirrors tenant_ai_cap's sparse-override shape): a tenant

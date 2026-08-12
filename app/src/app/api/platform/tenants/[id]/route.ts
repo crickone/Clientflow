@@ -4,6 +4,8 @@ import { guardPlatform } from "@/lib/platform/auth";
 import { listEvents, listInvoices } from "@/lib/billing/engine";
 import { getTenantSummary, tenantUsage } from "@/lib/platform/queries";
 import { getAutoTopup, getEmailBalanceCents, isMarketingSuspended } from "@/lib/email/credits";
+import { getAiBalanceCents, getAiAutoTopup, isAiSuspended, listAiLedger } from "@/lib/ai/creditsLedger";
+import { getMonthlyUsageCents, getTenantCapCents } from "@/lib/ai/usage";
 
 export const dynamic = "force-dynamic";
 
@@ -27,5 +29,13 @@ export async function GET(
     emailBalanceCents: getEmailBalanceCents(id),
     marketingSuspended: isMarketingSuspended(id),
     autoTopup: getAutoTopup(id),
+    ai: {
+      balanceCents: getAiBalanceCents(id),
+      freeTrancheCents: getTenantCapCents(id),
+      monthlyUsedCents: getMonthlyUsageCents(id),
+      suspended: isAiSuspended(id),
+      autoTopup: getAiAutoTopup(id),
+      ledger: listAiLedger(id, 20),
+    },
   });
 }
