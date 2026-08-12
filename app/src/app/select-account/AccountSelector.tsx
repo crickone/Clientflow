@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import type { MembershipOption } from "@/lib/auth";
 import { chooseAccount } from "./actions";
+import { LogoLoader } from "@/components/ui/LogoLoader";
 
 export function AccountSelector({
   memberships,
@@ -39,6 +40,7 @@ export function AccountSelector({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {selecting !== null && <LogoLoader />}
       {memberships.map((m) => {
         const busy = pending && selecting === m.tenantId;
         return (

@@ -50,6 +50,7 @@ import {
 import { toast } from "sonner";
 
 import { chooseAccount } from "@/app/select-account/actions";
+import { LogoLoader } from "@/components/ui/LogoLoader";
 import { useVocab } from "@/components/providers/VocabProvider";
 import { Logo } from "@/components/ui/Logo";
 import type { Vocab } from "@/lib/vocabulary";
@@ -539,7 +540,9 @@ function AccountSwitcher({
   }
 
   return (
-    <DropdownMenu>
+    <>
+      {switching !== null && <LogoLoader />}
+      <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           disabled={pending}
@@ -600,5 +603,6 @@ function AccountSwitcher({
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+    </>
   );
 }
