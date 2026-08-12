@@ -17,6 +17,7 @@ export interface ThemeConfig {
  */
 export const HEADING_FONTS: { id: string; label: string; cssVar: string }[] = [
   { id: "space-grotesk", label: "Space Grotesk", cssVar: "--font-space-grotesk" },
+  { id: "familjen", label: "Familjen Grotesk", cssVar: "--font-familjen" },
   { id: "bebas", label: "Bebas Neue", cssVar: "--font-bebas" },
   { id: "nebula", label: "Nebula", cssVar: "--font-nebula" },
   { id: "clash", label: "Clash Display", cssVar: "--font-clash" },
