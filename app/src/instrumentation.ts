@@ -57,7 +57,7 @@ async function sendCrashAlertEmail(
   const apiKey = process.env.RESEND_API_KEY;
   if (!to || !apiKey) return; // opt-in alarm; silent no-op when unset (console.error already recorded the crash)
   // Verified platform sender; override via ALERT_EMAIL_FROM if billing_from_email differs.
-  const from = process.env.ALERT_EMAIL_FROM || "AdonisAgent Alerts <billing@clientflow.ie>";
+  const from = process.env.ALERT_EMAIL_FROM || "AdonisAgent Alerts <billing@adonisagent.ie>";
   const safeStack = (err.stack ?? err.message).replace(/</g, "&lt;");
   try {
     await fetch("https://api.resend.com/emails", {

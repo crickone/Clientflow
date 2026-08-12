@@ -97,7 +97,7 @@ export async function POST(
         grantAdminMembership(id, g.userId);
         logEvent(id, "opened_by_admin", null, actor);
         const token = createOpenToken(g.userId, id);
-        const appUrl = (process.env.APP_URL ?? "https://app.clientflow.ie").replace(/\/+$/, "");
+        const appUrl = (process.env.APP_URL ?? "https://app.adonisagent.ie").replace(/\/+$/, "");
         return NextResponse.json({ ok: true, url: `${appUrl}/open?token=${token}` });
       }
       case "offboard":

@@ -208,7 +208,7 @@ export async function sendPlatformEmail(opts: {
   if (!apiKey) {
     return { ok: false, error: "Platform email isn't configured (missing RESEND_API_KEY)." };
   }
-  const fromEmail = process.env.PLATFORM_EMAIL_FROM || "no-reply@clientflow.ie";
+  const fromEmail = process.env.PLATFORM_EMAIL_FROM || "no-reply@adonisagent.ie";
   const from = `${sanitizeName(opts.fromName || "AdonisAgent")} <${fromEmail}>`;
   try {
     const resend = new Resend(apiKey);

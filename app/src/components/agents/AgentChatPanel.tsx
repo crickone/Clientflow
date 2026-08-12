@@ -17,7 +17,7 @@ import type { Agent } from "@/lib/db/schema";
  */
 const ORCHESTRATOR_CHAT_COPY = {
   subtitle: "routes work to Sales, Marketing and Operations and reports back — you approve before anything sends, saves, or publishes",
-  emptyTitle: "Ask the Orchestrator to run the business",
+  emptyTitle: "Ask Adonis to run the business",
   emptyBody:
     "It breaks a request into sub-tasks, delegates each to the right specialist, and summarises what came back — nothing any specialist drafts sends, saves, or publishes until you click Approve.",
   suggestions: [
@@ -26,7 +26,7 @@ const ORCHESTRATOR_CHAT_COPY = {
     "What should I focus on today?",
     "Get Marketing to draft a post and Sales to chase new leads",
   ],
-  placeholder: "Ask the Orchestrator…  (Enter to send)",
+  placeholder: "Ask Adonis…  (Enter to send)",
 };
 
 const SALES_CHAT_COPY = {
@@ -134,10 +134,10 @@ export function AgentChatPanel({ agent, tenantId }: { agent: Agent; tenantId: nu
             marginBottom: 8,
           }}
         >
-          Runs through the Orchestrator
+          Runs through Adonis
         </div>
         <p style={{ color: "var(--text-tertiary)", fontSize: 13, lineHeight: 1.5, maxWidth: 440, margin: "0 auto 18px" }}>
-          The Concierge has no chat of its own — hand it a general, inbox, money, or plan task from the Orchestrator&apos;s
+          The Concierge has no chat of its own — hand it a general, inbox, money, or plan task from Adonis&apos;s
           chat and it delegates automatically. Its model and instructions above still apply whenever it runs.
         </p>
         <Link
@@ -155,7 +155,7 @@ export function AgentChatPanel({ agent, tenantId }: { agent: Agent; tenantId: nu
             textDecoration: "none",
           }}
         >
-          Open the Orchestrator
+          Open Adonis
         </Link>
       </Card>
     );

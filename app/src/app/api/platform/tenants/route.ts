@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
       actor,
     );
 
-    const appUrl = process.env.APP_URL ?? "https://app.clientflow.ie";
+    const appUrl = process.env.APP_URL ?? "https://app.adonisagent.ie";
     const loginUrl = `${appUrl.replace(/\/$/, "")}/login`;
     // The tenant + all admins are already committed. sendPlatformEmail's actual
     // send is try/catch-guarded, but its dynamic imports (`resend`,

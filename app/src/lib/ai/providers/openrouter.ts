@@ -404,7 +404,7 @@ export class OpenRouterProvider implements ModelProvider {
         // OpenRouter's recommended attribution headers (identifies the
         // calling app on openrouter.ai's dashboard/rankings) — optional but
         // good practice, per the task brief.
-        "HTTP-Referer": "https://app.clientflow.ie",
+        "HTTP-Referer": "https://app.adonisagent.ie",
         "X-Title": "AdonisAgent",
       },
       body: JSON.stringify({

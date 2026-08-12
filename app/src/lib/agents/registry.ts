@@ -7,7 +7,7 @@ import { MODEL_CATALOG } from "@/lib/ai/modelCatalog";
 
 export interface AgentDef { key: string; name: string; mandate: string; status: "active" | "dormant"; defaultModel: string; }
 export const AGENT_CATALOG: AgentDef[] = [
-  { key: "orchestrator", name: "Orchestrator", mandate: "Routes work to the right specialist.", status: "active", defaultModel: MODELS.sonnet },
+  { key: "orchestrator", name: "Adonis", mandate: "Routes work to the right specialist.", status: "active", defaultModel: MODELS.sonnet },
   { key: "sales", name: "Sales", mandate: "Works leads: instant replies + relentless follow-up.", status: "active", defaultModel: MODELS.sonnet },
   { key: "marketing", name: "Marketing", mandate: "Runs the Marketing Brain: campaigns + social.", status: "active", defaultModel: MODELS.sonnet },
   { key: "operations", name: "Operations", mandate: "No-shows, class fill, attendance, admin.", status: "active", defaultModel: MODELS.sonnet },
@@ -27,22 +27,29 @@ export const AGENT_CATALOG: AgentDef[] = [
 
 export function ensureAgents(tenantId: number): void {
   const db = getTenantDbById(tenantId);
-  const existingRows = db.select({ key: agents.key, status: agents.status }).from(agents).all();
-  const existingStatus = new Map(existingRows.map(r => [r.key, r.status]));
+  const existingRows = db.select({ key: agents.key, status: agents.status, name: agents.name }).from(agents).all();
+  const existingByKey = new Map(existingRows.map(r => [r.key, r]));
   for (const a of AGENT_CATALOG) {
-    if (!existingStatus.has(a.key)) {
+    const row = existingByKey.get(a.key);
+    if (!row) {
       db.insert(agents).values({ key: a.key, name: a.name, status: a.status, model: a.defaultModel, instructions: "" }).run();
-    } else if (existingStatus.get(a.key) !== a.status) {
-      // Catalog-driven status reconcile: a tenant's row can have been seeded
-      // under an older AGENT_CATALOG (e.g. Marketing was "dormant" before it
-      // went live), and the insert-only loop above never touches existing
-      // rows — so without this, that tenant's Marketing row would stay
-      // dormant forever. There's no UI to change status directly, so the
-      // catalog is the single source of truth for it; bring the row in line
-      // on every call. Deliberately narrow: ONLY `status` is written here —
+    } else {
+      // Catalog-driven reconcile of the fields the catalog OWNS — `status` and
+      // `name`. A tenant's row can have been seeded under an older AGENT_CATALOG
+      // (Marketing was "dormant" before it went live; the top agent was named
+      // "Orchestrator" before it became "Adonis"), and the insert-only branch
+      // above never touches existing rows — so without this, that tenant's row
+      // keeps the stale status/name forever. There's no UI to change either
+      // directly, so the catalog is the single source of truth for both. Stay
+      // deliberately narrow: ONLY `status` and `name` are written here —
       // `instructions`/`model` are tenant-owned (edited from the Agents tab)
       // and must never be overwritten by a reconcile.
-      db.update(agents).set({ status: a.status }).where(eq(agents.key, a.key)).run();
+      const patch: { status?: "active" | "dormant"; name?: string } = {};
+      if (row.status !== a.status) patch.status = a.status;
+      if (row.name !== a.name) patch.name = a.name;
+      if (Object.keys(patch).length > 0) {
+        db.update(agents).set(patch).where(eq(agents.key, a.key)).run();
+      }
     }
   }
   // Prune agents removed from AGENT_CATALOG (e.g. SEO): the seed loop never

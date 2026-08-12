@@ -86,7 +86,7 @@ export default async function DashboardPage() {
         <AssistantChat
           tenantId={tenantId}
           endpoint="/api/agents/orchestrator/chat"
-          title="Orchestrator"
+          title="Adonis"
           subtitle="routes any request to the right agent — sales, marketing, ops, or your general concierge"
           emptyTitle="Ask for anything — I'll route it"
           emptyBody="Tell me what you need and I'll hand it to the right agent: chasing leads, drafting content, recovering no-shows, or the general stuff — your inbox, invoices, money, and plans. Nothing sends or changes without your approval."
@@ -96,7 +96,7 @@ export default async function DashboardPage() {
             "Pull together this month's invoices",
             "Draft a blog about our newest class",
           ]}
-          placeholder="Ask the Orchestrator…  (Enter to send)"
+          placeholder="Ask Adonis…  (Enter to send)"
           height="clamp(440px, 62vh, 720px)"
         />
       </div>
