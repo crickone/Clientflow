@@ -33,6 +33,14 @@ export async function guard(level: AuthLevel = "user"): Promise<Response | null>
     if (msg === "FORBIDDEN") {
       return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
     }
+    if (msg === "TENANT_SUSPENDED") {
+      // Billing not active for this tenant (suspended / awaiting first
+      // payment) — authenticated but blocked until it's resolved.
+      return NextResponse.json(
+        { ok: false, error: "Billing is not active for this account." },
+        { status: 402 },
+      );
+    }
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 }

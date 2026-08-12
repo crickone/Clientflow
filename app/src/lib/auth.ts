@@ -6,6 +6,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { and, eq, lt } from "drizzle-orm";
 
+import { getBilling } from "@/lib/billing/engine";
 import { authDb, SESSION_COOKIE } from "@/lib/db/control";
 import { resolveSessionTenant } from "@/lib/db/tenant";
 import {
@@ -199,9 +200,34 @@ export async function getSessionUser(): Promise<User | null> {
   return { ...row.user, role };
 }
 
+/**
+ * Billing enforcement at the AUTH layer, so it covers every API route (via
+ * guard()) and every server action (which call requireUser/requireAdmin
+ * directly) — not just page navigations. Previously suspension was only a
+ * layout redirect that explicitly exempted /api/* and never ran for server
+ * actions, so a suspended tenant's staff could keep reading/writing all data.
+ *
+ * Blocks `suspended` and `pending_payment` (matching the page gate). Platform
+ * admins bypass — they administer suspended tenants. The billing pages
+ * themselves and /api/billing/capture/start use requireUserPage /
+ * getCurrentMembership directly, so the payment path stays reachable.
+ */
+function assertTenantBillingActive(m: CurrentMembership): void {
+  if (m.user.isPlatformAdmin) return;
+  const billing = getBilling(m.tenant.id);
+  if (
+    billing &&
+    !billing.billingExempt &&
+    (billing.status === "suspended" || billing.status === "pending_payment")
+  ) {
+    throw new Error("TENANT_SUSPENDED");
+  }
+}
+
 export async function requireUser(): Promise<User> {
   const m = getCurrentMembership();
   if (!m) throw new Error("UNAUTHENTICATED");
+  assertTenantBillingActive(m);
   return { ...m.user, role: m.role };
 }
 
@@ -209,6 +235,7 @@ export async function requireAdmin(): Promise<User> {
   const m = getCurrentMembership();
   if (!m) throw new Error("UNAUTHENTICATED");
   if (m.role !== "admin") throw new Error("FORBIDDEN");
+  assertTenantBillingActive(m);
   return { ...m.user, role: m.role };
 }
 
