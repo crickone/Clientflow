@@ -36,8 +36,10 @@ const SITE_NAME = "AdonisAgent";
  * 1 re-pushes their body once.
  *   rev 2 (2026-08-12) — "Living blueprint" pass: bronze live-signal accents,
  *   streaming hero activity rail, orchestrated entrance, count-up, Lenis.
+ *   rev 3 (2026-08-12) — drop Lenis (its scroll hijack breaks scrolling inside
+ *   the CMS-embedded template); native smooth scroll + scroll-padding-top.
  */
-const MARKETING_SITE_REV = 2;
+const MARKETING_SITE_REV = 3;
 const REV_KEY = "marketing_site_rev";
 
 export function seedMarketingSite(): void {
