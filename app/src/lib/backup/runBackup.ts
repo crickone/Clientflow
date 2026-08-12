@@ -8,6 +8,7 @@ import {
   S3Client,
   PutObjectCommand,
   ListObjectsV2Command,
+  type ListObjectsV2CommandOutput,
   DeleteObjectsCommand,
 } from "@aws-sdk/client-s3";
 
@@ -19,6 +20,82 @@ export { isBackupConfigured } from "./config";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const KEEP = 14; // retain the most recent N snapshots per database, per target
+
+/**
+ * Uploaded-media / asset directories under data/ that are NOT captured by the
+ * SQLite snapshots — the DB rows reference these files by name, so a volume
+ * loss that took only the DBs would still orphan every logo, image and video.
+ * Mirrored file-by-file to object storage under the `media/` prefix (see
+ * syncMedia). `tenants` is included for per-tenant branding/nutrition/workout
+ * files; *.db* files inside it are skipped (the DB snapshots above are the
+ * single consistent source for databases). `cards` (a regenerable render
+ * cache) and `archive` (already-archived offboarded tenants) are omitted.
+ */
+export const MEDIA_DIRS = [
+  "uploads",
+  "cms",
+  "image-library",
+  "branding",
+  "broll-library",
+  "music",
+  "tenants",
+];
+
+/** A local media file paired with the object key it mirrors to (`media/<relpath>`). */
+interface MediaFile {
+  abs: string;
+  key: string;
+}
+
+/** Walk MEDIA_DIRS (recursively) into a flat file list, skipping DB files. */
+export function listMediaFiles(dataDir = DATA_DIR): MediaFile[] {
+  const out: MediaFile[] = [];
+  const isDbFile = (name: string) => /\.db(-wal|-shm)?$/.test(name);
+  const walk = (absDir: string, rel: string) => {
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(absDir, { withFileTypes: true });
+    } catch {
+      return; // dir vanished mid-walk — skip
+    }
+    for (const e of entries) {
+      const abs = path.join(absDir, e.name);
+      const relPath = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) walk(abs, relPath);
+      else if (e.isFile() && !isDbFile(e.name)) {
+        out.push({ abs, key: `media/${relPath}` });
+      }
+    }
+  };
+  for (const d of MEDIA_DIRS) {
+    const absDir = path.join(dataDir, d);
+    if (fs.existsSync(absDir)) walk(absDir, d);
+  }
+  return out;
+}
+
+/** Every object under `prefix` in a target, as key → byte size (paginated). */
+async function listRemoteSizes(
+  target: BackupTarget,
+  prefix: string,
+): Promise<Map<string, number>> {
+  const sizes = new Map<string, number>();
+  let token: string | undefined;
+  do {
+    const page: ListObjectsV2CommandOutput = await target.client.send(
+      new ListObjectsV2Command({
+        Bucket: target.bucket,
+        Prefix: prefix,
+        ContinuationToken: token,
+      }),
+    );
+    for (const o of page.Contents ?? []) {
+      if (o.Key) sizes.set(o.Key, o.Size ?? -1);
+    }
+    token = page.IsTruncated ? page.NextContinuationToken : undefined;
+  } while (token);
+  return sizes;
+}
 
 /**
  * Every SQLite file to back up: the control DB plus every tenant's business DB.
@@ -156,6 +233,12 @@ export async function runBackup(): Promise<BackupResult> {
         }
       }
     }
+
+    // Media mirror: incrementally mirror the asset dirs to every target under
+    // the `media/` prefix (only new/changed files upload). A failure here is
+    // collected (does not abort the DB backups, which already succeeded above).
+    await syncMedia(targets, uploaded, errors);
+
     return {
       ok: errors.length === 0 && uploaded.length > 0,
       uploaded,
@@ -173,6 +256,63 @@ export async function runBackup(): Promise<BackupResult> {
       fs.rmSync(tmp, { recursive: true, force: true });
     } catch {
       /* best effort */
+    }
+  }
+}
+
+/**
+ * Mirror the media/asset dirs to every target under the `media/` prefix,
+ * uploading only files that are NEW or size-changed. A full nightly re-upload
+ * of multi-GB media (video projects, image library) to two clouds would be
+ * prohibitive, so this diffs against a single ListObjectsV2 pass per target
+ * and PUTs only the deltas — the first run uploads everything, later runs
+ * upload just what changed. Orphans (files deleted locally) are deliberately
+ * LEFT in the mirror: cheap insurance against accidental deletion, and media
+ * rarely churns. Uploads stream from disk. Failures are collected into
+ * `errors`, never thrown (the DB snapshots already succeeded).
+ *
+ * Note this is a live MIRROR, not point-in-time like the DB snapshots — a
+ * restore pairs the latest media with a chosen DB snapshot. That's safe: the
+ * DB references a subset of the media by filename, so extra/newer files are
+ * inert. See tools/restore-backup.cjs.
+ */
+async function syncMedia(
+  targets: BackupTarget[],
+  uploaded: string[],
+  errors: string[],
+): Promise<void> {
+  const files = listMediaFiles();
+  if (files.length === 0) return;
+
+  for (const target of targets) {
+    try {
+      const remote = await listRemoteSizes(target, "media/");
+      let changed = 0;
+      for (const f of files) {
+        let size: number;
+        try {
+          size = fs.statSync(f.abs).size;
+        } catch {
+          continue; // file vanished between walk and upload
+        }
+        if (remote.get(f.key) === size) continue; // already mirrored, unchanged
+        await target.client.send(
+          new PutObjectCommand({
+            Bucket: target.bucket,
+            Key: f.key,
+            Body: fs.createReadStream(f.abs),
+            ContentLength: size,
+          }),
+        );
+        changed++;
+      }
+      uploaded.push(`${target.label}:media(${changed} changed/${files.length})`);
+    } catch (err) {
+      errors.push(
+        `${target.label} media: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
     }
   }
 }
