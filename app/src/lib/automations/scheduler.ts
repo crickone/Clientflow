@@ -9,6 +9,7 @@ import { applyShortcodes, DEFAULT_MESSAGES, isMessageLive, type Channel } from "
 import { getBusinessProfileForTenant } from "@/lib/businessProfile";
 import { listExercisesForTenant, setExerciseVideoUrlForTenant } from "@/lib/exerciseLibrary";
 import { getThemeForTenant } from "@/lib/settings";
+import { seedMarketingSite } from "@/lib/cms/seedMarketingSite";
 import { renderEmailShell, sendEmailForTenant, textToParagraphs } from "@/lib/email";
 import { parseYouTubeId, searchExerciseVideoDetailed } from "@/lib/youtube";
 import { publishDueScheduledPosts } from "@/lib/cms/blog";
@@ -250,4 +251,8 @@ export function startScheduler(): void {
 // duplicate timers across the many modules that touch the scheduler.
 if (process.env.NEXT_PHASE !== "phase-production-build") {
   startScheduler();
+  // Ensure the platform's own AdonisAgent marketing site exists in the operator
+  // tenant on boot (create-if-missing; ships its HTML in the build). Runs once
+  // here rather than in a tick so the preview is ready immediately after deploy.
+  seedMarketingSite();
 }
