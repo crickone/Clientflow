@@ -27,6 +27,7 @@ const MIME_BY_EXT: Record<string, string> = {
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
   ".webp": "image/webp",
+  ".svg": "image/svg+xml",
 };
 
 /** Streams the current logo for preview in the settings page + img tags. */
@@ -87,7 +88,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         ok: false,
-        error: "Logo must be a PNG, JPG, or WEBP image.",
+        error: "Logo must be a PNG, JPG, WEBP, or SVG image.",
       },
       { status: 400 },
     );
@@ -108,14 +109,21 @@ export async function POST(req: Request) {
   const filename = `${LOGO_BASENAME}${ext}`;
   const dest = path.join(dir, filename);
   const rawBuf = Buffer.from(await file.arrayBuffer());
-  // Batch 5c: downscale + re-encode (never upscale; SVG N/A here — logos are
-  // PNG/JPG/WEBP only per isAllowedLogoExt). Failure-safe — falls back to
-  // rawBuf untouched if sharp can't decode it.
-  const { buffer: processedBuf } = await processImageUpload(
-    rawBuf,
-    MIME_BY_EXT[ext] ?? "application/octet-stream",
-  );
-  fs.writeFileSync(dest, processedBuf);
+  // SVG is vector — store it verbatim (sharp would rasterise it, losing the
+  // vector). It's served with the sandbox CSP in mediaSecurityHeaders() so an
+  // embedded <script> can't execute, the chrome renders it via <img> (also
+  // script-safe), and the video pipeline rasterises it on demand
+  // (resolveRasterLogoPath). Raster logos still get downscale/re-encode (never
+  // upscale; failure-safe — falls back to rawBuf untouched if sharp can't decode).
+  let outBuf: Buffer = rawBuf;
+  if (ext !== ".svg") {
+    const { buffer: processedBuf } = await processImageUpload(
+      rawBuf,
+      MIME_BY_EXT[ext] ?? "application/octet-stream",
+    );
+    outBuf = processedBuf;
+  }
+  fs.writeFileSync(dest, outBuf);
   setKey("branding_logo_filename", filename);
 
   // Invalidate the cached intro/outro cards so they re-render with the new

@@ -7,7 +7,7 @@ import { getBrandingLogoFilename } from "@/lib/settings";
 import { getCurrentTenant } from "@/lib/db/tenant";
 
 const DATA_DIR = path.join(process.cwd(), "data");
-const ALLOWED_EXT = new Set([".png", ".jpg", ".jpeg", ".webp"]);
+const ALLOWED_EXT = new Set([".png", ".jpg", ".jpeg", ".webp", ".svg"]);
 export const LOGO_BASENAME = "logo";
 
 /**
@@ -46,6 +46,33 @@ export function resolveLogoPath(): string | null {
   const full = path.join(brandingDir(), safe);
   if (!fs.existsSync(full)) return null;
   return full;
+}
+
+/**
+ * Logo path guaranteed to be a RASTER file, for consumers that can't read SVG
+ * (the ffmpeg video pipeline). Raster uploads pass through unchanged; an SVG
+ * logo is rasterised to a cached PNG (`logo.raster.png`, cleared alongside the
+ * logo on upload/delete). Returns null when no logo is set or rasterisation
+ * fails — the video then renders without a logo rather than crashing on an SVG.
+ */
+export async function resolveRasterLogoPath(): Promise<string | null> {
+  const src = resolveLogoPath();
+  if (!src) return null;
+  if (path.extname(src).toLowerCase() !== ".svg") return src;
+  try {
+    const out = path.join(brandingDir(), `${LOGO_BASENAME}.raster.png`);
+    const svgMtime = fs.statSync(src).mtimeMs;
+    if (!fs.existsSync(out) || fs.statSync(out).mtimeMs < svgMtime) {
+      const sharp = (await import("sharp")).default;
+      await sharp(fs.readFileSync(src))
+        .resize(1024, 1024, { fit: "inside", withoutEnlargement: true })
+        .png()
+        .toFile(out);
+    }
+    return out;
+  } catch {
+    return null;
+  }
 }
 
 /**

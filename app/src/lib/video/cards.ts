@@ -7,7 +7,7 @@ import ffmpegStatic from "ffmpeg-static";
 
 import type { AspectRatio } from "@/lib/video/captions";
 import { configFor, FONTS_DIR } from "@/lib/video/captions";
-import { resolveLogoPath } from "@/lib/branding";
+import { resolveRasterLogoPath } from "@/lib/branding";
 
 const ffmpegPath: string = (ffmpegStatic as unknown as string) || "ffmpeg";
 
@@ -62,7 +62,7 @@ export async function ensureCards(
   const fontPath = fs.existsSync(nebula)
     ? nebula
     : path.join(FONTS_DIR, "Nebula-Hollow.otf");
-  const logoPath = resolveLogoPath();
+  const logoPath = await resolveRasterLogoPath();
 
   // Intro is no longer a standalone card — it's a logo fade-in overlay drawn
   // by render.ts over the first ~1.6s of the actual footage. We intentionally

@@ -484,7 +484,7 @@ function LogoManager({ hasLogo }: { hasLogo: boolean }) {
         <input
           ref={fileRef}
           type="file"
-          accept="image/png,image/jpeg,image/webp"
+          accept="image/png,image/jpeg,image/webp,image/svg+xml"
           style={{ display: "none" }}
           onChange={(e) => {
             const f = e.target.files?.[0];

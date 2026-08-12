@@ -1,8 +1,6 @@
 import { redirect } from "next/navigation";
 
 import { getSessionUser, listActiveMemberships } from "@/lib/auth";
-import { getChromeLogoSrc } from "@/lib/branding";
-import { getBusinessProfile } from "@/lib/businessProfile";
 import { Logo } from "@/components/ui/Logo";
 import { AccountSelector } from "./AccountSelector";
 
@@ -43,7 +41,8 @@ export default async function SelectAccountPage() {
         }}
       >
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 28 }}>
-          <Logo src={getChromeLogoSrc()} alt={getBusinessProfile().businessName} height={28} />
+          {/* Platform account picker — always AdonisAgent-branded, not a tenant's identity. */}
+          <Logo src={null} alt="" height={28} />
         </div>
         <h1
           style={{

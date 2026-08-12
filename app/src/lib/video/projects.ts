@@ -11,7 +11,7 @@ import { planCut, type CutPlan } from "@/lib/ai/planCut";
 import { renderProject } from "@/lib/video/render";
 import { parseTimeline, type MainSegment } from "@/lib/video/timeline";
 import { resolveTrackPath } from "@/lib/video/music";
-import { resolveLogoPath } from "@/lib/branding";
+import { resolveRasterLogoPath } from "@/lib/branding";
 import { AiCapError } from "@/lib/ai/usage";
 
 /**
@@ -354,7 +354,7 @@ export function runRender(
         musicVolume: project.musicVolume,
         autoTrimSilence: project.autoTrimSilence,
         showIntroOutro: project.showIntroOutro,
-        logoPath: resolveLogoPath(),
+        logoPath: await resolveRasterLogoPath(),
         introDurationSec: project.introDurationSec,
       });
 
