@@ -7,7 +7,7 @@ import { toast } from "sonner";
 
 import type { MembershipOption } from "@/lib/auth";
 import { chooseAccount } from "./actions";
-import { LogoLoader } from "@/components/ui/LogoLoader";
+import { LogoLoader, finishSwitchLoader } from "@/components/ui/LogoLoader";
 
 export function AccountSelector({
   memberships,
@@ -20,6 +20,7 @@ export function AccountSelector({
 
   function pick(tenantId: number) {
     setSelecting(tenantId);
+    const startedAt = Date.now();
     start(async () => {
       const res = await chooseAccount(tenantId);
       if (!res.ok) {
@@ -27,8 +28,9 @@ export function AccountSelector({
         setSelecting(null);
         return;
       }
-      // Full reload so the root layout renders the chosen tenant's theme/chrome.
-      window.location.assign("/dashboard");
+      // Hold the branded loader for a full draw cycle, then hard-reload so the
+      // root layout renders the chosen tenant's theme/chrome.
+      await finishSwitchLoader(startedAt);
     });
   }
 

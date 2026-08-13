@@ -4,6 +4,30 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 /**
+ * One full draw-in→draw-out cycle of the loader animation, in ms — and the
+ * single source of that duration (interpolated into the CSS below). Exported so
+ * an account switch can hold the loader for a complete cycle before the hard
+ * reload tears it down, instead of the mark only half-drawing.
+ */
+export const LOADER_CYCLE_MS = 1900;
+
+/**
+ * Hold until the loader has been visible for at least one full cycle (measured
+ * from `startedAt`), then hard-reload into the switched tenant — so the branded
+ * draw-in plays fully instead of being cut off mid-draw. The wait is skipped
+ * under reduced motion, where the animation is disabled and there's nothing to
+ * watch.
+ */
+export async function finishSwitchLoader(startedAt: number, to = "/dashboard"): Promise<void> {
+  const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+  const elapsed = Date.now() - startedAt;
+  if (!reduceMotion && elapsed < LOADER_CYCLE_MS) {
+    await new Promise((resolve) => setTimeout(resolve, LOADER_CYCLE_MS - elapsed));
+  }
+  window.location.assign(to);
+}
+
+/**
  * Full-screen branded loader — the AdonisAgent Greek-key mark drawing itself in
  * a loop. Shown over an account switch while the session repoints and the page
  * hard-reloads into the chosen tenant's chrome. Portalled to <body> so the fixed
@@ -56,7 +80,7 @@ export function LogoLoader({ label = "Switching account" }: { label?: string }) 
         .aa-loader-draw {
           stroke-dasharray: 500;
           stroke-dashoffset: 500;
-          animation: aaLoaderDraw 1.9s ease-in-out infinite;
+          animation: aaLoaderDraw ${LOADER_CYCLE_MS}ms ease-in-out infinite;
         }
         @keyframes aaLoaderDraw {
           0%   { stroke-dashoffset: 500; }

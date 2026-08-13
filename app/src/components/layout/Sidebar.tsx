@@ -50,7 +50,7 @@ import {
 import { toast } from "sonner";
 
 import { chooseAccount } from "@/app/select-account/actions";
-import { LogoLoader } from "@/components/ui/LogoLoader";
+import { LogoLoader, finishSwitchLoader } from "@/components/ui/LogoLoader";
 import { useVocab } from "@/components/providers/VocabProvider";
 import { Logo } from "@/components/ui/Logo";
 import type { Vocab } from "@/lib/vocabulary";
@@ -526,6 +526,7 @@ function AccountSwitcher({
   function switchTo(tenantId: number) {
     if (tenantId === activeTenantId) return;
     setSwitching(tenantId);
+    const startedAt = Date.now();
     start(async () => {
       const res = await chooseAccount(tenantId);
       if (!res.ok) {
@@ -533,9 +534,9 @@ function AccountSwitcher({
         setSwitching(null);
         return;
       }
-      // Full reload so the ROOT layout re-renders with the new tenant's theme,
-      // logo and nav (a soft nav would keep the previous tenant's chrome).
-      window.location.assign("/dashboard");
+      // Hold the branded loader for a full draw cycle, then hard-reload so the
+      // ROOT layout re-renders with the new tenant's theme, logo and nav.
+      await finishSwitchLoader(startedAt);
     });
   }
 
