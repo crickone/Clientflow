@@ -3,6 +3,7 @@ import { and, desc, eq, like, or, sql } from "drizzle-orm";
 import { db } from "./db";
 import { leadMessages, leads, type Lead, type LeadMessage } from "./db/schema";
 import { normalizePhone } from "./whatsapp/phone";
+import { splitFullName } from "./humanName";
 
 export type LeadStatus = "new" | "contacted" | "replied" | "booked" | "lost";
 
@@ -12,6 +13,7 @@ export interface NormalizedLeadInput {
   campaign?: string | null;
   firstName?: string | null;
   lastName?: string | null;
+  fullName?: string | null;
   email?: string | null;
   phone?: string | null;
   therapyInterest?: string | null;
@@ -31,6 +33,18 @@ export function upsertLead(input: NormalizedLeadInput): {
   const source = input.source?.trim() || "manual";
   const sourceLeadId = input.sourceLeadId?.trim() || null;
 
+  // When no explicit first name is given but a single `fullName` is, split it
+  // server-side — so an integration (Zapier/Make/Facebook) can send one "Full
+  // name" field instead of splitting it in every scenario. An explicit
+  // firstName always wins.
+  let firstName = input.firstName;
+  let lastName = input.lastName;
+  if (!nz(firstName) && nz(input.fullName)) {
+    const split = splitFullName(input.fullName);
+    firstName = split.firstName;
+    lastName = split.lastName;
+  }
+
   if (sourceLeadId) {
     const existing = db
       .select()
@@ -46,8 +60,8 @@ export function upsertLead(input: NormalizedLeadInput): {
       source,
       sourceLeadId,
       campaign: nz(input.campaign),
-      firstName: nz(input.firstName),
-      lastName: nz(input.lastName),
+      firstName: nz(firstName),
+      lastName: nz(lastName),
       email: nz(input.email),
       phone: nz(input.phone),
       therapyInterest: nz(input.therapyInterest),

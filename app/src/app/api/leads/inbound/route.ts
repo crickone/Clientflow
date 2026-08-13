@@ -24,8 +24,9 @@ const RATE_WINDOW_MS = 60 * 1000; // …per minute
  *     "source": "zapier",            // optional, defaults to "manual"
  *     "sourceLeadId": "fb-leadgen-123", // optional, used for dedup
  *     "campaign": "HBOT - Apr 2026",
- *     "firstName": "Niamh",
- *     "lastName": "Walsh",
+ *     "fullName": "Niamh Walsh",        // OR firstName/lastName below; a lone
+ *     "firstName": "Niamh",             //   fullName is split into first+last
+ *     "lastName": "Walsh",              //   server-side (see splitFullName)
  *     "email": "niamh@example.com",
  *     "phone": "+353 87 …",
  *     "therapyInterest": "HBOT",
@@ -48,6 +49,7 @@ const schema = z.object({
   campaign: z.string().optional().nullable(),
   firstName: z.string().optional().nullable(),
   lastName: z.string().optional().nullable(),
+  fullName: z.string().optional().nullable(),
   email: z.string().email().optional().or(z.literal("")).nullable(),
   phone: z.string().optional().nullable(),
   therapyInterest: z.string().optional().nullable(),
@@ -127,6 +129,7 @@ export async function POST(req: NextRequest) {
       campaign: parsed.data.campaign,
       firstName: parsed.data.firstName,
       lastName: parsed.data.lastName,
+      fullName: parsed.data.fullName,
       email: parsed.data.email || null,
       phone: parsed.data.phone,
       therapyInterest: parsed.data.therapyInterest,
