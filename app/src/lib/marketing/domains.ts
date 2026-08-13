@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { getTenantDbById } from "@/lib/db/tenant";
 import { sendingDomains, type SendingDomain } from "@/lib/db/schema";
 import { getCampaignSender } from "@/lib/marketing/sender";
+import { getAppBaseUrl } from "@/lib/appUrl";
 import type { DomainStatus } from "@/lib/marketing/sender/types";
 
 /**
@@ -96,6 +97,22 @@ export async function connectDomain(
     tdb.update(sendingDomains).set(values).where(eq(sendingDomains.id, existing.id)).run();
   } else {
     tdb.insert(sendingDomains).values(values).run();
+  }
+
+  // Best-effort: auto-wire Mailgun webhooks + open/click tracking for the new
+  // domain so campaign stats + suppression flow back with zero manual dashboard
+  // setup. Runs AFTER the row is saved so a slow/failed config can never lose
+  // the connection, and guarded with `?.` (configureDomainDelivery is an
+  // optional provider capability). Never throws — logs and moves on.
+  try {
+    const cfg = await sender.configureDomainDelivery?.(clean, `${getAppBaseUrl()}/api/mailgun/webhook`);
+    if (cfg && cfg.ok) {
+      console.log(`[connectDomain] ${clean}: webhooks [${cfg.webhooks.join(", ")}], tracking=${cfg.tracking}`);
+    } else if (cfg && !cfg.ok) {
+      console.warn(`[connectDomain] ${clean}: delivery auto-config skipped — ${cfg.error}`);
+    }
+  } catch (err) {
+    console.warn(`[connectDomain] ${clean}: delivery auto-config failed (non-fatal):`, err);
   }
 
   const record = getSendingDomain(tenantId);

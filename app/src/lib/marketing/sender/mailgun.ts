@@ -29,6 +29,22 @@ import type { CampaignMessage, CampaignSendResult, CampaignSender, DomainStatus,
 
 const MISSING_KEY_ERROR = "Mailgun is not configured (MAILGUN_API_KEY is unset).";
 
+/**
+ * The Mailgun webhook event ids we auto-register on a new domain — exactly the
+ * set parseMailgunEvent acts on. `permanent_fail`/`temporary_fail` both arrive
+ * as a `failed` event distinguished by `severity`, so they're two webhooks that
+ * map to one parsed event type.
+ */
+const WEBHOOK_EVENTS = [
+  "delivered",
+  "permanent_fail",
+  "temporary_fail",
+  "complained",
+  "unsubscribed",
+  "opened",
+  "clicked",
+] as const;
+
 function apiKey(): string | null {
   const key = process.env.MAILGUN_API_KEY;
   return key && key.trim() ? key.trim() : null;
@@ -148,6 +164,69 @@ export class MailgunSender implements CampaignSender {
     } catch (err) {
       return { ok: false, error: `Mailgun getDomainStatus failed: ${errorMessage(err)}` };
     }
+  }
+
+  /**
+   * Auto-wire delivery for a freshly-registered domain (see CampaignSender):
+   * one webhook per event type, all pointing at `webhookUrl` (the route resolves
+   * tenant/campaign from the send's user-variables), then open + click tracking
+   * on. Every call is tolerated individually and NONE throws — a non-2xx (e.g.
+   * "already exists" on a re-connect) or a network hiccup on one event just
+   * drops that event from the returned list; a fresh domain gets all seven.
+   * `ok:false` only when the key is missing. Mirrors the plain-`fetch` shape of
+   * the methods above; the key never appears in any returned string.
+   */
+  async configureDomainDelivery(
+    domain: string,
+    webhookUrl: string,
+  ): Promise<{ ok: true; webhooks: string[]; tracking: boolean } | { ok: false; error: string }> {
+    const key = apiKey();
+    if (!key) return { ok: false, error: MISSING_KEY_ERROR };
+    const d = encodeURIComponent(domain);
+
+    const registered: string[] = [];
+    for (const event of WEBHOOK_EVENTS) {
+      try {
+        const form = new URLSearchParams();
+        form.set("id", event);
+        form.set("url", webhookUrl);
+        const res = await fetch(`${baseUrl()}/domains/${d}/webhooks`, {
+          method: "POST",
+          headers: { Authorization: authHeader(key) },
+          body: form,
+        });
+        if (res.ok) registered.push(event);
+        // A non-2xx (typically "already exists" on a re-connect) is tolerated.
+      } catch {
+        // network hiccup on one event — skip it, keep the rest going.
+      }
+    }
+
+    let tracking = false;
+    try {
+      const activate = () => {
+        const f = new URLSearchParams();
+        f.set("active", "yes");
+        return f;
+      };
+      const [openRes, clickRes] = await Promise.all([
+        fetch(`${baseUrl()}/domains/${d}/tracking/open`, {
+          method: "PUT",
+          headers: { Authorization: authHeader(key) },
+          body: activate(),
+        }),
+        fetch(`${baseUrl()}/domains/${d}/tracking/click`, {
+          method: "PUT",
+          headers: { Authorization: authHeader(key) },
+          body: activate(),
+        }),
+      ]);
+      tracking = openRes.ok && clickRes.ok;
+    } catch {
+      // leave tracking=false — the caller logs it; not fatal.
+    }
+
+    return { ok: true, webhooks: registered, tracking };
   }
 
   async send(

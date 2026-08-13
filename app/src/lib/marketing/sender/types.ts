@@ -80,6 +80,21 @@ export interface CampaignSender {
   ): Promise<{ ok: true; id: string; dnsRecords: DomainStatus["dnsRecords"] } | { ok: false; error: string }>;
   /** Re-check a previously registered domain's verification state (forces a fresh DNS check, not a cached read). */
   getDomainStatus(domain: string): Promise<{ ok: true; status: DomainStatus } | { ok: false; error: string }>;
+  /**
+   * OPTIONAL capability: auto-wire event delivery for a freshly-registered
+   * domain — register the campaign webhooks (every event type → `webhookUrl`)
+   * and switch on open/click tracking — so campaign stats + suppression flow
+   * back with no manual dashboard setup. Optional because it's provider-specific
+   * (not every provider exposes per-domain webhook config), so callers guard
+   * with `?.`. Best-effort and non-throwing: a partial or total failure never
+   * blocks the domain — it just means events aren't tracked until wired by hand.
+   * `webhooks` lists the event types actually registered; `tracking` is whether
+   * open+click tracking stuck; `ok:false` only when the provider is unconfigured.
+   */
+  configureDomainDelivery?(
+    domain: string,
+    webhookUrl: string,
+  ): Promise<{ ok: true; webhooks: string[]; tracking: boolean } | { ok: false; error: string }>;
   /** Send one campaign email FROM `fromDomain` (must already be a verified sending domain). */
   send(
     fromDomain: string,
