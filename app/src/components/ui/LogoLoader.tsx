@@ -4,25 +4,26 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 /**
- * One full draw-in→draw-out cycle of the loader animation, in ms — and the
- * single source of that duration (interpolated into the CSS below). Exported so
- * an account switch can hold the loader for a complete cycle before the hard
- * reload tears it down, instead of the mark only half-drawing.
+ * Duration of the mark's single draw-in, in ms — the single source of that
+ * timing, interpolated into the CSS below. The account switch holds the loader
+ * for one full draw (the mark drawing itself in, then holding — it does NOT
+ * loop) before the hard reload, so the animation always plays through once.
  */
-export const LOADER_CYCLE_MS = 1900;
+export const LOADER_DRAW_MS = 1300;
 
 /**
- * Hold until the loader has been visible for at least one full cycle (measured
- * from `startedAt`), then hard-reload into the switched tenant — so the branded
- * draw-in plays fully instead of being cut off mid-draw. The wait is skipped
- * under reduced motion, where the animation is disabled and there's nothing to
- * watch.
+ * Hold until the mark has drawn itself in once (measured from `startedAt`, so a
+ * slow switch adds no extra wait), THEN hard-reload into the switched tenant.
+ * The switch (chooseAccount) runs during the draw and the loader stays up —
+ * fully drawn and holding — through the reload, so the whole transition happens
+ * under the cover: no mid-draw cut, and no flash of the old account. The wait is
+ * skipped under reduced motion (the animation is disabled — nothing to play).
  */
 export async function finishSwitchLoader(startedAt: number, to = "/dashboard"): Promise<void> {
   const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
   const elapsed = Date.now() - startedAt;
-  if (!reduceMotion && elapsed < LOADER_CYCLE_MS) {
-    await new Promise((resolve) => setTimeout(resolve, LOADER_CYCLE_MS - elapsed));
+  if (!reduceMotion && elapsed < LOADER_DRAW_MS) {
+    await new Promise((resolve) => setTimeout(resolve, LOADER_DRAW_MS - elapsed));
   }
   window.location.assign(to);
 }
@@ -80,12 +81,11 @@ export function LogoLoader({ label = "Switching account" }: { label?: string }) 
         .aa-loader-draw {
           stroke-dasharray: 500;
           stroke-dashoffset: 500;
-          animation: aaLoaderDraw ${LOADER_CYCLE_MS}ms ease-in-out infinite;
+          animation: aaLoaderDraw ${LOADER_DRAW_MS}ms ease-in-out forwards;
         }
         @keyframes aaLoaderDraw {
-          0%   { stroke-dashoffset: 500; }
-          50%  { stroke-dashoffset: 0; }
-          100% { stroke-dashoffset: -500; }
+          from { stroke-dashoffset: 500; }
+          to   { stroke-dashoffset: 0; }
         }
         @media (prefers-reduced-motion: reduce) {
           .aa-loader-draw { animation: none; stroke-dashoffset: 0; }
