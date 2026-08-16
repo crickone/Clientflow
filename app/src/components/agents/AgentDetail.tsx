@@ -185,7 +185,7 @@ function ModelCard({ agent, openRouterConfigured }: { agent: Agent; openRouterCo
               type="button"
               onClick={() => pick(choice)}
               disabled={pending || locked}
-              title={locked ? "Requires an OpenRouter API key" : undefined}
+              title={locked ? "Requires additional setup" : undefined}
               style={{
                 textAlign: "left",
                 padding: "10px 12px",
@@ -203,18 +203,9 @@ function ModelCard({ agent, openRouterConfigured }: { agent: Agent; openRouterCo
                 <span style={{ fontSize: 13.5, fontWeight: 600, color: selected ? "var(--accent-ink)" : "var(--text-primary)" }}>
                   {choice.label}
                 </span>
-                {choice.provider === "openrouter" && (
-                  <Badge
-                    tone={locked ? "amber" : undefined}
-                    style={locked ? undefined : { background: "var(--surface-2)", color: "var(--text-tertiary)" }}
-                  >
-                    {locked ? (
-                      <>
-                        <Lock size={9} strokeWidth={2} /> Needs OpenRouter key
-                      </>
-                    ) : (
-                      "OpenRouter"
-                    )}
+                {choice.provider === "openrouter" && locked && (
+                  <Badge tone="amber">
+                    <Lock size={9} strokeWidth={2} /> Needs setup
                   </Badge>
                 )}
               </span>

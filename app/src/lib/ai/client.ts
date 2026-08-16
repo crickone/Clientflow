@@ -54,6 +54,13 @@ export const PRICING: Record<string, { inCents: number; outCents: number }> = {
   // whole catalog. Without this entry it would silently fall back to the
   // Sonnet rate above (~33x too high on input, ~27x too high on output).
   "openrouter:qwen/qwen3-235b-a22b-2507": { inCents: 9, outCents: 55 },
+  // OpenRouter GLM 5.2 (Z.ai, bare "glm-5.2" — matches the catalog id; NOT the
+  // ":batch" async variant). $0.308 in / $0.968 out per 1M tokens, sourced live
+  // from openrouter.ai/z-ai on 2026-08-16 (rounded up to whole cents → 31/97).
+  // Without this entry estCostCents would silently price every GLM run at the
+  // Sonnet fallback rate above (~10x too high on input, ~15x too high on
+  // output), undermining the €25/tenant cap.
+  "openrouter:z-ai/glm-5.2": { inCents: 31, outCents: 97 },
   // OpenRouter GPT-5 (OpenAI's flagship, bare "gpt-5" id — see the matching
   // catalog comment for why this id and not -mini/-nano/-pro/-codex or the
   // newer 5.1/5.2/... line). $1.25 in / $10.00 out per 1M tokens, sourced

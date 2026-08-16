@@ -30,7 +30,7 @@ function ok(name: string, cond: boolean) {
 // match) without ever surfacing as an error.
 {
   const ids = MODEL_CATALOG.map((m) => m.id);
-  ok("MODEL_CATALOG has exactly 7 entries (2 Anthropic + 5 OpenRouter)", ids.length === 7);
+  ok("MODEL_CATALOG has exactly 8 entries (2 Anthropic + 6 OpenRouter)", ids.length === 8);
   ok("every MODEL_CATALOG id is unique", new Set(ids).size === ids.length);
 }
 
@@ -66,7 +66,7 @@ ok("no catalog id contains the substring 'fable' (case-insensitive)", !/fable/i.
   ok("claude-sonnet-5 is first in the catalog (the default)", MODEL_CATALOG[0]?.id === "claude-sonnet-5");
 }
 
-// MP4: five OpenRouter entries now (DeepSeek + Kimi K2 + Qwen3 + GPT-5 +
+// Six OpenRouter entries now (DeepSeek + Kimi K2 + Qwen3 + GLM 5.2 + GPT-5 +
 // Gemini) — every one of them must be flagged needsOpenRouter: true (this is
 // what lets AgentDetail render it disabled until OPENROUTER_API_KEY is set),
 // carry the "openrouter:" prefix getProvider (@/lib/ai/providers) dispatches
@@ -76,7 +76,7 @@ ok("no catalog id contains the substring 'fable' (case-insensitive)", !/fable/i.
 // added to the catalog is covered automatically.
 {
   const openRouterEntries = MODEL_CATALOG.filter((m) => m.provider === "openrouter");
-  ok("exactly five openrouter-provider entries in the catalog", openRouterEntries.length === 5);
+  ok("exactly six openrouter-provider entries in the catalog", openRouterEntries.length === 6);
   for (const entry of openRouterEntries) {
     ok(`${entry.id}: needsOpenRouter is true`, entry.needsOpenRouter === true);
     ok(`${entry.id}: id carries the "openrouter:" prefix`, entry.id.startsWith("openrouter:"));
@@ -95,6 +95,7 @@ ok("no catalog id contains the substring 'fable' (case-insensitive)", !/fable/i.
   const expectedLabels: Record<string, string> = {
     "openrouter:moonshotai/kimi-k2-0905": "Kimi K2",
     "openrouter:qwen/qwen3-235b-a22b-2507": "Qwen3 235B",
+    "openrouter:z-ai/glm-5.2": "GLM 5.2",
     "openrouter:openai/gpt-5": "GPT-5",
     "openrouter:google/gemini-3.1-pro-preview": "Gemini 3.1 Pro",
   };

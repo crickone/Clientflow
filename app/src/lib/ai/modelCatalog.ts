@@ -51,7 +51,7 @@ export const MODEL_CATALOG: ModelChoice[] = [
     label: "DeepSeek V4 Flash",
     provider: "openrouter",
     needsOpenRouter: true,
-    note: "Open model via OpenRouter — lowest cost; tool use is good but benchmark before relying on it.",
+    note: "Open model — lowest cost; tool use is good but benchmark before relying on it.",
   },
   {
     // Dated refresh ("0905") over the bare "kimi-k2" (0711 release, 131K
@@ -66,7 +66,7 @@ export const MODEL_CATALOG: ModelChoice[] = [
     label: "Kimi K2",
     provider: "openrouter",
     needsOpenRouter: true,
-    note: "Open model via OpenRouter — excellent agentic tool use, great value.",
+    note: "Open model — excellent agentic tool use, great value.",
   },
   {
     // "-2507" dated refresh of Qwen3 235B A22B Instruct (a post-training
@@ -79,7 +79,19 @@ export const MODEL_CATALOG: ModelChoice[] = [
     label: "Qwen3 235B",
     provider: "openrouter",
     needsOpenRouter: true,
-    note: "Open model via OpenRouter — cheapest option here, solid tool use.",
+    note: "Open model — cheapest option here, solid tool use.",
+  },
+  {
+    // Z.ai's GLM 5.2 (bare "glm-5.2", NOT the ":batch" async variant — that's
+    // cheaper but for offline batch jobs, not interactive tool use). A strong
+    // OPEN-WEIGHT model with a huge 1.05M-token context at open-model prices.
+    // Verified live against openrouter.ai/z-ai on 2026-08-16 — see the matching
+    // PRICING entry in @/lib/ai/client for the sourced price.
+    id: "openrouter:z-ai/glm-5.2",
+    label: "GLM 5.2",
+    provider: "openrouter",
+    needsOpenRouter: true,
+    note: "Open model — 1M-token context, very low cost, strong agentic tool use.",
   },
   {
     // OpenAI's flagship, routed through OpenRouter rather than a native
@@ -92,7 +104,7 @@ export const MODEL_CATALOG: ModelChoice[] = [
     label: "GPT-5",
     provider: "openrouter",
     needsOpenRouter: true,
-    note: "OpenAI flagship via OpenRouter — top-tier reasoning, premium price.",
+    note: "OpenAI flagship — top-tier reasoning, premium price.",
   },
   {
     // Google's current flagship "Pro" tier — still shipping under "-preview"
@@ -107,7 +119,7 @@ export const MODEL_CATALOG: ModelChoice[] = [
     label: "Gemini 3.1 Pro",
     provider: "openrouter",
     needsOpenRouter: true,
-    note: "Google flagship via OpenRouter — huge 1M-token context, mid-premium price.",
+    note: "Google flagship — huge 1M-token context, mid-premium price.",
   },
 ];
 
