@@ -62,4 +62,26 @@ check("empty → avg null", empty.avgSpeedToLeadMs, null);
 check("empty → conversion null", empty.conversionPct, null);
 check("empty → not breaching", empty.uncontactedBreaching, false);
 
+// Boundary coverage (Task 2 review): bracket the strict thresholds, mirroring
+// Task 1's boundary rigor. Each uses a focused single-lead fixture.
+const breachAtThreshold: LeadMetricInput = { createdAt: NOW - 60 * 60_000, updatedAt: NOW - 60 * 60_000, pipelineStage: "hot_lead", firstOutboundAt: null };
+check("uncontacted at exactly 1h → NOT breaching (strict >)", computeBoardMetrics([breachAtThreshold], NOW).uncontactedBreaching, false);
+const breachPastThreshold: LeadMetricInput = { createdAt: NOW - 60 * 60_000 - 1, updatedAt: NOW - 60 * 60_000 - 1, pipelineStage: "hot_lead", firstOutboundAt: null };
+check("uncontacted at 1h+1ms → breaching", computeBoardMetrics([breachPastThreshold], NOW).uncontactedBreaching, true);
+
+const atWeekStart: LeadMetricInput = { createdAt: weekStart, updatedAt: weekStart, pipelineStage: "new_lead", firstOutboundAt: null };
+check("createdAt exactly weekStart → this week (inclusive)", computeBoardMetrics([atWeekStart], NOW).newThisWeek, 1);
+const atPrevWeekStart: LeadMetricInput = { createdAt: weekStart - 7 * DAY, updatedAt: weekStart - 7 * DAY, pipelineStage: "new_lead", firstOutboundAt: null };
+check("createdAt exactly prevWeekStart → prev week, delta -1", computeBoardMetrics([atPrevWeekStart], NOW).newThisWeekDelta, -1);
+
+const atCutoff30: LeadMetricInput = { createdAt: NOW - 30 * DAY, updatedAt: NOW - 30 * DAY, pipelineStage: "new_lead", firstOutboundAt: NOW - 30 * DAY + HOUR };
+check("speed sample at exactly 30d cutoff → included", computeBoardMetrics([atCutoff30], NOW).avgSpeedToLeadMs, HOUR);
+const beforeCutoff30: LeadMetricInput = { createdAt: NOW - 30 * DAY - 1, updatedAt: NOW - 30 * DAY - 1, pipelineStage: "new_lead", firstOutboundAt: NOW - 30 * DAY - 1 + HOUR };
+check("speed sample just before 30d cutoff → excluded (null)", computeBoardMetrics([beforeCutoff30], NOW).avgSpeedToLeadMs, null);
+
+const atCutoff90Won: LeadMetricInput = { createdAt: NOW - 90 * DAY, updatedAt: NOW - 90 * DAY, pipelineStage: "sale", firstOutboundAt: null };
+check("won lead at exactly 90d cutoff → counted (100%)", computeBoardMetrics([atCutoff90Won], NOW).conversionPct, 100);
+const beforeCutoff90Won: LeadMetricInput = { createdAt: NOW - 90 * DAY - 1, updatedAt: NOW - 90 * DAY - 1, pipelineStage: "sale", firstOutboundAt: null };
+check("won lead just before 90d cutoff → excluded (null)", computeBoardMetrics([beforeCutoff90Won], NOW).conversionPct, null);
+
 console.log(`\n${passed} passed`);
