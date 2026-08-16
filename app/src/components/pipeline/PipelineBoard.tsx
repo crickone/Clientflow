@@ -41,11 +41,25 @@ export function PipelineBoard({ leads: propLeads }: { leads: LeadWithSla[] }) {
   const [activeId, setActiveId] = useState<number | null>(null);
   const [, startTransition] = useTransition();
   const draggingRef = useRef(false);
+  const pendingIds = useRef<Set<number>>(new Set());
 
   // Server is the source of truth; when a refresh brings new props (e.g. the
   // auto-engine advanced a lead), adopt them — unless a drag is mid-flight.
+  // Server is the source of truth; adopt refreshed props — but never mid-drag,
+  // and preserve the optimistic stage of any move still awaiting the server, so
+  // a periodic/focus refresh landing in that window can't snap the card back.
   useEffect(() => {
-    if (!draggingRef.current) setLeads(propLeads);
+    if (draggingRef.current) return;
+    setLeads((prev) => {
+      if (pendingIds.current.size === 0) return propLeads;
+      const optimistic = new Map<number, PipelineStage>();
+      for (const l of prev) {
+        if (pendingIds.current.has(l.id)) optimistic.set(l.id, l.pipelineStage as PipelineStage);
+      }
+      return propLeads.map((l) =>
+        optimistic.has(l.id) ? { ...l, pipelineStage: optimistic.get(l.id)! } : l,
+      );
+    });
   }, [propLeads]);
 
   // Restore the saved view once on mount (avoids SSR mismatch).
@@ -113,6 +127,7 @@ export function PipelineBoard({ leads: propLeads }: { leads: LeadWithSla[] }) {
 
   const move = useCallback(
     (id: number, to: PipelineStage, from: PipelineStage) => {
+      pendingIds.current.add(id);
       setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, pipelineStage: to } : l)));
       startTransition(async () => {
         try {
@@ -122,8 +137,15 @@ export function PipelineBoard({ leads: propLeads }: { leads: LeadWithSla[] }) {
             action: { label: "Undo", onClick: () => move(id, from, to) },
           });
         } catch {
-          setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, pipelineStage: from } : l)));
+          // Only revert if a newer move hasn't since superseded this one.
+          setLeads((prev) =>
+            prev.map((l) =>
+              l.id === id && l.pipelineStage === to ? { ...l, pipelineStage: from } : l,
+            ),
+          );
           toast.error("Couldn't move the lead. Reverted.");
+        } finally {
+          pendingIds.current.delete(id);
         }
       });
     },
@@ -181,7 +203,7 @@ export function PipelineBoard({ leads: propLeads }: { leads: LeadWithSla[] }) {
       </div>
 
       {view === "list" ? (
-        <LeadList leads={leads} />
+        <LeadList leads={filtered} />
       ) : (
         <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
           <LayoutGroup>
@@ -245,7 +267,7 @@ function DraggableCard({
 }) {
   const { setNodeRef, listeners, attributes, transform, isDragging } = useDraggable({ id: lead.id });
   return (
-    <motion.div layout transition={{ duration: 0.25 }} style={{ opacity: isDragging ? 0.35 : 1 }}>
+    <motion.div layout layoutId={String(lead.id)} transition={{ duration: 0.25 }} style={{ opacity: isDragging ? 0.35 : 1 }}>
       <div
         ref={setNodeRef}
         {...listeners}
