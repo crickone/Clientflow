@@ -43,8 +43,6 @@ export function PipelineBoard({ leads: propLeads }: { leads: LeadWithSla[] }) {
   const draggingRef = useRef(false);
   const pendingIds = useRef<Set<number>>(new Set());
 
-  // Server is the source of truth; when a refresh brings new props (e.g. the
-  // auto-engine advanced a lead), adopt them — unless a drag is mid-flight.
   // Server is the source of truth; adopt refreshed props — but never mid-drag,
   // and preserve the optimistic stage of any move still awaiting the server, so
   // a periodic/focus refresh landing in that window can't snap the card back.
@@ -128,7 +126,9 @@ export function PipelineBoard({ leads: propLeads }: { leads: LeadWithSla[] }) {
   const move = useCallback(
     (id: number, to: PipelineStage, from: PipelineStage) => {
       pendingIds.current.add(id);
-      setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, pipelineStage: to } : l)));
+      setLeads((prev) =>
+        prev.map((l) => (l.id === id ? { ...l, pipelineStage: to, updatedAt: new Date() } : l)),
+      );
       startTransition(async () => {
         try {
           await setLeadStageAction(id, to);
