@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, like, or, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, like, or, sql } from "drizzle-orm";
 import { db } from "./db";
 import { leadMessages, leads, type Lead, type LeadMessage } from "./db/schema";
 import { normalizePhone } from "./whatsapp/phone";
@@ -197,4 +197,34 @@ export function leadCounts() {
     out.all += r.n;
   }
   return out;
+}
+
+/** A board lead: the full row plus the epoch-ms of its first *sent* outbound message (or null). */
+export type LeadWithSla = Lead & { firstOutboundAt: number | null };
+
+/**
+ * All leads for the pipeline board, each with `firstOutboundAt` computed in a
+ * single grouped left-join (no N+1). `firstOutboundAt` = MIN(sent_at) over that
+ * lead's SENT outbound messages (drafts have null sent_at and are excluded).
+ * Ordered newest-first; the board buckets by stage client-side.
+ */
+export function listLeadsForBoard(): LeadWithSla[] {
+  const firstOutbound = db
+    .select({
+      leadId: leadMessages.leadId,
+      firstOutboundAt: sql<number>`min(${leadMessages.sentAt})`.as("first_outbound_at"),
+    })
+    .from(leadMessages)
+    .where(and(eq(leadMessages.direction, "outbound"), isNotNull(leadMessages.sentAt)))
+    .groupBy(leadMessages.leadId)
+    .as("first_outbound");
+
+  const rows = db
+    .select({ lead: leads, firstOutboundAt: firstOutbound.firstOutboundAt })
+    .from(leads)
+    .leftJoin(firstOutbound, eq(firstOutbound.leadId, leads.id))
+    .orderBy(desc(leads.createdAt))
+    .all();
+
+  return rows.map((r) => ({ ...r.lead, firstOutboundAt: r.firstOutboundAt ?? null }));
 }
