@@ -37,6 +37,9 @@ const RECOMMENDED_VARS = [
   "CMS_SITE_HOSTS", // public multi-site host→tenant routing (see middleware.ts)
   "MAILGUN_API_KEY", // email marketing sends (lib/marketing/sender/mailgun.ts) — unset = every send fails closed
   "MAILGUN_WEBHOOK_SIGNING_KEY", // verifies inbound Mailgun webhook signatures — unset = every webhook rejected (fails closed, never accepts unsigned events)
+  "FACEBOOK_APP_ID", // native Facebook lead-gen connect flow — unset = facebookConfigured() is false, so "Connect Facebook" stays disabled
+  "FACEBOOK_APP_SECRET", // FB OAuth code exchange + leadgen webhook X-Hub-Signature-256 verification — unset = every leadgen webhook is rejected (fails closed)
+  "FACEBOOK_WEBHOOK_VERIFY_TOKEN", // echoed on Facebook's webhook-subscription GET — unset = the leadgen subscription can never be verified
   "APP_URL", // stable absolute origin for links that must work outside a request (unsubscribe links, invite emails); the campaign-send pipeline threads the in-request forwarded host through to its detached continuation as the primary mechanism, so this is belt-and-suspenders, not the only path — see lib/appUrl.ts
 ] as const;
 

@@ -14,6 +14,7 @@ import {
   Mail,
   Bot,
   KeyRound,
+  Megaphone,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardLabel } from "@/components/ui/Card";
@@ -96,6 +97,12 @@ function buildSections(vocab: ReturnType<typeof getVocab>) {
     icon: MessageCircle,
     title: "WhatsApp",
     desc: "Connect a WhatsApp number to message leads and clients in their thread.",
+  },
+  {
+    href: "/settings/integrations/facebook",
+    icon: Megaphone,
+    title: "Facebook",
+    desc: "Connect a Facebook Page to pull in Lead Ads leads instantly — native, no Zapier/Make needed.",
   },
   {
     href: "/settings/inbox-ai",

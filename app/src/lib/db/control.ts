@@ -394,6 +394,26 @@ export function ensureControlTables() {
     );
     CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
 
+    -- Per-tenant Facebook Pages connected for the native Meta lead-gen
+    -- integration (Phase 1). Control-plane, NOT the tenant DB: the leadgen
+    -- webhook is a server-to-server call with no session, so it must resolve the
+    -- owning tenant + Page token from the incoming page_id — exactly how api_keys
+    -- routes an inbound-leads POST. One row per connected Page (page_id unique);
+    -- page_access_token is a long-lived Page token (a secret — never returned to
+    -- the UI or logged).
+    CREATE TABLE IF NOT EXISTS facebook_pages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      page_id TEXT NOT NULL UNIQUE,
+      page_name TEXT,
+      page_access_token TEXT NOT NULL,
+      connected_by_user_id INTEGER,
+      subscribed_at INTEGER,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch()*1000),
+      revoked_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_facebook_pages_page ON facebook_pages(page_id);
+
     -- Client-app password resets + first-password invites. A single-use,
     -- expiring token tied to a client_credentials row. Used by both the
     -- migration bulk-invite ("set your password") and the client forgot-password
