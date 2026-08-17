@@ -1,0 +1,268 @@
+<style>
+  :root{
+    --black:#0E0E0E; --white:#FFFFFF; --graphite:#6B6B6B; --mist:#F4F4F4; --hair:#DcDcDc;
+    --rule:#0E0E0E;
+    --fam:"Familjen Grotesk","Futura","Century Gothic",ui-sans-serif,system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  .wrap{background:var(--white);color:var(--black);font-family:var(--fam);line-height:1.5;
+    -webkit-font-smoothing:antialiased;min-height:100vh;font-weight:400}
+  .container{max-width:1120px;margin:0 auto;padding:0 32px}
+  p{margin:0}
+  .g{display:grid;grid-template-columns:repeat(12,1fr);gap:24px}
+
+  /* type utilities */
+  .label{font-size:11px;letter-spacing:.22em;text-transform:uppercase;font-weight:600}
+  .idx{font-size:13px;letter-spacing:.04em;font-weight:600}
+  .muted{color:var(--graphite)}
+  .lead{font-size:clamp(16px,2vw,19px);line-height:1.45;max-width:34ch;font-weight:400}
+  .num{font-variant-numeric:tabular-nums}
+
+  /* masthead */
+  .mast{display:flex;justify-content:space-between;align-items:baseline;padding:20px 0 14px;border-bottom:1.5px solid var(--rule)}
+  .mast .label{font-weight:600}
+
+  /* cover */
+  .cover{padding:70px 0 64px;border-bottom:1.5px solid var(--rule)}
+  .display{font-weight:600;line-height:.9;letter-spacing:-.015em;font-size:clamp(46px,11.5vw,132px);max-width:100%}
+  .cover .meta{margin-top:26px}
+  .cover .meta .k{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--graphite)}
+  .cover .meta .v{font-size:14px;margin-top:3px}
+
+  /* sections: index column + content */
+  .row{padding:46px 0;border-bottom:1px solid var(--hair)}
+  .row .head{grid-column:1 / 4}
+  .row .body{grid-column:4 / 13}
+  .row h2{grid-column:4 / 13;font-weight:600;font-size:clamp(22px,3vw,30px);letter-spacing:-.005em;margin:0 0 22px;line-height:1.05}
+  .row .head .idx{display:block}
+  .row .head .label{display:block;margin-top:8px;color:var(--graphite)}
+  @media(max-width:760px){
+    .row .head,.row .body,.row h2{grid-column:1 / 13}
+    .row .head{margin-bottom:18px;display:flex;gap:12px;align-items:baseline}
+    .row .head .label{margin-top:0}
+  }
+
+  /* mark specimens */
+  .marks{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+  @media(max-width:640px){.marks{grid-template-columns:1fr 1fr}}
+  .spec{display:flex;flex-direction:column;gap:12px}
+  .spec .frame{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border:1px solid var(--hair)}
+  .spec .frame.k{background:var(--black)}
+  .spec .frame.w{background:var(--white)}
+  .spec .cap{font-size:12px;color:var(--graphite);display:flex;justify-content:space-between;border-top:1px solid var(--hair);padding-top:8px}
+  .spec .cap b{color:var(--black);font-weight:600}
+
+  /* lockups */
+  .lockrow{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:640px){.lockrow{grid-template-columns:1fr}}
+  .lockcell{border:1px solid var(--hair);padding:40px 28px;display:flex;align-items:center;justify-content:space-between;gap:24px}
+  .lockcell.k{background:var(--black)}
+  .lockcell .word{font-weight:600;font-size:clamp(26px,3.4vw,40px);letter-spacing:-.005em;line-height:1}
+  .lockcell .tag{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--graphite)}
+  .lockcell.k .tag{color:#9a9a9a}
+  /* optically-locked lockup: mark ≈ cap-height, em-based gap, cap-band alignment */
+  .lk{display:inline-flex;align-items:center;line-height:1;min-width:0}
+  .lk > svg{height:.82em;width:auto;flex:none;transform:translateY(-.03em)}
+  .lk > .w{font-weight:600;line-height:1;margin-left:.42em;white-space:nowrap}
+  /* stacked lockup (primary): mark over wordmark over tagline, centred + tracked.
+     padding-left compensates the trailing letter-spacing so tracked lines stay optically centred. */
+  .stack{display:flex;flex-direction:column;align-items:center;text-align:center;line-height:1}
+  .stack > svg{width:2.05em;height:auto;margin-bottom:.62em}
+  .stack .w{font-weight:600;font-size:1em;text-transform:uppercase;letter-spacing:.2em;padding-left:.2em;margin-bottom:.62em}
+  .stack .t{font-weight:600;font-size:.3em;text-transform:uppercase;letter-spacing:.44em;padding-left:.44em;opacity:.9}
+
+  /* colour table */
+  .ctable{border-top:1px solid var(--hair)}
+  .crow{display:grid;grid-template-columns:64px 1fr 1fr 2fr;gap:20px;align-items:center;padding:14px 0;border-bottom:1px solid var(--hair)}
+  .crow .box{width:44px;height:44px;border:1px solid var(--hair)}
+  .crow .cn{font-weight:600}
+  .crow .hex{font-variant-numeric:tabular-nums;color:var(--graphite);letter-spacing:.03em}
+  .crow .use{color:var(--graphite);font-size:13.5px}
+  @media(max-width:640px){.crow{grid-template-columns:44px 1fr 1fr;gap:14px}.crow .use{display:none}}
+
+  /* type specimen */
+  .specimen{border:1px solid var(--hair);padding:34px 28px}
+  .aa{font-weight:600;font-size:clamp(96px,22vw,260px);line-height:.8;letter-spacing:-.02em}
+  .glyphs{font-size:clamp(15px,2.2vw,22px);letter-spacing:.06em;color:var(--graphite);margin-top:20px;border-top:1px solid var(--hair);padding-top:18px}
+  .scale{margin-top:24px}
+  .scale .sr{display:grid;grid-template-columns:120px 1fr;gap:20px;align-items:baseline;padding:12px 0;border-bottom:1px dashed var(--hair)}
+  .scale .sr:last-child{border-bottom:none}
+  .scale .sk{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--graphite)}
+  .scale .sv{font-weight:600;line-height:1}
+
+  /* usage */
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:40px}
+  @media(max-width:640px){.cols{grid-template-columns:1fr}}
+  .list{list-style:none;margin:0;padding:0}
+  .list li{padding:9px 0;border-bottom:1px solid var(--hair);font-size:14px;display:flex;gap:12px}
+  .list li .m{color:var(--graphite);font-variant-numeric:tabular-nums;flex:none;width:20px}
+  .iconsizes{display:flex;gap:14px;align-items:flex-end;margin-top:14px}
+
+  .foot{border-top:1.5px solid var(--rule);margin-top:8px;display:flex;justify-content:space-between;align-items:baseline;padding:22px 0 60px}
+</style>
+
+<div class="wrap">
+  <div class="container">
+
+    <!-- MASTHEAD -->
+    <div class="mast">
+      <span class="label">AdonisAgent — Brand System</span>
+      <span class="label muted">v1 / 2026</span>
+    </div>
+
+    <!-- COVER -->
+    <div class="cover">
+      <svg width="74" viewBox="0 0 120 120" style="display:block;margin-bottom:30px" aria-label="AdonisAgent mark">
+        <rect width="120" height="120" fill="#0E0E0E"/>
+        <path d="M20 20 L100 20 L100 100 L20 100 L20 40 L80 40 L80 80 L40 80 L40 60 L60 60" fill="none" stroke="#FFFFFF" stroke-width="9" stroke-linecap="square" stroke-linejoin="miter"/>
+      </svg>
+      <div class="display">AdonisAgent</div>
+      <div class="g meta">
+        <div style="grid-column:1 / 6">
+          <p class="lead">The AI agent that runs the business — clients, sites, marketing, and money, under one roof.</p>
+        </div>
+        <div style="grid-column:8 / 10"><div class="k">Typeface</div><div class="v">Familjen Grotesk</div></div>
+        <div style="grid-column:10 / 12"><div class="k">Palette</div><div class="v">Black / White</div></div>
+      </div>
+    </div>
+
+    <!-- 01 MARK -->
+    <div class="row g">
+      <div class="head"><span class="idx num">01</span><span class="label">The Mark</span></div>
+      <h2>A Greek key, reduced to a single line</h2>
+      <div class="body">
+        <p class="lead muted" style="max-width:46ch;margin-bottom:26px">One continuous meander spiralling into a square — right angles only, one stroke weight. Built as vector: it holds from a 168px header to a 16px favicon.</p>
+        <div class="marks">
+          <div class="spec">
+            <div class="frame k">
+              <svg width="58%" viewBox="0 0 120 120"><path d="M20 20 L100 20 L100 100 L20 100 L20 40 L80 40 L80 80 L40 80 L40 60 L60 60" fill="none" stroke="#FFFFFF" stroke-width="9" stroke-linecap="square" stroke-linejoin="miter"/></svg>
+            </div>
+            <div class="cap"><b>Primary</b><span>White / Black</span></div>
+          </div>
+          <div class="spec">
+            <div class="frame w">
+              <svg width="58%" viewBox="0 0 120 120"><path d="M20 20 L100 20 L100 100 L20 100 L20 40 L80 40 L80 80 L40 80 L40 60 L60 60" fill="none" stroke="#0E0E0E" stroke-width="9" stroke-linecap="square" stroke-linejoin="miter"/></svg>
+            </div>
+            <div class="cap"><b>Inverse</b><span>Black / White</span></div>
+          </div>
+          <div class="spec">
+            <div class="frame w">
+              <svg width="58%" viewBox="0 0 120 120"><path d="M20 20 L100 20 L100 100 L20 100 L20 40 L80 40 L80 80 L40 80 L40 60 L60 60" fill="none" stroke="#0E0E0E" stroke-width="9" stroke-linecap="square" stroke-linejoin="miter"/></svg>
+            </div>
+            <div class="cap"><b>Line</b><span>No container</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 02 LOCKUPS -->
+    <div class="row g">
+      <div class="head"><span class="idx num">02</span><span class="label">Lockups</span></div>
+      <h2>Mark + wordmark</h2>
+      <div class="body">
+        <p class="lead muted" style="max-width:48ch;margin-bottom:30px">The primary lockup stacks the mark over the wordmark, with a tracked tagline beneath — centred and symmetrical. Optically locked: the mark sized to the cap-height band, gaps set in ems so they hold at any size, and each tracked line nudged back to true centre.</p>
+
+        <!-- PRIMARY — stacked, on black -->
+        <div style="background:var(--black);color:#fff;padding:clamp(48px,7vw,92px) 24px;display:flex;justify-content:center">
+          <div class="stack" style="font-size:clamp(30px,4.6vw,48px)">
+            <svg viewBox="0 0 120 120"><path d="M20 20 L100 20 L100 100 L20 100 L20 40 L80 40 L80 80 L40 80 L40 60 L60 60" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="square" stroke-linejoin="miter"/></svg>
+            <div class="w">Adonis Agent</div>
+            <div class="t">Run the whole business</div>
+          </div>
+        </div>
+        <div class="label muted" style="margin:12px 0 30px">Primary — stacked. Tagline shown is a placeholder; give me the real one and I'll track it to the wordmark's width.</div>
+
+        <div class="lockrow">
+          <div class="lockcell" style="justify-content:center;padding:52px 24px">
+            <div class="stack" style="font-size:clamp(21px,2.9vw,30px)">
+              <svg viewBox="0 0 120 120"><path d="M20 20 L100 20 L100 100 L20 100 L20 40 L80 40 L80 80 L40 80 L40 60 L60 60" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="square" stroke-linejoin="miter"/></svg>
+              <div class="w">Adonis Agent</div>
+              <div class="t">Run the whole business</div>
+            </div>
+          </div>
+          <div class="lockcell k" style="justify-content:center;padding:52px 24px">
+            <span class="lk" style="font-size:clamp(20px,2.6vw,30px);color:#fff">
+              <svg viewBox="0 0 120 120"><path d="M20 20 L100 20 L100 100 L20 100 L20 40 L80 40 L80 80 L40 80 L40 60 L60 60" fill="none" stroke="currentColor" stroke-width="9" stroke-linecap="square" stroke-linejoin="miter"/></svg>
+              <span class="w" style="text-transform:uppercase;letter-spacing:.14em">Adonis Agent</span>
+            </span>
+          </div>
+        </div>
+        <div class="label muted" style="margin:12px 0 0">Stacked on light · horizontal (for app bars &amp; tight spaces)</div>
+      </div>
+    </div>
+
+    <!-- 03 COLOUR -->
+    <div class="row g">
+      <div class="head"><span class="idx num">03</span><span class="label">Monochrome</span></div>
+      <h2>Black, white, three greys</h2>
+      <div class="body">
+        <div class="ctable">
+          <div class="crow"><span class="box" style="background:#0E0E0E"></span><span class="cn">Black</span><span class="hex">#0E0E0E</span><span class="use">Text, mark, ground</span></div>
+          <div class="crow"><span class="box" style="background:#FFFFFF"></span><span class="cn">White</span><span class="hex">#FFFFFF</span><span class="use">Surface, reverse mark</span></div>
+          <div class="crow"><span class="box" style="background:#6B6B6B"></span><span class="cn">Graphite</span><span class="hex">#6B6B6B</span><span class="use">Secondary text</span></div>
+          <div class="crow"><span class="box" style="background:#F4F4F4"></span><span class="cn">Mist</span><span class="hex">#F4F4F4</span><span class="use">Panels, fills</span></div>
+          <div class="crow"><span class="box" style="background:#DcDcDc"></span><span class="cn">Hairline</span><span class="hex">#DCDCDC</span><span class="use">Rules, grid, borders</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 04 TYPE -->
+    <div class="row g">
+      <div class="head"><span class="idx num">04</span><span class="label">Typography</span></div>
+      <h2>Familjen Grotesk, one voice</h2>
+      <div class="body">
+        <div class="specimen">
+          <div class="aa">Aa</div>
+          <div class="glyphs">ABCDEFGHIJKLMNOPQRSTUVWXYZ&nbsp;&nbsp;0123456789</div>
+        </div>
+        <div class="scale">
+          <div class="sr"><span class="sk">Display</span><span class="sv" style="font-size:46px">AdonisAgent</span></div>
+          <div class="sr"><span class="sk">Heading / 30</span><span class="sv" style="font-size:30px">Run the whole business</span></div>
+          <div class="sr"><span class="sk">Subhead / 20</span><span class="sv" style="font-size:20px">Clients · Sites · Marketing · Money</span></div>
+          <div class="sr"><span class="sk">Label / 11</span><span class="sv label" style="font-size:11px">Campaigns / Contacts / Domains</span></div>
+          <div class="sr"><span class="sk">Body / 15</span><span style="font-size:15px;font-weight:400;line-height:1.5;max-width:52ch">Set at a comfortable reading size; Familjen Grotesk carries structure and voice, and never gives up legibility.</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 05 USAGE -->
+    <div class="row g">
+      <div class="head"><span class="idx num">05</span><span class="label">Grid &amp; Usage</span></div>
+      <h2>System, not decoration</h2>
+      <div class="body">
+        <div class="cols">
+          <div>
+            <div class="label muted" style="margin-bottom:6px">Clearspace &amp; scale</div>
+            <ul class="list">
+              <li><span class="m">→</span> Clear space ≥ the mark’s inner square, all sides.</li>
+              <li><span class="m">→</span> Minimum: 24px screen / 8mm print.</li>
+              <li><span class="m">→</span> Favicon &amp; app icon: white mark on black.</li>
+            </ul>
+            <div class="iconsizes">
+              <svg width="16" viewBox="0 0 120 120"><rect width="120" height="120" fill="#0E0E0E"/><path d="M20 20 L100 20 L100 100 L20 100 L20 40 L80 40 L80 80 L40 80 L40 60 L60 60" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="square"/></svg>
+              <svg width="28" viewBox="0 0 120 120"><rect width="120" height="120" fill="#0E0E0E"/><path d="M20 20 L100 20 L100 100 L20 100 L20 40 L80 40 L80 80 L40 80 L40 60 L60 60" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="square"/></svg>
+              <svg width="48" viewBox="0 0 120 120"><rect width="120" height="120" fill="#0E0E0E"/><path d="M20 20 L100 20 L100 100 L20 100 L20 40 L80 40 L80 80 L40 80 L40 60 L60 60" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="square"/></svg>
+            </div>
+          </div>
+          <div>
+            <div class="label muted" style="margin-bottom:6px">Rules</div>
+            <ul class="list">
+              <li><span class="m">01</span> Black, white and greys only.</li>
+              <li><span class="m">02</span> Invert freely; never recolour.</li>
+              <li><span class="m">03</span> No gradient, shadow, rotation or stretch.</li>
+              <li><span class="m">04</span> Align to the grid; flush left.</li>
+              <li><span class="m">05</span> Wordmark is Familjen Grotesk, always.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FOOT -->
+    <div class="foot">
+      <span class="label">AdonisAgent</span>
+      <span class="label muted">Ancient craft · Modern software</span>
+    </div>
+
+  </div>
+</div>

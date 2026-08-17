@@ -97,6 +97,9 @@ export async function updateStageAction(
   await adminTenantId();
   if (!Number.isInteger(id)) return { ok: false, error: "Invalid stage" };
 
+  const stages = listStages();
+  if (!stages.some((s) => s.id === id)) return { ok: false, error: "Stage not found." };
+
   const next: { name?: string; colour?: string; role?: StageRole | null } = {};
 
   if (patch.name !== undefined) {
@@ -147,7 +150,7 @@ export async function reorderStagesAction(orderedIds: number[]): Promise<ActionR
   }
 
   const currentIds = new Set(listStages().map((s) => s.id));
-  const sameSet = orderedIds.length === currentIds.size && orderedIds.every((id) => currentIds.has(id));
+  const sameSet = orderedIds.length === currentIds.size && orderedIds.every((id) => currentIds.has(id)) && new Set(orderedIds).size === orderedIds.length;
   if (!sameSet) {
     return { ok: false, error: "Stage list is out of date — refresh and try again." };
   }
@@ -171,6 +174,7 @@ export async function deleteStageAction(id: number, moveToId: number): Promise<A
   }
 
   const stages = listStages();
+  if (!stages.some((s) => s.id === id)) return { ok: false, error: "Stage not found." };
   const gate = canDeleteStage(stages, id);
   if (!gate.ok) {
     return { ok: false, error: gate.reason };

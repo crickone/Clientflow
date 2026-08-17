@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 120" width="620" height="120">
+  <!-- Wordmark set in Familjen Grotesk. Renders correctly where the font is
+       installed; outline the text to paths in a vector editor for print / full portability. -->
+  <text x="0" y="86" font-family="'Familjen Grotesk','Space Grotesk',sans-serif" font-size="100" font-weight="500" letter-spacing="-2" fill="#0E0E0E">AdonisAgent</text>
+</svg>
