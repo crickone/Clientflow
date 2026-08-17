@@ -5,6 +5,8 @@ import { and, eq, gt, inArray, sql } from "drizzle-orm";
 import { schema } from "@/lib/db";
 import { openTenantDb, type TenantDb } from "@/lib/db/tenant";
 import { listTenants } from "@/lib/tenants";
+import { resolveStageIdByRoleOnConn } from "./stageRepo";
+import { ROLE_TO_LEGACY_KEY, type StageRole } from "./roles";
 
 const LAPSE_DAYS = 90;
 
@@ -52,24 +54,19 @@ function paidCount(conn: TenantDb, clientId: number): number {
  * the request-scoped `db` proxy or the shared stage helpers — it operates on the
  * explicit connection passed in.
  */
-function writeLapseStage(
-  conn: TenantDb,
-  leadId: number,
-  stage: "lapsed" | "sale" | "repeat_customer",
-): void {
+function writeLapseStage(conn: TenantDb, leadId: number, role: "lapsed" | "won" | "repeat"): void {
+  const stageId = resolveStageIdByRoleOnConn(conn, role);
+  if (stageId == null) return; // tenant doesn't use this role → skip
   conn
     .update(schema.leads)
-    .set({ pipelineStage: stage, updatedAt: new Date() })
+    .set({ stageId, pipelineStage: ROLE_TO_LEGACY_KEY[role] as typeof schema.leads.$inferInsert.pipelineStage, updatedAt: new Date() })
     .where(eq(schema.leads.id, leadId))
     .run();
-  conn
-    .insert(schema.activityLog)
-    .values({
-      type: "pipeline.stage",
-      message: `Lead ${stage === "lapsed" ? "lapsed" : "re-activated"} (auto)`,
-      meta: JSON.stringify({ leadId }),
-    })
-    .run();
+  conn.insert(schema.activityLog).values({
+    type: "pipeline.stage",
+    message: `Lead ${role === "lapsed" ? "lapsed" : "re-activated"} (auto)`,
+    meta: JSON.stringify({ leadId }),
+  }).run();
 }
 
 /**
@@ -90,34 +87,25 @@ export function recomputeLapsed(conn: TenantDb): {
   let lapsed = 0;
   let reactivated = 0;
 
-  const customers = conn
-    .select({ id: schema.leads.id, clientId: schema.leads.clientId })
-    .from(schema.leads)
-    .where(inArray(schema.leads.pipelineStage, ["sale", "repeat_customer"]))
-    .all();
+  const wonId = resolveStageIdByRoleOnConn(conn, "won");
+  const repeatId = resolveStageIdByRoleOnConn(conn, "repeat");
+  const lapsedId = resolveStageIdByRoleOnConn(conn, "lapsed");
+  const customerStageIds = [wonId, repeatId].filter((x): x is number => x != null);
+
+  const customers = customerStageIds.length
+    ? conn.select({ id: schema.leads.id, clientId: schema.leads.clientId }).from(schema.leads).where(inArray(schema.leads.stageId, customerStageIds)).all()
+    : [];
   for (const l of customers) {
     if (l.clientId == null) continue;
-    if (!isActive(conn, l.clientId, cutoffIso, cutoffMs)) {
-      writeLapseStage(conn, l.id, "lapsed");
-      lapsed++;
-    }
+    if (!isActive(conn, l.clientId, cutoffIso, cutoffMs)) { writeLapseStage(conn, l.id, "lapsed"); lapsed++; }
   }
 
-  const lapsedLeads = conn
-    .select({ id: schema.leads.id, clientId: schema.leads.clientId })
-    .from(schema.leads)
-    .where(eq(schema.leads.pipelineStage, "lapsed"))
-    .all();
+  const lapsedLeads = lapsedId != null
+    ? conn.select({ id: schema.leads.id, clientId: schema.leads.clientId }).from(schema.leads).where(eq(schema.leads.stageId, lapsedId)).all()
+    : [];
   for (const l of lapsedLeads) {
     if (l.clientId == null) continue;
-    if (isActive(conn, l.clientId, cutoffIso, cutoffMs)) {
-      writeLapseStage(
-        conn,
-        l.id,
-        paidCount(conn, l.clientId) >= 2 ? "repeat_customer" : "sale",
-      );
-      reactivated++;
-    }
+    if (isActive(conn, l.clientId, cutoffIso, cutoffMs)) { writeLapseStage(conn, l.id, paidCount(conn, l.clientId) >= 2 ? "repeat" : "won"); reactivated++; }
   }
 
   return { lapsed, reactivated };
