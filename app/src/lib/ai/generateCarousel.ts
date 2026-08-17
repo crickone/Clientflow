@@ -19,6 +19,12 @@ Format constraints:
 - Bodies: 1–3 short sentences.
 - Numbered tips look great as content slides — phrase them as concrete actions ("Start with the basics").
 - Don't quote the brand name on every slide; trust that it's already implied.
+- Each slide ALSO carries an "image" field: a concrete photographic scene
+  description for that slide's BACKGROUND image (subject, setting, mood,
+  composition). Vary the scenes across the carousel while keeping one coherent
+  visual world. The background sits behind text drawn by our templates — favour
+  calm compositions with clear space, and NEVER describe any text, signage,
+  lettering or logos appearing in the scene.
 
 Template options — pick what fits each slide:
 - "carousel-cover" — series opener with title + slide indicator. Use only on slide 1.
@@ -40,9 +46,9 @@ Output format — return ONLY a JSON object inside <slides>...</slides> tags, no
 {
   "caption": "...",
   "slides": [
-    { "template": "carousel-cover", "heading": "...", "body": "..." },
-    { "template": "carousel-content", "heading": "...", "body": "..." },
-    { "template": "carousel-cta", "heading": "...", "body": "..." }
+    { "template": "carousel-cover", "heading": "...", "body": "...", "image": "..." },
+    { "template": "carousel-content", "heading": "...", "body": "...", "image": "..." },
+    { "template": "carousel-cta", "heading": "...", "body": "...", "image": "..." }
   ]
 }
 </slides>
@@ -53,6 +59,7 @@ export interface GeneratedSlide {
   template: string;
   heading: string;
   body: string;
+  image: string;
 }
 
 export interface GenerateInput {
@@ -181,7 +188,7 @@ function buildUserPrompt(input: GenerateInput): string {
   return lines.join("\n");
 }
 
-function extractPayload(text: string): {
+export function extractPayload(text: string): {
   slides: GeneratedSlide[];
   caption: string;
 } {
@@ -211,7 +218,8 @@ function extractPayload(text: string): {
           : "carousel-content";
     const heading = typeof obj.heading === "string" ? obj.heading.trim() : "";
     const body = typeof obj.body === "string" ? obj.body.trim() : "";
-    return { template, heading, body };
+    const image = typeof obj.image === "string" ? obj.image.trim() : "";
+    return { template, heading, body, image };
   });
   return { slides, caption };
 }
