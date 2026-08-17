@@ -4,17 +4,14 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PipelineBoard } from "@/components/pipeline/PipelineBoard";
-import { PipelineMetrics } from "@/components/pipeline/PipelineMetrics";
 import { listLeadsForBoard } from "@/lib/leads";
 import { listStages } from "@/lib/pipeline/stageRepo";
-import { boardMetricsFromLeads } from "@/lib/pipeline/metrics";
 
 export const dynamic = "force-dynamic";
 
 export default async function LeadsPage() {
   const leads = listLeadsForBoard();
   const stages = listStages();
-  const metrics = boardMetricsFromLeads(leads);
 
   return (
     <div className="app-page">
@@ -47,10 +44,7 @@ export default async function LeadsPage() {
           }
         />
       ) : (
-        <>
-          <PipelineMetrics metrics={metrics} />
-          <PipelineBoard leads={leads} stages={stages} />
-        </>
+        <PipelineBoard leads={leads} stages={stages} />
       )}
     </div>
   );

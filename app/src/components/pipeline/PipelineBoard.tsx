@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { LayoutGroup, motion } from "motion/react";
 import {
@@ -21,18 +21,41 @@ import { toast } from "sonner";
 import type { LeadWithSla } from "@/lib/leads";
 import { setLeadStageAction } from "@/app/leads/actions";
 import { WON_ROLES, type StageRecord } from "@/lib/pipeline/roles";
+import { computeBoardMetrics, type LeadMetricInput } from "@/lib/pipeline/boardMetrics";
 import { Input } from "@/components/ui/Input";
 import { LeadList } from "@/components/leads/LeadList";
 import { LeadCard } from "./LeadCard";
+import { PipelineMetrics } from "./PipelineMetrics";
 import { StageColumn } from "./StageColumn";
 
 const WON_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Distinct, non-null, sorted values — for populating a filter dropdown's options. */
+function distinctValues(values: (string | null)[]): string[] {
+  return [...new Set(values)].filter((v): v is string => Boolean(v)).sort();
+}
+
+const selectStyle: CSSProperties = {
+  height: 38,
+  padding: "0 12px",
+  borderRadius: "var(--radius)",
+  border: "1px solid var(--hairline)",
+  background: "var(--surface-1)",
+  color: "var(--text-primary)",
+  fontSize: 13,
+  fontFamily: "inherit",
+  cursor: "pointer",
+  minWidth: 140,
+};
 
 export function PipelineBoard({ leads: propLeads, stages }: { leads: LeadWithSla[]; stages: StageRecord[] }) {
   const router = useRouter();
   const [leads, setLeads] = useState<LeadWithSla[]>(propLeads);
   const [view, setView] = useState<"board" | "list">("board");
   const [q, setQ] = useState("");
+  const [campaignFilter, setCampaignFilter] = useState("");
+  const [therapyFilter, setTherapyFilter] = useState("");
+  const [sourceFilter, setSourceFilter] = useState("");
   const [now, setNow] = useState(() => Date.now());
   const [railOpen, setRailOpen] = useState<Record<string, boolean>>({});
   const [activeId, setActiveId] = useState<number | null>(null);
@@ -66,6 +89,24 @@ export function PipelineBoard({ leads: propLeads, stages }: { leads: LeadWithSla
     localStorage.setItem("leads.view", view);
   }, [view]);
 
+  // Restore saved filter selections once on mount — same pattern as the view
+  // toggle above, but only applied if still valid for these leads (a stale
+  // campaign/therapy/source no longer present would otherwise empty the board).
+  useEffect(() => {
+    const savedCampaign = localStorage.getItem("leads.filter.campaign");
+    const savedTherapy = localStorage.getItem("leads.filter.therapy");
+    const savedSource = localStorage.getItem("leads.filter.source");
+    if (savedCampaign && leads.some((l) => l.campaign === savedCampaign)) setCampaignFilter(savedCampaign);
+    if (savedTherapy && leads.some((l) => l.therapyInterest === savedTherapy)) setTherapyFilter(savedTherapy);
+    if (savedSource && leads.some((l) => l.source === savedSource)) setSourceFilter(savedSource);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    localStorage.setItem("leads.filter.campaign", campaignFilter);
+    localStorage.setItem("leads.filter.therapy", therapyFilter);
+    localStorage.setItem("leads.filter.source", sourceFilter);
+  }, [campaignFilter, therapyFilter, sourceFilter]);
+
   // Live-ish clock + auto-move visibility: re-tick `now` and pull fresh server
   // data every 30s and whenever the tab regains focus.
   useEffect(() => {
@@ -87,17 +128,38 @@ export function PipelineBoard({ leads: propLeads, stages }: { leads: LeadWithSla
     useSensor(KeyboardSensor),
   );
 
+  // Distinct non-null values across ALL leads (not just `filtered`), so picking
+  // one filter never shrinks the options offered by the other two dropdowns.
+  const campaignOptions = useMemo(() => distinctValues(leads.map((l) => l.campaign)), [leads]);
+  const therapyOptions = useMemo(() => distinctValues(leads.map((l) => l.therapyInterest)), [leads]);
+  const sourceOptions = useMemo(() => distinctValues(leads.map((l) => l.source)), [leads]);
+
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    if (!needle) return leads;
-    return leads.filter((l) =>
-      [l.firstName, l.lastName, l.email, l.phone, l.therapyInterest, l.campaign, l.notes, l.source]
+    return leads.filter((l) => {
+      if (campaignFilter && l.campaign !== campaignFilter) return false;
+      if (therapyFilter && l.therapyInterest !== therapyFilter) return false;
+      if (sourceFilter && l.source !== sourceFilter) return false;
+      if (!needle) return true;
+      return [l.firstName, l.lastName, l.email, l.phone, l.therapyInterest, l.campaign, l.notes, l.source]
         .filter(Boolean)
         .join(" ")
         .toLowerCase()
-        .includes(needle),
-    );
-  }, [leads, q]);
+        .includes(needle);
+    });
+  }, [leads, q, campaignFilter, therapyFilter, sourceFilter]);
+
+  // Segment-scoped metrics: recomputes from `filtered`, so the 4 tiles above
+  // the board always describe the currently-visible segment (search + filters).
+  const metrics = useMemo(() => {
+    const input: LeadMetricInput[] = filtered.map((l) => ({
+      createdAt: l.createdAt.getTime(),
+      updatedAt: l.updatedAt.getTime(),
+      role: l.stage?.role ?? null,
+      firstOutboundAt: l.firstOutboundAt,
+    }));
+    return computeBoardMetrics(input, now);
+  }, [filtered, now]);
 
   // Funnel = ordinary stages (position order, as returned by listStages()); rails = lapsed/lost.
   const funnelStages = useMemo(
@@ -182,11 +244,50 @@ export function PipelineBoard({ leads: propLeads, stages }: { leads: LeadWithSla
 
   return (
     <>
+      <PipelineMetrics metrics={metrics} />
+
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
         <div style={{ position: "relative", flex: 1, maxWidth: 360 }}>
           <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-tertiary)", pointerEvents: "none" }} />
           <Input placeholder="Search leads…" value={q} onChange={(e) => setQ(e.target.value)} style={{ paddingLeft: 34 }} />
         </div>
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <select
+            aria-label="Filter by campaign"
+            value={campaignFilter}
+            onChange={(e) => setCampaignFilter(e.target.value)}
+            style={selectStyle}
+          >
+            <option value="">All campaigns</option>
+            {campaignOptions.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+          <select
+            aria-label="Filter by therapy interest"
+            value={therapyFilter}
+            onChange={(e) => setTherapyFilter(e.target.value)}
+            style={selectStyle}
+          >
+            <option value="">All therapies</option>
+            {therapyOptions.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+          <select
+            aria-label="Filter by source"
+            value={sourceFilter}
+            onChange={(e) => setSourceFilter(e.target.value)}
+            style={selectStyle}
+          >
+            <option value="">All sources</option>
+            {sourceOptions.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </div>
+
         <div role="tablist" style={{ marginLeft: "auto", display: "inline-flex", background: "var(--surface-1)", border: "1px solid var(--hairline)", borderRadius: "var(--radius)", padding: 3, gap: 2 }}>
           {(["board", "list"] as const).map((v) => (
             <button
