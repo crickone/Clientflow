@@ -7,9 +7,14 @@ import assert from "node:assert/strict";
 import {
   DEFAULT_STAGES,
   LEGACY_KEY_TO_ROLE,
+  ROLE_TO_LEGACY_KEY,
   roleOf,
   shouldAdvance,
   ALL_ROLES,
+  WON_ROLES,
+  INACTIVE_ROLES,
+  STALE_SUPPRESSED_ROLES,
+  OUT_OF_BAND,
   type StageRole,
 } from "./roles";
 
@@ -58,5 +63,34 @@ check("funnel→lost not via shouldAdvance", shouldAdvance(S(5, "won"), S(8, "lo
 // A null-role (manual-only) stage never auto-advances in or out.
 check("null-role current → no advance", shouldAdvance(S(3, null), S(4, "attended")), false);
 check("advance INTO null-role blocked", shouldAdvance(S(1, "engaged"), S(3, null)), false);
+
+// Hardening (Task 2 review): exact-value coverage for the maps + role sets everything downstream trusts.
+check("ROLE_TO_LEGACY_KEY round-trips via roleOf for all 9 roles", ALL_ROLES.every((r) => roleOf(ROLE_TO_LEGACY_KEY[r]) === r), true);
+check("LEGACY_KEY_TO_ROLE is exactly the 9 pairs", LEGACY_KEY_TO_ROLE, {
+  new_lead: "new", hot_lead: "engaged", consultation_booked: "booked", no_show: "no_show",
+  attended: "attended", sale: "won", repeat_customer: "repeat", lapsed: "lapsed", lost: "lost",
+});
+check("DEFAULT_STAGES full literal (names/colours/positions/roles)", DEFAULT_STAGES, [
+  { name: "New lead", colour: "#8b949e", position: 0, role: "new" },
+  { name: "Hot lead", colour: "#ef5a24", position: 1, role: "engaged" },
+  { name: "Consultation booked", colour: "#3b82f6", position: 2, role: "booked" },
+  { name: "No-show", colour: "#d29922", position: 3, role: "no_show" },
+  { name: "Attended", colour: "#2ea043", position: 4, role: "attended" },
+  { name: "Sale", colour: "#1f9d55", position: 5, role: "won" },
+  { name: "Repeat customer", colour: "#8a3fd1", position: 6, role: "repeat" },
+  { name: "Lapsed", colour: "#6e7681", position: 7, role: "lapsed" },
+  { name: "Lost", colour: "#484f58", position: 8, role: "lost" },
+]);
+check("role sets have the expected membership", {
+  won: [...WON_ROLES].sort(),
+  inactive: [...INACTIVE_ROLES].sort(),
+  stale: [...STALE_SUPPRESSED_ROLES].sort(),
+  oob: [...OUT_OF_BAND].sort(),
+}, {
+  won: ["repeat", "won"],
+  inactive: ["lost", "repeat", "won"],
+  stale: ["lost", "repeat", "won"],
+  oob: ["lapsed", "lost"],
+});
 
 console.log(`\n${passed} passed`);
