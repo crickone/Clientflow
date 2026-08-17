@@ -853,6 +853,8 @@ export const imageDesigns = sqliteTable("image_designs", {
 export const carouselSets = sqliteTable("carousel_sets", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
+  /** Draw the tenant's uploaded logo on every slide of this design (preview + export). */
+  showLogo: integer("show_logo", { mode: "boolean" }).notNull().default(true),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),
@@ -905,6 +907,12 @@ export const carouselSlides = sqliteTable("carousel_slides", {
   backgroundOffsetX: real("background_offset_x").notNull().default(0.5),
   backgroundOffsetY: real("background_offset_y").notNull().default(0.5),
   backgroundZoom: real("background_zoom").notNull().default(1),
+  /** AI background generation state: null = never generated, else 'generating' | 'ready' | 'failed'. */
+  imageStatus: text("image_status", { enum: ["generating", "ready", "failed"] }),
+  /** The prompt last used for this slide's AI background (Regenerate reuses it; Edit-prompt overwrites it). */
+  imagePrompt: text("image_prompt"),
+  /** Operator-visible message when image_status = 'failed'. */
+  imageError: text("image_error"),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),

@@ -62,7 +62,10 @@ export function listCarousels(): CarouselSummary[] {
   });
 }
 
-export function updateCarousel(id: number, patch: { name?: string }) {
+export function updateCarousel(
+  id: number,
+  patch: { name?: string; showLogo?: boolean },
+) {
   db.update(schema.carouselSets)
     .set({ ...patch, updatedAt: new Date() })
     .where(eq(schema.carouselSets.id, id))
@@ -93,6 +96,8 @@ export interface AddSlideInput {
   backgroundOffsetX?: number;
   backgroundOffsetY?: number;
   backgroundZoom?: number;
+  imageStatus?: "generating" | "ready" | "failed" | null;
+  imagePrompt?: string | null;
 }
 
 export function addSlide(input: AddSlideInput): CarouselSlide {
@@ -133,6 +138,8 @@ export function addSlide(input: AddSlideInput): CarouselSlide {
       backgroundOffsetX: input.backgroundOffsetX ?? 0.5,
       backgroundOffsetY: input.backgroundOffsetY ?? 0.5,
       backgroundZoom: input.backgroundZoom ?? 1,
+      imageStatus: input.imageStatus ?? null,
+      imagePrompt: input.imagePrompt ?? null,
     })
     .returning()
     .all();

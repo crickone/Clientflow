@@ -1163,6 +1163,7 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     CREATE TABLE IF NOT EXISTS carousel_sets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
+      show_logo INTEGER NOT NULL DEFAULT 1,
       created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
       updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
@@ -1187,6 +1188,9 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       background_offset_x REAL NOT NULL DEFAULT 0.5,
       background_offset_y REAL NOT NULL DEFAULT 0.5,
       background_zoom REAL NOT NULL DEFAULT 1,
+      image_status TEXT,
+      image_prompt TEXT,
+      image_error TEXT,
       created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
       updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
@@ -1471,6 +1475,32 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     }
   } catch (err) {
     console.error("[db] carousel_slides caption migration failed:", err);
+  }
+
+  // Carousel AI-imagery + logo columns (2026-08-17): additive, nullable/defaulted.
+  try {
+    const cols = sqlite
+      .prepare("PRAGMA table_info(carousel_slides)")
+      .all() as Array<{ name: string }>;
+    if (!cols.find((c) => c.name === "image_status")) {
+      sqlite.exec("ALTER TABLE carousel_slides ADD COLUMN image_status TEXT");
+    }
+    if (!cols.find((c) => c.name === "image_prompt")) {
+      sqlite.exec("ALTER TABLE carousel_slides ADD COLUMN image_prompt TEXT");
+    }
+    if (!cols.find((c) => c.name === "image_error")) {
+      sqlite.exec("ALTER TABLE carousel_slides ADD COLUMN image_error TEXT");
+    }
+    const setCols = sqlite
+      .prepare("PRAGMA table_info(carousel_sets)")
+      .all() as Array<{ name: string }>;
+    if (!setCols.find((c) => c.name === "show_logo")) {
+      sqlite.exec(
+        "ALTER TABLE carousel_sets ADD COLUMN show_logo INTEGER NOT NULL DEFAULT 1",
+      );
+    }
+  } catch (err) {
+    console.error("[db] carousel imagery migration failed:", err);
   }
 
   // image_library_assets predates the unified media library; add the kind

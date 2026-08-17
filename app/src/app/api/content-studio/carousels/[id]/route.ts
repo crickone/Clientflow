@@ -59,8 +59,14 @@ export async function PATCH(
     reorderSlides(id, slideIds);
   }
 
-  if (typeof body?.name === "string" && body.name.trim()) {
-    updateCarousel(id, { name: body.name.trim() });
+  const name =
+    typeof body?.name === "string" && body.name.trim()
+      ? body.name.trim()
+      : undefined;
+  const showLogo =
+    typeof body?.showLogo === "boolean" ? body.showLogo : undefined;
+  if (name !== undefined || showLogo !== undefined) {
+    updateCarousel(id, { name, showLogo });
   }
 
   return NextResponse.json({ ok: true, carousel: getCarousel(id) });

@@ -101,6 +101,16 @@ export function getBrandingLogoFilename(): string | null {
 }
 
 /**
+ * Per-tenant "house style" half of every AI post-image prompt (see
+ * lib/ai/image/prompt.ts buildImagePrompt). Null/empty = caller falls back to
+ * defaultImageStyle(getBusinessProfile()).
+ */
+export function getBrandImageStyle(): string | null {
+  const v = readKey<string | null>("brand_image_style", null);
+  return typeof v === "string" && v.trim() ? v.trim() : null;
+}
+
+/**
  * Venue type drives the user-facing vocabulary (Clients/Therapies vs
  * Members/Classes). The internal data model is identical for both.
  */
