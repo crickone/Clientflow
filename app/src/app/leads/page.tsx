@@ -6,12 +6,16 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PipelineBoard } from "@/components/pipeline/PipelineBoard";
 import { listLeadsForBoard } from "@/lib/leads";
 import { listStages } from "@/lib/pipeline/stageRepo";
+import { getCurrentMembership } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function LeadsPage() {
   const leads = listLeadsForBoard();
   const stages = listStages();
+  // Only admins get the "Manage stages" affordance on the board (the editor
+  // actions are admin-guarded server-side too).
+  const canManageStages = getCurrentMembership()?.role === "admin";
 
   return (
     <div className="app-page">
@@ -44,7 +48,7 @@ export default async function LeadsPage() {
           }
         />
       ) : (
-        <PipelineBoard leads={leads} stages={stages} />
+        <PipelineBoard leads={leads} stages={stages} canManageStages={canManageStages} />
       )}
     </div>
   );

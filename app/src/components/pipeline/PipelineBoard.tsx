@@ -15,7 +15,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { Search } from "lucide-react";
+import { Search, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 
 import type { LeadWithSla } from "@/lib/leads";
@@ -27,6 +27,8 @@ import { LeadList } from "@/components/leads/LeadList";
 import { LeadCard } from "./LeadCard";
 import { PipelineMetrics } from "./PipelineMetrics";
 import { StageColumn } from "./StageColumn";
+import { Dialog, DialogContent } from "@/components/ui/Dialog";
+import { PipelineStagesManager } from "@/components/settings/PipelineStagesManager";
 
 const WON_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -48,7 +50,7 @@ const selectStyle: CSSProperties = {
   minWidth: 140,
 };
 
-export function PipelineBoard({ leads: propLeads, stages }: { leads: LeadWithSla[]; stages: StageRecord[] }) {
+export function PipelineBoard({ leads: propLeads, stages, canManageStages }: { leads: LeadWithSla[]; stages: StageRecord[]; canManageStages: boolean }) {
   const router = useRouter();
   const [leads, setLeads] = useState<LeadWithSla[]>(propLeads);
   const [view, setView] = useState<"board" | "list">("board");
@@ -59,6 +61,7 @@ export function PipelineBoard({ leads: propLeads, stages }: { leads: LeadWithSla
   const [now, setNow] = useState(() => Date.now());
   const [railOpen, setRailOpen] = useState<Record<string, boolean>>({});
   const [activeId, setActiveId] = useState<number | null>(null);
+  const [manageOpen, setManageOpen] = useState(false);
   const [, startTransition] = useTransition();
   const draggingRef = useRef(false);
   const pendingIds = useRef<Set<number>>(new Set());
@@ -288,7 +291,17 @@ export function PipelineBoard({ leads: propLeads, stages }: { leads: LeadWithSla
           </select>
         </div>
 
-        <div role="tablist" style={{ marginLeft: "auto", display: "inline-flex", background: "var(--surface-1)", border: "1px solid var(--hairline)", borderRadius: "var(--radius)", padding: 3, gap: 2 }}>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+          {canManageStages && (
+            <button
+              type="button"
+              onClick={() => setManageOpen(true)}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 38, padding: "0 12px", borderRadius: "var(--radius)", border: "1px solid var(--hairline)", background: "var(--surface-1)", color: "var(--text-primary)", fontSize: 13, fontFamily: "inherit", cursor: "pointer" }}
+            >
+              <SlidersHorizontal size={14} /> Manage stages
+            </button>
+          )}
+          <div role="tablist" style={{ display: "inline-flex", background: "var(--surface-1)", border: "1px solid var(--hairline)", borderRadius: "var(--radius)", padding: 3, gap: 2 }}>
           {(["board", "list"] as const).map((v) => (
             <button
               key={v}
@@ -311,6 +324,7 @@ export function PipelineBoard({ leads: propLeads, stages }: { leads: LeadWithSla
               {v}
             </button>
           ))}
+          </div>
         </div>
       </div>
 
@@ -359,6 +373,14 @@ export function PipelineBoard({ leads: propLeads, stages }: { leads: LeadWithSla
             ) : null}
           </DragOverlay>
         </DndContext>
+      )}
+
+      {canManageStages && (
+        <Dialog open={manageOpen} onOpenChange={setManageOpen}>
+          <DialogContent title="Pipeline stages" description="Add, rename, reorder or recolour your stages — changes apply to the board immediately." width={720}>
+            <PipelineStagesManager stages={stages} />
+          </DialogContent>
+        </Dialog>
       )}
     </>
   );

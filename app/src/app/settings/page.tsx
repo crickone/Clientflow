@@ -15,7 +15,6 @@ import {
   Bot,
   KeyRound,
   Megaphone,
-  GitBranch,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardLabel } from "@/components/ui/Card";
@@ -74,12 +73,6 @@ function buildSections(vocab: ReturnType<typeof getVocab>) {
     icon: KeyRound,
     title: "API keys",
     desc: "Per-tenant keys for inbound integrations (Zapier, Make, Facebook lead-gen) that post leads into this account.",
-  },
-  {
-    href: "/settings/pipeline",
-    icon: GitBranch,
-    title: "Pipeline",
-    desc: "Add, rename, reorder and recolour the lead pipeline stages; tag stages with roles to drive automation.",
   },
   {
     href: "/settings/appearance",
