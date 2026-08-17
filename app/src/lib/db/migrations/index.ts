@@ -1,4 +1,5 @@
 import type { Database as BetterSqlite3 } from "better-sqlite3";
+import { DEFAULT_STAGES, LEGACY_KEY_TO_ROLE } from "@/lib/pipeline/roles";
 
 /**
  * Versioned, transactional migration runner (Batch 6b —
@@ -117,6 +118,33 @@ export const TENANT_MIGRATIONS: Migration[] = [
       "Baseline: proves the tenant-plane migration runner end-to-end via a harmless no-op (re-asserts idx_agents_key, which ensureTenantTables already creates).",
     up: (sqlite) => {
       sqlite.exec("CREATE INDEX IF NOT EXISTS idx_agents_key ON agents(key)");
+    },
+  },
+  {
+    id: "0002-seed-pipeline-stages",
+    description:
+      "Seed the 9 canonical pipeline_stages (once, if empty) and backfill leads.stage_id from the frozen pipeline_stage text via role.",
+    up: (sqlite) => {
+      const count = (sqlite.prepare("SELECT count(*) AS n FROM pipeline_stages").get() as { n: number }).n;
+      if (count === 0) {
+        const insert = sqlite.prepare(
+          "INSERT INTO pipeline_stages (name, colour, position, role, created_at) VALUES (?, ?, ?, ?, ?)",
+        );
+        const now = Date.now();
+        for (const s of DEFAULT_STAGES) insert.run(s.name, s.colour, s.position, s.role, now);
+      }
+      // Backfill: map each lead's old text key → role → the seeded stage of that role.
+      const stageIdByRole = new Map<string, number>();
+      for (const row of sqlite.prepare("SELECT id, role FROM pipeline_stages").all() as Array<{ id: number; role: string | null }>) {
+        if (row.role) stageIdByRole.set(row.role, row.id);
+      }
+      const setStage = sqlite.prepare("UPDATE leads SET stage_id = ? WHERE id = ?");
+      const leads = sqlite.prepare("SELECT id, pipeline_stage FROM leads WHERE stage_id IS NULL").all() as Array<{ id: number; pipeline_stage: string }>;
+      for (const l of leads) {
+        const role = LEGACY_KEY_TO_ROLE[l.pipeline_stage] ?? "new";
+        const stageId = stageIdByRole.get(role) ?? stageIdByRole.get("new");
+        if (stageId != null) setStage.run(stageId, l.id);
+      }
     },
   },
 ];
