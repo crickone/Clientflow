@@ -1,9 +1,11 @@
 import "server-only";
 import { and, desc, eq, isNotNull, like, or, sql } from "drizzle-orm";
 import { db } from "./db";
-import { leadMessages, leads, type Lead, type LeadMessage } from "./db/schema";
+import { leadMessages, leads, pipelineStages, type Lead, type LeadMessage } from "./db/schema";
 import { normalizePhone } from "./whatsapp/phone";
 import { splitFullName } from "./humanName";
+import { resolveEntryStageId } from "./pipeline/stageRepo";
+import type { StageRole } from "./pipeline/roles";
 
 export type LeadStatus = "new" | "contacted" | "replied" | "booked" | "lost";
 
@@ -67,6 +69,7 @@ export function upsertLead(input: NormalizedLeadInput): {
       therapyInterest: nz(input.therapyInterest),
       notes: nz(input.notes),
       rawPayload: input.rawPayload ? JSON.stringify(input.rawPayload) : null,
+      stageId: resolveEntryStageId() ?? undefined,
     })
     .returning()
     .all();
@@ -200,13 +203,18 @@ export function leadCounts() {
 }
 
 /** A board lead: the full row plus the epoch-ms of its first *sent* outbound message (or null). */
-export type LeadWithSla = Lead & { firstOutboundAt: number | null };
+export type LeadWithSla = Lead & {
+  firstOutboundAt: number | null;
+  stage: { id: number; name: string; colour: string; position: number; role: StageRole | null } | null;
+};
 
 /**
  * All leads for the pipeline board, each with `firstOutboundAt` computed in a
  * single grouped left-join (no N+1). `firstOutboundAt` = MIN(sent_at) over that
  * lead's SENT outbound messages (drafts have null sent_at and are excluded).
- * Ordered newest-first; the board buckets by stage client-side.
+ * A second left-join resolves each lead's `stage` (pipeline_stages row) —
+ * null when a lead has no stage_id. Ordered newest-first; the board buckets
+ * by stage client-side.
  */
 export function listLeadsForBoard(): LeadWithSla[] {
   const firstOutbound = db
@@ -220,11 +228,20 @@ export function listLeadsForBoard(): LeadWithSla[] {
     .as("first_outbound");
 
   const rows = db
-    .select({ lead: leads, firstOutboundAt: firstOutbound.firstOutboundAt })
+    .select({
+      lead: leads,
+      firstOutboundAt: firstOutbound.firstOutboundAt,
+      sId: pipelineStages.id, sName: pipelineStages.name, sColour: pipelineStages.colour, sPos: pipelineStages.position, sRole: pipelineStages.role,
+    })
     .from(leads)
     .leftJoin(firstOutbound, eq(firstOutbound.leadId, leads.id))
+    .leftJoin(pipelineStages, eq(pipelineStages.id, leads.stageId))
     .orderBy(desc(leads.createdAt))
     .all();
 
-  return rows.map((r) => ({ ...r.lead, firstOutboundAt: r.firstOutboundAt ?? null }));
+  return rows.map((r) => ({
+    ...r.lead,
+    firstOutboundAt: r.firstOutboundAt ?? null,
+    stage: r.sId != null ? { id: r.sId, name: r.sName!, colour: r.sColour!, position: r.sPos!, role: (r.sRole as StageRole | null) } : null,
+  }));
 }
