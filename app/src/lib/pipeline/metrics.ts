@@ -6,13 +6,12 @@
  */
 import type { LeadWithSla } from "@/lib/leads";
 import { computeBoardMetrics, type BoardMetrics, type LeadMetricInput } from "./boardMetrics";
-import type { PipelineStage } from "./stages";
 
 export function boardMetricsFromLeads(leads: LeadWithSla[]): BoardMetrics {
   const input: LeadMetricInput[] = leads.map((l) => ({
     createdAt: l.createdAt.getTime(),
     updatedAt: l.updatedAt.getTime(),
-    pipelineStage: l.pipelineStage as PipelineStage,
+    role: l.stage?.role ?? null,
     firstOutboundAt: l.firstOutboundAt,
   }));
   return computeBoardMetrics(input, Date.now());

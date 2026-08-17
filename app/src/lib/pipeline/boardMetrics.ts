@@ -4,7 +4,7 @@
  * test runner. The server wrapper (metrics.ts) injects `now` + DB rows; this file
  * is the fully-tested logic.
  */
-import type { PipelineStage } from "./stages";
+import { WON_ROLES, INACTIVE_ROLES, STALE_SUPPRESSED_ROLES, type StageRole } from "./roles";
 
 export const SLA_AMBER_MS = 15 * 60 * 1000; // 900000
 export const SLA_RED_MS = 60 * 60 * 1000; // 3600000
@@ -19,22 +19,16 @@ export function slaTone(waitingMs: number): SlaTone {
   return "neutral";
 }
 
-const STALE_SUPPRESSED: ReadonlySet<PipelineStage> = new Set<PipelineStage>([
-  "sale",
-  "repeat_customer",
-  "lost",
-]);
-
-/** True when a card has sat in one stage > 7 days — except won/lost stages, where staleness is meaningless. */
-export function isStale(msInStage: number, stage: PipelineStage): boolean {
-  if (STALE_SUPPRESSED.has(stage)) return false;
+/** True when a card has sat in one stage > 7 days — except won/repeat/lost stages, where staleness is meaningless. */
+export function isStale(msInStage: number, role: StageRole | null): boolean {
+  if (role != null && STALE_SUPPRESSED_ROLES.has(role)) return false;
   return msInStage > STALE_MS;
 }
 
 export interface LeadMetricInput {
   createdAt: number; // epoch ms
   updatedAt: number; // epoch ms
-  pipelineStage: PipelineStage;
+  role: StageRole | null;
   firstOutboundAt: number | null; // epoch ms of first *sent* outbound, or null
 }
 
@@ -48,12 +42,6 @@ export interface BoardMetrics {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const WON_STAGES: ReadonlySet<PipelineStage> = new Set<PipelineStage>(["sale", "repeat_customer"]);
-const INACTIVE_STAGES: ReadonlySet<PipelineStage> = new Set<PipelineStage>([
-  "sale",
-  "repeat_customer",
-  "lost",
-]);
 
 /** Start of the Monday-based week containing `now`, as epoch ms. */
 export function startOfWeekMs(now: number): number {
@@ -89,14 +77,14 @@ export function computeBoardMetrics(leads: LeadMetricInput[], now: number): Boar
       speedCount++;
     }
 
-    if (l.firstOutboundAt == null && !INACTIVE_STAGES.has(l.pipelineStage)) {
+    if (l.firstOutboundAt == null && (l.role == null || !INACTIVE_ROLES.has(l.role))) {
       uncontactedNow++;
       if (now - l.createdAt > SLA_RED_MS) uncontactedBreaching = true;
     }
 
     if (l.createdAt >= cutoff90) {
       created90++;
-      if (WON_STAGES.has(l.pipelineStage)) won90++;
+      if (l.role != null && WON_ROLES.has(l.role)) won90++;
     }
   }
 
