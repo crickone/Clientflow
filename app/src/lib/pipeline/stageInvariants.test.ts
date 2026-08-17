@@ -27,4 +27,8 @@ check("role conflict finds the holder", roleConflict(stages, "engaged", null)?.i
 check("role conflict ignores the excepted id (self-edit)", roleConflict(stages, "engaged", 11), null);
 check("no conflict for an unused role", roleConflict(stages, "won", null), null);
 
+check("entry fallback skips a lower-position lost stage for a funnel stage", resolveEntryStage([mk(1, 0, "lost"), mk(2, 1, null)])?.id, 2);
+check("entry fallback: role:new wins even at a non-lowest position", resolveEntryStage([mk(1, 5, "new"), mk(2, 0, "engaged")])?.id, 1);
+check("entry fallback: all out-of-band → still returns the lowest position (no crash)", resolveEntryStage([mk(1, 3, "lost"), mk(2, 1, "lapsed")])?.id, 2);
+
 console.log(`\n${passed} passed`);

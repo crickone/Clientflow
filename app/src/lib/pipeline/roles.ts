@@ -122,7 +122,11 @@ export function resolveEntryStage(stages: StageRecord[]): StageRecord | null {
   if (stages.length === 0) return null;
   const byRole = stages.find((s) => s.role === "new");
   if (byRole) return byRole;
-  return stages.reduce((lo, s) => (s.position < lo.position ? s : lo));
+  // No explicit `new` stage: fall back to the lowest-position FUNNEL stage —
+  // never an out-of-band lapsed/lost stage, where new leads would be frozen.
+  const funnel = stages.filter((s) => s.role == null || !OUT_OF_BAND.has(s.role));
+  const pool = funnel.length ? funnel : stages;
+  return pool.reduce((lo, s) => (s.position < lo.position ? s : lo));
 }
 
 /** Guard: a pipeline must always keep ≥1 stage. */
