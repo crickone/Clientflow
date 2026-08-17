@@ -109,6 +109,13 @@ const requireLocal = createRequire(import.meta.url);
     requireLocal("../db/schema") as typeof import("../db/schema");
   const { WRITE_TOOLS, summarizeToolAction } =
     requireLocal("../assistant/tools") as typeof import("../assistant/tools");
+  // Task 9: tools.sales.ts's set_lead_stage now takes the tenant's own DB
+  // stage NAME (not the old hardcoded "hot_lead" key) — used only to seed
+  // the lead with a real stageId and to build a realistic fake tool_use
+  // input below; getTenantDbById already runs TENANT_MIGRATIONS (seeding
+  // pipeline_stages), same as tools.sales.test.ts.
+  const { resolveEntryStageIdOnConn } =
+    requireLocal("../pipeline/stageRepo") as typeof import("../pipeline/stageRepo");
   const { runAgentTurn } =
     requireLocal("./runAgentTurn") as typeof import("./runAgentTurn");
   const { MODELS } =
@@ -213,14 +220,21 @@ const requireLocal = createRequire(import.meta.url);
     // ════════════════════════════════════════════════════════════════════
     // 1. THE SAFETY PROPERTY: a WRITE tool_use is collected, never executed
     // ════════════════════════════════════════════════════════════════════
+    const entryStageId = resolveEntryStageIdOnConn(db)!;
     const leadRow = db
       .insert(leads)
-      .values({ firstName: "Ada", lastName: "Tester", phone: "0851234567", email: "ada@example.com" })
+      .values({ firstName: "Ada", lastName: "Tester", phone: "0851234567", email: "ada@example.com", stageId: entryStageId })
       .returning()
       .get();
     assert.equal(leadRow.pipelineStage, "new_lead", "seeded lead starts at the default stage");
 
-    const writeInput = { leadId: leadRow.id, stage: "hot_lead" };
+    // Task 9: a real model call would send the tenant's actual stage NAME
+    // ("Hot lead"), not the old hardcoded key — this input is never actually
+    // validated/resolved in THIS test (the write is intercepted before
+    // executeTool ever runs it — that's the whole safety property below), so
+    // the exact string is inert for the assertions, but keeping it realistic
+    // avoids confusion for a future reader.
+    const writeInput = { leadId: leadRow.id, stage: "Hot lead" };
     const { provider: writeProvider, calls: writeCalls } = makeFakeProvider([
       {
         toolCalls: [{ id: "tu_write", name: "set_lead_stage", input: writeInput }],
@@ -267,9 +281,14 @@ const requireLocal = createRequire(import.meta.url);
     );
     const rereadLead = db.select().from(leads).where(eq(leads.id, leadRow.id)).get();
     assert.equal(
+      rereadLead?.stageId,
+      entryStageId,
+      "THE PROOF (Task 9): the lead's real stageId is unchanged — set_lead_stage's underlying DB write never ran",
+    );
+    assert.equal(
       rereadLead?.pipelineStage,
       "new_lead",
-      "THE PROOF: the lead's real pipelineStage is unchanged — set_lead_stage's underlying DB write never ran",
+      "same proof via the frozen legacy column (still dual-written when a real write DOES happen) — also unchanged",
     );
 
     // ════════════════════════════════════════════════════════════════════

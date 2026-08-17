@@ -6,13 +6,8 @@ import { desc, eq } from "drizzle-orm";
 import { getTenantDbById } from "@/lib/db/tenant";
 import { leadMessages, leads } from "@/lib/db/schema";
 import { addMessage, getLead } from "@/lib/leads";
-import {
-  currentStage,
-  setStageManual,
-  STAGE_ORDER,
-  STAGES,
-  type PipelineStage,
-} from "@/lib/pipeline/stage";
+import { currentStageRecord, setStageToId } from "@/lib/pipeline/stage";
+import { listStages, listStagesOnConn } from "@/lib/pipeline/stageRepo";
 import { sendWhatsApp } from "@/lib/whatsapp/send";
 import { draftFollowup } from "@/lib/ai/draftFollowup";
 
@@ -70,8 +65,9 @@ export const SALES_TOOLS: Anthropic.Tool[] = [
       properties: {
         stage: {
           type: "string",
-          enum: STAGE_ORDER,
-          description: "Filter to a single pipeline stage. Omit to list all leads.",
+          description:
+            "Filter to a single pipeline stage, by its exact current name (stages are tenant-editable — " +
+            "check a lead's `stage` in this tool's own results for the live names). Omit to list all leads.",
         },
         limit: { type: "integer", description: "Max leads to return (default 50)." },
       },
@@ -118,7 +114,12 @@ export const SALES_TOOLS: Anthropic.Tool[] = [
       type: "object",
       properties: {
         leadId: { type: "integer", description: "The lead's id." },
-        stage: { type: "string", enum: STAGE_ORDER, description: "The pipeline stage to set." },
+        stage: {
+          type: "string",
+          description:
+            "The pipeline stage to set, by its exact current name (stages are tenant-editable — call " +
+            "list_leads first if unsure; this tool reports the valid names if the one given doesn't match).",
+        },
       },
       required: ["leadId", "stage"],
     },
@@ -154,18 +155,31 @@ export const SALES_TOOLS: Anthropic.Tool[] = [
 // guaranteed to equal ctx.tenantId. Tests must reproduce that wrapping (see
 // tools.sales.test.ts).
 
-/** READ — list pipeline leads (stage, name, last touch). Never fenced: no free-text lead content leaves this tool. */
+/**
+ * READ — list pipeline leads (stage, name, last touch). Never fenced: no free-text lead content leaves this tool.
+ *
+ * Stages are resolved via `listStagesOnConn(db)` — the CONNECTION-based
+ * variant, not the ambient-tenant `listStages()` — deliberately, so this tool
+ * keeps its existing "scopes explicitly via tdb(ctx), no ambient dependency"
+ * property (see the file-level comment above): it can still be called
+ * without `runWithTenant`, exactly like before Task 9. `set_lead_stage`
+ * below is a WRITE tool and already depends on ambient tenant state (via
+ * `@/lib/pipeline/stage`), so it uses the ambient `listStages()` instead —
+ * consistent with its existing convention.
+ */
 export function listLeadsTool(ctx: ToolContext, input: Record<string, unknown>): ToolResult {
   const db = tdb(ctx);
+  const stages = listStagesOnConn(db);
+  const stageNameById = new Map(stages.map((s) => [s.id, s.name]));
   const stageArg = typeof input.stage === "string" ? input.stage : "";
-  const stageFilter = (STAGE_ORDER as readonly string[]).includes(stageArg) ? (stageArg as PipelineStage) : null;
+  const stageMatch = stageArg ? stages.find((s) => s.name === stageArg) : undefined;
   const limitArg = Number(input.limit);
   const limit = Number.isFinite(limitArg) && limitArg > 0 ? Math.min(200, Math.round(limitArg)) : 50;
 
   const rows = db
     .select()
     .from(leads)
-    .where(stageFilter ? eq(leads.pipelineStage, stageFilter) : undefined)
+    .where(stageMatch ? eq(leads.stageId, stageMatch.id) : undefined)
     .orderBy(desc(leads.updatedAt))
     .limit(limit)
     .all();
@@ -181,7 +195,11 @@ export function listLeadsTool(ctx: ToolContext, input: Record<string, unknown>):
     return {
       leadId: l.id,
       name: leadName(l),
-      stage: l.pipelineStage,
+      // Prefer the live DB stage name; fall back to the frozen legacy text
+      // only if stageId is somehow unset/dangling (shouldn't happen — every
+      // lead-creation path sets an entry stage — but a lead predating that
+      // guarantee should still report something sensible rather than blank).
+      stage: (l.stageId != null ? stageNameById.get(l.stageId) : undefined) ?? l.pipelineStage,
       phone: l.phone,
       email: l.email,
       lastTouchAt: last?.createdAt ? last.createdAt.toISOString() : null,
@@ -274,20 +292,25 @@ export async function sendWhatsappTool(ctx: ToolContext, input: Record<string, u
   } catch (e) { return { text: JSON.stringify({ error: e instanceof Error ? e.message : "Send failed." }) }; }
 }
 
-/** WRITE — manually set a lead's pipelineStage. Rejects anything outside the real PipelineStage enum. */
+/** WRITE — manually set a lead's stage (by the tenant's own DB stages). Rejects any name that isn't a real current stage. */
 export function setLeadStageTool(ctx: ToolContext, input: Record<string, unknown>): ToolResult {
   const leadId = Number(input.leadId);
   const stage = String(input.stage || "");
   if (!leadId) return { text: JSON.stringify({ error: "leadId is required." }) };
-  if (!(STAGE_ORDER as readonly string[]).includes(stage)) {
-    return { text: JSON.stringify({ error: `stage must be one of: ${STAGE_ORDER.join(", ")}.` }) };
+
+  const stages = listStages();
+  const target = stages.find((s) => s.name === stage);
+  if (!target) {
+    return { text: JSON.stringify({ error: `stage must be one of: ${stages.map((s) => s.name).join(", ")}.` }) };
   }
-  const before = currentStage(leadId);
-  if (before === null) return { text: JSON.stringify({ error: `No lead with id ${leadId}.` }) };
-  setStageManual(leadId, stage as PipelineStage);
+
+  const before = currentStageRecord(leadId);
+  if (!before) return { text: JSON.stringify({ error: `No lead with id ${leadId}.` }) };
+
+  setStageToId(leadId, target.id);
   return {
     text: JSON.stringify({
-      result: `Lead #${leadId} moved from "${STAGES[before].label}" to "${STAGES[stage as PipelineStage].label}".`,
+      result: `Lead #${leadId} moved from "${before.name}" to "${target.name}".`,
     }),
   };
 }

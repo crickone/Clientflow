@@ -7,7 +7,7 @@
 // READ tools (list_leads, get_lead_health, draft_lead_reply) are NOT; that
 // send_whatsapp/set_lead_stage/log_lead_touch reject bad input without ever
 // touching the network or the DB; that set_lead_stage only accepts a real
-// PipelineStage and actually persists a valid change; and that
+// (tenant DB) pipeline stage name and actually persists a valid change; and that
 // get_lead_health fences the seeded lead's inbound (attacker-controllable)
 // text in <untrusted_external_content> tags.
 //
@@ -70,6 +70,15 @@ const requireLocal = createRequire(import.meta.url);
   } = requireLocal("./tools.sales") as typeof import("./tools.sales");
   const { WRITE_TOOLS } =
     requireLocal("../assistant/tools") as typeof import("../assistant/tools");
+  // Task 9: tools.sales.ts now resolves stages from the tenant's own DB
+  // (pipeline_stages) instead of the hardcoded STAGE_ORDER/STAGES vocabulary.
+  // getTenantDbById (below) already runs ensureTenantTables THEN
+  // runMigrations(sqlite, TENANT_MIGRATIONS) (see ../db/tenant.ts's
+  // openTenantDb) — migration "0002-seed-pipeline-stages" seeds the 9
+  // canonical stages, so no extra seeding call is needed here; this import is
+  // only to resolve real stage ids/names for the fixtures + assertions below.
+  const { listStagesOnConn, resolveEntryStageIdOnConn } =
+    requireLocal("../pipeline/stageRepo") as typeof import("../pipeline/stageRepo");
 
   // ── scratch tenant (control row + a real tenant DB file, so
   // getTenantDbById() resolves it, ensureTenantTables() gives us real
@@ -109,16 +118,33 @@ const requireLocal = createRequire(import.meta.url);
     assert.ok(!WRITE_TOOLS.has("get_lead_health"), "get_lead_health is a read tool — must NOT require approval");
     assert.ok(!WRITE_TOOLS.has("draft_lead_reply"), "draft_lead_reply is a read tool — must NOT require approval");
 
-    // getTenantDbById(tid) resolves the scratch tenant and creates its tables.
+    // getTenantDbById(tid) resolves the scratch tenant, creates its tables,
+    // AND runs TENANT_MIGRATIONS (see ../db/tenant.ts's openTenantDb) — so
+    // pipeline_stages is already seeded with the 9 canonical stages by the
+    // time this returns. Resolve the "New lead"/"Hot lead" stages (by role,
+    // not by hardcoded position) for the fixtures below.
     const db = getTenantDbById(tid);
+    const stages = listStagesOnConn(db);
+    const entryStageId = resolveEntryStageIdOnConn(db)!;
+    const hotStage = stages.find((s) => s.role === "engaged")!;
+    assert.ok(entryStageId, "the migration seeded a role:new stage (New lead)");
+    assert.ok(hotStage, "the migration seeded a role:engaged stage (Hot lead)");
 
     // Seed one lead with an inbound message containing attacker-style text —
     // this is exactly the kind of external, lead-authored content
     // get_lead_health must fence rather than let the model treat as
-    // instructions.
+    // instructions. stageId is set explicitly (mirrors upsertLead's real
+    // entry-stage assignment, Task 6) — a raw insert like this has no DB
+    // default for stage_id, and list_leads now needs a real stage to resolve.
     const leadRow = db
       .insert(leads)
-      .values({ firstName: "Ada", lastName: "Tester", phone: "0851234567", email: "ada@example.com" })
+      .values({
+        firstName: "Ada",
+        lastName: "Tester",
+        phone: "0851234567",
+        email: "ada@example.com",
+        stageId: entryStageId,
+      })
       .returning()
       .get();
     const injection =
@@ -135,7 +161,7 @@ const requireLocal = createRequire(import.meta.url);
     const seededInList = listPayload.leads.find((l: { leadId: number }) => l.leadId === leadRow.id);
     assert.ok(seededInList, "list_leads returns the seeded lead");
     assert.equal(seededInList.name, "Ada Tester", "list_leads reports the lead's name");
-    assert.equal(seededInList.stage, "new_lead", "list_leads reports the lead's pipeline stage");
+    assert.equal(seededInList.stage, "New lead", "list_leads reports the lead's pipeline stage BY THE TENANT'S DB STAGE NAME (not the old hardcoded key)");
 
     // ── get_lead_health (READ) — also tdb(ctx)-scoped, called without
     // runWithTenant for the same reason as list_leads above. ──
@@ -181,31 +207,67 @@ const requireLocal = createRequire(import.meta.url);
 
     // ── set_lead_stage (WRITE) — (c) an invalid stage is rejected; a valid
     // stage actually updates the seeded lead. This tool reads/writes via the
-    // ambient-tenant pipeline lib (currentStage/setStageManual), so it MUST
-    // run inside runWithTenant(tid, ...) — exactly the contract the chat
+    // ambient-tenant pipeline lib (currentStageRecord/setStageToId), so it
+    // MUST run inside runWithTenant(tid, ...) — exactly the contract the chat
     // route and /api/assistant/execute already guarantee in production. ──
     const invalidStage = JSON.parse(
       runWithTenant(tid, () => setLeadStageTool(ctx, { leadId: leadRow.id, stage: "made_up_stage" })).text,
     );
     assert.ok(invalidStage.error, "an invalid stage is rejected");
+    assert.ok(invalidStage.error.includes("stage must be one of"), "the error explains valid values");
     assert.ok(
-      invalidStage.error.includes("new_lead") || invalidStage.error.includes("stage must be one of"),
-      "the error names the real, allowed PipelineStage values",
+      invalidStage.error.includes("New lead"),
+      "the error names the tenant's REAL current DB stage names (Task 9 — not the old hardcoded STAGE_ORDER list)",
     );
 
+    // Task 9: the model now passes a stage NAME (tenant-editable, e.g. "Hot
+    // lead"), not the old hardcoded key ("hot_lead") — set_lead_stage
+    // resolves it to the tenant's real pipeline_stages row and sets by id.
     const validStage = JSON.parse(
-      runWithTenant(tid, () => setLeadStageTool(ctx, { leadId: leadRow.id, stage: "hot_lead" })).text,
+      runWithTenant(tid, () => setLeadStageTool(ctx, { leadId: leadRow.id, stage: "Hot lead" })).text,
     );
     assert.ok(validStage.result && !validStage.error, "a valid stage change succeeds");
+    assert.equal(
+      validStage.result,
+      `Lead #${leadRow.id} moved from "New lead" to "Hot lead".`,
+      "the confirmation text names the real before/after DB stages",
+    );
 
     const rereadLead = db.select().from(leads).where(eq(leads.id, leadRow.id)).get();
-    assert.equal(rereadLead?.pipelineStage, "hot_lead", "the seeded lead's pipelineStage was actually persisted");
+    assert.equal(rereadLead?.stageId, hotStage.id, "THE PROOF: the lead's stageId now points at the real 'Hot lead' pipeline_stages row (id-based set)");
+    assert.equal(
+      rereadLead?.pipelineStage,
+      "hot_lead",
+      "the frozen legacy pipelineStage column is still dual-written by setStageToId's writeStageId (Task 5) — stays valid for not-yet-migrated readers",
+    );
 
-    // Unknown lead id -> a clean error, not a silent no-op.
+    // ── list_leads stage FILTER (Task 9's other changed path) — now resolves
+    // the model's stage NAME to the tenant's real pipeline_stages id and
+    // filters leads.stageId by it, instead of matching the old frozen enum
+    // text. Ada is "Hot lead" now (just moved above), so she must appear
+    // under that filter and not under "New lead". ──
+    const hotList = JSON.parse(listLeadsTool(ctx, { stage: "Hot lead" }).text);
+    assert.ok(
+      hotList.leads.some((l: { leadId: number }) => l.leadId === leadRow.id),
+      "list_leads({stage: 'Hot lead'}) includes the lead that was just moved there",
+    );
+    const newList = JSON.parse(listLeadsTool(ctx, { stage: "New lead" }).text);
+    assert.ok(
+      !newList.leads.some((l: { leadId: number }) => l.leadId === leadRow.id),
+      "list_leads({stage: 'New lead'}) no longer includes it — the filter is real, not a no-op",
+    );
+
+    // Unknown lead id -> a clean error, not a silent no-op. Uses a REAL stage
+    // name ("Hot lead") so this actually exercises the lead-existence check,
+    // not the (already-covered-above) stage-name validation.
     const stageUnknownLead = JSON.parse(
-      runWithTenant(tid, () => setLeadStageTool(ctx, { leadId: 9_999_999, stage: "hot_lead" })).text,
+      runWithTenant(tid, () => setLeadStageTool(ctx, { leadId: 9_999_999, stage: "Hot lead" })).text,
     );
     assert.ok(stageUnknownLead.error, "set_lead_stage errors cleanly for an unknown leadId");
+    assert.ok(
+      stageUnknownLead.error.includes("No lead with id"),
+      "the error is specifically about the missing lead, not a rejected stage name",
+    );
 
     // ── log_lead_touch (WRITE) — missing leadId is rejected; a valid touch
     // records a lead_messages "note" row. Also ambient-tenant based
