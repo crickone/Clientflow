@@ -5,11 +5,8 @@ import { and, eq, gt, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { logActivity } from "@/lib/queries";
 import { listStages, resolveStageIdByRole, resolveEntryStageId } from "./stageRepo";
-import { shouldAdvance, ROLE_TO_LEGACY_KEY, roleOf, type StageRecord, type StageRole } from "./roles";
+import { shouldAdvance, ROLE_TO_LEGACY_KEY, type StageRecord, type StageRole } from "./roles";
 
-// Legacy re-exports kept until the contract task (Task 11); readers migrate off these.
-export { STAGES, STAGE_ORDER, nextAutoStage } from "./stages";
-export type { PipelineStage } from "./stages";
 export type { StageRole } from "./roles";
 
 /**
@@ -76,23 +73,9 @@ export function setStageToId(leadId: number, stageId: number): void {
   writeStageId(leadId, stageId, `Lead set to ${stage.name} (manual)`);
 }
 
-/** Legacy name-based manual override — kept for callers not yet migrated (leads/actions, tools.sales). */
-export function setStageManual(leadId: number, stage: import("./stages").PipelineStage): void {
-  const role = roleOf(stage);
-  const id = role ? resolveStageIdByRole(role) : null;
-  if (id != null) setStageToId(leadId, id);
-}
-
 export function leadIdForClient(clientId: number): number | null {
   const row = db.select({ id: schema.leads.id }).from(schema.leads).where(eq(schema.leads.clientId, clientId)).get();
   return row?.id ?? null;
-}
-
-/** Legacy name accessor — kept for tools.sales until Task 9. */
-export function currentStage(leadId: number): import("./stages").PipelineStage | null {
-  const rec = currentStageRecord(leadId);
-  if (!rec?.role) return null;
-  return ROLE_TO_LEGACY_KEY[rec.role] as import("./stages").PipelineStage;
 }
 
 // ── Event hooks (signatures UNCHANGED — call sites in appointments/packages/whatsapp untouched) ──
