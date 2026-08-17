@@ -1,8 +1,7 @@
-import { STAGES, type PipelineStage } from "@/lib/pipeline/stages";
-
-/** Colour-coded chip for a lead's current pipeline stage. */
-export function StageChip({ stage }: { stage: PipelineStage }) {
-  const s = STAGES[stage] ?? STAGES.new_lead;
+/** Colour-coded chip for a lead's current stage. Takes the resolved record (DB stage). */
+export function StageChip({ stage }: { stage: { name: string; colour: string } | null }) {
+  const colour = stage?.colour ?? "#8b949e";
+  const label = stage?.name ?? "—";
   return (
     <span
       style={{
@@ -14,9 +13,9 @@ export function StageChip({ stage }: { stage: PipelineStage }) {
         fontSize: 11,
         fontWeight: 600,
         whiteSpace: "nowrap",
-        color: s.colourHex,
-        background: `${s.colourHex}1f`,
-        border: `1px solid ${s.colourHex}55`,
+        color: colour,
+        background: `${colour}1f`,
+        border: `1px solid ${colour}55`,
       }}
     >
       <span
@@ -24,10 +23,10 @@ export function StageChip({ stage }: { stage: PipelineStage }) {
           width: 7,
           height: 7,
           borderRadius: "50%",
-          background: s.colourHex,
+          background: colour,
         }}
       />
-      {s.label}
+      {label}
     </span>
   );
 }

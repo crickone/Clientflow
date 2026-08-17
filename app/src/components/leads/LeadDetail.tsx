@@ -21,7 +21,7 @@ import { Card, CardLabel } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Textarea } from "@/components/ui/Input";
 import { StageChip } from "@/components/pipeline/StageChip";
-import { STAGES, STAGE_ORDER, type PipelineStage } from "@/lib/pipeline/stages";
+import type { StageRecord } from "@/lib/pipeline/roles";
 import {
   deleteLeadAction,
   logInboundReplyAction,
@@ -34,9 +34,10 @@ import { formatDate, formatDateTime, relativeTime } from "@/lib/utils";
 interface Props {
   lead: Lead;
   messages: LeadMessage[];
+  stages: StageRecord[];
 }
 
-export function LeadDetail({ lead: initialLead, messages: initialMessages }: Props) {
+export function LeadDetail({ lead: initialLead, messages: initialMessages, stages }: Props) {
   const [lead, setLead] = useState(initialLead);
   const [messages, setMessages] = useState(initialMessages);
   const [drafting, setDrafting] = useState(false);
@@ -49,6 +50,8 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages }: Pro
   const [replyChannel, setReplyChannel] = useState<
     "email" | "sms" | "whatsapp" | "call" | "manual"
   >("email");
+
+  const stage = stages.find((s) => s.id === lead.stageId) ?? null;
 
   const fullName =
     [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "Anonymous";
@@ -91,11 +94,13 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages }: Pro
     }
   }
 
-  function setStage(s: PipelineStage) {
+  function setStage(stageId: number) {
+    const target = stages.find((s) => s.id === stageId);
+    if (!target) return;
     start(async () => {
-      await setLeadStageAction(lead.id, s);
-      setLead({ ...lead, pipelineStage: s });
-      toast.success(`Moved to ${STAGES[s].label}.`);
+      await setLeadStageAction(lead.id, stageId);
+      setLead({ ...lead, stageId });
+      toast.success(`Moved to ${target.name}.`);
     });
   }
 
@@ -267,7 +272,7 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages }: Pro
                 <Phone size={14} /> {lead.phone}
               </span>
             )}
-            <StageChip stage={lead.pipelineStage as PipelineStage} />
+            <StageChip stage={stage} />
             {lead.therapyInterest && <Badge>{lead.therapyInterest}</Badge>}
             {lead.campaign && <Badge>{lead.campaign}</Badge>}
           </div>
@@ -546,20 +551,20 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages }: Pro
           <Card>
             <CardLabel>Pipeline stage</CardLabel>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {STAGE_ORDER.map((s) => {
-                const active = lead.pipelineStage === s;
+              {stages.map((s) => {
+                const active = lead.stageId === s.id;
                 return (
                   <button
-                    key={s}
+                    key={s.id}
                     type="button"
                     disabled={pending || active}
-                    onClick={() => setStage(s)}
+                    onClick={() => setStage(s.id)}
                     style={{
                       padding: "8px 12px",
                       borderRadius: "var(--radius)",
-                      border: `1px solid ${active ? STAGES[s].colourHex : "var(--hairline)"}`,
-                      background: active ? `${STAGES[s].colourHex}1f` : "transparent",
-                      color: active ? STAGES[s].colourHex : "var(--text-primary)",
+                      border: `1px solid ${active ? s.colour : "var(--hairline)"}`,
+                      background: active ? `${s.colour}1f` : "transparent",
+                      color: active ? s.colour : "var(--text-primary)",
                       cursor: active ? "default" : "pointer",
                       textAlign: "left",
                       fontFamily: "inherit",
@@ -568,7 +573,7 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages }: Pro
                       opacity: active ? 1 : 0.85,
                     }}
                   >
-                    {STAGES[s].label}
+                    {s.name}
                   </button>
                 );
               })}

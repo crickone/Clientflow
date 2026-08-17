@@ -4,7 +4,6 @@ import { Sparkles, MessageCircle } from "lucide-react";
 import type { LeadWithSla } from "@/lib/leads";
 import { Badge } from "@/components/ui/Badge";
 import { slaTone, isStale } from "@/lib/pipeline/boardMetrics";
-import { STAGES, type PipelineStage } from "@/lib/pipeline/stages";
 import { initialsOf } from "@/lib/utils";
 
 export interface LeadCardProps {
@@ -32,13 +31,13 @@ function waitLabel(ms: number): string {
 export function LeadCard({ lead, now, onDraft, onWhatsApp }: LeadCardProps) {
   const name = [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "Anonymous";
   const initials = initialsOf(lead.firstName ?? "?", lead.lastName ?? "") || "??";
-  const stage = lead.pipelineStage as PipelineStage;
+  const role = lead.stage?.role ?? null;
 
   const waitingMs = lead.firstOutboundAt == null ? now - lead.createdAt.getTime() : null;
   const tone = waitingMs != null ? slaTone(waitingMs) : null;
 
   const msInStage = now - lead.updatedAt.getTime();
-  const stale = isStale(msInStage, lead.stage?.role ?? null);
+  const stale = isStale(msInStage, role);
   const staleDays = Math.floor(msInStage / 86_400_000);
 
   return (
@@ -101,7 +100,7 @@ export function LeadCard({ lead, now, onDraft, onWhatsApp }: LeadCardProps) {
         </span>
         {stale && (
           <span
-            title={`${staleDays}d in ${STAGES[stage].label}`}
+            title={`${staleDays}d in ${lead.stage?.name ?? ""}`}
             style={{ width: 7, height: 7, borderRadius: "50%", background: "#d29922", flex: "0 0 auto" }}
           />
         )}

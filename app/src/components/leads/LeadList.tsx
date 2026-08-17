@@ -3,23 +3,24 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
-import type { Lead } from "@/lib/db/schema";
+import type { LeadWithSla } from "@/lib/leads";
 import { Card } from "@/components/ui/Card";
 import { Reveal, RevealGroup } from "@/components/motion/Reveal";
 import { Input } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
 import { StageChip } from "@/components/pipeline/StageChip";
-import { STAGES, STAGE_ORDER, type PipelineStage } from "@/lib/pipeline/stages";
+import type { StageRecord } from "@/lib/pipeline/roles";
 import { useVocab } from "@/components/providers/VocabProvider";
 import { formatDate, initialsOf } from "@/lib/utils";
 
-type Filter = PipelineStage | "all";
+type Filter = number | "all";
 
 interface Props {
-  leads: Lead[];
+  leads: LeadWithSla[];
+  stages: StageRecord[];
 }
 
-export function LeadList({ leads }: Props) {
+export function LeadList({ leads, stages }: Props) {
   const vocab = useVocab();
   const [filter, setFilter] = useState<Filter>("all");
   const [q, setQ] = useState("");
@@ -28,8 +29,8 @@ export function LeadList({ leads }: Props) {
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: leads.length };
     for (const l of leads) {
-      const s = l.pipelineStage as PipelineStage;
-      c[s] = (c[s] ?? 0) + 1;
+      if (l.stageId == null) continue;
+      c[l.stageId] = (c[l.stageId] ?? 0) + 1;
     }
     return c;
   }, [leads]);
@@ -38,17 +39,17 @@ export function LeadList({ leads }: Props) {
   const tabs: { value: Filter; label: string }[] = useMemo(
     () => [
       { value: "all" as Filter, label: "All" },
-      ...STAGE_ORDER.filter((s) => (counts[s] ?? 0) > 0).map((s) => ({
-        value: s as Filter,
-        label: STAGES[s].label,
+      ...stages.filter((s) => (counts[s.id] ?? 0) > 0).map((s) => ({
+        value: s.id as Filter,
+        label: s.name,
       })),
     ],
-    [counts],
+    [counts, stages],
   );
 
   const visible = useMemo(() => {
     let list =
-      filter === "all" ? leads : leads.filter((l) => l.pipelineStage === filter);
+      filter === "all" ? leads : leads.filter((l) => l.stageId === filter);
     if (q.trim()) {
       const needle = q.trim().toLowerCase();
       list = list.filter((l) =>
@@ -238,7 +239,7 @@ export function LeadList({ leads }: Props) {
                         {l.email ?? l.phone ?? "—"}
                       </div>
                     </div>
-                    <StageChip stage={l.pipelineStage as PipelineStage} />
+                    <StageChip stage={l.stage} />
                   </div>
                   <div
                     style={{

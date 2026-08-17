@@ -16,12 +16,12 @@ import {
 } from "@/lib/leads";
 import { logActivity } from "@/lib/queries";
 import { sendWhatsApp } from "@/lib/whatsapp/send";
-import { setStageManual, type PipelineStage } from "@/lib/pipeline/stage";
+import { setStageToId } from "@/lib/pipeline/stage";
 
 /** Operator override of a lead's pipeline stage (e.g. mark Lost, or correct). */
-export async function setLeadStageAction(leadId: number, stage: PipelineStage) {
+export async function setLeadStageAction(leadId: number, stageId: number) {
   await requireUser();
-  setStageManual(leadId, stage);
+  setStageToId(leadId, stageId);
   revalidatePath(`/leads/${leadId}`);
   revalidatePath("/leads");
 }

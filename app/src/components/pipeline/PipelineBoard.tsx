@@ -20,18 +20,15 @@ import { toast } from "sonner";
 
 import type { LeadWithSla } from "@/lib/leads";
 import { setLeadStageAction } from "@/app/leads/actions";
-import { STAGES, STAGE_ORDER, type PipelineStage } from "@/lib/pipeline/stages";
+import { WON_ROLES, type StageRecord } from "@/lib/pipeline/roles";
 import { Input } from "@/components/ui/Input";
 import { LeadList } from "@/components/leads/LeadList";
 import { LeadCard } from "./LeadCard";
 import { StageColumn } from "./StageColumn";
 
-const FUNNEL: PipelineStage[] = STAGE_ORDER.filter((s) => s !== "lapsed" && s !== "lost");
-const RAILS: PipelineStage[] = ["lapsed", "lost"];
-const WON: ReadonlySet<PipelineStage> = new Set<PipelineStage>(["sale", "repeat_customer"]);
 const WON_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
-export function PipelineBoard({ leads: propLeads }: { leads: LeadWithSla[] }) {
+export function PipelineBoard({ leads: propLeads, stages }: { leads: LeadWithSla[]; stages: StageRecord[] }) {
   const router = useRouter();
   const [leads, setLeads] = useState<LeadWithSla[]>(propLeads);
   const [view, setView] = useState<"board" | "list">("board");
@@ -50,12 +47,12 @@ export function PipelineBoard({ leads: propLeads }: { leads: LeadWithSla[] }) {
     if (draggingRef.current) return;
     setLeads((prev) => {
       if (pendingIds.current.size === 0) return propLeads;
-      const optimistic = new Map<number, PipelineStage>();
+      const optimistic = new Map<number, LeadWithSla["stage"]>();
       for (const l of prev) {
-        if (pendingIds.current.has(l.id)) optimistic.set(l.id, l.pipelineStage as PipelineStage);
+        if (pendingIds.current.has(l.id)) optimistic.set(l.id, l.stage);
       }
       return propLeads.map((l) =>
-        optimistic.has(l.id) ? { ...l, pipelineStage: optimistic.get(l.id)! } : l,
+        optimistic.has(l.id) ? { ...l, stage: optimistic.get(l.id)! } : l,
       );
     });
   }, [propLeads]);
@@ -102,37 +99,49 @@ export function PipelineBoard({ leads: propLeads }: { leads: LeadWithSla[] }) {
     );
   }, [leads, q]);
 
-  // Bucket by stage; apply the 30-day window to won stages (keep all-time totals).
+  // Funnel = ordinary stages (position order, as returned by listStages()); rails = lapsed/lost.
+  const funnelStages = useMemo(
+    () => stages.filter((s) => s.role !== "lapsed" && s.role !== "lost"),
+    [stages],
+  );
+  const railStages = useMemo(
+    () => stages.filter((s) => s.role === "lapsed" || s.role === "lost"),
+    [stages],
+  );
+
+  // Bucket by stage id; apply the 30-day window to won/repeat stages (keep all-time totals).
   const byStage = useMemo(() => {
-    const visible = new Map<PipelineStage, LeadWithSla[]>();
-    const totals = new Map<PipelineStage, number>();
-    for (const s of STAGE_ORDER) {
-      visible.set(s, []);
-      totals.set(s, 0);
+    const visible = new Map<number, LeadWithSla[]>();
+    const totals = new Map<number, number>();
+    for (const s of stages) {
+      visible.set(s.id, []);
+      totals.set(s.id, 0);
     }
     for (const l of filtered) {
-      const s = l.pipelineStage as PipelineStage;
-      totals.set(s, (totals.get(s) ?? 0) + 1);
-      if (WON.has(s) && now - l.updatedAt.getTime() > WON_WINDOW_MS) continue;
-      visible.get(s)?.push(l);
+      const sid = l.stage?.id;
+      if (sid == null) continue;
+      totals.set(sid, (totals.get(sid) ?? 0) + 1);
+      const role = l.stage?.role ?? null;
+      if (role != null && WON_ROLES.has(role) && now - l.updatedAt.getTime() > WON_WINDOW_MS) continue;
+      visible.get(sid)?.push(l);
     }
     return { visible, totals };
-  }, [filtered, now]);
+  }, [filtered, now, stages]);
 
   const openLead = useCallback((id: number) => router.push(`/leads/${id}`), [router]);
   const draftLead = useCallback((id: number) => router.push(`/leads/${id}?draft=1`), [router]);
   const whatsappLead = useCallback((id: number) => router.push(`/leads/${id}?reply=whatsapp`), [router]);
 
   const move = useCallback(
-    (id: number, to: PipelineStage, from: PipelineStage) => {
+    (id: number, to: StageRecord, from: StageRecord) => {
       pendingIds.current.add(id);
       setLeads((prev) =>
-        prev.map((l) => (l.id === id ? { ...l, pipelineStage: to, updatedAt: new Date() } : l)),
+        prev.map((l) => (l.id === id ? { ...l, stage: to, updatedAt: new Date() } : l)),
       );
       startTransition(async () => {
         try {
-          await setLeadStageAction(id, to);
-          toast.success(`Moved to ${STAGES[to].label}`, {
+          await setLeadStageAction(id, to.id);
+          toast.success(`Moved to ${to.name}`, {
             duration: 5000,
             action: { label: "Undo", onClick: () => move(id, from, to) },
           });
@@ -140,7 +149,7 @@ export function PipelineBoard({ leads: propLeads }: { leads: LeadWithSla[] }) {
           // Only revert if a newer move hasn't since superseded this one.
           setLeads((prev) =>
             prev.map((l) =>
-              l.id === id && l.pipelineStage === to ? { ...l, pipelineStage: from } : l,
+              l.id === id && l.stage?.id === to.id ? { ...l, stage: from } : l,
             ),
           );
           toast.error("Couldn't move the lead. Reverted.");
@@ -159,12 +168,14 @@ export function PipelineBoard({ leads: propLeads }: { leads: LeadWithSla[] }) {
   function onDragEnd(e: DragEndEvent) {
     draggingRef.current = false;
     setActiveId(null);
-    const overId = e.over?.id as PipelineStage | undefined;
+    const overId = e.over?.id as string | undefined;
     if (!overId) return;
+    const target = stages.find((s) => s.id === Number(overId));
+    if (!target) return;
     const id = Number(e.active.id);
     const lead = leads.find((l) => l.id === id);
-    if (!lead || lead.pipelineStage === overId) return;
-    move(id, overId, lead.pipelineStage as PipelineStage);
+    if (!lead || !lead.stage || lead.stage.id === target.id) return;
+    move(id, target, lead.stage);
   }
 
   const activeLead = activeId != null ? leads.find((l) => l.id === activeId) ?? null : null;
@@ -203,32 +214,33 @@ export function PipelineBoard({ leads: propLeads }: { leads: LeadWithSla[] }) {
       </div>
 
       {view === "list" ? (
-        <LeadList leads={filtered} />
+        <LeadList leads={filtered} stages={stages} />
       ) : (
         <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
           <LayoutGroup>
             <div style={{ display: "flex", gap: 12, overflowX: "auto", scrollSnapType: "x proximity", paddingBottom: 12, alignItems: "stretch" }}>
-              {FUNNEL.map((stage) => {
-                const cards = byStage.visible.get(stage) ?? [];
+              {funnelStages.map((stage) => {
+                const cards = byStage.visible.get(stage.id) ?? [];
                 return (
-                  <StageColumn key={stage} stage={stage} count={cards.length} total={byStage.totals.get(stage)}>
+                  <StageColumn key={stage.id} stageId={stage.id} stage={stage} count={cards.length} total={byStage.totals.get(stage.id)}>
                     {cards.map((lead) => (
                       <DraggableCard key={lead.id} lead={lead} now={now} onOpen={openLead} onDraft={draftLead} onWhatsApp={whatsappLead} />
                     ))}
                   </StageColumn>
                 );
               })}
-              {RAILS.map((stage) => {
-                const cards = byStage.visible.get(stage) ?? [];
+              {railStages.map((stage) => {
+                const cards = byStage.visible.get(stage.id) ?? [];
                 return (
                   <StageColumn
-                    key={stage}
+                    key={stage.id}
+                    stageId={stage.id}
                     stage={stage}
                     count={cards.length}
-                    total={byStage.totals.get(stage)}
+                    total={byStage.totals.get(stage.id)}
                     rail
-                    expanded={!!railOpen[stage]}
-                    onToggle={() => setRailOpen((r) => ({ ...r, [stage]: !r[stage] }))}
+                    expanded={!!railOpen[stage.id]}
+                    onToggle={() => setRailOpen((r) => ({ ...r, [stage.id]: !r[stage.id] }))}
                   >
                     {cards.map((lead) => (
                       <DraggableCard key={lead.id} lead={lead} now={now} onOpen={openLead} onDraft={draftLead} onWhatsApp={whatsappLead} />
