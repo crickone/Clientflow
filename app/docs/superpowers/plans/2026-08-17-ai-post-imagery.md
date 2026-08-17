@@ -265,7 +265,41 @@ import {
 Run: `npm test -- src/lib/ai/usageFlat.test.ts`
 Expected: FAIL — `recordFlatUsage` is not exported.
 
-- [ ] **Step 3: Implement** — append to `src/lib/ai/usage.ts`:
+- [ ] **Step 3: Implement** — in `src/lib/ai/usage.ts`: extract the tranche/overflow billing that `meterAndCharge` currently inlines into a private helper, delegate `meterAndCharge` to it (its doc comment and exported behaviour stay EXACTLY as-is), and add the two flat-cost functions:
+
+```ts
+/**
+ * Shared tranche/overflow billing used by `meterAndCharge` (token calls) and
+ * `meterAndChargeFlat` (flat-cost calls): the slice of `rawCost` lying ABOVE
+ * the free tranche is marked up (`withMargin`, +5%) and debited from prepaid
+ * credits. `usedBefore` must be read BEFORE the usage row was recorded so the
+ * call isn't counted against its own free-tranche headroom.
+ */
+function chargeOverflow(
+  tenantId: number,
+  agentKey: string,
+  usedBefore: number,
+  rawCost: number,
+): void {
+  const trancheCents = getTenantCapCents(tenantId);
+  const freeRemaining = Math.max(0, trancheCents - usedBefore);
+  const overflowRaw = Math.max(0, rawCost - freeRemaining);
+  const billable = withMargin(overflowRaw);
+  if (billable > 0) recordAiSpend(tenantId, billable, agentKey);
+}
+```
+
+`meterAndCharge`'s body becomes (keep its existing doc comment verbatim):
+
+```ts
+export function meterAndCharge(tenantId: number, agentKey: string, model: string, u: Usage): void {
+  const usedBefore = getMonthlyUsageCents(tenantId);
+  const rawCost = recordUsage(tenantId, agentKey, model, u);
+  chargeOverflow(tenantId, agentKey, usedBefore, rawCost);
+}
+```
+
+Then append:
 
 ```ts
 /**
@@ -291,9 +325,8 @@ export function recordFlatUsage(
 
 /**
  * `meterAndCharge` for flat-cost calls (post images): identical
- * free-tranche/overflow/margin billing, with the raw cost given directly
- * instead of estimated from tokens. Kept side-by-side with `meterAndCharge`
- * so the two stay reviewably in lockstep.
+ * free-tranche/overflow/margin billing via the shared `chargeOverflow`, with
+ * the raw cost given directly instead of estimated from tokens.
  */
 export function meterAndChargeFlat(
   tenantId: number,
@@ -301,13 +334,9 @@ export function meterAndChargeFlat(
   model: string,
   costCents: number,
 ): void {
-  const trancheCents = getTenantCapCents(tenantId);
   const usedBefore = getMonthlyUsageCents(tenantId);
   const rawCost = recordFlatUsage(tenantId, agentKey, model, costCents);
-  const freeRemaining = Math.max(0, trancheCents - usedBefore);
-  const overflowRaw = Math.max(0, rawCost - freeRemaining);
-  const billable = withMargin(overflowRaw);
-  if (billable > 0) recordAiSpend(tenantId, billable, agentKey);
+  chargeOverflow(tenantId, agentKey, usedBefore, rawCost);
 }
 ```
 
