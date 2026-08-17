@@ -42,12 +42,14 @@ const FORBIDDEN: { pattern: RegExp; fix: string }[] = [
  * several — e.g. metered.ts's own header, runAgentTurn's history note) isn't
  * mistaken for a real call. Truncating a string literal that happens to contain
  * `//` can only remove text, never synthesise a forbidden call, so this can't
- * manufacture a false positive.
+ * manufacture a false positive. Line comments immediately preceded by `:` (e.g.
+ * in URL schemes like `https://`) are preserved so URL-shaped forbidden patterns
+ * (e.g. `fal.run`) survive stripping and can be matched by the guard.
  */
 function stripComments(code: string): string {
   return code
     .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/\/\/[^\n]*/g, "");
+    .replace(/(?<!:)\/\/[^\n]*/g, "");
 }
 
 function walkSourceFiles(dir: string): string[] {
@@ -69,6 +71,16 @@ function walkSourceFiles(dir: string): string[] {
 
 const srcDir = join(process.cwd(), "src");
 const violations: string[] = [];
+
+// stripComments self-test: URL schemes survive (so URL-shaped patterns can
+// match), while real line comments — including trailing ones — still strip.
+{
+  const stripped = stripComments(
+    'const U = "https://fal.run/x"; // mention of new Anthropic( in a comment',
+  );
+  assert.ok(/fal\.run/.test(stripped), "URL string survives comment-stripping");
+  assert.ok(!/new\s+Anthropic\s*\(/.test(stripped), "trailing line comment still stripped");
+}
 
 for (const abs of walkSourceFiles(srcDir)) {
   const rel = relative(process.cwd(), abs).split(sep).join("/");
