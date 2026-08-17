@@ -46,32 +46,38 @@ export async function falGenerateImage(
     throw new ImageGenError("Image generation isn't configured (FAL_KEY missing).");
   }
 
-  const res = await fetchImpl(FAL_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Key ${key}`,
-    },
-    body: JSON.stringify({
-      prompt: input.prompt,
-      image_size: { width: input.width, height: input.height },
-      num_images: 1,
-      output_format: "jpeg",
-      enable_safety_checker: true,
-    }),
-    signal: AbortSignal.timeout(60_000),
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new ImageGenError(`Image API error ${res.status}: ${text.slice(0, 200)}`);
-  }
-  const json = (await res.json()) as FalImageResponse;
-  const url = json.images?.[0]?.url;
-  if (!url) throw new ImageGenError("Image API returned no image.");
+  try {
+    const res = await fetchImpl(FAL_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Key ${key}`,
+      },
+      body: JSON.stringify({
+        prompt: input.prompt,
+        image_size: { width: input.width, height: input.height },
+        num_images: 1,
+        output_format: "jpeg",
+        enable_safety_checker: true,
+      }),
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new ImageGenError(`Image API error ${res.status}: ${text.slice(0, 200)}`);
+    }
+    const json = (await res.json()) as FalImageResponse;
+    const url = json.images?.[0]?.url;
+    if (!url) throw new ImageGenError("Image API returned no image.");
 
-  const imgRes = await fetchImpl(url, { signal: AbortSignal.timeout(60_000) });
-  if (!imgRes.ok) {
-    throw new ImageGenError(`Couldn't download the generated image (${imgRes.status}).`);
+    const imgRes = await fetchImpl(url, { signal: AbortSignal.timeout(60_000) });
+    if (!imgRes.ok) {
+      throw new ImageGenError(`Couldn't download the generated image (${imgRes.status}).`);
+    }
+    return Buffer.from(await imgRes.arrayBuffer());
+  } catch (err) {
+    if (err instanceof ImageGenError) throw err;
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new ImageGenError(`Image generation failed: ${detail}`);
   }
-  return Buffer.from(await imgRes.arrayBuffer());
 }

@@ -42,6 +42,7 @@ import {
     assert.equal(body.num_images, 1);
     assert.equal(body.output_format, "jpeg");
     assert.equal(body.enable_safety_checker, true);
+    assert.equal(calls[1].url, "https://cdn.example/img.jpg", "downloads the URL the API returned");
 
     // API error → ImageGenError.
     const errFetch = (async () => new Response("boom", { status: 500 })) as typeof fetch;
@@ -58,6 +59,15 @@ import {
       ImageGenError,
     );
 
+    // Network-level failure (e.g. timeout abort) → wrapped as ImageGenError.
+    const throwingFetch = (async () => {
+      throw new TypeError("fetch failed");
+    }) as typeof fetch;
+    await assert.rejects(
+      () => falGenerateImage({ prompt: "x", width: 992, height: 992 }, throwingFetch),
+      ImageGenError,
+    );
+
     // Missing key → ImageGenError before any fetch.
     delete process.env.FAL_KEY;
     assert.equal(isImageGenConfigured(), false);
@@ -65,6 +75,7 @@ import {
       () => falGenerateImage({ prompt: "x", width: 992, height: 992 }, okFetch),
       ImageGenError,
     );
+    assert.equal(calls.length, 2, "missing key throws before any fetch happens");
 
     assert.equal(IMAGE_COST_CENTS, 4);
     assert.equal(IMAGE_MODEL_ID, "fal:flux-1.1-pro");
