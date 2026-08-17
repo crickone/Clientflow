@@ -108,3 +108,30 @@ export function shouldAdvance(current: StageLike, candidate: StageLike): boolean
   if (current.role == null) return false;
   return candidate.position > current.position;
 }
+
+export interface StageRecord {
+  id: number;
+  name: string;
+  colour: string;
+  position: number;
+  role: StageRole | null;
+}
+
+/** The stage new leads enter: the `role:new` stage, else the lowest position, else null. */
+export function resolveEntryStage(stages: StageRecord[]): StageRecord | null {
+  if (stages.length === 0) return null;
+  const byRole = stages.find((s) => s.role === "new");
+  if (byRole) return byRole;
+  return stages.reduce((lo, s) => (s.position < lo.position ? s : lo));
+}
+
+/** Guard: a pipeline must always keep ≥1 stage. */
+export function canDeleteStage(stages: StageRecord[], id: number): { ok: true } | { ok: false; reason: string } {
+  if (stages.length <= 1) return { ok: false, reason: "A pipeline needs at least one stage." };
+  return { ok: true };
+}
+
+/** The stage currently holding `role` (other than `exceptId`), or null — for the unique-role guard. */
+export function roleConflict(stages: StageRecord[], role: StageRole, exceptId: number | null): StageRecord | null {
+  return stages.find((s) => s.role === role && s.id !== exceptId) ?? null;
+}
