@@ -75,6 +75,7 @@ import {
   delegateToOperationsTool,
   delegateToSalesTool,
 } from "@/lib/agents/tools.orchestrator";
+import { resolveEntryStageId } from "@/lib/pipeline/stageRepo";
 
 export type ToolArtifact = { url: string; filename: string; label: string };
 export type ToolResult = {
@@ -1624,6 +1625,7 @@ function createLead(ctx: ToolContext, input: Record<string, unknown>): string {
       phone: str(input.phone),
       source: str(input.source) ?? "manual",
       notes: str(input.notes),
+      stageId: resolveEntryStageId() ?? undefined,
     })
     .returning({ id: leads.id })
     .get();
