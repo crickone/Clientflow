@@ -25,6 +25,7 @@ const SANCTIONED = new Set([
   "src/lib/ai/client.ts", // getAnthropic(): the one cached Anthropic client (the sole `new Anthropic()`)
   "src/lib/ai/metered.ts", // meteredCreate(): the one-shot metered .messages.create() chokepoint
   "src/lib/ai/providers/anthropic.ts", // AnthropicProvider: the streaming .messages.stream() runAgentTurn meters
+  "src/lib/ai/image/falClient.ts", // falGenerateImage(): the one fal.ai call site (flat-cost images; metered via generatePostImage)
 ]);
 
 // Raw-SDK-access signatures that must not appear outside SANCTIONED files.
@@ -33,6 +34,7 @@ const FORBIDDEN: { pattern: RegExp; fix: string }[] = [
   { pattern: /\.messages\s*\.\s*create\s*\(/, fix: ".messages.create() — route one-shot calls through meteredCreate()" },
   { pattern: /\.messages\s*\.\s*stream\s*\(/, fix: ".messages.stream() — streaming lives in AnthropicProvider; drive it via runAgentTurn()" },
   { pattern: /\bgetAnthropic\s*\(/, fix: "getAnthropic() — grabbing the raw client bypasses the cap; use meteredCreate()" },
+  { pattern: /fal\.run/, fix: "fal.ai calls live only in lib/ai/image/falClient.ts — route image generation through generatePostImage()" },
 ];
 
 /**
