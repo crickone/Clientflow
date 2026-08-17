@@ -1056,6 +1056,16 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
     CREATE INDEX IF NOT EXISTS idx_leads_source_dedup ON leads(source, source_lead_id);
 
+    CREATE TABLE IF NOT EXISTS pipeline_stages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      colour TEXT NOT NULL,
+      position INTEGER NOT NULL,
+      role TEXT,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_pipeline_stages_role ON pipeline_stages(role);
+
     CREATE TABLE IF NOT EXISTS lead_messages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       lead_id INTEGER NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
@@ -1358,6 +1368,15 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     }
   } catch (err) {
     console.error("[db] leads pipeline_stage migration failed:", err);
+  }
+
+  try {
+    const cols = sqlite.prepare("PRAGMA table_info(leads)").all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === "stage_id")) {
+      sqlite.exec("ALTER TABLE leads ADD COLUMN stage_id INTEGER REFERENCES pipeline_stages(id)");
+    }
+  } catch (err) {
+    console.error("[db] leads stage_id migration failed:", err);
   }
 
   try {

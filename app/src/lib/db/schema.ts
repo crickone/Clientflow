@@ -313,6 +313,9 @@ export const leads = sqliteTable("leads", {
   })
     .notNull()
     .default("new_lead"),
+  // Pipeline Management: the editable-stage FK. Supersedes `pipelineStage` (which
+  // is frozen: kept for backfill + rollback, dual-written during transition).
+  stageId: integer("stage_id").references(() => pipelineStages.id),
   clientId: integer("client_id").references(() => clients.id),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
@@ -321,6 +324,28 @@ export const leads = sqliteTable("leads", {
     .notNull()
     .default(sql`(unixepoch() * 1000)`),
 });
+
+/**
+ * Per-tenant, editable pipeline stages (Pipeline Management). Replaces the
+ * hardcoded 9-stage vocabulary in lib/pipeline/stages.ts. `role` (nullable) is
+ * one of the fixed StageRole values and is unique-per-tenant where set — it's
+ * how the auto-advance engine targets a stage without depending on its name.
+ * `position` drives board order + funnel advancement.
+ */
+export const pipelineStages = sqliteTable(
+  "pipeline_stages",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    name: text("name").notNull(),
+    colour: text("colour").notNull(),
+    position: integer("position").notNull(),
+    role: text("role"), // StageRole | null; app-enforced unique-where-set
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => ({ byRole: uniqueIndex("idx_pipeline_stages_role").on(t.role) }),
+);
 
 /**
  * AI-triage columns shared by lead_messages and client_messages. Populated on
