@@ -183,6 +183,26 @@ export function assertAiAllowed(tenantId: number): void {
 }
 
 /**
+ * Shared tranche/overflow billing used by `meterAndCharge` (token calls) and
+ * `meterAndChargeFlat` (flat-cost calls): the slice of `rawCost` lying ABOVE
+ * the free tranche is marked up (`withMargin`, +5%) and debited from prepaid
+ * credits. `usedBefore` must be read BEFORE the usage row was recorded so the
+ * call isn't counted against its own free-tranche headroom.
+ */
+function chargeOverflow(
+  tenantId: number,
+  agentKey: string,
+  usedBefore: number,
+  rawCost: number,
+): void {
+  const trancheCents = getTenantCapCents(tenantId);
+  const freeRemaining = Math.max(0, trancheCents - usedBefore);
+  const overflowRaw = Math.max(0, rawCost - freeRemaining);
+  const billable = withMargin(overflowRaw);
+  if (billable > 0) recordAiSpend(tenantId, billable, agentKey);
+}
+
+/**
  * Record one AI call's usage AND bill any portion beyond the free tranche to
  * the tenant's prepaid credits. Replaces a bare `recordUsage` at the metering
  * chokepoints:
@@ -196,11 +216,44 @@ export function assertAiAllowed(tenantId: number): void {
  * isn't counted against its own free-tranche headroom.
  */
 export function meterAndCharge(tenantId: number, agentKey: string, model: string, u: Usage): void {
-  const trancheCents = getTenantCapCents(tenantId);
   const usedBefore = getMonthlyUsageCents(tenantId);
   const rawCost = recordUsage(tenantId, agentKey, model, u);
-  const freeRemaining = Math.max(0, trancheCents - usedBefore);
-  const overflowRaw = Math.max(0, rawCost - freeRemaining);
-  const billable = withMargin(overflowRaw);
-  if (billable > 0) recordAiSpend(tenantId, billable, agentKey);
+  chargeOverflow(tenantId, agentKey, usedBefore, rawCost);
+}
+
+/**
+ * Record a FLAT-COST AI call (per-image pricing — no token counts) against a
+ * tenant's monthly `ai_usage` bucket. Same row shape as `recordUsage` with all
+ * four token columns 0, so every existing rollup (total / by-agent / by-model)
+ * includes it with no changes. Returns the cost it recorded.
+ */
+export function recordFlatUsage(
+  tenantId: number,
+  agentKey: string,
+  model: string,
+  costCents: number,
+): number {
+  controlSqlite
+    .prepare(
+      `INSERT INTO ai_usage (tenant_id, yyyymm, agent_key, model, input_tokens, output_tokens, cache_read_tokens, cache_create_tokens, cost_cents)
+       VALUES (?,?,?,?,0,0,0,0,?)`,
+    )
+    .run(tenantId, currentMonth(), agentKey, model, costCents);
+  return costCents;
+}
+
+/**
+ * `meterAndCharge` for flat-cost calls (post images): identical
+ * free-tranche/overflow/margin billing via the shared `chargeOverflow`, with
+ * the raw cost given directly instead of estimated from tokens.
+ */
+export function meterAndChargeFlat(
+  tenantId: number,
+  agentKey: string,
+  model: string,
+  costCents: number,
+): void {
+  const usedBefore = getMonthlyUsageCents(tenantId);
+  const rawCost = recordFlatUsage(tenantId, agentKey, model, costCents);
+  chargeOverflow(tenantId, agentKey, usedBefore, rawCost);
 }
