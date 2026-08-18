@@ -65,6 +65,10 @@ export async function PATCH(
   if (typeof body?.backgroundZoom === "number") {
     patch.backgroundZoom = body.backgroundZoom;
   }
+  if (body?.imageStatus === null) {
+    patch.imageStatus = null;
+    patch.imageError = null;
+  }
 
   updateSlide(slideId, patch as any);
   return NextResponse.json({ ok: true });

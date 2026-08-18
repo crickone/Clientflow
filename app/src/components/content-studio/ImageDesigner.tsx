@@ -219,6 +219,33 @@ export function ImageDesigner({
     [activeSlide],
   );
 
+  // A MANUAL background change resolves any pending AI generation for the
+  // active slide: clear image_status locally (kills the poll's merge guard +
+  // the chip) and persist that resolution immediately — the detached queue
+  // checks it before writing, so the user's pick wins over a late AI result.
+  const setSlideBackgroundManually = useCallback(
+    (backgroundAssetId: number | null) => {
+      if (!activeSlide) return;
+      const wasGenerating = activeSlide.imageStatus === "generating";
+      updateActiveSlide(
+        wasGenerating
+          ? { backgroundAssetId, imageStatus: null, imageError: null }
+          : { backgroundAssetId },
+      );
+      if (wasGenerating) {
+        void fetch(
+          `/api/content-studio/carousels/${designId}/slides/${activeSlide.id}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ imageStatus: null }),
+          },
+        ).catch(() => {});
+      }
+    },
+    [activeSlide, designId, updateActiveSlide],
+  );
+
   // Auto-save active slide (debounced)
   const lastSavedRef = useRef<Record<number, string>>({});
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -569,7 +596,7 @@ export function ImageDesigner({
       const newAssets = json.assets as ImageLibraryAsset[];
       setLibrary((prev) => [...newAssets, ...prev]);
       if (newAssets.length > 0) {
-        updateActiveSlide({ backgroundAssetId: newAssets[0].id });
+        setSlideBackgroundManually(newAssets[0].id);
       }
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Upload failed.");
@@ -588,7 +615,7 @@ export function ImageDesigner({
       if (!res.ok || !json.ok) throw new Error(json.error || "Couldn't delete.");
       setLibrary((prev) => prev.filter((a) => a.id !== assetId));
       if (activeSlide?.backgroundAssetId === assetId) {
-        updateActiveSlide({ backgroundAssetId: null });
+        setSlideBackgroundManually(null);
       }
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Couldn't delete.");
@@ -1467,6 +1494,7 @@ export function ImageDesigner({
             <div>
               <Label>AI background</Label>
               <AiImagePanel
+                key={activeSlide.id}
                 slide={activeSlide}
                 designId={designId}
                 onAsset={(asset) =>
@@ -1508,9 +1536,7 @@ export function ImageDesigner({
                       type="button"
                       size="sm"
                       variant="ghost"
-                      onClick={() =>
-                        updateActiveSlide({ backgroundAssetId: null })
-                      }
+                      onClick={() => setSlideBackgroundManually(null)}
                     >
                       Clear
                     </Button>
@@ -1584,9 +1610,7 @@ export function ImageDesigner({
                           cursor: "pointer",
                           background: "var(--surface-2)",
                         }}
-                        onClick={() =>
-                          updateActiveSlide({ backgroundAssetId: asset.id })
-                        }
+                        onClick={() => setSlideBackgroundManually(asset.id)}
                       >
                         <img
                           src={libraryFileUrl(asset.filename)}
@@ -2079,7 +2103,10 @@ function AiImagePanel({
       });
       setPrompt(json.slide?.imagePrompt ?? prompt);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Image generation failed.");
+      const message =
+        err instanceof Error ? err.message : "Image generation failed.";
+      setError(message);
+      onSlidePatch({ imageStatus: "failed", imageError: message });
     } finally {
       setBusy(false);
     }

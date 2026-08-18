@@ -1,10 +1,31 @@
 import "server-only";
 
+import { db, schema } from "@/lib/db";
+import { eq } from "drizzle-orm";
 import { runWithTenant } from "@/lib/db/tenant";
 import { updateSlide } from "@/lib/image/carousels";
 import { AiCapError } from "@/lib/ai/usage";
 import { generatePostImage } from "@/lib/ai/image/generatePostImage";
 import type { ImageAspect } from "@/lib/ai/image/prompt";
+
+/**
+ * Write a generation outcome ONLY if the slide still awaits it. A manual
+ * background pick (or slide deletion) mid-flight clears image_status — in
+ * that case the user's choice wins and the late AI result is dropped (the
+ * generated file stays in the image library, so nothing paid-for is lost).
+ */
+function resolveIfStillGenerating(
+  slideId: number,
+  patch: { backgroundAssetId?: number; imageStatus: "ready" | "failed"; imageError: string | null },
+): void {
+  const row = db
+    .select({ imageStatus: schema.carouselSlides.imageStatus })
+    .from(schema.carouselSlides)
+    .where(eq(schema.carouselSlides.id, slideId))
+    .get();
+  if (!row || row.imageStatus !== "generating") return;
+  updateSlide(slideId, patch);
+}
 
 export interface SlideImageJob {
   slideId: number;
@@ -33,7 +54,7 @@ export function queueSlideImages(tenantId: number, jobs: SlideImageJob[]): void 
           { prompt: job.prompt, aspectRatio: job.aspectRatio },
           { tenantId, agentKey: "carousel" },
         );
-        updateSlide(job.slideId, {
+        resolveIfStillGenerating(job.slideId, {
           backgroundAssetId: asset.id,
           imageStatus: "ready",
           imageError: null,
@@ -43,12 +64,18 @@ export function queueSlideImages(tenantId: number, jobs: SlideImageJob[]): void 
           err instanceof Error ? err.message : "Image generation failed.";
         if (err instanceof AiCapError) {
           for (const rest of jobs.slice(i)) {
-            updateSlide(rest.slideId, { imageStatus: "failed", imageError: message });
+            resolveIfStillGenerating(rest.slideId, {
+              imageStatus: "failed",
+              imageError: message,
+            });
           }
           console.error("[autoImages] stopped — tenant over its AI allowance");
           return;
         }
-        updateSlide(job.slideId, { imageStatus: "failed", imageError: message });
+        resolveIfStillGenerating(job.slideId, {
+          imageStatus: "failed",
+          imageError: message,
+        });
         console.error(`[autoImages] slide ${job.slideId} failed:`, err);
       }
     }
