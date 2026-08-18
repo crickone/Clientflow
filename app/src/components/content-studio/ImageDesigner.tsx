@@ -261,6 +261,8 @@ export function ImageDesigner({
       bodyFont: activeSlide.bodyFont,
       accentColor: activeSlide.accentColor,
       backgroundColor: activeSlide.backgroundColor,
+      // backgroundAssetId's inclusion here is load-bearing for the
+      // manual-pick-wins convergence — see setSlideBackgroundManually.
       backgroundAssetId: activeSlide.backgroundAssetId,
       backgroundFit: activeSlide.backgroundFit,
       backgroundOffsetX: activeSlide.backgroundOffsetX,
@@ -2077,12 +2079,24 @@ function AiImagePanel({
     setError(null);
   }, [slide.id, slide.imagePrompt]);
 
+  // Live mirror of the slide's status for the in-flight generate() closure
+  // below — belt-and-braces for the fetch-throw path (no response to read
+  // `superseded` from) when a manual pick resolves this slide mid-flight.
+  const statusRef = useRef(slide.imageStatus);
+  useEffect(() => {
+    statusRef.current = slide.imageStatus;
+  }, [slide.imageStatus]);
+
   const generating = slide.imageStatus === "generating";
   const failed = slide.imageStatus === "failed";
 
   async function generate() {
     setBusy(true);
     setError(null);
+    // Mark pending locally BEFORE the fetch so a manual pick mid-flight
+    // (setSlideBackgroundManually) sees imageStatus === "generating" and
+    // takes its protective branch — same contract as the async queue path.
+    onSlidePatch({ imageStatus: "generating", imageError: null });
     try {
       const res = await fetch(
         `/api/content-studio/carousels/${designId}/slides/${slide.id}/image`,
@@ -2095,6 +2109,14 @@ function AiImagePanel({
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error || "Image generation failed.");
       if (json.asset) onAsset(json.asset as ImageLibraryAsset);
+      // A manual pick mid-flight wins: json.superseded (server truth) is the
+      // primary guard; statusRef is the fallback for callers with no server
+      // response to check. Either way, the asset is already added to the
+      // library above — it's paid for and shouldn't be lost — but the slide
+      // itself must not be clobbered back onto this now-stale AI result.
+      if (json.superseded === true || statusRef.current !== "generating") {
+        return;
+      }
       onSlidePatch({
         backgroundAssetId: json.slide?.backgroundAssetId ?? json.asset?.id ?? null,
         imageStatus: "ready",
@@ -2105,8 +2127,13 @@ function AiImagePanel({
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Image generation failed.";
-      setError(message);
-      onSlidePatch({ imageStatus: "failed", imageError: message });
+      // A slide the user already resolved manually must not get a failure
+      // banner slapped back onto it — only surface the failure if this
+      // request is still the thing the slide is waiting on.
+      if (statusRef.current === "generating") {
+        setError(message);
+        onSlidePatch({ imageStatus: "failed", imageError: message });
+      }
     } finally {
       setBusy(false);
     }

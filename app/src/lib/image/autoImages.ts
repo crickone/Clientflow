@@ -13,18 +13,26 @@ import type { ImageAspect } from "@/lib/ai/image/prompt";
  * background pick (or slide deletion) mid-flight clears image_status — in
  * that case the user's choice wins and the late AI result is dropped (the
  * generated file stays in the image library, so nothing paid-for is lost).
+ *
+ * Shared by both the detached queue below (queueSlideImages) AND the
+ * synchronous single-slide generate route
+ * (api/content-studio/carousels/[id]/slides/[slideId]/image) — same
+ * manual-pick-wins invariant, same guard, for both the async and sync
+ * generation paths. Returns whether the write applied (false means it was
+ * superseded by a manual pick and skipped).
  */
-function resolveIfStillGenerating(
+export function resolveIfStillGenerating(
   slideId: number,
   patch: { backgroundAssetId?: number; imageStatus: "ready" | "failed"; imageError: string | null },
-): void {
+): boolean {
   const row = db
     .select({ imageStatus: schema.carouselSlides.imageStatus })
     .from(schema.carouselSlides)
     .where(eq(schema.carouselSlides.id, slideId))
     .get();
-  if (!row || row.imageStatus !== "generating") return;
+  if (!row || row.imageStatus !== "generating") return false;
   updateSlide(slideId, patch);
+  return true;
 }
 
 export interface SlideImageJob {

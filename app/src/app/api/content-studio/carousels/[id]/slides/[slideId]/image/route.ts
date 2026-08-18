@@ -6,6 +6,7 @@ import { getBusinessProfile } from "@/lib/businessProfile";
 import { getBrandImageStyle } from "@/lib/settings";
 import { AiCapError } from "@/lib/ai/usage";
 import { generatePostImage } from "@/lib/ai/image/generatePostImage";
+import { resolveIfStillGenerating } from "@/lib/image/autoImages";
 import { isImageGenConfigured } from "@/lib/ai/image/falClient";
 import { IMAGE_COST_CENTS } from "@/lib/ai/image/falClient";
 import {
@@ -69,26 +70,41 @@ export async function POST(
       scene: fallbackScene({ heading: slide.headingText, body: slide.bodyText }),
     });
 
+  // Mark pending BEFORE the (several-second) generation call, and persist the
+  // prompt at initiation — same 'generating' contract the detached queue
+  // uses, so a manual pick mid-flight (setSlideBackgroundManually) takes its
+  // protective branch here too. The stored prompt now reflects the last
+  // ATTEMPT even if this request is later superseded.
+  updateSlide(slideId, { imageStatus: "generating", imageError: null, imagePrompt: prompt });
+
   try {
     const asset = await generatePostImage(
       { prompt, aspectRatio: slide.aspectRatio as ImageAspect },
       { tenantId, agentKey: "carousel" },
     );
-    updateSlide(slideId, {
+    // Route the success write through the same guard the detached queue
+    // uses: if a manual pick resolved this slide while generation was in
+    // flight, the write is skipped and the generated asset is still
+    // returned (below) so it lands in the library instead of being lost.
+    const applied = resolveIfStillGenerating(slideId, {
       backgroundAssetId: asset.id,
-      imagePrompt: prompt,
       imageStatus: "ready",
       imageError: null,
     });
     const fresh = getCarousel(carouselId)?.slides.find((s) => s.id === slideId) ?? null;
-    return NextResponse.json({ ok: true, slide: fresh, asset, costCents: IMAGE_COST_CENTS });
+    return NextResponse.json({
+      ok: true,
+      slide: fresh,
+      asset,
+      costCents: IMAGE_COST_CENTS,
+      superseded: !applied,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Image generation failed.";
     try {
-      updateSlide(slideId, { imageStatus: "failed", imageError: message });
+      resolveIfStillGenerating(slideId, { imageStatus: "failed", imageError: message });
     } catch {
-      // Best effort — a failed status write must not mask the real error or
-      // strand the JSON error response (mirrors the generate route's cleanup).
+      // Best effort — a failed status write must not mask the real error.
     }
     if (err instanceof AiCapError) {
       return NextResponse.json({ ok: false, error: message }, { status: 429 });
