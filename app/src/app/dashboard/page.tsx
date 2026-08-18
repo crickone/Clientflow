@@ -25,6 +25,9 @@ import { getVocab } from "@/lib/vocabulary";
 import { isBriefComplete } from "@/lib/businessProfile";
 import { getCurrentTenant } from "@/lib/db/tenant";
 import { AssistantChat } from "@/components/messaging/AssistantChat";
+import { getSetupSummary, isSetupDismissed } from "@/lib/setup/steps";
+import { getCurrentMembership } from "@/lib/auth";
+import { SetupProgressCard } from "@/components/dashboard/SetupProgressCard";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +39,10 @@ export default async function DashboardPage() {
   const isGym = getSchedulingMode() === "timetable";
   const briefComplete = isBriefComplete();
   const today = new Date().toISOString().slice(0, 10);
+  // Only run the ~11-step setup-summary detection when it can actually be
+  // shown (admin, not dismissed) — never unconditionally.
+  const isAdmin = getCurrentMembership()?.role === "admin";
+  const setup = isAdmin && !isSetupDismissed() ? getSetupSummary() : null;
 
   const [kpis, todays, activity, revenue, therapyMap] = await Promise.all([
     dashboardKpis(),
@@ -58,6 +65,11 @@ export default async function DashboardPage() {
 
   return (
     <div className="app-page">
+      {setup && !setup.allResolved && (
+        <Reveal>
+          <SetupProgressCard requiredDone={setup.requiredDone} requiredTotal={setup.requiredTotal} nextHref={setup.nextHref} />
+        </Reveal>
+      )}
       <PageHeader
         eyebrow="Today"
         title="Dashboard"
