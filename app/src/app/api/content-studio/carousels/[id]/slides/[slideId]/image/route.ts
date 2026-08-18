@@ -84,7 +84,12 @@ export async function POST(
     return NextResponse.json({ ok: true, slide: fresh, asset, costCents: IMAGE_COST_CENTS });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Image generation failed.";
-    updateSlide(slideId, { imageStatus: "failed", imageError: message });
+    try {
+      updateSlide(slideId, { imageStatus: "failed", imageError: message });
+    } catch {
+      // Best effort — a failed status write must not mask the real error or
+      // strand the JSON error response (mirrors the generate route's cleanup).
+    }
     if (err instanceof AiCapError) {
       return NextResponse.json({ ok: false, error: message }, { status: 429 });
     }
