@@ -7,6 +7,7 @@ import {
   addSlide,
   deleteSlot,
   getCarousel,
+  updateSlide,
 } from "@/lib/image/carousels";
 import { generateCarouselSlides } from "@/lib/ai/generateCarousel";
 import { AiCapError } from "@/lib/ai/usage";
@@ -113,33 +114,53 @@ export async function POST(
     : null;
   const jobs: SlideImageJob[] = [];
 
-  for (let i = 0; i < result.slides.length; i++) {
-    const slide = result.slides[i];
-    const prompt = houseStyle
-      ? buildImagePrompt({
-          houseStyle,
-          scene:
-            slide.image?.trim() ||
-            fallbackScene({ heading: slide.heading, body: slide.body }),
-        })
-      : null;
-    const row = addSlide({
-      carouselSetId: carouselId,
-      slotKey,
-      templateId: slide.template,
-      aspectRatio: "1:1",
-      headingText: slide.heading,
-      bodyText: slide.body,
-      // Caption belongs to the carousel as a whole — store it on slide[0]
-      caption: i === 0 ? result.caption : "",
-      accentColor: previousAccent,
-      imagePrompt: prompt,
-      imageStatus: prompt ? "generating" : null,
-    });
-    if (prompt) jobs.push({ slideId: row.id, prompt, aspectRatio: "1:1" });
-  }
+  try {
+    for (let i = 0; i < result.slides.length; i++) {
+      const slide = result.slides[i];
+      const prompt = houseStyle
+        ? buildImagePrompt({
+            houseStyle,
+            scene:
+              slide.image?.trim() ||
+              fallbackScene({ heading: slide.heading, body: slide.body }),
+          })
+        : null;
+      const row = addSlide({
+        carouselSetId: carouselId,
+        slotKey,
+        templateId: slide.template,
+        aspectRatio: "1:1",
+        headingText: slide.heading,
+        bodyText: slide.body,
+        // Caption belongs to the carousel as a whole — store it on slide[0]
+        caption: i === 0 ? result.caption : "",
+        accentColor: previousAccent,
+        imagePrompt: prompt,
+        imageStatus: prompt ? "generating" : null,
+      });
+      if (prompt) jobs.push({ slideId: row.id, prompt, aspectRatio: "1:1" });
+    }
 
-  if (jobs.length > 0) queueSlideImages(tenantId, jobs);
+    if (jobs.length > 0) queueSlideImages(tenantId, jobs);
+  } catch (err) {
+    // A mid-loop failure must not strand earlier-inserted slides at
+    // 'generating' — that state is only ever cleared by the queue, which
+    // won't fire now. Mark them failed (best-effort) so the designer shows
+    // a Retry instead of an eternal spinner.
+    for (const job of jobs) {
+      try {
+        updateSlide(job.slideId, {
+          imageStatus: "failed",
+          imageError: "Slide creation failed part-way — regenerate the carousel.",
+        });
+      } catch {
+        // best effort
+      }
+    }
+    const message = err instanceof Error ? err.message : "Couldn't create the slides.";
+    console.error("[carousel-generate] slide insert failed part-way:", err);
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+  }
 
   db.update(schema.carouselSets)
     .set({ updatedAt: new Date() })
