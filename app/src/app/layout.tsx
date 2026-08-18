@@ -20,6 +20,7 @@ import { getVocab } from "@/lib/vocabulary";
 import { DEFAULT_THEME, themeCss } from "@/lib/theme";
 import { getBusinessProfile } from "@/lib/businessProfile";
 import { getChromeLogoSrc } from "@/lib/branding";
+import { isSetupDismissed } from "@/lib/setup/steps";
 import { getBilling } from "@/lib/billing/engine";
 import { PastDueBanner } from "@/components/billing/PastDueBanner";
 // Side-effect import: boots the daily automation scheduler (birthdays etc.) on
@@ -217,6 +218,11 @@ export default async function RootLayout({
   const themeStyle = themeCss(current ? getTheme() : DEFAULT_THEME);
   const tenantSlug = current ? current.tenant.slug : "";
   const schedulingMode = current ? getSchedulingMode() : "appointments";
+  // Single cheap KV read (never the full getSetupSummary()) — safe to run on
+  // every page. Guarded on `current` (not just `user`) because isSetupDismissed
+  // touches the tenant-scoped `db` proxy, which throws when no tenant is
+  // resolved (e.g. a signed-in multi-account user still on /select-account).
+  const showSetup = current ? !isSetupDismissed() : false;
   return (
     <html lang="en" className={FONT_VARS}>
       <body>
@@ -235,6 +241,7 @@ export default async function RootLayout({
                 activeTenantId={activeTenantId}
                 tenantSlug={tenantSlug}
                 schedulingMode={schedulingMode}
+                showSetup={showSetup}
                 user={
                   user
                     ? {

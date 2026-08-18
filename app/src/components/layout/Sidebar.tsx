@@ -38,6 +38,7 @@ import {
   Salad,
   Send,
   Package as PackageIcon,
+  Rocket,
   Settings as SettingsIcon,
   ShoppingBag,
   Smartphone,
@@ -82,6 +83,8 @@ type NavLink = {
   exact?: boolean;
   /** When set, the label is taken from the active venue vocabulary. */
   labelKey?: keyof Vocab;
+  /** Show a small nudge dot at the row's right edge. */
+  dot?: boolean;
 };
 type NavGroup = {
   label: string;
@@ -98,7 +101,10 @@ type NavSection = { heading?: string; items: NavEntry[] };
 
 const NAV: NavSection[] = [
   {
-    items: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }],
+    items: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/setup", label: "Set up", icon: Rocket, adminOnly: true, dot: true },
+    ],
   },
   {
     heading: "Clients",
@@ -210,6 +216,7 @@ export function Sidebar({
   schedulingMode,
   logoSrc,
   businessName,
+  showSetup,
   open = false,
   onClose,
 }: {
@@ -220,6 +227,7 @@ export function Sidebar({
   schedulingMode: "appointments" | "timetable";
   logoSrc: string | null;
   businessName: string;
+  showSetup: boolean;
   open?: boolean;
   onClose?: () => void;
 }) {
@@ -240,7 +248,8 @@ export function Sidebar({
   const linkAllowed = (l: NavLink) =>
     (!l.adminOnly || isAdmin) &&
     (!l.tenants || l.tenants.includes(tenantSlug)) &&
-    (!l.mode || l.mode === schedulingMode);
+    (!l.mode || l.mode === schedulingMode) &&
+    (l.href !== "/setup" || showSetup);
   const filterEntry = (e: NavEntry): NavEntry | null => {
     if (isGroup(e)) {
       if (e.adminOnly && !isAdmin) return null;
@@ -304,6 +313,19 @@ export function Sidebar({
         )}
         <Icon size={indent ? 15 : 16} strokeWidth={1.75} />
         <span>{item.labelKey ? vocab[item.labelKey] : item.label}</span>
+        {item.dot && (
+          <span
+            aria-hidden
+            style={{
+              marginLeft: "auto",
+              width: 7,
+              height: 7,
+              borderRadius: "50%",
+              background: "var(--warning, #f59e0b)",
+              flexShrink: 0,
+            }}
+          />
+        )}
       </Link>
     );
   }

@@ -24,6 +24,7 @@ export function AppShell({
   vocab,
   logoSrc,
   businessName,
+  showSetup,
   children,
 }: {
   user: SidebarUser | null;
@@ -34,6 +35,7 @@ export function AppShell({
   vocab: Vocab;
   logoSrc: string | null;
   businessName: string;
+  showSetup: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -63,6 +65,7 @@ export function AppShell({
           schedulingMode={schedulingMode}
           logoSrc={logoSrc}
           businessName={businessName}
+          showSetup={showSetup}
           open={navOpen}
           onClose={() => setNavOpen(false)}
         />
