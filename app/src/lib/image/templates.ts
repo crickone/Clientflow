@@ -3403,6 +3403,14 @@ export function drawLogoOverlay(
   }
   ctx.save();
   ctx.globalAlpha = 0.92;
+  // Soft dark drop-shadow, rendered from the logo's own alpha: tenant logos
+  // are typically white-on-transparent, which disappears entirely against the
+  // bright photographic backgrounds AI generation favours (measured: Renova's
+  // logo is 255/255 luminance). The shadow gives it contrast on light imagery
+  // and stays near-invisible on dark grounds where the logo already reads.
+  ctx.shadowColor = "rgba(0, 0, 0, 0.55)";
+  ctx.shadowBlur = Math.max(4, Math.round(drawH * 0.22));
+  ctx.shadowOffsetY = Math.max(1, Math.round(drawH * 0.05));
   ctx.drawImage(logo, width - margin - drawW, height - margin - drawH, drawW, drawH);
   ctx.restore();
 }
