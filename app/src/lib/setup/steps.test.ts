@@ -60,7 +60,7 @@ const VOCAB = { services: "Classes", members: "Members" } as any;
   const servicesRow = full.steps.find((s) => s.id === "services")!;
   assert.equal(servicesRow.title, "Classes", "labelKey services → vocab.services");
   const clientsRow = full.steps.find((s) => s.id === "clients")!;
-  assert.ok(clientsRow.title.includes("Members"), "labelKey members → vocab.members");
+  assert.ok(clientsRow.title.includes("members"), "labelKey members → vocab.members, lowercased mid-sentence (codebase convention)");
 
   console.log("steps.test.ts: all assertions passed");
 })();

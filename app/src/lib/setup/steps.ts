@@ -1,9 +1,8 @@
 import "server-only";
-import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getCurrentTenant } from "@/lib/db/tenant";
 import { controlSqlite } from "@/lib/db/control";
-import { readKey, setKey, getBrandingLogoFilename, getVenueType, getSchedulingMode } from "@/lib/settings";
+import { readKey, setKey, getBrandingLogoFilename, getVenueType } from "@/lib/settings";
 import { getBusinessProfile, isBriefComplete } from "@/lib/businessProfile";
 import { isEmailConfigured } from "@/lib/email";
 import { isWhatsAppConfigured } from "@/lib/whatsapp/config";
@@ -73,7 +72,7 @@ export function summarizeSetup(
   const steps: SetupStepStatus[] = defs.map((d) => ({
     ...d,
     title: d.labelKey === "services" ? vocab.services
-         : d.labelKey === "members" ? `Import your ${vocab.members}`
+         : d.labelKey === "members" ? `Import your ${vocab.members.toLowerCase()}`
          : d.title,
     done: detections[d.id] === true,
     skipped: !detections[d.id] && skips[d.id] === true,
