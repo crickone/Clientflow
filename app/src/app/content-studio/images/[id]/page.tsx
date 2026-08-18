@@ -7,6 +7,7 @@ import { getCarousel } from "@/lib/image/carousels";
 import { listLibraryAssets } from "@/lib/image/library";
 import { getBrandFontIds } from "@/lib/settings";
 import { getBusinessProfile } from "@/lib/businessProfile";
+import { getChromeLogoSrc } from "@/lib/branding";
 import { isImageGenConfigured } from "@/lib/ai/image/falClient";
 import { ImageDesigner } from "@/components/content-studio/ImageDesigner";
 
@@ -62,6 +63,8 @@ export default function ImageDesignPage({
         defaultBodyFontId={brandFonts.body}
         brand={brand}
         imageGenEnabled={isImageGenConfigured()}
+        logoUrl={getChromeLogoSrc()}
+        initialShowLogo={design.showLogo}
       />
     </>
   );

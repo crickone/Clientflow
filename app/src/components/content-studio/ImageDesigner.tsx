@@ -35,6 +35,7 @@ import type {
 } from "@/lib/db/schema";
 import {
   CATEGORIES,
+  drawLogoOverlay,
   getTemplate,
   templatesByCategory,
   type Template,
@@ -87,6 +88,10 @@ interface Props {
   brand?: BrandLabels;
   /** Whether AI background generation is configured (FAL_KEY set) — gates the AI panel + related UI. */
   imageGenEnabled?: boolean;
+  /** Same-origin URL of the tenant's uploaded logo (`getChromeLogoSrc()`), or null when none is uploaded. */
+  logoUrl?: string | null;
+  /** Whether this design currently draws the logo on its slides (persisted per-design). */
+  initialShowLogo?: boolean;
 }
 
 function libraryFileUrl(filename: string) {
@@ -112,6 +117,8 @@ export function ImageDesigner({
   defaultBodyFontId = DEFAULT_BODY_FONT_ID,
   brand,
   imageGenEnabled = false,
+  logoUrl = null,
+  initialShowLogo = true,
 }: Props) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -156,6 +163,22 @@ export function ImageDesigner({
       setFontsReady(true);
     })();
   }, []);
+
+  // Tenant logo overlay — loaded once client-side (same-origin, so the export
+  // canvas stays untainted) and drawn on every slide when showLogo is on.
+  const [showLogo, setShowLogo] = useState(initialShowLogo);
+  const [logoImg, setLogoImg] = useState<HTMLImageElement | null>(null);
+  useEffect(() => {
+    if (!logoUrl) {
+      setLogoImg(null);
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = "anonymous"; // same-origin /api/branding/logo — keeps export canvases untainted
+    img.src = logoUrl;
+    img.onload = () => setLogoImg(img);
+    img.onerror = () => setLogoImg(null);
+  }, [logoUrl]);
 
   /**
    * Resolve per-slide font families for canvas. Falls back to the Renova
@@ -634,6 +657,7 @@ export function ImageDesigner({
       library,
       slideFonts(activeSlide),
       brand,
+      showLogo ? logoImg : null,
     );
     if (!blob) return;
     const url = URL.createObjectURL(blob);
@@ -670,6 +694,7 @@ export function ImageDesigner({
           library,
           slideFonts(slidesInSlot[i]),
           brand,
+          showLogo ? logoImg : null,
         );
         if (blob) {
           zip.file(`${padNumber(i + 1, 2)}-${slug}.png`, blob);
@@ -833,6 +858,28 @@ export function ImageDesigner({
               {exportingZip ? "Zipping…" : "Export all (.zip)"}
             </Button>
           )}
+          {logoUrl && (
+            <Button
+              type="button"
+              size="sm"
+              variant={showLogo ? "primary" : "outline"}
+              title="Draw your logo on every slide (preview + export)"
+              onClick={async () => {
+                const next = !showLogo;
+                setShowLogo(next); // optimistic — canvas re-renders immediately
+                try {
+                  await fetch(`/api/content-studio/carousels/${designId}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ showLogo: next }),
+                  });
+                } catch {}
+              }}
+            >
+              <ImageIcon size={14} />
+              {showLogo ? "Logo on" : "Logo off"}
+            </Button>
+          )}
           <Button variant="destructive" size="sm" onClick={deleteDesign}>
             <Trash2 size={14} />
             Delete design
@@ -938,6 +985,7 @@ export function ImageDesigner({
                   defaultHeadingFontId={defaultHeadingFontId}
                   defaultBodyFontId={defaultBodyFontId}
                   brand={brand}
+                  logo={showLogo ? logoImg : null}
                 />
               ))}
             </div>
@@ -969,6 +1017,7 @@ export function ImageDesigner({
                     defaultHeadingFontId={defaultHeadingFontId}
                     defaultBodyFontId={defaultBodyFontId}
                     brand={brand}
+                    logo={showLogo ? logoImg : null}
                   />
                   {activeSlide?.imageStatus === "generating" && (
                     <div
@@ -2216,6 +2265,7 @@ function SlideCanvas({
   defaultHeadingFontId = DEFAULT_HEADING_FONT_ID,
   defaultBodyFontId = DEFAULT_BODY_FONT_ID,
   brand,
+  logo = null,
 }: {
   slide: CarouselSlide;
   slideIdx: number;
@@ -2225,6 +2275,7 @@ function SlideCanvas({
   defaultHeadingFontId?: string;
   defaultBodyFontId?: string;
   brand?: BrandLabels;
+  logo?: HTMLImageElement | null;
 }) {
   const fontFamilies = useMemo(
     () => ({
@@ -2299,7 +2350,8 @@ function SlideCanvas({
       bgRef.current,
       fontFamilies,
     );
-  }, [slide, slideIdx, total, fontsReady, fontFamilies, tick, brand]);
+    if (logo) drawLogoOverlay(ctx, canvas.width, canvas.height, logo);
+  }, [slide, slideIdx, total, fontsReady, fontFamilies, tick, brand, logo]);
 
   const template = getTemplate(slide.templateId);
   const aspect = template?.aspectRatio ?? "1:1";
@@ -2331,6 +2383,7 @@ function SlideThumb({
   defaultHeadingFontId,
   defaultBodyFontId,
   brand,
+  logo = null,
 }: {
   slide: CarouselSlide;
   slideIdx: number;
@@ -2342,6 +2395,7 @@ function SlideThumb({
   defaultHeadingFontId?: string;
   defaultBodyFontId?: string;
   brand?: BrandLabels;
+  logo?: HTMLImageElement | null;
 }) {
   const template = getTemplate(slide.templateId);
   return (
@@ -2392,6 +2446,7 @@ function SlideThumb({
         defaultHeadingFontId={defaultHeadingFontId}
         defaultBodyFontId={defaultBodyFontId}
         brand={brand}
+        logo={logo}
       />
     </button>
   );
@@ -2422,6 +2477,7 @@ async function renderSlideToBlob(
   library: ImageLibraryAsset[],
   fontFamilies: { heading: string; body: string },
   brand?: BrandLabels,
+  logo: HTMLImageElement | null = null,
 ): Promise<Blob | null> {
   const template = getTemplate(slide.templateId);
   if (!template) return null;
@@ -2465,6 +2521,7 @@ async function renderSlideToBlob(
     bg,
     fontFamilies,
   );
+  if (logo) drawLogoOverlay(ctx, canvas.width, canvas.height, logo);
 
   return new Promise<Blob | null>((resolve) => {
     canvas.toBlob((b) => resolve(b), "image/png");

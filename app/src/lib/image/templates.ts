@@ -3377,3 +3377,32 @@ export function templatesByCategory(
 ): Template[] {
   return TEMPLATES.filter((t) => t.category === category);
 }
+
+/**
+ * Draw the tenant's uploaded logo bottom-right on a rendered slide. Called by
+ * the canvas renderers AFTER template.render — both the live preview and the
+ * PNG export — never by templates themselves, so every template gets it from
+ * one shared implementation.
+ */
+export function drawLogoOverlay(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  logo: HTMLImageElement,
+) {
+  const nw = logo.naturalWidth || logo.width;
+  const nh = logo.naturalHeight || logo.height;
+  if (!nw || !nh) return;
+  const margin = Math.round(height * 0.04);
+  let drawH = Math.round(height * 0.055);
+  let drawW = Math.round((nw / nh) * drawH);
+  const maxW = Math.round(width * 0.22);
+  if (drawW > maxW) {
+    drawW = maxW;
+    drawH = Math.round((nh / nw) * drawW);
+  }
+  ctx.save();
+  ctx.globalAlpha = 0.92;
+  ctx.drawImage(logo, width - margin - drawW, height - margin - drawH, drawW, drawH);
+  ctx.restore();
+}
