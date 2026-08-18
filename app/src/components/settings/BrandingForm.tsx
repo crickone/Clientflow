@@ -7,18 +7,22 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Input";
 import { FONT_OPTIONS } from "@/lib/image/fonts";
-import { saveBrandFontsAction } from "@/app/settings/branding/actions";
+import { saveBrandFontsAction, saveBrandImageStyleAction } from "@/app/settings/branding/actions";
 
 export function BrandingForm({
   hasLogo,
   filename,
   headingFontId,
   bodyFontId,
+  imageStyle,
+  imageStyleDefault,
 }: {
   hasLogo: boolean;
   filename: string | null;
   headingFontId: string;
   bodyFontId: string;
+  imageStyle: string;
+  imageStyleDefault: string;
 }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -43,6 +47,23 @@ export function BrandingForm({
       toast.error(err instanceof Error ? err.message : "Save failed");
     } finally {
       setSavingFonts(false);
+    }
+  }
+
+  const [style, setStyle] = useState(imageStyle);
+  const [savingStyle, setSavingStyle] = useState(false);
+
+  async function saveStyle() {
+    setSavingStyle(true);
+    try {
+      const res = await saveBrandImageStyleAction({ style });
+      if (!res.ok) throw new Error(("error" in res && res.error) || "Couldn't save.");
+      toast.success("Image style saved");
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't save.");
+    } finally {
+      setSavingStyle(false);
     }
   }
   // Bust the <img> cache when a new file is uploaded — the URL stays the
@@ -242,6 +263,40 @@ export function BrandingForm({
               )}
               {savingFonts ? "Saving…" : "Save fonts"}
             </Button>
+          </div>
+        </div>
+      </Section>
+
+      <Section title="AI image style">
+        <div style={{ display: "grid", gap: 8 }}>
+          <Label htmlFor="brand-image-style">Style prompt</Label>
+          <textarea
+            id="brand-image-style"
+            rows={3}
+            value={style}
+            onChange={(e) => setStyle(e.target.value)}
+            placeholder={imageStyleDefault}
+            style={{
+              width: "100%",
+              resize: "vertical",
+              font: "inherit",
+              fontSize: 13,
+              padding: 10,
+              borderRadius: "var(--radius)",
+              border: "1px solid var(--hairline)",
+              background: "var(--surface-1)",
+              color: "var(--text-primary)",
+            }}
+          />
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Button type="button" size="sm" onClick={saveStyle} disabled={savingStyle}>
+              {savingStyle ? <Loader2 size={14} className="spin" /> : <Check size={14} />}
+              Save style
+            </Button>
+            <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+              The look-and-feel half of every AI post image prompt. Leave blank
+              to use the default shown above.
+            </span>
           </div>
         </div>
       </Section>
