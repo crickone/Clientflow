@@ -1,6 +1,11 @@
 "use server";
 
-import { requireAdmin } from "@/lib/auth";
+import { revalidatePath } from "next/cache";
+import { eq } from "drizzle-orm";
+
+import { getCurrentMembership, requireAdmin } from "@/lib/auth";
+import { authDb } from "@/lib/db/control";
+import { tenants } from "@/lib/db/schema";
 import { getBusinessProfile, setBusinessProfile } from "@/lib/businessProfile";
 import {
   setVenueType,
@@ -34,6 +39,18 @@ export async function saveBusinessEssentialsAction(input: {
     phone: String(input.phone ?? "").trim(),
     website: String(input.website ?? "").trim(),
   });
+
+  // Keep the control-plane registry name (account switcher + /select-account +
+  // platform admin read tenants.name) in sync with the business name — mirrors
+  // Settings → Business. Slug is never touched; requireAdmin scopes this to the
+  // caller's own current tenant.
+  const membership = getCurrentMembership();
+  if (membership && name) {
+    authDb.update(tenants).set({ name }).where(eq(tenants.id, membership.tenant.id)).run();
+  }
+  // Identity feeds the chrome (metadata, sidebar, login) resolved in the layout.
+  revalidatePath("/", "layout");
+
   return { ok: true };
 }
 
@@ -45,6 +62,8 @@ export async function ackVenueAction(input: {
   setVenueType(input.venue);
   setSchedulingMode(input.scheduling);
   ackVenue();
+  // Venue type drives sitewide nav vocabulary (getVocab(getVenueType())).
+  revalidatePath("/", "layout");
   return { ok: true };
 }
 
