@@ -25,7 +25,7 @@ import { getVocab } from "@/lib/vocabulary";
 import { isBriefComplete } from "@/lib/businessProfile";
 import { getCurrentTenant } from "@/lib/db/tenant";
 import { AssistantChat } from "@/components/messaging/AssistantChat";
-import { getSetupSummary, isSetupDismissed } from "@/lib/setup/steps";
+import { getSetupSummary, isSetupDismissed, setSetupDismissed } from "@/lib/setup/steps";
 import { getCurrentMembership } from "@/lib/auth";
 import { SetupProgressCard } from "@/components/dashboard/SetupProgressCard";
 
@@ -43,6 +43,9 @@ export default async function DashboardPage() {
   // shown (admin, not dismissed) — never unconditionally.
   const isAdmin = getCurrentMembership()?.role === "admin";
   const setup = isAdmin && !isSetupDismissed() ? getSetupSummary() : null;
+  // Once everything's resolved, latch it so the Sidebar item + dot retire too
+  // (the layout can't afford the full detection to know allResolved itself).
+  if (setup?.allResolved) setSetupDismissed(true);
 
   const [kpis, todays, activity, revenue, therapyMap] = await Promise.all([
     dashboardKpis(),

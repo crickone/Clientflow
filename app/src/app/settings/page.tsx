@@ -15,6 +15,7 @@ import {
   Bot,
   KeyRound,
   Megaphone,
+  Rocket,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardLabel } from "@/components/ui/Card";
@@ -26,6 +27,12 @@ export const dynamic = "force-dynamic";
 
 function buildSections(vocab: ReturnType<typeof getVocab>) {
   return [
+  {
+    href: "/setup",
+    icon: Rocket,
+    title: "Set-up guide",
+    desc: "Walk through everything you need to get your account fully up and running.",
+  },
   {
     href: "/settings/business",
     icon: Store,
