@@ -7,6 +7,7 @@ import { getCarousel } from "@/lib/image/carousels";
 import { listLibraryAssets } from "@/lib/image/library";
 import { getBrandFontIds } from "@/lib/settings";
 import { getBusinessProfile } from "@/lib/businessProfile";
+import { isImageGenConfigured } from "@/lib/ai/image/falClient";
 import { ImageDesigner } from "@/components/content-studio/ImageDesigner";
 
 export const dynamic = "force-dynamic";
@@ -60,6 +61,7 @@ export default function ImageDesignPage({
         defaultHeadingFontId={brandFonts.heading}
         defaultBodyFontId={brandFonts.body}
         brand={brand}
+        imageGenEnabled={isImageGenConfigured()}
       />
     </>
   );

@@ -19,6 +19,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import {
@@ -84,6 +85,8 @@ interface Props {
   defaultBodyFontId?: string;
   /** Brand labels drawn on the templates (from the account's Business Profile). */
   brand?: BrandLabels;
+  /** Whether AI background generation is configured (FAL_KEY set) — gates the AI panel + related UI. */
+  imageGenEnabled?: boolean;
 }
 
 function libraryFileUrl(filename: string) {
@@ -108,6 +111,7 @@ export function ImageDesigner({
   defaultHeadingFontId = DEFAULT_HEADING_FONT_ID,
   defaultBodyFontId = DEFAULT_BODY_FONT_ID,
   brand,
+  imageGenEnabled = false,
 }: Props) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -283,6 +287,72 @@ export function ImageDesigner({
       } catch {}
     }, 700);
   }, [name, designId, router]);
+
+  // Poll while any slide's AI background is generating — the detached server
+  // queue flips image_status/backgroundAssetId as each image completes. Merge
+  // ONLY the generation-owned fields; backgroundAssetId only while the local
+  // slide is still 'generating' (a manual pick mid-flight wins). These fields
+  // are NOT in the auto-save snapshot, so polling never fights the debounce.
+  const libraryRef = useRef(library);
+  useEffect(() => {
+    libraryRef.current = library;
+  }, [library]);
+  const anyGenerating = slides.some((s) => s.imageStatus === "generating");
+  useEffect(() => {
+    if (!anyGenerating) return;
+    let stopped = false;
+    const tick = async () => {
+      try {
+        const res = await fetch(`/api/content-studio/carousels/${designId}`);
+        const json = await res.json();
+        if (stopped || !res.ok || !json.ok) return;
+        const server: CarouselSlide[] = json.carousel?.slides ?? [];
+        const byId = new Map(server.map((s) => [s.id, s]));
+        // Hydrate newly-generated assets we don't have locally yet.
+        const known = new Set(libraryRef.current.map((a) => a.id));
+        const missing = Array.from(
+          new Set(
+            server
+              .map((s) => s.backgroundAssetId)
+              .filter((id): id is number => id != null && !known.has(id)),
+          ),
+        );
+        for (const id of missing) {
+          try {
+            const ares = await fetch(`/api/content-studio/image-library/${id}`);
+            const ajson = await ares.json();
+            if (!stopped && ares.ok && ajson.ok && ajson.asset) {
+              setLibrary((prev) =>
+                prev.some((a) => a.id === ajson.asset.id) ? prev : [ajson.asset, ...prev],
+              );
+            }
+          } catch {}
+        }
+        if (stopped) return;
+        setSlides((prev) =>
+          prev.map((s) => {
+            const sv = byId.get(s.id);
+            if (!sv) return s;
+            const patch: Partial<CarouselSlide> = {
+              imageStatus: sv.imageStatus,
+              imageError: sv.imageError,
+              imagePrompt: sv.imagePrompt,
+            };
+            if (s.imageStatus === "generating" && sv.backgroundAssetId != null) {
+              patch.backgroundAssetId = sv.backgroundAssetId;
+            }
+            return { ...s, ...patch };
+          }),
+        );
+      } catch {}
+    };
+    const iv = setInterval(tick, 2500);
+    tick();
+    return () => {
+      stopped = true;
+      clearInterval(iv);
+    };
+  }, [anyGenerating, designId]);
 
   async function addSlide() {
     setActionError(null);
@@ -673,7 +743,7 @@ export function ImageDesigner({
               name.trim() ||
               ""
             }
-            onGenerated={(newSlides) => {
+            onGenerated={(newSlides, images) => {
               lastSavedRef.current = {};
               setSlides(newSlides);
               // The carousel lives in its carousel slot — switch the view to the
@@ -689,6 +759,9 @@ export function ImageDesigner({
               setActiveCategory("carousels");
               setActiveIdx(0);
               router.refresh();
+              if (images && images.queued > 0) {
+                toast.success(`Generating ${images.queued} AI backgrounds — they'll appear as they finish.`);
+              }
             }}
           />
           {slidesInSlot.length > 0 && (
@@ -851,7 +924,13 @@ export function ImageDesigner({
                   justifyContent: "center",
                 }}
               >
-                <div style={{ maxWidth: previewMaxWidth, width: "100%" }}>
+                <div
+                  style={{
+                    maxWidth: previewMaxWidth,
+                    width: "100%",
+                    position: "relative",
+                  }}
+                >
                   <SlideCanvas
                     slide={activeSlide}
                     slideIdx={activeIdx}
@@ -862,6 +941,31 @@ export function ImageDesigner({
                     defaultBodyFontId={defaultBodyFontId}
                     brand={brand}
                   />
+                  {activeSlide?.imageStatus === "generating" && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 10,
+                        right: 10,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        letterSpacing: "0.04em",
+                        padding: "4px 10px",
+                        borderRadius: 999,
+                        background: "rgba(10,10,10,0.72)",
+                        color: "#fff",
+                      }}
+                    >
+                      <RefreshCw
+                        size={11}
+                        style={{ animation: "spin 1s linear infinite" }}
+                      />
+                      Generating image…
+                    </div>
+                  )}
                 </div>
               </div>
             )
@@ -1359,6 +1463,22 @@ export function ImageDesigner({
             </p>
           </div>
 
+          {imageGenEnabled && activeSlide && (
+            <div>
+              <Label>AI background</Label>
+              <AiImagePanel
+                slide={activeSlide}
+                designId={designId}
+                onAsset={(asset) =>
+                  setLibrary((prev) =>
+                    prev.some((a) => a.id === asset.id) ? prev : [asset, ...prev],
+                  )
+                }
+                onSlidePatch={updateActiveSlide}
+              />
+            </div>
+          )}
+
           <div>
             <Label>Background photo</Label>
             <div
@@ -1765,7 +1885,10 @@ function GenerateCarouselButton({
   designId: number;
   slotKey: string;
   defaultTopic: string;
-  onGenerated: (newSlides: CarouselSlide[]) => void;
+  onGenerated: (
+    newSlides: CarouselSlide[],
+    images?: { queued: number; estCents: number },
+  ) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [topic, setTopic] = useState(defaultTopic);
@@ -1813,7 +1936,7 @@ function GenerateCarouselButton({
         throw new Error("Generator returned no slides.");
       }
       setOpen(false);
-      onGenerated(newSlides as CarouselSlide[]);
+      onGenerated(newSlides as CarouselSlide[], json.images);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Couldn't generate the carousel.",
@@ -1902,6 +2025,126 @@ function GenerateCarouselButton({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * Per-slide AI background controls: prompt textarea (prefilled with the
+ * stored prompt), Generate/Regenerate via the sync slide-image route, cost
+ * hint, and failed-state retry. Rendered only when imageGenEnabled.
+ */
+function AiImagePanel({
+  slide,
+  designId,
+  onAsset,
+  onSlidePatch,
+}: {
+  slide: CarouselSlide;
+  designId: number;
+  onAsset: (asset: ImageLibraryAsset) => void;
+  onSlidePatch: (patch: Partial<CarouselSlide>) => void;
+}) {
+  const [prompt, setPrompt] = useState(slide.imagePrompt ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPrompt(slide.imagePrompt ?? "");
+    setError(null);
+  }, [slide.id, slide.imagePrompt]);
+
+  const generating = slide.imageStatus === "generating";
+  const failed = slide.imageStatus === "failed";
+
+  async function generate() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/content-studio/carousels/${designId}/slides/${slide.id}/image`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: prompt.trim() || null }),
+        },
+      );
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.error || "Image generation failed.");
+      if (json.asset) onAsset(json.asset as ImageLibraryAsset);
+      onSlidePatch({
+        backgroundAssetId: json.slide?.backgroundAssetId ?? json.asset?.id ?? null,
+        imageStatus: "ready",
+        imageError: null,
+        imagePrompt: json.slide?.imagePrompt ?? prompt,
+      });
+      setPrompt(json.slide?.imagePrompt ?? prompt);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Image generation failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      style={{
+        border: "1px solid var(--hairline)",
+        borderRadius: "var(--radius)",
+        padding: 14,
+        background: "var(--surface-1)",
+        display: "grid",
+        gap: 10,
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)" }}>
+          AI background
+        </span>
+        <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>≈ €0.04 / image</span>
+      </div>
+      <Textarea
+        rows={3}
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+        placeholder="Describe the scene — leave as-is to reuse the last prompt"
+        style={{ fontSize: 12 }}
+      />
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <Button type="button" size="sm" onClick={generate} disabled={busy || generating}>
+          <Sparkles size={14} />
+          {busy
+            ? "Generating…"
+            : slide.backgroundAssetId != null
+              ? "Regenerate"
+              : "Generate"}
+        </Button>
+        {generating && (
+          <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+            Generating in the background…
+          </span>
+        )}
+      </div>
+      {(error || failed) && (
+        <div style={{ fontSize: 12, color: "var(--danger, #dc2626)" }}>
+          {error ?? slide.imageError ?? "Image generation failed."}{" "}
+          <button
+            type="button"
+            onClick={generate}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              color: "inherit",
+              textDecoration: "underline",
+              cursor: "pointer",
+              font: "inherit",
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
