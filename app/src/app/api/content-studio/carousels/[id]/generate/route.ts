@@ -10,6 +10,11 @@ import {
 } from "@/lib/image/carousels";
 import { generateCarouselSlides } from "@/lib/ai/generateCarousel";
 import { AiCapError } from "@/lib/ai/usage";
+import { isImageGenConfigured, IMAGE_COST_CENTS } from "@/lib/ai/image/falClient";
+import { buildImagePrompt, defaultImageStyle, fallbackScene } from "@/lib/ai/image/prompt";
+import { getBrandImageStyle } from "@/lib/settings";
+import { getBusinessProfile } from "@/lib/businessProfile";
+import { queueSlideImages, type SlideImageJob } from "@/lib/image/autoImages";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -102,9 +107,23 @@ export async function POST(
     deleteSlot(carouselId, slotKey);
   }
 
+  const imageGen = isImageGenConfigured();
+  const houseStyle = imageGen
+    ? (getBrandImageStyle() ?? defaultImageStyle(getBusinessProfile()))
+    : null;
+  const jobs: SlideImageJob[] = [];
+
   for (let i = 0; i < result.slides.length; i++) {
     const slide = result.slides[i];
-    addSlide({
+    const prompt = houseStyle
+      ? buildImagePrompt({
+          houseStyle,
+          scene:
+            slide.image?.trim() ||
+            fallbackScene({ heading: slide.heading, body: slide.body }),
+        })
+      : null;
+    const row = addSlide({
       carouselSetId: carouselId,
       slotKey,
       templateId: slide.template,
@@ -114,8 +133,13 @@ export async function POST(
       // Caption belongs to the carousel as a whole — store it on slide[0]
       caption: i === 0 ? result.caption : "",
       accentColor: previousAccent,
+      imagePrompt: prompt,
+      imageStatus: prompt ? "generating" : null,
     });
+    if (prompt) jobs.push({ slideId: row.id, prompt, aspectRatio: "1:1" });
   }
+
+  if (jobs.length > 0) queueSlideImages(tenantId, jobs);
 
   db.update(schema.carouselSets)
     .set({ updatedAt: new Date() })
@@ -126,5 +150,6 @@ export async function POST(
     ok: true,
     carousel: getCarousel(carouselId),
     usage: result.usage,
+    images: { queued: jobs.length, estCents: jobs.length * IMAGE_COST_CENTS },
   });
 }
