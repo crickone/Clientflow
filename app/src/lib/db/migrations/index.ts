@@ -82,13 +82,32 @@ export function runMigrations(sqlite: BetterSqlite3, migrations: Migration[]): v
     // original error — so a migration that fails partway through `up()`
     // (including any CREATE/ALTER it already ran) leaves the DB exactly as
     // it was, and its id is never inserted.
+    //
+    // Re-checking applied-ness INSIDE the transaction (on top of the cheap
+    // `applied` set check above) matters under concurrency: two processes can
+    // both read an empty schema_migrations before either commits — e.g.
+    // `next build`'s parallel page-data workers each bootstrapping a fresh
+    // control.db in the Docker builder (deploy e492f8a9 failed exactly this
+    // way). The loser of the lock race re-reads after the winner committed
+    // and skips instead of double-applying.
     const applyOne = sqlite.transaction(() => {
+      const already = sqlite
+        .prepare("SELECT 1 FROM schema_migrations WHERE id = ?")
+        .get(migration.id);
+      if (already) return;
       migration.up(sqlite);
       insertApplied.run(migration.id, Date.now());
     });
 
     try {
-      applyOne();
+      // BEGIN IMMEDIATE, not the default deferred BEGIN: with deferred, two
+      // connections that both hold read locks and both try to upgrade to
+      // write hit SQLite's upgrade deadlock, which returns SQLITE_BUSY
+      // instantly WITHOUT consulting the busy handler — busy_timeout never
+      // gets a say. IMMEDIATE takes the write lock up front, so the second
+      // connection just waits out busy_timeout (15s on both planes) while
+      // the first finishes, then re-checks and no-ops.
+      applyOne.immediate();
     } catch (err) {
       console.error(
         `[db] migration ${migration.id} failed — rolled back and left unapplied, stopping:`,
