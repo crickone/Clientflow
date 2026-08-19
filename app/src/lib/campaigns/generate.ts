@@ -118,7 +118,7 @@ async function generateRaw(meter: MeterContext, formatRules: string, prompt: str
 
 type EmailAngle = "announce" | "proof" | "last_chance";
 
-function emailAngleFromTitle(title: string): EmailAngle {
+export function emailAngleFromTitle(title: string): EmailAngle {
   const t = title.toLowerCase();
   if (t.includes("proof")) return "proof";
   if (t.includes("last")) return "last_chance";
@@ -224,7 +224,10 @@ export async function generateAsset(
         },
         meter,
       );
-      return { title: subject, body: draft.content };
+      // title stays the stable angle label ("Email — Proof") — emailAngleFromTitle depends on
+      // it surviving regeneration; the generated subject lives in body alongside content (mirrors
+      // the social branch's body-JSON), and materialise (Task 4) parses {subject, content} from it.
+      return { title: asset.title, body: JSON.stringify({ subject, content: draft.content }) };
     }
 
     default: {
