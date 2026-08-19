@@ -194,6 +194,12 @@ function materialiseEmail(asset: CampaignAsset, campaign: Campaign, tenantId: nu
  * rather than throwing, so the caller's approve can always proceed.
  */
 export function materialiseAsset(asset: CampaignAsset, campaign: Campaign, tenantId: number): MaterialiseResult | null {
+  // Already materialised (e.g. a redraft-then-reapprove path) — never create a
+  // second real record or re-spend image money; return the existing link.
+  if (asset.externalId != null && asset.externalKind != null) {
+    return { externalKind: asset.externalKind, externalId: asset.externalId };
+  }
+
   try {
     switch (asset.kind) {
       case "blog":

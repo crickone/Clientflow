@@ -416,6 +416,25 @@ export function approveCampaignAssetTool(ctx: ToolContext, input: Record<string,
     return { text: JSON.stringify({ error: `"${asset.title}" hasn't been drafted yet — call draft_campaign_asset first.` }) };
   }
 
+  // Idempotent: never re-materialise an already-approved asset (would duplicate
+  // the real record + re-spend AI money on image generation).
+  if (asset.status === "approved") {
+    const remaining = nextPendingAsset(listAssets(campaignId));
+    return {
+      text: JSON.stringify({
+        result: `"${asset.title}" is already approved — no changes made.`,
+        campaignId,
+        assetId: asset.id,
+        approved: true,
+        alreadyApproved: true,
+        externalKind: asset.externalKind ?? null,
+        externalId: asset.externalId ?? null,
+        nextAsset: remaining ? { id: remaining.id, kind: remaining.kind, title: remaining.title } : null,
+        campaignStatus: campaign.status,
+      }),
+    };
+  }
+
   const materialised = materialiseAsset(asset, campaign, ctx.tenantId);
   approveAsset(asset.id, materialised ?? undefined);
 

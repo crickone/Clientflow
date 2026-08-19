@@ -369,6 +369,88 @@ const requireLocal = createRequire(import.meta.url);
     const launchUnknown = JSON.parse(runWithTenant(tid, () => launchCampaignTool(ctx, { campaignId: 9_999_999 })).text);
     assert.ok(launchUnknown.error, "launch_campaign errors cleanly for an unknown campaignId");
 
+    // ── (i-regression) Idempotent approve + materialise — re-approving an
+    // already-approved email asset must never create a duplicate email_campaign
+    // record nor re-spend AI money on image generation. Create a fresh campaign,
+    // draft an email asset, approve it (materialising it), count the
+    // email_campaigns rows, then approve again and assert no new rows were
+    // created + the response carries alreadyApproved: true. ──
+    const regressionCampaign = JSON.parse(
+      runWithTenant(tid, () =>
+        createCampaignTool(ctx, { name: "Regression Test Campaign", offer: "50% off" }),
+      ).text,
+    );
+    assert.ok(!regressionCampaign.error, "regression test: create_campaign succeeds");
+    const regCampaignId = regressionCampaign.campaignId as number;
+
+    // Find an email asset to draft and approve.
+    const regAssets = runWithTenant(tid, () => listAssets(regCampaignId));
+    const regEmailAsset = regAssets.find((a) => a.kind === "email")!;
+    assert.ok(regEmailAsset, "regression test: campaign has an email asset");
+
+    // Draft the email asset.
+    const regDraft = JSON.parse(
+      (await runWithTenant(tid, async () => draftCampaignAssetTool(ctx, { campaignId: regCampaignId, assetId: regEmailAsset.id }))).text,
+    );
+    assert.ok(!regDraft.error, "regression test: draft_campaign_asset succeeds");
+
+    // Count email_campaigns rows before first approval.
+    const countBeforeFirstApprove = runWithTenant(tid, () => {
+      const { db: db2 } = requireLocal("../db") as typeof import("../db");
+      const { emailCampaigns } = requireLocal("../db/schema") as typeof import("../db/schema");
+      return db2.select({ id: emailCampaigns.id }).from(emailCampaigns).all().length;
+    });
+
+    // First approval: materialises to a real email_campaigns row.
+    const regApprove1 = JSON.parse(
+      runWithTenant(tid, () => approveCampaignAssetTool(ctx, { campaignId: regCampaignId, assetId: regEmailAsset.id })).text,
+    );
+    assert.ok(!regApprove1.error && regApprove1.approved, "regression test: first approval succeeds");
+    assert.equal(regApprove1.externalKind, "email_campaign", "regression test: first approval materialised to an email_campaign");
+    assert.ok(
+      typeof regApprove1.externalId === "number" && regApprove1.externalId > 0,
+      "regression test: first approval captures the externalId",
+    );
+
+    const countAfterFirstApprove = runWithTenant(tid, () => {
+      const { db: db2 } = requireLocal("../db") as typeof import("../db");
+      const { emailCampaigns } = requireLocal("../db/schema") as typeof import("../db/schema");
+      return db2.select({ id: emailCampaigns.id }).from(emailCampaigns).all().length;
+    });
+    assert.equal(
+      countAfterFirstApprove,
+      countBeforeFirstApprove + 1,
+      "regression test: first approval created exactly one email_campaigns row",
+    );
+
+    // Second approval (re-approval): must be idempotent — no new rows, no re-spend.
+    const regApprove2 = JSON.parse(
+      runWithTenant(tid, () => approveCampaignAssetTool(ctx, { campaignId: regCampaignId, assetId: regEmailAsset.id })).text,
+    );
+    assert.ok(!regApprove2.error && regApprove2.approved, "regression test: second approval succeeds");
+    assert.equal(regApprove2.alreadyApproved, true, "regression test: second approval response carries alreadyApproved: true");
+    assert.equal(
+      regApprove2.externalId,
+      regApprove1.externalId,
+      "regression test: second approval returns the same externalId as first",
+    );
+    assert.equal(
+      regApprove2.externalKind,
+      "email_campaign",
+      "regression test: second approval returns the same externalKind",
+    );
+
+    const countAfterSecondApprove = runWithTenant(tid, () => {
+      const { db: db2 } = requireLocal("../db") as typeof import("../db");
+      const { emailCampaigns } = requireLocal("../db/schema") as typeof import("../db/schema");
+      return db2.select({ id: emailCampaigns.id }).from(emailCampaigns).all().length;
+    });
+    assert.equal(
+      countAfterSecondApprove,
+      countAfterFirstApprove,
+      "regression test: second approval created NO new email_campaigns rows — idempotent",
+    );
+
     // ── (j) summarizeToolAction — human strings for the three writes. Content
     // (not exact punctuation) is what's asserted: the campaign/asset name
     // appears and the phrasing matches the action. Note: create_campaign's
