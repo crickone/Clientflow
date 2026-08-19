@@ -139,6 +139,11 @@ const TOOL_LABEL: Record<string, string> = {
   send_whatsapp: "Sending WhatsApp",
   set_lead_stage: "Updating pipeline stage",
   log_lead_touch: "Logging a touch",
+  plan_campaign: "Planning the campaign",
+  create_campaign: "Creating the campaign",
+  draft_campaign_asset: "Drafting…",
+  approve_campaign_asset: "Saving…",
+  launch_campaign: "Launching the campaign",
 };
 
 const DEFAULT_ENDPOINT = "/api/assistant/chat";
@@ -1049,6 +1054,7 @@ function MessageBubble({
                   onChange={(e) => setTweak(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
+                      if (busy) return;
                       e.preventDefault();
                       submitGoAgain();
                     } else if (e.key === "Escape") {

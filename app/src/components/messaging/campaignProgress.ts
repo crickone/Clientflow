@@ -159,7 +159,10 @@ export function campaignGoAgainMessage(action: ActionLike, tweak: string): strin
   }
 
   const rawTitle = typeof action.input.assetTitle === "string" ? action.input.assetTitle.trim() : "";
-  return rawTitle ? `Go again on "${rawTitle}"${suffix}.` : `Go again on that asset${suffix}.`;
+  const campaignId = action.input.campaignId ?? "";
+  const assetId = action.input.assetId ?? "";
+  const ids = campaignId && assetId ? ` (campaign ${campaignId}, asset ${assetId})` : "";
+  return rawTitle ? `Go again on "${rawTitle}"${ids}${suffix}.` : `Go again on that asset${ids}${suffix}.`;
 }
 
 /**
@@ -207,7 +210,7 @@ export function deriveCampaignProgress(events: CampaignProgressEvent[]): Campaig
     const title = typeof event.nextAsset.title === "string" ? event.nextAsset.title.trim() : "";
     const kind = typeof event.nextAsset.kind === "string" ? event.nextAsset.kind : "";
     const trackedAssets: CampaignProgressAsset[] = state.assets;
-    let idx: number = title ? trackedAssets.findIndex((a) => a.title === title) : -1;
+    let idx: number = title ? trackedAssets.findIndex((a) => a.title === title && a.status !== "done") : -1;
     if (idx < 0 && kind) idx = trackedAssets.findIndex((a) => a.kind === kind && a.status !== "done");
     if (idx < 0) continue; // can't place it — leave prior progress exactly as it was rather than guess
 

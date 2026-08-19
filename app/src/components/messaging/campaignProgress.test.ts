@@ -223,12 +223,14 @@ check(
   check("campaignGoAgainMessage (asset): contains \"Go again\"", msg.includes("Go again"));
   check("campaignGoAgainMessage (asset): quotes the asset title", msg.includes('"Blog post"'));
   check("campaignGoAgainMessage (asset): includes the tweak", msg.includes("shorter"));
+  check("campaignGoAgainMessage (asset): includes the campaignId", msg.includes("5"));
+  check("campaignGoAgainMessage (asset): includes the assetId", msg.includes("2"));
 }
 
 check(
   "campaignGoAgainMessage (asset): falls back to \"that asset\" when assetTitle is missing",
   campaignGoAgainMessage({ name: "approve_campaign_asset", input: { campaignId: 5, assetId: 2 } }, "") ===
-    "Go again on that asset.",
+    "Go again on that asset (campaign 5, asset 2).",
 );
 
 // ── deriveCampaignProgress ──────────────────────────────────────────────────
