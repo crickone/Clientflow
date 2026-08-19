@@ -1,7 +1,7 @@
 # Campaign Engine — Slice 1: the Campaign Kit (agent-built, step-approved) — Design
 
-**Date:** 2026-08-19 · **Status:** DRAFT for user approval
-**Decisions locked:** content-kit first (no public funnel yet) · conversational "ask Adonis" in the Marketing agent chat · **per-artifact Approve / Go-again** loop.
+**Date:** 2026-08-19 · **Status:** APPROVED
+**Decisions locked:** content-kit first (no public funnel yet) · conversational "ask Adonis" in the Marketing agent chat · **per-artifact Approve / Go-again** loop · engine at **`/marketing/campaigns`** (the empty "Marketing" nav slot); email marketing relabelled **"Email campaigns"** (route unchanged) · **3-email sequence** (announce → proof → last-chance) · **materialise-on-approve as drafts** in real homes, then a **"Launch"** step posts/publishes/sends the approved kit.
 
 ## Goal
 
@@ -25,7 +25,8 @@ A structured build **surfaced in the existing agent chat**, reusing its SSE + Ap
 3. **Per-artifact loop (steps 1..N).** For each artifact in order, the agent calls `draft_campaign_asset` (READ) → generates it from the Brain + the campaign offer → renders an **artifact card** (the draft) with **Approve** / **Go again**.
    - *Go again* → `draft_campaign_asset` re-runs (with the operator's optional tweak note) → new draft replaces the shown one.
    - *Approve* → `approve_campaign_asset` (WRITE, gated) stores the approved content and **materialises** it to its real home (below), then the agent advances to the next artifact.
-4. **Done.** When every artifact is approved, campaign → status `ready`. The **campaign hub** shows the whole kit.
+4. **Done drafting.** When every artifact is approved, campaign → status `ready`. Each approved asset already lives as a **draft in its real home** (CMS blog draft, Content Studio carousel, email-campaign draft) — see materialise-on-approve.
+5. **Launch (one action, at the end).** From the campaign hub (or the chat), a **"Launch campaign"** control fires the whole kit at once: **publish** the blog to the live site, **send/schedule** the 3-email sequence, and mark the socials **ready-to-post**. Social *auto-posting* needs FB App Review (deferred — for v1 "ready-to-post" = exported/queued for manual posting, clearly labelled). Launch flips the campaign `ready → active`.
 
 **Why this fits:** the agent already does draft (READ, shown in chat) → Approve-card → gated WRITE via `/api/assistant/execute`. This slice adds (a) a second **"Go again"** button on the card that re-invokes the draft tool, and (b) a **campaign** to hang the sequence + approved assets on. No new agent-loop safety surface — every persist is still an `isWriteTool` gated write.
 
@@ -43,6 +44,7 @@ All reuse the existing `ToolContext`/`ToolResult`, `runWithTenant`-wrapped execu
 - **`create_campaign`** (WRITE) — input `{ name, season, startsOn?, endsOn?, offer, assets: [{kind, title, sortOrder}] }`. Creates the `campaigns` row + the `pending` `campaign_assets` rows. Returns the campaignId + the first asset to draft.
 - **`draft_campaign_asset`** (READ) — input `{ campaignId, assetId, tweak? }`. Generates that asset's content from the Brain + the campaign offer using the right generator (below), returns the draft (persists it to the asset row as `drafted` so "Go again" has something to replace, but NOT approved). Metered. `tweak` threads the operator's "make it punchier / change the offer" note into the prompt.
 - **`approve_campaign_asset`** (WRITE) — input `{ campaignId, assetId }`. Marks the asset `approved` and **materialises** (below). When it's the last asset, flips the campaign to `ready`.
+- **`launch_campaign`** (WRITE) — input `{ campaignId }`. Only valid when `ready`. Publishes/sends the approved kit (see The Launch step); flips `ready → active`.
 
 Registration mirrors the existing marketing tools in `@/lib/assistant/tools.ts` (TOOLS + executeTool switch + WRITE_TOOLS for the two writes + summarizeToolAction). System-prompt guidance tells the agent to build **one asset at a time**, always via draft→(operator Approve/Go-again)→approve, never batch.
 
@@ -53,7 +55,7 @@ Registration mirrors the existing marketing tools in `@/lib/assistant/tools.ts` 
 | `offer` | new `meteredCreate` prompt (Grand Slam Offer from the Brain, honouring **house rules** — see below) | stays on `campaign_assets` |
 | `blog` | existing `draftBlogPost` (`agentKey:"marketing"`) | `createSiteBlogPost` + `updateBlogContent` → a CMS **blog draft** (external_kind `blog_post`) |
 | `social` | existing `generateCarouselSlides` → then the **auto-image queue we just shipped** | a `carousel_sets` row (external_kind `carousel_set`) with AI backgrounds + logo |
-| `email` | existing `draftCampaignEmail` | an `email_campaigns` **draft** row (external_kind `email_campaign`) |
+| `email` ×3 (announce → proof → last-chance) | existing `draftCampaignEmail`, one call per email with its sequence angle | one `email_campaigns` **draft** row per email (external_kind `email_campaign`) — each approved/regenerated independently |
 | `ad_copy` | new `meteredCreate` prompt (FB/IG primary-text + headline variants) | stays on `campaign_assets` |
 | `video_script` | new `meteredCreate` prompt (hook→body→CTA reel/ad script) | stays on `campaign_assets` |
 
@@ -67,13 +69,17 @@ Registration mirrors the existing marketing tools in `@/lib/assistant/tools.ts` 
 
 ## The campaign hub
 
-- **List + detail** at a marketing-campaigns route (see Open Decision 1). Detail shows the campaign (name/season/dates/offer/status) + each asset with its status and content; approved blog/social/email link out to their Content Studio / CMS / Email homes (via `external_id`); offer/ad-copy/scripts render inline with copy buttons. A "continue building" button drops the operator back into the agent chat for any `pending`/`drafted` assets.
+- **List** at `/marketing/campaigns`, **detail** at `/marketing/campaigns/[id]`. Detail shows the campaign (name/season/dates/offer/status) + each asset with its status and content; approved blog/social/email link out to their Content Studio / CMS / Email homes (via `external_id`); offer/ad-copy/scripts render inline with copy buttons. A **"Continue building"** button drops the operator back into the agent chat for any `pending`/`drafted` assets; a **"Launch campaign"** button (enabled only when `ready`) fires `launch_campaign` behind the normal approve gate. Post-launch, the hub shows what's live vs. queued-for-manual-posting.
 
-## Open decisions (need your call — folded into the plan once decided)
+## Resolved decisions
 
-1. **Route/IA naming.** `/campaigns` today = **email** marketing (`email_campaigns`). Recommend the **engine takes "Campaigns"** and email becomes a channel within it (move current UI → `/campaigns/email`, relabel nav "Email"). Low-risk but it's a live feature — confirm, or we mount the engine at `/marketing/campaigns` and leave email alone.
-2. **Artifact set / counts for v1.** Default: offer + blog + **3** social posts + 1 email + ad copy + 1 video script. Trim/adjust?
-3. **Materialise-on-approve depth.** Recommend materialising blog/social/email into their real homes on approve (above). OK, or keep everything on the campaign for v1 and add "push to Studio" later?
+1. **Route/IA.** Engine mounts at **`/marketing/campaigns`** (list) + `/marketing/campaigns/[id]` (detail), filling the existing empty **"Marketing"** nav slot (`/marketing`, Megaphone) — the `/marketing` placeholder page becomes/points at the engine. The existing email-marketing **"Campaigns"** nav group is **relabelled "Email campaigns"** (its `/campaigns` routes are unchanged — no risky move of a live feature).
+2. **Artifact set (v1), 9 assets in order:** `offer` · `blog` · `social` ×3 · `email` ×3 (announce/proof/last-chance) · `ad_copy` · `video_script`. The `plan_campaign` proposal lists them and the operator can trim before approving the plan.
+3. **Materialise-on-approve = drafts in real homes**, then **Launch** posts them (blog publish, email send/schedule, social ready-to-post). See the interaction step 5 + generators table.
+
+## The Launch step
+
+- `launch_campaign` (WRITE, gated) — only offered once the campaign is `ready` (all assets approved). Executes, per approved asset via its `external_id`: **blog** → `setPublishState(..., "published")`; **email** ×3 → move each draft to sent/scheduled (reuse the existing campaign send/schedule path — for v1 "schedule" may mean queue/mark-ready if throttled send isn't wired to a scheduler, clearly stated); **social** → mark **ready-to-post** (auto-post deferred to App Review). `offer`/`ad_copy`/`video_script` have no publish target (reference assets). Flips campaign `ready → active`; the hub shows what went live vs. what's queued for manual posting.
 
 ## Metering, tenancy, testing, rollout
 
