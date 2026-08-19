@@ -4,12 +4,21 @@
  * Zero imports — loads under the plain tsx test runner with no DB/Next
  * module graph behind it, mirrors src/lib/campaigns/plan.ts / assetBody.ts.
  *
- * This module does NOT decide tenancy — it only shapes/validates the
- * submitted fields. The route (src/app/api/campaigns/signup/route.ts) is a
- * thin wrapper: size cap → JSON.parse → isHoneypotTripped → validateSignup →
- * resolvePublicSite(host) → rateLimit → runWithTenant(upsertLead). Tenant
- * resolution lives entirely on the route side, from the request HOST — never
- * from anything in this module's input.
+ * This module does NOT decide tenancy or campaign identity — it only
+ * shapes/validates the human-entered fields (name/contact/message). The
+ * route (src/app/api/campaigns/signup/route.ts) is a thin wrapper: size cap
+ * → JSON.parse → isHoneypotTripped → rateLimit → validateSignup →
+ * verifyCampaignSignupToken → runWithTenant(upsertLead).
+ *
+ * "Fix wave 1" (closing a CRITICAL cross-tenant lead-injection hole in the
+ * original commit 89c08ad — see the Task 2 report's "Fix wave 1" section)
+ * removed `campaignSlug` from this module entirely. The route used to trust
+ * a client-supplied `campaignSlug` (paired with a host/siteSlug tenant
+ * resolution that turned out to be forgeable) to pick WHICH campaign a lead
+ * was attributed to; it's now resolved from a server-signed token
+ * (`lib/campaigns/signupToken.ts`) that the route verifies separately, so
+ * there's no campaign/tenant identifier left in the human-entered submission
+ * shape at all — a client literally cannot name one.
  */
 
 /** Fields a submission "belongs" to before validation — every value is
@@ -20,7 +29,6 @@ export interface SignupInput {
   email?: unknown;
   phone?: unknown;
   message?: unknown;
-  campaignSlug?: unknown;
   /** Hidden honeypot field. Real visitors never see or fill it (CSS-hidden
    *  in the form); a bot that fills every input it finds trips it. */
   website?: unknown;
@@ -31,7 +39,6 @@ export interface ValidSignup {
   email: string | null;
   phone: string | null;
   message: string | null;
-  campaignSlug: string;
 }
 
 export type ValidateSignupResult =
@@ -43,10 +50,10 @@ export type ValidateSignupResult =
 // positives/negatives of a "fully correct" RFC 5322 regex.
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-// name/email/phone/campaignSlug are short, single-line fields — 200 chars is
-// generous headroom over any real value. `message` is free text a visitor
-// might actually write a paragraph into, so it gets a longer cap (matches
-// the equivalent field on the sibling public-lead endpoint, site-demo-lead's
+// name/email/phone are short, single-line fields — 200 chars is generous
+// headroom over any real value. `message` is free text a visitor might
+// actually write a paragraph into, so it gets a longer cap (matches the
+// equivalent field on the sibling public-lead endpoint, site-demo-lead's
 // `message: z.string().max(2000)`).
 const MAX_FIELD_LEN = 200;
 const MAX_MESSAGE_LEN = 2000;
@@ -69,15 +76,19 @@ export function isHoneypotTripped(body: unknown): boolean {
 }
 
 /**
- * Validate a public signup submission. Requires a non-empty `name` and a
- * non-empty `campaignSlug`, plus at least one of `email`/`phone` — a lead
- * with neither is unreachable, and the route's dedupe key is keyed on
- * `email || phone`, so it would degenerate without this. A present `email`
- * must look like an email address (format only — no MX/deliverability
- * check). Every string field is trimmed and length-capped so a hostile
- * payload can't stuff an oversized value into a DB column (the route's own
- * request-size cap already bounds the payload as a whole; this is a second,
- * per-field check that also runs standalone in tests, DB-free).
+ * Validate a public signup submission. Requires a non-empty `name`, plus at
+ * least one of `email`/`phone` — a lead with neither is unreachable, and the
+ * route's dedupe key is keyed on `email || phone`, so it would degenerate
+ * without this. A present `email` must look like an email address (format
+ * only — no MX/deliverability check). Every string field is trimmed and
+ * length-capped so a hostile payload can't stuff an oversized value into a
+ * DB column (the route's own request-size cap already bounds the payload as
+ * a whole; this is a second, per-field check that also runs standalone in
+ * tests, DB-free).
+ *
+ * Does NOT validate a campaign identifier — see this file's module doc
+ * ("Fix wave 1"): the route resolves tenant+campaign from a separately
+ * verified signed token, not from anything in this body shape.
  */
 export function validateSignup(body: unknown): ValidateSignupResult {
   if (!body || typeof body !== "object") {
@@ -89,12 +100,6 @@ export function validateSignup(body: unknown): ValidateSignupResult {
   if (!name) return { ok: false, error: "Name is required." };
   if (name.length > MAX_FIELD_LEN) {
     return { ok: false, error: "Name is too long." };
-  }
-
-  const campaignSlug = asString(obj.campaignSlug);
-  if (!campaignSlug) return { ok: false, error: "Missing campaign." };
-  if (campaignSlug.length > MAX_FIELD_LEN) {
-    return { ok: false, error: "Missing campaign." };
   }
 
   const email = asString(obj.email);
@@ -126,7 +131,6 @@ export function validateSignup(body: unknown): ValidateSignupResult {
       email: email || null,
       phone: phone || null,
       message: message || null,
-      campaignSlug,
     },
   };
 }

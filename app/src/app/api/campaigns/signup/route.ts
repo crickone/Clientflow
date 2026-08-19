@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getCampaignBySlug } from "@/lib/campaigns/store";
+import { getCampaign } from "@/lib/campaigns/store";
 import { isHoneypotTripped, validateSignup } from "@/lib/campaigns/signup";
-import { resolvePublicSite } from "@/lib/cms/resolveHost";
+import { verifyCampaignSignupToken } from "@/lib/campaigns/signupToken";
 import { runWithTenant } from "@/lib/db/tenant";
 import { upsertLead } from "@/lib/leads";
 import { clientIp, rateLimit } from "@/lib/rateLimit";
@@ -14,29 +14,42 @@ const RATE_LIMIT = 30; // requests per IP…
 const RATE_WINDOW_MS = 60 * 1000; // …per minute
 
 /**
- * Public campaign-landing signup (Campaign Engine Slice 2, Task 2). Task 3's
- * `/site/<slug>/c/<campaignSlug>` landing page POSTs here with NO API key —
- * unlike `/api/leads/inbound` (keyed integrations), a browser can't hold a
- * secret, so this endpoint proves tenancy a different way: the tenant is
- * resolved from the request's HOST via `resolvePublicSite` (the control-plane
- * `site_domains` table — the exact same trust basis the public CMS itself
- * renders on). The request body is NEVER trusted for tenant identity; it
- * carries no tenant id field at all, and `siteSlug` (used only for the
- * dev/no-mapped-host fallback) still resolves through the same
- * `resolvePublicSite` lookup rather than being taken at face value.
+ * Public campaign-landing signup (Campaign Engine Slice 2, Task 2; rewritten
+ * in "Fix wave 1" — see the Task 2 report's "Fix wave 1" section — to close a
+ * CRITICAL cross-tenant lead-injection vulnerability in commit 89c08ad).
  *
- * Once the tenant is resolved, the campaign lookup + lead write both run
- * inside `runWithTenant(site.tenantId, …)`, so a `campaignSlug` naming
- * another tenant's campaign simply isn't found — there is no row to leak
- * into or attribute a lead to. Structural guard: per-tenant DB, not a
- * runtime check.
+ * Task 3's `/site/<slug>/c/<campaignSlug>` landing page POSTs here with NO
+ * API key — unlike `/api/leads/inbound` (keyed integrations), a browser
+ * can't hold a secret. Tenancy is proven with a server-signed `token`
+ * (`lib/campaigns/signupToken.ts`): the landing page mints it at render
+ * time, encoding `{tenantId, campaignId}` and HMAC-signed with a server-only
+ * secret; this route's only job is to verify it. The request body carries no
+ * OTHER tenant/campaign identifier — not a `siteSlug`, not a `campaignSlug`
+ * — so there is nothing in client input an attacker could substitute to name
+ * a different tenant's campaign. Forging a token requires the server secret,
+ * which the client never has.
  *
- * Hardening mirrors /api/leads/inbound: request-size cap, per-IP rate-limit,
- * runWithTenant, and the same `{ok, ...}` response shape. Two things this
- * route adds that /api/leads/inbound doesn't need: a honeypot (this is a
- * public HTML form with no other bot defence — no CAPTCHA, no API key to
- * gate access at all), and the host-based tenant resolution above (in place
- * of the API-key lookup /api/leads/inbound uses instead).
+ * This replaces the original (commit 89c08ad) design, which resolved the
+ * tenant via `resolvePublicSite({host, siteParam: body.siteSlug})`. That was
+ * forgeable: `resolvePublicSite`'s dev/unmapped-host fallback searches EVERY
+ * tenant's DB for a site matching a client-supplied `siteParam`, and an
+ * attacker can trivially arrange an unmapped Host in production (e.g. the
+ * platform's own default host). POSTing a victim's `siteSlug`+`campaignSlug`
+ * against an unmapped host resolved the VICTIM tenant and wrote a lead into
+ * their CRM — a full cross-tenant write bypass, plus a slug-enumeration
+ * oracle via the distinct 400/404 responses. The "tenant comes only from the
+ * host, never client input" invariant the old code's comments claimed was
+ * false in practice. The token design removes host/slug from the trust chain
+ * entirely — this now works identically, and safely, on any host (platform
+ * default or a verified custom domain).
+ *
+ * Hardening mirrors /api/leads/inbound: request-size cap, per-IP rate-limit
+ * — moved as early as the honeypot check, BEFORE any DB read or HMAC verify,
+ * so an attacker can't dodge the throttle by sending invalid/unresolvable
+ * requests — runWithTenant, and the same `{ok, ...}` response shape. Also
+ * gates on campaign lifecycle: `status` must be `ready` or `active`, so a
+ * `building` campaign can't take sign-ups even if its token were somehow
+ * obtained early (e.g. a preview link).
  */
 export async function POST(req: NextRequest) {
   // 1. Cap the payload size before buffering it. Mirrors /api/leads/inbound:
@@ -66,26 +79,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  // 3. Validate the real fields (name, campaignSlug, at-least-one-contact,
-  //    email format, length caps — see lib/campaigns/signup.ts).
-  const validated = validateSignup(body);
-  if (!validated.ok) {
-    return NextResponse.json({ ok: false, error: validated.error }, { status: 400 });
-  }
-  const { name, email, phone, message, campaignSlug } = validated.data;
-
-  // 4. Resolve tenant+site from the HOST (prod) or body.siteSlug (dev
-  //    fallback, mirrors the public CMS's own ?site= dev path) — this is the
-  //    ONLY source of tenant identity for the whole request. There is no
-  //    tenant id field anywhere in the accepted body shape.
-  const bodyObj = body as Record<string, unknown>;
-  const siteSlugParam = typeof bodyObj.siteSlug === "string" ? bodyObj.siteSlug : null;
-  const site = resolvePublicSite({ host: req.headers.get("host"), siteParam: siteSlugParam });
-  if (!site) {
-    return NextResponse.json({ ok: false, error: "Unknown site." }, { status: 400 });
-  }
-
-  // 5. Throttle per IP so nobody can flood the pipeline / fill the disk.
+  // 3. Throttle per IP FIRST — before any DB read or HMAC verify — so
+  //    nobody can flood the pipeline / fill the disk, and an invalid or
+  //    unresolvable request still counts against the caller's budget (no
+  //    free pre-throttle scan of any kind).
   const rl = rateLimit(`campaign-signup:${clientIp(req)}`, RATE_LIMIT, RATE_WINDOW_MS);
   if (!rl.ok) {
     return NextResponse.json(
@@ -94,19 +91,42 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 6. The campaign lookup + lead upsert both run bound to the HOST-resolved
-  //    tenant (never a client-supplied one), so a campaignSlug belonging to
-  //    another tenant just isn't found here.
-  const result = await runWithTenant(site.tenantId, async () => {
-    const campaign = getCampaignBySlug(campaignSlug);
-    if (!campaign) return { notFound: true as const };
+  // 4. Validate the real fields (name, at-least-one-contact, email format,
+  //    length caps — see lib/campaigns/signup.ts). `campaignSlug` is no
+  //    longer part of this shape; the token (next step) replaces it as the
+  //    campaign identifier.
+  const validated = validateSignup(body);
+  if (!validated.ok) {
+    return NextResponse.json({ ok: false, error: validated.error }, { status: 400 });
+  }
+  const { name, email, phone, message } = validated.data;
+
+  // 5. Verify the signed token — the ONLY source of tenant+campaign identity
+  //    for the whole request. No host, no client-supplied slug of any kind.
+  const bodyObj = body as Record<string, unknown>;
+  const claim = verifyCampaignSignupToken(String(bodyObj.token ?? ""));
+  if (!claim) {
+    return NextResponse.json(
+      { ok: false, error: "Invalid or missing signup token." },
+      { status: 400 },
+    );
+  }
+
+  // 6. The campaign lookup + lead upsert both run bound to the TOKEN-resolved
+  //    tenant (never a client-supplied or host-derived one), so there is no
+  //    code path left that could write into a different tenant's DB.
+  const result = await runWithTenant(claim.tenantId, async () => {
+    const campaign = getCampaign(claim.campaignId);
+    if (!campaign) return { notFound: true } as const;
+    if (campaign.status !== "ready" && campaign.status !== "active") {
+      return { notLive: true } as const;
+    }
 
     // Stable dedupe key so a double-submit (double-click, retry after a
     // flaky network) doesn't create two leads — upsertLead is idempotent on
     // (source, sourceLeadId). validateSignup already guarantees email||phone
-    // is non-empty, so this key is always meaningful (never
-    // "landing:<slug>:").
-    const sourceLeadId = `landing:${campaignSlug}:${(email || phone || "").toLowerCase()}`;
+    // is non-empty, so this key is always meaningful (never "landing:<id>:").
+    const sourceLeadId = `landing:${claim.campaignId}:${(email || phone || "").toLowerCase()}`;
 
     upsertLead({
       source: "landing",
@@ -116,14 +136,19 @@ export async function POST(req: NextRequest) {
       email: email || null,
       phone: phone || null,
       notes: message || null,
-      rawPayload: body,
     });
 
-    return { notFound: false as const };
+    return { ok: true } as const;
   });
 
-  if (result.notFound) {
+  if ("notFound" in result) {
     return NextResponse.json({ ok: false, error: "Campaign not found." }, { status: 404 });
+  }
+  if ("notLive" in result) {
+    return NextResponse.json(
+      { ok: false, error: "This campaign isn't accepting sign-ups yet." },
+      { status: 400 },
+    );
   }
 
   return NextResponse.json({ ok: true });
