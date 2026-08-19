@@ -634,6 +634,62 @@ const requireLocal = createRequire(import.meta.url);
       "regression test: second approval created NO new email_campaigns rows — idempotent",
     );
 
+    // ── (i4-regression) Approved assets can't be regenerated — closes
+    // stale-content path. Once an asset is approved (materialised + status
+    // flipped), calling draft_campaign_asset again must reject it, keeping
+    // status=approved and body unchanged. Create a fresh campaign, draft+approve
+    // an email asset (materialised), then call draft_campaign_asset AGAIN on
+    // that approved asset and assert: (a) error returned (already approved /
+    // can't regenerate), (b) asset status STILL "approved" (not flipped back to
+    // drafted), (c) asset body UNCHANGED (no regeneration ran). ──
+    const noRedraftCampaign = JSON.parse(
+      runWithTenant(tid, () =>
+        createCampaignTool(ctx, { name: "No-Redraft Test Campaign", offer: "25% off" }),
+      ).text,
+    );
+    assert.ok(!noRedraftCampaign.error, "no-redraft test: create_campaign succeeds");
+    const noRedraftCampaignId = noRedraftCampaign.campaignId as number;
+
+    const noRedraftAssets = runWithTenant(tid, () => listAssets(noRedraftCampaignId));
+    const noRedraftEmailAsset = noRedraftAssets.find((a) => a.kind === "email")!;
+    assert.ok(noRedraftEmailAsset, "no-redraft test: campaign has an email asset");
+
+    // Draft the email asset.
+    const noRedraftInitialDraft = JSON.parse(
+      (await runWithTenant(tid, async () => draftCampaignAssetTool(ctx, { campaignId: noRedraftCampaignId, assetId: noRedraftEmailAsset.id }))).text,
+    );
+    assert.ok(!noRedraftInitialDraft.error, "no-redraft test: initial draft_campaign_asset succeeds");
+    const initialBody = noRedraftInitialDraft.body as string;
+
+    // Approve the asset (materialises it).
+    const noRedraftApprove = JSON.parse(
+      runWithTenant(tid, () =>
+        approveCampaignAssetTool(ctx, { campaignId: noRedraftCampaignId, assetId: noRedraftEmailAsset.id }),
+      ).text,
+    );
+    assert.ok(!noRedraftApprove.error && noRedraftApprove.approved, "no-redraft test: approval succeeds");
+    assert.equal(noRedraftApprove.externalKind, "email_campaign", "no-redraft test: asset materialised to an email_campaign");
+
+    // Verify the asset is now approved in the DB.
+    const assetBeforeRedraft = runWithTenant(tid, () => getAsset(noRedraftEmailAsset.id));
+    assert.equal(assetBeforeRedraft?.status, "approved", "no-redraft test: asset status is approved after approval");
+    assert.equal(assetBeforeRedraft?.body, initialBody, "no-redraft test: asset body is the initial draft before redraft attempt");
+
+    // Now try to redraft the already-approved asset — should reject.
+    const noRedraftAttempt = JSON.parse(
+      (await runWithTenant(tid, async () => draftCampaignAssetTool(ctx, { campaignId: noRedraftCampaignId, assetId: noRedraftEmailAsset.id, tweak: "make it punchier" }))).text,
+    );
+    assert.ok(noRedraftAttempt.error, "no-redraft test: draft_campaign_asset rejects redrafting an approved asset");
+    assert.ok(
+      /already approved/.test(noRedraftAttempt.error) || /can't be regenerated/.test(noRedraftAttempt.error),
+      `no-redraft test: error message mentions approval/regeneration: "${noRedraftAttempt.error}"`,
+    );
+
+    // Verify the asset status is STILL approved and body is UNCHANGED.
+    const assetAfterRedraft = runWithTenant(tid, () => getAsset(noRedraftEmailAsset.id));
+    assert.equal(assetAfterRedraft?.status, "approved", "no-redraft test: asset status STILL approved after redraft rejection");
+    assert.equal(assetAfterRedraft?.body, initialBody, "no-redraft test: asset body UNCHANGED after redraft rejection");
+
     // ── (j) summarizeToolAction — human strings for the three writes. Content
     // (not exact punctuation) is what's asserted: the campaign/asset name
     // appears and the phrasing matches the action. Note: create_campaign's

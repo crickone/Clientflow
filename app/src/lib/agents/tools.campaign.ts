@@ -363,6 +363,13 @@ export async function draftCampaignAssetTool(ctx: ToolContext, input: Record<str
   if (asset.campaignId !== campaignId) {
     return { text: JSON.stringify({ error: `Asset ${assetId} does not belong to campaign ${campaignId}.` }) };
   }
+  if (asset.status === "approved") {
+    return {
+      text: JSON.stringify({
+        error: `"${asset.title}" is already approved and can't be regenerated. Edit it in its home (the blog/social/email draft it was saved to), or start a fresh campaign.`,
+      }),
+    };
+  }
 
   const tweak = input.tweak != null ? String(input.tweak).trim() || undefined : undefined;
 
