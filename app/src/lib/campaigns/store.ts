@@ -8,6 +8,7 @@ import type { Campaign, CampaignAsset } from "@/lib/db/schema";
 import {
   ASSET_ORDER,
   DEFAULT_ASSET_PLAN,
+  findApprovedLandingAsset,
   isTerminalStatus,
   nextPendingAsset,
   type AssetDef,
@@ -15,6 +16,7 @@ import {
   type AssetLike,
   type AssetStatus,
   type CampaignStatus,
+  type LandingAssetLike,
 } from "./plan";
 
 /**
@@ -27,18 +29,23 @@ import {
  * campaign list view.
  *
  * The ordering + status-plan pure helpers (DEFAULT_ASSET_PLAN,
- * nextPendingAsset, ASSET_ORDER, isTerminalStatus) live in ./plan — which has
- * zero imports, so it (and by extension store.test.ts, which only exercises
- * those two) loads under the DB-free tsx test runner — and are just
- * re-exported here for callers that only need `./store` as their one import.
+ * nextPendingAsset, ASSET_ORDER, isTerminalStatus, findApprovedLandingAsset)
+ * live in ./plan — which has zero imports, so it (and by extension
+ * store.test.ts, which only exercises the first two; plan.test.ts covers
+ * findApprovedLandingAsset directly) loads under the DB-free tsx test runner
+ * — and are just re-exported here for callers that only need `./store` as
+ * their one import (e.g. the public landing route, Campaign Engine Slice 2
+ * Task 3, which needs findApprovedLandingAsset alongside getCampaignBySlug/
+ * listAssets below).
  */
 export {
   ASSET_ORDER,
   DEFAULT_ASSET_PLAN,
+  findApprovedLandingAsset,
   isTerminalStatus,
   nextPendingAsset,
 };
-export type { AssetDef, AssetKind, AssetLike, AssetStatus, CampaignStatus };
+export type { AssetDef, AssetKind, AssetLike, AssetStatus, CampaignStatus, LandingAssetLike };
 export type { Campaign, CampaignAsset };
 
 // ── campaigns ────────────────────────────────────────────────────────────

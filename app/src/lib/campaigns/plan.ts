@@ -102,3 +102,40 @@ export function nextPendingAsset<T extends AssetLike>(assets: T[]): T | null {
 export function isTerminalStatus(status: CampaignStatus): boolean {
   return status === "complete" || status === "archived";
 }
+
+/** The minimal asset shape findApprovedLandingAsset needs — matches both a real CampaignAsset row and a bare test fixture. */
+export interface LandingAssetLike {
+  kind: AssetKind;
+  status: AssetStatus;
+}
+
+/**
+ * The public landing-page render gate (Campaign Engine Slice 2, Task 3): a
+ * campaign's `/site/<slug>/c/<campaignSlug>` route renders ONLY when BOTH
+ * hold —
+ *   1. the campaign itself is live: status is 'ready' (an approved-but-not-
+ *      launched preview) or 'active' (launched) — 'building'/'complete'/
+ *      'archived' must never render, mirroring the status check
+ *      `/api/campaigns/signup` (lib/campaigns/signupToken.ts's route) makes
+ *      independently on the same two values;
+ *   2. there is an APPROVED `landing_page` asset to render — a drafted-but-
+ *      not-yet-approved landing page (or none at all) has nothing safe to
+ *      show a public visitor, even if the campaign is otherwise live.
+ *
+ * Returns the matching asset (so the caller can parse its `body` — see
+ * ./assetBody's parseLandingBody) or `null` if either condition fails. Pure
+ * + generic (same shape as nextPendingAsset above) so it's unit-testable
+ * with plain fixtures and still returns the CALLER's full asset type (e.g. a
+ * real CampaignAsset, with `.body`) rather than just the narrow
+ * LandingAssetLike view. When more than one asset qualifies (shouldn't
+ * happen — DEFAULT_ASSET_PLAN seeds exactly one landing_page per campaign —
+ * but nothing enforces uniqueness at the DB level) this deterministically
+ * returns the first match in array order rather than throwing.
+ */
+export function findApprovedLandingAsset<T extends LandingAssetLike>(
+  campaignStatus: CampaignStatus,
+  assets: T[],
+): T | null {
+  if (campaignStatus !== "ready" && campaignStatus !== "active") return null;
+  return assets.find((a) => a.kind === "landing_page" && a.status === "approved") ?? null;
+}
