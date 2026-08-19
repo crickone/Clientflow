@@ -4,6 +4,13 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Sparkles, Send, Download, Loader2, Check, History, Plus, Trash2, MessageSquare } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
+import {
+  campaignGoAgainMessage,
+  campaignPlanEventFromActions,
+  campaignProgressEventFromResult,
+  deriveCampaignProgress,
+  type CampaignProgressEvent,
+} from "./campaignProgress";
 
 type Artifact = { url: string; filename: string; label: string };
 type Step = { label: string; done: boolean };
@@ -33,6 +40,19 @@ type Conversation = {
    * `undefined` for any conversation created there — resume is a no-op.
    */
   activeRunId?: string;
+  /**
+   * Campaign Engine Slice 1 (Task 6): a chronological log of campaign-build
+   * signal seen so far in THIS conversation — one entry per proposed
+   * create_campaign call ("plan") or executed create_campaign/
+   * approve_campaign_asset/launch_campaign result ("progress"). Folded by
+   * `deriveCampaignProgress` (@/components/messaging/campaignProgress) into
+   * the compact progress-strip render model just below the header. Plain
+   * JSON, so it round-trips through the existing localStorage persist/load
+   * effects with zero changes there; absent entirely on any conversation
+   * that predates this feature or never touched a campaign tool — reads as
+   * `undefined`, which `deriveCampaignProgress([])` renders as "no strip".
+   */
+  campaignEvents?: CampaignProgressEvent[];
 };
 
 function newId(): string {
@@ -328,6 +348,13 @@ export function AssistantChat({
             pending: actions.length ? { actions, status: "awaiting" } : m.pending,
             artifacts: mergeArtifacts(m.artifacts, arts),
           }));
+          // Campaign Engine Slice 1 (Task 6): a reload/reconnect landing
+          // exactly on a not-yet-approved create_campaign proposal still
+          // seeds the progress strip, same as the live confirm branch below.
+          if (actions.length) {
+            const planEvent = campaignPlanEventFromActions(actions);
+            if (planEvent) appendCampaignEvent(convId, planEvent);
+          }
           clearRunId();
           break;
         }
@@ -484,6 +511,13 @@ export function AssistantChat({
               steps: m.steps.map((s) => ({ ...s, done: true })),
               pending: { actions, status: "awaiting" },
             }));
+            // Campaign Engine Slice 1 (Task 6): a proposed create_campaign
+            // call is the only moment the full ordered asset list is ever
+            // visible client-side — seed (or replace) the progress-strip
+            // model from it. A no-op (returns null) for every other action,
+            // i.e. every non-campaign write in the app.
+            const planEvent = campaignPlanEventFromActions(actions);
+            if (planEvent) appendCampaignEvent(convId, planEvent);
           } else if (evt.type === "text" && evt.text) {
             // First token means tool work is done → mark all steps complete.
             patch((m) => ({
@@ -534,6 +568,19 @@ export function AssistantChat({
     );
   }
 
+  // Campaign Engine Slice 1 (Task 6): append one entry to a conversation's
+  // campaign-event log (see the `campaignEvents` doc comment on
+  // Conversation). A plain function declaration (hoisted), like patchAt
+  // above, so it's safe to call from resumeRun() even though that's defined
+  // earlier in this file — by the time either actually RUNS (both are
+  // invoked from effects/callbacks, never during the initial render), every
+  // const/function in this component body has already been initialised.
+  function appendCampaignEvent(convId: string, event: CampaignProgressEvent) {
+    setConversations((prev) =>
+      prev.map((c) => (c.id === convId ? { ...c, campaignEvents: [...(c.campaignEvents ?? []), event] } : c)),
+    );
+  }
+
   async function approve(convId: string, index: number, actions: PendingAction[]) {
     patchAt(convId, index, (m) => (m.pending ? { ...m, pending: { ...m.pending, status: "approving" } } : m));
     try {
@@ -555,6 +602,14 @@ export function AssistantChat({
       }
       const lines = data.results.map((r) => (r.ok ? `✓ ${r.text}` : `⚠️ ${r.text}`)).join("\n\n");
       const arts = data.results.flatMap((r) => (r.artifact ? [r.artifact] : []));
+      // Campaign Engine Slice 1 (Task 6): fold any executed campaign write's
+      // result into the progress-strip log — a no-op (returns null) for
+      // every non-campaign write, so this never affects any other tool.
+      for (const r of data.results) {
+        if (!r.ok) continue;
+        const progressEvent = campaignProgressEventFromResult(r.name, r.text);
+        if (progressEvent) appendCampaignEvent(convId, progressEvent);
+      }
       patchAt(convId, index, (m) => ({
         ...m,
         content: m.content + (m.content ? "\n\n" : "") + lines,
@@ -576,6 +631,31 @@ export function AssistantChat({
       content: m.content + (m.content ? "\n\n" : "") + "_Cancelled — nothing was changed._",
       pending: m.pending ? { ...m.pending, status: "cancelled" } : m.pending,
     }));
+  }
+
+  /**
+   * Campaign Engine Slice 1 (Task 6): "Go again" on a campaign plan/asset
+   * Approve-card. Deliberately does NOT call /api/assistant/execute (that
+   * would run the write) — instead it closes this card (same terminal
+   * "cancelled" status cancelPending uses — nothing here was approved
+   * either) and sends a normal chat message down the EXISTING send() path,
+   * containing the literal words "Go again" the Marketing agent's own
+   * playbook (specialists/marketing.ts) already anchors on. This was the
+   * simplest-reliable option from the task brief: zero new endpoint, zero
+   * new SSE frame type, reuses every bit of send()'s existing streaming/
+   * durable-run machinery untouched. Message construction (which asset,
+   * which campaign, quoting the tweak) lives in the pure
+   * campaignGoAgainMessage helper — see campaignProgress.ts.
+   */
+  function goAgain(convId: string, index: number, actions: PendingAction[], tweak: string) {
+    const action = actions.find((a) => a.name === "create_campaign" || a.name === "approve_campaign_asset");
+    if (!action) return; // the button only ever renders when one of these is present
+    patchAt(convId, index, (m) => ({
+      ...m,
+      content: m.content + (m.content ? "\n\n" : "") + "_Asked for another draft…_",
+      pending: m.pending ? { ...m.pending, status: "cancelled" } : m.pending,
+    }));
+    void send(campaignGoAgainMessage(action, tweak));
   }
 
   function newChat() {
@@ -606,6 +686,12 @@ export function AssistantChat({
     .sort((a, b) => b.updatedAt - a.updatedAt);
 
   const empty = messages.length === 0;
+  // Campaign Engine Slice 1 (Task 6): purely derived from this conversation's
+  // campaignEvents log (see the Conversation type's doc comment) — null on
+  // every chat that hasn't touched a campaign tool, which is the overwhelming
+  // majority (Sales/Operations/Communication chats, and most Marketing/
+  // Orchestrator turns too), so the strip below renders nothing for them.
+  const campaignProgress = deriveCampaignProgress(active?.campaignEvents ?? []);
   let lastUserIdx = -1;
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i].role === "user") { lastUserIdx = i; break; }
@@ -696,6 +782,56 @@ export function AssistantChat({
         </div>
       </div>
 
+      {campaignProgress && (
+        <div
+          aria-label={`Campaign progress: ${campaignProgress.assets.filter((a) => a.status === "done").length} of ${campaignProgress.assets.length} approved`}
+          style={{
+            padding: "9px 16px",
+            borderBottom: "1px solid var(--hairline)",
+            background: "var(--surface-2)",
+            display: "flex",
+            alignItems: "baseline",
+            flexWrap: "wrap",
+            gap: "3px 10px",
+          }}
+        >
+          <span
+            style={{
+              fontSize: 10.5,
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+              color: "var(--text-tertiary)",
+              fontFamily: "var(--font-mono), monospace",
+              flexShrink: 0,
+            }}
+          >
+            {campaignProgress.name}
+          </span>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", fontSize: 12.5 }}>
+            {campaignProgress.assets.map((a, idx) => (
+              <span key={`${idx}-${a.kind}`} style={{ display: "inline-flex", alignItems: "baseline" }}>
+                {idx > 0 && (
+                  <span style={{ margin: "0 8px", color: "var(--text-tertiary)", opacity: 0.5 }} aria-hidden>
+                    ·
+                  </span>
+                )}
+                <span
+                  style={{
+                    color: a.status === "current" ? "var(--accent)" : "var(--text-tertiary)",
+                    fontWeight: a.status === "current" ? 600 : 400,
+                  }}
+                >
+                  {a.title}
+                  <span style={{ marginLeft: 5 }} aria-hidden>
+                    {a.status === "done" ? "✓" : a.status === "current" ? "●" : "…"}
+                  </span>
+                </span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 14 }}>
         {empty ? (
           <div style={{ margin: "auto", textAlign: "center", maxWidth: 460 }}>
@@ -742,8 +878,10 @@ export function AssistantChat({
                 // "still working" affordance (thinking dots / caret) as a
                 // live stream.
                 streaming={(busy || resumingConvId === activeId) && i === messages.length - 1}
+                busy={busy}
                 onApprove={() => m.pending && approve(activeId, i, m.pending.actions)}
                 onCancel={() => cancelPending(activeId, i)}
+                onGoAgain={(tweak) => m.pending && goAgain(activeId, i, m.pending.actions, tweak)}
               />
             </div>
           ))
@@ -789,15 +927,37 @@ export function AssistantChat({
 function MessageBubble({
   m,
   streaming,
+  busy,
   onApprove,
   onCancel,
+  onGoAgain,
 }: {
   m: ChatMessage;
   streaming: boolean;
+  /** Global "a send() turn is in flight" flag — distinct from `streaming` (which is per-message and only true for the LAST message). Gates the Go-again/Regenerate buttons, since goAgain() routes through send(), which silently no-ops while busy. */
+  busy?: boolean;
   onApprove?: () => void;
   onCancel?: () => void;
+  /** Campaign Engine Slice 1 (Task 6): present only for a create_campaign/approve_campaign_asset pending — see `campaignAction` below. */
+  onGoAgain?: (tweak: string) => void;
 }) {
   const isUser = m.role === "user";
+  // Campaign Engine Slice 1 (Task 6): "Go again" only ever renders for a
+  // pending that is EXACTLY one campaign write — never for a plain write,
+  // and never for a batch (e.g. a delegated multi-action confirm), where
+  // "redo" has no single clear target. Every other pending renders the
+  // Approve/Cancel row completely unchanged from before this task.
+  const campaignAction =
+    m.pending && m.pending.actions.length === 1 && (m.pending.actions[0].name === "create_campaign" || m.pending.actions[0].name === "approve_campaign_asset")
+      ? m.pending.actions[0]
+      : null;
+  const [tweakOpen, setTweakOpen] = useState(false);
+  const [tweak, setTweak] = useState("");
+  function submitGoAgain() {
+    onGoAgain?.(tweak);
+    setTweakOpen(false);
+    setTweak("");
+  }
   return (
     <div style={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start" }}>
       <div
@@ -875,14 +1035,68 @@ function MessageBubble({
                 </li>
               ))}
             </ul>
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <Button variant="ghost" size="sm" onClick={onCancel} disabled={m.pending.status === "approving"}>
-                Cancel
-              </Button>
-              <Button size="sm" onClick={onApprove} loading={m.pending.status === "approving"}>
-                Approve
-              </Button>
-            </div>
+            {campaignAction && tweakOpen ? (
+              // Campaign Engine Slice 1 (Task 6): the revealed one-line tweak
+              // input — submitting sends a normal chat message down the
+              // existing send() path (see goAgain() in the parent) instead of
+              // approving; the Approve/Cancel row above never rendered this,
+              // so this branch is the ONLY new UI a non-campaign write can
+              // never reach (campaignAction is null for every one of those).
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <input
+                  autoFocus
+                  value={tweak}
+                  onChange={(e) => setTweak(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      submitGoAgain();
+                    } else if (e.key === "Escape") {
+                      e.preventDefault();
+                      setTweakOpen(false);
+                    }
+                  }}
+                  placeholder="Optional tweak — e.g. “make it punchier” (Enter to send)"
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    background: "var(--bg)",
+                    border: "1px solid var(--hairline)",
+                    borderRadius: "var(--radius)",
+                    padding: "7px 10px",
+                    color: "var(--text-primary)",
+                    fontSize: 13,
+                    fontFamily: "inherit",
+                    outline: "none",
+                  }}
+                />
+                <Button variant="ghost" size="sm" onClick={() => setTweakOpen(false)}>
+                  Back
+                </Button>
+                <Button size="sm" onClick={submitGoAgain} disabled={busy}>
+                  Regenerate
+                </Button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <Button variant="ghost" size="sm" onClick={onCancel} disabled={m.pending.status === "approving"}>
+                  Cancel
+                </Button>
+                {campaignAction && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setTweakOpen(true)}
+                    disabled={m.pending.status === "approving" || busy}
+                  >
+                    Go again
+                  </Button>
+                )}
+                <Button size="sm" onClick={onApprove} loading={m.pending.status === "approving"}>
+                  Approve
+                </Button>
+              </div>
+            )}
           </div>
         )}
         {m.artifacts.map((a) => (
