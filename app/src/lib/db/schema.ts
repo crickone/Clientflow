@@ -922,13 +922,15 @@ export const carouselSlides = sqliteTable("carousel_slides", {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Campaign Engine (Slice 1): a seasonal campaign kit the Marketing agent
-// builds one artifact at a time (offer, blog, socials, emails, ad copy, video
-// script). `campaigns` is the kit container; `campaign_assets` is one row per
-// artifact, ordered by sort_order, moving pending -> drafted -> approved.
-// externalKind/externalId optionally point at the row a later "materialise"
-// task created (a blog_posts / carousel_sets / email_campaigns row) once an
-// asset is approved and published into its home module.
+// Campaign Engine (Slice 1 + Slice 2): a seasonal campaign kit the Marketing
+// agent builds one artifact at a time (offer, landing page, blog, socials,
+// emails, ad copy, video script). `campaigns` is the kit container;
+// `campaign_assets` is one row per artifact, ordered by sort_order, moving
+// pending -> drafted -> approved. externalKind/externalId optionally point at
+// the row a later "materialise" task created (a blog_posts / carousel_sets /
+// email_campaigns row) once an asset is approved and published into its home
+// module — landing_page has no external home (Slice 2: it renders straight
+// from the asset row on a public route instead).
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const campaigns = sqliteTable("campaigns", {
@@ -958,7 +960,7 @@ export const campaignAssets = sqliteTable("campaign_assets", {
     .notNull()
     .references(() => campaigns.id, { onDelete: "cascade" }),
   kind: text("kind", {
-    enum: ["offer", "blog", "social", "email", "ad_copy", "video_script"],
+    enum: ["offer", "landing_page", "blog", "social", "email", "ad_copy", "video_script"],
   }).notNull(),
   title: text("title").notNull().default(""),
   body: text("body").notNull().default(""),

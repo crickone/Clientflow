@@ -59,11 +59,15 @@ import { getCampaign, listAssets, setCampaignStatus } from "./store";
  *     is still pending — a documented Slice-1 deferral). Reported in
  *     `queued` with a label that says so plainly.
  *
- *   - offer / ad_copy / video_script, and any blog/social/email asset that
- *     never got a materialised link (e.g. a blog asset on a 0-or-2+-site
- *     tenant — materialiseAsset returns null, so externalKind/externalId
- *     stay null; Task 4 carry-in) -> skipped. Never crashes, never appears
- *     in either summary array.
+ *   - offer / landing_page / ad_copy / video_script, and any blog/social/
+ *     email asset that never got a materialised link (e.g. a blog asset on
+ *     a 0-or-2+-site tenant — materialiseAsset returns null, so
+ *     externalKind/externalId stay null; Task 4 carry-in) -> skipped. Never
+ *     crashes, never appears in either summary array. landing_page (Slice 2
+ *     Task 1) never materialises to an external row by design (see
+ *     materialise.ts), so it always lands here too — Slice 2's launch task
+ *     surfaces its live URL separately, from the campaign's assets directly,
+ *     not through this publish/queue/skip per-asset action.
  *
  * Never claims a publish/send that didn't happen — see `launchActionFor`
  * (pure, DB-free, independently testable) for the per-kind action decision,
@@ -116,6 +120,7 @@ export function launchActionFor(
     case "social":
       return "queue";
     case "offer":
+    case "landing_page":
     case "ad_copy":
     case "video_script":
       return "skip";

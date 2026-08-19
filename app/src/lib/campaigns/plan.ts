@@ -9,11 +9,12 @@
  */
 
 /**
- * The 6 artifact kinds a campaign kit can hold, in the order the Marketing
+ * The 7 artifact kinds a campaign kit can hold, in the order the Marketing
  * agent builds them. Matches campaign_assets.kind's DB enum exactly.
  */
 export const ASSET_ORDER = [
   "offer",
+  "landing_page",
   "blog",
   "social",
   "email",
@@ -37,23 +38,26 @@ export interface AssetDef {
 }
 
 /**
- * The default 10-asset kit, in build order: one offer, one blog post, 3
- * social posts, 3 emails, one ad copy, one video script. sortOrder is 0..9
- * and doubles as campaign_assets.sort_order at insert time — store.ts's
- * addAssets(campaignId, DEFAULT_ASSET_PLAN) inserts these verbatim under a
- * freshly created campaign.
+ * The default 11-asset kit, in build order: one offer, one landing page, one
+ * blog post, 3 social posts, 3 emails, one ad copy, one video script.
+ * sortOrder is 0..10 and doubles as campaign_assets.sort_order at insert
+ * time — store.ts's addAssets(campaignId, DEFAULT_ASSET_PLAN) inserts these
+ * verbatim under a freshly created campaign. landing_page sits right after
+ * offer (sortOrder 1) since it's generated straight from the offer, same as
+ * every other asset in the kit — see ./prompts's landingPagePrompt.
  */
 export const DEFAULT_ASSET_PLAN: AssetDef[] = [
   { kind: "offer", title: "Offer", sortOrder: 0 },
-  { kind: "blog", title: "Blog post", sortOrder: 1 },
-  { kind: "social", title: "Social post 1", sortOrder: 2 },
-  { kind: "social", title: "Social post 2", sortOrder: 3 },
-  { kind: "social", title: "Social post 3", sortOrder: 4 },
-  { kind: "email", title: "Email — Announce", sortOrder: 5 },
-  { kind: "email", title: "Email — Proof", sortOrder: 6 },
-  { kind: "email", title: "Email — Last chance", sortOrder: 7 },
-  { kind: "ad_copy", title: "Ad copy", sortOrder: 8 },
-  { kind: "video_script", title: "Video script", sortOrder: 9 },
+  { kind: "landing_page", title: "Landing page", sortOrder: 1 },
+  { kind: "blog", title: "Blog post", sortOrder: 2 },
+  { kind: "social", title: "Social post 1", sortOrder: 3 },
+  { kind: "social", title: "Social post 2", sortOrder: 4 },
+  { kind: "social", title: "Social post 3", sortOrder: 5 },
+  { kind: "email", title: "Email — Announce", sortOrder: 6 },
+  { kind: "email", title: "Email — Proof", sortOrder: 7 },
+  { kind: "email", title: "Email — Last chance", sortOrder: 8 },
+  { kind: "ad_copy", title: "Ad copy", sortOrder: 9 },
+  { kind: "video_script", title: "Video script", sortOrder: 10 },
 ];
 
 /** The minimal asset shape nextPendingAsset needs — matches both a real CampaignAsset row and a bare test fixture. */

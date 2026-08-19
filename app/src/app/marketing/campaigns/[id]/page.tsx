@@ -6,6 +6,7 @@ import {
   ExternalLink,
   FileText,
   Gift,
+  Globe,
   Image as ImageIcon,
   Mail,
   Megaphone,
@@ -44,6 +45,7 @@ const ASSET_STATUS_TONE: Record<CampaignAsset["status"], "neutral" | "amber" | "
 
 const KIND_ICON: Record<CampaignAsset["kind"], typeof Gift> = {
   offer: Gift,
+  landing_page: Globe,
   blog: FileText,
   social: ImageIcon,
   email: Mail,
@@ -57,9 +59,12 @@ const EXTERNAL_HOME_LABEL: Record<NonNullable<CampaignAsset["externalKind"]>, st
   email_campaign: "View email campaign",
 };
 
-// The 3 kinds materialiseAsset (@/lib/campaigns/materialise) never gives an
-// external home to — they render fully inline instead, with a copy
-// affordance (per the Task 7 brief).
+// The 3 plain-text kinds materialiseAsset (@/lib/campaigns/materialise)
+// never gives an external home to — they render fully inline instead, with a
+// copy affordance (per the Task 7 brief). landing_page (Slice 2) also has no
+// external home, but stores structured JSON rather than reader-facing plain
+// text, so it's deliberately left out of this set — a later task gives it
+// its own "view live" affordance once the public landing route exists.
 const COPYABLE_KINDS = new Set<CampaignAsset["kind"]>(["offer", "ad_copy", "video_script"]);
 
 /**

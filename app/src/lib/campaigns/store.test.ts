@@ -40,9 +40,9 @@ const requireLocal = createRequire(import.meta.url);
 (async () => {
   const { DEFAULT_ASSET_PLAN, nextPendingAsset } = requireLocal("./store") as typeof import("./store");
 
-  // Default plan is the 10-asset order from the spec.
+  // Default plan is the 11-asset order from the spec.
   const kinds = DEFAULT_ASSET_PLAN.map((a) => a.kind);
-  assert.deepEqual(kinds, ["offer", "blog", "social", "social", "social", "email", "email", "email", "ad_copy", "video_script"]);
+  assert.deepEqual(kinds, ["offer", "landing_page", "blog", "social", "social", "social", "email", "email", "email", "ad_copy", "video_script"]);
   assert.equal(DEFAULT_ASSET_PLAN[0].kind, "offer");
   assert.equal(DEFAULT_ASSET_PLAN.filter((a) => a.kind === "social").length, 3);
   assert.equal(DEFAULT_ASSET_PLAN.filter((a) => a.kind === "email").length, 3);

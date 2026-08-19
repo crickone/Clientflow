@@ -8,7 +8,7 @@
  */
 import assert from "node:assert/strict";
 
-import { HOUSE_RULES_CLAUSE, offerPrompt, adCopyPrompt, videoScriptPrompt } from "./prompts";
+import { HOUSE_RULES_CLAUSE, offerPrompt, adCopyPrompt, videoScriptPrompt, landingPagePrompt } from "./prompts";
 import type { Campaign } from "@/lib/db/schema";
 
 let passed = 0;
@@ -44,6 +44,7 @@ const builders: Array<[string, (c: Campaign, tweak?: string) => string]> = [
   ["offerPrompt", offerPrompt],
   ["adCopyPrompt", adCopyPrompt],
   ["videoScriptPrompt", videoScriptPrompt],
+  ["landingPagePrompt", landingPagePrompt],
 ];
 
 for (const [name, build] of builders) {
@@ -56,6 +57,14 @@ for (const [name, build] of builders) {
   const tweak = "Make it punchier and mention the free assessment week";
   const tweaked = build(campaign, tweak);
   check(`${name}: includes the tweak when passed`, tweaked.includes(tweak));
+}
+
+// landingPagePrompt-specific: the CTA is fixed to "Register your interest" —
+// never a price, booking action, or guarantee (the landing page captures a
+// lead, it doesn't transact).
+{
+  const out = landingPagePrompt(campaign);
+  check('landingPagePrompt: states the CTA is "Register your interest"', out.includes("Register your interest"));
 }
 
 // A campaign with no season set / no offer decided yet still produces a

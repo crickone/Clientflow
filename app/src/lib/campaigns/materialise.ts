@@ -41,8 +41,12 @@ import { parseSocialBody, parseEmailBody } from "./assetBody";
  *     DRAFT row) — the exact function the /campaigns composer's
  *     createCampaignAction calls, just invoked with a tenant-derived sender
  *     identity instead of an operator-typed one.
- *   - offer/ad_copy/video_script: no external home — returns null, content
- *     stays on the campaign_assets row itself.
+ *   - offer/landing_page/ad_copy/video_script: no external home — returns
+ *     null, content stays on the campaign_assets row itself. landing_page
+ *     (Slice 2) is deliberate, not a deferral: its home is a PUBLIC route
+ *     that renders straight from the asset's own stored JSON body (see
+ *     ./assetBody's parseLandingBody) — there's no separate table for it to
+ *     materialise into.
  *
  * Robustness — approve must NEVER 500: `asset.body` for social/email is
  * parsed via ./assetBody's `parseSocialBody`/`parseEmailBody`, both total
@@ -187,11 +191,12 @@ function materialiseEmail(asset: CampaignAsset, campaign: Campaign, tenantId: nu
 
 /**
  * Materialise ONE approved campaign asset into its real home. Returns null
- * (no external link — content stays on the asset row) for offer/ad_copy/
- * video_script by design, or for blog/social/email when materialisation
- * couldn't safely proceed (unparseable body, no resolvable site, or any
- * other unexpected failure) — every failure path logs and returns null
- * rather than throwing, so the caller's approve can always proceed.
+ * (no external link — content stays on the asset row) for offer/landing_page/
+ * ad_copy/video_script by design, or for blog/social/email when
+ * materialisation couldn't safely proceed (unparseable body, no resolvable
+ * site, or any other unexpected failure) — every failure path logs and
+ * returns null rather than throwing, so the caller's approve can always
+ * proceed.
  */
 export function materialiseAsset(asset: CampaignAsset, campaign: Campaign, tenantId: number): MaterialiseResult | null {
   // Already materialised (e.g. a redraft-then-reapprove path) — never create a
@@ -209,6 +214,7 @@ export function materialiseAsset(asset: CampaignAsset, campaign: Campaign, tenan
       case "email":
         return materialiseEmail(asset, campaign, tenantId);
       case "offer":
+      case "landing_page":
       case "ad_copy":
       case "video_script":
         return null;

@@ -9,23 +9,34 @@ import { generateCarouselSlides } from "@/lib/ai/generateCarousel";
 import { draftCampaignEmail } from "@/lib/ai/draftCampaign";
 import type { Campaign, CampaignAsset } from "@/lib/db/schema";
 
-import { adCopyPrompt, offerPrompt, videoScriptPrompt } from "./prompts";
+import { adCopyPrompt, landingPagePrompt, offerPrompt, videoScriptPrompt } from "./prompts";
+import { parseLandingBody, type ParsedLandingBody } from "./assetBody";
 
 /**
- * Per-asset generation dispatch (Campaign Engine Slice 1) — turns a
+ * Per-asset generation dispatch (Campaign Engine Slice 1 + Slice 2) — turns a
  * `CampaignAsset` row into real content, reusing the SAME generators the
  * rest of Content Studio/campaigns already ship (`draftBlogPost`,
  * `generateCarouselSlides`, `draftCampaignEmail`) for the kinds that map
  * onto them, and a direct `meteredCreate` call — mirroring those
- * generators' own house/format-rules shape exactly — for the three kinds
- * that don't have an existing generator (offer / ad_copy / video_script).
+ * generators' own house/format-rules shape exactly — for the four kinds
+ * that don't have an existing generator (offer / landing_page / ad_copy /
+ * video_script).
  *
  * House rules ride in EVERY branch: getBusinessContext() (injecting the
  * tenant's Marketing Brain) is either supplied by the reused generator
- * itself (blog/social/email) or prepended here (offer/ad_copy/video_script);
- * the offer/ad_copy/video_script user prompts additionally restate
- * HOUSE_RULES_CLAUSE (see ./prompts) as a belt-and-braces reminder never to
- * invent a guarantee or free offer the Brain hasn't sanctioned.
+ * itself (blog/social/email) or prepended here (offer/landing_page/ad_copy/
+ * video_script); the offer/landing_page/ad_copy/video_script user prompts
+ * additionally restate HOUSE_RULES_CLAUSE (see ./prompts) as a
+ * belt-and-braces reminder never to invent a guarantee or free offer the
+ * Brain hasn't sanctioned.
+ *
+ * landing_page (Slice 2) is the one branch that additionally has to turn the
+ * model's raw text back into structured JSON itself — offer/ad_copy/
+ * video_script return raw text as-is, and blog/social/email's reused
+ * generators already hand back structured data — so its branch parses the
+ * model's output with ./assetBody's `parseLandingBody` (tolerant; never
+ * throws) and falls back to a safe default object if that fails, rather
+ * than letting a malformed model response take the whole draft down.
  *
  * Every branch is metered — there is no path here that calls the model
  * without going through `meteredCreate` (directly, or inside the reused
@@ -39,7 +50,7 @@ export interface GeneratedAsset {
   body: string;
 }
 
-// ── Format rules for the three kinds with no existing generator ───────────
+// ── Format rules for the four kinds with no existing generator ────────────
 // Mirrors BLOG_FORMAT_RULES / CAROUSEL_FORMAT_RULES / CAMPAIGN_FORMAT_RULES
 // in draftBlog.ts / generateCarousel.ts / draftCampaign.ts: the business
 // identity + Marketing Brain come from getBusinessContext(), prepended at
@@ -56,6 +67,20 @@ Formatting:
 
 Output format:
 - Return ONLY the offer description. No heading, no preamble, no notes about the writing process.`;
+
+const LANDING_FORMAT_RULES = `You write landing-page copy for a marketing campaign, built around a specific offer — copy for a public page whose only job is to get a visitor to register their interest.
+
+Formatting:
+- Return ONLY a single JSON object — no markdown, no code fences, no preamble, no notes about the writing process.
+- Shape exactly: {"headline": string, "subhead": string, "bullets": string[], "ctaLabel": string}.
+- headline: short and punchy (under 60 characters).
+- subhead: one sentence expanding on the headline.
+- bullets: 3-5 short, concrete benefit statements grounded in the offer.
+- ctaLabel: always exactly "Register your interest" — never a price, a booking action, or a guarantee.
+- Do not invent a discount, guarantee, bonus or deadline beyond what you've been given.
+
+Output format:
+- Return ONLY the JSON object described above. No heading, no preamble, no code fences, no notes about the writing process.`;
 
 const AD_COPY_FORMAT_RULES = `You write paid social ad copy (Facebook/Instagram) for a marketing campaign, built around a specific offer.
 
@@ -158,6 +183,22 @@ export async function generateAsset(
     case "offer": {
       const body = await generateRaw(meter, OFFER_FORMAT_RULES, offerPrompt(campaign, tweak));
       return { title: asset.title, body };
+    }
+
+    case "landing_page": {
+      const raw = await generateRaw(meter, LANDING_FORMAT_RULES, landingPagePrompt(campaign, tweak));
+      // parseLandingBody never throws; a model response it can't make sense
+      // of at all (empty/non-JSON) falls back to a safe, honest default
+      // rather than failing the draft outright — same "never 500 the
+      // operator's action" posture as materialise.ts.
+      const fallback: ParsedLandingBody = {
+        headline: campaign.name || campaign.offer || "Register your interest",
+        subhead: "",
+        bullets: [],
+        ctaLabel: "Register your interest",
+      };
+      const parsed = parseLandingBody(raw) ?? fallback;
+      return { title: asset.title, body: JSON.stringify(parsed) };
     }
 
     case "ad_copy": {
