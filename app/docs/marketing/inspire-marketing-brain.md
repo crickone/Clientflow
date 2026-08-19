@@ -18,7 +18,7 @@ Instance of [marketing-brain-template.md](./marketing-brain-template.md) for **I
 ### 2. The Offer
 **Value Equation, Inspire:**
 - **Dream outcome** — visible transformation (weight/inches down, strength/energy up) + confidence.
-- **Perceived likelihood** — coaching + a structured plan + group accountability + tracked progress → "people like me actually get results here." Backed by a guarantee.
+- **Perceived likelihood** — coaching + a structured plan + group accountability + tracked progress → "people like me actually get results here." Proven by real member transformations (proof carries the risk-reversal — see house rule below).
 - **Time delay** — a **6-week** structure gives a fast, visible win (the classic challenge window).
 - **Effort & sacrifice** — done-*with*-you: the plan, the classes, the nutrition, the check-ins are all handed to them — they just show up. Community makes it enjoyable, not a grind.
 
@@ -32,13 +32,13 @@ Instance of [marketing-brain-template.md](./marketing-brain-template.md) for **I
   | "I quit on my own" | Weekly accountability check-ins + progress tracking | € `[NEED]` |
   | "I need people around me" | The challenge community / group | € `[NEED]` |
   | `[NEED: bonuses — InBody scan? recipe pack? guest passes?]` | … | … |
-- **Guarantee (risk reversal):** "Show up and follow the plan for 6 weeks — if you don't see a change, you get your money back / your next month free." `[NEED: confirm the guarantee you'll stand behind]`
+- **Risk reversal — ⛔ HOUSE RULE: NO money-back guarantees, NO free consultations. Ever.** Risk reversal comes instead from: **proof** (named member transformations), the **structured cohort** (a defined start, plan and finish — not an open-ended gamble), and the **fast first win** (visible change inside 2 weeks). Optional, only if you ever want any promise at all: a *service-extension* ("follow the plan fully and if you don't see a change, we keep coaching you at no charge until you do") — extra service, never a refund. `[NEED: proof-only, or proof + service-extension?]`
 - **Scarcity (real):** each challenge runs as a **cohort** — only `[NEED: N]` places, starting `[NEED: date/cadence]`.
 - **Bonuses:** `[NEED]`.
 - **Price:** € `[NEED: challenge price — Hormozi-style this is a low-ish front-end, e.g. €149–€297, designed to cover ad spend, NOT your profit centre]`.
 
 ### 3. The Lead Engine
-- **Lead magnet:** the **Challenge itself** is the front-end hook. Softer top-of-funnel options: a **"Which of the 4 fitness types are you?" quiz**, or a **free 3-day pass**, or a **"6 lies commercial gyms tell you" guide** — all routing to the Challenge.
+- **Lead magnet:** the **Challenge itself** is the front-end hook. Softer top-of-funnel options: a **"Which of the 4 fitness types are you?" quiz** or a **"6 lies commercial gyms tell you" guide** — all routing to the Challenge. (A free 3-day pass is possible but flag it against your no-free-stuff instinct: `[NEED: allow free passes, or paid-entry only?]`)
 - **Content pillars (Content Studio rotates):** (1) member transformations & results; (2) simple training tips (form, what-to-do); (3) simple nutrition (fat-loss without misery); (4) motivation / mindset / consistency; (5) behind-the-scenes community & coaches.
 - **The Core Four:**
   - **Warm outreach:** past leads/trial-goers who never joined, members' friends & family (referral offer), lapsed members (win-back).
@@ -58,7 +58,7 @@ This is the textbook Hormozi gym sequence — designed for Client-Financed Acqui
 ### 5. Voice & rules
 - **Tone:** motivating, warm, no-shame, real. Coach-in-your-corner, not drill-sergeant. Local and human.
 - **Always:** lead with a real member result; make the next step one clear action (take the quiz / join the next Challenge); speak to the *feeling* (confidence, energy), not just the kilos.
-- **Never:** body-shame or fear-monger; never sell "gym access" (sell the result + coaching); never a vague "DM for prices."
+- **Never:** ⛔ **never offer money-back guarantees; never offer free consultations/assessments** (house rule — risk reversal is proof + structure, not refunds); never body-shame or fear-monger; never sell "gym access" (sell the result + coaching); never a vague "DM for prices."
 - **Proof to cite:** `[NEED: 2–3 named member transformations + numbers, coach credentials]`.
 - **The ONE next action:** **join the next 6-Week Transformation Challenge** (or take the quiz that leads to it).
 
@@ -79,7 +79,7 @@ coach and community behind them.
 OUR OFFER: "The Inspire 6-Week Transformation Challenge" — coached classes + a simple
 nutrition plan + weekly accountability + a supportive community, built to deliver a
 visible result in 6 weeks. It works because it's done-WITH-you (they just show up),
-gives a fast win, and is backed by a money-back / free-month guarantee. Never sell "gym
+gives a fast win, and is proven by real member transformations. Never sell "gym
 membership access" — sell the transformation.
 
 WHAT WE SELL (money model — always drive the NEXT step):
@@ -93,12 +93,14 @@ the quiz that leads to it).
 CONTENT PILLARS (rotate): member transformations & results; simple training tips; simple
 nutrition (fat-loss without misery); motivation / consistency / mindset; behind-the-scenes
 community & coaches.
-LEAD MAGNETS: the "which fitness type are you?" quiz; a free 3-day pass.
+LEAD MAGNETS: the "which fitness type are you?" quiz.
 
 VOICE: motivating, warm, no-shame, real — a coach in your corner, never a drill sergeant.
 Local and human. ALWAYS lead with a real member result and one clear next step. Speak to
-the feeling (confidence, energy), not just the kilos. NEVER body-shame or fear-monger,
-NEVER sell "access," NEVER end with a vague "DM for prices."
+the feeling (confidence, energy), not just the kilos. NEVER offer money-back guarantees
+or free consultations/assessments (house rule — our risk reversal is proof and structure,
+never refunds or freebies). NEVER body-shame or fear-monger, NEVER sell "access," NEVER
+end with a vague "DM for prices."
 
 When you write anything: make it specific to this avatar and this offer, give real value
 first, and end by pointing at the next step in the money model.
@@ -108,7 +110,7 @@ first, and end by pointing at the next step in the money model.
 
 ## What I need from you to finalise (the `[NEED]` list)
 1. **The Challenge** — happy with a "6-Week Transformation Challenge," and what would you include + charge for it? (Hormozi-style it's a low-ish front-end that covers ad spend, not your profit.)
-2. **The guarantee** — money-back? free month? what will you stand behind?
+2. **Risk reversal** — proof-only, or also a service-extension promise (never money-back — house rule)?
 3. **Cohort size + cadence** — how many places per challenge, how often do they start?
 4. **PT / small-group coaching** — do you offer it, and at what price? (the premium upsell)
 5. **Proof** — 2–3 named member transformations (with numbers) + coach credentials.
