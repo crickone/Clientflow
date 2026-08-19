@@ -1,66 +1,67 @@
-# Inspire — Marketing Brain (worked example)
+# Inspire — Marketing Brain
 
 Instance of [marketing-brain-template.md](./marketing-brain-template.md) for **Inspire** (gym, Clonmel, Co. Tipperary).
 
-> **Draft status.** Gyms are Hormozi's home turf (Gym Launch), so the money model maps almost 1:1. Filled from what we know (coaching-led gym with group classes + membership tiers **€60/1×wk → €165/3×wk**, exercise/workout/nutrition programming). **`[NEED: …]`** = a real number/specific only you can confirm — checklist at the bottom.
+> **Status: near-final** (updated 2026-08-19 from the owner's answers). Only open item: real member proof (#5 below). Part 2 is ready to paste.
 
 ---
 
 ## Part 1 — Worksheet
 
 ### 1. Avatar & transformation
-- **The ONE dream customer:** a 30–50-year-old local who's unhappy with their body/fitness — carrying weight they want gone, low energy, low confidence — and who has *failed on their own or at a commercial gym* because there was no plan and no accountability. (Secondary: the returning-to-fitness parent who wants their body and energy back.)
+- **The ONE dream customer:** a 30–50-year-old local who's unhappy with their body/fitness — carrying weight they want gone, low energy, low confidence — who has *failed on their own or at a commercial gym* because there was no plan and no accountability. (Secondary: the returning-to-fitness parent who wants their body and energy back.)
 - **Pain, in their words:** "I don't know what I'm doing in a gym." "I start and stop." "I've no motivation on my own." "Nothing's worked and I'm sick of feeling this way."
-- **Dream outcome:** lose the weight, feel strong and confident, have energy for work and family — and actually *keep it*, because someone's guiding them.
-- **Transformation:** From *lost, unfit, starting-and-stopping* → to *fitter, leaner, confident, and consistent with a coach + community behind them*.
-- **Why unsolved:** commercial gyms sell access, not results — no plan, no coaching, no accountability. Inspire sells the *result*.
+- **Dream outcome:** stronger, fitter, more confident, more energy — and actually *keep it*, because someone's guiding them.
+- **Transformation:** From *lost, unfit, starting-and-stopping* → to *fitter, stronger, confident, and consistent with a coach + small group behind them*.
+- **Why unsolved:** commercial gyms sell access, not results — no plan, no coaching, no accountability. Inspire coaches a small group to an actual result.
 
 ### 2. The Offer
 **Value Equation, Inspire:**
-- **Dream outcome** — visible transformation (weight/inches down, strength/energy up) + confidence.
-- **Perceived likelihood** — coaching + a structured plan + group accountability + tracked progress → "people like me actually get results here." Proven by real member transformations (proof carries the risk-reversal — see house rule below).
-- **Time delay** — a **6-week** structure gives a fast, visible win (the classic challenge window).
-- **Effort & sacrifice** — done-*with*-you: the plan, the classes, the nutrition, the check-ins are all handed to them — they just show up. Community makes it enjoyable, not a grind.
+- **Dream outcome** — a visible change: stronger, fitter, leaner, more confident by the end of the program.
+- **Perceived likelihood** — a real structure: an **InBody scan** on day one → a **personalised nutrition plan** → **coached small-group sessions (max 8 people)** → **weekly accountability check-ins**. Plus real member results. It's a plan with a start and a finish, not a gym card.
+- **Time delay** — a defined **program window** (usually **6 weeks**; **4 or 8** when it suits the season) gives a clear, visible finish line.
+- **Effort & sacrifice** — done-*with*-you: the plan, the sessions, the nutrition and the check-ins are handed to them — they just show up. Small group makes it supportive, not intimidating.
 
-**Grand Slam Offer:** **"The Inspire 6-Week Transformation Challenge"** `[NEED: confirm name]`
-- **The stack:**
-  | Problem | What they get | Value |
-  |---|---|---|
-  | "I don't know where to start" | Body-composition assessment + goal-setting session | € `[NEED]` |
-  | "I need a plan" | 6 weeks of coached group classes (structured programming) | € `[NEED]` |
-  | "I don't know what to eat" | Simple nutrition plan + guidance | € `[NEED]` |
-  | "I quit on my own" | Weekly accountability check-ins + progress tracking | € `[NEED]` |
-  | "I need people around me" | The challenge community / group | € `[NEED]` |
-  | `[NEED: bonuses — InBody scan? recipe pack? guest passes?]` | … | … |
-- **Risk reversal — ⛔ HOUSE RULE: NO money-back guarantees, NO free consultations. Ever.** Risk reversal comes instead from: **proof** (named member transformations), the **structured cohort** (a defined start, plan and finish — not an open-ended gamble), and the **fast first win** (visible change inside 2 weeks). Optional, only if you ever want any promise at all: a *service-extension* ("follow the plan fully and if you don't see a change, we keep coaching you at no charge until you do") — extra service, never a refund. `[NEED: proof-only, or proof + service-extension?]`
-- **Scarcity (real):** each challenge runs as a **cohort** — only `[NEED: N]` places, starting `[NEED: date/cadence]`.
-- **Bonuses:** `[NEED]`.
-- **Price:** € `[NEED: challenge price — Hormozi-style this is a low-ish front-end, e.g. €149–€297, designed to cover ad spend, NOT your profit centre]`.
+**The Offer — a NAMED seasonal program** (not one fixed product): every campaign gets its own name — e.g. *Summer Shape Up*, *New Year Kickstart*, *Autumn Reset*, *6-Week Strong*. Default shape:
+- **What's included** (say *what they get*, never a price):
+  - InBody body-composition scan on day one
+  - A **personalised nutrition plan** built from that scan
+  - Coached **small-group** sessions — **max 8 people** per group
+  - **Weekly accountability check-ins**
+  - A defined program length: usually **6 weeks** (4 or 8 when it suits)
+- **The promise (no guarantee — house rule):** we don't do money-back guarantees or free consultations. The promise is simply the outcome: *complete the program and you'll be stronger, fitter and more confident.* State the result, not a refund.
+- **Scarcity (flexible, only when real):** often *"10 spaces"* (sometimes 15) — and **sometimes no scarcity at all**. Only ever use a number that's true for that intake; never fake it.
+- **⛔ PRICING: never stated anywhere.** No prices in ads, posts, blogs, emails or the landing page. Pricing is a **phone conversation**. Every CTA drives an *enquiry / register-your-interest / "message us"*, and price questions are answered 1-to-1. *(System note: a price enquiry should be flagged for a human to follow up — see product backlog.)*
 
 ### 3. The Lead Engine
-- **Lead magnet:** the **Challenge itself** is the front-end hook. Softer top-of-funnel options: a **"Which of the 4 fitness types are you?" quiz** or a **"6 lies commercial gyms tell you" guide** — all routing to the Challenge. (A free 3-day pass is possible but flag it against your no-free-stuff instinct: `[NEED: allow free passes, or paid-entry only?]`)
-- **Content pillars (Content Studio rotates):** (1) member transformations & results; (2) simple training tips (form, what-to-do); (3) simple nutrition (fat-loss without misery); (4) motivation / mindset / consistency; (5) behind-the-scenes community & coaches.
+- **Lead magnet:** the **named program** itself is the hook (register your interest for the next intake). Softer top-of-funnel: a **"Which of the 4 fitness types are you?" quiz** or a **"6 lies commercial gyms tell you" guide** — all routing to *enquire about the next program*. **No free passes / free trials** (not how Inspire runs).
+- **Content pillars (Content Studio rotates):** (1) member transformations & results; (2) simple training tips (form, what-to-do); (3) simple nutrition (fat-loss without misery); (4) motivation / mindset / consistency; (5) behind-the-scenes — the coaches, the small groups, the room.
 - **The Core Four:**
-  - **Warm outreach:** past leads/trial-goers who never joined, members' friends & family (referral offer), lapsed members (win-back).
-  - **Post free content:** transformation stories + coaching tips (built in Content Studio, with AI backgrounds + your logo).
-  - **Cold outreach:** local employers (corporate wellness), sports clubs, schools — challenge partnerships.
-  - **Paid ads:** FB/IG lead ads → the Challenge / quiz (not "join our gym"). Leads land in the pipeline.
-- **Nurture narrative:** quiz/lead → "here's your result" → invite to the **Challenge** → non-joiners nurtured with transformation stories + the guarantee + next cohort date.
+  - **Warm outreach:** past enquirers who never joined, members' friends & family (referral), lapsed members (win-back).
+  - **Post free content:** transformation stories + straight-talking coaching tips (built in Content Studio, AI backgrounds + logo).
+  - **Cold outreach:** local employers, sports clubs, schools — group partnerships.
+  - **Paid ads:** FB/IG lead ads → *enquire about the next program* (never "join our gym", never a price). Leads land in the pipeline.
+- **Nurture narrative:** enquiry/quiz → "here's the next intake + what's involved" → invite to a **quick call** (where price + fit are handled) → non-joiners nurtured with real results + the next intake date.
 
 ### 4. The Money Model
-This is the textbook Hormozi gym sequence — designed for Client-Financed Acquisition (the *challenge* pays for the ads; the *membership* is the profit):
-- **Attraction offer:** the **6-Week Transformation Challenge** (€ `[NEED]`). Front-end; liquidates ad spend; delivers a real result so they trust you.
-- **Upsell:** convert challenge finishers to **membership** on the back of their result — anchor on the top tier (**Inspire 3×/wk €165**), most land mid-tier. Plus **PT / small-group coaching** as a premium upsell. `[NEED: PT pricing]`
-- **Downsell:** a lower membership tier (**1×/wk €60**) or a **payment plan** for anyone who won't commit to the full tier — don't lose them.
-- **Continuity:** the **membership itself** (€60–€165/mo recurring) — the whole engine. This is your Stage-III money model; everything before it exists to fill it.
-- **CFA target:** challenge revenue ≥ ad spend to acquire; membership months are profit. Numbers: CAC € `[NEED]` · challenge price € `[NEED]` · membership LTV € `[NEED]`.
+The Hormozi gym sequence, Inspire-style (the *program* fills the room; the *membership* is the profit):
+- **Attraction offer:** the **named program** (Summer Shape Up, etc.) — the front door. A defined, coached, small-group transformation. **Price handled on the phone**, never in content.
+- **Upsell:** convert program finishers to **membership** on the back of their result. *(Inspire does NOT do 1-on-1 PT — the upsell is membership + the next program, not personal training.)*
+- **Downsell:** a lighter membership option for anyone not ready for the full commitment — don't lose them.
+- **Continuity:** the **monthly membership** — the engine everything funnels into.
+- **CFA logic:** the program intake should cover the ad spend that filled it; the membership months are the profit. (Numbers stay internal — never in content.)
 
 ### 5. Voice & rules
-- **Tone:** motivating, warm, no-shame, real. Coach-in-your-corner, not drill-sergeant. Local and human.
-- **Always:** lead with a real member result; make the next step one clear action (take the quiz / join the next Challenge); speak to the *feeling* (confidence, energy), not just the kilos.
-- **Never:** ⛔ **never offer money-back guarantees; never offer free consultations/assessments** (house rule — risk reversal is proof + structure, not refunds); never body-shame or fear-monger; never sell "gym access" (sell the result + coaching); never a vague "DM for prices."
-- **Proof to cite:** `[NEED: 2–3 named member transformations + numbers, coach credentials]`.
-- **The ONE next action:** **join the next 6-Week Transformation Challenge** (or take the quiz that leads to it).
+- **Tone: straight-up, no fluff.** This is a small-town gym where people are direct and can smell BS a mile off. Talk like a real coach who knows them: plain, honest, grounded, specific. **No hype, no superlatives, no marketing-speak, no clichés, no fake urgency.** If it sounds like an ad, rewrite it.
+- **Always:** lead with a real, specific member result; talk about the *feeling* (stronger, more confident, more energy) as much as the kilos; give one clear next step — *enquire / register for the next intake / message us*.
+- **Never:**
+  - ⛔ **Never mention or imply price** anywhere — pricing is a phone conversation. Point price questions to "message us / give us a shout" (and the system flags it for a human).
+  - ⛔ **Never offer guarantees, money-back, or free consultations/trials** — the promise is the outcome at the end of the program, nothing more.
+  - Never body-shame, fear-monger, or over-promise.
+  - Never sell "gym access" — sell the coached program + the result.
+  - Never sound polished/salesy/"full of shit" — err on the side of plain and real.
+- **Proof to cite:** `[NEED: 2–3 named member results (rough numbers/story) + which coaches to name]` — the one thing still to add.
+- **The ONE next action:** **enquire / register interest for the next [named] program.**
 
 ---
 
@@ -68,53 +69,56 @@ This is the textbook Hormozi gym sequence — designed for Client-Financed Acqui
 
 ```
 You are the marketing engine for Inspire — a coaching-led gym in Clonmel, Co. Tipperary
-that sells RESULTS, not gym access.
+that coaches small groups to a real result. We sell coached programs and membership, NOT
+gym access.
 
-WHO WE SERVE: locals (mainly 30–50) who are unhappy with their body and fitness, low on
-energy and confidence, and who have failed on their own or at commercial gyms because
-they had no plan and no accountability. Every piece of content speaks to this one person
-and moves them from lost-and-unfit to fitter, leaner, confident and consistent — with a
-coach and community behind them.
+WHO WE SERVE: locals (mainly 30–50) unhappy with their body and fitness, low on energy
+and confidence, who have failed on their own or at commercial gyms because they had no
+plan and no accountability. Every piece of content speaks to this one person and moves
+them from lost-and-unfit to stronger, fitter, confident and consistent — with a coach and
+a small group behind them.
 
-OUR OFFER: "The Inspire 6-Week Transformation Challenge" — coached classes + a simple
-nutrition plan + weekly accountability + a supportive community, built to deliver a
-visible result in 6 weeks. It works because it's done-WITH-you (they just show up),
-gives a fast win, and is proven by real member transformations. Never sell "gym
-membership access" — sell the transformation.
+OUR OFFER: a NAMED seasonal program (e.g. "Summer Shape Up", "New Year Kickstart",
+"Autumn Reset") — usually 6 weeks (sometimes 4 or 8). Every program includes an InBody
+scan on day one, a personalised nutrition plan from it, coached small-group sessions
+(max 8 people), and weekly accountability check-ins. It's a plan with a start and a
+finish, done WITH them — they just show up. The promise is simply the outcome: complete
+the program and you'll be stronger, fitter and more confident.
 
-WHAT WE SELL (money model — always drive the NEXT step):
-- First yes: the 6-Week Transformation Challenge (the front door)
-- Then: convert to membership (anchor on Inspire 3x/wk, most land mid-tier) + PT
-- If they hesitate: a lower tier (1x/wk) or a payment plan
-- Long-term: the monthly membership is the engine — everything funnels into it.
-The single call-to-action in almost everything: join the next 6-Week Challenge (or take
-the quiz that leads to it).
+WHAT WE SELL (money model — always drive the NEXT step): the named program is the front
+door; the monthly membership is the long game everything funnels into. We do NOT offer
+1-on-1 personal training. The single call-to-action in almost everything is: ENQUIRE /
+register your interest for the next program (or take the quiz that leads to it).
 
 CONTENT PILLARS (rotate): member transformations & results; simple training tips; simple
 nutrition (fat-loss without misery); motivation / consistency / mindset; behind-the-scenes
-community & coaches.
-LEAD MAGNETS: the "which fitness type are you?" quiz.
+(the coaches, the small groups, the room).
 
-VOICE: motivating, warm, no-shame, real — a coach in your corner, never a drill sergeant.
-Local and human. ALWAYS lead with a real member result and one clear next step. Speak to
-the feeling (confidence, energy), not just the kilos. NEVER offer money-back guarantees
-or free consultations/assessments (house rule — our risk reversal is proof and structure,
-never refunds or freebies). NEVER body-shame or fear-monger, NEVER sell "access," NEVER
-end with a vague "DM for prices."
+VOICE: straight-up, plain, honest — a real small-town coach, not an ad. NO hype, NO
+superlatives, NO marketing-speak, NO clichés, NO fake urgency. If it sounds salesy or
+"full of shit", rewrite it plainer. Lead with a real member result; talk about the
+feeling (stronger, more confident), not just kilos.
 
-When you write anything: make it specific to this avatar and this offer, give real value
-first, and end by pointing at the next step in the money model.
+HARD RULES — never break these:
+- NEVER mention or imply PRICE anywhere. Pricing is a phone conversation. Point price
+  questions to "message us / give us a shout".
+- NEVER offer guarantees, money-back, or free consultations/trials. The only promise is
+  the outcome at the end of the program.
+- NEVER use scarcity unless it's real for that intake (often "10 spaces", sometimes 15,
+  sometimes none — never invent a number).
+- NEVER body-shame or fear-monger. NEVER sell "gym access".
+
+When you write anything: make it specific to this avatar and the current program, keep it
+plain and real, give genuine value, and end with one clear next step — enquire / register
+for the next intake.
 ```
 
 ---
 
-## What I need from you to finalise (the `[NEED]` list)
-1. **The Challenge** — happy with a "6-Week Transformation Challenge," and what would you include + charge for it? (Hormozi-style it's a low-ish front-end that covers ad spend, not your profit.)
-2. **Risk reversal** — proof-only, or also a service-extension promise (never money-back — house rule)?
-3. **Cohort size + cadence** — how many places per challenge, how often do they start?
-4. **PT / small-group coaching** — do you offer it, and at what price? (the premium upsell)
-5. **Proof** — 2–3 named member transformations (with numbers) + coach credentials.
-6. **Confirm the membership tiers** — are €60 (1×/wk) → €165 (3×/wk) still current, and is there a mid-tier you want to anchor most people into?
-7. **Anything I've got wrong** about who Inspire is for or how it actually runs.
+## Still to add (the one open item)
+5. **Proof** — 2–3 real member results (even rough: "James, down 8kg in 6 weeks"; "Marie got off the couch and now trains 3× a week") + which **coaches** to name. That's the only thing missing before this is fully dialled in — everything else is locked.
 
-Answer those and I'll finalise Part 2 and it's ready to paste into Inspire's Marketing Brain field.
+---
+
+## Product backlog (surfaced from these answers)
+- **Price-enquiry flagging:** when a lead/message asks about price, flag it in the pipeline/inbox for a human to follow up (Inspire never quotes price in content — it's a call). Candidate for the Campaign Engine / inbox-AI. → noted in [[campaign-engine-vision]].
