@@ -11,13 +11,23 @@ import { useState } from "react";
 const MAX_FIELD_LEN = 200;
 const MAX_MESSAGE_LEN = 2000;
 
+// The submit CTA is a business INVARIANT — always exactly "Register your
+// interest", never a price, a booking action, or a guarantee, regardless of
+// what an approved landing_page asset's AI-generated `ctaLabel` says. The
+// generation prompt already instructs the model to return exactly this
+// string (see lib/campaigns/generate.ts's landing_page prompt), but a
+// mis-generated asset could still slip a different value past an operator's
+// approval — the model's output was never a reliable source for the
+// DISPLAYED button text, so it's hardcoded here instead of threaded in as a
+// prop from the stored/generated body.
+const CTA_LABEL = "Register your interest";
+
 interface Props {
   /** The server-signed (tenantId, campaignId) claim minted by the route
    *  (signCampaignSignupToken) — the ONLY thing this form sends that names a
    *  tenant or campaign. Opaque to this component; just relayed verbatim in
    *  the POST body. */
   token: string;
-  ctaLabel: string;
 }
 
 /**
@@ -31,14 +41,13 @@ interface Props {
  * only ever accepts a JSON body — see api/campaigns/signup/route.ts — so a
  * plain browser form-urlencoded POST would just 400).
  */
-export function SignupForm({ token, ctaLabel }: Props) {
+export function SignupForm({ token }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setSubmitting(true);
     setError(null);
 
     const fd = new FormData(e.currentTarget);
@@ -53,6 +62,19 @@ export function SignupForm({ token, ctaLabel }: Props) {
       // treats a non-empty value as silent success, no lead created.
       website: String(fd.get("website") ?? ""),
     };
+
+    // Mirrors the server's own rule exactly (lib/campaigns/signup.ts's
+    // validateSignup: name required + at-least-one-of email/phone). `name`
+    // is already enforced by that field's HTML `required` (the browser
+    // blocks submission before this handler even runs), so this only needs
+    // to catch the email-or-phone half — otherwise a visitor who fills only
+    // their name wouldn't find out until the server's 400 comes back.
+    if (!payload.email.trim() && !payload.phone.trim()) {
+      setError("Add an email or phone number so we can get back to you");
+      return;
+    }
+
+    setSubmitting(true);
 
     try {
       const res = await fetch("/api/campaigns/signup", {
@@ -113,7 +135,7 @@ export function SignupForm({ token, ctaLabel }: Props) {
       )}
 
       <button type="submit" disabled={submitting} style={submitBtnStyle(submitting)}>
-        {submitting ? "Sending…" : ctaLabel}
+        {submitting ? "Sending…" : CTA_LABEL}
       </button>
     </form>
   );

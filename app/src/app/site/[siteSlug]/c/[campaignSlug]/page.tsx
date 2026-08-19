@@ -1,3 +1,13 @@
+/**
+ * NAMESPACE NOTE: this route permanently reserves the `/c/*` path segment on
+ * every public site — `/site/<slug>/c/<campaignSlug>` resolves HERE, ahead
+ * of the catch-all CMS page renderer (site/[siteSlug]/[...slug]/page.tsx). A
+ * CMS page ever published at a `/c/...` slug would be shadowed and
+ * unreachable, same accepted tradeoff as the existing `/blog/*` segment
+ * (also a dedicated route ahead of the catch-all, for the same structural
+ * reason). Not a bug — just a reserved-namespace cost worth knowing about if
+ * a client ever wants a CMS page at `/c/...`.
+ */
 import type { Metadata } from "next";
 import fs from "node:fs";
 import path from "node:path";
@@ -5,7 +15,7 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { resolvePublicSite } from "@/lib/cms/resolveHost";
-import { runWithTenant } from "@/lib/db/tenant";
+import { runWithTenant, getCurrentTenant } from "@/lib/db/tenant";
 import {
   findApprovedLandingAsset,
   getCampaignBySlug,
@@ -35,6 +45,16 @@ const LOGO_MIME_BY_EXT: Record<string, string> = {
   ".svg": "image/svg+xml",
 };
 
+// Unlike the app chrome's own logo (served via a URL, /api/branding/logo),
+// this page inlines the raw bytes as a base64 data URI (see logoDataUri()'s
+// doc below) — so an oversized upload bloats THIS page's initial HTML
+// directly. Raster logos are already implicitly bounded by whatever upload
+// limit exists elsewhere, but an SVG is stored verbatim with no downscale: a
+// ~5MB SVG would become a ~6.65MB base64 blob embedded in the document.
+// 512KB is generous headroom over any real logo (raster or vector) while
+// still ruling out that pathological case.
+const MAX_LOGO_BYTES = 512 * 1024;
+
 /**
  * Inline the tenant's uploaded logo as a base64 data URI instead of linking
  * `getChromeLogoSrc()`'s `/api/branding/logo` URL. That endpoint resolves
@@ -62,6 +82,18 @@ function logoDataUri(): string | null {
   }
   if (!filePath) return null;
   try {
+    // Stat before read: an oversized file (see MAX_LOGO_BYTES's doc — the
+    // pathological case is an uncompressed SVG) shouldn't be inlined at all,
+    // so there's no point paying to read+base64-encode it first. <Logo>
+    // already renders a text wordmark fallback when src is null, so this is
+    // a graceful degrade, not a broken page.
+    const size = fs.statSync(filePath).size;
+    if (size > MAX_LOGO_BYTES) {
+      console.warn(
+        `[campaign landing] logo for tenant "${getCurrentTenant().slug}" is ${size} bytes (over the ${MAX_LOGO_BYTES}-byte inline cap) — skipping inline, falling back to text wordmark`,
+      );
+      return null;
+    }
     const ext = path.extname(filePath).toLowerCase();
     const mime = LOGO_MIME_BY_EXT[ext] ?? "application/octet-stream";
     const buf = fs.readFileSync(filePath);

@@ -72,7 +72,9 @@ export function CampaignLanding({ body, theme, fonts, logoSrc, business, signupT
   const headline = body.headline.trim() || businessName;
   const subhead = body.subhead.trim();
   const bullets = body.bullets.map((b) => b.trim()).filter((b) => b.length > 0);
-  const ctaLabel = body.ctaLabel.trim() || "Register your interest";
+  // body.ctaLabel is intentionally NOT read here — the CTA is a business
+  // invariant, hardcoded inside <SignupForm> itself rather than threaded
+  // through as a prop. See that component's CTA_LABEL comment for why.
   const phone = business.phone.trim();
   const telHref = phone ? `tel:${phone.replace(/[^\d+]/g, "")}` : null;
 
@@ -193,7 +195,7 @@ export function CampaignLanding({ body, theme, fonts, logoSrc, business, signupT
                 padding: "clamp(20px, 4vw, 32px)",
               }}
             >
-              <SignupForm token={signupToken} ctaLabel={ctaLabel} />
+              <SignupForm token={signupToken} />
               {telHref && (
                 <p style={{ margin: "16px 0 0", fontSize: 13, color: "var(--text-tertiary)", textAlign: "center" }}>
                   Prefer to talk? Call{" "}

@@ -14,7 +14,7 @@
 // tools.campaign.ts's header comment. Also verifies: all 5 tools are
 // registered in TOOLS + wired into executeTool; create_campaign rejects a
 // missing name and slugifies deterministically; create_campaign seeds the
-// default 10-asset plan and pre-drafts the offer asset; the
+// default 11-asset plan and pre-drafts the offer asset; the
 // approve/next-asset/campaign-status progression end to end; the
 // launch_campaign "ready" guard; and summarizeToolAction's human strings for
 // the three writes.
@@ -181,7 +181,7 @@ const requireLocal = createRequire(import.meta.url);
 
     // ── (c) create_campaign (WRITE) — a valid call slugifies the name
     // deterministically (lowercase, hyphenated, punctuation stripped) and
-    // seeds the DEFAULT 10-asset plan when `assets` is omitted, with the
+    // seeds the DEFAULT 11-asset plan when `assets` is omitted, with the
     // offer asset pre-drafted from the given offer text (status "drafted",
     // not left "pending") so its first card is Approve/Go-again like every
     // other asset. ──
@@ -246,7 +246,7 @@ const requireLocal = createRequire(import.meta.url);
     );
     assert.ok(!trimmed.error, "create_campaign accepts a custom assets array");
     const trimmedAssets = runWithTenant(tid, () => listAssets(trimmed.campaignId as number));
-    assert.equal(trimmedAssets.length, 2, "create_campaign seeds exactly the custom assets given, not the default 10");
+    assert.equal(trimmedAssets.length, 2, "create_campaign seeds exactly the custom assets given, not the default 11");
 
     const badKind = JSON.parse(
       runWithTenant(tid, () =>
@@ -313,7 +313,7 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(plan.name, "Summer Shape Up 2026");
     assert.equal(plan.season, "Summer 2026");
     assert.ok(typeof plan.offer === "string" && plan.offer.length > 0, "plan_campaign returns a generated, non-empty offer");
-    assert.deepEqual(plan.assets, DEFAULT_ASSET_PLAN, "plan_campaign proposes DEFAULT_ASSET_PLAN's exact 10-asset kit");
+    assert.deepEqual(plan.assets, DEFAULT_ASSET_PLAN, "plan_campaign proposes DEFAULT_ASSET_PLAN's exact 11-asset kit");
     const planMissingBrief = JSON.parse((await planCampaignTool(ctx, {})).text);
     assert.ok(planMissingBrief.error, "plan_campaign requires a brief");
 
@@ -795,7 +795,7 @@ const requireLocal = createRequire(import.meta.url);
     // (not exact punctuation) is what's asserted: the campaign/asset name
     // appears and the phrasing matches the action. Note: create_campaign's
     // count is computed from the ACTUAL `assets` array length passed in (here
-    // 10, DEFAULT_ASSET_PLAN's real length) rather than hardcoded, so an
+    // 11, DEFAULT_ASSET_PLAN's real length) rather than hardcoded, so an
     // operator-trimmed plan is always described correctly. ──
     const createSummary = summarizeToolAction("create_campaign", { name: "Summer Shape Up 2026", assets: DEFAULT_ASSET_PLAN });
     assert.ok(createSummary.includes("Summer Shape Up 2026"), `create_campaign summary names the campaign: "${createSummary}"`);
