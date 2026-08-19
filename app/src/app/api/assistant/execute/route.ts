@@ -20,6 +20,16 @@ export async function POST(req: NextRequest) {
   const me = await requireUser();
   const membership = getCurrentMembership();
   if (!membership) return new Response("No active account", { status: 401 });
+  // Authorization: agent WRITE actions (publish a blog, send an email/WhatsApp,
+  // cancel a membership, launch a campaign, …) are admin-only. Staff can still
+  // CHAT with the assistant and see DRAFTS (the chat routes stay open, incl. the
+  // staff-facing dashboard Orchestrator), but only an admin can approve-and-run
+  // a write. This is the enforcement point: the chat route never executes a
+  // write — every approval funnels through here — so one role check closes the
+  // whole surface (matches the admin-only agent pages that surface these tools).
+  if (membership.role !== "admin") {
+    return new Response("Only admins can approve and run agent actions.", { status: 403 });
+  }
   const tenantId = membership.tenant.id;
   const userId = me.id;
 
