@@ -420,6 +420,16 @@ export function approveCampaignAssetTool(ctx: ToolContext, input: Record<string,
   // Idempotent: never re-materialise an already-approved asset (would duplicate
   // the real record + re-spend AI money on image generation).
   if (asset.status === "approved") {
+    // `remaining` is already the FULL CampaignAsset row (same nextPendingAsset
+    // call the normal path below uses) — return it verbatim rather than
+    // reshaping it down to {id,kind,title}. Task 6 review caught that the
+    // earlier narrowed version made this the ONE path where `nextAsset`
+    // doesn't match the normal path's shape, forcing every client-side
+    // consumer to treat sortOrder/status as possibly-absent. Returning the
+    // same shape both paths return removes that footgun at the source (the
+    // chat UI's progress-strip model still tolerates a narrow nextAsset
+    // defensively — see campaignProgress.ts — but no longer needs to for
+    // THIS path).
     const remaining = nextPendingAsset(listAssets(campaignId));
     return {
       text: JSON.stringify({
@@ -430,7 +440,7 @@ export function approveCampaignAssetTool(ctx: ToolContext, input: Record<string,
         alreadyApproved: true,
         externalKind: asset.externalKind ?? null,
         externalId: asset.externalId ?? null,
-        nextAsset: remaining ? { id: remaining.id, kind: remaining.kind, title: remaining.title } : null,
+        nextAsset: remaining,
         campaignStatus: campaign.status,
       }),
     };
