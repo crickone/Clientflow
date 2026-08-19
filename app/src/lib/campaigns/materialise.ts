@@ -135,7 +135,8 @@ function materialiseSocial(asset: CampaignAsset, campaign: Campaign, tenantId: n
   const houseStyle = imageGen ? (getBrandImageStyle() ?? defaultImageStyle(getBusinessProfile())) : null;
   const jobs: SlideImageJob[] = [];
 
-  for (const slide of parsed.slides) {
+  for (let i = 0; i < parsed.slides.length; i++) {
+    const slide = parsed.slides[i];
     const prompt = houseStyle
       ? buildImagePrompt({
           houseStyle,
@@ -149,7 +150,9 @@ function materialiseSocial(asset: CampaignAsset, campaign: Campaign, tenantId: n
       aspectRatio: "1:1",
       headingText: slide.heading,
       bodyText: slide.body,
-      caption: parsed.slides.indexOf(slide) === 0 ? parsed.caption : "",
+      // Caption belongs to the carousel as a whole — store it on slide[0],
+      // same convention the Content Studio generate route uses.
+      caption: i === 0 ? parsed.caption : "",
       imagePrompt: prompt,
       imageStatus: prompt ? "generating" : null,
     });
