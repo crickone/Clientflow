@@ -180,11 +180,19 @@ const NAV: NavSection[] = [
   {
     heading: "Marketing",
     items: [
-      { href: "/marketing", label: "Marketing", icon: Megaphone },
+      // Campaign Engine hub (Slice 1): the Marketing agent builds a full
+      // seasonal kit (offer/blog/social/email/ads/video script) here, one
+      // asset at a time. Admin-only for the same reason the email Campaigns
+      // group below is — the detail page's Launch action publishes content
+      // live and the build itself only ever runs through the Marketing
+      // agent chat (/agents/marketing), which is itself requireAdminPage'd —
+      // so keep the nav consistent rather than show staff a link that just
+      // redirects them to /dashboard.
+      { href: "/marketing/campaigns", label: "Marketing", icon: Megaphone, adminOnly: true },
       { href: "/cms", label: "Sites", icon: Globe, adminOnly: true },
       { href: "/content-studio", label: "Content Studio", icon: Clapperboard },
       {
-        label: "Campaigns",
+        label: "Email campaigns",
         icon: Send,
         // Admin-only: campaign pages/actions are all requireAdmin (credit spend,
         // contact-list management, deliverability) — keep the nav consistent so
