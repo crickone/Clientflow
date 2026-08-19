@@ -921,6 +921,67 @@ export const carouselSlides = sqliteTable("carousel_slides", {
     .default(sql`(unixepoch() * 1000)`),
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Campaign Engine (Slice 1): a seasonal campaign kit the Marketing agent
+// builds one artifact at a time (offer, blog, socials, emails, ad copy, video
+// script). `campaigns` is the kit container; `campaign_assets` is one row per
+// artifact, ordered by sort_order, moving pending -> drafted -> approved.
+// externalKind/externalId optionally point at the row a later "materialise"
+// task created (a blog_posts / carousel_sets / email_campaigns row) once an
+// asset is approved and published into its home module.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const campaigns = sqliteTable("campaigns", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  slug: text("slug").notNull(),
+  season: text("season"),
+  startsOn: text("starts_on"), // ISO date or null
+  endsOn: text("ends_on"),
+  offer: text("offer").notNull().default(""),
+  status: text("status", {
+    enum: ["building", "ready", "active", "complete", "archived"],
+  })
+    .notNull()
+    .default("building"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
+export const campaignAssets = sqliteTable("campaign_assets", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  campaignId: integer("campaign_id")
+    .notNull()
+    .references(() => campaigns.id, { onDelete: "cascade" }),
+  kind: text("kind", {
+    enum: ["offer", "blog", "social", "email", "ad_copy", "video_script"],
+  }).notNull(),
+  title: text("title").notNull().default(""),
+  body: text("body").notNull().default(""),
+  sortOrder: integer("sort_order").notNull().default(0),
+  status: text("status", {
+    enum: ["pending", "drafted", "approved"],
+  })
+    .notNull()
+    .default("pending"),
+  externalKind: text("external_kind", {
+    enum: ["blog_post", "carousel_set", "email_campaign"],
+  }),
+  externalId: integer("external_id"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+export type Campaign = typeof campaigns.$inferSelect;
+export type CampaignAsset = typeof campaignAssets.$inferSelect;
+
 export const blogPosts = sqliteTable("blog_posts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   title: text("title").notNull(),

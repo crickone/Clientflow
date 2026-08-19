@@ -1197,6 +1197,39 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
 
     CREATE INDEX IF NOT EXISTS idx_carousel_slides_set ON carousel_slides(carousel_set_id, slide_order);
 
+    -- ── Campaign Engine (Slice 1) ────────────────────────────────────────────
+    -- Seasonal campaign kit the Marketing agent builds one artifact at a time.
+    -- campaigns is the kit container; campaign_assets is one row per artifact
+    -- (offer/blog/social/email/ad_copy/video_script), ordered by sort_order.
+    CREATE TABLE IF NOT EXISTS campaigns (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL,
+      season TEXT,
+      starts_on TEXT,
+      ends_on TEXT,
+      offer TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'building',
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+
+    CREATE TABLE IF NOT EXISTS campaign_assets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL,
+      title TEXT NOT NULL DEFAULT '',
+      body TEXT NOT NULL DEFAULT '',
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'pending',
+      external_kind TEXT,
+      external_id INTEGER,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_campaign_assets_campaign ON campaign_assets(campaign_id, sort_order);
+
     -- ============ CMS (multi-site) ============
     -- A first-class website managed by the agency. Content below is scoped by
     -- site_id. A site optionally links to a CRM clinic tenant (informational).
