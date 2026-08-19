@@ -78,6 +78,26 @@ export function getCampaign(id: number): Campaign | null {
   );
 }
 
+/**
+ * Look up a campaign by its slug. `slug` has no DB-unique constraint (see
+ * tenant.ts's campaigns table + tools.campaign.ts's note that two campaigns
+ * with the same name land on the same slug — "dedupe is not required for
+ * v1"), so this returns *a* match, not guaranteed the only one.
+ *
+ * Reads through the ambient `db` proxy like every other function in this
+ * file, so it's ALWAYS tenant-scoped by whatever bound the request's tenant
+ * context — critically, the public signup route (Campaign Engine Slice 2,
+ * Task 2) calls this inside `runWithTenant(site.tenantId, …)`, where
+ * `site.tenantId` was resolved from the request HOST, never from client
+ * input. That's what makes cross-tenant campaign attribution structurally
+ * impossible: a slug from tenant B simply doesn't exist in tenant A's DB.
+ */
+export function getCampaignBySlug(slug: string): Campaign | null {
+  return (
+    db.select().from(schema.campaigns).where(eq(schema.campaigns.slug, slug)).get() ?? null
+  );
+}
+
 /** All campaigns, newest first. */
 export function listCampaigns(): Campaign[] {
   return db.select().from(schema.campaigns).orderBy(desc(schema.campaigns.createdAt)).all();
