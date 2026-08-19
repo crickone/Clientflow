@@ -4,6 +4,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 
 import { slugify } from "@/lib/cms/blog";
 import { generateAsset } from "@/lib/campaigns/generate";
+import { materialiseAsset } from "@/lib/campaigns/materialise";
 import {
   ASSET_ORDER,
   DEFAULT_ASSET_PLAN,
@@ -21,13 +22,17 @@ import {
 import type { AssetDef, AssetKind, Campaign, CampaignAsset } from "@/lib/campaigns/store";
 
 /**
- * Marketing-agent tools (Campaign Engine Slice 1, Task 3): the five tools
+ * Marketing-agent tools (Campaign Engine Slice 1, Tasks 3-4): the five tools
  * that drive the per-artifact campaign-kit build loop — plan a kit from a
- * brief, persist it, draft each asset one at a time, approve each one, and
- * launch once every asset is approved. Wraps the EXISTING generation
- * dispatch (`generateAsset`, @/lib/campaigns/generate — itself reusing
- * draftBlogPost/generateCarouselSlides/draftCampaignEmail plus the new
- * offer/ad_copy/video_script prompts) and the EXISTING campaign store
+ * brief, persist it, draft each asset one at a time, approve each one
+ * (materialising it into its real home along the way), and launch once every
+ * asset is approved. Wraps the EXISTING generation dispatch (`generateAsset`,
+ * @/lib/campaigns/generate — itself reusing draftBlogPost/
+ * generateCarouselSlides/draftCampaignEmail plus the new offer/ad_copy/
+ * video_script prompts), the materialise-on-approve dispatch
+ * (`materialiseAsset`, @/lib/campaigns/materialise — turns an approved
+ * blog/social/email asset into a real blog_posts/carousel_sets/
+ * email_campaigns DRAFT row), and the EXISTING campaign store
  * (`@/lib/campaigns/store`) — no new infrastructure here. Registered into
  * the central tool registry by `@/lib/assistant/tools` (TOOLS/executeTool/
  * WRITE_TOOLS/summarizeToolAction), exactly like tools.marketing.ts.
@@ -78,6 +83,13 @@ export type ToolResult = { text: string; artifact?: ToolArtifact };
 export type ToolContext = { tenantId: number; userId?: number };
 
 const ASSET_KIND_SET = new Set<string>(ASSET_ORDER);
+
+/** Human label for a materialised external record — used only to phrase approve_campaign_asset's result string. */
+const EXTERNAL_KIND_LABEL: Record<NonNullable<CampaignAsset["externalKind"]>, string> = {
+  blog_post: "blog post",
+  carousel_set: "carousel",
+  email_campaign: "email campaign",
+};
 
 /** Validate + coerce a model-supplied `assets` array into AssetDef[], or an error message. Unknown kinds are rejected rather than silently dropped or defaulted. */
 function normalizeAssetDefs(raw: unknown[]): AssetDef[] | { error: string } {
@@ -373,10 +385,14 @@ export async function draftCampaignAssetTool(ctx: ToolContext, input: Record<str
 }
 
 /**
- * WRITE — approve an asset's current draft. Materialising it into its real
- * home (blog_posts / carousel_sets / email_campaigns) is a later task
- * (approveAsset already accepts an optional externalKind/externalId for
- * exactly that) — out of scope here; this only flips status. When every
+ * WRITE — approve an asset's current draft. Before flipping status, tries to
+ * materialise it into its real home (blog_posts / carousel_sets /
+ * email_campaigns, as a DRAFT — see @/lib/campaigns/materialise) and records
+ * the link via approveAsset's optional externalKind/externalId; offer/
+ * ad_copy/video_script have no external home and stay on the asset itself.
+ * materialiseAsset never throws (it logs and returns null on any failure —
+ * an unparseable stored body, an unresolvable site, an unexpected DB error),
+ * so a materialisation hiccup never blocks the approval itself. When every
  * asset in the campaign is approved, the campaign moves to "ready".
  */
 export function approveCampaignAssetTool(ctx: ToolContext, input: Record<string, unknown>): ToolResult {
@@ -400,22 +416,26 @@ export function approveCampaignAssetTool(ctx: ToolContext, input: Record<string,
     return { text: JSON.stringify({ error: `"${asset.title}" hasn't been drafted yet — call draft_campaign_asset first.` }) };
   }
 
-  approveAsset(asset.id);
+  const materialised = materialiseAsset(asset, campaign, ctx.tenantId);
+  approveAsset(asset.id, materialised ?? undefined);
 
   const assets = listAssets(campaignId);
   const nextAsset = nextPendingAsset(assets);
   if (!nextAsset) setCampaignStatus(campaignId, "ready");
 
   const campaignStatus = nextAsset ? campaign.status : "ready";
+  const savedNote = materialised ? ` Saved as a draft ${EXTERNAL_KIND_LABEL[materialised.externalKind]}.` : "";
 
   return {
     text: JSON.stringify({
       result: nextAsset
-        ? `Approved "${asset.title}". Next up: "${nextAsset.title}".`
-        : `Approved "${asset.title}" — every asset in "${campaign.name}" is now approved. The campaign is ready to launch.`,
+        ? `Approved "${asset.title}".${savedNote} Next up: "${nextAsset.title}".`
+        : `Approved "${asset.title}".${savedNote} Every asset in "${campaign.name}" is now approved. The campaign is ready to launch.`,
       campaignId,
       assetId: asset.id,
       approved: true,
+      externalKind: materialised?.externalKind ?? null,
+      externalId: materialised?.externalId ?? null,
       nextAsset,
       campaignStatus,
     }),
