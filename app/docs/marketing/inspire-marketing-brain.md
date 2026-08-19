@@ -119,8 +119,8 @@ for the next intake.
 
 ---
 
-## Still to add (the one open item)
-5. **Proof** — 2–3 real member results (even rough: "James, down 8kg in 6 weeks"; "Marie got off the couch and now trains 3× a week") + which **coaches** to name. That's the only thing missing before this is fully dialled in — everything else is locked.
+## Optional, later (deferred by the owner)
+- **Real member proof** — whenever you want, drop in 2–3 real results + coach names and I'll fold them in. The brain runs safely without them (it hard-bans inventing results and sells the process instead), so this is a nice-to-have, not a blocker.
 
 ---
 
