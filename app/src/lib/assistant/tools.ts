@@ -63,6 +63,14 @@ import {
   saveBlogPostTool,
 } from "@/lib/agents/tools.marketing";
 import {
+  CAMPAIGN_TOOLS,
+  approveCampaignAssetTool,
+  createCampaignTool,
+  draftCampaignAssetTool,
+  launchCampaignTool,
+  planCampaignTool,
+} from "@/lib/agents/tools.campaign";
+import {
   OPERATIONS_TOOLS,
   listLapsedMembersTool,
   listNoShowsTool,
@@ -134,6 +142,13 @@ export const WRITE_TOOLS = new Set<string>([
   // Approve click. The 3 read tools (list_blog_posts, draft_blog_post,
   // draft_carousel) are NOT here and run freely.
   "save_blog_post", "publish_blog_post",
+  // Marketing agent (Campaign Engine Slice 1, Task 3): persisting the
+  // campaign + approving an asset + launching all require an operator
+  // Approve click. The 2 read tools (plan_campaign, draft_campaign_asset)
+  // are NOT here and run freely — draft_campaign_asset DOES persist a
+  // "drafted" row, but never beyond that until approve_campaign_asset (see
+  // tools.campaign.ts's header comment for why that's still a READ).
+  "create_campaign", "approve_campaign_asset", "launch_campaign",
   // Operations agent (Operations Task 1): WhatsApp send to a CLIENT (distinct
   // from the sales agent's lead-scoped send_whatsapp above) — never
   // auto-executes; deferred to the Approve card like every other write above.
@@ -183,6 +198,9 @@ const WRITE_LABELS: Record<string, string> = {
   save_blog_post: "Save blog post draft",
   publish_blog_post: "Publish blog post",
   send_client_whatsapp: "Send WhatsApp",
+  create_campaign: "Create campaign",
+  approve_campaign_asset: "Approve campaign asset",
+  launch_campaign: "Launch campaign",
 };
 
 /** One-line, human-readable description of a pending write, for the Approve card. */
@@ -250,6 +268,16 @@ export function summarizeToolAction(name: string, input: Record<string, unknown>
       return `Save blog post "${v("title") || "Untitled"}" as a draft`;
     case "publish_blog_post":
       return `Publish blog post ${v("title") ? `"${v("title")}"` : `#${v("postId") || "?"}`} to the live site`;
+    case "create_campaign": {
+      const assetCount = Array.isArray(input.assets) ? input.assets.length : 0;
+      return `Create campaign "${v("name") || "Untitled"}"${assetCount ? ` and ${assetCount} asset${assetCount === 1 ? "" : "s"}` : ""}`;
+    }
+    case "approve_campaign_asset": {
+      const assetLabel = v("assetTitle") || `asset #${v("assetId") || "?"}`;
+      return `Approve the ${assetLabel}${v("campaignName") ? ` for "${v("campaignName")}"` : ""}`;
+    }
+    case "launch_campaign":
+      return `Launch ${v("campaignName") ? `"${v("campaignName")}"` : `campaign #${v("campaignId") || "?"}`}`;
     default:
       return WRITE_LABELS[name] ?? name.replace(/_/g, " ");
   }
@@ -811,6 +839,11 @@ export const TOOLS: Anthropic.Tool[] = [
   // ── Marketing agent (Marketing Task 1): blog + carousel drafting ────────
   ...MARKETING_TOOLS,
 
+  // ── Marketing agent (Campaign Engine Slice 1, Task 3): the campaign-kit
+  // build loop — plan, persist, draft each asset one at a time, approve,
+  // launch. ──
+  ...CAMPAIGN_TOOLS,
+
   // ── Operations agent (Operations Task 1): no-show + lapsed-member tools ──
   ...OPERATIONS_TOOLS,
 
@@ -968,6 +1001,16 @@ export async function executeTool(
         return publishBlogPostTool(ctx, input);
       case "draft_carousel":
         return await draftCarouselTool(ctx, input);
+      case "plan_campaign":
+        return await planCampaignTool(ctx, input);
+      case "create_campaign":
+        return createCampaignTool(ctx, input);
+      case "draft_campaign_asset":
+        return await draftCampaignAssetTool(ctx, input);
+      case "approve_campaign_asset":
+        return approveCampaignAssetTool(ctx, input);
+      case "launch_campaign":
+        return launchCampaignTool(ctx, input);
       case "list_no_shows":
         return listNoShowsTool(ctx, input);
       case "list_lapsed_members":

@@ -136,23 +136,31 @@ const requireLocal = createRequire(import.meta.url);
   const salesAllowed = new Set<string>(SPECIALISTS.sales.toolNames);
   assert.ok(!salesAllowed.has(nonSalesTool), "sanity: the chosen non-sales tool is not in the sales tool slice");
 
-  // ── (d) Marketing's shape is pinned too: exactly the 6 tools from
-  // Marketing Task 1 (5 blog/carousel tools + business_overview), and its
-  // base playbook contains — verbatim — the required honesty line that it
-  // cannot post to social or schedule posts. This is the #1 non-negotiable
-  // of Marketing Task 2: the agent must never imply it did something the
-  // infra can't actually do. ──
-  assert.equal(SPECIALISTS.marketing.toolNames.length, 6, "MARKETING_SPECIALIST.toolNames has exactly 6 entries");
+  // ── (d) Marketing's shape is pinned too: the 6 tools from Marketing Task 1
+  // (5 blog/carousel tools + business_overview) plus the 5 campaign-kit
+  // tools from Campaign Engine Slice 1 Task 3 (11 total), and its base
+  // playbook contains — verbatim — the required honesty line that it cannot
+  // post to social or schedule posts. This is the #1 non-negotiable of
+  // Marketing Task 2: the agent must never imply it did something the infra
+  // can't actually do. ──
+  assert.equal(SPECIALISTS.marketing.toolNames.length, 11, "MARKETING_SPECIALIST.toolNames has exactly 11 entries");
   assert.deepEqual(
     [...SPECIALISTS.marketing.toolNames].sort(),
-    ["business_overview", "draft_blog_post", "draft_carousel", "list_blog_posts", "publish_blog_post", "save_blog_post"].sort(),
-    "MARKETING_SPECIALIST.toolNames is exactly the 6 expected tools",
+    [
+      "business_overview", "draft_blog_post", "draft_carousel", "list_blog_posts", "publish_blog_post", "save_blog_post",
+      "plan_campaign", "create_campaign", "draft_campaign_asset", "approve_campaign_asset", "launch_campaign",
+    ].sort(),
+    "MARKETING_SPECIALIST.toolNames is exactly the 11 expected tools",
   );
   assert.ok(
     SPECIALISTS.marketing.basePlaybook.includes(
       "You CANNOT post to social media or schedule posts yet",
     ),
     "MARKETING_SPECIALIST.basePlaybook contains the required honesty line about not being able to post/schedule",
+  );
+  assert.ok(
+    SPECIALISTS.marketing.basePlaybook.includes("ONE asset at a time, never batch"),
+    "MARKETING_SPECIALIST.basePlaybook contains the campaign-build guidance requiring one-asset-at-a-time approval",
   );
 
   // ── (e) Operations' shape is pinned too (Operations Task 1): exactly the

@@ -1,0 +1,455 @@
+import "server-only";
+
+import type Anthropic from "@anthropic-ai/sdk";
+
+import { slugify } from "@/lib/cms/blog";
+import { generateAsset } from "@/lib/campaigns/generate";
+import {
+  ASSET_ORDER,
+  DEFAULT_ASSET_PLAN,
+  addAssets,
+  approveAsset,
+  createCampaign,
+  getAsset,
+  getCampaign,
+  isTerminalStatus,
+  listAssets,
+  nextPendingAsset,
+  setAssetDraft,
+  setCampaignStatus,
+} from "@/lib/campaigns/store";
+import type { AssetDef, AssetKind, Campaign, CampaignAsset } from "@/lib/campaigns/store";
+
+/**
+ * Marketing-agent tools (Campaign Engine Slice 1, Task 3): the five tools
+ * that drive the per-artifact campaign-kit build loop — plan a kit from a
+ * brief, persist it, draft each asset one at a time, approve each one, and
+ * launch once every asset is approved. Wraps the EXISTING generation
+ * dispatch (`generateAsset`, @/lib/campaigns/generate — itself reusing
+ * draftBlogPost/generateCarouselSlides/draftCampaignEmail plus the new
+ * offer/ad_copy/video_script prompts) and the EXISTING campaign store
+ * (`@/lib/campaigns/store`) — no new infrastructure here. Registered into
+ * the central tool registry by `@/lib/assistant/tools` (TOOLS/executeTool/
+ * WRITE_TOOLS/summarizeToolAction), exactly like tools.marketing.ts.
+ *
+ * `ToolArtifact`/`ToolResult`/`ToolContext` below are deliberately LOCAL,
+ * structurally-identical copies of the ones in `@/lib/assistant/tools`
+ * rather than imports from it — same circular-dependency reason documented
+ * in `tools.marketing.ts`: that file imports THIS module's schemas and
+ * executors to register them, so importing back from it here would cycle.
+ * TypeScript's structural typing makes these interchangeable at every call
+ * site.
+ *
+ * No local `tdb`/`resolveSite` helper (unlike tools.marketing.ts): every
+ * `@/lib/campaigns/store` function reads/writes through the ambient,
+ * request-scoped `db` proxy (@/lib/db) rather than an explicit per-tenant
+ * connection — the same choice `@/lib/marketing/campaigns.ts` and
+ * `@/lib/image/carousels.ts` make — and campaigns have no `site_id` (they're
+ * tenant-wide, not per-site), so there's no resolveSite-style
+ * disambiguation step to mirror. `ctx.tenantId` is still used below, as the
+ * meter context's tenantId for AI spend accounting. Safe because every call
+ * site that invokes executeTool for a tenant's tools (/api/assistant/chat,
+ * /api/assistant/execute, /api/agents/[key]/chat) always wraps the call in
+ * runWithTenant(ctx.tenantId, ...) first, so the ambient tenant is
+ * guaranteed to equal ctx.tenantId. Tests must reproduce that wrapping (see
+ * tools.campaign.test.ts).
+ *
+ * READ vs WRITE — one deliberate nuance vs. every other tool file: unlike
+ * draft_blog_post/draft_carousel (which return a draft with NO persistence
+ * at all), `draft_campaign_asset` DOES write a row (setAssetDraft moves the
+ * asset's status "pending" -> "drafted") and is still classified as a READ
+ * (absent from WRITE_TOOLS in @/lib/assistant/tools). That's intentional,
+ * per the plan's Task 3 global constraint ("reads never persist beyond
+ * drafted"): a "drafted" campaign_assets row never leaves the campaign's own
+ * building state and has no external/public exposure — the real
+ * write-approval gate is `approve_campaign_asset`, which promotes it.
+ * `plan_campaign` never persists anything at all (transient in-memory
+ * objects only, discarded after the call).
+ *
+ * Metering: every model-calling tool below (`plan_campaign`,
+ * `draft_campaign_asset`) passes `{ tenantId: ctx.tenantId, agentKey:
+ * "marketing" }` into `generateAsset`, which forwards it verbatim into
+ * whichever underlying generator/meteredCreate call it dispatches to — same
+ * agentKey the rest of the Marketing agent's tools use, so the Agents page's
+ * per-agent spend breakdown stays meaningful.
+ */
+type ToolArtifact = { url: string; filename: string; label: string };
+export type ToolResult = { text: string; artifact?: ToolArtifact };
+export type ToolContext = { tenantId: number; userId?: number };
+
+const ASSET_KIND_SET = new Set<string>(ASSET_ORDER);
+
+/** Validate + coerce a model-supplied `assets` array into AssetDef[], or an error message. Unknown kinds are rejected rather than silently dropped or defaulted. */
+function normalizeAssetDefs(raw: unknown[]): AssetDef[] | { error: string } {
+  const out: AssetDef[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const item = (raw[i] ?? {}) as Record<string, unknown>;
+    const kind = String(item.kind || "");
+    if (!ASSET_KIND_SET.has(kind)) {
+      return { error: `assets[${i}].kind "${kind}" must be one of: ${ASSET_ORDER.join(", ")}.` };
+    }
+    const title = String(item.title || "").trim() || kind;
+    const sortOrderArg = Number(item.sortOrder);
+    const sortOrder = Number.isFinite(sortOrderArg) ? sortOrderArg : i;
+    out.push({ kind: kind as AssetKind, title, sortOrder });
+  }
+  return out;
+}
+
+// ─── Tool schemas (what the model sees) ──────────────────────────────────────
+
+export const CAMPAIGN_TOOLS: Anthropic.Tool[] = [
+  {
+    name: "plan_campaign",
+    description:
+      "Plan a new seasonal campaign kit from a brief: proposes a name/season/dates and GENERATES a real, house-rule-guarded core offer, plus the standard 10-asset build plan (one offer, one blog post, 3 social posts, 3 emails, one ad copy, one video script). Returns ONLY a plan — it does NOT save anything. Show the plan to the operator for Approve/Go-again before calling create_campaign.",
+    input_schema: {
+      type: "object",
+      properties: {
+        brief: {
+          type: "string",
+          description:
+            "What the campaign should be about — the season/theme/goal and any specifics for the offer (e.g. 'a summer transformation offer for new leads, running to June 30th').",
+        },
+        name: { type: "string", description: "Campaign name, e.g. 'Summer Shape Up 2026'. If omitted, propose one." },
+        season: { type: "string", description: "e.g. 'Summer 2026'. Optional." },
+        startsOn: { type: "string", description: "YYYY-MM-DD. Optional." },
+        endsOn: { type: "string", description: "YYYY-MM-DD. Optional." },
+      },
+      required: ["brief"],
+    },
+  },
+  {
+    name: "create_campaign",
+    description:
+      "Persist a campaign and seed its asset plan. Call this ONLY after the operator has approved the plan from plan_campaign (or asked to trim it). The offer asset is saved as an immediate draft of the given offer text (ready for Approve/Go-again); every other asset starts pending, built one at a time via draft_campaign_asset.",
+    input_schema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Campaign name." },
+        season: { type: "string", description: "Optional." },
+        startsOn: { type: "string", description: "YYYY-MM-DD. Optional." },
+        endsOn: { type: "string", description: "YYYY-MM-DD. Optional." },
+        offer: { type: "string", description: "The approved offer text — normally plan_campaign's `offer` verbatim." },
+        assets: {
+          type: "array",
+          description:
+            "The asset plan to seed — normally plan_campaign's `assets` verbatim, or trimmed if the operator asked to drop some. Defaults to the standard 10-asset plan if omitted.",
+          items: {
+            type: "object",
+            properties: {
+              kind: { type: "string", enum: [...ASSET_ORDER] },
+              title: { type: "string" },
+              sortOrder: { type: "integer", description: "Build order, 0-based. Defaults to the array position if omitted." },
+            },
+            required: ["kind", "title"],
+          },
+        },
+      },
+      required: ["name", "offer"],
+    },
+  },
+  {
+    name: "draft_campaign_asset",
+    description:
+      "Generate (or regenerate, with a tweak) ONE campaign asset's draft content — the next step in building a campaign kit one artifact at a time. Saves the draft to the asset, but this is NOT the operator's approval — show it in chat and only call approve_campaign_asset once they explicitly approve THAT asset.",
+    input_schema: {
+      type: "object",
+      properties: {
+        campaignId: { type: "integer" },
+        assetId: { type: "integer", description: "The asset's id — see the campaign's nextAsset from create_campaign/approve_campaign_asset." },
+        tweak: { type: "string", description: "Optional one-line instruction to change this draft on a 'Go again' (e.g. 'make it punchier')." },
+      },
+      required: ["campaignId", "assetId"],
+    },
+  },
+  {
+    name: "approve_campaign_asset",
+    description:
+      "Approve a campaign asset's current draft. ONLY call this after the operator has explicitly approved what draft_campaign_asset showed them for THAT asset — never batch-approve, never approve without an explicit go-ahead. When every asset in the campaign is approved, the campaign becomes ready to launch.",
+    input_schema: {
+      type: "object",
+      properties: {
+        campaignId: { type: "integer" },
+        assetId: { type: "integer" },
+        assetTitle: {
+          type: "string",
+          description: "Optional — this asset's title (e.g. from draft_campaign_asset's own result), purely so the operator sees a clear confirmation card.",
+        },
+        campaignName: { type: "string", description: "Optional — the campaign's name, purely for the confirmation card." },
+      },
+      required: ["campaignId", "assetId"],
+    },
+  },
+  {
+    name: "launch_campaign",
+    description:
+      "Launch a campaign once every asset is approved (status 'ready'). Only call this when the operator explicitly asks to launch/go live.",
+    input_schema: {
+      type: "object",
+      properties: {
+        campaignId: { type: "integer" },
+        campaignName: { type: "string", description: "Optional — the campaign's name, purely for the confirmation card." },
+      },
+      required: ["campaignId"],
+    },
+  },
+];
+
+// ─── Executors ───────────────────────────────────────────────────────────────
+
+/**
+ * READ — plans a campaign kit from a brief: proposes name/season/dates and
+ * GENERATES a real offer via generateAsset's "offer" branch (which reads the
+ * tenant's Marketing Brain + venue voice through getBusinessContext(), and
+ * restates the house-rules clause in its own prompt — see
+ * @/lib/campaigns/prompts). The operator's brief rides in as `tweak`:
+ * generateAsset's last parameter is exactly "extra instruction for this
+ * draft", which is what a brief is at plan time (there's no saved offer yet
+ * for it to riff on). Performs NO persistence — nothing is saved until
+ * create_campaign.
+ */
+export async function planCampaignTool(ctx: ToolContext, input: Record<string, unknown>): Promise<ToolResult> {
+  const brief = String(input.brief || "").trim();
+  if (!brief) return { text: JSON.stringify({ error: "brief is required." }) };
+
+  const name = input.name != null ? String(input.name).trim() : "";
+  const season = input.season != null ? String(input.season).trim() : "";
+  const startsOn = input.startsOn != null ? String(input.startsOn).trim() : "";
+  const endsOn = input.endsOn != null ? String(input.endsOn).trim() : "";
+  const draftName = name || "New campaign";
+
+  // Transient (never persisted) Campaign/CampaignAsset shapes — just enough
+  // for generateAsset's "offer" branch, which only reads asset.title and
+  // campaign.{name,season,startsOn,endsOn,offer} (see prompts.ts's
+  // campaignContextLines). Every other field is a placeholder that branch
+  // never touches.
+  const now = new Date();
+  const transientCampaign: Campaign = {
+    id: 0,
+    name: draftName,
+    slug: "",
+    season: season || null,
+    startsOn: startsOn || null,
+    endsOn: endsOn || null,
+    offer: "",
+    status: "building",
+    createdAt: now,
+    updatedAt: now,
+  };
+  const transientOfferAsset: CampaignAsset = {
+    id: 0,
+    campaignId: 0,
+    kind: "offer",
+    title: "Offer",
+    body: "",
+    sortOrder: 0,
+    status: "pending",
+    externalKind: null,
+    externalId: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  try {
+    const { body: offer } = await generateAsset(
+      transientOfferAsset,
+      transientCampaign,
+      { tenantId: ctx.tenantId, agentKey: "marketing" },
+      brief,
+    );
+
+    return {
+      text: JSON.stringify({
+        result:
+          "Plan prepared — nothing has been saved. Show it to the operator; once they approve (trimming `assets` first if they want fewer), call create_campaign with this exact shape.",
+        name: draftName,
+        season: season || null,
+        startsOn: startsOn || null,
+        endsOn: endsOn || null,
+        offer,
+        assets: DEFAULT_ASSET_PLAN,
+      }),
+    };
+  } catch (e) {
+    return { text: JSON.stringify({ error: e instanceof Error ? e.message : "Failed to plan the campaign." }) };
+  }
+}
+
+/** WRITE — persist a campaign + its asset plan. Call ONLY after the operator has approved plan_campaign's output. */
+export function createCampaignTool(ctx: ToolContext, input: Record<string, unknown>): ToolResult {
+  const name = String(input.name || "").trim();
+  if (!name) return { text: JSON.stringify({ error: "name is required." }) };
+
+  // `offer` is schema-required (steers the model to always pass the
+  // already-approved plan's offer) but not runtime-fatal if somehow blank:
+  // the campaign row still has its own DB default (""), it's just that the
+  // offer asset below is left "pending" instead of pre-seeded — there's
+  // nothing to seed it with.
+  const offer = input.offer != null ? String(input.offer).trim() : "";
+  const season = input.season != null ? String(input.season).trim() || null : null;
+  const startsOn = input.startsOn != null ? String(input.startsOn).trim() || null : null;
+  const endsOn = input.endsOn != null ? String(input.endsOn).trim() || null : null;
+
+  let assetDefs: AssetDef[] = DEFAULT_ASSET_PLAN;
+  if (Array.isArray(input.assets) && input.assets.length > 0) {
+    const normalized = normalizeAssetDefs(input.assets);
+    if (!Array.isArray(normalized)) return { text: JSON.stringify({ error: normalized.error }) };
+    assetDefs = normalized;
+  }
+
+  // Deterministic, no random/timestamp suffix — two campaigns with the exact
+  // same name land on the exact same slug (dedupe is not required for v1).
+  const slug = slugify(name) || "campaign";
+
+  const campaign = createCampaign({ name, slug, season, startsOn, endsOn, offer });
+  const assets = addAssets(campaign.id, assetDefs);
+
+  // Pre-seed the offer asset (kind "offer") with the already-generated,
+  // already-shown offer text, moving it straight to "drafted" — so its first
+  // card in chat is Approve/Go-again like every other asset, instead of
+  // forcing a redundant regeneration of an offer the operator already saw
+  // and approved at the plan step.
+  if (offer) {
+    const offerAsset = assets.find((a) => a.kind === "offer");
+    if (offerAsset) setAssetDraft(offerAsset.id, { title: offerAsset.title || "Offer", body: offer });
+  }
+
+  const freshAssets = listAssets(campaign.id);
+  const nextAsset = nextPendingAsset(freshAssets);
+
+  return {
+    text: JSON.stringify({
+      result: `Created campaign "${name}" with ${assets.length} asset${assets.length === 1 ? "" : "s"}.`,
+      campaignId: campaign.id,
+      slug: campaign.slug,
+      nextAsset,
+    }),
+  };
+}
+
+/**
+ * READ — generate (or regenerate, with `tweak`) ONE asset's draft content and
+ * save it (status -> "drafted"). See this file's header comment for why this
+ * DOES persist a row yet is still a READ, not a WRITE_TOOLS entry.
+ */
+export async function draftCampaignAssetTool(ctx: ToolContext, input: Record<string, unknown>): Promise<ToolResult> {
+  const campaignId = Number(input.campaignId);
+  const assetId = Number(input.assetId);
+  if (!campaignId) return { text: JSON.stringify({ error: "campaignId is required." }) };
+  if (!assetId) return { text: JSON.stringify({ error: "assetId is required." }) };
+
+  const campaign = getCampaign(campaignId);
+  if (!campaign) return { text: JSON.stringify({ error: `No campaign with id ${campaignId}.` }) };
+  if (isTerminalStatus(campaign.status)) {
+    return { text: JSON.stringify({ error: `Campaign "${campaign.name}" is ${campaign.status} — no further changes.` }) };
+  }
+
+  const asset = getAsset(assetId);
+  if (!asset) return { text: JSON.stringify({ error: `No asset with id ${assetId}.` }) };
+  if (asset.campaignId !== campaignId) {
+    return { text: JSON.stringify({ error: `Asset ${assetId} does not belong to campaign ${campaignId}.` }) };
+  }
+
+  const tweak = input.tweak != null ? String(input.tweak).trim() || undefined : undefined;
+
+  try {
+    const draft = await generateAsset(asset, campaign, { tenantId: ctx.tenantId, agentKey: "marketing" }, tweak);
+    setAssetDraft(asset.id, draft);
+
+    return {
+      text: JSON.stringify({
+        result: `Draft prepared for "${draft.title}" — this is NOT approved yet. Show it to the operator and only call approve_campaign_asset once they approve it (or call draft_campaign_asset again with a tweak for "Go again").`,
+        campaignId,
+        assetId: asset.id,
+        kind: asset.kind,
+        title: draft.title,
+        body: draft.body,
+      }),
+    };
+  } catch (e) {
+    return { text: JSON.stringify({ error: e instanceof Error ? e.message : "Failed to draft this asset." }) };
+  }
+}
+
+/**
+ * WRITE — approve an asset's current draft. Materialising it into its real
+ * home (blog_posts / carousel_sets / email_campaigns) is a later task
+ * (approveAsset already accepts an optional externalKind/externalId for
+ * exactly that) — out of scope here; this only flips status. When every
+ * asset in the campaign is approved, the campaign moves to "ready".
+ */
+export function approveCampaignAssetTool(ctx: ToolContext, input: Record<string, unknown>): ToolResult {
+  const campaignId = Number(input.campaignId);
+  const assetId = Number(input.assetId);
+  if (!campaignId) return { text: JSON.stringify({ error: "campaignId is required." }) };
+  if (!assetId) return { text: JSON.stringify({ error: "assetId is required." }) };
+
+  const campaign = getCampaign(campaignId);
+  if (!campaign) return { text: JSON.stringify({ error: `No campaign with id ${campaignId}.` }) };
+  if (isTerminalStatus(campaign.status)) {
+    return { text: JSON.stringify({ error: `Campaign "${campaign.name}" is ${campaign.status} — no further changes.` }) };
+  }
+
+  const asset = getAsset(assetId);
+  if (!asset) return { text: JSON.stringify({ error: `No asset with id ${assetId}.` }) };
+  if (asset.campaignId !== campaignId) {
+    return { text: JSON.stringify({ error: `Asset ${assetId} does not belong to campaign ${campaignId}.` }) };
+  }
+  if (asset.status === "pending") {
+    return { text: JSON.stringify({ error: `"${asset.title}" hasn't been drafted yet — call draft_campaign_asset first.` }) };
+  }
+
+  approveAsset(asset.id);
+
+  const assets = listAssets(campaignId);
+  const nextAsset = nextPendingAsset(assets);
+  if (!nextAsset) setCampaignStatus(campaignId, "ready");
+
+  const campaignStatus = nextAsset ? campaign.status : "ready";
+
+  return {
+    text: JSON.stringify({
+      result: nextAsset
+        ? `Approved "${asset.title}". Next up: "${nextAsset.title}".`
+        : `Approved "${asset.title}" — every asset in "${campaign.name}" is now approved. The campaign is ready to launch.`,
+      campaignId,
+      assetId: asset.id,
+      approved: true,
+      nextAsset,
+      campaignStatus,
+    }),
+  };
+}
+
+/**
+ * WRITE — launch a campaign once every asset is approved (status "ready").
+ * Task 3 stub: flips status to "active" only — publishing the blog, queueing
+ * emails and marking socials ready-to-post is a later task; this never
+ * claims any of that happened.
+ */
+export function launchCampaignTool(ctx: ToolContext, input: Record<string, unknown>): ToolResult {
+  void ctx; // no tenant-scoped read needed beyond the campaign row itself (ambient db)
+  const campaignId = Number(input.campaignId);
+  if (!campaignId) return { text: JSON.stringify({ error: "campaignId is required." }) };
+
+  const campaign = getCampaign(campaignId);
+  if (!campaign) return { text: JSON.stringify({ error: `No campaign with id ${campaignId}.` }) };
+  if (campaign.status !== "ready") {
+    return {
+      text: JSON.stringify({
+        error: `"${campaign.name}" isn't ready to launch yet (status: ${campaign.status}) — every asset must be approved first.`,
+      }),
+    };
+  }
+
+  setCampaignStatus(campaignId, "active");
+
+  return {
+    text: JSON.stringify({
+      result: `Marked "${campaign.name}" as active. (Publishing the blog, queueing emails and marking socials ready — the real per-asset launch — lands in a later update; for now this only flips the campaign's status.)`,
+      campaignId,
+      status: "active",
+    }),
+  };
+}
