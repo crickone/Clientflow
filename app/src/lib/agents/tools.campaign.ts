@@ -5,6 +5,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { slugify } from "@/lib/cms/blog";
 import { generateAsset } from "@/lib/campaigns/generate";
 import { materialiseAsset } from "@/lib/campaigns/materialise";
+import { launchCampaign } from "@/lib/campaigns/launch";
 import {
   ASSET_ORDER,
   DEFAULT_ASSET_PLAN,
@@ -463,9 +464,13 @@ export function approveCampaignAssetTool(ctx: ToolContext, input: Record<string,
 
 /**
  * WRITE — launch a campaign once every asset is approved (status "ready").
- * Task 3 stub: flips status to "active" only — publishing the blog, queueing
- * emails and marking socials ready-to-post is a later task; this never
- * claims any of that happened.
+ * Delegates the actual per-asset work to @/lib/campaigns/launch's
+ * `launchCampaign` — blog publishes for real (siteId re-derived from the
+ * linked blog_posts row), email/social are queued for the operator rather
+ * than auto-sent/auto-posted (see that module's header comment for exactly
+ * why) — then flips the campaign to "active". The result text reports
+ * ONLY what `launchCampaign` actually reports back: never claims a
+ * publish/send that didn't happen.
  */
 export function launchCampaignTool(ctx: ToolContext, input: Record<string, unknown>): ToolResult {
   void ctx; // no tenant-scoped read needed beyond the campaign row itself (ambient db)
@@ -477,18 +482,33 @@ export function launchCampaignTool(ctx: ToolContext, input: Record<string, unkno
   if (campaign.status !== "ready") {
     return {
       text: JSON.stringify({
-        error: `"${campaign.name}" isn't ready to launch yet (status: ${campaign.status}) — every asset must be approved first.`,
+        error: `"${campaign.name}" isn't ready to launch yet (status: ${campaign.status}) — approve every asset first.`,
       }),
     };
   }
 
-  setCampaignStatus(campaignId, "active");
+  try {
+    const { published, queued } = launchCampaign(campaignId);
 
-  return {
-    text: JSON.stringify({
-      result: `Marked "${campaign.name}" as active. (Publishing the blog, queueing emails and marking socials ready — the real per-asset launch — lands in a later update; for now this only flips the campaign's status.)`,
-      campaignId,
-      status: "active",
-    }),
-  };
+    const parts: string[] = [];
+    if (published.length) {
+      parts.push(`${published.length} published (${published.map((p) => p.title).join(", ")})`);
+    }
+    if (queued.length) {
+      parts.push(`${queued.length} queued for manual follow-up (${queued.map((q) => q.title).join(", ")})`);
+    }
+    const summary = parts.length > 0 ? parts.join("; ") : "nothing to publish or queue (no asset had a materialised link)";
+
+    return {
+      text: JSON.stringify({
+        result: `Launched "${campaign.name}": ${summary}.`,
+        campaignId,
+        status: "active",
+        published,
+        queued,
+      }),
+    };
+  } catch (e) {
+    return { text: JSON.stringify({ error: e instanceof Error ? e.message : "Failed to launch this campaign." }) };
+  }
 }

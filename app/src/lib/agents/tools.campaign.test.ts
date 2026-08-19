@@ -122,7 +122,7 @@ const requireLocal = createRequire(import.meta.url);
   } = requireLocal("./tools.campaign") as typeof import("./tools.campaign");
   const { TOOLS, WRITE_TOOLS, summarizeToolAction } =
     requireLocal("../assistant/tools") as typeof import("../assistant/tools");
-  const { DEFAULT_ASSET_PLAN, listAssets, getAsset, getCampaign } =
+  const { DEFAULT_ASSET_PLAN, listAssets, getAsset, getCampaign, setAssetDraft } =
     requireLocal("../campaigns/store") as typeof import("../campaigns/store");
   const { emailAngleFromTitle } = requireLocal("../campaigns/generate") as typeof import("../campaigns/generate");
 
@@ -366,8 +366,191 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(launched.status, "active");
     assert.equal(runWithTenant(tid, () => getCampaign(campaignId))?.status, "active", "the persisted campaign row's status is active after launch");
 
+    // This tenant has NO CMS site (sites starts empty — see the header
+    // comment on tools.marketing.test.ts's equivalent setup), so the blog
+    // asset above never materialised (Task 4 carry-in: externalKind stays
+    // null on a 0-site tenant) — launch must tolerate that and skip it
+    // rather than crash or falsely claim a publish. The 3 social assets
+    // ALSO never materialised here — this file's generateAsset stub (see
+    // the header comment) returns a plain string body for "social", not the
+    // {caption,slides} JSON materialiseAsset needs, so they're tolerated
+    // the same way, just for a different reason (unparseable body, not a
+    // missing site). Only the 3 email assets (whose stub body IS valid
+    // JSON) actually materialised. A dedicated real-materialised-social
+    // scenario proving the queue behaviour follows below (i3).
+    assert.deepEqual(
+      launched.published,
+      [],
+      "no CMS site exists on this tenant, so the blog asset was never materialised — launch skips it (Task 4 carry-in), publishing nothing",
+    );
+    assert.equal(launched.queued.length, 3, "exactly the 3 materialised email assets are queued here (social didn't materialise under this test's stub; offer/ad_copy/video_script have no external home)");
+    assert.deepEqual(
+      launched.queued.map((q: { kind: string }) => q.kind).sort(),
+      ["email", "email", "email"],
+      "the queued items here are exactly the materialised email assets",
+    );
+    assert.ok(
+      launched.queued.every((q: { where: unknown }) => typeof q.where === "string" && q.where.length > 0),
+      "every queued item carries a non-empty honest label",
+    );
+    assert.ok(
+      launched.queued.every((q: { kind: string; where: string }) => q.kind === "email" && /ready to send in Email campaigns/.test(q.where)),
+      "email items are honestly labelled 'ready to send' — never claimed sent (no scheduler is fired)",
+    );
+
     const launchUnknown = JSON.parse(runWithTenant(tid, () => launchCampaignTool(ctx, { campaignId: 9_999_999 })).text);
     assert.ok(launchUnknown.error, "launch_campaign errors cleanly for an unknown campaignId");
+
+    // ── (i2) launch_campaign — blog ACTUALLY publishes for real. The flow
+    // above never exercised this (no CMS site on that tenant), so it only
+    // proved the tolerate-and-skip half. Seed exactly one site, build a
+    // fresh (trimmed, for speed) offer+blog campaign, draft+approve the
+    // blog asset (materialises it against the real site), launch, and
+    // assert the underlying blog_posts row is genuinely publishState =
+    // "published" with siteId matching the seeded site — proof launch.ts's
+    // publishBlog re-derives siteId via getBlogPost rather than guessing,
+    // and that the summary's "published" claim is truthful, not just text. ──
+    const { sites: sitesTable, blogPosts: blogPostsTable } = requireLocal("../db/schema") as typeof import("../db/schema");
+    const seededSite = runWithTenant(tid, () => {
+      const { db: tdb } = requireLocal("../db") as typeof import("../db");
+      return tdb.insert(sitesTable).values({ slug: "campaign-test-site", name: "Campaign Test Site" }).returning().get();
+    });
+    assert.ok(seededSite?.id, "blog-publish test sanity: a CMS site now exists on this tenant");
+
+    const blogCampaign = JSON.parse(
+      runWithTenant(tid, () =>
+        createCampaignTool(ctx, {
+          name: "Blog Publish Test",
+          offer: "blog-only kit",
+          assets: [
+            { kind: "offer", title: "Offer" },
+            { kind: "blog", title: "Blog post" },
+          ],
+        }),
+      ).text,
+    );
+    assert.ok(!blogCampaign.error, "blog-publish test: create_campaign succeeds");
+    const blogCampaignId = blogCampaign.campaignId as number;
+    const blogCampaignAssets = runWithTenant(tid, () => listAssets(blogCampaignId));
+    const offerAssetForBlogTest = blogCampaignAssets.find((a) => a.kind === "offer")!;
+    const blogAssetForBlogTest = blogCampaignAssets.find((a) => a.kind === "blog")!;
+
+    assert.ok(
+      JSON.parse(
+        runWithTenant(tid, () =>
+          approveCampaignAssetTool(ctx, { campaignId: blogCampaignId, assetId: offerAssetForBlogTest.id }),
+        ).text,
+      ).approved,
+      "blog-publish test: the pre-drafted offer asset approves",
+    );
+    const blogDraft = JSON.parse(
+      (
+        await runWithTenant(tid, async () =>
+          draftCampaignAssetTool(ctx, { campaignId: blogCampaignId, assetId: blogAssetForBlogTest.id }),
+        )
+      ).text,
+    );
+    assert.ok(!blogDraft.error, "blog-publish test: draft_campaign_asset succeeds for the blog asset");
+    const blogApprove = JSON.parse(
+      runWithTenant(tid, () =>
+        approveCampaignAssetTool(ctx, { campaignId: blogCampaignId, assetId: blogAssetForBlogTest.id }),
+      ).text,
+    );
+    assert.ok(blogApprove.approved && !blogApprove.error, "blog-publish test: blog asset approves");
+    assert.equal(blogApprove.externalKind, "blog_post", "blog-publish test: the blog asset materialised to a real blog_posts row");
+    const materialisedBlogId = blogApprove.externalId as number;
+    assert.equal(
+      runWithTenant(tid, () => getCampaign(blogCampaignId))?.status,
+      "ready",
+      "blog-publish test: the campaign is ready once both its assets are approved",
+    );
+
+    const blogPostBeforeLaunch = runWithTenant(tid, () => {
+      const { db: tdb } = requireLocal("../db") as typeof import("../db");
+      return tdb.select().from(blogPostsTable).all().find((p) => p.id === materialisedBlogId);
+    });
+    assert.equal(blogPostBeforeLaunch?.publishState, "draft", "blog-publish test sanity: the materialised post starts as a draft, not yet published");
+
+    const blogLaunch = JSON.parse(runWithTenant(tid, () => launchCampaignTool(ctx, { campaignId: blogCampaignId })).text);
+    assert.ok(blogLaunch.result && !blogLaunch.error, "blog-publish test: launch_campaign succeeds");
+    assert.equal(blogLaunch.published.length, 1, "blog-publish test: exactly one asset published");
+    assert.equal(blogLaunch.published[0].kind, "blog", "blog-publish test: the published item is the blog asset");
+    assert.equal(blogLaunch.published[0].title, "Blog post", "blog-publish test: the published item carries the asset's title");
+    assert.ok(
+      /published/i.test(blogLaunch.published[0].where),
+      `blog-publish test: the published item's "where" reads as published: "${blogLaunch.published[0].where}"`,
+    );
+    assert.deepEqual(blogLaunch.queued, [], "blog-publish test: the offer asset has no external home, so nothing is queued");
+
+    const blogPostAfterLaunch = runWithTenant(tid, () => {
+      const { db: tdb } = requireLocal("../db") as typeof import("../db");
+      return tdb.select().from(blogPostsTable).all().find((p) => p.id === materialisedBlogId);
+    });
+    assert.equal(
+      blogPostAfterLaunch?.publishState,
+      "published",
+      "blog-publish test: the REAL blog_posts row is now published — launch_campaign genuinely calls setPublishState, not just claims to",
+    );
+    assert.equal(
+      blogPostAfterLaunch?.siteId,
+      seededSite.id,
+      "blog-publish test: the published post's siteId matches the seeded site — proves siteId was re-derived via getBlogPost, not guessed",
+    );
+    assert.ok(blogPostAfterLaunch?.publishedAt, "blog-publish test: publishedAt is set");
+
+    // ── (i3) launch_campaign — social ACTUALLY gets queued, never
+    // auto-posted, once genuinely materialised. The shared flow above never
+    // exercised this (its generateAsset stub returns a plain string for
+    // "social", not valid {caption,slides} JSON, so materialisation there
+    // always no-ops). Inject a validly-shaped draft directly via
+    // setAssetDraft (bypassing the stub) so this asset genuinely
+    // materialises into a real carousel_sets row, then launch and assert
+    // it's queued with the exact honest label. ──
+    const socialCampaign = JSON.parse(
+      runWithTenant(tid, () =>
+        createCampaignTool(ctx, {
+          name: "Social Queue Test",
+          offer: "social-only kit",
+          assets: [{ kind: "social", title: "Social post 1" }],
+        }),
+      ).text,
+    );
+    assert.ok(!socialCampaign.error, "social-queue test: create_campaign succeeds");
+    const socialCampaignId = socialCampaign.campaignId as number;
+    const socialAsset = runWithTenant(tid, () => listAssets(socialCampaignId))[0];
+
+    runWithTenant(tid, () =>
+      setAssetDraft(socialAsset.id, {
+        title: socialAsset.title,
+        body: JSON.stringify({
+          caption: "Test caption",
+          slides: [{ template: "carousel-cover", heading: "H", body: "B", image: "" }],
+        }),
+      }),
+    );
+    const socialApprove = JSON.parse(
+      runWithTenant(tid, () =>
+        approveCampaignAssetTool(ctx, { campaignId: socialCampaignId, assetId: socialAsset.id }),
+      ).text,
+    );
+    assert.ok(socialApprove.approved && !socialApprove.error, "social-queue test: social asset approves");
+    assert.equal(socialApprove.externalKind, "carousel_set", "social-queue test: the social asset materialised to a real carousel_sets row");
+    assert.equal(
+      runWithTenant(tid, () => getCampaign(socialCampaignId))?.status,
+      "ready",
+      "social-queue test: campaign is ready once its one asset is approved",
+    );
+
+    const socialLaunch = JSON.parse(runWithTenant(tid, () => launchCampaignTool(ctx, { campaignId: socialCampaignId })).text);
+    assert.ok(socialLaunch.result && !socialLaunch.error, "social-queue test: launch_campaign succeeds");
+    assert.deepEqual(socialLaunch.published, [], "social-queue test: nothing is auto-published for a social-only kit");
+    assert.equal(socialLaunch.queued.length, 1, "social-queue test: exactly one item queued");
+    assert.equal(socialLaunch.queued[0].kind, "social");
+    assert.equal(
+      socialLaunch.queued[0].where,
+      "social ready to post (auto-posting coming after Meta review)",
+      "social-queue test: the exact honest label — auto-posting is never claimed",
+    );
 
     // ── (i-regression) Idempotent approve + materialise — re-approving an
     // already-approved email asset must never create a duplicate email_campaign
