@@ -14,11 +14,12 @@ import {
 } from "lucide-react";
 
 import { requireAdminPage } from "@/lib/auth";
-import { getCampaign, listAssets } from "@/lib/campaigns/store";
+import { findApprovedLandingAsset, getCampaign, getCampaignLandingUrl, listAssets } from "@/lib/campaigns/store";
 import type { CampaignAsset } from "@/lib/campaigns/store";
 import { getBlogPost } from "@/lib/blog/posts";
 import { getSiteById } from "@/lib/cms/sites";
-import { parseEmailBody, parseSocialBody } from "@/lib/campaigns/assetBody";
+import { parseEmailBody, parseLandingBody, parseSocialBody } from "@/lib/campaigns/assetBody";
+import { countLeadsByCampaign } from "@/lib/leads";
 import { formatDate } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -63,8 +64,11 @@ const EXTERNAL_HOME_LABEL: Record<NonNullable<CampaignAsset["externalKind"]>, st
 // never gives an external home to — they render fully inline instead, with a
 // copy affordance (per the Task 7 brief). landing_page (Slice 2) also has no
 // external home, but stores structured JSON rather than reader-facing plain
-// text, so it's deliberately left out of this set — a later task gives it
-// its own "view live" affordance once the public landing route exists.
+// text, so it's deliberately left out of this set — it gets its OWN "view
+// live" affordance instead (Slice 2 Task 4's landing-URL block, rendered
+// separately below, right under the Offer) once the public landing route
+// exists AND the campaign is live (ready/active) — see
+// findApprovedLandingAsset.
 const COPYABLE_KINDS = new Set<CampaignAsset["kind"]>(["offer", "ad_copy", "video_script"]);
 
 /**
@@ -97,11 +101,19 @@ async function externalHref(asset: CampaignAsset): Promise<string | null> {
 
 /**
  * A readable preview of an asset's stored body. offer/ad_copy/video_script/
- * blog store plain text or markdown directly; social/email store a JSON
- * envelope (see ./assetBody's header comment) that gets parsed into
- * something readable rather than shown as raw JSON. Never throws — an
- * unparseable social/email body (shouldn't happen; setAssetDraft always
- * writes what generateAsset returned) just degrades to an empty preview.
+ * blog store plain text or markdown directly; social/email/landing_page
+ * store a JSON envelope (see ./assetBody's header comment) that gets parsed
+ * into something readable rather than shown as raw JSON. Never throws — an
+ * unparseable social/email/landing_page body (shouldn't happen; setAssetDraft
+ * always writes what generateAsset returned) just degrades to an empty
+ * preview.
+ *
+ * landing_page carried fix (Task 4): this used to have no branch for it at
+ * all, so it fell through to the final `return asset.body` below and
+ * rendered the asset's raw `{headline, subhead, bullets, ctaLabel}` JSON
+ * verbatim in the card. Never shows raw JSON now — just the headline (plus
+ * subhead, if the model wrote one), same "readable, not raw" bar social/email
+ * already meet.
  */
 function previewText(asset: CampaignAsset): string {
   if (!asset.body) return "";
@@ -115,6 +127,11 @@ function previewText(asset: CampaignAsset): string {
     const parsed = parseEmailBody(asset.body);
     if (!parsed) return "";
     return `Subject: ${parsed.subject}\n\n${parsed.content}`;
+  }
+  if (asset.kind === "landing_page") {
+    const parsed = parseLandingBody(asset.body);
+    if (!parsed || !parsed.headline) return "";
+    return [`Landing page — ${parsed.headline}`, parsed.subhead].filter(Boolean).join("\n\n");
   }
   return asset.body;
 }
@@ -130,6 +147,19 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
   const assets = listAssets(id);
   const hrefs = await Promise.all(assets.map((a) => externalHref(a)));
   const approvedCount = assets.filter((a) => a.status === "approved").length;
+
+  // Landing page (Slice 2 Task 4): reuses the SAME gate the public
+  // `/site/<slug>/c/<campaignSlug>` route checks (findApprovedLandingAsset —
+  // an approved landing_page asset AND campaign.status ready/active) so this
+  // block only ever offers a link that actually resolves. landingUrl is null
+  // when the tenant has no CMS site yet (getCampaignLandingUrl, via the
+  // shared buildCampaignLandingUrl — the SAME helper launch.ts's summary
+  // line uses, so the two can't disagree) — signupCount is computed
+  // unconditionally (cheap, and well-defined regardless of the gate) but
+  // only ever displayed alongside the gated block below.
+  const landingAsset = findApprovedLandingAsset(campaign.status, assets);
+  const landingUrl = landingAsset ? await getCampaignLandingUrl(campaign.slug) : null;
+  const signupCount = countLeadsByCampaign(campaign.name);
 
   const dateRange =
     campaign.startsOn || campaign.endsOn
@@ -187,6 +217,54 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
             {campaign.offer || "Not set yet."}
           </p>
         </div>
+
+        {landingAsset && (
+          <div>
+            <div
+              style={{
+                fontSize: 11,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                color: "var(--text-tertiary)",
+                marginBottom: 6,
+              }}
+            >
+              Landing page
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              {landingUrl ? (
+                <>
+                  <code
+                    style={{
+                      fontSize: 12.5,
+                      color: "var(--text-secondary)",
+                      background: "var(--surface-2)",
+                      border: "1px solid var(--hairline)",
+                      borderRadius: "var(--radius)",
+                      padding: "4px 8px",
+                    }}
+                  >
+                    {landingUrl}
+                  </code>
+                  <CopyAssetButton text={landingUrl} />
+                  <a href={landingUrl} target="_blank" rel="noreferrer">
+                    <Button variant="ghost" size="sm">
+                      <ExternalLink size={13} />
+                      View
+                    </Button>
+                  </a>
+                </>
+              ) : (
+                <span style={{ fontSize: 13, color: "var(--text-tertiary)", fontStyle: "italic" }}>
+                  Add a site to publish the landing page.
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: 12.5, color: "var(--text-tertiary)", marginTop: 8 }}>
+              {signupCount === 1 ? "1 sign-up so far" : `${signupCount} sign-ups so far`}
+            </div>
+          </div>
+        )}
       </Card>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>

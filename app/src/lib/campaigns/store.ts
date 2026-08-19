@@ -5,6 +5,8 @@ import { asc, desc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { Campaign, CampaignAsset } from "@/lib/db/schema";
 
+import { listSites } from "@/lib/cms/sites";
+
 import {
   ASSET_ORDER,
   DEFAULT_ASSET_PLAN,
@@ -18,6 +20,7 @@ import {
   type CampaignStatus,
   type LandingAssetLike,
 } from "./plan";
+import { buildCampaignLandingUrl } from "./landingUrl";
 
 /**
  * Campaign store — drizzle CRUD for `campaigns` + `campaign_assets`
@@ -36,7 +39,12 @@ import {
  * — and are just re-exported here for callers that only need `./store` as
  * their one import (e.g. the public landing route, Campaign Engine Slice 2
  * Task 3, which needs findApprovedLandingAsset alongside getCampaignBySlug/
- * listAssets below).
+ * listAssets below). buildCampaignLandingUrl (the representative-site pick +
+ * URL-format rule for a campaign's landing page — Slice 2 Task 4) lives in
+ * ./landingUrl for the same DB-free-testability reason and is re-exported the
+ * same way; its DB-touching half, `getCampaignLandingUrl` below, reads the
+ * tenant's sites via @/lib/cms/sites's listSites() so launch.ts and the
+ * campaign hub detail page both get the SAME answer through one call.
  */
 export {
   ASSET_ORDER,
@@ -44,6 +52,7 @@ export {
   findApprovedLandingAsset,
   isTerminalStatus,
   nextPendingAsset,
+  buildCampaignLandingUrl,
 };
 export type { AssetDef, AssetKind, AssetLike, AssetStatus, CampaignStatus, LandingAssetLike };
 export type { Campaign, CampaignAsset };
@@ -115,6 +124,22 @@ export function setCampaignStatus(id: number, status: CampaignStatus): void {
     .set({ status, updatedAt: new Date() })
     .where(eq(schema.campaigns.id, id))
     .run();
+}
+
+/**
+ * The live public URL for a campaign's landing page, or `null` if the tenant
+ * has no CMS site to host it on (Campaign Engine Slice 2, Task 4). Thin DB
+ * wrapper around the pure `buildCampaignLandingUrl` (./landingUrl): reads the
+ * tenant's sites via the ambient `db` proxy (@/lib/cms/sites's listSites)
+ * and lets the pure function do the representative-site pick + URL
+ * formatting. This is the ONLY thing launch.ts (the launch summary's
+ * "landing page live at …" line) and the campaign hub detail page (the
+ * landing URL's copy/view affordance) call — neither re-implements the
+ * site-picking rule itself, so they can't diverge on it.
+ */
+export async function getCampaignLandingUrl(campaignSlug: string): Promise<string | null> {
+  const sites = await listSites();
+  return buildCampaignLandingUrl(sites, campaignSlug);
 }
 
 // ── campaign assets ─────────────────────────────────────────────────────

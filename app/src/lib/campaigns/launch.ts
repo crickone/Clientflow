@@ -9,7 +9,7 @@ import { getBlogPost } from "@/lib/blog/posts";
 import { setPublishState } from "@/lib/cms/blog";
 import { getCampaign as getEmailCampaign } from "@/lib/marketing/campaigns";
 
-import { getCampaign, listAssets, setCampaignStatus } from "./store";
+import { findApprovedLandingAsset, getCampaign, getCampaignLandingUrl, listAssets, setCampaignStatus } from "./store";
 
 /**
  * Launch (Campaign Engine Slice 1, Task 5): the final step of the
@@ -65,9 +65,22 @@ import { getCampaign, listAssets, setCampaignStatus } from "./store";
  *     externalKind/externalId stay null; Task 4 carry-in) -> skipped. Never
  *     crashes, never appears in either summary array. landing_page (Slice 2
  *     Task 1) never materialises to an external row by design (see
- *     materialise.ts), so it always lands here too — Slice 2's launch task
- *     surfaces its live URL separately, from the campaign's assets directly,
- *     not through this publish/queue/skip per-asset action.
+ *     materialise.ts), so it always lands here too — through this
+ *     publish/queue/skip per-asset action it is always "skip".
+ *
+ *   - landing_page's live URL (Slice 2 Task 4) is surfaced SEPARATELY, after
+ *     the per-asset loop above, straight from the campaign's own assets —
+ *     not through launchActionFor/materialise at all (landing_page has
+ *     nothing to materialise; the "live" state is the campaign's own status,
+ *     already 'ready' by the time launchCampaign runs). When
+ *     findApprovedLandingAsset (./plan, reused — the SAME gate the public
+ *     `/site/<slug>/c/<campaignSlug>` route checks) finds an approved
+ *     landing_page asset, its URL is resolved via `getCampaignLandingUrl`
+ *     (./store — a thin wrapper around the pure, shared
+ *     `buildCampaignLandingUrl`, ./landingUrl) and appended to `published` as
+ *     an honest "landing page live at …" line. A tenant with no CMS site has
+ *     no URL to report (`getCampaignLandingUrl` returns null) — omitted from
+ *     the summary, never a crash; the launch itself still succeeds.
  *
  * Never claims a publish/send that didn't happen — see `launchActionFor`
  * (pure, DB-free, independently testable) for the per-kind action decision,
@@ -185,11 +198,15 @@ function queueSocial(asset: CampaignAsset): LaunchItem {
 
 /**
  * Launch a "ready" campaign: publish what can honestly publish (blog),
- * queue what can't yet (email, social) and skip the rest, then flip the
+ * queue what can't yet (email, social), surface the live landing page's URL
+ * (if the campaign has an approved one) and skip the rest, then flip the
  * campaign to "active". Returns the truthful {published, queued} summary —
- * see this file's header comment for the full per-kind reasoning.
+ * see this file's header comment for the full per-kind reasoning. Async
+ * (unlike every other function in this file) solely because resolving the
+ * landing URL needs `getCampaignLandingUrl`'s `listSites()` read
+ * (@/lib/cms/sites) — everything else here stays synchronous better-sqlite3.
  */
-export function launchCampaign(campaignId: number): LaunchResult {
+export async function launchCampaign(campaignId: number): Promise<LaunchResult> {
   const campaign = getCampaign(campaignId);
   if (!campaign) throw new Error(`No campaign with id ${campaignId}.`);
   if (campaign.status !== "ready") throw new CampaignNotReadyError(campaign.status);
@@ -197,7 +214,9 @@ export function launchCampaign(campaignId: number): LaunchResult {
   const published: LaunchItem[] = [];
   const queued: LaunchItem[] = [];
 
-  for (const asset of listAssets(campaignId)) {
+  const assets = listAssets(campaignId);
+
+  for (const asset of assets) {
     const action = launchActionFor(asset);
     if (action === "skip") continue;
 
@@ -212,6 +231,29 @@ export function launchCampaign(campaignId: number): LaunchResult {
       }
     } catch (err) {
       console.error(`[launch] asset #${asset.id} (${asset.kind}) failed unexpectedly — leaving it out of the summary:`, err);
+    }
+  }
+
+  // Landing page (Slice 2 Task 4): never goes through launchActionFor above
+  // (always "skip" there — see this file's header comment) because it never
+  // materialises to an external row. Surfaced here directly instead, once,
+  // from the campaign's own assets: reuse the SAME render gate the public
+  // route checks (findApprovedLandingAsset — campaign.status is already
+  // "ready" here, one of the two statuses that gate allows) so this summary
+  // line only ever appears when a visitor hitting the URL would actually see
+  // the page. Never lets a landing-URL resolution hiccup fail the launch —
+  // the rest of the campaign already published/queued for real above.
+  const landingAsset = findApprovedLandingAsset(campaign.status, assets);
+  if (landingAsset) {
+    try {
+      const url = await getCampaignLandingUrl(campaign.slug);
+      if (url) {
+        published.push({ kind: "landing_page", title: landingAsset.title, where: `landing page live at ${url}` });
+      }
+      // url === null -> tenant has no CMS site to host it on; omitted from
+      // the summary entirely (no honest URL to report), never a crash.
+    } catch (err) {
+      console.error(`[launch] campaign #${campaignId}: failed to resolve the landing page URL — omitting it from the summary:`, err);
     }
   }
 

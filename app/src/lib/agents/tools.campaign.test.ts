@@ -357,11 +357,13 @@ const requireLocal = createRequire(import.meta.url);
     // ── (i) launch_campaign (WRITE) — guards on status; only "ready"
     // campaigns can launch. ──
     const launchNotReady = JSON.parse(
-      runWithTenant(tid, () => launchCampaignTool(ctx, { campaignId: trimmed.campaignId })).text,
+      (await runWithTenant(tid, async () => launchCampaignTool(ctx, { campaignId: trimmed.campaignId }))).text,
     );
     assert.ok(launchNotReady.error, "launch_campaign refuses a campaign that isn't ready (still building)");
 
-    const launched = JSON.parse(runWithTenant(tid, () => launchCampaignTool(ctx, { campaignId })).text);
+    const launched = JSON.parse(
+      (await runWithTenant(tid, async () => launchCampaignTool(ctx, { campaignId }))).text,
+    );
     assert.ok(launched.result && !launched.error, "launch_campaign succeeds once every asset is approved");
     assert.equal(launched.status, "active");
     assert.equal(runWithTenant(tid, () => getCampaign(campaignId))?.status, "active", "the persisted campaign row's status is active after launch");
@@ -398,7 +400,9 @@ const requireLocal = createRequire(import.meta.url);
       "email items are honestly labelled 'ready to send' — never claimed sent (no scheduler is fired)",
     );
 
-    const launchUnknown = JSON.parse(runWithTenant(tid, () => launchCampaignTool(ctx, { campaignId: 9_999_999 })).text);
+    const launchUnknown = JSON.parse(
+      (await runWithTenant(tid, async () => launchCampaignTool(ctx, { campaignId: 9_999_999 }))).text,
+    );
     assert.ok(launchUnknown.error, "launch_campaign errors cleanly for an unknown campaignId");
 
     // ── (i2) launch_campaign — blog ACTUALLY publishes for real. The flow
@@ -471,7 +475,9 @@ const requireLocal = createRequire(import.meta.url);
     });
     assert.equal(blogPostBeforeLaunch?.publishState, "draft", "blog-publish test sanity: the materialised post starts as a draft, not yet published");
 
-    const blogLaunch = JSON.parse(runWithTenant(tid, () => launchCampaignTool(ctx, { campaignId: blogCampaignId })).text);
+    const blogLaunch = JSON.parse(
+      (await runWithTenant(tid, async () => launchCampaignTool(ctx, { campaignId: blogCampaignId }))).text,
+    );
     assert.ok(blogLaunch.result && !blogLaunch.error, "blog-publish test: launch_campaign succeeds");
     assert.equal(blogLaunch.published.length, 1, "blog-publish test: exactly one asset published");
     assert.equal(blogLaunch.published[0].kind, "blog", "blog-publish test: the published item is the blog asset");
@@ -497,6 +503,99 @@ const requireLocal = createRequire(import.meta.url);
       "blog-publish test: the published post's siteId matches the seeded site — proves siteId was re-derived via getBlogPost, not guessed",
     );
     assert.ok(blogPostAfterLaunch?.publishedAt, "blog-publish test: publishedAt is set");
+
+    // ── (i2b) launch_campaign — the landing page's live URL is surfaced in
+    // `published`, honestly, once a site exists AND the campaign has an
+    // approved landing_page asset (Campaign Engine Slice 2, Task 4). Reuses
+    // `seededSite` from (i2) above — still this tenant's only site at this
+    // point in the test, still status "draft" (no primaryHost) — so this
+    // proves the representative-site pick falls back to "the only site there
+    // is" and the resulting URL is the exact dev-path shape
+    // `/site/<siteSlug>/c/<campaignSlug>`, exercising the real
+    // launch_campaign tool end to end (landingUrl.test.ts covers the pure
+    // rule itself in isolation). landing_page never materialises to an
+    // external row (materialise.ts, by design), so externalKind stays null
+    // even though the launch summary reports it. ──
+    const landingCampaign = JSON.parse(
+      runWithTenant(tid, () =>
+        createCampaignTool(ctx, {
+          name: "Landing URL Test",
+          offer: "landing-only kit",
+          assets: [
+            { kind: "offer", title: "Offer" },
+            { kind: "landing_page", title: "Landing page" },
+          ],
+        }),
+      ).text,
+    );
+    assert.ok(!landingCampaign.error, "landing-url test: create_campaign succeeds");
+    const landingCampaignId = landingCampaign.campaignId as number;
+    const landingCampaignAssets = runWithTenant(tid, () => listAssets(landingCampaignId));
+    const offerAssetForLandingTest = landingCampaignAssets.find((a) => a.kind === "offer")!;
+    const landingAssetForLandingTest = landingCampaignAssets.find((a) => a.kind === "landing_page")!;
+
+    assert.ok(
+      JSON.parse(
+        runWithTenant(tid, () =>
+          approveCampaignAssetTool(ctx, { campaignId: landingCampaignId, assetId: offerAssetForLandingTest.id }),
+        ).text,
+      ).approved,
+      "landing-url test: the pre-drafted offer asset approves",
+    );
+    const landingDraft = JSON.parse(
+      (
+        await runWithTenant(tid, async () =>
+          draftCampaignAssetTool(ctx, { campaignId: landingCampaignId, assetId: landingAssetForLandingTest.id }),
+        )
+      ).text,
+    );
+    assert.ok(!landingDraft.error, "landing-url test: draft_campaign_asset succeeds for the landing_page asset");
+    const landingApprove = JSON.parse(
+      runWithTenant(tid, () =>
+        approveCampaignAssetTool(ctx, { campaignId: landingCampaignId, assetId: landingAssetForLandingTest.id }),
+      ).text,
+    );
+    assert.ok(landingApprove.approved && !landingApprove.error, "landing-url test: landing_page asset approves");
+    assert.equal(
+      landingApprove.externalKind,
+      null,
+      "landing-url test: landing_page never materialises to an external row (by design)",
+    );
+    assert.equal(
+      runWithTenant(tid, () => getCampaign(landingCampaignId))?.status,
+      "ready",
+      "landing-url test: the campaign is ready once both its assets are approved",
+    );
+
+    const landingLaunch = JSON.parse(
+      (await runWithTenant(tid, async () => launchCampaignTool(ctx, { campaignId: landingCampaignId }))).text,
+    );
+    assert.ok(landingLaunch.result && !landingLaunch.error, "landing-url test: launch_campaign succeeds");
+    assert.equal(
+      landingLaunch.published.length,
+      1,
+      "landing-url test: exactly one item published — the landing URL line",
+    );
+    assert.equal(
+      landingLaunch.published[0].kind,
+      "landing_page",
+      "landing-url test: the published item is the landing_page asset",
+    );
+    assert.equal(
+      landingLaunch.published[0].title,
+      "Landing page",
+      "landing-url test: the published item carries the asset's title",
+    );
+    assert.equal(
+      landingLaunch.published[0].where,
+      `landing page live at /site/campaign-test-site/c/${landingCampaign.slug}`,
+      "landing-url test: the exact honest 'landing page live at …' label, dev-path shape (seededSite has no primaryHost)",
+    );
+    assert.deepEqual(
+      landingLaunch.queued,
+      [],
+      "landing-url test: nothing to queue for an offer+landing_page-only kit",
+    );
 
     // ── (i3) launch_campaign — social ACTUALLY gets queued, never
     // auto-posted, once genuinely materialised. The shared flow above never
@@ -541,7 +640,9 @@ const requireLocal = createRequire(import.meta.url);
       "social-queue test: campaign is ready once its one asset is approved",
     );
 
-    const socialLaunch = JSON.parse(runWithTenant(tid, () => launchCampaignTool(ctx, { campaignId: socialCampaignId })).text);
+    const socialLaunch = JSON.parse(
+      (await runWithTenant(tid, async () => launchCampaignTool(ctx, { campaignId: socialCampaignId }))).text,
+    );
     assert.ok(socialLaunch.result && !socialLaunch.error, "social-queue test: launch_campaign succeeds");
     assert.deepEqual(socialLaunch.published, [], "social-queue test: nothing is auto-published for a social-only kit");
     assert.equal(socialLaunch.queued.length, 1, "social-queue test: exactly one item queued");

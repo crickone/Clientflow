@@ -30,7 +30,7 @@ export default async function MarketingCampaignsPage() {
 
   const campaigns = listCampaigns();
   // Cheap per-campaign approved/total tally — campaigns are few (a handful
-  // per tenant, ~10 assets each), so N synchronous reads here is fine and
+  // per tenant, ~11 assets each), so N synchronous reads here is fine and
   // lets the list itself show build progress at a glance (the whole point
   // of a "hub"), rather than making every row a guess until you click in.
   const progress = campaigns.map((c) => {

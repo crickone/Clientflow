@@ -202,6 +202,25 @@ export function leadCounts() {
   return out;
 }
 
+/**
+ * Tenant-scoped count of leads attributed to one campaign — `leads.campaign`
+ * is a free-text label (see upsertLead above), and the public campaign
+ * signup flow (@/lib/campaigns/signup + /api/campaigns/signup) writes it as
+ * exactly `campaign.name` (never the slug), so callers must pass that same
+ * string (the campaign hub detail page does: `countLeadsByCampaign(campaign
+ * .name)`). Campaign Engine Slice 2, Task 4 — the hub's "N sign-ups so far"
+ * stat.
+ */
+export function countLeadsByCampaign(campaign: string): number {
+  return (
+    db
+      .select({ n: sql<number>`count(*)` })
+      .from(leads)
+      .where(eq(leads.campaign, campaign))
+      .get()?.n ?? 0
+  );
+}
+
 /** A board lead: the full row plus the epoch-ms of its first *sent* outbound message (or null). */
 export type LeadWithSla = Lead & {
   firstOutboundAt: number | null;

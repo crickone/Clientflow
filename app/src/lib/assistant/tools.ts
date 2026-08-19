@@ -1010,7 +1010,7 @@ export async function executeTool(
       case "approve_campaign_asset":
         return approveCampaignAssetTool(ctx, input);
       case "launch_campaign":
-        return launchCampaignTool(ctx, input);
+        return await launchCampaignTool(ctx, input);
       case "list_no_shows":
         return listNoShowsTool(ctx, input);
       case "list_lapsed_members":

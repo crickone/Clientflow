@@ -115,7 +115,7 @@ export const CAMPAIGN_TOOLS: Anthropic.Tool[] = [
   {
     name: "plan_campaign",
     description:
-      "Plan a new seasonal campaign kit from a brief: proposes a name/season/dates and GENERATES a real, house-rule-guarded core offer, plus the standard 10-asset build plan (one offer, one blog post, 3 social posts, 3 emails, one ad copy, one video script). Returns ONLY a plan — it does NOT save anything. Show the plan to the operator for Approve/Go-again before calling create_campaign.",
+      "Plan a new seasonal campaign kit from a brief: proposes a name/season/dates and GENERATES a real, house-rule-guarded core offer, plus the standard 11-asset build plan (one offer, one landing page, one blog post, 3 social posts, 3 emails, one ad copy, one video script). Returns ONLY a plan — it does NOT save anything. Show the plan to the operator for Approve/Go-again before calling create_campaign.",
     input_schema: {
       type: "object",
       properties: {
@@ -147,7 +147,7 @@ export const CAMPAIGN_TOOLS: Anthropic.Tool[] = [
         assets: {
           type: "array",
           description:
-            "The asset plan to seed — normally plan_campaign's `assets` verbatim, or trimmed if the operator asked to drop some. Defaults to the standard 10-asset plan if omitted.",
+            "The asset plan to seed — normally plan_campaign's `assets` verbatim, or trimmed if the operator asked to drop some. Defaults to the standard 11-asset plan (offer, landing page, blog post, 3 social posts, 3 emails, ad copy, video script) if omitted.",
           items: {
             type: "object",
             properties: {
@@ -489,7 +489,7 @@ export function approveCampaignAssetTool(ctx: ToolContext, input: Record<string,
  * ONLY what `launchCampaign` actually reports back: never claims a
  * publish/send that didn't happen.
  */
-export function launchCampaignTool(ctx: ToolContext, input: Record<string, unknown>): ToolResult {
+export async function launchCampaignTool(ctx: ToolContext, input: Record<string, unknown>): Promise<ToolResult> {
   void ctx; // no tenant-scoped read needed beyond the campaign row itself (ambient db)
   const campaignId = Number(input.campaignId);
   if (!campaignId) return { text: JSON.stringify({ error: "campaignId is required." }) };
@@ -505,7 +505,7 @@ export function launchCampaignTool(ctx: ToolContext, input: Record<string, unkno
   }
 
   try {
-    const { published, queued } = launchCampaign(campaignId);
+    const { published, queued } = await launchCampaign(campaignId);
 
     const parts: string[] = [];
     if (published.length) {
