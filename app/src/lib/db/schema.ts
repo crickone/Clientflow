@@ -941,6 +941,7 @@ export const campaigns = sqliteTable("campaigns", {
   startsOn: text("starts_on"), // ISO date or null
   endsOn: text("ends_on"),
   offer: text("offer").notNull().default(""),
+  adSpendCents: integer("ad_spend_cents").notNull().default(0),
   status: text("status", {
     enum: ["building", "ready", "active", "complete", "archived"],
   })

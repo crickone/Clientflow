@@ -1416,6 +1416,19 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     console.error("[db] leads stage_id migration failed:", err);
   }
 
+  // Campaign Engine (Slice 5): manual ad-spend input the CFA/ROAS scoreboard
+  // computes from. Additive/idempotent like every guard in this block.
+  try {
+    const campCols = sqlite
+      .prepare("PRAGMA table_info(campaigns)")
+      .all() as Array<{ name: string }>;
+    if (!campCols.some((c) => c.name === "ad_spend_cents")) {
+      sqlite.exec("ALTER TABLE campaigns ADD COLUMN ad_spend_cents INTEGER NOT NULL DEFAULT 0");
+    }
+  } catch (err) {
+    console.error("[db] campaigns ad_spend_cents migration failed:", err);
+  }
+
   try {
     const cols = sqlite
       .prepare("PRAGMA table_info(gift_vouchers)")

@@ -127,6 +127,23 @@ export function setCampaignStatus(id: number, status: CampaignStatus): void {
 }
 
 /**
+ * Record manual ad spend for a campaign (Campaign Engine Slice 5 — the CFA/
+ * ROAS scoreboard's one manual input; later tasks derive CFA/CAC/ROAS from
+ * this against the campaign's leads/conversions). `cents` is clamped to a
+ * non-negative integer so a bad operator input can't store a negative spend
+ * or drift the DB's INTEGER column off a whole cent. Deliberately does NOT
+ * bump updatedAt — unlike setCampaignStatus, adjusting spend isn't a content
+ * edit, so it shouldn't perturb "last touched" for the campaign list view.
+ */
+export function setCampaignAdSpend(campaignId: number, cents: number): void {
+  const clamped = Math.max(0, Math.round(cents));
+  db.update(schema.campaigns)
+    .set({ adSpendCents: clamped })
+    .where(eq(schema.campaigns.id, campaignId))
+    .run();
+}
+
+/**
  * The live public URL for a campaign's landing page, or `null` if the tenant
  * has no CMS site to host it on (Campaign Engine Slice 2, Task 4). Thin DB
  * wrapper around the pure `buildCampaignLandingUrl` (./landingUrl): reads the
