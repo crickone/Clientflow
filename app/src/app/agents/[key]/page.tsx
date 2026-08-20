@@ -13,10 +13,17 @@ import { conciergeToolSlice } from "@/lib/assistant/tools";
 import { getSchedulingMode } from "@/lib/settings";
 import { isDriveConnected } from "@/lib/gmail";
 import { AgentDetail } from "@/components/agents/AgentDetail";
+import { campaignSeedStarterMessage } from "@/components/marketing/BuildCampaignLink";
 
 export const dynamic = "force-dynamic";
 
-export default async function AgentDetailPage({ params }: { params: { key: string } }) {
+export default async function AgentDetailPage({
+  params,
+  searchParams,
+}: {
+  params: { key: string };
+  searchParams: { seedName?: string; season?: string; startsOn?: string; endsOn?: string; angle?: string };
+}) {
   await requireAdminPage();
   // requireAdminPage guarantees an admin membership in the active tenant.
   const tenantId = getCurrentMembership()!.tenant.id;
@@ -24,6 +31,19 @@ export default async function AgentDetailPage({ params }: { params: { key: strin
   const key = params.key;
   const agent = getAgent(tenantId, key);
   if (!agent) notFound();
+
+  // Campaign Engine Slice 3 (Task 3): a "Build campaign" link from the
+  // Seasonal calendar (/marketing/calendar) lands here carrying a seed in
+  // the query string — see BuildCampaignLink.tsx's seed contract. This IS
+  // where campaign creation happens: /marketing/campaigns's "+ New
+  // campaign" (and its empty state) link straight here, no form — so the
+  // seed becomes a pre-filled chat starter (below, threaded into
+  // AgentDetail -> AgentChatPanel -> AssistantChat) rather than form
+  // values. Only the Marketing agent consumes it — any other agent key
+  // ignores a stray seed param instead of surfacing an unrelated pre-filled
+  // message. `?? undefined` normalises the pure helper's `string | null`
+  // return (null for an empty/absent seed) to the prop's `string | undefined`.
+  const initialInput = key === "marketing" ? campaignSeedStarterMessage(searchParams) ?? undefined : undefined;
 
   const catalogEntry = AGENT_CATALOG.find((a) => a.key === key);
   // Same registry composeAgentSystem (@/lib/agents/context) reads from — see
@@ -110,8 +130,14 @@ export default async function AgentDetailPage({ params }: { params: { key: strin
         // a DIFFERENT agent key without an intervening unmount, e.g. a future
         // direct agent-to-agent link. Without this, React would reuse the
         // component instance across a client-side navigation and carry over
-        // the previous agent's local state.
-        key={agent.key}
+        // the previous agent's local state. Also varies with `initialInput`
+        // (Campaign Engine Slice 3): AssistantChat only ever APPLIES a seed
+        // once per mount (see its initialInputApplied ref), so clicking a
+        // second, different "Build campaign" link for the same agent via a
+        // client-side nav needs its own remount too, or the second seed
+        // would silently be dropped onto an instance that already consumed
+        // the first one.
+        key={initialInput ? `${agent.key}:${initialInput}` : agent.key}
         agent={agent}
         layers={layers}
         toolNames={isConcierge ? conciergeToolNames : spec?.toolNames ?? []}
@@ -119,6 +145,7 @@ export default async function AgentDetailPage({ params }: { params: { key: strin
         capCents={capCents}
         tenantId={tenantId}
         openRouterConfigured={openRouterConfigured}
+        initialInput={initialInput}
       />
     </div>
   );

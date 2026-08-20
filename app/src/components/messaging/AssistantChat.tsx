@@ -169,6 +169,7 @@ export function AssistantChat({
   emptyBody = "I can read your inbox and WhatsApp, summarise what matters, check your income, and bundle invoices for download.",
   suggestions = SUGGESTIONS,
   placeholder = "Ask your assistant…  (Enter to send)",
+  initialInput,
 }: {
   tenantId: number;
   height?: string;
@@ -187,6 +188,16 @@ export function AssistantChat({
   emptyBody?: string;
   suggestions?: string[];
   placeholder?: string;
+  /**
+   * Campaign Engine Slice 3 (Task 3): a starter draft to pre-fill the
+   * compose box with on mount — e.g. a "Build campaign" link from the
+   * Seasonal calendar (see BuildCampaignLink.tsx's campaignSeedStarterMessage,
+   * read by /agents/[key]/page.tsx). Applied once, and only into an empty
+   * compose box (never clobbers text the operator already typed) — and
+   * never auto-sent, so the operator still reviews/edits/hits send
+   * themselves, same as every other write in this app.
+   */
+  initialInput?: string;
 }) {
   // Per-account chat HISTORY in localStorage (survives browser close). Each entry
   // is a saved conversation; "New chat" opens a fresh one and keeps the old ones.
@@ -218,6 +229,9 @@ export function AssistantChat({
   const [resumingConvId, setResumingConvId] = useState<string | null>(null);
   const resumeAttempted = useRef(false);
   const resumeCancelRef = useRef<Record<string, boolean>>({});
+  // Campaign Engine Slice 3: guards the initialInput seed effect below to
+  // apply (at most) once per mount, same pattern as resumeAttempted.
+  const initialInputApplied = useRef(false);
 
   const active = conversations.find((c) => c.id === activeId) ?? null;
   const messages = active?.messages ?? [];
@@ -244,6 +258,18 @@ export function AssistantChat({
     setActiveId(id);
     setLoaded(true);
   }, [storeKey]);
+
+  // Campaign Engine Slice 3 (Task 3): prime the compose box from a
+  // "Build campaign" seed, once conversations are loaded. Functional
+  // setInput update (rather than reading `input` in the effect body) means
+  // this never needs `input` in the dependency array, so it can't re-fire
+  // just because the operator started typing. `cur || initialInput` means it
+  // only ever fills a genuinely empty box.
+  useEffect(() => {
+    if (!loaded || initialInputApplied.current || !initialInput) return;
+    initialInputApplied.current = true;
+    setInput((cur) => cur || initialInput);
+  }, [loaded, initialInput]);
 
   // Persist (keep the 40 most-recent).
   useEffect(() => {

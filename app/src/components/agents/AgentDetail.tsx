@@ -30,6 +30,8 @@ interface Props {
   tenantId: number;
   /** Whether `OPENROUTER_API_KEY` is set — computed server-side (page.tsx) and passed down so a client component never has to guess at env state. Gates the DeepSeek/OpenRouter option in the model picker below. */
   openRouterConfigured: boolean;
+  /** Campaign Engine Slice 3: see AssistantChat's `initialInput` doc — threaded straight through to the chat panel. */
+  initialInput?: string;
 }
 
 /**
@@ -38,7 +40,7 @@ interface Props {
  * `composeAgentSystem` — @/lib/agents/context — actually concatenates them
  * for a live run), and the agent's working chat (or a dormant placeholder).
  */
-export function AgentDetail({ agent, layers, toolNames, usageCents, capCents, tenantId, openRouterConfigured }: Props) {
+export function AgentDetail({ agent, layers, toolNames, usageCents, capCents, tenantId, openRouterConfigured, initialInput }: Props) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 36 }}>
       <RevealGroup style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
@@ -71,7 +73,7 @@ export function AgentDetail({ agent, layers, toolNames, usageCents, capCents, te
       <Reveal>
         <section>
           <SectionLabel>{agent.status === "active" ? "Working chat" : "Chat"}</SectionLabel>
-          <AgentChatPanel agent={agent} tenantId={tenantId} />
+          <AgentChatPanel agent={agent} tenantId={tenantId} initialInput={initialInput} />
         </section>
       </Reveal>
     </div>

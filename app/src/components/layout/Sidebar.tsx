@@ -17,6 +17,7 @@ import {
 import {
   BarChart3,
   Bot,
+  Calendar,
   CalendarClock,
   CalendarDays,
   CalendarRange,
@@ -189,6 +190,11 @@ const NAV: NavSection[] = [
       // so keep the nav consistent rather than show staff a link that just
       // redirects them to /dashboard.
       { href: "/marketing/campaigns", label: "Marketing", icon: Megaphone, adminOnly: true },
+      // Campaign Engine Slice 3: the year-map of Irish marketing dates +
+      // seasons overlaid with real campaigns, plus the AI radar "coming up"
+      // rail. Same admin-only reasoning as "Marketing" above (Build-campaign
+      // here lands on the same requireAdminPage'd /agents/marketing chat).
+      { href: "/marketing/calendar", label: "Seasonal calendar", icon: Calendar, adminOnly: true },
       { href: "/cms", label: "Sites", icon: Globe, adminOnly: true },
       { href: "/content-studio", label: "Content Studio", icon: Clapperboard },
       {

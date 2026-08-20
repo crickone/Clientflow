@@ -98,7 +98,16 @@ const CHAT_COPY: Record<string, typeof SALES_CHAT_COPY> = {
  * "coming soon" idea. Its model + editable instructions (above, on this same
  * page) still apply the moment it actually runs via delegation.
  */
-export function AgentChatPanel({ agent, tenantId }: { agent: Agent; tenantId: number }) {
+export function AgentChatPanel({
+  agent,
+  tenantId,
+  initialInput,
+}: {
+  agent: Agent;
+  tenantId: number;
+  /** Campaign Engine Slice 3: see AssistantChat's `initialInput` doc — threaded straight through, only ever non-empty for the Marketing agent (see AgentDetailPage). */
+  initialInput?: string;
+}) {
   if (agent.status !== "active") {
     return (
       <Card style={{ textAlign: "center", padding: "56px 28px" }}>
@@ -173,6 +182,7 @@ export function AgentChatPanel({ agent, tenantId }: { agent: Agent; tenantId: nu
       emptyBody={copy?.emptyBody}
       suggestions={copy?.suggestions}
       placeholder={copy?.placeholder}
+      initialInput={initialInput}
     />
   );
 }
