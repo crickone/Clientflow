@@ -33,73 +33,34 @@ export function Logo({
   }, [src]);
 
   if (!src || failed) {
-    const markSize = Math.round(height * 1.02);
+    // AdonisAgent designed wordmark ("ADONIS AGENT"), rendered as a
+    // currentColor CSS mask so it adapts to ANY tenant theme (light or dark) —
+    // /adonis-logo.svg is the wordmark on a cropped viewBox. The business name
+    // rides in aria-label rather than a visible sub-line: it's already shown in
+    // the chrome's business switcher, and a designed wordmark reads cleaner solo.
+    const wmWidth = Math.round(height * 2.326); // matches the 1500:645 cropped viewBox aspect
     return (
       <span
+        role="img"
+        aria-label={alt ? `AdonisAgent — ${alt}` : "AdonisAgent"}
         style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: Math.round(height * 0.34),
+          display: "inline-block",
+          flex: "none",
+          height,
+          width: wmWidth,
           maxWidth: "100%",
-          minWidth: 0,
           color: "var(--text-primary)",
+          backgroundColor: "currentColor",
+          WebkitMaskImage: "url(/adonis-logo.svg)",
+          maskImage: "url(/adonis-logo.svg)",
+          WebkitMaskRepeat: "no-repeat",
+          maskRepeat: "no-repeat",
+          WebkitMaskSize: "contain",
+          maskSize: "contain",
+          WebkitMaskPosition: "left center",
+          maskPosition: "left center",
         }}
-      >
-        {/* AdonisAgent Greek-key mark — same meander as the marketing site */}
-        <svg
-          width={markSize}
-          height={markSize}
-          viewBox="0 0 120 120"
-          aria-hidden="true"
-          style={{ flex: "none", display: "block" }}
-        >
-          <path
-            d="M20 20 L100 20 L100 100 L20 100 L20 40 L80 40 L80 80 L40 80 L40 60 L60 60"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={10}
-            strokeLinecap="square"
-            strokeLinejoin="miter"
-          />
-        </svg>
-        <span
-          style={{
-            display: "inline-flex",
-            flexDirection: "column",
-            gap: 3,
-            lineHeight: 1,
-            minWidth: 0,
-          }}
-        >
-          <span
-            style={{
-              fontFamily: "var(--font-familjen), var(--font-heading), sans-serif",
-              textTransform: "uppercase",
-              fontSize: Math.round(height * 0.72),
-              letterSpacing: "0.02em",
-              lineHeight: 1,
-              color: "var(--text-primary)",
-            }}
-          >
-            AdonisAgent
-          </span>
-          {alt && (
-            <span
-              style={{
-                fontFamily: "var(--font-mono), ui-monospace, monospace",
-                fontSize: Math.max(9, Math.round(height * 0.38)),
-                letterSpacing: "0.04em",
-                color: "var(--text-tertiary)",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              — {alt}
-            </span>
-          )}
-        </span>
-      </span>
+      />
     );
   }
 

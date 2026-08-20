@@ -1,5 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 120" width="700" height="120">
-  <!-- Horizontal lockup on dark grounds: Greek-key mark + AdonisAgent wordmark (Familjen Grotesk). -->
-  <path d="M20 20 L100 20 L100 100 L20 100 L20 40 L80 40 L80 80 L40 80 L40 60 L60 60" fill="none" stroke="#FFFFFF" stroke-width="9" stroke-linecap="square" stroke-linejoin="miter"/>
-  <text x="132" y="84" font-family="'Familjen Grotesk','Space Grotesk',sans-serif" font-size="84" font-weight="500" letter-spacing="-2" fill="#FFFFFF">AdonisAgent</text>
-</svg>
