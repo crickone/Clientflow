@@ -91,25 +91,36 @@ type NavGroup = {
   label: string;
   icon: typeof LayoutDashboard;
   adminOnly?: boolean;
-  children: NavLink[];
+  /** Children may themselves be groups — the sidebar renders up to two levels of nesting. */
+  children: NavEntry[];
 };
 type NavEntry = NavLink | NavGroup;
 
 const isGroup = (e: NavEntry): e is NavGroup => "children" in e;
 
-/** A labelled block of nav entries. An empty heading = the top (unlabelled) block. */
-type NavSection = { heading?: string; items: NavEntry[] };
+/** True if `item`'s href matches (or is the route family of) the current path. */
+function isActiveLink(item: NavLink, pathname: string | null): boolean {
+  if (item.href === "/dashboard") return pathname === "/dashboard" || pathname === "/";
+  return item.exact ? pathname === item.href : !!pathname?.startsWith(item.href);
+}
 
-const NAV: NavSection[] = [
+/** True if any link anywhere under `group` — at any nesting depth — is the active route. */
+function groupHasActiveDescendant(group: NavGroup, pathname: string | null): boolean {
+  return group.children.some((c) =>
+    isGroup(c) ? groupHasActiveDescendant(c, pathname) : isActiveLink(c, pathname)
+  );
+}
+
+/** The flagship item — pinned above Dashboard, rendered prominently, not part of a group. */
+const ADONIS_LINK: NavLink = { href: "/adonis", label: "Adonis", icon: Bot };
+const DASHBOARD_LINK: NavLink = { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard };
+
+/** Five collapsible top-level groups, folded by default (see `openGroups`). */
+const NAV_GROUPS: NavGroup[] = [
   {
-    items: [
-      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/setup", label: "Set up", icon: Rocket, adminOnly: true, dot: true },
-    ],
-  },
-  {
-    heading: "Clients",
-    items: [
+    label: "Clients",
+    icon: Users,
+    children: [
       { href: "/clients", label: "Clients", icon: Users, labelKey: "members" },
       { href: "/leads", label: "Leads", icon: Sparkles },
       { href: "/communication", label: "Communication", icon: MessagesSquare },
@@ -118,8 +129,9 @@ const NAV: NavSection[] = [
     ],
   },
   {
-    heading: "Coaching",
-    items: [
+    label: "Coaching",
+    icon: GraduationCap,
+    children: [
       { href: "/timetable", label: "Timetable", icon: CalendarRange, mode: "timetable" },
       { href: "/attendance", label: "Attendance", icon: ClipboardCheck },
       {
@@ -156,8 +168,9 @@ const NAV: NavSection[] = [
     ],
   },
   {
-    heading: "Business",
-    items: [
+    label: "Business",
+    icon: ShoppingBag,
+    children: [
       {
         label: "Products",
         icon: ShoppingBag,
@@ -173,14 +186,9 @@ const NAV: NavSection[] = [
     ],
   },
   {
-    heading: "AI",
-    items: [
-      { href: "/agents", label: "Agents", icon: Bot, adminOnly: true },
-    ],
-  },
-  {
-    heading: "Marketing",
-    items: [
+    label: "Marketing",
+    icon: Megaphone,
+    children: [
       // Campaign Engine hub (Slice 1): the Marketing agent builds a full
       // seasonal kit (offer/blog/social/email/ads/video script) here, one
       // asset at a time. Admin-only for the same reason the email Campaigns
@@ -213,11 +221,14 @@ const NAV: NavSection[] = [
     ],
   },
   {
-    heading: "System",
-    items: [
+    label: "System",
+    icon: SettingsIcon,
+    children: [
       { href: "/my-app", label: "My App", icon: Smartphone },
       { href: "/training", label: "Training", icon: GraduationCap, tenants: ["renova"] },
       { href: "/settings", label: "Settings", icon: SettingsIcon, adminOnly: true },
+      // Dismissible self-onboarding checklist — admin-only, hidden once complete (showSetup).
+      { href: "/setup", label: "Set up", icon: Rocket, adminOnly: true, dot: true },
     ],
   },
 ];
@@ -267,15 +278,18 @@ export function Sidebar({
   const filterEntry = (e: NavEntry): NavEntry | null => {
     if (isGroup(e)) {
       if (e.adminOnly && !isAdmin) return null;
-      const children = e.children.filter(linkAllowed);
+      // Recurse first — a nested group (e.g. Nutrition) is itself filtered by
+      // the same rule, so it disappears if none of ITS children survive.
+      const children = e.children.map(filterEntry).filter((c): c is NavEntry => c !== null);
       return children.length ? { ...e, children } : null;
     }
     return linkAllowed(e) ? e : null;
   };
-  const visibleSections = NAV.map((section) => ({
-    heading: section.heading,
-    items: section.items.map(filterEntry).filter((e): e is NavEntry => e !== null),
-  })).filter((s) => s.items.length > 0);
+  const showAdonis = linkAllowed(ADONIS_LINK);
+  const showDashboard = linkAllowed(DASHBOARD_LINK);
+  const visibleGroups = NAV_GROUPS.map((g) => filterEntry(g) as NavGroup | null).filter(
+    (g): g is NavGroup => g !== null
+  );
 
   async function signOut() {
     setSigningOut(true);
@@ -299,13 +313,11 @@ export function Sidebar({
     transition: "background 0.15s var(--ease), color 0.15s var(--ease)",
   };
 
-  function renderLink(item: NavLink, indent = false) {
-    const active =
-      item.href === "/dashboard"
-        ? pathname === "/dashboard" || pathname === "/"
-        : item.exact
-          ? pathname === item.href
-          : pathname?.startsWith(item.href);
+  /** Left indent scales with nesting depth (0 = top level, matches the old indent/no-indent split at depth 1). */
+  const indentFor = (depth: number) => 13 + depth * 21;
+
+  function renderLink(item: NavLink, depth = 0) {
+    const active = isActiveLink(item, pathname);
     const Icon = item.icon;
     return (
       <Link
@@ -314,7 +326,7 @@ export function Sidebar({
         className={cn("nav-link", active && "nav-link--active")}
         style={{
           ...navRowStyle,
-          paddingLeft: indent ? 34 : 13,
+          paddingLeft: indentFor(depth),
         }}
       >
         {active && (
@@ -325,7 +337,7 @@ export function Sidebar({
             transition={{ duration: DUR.base, ease: [...EASE] }}
           />
         )}
-        <Icon size={indent ? 15 : 16} strokeWidth={1.75} />
+        <Icon size={depth === 0 ? 16 : 15} strokeWidth={1.75} />
         <span>{item.labelKey ? vocab[item.labelKey] : item.label}</span>
         {item.dot && (
           <span
@@ -341,6 +353,80 @@ export function Sidebar({
           />
         )}
       </Link>
+    );
+  }
+
+  /**
+   * The pinned Adonis row — visually distinct from every other row (accent
+   * text/icon + accent-tinted background at all times, not just on hover/
+   * active) since it's the product's flagship entry point, not a normal nav
+   * item. Active state (on /adonis/**) still gets the shared nav-active-bar
+   * so it reads consistently with the rest of the nav.
+   */
+  function renderAdonisLink(item: NavLink) {
+    const active = isActiveLink(item, pathname);
+    const Icon = item.icon;
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        style={{
+          ...navRowStyle,
+          paddingLeft: indentFor(0),
+          background: "var(--accent-soft)",
+          color: "var(--accent)",
+          fontSize: 14,
+          fontWeight: 800,
+        }}
+      >
+        {active && (
+          <motion.span
+            layoutId="nav-active-bar"
+            aria-hidden
+            style={{ position: "absolute", left: 0, top: 5, bottom: 5, width: 3, background: "var(--accent)" }}
+            transition={{ duration: DUR.base, ease: [...EASE] }}
+          />
+        )}
+        <Icon size={18} strokeWidth={2} />
+        <span>{item.label}</span>
+      </Link>
+    );
+  }
+
+  /** Recursive: an entry is either a leaf link or a group whose children may themselves be groups. */
+  function renderEntry(entry: NavEntry, depth: number) {
+    if (!isGroup(entry)) return renderLink(entry, depth);
+
+    const Icon = entry.icon;
+    const childActive = groupHasActiveDescendant(entry, pathname);
+    const expanded = openGroups[entry.label] ?? childActive;
+    return (
+      <div key={entry.label}>
+        <button
+          onClick={() => setOpenGroups((s) => ({ ...s, [entry.label]: !expanded }))}
+          className="nav-link"
+          style={{
+            ...navRowStyle,
+            width: "100%",
+            border: "none",
+            cursor: "pointer",
+            paddingLeft: indentFor(depth),
+            ...(childActive ? { color: "var(--text-primary)" } : {}),
+          }}
+        >
+          <Icon size={depth === 0 ? 16 : 15} strokeWidth={1.75} />
+          <span style={{ flex: 1, textAlign: "left" }}>{entry.label}</span>
+          <ChevronDown
+            size={14}
+            style={{
+              transition: "transform 0.15s var(--ease)",
+              transform: expanded ? "rotate(0deg)" : "rotate(-90deg)",
+              opacity: 0.6,
+            }}
+          />
+        </button>
+        {expanded && entry.children.map((c) => renderEntry(c, depth + 1))}
+      </div>
     );
   }
 
@@ -374,59 +460,19 @@ export function Sidebar({
       </div>
 
       <nav style={{ padding: "8px 8px 12px", flex: 1, overflowY: "auto" }}>
-        {visibleSections.map((section, si) => (
-          <div key={section.heading ?? `top-${si}`} style={{ marginTop: si === 0 ? 0 : 14 }}>
-            {section.heading && (
-              <div
-                style={{
-                  padding: "6px 13px 5px",
-                  fontSize: 9.5,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.12em",
-                  color: "var(--text-tertiary)",
-                  fontFamily: "var(--font-mono), ui-monospace, monospace",
-                  opacity: 0.6,
-                }}
-              >
-                {section.heading}
-              </div>
-            )}
-            {section.items.map((entry) => {
-              if (!isGroup(entry)) return renderLink(entry);
-
-              const Icon = entry.icon;
-              const childActive = entry.children.some((c) => pathname?.startsWith(c.href));
-              const expanded = openGroups[entry.label] ?? childActive;
-              return (
-                <div key={entry.label}>
-                  <button
-                    onClick={() => setOpenGroups((s) => ({ ...s, [entry.label]: !expanded }))}
-                    className="nav-link"
-                    style={{
-                      ...navRowStyle,
-                      width: "100%",
-                      border: "none",
-                      cursor: "pointer",
-                      ...(childActive ? { color: "var(--text-primary)" } : {}),
-                    }}
-                  >
-                    <Icon size={16} strokeWidth={1.75} />
-                    <span style={{ flex: 1, textAlign: "left" }}>{entry.label}</span>
-                    <ChevronDown
-                      size={14}
-                      style={{
-                        transition: "transform 0.15s var(--ease)",
-                        transform: expanded ? "rotate(0deg)" : "rotate(-90deg)",
-                        opacity: 0.6,
-                      }}
-                    />
-                  </button>
-                  {expanded && entry.children.map((c) => renderLink(c, true))}
-                </div>
-              );
-            })}
+        {(showAdonis || showDashboard) && (
+          <div
+            style={{
+              marginBottom: 10,
+              paddingBottom: 10,
+              borderBottom: "1px solid var(--hairline)",
+            }}
+          >
+            {showAdonis && renderAdonisLink(ADONIS_LINK)}
+            {showDashboard && renderLink(DASHBOARD_LINK)}
           </div>
-        ))}
+        )}
+        {visibleGroups.map((group) => renderEntry(group, 0))}
       </nav>
 
       <div
