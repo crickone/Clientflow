@@ -16,6 +16,9 @@ import {
 import { requireAdminPage } from "@/lib/auth";
 import { findApprovedLandingAsset, getCampaign, getCampaignLandingUrl, listAssets } from "@/lib/campaigns/store";
 import type { CampaignAsset } from "@/lib/campaigns/store";
+import { getCampaignBuildModel } from "@/lib/campaigns/buildModel";
+import { estimateCampaignBuildCents, formatCentsEur } from "@/lib/campaigns/costEstimate";
+import { MODEL_CATALOG } from "@/lib/ai/modelCatalog";
 import { getBlogPost } from "@/lib/blog/posts";
 import { getSiteById } from "@/lib/cms/sites";
 import { parseEmailBody, parseLandingBody, parseSocialBody } from "@/lib/campaigns/assetBody";
@@ -148,6 +151,18 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
   const hrefs = await Promise.all(assets.map((a) => externalHref(a)));
   const approvedCount = assets.filter((a) => a.status === "approved").length;
 
+  // Cost estimate (Campaign Engine Slice 4, Task 4) — an informational recap,
+  // not a live figure: by the time a campaign reaches this hub its assets are
+  // already built, so this just answers "what did/would this kit roughly
+  // cost", priced off the SAME tenant build-model + pure estimator
+  // plan_campaign's own estimate uses (tools.campaign.ts). Degrades to
+  // €0.00 for a 0-asset campaign (estimateCampaignBuildCents sums an empty
+  // array to 0) — never crashes; the render below omits the stat entirely in
+  // that case rather than show a meaningless €0.00.
+  const buildModel = await getCampaignBuildModel();
+  const modelLabel = MODEL_CATALOG.find((m) => m.id === buildModel)?.label ?? buildModel;
+  const estimateCents = estimateCampaignBuildCents(assets, buildModel);
+
   // Landing page (Slice 2 Task 4): reuses the SAME gate the public
   // `/site/<slug>/c/<campaignSlug>` route checks (findApprovedLandingAsset —
   // an approved landing_page asset AND campaign.status ready/active) so this
@@ -199,6 +214,9 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
           <Badge tone={CAMPAIGN_STATUS_TONE[campaign.status] ?? "neutral"}>{campaign.status}</Badge>
           <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
             {approvedCount}/{assets.length} assets approved · created {formatDate(campaign.createdAt)}
+            {assets.length > 0 && (
+              <> · Est. build cost ≈ {formatCentsEur(estimateCents)} on {modelLabel}</>
+            )}
           </span>
         </div>
         <div>

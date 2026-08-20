@@ -6,6 +6,9 @@ import { slugify } from "@/lib/cms/blog";
 import { generateAsset } from "@/lib/campaigns/generate";
 import { materialiseAsset } from "@/lib/campaigns/materialise";
 import { launchCampaign } from "@/lib/campaigns/launch";
+import { getCampaignBuildModel } from "@/lib/campaigns/buildModel";
+import { estimateCampaignBuildCents, formatCentsEur } from "@/lib/campaigns/costEstimate";
+import { MODEL_CATALOG } from "@/lib/ai/modelCatalog";
 import {
   ASSET_ORDER,
   DEFAULT_ASSET_PLAN,
@@ -272,16 +275,29 @@ export async function planCampaignTool(ctx: ToolContext, input: Record<string, u
       brief,
     );
 
+    // Cost estimate (Campaign Engine Slice 4, Task 4) — purely informational,
+    // never gates the plan: the tenant's chosen build model (buildModel.ts)
+    // priced against the standard 11-asset plan via the pure estimator
+    // (costEstimate.ts). Surfaced both as structured fields (estimateCents/
+    // modelLabel, for any future UI consumer of this tool result) and folded
+    // into `result`'s own text, since that's the one line the model reliably
+    // relays to the operator when it shows the plan.
+    const buildModel = await getCampaignBuildModel();
+    const modelLabel = MODEL_CATALOG.find((m) => m.id === buildModel)?.label ?? buildModel;
+    const estimateCents = estimateCampaignBuildCents(DEFAULT_ASSET_PLAN, buildModel);
+    const estimateLine = `Estimated build cost: ${formatCentsEur(estimateCents)} on ${modelLabel} (an estimate — change the campaign model in settings to lower it).`;
+
     return {
       text: JSON.stringify({
-        result:
-          "Plan prepared — nothing has been saved. Show it to the operator; once they approve (trimming `assets` first if they want fewer), call create_campaign with this exact shape.",
+        result: `Plan prepared — nothing has been saved. Show it to the operator; once they approve (trimming \`assets\` first if they want fewer), call create_campaign with this exact shape. ${estimateLine}`,
         name: draftName,
         season: season || null,
         startsOn: startsOn || null,
         endsOn: endsOn || null,
         offer,
         assets: DEFAULT_ASSET_PLAN,
+        estimateCents,
+        modelLabel,
       }),
     };
   } catch (e) {
