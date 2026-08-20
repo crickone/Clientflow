@@ -31,8 +31,9 @@
 - Produces:
   - `const CAMPAIGN_MODEL_KEY = "campaignBuildModel"`
   - `resolveCampaignBuildModel(raw: string | null | undefined): string` — **pure**: returns `raw` iff it's a current `MODEL_CATALOG` id, else `CONTENT_MODEL`.
-  - `getCampaignBuildModel(): string` — `resolveCampaignBuildModel(readKey(CAMPAIGN_MODEL_KEY, ""))` (tenant-scoped via the ambient `readKey`).
-  - `setCampaignBuildModel(id: string): void` — validates against `MODEL_CATALOG` (throws `Error` on an unknown id), else `setKey(CAMPAIGN_MODEL_KEY, id)`.
+  - `getCampaignBuildModel(): Promise<string>` — **async** (`@/lib/settings` is dynamically imported inside, to keep the module importable under the pure test runner — same react-server dodge as the radar; every caller `await`s it): resolves `readKey(CAMPAIGN_MODEL_KEY, "")`.
+  - `setCampaignBuildModel(id: string): Promise<void>` — **async**; validates against `MODEL_CATALOG` (throws `Error` on an unknown id), else `setKey(CAMPAIGN_MODEL_KEY, id)`.
+  - ⚠️ **Both getters are ASYNC** — Task 3 (`const model = await getCampaignBuildModel()`), Task 4 (`await getCampaignBuildModel()`), Task 5 (`await setCampaignBuildModel(...)`) must await. All their call sites are already async (generateAsset / the tool executor / the server component / the server action).
   - `isCampaignBuildModelId(id: string): boolean` — helper used by the resolver + setter.
 
 - [ ] **Step 1: Write the failing test** (pure resolver + validator only — `getCampaignBuildModel`/`setCampaignBuildModel` hit the DB proxy and are NOT unit-tested here):
