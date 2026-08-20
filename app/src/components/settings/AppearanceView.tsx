@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Input";
 import {
-  DEFAULT_THEME,
+  DEFAULT_HEADING_FONT,
   HEADING_FONTS,
   type ThemeConfig,
 } from "@/lib/theme";
@@ -75,9 +75,10 @@ export function AppearanceView({
     start(async () => {
       const res = await resetThemeAction();
       if (res.ok) {
-        setDraft(DEFAULT_THEME);
-        setSaved(DEFAULT_THEME);
-        toast.success("Theme reset to default.");
+        // Only the heading font resets; the tenant's bg/accent (brand) stay.
+        setDraft((d) => ({ ...d, headingFont: DEFAULT_HEADING_FONT }));
+        setSaved((s) => ({ ...s, headingFont: DEFAULT_HEADING_FONT }));
+        toast.success("Heading font reset.");
         router.refresh();
       } else {
         toast.error(res.error);

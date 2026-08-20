@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireAdmin } from "@/lib/auth";
-import { clearTheme, setTheme } from "@/lib/settings";
-import { HEADING_FONTS } from "@/lib/theme";
+import { getTheme, setTheme } from "@/lib/settings";
+import { DEFAULT_HEADING_FONT, HEADING_FONTS } from "@/lib/theme";
 
 export type ThemeResult = { ok: true } | { ok: false; error: string };
 
@@ -35,7 +35,11 @@ export async function saveThemeAction(input: {
 
 export async function resetThemeAction(): Promise<ThemeResult> {
   await requireAdmin();
-  clearTheme();
+  // Reset ONLY the heading font — preserve the tenant's stored bg/accent. Those
+  // still drive customer-facing surfaces (client mobile app, campaign landing
+  // pages, transactional + marketing emails) even though the admin chrome now
+  // uses the light/dark preset instead. (Colour is no longer editable here.)
+  setTheme({ ...getTheme(), headingFont: DEFAULT_HEADING_FONT });
   revalidatePath("/", "layout");
   return { ok: true };
 }
