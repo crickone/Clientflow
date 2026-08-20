@@ -131,8 +131,10 @@ interface Resolved {
  * /api/campaigns/signup uses around its own upsertLead call.
  *
  * Returns null for every "don't render" case — unmapped host, unknown
- * campaign slug, or the findApprovedLandingAsset gate failing (campaign not
- * in {ready,active}, or no APPROVED landing_page asset) — so both callers
+ * campaign slug, a still-`ready` (approved-but-unlaunched) campaign reached
+ * via the unmapped-host fallback (resolvedVia "fallback" — see below), or
+ * the findApprovedLandingAsset gate failing (campaign not in
+ * {ready,active}, or no APPROVED landing_page asset) — so both callers
  * below treat every failure identically. No path here ever reveals to the
  * client WHY a page didn't render (matches /api/campaigns/signup folding
  * "unknown token" and "tampered token" into the same 400).
@@ -162,6 +164,19 @@ function resolveCampaignLanding(
   return runWithTenant(resolved.tenantId, (): Resolved | null => {
     const campaign = getCampaignBySlug(params.campaignSlug);
     if (!campaign) return null;
+
+    // Unmapped-host fallback (resolvedVia "fallback" — resolveHost.ts's dev
+    // preview path, which trusts the URL's siteSlug with no proof of
+    // hostname ownership) must not leak a `ready` campaign's landing copy:
+    // that status means approved-but-NOT-launched, so reaching it this way
+    // is indistinguishable from someone guessing campaign slugs on the raw
+    // Railway host. Once `active` (launched) the page is public anyway, so
+    // only the pre-launch preview is withheld here. An operator can still
+    // preview a `ready` campaign — just via the site's own mapped host
+    // (resolvedVia "host"), same as any other CMS preview-before-DNS case.
+    if (resolved.resolvedVia === "fallback" && campaign.status !== "active") {
+      return null;
+    }
 
     const assets = listAssets(campaign.id);
     const landingAsset = findApprovedLandingAsset(campaign.status, assets);

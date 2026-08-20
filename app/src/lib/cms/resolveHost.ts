@@ -32,6 +32,18 @@ export interface PublicSite {
   site: Site;
   /** Canonical host for absolute URLs (sitemap/canonical/OG). */
   primaryHost: string | null;
+  /**
+   * How this site was resolved: `"host"` = a real, ownership-verified
+   * hostname mapped in the control-plane `site_domains` table (step 1
+   * below) — the strong case. `"fallback"` = the dev/unmapped-host slug
+   * search (step 2) that lets `/site/<slug>` preview work before a
+   * client's DNS is pointed — it trusts the URL's `siteSlug` alone, with
+   * no proof of ownership. Most callers can ignore this; it exists so a
+   * route can choose to withhold not-yet-public content (e.g. an
+   * unlaunched campaign landing page) when reached via the weaker,
+   * guessable path. See site/[siteSlug]/c/[campaignSlug]/page.tsx.
+   */
+  resolvedVia: "host" | "fallback";
 }
 
 export function normalizeHost(host?: string | null): string | null {
@@ -71,6 +83,7 @@ export function resolvePublicSite(opts: {
             tenantDbFile: tenant.dbFile,
             site,
             primaryHost: site.primaryHost ?? host,
+            resolvedVia: "host",
           };
         }
       }
@@ -102,6 +115,7 @@ export function resolvePublicSite(opts: {
           tenantDbFile: tenant.dbFile,
           site,
           primaryHost: site.primaryHost,
+          resolvedVia: "fallback",
         };
       }
     }
