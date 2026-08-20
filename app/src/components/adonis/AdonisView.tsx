@@ -16,15 +16,16 @@ import { Tooltip } from "@/components/ui/Tooltip";
  * chart, model pickers, spend cap — unchanged, just relocated out of the
  * navbar per the sidebar redesign).
  *
- * AssistantChat renders its OWN bordered card with its own header bar and
- * its own internal empty-state (icon/title/body/suggestions) — it exposes no
- * prop to swap or suppress that in favour of a custom hero, and per the task
- * brief this is NOT a reason to fork/rewrite it. So the hero below is a
- * static block ABOVE the chat card (not something that dynamically
- * shrinks/hides once a conversation starts — this component has no way to
- * observe AssistantChat's message state) and it's fine for it to stay put;
- * AssistantChat's own empty-state still collapses away once the visitor
- * sends a first message, exactly as it already does on the dashboard.
+ * The hero below is a static block ABOVE the chat card. To keep the view
+ * "clean like the Hermes reference" — one identity block, not two — we pass
+ * AssistantChat the additive, default-off `hideHeader` prop, which suppresses
+ * ITS internal identity header (icon + title + subtitle) and the big
+ * empty-state icon so they don't stack redundantly beneath our wordmark;
+ * History + New-chat controls stay (a slim right-aligned strip) and the
+ * dashboard/specialist chats are untouched (they don't set the prop). We also
+ * pass an empty `emptyBody` so only the short prompt + suggestions show. The
+ * hero doesn't shrink/hide once a conversation starts (this component can't
+ * observe AssistantChat's message state) — fine, it just sits above the chat.
  */
 export function AdonisView({
   tenantId,
@@ -147,9 +148,9 @@ export function AdonisView({
             tenantId={tenantId}
             endpoint="/api/agents/orchestrator/chat"
             title="Adonis"
-            subtitle="routes any request to the right agent — sales, marketing, ops, or your general concierge"
+            hideHeader
             emptyTitle="Ask for anything — I'll route it"
-            emptyBody="Tell me what you need and I'll hand it to the right agent: chasing leads, drafting content, recovering no-shows, or the general stuff — your inbox, invoices, money, and plans. Nothing sends or changes without your approval."
+            emptyBody=""
             suggestions={[
               "Give me a breakdown of everything important today",
               "Work my leads and win back anyone who's gone quiet",

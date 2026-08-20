@@ -170,6 +170,7 @@ export function AssistantChat({
   suggestions = SUGGESTIONS,
   placeholder = "Ask your assistant…  (Enter to send)",
   initialInput,
+  hideHeader = false,
 }: {
   tenantId: number;
   height?: string;
@@ -198,6 +199,17 @@ export function AssistantChat({
    * themselves, same as every other write in this app.
    */
   initialInput?: string;
+  /**
+   * When true, suppress the internal identity header (the Sparkles icon +
+   * `title` + `subtitle`) and the big empty-state icon, so a host page can
+   * supply its own hero (e.g. the /adonis flagship view's centered ADONIS
+   * AGENT wordmark) without a second, redundant title/subtitle stacked
+   * beneath it. History + New-chat controls are PRESERVED (rendered as a
+   * slim, borderless right-aligned strip) so no function is lost. Defaults
+   * to false — every existing consumer (dashboard, specialist chats) is
+   * byte-identical unless it explicitly opts in.
+   */
+  hideHeader?: boolean;
 }) {
   // Per-account chat HISTORY in localStorage (survives browser close). Each entry
   // is a saved conversation; "New chat" opens a fresh one and keeps the old ones.
@@ -741,10 +753,20 @@ export function AssistantChat({
         overflow: "hidden",
       }}
     >
-      <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--hairline)", display: "flex", alignItems: "center", gap: 8 }}>
-        <Sparkles size={16} strokeWidth={1.75} style={{ color: "var(--accent)" }} />
-        <strong style={{ fontSize: 14, color: "var(--text-primary)" }}>{title}</strong>
-        <span style={{ fontSize: 12, color: "var(--text-tertiary)" }} className="ai-subtitle">{subtitle}</span>
+      <div
+        style={{
+          padding: hideHeader ? "8px 10px 0" : "12px 16px",
+          borderBottom: hideHeader ? "none" : "1px solid var(--hairline)",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+        }}
+      >
+        {!hideHeader && <Sparkles size={16} strokeWidth={1.75} style={{ color: "var(--accent)" }} />}
+        {!hideHeader && <strong style={{ fontSize: 14, color: "var(--text-primary)" }}>{title}</strong>}
+        {!hideHeader && (
+          <span style={{ fontSize: 12, color: "var(--text-tertiary)" }} className="ai-subtitle">{subtitle}</span>
+        )}
         <div style={{ marginLeft: "auto", display: "flex", gap: 2, position: "relative" }}>
           <Button variant="ghost" size="sm" onClick={() => setHistoryOpen((v) => !v)}>
             <History size={14} /> History{historyList.length ? ` (${historyList.length})` : ""}
@@ -866,13 +888,17 @@ export function AssistantChat({
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 14 }}>
         {empty ? (
           <div style={{ margin: "auto", textAlign: "center", maxWidth: 460 }}>
-            <Sparkles size={26} strokeWidth={1.5} style={{ color: "var(--accent)", marginBottom: 10 }} />
+            {!hideHeader && (
+              <Sparkles size={26} strokeWidth={1.5} style={{ color: "var(--accent)", marginBottom: 10 }} />
+            )}
             <div style={{ fontSize: 15, color: "var(--text-primary)", fontWeight: 600, marginBottom: 6 }}>
               {emptyTitle}
             </div>
-            <div style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 18, lineHeight: 1.5 }}>
-              {emptyBody}
-            </div>
+            {emptyBody && (
+              <div style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 18, lineHeight: 1.5 }}>
+                {emptyBody}
+              </div>
+            )}
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {suggestions.map((s) => (
                 <button
