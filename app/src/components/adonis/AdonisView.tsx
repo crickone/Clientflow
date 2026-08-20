@@ -147,7 +147,6 @@ export function AdonisView({
           <AssistantChat
             tenantId={tenantId}
             endpoint="/api/agents/orchestrator/chat"
-            title="Adonis"
             hideHeader
             emptyTitle="Ask for anything — I'll route it"
             emptyBody=""
