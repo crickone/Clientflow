@@ -38,7 +38,8 @@ export function Logo({
     // /adonis-logo.svg is the wordmark on a cropped viewBox. The business name
     // rides in aria-label rather than a visible sub-line: it's already shown in
     // the chrome's business switcher, and a designed wordmark reads cleaner solo.
-    const wmWidth = Math.round(height * 2.326); // matches the 1500:645 cropped viewBox aspect
+    const wmHeight = Math.round(height * 1.5); // the 2-line ADONIS AGENT lockup reads small at the nominal height — render ~1.5x up
+    const wmWidth = Math.round(wmHeight * 2.326); // matches the 1500:645 cropped viewBox aspect
     return (
       <span
         role="img"
@@ -46,7 +47,7 @@ export function Logo({
         style={{
           display: "inline-block",
           flex: "none",
-          height,
+          height: wmHeight,
           width: wmWidth,
           maxWidth: "100%",
           color: "var(--text-primary)",
