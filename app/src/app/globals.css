@@ -1112,3 +1112,12 @@ a {
   .skeleton, .ai-shimmer, .ai-caret, .ai-dot { animation: none !important; }
   html { scroll-behavior: auto !important; }
 }
+
+/* /adonis hero mark — theme-specific asset (white on dark, ink on light).
+   Both <img>s render; CSS shows the one matching the active theme, keyed on
+   the [data-theme] attribute the light/dark toggle stamps on <html>. Default
+   (no attribute = the original dark app) shows the dark (white) mark. */
+.adonis-hero-logo { display: block; margin: 0 auto; }
+.adonis-hero-logo--light { display: none; }
+:root[data-theme="light"] .adonis-hero-logo--dark { display: none; }
+:root[data-theme="light"] .adonis-hero-logo--light { display: block; }

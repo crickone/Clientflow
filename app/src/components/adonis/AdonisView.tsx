@@ -11,23 +11,19 @@ import { Tooltip } from "@/components/ui/Tooltip";
  * for the Orchestrator ("Adonis") chat — the same `AssistantChat` component
  * + `/api/agents/orchestrator/chat` endpoint already embedded on the
  * dashboard, so specialist routing + the write-approval gate are completely
- * unchanged. A big centered ADONIS AGENT wordmark + tagline sit above the
- * chat; a settings gear top-right opens the existing `/agents` page (org
+ * unchanged. A settings gear top-right opens the existing `/agents` page (org
  * chart, model pickers, spend cap — unchanged, just relocated out of the
  * navbar per the sidebar redesign).
  *
- * The hero below is a static block ABOVE the chat. To keep the view "clean
- * like the Hermes reference" — one identity block on a plain background, no
- * grey card — we pass AssistantChat the additive, default-off `bare` prop:
- * it suppresses that component's own identity header (icon + title + subtitle)
- * and big empty-state icon, AND drops its card border / `--surface-1` fill /
- * radius + the compose-row divider, so the suggestions + input float on the
- * page background (the input keeps its own subtle border). History + New-chat
- * stay; the dashboard/specialist/Communication chats are untouched (they don't
- * set the prop). We also pass an empty `emptyBody` so only the short prompt +
- * suggestions show. The hero doesn't shrink/hide once a conversation starts
- * (this component can't observe AssistantChat's message state) — fine, it just
- * sits above the chat.
+ * `bare` (default-off elsewhere) strips AssistantChat's own header + card
+ * chrome so the chat blends into a clean full-page background like the Hermes
+ * reference. The hero (the Adonis window mark + tagline) is passed as
+ * `heroSlot`, so it renders INSIDE the chat's scroll area: centered mid-window
+ * while empty, then scrolling up with the conversation once it starts (it's
+ * part of the scroll content, not pinned chrome). The window mark is a
+ * theme-specific asset (`Logo.tsx`-independent, /adonis only) — see the
+ * `.adonis-hero-*` swap in globals.css: the white variant shows on dark, the
+ * ink variant on light.
  */
 export function AdonisView({
   tenantId,
@@ -36,6 +32,47 @@ export function AdonisView({
   tenantId: number;
   isAdmin: boolean;
 }) {
+  // The Adonis window mark + tagline — rendered at the top of the chat's
+  // scroll area (see AssistantChat `heroSlot`). Two theme-specific <img>s,
+  // one shown per active theme via the `.adonis-hero-logo--*` CSS in
+  // globals.css (dark=white mark, light=ink mark).
+  const hero = (
+    <div
+      style={{
+        flexShrink: 0,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        textAlign: "center",
+        padding: "8px 16px 22px",
+      }}
+    >
+      <img
+        src="/adonis-window-dark.svg"
+        alt="Adonis Agent"
+        className="adonis-hero-logo adonis-hero-logo--dark"
+        style={{ height: "clamp(96px, 15vw, 148px)", width: "auto" }}
+      />
+      <img
+        src="/adonis-window-light.svg"
+        alt=""
+        aria-hidden
+        className="adonis-hero-logo adonis-hero-logo--light"
+        style={{ height: "clamp(96px, 15vw, 148px)", width: "auto" }}
+      />
+      <div
+        style={{
+          marginTop: 10,
+          fontSize: 14,
+          color: "var(--text-secondary)",
+          letterSpacing: "0.01em",
+        }}
+      >
+        Turning Conversations Into Campaigns
+      </div>
+    </div>
+  );
+
   return (
     <div
       style={{
@@ -49,7 +86,7 @@ export function AdonisView({
       {/* Top bar — minimal: just the settings gear, top-right. Admin-only:
           its target (/agents) is requireAdminPage()-gated, so we never render
           a gear that would silently bounce a non-admin staff user. The row is
-          kept (fixed height) for both so the hero's vertical rhythm is stable. */}
+          kept (fixed height) for both so the layout is stable. */}
       <div
         style={{
           display: "flex",
@@ -81,8 +118,9 @@ export function AdonisView({
         )}
       </div>
 
-      {/* Centered column: hero + chat, capped width so the chat reads like a
-          composer (not stretched edge-to-edge on wide monitors). */}
+      {/* Centered column: capped width so the chat reads like a composer (not
+          stretched edge-to-edge on wide monitors). The hero lives INSIDE the
+          chat (heroSlot), centered while empty, scrolling up once chatting. */}
       <div
         style={{
           flex: 1,
@@ -94,62 +132,12 @@ export function AdonisView({
           margin: "0 auto",
         }}
       >
-        {/* Hero — the ADONIS AGENT wordmark, rendered as a currentColor CSS
-            mask exactly like Logo.tsx's fallback lockup (same asset,
-            /adonis-logo.svg, so it stays theme-adaptive across light/dark
-            and any per-tenant accent), plus the one-line tagline beneath it. */}
-        <div
-          style={{
-            flexShrink: 0,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            textAlign: "center",
-            padding: "clamp(20px, 5dvh, 56px) 16px clamp(16px, 4dvh, 32px)",
-          }}
-        >
-          <span
-            role="img"
-            aria-label="Adonis Agent"
-            style={{
-              display: "block",
-              height: "clamp(40px, 8vw, 68px)",
-              width: "auto",
-              aspectRatio: "1500 / 645", // matches /adonis-logo.svg's cropped viewBox
-              color: "var(--text-primary)",
-              backgroundColor: "currentColor",
-              WebkitMaskImage: "url(/adonis-logo.svg)",
-              maskImage: "url(/adonis-logo.svg)",
-              WebkitMaskRepeat: "no-repeat",
-              maskRepeat: "no-repeat",
-              WebkitMaskSize: "contain",
-              maskSize: "contain",
-              WebkitMaskPosition: "center",
-              maskPosition: "center",
-            }}
-          />
-          <div
-            style={{
-              marginTop: 14,
-              fontSize: 14,
-              color: "var(--text-secondary)",
-              letterSpacing: "0.01em",
-            }}
-          >
-            Turning Conversations Into Campaigns
-          </div>
-        </div>
-
-        {/* The chat — fills all remaining height; its own input row is the
-            last flex child of AssistantChat's internal column, so it stays
-            pinned at the bottom of this card exactly like the Hermes
-            reference (unchanged internals — see the module doc comment). */}
         <div style={{ flex: 1, minHeight: 0 }}>
           <AssistantChat
             tenantId={tenantId}
             endpoint="/api/agents/orchestrator/chat"
             bare
+            heroSlot={hero}
             emptyTitle="Ask for anything — I'll route it"
             emptyBody=""
             suggestions={[

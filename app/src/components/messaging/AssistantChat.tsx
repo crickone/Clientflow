@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Sparkles, Send, Download, Loader2, Check, History, Plus, Trash2, MessageSquare } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
@@ -171,6 +171,7 @@ export function AssistantChat({
   placeholder = "Ask your assistant…  (Enter to send)",
   initialInput,
   bare = false,
+  heroSlot,
 }: {
   tenantId: number;
   height?: string;
@@ -215,6 +216,16 @@ export function AssistantChat({
    * specialist chats, Communication) is byte-identical unless it opts in.
    */
   bare?: boolean;
+  /**
+   * Optional hero rendered at the TOP of the scrollable message area (used
+   * with `bare` by the /adonis flagship view). While there are no messages
+   * it's vertically centered together with the empty-state prompt (so a big
+   * wordmark sits mid-window like the Hermes reference); once a conversation
+   * starts it anchors to the top and scrolls up naturally with the messages —
+   * it's part of the scroll content, not pinned chrome. Omitted → nothing
+   * renders and every existing consumer is byte-identical.
+   */
+  heroSlot?: ReactNode;
 }) {
   // Per-account chat HISTORY in localStorage (survives browser close). Each entry
   // is a saved conversation; "New chat" opens a fresh one and keeps the old ones.
@@ -890,9 +901,24 @@ export function AssistantChat({
         </div>
       )}
 
-      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 14 }}>
+      <div
+        ref={scrollRef}
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          padding: 16,
+          display: "flex",
+          flexDirection: "column",
+          gap: 14,
+          // With a heroSlot, center the [hero + empty-state] group in the
+          // viewport while empty (Hermes-style), then top-anchor once a
+          // conversation starts so the hero scrolls up with the messages.
+          justifyContent: heroSlot && empty ? "center" : undefined,
+        }}
+      >
+        {heroSlot}
         {empty ? (
-          <div style={{ margin: "auto", textAlign: "center", maxWidth: 460 }}>
+          <div style={{ margin: heroSlot ? "0 auto" : "auto", textAlign: "center", maxWidth: 460 }}>
             {!bare && (
               <Sparkles size={26} strokeWidth={1.5} style={{ color: "var(--accent)", marginBottom: 10 }} />
             )}
