@@ -3,8 +3,7 @@ import { Megaphone, Plus } from "lucide-react";
 
 import { requireAdminPage } from "@/lib/auth";
 import { listAssets, listCampaigns } from "@/lib/campaigns/store";
-import { getCampaignBuildModel } from "@/lib/campaigns/buildModel";
-import { MODEL_CATALOG } from "@/lib/ai/modelCatalog";
+import { getCampaignBuildModel, CAMPAIGN_MODEL_CHOICES } from "@/lib/campaigns/buildModel";
 import { formatDate } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -99,9 +98,9 @@ export default async function MarketingCampaignsPage() {
               fontFamily: "inherit",
             }}
           >
-            {MODEL_CATALOG.map((m) => (
+            {CAMPAIGN_MODEL_CHOICES.map((m) => (
               <option key={m.id} value={m.id}>
-                {m.label} ({m.provider})
+                {m.label} — {m.hint}
               </option>
             ))}
           </select>

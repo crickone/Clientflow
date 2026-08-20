@@ -14,7 +14,9 @@ import { setCampaignBuildModel } from "@/lib/campaigns/buildModel";
  * server action is its own POST endpoint, reachable directly regardless of
  * what rendered the form that normally points at it.
  *
- * setCampaignBuildModel (Task 1) throws on any id outside MODEL_CATALOG.
+ * setCampaignBuildModel (Task 1) throws on any id outside CAMPAIGN_MODEL_CHOICES
+ * (@/lib/campaigns/buildModel — the native-Anthropic Haiku/Sonnet/Opus subset
+ * meteredCreate can actually run, NOT the full agent-chat MODEL_CATALOG).
  * Caught here — rather than left to propagate, as saveModel/saveCapEur do in
  * agents/actions.ts — because those are called from CLIENT components that
  * wrap the call in try/catch and toast the error; this hub's selector is a
@@ -22,14 +24,17 @@ import { setCampaignBuildModel } from "@/lib/campaigns/buildModel";
  * rejection. Its <select> only ever offers catalog ids, so a thrown error
  * here means a direct/tampered POST, not a normal user mistake: a silent
  * no-op (page just re-renders with the unchanged value) is correct, a 500
- * is not.
+ * is not. The catch still logs (Task 5 review, M2) — an invalid id is one
+ * expected cause, but so is a genuine DB-write failure in setKey, and those
+ * two must not be indistinguishable in the logs.
  */
 export async function setCampaignBuildModelAction(formData: FormData): Promise<void> {
   await requireAdmin();
   const id = String(formData.get("model") ?? "");
   try {
     await setCampaignBuildModel(id);
-  } catch {
+  } catch (err) {
+    console.error("[setCampaignBuildModelAction]", err);
     return;
   }
   revalidatePath("/marketing/campaigns");

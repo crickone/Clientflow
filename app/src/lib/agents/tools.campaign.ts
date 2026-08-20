@@ -6,9 +6,8 @@ import { slugify } from "@/lib/cms/blog";
 import { generateAsset } from "@/lib/campaigns/generate";
 import { materialiseAsset } from "@/lib/campaigns/materialise";
 import { launchCampaign } from "@/lib/campaigns/launch";
-import { getCampaignBuildModel } from "@/lib/campaigns/buildModel";
+import { getCampaignBuildModel, campaignModelLabel } from "@/lib/campaigns/buildModel";
 import { estimateCampaignBuildCents, formatCentsEur } from "@/lib/campaigns/costEstimate";
-import { MODEL_CATALOG } from "@/lib/ai/modelCatalog";
 import {
   ASSET_ORDER,
   DEFAULT_ASSET_PLAN,
@@ -283,9 +282,9 @@ export async function planCampaignTool(ctx: ToolContext, input: Record<string, u
     // into `result`'s own text, since that's the one line the model reliably
     // relays to the operator when it shows the plan.
     const buildModel = await getCampaignBuildModel();
-    const modelLabel = MODEL_CATALOG.find((m) => m.id === buildModel)?.label ?? buildModel;
+    const modelLabel = campaignModelLabel(buildModel);
     const estimateCents = estimateCampaignBuildCents(DEFAULT_ASSET_PLAN, buildModel);
-    const estimateLine = `Estimated build cost: ${formatCentsEur(estimateCents)} on ${modelLabel} (an estimate — change the campaign model in settings to lower it).`;
+    const estimateLine = `Estimated build cost: ${formatCentsEur(estimateCents)} on ${modelLabel} (an estimate — change the campaign model on the campaigns page to lower it).`;
 
     return {
       text: JSON.stringify({

@@ -16,9 +16,8 @@ import {
 import { requireAdminPage } from "@/lib/auth";
 import { findApprovedLandingAsset, getCampaign, getCampaignLandingUrl, listAssets } from "@/lib/campaigns/store";
 import type { CampaignAsset } from "@/lib/campaigns/store";
-import { getCampaignBuildModel } from "@/lib/campaigns/buildModel";
+import { getCampaignBuildModel, campaignModelLabel } from "@/lib/campaigns/buildModel";
 import { estimateCampaignBuildCents, formatCentsEur } from "@/lib/campaigns/costEstimate";
-import { MODEL_CATALOG } from "@/lib/ai/modelCatalog";
 import { getBlogPost } from "@/lib/blog/posts";
 import { getSiteById } from "@/lib/cms/sites";
 import { parseEmailBody, parseLandingBody, parseSocialBody } from "@/lib/campaigns/assetBody";
@@ -160,7 +159,7 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
   // array to 0) — never crashes; the render below omits the stat entirely in
   // that case rather than show a meaningless €0.00.
   const buildModel = await getCampaignBuildModel();
-  const modelLabel = MODEL_CATALOG.find((m) => m.id === buildModel)?.label ?? buildModel;
+  const modelLabel = campaignModelLabel(buildModel);
   const estimateCents = estimateCampaignBuildCents(assets, buildModel);
 
   // Landing page (Slice 2 Task 4): reuses the SAME gate the public
