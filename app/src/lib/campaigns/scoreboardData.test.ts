@@ -1,9 +1,10 @@
 // Run: npm test -- src/lib/campaigns/scoreboardData.test.ts
 //
 // Pure tests for aggregateConvertRevenue (Campaign Engine Slice 5, Task 2).
-// The 3 cases below are the money-math contract Task 3/4 build on: active-only
-// MRR, upfront = active memberships' first month + non-cancelled packages +
-// clinic packages, and empty input never throws.
+// The cases below are the money-math contract Task 3/4 build on: active-only
+// MRR, upfront = non-cancelled memberships' first month (active + expired both
+// collected a first payment; only cancelled gives it back) + non-cancelled
+// packages + clinic packages, and empty input never throws.
 //
 // ./scoreboardData also holds gatherCampaignRevenue (the DB half, untested
 // here) with `import "server-only"` + `@/lib/db` (the ambient db proxy) and
@@ -65,6 +66,19 @@ test("upfront = active memberships' first month + non-cancelled packages + clini
     clinicPackagesCents: [7500, 2500],                            // 10000
   });
   assert.equal(r.upfrontCashCents, 5000 + 12000 + 3000 + 10000); // 30000
+});
+
+test("expired memberships keep their upfront first-month credit; only cancelled is dropped", () => {
+  const r = aggregateConvertRevenue({
+    memberships: [
+      { priceCents: 5000, status: "active" },                     // still recurring: counts in MRR + upfront
+      { priceCents: 4000, status: "expired" },                    // lapsed, but its first month was collected: upfront only
+      { priceCents: 9999, status: "cancelled" },                  // refunded/never collected: excluded from both
+    ],
+    packages: [], clinicPackagesCents: [],
+  });
+  assert.equal(r.mrrCents, 5000); // active only — the lapsed membership isn't still paying
+  assert.equal(r.upfrontCashCents, 9000); // 5000 (active) + 4000 (expired) first months; cancelled's 9999 excluded
 });
 
 test("empty → zeros, never throws", () => {

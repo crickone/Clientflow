@@ -41,6 +41,7 @@ Card.displayName = "Card";
 
 export function CardLabel({
   children,
+  style,
   ...rest
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
@@ -54,6 +55,7 @@ export function CardLabel({
         letterSpacing: "0.14em",
         textTransform: "uppercase",
         marginBottom: 10,
+        ...style,
       }}
     >
       {children}
@@ -63,6 +65,7 @@ export function CardLabel({
 
 export function CardValue({
   children,
+  style,
   ...rest
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
@@ -76,6 +79,7 @@ export function CardValue({
         lineHeight: 1,
         textTransform: "uppercase",
         letterSpacing: 0,
+        ...style,
       }}
     >
       {children}

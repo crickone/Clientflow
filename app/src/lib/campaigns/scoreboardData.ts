@@ -25,10 +25,18 @@ export function aggregateConvertRevenue(input: {
   packages: PackageRec[];
   clinicPackagesCents: number[];
 }): { upfrontCashCents: number; mrrCents: number } {
+  // MRR = current recurring run-rate: active memberships only.
   const activeMonthly = input.memberships.filter((m) => m.status === "active").map((m) => m.priceCents);
   const mrrCents = sum(activeMonthly);
+  // Upfront first-month cash was already collected for any membership that
+  // isn't cancelled — active AND expired (lapsed card, non-renewal, admin
+  // close-out) both took a first payment; only a cancelled/refunded
+  // membership gives that cash back. Mirrors clientPackages below, which
+  // already counts `status !== "cancelled"` rather than active-only.
+  const membershipFirstMonth = input.memberships.filter((m) => m.status !== "cancelled").map((m) => m.priceCents);
+  const membershipFirstMonthCents = sum(membershipFirstMonth);
   const paidPackages = input.packages.filter((p) => p.status !== "cancelled").map((p) => p.priceCents);
-  const upfrontCashCents = mrrCents /* first month of each active membership */ + sum(paidPackages) + sum(input.clinicPackagesCents);
+  const upfrontCashCents = membershipFirstMonthCents + sum(paidPackages) + sum(input.clinicPackagesCents);
   return { upfrontCashCents, mrrCents };
 }
 
