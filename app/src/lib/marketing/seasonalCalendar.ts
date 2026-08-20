@@ -71,11 +71,14 @@ export function catalogForYear(year: number): { dates: CalDate[]; seasons: Seaso
   const easter = easterSunday(year);
   const easterMon = addDays(year, easter.month, easter.day, 1);
   const mothers = addDays(year, easter.month, easter.day, -21); // 4th Sun of Lent (IE/UK)
+  // IE law: St Brigid's Day holiday is the first Monday of Feb, EXCEPT when
+  // 1 Feb is itself a Friday, in which case the holiday is that Friday (1 Feb).
+  const stBrigidsDay = dow(year, 2, 1) === 5 ? 1 : nthWeekday(year, 2, 1, 1);
 
   const dates: CalDate[] = [
     // public holidays (IE)
     { id: "new-year", name: "New Year's Day", kind: "public-holiday", iso: iso(year, 1, 1), angle: "New-year transformation challenge / fresh-start kickstart" },
-    { id: "st-brigids", name: "St Brigid's Day", kind: "public-holiday", iso: iso(year, 2, nthWeekday(year, 2, 1, 1)), angle: "Start-of-spring reset" },
+    { id: "st-brigids", name: "St Brigid's Day", kind: "public-holiday", iso: iso(year, 2, stBrigidsDay), angle: "Start-of-spring reset" },
     { id: "st-patricks", name: "St Patrick's Day", kind: "public-holiday", iso: iso(year, 3, 17), angle: "Short 'Lucky' kickstart week" },
     { id: "easter-monday", name: "Easter Monday", kind: "public-holiday", iso: iso(easterMon.year, easterMon.month, easterMon.day), angle: "Spring-into-summer prep" },
     { id: "may-day", name: "May Bank Holiday", kind: "public-holiday", iso: iso(year, 5, nthWeekday(year, 5, 1, 1)), angle: "Summer-countdown program launch" },

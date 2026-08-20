@@ -23,6 +23,13 @@ test("catalog: fixed + computed IE holidays land on the right dates (2026)", () 
   assert.equal(by("st-stephens"), "2026-12-26");
 });
 
+test("catalog: St Brigid's Day honours the Friday-1-Feb exception", () => {
+  const by = (y: number) => catalogForYear(y).dates.find((d) => d.id === "st-brigids")?.iso;
+  assert.equal(by(2030), "2030-02-01"); // 1 Feb 2030 is a Friday → the holiday IS that Friday
+  assert.equal(by(2026), "2026-02-02"); // 1 Feb 2026 is a Sunday → first Monday (2 Feb)
+  assert.equal(by(2027), "2027-02-01"); // 1 Feb 2027 is a Monday → first Monday IS 1 Feb
+});
+
 test("catalog: awareness days (2026)", () => {
   const { dates } = catalogForYear(2026);
   const by = (id: string) => dates.find((d) => d.id === id)?.iso;
