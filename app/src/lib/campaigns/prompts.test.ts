@@ -59,12 +59,17 @@ for (const [name, build] of builders) {
   check(`${name}: includes the tweak when passed`, tweaked.includes(tweak));
 }
 
-// landingPagePrompt-specific: the CTA is fixed to "Register your interest" —
-// never a price, booking action, or guarantee (the landing page captures a
-// lead, it doesn't transact).
+// landingPagePrompt-specific: the CTA is fixed to "Sign up" — never a price,
+// booking action, or guarantee (the landing page captures a lead, it
+// doesn't transact). It also instructs the model to produce SEO meta copy
+// (metaTitle/metaDescription) alongside the landing copy itself.
 {
   const out = landingPagePrompt(campaign);
-  check('landingPagePrompt: states the CTA is "Register your interest"', out.includes("Register your interest"));
+  check('landingPagePrompt: states the CTA is "Sign up"', out.includes("Sign up"));
+  check(
+    "landingPagePrompt: instructs the model to also produce metaTitle + metaDescription",
+    out.includes("metaTitle") && out.includes("metaDescription"),
+  );
 }
 
 // A campaign with no season set / no offer decided yet still produces a

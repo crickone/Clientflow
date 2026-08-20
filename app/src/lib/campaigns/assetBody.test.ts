@@ -123,7 +123,9 @@ const validLandingRaw = JSON.stringify({
   headline: "Summer Shape Up is here",
   subhead: "6 weeks to a stronger you.",
   bullets: ["Small-group coaching", "Personalised plan", "Real accountability"],
-  ctaLabel: "Register your interest",
+  ctaLabel: "Sign up",
+  metaTitle: "Summer Shape Up — 6-Week Transformation",
+  metaDescription: "Small-group coaching and a personalised plan. Real accountability, real results.",
 });
 
 {
@@ -133,7 +135,12 @@ const validLandingRaw = JSON.stringify({
   check("parseLandingBody: subhead round-trips", parsed?.subhead === "6 weeks to a stronger you.");
   check("parseLandingBody: bullets round-trip (count)", parsed?.bullets.length === 3);
   check("parseLandingBody: bullet content round-trips", parsed?.bullets[1] === "Personalised plan");
-  check("parseLandingBody: ctaLabel round-trips", parsed?.ctaLabel === "Register your interest");
+  check("parseLandingBody: ctaLabel round-trips", parsed?.ctaLabel === "Sign up");
+  check("parseLandingBody: metaTitle round-trips", parsed?.metaTitle === "Summer Shape Up — 6-Week Transformation");
+  check(
+    "parseLandingBody: metaDescription round-trips",
+    parsed?.metaDescription === "Small-group coaching and a personalised plan. Real accountability, real results.",
+  );
 }
 
 check(
@@ -169,6 +176,8 @@ check(
   check("parseLandingBody: missing subhead defaults to ''", parsed?.subhead === "");
   check("parseLandingBody: missing bullets defaults to []", Array.isArray(parsed?.bullets) && parsed?.bullets.length === 0);
   check("parseLandingBody: missing ctaLabel defaults to ''", parsed?.ctaLabel === "");
+  check("parseLandingBody: missing metaTitle defaults to ''", parsed?.metaTitle === "");
+  check("parseLandingBody: missing metaDescription defaults to ''", parsed?.metaDescription === "");
 }
 
 check(

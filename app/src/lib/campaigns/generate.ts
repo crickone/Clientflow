@@ -72,11 +72,13 @@ const LANDING_FORMAT_RULES = `You write landing-page copy for a marketing campai
 
 Formatting:
 - Return ONLY a single JSON object — no markdown, no code fences, no preamble, no notes about the writing process.
-- Shape exactly: {"headline": string, "subhead": string, "bullets": string[], "ctaLabel": string}.
+- Shape exactly: {"headline": string, "subhead": string, "bullets": string[], "ctaLabel": string, "metaTitle": string, "metaDescription": string}.
 - headline: short and punchy (under 60 characters).
 - subhead: one sentence expanding on the headline.
 - bullets: 3-5 short, concrete benefit statements grounded in the offer.
-- ctaLabel: always exactly "Register your interest" — never a price, a booking action, or a guarantee.
+- ctaLabel: always exactly "Sign up" — never a price, a booking action, or a guarantee.
+- metaTitle: search-engine page title, 60 characters or fewer, names the offer or business, compelling but never clickbait.
+- metaDescription: search-engine snippet, 155 characters or fewer, benefit-led, reads as a natural search-result snippet — not just a repeat of the headline.
 - Do not invent a discount, guarantee, bonus or deadline beyond what you've been given.
 
 Output format:
@@ -190,12 +192,19 @@ export async function generateAsset(
       // parseLandingBody never throws; a model response it can't make sense
       // of at all (empty/non-JSON) falls back to a safe, honest default
       // rather than failing the draft outright — same "never 500 the
-      // operator's action" posture as materialise.ts.
+      // operator's action" posture as materialise.ts. fallbackTitle doubles
+      // as both headline and metaTitle — with no model output to draw on,
+      // the campaign's own name/offer is the only honest thing to show
+      // (never the CTA text — a "Sign up"/"Join us" headline would read as
+      // the button, not a title).
+      const fallbackTitle = campaign.name || campaign.offer || "Join us";
       const fallback: ParsedLandingBody = {
-        headline: campaign.name || campaign.offer || "Register your interest",
+        headline: fallbackTitle,
         subhead: "",
         bullets: [],
-        ctaLabel: "Register your interest",
+        ctaLabel: "Sign up",
+        metaTitle: fallbackTitle,
+        metaDescription: campaign.offer || "",
       };
       const parsed = parseLandingBody(raw) ?? fallback;
       return { title: asset.title, body: JSON.stringify(parsed) };

@@ -9,7 +9,8 @@
  *   - email:  `JSON.stringify({ subject, content })` (see generate.ts's
  *     "email" branch).
  *   - landing_page (Slice 2): `JSON.stringify({ headline, subhead, bullets,
- *     ctaLabel })` (see generate.ts's "landing_page" branch).
+ *     ctaLabel, metaTitle, metaDescription })` (see generate.ts's
+ *     "landing_page" branch).
  *
  * parseSocialBody/parseEmailBody are used by ./materialise (Task 4:
  * materialise-on-approve) to turn an approved asset's ALREADY-TRUSTED stored
@@ -64,6 +65,15 @@ export interface ParsedLandingBody {
   subhead: string;
   bullets: string[];
   ctaLabel: string;
+  /** Search-engine page title (≤60 chars), rendered into <title>/og:title/
+   *  twitter:title by the landing route's generateMetadata. Defaults to ""
+   *  — an empty value means "no AI-generated meta title", never a crash;
+   *  the route falls back to headline/business name/campaign name. */
+  metaTitle: string;
+  /** Search-engine snippet (≤155 chars), rendered into the meta description/
+   *  og:description/twitter:description. Defaults to "" — the route falls
+   *  back to subhead, then the campaign's offer. */
+  metaDescription: string;
 }
 
 function asString(v: unknown): string {
@@ -128,15 +138,16 @@ export function parseEmailBody(raw: string): ParsedEmailBody | null {
 
 /**
  * Parse a landing-page asset's stored/model-output `{headline, subhead,
- * bullets, ctaLabel}` JSON. Returns `null` only for malformed JSON or a
- * non-object/array payload — unlike parseEmailBody, no individual field is
- * load-bearing: every field tolerantly defaults (headline/subhead/ctaLabel
- * to `""`, bullets to `[]`, and non-string bullet entries to `""`) rather
- * than rejecting the whole body. This extra tolerance matters because
- * generate.ts calls this on the MODEL's raw output directly (see this file's
- * header comment) — a model that gets the shape mostly right but drops one
- * field shouldn't fall all the way back to the generic safe-default object
- * when the rest of its output is perfectly usable.
+ * bullets, ctaLabel, metaTitle, metaDescription}` JSON. Returns `null` only
+ * for malformed JSON or a non-object/array payload — unlike parseEmailBody,
+ * no individual field is load-bearing: every field tolerantly defaults
+ * (headline/subhead/ctaLabel/metaTitle/metaDescription to `""`, bullets to
+ * `[]`, and non-string bullet entries to `""`) rather than rejecting the
+ * whole body. This extra tolerance matters because generate.ts calls this on
+ * the MODEL's raw output directly (see this file's header comment) — a model
+ * that gets the shape mostly right but drops one field shouldn't fall all
+ * the way back to the generic safe-default object when the rest of its
+ * output is perfectly usable.
  *
  * Also strips a leading/trailing markdown code fence before parsing —
  * LANDING_FORMAT_RULES (generate.ts) tells the model to return bare JSON,
@@ -163,5 +174,7 @@ export function parseLandingBody(raw: string): ParsedLandingBody | null {
     subhead: asString(obj.subhead),
     bullets,
     ctaLabel: asString(obj.ctaLabel),
+    metaTitle: asString(obj.metaTitle),
+    metaDescription: asString(obj.metaDescription),
   };
 }

@@ -11,16 +11,16 @@ import { useState } from "react";
 const MAX_FIELD_LEN = 200;
 const MAX_MESSAGE_LEN = 2000;
 
-// The submit CTA is a business INVARIANT — always exactly "Register your
-// interest", never a price, a booking action, or a guarantee, regardless of
-// what an approved landing_page asset's AI-generated `ctaLabel` says. The
-// generation prompt already instructs the model to return exactly this
-// string (see lib/campaigns/generate.ts's landing_page prompt), but a
-// mis-generated asset could still slip a different value past an operator's
-// approval — the model's output was never a reliable source for the
-// DISPLAYED button text, so it's hardcoded here instead of threaded in as a
-// prop from the stored/generated body.
-const CTA_LABEL = "Register your interest";
+// The submit CTA is a business INVARIANT — always exactly "Sign up", never a
+// price, a booking action, or a guarantee, regardless of what an approved
+// landing_page asset's AI-generated `ctaLabel` says. The generation prompt
+// already instructs the model to return exactly this string (see
+// lib/campaigns/generate.ts's landing_page prompt), but a mis-generated
+// asset could still slip a different value past an operator's approval —
+// the model's output was never a reliable source for the DISPLAYED button
+// text, so it's hardcoded here instead of threaded in as a prop from the
+// stored/generated body.
+const CTA_LABEL = "Sign up";
 
 interface Props {
   /** The server-signed (tenantId, campaignId) claim minted by the route
@@ -31,7 +31,7 @@ interface Props {
 }
 
 /**
- * The public "Register your interest" form (Campaign Engine Slice 2, Task
+ * The public campaign-landing "Sign up" form (Campaign Engine Slice 2, Task
  * 3). Posts JSON straight to /api/campaigns/signup — a RELATIVE url, so this
  * works unchanged on any host (platform default or a client's own verified
  * domain) and needs no siteSlug/campaignSlug: the signed `token` alone

@@ -87,14 +87,14 @@ export function videoScriptPrompt(campaign: Campaign, tweak?: string): string {
 /**
  * The campaign's landing-page copy (Slice 2) — headline, subhead, 3-5
  * benefit bullets, all built around the offer above — for the public,
- * branded "Register your interest" page a later task renders from this
- * asset. The CTA is deliberately fixed to "Register your interest": this
- * page captures a lead, it never transacts one, so — unlike offer/ad_copy/
- * video_script, which may reference whatever terms the offer itself sets —
- * the call to action here must never state a price, a booking action, or a
- * guarantee. See ./generate's LANDING_FORMAT_RULES for the JSON shape this
- * gets parsed into ({headline, subhead, bullets, ctaLabel} — ./assetBody's
- * parseLandingBody).
+ * branded "Sign up" page a later task renders from this asset. The CTA is
+ * deliberately fixed to "Sign up": this page captures a lead, it never
+ * transacts one, so — unlike offer/ad_copy/video_script, which may
+ * reference whatever terms the offer itself sets — the call to action here
+ * must never state a price, a booking action, or a guarantee. See
+ * ./generate's LANDING_FORMAT_RULES for the JSON shape this gets parsed
+ * into ({headline, subhead, bullets, ctaLabel, metaTitle, metaDescription}
+ * — ./assetBody's parseLandingBody).
  */
 export function landingPagePrompt(campaign: Campaign, tweak?: string): string {
   const lines = campaignContextLines(campaign, tweak);
@@ -103,7 +103,10 @@ export function landingPagePrompt(campaign: Campaign, tweak?: string): string {
     "Write this campaign's landing page copy: a short, punchy headline, a one-sentence subhead, and 3-5 benefit bullets — all grounded in the offer above and written to make a visitor want to register their interest.",
   );
   lines.push(
-    'The call to action is always "Register your interest" — never state a price, a booking action, or a guarantee; this page captures interest, it does not transact.',
+    'The call to action is always "Sign up" — never state a price, a booking action, or a guarantee; this page captures interest, it does not transact.',
+  );
+  lines.push(
+    "Also write this page's SEO meta copy: a metaTitle (60 characters or fewer, naming the offer or business, compelling but never clickbait) and a metaDescription (155 characters or fewer, benefit-led, reading as a natural search-result snippet — not just a repeat of the headline). The same house rules apply to this meta copy: never state a price, a guarantee, or a fabricated result.",
   );
   lines.push("");
   lines.push(HOUSE_RULES_CLAUSE);

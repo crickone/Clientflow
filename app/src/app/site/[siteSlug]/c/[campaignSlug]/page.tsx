@@ -14,7 +14,7 @@ import path from "node:path";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
-import { resolvePublicSite } from "@/lib/cms/resolveHost";
+import { resolvePublicSite, siteUrl, type PublicSite } from "@/lib/cms/resolveHost";
 import { runWithTenant, getCurrentTenant } from "@/lib/db/tenant";
 import {
   findApprovedLandingAsset,
@@ -111,6 +111,13 @@ interface Resolved {
   logoSrc: string | null;
   business: BusinessProfile;
   signupToken: string;
+  /** The resolved public site (host → tenant/site), kept around so
+   *  generateMetadata can build this page's own canonical URL via
+   *  siteUrl() — mirrors PageContext.resolved in lib/cms/render.ts. */
+  publicSite: PublicSite;
+  /** Request host, for siteUrl()'s dev (?site=) fallback branch — mirrors
+   *  PageContext.host in lib/cms/render.ts. */
+  host: string | null;
 }
 
 /**
@@ -136,6 +143,10 @@ interface Resolved {
  * re-runs resolvePageContext rather than sharing it with the page body). The
  * work is a handful of synchronous, in-process better-sqlite3 reads, so
  * paying it twice is not worth adding a request-scoped cache for.
+ *
+ * Also returns `publicSite` + `host` (unused by the page body itself)
+ * purely so generateMetadata can build this page's own canonical URL —
+ * same shape lib/cms/render.ts's PageContext carries `resolved`/`host` for.
  */
 function resolveCampaignLanding(
   params: Props["params"],
@@ -160,7 +171,9 @@ function resolveCampaignLanding(
       headline: campaign.name,
       subhead: "",
       bullets: [],
-      ctaLabel: "Register your interest",
+      ctaLabel: "Sign up",
+      metaTitle: "",
+      metaDescription: "",
     };
 
     // Mint the signup token HERE — this is the only place in the whole
@@ -184,17 +197,70 @@ function resolveCampaignLanding(
       logoSrc: logoDataUri(),
       business: getBusinessProfile(),
       signupToken,
+      publicSite: resolved,
+      host,
     };
   });
 }
 
+/**
+ * Full SEO suite for a campaign landing page: title, description, OG,
+ * Twitter card, canonical, robots. `data.body.metaTitle`/`metaDescription`
+ * are the AI-generated meta copy (Campaign Engine Slice 2 SEO pass — see
+ * ./assetBody's ParsedLandingBody + ./generate's LANDING_FORMAT_RULES);
+ * every other field has a defensive fallback chain, because a landing body
+ * can legitimately have blank meta fields (an older asset generated before
+ * this SEO pass shipped, a model that dropped the field, or the
+ * findApprovedLandingAsset default object) and this must never throw or
+ * render an obviously-broken title/description.
+ *
+ * No og:image/twitter:image: the tenant logo is only servable as a data:
+ * URI here (see logoDataUri()'s doc — the cookie-scoped /api/branding/logo
+ * URL 404s for an anonymous crawler) and a data: URI isn't a valid OG image
+ * value, so images are left out entirely rather than shipping a broken one.
+ * TODO: og:image once a public campaign image URL exists.
+ */
 export function generateMetadata({ params, searchParams }: Props): Metadata {
   const data = resolveCampaignLanding(params, searchParams);
   if (!data) return { title: "Campaign" };
-  const title = data.body.headline || data.campaign.name;
+
+  const { campaign, body, business, publicSite, host } = data;
+  const businessName = business.businessName.trim();
+  const headline = body.headline.trim();
+  // "headline — business name" only when both halves are real — a bare
+  // template-string join (`${headline} — ${businessName}`) would still be
+  // "truthy" (a non-empty " — ") even when BOTH are blank, so a naive ||
+  // chain built straight from that join would never actually reach the
+  // campaign.name fallback below. Same conditional-suffix idiom the
+  // pre-SEO version of this function, and buildPageMetadata (site/[siteSlug]
+  // /page.tsx), already used.
+  const headlineTitle = headline ? (businessName ? `${headline} — ${businessName}` : headline) : "";
+  const title = body.metaTitle.trim() || headlineTitle || campaign.name;
+  const description = body.metaDescription.trim() || body.subhead.trim() || campaign.offer || undefined;
+  const canonical = siteUrl(publicSite, `/c/${params.campaignSlug}`, host);
+  // Only a LIVE campaign's landing page should be crawled/indexed — "ready"
+  // is a pre-launch preview (findApprovedLandingAsset already gates render
+  // to campaign.status in {ready, active}, so this is always one of those
+  // two here, never building/complete/archived).
+  const isLive = campaign.status === "active";
+
   return {
-    title: data.business.businessName ? `${title} — ${data.business.businessName}` : title,
-    description: data.body.subhead || undefined,
+    title,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      title,
+      description,
+      url: canonical,
+      siteName: businessName || undefined,
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
+    robots: isLive ? { index: true, follow: true } : { index: false, follow: false },
   };
 }
 
