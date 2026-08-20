@@ -18,6 +18,7 @@ import { findApprovedLandingAsset, getCampaign, getCampaignLandingUrl, listAsset
 import type { CampaignAsset } from "@/lib/campaigns/store";
 import { getCampaignBuildModel, campaignModelLabel } from "@/lib/campaigns/buildModel";
 import { estimateCampaignBuildCents, formatCentsEur } from "@/lib/campaigns/costEstimate";
+import { getCampaignScoreboard } from "@/lib/campaigns/scoreboardData";
 import { getBlogPost } from "@/lib/blog/posts";
 import { getSiteById } from "@/lib/cms/sites";
 import { parseEmailBody, parseLandingBody, parseSocialBody } from "@/lib/campaigns/assetBody";
@@ -25,10 +26,11 @@ import { countLeadsByCampaign } from "@/lib/leads";
 import { formatDate } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
+import { Card, CardLabel, CardValue } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { CopyAssetButton } from "@/components/campaigns/CopyAssetButton";
 import { LaunchCampaignButton } from "@/components/campaigns/LaunchCampaignButton";
+import { setCampaignAdSpendAction } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -162,6 +164,29 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
   const modelLabel = campaignModelLabel(buildModel);
   const estimateCents = estimateCampaignBuildCents(assets, buildModel);
 
+  // Scoreboard (Campaign Engine Slice 5, Task 4) — CFA/CAC/ROAS for this
+  // campaign's OWN attributed leads/converts, against the ad spend recorded
+  // below. Passes estimateCents straight in as the scoreboard's aiBuildCents
+  // rather than letting getCampaignScoreboard recompute it, so the "AI build
+  // cost" figure shown in the scoreboard can never disagree with the "Est.
+  // build cost" line above — same model, same estimate, one call.
+  const scoreboard = await getCampaignScoreboard(campaign, estimateCents);
+  // Gated on converts, not on roas/cfaCovered directly: gatherCampaignRevenue
+  // always reports upfrontCashCents=0 when there are no converts yet, so if
+  // ad spend is already set the plain roas/cfaCovered math below would render
+  // a misleading "✗ short of covering" for a campaign that simply hasn't had
+  // time to convert anyone — the empty state (below, in the render) replaces
+  // that with a neutral "no conversions yet" instead.
+  const hasConverts = scoreboard.converts > 0;
+  const heroColor =
+    scoreboard.roas === null ? "var(--text-secondary)" : scoreboard.cfaCovered ? "#4ade80" : "#f87171"; // same green/red inks as Badge's tone palette
+  const heroText =
+    scoreboard.roas === null
+      ? "Add ad spend to see if this campaign paid for itself."
+      : scoreboard.cfaCovered
+        ? `✓ Self-funded — front-end sales covered the ${formatCentsEur(scoreboard.adSpendCents)} ad spend (${scoreboard.roas.toFixed(1)}×)`
+        : `✗ ${formatCentsEur(scoreboard.adSpendCents - scoreboard.upfrontCashCents)} short of covering the ${formatCentsEur(scoreboard.adSpendCents)} ad spend`;
+
   // Landing page (Slice 2 Task 4): reuses the SAME gate the public
   // `/site/<slug>/c/<campaignSlug>` route checks (findApprovedLandingAsset —
   // an approved landing_page asset AND campaign.status ready/active) so this
@@ -282,6 +307,117 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
             </div>
           </div>
         )}
+      </Card>
+
+      <Card style={{ padding: 20, marginBottom: 24 }}>
+        <div
+          style={{
+            fontSize: 11,
+            textTransform: "uppercase",
+            letterSpacing: "0.08em",
+            color: "var(--text-tertiary)",
+            marginBottom: 14,
+          }}
+        >
+          Scoreboard
+        </div>
+
+        {hasConverts ? (
+          <div style={{ fontSize: 15, fontWeight: 500, color: heroColor, marginBottom: 18 }}>{heroText}</div>
+        ) : (
+          <p style={{ fontSize: 13, color: "var(--text-tertiary)", fontStyle: "italic", marginBottom: 18 }}>
+            No conversions attributed yet.
+          </p>
+        )}
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 20 }}>
+          <div>
+            <CardLabel>Leads</CardLabel>
+            <CardValue style={{ fontSize: 22 }}>{scoreboard.leads}</CardValue>
+          </div>
+
+          {hasConverts && (
+            <div>
+              <CardLabel>Converts</CardLabel>
+              <CardValue style={{ fontSize: 22 }}>{scoreboard.converts}</CardValue>
+            </div>
+          )}
+
+          {hasConverts && (
+            <div>
+              <CardLabel>Conv. rate</CardLabel>
+              <CardValue style={{ fontSize: 22 }}>
+                {scoreboard.conversionRatePct === null ? "—" : `${scoreboard.conversionRatePct.toFixed(0)}%`}
+              </CardValue>
+            </div>
+          )}
+
+          <div>
+            <CardLabel>Ad spend</CardLabel>
+            {/* Admin-only by construction, not by an extra isAdmin check here:
+                requireAdminPage() at the top of this page already redirects
+                any non-admin away before a single line of this component
+                renders, so this form — like the campaign-build-model selector
+                on the campaigns list page — is admin-only simply because
+                nothing else ever reaches this render. The action itself
+                (setCampaignAdSpendAction) still re-checks requireAdmin() on
+                its own, since a server action is its own reachable POST
+                endpoint regardless of what rendered the form. */}
+            <form action={setCampaignAdSpendAction} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <input type="hidden" name="campaignId" value={campaign.id} />
+              <span style={{ fontSize: 15, color: "var(--text-tertiary)" }}>€</span>
+              <input
+                type="number"
+                name="adSpend"
+                step="0.01"
+                min="0"
+                defaultValue={(campaign.adSpendCents / 100).toFixed(2)}
+                style={{
+                  width: 76,
+                  background: "var(--bg)",
+                  border: "1px solid var(--hairline)",
+                  borderRadius: "var(--radius)",
+                  padding: "5px 7px",
+                  color: "var(--text-primary)",
+                  fontSize: 14,
+                  fontFamily: "inherit",
+                }}
+              />
+              <Button type="submit" size="sm" variant="outline">
+                Save
+              </Button>
+            </form>
+          </div>
+
+          {hasConverts && (
+            <>
+              <div>
+                <CardLabel>CAC</CardLabel>
+                <CardValue style={{ fontSize: 22 }}>
+                  {scoreboard.cacCents === null ? "—" : formatCentsEur(scoreboard.cacCents)}
+                </CardValue>
+              </div>
+              <div>
+                <CardLabel>Upfront cash</CardLabel>
+                <CardValue style={{ fontSize: 22 }}>{formatCentsEur(scoreboard.upfrontCashCents)}</CardValue>
+              </div>
+              <div>
+                <CardLabel>MRR added</CardLabel>
+                <CardValue style={{ fontSize: 22 }}>{formatCentsEur(scoreboard.mrrCents)}/mo</CardValue>
+              </div>
+              <div>
+                <CardLabel>ROAS</CardLabel>
+                <CardValue style={{ fontSize: 22 }}>
+                  {scoreboard.roas === null ? "—" : `${scoreboard.roas.toFixed(1)}×`}
+                </CardValue>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 16 }}>
+          AI build cost ≈ {formatCentsEur(scoreboard.aiBuildCents)}
+        </div>
       </Card>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>

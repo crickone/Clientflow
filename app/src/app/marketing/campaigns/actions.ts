@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireAdmin } from "@/lib/auth";
 import { setCampaignBuildModel } from "@/lib/campaigns/buildModel";
+import { setCampaignAdSpend } from "@/lib/campaigns/store";
 
 /**
  * Campaign Engine Slice 4, Task 5 — admin action behind the "Campaign build
@@ -38,4 +39,33 @@ export async function setCampaignBuildModelAction(formData: FormData): Promise<v
     return;
   }
   revalidatePath("/marketing/campaigns");
+}
+
+/**
+ * Campaign Engine Slice 5, Task 4 — admin action behind the ad-spend editor
+ * on the campaign hub (./[id]/page.tsx). Same `requireAdmin` re-check FIRST,
+ * for the same reason as setCampaignBuildModelAction above: a server action
+ * is its own reachable POST endpoint regardless of what rendered the form
+ * that normally points at it, so the hub page's own requireAdminPage() gate
+ * (which is what actually keeps the editor off a non-admin's screen — see
+ * the hub page's comment) can't be the only thing standing between a
+ * tampered request and a write.
+ *
+ * `eur` is guarded with `Number.isFinite` (not just `setCampaignAdSpend`'s
+ * own `Math.max(0, Math.round(...))` clamp) because a non-numeric `adSpend`
+ * field — an empty/tampered submit — turns `Number(...)` into `NaN`, and
+ * `Math.max(0, NaN)` is itself `NaN`, not 0: better-sqlite3 binds a JS `NaN`
+ * as SQL `NULL`, which would then fail `ad_spend_cents`' NOT NULL constraint
+ * and throw instead of no-opping. Falling back to 0 here keeps that path a
+ * plain "clear the spend" rather than a 500. `campaignId` needs no matching
+ * guard: an invalid/NaN id also binds NULL, but only into the UPDATE's WHERE
+ * clause, which just matches zero rows — an inherently safe no-op already.
+ */
+export async function setCampaignAdSpendAction(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const campaignId = Number(formData.get("campaignId"));
+  const eur = Number(formData.get("adSpend"));
+  const cents = Math.round((Number.isFinite(eur) ? Math.max(0, eur) : 0) * 100);
+  setCampaignAdSpend(campaignId, cents);
+  revalidatePath(`/marketing/campaigns/${campaignId}`);
 }

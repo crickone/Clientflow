@@ -2,11 +2,12 @@ import "server-only";
 import { eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { clientMemberships, clientPackages, clients, leads, packages, pipelineStages } from "@/lib/db/schema";
+import { clientMemberships, clientPackages, clients, leads, packages, pipelineStages, type Campaign } from "@/lib/db/schema";
 import { findClientByPhone } from "@/lib/clientMessages";
 import { countLeadsByCampaign } from "@/lib/leads";
 import { WON_ROLES, type StageRole } from "@/lib/pipeline/roles";
 import { normalizePhone } from "@/lib/whatsapp/phone";
+import { computeCampaignScoreboard, type Scoreboard } from "./scoreboard";
 
 // ── pure aggregation ────────────────────────────────────────────────────
 //
@@ -152,4 +153,28 @@ export async function gatherCampaignRevenue(campaignName: string): Promise<Campa
     console.error("[scoreboardData] gatherCampaignRevenue failed:", err);
     return { leads: leadCount, ...ZERO_REVENUE };
   }
+}
+
+/**
+ * Task 4 wrapper: `gatherCampaignRevenue` (above) + `computeCampaignScoreboard`
+ * (./scoreboard, pure) composed into the one call the hub page makes.
+ * `aiBuildCents` is a parameter, not computed in here, so the hub can pass in
+ * the SAME figure its existing Slice-4 estimate line already computed
+ * (`estimateCampaignBuildCents(assets, buildModel)`) — this avoids a second
+ * `getCampaignBuildModel()` KV read and guarantees the scoreboard's "AI build
+ * cost" can never disagree with the estimate line shown just above it.
+ */
+export async function getCampaignScoreboard(
+  campaign: Pick<Campaign, "name" | "adSpendCents">,
+  aiBuildCents: number,
+): Promise<Scoreboard> {
+  const rev = await gatherCampaignRevenue(campaign.name);
+  return computeCampaignScoreboard({
+    leads: rev.leads,
+    converts: rev.converts,
+    adSpendCents: campaign.adSpendCents,
+    aiBuildCents,
+    upfrontCashCents: rev.upfrontCashCents,
+    mrrCents: rev.mrrCents,
+  });
 }
