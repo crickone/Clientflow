@@ -1,10 +1,15 @@
 // Run: npm test -- src/lib/campaigns/scoreboardData.test.ts
 //
-// Pure tests for aggregateConvertRevenue (Campaign Engine Slice 5, Task 2).
-// The cases below are the money-math contract Task 3/4 build on: active-only
-// MRR, upfront = non-cancelled memberships' first month (active + expired both
-// collected a first payment; only cancelled gives it back) + non-cancelled
-// packages + clinic packages, and empty input never throws.
+// Pure tests for aggregateConvertRevenue + startedOnOrAfter (Campaign Engine
+// Slice 5, Task 2 + the campaign-launch date-window fix deferred from the
+// Slice-5 final review). The aggregateConvertRevenue cases are the money-math
+// contract Task 3/4 build on: active-only MRR, upfront = non-cancelled
+// memberships' first month (active + expired both collected a first payment;
+// only cancelled gives it back) + non-cancelled packages + clinic packages,
+// and empty input never throws. The startedOnOrAfter cases are the testable
+// core of the date-window fix: only a membership/package that started on/
+// after the campaign's own launch date should count toward that campaign's
+// revenue (see its doc comment in ./scoreboardData for the full rationale).
 //
 // ./scoreboardData also holds gatherCampaignRevenue (the DB half, untested
 // here) with `import "server-only"` + `@/lib/db` (the ambient db proxy) and
@@ -40,7 +45,7 @@ mod._load = function (this: unknown, request: string, ...rest: unknown[]) {
 };
 
 const requireLocal = createRequire(import.meta.url);
-const { aggregateConvertRevenue } = requireLocal("./scoreboardData") as typeof import("./scoreboardData");
+const { aggregateConvertRevenue, startedOnOrAfter } = requireLocal("./scoreboardData") as typeof import("./scoreboardData");
 
 test("MRR = active memberships' monthly price; cancelled/expired excluded", () => {
   const r = aggregateConvertRevenue({
@@ -84,4 +89,39 @@ test("expired memberships keep their upfront first-month credit; only cancelled 
 test("empty → zeros, never throws", () => {
   const r = aggregateConvertRevenue({ memberships: [], packages: [], clinicPackagesCents: [] });
   assert.deepEqual(r, { upfrontCashCents: 0, mrrCents: 0 });
+});
+
+// ── startedOnOrAfter (campaign-launch date-window fix, deferred from the
+// Slice-5 final review) ─────────────────────────────────────────────────
+//
+// gatherCampaignRevenue summed a convert's CURRENT memberships/packages with
+// no time relation to the campaign, so a client already paying for a year
+// who later re-converts on a brand-new campaign had that pre-existing
+// membership's revenue over-attributed to the new campaign. This predicate
+// is the testable core of the fix: only a record that started on/after the
+// campaign's own launch date should count.
+
+test("startedOnOrAfter: a pre-campaign record date is excluded", () => {
+  assert.equal(startedOnOrAfter("2025-01-01", "2026-08-01"), false);
+});
+
+test("startedOnOrAfter: an on/after record date is included (on-the-day and after)", () => {
+  assert.equal(startedOnOrAfter("2026-08-01", "2026-08-01"), true); // exactly on launch day
+  assert.equal(startedOnOrAfter("2026-08-15", "2026-08-01"), true); // after launch day
+});
+
+test("startedOnOrAfter: null campaignStartsOn (no window) includes everything", () => {
+  assert.equal(startedOnOrAfter("2020-01-01", null), true); // even a very old record
+  assert.equal(startedOnOrAfter(null, null), true);
+});
+
+test("startedOnOrAfter: null recordStartDate is excluded (defensive — real rows are NOT NULL)", () => {
+  assert.equal(startedOnOrAfter(null, "2026-08-01"), false);
+});
+
+test("startedOnOrAfter: compares only the date part, ignoring a stray time component", () => {
+  // Guards against a future write-path drift to a datetime string — same-day
+  // record with a time component still counts as "on" the campaign's launch day.
+  assert.equal(startedOnOrAfter("2026-08-01T23:59:59.000Z", "2026-08-01"), true);
+  assert.equal(startedOnOrAfter("2026-07-31T23:59:59.000Z", "2026-08-01"), false);
 });
