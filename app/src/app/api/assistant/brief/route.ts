@@ -10,6 +10,7 @@ import {
   syncGmailInbox,
 } from "@/lib/gmail";
 import { runWithTenant } from "@/lib/db/tenant";
+import { getCampaignRadar } from "@/lib/marketing/campaignRadar";
 import { MODELS } from "@/lib/ai/client";
 import { assertAiAllowed, AiCapError } from "@/lib/ai/usage";
 import { meteredCreate } from "@/lib/ai/metered";
@@ -74,6 +75,23 @@ export async function GET() {
   const gym = getGymDashboard();
   const attention = getNeedsAttention();
 
+  // Campaign Engine Slice 3 (Task 4): fold the same AI campaign radar
+  // /marketing/calendar reads into the brief's own context, so the operator
+  // sees "what's coming up" proactively on the dashboard too. `tenantId`
+  // here is this route's own already-resolved session tenant (line 25
+  // above) — the SAME id already used for assertAiAllowed/meteredCreate
+  // below, never a second/foreign lookup — so this can't leak another
+  // tenant's radar into this brief. getCampaignRadar memoises per
+  // tenantId:yyyymmdd, so this either hits that memo or makes, at most, the
+  // one metered "marketing" AI call/day the calendar would also trigger —
+  // this route adds no new AI framing call of its own. `.catch(() => [])`
+  // is belt-and-braces: getCampaignRadar already swallows its own failures
+  // internally (a capped/errored/unparseable call falls back to the static
+  // catalog angle rather than throwing), so this shouldn't throw today — but
+  // the brief must NEVER fail because of the radar, so the call site stays
+  // defensive regardless.
+  const radar = await getCampaignRadar(tenantId).catch(() => []);
+
   const data = {
     business,
     date: new Date().toISOString().slice(0, 10),
@@ -85,6 +103,16 @@ export async function GET() {
     revenueThisMonthEur: gym.revenueThisMonthEur,
     todaysClasses: gym.todayClasses.map((c) => `${c.time} ${c.name} — ${c.booked}/${c.capacity} booked`),
     needsAttention: attention.map((a) => `${a.count} ${a.label}`),
+    // Only present when the radar actually returned something — keeps the
+    // system prompt's existing "if a value is 0 or empty, don't dwell on
+    // it" rule from ever having to reason about an empty/absent block.
+    ...(radar.length > 0
+      ? {
+          upcomingMarketingOpportunities: radar
+            .slice(0, 3)
+            .map((r) => `${r.dateName} (in ${r.daysAway} days): ${r.suggestionName} — ${r.suggestionHook}`),
+        }
+      : {}),
   };
 
   try {
@@ -96,7 +124,7 @@ export async function GET() {
       max_tokens: 500,
       system: `You write a short, friendly MORNING BRIEF for the owner of ${business}, a ${mode === "timetable" ? "gym/studio" : "clinic"}, shown at the top of their dashboard.
 - 3 to 5 short bullet points, Irish English.
-- Lead with anything that needs ACTION (unanswered messages, new leads), then today's schedule/classes, then a quick members/money line.
+- Lead with anything that needs ACTION (unanswered messages, new leads), then today's schedule/classes, then a quick members/money line, then (if present) the nearest upcoming marketing opportunity.
 - Be specific with the numbers you're given. NEVER invent data. If a value is 0 or empty, don't dwell on it.
 - If there's genuinely nothing to flag, say it's a quiet day and suggest one useful thing to do.
 - Output ONLY the bullet points (each starting with "- "), no preamble or sign-off.`,
