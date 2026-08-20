@@ -930,26 +930,31 @@ export function AssistantChat({
                 {emptyBody}
               </div>
             )}
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {suggestions.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => send(s)}
-                  style={{
-                    textAlign: "left",
-                    padding: "10px 14px",
-                    border: "1px solid var(--hairline)",
-                    borderRadius: "var(--radius)",
-                    background: "var(--surface-2)",
-                    color: "var(--text-secondary)",
-                    fontSize: 13,
-                    cursor: "pointer",
-                  }}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
+            {/* In `bare` mode (the /adonis flagship view) the suggestions move
+                to a compact row just above the input (below) so the hero stays
+                centered and clean; other consumers keep them here. */}
+            {!bare && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {suggestions.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => send(s)}
+                    style={{
+                      textAlign: "left",
+                      padding: "10px 14px",
+                      border: "1px solid var(--hairline)",
+                      borderRadius: "var(--radius)",
+                      background: "var(--surface-2)",
+                      color: "var(--text-secondary)",
+                      fontSize: 13,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           messages.map((m, i) => (
@@ -975,6 +980,31 @@ export function AssistantChat({
           ))
         )}
       </div>
+
+      {/* bare (/adonis): compact prompt chips sit right above the input, small,
+          only while empty — moved down out of the centered hero group. */}
+      {bare && empty && suggestions.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 6, padding: "0 2px 10px" }}>
+          {suggestions.map((s) => (
+            <button
+              key={s}
+              onClick={() => send(s)}
+              style={{
+                padding: "5px 11px",
+                border: "1px solid var(--hairline)",
+                borderRadius: 999,
+                background: "transparent",
+                color: "var(--text-tertiary)",
+                fontSize: 11.5,
+                lineHeight: 1.3,
+                cursor: "pointer",
+              }}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div style={{ borderTop: bare ? "none" : "1px solid var(--hairline)", padding: bare ? "12px 0 0" : 12, display: "flex", gap: 8 }}>
         <textarea

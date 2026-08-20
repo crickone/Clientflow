@@ -48,9 +48,12 @@ export const DEFAULT_THEME: ThemeConfig = {
  */
 export type ThemeMode = "dark" | "light";
 export const THEME_MODE_COOKIE = "ui-theme";
+// Monochrome admin chrome: a near-white accent on dark, near-black on light.
+// (The per-tenant brand accent — DEFAULT_THEME / getTheme — stays orange for
+// CUSTOMER-facing surfaces: client app, campaign landings, emails.)
 export const THEME_MODES: Record<ThemeMode, { bg: string; accent: string }> = {
-  dark: { bg: "#0c0d10", accent: "#ff6a32" },
-  light: { bg: "#f4f5f7", accent: "#ff6a32" },
+  dark: { bg: "#0c0d10", accent: "#ffffff" },
+  light: { bg: "#f4f5f7", accent: "#16181c" },
 };
 /** Coerce an untrusted value (cookie / localStorage) to a mode; default dark. */
 export function coerceThemeMode(v: unknown): ThemeMode {
@@ -147,6 +150,11 @@ export function resolveThemeVars(cfg: ThemeConfig): Array<[string, string]> {
 
   const accentInk = dark ? lighten(accent, 0.18) : darken(accent, 0.12);
 
+  // Text/icon colour that sits ON the accent (e.g. primary-button label). Flips
+  // with the accent's own luminance so a near-white accent gets dark ink and a
+  // near-black accent gets white ink — essential now the accent is monochrome.
+  const accentContrast: RGB = luminance(accent) > 0.5 ? { r: 20, g: 21, b: 23 } : WHITE;
+
   return [
     ["--bg", bgHex],
     ["--surface-1", toHex(surface1)],
@@ -160,6 +168,7 @@ export function resolveThemeVars(cfg: ThemeConfig): Array<[string, string]> {
     ["--text-tertiary", rgba(fg, 0.42)],
     ["--accent", accentHex],
     ["--accent-ink", toHex(accentInk)],
+    ["--accent-contrast", toHex(accentContrast)],
     ["--accent-soft", rgba(accent, 0.14)],
     ["--accent-glow", `0 0 0 1px ${rgba(accent, 0.4)}, 0 6px 24px -6px ${rgba(accent, 0.5)}`],
     ["--glass", rgba(surface1, 0.72)],

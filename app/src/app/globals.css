@@ -19,8 +19,11 @@
   --text-primary: #f4f5f7;
   --text-secondary: rgba(244, 245, 247, 0.64);
   --text-tertiary: rgba(244, 245, 247, 0.42);
-  --accent: #ff6a32;            /* brighter orange to glow on dark */
-  --accent-ink: #ff8a5c;        /* orange text on dark surfaces */
+  --accent: #ff6a32;            /* brand orange — base/public fallback; the admin
+                                   chrome overrides this with a mono accent via
+                                   the injected theme <style> (see lib/theme.ts) */
+  --accent-ink: #ff8a5c;        /* accent text on dark surfaces */
+  --accent-contrast: #141517;   /* ink that sits ON the accent (e.g. button label) */
   --accent-soft: rgba(255, 106, 50, 0.14);
   --accent-glow: 0 0 0 1px rgba(255, 106, 50, 0.4), 0 6px 24px -6px rgba(255, 106, 50, 0.5);
   --accent-hbot: #4d8df0;       /* per-therapy — charts/data only */
@@ -202,8 +205,8 @@ a {
 .btn--lg { font-size: 13px; padding: 11px 22px; height: 44px; }
 .btn--icon { padding: 0; width: 36px; height: 36px; }
 
-.btn--primary { background: var(--accent); color: #1a0a03; box-shadow: var(--accent-glow); font-weight: 600; }
-.btn--primary:hover:not(:disabled) { filter: brightness(1.08); }
+.btn--primary { background: var(--accent); color: var(--accent-contrast); box-shadow: var(--accent-glow); font-weight: 600; }
+.btn--primary:hover:not(:disabled) { opacity: 0.88; }
 .btn--secondary { background: var(--surface-2); color: var(--text-primary); border-color: var(--grid); }
 .btn--secondary:hover:not(:disabled) { background: var(--surface-3); border-color: var(--hairline-strong); }
 .btn--outline { background: transparent; color: var(--text-primary); border-color: var(--hairline-strong); }

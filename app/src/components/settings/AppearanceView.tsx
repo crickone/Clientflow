@@ -237,7 +237,7 @@ function ThemePreview({ businessName }: { businessName: string }) {
             <span
               style={{
                 background: "var(--accent)",
-                color: "#fff",
+                color: "var(--accent-contrast)",
                 fontSize: 12.5,
                 fontWeight: 500,
                 padding: "7px 14px",
