@@ -16,16 +16,18 @@ import { Tooltip } from "@/components/ui/Tooltip";
  * chart, model pickers, spend cap — unchanged, just relocated out of the
  * navbar per the sidebar redesign).
  *
- * The hero below is a static block ABOVE the chat card. To keep the view
- * "clean like the Hermes reference" — one identity block, not two — we pass
- * AssistantChat the additive, default-off `hideHeader` prop, which suppresses
- * ITS internal identity header (icon + title + subtitle) and the big
- * empty-state icon so they don't stack redundantly beneath our wordmark;
- * History + New-chat controls stay (a slim right-aligned strip) and the
- * dashboard/specialist chats are untouched (they don't set the prop). We also
- * pass an empty `emptyBody` so only the short prompt + suggestions show. The
- * hero doesn't shrink/hide once a conversation starts (this component can't
- * observe AssistantChat's message state) — fine, it just sits above the chat.
+ * The hero below is a static block ABOVE the chat. To keep the view "clean
+ * like the Hermes reference" — one identity block on a plain background, no
+ * grey card — we pass AssistantChat the additive, default-off `bare` prop:
+ * it suppresses that component's own identity header (icon + title + subtitle)
+ * and big empty-state icon, AND drops its card border / `--surface-1` fill /
+ * radius + the compose-row divider, so the suggestions + input float on the
+ * page background (the input keeps its own subtle border). History + New-chat
+ * stay; the dashboard/specialist/Communication chats are untouched (they don't
+ * set the prop). We also pass an empty `emptyBody` so only the short prompt +
+ * suggestions show. The hero doesn't shrink/hide once a conversation starts
+ * (this component can't observe AssistantChat's message state) — fine, it just
+ * sits above the chat.
  */
 export function AdonisView({
   tenantId,
@@ -147,7 +149,7 @@ export function AdonisView({
           <AssistantChat
             tenantId={tenantId}
             endpoint="/api/agents/orchestrator/chat"
-            hideHeader
+            bare
             emptyTitle="Ask for anything — I'll route it"
             emptyBody=""
             suggestions={[

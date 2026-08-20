@@ -170,7 +170,7 @@ export function AssistantChat({
   suggestions = SUGGESTIONS,
   placeholder = "Ask your assistant…  (Enter to send)",
   initialInput,
-  hideHeader = false,
+  bare = false,
 }: {
   tenantId: number;
   height?: string;
@@ -200,16 +200,21 @@ export function AssistantChat({
    */
   initialInput?: string;
   /**
-   * When true, suppress the internal identity header (the Sparkles icon +
-   * `title` + `subtitle`) and the big empty-state icon, so a host page can
-   * supply its own hero (e.g. the /adonis flagship view's centered ADONIS
-   * AGENT wordmark) without a second, redundant title/subtitle stacked
-   * beneath it. History + New-chat controls are PRESERVED (rendered as a
-   * slim, borderless right-aligned strip) so no function is lost. Defaults
-   * to false — every existing consumer (dashboard, specialist chats) is
-   * byte-identical unless it explicitly opts in.
+   * "Bare" / chromeless mode for a host page that supplies its own frame
+   * (e.g. the /adonis flagship view: a centered ADONIS AGENT wordmark hero
+   * on a clean full-page background, like the Hermes reference). When true:
+   *  - the internal identity header (Sparkles icon + `title` + `subtitle`)
+   *    and the big empty-state icon are suppressed, so there's no second,
+   *    redundant title stacked beneath the host's hero;
+   *  - the root card's border / `--surface-1` fill / radius are dropped and
+   *    the compose row's top divider is removed, so the chat blends into the
+   *    host background instead of sitting in a grey card.
+   * History + New-chat controls are PRESERVED (a slim right-aligned strip),
+   * and the compose field keeps its own subtle border so it still reads as
+   * an input. Defaults to false — every existing consumer (dashboard,
+   * specialist chats, Communication) is byte-identical unless it opts in.
    */
-  hideHeader?: boolean;
+  bare?: boolean;
 }) {
   // Per-account chat HISTORY in localStorage (survives browser close). Each entry
   // is a saved conversation; "New chat" opens a fresh one and keeps the old ones.
@@ -747,24 +752,24 @@ export function AssistantChat({
         flexDirection: "column",
         height: height ?? "72vh",
         minHeight: 420,
-        border: "1px solid var(--hairline)",
-        borderRadius: "var(--radius)",
-        background: "var(--surface-1)",
+        border: bare ? "none" : "1px solid var(--hairline)",
+        borderRadius: bare ? 0 : "var(--radius)",
+        background: bare ? "transparent" : "var(--surface-1)",
         overflow: "hidden",
       }}
     >
       <div
         style={{
-          padding: hideHeader ? "8px 10px 0" : "12px 16px",
-          borderBottom: hideHeader ? "none" : "1px solid var(--hairline)",
+          padding: bare ? "8px 10px 0" : "12px 16px",
+          borderBottom: bare ? "none" : "1px solid var(--hairline)",
           display: "flex",
           alignItems: "center",
           gap: 8,
         }}
       >
-        {!hideHeader && <Sparkles size={16} strokeWidth={1.75} style={{ color: "var(--accent)" }} />}
-        {!hideHeader && <strong style={{ fontSize: 14, color: "var(--text-primary)" }}>{title}</strong>}
-        {!hideHeader && (
+        {!bare && <Sparkles size={16} strokeWidth={1.75} style={{ color: "var(--accent)" }} />}
+        {!bare && <strong style={{ fontSize: 14, color: "var(--text-primary)" }}>{title}</strong>}
+        {!bare && (
           <span style={{ fontSize: 12, color: "var(--text-tertiary)" }} className="ai-subtitle">{subtitle}</span>
         )}
         <div style={{ marginLeft: "auto", display: "flex", gap: 2, position: "relative" }}>
@@ -888,7 +893,7 @@ export function AssistantChat({
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 14 }}>
         {empty ? (
           <div style={{ margin: "auto", textAlign: "center", maxWidth: 460 }}>
-            {!hideHeader && (
+            {!bare && (
               <Sparkles size={26} strokeWidth={1.5} style={{ color: "var(--accent)", marginBottom: 10 }} />
             )}
             <div style={{ fontSize: 15, color: "var(--text-primary)", fontWeight: 600, marginBottom: 6 }}>
@@ -945,7 +950,7 @@ export function AssistantChat({
         )}
       </div>
 
-      <div style={{ borderTop: "1px solid var(--hairline)", padding: 12, display: "flex", gap: 8 }}>
+      <div style={{ borderTop: bare ? "none" : "1px solid var(--hairline)", padding: bare ? "12px 0 0" : 12, display: "flex", gap: 8 }}>
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
