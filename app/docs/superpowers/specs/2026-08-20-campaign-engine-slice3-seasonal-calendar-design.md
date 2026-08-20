@@ -44,7 +44,7 @@ Branded with the app chrome (this is an internal admin surface, not the public s
 
 `getCampaignRadar(tenantId): RadarSuggestion[]` — **cached once per tenant per day**:
 
-- Reads today's cached result from the tenant **settings KV** keyed `marketing.radar.<yyyymmdd>` (same KV `getBusinessProfile` uses — **no new table, no migration**). If present → return it.
+- Reads today's cached result from an **in-process daily memo** (a module-level `Map` keyed `` `${tenantId}:${yyyymmdd}` `` — **no table, no migration**; the settings store is a structured blob with no generic KV, and a daily memo is simpler and makes "don't cache the fallback" trivial). If present → return it.
 - If absent → compute: take the **next up to 5** dates from `upcomingDates(today, 60)` (the notable ones nearest now) + the tenant's **Marketing Brain** (business context) and make **one metered AI call** (via the sanctioned `meteredCreate` chokepoint, agentKey `marketing`, gated by `assertAiAllowed` / recorded by the meter — same posture as every other paid call, house rules applied) that returns, for those dates, a one-line campaign suggestion each `{ dateId, name, hook }`. Write to the KV, return. (Dates in the 60-day window beyond the framed 5 still render in the rail with their static catalog `angle`.)
 - Fail-soft: if the AI call is unavailable/capped, fall back to the catalog's static `angle` per date (no crash, still useful) and do **not** cache the fallback (so it retries next view).
 
@@ -62,7 +62,7 @@ Extend the existing dashboard brief to surface the radar's top suggestions ("�
 
 ## Data model
 
-- **No schema change.** Campaigns already carry `season`, `startsOn`, `endsOn` (used for placement on the year). The radar cache lives in the existing tenant settings KV (`marketing.radar.<yyyymmdd>`), self-expiring by virtue of the date key (old keys are simply never read; a tiny opportunistic cleanup of prior-day keys is optional, not required).
+- **No schema change.** Campaigns already carry `season`, `startsOn`, `endsOn` (used for placement on the year). The radar cache is an **in-process module-level memo** (`Map` keyed `tenantId:yyyymmdd`), recomputed at most once/tenant/day and after any deploy — no table, no KV, no migration.
 
 ## Security, tenancy, metering, testing, rollout
 
