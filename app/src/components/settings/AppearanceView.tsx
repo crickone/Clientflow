@@ -10,20 +10,16 @@ import { Label } from "@/components/ui/Input";
 import {
   DEFAULT_THEME,
   HEADING_FONTS,
-  isHexColor,
-  resolveThemeVars,
-  THEME_PRESETS,
   type ThemeConfig,
 } from "@/lib/theme";
 import { resetThemeAction, saveThemeAction } from "@/app/settings/appearance/actions";
 
-/** Apply a resolved palette to the live document root (inline → wins over the injected <style>). */
-function applyLive(cfg: ThemeConfig) {
-  const root = document.documentElement;
-  for (const [k, v] of resolveThemeVars(cfg)) {
-    if (k === "color-scheme") root.style.colorScheme = v;
-    else root.style.setProperty(k, v);
-  }
+/** Live-preview just the heading font on the document root (inline → wins over
+ *  the injected <style>). Colours are the app light/dark mode now — toggled from
+ *  the sidebar, not editable here — so we never touch the palette from here. */
+function applyLiveFont(headingFont: string) {
+  const f = HEADING_FONTS.find((x) => x.id === headingFont) ?? HEADING_FONTS[0];
+  document.documentElement.style.setProperty("--font-heading", `var(${f.cssVar})`);
 }
 
 export function AppearanceView({
@@ -45,30 +41,29 @@ export function AppearanceView({
     savedRef.current = saved;
   }, [saved]);
 
-  // Live-preview the draft across the whole app while editing…
+  // Live-preview just the heading font while editing…
   useEffect(() => {
-    applyLive(draft);
-  }, [draft]);
-  // …and revert to the last saved theme if the user leaves without saving.
+    applyLiveFont(draft.headingFont);
+  }, [draft.headingFont]);
+  // …and revert to the last saved font if the user leaves without saving.
   useEffect(() => {
-    return () => applyLive(savedRef.current);
+    return () => applyLiveFont(savedRef.current.headingFont);
   }, []);
 
-  const dirty =
-    draft.bg !== saved.bg ||
-    draft.accent !== saved.accent ||
-    draft.headingFont !== saved.headingFont;
+  const dirty = draft.headingFont !== saved.headingFont;
 
   const save = () => {
-    if (!isHexColor(draft.bg) || !isHexColor(draft.accent)) {
-      toast.error("Enter valid hex colours (e.g. #0c0d10).");
-      return;
-    }
     start(async () => {
-      const res = await saveThemeAction(draft);
+      // bg/accent are carried through unchanged — the colour picker was retired
+      // (light/dark is the sidebar toggle); only the heading font is editable here.
+      const res = await saveThemeAction({
+        bg: saved.bg,
+        accent: saved.accent,
+        headingFont: draft.headingFont,
+      });
       if (res.ok) {
         setSaved(draft);
-        toast.success("Theme saved.");
+        toast.success("Heading font saved.");
         router.refresh();
       } else {
         toast.error(res.error);
@@ -92,62 +87,12 @@ export function AppearanceView({
 
   return (
     <div style={{ display: "grid", gap: 20 }}>
-      {/* ── Theme ─────────────────────────────────────────────────── */}
-      <Section title="Theme">
+      {/* ── Heading font ─────────────────────────────────────────── */}
+      <Section title="Heading font">
         <div style={{ display: "grid", gap: 18 }}>
           <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6 }}>
-            Pick a page background and an accent colour. The rest of the palette — surfaces, text,
-            borders — is derived automatically so the whole app stays coherent. Changes preview live;
-            click <strong>Save theme</strong> to keep them.
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-            <ColorField
-              label="Background"
-              value={draft.bg}
-              onChange={(bg) => setDraft((d) => ({ ...d, bg }))}
-            />
-            <ColorField
-              label="Accent"
-              value={draft.accent}
-              onChange={(accent) => setDraft((d) => ({ ...d, accent }))}
-            />
-          </div>
-
-          {/* presets */}
-          <div>
-            <Label>Presets</Label>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
-              {THEME_PRESETS.map((p) => {
-                const active = p.theme.bg === draft.bg && p.theme.accent === draft.accent;
-                return (
-                  <button
-                    key={p.name}
-                    type="button"
-                    onClick={() => setDraft((d) => ({ ...d, ...p.theme }))}
-                    title={p.name}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "6px 10px 6px 8px",
-                      borderRadius: "var(--radius)",
-                      border: active ? "1px solid var(--accent)" : "1px solid var(--hairline)",
-                      background: active ? "var(--accent-soft)" : "transparent",
-                      cursor: "pointer",
-                      color: "var(--text-secondary)",
-                      fontSize: 12,
-                    }}
-                  >
-                    <span style={{ display: "inline-flex" }}>
-                      <Swatch color={p.theme.bg} />
-                      <Swatch color={p.theme.accent} style={{ marginLeft: -6 }} />
-                    </span>
-                    {p.name}
-                  </button>
-                );
-              })}
-            </div>
+            Choose the display font used for headings across the app. Light and dark mode
+            are toggled from the sun/moon button at the bottom of the sidebar.
           </div>
 
           {/* heading font */}
@@ -209,11 +154,11 @@ export function AppearanceView({
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <Button onClick={save} disabled={!dirty || pending}>
               {pending ? <Loader2 size={14} className="spin" /> : <Check size={14} />}
-              {pending ? "Saving…" : "Save theme"}
+              {pending ? "Saving…" : "Save font"}
             </Button>
             <Button variant="outline" onClick={reset} disabled={pending}>
               <RotateCcw size={14} />
-              Reset to default
+              Reset font
             </Button>
           </div>
         </div>
@@ -222,84 +167,6 @@ export function AppearanceView({
       {/* ── Logo ─────────────────────────────────────────────────── */}
       <LogoManager hasLogo={hasLogo} />
     </div>
-  );
-}
-
-// ── colour field ──────────────────────────────────────────────────────────────
-
-function ColorField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (hex: string) => void;
-}) {
-  const safe = isHexColor(value) ? value : "#000000";
-  return (
-    <div>
-      <Label>{label}</Label>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          marginTop: 6,
-          border: "1px solid var(--hairline)",
-          borderRadius: "var(--radius)",
-          padding: 6,
-          background: "var(--surface-1)",
-        }}
-      >
-        <input
-          type="color"
-          value={safe}
-          onChange={(e) => onChange(e.target.value)}
-          aria-label={`${label} colour`}
-          style={{
-            width: 42,
-            height: 34,
-            border: "none",
-            background: "transparent",
-            padding: 0,
-            cursor: "pointer",
-          }}
-        />
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value.trim())}
-          spellCheck={false}
-          style={{
-            flex: 1,
-            minWidth: 0,
-            background: "transparent",
-            border: "none",
-            outline: "none",
-            color: "var(--text-primary)",
-            fontFamily: "var(--font-mono), monospace",
-            fontSize: 13,
-          }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function Swatch({ color, style }: { color: string; style?: React.CSSProperties }) {
-  return (
-    <span
-      style={{
-        width: 16,
-        height: 16,
-        borderRadius: "50%",
-        background: color,
-        border: "1px solid rgba(255,255,255,0.25)",
-        display: "inline-block",
-        ...style,
-      }}
-    />
   );
 }
 

@@ -7,6 +7,8 @@ import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { EASE, DUR } from "@/lib/motion";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import type { ThemeMode } from "@/lib/theme";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -242,6 +244,7 @@ export function Sidebar({
   logoSrc,
   businessName,
   showSetup,
+  themeMode,
   open = false,
   onClose,
 }: {
@@ -253,6 +256,7 @@ export function Sidebar({
   logoSrc: string | null;
   businessName: string;
   showSetup: boolean;
+  themeMode: ThemeMode;
   open?: boolean;
   onClose?: () => void;
 }) {
@@ -529,6 +533,7 @@ export function Sidebar({
             {user.role}
           </div>
         </div>
+        <ThemeToggle initialMode={themeMode} />
         <Tooltip label="Sign out">
           <button
             onClick={signOut}

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Toaster } from "sonner";
 import { AppShell } from "@/components/layout/AppShell";
@@ -17,7 +17,14 @@ import type { SidebarAccount } from "@/components/layout/Sidebar";
 import { resolveCurrentTenant } from "@/lib/db/tenant";
 import { getTheme, getVenueType, getSchedulingMode } from "@/lib/settings";
 import { getVocab } from "@/lib/vocabulary";
-import { DEFAULT_THEME, themeCss } from "@/lib/theme";
+import {
+  DEFAULT_HEADING_FONT,
+  DEFAULT_THEME,
+  coerceThemeMode,
+  themeCss,
+  themeForMode,
+  THEME_MODE_COOKIE,
+} from "@/lib/theme";
 import { getBusinessProfile } from "@/lib/businessProfile";
 import { getChromeLogoSrc } from "@/lib/branding";
 import { isSetupDismissed } from "@/lib/setup/steps";
@@ -215,7 +222,14 @@ export default async function RootLayout({
   const vocab = getVocab(current ? getVenueType() : "clinic");
   const logoSrc = current ? getChromeLogoSrc() : null;
   const businessName = current ? getBusinessProfile().businessName : "";
-  const themeStyle = themeCss(current ? getTheme() : DEFAULT_THEME);
+  // App light/dark mode — a per-browser choice (the `ui-theme` cookie), read
+  // here so the SSR'd palette matches from the first paint (no flash). The
+  // tenant's chosen heading font is carried through; bg/accent come from the
+  // mode preset, not per-tenant settings (the colour picker was retired).
+  const themeMode = coerceThemeMode(cookies().get(THEME_MODE_COOKIE)?.value);
+  const themeStyle = themeCss(
+    themeForMode(themeMode, current ? getTheme().headingFont : DEFAULT_HEADING_FONT),
+  );
   const tenantSlug = current ? current.tenant.slug : "";
   const schedulingMode = current ? getSchedulingMode() : "appointments";
   // Single cheap KV read (never the full getSetupSummary()) — safe to run on
@@ -224,10 +238,11 @@ export default async function RootLayout({
   // resolved (e.g. a signed-in multi-account user still on /select-account).
   const showSetup = current ? !isSetupDismissed() : false;
   return (
-    <html lang="en" className={FONT_VARS}>
+    <html lang="en" className={FONT_VARS} data-theme={themeMode}>
       <body>
-        {/* Per-tenant theme overrides — injected after globals.css so the
-            derived palette (background + accent) wins. */}
+        {/* App theme (light/dark preset + tenant heading font) — injected after
+            globals.css so the derived palette wins. data-theme on <html> lets
+            CSS key off the active mode (e.g. the /adonis mark swap). */}
         <style id="tenant-theme" dangerouslySetInnerHTML={{ __html: themeStyle }} />
         <div className="grain" aria-hidden />
         <MotionRoot>
@@ -242,6 +257,7 @@ export default async function RootLayout({
                 tenantSlug={tenantSlug}
                 schedulingMode={schedulingMode}
                 showSetup={showSetup}
+                themeMode={themeMode}
                 user={
                   user
                     ? {

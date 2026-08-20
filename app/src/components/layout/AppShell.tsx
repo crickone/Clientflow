@@ -12,6 +12,7 @@ import {
 import { Logo } from "@/components/ui/Logo";
 import { VocabProvider } from "@/components/providers/VocabProvider";
 import type { Vocab } from "@/lib/vocabulary";
+import type { ThemeMode } from "@/lib/theme";
 
 const NO_SHELL_PATHS = ["/login", "/change-password", "/select-account", "/accept-invite"];
 
@@ -25,6 +26,7 @@ export function AppShell({
   logoSrc,
   businessName,
   showSetup,
+  themeMode,
   children,
 }: {
   user: SidebarUser | null;
@@ -36,6 +38,7 @@ export function AppShell({
   logoSrc: string | null;
   businessName: string;
   showSetup: boolean;
+  themeMode: ThemeMode;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -66,6 +69,7 @@ export function AppShell({
           logoSrc={logoSrc}
           businessName={businessName}
           showSetup={showSetup}
+          themeMode={themeMode}
           open={navOpen}
           onClose={() => setNavOpen(false)}
         />

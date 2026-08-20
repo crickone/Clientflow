@@ -38,6 +38,32 @@ export const DEFAULT_THEME: ThemeConfig = {
   headingFont: DEFAULT_HEADING_FONT,
 };
 
+/**
+ * App light/dark mode — the ONLY colour choice now (the free bg/accent picker
+ * was retired in favour of this simple toggle). Each mode is a fixed {bg,
+ * accent} preset run through `resolveThemeVars`, keeping the brand accent in
+ * both. Persisted per-browser in the `ui-theme` cookie (read server-side in
+ * layout.tsx so the SSR'd palette matches → no flash) and mirrored onto
+ * `<html data-theme>` for CSS that keys off the mode (e.g. the /adonis mark).
+ */
+export type ThemeMode = "dark" | "light";
+export const THEME_MODE_COOKIE = "ui-theme";
+export const THEME_MODES: Record<ThemeMode, { bg: string; accent: string }> = {
+  dark: { bg: "#0c0d10", accent: "#ff6a32" },
+  light: { bg: "#f4f5f7", accent: "#ff6a32" },
+};
+/** Coerce an untrusted value (cookie / localStorage) to a mode; default dark. */
+export function coerceThemeMode(v: unknown): ThemeMode {
+  return v === "light" ? "light" : "dark";
+}
+/** The full ThemeConfig for a mode, carrying the tenant's chosen heading font. */
+export function themeForMode(
+  mode: ThemeMode,
+  headingFont: string = DEFAULT_HEADING_FONT,
+): ThemeConfig {
+  return { ...THEME_MODES[mode], headingFont };
+}
+
 /** A handful of ready-made colour pairs for the settings picker. */
 export const THEME_PRESETS: { name: string; theme: { bg: string; accent: string } }[] = [
   { name: "Charcoal · Orange", theme: { bg: "#0c0d10", accent: "#ff6a32" } },
