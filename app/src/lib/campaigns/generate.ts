@@ -7,6 +7,7 @@ import { meteredCreate, type MeterContext } from "@/lib/ai/metered";
 import { draftBlogPost } from "@/lib/ai/draftBlog";
 import { generateCarouselSlides } from "@/lib/ai/generateCarousel";
 import { draftCampaignEmail } from "@/lib/ai/draftCampaign";
+import { getCampaignBuildModel } from "@/lib/campaigns/buildModel";
 import type { Campaign, CampaignAsset } from "@/lib/db/schema";
 
 import { adCopyPrompt, landingPagePrompt, offerPrompt, videoScriptPrompt } from "./prompts";
@@ -119,10 +120,21 @@ function extractText(message: Anthropic.Message): string {
     .trim();
 }
 
-/** One metered, non-streaming call for the three "raw text" kinds — same shape as draftBlogPost/generateCarouselSlides/draftCampaignEmail's own meteredCreate call. */
-async function generateRaw(meter: MeterContext, formatRules: string, prompt: string): Promise<string> {
+/**
+ * One metered, non-streaming call for the four "raw text" kinds - same
+ * shape as draftBlogPost/generateCarouselSlides/draftCampaignEmail's own
+ * meteredCreate call. `model` defaults to CONTENT_MODEL but every call site
+ * in generateAsset below passes the tenant's chosen campaign build model
+ * explicitly.
+ */
+async function generateRaw(
+  meter: MeterContext,
+  formatRules: string,
+  prompt: string,
+  model: string = CONTENT_MODEL,
+): Promise<string> {
   const message = await meteredCreate(meter, () => ({
-    model: CONTENT_MODEL,
+    model,
     max_tokens: 4096,
     thinking: { type: "adaptive" },
     system: [
@@ -181,14 +193,15 @@ export async function generateAsset(
   meter: MeterContext,
   tweak?: string,
 ): Promise<GeneratedAsset> {
+  const model = await getCampaignBuildModel();
   switch (asset.kind) {
     case "offer": {
-      const body = await generateRaw(meter, OFFER_FORMAT_RULES, offerPrompt(campaign, tweak));
+      const body = await generateRaw(meter, OFFER_FORMAT_RULES, offerPrompt(campaign, tweak), model);
       return { title: asset.title, body };
     }
 
     case "landing_page": {
-      const raw = await generateRaw(meter, LANDING_FORMAT_RULES, landingPagePrompt(campaign, tweak));
+      const raw = await generateRaw(meter, LANDING_FORMAT_RULES, landingPagePrompt(campaign, tweak), model);
       // parseLandingBody never throws; a model response it can't make sense
       // of at all (empty/non-JSON) falls back to a safe, honest default
       // rather than failing the draft outright — same "never 500 the
@@ -211,12 +224,12 @@ export async function generateAsset(
     }
 
     case "ad_copy": {
-      const body = await generateRaw(meter, AD_COPY_FORMAT_RULES, adCopyPrompt(campaign, tweak));
+      const body = await generateRaw(meter, AD_COPY_FORMAT_RULES, adCopyPrompt(campaign, tweak), model);
       return { title: asset.title, body };
     }
 
     case "video_script": {
-      const body = await generateRaw(meter, VIDEO_SCRIPT_FORMAT_RULES, videoScriptPrompt(campaign, tweak));
+      const body = await generateRaw(meter, VIDEO_SCRIPT_FORMAT_RULES, videoScriptPrompt(campaign, tweak), model);
       return { title: asset.title, body };
     }
 
@@ -241,6 +254,7 @@ export async function generateAsset(
           videoProjectName: null,
         },
         meter,
+        model,
       );
       return { title, body: draft.content };
     }
@@ -252,6 +266,7 @@ export async function generateAsset(
       const draft = await generateCarouselSlides(
         { topic: topicLines.join("\n"), slideCount: 5, tone: null },
         meter,
+        model,
       );
       return { title: asset.title, body: JSON.stringify({ caption: draft.caption, slides: draft.slides }) };
     }
@@ -273,6 +288,7 @@ export async function generateAsset(
           targetWords: 150,
         },
         meter,
+        model,
       );
       // title stays the stable angle label ("Email — Proof") — emailAngleFromTitle depends on
       // it surviving regeneration; the generated subject lives in body alongside content (mirrors

@@ -230,17 +230,22 @@ export function extractPayload(text: string): {
  * tenant's monthly AI cap and records the spend, so no caller can invoke it
  * unmetered. Callers pass their own agentKey — "carousel" (Content Studio's
  * Generate route) or "marketing" (the Marketing agent's draft_carousel tool).
+ *
+ * `model` defaults to CONTENT_MODEL (both of those callers never pass it);
+ * the campaign kit (lib/campaigns/generate.ts) is the one caller that
+ * overrides it with the tenant's chosen campaign build model.
  */
 export async function generateCarouselSlides(
   input: GenerateInput,
   meter: MeterContext,
+  model: string = CONTENT_MODEL,
 ): Promise<GenerateResult> {
   if (input.slideCount < 2 || input.slideCount > 10) {
     throw new Error("Slide count must be between 2 and 10.");
   }
 
   const message = await meteredCreate(meter, () => ({
-    model: CONTENT_MODEL,
+    model,
     max_tokens: 4096,
     thinking: { type: "adaptive" },
     system: [

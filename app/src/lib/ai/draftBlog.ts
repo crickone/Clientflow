@@ -102,13 +102,18 @@ function buildUserPrompt(input: BlogDraftInput): string {
  * editor's Generate button, via runBlogGeneration) and "marketing" (the
  * Marketing agent's draft_blog_post tool) — so the per-agent spend breakdown
  * stays meaningful.
+ *
+ * `model` defaults to CONTENT_MODEL (Content Studio / the marketing tool
+ * never pass it); the campaign kit (lib/campaigns/generate.ts) is the one
+ * caller that overrides it with the tenant's chosen campaign build model.
  */
 export async function draftBlogPost(
   input: BlogDraftInput,
   meter: MeterContext,
+  model: string = CONTENT_MODEL,
 ): Promise<BlogDraftResult> {
   const message = await meteredCreate(meter, () => ({
-    model: CONTENT_MODEL,
+    model,
     max_tokens: 4096,
     thinking: { type: "adaptive" },
     system: [

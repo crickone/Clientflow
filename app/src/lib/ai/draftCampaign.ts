@@ -83,13 +83,18 @@ function buildUserPrompt(input: CampaignDraftInput): string {
  * tenant's monthly AI cap and records the spend, so it can't be invoked
  * unmetered. Its one caller (the campaign composer's Draft action) passes the
  * "campaign_draft" agentKey.
+ *
+ * `model` defaults to CONTENT_MODEL (that caller never passes it); the
+ * campaign kit (lib/campaigns/generate.ts) is the one caller that overrides
+ * it with the tenant's chosen campaign build model.
  */
 export async function draftCampaignEmail(
   input: CampaignDraftInput,
   meter: MeterContext,
+  model: string = CONTENT_MODEL,
 ): Promise<CampaignDraftResult> {
   const message = await meteredCreate(meter, () => ({
-    model: CONTENT_MODEL,
+    model,
     max_tokens: 4096,
     thinking: { type: "adaptive" },
     system: [
