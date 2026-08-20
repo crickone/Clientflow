@@ -80,7 +80,11 @@ export function campaignSeedStarterMessage(seed: CampaignSeed): string | null {
   const startsOn = str(seed.startsOn);
   const endsOn = str(seed.endsOn);
   const angle = str(seed.angle);
-  if (!name && !season && !startsOn && !endsOn && !angle) return null;
+  // endsOn is deliberately NOT part of the emptiness test: it's only ever
+  // shown alongside startsOn (never alone), so an endsOn-only seed carries no
+  // usable content and should be treated as empty (null) rather than emit a
+  // bare "Create a campaign."
+  if (!name && !season && !startsOn && !angle) return null;
 
   const subject = name ? `a "${name}" campaign` : "a campaign";
   let when = "";

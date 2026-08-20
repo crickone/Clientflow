@@ -77,29 +77,15 @@ test("campaignSeedStarterMessage: an all-empty/undefined seed returns null", () 
   assert.equal(campaignSeedStarterMessage({ seedName: "   ", angle: "\t" }), null);
 });
 
-test("campaignSeedStarterMessage: a seed with only endsOn set does not throw, and endsOn alone does not fabricate a dated message", () => {
-  // NOTE on the guard fix: the pre-fix guard was
-  //   `if (!name && !season && !startsOn && !angle) return null;`
-  // — it never looked at endsOn at all. For a seed with ONLY endsOn set,
-  // that meant name/season/startsOn/angle were all empty, so the guard
-  // already (if accidentally) returned null for this exact case — verified
-  // directly against the pre-fix source before touching it, with a
-  // standalone trace of that exact expression. The post-fix guard (per the
-  // task's own fix spec) is
-  //   `if (!name && !season && !startsOn && !endsOn && !angle) return null;`
-  // which now counts endsOn as "the seed has content" — so a lone endsOn no
-  // longer trips the all-empty guard and the function proceeds. Since
-  // endsOn is only ever read inside the `startsOn && endsOn` branch (never
-  // on its own), the result is the generic fallback subject with no `when`
-  // clause — non-null, and importantly still never throws and never
-  // fabricates a bogus date-only clause. Locking in the real, verified
-  // behaviour rather than an assumed one.
-  const seed = { endsOn: "2026-03-01" };
-  let msg: string | null = null;
+test("campaignSeedStarterMessage: an endsOn-only seed is treated as empty (null), never throws", () => {
+  // An end date with no name/season/startsOn/angle is a meaningless seed —
+  // endsOn is only ever rendered alongside startsOn (never on its own), so a
+  // lone endsOn carries no usable content and must be treated as empty.
+  let msg: string | null = "unset";
   assert.doesNotThrow(() => {
-    msg = campaignSeedStarterMessage(seed);
+    msg = campaignSeedStarterMessage({ endsOn: "2026-03-01" });
   });
-  assert.equal(msg, "Create a campaign.");
+  assert.equal(msg, null);
 });
 
 test("buildCampaignSeedHref: round-trips a full seed's fields through the query string", () => {
