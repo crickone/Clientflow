@@ -32,6 +32,14 @@ function daysBetween(fromIso: string, toIso: string): number {
  * Pure merge: AI framing (when present) wins per-date, otherwise falls back
  * to that date's catalog `angle`. No AI/DB/I-O — exported so tests can drive
  * it directly without a metered call.
+ *
+ * Total: never throws, no matter what `framed` contains. `framed` is
+ * ultimately `JSON.parse` output funnelled through a type assertion (see
+ * getCampaignRadar), so its declared type is aspirational, not guaranteed —
+ * a leaf can be a number, array, null, etc. Each leaf is only used when it is
+ * actually a non-empty string; anything else falls back to the date's own
+ * catalog `name`/`angle` instead of throwing (e.g. calling `.trim()` on a
+ * non-string).
  */
 export function buildRadarFromFraming(
   upcoming: CalDate[],
@@ -40,13 +48,15 @@ export function buildRadarFromFraming(
 ): RadarSuggestion[] {
   return upcoming.map((d) => {
     const f = framed?.[d.id];
+    const name = typeof f?.name === "string" && f.name.trim() ? f.name.trim() : d.name;
+    const hook = typeof f?.hook === "string" && f.hook.trim() ? f.hook.trim() : d.angle;
     return {
       dateId: d.id,
       dateName: d.name,
       dateIso: d.iso,
       daysAway: daysBetween(todayIso, d.iso),
-      suggestionName: f?.name?.trim() || d.name,
-      suggestionHook: f?.hook?.trim() || d.angle,
+      suggestionName: name,
+      suggestionHook: hook,
     };
   });
 }
@@ -85,20 +95,28 @@ export async function getCampaignRadar(
     // here means it only resolves when getCampaignRadar actually runs, which in
     // production is always inside a real request. No behavioural change either way.
     const { getBusinessContext } = await import("@/lib/ai/businessContext");
-    const ctx = getBusinessContext();
     const list = upcoming
       .map((d) => `- ${d.id} · ${d.name} (${d.iso}) — angle: ${d.angle}`)
       .join("\n");
-    const res = await meteredCreate({ tenantId, agentKey: "marketing" }, () => ({
-      model: CONTENT_MODEL,
-      max_tokens: 500,
-      system:
-        "You are a marketing strategist for this business. Using ONLY the business context, " +
-        "suggest a short seasonal campaign for each upcoming date. Obey every rule in the context " +
-        "(no prices, no guarantees, no invented results). Reply with STRICT JSON only: " +
-        '{"<dateId>":{"name":"<=6 words","hook":"one sentence"}}. No prose.',
-      messages: [{ role: "user", content: `BUSINESS CONTEXT:\n${ctx}\n\nUPCOMING DATES:\n${list}` }],
-    }));
+    // getBusinessContext() itself (not just the import above) does the DB reads
+    // (venue-aware tenant lookups) — it must run INSIDE this thunk, not before
+    // meteredCreate, so those reads stay behind assertAiAllowed. meteredCreate
+    // calls buildParams() synchronously, not via await (see its JSDoc: "gate
+    // BEFORE any per-call work"), so a capped tenant now throws AiCapError
+    // before this thunk — and its DB reads — ever run.
+    const res = await meteredCreate({ tenantId, agentKey: "marketing" }, () => {
+      const ctx = getBusinessContext();
+      return {
+        model: CONTENT_MODEL,
+        max_tokens: 500,
+        system:
+          "You are a marketing strategist for this business. Using ONLY the business context, " +
+          "suggest a short seasonal campaign for each upcoming date. Obey every rule in the context " +
+          "(no prices, no guarantees, no invented results). Reply with STRICT JSON only: " +
+          '{"<dateId>":{"name":"<=6 words","hook":"one sentence"}}. No prose.',
+        messages: [{ role: "user", content: `BUSINESS CONTEXT:\n${ctx}\n\nUPCOMING DATES:\n${list}` }],
+      };
+    });
     const text = res.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim();
     const jsonStart = text.indexOf("{");
     const jsonEnd = text.lastIndexOf("}");
@@ -110,6 +128,9 @@ export async function getCampaignRadar(
   }
 
   const result = buildRadarFromFraming(upcoming, todayIso, framed);
-  if (framed) memo.set(key, result); // only cache real framing
+  if (framed) {
+    for (const k of [...memo.keys()]) if (!k.endsWith(`:${yyyymmdd(todayIso)}`)) memo.delete(k); // evict prior days so memo stays ~1 entry/tenant
+    memo.set(key, result); // only cache real framing
+  }
   return result;
 }

@@ -29,3 +29,29 @@ test("buildRadarFromFraming: daysAway is correct + non-negative", () => {
   const stp = out.find((r) => r.dateId === "st-patricks")!; // 2026-03-17
   assert.equal(stp.daysAway, 16);
 });
+
+test("buildRadarFromFraming: never throws on a malformed AI shape (non-string leaves)", () => {
+  // Simulates what a real (but misbehaving) model response looks like after
+  // JSON.parse: valid JSON, wrong leaf types. framed's declared type claims
+  // { name: string; hook: string }, but JSON.parse really returns `any`, so
+  // this is a legitimate runtime shape the type system can't rule out.
+  const framed = { "st-patricks": { name: 42, hook: ["nope"] } } as any;
+
+  let out: ReturnType<typeof buildRadarFromFraming> = [];
+  assert.doesNotThrow(() => {
+    out = buildRadarFromFraming(upcoming, "2026-03-01", framed);
+  });
+
+  const stpCatalog = upcoming.find((d) => d.id === "st-patricks")!;
+  const stp = out.find((r) => r.dateId === "st-patricks")!;
+  assert.equal(stp.suggestionName, stpCatalog.name, "non-string name leaf falls back to the catalog name");
+  assert.equal(stp.suggestionHook, stpCatalog.angle, "non-string hook leaf falls back to the catalog angle");
+
+  assert.equal(out.length, upcoming.length);
+  for (const r of out) {
+    assert.equal(typeof r.suggestionName, "string");
+    assert.equal(typeof r.suggestionHook, "string");
+    assert.ok(r.suggestionName.trim().length > 0, "every row has a non-empty suggestionName");
+    assert.ok(r.suggestionHook.trim().length > 0, "every row has a non-empty suggestionHook");
+  }
+});
