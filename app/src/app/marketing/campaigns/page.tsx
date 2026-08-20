@@ -3,12 +3,15 @@ import { Megaphone, Plus } from "lucide-react";
 
 import { requireAdminPage } from "@/lib/auth";
 import { listAssets, listCampaigns } from "@/lib/campaigns/store";
+import { getCampaignBuildModel } from "@/lib/campaigns/buildModel";
+import { MODEL_CATALOG } from "@/lib/ai/modelCatalog";
 import { formatDate } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { setCampaignBuildModelAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +30,13 @@ const STATUS_TONE: Record<string, "neutral" | "amber" | "green" | "red"> = {
 
 export default async function MarketingCampaignsPage() {
   await requireAdminPage();
+
+  // Task 5: the tenant's current campaign build model, for the selector
+  // below. requireAdminPage() above already redirects any non-admin away
+  // before this line runs, so everything the rest of this component renders
+  // — selector included — is admin-only by construction; no extra isAdmin
+  // check is needed here (same reasoning as CapEditor on /agents).
+  const buildModel = await getCampaignBuildModel();
 
   const campaigns = listCampaigns();
   // Cheap per-campaign approved/total tally — campaigns are few (a handful
@@ -52,6 +62,54 @@ export default async function MarketingCampaignsPage() {
           </Link>
         }
       />
+
+      <Card
+        style={{
+          padding: 16,
+          marginBottom: 24,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 16,
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <div style={{ fontSize: 13.5, fontWeight: 500, color: "var(--text-primary)" }}>
+            Campaign build model
+          </div>
+          <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2 }}>
+            Drives campaign generation and the cost estimate.
+          </div>
+        </div>
+        <form
+          action={setCampaignBuildModelAction}
+          style={{ display: "flex", alignItems: "center", gap: 8 }}
+        >
+          <select
+            name="model"
+            defaultValue={buildModel}
+            style={{
+              background: "var(--bg)",
+              border: "1px solid var(--hairline)",
+              borderRadius: "var(--radius)",
+              padding: "8px 12px",
+              color: "var(--text-primary)",
+              fontSize: 13,
+              fontFamily: "inherit",
+            }}
+          >
+            {MODEL_CATALOG.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label} ({m.provider})
+              </option>
+            ))}
+          </select>
+          <Button type="submit" size="sm" variant="outline">
+            Save
+          </Button>
+        </form>
+      </Card>
 
       {campaigns.length === 0 ? (
         <EmptyState
