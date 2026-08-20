@@ -26,7 +26,13 @@ import { Tooltip } from "@/components/ui/Tooltip";
  * AssistantChat's own empty-state still collapses away once the visitor
  * sends a first message, exactly as it already does on the dashboard.
  */
-export function AdonisView({ tenantId }: { tenantId: number }) {
+export function AdonisView({
+  tenantId,
+  isAdmin,
+}: {
+  tenantId: number;
+  isAdmin: boolean;
+}) {
   return (
     <div
       style={{
@@ -37,27 +43,39 @@ export function AdonisView({ tenantId }: { tenantId: number }) {
         boxSizing: "border-box",
       }}
     >
-      {/* Top bar — minimal: just the settings gear, top-right. */}
-      <div style={{ display: "flex", justifyContent: "flex-end", flexShrink: 0 }}>
-        <Tooltip label="Agent settings">
-          <Link
-            href="/agents"
-            aria-label="Agent settings"
-            className="nav-link"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 36,
-              height: 36,
-              borderRadius: "var(--radius)",
-              color: "var(--text-secondary)",
-              flexShrink: 0,
-            }}
-          >
-            <Settings size={18} strokeWidth={1.75} />
-          </Link>
-        </Tooltip>
+      {/* Top bar — minimal: just the settings gear, top-right. Admin-only:
+          its target (/agents) is requireAdminPage()-gated, so we never render
+          a gear that would silently bounce a non-admin staff user. The row is
+          kept (fixed height) for both so the hero's vertical rhythm is stable. */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          flexShrink: 0,
+          minHeight: 36,
+        }}
+      >
+        {isAdmin && (
+          <Tooltip label="Agent settings">
+            <Link
+              href="/agents"
+              aria-label="Agent settings"
+              className="nav-link"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 36,
+                height: 36,
+                borderRadius: "var(--radius)",
+                color: "var(--text-secondary)",
+                flexShrink: 0,
+              }}
+            >
+              <Settings size={18} strokeWidth={1.75} />
+            </Link>
+          </Tooltip>
+        )}
       </div>
 
       {/* Centered column: hero + chat, capped width so the chat reads like a

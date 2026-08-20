@@ -1,16 +1,21 @@
 import { getCurrentTenant } from "@/lib/db/tenant";
+import { getCurrentMembership } from "@/lib/auth";
 import { AdonisView } from "@/components/adonis/AdonisView";
 
-// Mirrors dashboard/page.tsx: no page-level auth guard call — the root
-// layout (`src/app/layout.tsx`) already redirects any signed-in-but-
-// unresolved session to /select-account and any signed-out visitor to
-// /login before this ever renders, and `getCurrentTenant()` fails closed
-// (see the 2026-08-12 multitenancy hardening) if that invariant is ever
-// broken. Staff-visible, NOT admin-only — the Orchestrator ("Adonis") chat
-// is staff-facing today, same as its embed on the dashboard.
+// Mirrors dashboard/page.tsx: no page-level auth guard call — a signed-out
+// visitor is redirected to /login by `middleware.ts` at the edge before
+// React runs, the root layout (`src/app/layout.tsx`) redirects any signed-
+// in-but-unresolved session to /select-account for non-bare paths, and
+// `getCurrentTenant()` fails closed (see the 2026-08-12 multitenancy
+// hardening) if either invariant is ever bypassed. Staff-visible, NOT
+// admin-only — the Orchestrator ("Adonis") chat is staff-facing today, same
+// as its embed on the dashboard. `isAdmin` only gates the settings gear,
+// whose target (/agents) is itself requireAdminPage()-gated, so we don't
+// render a control that would silently bounce a non-admin.
 export const dynamic = "force-dynamic";
 
 export default async function AdonisPage() {
   const tenantId = getCurrentTenant().id;
-  return <AdonisView tenantId={tenantId} />;
+  const isAdmin = getCurrentMembership()?.role === "admin";
+  return <AdonisView tenantId={tenantId} isAdmin={isAdmin} />;
 }
