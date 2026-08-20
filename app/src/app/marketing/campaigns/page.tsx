@@ -4,6 +4,9 @@ import { Megaphone, Plus } from "lucide-react";
 import { requireAdminPage } from "@/lib/auth";
 import { listAssets, listCampaigns } from "@/lib/campaigns/store";
 import { getCampaignBuildModel, CAMPAIGN_MODEL_CHOICES } from "@/lib/campaigns/buildModel";
+import { gatherCampaignRevenue } from "@/lib/campaigns/scoreboardData";
+import { computeCampaignScoreboard, type Scoreboard } from "@/lib/campaigns/scoreboard";
+import { formatCentsEur } from "@/lib/campaigns/costEstimate";
 import { formatDate } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -27,6 +30,21 @@ const STATUS_TONE: Record<string, "neutral" | "amber" | "green" | "red"> = {
   archived: "neutral",
 };
 
+/**
+ * Roll-up follow-on to the Slice-5 hub's CFA hero (see `[id]/page.tsx`'s
+ * heroColor/heroText) — same tri-state read of a scoreboard, condensed to a
+ * one-word Badge instead of a full sentence: no ad spend recorded yet is
+ * neutral (nothing to judge), spend covered by front-end cash is green,
+ * spend NOT yet covered is red. Reuses Badge's own green/red inks (#4ade80 /
+ * #f87171 — see components/ui/Badge.tsx), the same values the hub hero
+ * hardcodes, so the two pages read as one system.
+ */
+function cfaBadge(sb: Scoreboard): { tone: "neutral" | "green" | "red"; label: string } {
+  if (sb.roas === null) return { tone: "neutral", label: "— no ad spend" };
+  if (sb.cfaCovered) return { tone: "green", label: "✓ Self-funded" };
+  return { tone: "red", label: "✗ short" };
+}
+
 export default async function MarketingCampaignsPage() {
   await requireAdminPage();
 
@@ -46,6 +64,36 @@ export default async function MarketingCampaignsPage() {
     const assets = listAssets(c.id);
     return { approved: assets.filter((a) => a.status === "approved").length, total: assets.length };
   });
+
+  // Cross-campaign performance roll-up (this task) — the same CFA/ROAS
+  // scoreboard Slice 5 put on each campaign's own hub
+  // (`[id]/page.tsx`'s getCampaignScoreboard call), computed here for EVERY
+  // listed campaign so an operator sees at a glance which are performing
+  // without clicking into each one. Reuses gatherCampaignRevenue +
+  // computeCampaignScoreboard directly (not getCampaignScoreboard) so
+  // aiBuildCents can be a plain 0 rather than re-deriving a real build-cost
+  // estimate per row — this roll-up never displays the AI-build line, and
+  // CFA/CAC/ROAS are computed from ad spend, not aiBuild, so the 0 doesn't
+  // change any number this page shows.
+  // Promise.all rather than a serial for-await: each gatherCampaignRevenue
+  // call is an independent read (its own campaign-scoped DB queries), so
+  // running them concurrently keeps this page's load time close to the
+  // SLOWEST single campaign's lookup rather than the SUM of all of them.
+  // Fine at typical scale (a handful to dozens of campaigns per tenant); a
+  // very large campaign count would want batching, not attempted here.
+  const scoreboards: Scoreboard[] = await Promise.all(
+    campaigns.map(async (c) => {
+      const rev = await gatherCampaignRevenue(c.name, c.startsOn);
+      return computeCampaignScoreboard({
+        leads: rev.leads,
+        converts: rev.converts,
+        adSpendCents: c.adSpendCents,
+        aiBuildCents: 0,
+        upfrontCashCents: rev.upfrontCashCents,
+        mrrCents: rev.mrrCents,
+      });
+    }),
+  );
 
   return (
     <div className="app-page">
@@ -132,27 +180,42 @@ export default async function MarketingCampaignsPage() {
                 <th style={th}>Season</th>
                 <th style={th}>Status</th>
                 <th style={th}>Assets</th>
+                <th style={th}>Performance</th>
                 <th style={th}>Created</th>
               </tr>
             </thead>
             <tbody>
-              {campaigns.map((c, i) => (
-                <tr key={c.id}>
-                  <td style={{ ...td, color: "var(--text-primary)" }}>
-                    <Link href={`/marketing/campaigns/${c.id}`} style={{ color: "inherit" }}>
-                      {c.name}
-                    </Link>
-                  </td>
-                  <td style={td}>{c.season || "—"}</td>
-                  <td style={td}>
-                    <Badge tone={STATUS_TONE[c.status] ?? "neutral"}>{c.status}</Badge>
-                  </td>
-                  <td style={td}>
-                    {progress[i].approved}/{progress[i].total} approved
-                  </td>
-                  <td style={td}>{formatDate(c.createdAt)}</td>
-                </tr>
-              ))}
+              {campaigns.map((c, i) => {
+                const sb = scoreboards[i];
+                const badge = cfaBadge(sb);
+                return (
+                  <tr key={c.id}>
+                    <td style={{ ...td, color: "var(--text-primary)" }}>
+                      <Link href={`/marketing/campaigns/${c.id}`} style={{ color: "inherit" }}>
+                        {c.name}
+                      </Link>
+                    </td>
+                    <td style={td}>{c.season || "—"}</td>
+                    <td style={td}>
+                      <Badge tone={STATUS_TONE[c.status] ?? "neutral"}>{c.status}</Badge>
+                    </td>
+                    <td style={td}>
+                      {progress[i].approved}/{progress[i].total} approved
+                    </td>
+                    <td style={td}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <Badge tone={badge.tone}>{badge.label}</Badge>
+                        <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
+                          {sb.leads} lead{sb.leads === 1 ? "" : "s"} · {sb.converts} convert
+                          {sb.converts === 1 ? "" : "s"} · {formatCentsEur(sb.adSpendCents)} ·{" "}
+                          {sb.roas === null ? "—" : `${sb.roas.toFixed(1)}×`} ROAS
+                        </span>
+                      </div>
+                    </td>
+                    <td style={td}>{formatDate(c.createdAt)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </Card>
