@@ -383,7 +383,8 @@ async function withApiKey<T>(value: string | undefined, fn: () => Promise<T>): P
     }
   });
 
-  // ── nearbyGyms failure propagates verbatim; spend is still recorded (a request Google received) ──
+  // ── nearbyGyms failure propagates verbatim; spend is NOT recorded (charge on
+  //    success only — symmetric with geocode; a failed Google call isn't billed) ──
   await withApiKey("test-key", async () => {
     const slug = "discovery-test-nearby-fail";
     const tid = makeScratchTenant(slug);
@@ -398,8 +399,8 @@ async function withApiKey<T>(value: string | undefined, fn: () => Promise<T>): P
           check("discoverCompetitors: nearbyGyms HTTP failure -> ok:false", result.ok === false);
           const after = researchSpentCents(tid);
           check(
-            "discoverCompetitors: nearby spend is still recorded on failure",
-            after - before === UNIT_COST_CENTS.nearby,
+            "discoverCompetitors: nearby spend NOT recorded on failure (charge on success only)",
+            after - before === 0,
           );
         },
       );

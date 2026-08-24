@@ -179,8 +179,10 @@ export async function discoverCompetitors(radiusKm: number = DEFAULT_RADIUS_KM):
 
     assertUnderResearchCap(tenantId);
     const nearby = await nearbyGyms(centre.lat, centre.lng, radiusKm);
-    recordResearchSpend(tenantId, UNIT_COST_CENTS.nearby, "nearby");
+    // Charge only on success — symmetric with the geocode step above (a failed
+    // Google call isn't billed, and over-counting would trip the cap early).
     if (!nearby.ok) return { ok: false, error: nearby.error };
+    recordResearchSpend(tenantId, UNIT_COST_CENTS.nearby, "nearby");
 
     // Snapshot BEFORE upserting anything this run, so a place discovered
     // earlier in this same loop can never make a later duplicate read as
