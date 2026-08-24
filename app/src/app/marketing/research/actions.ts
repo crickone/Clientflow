@@ -7,7 +7,8 @@ import { buildCampaignSeedHref } from "@/components/marketing/buildCampaignSeed"
 import { buildCompetitorGapSeed } from "@/lib/research/campaignGap";
 import { mostRecentRefreshAt, wasRecentlyScanned } from "@/lib/research/debounce";
 import { refreshTenant } from "@/lib/research/refresh";
-import { competitorThemes, landscapeSummary } from "@/lib/research/summary";
+import { competitorThemes, landscapeSummary, adAngle } from "@/lib/research/summary";
+import { adLibraryConfigured } from "@/lib/research/adLibrary";
 import {
   latestMetric,
   listCompetitors,
@@ -30,14 +31,14 @@ import { setKey } from "@/lib/settings";
  * standing between a direct/tampered POST and a write.
  *
  * Metering already lives inside discoverCompetitors/refreshTenant/
- * competitorThemes/landscapeSummary (their own modules' contracts: never
- * throw, cap errors resolve to a fail-soft `{ok:false,error}` or a partial
- * result) — this file never calls assertUnderResearchCap/recordResearchSpend
- * or the AI cap equivalents itself, it only calls the already-metered
- * primitives. The `ResearchCapError`/`AiCapError` catches below are
- * unreachable via any path currently in those modules (both fully swallow
- * their own cap errors internally) — kept anyway as an explicit, visible
- * contract matching lib/research/discovery.ts's own `{ok:false,
+ * competitorThemes/landscapeSummary/adAngle (their own modules' contracts:
+ * never throw, cap errors resolve to a fail-soft `{ok:false,error}` or a
+ * partial result) — this file never calls assertUnderResearchCap/
+ * recordResearchSpend or the AI cap equivalents itself, it only calls the
+ * already-metered primitives. The `ResearchCapError`/`AiCapError` catches
+ * below are unreachable via any path currently in those modules (both fully
+ * swallow their own cap errors internally) — kept anyway as an explicit,
+ * visible contract matching lib/research/discovery.ts's own `{ok:false,
  * error:"cap_reached"}` shape, so a future change to either module that
  * lets a cap error propagate degrades to a friendly toast instead of a 500.
  */
@@ -75,6 +76,17 @@ export type RescanResult = {
  * operator's 'Rescan now' action (Task 11) actually makes"). Calling
  * discoverCompetitors() again here would silently double-charge the Places
  * Nearby/Geocoding spend on every single manual rescan.
+ *
+ * Market Research P2, Task 7: the pre-warm loop below also warms each
+ * competitor's cached AI ad-angle (`adAngle`, Task 5) alongside its themes —
+ * gated on `adLibraryConfigured()` so an unconfigured deployment (no
+ * META_AD_LIBRARY_TOKEN) skips the ad-angle work entirely rather than call
+ * `adAngle` for every competitor just to have it re-discover there's nothing
+ * to read (refreshTenant's own ad-fetch step, above, already no-ops the same
+ * way — see refresh.ts — so every competitor genuinely has zero stored ads
+ * in that case). `adAngle` itself is already metered + never-throws +
+ * short-circuits to "No active ads found." with no model call when a
+ * competitor has none, so this gate is a courtesy skip, not a safety one.
  */
 export async function rescanNowAction(): Promise<RescanResult> {
   await requireAdmin();
@@ -90,20 +102,26 @@ export async function rescanNowAction(): Promise<RescanResult> {
       return { ok: false, error: refreshResult.error };
     }
 
-    // Pre-warm: per-tracked-competitor themes (cached onto the competitor
-    // row) + the landscape summary (cached to the research_landscape KV
-    // page.tsx reads for free). Re-queries the watchlist so a competitor
-    // discovered by THIS cycle's refresh also gets its themes warmed.
-    // competitorThemes/landscapeSummary already never throw internally
-    // (lib/research/summary.ts's own contract) — this try/catch is defense
-    // in depth only, so a genuinely unexpected failure here (e.g. a KV
-    // write error) can never erase an otherwise-successful refresh count.
+    // Pre-warm: per-tracked-competitor themes + ad-angle (both cached onto
+    // the competitor row) + the landscape summary (cached to the
+    // research_landscape KV page.tsx reads for free). Re-queries the
+    // watchlist so a competitor discovered by THIS cycle's refresh also gets
+    // warmed. competitorThemes/adAngle/landscapeSummary already never throw
+    // internally (lib/research/summary.ts's own contract) — this try/catch
+    // is defense in depth only, so a genuinely unexpected failure here (e.g.
+    // a KV write error) can never erase an otherwise-successful refresh
+    // count.
     try {
-      // excludeSelf (P1.1): themes are never displayed for the tenant's own
-      // gym (it doesn't render as a competitor row at all — see
+      // excludeSelf (P1.1): themes/ad-angle are never displayed for the
+      // tenant's own gym (it doesn't render as a competitor row at all — see
       // ResearchView), so warming them would just be a wasted metered call.
+      // warmAdAngle (P2 T7): only attempt the ad-angle read when the Ad
+      // Library is actually configured — see this function's own doc
+      // comment above.
+      const warmAdAngle = adLibraryConfigured();
       for (const comp of listCompetitors({ trackedOnly: true, excludeSelf: true })) {
         await competitorThemes(comp.id);
+        if (warmAdAngle) await adAngle(comp.id);
       }
       const text = await landscapeSummary();
       setKey(RESEARCH_LANDSCAPE_KEY, { text, at: new Date().toISOString() });
@@ -170,6 +188,14 @@ export async function markResearchEventsSeenAction(ids: number[]): Promise<{ ok:
  * all, see ResearchView) — rather than the unfiltered list, so a stale
  * client or a direct/tampered POST can't mint a seed for a competitor an
  * admin already muted/untracked, or for the tenant's own business.
+ *
+ * Market Research P2, Task 7: also passes the competitor's cached
+ * `adAngleJson` through to `buildCompetitorGapSeed`, which folds it into the
+ * seed's `angle` as a counter-the-ads clause WHEN present (parsed via
+ * lib/research/adAngleJson.ts's `parseStoredAdAngle`) — same no-fabrication
+ * house rule as the rating/review/theme facts already there: a competitor
+ * with no cached ad angle yet (or an Ad Library not configured at all) still
+ * gets a seed, just without that clause, never a fabricated one.
  */
 export async function buildCampaignFromCompetitorAction(
   id: number,
@@ -185,6 +211,7 @@ export async function buildCampaignFromCompetitorAction(
       ratingStars: metric?.ratingMilli != null ? metric.ratingMilli / 1000 : null,
       reviewCount: metric?.reviewCount ?? null,
       themesJson: competitor.themesJson,
+      adAngleJson: competitor.adAngleJson,
     });
 
     return { ok: true, href: buildCampaignSeedHref(seed) };

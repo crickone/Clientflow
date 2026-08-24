@@ -1,4 +1,5 @@
 import { parseStoredThemes } from "./themesJson";
+import { parseStoredAdAngle } from "./adAngleJson";
 
 /**
  * Builds the campaign-seed content (seedName + angle) for "Build a campaign
@@ -13,9 +14,20 @@ import { parseStoredThemes } from "./themesJson";
  *
  * HOUSE RULE (no fabrication, same constraint lib/research/summary.ts's two
  * AI helpers enforce on the model): every fact used here — rating, review
- * count, theme — comes straight from the competitor's own CACHED data. A
- * competitor with no rating/reviews/themes yet still gets a seed, just a
- * more generic one; nothing is invented, guessed, or rounded to fill a gap.
+ * count, theme, ad angle — comes straight from the competitor's own CACHED
+ * data. A competitor with no rating/reviews/themes/ads yet still gets a
+ * seed, just a more generic one; nothing is invented, guessed, or rounded to
+ * fill a gap.
+ *
+ * Market Research P2, Task 7 folds in a second cached signal alongside
+ * themes: the competitor's cached AI ad-angle read (`adAngleJson`, written
+ * by lib/research/summary.ts's `adAngle` — Task 5). Same shape as the theme
+ * handling below — parsed via the sibling `adAngleJson.ts` module's
+ * `parseStoredAdAngle` (never throws, null on missing/malformed/empty) and,
+ * when present, appended as its own sentence asking the agent to counter it.
+ * `adAngle` only ever caches a genuine AI-generated read (it never caches its
+ * own fallback text — see that function's doc comment), so a non-null parse
+ * here is always real data, never a placeholder string leaking through.
  */
 
 export interface CompetitorGapInput {
@@ -26,6 +38,8 @@ export interface CompetitorGapInput {
   reviewCount: number | null;
   /** The competitor's raw `themesJson` column value, or null. */
   themesJson: string | null;
+  /** The competitor's raw `adAngleJson` cache column value, or null (Market Research P2, Task 7). */
+  adAngleJson: string | null;
 }
 
 export interface CompetitorGapSeed {
@@ -41,14 +55,30 @@ function formatStatsLabel(ratingStars: number | null, reviewCount: number | null
   return stats.length > 0 ? ` (${stats.join(", ")})` : "";
 }
 
+/**
+ * " They're currently running ads pushing: \"...\". Build a campaign that
+ * counters it and wins those members to us." / "" — only when a genuine
+ * cached ad-angle read is on hand (Market Research P2, Task 7); omitted
+ * entirely (never a generic "they run ads" filler) when there isn't one, per
+ * the module's no-fabrication house rule. Appended as its own trailing
+ * sentence onto EITHER of `buildCompetitorGapSeed`'s two branches below, so
+ * it composes with or without a cached theme.
+ */
+function formatAdAngleClause(adAngleJson: string | null): string {
+  const parsedAdAngle = parseStoredAdAngle(adAngleJson);
+  if (!parsedAdAngle) return "";
+  return ` They're currently running ads pushing: "${parsedAdAngle.angle}". Build a campaign that counters it and wins those members to us.`;
+}
+
 export function buildCompetitorGapSeed(input: CompetitorGapInput): CompetitorGapSeed {
   const statsLabel = formatStatsLabel(input.ratingStars, input.reviewCount);
   const parsedThemes = parseStoredThemes(input.themesJson);
   const theme = parsedThemes?.themes[0] ?? null;
+  const adAngleClause = formatAdAngleClause(input.adAngleJson);
 
   const angle = theme
-    ? `A nearby competitor, ${input.name}${statsLabel}, has reviews calling out: "${theme}". Position us as the better choice on exactly that gap and win their members over.`
-    : `A nearby competitor, ${input.name}${statsLabel}, is on our radar. Highlight what makes us the stronger choice nearby.`;
+    ? `A nearby competitor, ${input.name}${statsLabel}, has reviews calling out: "${theme}". Position us as the better choice on exactly that gap and win their members over.${adAngleClause}`
+    : `A nearby competitor, ${input.name}${statsLabel}, is on our radar. Highlight what makes us the stronger choice nearby.${adAngleClause}`;
 
   return { seedName: `Win over ${input.name}'s members`, angle };
 }
