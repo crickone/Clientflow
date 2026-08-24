@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronRight, Minus, TrendingDown, TrendingUp } from "lucide-react";
+import { ChevronDown, ChevronRight, Megaphone, Minus, TrendingDown, TrendingUp } from "lucide-react";
 
 import type { CompetitorRow as CompetitorRowData, Metric } from "@/lib/research/store";
 import { Badge } from "@/components/ui/Badge";
@@ -16,7 +16,8 @@ import { Sparkline } from "./Sparkline";
  * real Sparkline renders alongside it. The whole row is still the
  * expand/collapse toggle for CompetitorDetail (rendered by the parent,
  * ResearchView, immediately below when `expanded`); this component only
- * renders the row itself.
+ * renders the row itself. Market Research P2, Task 6 added an optional
+ * "Advertising" pill beside the distance chip, shown when `activeAdCount` > 0.
  */
 
 interface Props {
@@ -30,6 +31,11 @@ interface Props {
   /** The highest reviewCount among ALL tracked competitors (computed once by
    *  the parent) — the denominator the review-volume bar's width scales against. */
   maxReviewCount: number;
+  /** How many of this competitor's stored ads are currently `active` (Market
+   *  Research P2, Task 6) — the parent computes this once from `adsById`.
+   *  Defaults to 0 (no pill), so a caller that doesn't have ads on hand yet
+   *  degrades to today's row exactly. */
+  activeAdCount?: number;
   expanded: boolean;
   onToggle: () => void;
 }
@@ -95,7 +101,16 @@ function ReviewVolumeBar({ reviewCount, maxReviewCount }: { reviewCount: number;
   );
 }
 
-export function CompetitorRow({ competitor, rank, metric, history, maxReviewCount, expanded, onToggle }: Props) {
+export function CompetitorRow({
+  competitor,
+  rank,
+  metric,
+  history,
+  maxReviewCount,
+  activeAdCount = 0,
+  expanded,
+  onToggle,
+}: Props) {
   const trend = computeTrend(metric, history);
   const velocity = computeVelocity(metric, history);
   const { Icon: TrendIcon, color: trendColor } = TREND_META[trend];
@@ -135,6 +150,11 @@ export function CompetitorRow({ competitor, rank, metric, history, maxReviewCoun
           <Badge tone="neutral" style={{ flexShrink: 0 }}>
             {`${competitor.distanceKm.toFixed(1)}km`}
           </Badge>
+          {activeAdCount > 0 && (
+            <Badge tone="neutral" style={{ flexShrink: 0 }}>
+              <Megaphone size={10} /> Advertising
+            </Badge>
+          )}
         </div>
         <div
           style={{

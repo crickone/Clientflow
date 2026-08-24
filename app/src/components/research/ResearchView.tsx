@@ -6,7 +6,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Building2, Crown, Key, MapPin, MessageSquareText, RefreshCw, Search, Star, Users } from "lucide-react";
 import { toast } from "sonner";
 
-import type { CompetitorRow as CompetitorRowData, EventRow, Metric, StoredReview } from "@/lib/research/store";
+import type { CompetitorRow as CompetitorRowData, EventRow, Metric, StoredAd, StoredReview } from "@/lib/research/store";
 import type { RescanResult } from "@/app/marketing/research/actions";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -55,6 +55,13 @@ import { ScanningProgress } from "./ScanningProgress";
  * never filters self out itself. `self`/`selfMetric` are the tenant's own
  * gym, fetched separately, rendered as a distinct "Your gym" reference row
  * above the ranked list — never numbered among competitors.
+ *
+ * Market Research P2, Task 6: `adsById` (page.tsx's `listAds(id)` per
+ * competitor, ALL rows) and `adLibraryConfigured` (a sync env-var check, no
+ * network) are plumbed the same store-only way and forwarded per-row — an
+ * active count to CompetitorRow's "Advertising" pill, the full list +
+ * configured flag to CompetitorDetail's Ads section. Same zero-spend
+ * contract as everything else here.
  */
 
 export type ResearchState = "no-key" | "no-centre" | "empty" | "populated";
@@ -71,6 +78,10 @@ interface ResearchViewProps {
   metricsById: Record<number, Metric | null>;
   historyById: Record<number, Metric[]>;
   reviewsById: Record<number, StoredReview[]>;
+  /** Each competitor's stored ads (`listAds(id)`, Market Research P2 Task 6)
+   *  — ALL rows, active and stopped. Feeds both CompetitorRow's "Advertising"
+   *  pill (active count) and CompetitorDetail's Ads gallery (the full list). */
+  adsById: Record<number, StoredAd[]>;
   /** Tenant-wide, newest-first, already capped (page.tsx calls listEvents({limit:20})). */
   events: EventRow[];
   landscape: LandscapeCache | null;
@@ -78,6 +89,10 @@ interface ResearchViewProps {
    *  client component never needs to import the AI-cost formatter (which
    *  transitively pulls in a server-only module; see page.tsx). */
   spendLabel: string | null;
+  /** `adLibraryConfigured()` (lib/research/adLibrary.ts), read server-side in
+   *  page.tsx — whether META_AD_LIBRARY_TOKEN is set. Passed straight through
+   *  to every CompetitorDetail's Ads section (see that component). */
+  adLibraryConfigured: boolean;
   /** The tenant's own gym (P1.1's isSelf match), if discovery has found one — `getSelfCompetitor()`. Null renders no "Your gym" reference at all (best-effort, current pre-P1.1 behaviour). */
   self: CompetitorRowData | null;
   /** `self`'s `latestMetric(id)` — null for a self match that hasn't been refreshed yet. Ignored when `self` is null. */
@@ -100,9 +115,11 @@ export function ResearchView({
   metricsById,
   historyById,
   reviewsById,
+  adsById,
   events,
   landscape,
   spendLabel,
+  adLibraryConfigured,
   self,
   selfMetric,
   onRescan,
@@ -427,6 +444,7 @@ export function ResearchView({
                 <div>
                   {competitors.map((c, i) => {
                     const expanded = expandedId === c.id;
+                    const ads = adsById[c.id] ?? [];
                     return (
                       <div key={c.id} style={{ borderTop: "1px solid var(--hairline)" }}>
                         <CompetitorRow
@@ -435,6 +453,7 @@ export function ResearchView({
                           metric={metricsById[c.id] ?? null}
                           history={historyById[c.id] ?? []}
                           maxReviewCount={stats.maxReviewCount}
+                          activeAdCount={ads.filter((a) => a.active).length}
                           expanded={expanded}
                           onToggle={() => setExpandedId(expanded ? null : c.id)}
                         />
@@ -443,6 +462,8 @@ export function ResearchView({
                             competitor={c}
                             history={historyById[c.id] ?? []}
                             reviews={reviewsById[c.id] ?? []}
+                            ads={ads}
+                            adLibraryConfigured={adLibraryConfigured}
                             events={events.filter((e) => e.competitorId === c.id)}
                             onMarkSeen={handleMarkSeen}
                             onBuildCampaign={handleBuildCampaign}
@@ -501,6 +522,58 @@ export function ResearchView({
               border-radius: var(--radius);
               padding: 10px 12px;
             }
+            .mres-ad-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+              gap: 12px;
+            }
+            .mres-ad-card {
+              display: flex;
+              flex-direction: column;
+              background: var(--surface-1);
+              border: 1px solid var(--hairline);
+              border-radius: var(--radius);
+              padding: 12px;
+            }
+            .mres-ad-thumb {
+              display: block;
+              width: 100%;
+              aspect-ratio: 16 / 9;
+              object-fit: cover;
+              border-radius: calc(var(--radius) - 3px);
+              margin-bottom: 10px;
+              background: var(--surface-2);
+            }
+            .mres-ad-copy {
+              font-size: 12.5px;
+              color: var(--text-secondary);
+              line-height: 1.5;
+              margin: 0 0 10px;
+              display: -webkit-box;
+              -webkit-line-clamp: 4;
+              -webkit-box-orient: vertical;
+              overflow: hidden;
+              word-break: break-word;
+              flex: 1;
+            }
+            .mres-ad-footer {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 8px;
+              margin-top: auto;
+              padding-top: 8px;
+              border-top: 1px solid var(--hairline);
+            }
+            .mres-ad-link {
+              font-size: 11px;
+              color: var(--accent-ink);
+              font-family: var(--font-mono), ui-monospace, monospace;
+              text-decoration: none;
+              white-space: nowrap;
+              flex-shrink: 0;
+            }
+            .mres-ad-link:hover { text-decoration: underline; }
             @media (max-width: 640px) {
               .mres-row-spark { display: none; }
               .mres-row-rank { display: none; }

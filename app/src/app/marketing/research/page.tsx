@@ -2,6 +2,7 @@ import { requireAdminPage } from "@/lib/auth";
 import { getCurrentTenant } from "@/lib/db/tenant";
 import { formatCentsEur } from "@/lib/campaigns/costEstimate";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { adLibraryConfigured } from "@/lib/research/adLibrary";
 import { getResearchCentre } from "@/lib/research/discovery";
 import { placesConfigured } from "@/lib/research/places";
 import { getResearchCapCents, researchSpentCents } from "@/lib/research/spend";
@@ -9,12 +10,14 @@ import {
   getReviews,
   getSelfCompetitor,
   latestMetric,
+  listAds,
   listCompetitors,
   listEvents,
   metricHistory,
   type CompetitorRow,
   type EventRow,
   type Metric,
+  type StoredAd,
   type StoredReview,
 } from "@/lib/research/store";
 import { readKey } from "@/lib/settings";
@@ -66,6 +69,15 @@ function readLandscapeCache(): LandscapeCache | null {
  * skewed by the tenant's own gym. `self`/`selfMetric` (`getSelfCompetitor()`
  * + its `latestMetric`) are read separately and handed down for
  * ResearchView's "Your gym" reference row.
+ *
+ * Market Research P2, Task 6: `adsById` (`listAds(id)`, per competitor — ALL
+ * rows, active and stopped) and `adLibraryConfigured` (a sync env-var check,
+ * `adLibraryConfigured()` from lib/research/adLibrary.ts) are read the same
+ * store-only way and handed down for CompetitorDetail's Ads section +
+ * CompetitorRow's "Advertising" pill — NEVER `searchCompetitorAds` (the
+ * network call) or `adAngle` (the AI call) from here; the cached ad-angle
+ * text lives in `competitor.adAngleJson`, already inside every `CompetitorRow`
+ * this page already reads via `listCompetitors`.
  */
 export default async function MarketingResearchPage() {
   await requireAdminPage();
@@ -98,10 +110,12 @@ export default async function MarketingResearchPage() {
   const metricsById: Record<number, Metric | null> = {};
   const historyById: Record<number, Metric[]> = {};
   const reviewsById: Record<number, StoredReview[]> = {};
+  const adsById: Record<number, StoredAd[]> = {};
   for (const c of competitors) {
     metricsById[c.id] = latestMetric(c.id);
     historyById[c.id] = metricHistory(c.id);
     reviewsById[c.id] = getReviews(c.id);
+    adsById[c.id] = listAds(c.id);
   }
 
   const events: EventRow[] = listEvents({ limit: 20 });
@@ -109,6 +123,13 @@ export default async function MarketingResearchPage() {
 
   const tenantId = getCurrentTenant().id;
   const spendLabel = `${formatCentsEur(researchSpentCents(tenantId))} / ${formatCentsEur(getResearchCapCents(tenantId))} this month`;
+
+  // Market Research P2, Task 6 — a sync env-var presence check only (mirrors
+  // `configured`/`placesConfigured()` above), never a network call; decides
+  // whether a competitor with no ads shows "none found" or a "connect the Ad
+  // Library" nudge. Never call adLibrary.ts's `searchCompetitorAds` (or
+  // summary.ts's `adAngle`) from this page — it must stay a free read.
+  const adsConfigured = adLibraryConfigured();
 
   return (
     <div className="app-page">
@@ -123,9 +144,11 @@ export default async function MarketingResearchPage() {
         metricsById={metricsById}
         historyById={historyById}
         reviewsById={reviewsById}
+        adsById={adsById}
         events={events}
         landscape={landscape}
         spendLabel={spendLabel}
+        adLibraryConfigured={adsConfigured}
         self={self}
         selfMetric={selfMetric}
         onRescan={rescanNowAction}

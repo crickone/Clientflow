@@ -5,8 +5,10 @@ import {
   Activity as ActivityIcon,
   ChevronDown,
   ChevronRight,
+  CircleStop,
   Flame,
   MapPinPlus,
+  Rocket,
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
@@ -32,9 +34,10 @@ import { relativeTime } from "@/lib/utils";
  * by discovery, not tied to one row — see discovery.ts), so CompetitorDetail's
  * own per-competitor slice of the feed never contains any; the collapse logic
  * below is therefore inert there and only ever fires on the tenant-wide feed.
- * The real change types (`rating_up`/`rating_down`/`review_spike` — and,
- * future-proofed, anything else the engine ever adds) always render as
- * distinct, coloured rows since that's the feed's actual week-to-week value;
+ * The real change types (`rating_up`/`rating_down`/`review_spike`/`new_ad`/
+ * `ad_stopped` — the last two Market Research P2, Task 6 — and, future-
+ * proofed, anything else the engine ever adds) always render as distinct,
+ * coloured rows since that's the feed's actual week-to-week value;
  * `new_competitor` events render individually too UNLESS there are enough of
  * them to be the "monotonous wall" the brief called out (a first scan's ~20
  * near-identical "New gym nearby" rows), in which case they collapse into one
@@ -85,6 +88,11 @@ const CHANGE_EVENT_META: Record<string, { Icon: typeof TrendingUp; ink: string; 
   rating_up: { Icon: TrendingUp, ink: "#4ade80", tint: "rgba(74, 222, 128, 0.1)", ring: "rgba(74, 222, 128, 0.4)" },
   rating_down: { Icon: TrendingDown, ink: "#f87171", tint: "rgba(248, 113, 113, 0.1)", ring: "rgba(248, 113, 113, 0.4)" },
   review_spike: { Icon: Flame, ink: "#fbbf24", tint: "rgba(251, 191, 36, 0.1)", ring: "rgba(251, 191, 36, 0.4)" },
+  // Market Research P2, Task 6 — raised by adDiff.ts's diffAds (Task 2). Icon
+  // choice echoes its own summary copy verbatim ("launched a new ad" /
+  // "stopped an ad"): a rocket for a launch, a stop glyph for a stop.
+  new_ad: { Icon: Rocket, ink: "#818cf8", tint: "rgba(129, 140, 248, 0.1)", ring: "rgba(129, 140, 248, 0.4)" },
+  ad_stopped: { Icon: CircleStop, ink: "#94a3b8", tint: "rgba(148, 163, 184, 0.1)", ring: "rgba(148, 163, 184, 0.4)" },
 };
 const FALLBACK_CHANGE_META = { Icon: ActivityIcon, ink: "var(--text-secondary)", tint: "var(--surface-2)", ring: "var(--hairline)" };
 
