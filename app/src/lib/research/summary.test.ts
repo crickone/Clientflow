@@ -34,6 +34,16 @@
 // the cache write it feeds (setCompetitorThemes) already has round-trip
 // coverage in store.test.ts.
 //
+// adAngle (Market Research P2, Task 5, below) gets a genuine happy-path test
+// instead: `@/lib/ai/metered` is added to this file's require-shim as a thin
+// dispatcher — real `meteredCreate` by default (so competitorThemes's and
+// landscapeSummary's real AI-unavailable/over-cap assertions above are
+// completely unaffected), swapped for a canned successful reply for exactly
+// one call via the module-scoped `mockMeteredCreateImpl` variable. This is
+// the same require-interception TRICK the react/next-navigation stubs below
+// already use, just aimed at a module this file's tests want to control
+// instead of one they just need to not crash on.
+//
 // ./summary -> @/lib/db/tenant (react `cache`) and -> ./store -> @/lib/db ->
 // ./tenant -> @/lib/tenants -> @/lib/auth -> next/navigation; also ->
 // @/lib/ai/metered -> @/lib/ai/usage -> @/lib/db/control (draftFollowup.test.ts
@@ -52,6 +62,13 @@ import fs from "node:fs";
 import path from "node:path";
 
 type Loader = (request: string, ...rest: unknown[]) => unknown;
+type MeteredCreateFn = (...args: unknown[]) => unknown;
+// Section 5c (adAngle) sets this to a fake `meteredCreate` for exactly ONE
+// call. `null` — the default, and what every OTHER section in this file runs
+// under — means "@/lib/ai/metered" resolves to the REAL module below,
+// completely transparently.
+let mockMeteredCreateImpl: MeteredCreateFn | null = null;
+let realMeteredCreate: MeteredCreateFn | null = null;
 const mod = Module as unknown as { _load: Loader };
 const realLoad = mod._load;
 mod._load = function (this: unknown, request: string, ...rest: unknown[]) {
@@ -61,6 +78,15 @@ mod._load = function (this: unknown, request: string, ...rest: unknown[]) {
       redirect: () => {
         throw new Error("next/navigation.redirect() stub called unexpectedly in summary.test.ts");
       },
+    };
+  }
+  if (request === "@/lib/ai/metered") {
+    if (!realMeteredCreate) {
+      const real = realLoad.call(this, request, ...rest) as { meteredCreate: MeteredCreateFn };
+      realMeteredCreate = real.meteredCreate;
+    }
+    return {
+      meteredCreate: (...callArgs: unknown[]) => (mockMeteredCreateImpl ?? realMeteredCreate!)(...callArgs),
     };
   }
   return realLoad.call(this, request, ...rest);
@@ -77,10 +103,13 @@ const requireLocal = createRequire(import.meta.url);
     buildSelfClause,
     competitorThemes,
     landscapeSummary,
+    buildAdAngleFallback,
+    adAngle,
   } = requireLocal("./summary") as typeof import("./summary");
   type StoredReview = import("./store").StoredReview;
   type Metric = import("./store").Metric;
   type CompetitorRow = import("./store").CompetitorRow;
+  type StoredAd = import("./store").StoredAd;
 
   const review = (ratingMilli: number | null, text = "Review text"): StoredReview => ({
     externalReviewId: `r-${Math.random()}`,
@@ -117,6 +146,22 @@ const requireLocal = createRequire(import.meta.url);
     firstSeenAt: "2026-01-01T00:00:00.000Z",
     lastRefreshedAt: null,
   });
+  const storedAd = (id: number, bodies: string[] = ["Ad body"]): StoredAd => ({
+    id,
+    competitorId: 0,
+    adId: `ad-${id}`,
+    bodies,
+    linkTitle: null,
+    linkCaption: null,
+    platforms: ["facebook"],
+    snapshotUrl: "https://example.com/ad",
+    startedAt: null,
+    stoppedAt: null,
+    active: true,
+    imageUrl: null,
+    firstSeenAt: "2026-01-01T00:00:00.000Z",
+    lastSeenAt: "2026-01-01T00:00:00.000Z",
+  });
 
   // ── 1. buildThemesFallback ──────────────────────────────────────────
   {
@@ -142,6 +187,24 @@ const requireLocal = createRequire(import.meta.url);
       buildThemesFallback([]),
       "0 reviews, rating unavailable — connect AI for theme analysis.",
       "defensive: never crashes on an empty sample even though competitorThemes short-circuits before calling this with one",
+    );
+  }
+
+  // ── 1b. buildAdAngleFallback ────────────────────────────────────────
+  {
+    assert.equal(
+      buildAdAngleFallback([storedAd(1), storedAd(2), storedAd(3)]),
+      "3 active ads — connect AI for their angle.",
+    );
+    assert.equal(
+      buildAdAngleFallback([storedAd(1)]),
+      "1 active ad — connect AI for their angle.",
+      "singular 'ad', not 'ads'",
+    );
+    assert.equal(
+      buildAdAngleFallback([]),
+      "0 active ads — connect AI for their angle.",
+      "defensive: never crashes on an empty sample even though adAngle short-circuits before calling this with one",
     );
   }
 
@@ -395,6 +458,8 @@ const requireLocal = createRequire(import.meta.url);
     listCompetitors,
     appendMetric,
     getReviews,
+    upsertAd,
+    listAds,
   } = requireLocal("./store") as typeof import("./store");
   const { recordUsage } = requireLocal("../ai/usage") as typeof import("../ai/usage");
   const { MODELS } = requireLocal("../ai/client") as typeof import("../ai/client");
@@ -513,6 +578,90 @@ const requireLocal = createRequire(import.meta.url);
       assert.equal(overCapResult, expectedFallback, "over-cap falls back to the same static sentence, still never throwing");
 
       console.log("research/summary.test.ts: landscapeSummary assertions passed");
+    } finally {
+      cleanup();
+    }
+  }
+
+  // ── 5c. adAngle ──
+  {
+    const { tid, cleanup } = makeScratchTenant("research-summary-adangle-test");
+    try {
+      // No active ads -> the exact static string, no AI call, nothing cached.
+      const bareId = runWithTenant(tid, () =>
+        upsertCompetitor({ placeId: "places/AD-BARE", name: "Bare Ads Gym", address: "x", lat: 0, lng: 0, distanceKm: 1 }),
+      );
+      const noAdsResult = await runWithTenant(tid, async () => adAngle(bareId));
+      assert.equal(noAdsResult, "No active ads found.");
+      let bareRow = runWithTenant(tid, () => listCompetitors()).find((c) => c.id === bareId)!;
+      assert.equal(bareRow.adAngleJson, null, "the no-ads short-circuit never touches adAngleJson");
+
+      // Ads present. Set up the competitor + one active ad.
+      const compId = runWithTenant(tid, () =>
+        upsertCompetitor({ placeId: "places/AD-TEST", name: "Ad Testable Gym", address: "x", lat: 0, lng: 0, distanceKm: 1 }),
+      );
+      runWithTenant(tid, () =>
+        upsertAd(
+          compId,
+          {
+            adId: "meta-ad-1",
+            bodies: ["Join today and get your first month free"],
+            linkTitle: "Limited spots",
+            linkCaption: "Sign up now",
+            platforms: ["facebook"],
+            snapshotUrl: "https://example.com/ad/1",
+          },
+          "2026-08-01T00:00:00.000Z",
+        ),
+      );
+      const sample = runWithTenant(tid, () => listAds(compId, { activeOnly: true }));
+      const expectedFallback = buildAdAngleFallback(sample);
+      assert.equal(expectedFallback, "1 active ad — connect AI for their angle.");
+
+      // NOT over cap yet -- same "AI unavailable" reality as 5a/5b (no API
+      // key in this test env) exercises the real error-catch branch for
+      // adAngle too (mockMeteredCreateImpl is still null here).
+      const underCapResult = await runWithTenant(tid, async () => adAngle(compId));
+      assert.equal(underCapResult, expectedFallback, "AI-unavailable falls back to the exact static formula");
+      let row = runWithTenant(tid, () => listCompetitors()).find((c) => c.id === compId)!;
+      assert.equal(row.adAngleJson, null, "a fallback response must never be cached as if it were a real answer");
+
+      // Genuinely OVER cap -- same trick as 5a/5b: the real assertAiAllowed
+      // (inside the REAL meteredCreate, still reached since the mock is off)
+      // throws AiCapError BEFORE any network attempt.
+      recordUsage(tid, "sales", MODELS.sonnet, { inputTokens: 0, outputTokens: 2_000_000 });
+      const overCapResult = await runWithTenant(tid, async () => adAngle(compId));
+      assert.equal(overCapResult, expectedFallback, "over-cap falls back to the same static formula, still never throwing");
+      row = runWithTenant(tid, () => listCompetitors()).find((c) => c.id === compId)!;
+      assert.equal(row.adAngleJson, null, "still not cached after the over-cap attempt");
+
+      // Happy path -- unlike competitorThemes/landscapeSummary above (no live
+      // Claude credentials in this test env), adAngle CAN get a genuine
+      // successful-reply test: swap in a canned `meteredCreate` for exactly
+      // one call via mockMeteredCreateImpl (see the require-shim at the top
+      // of this file), proving the model's text is both cached via
+      // setCompetitorAdAngle AND returned verbatim. The tenant is still over
+      // cap from the previous step, which is irrelevant here -- the mock
+      // REPLACES meteredCreate entirely, so the real assertAiAllowed never
+      // runs for this one call.
+      mockMeteredCreateImpl = async () => ({
+        content: [{ type: "text", text: "They're pushing a free first month to get new members in the door fast." }],
+      });
+      let happyResult: string;
+      try {
+        happyResult = await runWithTenant(tid, async () => adAngle(compId));
+      } finally {
+        mockMeteredCreateImpl = null; // never leak the mock past this one call
+      }
+      assert.equal(happyResult, "They're pushing a free first month to get new members in the door fast.");
+      row = runWithTenant(tid, () => listCompetitors()).find((c) => c.id === compId)!;
+      assert.ok(row.adAngleJson, "a successful model reply IS cached");
+      const cached = JSON.parse(row.adAngleJson!) as { angle: string; at: string };
+      assert.equal(cached.angle, happyResult);
+      assert.equal(typeof cached.at, "string");
+      assert.equal(row.adAngleAt, cached.at, "the adAngleAt column matches the cached JSON's own at field");
+
+      console.log("research/summary.test.ts: adAngle assertions passed");
     } finally {
       cleanup();
     }

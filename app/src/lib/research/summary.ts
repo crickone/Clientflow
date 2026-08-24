@@ -11,9 +11,12 @@ import {
   latestMetric,
   getReviews,
   setCompetitorThemes,
+  listAds,
+  setCompetitorAdAngle,
   type CompetitorRow,
   type Metric,
   type StoredReview,
+  type StoredAd,
 } from "./store";
 
 /**
@@ -58,6 +61,15 @@ import {
  * static fallback (`buildSelfClause`) frame the operator against the pack.
  * No self match yet -> both paths revert verbatim to the original,
  * competitor-set-only behaviour.
+ *
+ * Market Research P2 (Task 5) added a third helper, `adAngle` — same shape
+ * again (metered under AGENT_KEY "research", never throws, no-fabrication,
+ * cache-on-success-only) but reading a competitor's stored AD COPY
+ * (`store.ts`'s `listAds`/`competitor_ads`, Task 3) instead of Google
+ * reviews, to describe the offer/hook/theme running through their ads
+ * rather than review themes. Caches via `setCompetitorAdAngle`, mirroring
+ * `setCompetitorThemes`'s `themesJson`/`themesAt` cache-column shape one
+ * column pair over (`adAngleJson`/`adAngleAt`).
  */
 
 const AGENT_KEY = "research";
@@ -423,5 +435,110 @@ export async function landscapeSummary(): Promise<string> {
   } catch (err) {
     console.error("[research/summary] landscapeSummary fallback:", err);
     return buildLandscapeFallback(digest);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// adAngle (Market Research P2, Task 5)
+// ─────────────────────────────────────────────────────────────────────────
+
+// Same reasoning as MAX_REVIEWS_FOR_THEMES above: bounds both the prompt and
+// the fallback's counted sample to a "top-5" read even if a competitor ever
+// has more than 5 ads active at once (a single Ad Library refresh is already
+// capped to RESULT_LIMIT=25 — see adLibrary.ts — so this is a further,
+// deliberately small bound on what one prompt/fallback reads).
+const MAX_ADS_FOR_ANGLE = 5;
+
+/**
+ * The over-cap / AI-unavailable / error fallback for `adAngle`: cheap local
+ * text over the same active-ad sample the model would have seen, no AI call.
+ * Pure + exported for direct unit testing.
+ */
+export function buildAdAngleFallback(ads: StoredAd[]): string {
+  const n = ads.length;
+  const label = `${n} active ad${n === 1 ? "" : "s"}`;
+  return `${label} — connect AI for their angle.`;
+}
+
+function buildAdAngleSystemPrompt(): string {
+  return [
+    "You read a small sample of a competing local business's currently running ad copy (sourced from Meta's Ad " +
+      "Library) and describe the ADVERTISING ANGLE they're pushing — the offer, hook, or theme running through it " +
+      "— for the operator who is tracking that competitor.",
+    NO_FABRICATION_RULE,
+    "Base your read strictly on the ad copy supplied in the next message — do not draw on outside knowledge of " +
+      "this or any business, and never invent an offer, price, discount, number, or claim that isn't literally " +
+      "present in the text below.",
+  ].join("\n\n");
+}
+
+function buildAdAngleUserPrompt(ads: StoredAd[]): string {
+  const lines = ads.flatMap((ad, i) => {
+    const label = `Ad ${i + 1}`;
+    const parts: string[] = [];
+    for (const body of ad.bodies) parts.push(`${label} body: ${body}`);
+    if (ad.linkTitle) parts.push(`${label} link title: ${ad.linkTitle}`);
+    if (ad.linkCaption) parts.push(`${label} link caption: ${ad.linkCaption}`);
+    return parts;
+  });
+  return [
+    "Active ad copy:",
+    ...(lines.length > 0 ? lines : ["(no text copy captured for these ads)"]),
+    "",
+    "In 1-2 short sentences, describe this competitor's advertising angle — the offer, hook, or theme running " +
+      "through their ads. Reply with ONLY the read itself: no heading, no preamble, no closing remarks.",
+  ].join("\n");
+}
+
+/**
+ * A 1-2 line read of a competitor's advertising angle — the offer/hook/theme
+ * running through their currently ACTIVE ads — from a small sample of their
+ * stored ad copy (Market Research P2, Task 5).
+ *
+ * No active ads -> "No active ads found." with NO model call (nothing to
+ * read, so no reason to spend) — mirrors `competitorThemes`'s "no reviews"
+ * short-circuit exactly. Otherwise: metered call to CONTENT_MODEL asking for
+ * the angle strictly grounded in the supplied bodies/linkTitle/linkCaption;
+ * the raw reply text is cached via `setCompetitorAdAngle` (so the dashboard
+ * doesn't re-spend on every render) and returned as-is (unlike
+ * `competitorThemes`, there's no multi-line parse step here — the prompt
+ * asks for one short read, not a list of themes). Any failure along the way
+ * — over cap, AI unavailable, network error, or the model returning nothing
+ * — falls back to `buildAdAngleFallback` over the SAME sample, never throws,
+ * and never caches a non-answer, same reasoning as `competitorThemes`.
+ */
+export async function adAngle(competitorId: number): Promise<string> {
+  const ads = listAds(competitorId, { activeOnly: true }).slice(0, MAX_ADS_FOR_ANGLE);
+  if (ads.length === 0) return "No active ads found.";
+
+  const tenantId = getCurrentTenant().id;
+
+  try {
+    const message = await meteredCreate({ tenantId, agentKey: AGENT_KEY }, () => ({
+      model: CONTENT_MODEL,
+      max_tokens: 200,
+      system: buildAdAngleSystemPrompt(),
+      messages: [{ role: "user", content: buildAdAngleUserPrompt(ads) }],
+    }));
+
+    const text = message.content
+      .filter((b): b is Anthropic.TextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("\n")
+      .trim();
+
+    if (text.length === 0) return buildAdAngleFallback(ads);
+
+    // Cache alongside the model call (inside the try): same reasoning as
+    // competitorThemes — a write failure here is rare (a plain synchronous
+    // SQLite write) and treating it like a model failure (fall back rather
+    // than return an answer that silently failed to persist) is the
+    // simpler, still-never-throws choice.
+    const nowIso = new Date().toISOString();
+    setCompetitorAdAngle(competitorId, JSON.stringify({ angle: text, at: nowIso }), nowIso);
+    return text;
+  } catch (err) {
+    console.error(`[research/summary] adAngle(${competitorId}) fallback:`, err);
+    return buildAdAngleFallback(ads);
   }
 }
