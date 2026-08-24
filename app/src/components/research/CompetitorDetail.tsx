@@ -1,8 +1,9 @@
 "use client";
 
-import { Megaphone } from "lucide-react";
+import { EyeOff, Megaphone } from "lucide-react";
 
 import type { CompetitorRow as CompetitorRowData, EventRow, Metric, StoredReview } from "@/lib/research/store";
+import { parseStoredThemes } from "@/lib/research/themesJson";
 import { Button } from "@/components/ui/Button";
 import { CardLabel } from "@/components/ui/Card";
 import { formatDate } from "@/lib/utils";
@@ -10,11 +11,14 @@ import { ChangedFeed } from "./ChangedFeed";
 import { Sparkline } from "./Sparkline";
 
 /**
- * The inline expand panel under a ranked row — Market Research P1, Task 10.
- * Renders ONLY from what the parent (ResearchView, in turn fed by page.tsx)
- * already has in hand: this competitor's metric history, cached review
- * sample, cached AI themes, and its own slice of the event feed. No fetch,
- * no AI call, no Google call.
+ * The inline expand panel under a ranked row — Market Research P1, Task 10
+ * (view) + Task 11 (the mute button + real onMarkSeen/onBuildCampaign
+ * handlers ResearchView now passes down). Renders ONLY from what the parent
+ * (ResearchView, in turn fed by page.tsx) already has in hand: this
+ * competitor's metric history, cached review sample, cached AI themes, and
+ * its own slice of the event feed. No fetch, no AI call, no Google call —
+ * every callback prop here is a plain, synchronous-looking function;
+ * ResearchView owns the actual Server Action calls behind them.
  */
 
 interface Props {
@@ -27,37 +31,27 @@ interface Props {
   events: EventRow[];
   onBuildCampaign?: (competitorId: number) => void;
   onMarkSeen?: (ids: number[]) => void;
+  /** T11: curation (`setCompetitorFlagsAction(id,{muted:true})` upstream) —
+   *  stop tracking this competitor. No confirmation UI to un-mute exists yet
+   *  (P1.5), so this component confirms before firing it — see the button. */
+  onMute?: (competitorId: number) => void;
+  /** True while ResearchView's shared curation transition is in flight (a
+   *  mark-seen / mute / build-campaign click anywhere on the page) — disables
+   *  both buttons below so a double-click can't fire `onMute` (no undo yet)
+   *  or `onBuildCampaign` twice. */
+  pending?: boolean;
 }
 
 const MAX_REVIEWS_SHOWN = 5;
 
-type ParsedThemes = { themes: string[]; at: string };
-
-/**
- * Parses the cached `competitor.themesJson` written by
- * lib/research/summary.ts's `competitorThemes` — `JSON.stringify({themes,
- * at})` (see that function's doc comment). Never throws: a missing key,
- * malformed JSON, or an unexpected shape all fall back to `null` (rendered
- * as "Themes generate on your next scan.") rather than crashing this panel
- * over a cache read — mirrors discovery.ts's readCachedCentre() ("validate
- * the shape, never trust the cast" for a value this module didn't write).
- */
-function parseThemes(themesJson: string | null): ParsedThemes | null {
-  if (!themesJson) return null;
-  try {
-    const raw = JSON.parse(themesJson) as unknown;
-    if (!raw || typeof raw !== "object") return null;
-    const { themes, at } = raw as Record<string, unknown>;
-    if (!Array.isArray(themes) || typeof at !== "string") return null;
-    const clean = themes.filter((t): t is string => typeof t === "string" && t.trim().length > 0);
-    return clean.length > 0 ? { themes: clean, at } : null;
-  } catch {
-    return null;
-  }
-}
-
-export function CompetitorDetail({ competitor, history, reviews, events, onBuildCampaign, onMarkSeen }: Props) {
-  const parsedThemes = parseThemes(competitor.themesJson);
+export function CompetitorDetail({ competitor, history, reviews, events, onBuildCampaign, onMarkSeen, onMute, pending = false }: Props) {
+  // Parsing lives in the shared, zero-import lib/research/themesJson.ts (T11)
+  // rather than a local copy: lib/research/campaignGap.ts (the "Build a
+  // campaign from this gap" seed builder) now needs the identical parse, and
+  // this component itself can never import lib/research/summary.ts (the
+  // writer of this JSON shape) — that module is `server-only`, so a CLIENT
+  // component reading its cache back out needs a shared, framework-free home.
+  const parsedThemes = parseStoredThemes(competitor.themesJson);
   // history[0] is the same capture latestMetric() would return (see
   // CompetitorRow's computeTrend comment) — "current" for this panel's chart caption.
   const latest = history[0] ?? null;
@@ -172,9 +166,25 @@ export function CompetitorDetail({ competitor, history, reviews, events, onBuild
         />
       </div>
 
-      <div style={{ marginTop: 20 }}>
-        <Button variant="outline" size="sm" onClick={() => onBuildCampaign?.(competitor.id)}>
+      <div style={{ marginTop: 20, display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <Button variant="outline" size="sm" disabled={pending} onClick={() => onBuildCampaign?.(competitor.id)}>
           <Megaphone size={14} /> Build a campaign from this gap
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={pending}
+          onClick={() => {
+            if (
+              window.confirm(
+                `Stop tracking ${competitor.name}? It'll drop off this list — there's no un-track control yet, so this can't be easily undone.`,
+              )
+            ) {
+              onMute?.(competitor.id);
+            }
+          }}
+        >
+          <EyeOff size={14} /> Stop tracking
         </Button>
       </div>
     </div>

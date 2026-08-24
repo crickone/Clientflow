@@ -18,17 +18,24 @@ import {
 } from "@/lib/research/store";
 import { readKey } from "@/lib/settings";
 import { ResearchView, type LandscapeCache, type ResearchState } from "@/components/research/ResearchView";
+import {
+  rescanNowAction,
+  setCompetitorFlagsAction,
+  markResearchEventsSeenAction,
+  buildCampaignFromCompetitorAction,
+} from "./actions";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Reads + validates the cached landscape-summary KV value a later task's
- * "Rescan now" action writes (`research_landscape`, JSON `{text, at}`);
- * null if absent or malformed. Mirrors lib/research/discovery.ts's
- * `readCachedCentre()` — same "validate the shape, never trust the
- * generic cast" idiom for a KV value this module didn't itself write.
- * Deliberately does NOT call `landscapeSummary()` (lib/research/summary.ts)
- * — that's a metered AI call, and this page must render for free.
+ * Reads + validates the cached landscape-summary KV value `rescanNowAction`
+ * (./actions.ts, Task 11) writes after every scan (`research_landscape`,
+ * JSON `{text, at}`); null if absent or malformed. Mirrors
+ * lib/research/discovery.ts's `readCachedCentre()` — same "validate the
+ * shape, never trust the generic cast" idiom for a KV value this module
+ * didn't itself write. Deliberately does NOT call `landscapeSummary()`
+ * (lib/research/summary.ts) — that's a metered AI call, and this page must
+ * render for free.
  */
 function readLandscapeCache(): LandscapeCache | null {
   const raw = readKey<unknown>("research_landscape", null);
@@ -39,15 +46,18 @@ function readLandscapeCache(): LandscapeCache | null {
 }
 
 /**
- * Market Research P1, Task 10 — the visible dashboard: a ranked competitor
- * list with rating/review trends, a "what changed" feed, and per-competitor
- * detail. Every read below is a plain store/KV select (see the imports —
- * store.ts, discovery.ts's cache-only getResearchCentre, settings.ts's
- * readKey, spend.ts's two pure read-throughs) — NEVER a Google Places call
- * or an AI call. Browsing this page is always free; only a future "Rescan
- * now" (Task 11) spends. `placesConfigured()`/`getResearchCentre()` decide
- * which of the 4 states ResearchView renders; ResearchView itself just
- * switches on `state`, it never re-derives it.
+ * Market Research P1, Task 10 (view) + Task 11 (the actions wired in below)
+ * — the visible dashboard: a ranked competitor list with rating/review
+ * trends, a "what changed" feed, and per-competitor detail. Every read below
+ * is a plain store/KV select (see the imports — store.ts, discovery.ts's
+ * cache-only getResearchCentre, settings.ts's readKey, spend.ts's two pure
+ * read-throughs) — NEVER a Google Places call or an AI call. Browsing this
+ * page is always free; only a "Rescan now" click (rescanNowAction, ./actions.ts)
+ * spends. `placesConfigured()`/`getResearchCentre()` decide which of the 4
+ * states ResearchView renders; ResearchView itself just switches on `state`,
+ * it never re-derives it. The 4 actions are passed straight down as props —
+ * see ResearchView's own doc comment for why (a Server Component handing a
+ * Server Action to a Client Component as a prop).
  */
 export default async function MarketingResearchPage() {
   await requireAdminPage();
@@ -103,6 +113,10 @@ export default async function MarketingResearchPage() {
         events={events}
         landscape={landscape}
         spendLabel={spendLabel}
+        onRescan={rescanNowAction}
+        onSetFlags={setCompetitorFlagsAction}
+        onMarkSeen={markResearchEventsSeenAction}
+        onBuildCampaign={buildCampaignFromCompetitorAction}
       />
     </div>
   );
