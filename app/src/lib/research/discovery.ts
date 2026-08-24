@@ -160,12 +160,11 @@ async function resolveCentre(
  * server-side and resolves to `{ok:false,error:<message>}` — see the module
  * doc for the full fail-soft contract.
  *
- * Unlike the geocode step above, the Nearby call's spend is recorded right
- * after the call regardless of its outcome (matching this step's wording in
- * the brief, which — unlike the geocode step — does not gate
- * recordResearchSpend behind "on ok"): a non-2xx/error response from Google
- * still represents a request Google received and may bill for, so it still
- * counts against the tenant's monthly cap.
+ * Both metered Google calls (geocode + Nearby) charge the tenant's monthly cap
+ * ONLY on success — a failed/non-2xx response isn't billed by Google, and
+ * over-counting would trip the cap early. See the inline comment at the Nearby
+ * call below and the "nearby spend NOT recorded on failure" case in
+ * discovery.test.ts.
  */
 export async function discoverCompetitors(radiusKm: number = DEFAULT_RADIUS_KM): Promise<DiscoverResult> {
   try {
