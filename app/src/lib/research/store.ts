@@ -240,6 +240,33 @@ export function replaceReviews(competitorId: number, reviews: StoredReview[], ca
   });
 }
 
+/**
+ * The current cached review sample for a competitor — whatever `replaceReviews`
+ * last wrote wholesale (already capped to Google's own top-N per place; see
+ * this table's doc comment above), in the order they were inserted (`id asc`),
+ * which preserves Google's own relevance ordering rather than re-sorting by,
+ * say, rating or recency. Empty array (never throwing) for a competitor with
+ * no sample yet — mirrors `metricHistory`'s "nothing yet -> []" contract.
+ *
+ * Added for Task 8 (Market Research P1's AI review-themes summary,
+ * lib/research/summary.ts) as the read counterpart to `replaceReviews` — no
+ * caller needed a single competitor's review rows back out until now.
+ */
+export function getReviews(competitorId: number): StoredReview[] {
+  return db
+    .select({
+      externalReviewId: schema.competitorReviews.externalReviewId,
+      author: schema.competitorReviews.author,
+      ratingMilli: schema.competitorReviews.ratingMilli,
+      text: schema.competitorReviews.text,
+      publishedAt: schema.competitorReviews.publishedAt,
+    })
+    .from(schema.competitorReviews)
+    .where(eq(schema.competitorReviews.competitorId, competitorId))
+    .orderBy(asc(schema.competitorReviews.id))
+    .all();
+}
+
 // ── change feed (alerts) ────────────────────────────────────────────────
 
 export function addEvent(e: NewEvent): void {

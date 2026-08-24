@@ -17,7 +17,11 @@
 //      integer, null ratings round-trip as null (not 0), and
 //      metricHistory's limit is respected.
 //   5. replaceReviews: wholesale swap (old rows gone, new rows in),
-//      including swapping down to zero reviews.
+//      including swapping down to zero reviews. Plus (5b) getReviews (added
+//      for Task 8 — lib/research/summary.ts's AI review-themes helper): the
+//      StoredReview shape round-trips exactly (no id/competitorId/capturedAt
+//      leaking through), insertion order (id asc) is preserved, and it
+//      tracks every replaceReviews swap including down to [].
 //   6. addEvent / listEvents / markEventsSeen: newest-first ordering,
 //      unseenOnly filtering, marking flips seen without deleting anything,
 //      and an omitted occurredAt defaults to ~now.
@@ -68,6 +72,7 @@ const requireLocal = createRequire(import.meta.url);
     latestMetric,
     metricHistory,
     replaceReviews,
+    getReviews,
     addEvent,
     listEvents,
     markEventsSeen,
@@ -263,6 +268,26 @@ const requireLocal = createRequire(import.meta.url);
     const r2 = reviewRows.find((r) => r.externalReviewId === "r2")!;
     assert.equal(r2.publishedAt, null, "a review with no publishedAt stores null, not a placeholder string");
 
+    // ── 5b. getReviews (Task 8's additive read helper) ──
+    // Insertion order (id asc) preserved -> [r1, r2], matching the order
+    // replaceReviews's `reviews` array was given in, i.e. Google's own
+    // relevance ordering, not re-sorted by rating/date.
+    let gotA = runWithTenant(tid, () => getReviews(idA));
+    assert.deepEqual(gotA.map((r) => r.externalReviewId), ["r1", "r2"]);
+    assert.deepEqual(gotA[0], {
+      externalReviewId: "r1",
+      author: "Sam",
+      ratingMilli: 5000,
+      text: "Great gym",
+      publishedAt: "2026-07-01T00:00:00.000Z",
+    });
+    assert.deepEqual(
+      Object.keys(gotA[0]).sort(),
+      ["author", "externalReviewId", "publishedAt", "ratingMilli", "text"],
+      "getReviews returns exactly the StoredReview shape -- no id/competitorId/capturedAt leaking through",
+    );
+    assert.deepEqual(runWithTenant(tid, () => getReviews(idB)), [], "a competitor with no sample yet reads as [], not throwing");
+
     // Swap again with a different, smaller set — the OLD rows must be gone.
     runWithTenant(tid, () =>
       replaceReviews(
@@ -275,11 +300,14 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(reviewRows.length, 1, "the previous review set was fully replaced, not appended to");
     assert.equal(reviewRows[0].externalReviewId, "r3");
     assert.equal(reviewRows[0].capturedAt, "2026-08-08");
+    gotA = runWithTenant(tid, () => getReviews(idA));
+    assert.deepEqual(gotA.map((r) => r.externalReviewId), ["r3"], "getReviews reflects the wholesale swap, not the old r1/r2 sample");
 
     // Swap down to zero reviews.
     runWithTenant(tid, () => replaceReviews(idA, [], "2026-08-15"));
     reviewRows = getTenantDbById(tid).select().from(schema.competitorReviews).all();
     assert.equal(reviewRows.length, 0, "an empty review set clears the sample entirely");
+    assert.deepEqual(runWithTenant(tid, () => getReviews(idA)), [], "getReviews reflects the clear too");
 
     // ── 6. addEvent / listEvents / markEventsSeen ──
     // Three events with fully-explicit, distinct occurredAt values, so the
