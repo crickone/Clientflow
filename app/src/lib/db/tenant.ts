@@ -2057,6 +2057,18 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     const colNames = new Set(cols.map((c) => c.name));
     if (!colNames.has("page_name")) {
       sqlite.exec("ALTER TABLE competitor_ads ADD COLUMN page_name TEXT");
+      // One-time cleanup: every competitor_ads row that existed BEFORE this
+      // column was added predates the advertiser-page-match filter, i.e. was
+      // stored by the old search_terms-matches-ad-COPY path that let unrelated
+      // advertisers' ads ride along (the Fitbit/Garmin/Taekwon-Do false
+      // positives). They all read back with page_name NULL and would otherwise
+      // linger (as dimmed "stopped" ads after the next rescan diffs them out).
+      // Purge them so the gallery, the "Advertising" pill count, and the AI
+      // ad-angle all rebuild clean from the next rescan — competitor_ads is
+      // refetchable cache (a free Ad Library re-fetch repopulates it, now
+      // page-matched). No incoming FK references this table, so this is safe.
+      // Guarded by the page_name-absence check, so it runs exactly once.
+      sqlite.exec("DELETE FROM competitor_ads WHERE page_name IS NULL");
     }
     if (!colNames.has("page_id")) {
       sqlite.exec("ALTER TABLE competitor_ads ADD COLUMN page_id TEXT");
