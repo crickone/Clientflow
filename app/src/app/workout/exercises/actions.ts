@@ -6,6 +6,7 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import {
   deleteExercise,
+  ExerciseOwnershipError,
   listExercises,
   saveExercise,
   selectExercisesNeedingVideo,
@@ -31,7 +32,20 @@ export async function saveExerciseAction(raw: unknown): Promise<ExerciseResult> 
   await requireUser();
   const parsed = schema.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid exercise." };
-  const id = saveExercise(parsed.data as ExerciseLibInput);
+  // saveExercise() throws ExerciseOwnershipError when `id` names a GLOBAL row
+  // (tenant_id IS NULL) or another tenant's custom — e.g. a crafted/direct
+  // POST trying to edit a shared library exercise. Map that to a normal
+  // ExerciseResult instead of letting it 500; anything else is unexpected
+  // and should still surface as a real error.
+  let id: number;
+  try {
+    id = saveExercise(parsed.data as ExerciseLibInput);
+  } catch (err) {
+    if (err instanceof ExerciseOwnershipError) {
+      return { ok: false, error: "That's a shared library exercise — you can only edit your own custom exercises." };
+    }
+    throw err;
+  }
   revalidatePath("/workout/exercises");
   revalidatePath("/workout");
   return { ok: true, id };
@@ -70,10 +84,11 @@ const BULK_MAX_PER_RUN = 40;
  * the shared library; GEL Task 3 only swapped the inline "missing" filter
  * for the shared selectExercisesNeedingVideo() helper, so this and the
  * nightly single-pass backfill (lib/automations/scheduler.ts) agree on one
- * tested definition of "missing". Same requireUser() gate as today — a
- * stricter tenant-vs-global write guard is GEL Task 4's concern for
- * saveExerciseAction/deleteExerciseAction, not this one (it only ever fills
- * a blank video_url, never edits/deletes a row).
+ * tested definition of "missing". Same requireUser() gate as today — the
+ * tenant-vs-global write guard added in GEL Task 5 (catching
+ * ExerciseOwnershipError) is saveExerciseAction/deleteExerciseAction's
+ * concern, not this one (it only ever fills a blank video_url, never
+ * edits/deletes a row).
  */
 export async function bulkFindExerciseVideosAction(): Promise<BulkVideoResult> {
   await requireUser();
@@ -99,6 +114,15 @@ export async function deleteExerciseAction(id: number) {
   await requireUser();
   const p = z.coerce.number().int().positive().safeParse(id);
   if (!p.success) return;
-  deleteExercise(p.data);
+  // Same ownership guard as saveExerciseAction above: deleteExercise() throws
+  // ExerciseOwnershipError for a GLOBAL row or another tenant's custom. Treat
+  // that as a no-op (the row is left untouched, same as an unknown id) rather
+  // than a 500 — anything else still throws.
+  try {
+    deleteExercise(p.data);
+  } catch (err) {
+    if (err instanceof ExerciseOwnershipError) return;
+    throw err;
+  }
   revalidatePath("/workout/exercises");
 }

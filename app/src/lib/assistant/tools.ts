@@ -17,7 +17,6 @@ import {
   clientPackages,
   clients,
   emailMessages,
-  exerciseLibrary,
   foodLibrary,
   formQuestions,
   forms,
@@ -45,6 +44,7 @@ import {
 import { uploadFilesToDrive } from "@/lib/google/drive";
 import { saveDownload } from "@/lib/assistant/downloadStore";
 import { sendClientEmail } from "@/lib/clientEmail";
+import { saveExercise } from "@/lib/exerciseLibrary";
 import {
   SALES_TOOLS,
   draftLeadReplyTool,
@@ -1528,21 +1528,38 @@ function createNutritionPlan(ctx: ToolContext, input: Record<string, unknown>): 
 }
 
 function addExercise(ctx: ToolContext, input: Record<string, unknown>): string {
-  const db = tdb(ctx);
+  // GEL Task 5: writes go through saveExercise() (control-plane tenant-custom,
+  // @/lib/exerciseLibrary) instead of a direct insert into the now-legacy
+  // per-tenant `exercise_library` table — listExercises()/the workout UI only
+  // ever read the control table (GEL T2), so an insert into the old table
+  // would silently vanish. saveExercise() stamps `tenant_id` itself from the
+  // AMBIENT getCurrentTenant() (AsyncLocalStorage), not from `ctx` — verified
+  // safe here: add_exercise is a WRITE_TOOL, so runAgentTurn.ts NEVER executes
+  // it inline (it's deferred to pendingWrites); the only place executeTool()
+  // actually runs it is /api/assistant/execute's approval endpoint, which
+  // wraps the whole batch in runWithTenant(tenantId, …) using the SAME
+  // tenantId passed here as `ctx.tenantId` — so getCurrentTenant() resolves
+  // to the right tenant before this function ever runs. `ctx` itself is
+  // unused as a result (kept for signature parity with every other tool).
+  void ctx;
   const name = String(input.name || "").trim();
   if (!name) return JSON.stringify({ error: "An exercise name is required." });
-  const row = db
-    .insert(exerciseLibrary)
-    .values({
-      name,
-      category: str(input.category),
-      muscleGroups: str(input.muscleGroups),
-      equipment: str(input.equipment),
-      instructions: str(input.instructions),
-    })
-    .returning({ id: exerciseLibrary.id })
-    .get();
-  return JSON.stringify({ result: `Added "${name}" to the exercise library.`, exerciseId: row.id });
+  const id = saveExercise({
+    name,
+    category: str(input.category),
+    // Tool schema describes muscleGroups as a comma-separated string (unlike
+    // ExerciseLibInput's string[]) — split it the same way saveExercise()
+    // itself re-joins on save, so a round trip preserves the same CSV.
+    muscleGroups: String(input.muscleGroups || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+    equipment: str(input.equipment),
+    videoUrl: null,
+    imageUrl: null,
+    instructions: str(input.instructions),
+  });
+  return JSON.stringify({ result: `Added "${name}" to the exercise library.`, exerciseId: id });
 }
 
 type ExIn = { name?: unknown; section?: unknown; sets?: unknown; reps?: unknown; restSeconds?: unknown; notes?: unknown; muscleGroups?: unknown };
