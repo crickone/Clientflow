@@ -3,7 +3,7 @@
 import { type ReactNode, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { Crown, Key, MapPin, MessageSquareText, RefreshCw, Search, Star, Users } from "lucide-react";
+import { Building2, Crown, Key, MapPin, MessageSquareText, RefreshCw, Search, Star, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import type { CompetitorRow as CompetitorRowData, EventRow, Metric, StoredReview } from "@/lib/research/store";
@@ -47,6 +47,14 @@ import { ScanningProgress } from "./ScanningProgress";
  * CompetitorDetail) the same plain, synchronous-looking callback shapes T10
  * already built them against — nothing below this component needs to know
  * a Server Action is involved at all.
+ *
+ * P1.1 self-detection: `competitors` (and everything derived from it —
+ * `computeCompetitorStats`, the Landscape stat tiles, the highlight badges)
+ * is ALREADY the self-EXCLUDING list (page.tsx calls
+ * `listCompetitors({trackedOnly:true, excludeSelf:true})`) — this component
+ * never filters self out itself. `self`/`selfMetric` are the tenant's own
+ * gym, fetched separately, rendered as a distinct "Your gym" reference row
+ * above the ranked list — never numbered among competitors.
  */
 
 export type ResearchState = "no-key" | "no-centre" | "empty" | "populated";
@@ -58,7 +66,7 @@ export interface LandscapeCache {
 
 interface ResearchViewProps {
   state: ResearchState;
-  /** Ranked nearest-first (store's own ordering — see listCompetitors). */
+  /** Ranked nearest-first, EXCLUDING the tenant's own gym (page.tsx's `listCompetitors({trackedOnly:true, excludeSelf:true})`) — see `self` below for that reference. */
   competitors: CompetitorRowData[];
   metricsById: Record<number, Metric | null>;
   historyById: Record<number, Metric[]>;
@@ -70,6 +78,10 @@ interface ResearchViewProps {
    *  client component never needs to import the AI-cost formatter (which
    *  transitively pulls in a server-only module; see page.tsx). */
   spendLabel: string | null;
+  /** The tenant's own gym (P1.1's isSelf match), if discovery has found one — `getSelfCompetitor()`. Null renders no "Your gym" reference at all (best-effort, current pre-P1.1 behaviour). */
+  self: CompetitorRowData | null;
+  /** `self`'s `latestMetric(id)` — null for a self match that hasn't been refreshed yet. Ignored when `self` is null. */
+  selfMetric: Metric | null;
   onRescan?: () => Promise<RescanResult>;
   onSetFlags?: (id: number, flags: { tracked?: boolean; muted?: boolean }) => Promise<{ ok: boolean }>;
   onMarkSeen?: (ids: number[]) => Promise<{ ok: boolean }>;
@@ -91,6 +103,8 @@ export function ResearchView({
   events,
   landscape,
   spendLabel,
+  self,
+  selfMetric,
   onRescan,
   onSetFlags,
   onMarkSeen,
@@ -233,6 +247,14 @@ export function ResearchView({
   }
 
   const stats = computeCompetitorStats(competitors, metricsById);
+  // Feeds ChangedFeed's forward-looking classification (isForwardLookingFeed,
+  // lib/research/feedState.ts) — has ANY tracked competitor had a second
+  // metric capture yet, i.e. has a refresh cycle beyond the very first ever
+  // run? historyById already excludes self (built from this same
+  // self-excluding `competitors` list), which is fine: it only takes ONE
+  // real competitor's history to carry this signal, and ChangedFeed can't
+  // render at all with zero real competitors (state would be "empty").
+  const hasSubsequentScan = Object.values(historyById).some((h) => h.length > 1);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
@@ -322,12 +344,64 @@ export function ResearchView({
                 )}
               </Card>
 
-              <ChangedFeed events={events} onMarkSeen={handleMarkSeen} />
+              <ChangedFeed events={events} onMarkSeen={handleMarkSeen} hasSubsequentScan={hasSubsequentScan} />
 
               <Card style={{ padding: 0, overflow: "hidden" }}>
                 <div style={{ padding: "16px 16px 4px" }}>
                   <CardLabel style={{ marginBottom: 0 }}>Competitors</CardLabel>
                 </div>
+                {self && (
+                  <div style={{ padding: "0 16px 14px" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 14,
+                        padding: "11px 14px",
+                        background: "var(--surface-2)",
+                        border: "1px solid var(--hairline)",
+                        borderLeft: "3px solid var(--accent)",
+                        borderRadius: "var(--radius)",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                        <Building2 size={15} color="var(--accent-ink)" aria-hidden />
+                        <span
+                          style={{
+                            fontFamily: "var(--font-mono), ui-monospace, monospace",
+                            fontSize: 10,
+                            letterSpacing: "0.1em",
+                            textTransform: "uppercase",
+                            color: "var(--accent-ink)",
+                          }}
+                        >
+                          Your gym
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          flex: "1 1 160px",
+                          minWidth: 0,
+                          fontSize: 14,
+                          fontWeight: 500,
+                          color: "var(--text-primary)",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {self.name}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 14, flexShrink: 0 }}>
+                        <Badge tone="neutral">{`★ ${selfMetric?.ratingMilli != null ? (selfMetric.ratingMilli / 1000).toFixed(1) : "—"}`}</Badge>
+                        <span style={{ fontSize: 13, color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums" }}>
+                          {selfMetric?.reviewCount != null ? selfMetric.reviewCount.toLocaleString("en-IE") : "—"} reviews
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {(stats.topRated || stats.mostReviewed || stats.closest) && (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: "0 16px 14px" }}>
                     {stats.topRated && (
@@ -464,15 +538,19 @@ function SwapPane({ children, reduceMotion }: { children: ReactNode; reduceMotio
   );
 }
 
-/** A compact mono stat tile for the Landscape card's stat strip. */
+/**
+ * A stat tile for the Landscape card's stat strip. The eyebrow (icon +
+ * label) stays small/mono up top; the VALUE is the hero — heading font,
+ * substantially larger than the eyebrow (28-34px range) so a glance lands on
+ * the number first, matching the same big-number recipe Card.tsx's
+ * CardValue and AttendanceDashboard's own stat strip already use elsewhere
+ * in the app (font-heading, ~30px, tight line-height).
+ */
 function StatTile({ icon, label, value, sub }: { icon: ReactNode; label: string; value: string; sub?: string }) {
   return (
     <div
       style={{
-        display: "flex",
-        alignItems: "flex-start",
-        gap: 9,
-        padding: "9px 13px",
+        padding: "12px 14px",
         background: "var(--surface-2)",
         border: "1px solid var(--hairline)",
         borderRadius: "var(--radius)",
@@ -480,47 +558,47 @@ function StatTile({ icon, label, value, sub }: { icon: ReactNode; label: string;
         minWidth: 0,
       }}
     >
-      <div style={{ color: "var(--text-tertiary)", flexShrink: 0, marginTop: 2 }}>{icon}</div>
-      <div style={{ minWidth: 0 }}>
-        <div
+      <div style={{ display: "flex", alignItems: "center", gap: 7, color: "var(--text-tertiary)" }}>
+        {icon}
+        <span
           style={{
             fontFamily: "var(--font-mono), ui-monospace, monospace",
             fontSize: 9.5,
             letterSpacing: "0.1em",
             textTransform: "uppercase",
-            color: "var(--text-tertiary)",
           }}
         >
           {label}
-        </div>
+        </span>
+      </div>
+      <div
+        style={{
+          fontFamily: "var(--font-heading), sans-serif",
+          fontSize: 30,
+          lineHeight: 1.15,
+          color: "var(--text-primary)",
+          marginTop: 6,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {value}
+      </div>
+      {sub && (
         <div
           style={{
-            fontSize: 14.5,
-            fontWeight: 600,
-            color: "var(--text-primary)",
-            marginTop: 3,
+            fontSize: 11,
+            color: "var(--text-tertiary)",
+            marginTop: 2,
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
           }}
         >
-          {value}
+          {sub}
         </div>
-        {sub && (
-          <div
-            style={{
-              fontSize: 11,
-              color: "var(--text-tertiary)",
-              marginTop: 1,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {sub}
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }

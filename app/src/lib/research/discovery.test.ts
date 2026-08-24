@@ -91,7 +91,7 @@ async function withApiKey<T>(value: string | undefined, fn: () => Promise<T>): P
   const { setKey } = requireLocal("../settings") as typeof import("../settings");
   const { researchSpentCents, UNIT_COST_CENTS } = requireLocal("./spend") as typeof import("./spend");
   const { haversineKm } = requireLocal("./distance") as typeof import("./distance");
-  const { partitionNearby, discoverCompetitors, getResearchCentre } = requireLocal("./discovery") as typeof import("./discovery");
+  const { partitionNearby, isSameBusiness, discoverCompetitors, getResearchCentre } = requireLocal("./discovery") as typeof import("./discovery");
 
   // ════════════════════════════════════════════════════════════════════
   // partitionNearby — pure: radius filter + new-vs-existing diff
@@ -145,6 +145,87 @@ async function withApiKey<T>(value: string | undefined, fn: () => Promise<T>): P
   }
 
   console.log(`\npartitionNearby: ${passed} checks passed so far.`);
+
+  // ════════════════════════════════════════════════════════════════════
+  // isSameBusiness — pure: is a discovered place actually the tenant's own
+  // gym? (Market Research P1.1 self-detection)
+  // ════════════════════════════════════════════════════════════════════
+  {
+    // The three scenarios named literally in the brief.
+    check(
+      "isSameBusiness: '&' vs 'and' at 0.0km -> true",
+      isSameBusiness("Inspire Health and Fitness", "Inspire Health & Fitness", 0.0) === true,
+    );
+    check(
+      "isSameBusiness: a genuinely different gym at 0.1km (within the distance envelope) -> false",
+      isSameBusiness("PureGym Clonmel", "Inspire Health and Fitness", 0.1) === false,
+    );
+    check(
+      "isSameBusiness: same name but 5km away -> false (distance gate rejects it even though the name matches)",
+      isSameBusiness("Inspire Health and Fitness", "Inspire Health and Fitness", 5) === false,
+    );
+
+    // Distance boundary: <= maxDistanceKm (default ~0.2km) is inclusive.
+    check(
+      "isSameBusiness: exactly AT the default 0.2km boundary -> true",
+      isSameBusiness("Inspire Health and Fitness", "Inspire Health and Fitness", 0.2) === true,
+    );
+    check(
+      "isSameBusiness: just OVER the default 0.2km boundary -> false",
+      isSameBusiness("Inspire Health and Fitness", "Inspire Health and Fitness", 0.2001) === false,
+    );
+
+    // Case-insensitive + legal-suffix stripping.
+    check(
+      "isSameBusiness: case-insensitive + a stripped 'Ltd' suffix -> true",
+      isSameBusiness("Inspire Health and Fitness Ltd", "inspire HEALTH and FITNESS", 0.15) === true,
+    );
+
+    // Containment: Google appends a town/qualifier the business-profile name doesn't have.
+    check(
+      "isSameBusiness: place name contains the full business name plus a trailing qualifier -> true",
+      isSameBusiness("Inspire Health and Fitness Clonmel", "Inspire Health and Fitness", 0.05) === true,
+    );
+
+    // High token overlap WITHOUT full containment either way.
+    check(
+      "isSameBusiness: high token overlap (4/5 words shared, neither name contains the other) -> true",
+      isSameBusiness("Inspire Health and Fitness Gym", "Inspire Health and Fitness Studio", 0.1) === true,
+    );
+
+    // Distance alone is never sufficient — an unrelated business at the exact same address.
+    check(
+      "isSameBusiness: an unrelated business at 0.0km (name doesn't match at all) -> false",
+      isSameBusiness("Costa Coffee", "Inspire Health and Fitness", 0.0) === false,
+    );
+
+    // A single shared generic word must not read as a match (false positives are the costly mistake here).
+    check(
+      "isSameBusiness: 'Fitness First' vs 'Inspire Health and Fitness' (1 shared filler word, ratio below threshold) -> false",
+      isSameBusiness("Fitness First", "Inspire Health and Fitness", 0.05) === false,
+    );
+    check(
+      "isSameBusiness: a bare one-word businessName ('Gym') must not contain-match a longer unrelated place name",
+      isSameBusiness("World Gym Clonmel", "Gym", 0.05) === false,
+    );
+
+    // Blank input fails closed, never throws.
+    check("isSameBusiness: blank placeName -> false", isSameBusiness("", "Inspire Health and Fitness", 0.0) === false);
+    check("isSameBusiness: blank businessName -> false", isSameBusiness("Some Gym", "", 0.0) === false);
+    check("isSameBusiness: whitespace/punctuation-only placeName -> false", isSameBusiness("   - . , ( )  ", "Inspire", 0.0) === false);
+
+    // opts override the defaults.
+    check(
+      "isSameBusiness: a tighter maxDistanceKm opt rejects a match the default would accept",
+      isSameBusiness("Inspire Health and Fitness", "Inspire Health and Fitness", 0.15, { maxDistanceKm: 0.1 }) === false,
+    );
+    check(
+      "isSameBusiness: a looser minTokenOverlap opt accepts a match the default would reject",
+      isSameBusiness("Fitness First", "Inspire Health and Fitness", 0.05, { minTokenOverlap: 0.4 }) === true,
+    );
+  }
+
+  console.log(`\nisSameBusiness: ${passed} checks passed so far.`);
 
   // ════════════════════════════════════════════════════════════════════
   // discoverCompetitors / getResearchCentre — orchestration, against a real
@@ -376,6 +457,162 @@ async function withApiKey<T>(value: string | undefined, fn: () => Promise<T>): P
           if (result.ok) check("discoverCompetitors: re-run still counts the (now pre-existing) place", result.count === 1);
           const events = runWithTenant(tid, () => listEvents());
           check("discoverCompetitors: re-discovering an already-known place raises NO new event", events.length === 1);
+        },
+      );
+    } finally {
+      cleanupScratchTenant(slug, tid);
+    }
+  });
+
+  // ── self-detection wiring (Market Research P1.1): the tenant's own gym
+  //    among the Nearby results gets isSelf:true; a genuine competitor
+  //    doesn't; discovery still raises new_competitor for BOTH (self-
+  //    detection only changes downstream ranking/UI treatment, never
+  //    discovery's own event-raising) ──
+  await withApiKey("test-key", async () => {
+    const slug = "discovery-test-self-detect";
+    const tid = makeScratchTenant(slug);
+    try {
+      cacheCentre(tid, 52.35, -7.7);
+      runWithTenant(tid, () =>
+        setBusinessProfile({
+          businessName: "Inspire Health and Fitness",
+          tagline: "",
+          location: "",
+          phone: "",
+          website: "",
+          email: "",
+          brief: "",
+          voiceNotes: "",
+          marketingBrain: "",
+          policies: "",
+          faqs: [],
+        }),
+      );
+
+      await withMockFetch(
+        (url) => {
+          if (url === NEARBY_URL) {
+            return new Response(
+              JSON.stringify({
+                places: [
+                  {
+                    id: "place-self",
+                    // Google's own formatting differs slightly from the business
+                    // profile's spelling ("&" vs "and") -- isSameBusiness must
+                    // still match it.
+                    displayName: { text: "Inspire Health & Fitness" },
+                    formattedAddress: "1 Own St, Clonmel",
+                    location: { latitude: 52.35, longitude: -7.7 }, // exactly the cached centre -> 0km
+                  },
+                  {
+                    id: "place-competitor",
+                    displayName: { text: "PureGym Clonmel" },
+                    formattedAddress: "2 Rival St, Clonmel",
+                    location: { latitude: 52.36, longitude: -7.71 },
+                  },
+                ],
+              }),
+              { status: 200 },
+            );
+          }
+          throw new Error(`unexpected fetch: ${url}`);
+        },
+        async () => {
+          const result = await runWithTenant(tid, async () => discoverCompetitors(5));
+          check("discoverCompetitors (self-detection): ok:true", result.ok === true);
+          if (result.ok) check("discoverCompetitors (self-detection): counts both places (self is still discovered/upserted, just later excluded from the UI's competitor set)", result.count === 2);
+
+          const watchlist = runWithTenant(tid, () => listCompetitors());
+          const selfRow = watchlist.find((c) => c.placeId === "place-self")!;
+          const competitorRow = watchlist.find((c) => c.placeId === "place-competitor")!;
+          check("discoverCompetitors (self-detection): the tenant's own place is flagged isSelf", selfRow.isSelf === true);
+          check("discoverCompetitors (self-detection): the genuine competitor is NOT flagged isSelf", competitorRow.isSelf === false);
+          check(
+            "discoverCompetitors (self-detection): at most one row is flagged isSelf",
+            watchlist.filter((c) => c.isSelf).length === 1,
+          );
+
+          const events = runWithTenant(tid, () => listEvents());
+          check(
+            "discoverCompetitors (self-detection): still raises a new_competitor event for the self place too",
+            events.some((e) => e.summary.includes("Inspire Health & Fitness")),
+          );
+        },
+      );
+    } finally {
+      cleanupScratchTenant(slug, tid);
+    }
+  });
+
+  // ── self-detection nearest-best-match: if more than one KEPT place in a
+  //    single run would satisfy isSameBusiness (e.g. a duplicate/merged
+  //    Google listing), only the NEAREST is flagged isSelf — never both ──
+  await withApiKey("test-key", async () => {
+    const slug = "discovery-test-self-tiebreak";
+    const tid = makeScratchTenant(slug);
+    try {
+      cacheCentre(tid, 52.35, -7.7);
+      runWithTenant(tid, () =>
+        setBusinessProfile({
+          businessName: "Inspire Health and Fitness",
+          tagline: "",
+          location: "",
+          phone: "",
+          website: "",
+          email: "",
+          brief: "",
+          voiceNotes: "",
+          marketingBrain: "",
+          policies: "",
+          faqs: [],
+        }),
+      );
+
+      await withMockFetch(
+        (url) => {
+          if (url === NEARBY_URL) {
+            return new Response(
+              JSON.stringify({
+                places: [
+                  // Listed FARTHER-first deliberately, to prove the tie-break
+                  // picks the nearest candidate rather than just the first one
+                  // Google happened to return.
+                  {
+                    id: "place-self-far",
+                    displayName: { text: "Inspire Health and Fitness" },
+                    formattedAddress: "3 Far Self St, Clonmel",
+                    location: { latitude: 52.3502, longitude: -7.7002 },
+                  },
+                  {
+                    id: "place-self-near",
+                    displayName: { text: "Inspire Health and Fitness" },
+                    formattedAddress: "4 Near Self St, Clonmel",
+                    location: { latitude: 52.3501, longitude: -7.7001 },
+                  },
+                ],
+              }),
+              { status: 200 },
+            );
+          }
+          throw new Error(`unexpected fetch: ${url}`);
+        },
+        async () => {
+          const result = await runWithTenant(tid, async () => discoverCompetitors(5));
+          check("discoverCompetitors (self-detection tie-break): ok:true", result.ok === true);
+
+          const watchlist = runWithTenant(tid, () => listCompetitors());
+          const nearRow = watchlist.find((c) => c.placeId === "place-self-near")!;
+          const farRow = watchlist.find((c) => c.placeId === "place-self-far")!;
+          check(
+            "discoverCompetitors (self-detection tie-break): the NEARER of two equally-name-matching places wins isSelf",
+            nearRow.isSelf === true,
+          );
+          check("discoverCompetitors (self-detection tie-break): the farther one does not", farRow.isSelf === false);
+          check(
+            "discoverCompetitors (self-detection tie-break): at most one isSelf across this run's watchlist",
+            watchlist.filter((c) => c.isSelf).length === 1,
+          );
         },
       );
     } finally {

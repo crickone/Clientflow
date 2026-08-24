@@ -7,6 +7,7 @@ import { placesConfigured } from "@/lib/research/places";
 import { getResearchCapCents, researchSpentCents } from "@/lib/research/spend";
 import {
   getReviews,
+  getSelfCompetitor,
   latestMetric,
   listCompetitors,
   listEvents,
@@ -58,13 +59,25 @@ function readLandscapeCache(): LandscapeCache | null {
  * it never re-derives it. The 4 actions are passed straight down as props —
  * see ResearchView's own doc comment for why (a Server Component handing a
  * Server Action to a Client Component as a prop).
+ *
+ * P1.1: `competitors` (and `state`, which is derived from its length) is the
+ * self-EXCLUDING list — `listCompetitors({trackedOnly:true,
+ * excludeSelf:true})` — so ranking/highlights/count/state can never be
+ * skewed by the tenant's own gym. `self`/`selfMetric` (`getSelfCompetitor()`
+ * + its `latestMetric`) are read separately and handed down for
+ * ResearchView's "Your gym" reference row.
  */
 export default async function MarketingResearchPage() {
   await requireAdminPage();
 
   const configured = placesConfigured();
   const centre = await getResearchCentre(); // cache-only read — never geocodes (see discovery.ts)
-  const competitors: CompetitorRow[] = listCompetitors({ trackedOnly: true });
+  // excludeSelf (Market Research P1.1): the tenant's own gym must never be
+  // ranked/counted/highlighted as a competitor — see getSelfCompetitor()
+  // below for the separate "Your gym" reference this page also reads.
+  const competitors: CompetitorRow[] = listCompetitors({ trackedOnly: true, excludeSelf: true });
+  const self = getSelfCompetitor();
+  const selfMetric = self ? latestMetric(self.id) : null;
 
   let state: ResearchState;
   if (!configured) {
@@ -113,6 +126,8 @@ export default async function MarketingResearchPage() {
         events={events}
         landscape={landscape}
         spendLabel={spendLabel}
+        self={self}
+        selfMetric={selfMetric}
         onRescan={rescanNowAction}
         onSetFlags={setCompetitorFlagsAction}
         onMarkSeen={markResearchEventsSeenAction}

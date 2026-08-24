@@ -23,6 +23,12 @@ import { db, schema } from "@/lib/db";
  * These exported names + signatures are the CONTRACT later Market Research
  * tasks (the refresh job, change-detection, and the dashboard UI) build
  * against verbatim — do not rename without updating every caller.
+ *
+ * P1.1 added `isSelf` on `competitors`: marks the tenant's OWN gym among the
+ * watchlist (see lib/research/discovery.ts's isSameBusiness) — exposed on
+ * `CompetitorRow` like every other column, settable via `NewCompetitor`,
+ * filterable via `listCompetitors({excludeSelf:true})`, and readable
+ * directly via `getSelfCompetitor()` below.
  */
 
 export type CompetitorRow = {
@@ -37,6 +43,8 @@ export type CompetitorRow = {
   source: string;
   tracked: boolean;
   muted: boolean;
+  /** True for the (at most one) row discovery matched as the tenant's own gym — see the module doc. */
+  isSelf: boolean;
   themesJson: string | null;
   themesAt: string | null;
   addedBy: string;
@@ -79,6 +87,8 @@ export type NewCompetitor = {
   distanceKm: number;
   source?: string;
   addedBy?: string;
+  /** Defaults to false when omitted — see the module doc. */
+  isSelf?: boolean;
 };
 
 export type NewEvent = {
@@ -101,6 +111,14 @@ export type NewEvent = {
  * this place up again) can never reset when it was first seen, silently
  * re-track/un-mute a row an operator chose to mute, or wipe a themes
  * summary that hasn't gone stale yet.
+ *
+ * `isSelf` IS included in the conflict `set`, unlike those operator-owned
+ * flags — it's re-derived fresh from Google's data + discovery's
+ * isSameBusiness match every run, not something an operator sets by hand.
+ * A rare miss on one run (e.g. Google briefly renames the place, or it
+ * drops out of this run's `kept` set) self-corrects on the next; omitted
+ * entirely (no `isSelf` on `c`), it defaults to false, matching the column
+ * default for a genuinely new row.
  */
 export function upsertCompetitor(c: NewCompetitor): number {
   const now = new Date().toISOString();
@@ -115,6 +133,7 @@ export function upsertCompetitor(c: NewCompetitor): number {
       distanceKm: c.distanceKm,
       source: c.source ?? "google",
       addedBy: c.addedBy ?? "auto",
+      isSelf: c.isSelf ?? false,
       firstSeenAt: now,
     })
     .onConflictDoUpdate({
@@ -126,6 +145,7 @@ export function upsertCompetitor(c: NewCompetitor): number {
         lng: c.lng,
         distanceKm: c.distanceKm,
         source: c.source ?? "google",
+        isSelf: c.isSelf ?? false,
       },
     })
     .returning({ id: schema.competitors.id })
@@ -137,19 +157,41 @@ export function upsertCompetitor(c: NewCompetitor): number {
  * The watchlist, nearest-first. `trackedOnly` filters to tracked=true AND
  * excludes muted rows too — a muted competitor is definitionally not part of
  * "what am I actively tracking", even if its `tracked` flag was never
- * flipped off.
+ * flipped off. `excludeSelf` (P1.1) additionally drops the tenant's own gym
+ * (isSelf=true) — the option every caller that means "competitors" (ranking,
+ * highlights, counts, the AI landscape digest) should pass; a caller that
+ * genuinely wants everything on the watchlist including self (e.g. the
+ * weekly refresh's own metric-snapshot loop, which must keep capturing
+ * self's rating/reviews too) omits it. `and()` tolerates `undefined`
+ * conditions (drizzle drops them), so any combination of the two flags — or
+ * neither — composes into a single `where` with no branching needed here.
  */
-export function listCompetitors(opts: { trackedOnly?: boolean } = {}): CompetitorRow[] {
+export function listCompetitors(opts: { trackedOnly?: boolean; excludeSelf?: boolean } = {}): CompetitorRow[] {
   return db
     .select()
     .from(schema.competitors)
     .where(
-      opts.trackedOnly
-        ? and(eq(schema.competitors.tracked, true), eq(schema.competitors.muted, false))
-        : undefined,
+      and(
+        opts.trackedOnly ? eq(schema.competitors.tracked, true) : undefined,
+        opts.trackedOnly ? eq(schema.competitors.muted, false) : undefined,
+        opts.excludeSelf ? eq(schema.competitors.isSelf, false) : undefined,
+      ),
     )
     .orderBy(asc(schema.competitors.distanceKm))
     .all();
+}
+
+/**
+ * The tenant's OWN gym, if discovery has ever matched one (isSameBusiness in
+ * discovery.ts) — at most one row can ever have isSelf=true (discovery
+ * enforces "nearest best match" per run). Null when no match has been found
+ * yet (best-effort, see discovery.ts's own doc comment) — callers treat that
+ * as "no self reference to show", the current, pre-P1.1 behaviour.
+ */
+export function getSelfCompetitor(): CompetitorRow | null {
+  return (
+    db.select().from(schema.competitors).where(eq(schema.competitors.isSelf, true)).limit(1).get() ?? null
+  );
 }
 
 /** Partial flag update — omit a key to leave it untouched. No-ops (no write) if neither flag is given. */

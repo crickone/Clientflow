@@ -196,8 +196,11 @@ async function withApiKey<T>(value: string | undefined, fn: () => Promise<T>): P
         );
 
         const body = JSON.parse(String(call.init?.body));
-        check("nearbyGyms: body.includedTypes", JSON.stringify(body.includedTypes) === JSON.stringify(["gym"]));
-        check("nearbyGyms: body.maxResultCount", body.maxResultCount === 20);
+        check(
+          "nearbyGyms: body.includedTypes broadened to a fitness/leisure set (Market Research P1.1) — verified Table A types",
+          JSON.stringify(body.includedTypes) === JSON.stringify(["gym", "fitness_center", "sports_complex", "swimming_pool"]),
+        );
+        check("nearbyGyms: body.maxResultCount stays at Google's own ceiling (20)", body.maxResultCount === 20);
         check(
           "nearbyGyms: body circle center",
           body.locationRestriction.circle.center.latitude === 52.35 &&

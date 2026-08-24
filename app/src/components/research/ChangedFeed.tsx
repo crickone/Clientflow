@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import type { EventRow } from "@/lib/research/store";
+import { isForwardLookingFeed } from "@/lib/research/feedState";
 import { Card, CardLabel } from "@/components/ui/Card";
 import { relativeTime } from "@/lib/utils";
 
@@ -43,6 +44,19 @@ import { relativeTime } from "@/lib/utils";
  * this component only renders the unseen state (a dot + hover affordance)
  * and calls the optional `onMarkSeen` seam; with no handler wired yet, both
  * the per-row click and "Mark N seen" are inert, never a fake local mutation.
+ *
+ * Forward-looking empty state (Market Research P1.1, UI refinement B): on a
+ * first scan the ONLY events are the initial `new_competitor` discovery
+ * batch, so rendering them all (or the collapsed "N discovered" summary
+ * above) as the feed's whole content reads as redundant — nothing has
+ * actually CHANGED yet. When `isForwardLookingFeed` (lib/research/
+ * feedState.ts) says so, this component swaps the events list for a single
+ * slim, muted line instead — see that module's own doc comment for the
+ * exact rule. This ONLY replaces the non-empty "it's just the seed"
+ * rendering; a genuinely empty `events` array still renders `emptyMessage`
+ * as before (unaffected — this keeps CompetitorDetail's embedded, per-
+ * competitor usage, which never sees `new_competitor` events at all,
+ * identical to today).
  */
 
 interface ChangedFeedProps {
@@ -54,6 +68,13 @@ interface ChangedFeedProps {
    *  off when embedded inside a panel that already provides its own chrome
    *  (CompetitorDetail's per-competitor "Activity" section). */
   bordered?: boolean;
+  /** True once any tracked competitor has a SECOND metric capture — i.e. a
+   *  refresh cycle beyond the very first has run. Feeds isForwardLookingFeed
+   *  (see its own doc comment); defaults to false, which is also correct/
+   *  inert for CompetitorDetail's embedded per-competitor usage (its event
+   *  slice never contains `new_competitor`, so this flag can't change its
+   *  outcome either way — see the module doc above). */
+  hasSubsequentScan?: boolean;
 }
 
 /** At or above this many `new_competitor` events, they collapse into one
@@ -240,6 +261,7 @@ export function ChangedFeed({
   emptyMessage = "Nothing's changed yet — check back after your next scan.",
   onMarkSeen,
   bordered = true,
+  hasSubsequentScan = false,
 }: ChangedFeedProps) {
   const unseenIds = events.filter((e) => !e.seen).map((e) => e.id);
   // The real, individually-meaningful changes always lead — "that's the
@@ -248,6 +270,9 @@ export function ChangedFeed({
   const changeEvents = events.filter((e) => e.type !== "new_competitor");
   const discoveryEvents = events.filter((e) => e.type === "new_competitor");
   const collapseDiscovery = discoveryEvents.length >= DISCOVERY_COLLAPSE_THRESHOLD;
+  // Only meaningful when `events` is non-empty — the `events.length === 0`
+  // branch below always renders `emptyMessage` regardless, same as today.
+  const forwardLooking = isForwardLookingFeed(events, hasSubsequentScan);
 
   const body = (
     <>
@@ -282,6 +307,13 @@ export function ChangedFeed({
 
       {events.length === 0 ? (
         <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: 0, padding: "0 16px 18px" }}>{emptyMessage}</p>
+      ) : forwardLooking ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "2px 16px 18px" }}>
+          <ActivityIcon size={14} color="var(--text-tertiary)" style={{ flexShrink: 0 }} aria-hidden />
+          <p style={{ fontSize: 12.5, color: "var(--text-tertiary)", margin: 0, lineHeight: 1.5 }}>
+            Watching for changes — rating moves, review spikes and new gyms opening will show up here.
+          </p>
+        </div>
       ) : (
         <div style={{ paddingBottom: 2 }}>
           {changeEvents.map((event, i) => (

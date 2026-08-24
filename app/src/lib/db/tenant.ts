@@ -1963,6 +1963,22 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     CREATE INDEX IF NOT EXISTS idx_competitor_events_seen ON competitor_events(seen);
   `);
 
+  // Market Research P1.1: `is_self` flags the tenant's OWN gym among its
+  // discovered competitors (see lib/research/discovery.ts's isSameBusiness)
+  // so it can be excluded from competitor ranking/highlights and shown
+  // separately as a "Your gym" reference. Column-add migration, PRAGMA-
+  // guarded + idempotent like every other one in this function — runs once;
+  // a rerun sees the column already there and no-ops. Drizzle mirror in
+  // schema.ts.
+  try {
+    const cols = sqlite.prepare("PRAGMA table_info(competitors)").all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === "is_self")) {
+      sqlite.exec("ALTER TABLE competitors ADD COLUMN is_self INTEGER NOT NULL DEFAULT 0");
+    }
+  } catch (err) {
+    console.error("[db] competitors is_self migration failed:", err);
+  }
+
   // Batch 6b (improvement-plan-2026-08.md Theme E1): tracking table for the
   // versioned migration runner (./migrations) — separate from everything
   // above, which is the additive bootstrap. Created here too (in addition to

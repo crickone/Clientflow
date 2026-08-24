@@ -2372,6 +2372,12 @@ export const competitors = sqliteTable(
     source: text("source").notNull().default("google"),
     tracked: integer("tracked", { mode: "boolean" }).notNull().default(true),
     muted: integer("muted", { mode: "boolean" }).notNull().default(false),
+    // Market Research P1.1: flags the tenant's OWN gym among its discovered
+    // "competitors" (see lib/research/discovery.ts's isSameBusiness) so it
+    // can be excluded from competitor ranking/highlights and shown
+    // separately as a "Your gym" reference. At most one row per tenant ever
+    // has this set (discovery picks the single nearest best match).
+    isSelf: integer("is_self", { mode: "boolean" }).notNull().default(false),
     themesJson: text("themes_json"), // JSON, AI-derived review themes
     themesAt: text("themes_at"),
     addedBy: text("added_by").notNull().default("auto"), // 'auto'|'manual'

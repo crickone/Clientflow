@@ -46,6 +46,40 @@ const NOT_CONFIGURED_ERROR = "not_configured";
 /** Google's hard max for searchNearby's circle radius — a caller-supplied radiusKm beyond this would otherwise make Google reject the whole request instead of just clamping to the practical max. */
 const MAX_RADIUS_METERS = 50000;
 
+/**
+ * Place types (New) requested from searchNearby — verified directly against
+ * Google's own "Place Types (New)" reference doc's Table A (the set of types
+ * usable to filter Nearby Search/Text Search results; Table B types are
+ * response-only and rejected by searchNearby's includedTypes). Table A's
+ * "Sports" category lists these fitness/leisure venue types verbatim: gym,
+ * fitness_center, sports_complex, sports_activity_location, sports_club,
+ * sports_coaching, sports_school, athletic_field, swimming_pool,
+ * tennis_court, golf_course, indoor_golf_course, ice_skating_rink,
+ * race_course, ski_resort, playground, arena, stadium.
+ *
+ * Broadened from the original gym-only list (Market Research P1.1) to also
+ * catch leisure centres, which commonly aren't tagged `gym` at all:
+ *  - `fitness_center` — Google's other primary tag for a gym/fitness club;
+ *    some places carry ONLY this, not `gym`.
+ *  - `sports_complex` — the closest direct match for "leisure centre": a
+ *    multi-facility venue (pool + gym + courts), exactly what the brief asks
+ *    to catch.
+ *  - `swimming_pool` — many council-run leisure centres in Ireland/UK are
+ *    primarily tagged this way (the pool being the flagship facility) even
+ *    though a gym is on-site.
+ *
+ * Deliberately NOT added, to keep results relevant (avoid pulling in venues
+ * that aren't realistically gym/leisure-centre competitors):
+ *  - `sports_activity_location` — Table A's least-specific catch-all; would
+ *    surface generic "somewhere you can do a sport" pins (courts, pitches)
+ *    rather than actual leisure-centre businesses.
+ *  - `sports_club` — skews toward niche single-sport membership clubs (golf,
+ *    tennis, cricket) that aren't gym/leisure-centre competitors.
+ *  - `stadium`/`arena`/`athletic_field`/etc. — large public sports venues,
+ *    not leisure-centre-shaped businesses.
+ */
+const INCLUDED_PLACE_TYPES = ["gym", "fitness_center", "sports_complex", "swimming_pool"];
+
 const NEARBY_FIELD_MASK =
   "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount";
 const DETAILS_FIELD_MASK = "id,displayName,formattedAddress,rating,userRatingCount,reviews";
@@ -205,7 +239,11 @@ export async function nearbyGyms(
         "X-Goog-FieldMask": NEARBY_FIELD_MASK,
       },
       body: JSON.stringify({
-        includedTypes: ["gym"],
+        includedTypes: INCLUDED_PLACE_TYPES,
+        // 20 is Google's own documented ceiling for searchNearby (valid
+        // range 1-20 inclusive; unset defaults to 20 too) -- already at the
+        // max, so there's no "more sane" value to move to here even with a
+        // broader includedTypes list turning up more candidates.
         maxResultCount: 20,
         locationRestriction: {
           circle: { center: { latitude: lat, longitude: lng }, radius: radiusMeters },

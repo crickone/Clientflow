@@ -74,6 +74,7 @@ const requireLocal = createRequire(import.meta.url);
     parseThemeLines,
     buildLandscapeDigest,
     buildLandscapeFallback,
+    buildSelfClause,
     competitorThemes,
     landscapeSummary,
   } = requireLocal("./summary") as typeof import("./summary");
@@ -107,6 +108,7 @@ const requireLocal = createRequire(import.meta.url);
     source: "google",
     tracked: true,
     muted: false,
+    isSelf: false,
     themesJson: null,
     themesAt: null,
     addedBy: "manual",
@@ -184,6 +186,7 @@ const requireLocal = createRequire(import.meta.url);
       strongest: null,
       weakest: null,
       mostReviews: null,
+      self: null,
     });
 
     const alpha = competitor(1, "Alpha Gym");
@@ -226,6 +229,94 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(single.strongest!.name, "Alpha Gym");
     assert.equal(single.weakest!.name, "Alpha Gym");
     assert.equal(single.minRating, single.maxRating);
+
+    // self (Market Research P1.1 you-vs-them) — kept OUT of rows/count/highlights.
+    const noSelf = buildLandscapeDigest([alpha], new Map<number, Metric | null>([[1, metric(4500, 40)]]));
+    assert.equal(noSelf.self, null, "self defaults to null when the caller doesn't pass one (no match found yet)");
+
+    const withSelf = buildLandscapeDigest(
+      [alpha],
+      new Map<number, Metric | null>([[1, metric(4200, 50)]]),
+      { name: "Inspire Health and Fitness", ratingStars: 4.7, reviewCount: 90 },
+    );
+    assert.deepEqual(withSelf.self, { name: "Inspire Health and Fitness", ratingStars: 4.7, reviewCount: 90 });
+    assert.equal(withSelf.count, 1, "self is never counted among competitors");
+    assert.equal(withSelf.strongest!.name, "Alpha Gym", "self never wins strongest/weakest -- those stay competitor-only");
+    assert.deepEqual(
+      withSelf.rows.map((r) => r.name),
+      ["Alpha Gym"],
+      "self never appears in rows either",
+    );
+
+    const selfNoRating = buildLandscapeDigest(
+      [alpha],
+      new Map<number, Metric | null>([[1, metric(4200, 50)]]),
+      { name: "Inspire Health and Fitness", ratingStars: null, reviewCount: null },
+    );
+    assert.deepEqual(
+      selfNoRating.self,
+      { name: "Inspire Health and Fitness", ratingStars: null, reviewCount: null },
+      "a self match with no rating captured yet still passes through as-is (not fabricated, not dropped)",
+    );
+
+    const explicitNullSelf = buildLandscapeDigest([alpha], new Map<number, Metric | null>([[1, metric(4200, 50)]]), null);
+    assert.equal(explicitNullSelf.self, null, "an explicit null self is the same as omitting the argument");
+  }
+
+  // ── 3b. buildSelfClause ─────────────────────────────────────────────
+  {
+    const alpha = competitor(1, "Alpha Gym");
+    const metricsById = new Map<number, Metric | null>([[1, metric(4200, 50)]]); // avg 4.2
+
+    const noSelfDigest = buildLandscapeDigest([alpha], metricsById);
+    assert.equal(buildSelfClause(noSelfDigest), "", "no self match -> empty clause");
+
+    const noRatingDigest = buildLandscapeDigest([alpha], metricsById, {
+      name: "Inspire",
+      ratingStars: null,
+      reviewCount: 12,
+    });
+    assert.equal(buildSelfClause(noRatingDigest), "", "self matched but no rating yet -> empty clause (nothing real to say)");
+
+    const fullDigest = buildLandscapeDigest([alpha], metricsById, {
+      name: "Inspire",
+      ratingStars: 4.8,
+      reviewCount: 120,
+    });
+    assert.equal(
+      buildSelfClause(fullDigest),
+      " You: 4.8★ (120 reviews) vs pack avg 4.2★.",
+      "states the self rating, review count (correct singular/plural), and the pack average -- all real numbers already in the digest",
+    );
+
+    const singleReviewDigest = buildLandscapeDigest([alpha], metricsById, {
+      name: "Inspire",
+      ratingStars: 5.0,
+      reviewCount: 1,
+    });
+    assert.equal(buildSelfClause(singleReviewDigest), " You: 5.0★ (1 review) vs pack avg 4.2★.", "singular 'review'");
+
+    const noReviewCountDigest = buildLandscapeDigest([alpha], metricsById, {
+      name: "Inspire",
+      ratingStars: 4.5,
+      reviewCount: null,
+    });
+    assert.equal(
+      buildSelfClause(noReviewCountDigest),
+      " You: 4.5★ vs pack avg 4.2★.",
+      "a null self reviewCount is omitted, never shown as 0",
+    );
+
+    const noPackAvgDigest = buildLandscapeDigest([alpha], new Map([[1, null]]), {
+      name: "Inspire",
+      ratingStars: 4.5,
+      reviewCount: 30,
+    });
+    assert.equal(
+      buildSelfClause(noPackAvgDigest),
+      " You: 4.5★ (30 reviews).",
+      "no pack average available (no competitor ratings captured yet) -> the vs-pack part is omitted, not fabricated",
+    );
   }
 
   // ── 4. buildLandscapeFallback ────────────────────────────────────────
@@ -259,6 +350,35 @@ const requireLocal = createRequire(import.meta.url);
       buildLandscapeFallback(sameRating),
       "1 competitor tracked, ratings 4.5★ (avg 4.5★) — connect AI for a fuller read.",
       "a single rating shows once (no A–B range) when min === max",
+    );
+
+    // With a self match, the fallback appends buildSelfClause's you-vs-them
+    // sentence end-to-end (Market Research P1.1) — the AI-unavailable path
+    // still gets a real, data-only comparison, not just the competitor set.
+    const withSelfFallback = buildLandscapeFallback(
+      buildLandscapeDigest([alpha, beta], new Map<number, Metric | null>([[1, metric(4200, 10)], [2, metric(4600, 5)]]), {
+        name: "Inspire Health and Fitness",
+        ratingStars: 4.9,
+        reviewCount: 200,
+      }),
+    );
+    assert.equal(
+      withSelfFallback,
+      "2 competitors tracked, ratings 4.2–4.6★ (avg 4.4★) — connect AI for a fuller read. You: 4.9★ (200 reviews) vs pack avg 4.4★.",
+    );
+
+    // Self matched but no ratings captured for the COMPETITOR set yet — the
+    // no-ratings branch also gets the self clause appended.
+    const withSelfNoCompetitorRatings = buildLandscapeFallback(
+      buildLandscapeDigest([alpha], new Map<number, Metric | null>([[1, null]]), {
+        name: "Inspire Health and Fitness",
+        ratingStars: 4.9,
+        reviewCount: 200,
+      }),
+    );
+    assert.equal(
+      withSelfNoCompetitorRatings,
+      "1 competitor tracked, no ratings captured yet — connect AI for a fuller read. You: 4.9★ (200 reviews).",
     );
   }
 

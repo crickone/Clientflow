@@ -99,7 +99,10 @@ export async function rescanNowAction(): Promise<RescanResult> {
     // in depth only, so a genuinely unexpected failure here (e.g. a KV
     // write error) can never erase an otherwise-successful refresh count.
     try {
-      for (const comp of listCompetitors({ trackedOnly: true })) {
+      // excludeSelf (P1.1): themes are never displayed for the tenant's own
+      // gym (it doesn't render as a competitor row at all — see
+      // ResearchView), so warming them would just be a wasted metered call.
+      for (const comp of listCompetitors({ trackedOnly: true, excludeSelf: true })) {
         await competitorThemes(comp.id);
       }
       const text = await landscapeSummary();
@@ -160,18 +163,20 @@ export async function markResearchEventsSeenAction(ids: number[]): Promise<{ ok:
  * BuildCampaignLink in the app, and the campaign builder's own
  * write-approval flow governs from there.
  *
- * Looks the competitor up via `listCompetitors({trackedOnly:true})` — the
- * same scope "Build a campaign from this gap" is only ever rendered from
- * (CompetitorDetail, under a trackedOnly row) — rather than the unfiltered
- * list, so a stale client or a direct/tampered POST can't mint a seed for a
- * competitor an admin already muted/untracked.
+ * Looks the competitor up via `listCompetitors({trackedOnly:true,
+ * excludeSelf:true})` — the same scope "Build a campaign from this gap" is
+ * only ever rendered from (CompetitorDetail, under a trackedOnly,
+ * non-self row — the tenant's own gym never renders as a competitor row at
+ * all, see ResearchView) — rather than the unfiltered list, so a stale
+ * client or a direct/tampered POST can't mint a seed for a competitor an
+ * admin already muted/untracked, or for the tenant's own business.
  */
 export async function buildCampaignFromCompetitorAction(
   id: number,
 ): Promise<{ ok: boolean; href?: string; error?: string }> {
   await requireAdmin();
   try {
-    const competitor = listCompetitors({ trackedOnly: true }).find((c) => c.id === id);
+    const competitor = listCompetitors({ trackedOnly: true, excludeSelf: true }).find((c) => c.id === id);
     if (!competitor) return { ok: false, error: "not_found" };
 
     const metric = latestMetric(id);

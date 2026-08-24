@@ -42,16 +42,25 @@ import { getCurrentTenant } from "@/lib/db/tenant";
  *
  * Testability: `discoverCompetitors` itself is intentionally thin — a
  * straight-line pipe through already-independently-tested foundation calls
- * (places/spend/store) plus one pure helper. The actual "did we get the
+ * (places/spend/store) plus two pure helpers. The actual "did we get the
  * radius filter and the new-vs-existing diff right" logic lives in
- * `partitionNearby`, a pure function with no fetch/db/tenant dependency, so
- * it can be unit-tested directly with plain literals — see discovery.test.ts.
- * Exercising the orchestration end-to-end would additionally require
- * stubbing the `./places` module's exported functions under the test
- * runner's CJS/tsx compile, which has no clean seam (no DI, ESM named
- * exports); rather than force that, the orchestration stays thin enough that
- * its correctness follows from the (separately covered) pieces it calls in
- * a fixed order.
+ * `partitionNearby`, and "is this discovered place actually the tenant's OWN
+ * gym" lives in `isSameBusiness` — both pure functions with no fetch/db/
+ * tenant dependency, so they can be unit-tested directly with plain literals
+ * — see discovery.test.ts. Exercising the orchestration end-to-end would
+ * additionally require stubbing the `./places` module's exported functions
+ * under the test runner's CJS/tsx compile, which has no clean seam (no DI,
+ * ESM named exports); rather than force that, the orchestration stays thin
+ * enough that its correctness follows from the (separately covered) pieces
+ * it calls in a fixed order.
+ *
+ * Self-detection (Market Research P1.1): a tenant's own gym otherwise shows
+ * up indistinguishable from a real competitor (and can even "win" a
+ * highlight like Top Rated). `isSameBusiness` decides whether a discovered
+ * place IS the tenant's own business — see its own doc comment for the
+ * match rule — and `discoverCompetitors` flags at most one `kept` place per
+ * run as `isSelf` (the nearest match, if more than one somehow qualifies).
+ * Best-effort: no match -> nothing is flagged, same as today.
  */
 
 const RESEARCH_CENTRE_KEY = "research_centre";
@@ -100,6 +109,124 @@ export function partitionNearby(
     if (!existingIds.has(place.placeId)) newPlaceIds.add(place.placeId);
   }
   return { kept, newPlaceIds };
+}
+
+// ── self-detection (Market Research P1.1) ──────────────────────────────
+
+const DEFAULT_SELF_MAX_DISTANCE_KM = 0.2;
+const DEFAULT_SELF_MIN_TOKEN_OVERLAP = 0.6;
+
+/** Legal/corporate suffixes that carry no identity signal for a name match — stripped before comparing. Deliberately does NOT strip meaningful business words (gym/fitness/health/club/centre): those are often the actual distinguishing part of a small business's name. */
+const LEGAL_NAME_SUFFIXES = new Set([
+  "ltd",
+  "limited",
+  "llc",
+  "llp",
+  "inc",
+  "incorporated",
+  "plc",
+  "co",
+  "company",
+  "corp",
+  "corporation",
+]);
+
+/**
+ * lowercase, "&" -> "and", punctuation stripped, whitespace collapsed, legal
+ * suffixes dropped -> a single space-joined token string ready for
+ * containment/overlap comparison. Never returns "" for a non-blank input
+ * that survives punctuation-stripping (falls back to the un-stripped token
+ * list if removing suffixes would empty it out, e.g. a place literally
+ * named "Ltd").
+ */
+function normalizeBusinessName(raw: string): string {
+  const cleaned = raw
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return "";
+  const tokens = cleaned.split(" ");
+  const withoutSuffixes = tokens.filter((t) => !LEGAL_NAME_SUFFIXES.has(t));
+  return (withoutSuffixes.length > 0 ? withoutSuffixes : tokens).join(" ");
+}
+
+/**
+ * Do two already-normalised name strings refer to the same business? Exact
+ * equality always matches; short of that, either name's full token set
+ * being a subset of the other's (order-independent — survives Google
+ * reordering or appending a town name), or a high token-overlap ratio
+ * (most of the shorter name's words present in the other — survives minor
+ * rewordings without full containment either way).
+ *
+ * Below 2 tokens on the shorter side, only exact equality counts: a single
+ * generic shared word (e.g. "gym") would otherwise look like a match by
+ * pure subset/overlap math against almost anything nearby. A false
+ * positive here wrongly hides a real competitor from the tenant, which is
+ * worse than the false negative of not auto-flagging a very tersely-named
+ * profile — see the module doc's "best-effort" framing.
+ */
+function isCloseNameMatch(a: string, b: string, minTokenOverlap: number): boolean {
+  if (a === b) return true;
+  const setA = new Set(a.split(" ").filter(Boolean));
+  const setB = new Set(b.split(" ").filter(Boolean));
+  if (setA.size === 0 || setB.size === 0) return false;
+  if (Math.min(setA.size, setB.size) < 2) return false;
+
+  const isSubset = (small: Set<string>, big: Set<string>) => [...small].every((t) => big.has(t));
+  if (isSubset(setA, setB) || isSubset(setB, setA)) return true;
+
+  let shared = 0;
+  for (const t of setA) if (setB.has(t)) shared++;
+  return shared / Math.min(setA.size, setB.size) >= minTokenOverlap;
+}
+
+export interface IsSameBusinessOptions {
+  /** Max distance (km) for a discovered place to still count as "at the tenant's own address". Default ~0.2km — Google's pin for a business and the tenant's own geocoded address should land almost exactly on top of each other; a genuine next-door competitor is already outside this margin. */
+  maxDistanceKm?: number;
+  /** Min token-overlap ratio (shared tokens / the shorter name's token count) to count as a name match when neither name fully contains the other. Default 0.6. */
+  minTokenOverlap?: number;
+}
+
+/**
+ * Pure: is `placeName` (a Google-discovered place) actually the tenant's
+ * OWN business (`businessName`, from the business profile), rather than a
+ * genuine nearby competitor? Two independent gates, BOTH required:
+ *
+ *  1. Distance: `distanceKm <= maxDistanceKm` (default ~0.2km).
+ *  2. Name: normalised (lowercase, "&"->"and", punctuation stripped, legal
+ *     suffixes like "Ltd"/"LLC" dropped) equal, one containing the other, or
+ *     a high token-overlap — see `isCloseNameMatch`.
+ *
+ * Distance alone is NOT sufficient (a coffee shop sharing the tenant's
+ * building must never match) and name alone is NOT sufficient (the same
+ * business name 5km away is a coincidence, not the tenant's own gym) — both
+ * gates independently guard against a false positive, which is the costlier
+ * mistake here: it would wrongly hide a real competitor from the tenant.
+ * Fails closed on blank input (an empty placeName/businessName can never
+ * match anything) and NEVER throws — discovery treats "no match" as
+ * "nothing flagged", the current, pre-this-feature behaviour.
+ */
+export function isSameBusiness(
+  placeName: string,
+  businessName: string,
+  distanceKm: number,
+  opts?: IsSameBusinessOptions,
+): boolean {
+  const maxDistanceKm = opts?.maxDistanceKm ?? DEFAULT_SELF_MAX_DISTANCE_KM;
+  const minTokenOverlap = opts?.minTokenOverlap ?? DEFAULT_SELF_MIN_TOKEN_OVERLAP;
+
+  // Written as a negated `<=` (not `distanceKm > maxDistanceKm`) so a NaN/
+  // malformed distanceKm fails closed here rather than silently falling
+  // through to the name check below.
+  if (!(distanceKm <= maxDistanceKm)) return false;
+
+  const a = normalizeBusinessName(placeName);
+  const b = normalizeBusinessName(businessName);
+  if (!a || !b) return false;
+
+  return isCloseNameMatch(a, b, minTokenOverlap);
 }
 
 /** Reads + validates the cached centre KV value; null if absent or malformed. */
@@ -189,6 +316,22 @@ export async function discoverCompetitors(radiusKm: number = DEFAULT_RADIUS_KM):
     const existingIds = new Set(listCompetitors().map((c) => c.placeId));
     const { kept, newPlaceIds } = partitionNearby(nearby.places, centre, radiusKm, existingIds);
 
+    // Self-detection (P1.1): find the SINGLE nearest `kept` place that is
+    // the tenant's own gym (isSameBusiness), if any — "at most one, nearest
+    // best match" even in the unlikely case more than one place qualifies.
+    // Blank businessName -> isSameBusiness never matches anything, so this
+    // degrades to "nothing flagged" exactly like today when the profile
+    // hasn't got a name set.
+    const businessName = getBusinessProfile().businessName.trim();
+    let selfPlaceId: string | null = null;
+    let selfDistanceKm = Infinity;
+    for (const place of kept) {
+      if (isSameBusiness(place.name, businessName, place.distanceKm) && place.distanceKm < selfDistanceKm) {
+        selfPlaceId = place.placeId;
+        selfDistanceKm = place.distanceKm;
+      }
+    }
+
     for (const place of kept) {
       if (newPlaceIds.has(place.placeId)) {
         addEvent({
@@ -206,6 +349,7 @@ export async function discoverCompetitors(radiusKm: number = DEFAULT_RADIUS_KM):
         distanceKm: place.distanceKm,
         source: "google",
         addedBy: "auto",
+        isSelf: place.placeId === selfPlaceId,
       });
     }
 

@@ -65,6 +65,7 @@ const requireLocal = createRequire(import.meta.url);
   const {
     upsertCompetitor,
     listCompetitors,
+    getSelfCompetitor,
     setCompetitorFlags,
     setCompetitorThemes,
     touchRefreshed,
@@ -121,6 +122,8 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(rowA.addedBy, "manual");
     assert.equal(rowA.tracked, true, "tracked defaults to true");
     assert.equal(rowA.muted, false, "muted defaults to false");
+    assert.equal(rowA.isSelf, false, "isSelf defaults to false when omitted");
+    assert.equal(typeof rowA.isSelf, "boolean", "isSelf round-trips as a real boolean, not 0/1");
     assert.equal(rowA.themesJson, null);
     assert.equal(rowA.lastRefreshedAt, null);
     assert.ok(rowA.firstSeenAt.length > 0, "firstSeenAt is set on insert");
@@ -151,6 +154,17 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(rowA.source, "manual-add");
     assert.equal(rowA.firstSeenAt, firstSeenAtOriginal, "firstSeenAt is preserved across a re-upsert");
     assert.equal(rowA.muted, true, "muted is preserved across a re-upsert (not reset by re-discovery)");
+
+    // isSelf, unlike muted/tracked/firstSeenAt above, IS re-derived on every
+    // upsert (it's discovery's fresh isSameBusiness verdict, not an
+    // operator-owned flag) — setting it true, then re-upserting WITHOUT it,
+    // clears it back to false rather than "sticking".
+    runWithTenant(tid, () => upsertCompetitor({ placeId: "places/AAA", name: rowA.name, address: rowA.address, lat: rowA.lat, lng: rowA.lng, distanceKm: rowA.distanceKm, isSelf: true }));
+    rowA = runWithTenant(tid, () => listCompetitors()).find((r) => r.id === idA)!;
+    assert.equal(rowA.isSelf, true, "isSelf is set by upsert's conflict-update path, not just on first insert");
+    runWithTenant(tid, () => upsertCompetitor({ placeId: "places/AAA", name: rowA.name, address: rowA.address, lat: rowA.lat, lng: rowA.lng, distanceKm: rowA.distanceKm }));
+    rowA = runWithTenant(tid, () => listCompetitors()).find((r) => r.id === idA)!;
+    assert.equal(rowA.isSelf, false, "an upsert that omits isSelf clears a previously-true flag back to false (re-derived fresh every run, not sticky)");
 
     // ── 2. listCompetitors: nearest-first ordering + trackedOnly ──
     const idB = runWithTenant(tid, () =>
@@ -188,6 +202,52 @@ const requireLocal = createRequire(import.meta.url);
       ["places/BBB"],
       "trackedOnly excludes both the muted row (AAA) and the untracked row (CCC)",
     );
+
+    // ── 2b. excludeSelf + getSelfCompetitor (Market Research P1.1) ──
+    assert.equal(runWithTenant(tid, () => getSelfCompetitor()), null, "no isSelf=true row yet -> null");
+
+    runWithTenant(tid, () =>
+      upsertCompetitor({
+        placeId: "places/BBB",
+        name: "PureGym Clonmel",
+        address: "2 Main St, Clonmel",
+        lat: 52.356,
+        lng: -7.701,
+        distanceKm: 0.4,
+        isSelf: true,
+      }),
+    );
+
+    const self = runWithTenant(tid, () => getSelfCompetitor());
+    assert.ok(self !== null && self.placeId === "places/BBB", "getSelfCompetitor returns the (only) isSelf=true row");
+
+    const withoutSelf = runWithTenant(tid, () => listCompetitors({ excludeSelf: true }));
+    assert.deepEqual(
+      withoutSelf.map((r) => r.placeId),
+      ["places/AAA", "places/CCC"],
+      "excludeSelf drops the self row (BBB) but keeps nearest-first ordering of the rest",
+    );
+
+    const trackedExcludeSelf = runWithTenant(tid, () => listCompetitors({ trackedOnly: true, excludeSelf: true }));
+    assert.deepEqual(
+      trackedExcludeSelf.map((r) => r.placeId),
+      [],
+      "trackedOnly + excludeSelf compose: BBB is tracked but self (excluded), AAA is muted, CCC is untracked -- nothing qualifies",
+    );
+
+    // Clear BBB's isSelf back off (a fresh upsert that omits it) so the
+    // sections below aren't surprised by it carrying isSelf=true forward.
+    runWithTenant(tid, () =>
+      upsertCompetitor({
+        placeId: "places/BBB",
+        name: "PureGym Clonmel",
+        address: "2 Main St, Clonmel",
+        lat: 52.356,
+        lng: -7.701,
+        distanceKm: 0.4,
+      }),
+    );
+    assert.equal(runWithTenant(tid, () => getSelfCompetitor()), null, "cleared back to no self match");
 
     // ── 3. setCompetitorFlags / setCompetitorThemes / touchRefreshed ──
     runWithTenant(tid, () => setCompetitorFlags(idB, { muted: true }));

@@ -7,6 +7,7 @@ import { meteredCreate } from "@/lib/ai/metered";
 import { getCurrentTenant } from "@/lib/db/tenant";
 import {
   listCompetitors,
+  getSelfCompetitor,
   latestMetric,
   getReviews,
   setCompetitorThemes,
@@ -48,6 +49,15 @@ import {
  * theme lines) lives in small pure functions exported for direct unit
  * testing; the two async entry points stay thin wrappers around
  * meteredCreate + a try/catch. See summary.test.ts.
+ *
+ * P1.1 unlocked a "you vs them" read in `landscapeSummary`: once discovery
+ * has matched the tenant's own gym (isSelf on `competitors` — see
+ * discovery.ts's isSameBusiness), its rating/reviews flow into
+ * `buildLandscapeDigest` as a separate `self` reference (never mixed into
+ * the competitor rows/count/highlights) and both the AI prompt and the
+ * static fallback (`buildSelfClause`) frame the operator against the pack.
+ * No self match yet -> both paths revert verbatim to the original,
+ * competitor-set-only behaviour.
  */
 
 const AGENT_KEY = "research";
@@ -200,19 +210,31 @@ export type LandscapeDigest = {
   strongest: { name: string; ratingStars: number } | null;
   weakest: { name: string; ratingStars: number } | null;
   mostReviews: { name: string; reviewCount: number } | null;
+  /**
+   * The tenant's OWN gym's rating/reviews (Market Research P1.1's
+   * "you-vs-them" read) — deliberately kept OUT of `rows`/`count`/
+   * `strongest`/`weakest`/`mostReviews` above, which all stay
+   * competitor-only; this is purely the reference point to frame them
+   * against. Null when discovery hasn't matched a self gym yet (see
+   * isSameBusiness in discovery.ts) — the pre-P1.1 behaviour.
+   */
+  self: { name: string; ratingStars: number | null; reviewCount: number | null } | null;
 };
 
 /**
- * Pure: turns the watchlist + each competitor's latest metric snapshot into
- * a compact digest — count, rating min/avg/max, and who's strongest/weakest
- * by rating and who leads on review volume. No fabrication risk here (it's
- * arithmetic over real stored numbers); the fabrication risk this whole
- * module guards against is entirely in what the MODEL is asked to add on
- * top of this digest. Exported for direct unit testing with plain literals.
+ * Pure: turns the watchlist + each competitor's latest metric snapshot (plus
+ * an optional self-gym reference, P1.1) into a compact digest — count,
+ * rating min/avg/max, who's strongest/weakest by rating, who leads on review
+ * volume, and (when given) the tenant's own rating/reviews to frame against
+ * the pack. No fabrication risk here (it's arithmetic over real stored
+ * numbers); the fabrication risk this whole module guards against is
+ * entirely in what the MODEL is asked to add on top of this digest.
+ * Exported for direct unit testing with plain literals.
  */
 export function buildLandscapeDigest(
   competitors: CompetitorRow[],
   metricsById: ReadonlyMap<number, Metric | null>,
+  self?: { name: string; ratingStars: number | null; reviewCount: number | null } | null,
 ): LandscapeDigest {
   const rows: LandscapeRow[] = competitors.map((c) => {
     const m = metricsById.get(c.id) ?? null;
@@ -248,37 +270,72 @@ export function buildLandscapeDigest(
     strongest: strongestRow ? { name: strongestRow.name, ratingStars: strongestRow.ratingStars } : null,
     weakest: weakestRow ? { name: weakestRow.name, ratingStars: weakestRow.ratingStars } : null,
     mostReviews: mostReviewsRow ? { name: mostReviewsRow.name, reviewCount: mostReviewsRow.reviewCount } : null,
+    self: self ?? null,
   };
+}
+
+/**
+ * The "you vs them" clause `buildLandscapeFallback` appends when a self gym
+ * is on hand (Market Research P1.1) — "" when there's no self match yet
+ * (`digest.self` is null, the pre-P1.1 default) or the match has no rating
+ * captured yet (nothing real to say). Only ever states numbers already in
+ * `digest` — no-fabrication, matching the rest of this module. Pure,
+ * exported for direct unit testing.
+ */
+export function buildSelfClause(digest: LandscapeDigest): string {
+  const self = digest.self;
+  if (!self || self.ratingStars == null) return "";
+  const reviewsPart =
+    self.reviewCount != null ? ` (${self.reviewCount} review${self.reviewCount === 1 ? "" : "s"})` : "";
+  const vsPart = digest.avgRating != null ? ` vs pack avg ${digest.avgRating.toFixed(1)}★` : "";
+  return ` You: ${self.ratingStars.toFixed(1)}★${reviewsPart}${vsPart}.`;
 }
 
 /**
  * The over-cap / AI-unavailable / error fallback for `landscapeSummary`, AND
  * the "nothing tracked yet" response — a data-only sentence (count of
- * competitors, rating range), no AI, built from the same digest the model
+ * competitors, rating range, plus a you-vs-them clause when a self gym is on
+ * hand — see `buildSelfClause`), no AI, built from the same digest the model
  * prompt would have used. Pure + exported for direct unit testing.
  */
 export function buildLandscapeFallback(digest: LandscapeDigest): string {
   if (digest.count === 0) return "No competitors tracked yet.";
   const label = `${digest.count} competitor${digest.count === 1 ? "" : "s"} tracked`;
+  const selfClause = buildSelfClause(digest);
   if (digest.minRating == null || digest.maxRating == null || digest.avgRating == null) {
-    return `${label}, no ratings captured yet — connect AI for a fuller read.`;
+    return `${label}, no ratings captured yet — connect AI for a fuller read.${selfClause}`;
   }
   const range =
     digest.minRating === digest.maxRating
       ? `${digest.minRating.toFixed(1)}★`
       : `${digest.minRating.toFixed(1)}–${digest.maxRating.toFixed(1)}★`;
-  return `${label}, ratings ${range} (avg ${digest.avgRating.toFixed(1)}★) — connect AI for a fuller read.`;
+  return `${label}, ratings ${range} (avg ${digest.avgRating.toFixed(1)}★) — connect AI for a fuller read.${selfClause}`;
 }
 
-function buildLandscapeSystemPrompt(): string {
-  return [
+/**
+ * Self-aware (P1.1): when `digest.self` carries a real rating, the model is
+ * explicitly handed it and asked to frame the operator's own business
+ * against the pack; when there's no self match, the prompt reverts VERBATIM
+ * to P1's original wording (forbidding any "us vs them" comparison) — the
+ * "fall back to the current competitor-set-only summary" the brief asks for.
+ */
+function buildLandscapeSystemPrompt(digest: LandscapeDigest): string {
+  const base = [
     "You are a market analyst summarising a set of local competitor businesses for the operator who tracks them.",
     NO_FABRICATION_RULE,
-    // P1 does not track the tenant's OWN Google rating (see the Market
-    // Research P1 spec) — there is nothing to compare the set against, so
-    // the model must never invent or imply a "you vs them" comparison.
-    'You are NOT given the operator\'s own rating or review data. Never invent or imply a comparison against "us"/the operator\'s own business — describe the competitor set only.',
-  ].join("\n\n");
+  ];
+  if (digest.self && digest.self.ratingStars != null) {
+    base.push(
+      "You ARE given the operator's own business's rating/review data below (marked \"(the operator's own business)\") " +
+        "— use it to frame where the operator sits versus the pack (stronger/weaker on rating, ahead/behind on review " +
+        "volume) in addition to describing the competitor set. Still base every number strictly on what's supplied.",
+    );
+  } else {
+    base.push(
+      'You are NOT given the operator\'s own rating or review data. Never invent or imply a comparison against "us"/the operator\'s own business — describe the competitor set only.',
+    );
+  }
+  return base.join("\n\n");
 }
 
 function buildLandscapeUserPrompt(digest: LandscapeDigest): string {
@@ -287,36 +344,61 @@ function buildLandscapeUserPrompt(digest: LandscapeDigest): string {
     const reviews = r.reviewCount != null ? `${r.reviewCount} reviews` : "review count unknown";
     return `- ${r.name}: ${rating}, ${reviews}`;
   });
+  const selfKnown = digest.self && digest.self.ratingStars != null;
+  const selfLines = selfKnown
+    ? [
+        "",
+        `The operator's own business, ${digest.self!.name} (the operator's own business):`,
+        `- rating: ${digest.self!.ratingStars!.toFixed(1)}★`,
+        `- reviews: ${digest.self!.reviewCount != null ? digest.self!.reviewCount : "unknown"}`,
+      ]
+    : [];
   return [
     `Tracked competitors (${digest.count} total):`,
     ...lines,
+    ...selfLines,
     "",
     "Write a 2-3 sentence read of this competitor set: which is strongest/weakest by rating, which leads on " +
-      "review volume, and any obvious gap in the pack. Base every claim strictly on the list above.",
+      "review volume, and any obvious gap in the pack." +
+      (selfKnown ? " Also say where the operator's own business sits versus this pack on rating and review volume." : "") +
+      " Base every claim strictly on the numbers above.",
   ].join("\n");
 }
 
 /**
- * A short paragraph reading the tracked competitor SET (P1 has no
- * tenant-self rating to compare against — see `buildLandscapeSystemPrompt`'s
- * comment — so this deliberately summarises the pack only, never a "you vs
- * them" comparison).
+ * A short paragraph reading the tracked competitor SET — and, once
+ * discovery has matched the tenant's own gym (Market Research P1.1), a
+ * "you vs them" read against it too (see `buildLandscapeSystemPrompt`'s
+ * self-aware branch). No self match yet -> reverts to P1's original
+ * competitor-set-only behaviour verbatim.
  *
  * No tracked competitors -> "No competitors tracked yet." with NO model
- * call. Otherwise: build the digest locally, ask CONTENT_MODEL for a short
- * read grounded strictly in it. Any failure (over cap, AI unavailable,
- * network error, empty model output) falls back to `buildLandscapeFallback`
- * over the same digest — never throws. Unlike `competitorThemes`, there is
- * no per-call cache column for this (the brief doesn't ask for one); a
- * caller that wants to avoid re-spending on every render should memoize
- * around this call itself, the same way `campaignRadar.ts` memoizes
- * `getCampaignRadar` per tenant/day.
+ * call. Otherwise: build the digest locally (competitors EXCLUDING self,
+ * plus self's own rating/reviews as a separate reference — see
+ * `listCompetitors`'s `excludeSelf` option and `getSelfCompetitor`), ask
+ * CONTENT_MODEL for a short read grounded strictly in it. Any failure (over
+ * cap, AI unavailable, network error, empty model output) falls back to
+ * `buildLandscapeFallback` over the same digest — never throws. Unlike
+ * `competitorThemes`, there is no per-call cache column for this (the brief
+ * doesn't ask for one); a caller that wants to avoid re-spending on every
+ * render should memoize around this call itself, the same way
+ * `campaignRadar.ts` memoizes `getCampaignRadar` per tenant/day.
  */
 export async function landscapeSummary(): Promise<string> {
-  const competitors = listCompetitors({ trackedOnly: true });
+  const competitors = listCompetitors({ trackedOnly: true, excludeSelf: true });
+  const selfCompetitor = getSelfCompetitor();
+  const selfMetric = selfCompetitor ? latestMetric(selfCompetitor.id) : null;
+  const selfForDigest = selfCompetitor
+    ? {
+        name: selfCompetitor.name,
+        ratingStars: selfMetric?.ratingMilli != null ? selfMetric.ratingMilli / 1000 : null,
+        reviewCount: selfMetric?.reviewCount ?? null,
+      }
+    : null;
   const digest = buildLandscapeDigest(
     competitors,
     new Map(competitors.map((c) => [c.id, latestMetric(c.id)])),
+    selfForDigest,
   );
 
   if (competitors.length === 0) return buildLandscapeFallback(digest); // "No competitors tracked yet." — nothing to summarise, no AI call
@@ -327,7 +409,7 @@ export async function landscapeSummary(): Promise<string> {
     const message = await meteredCreate({ tenantId, agentKey: AGENT_KEY }, () => ({
       model: CONTENT_MODEL,
       max_tokens: 400,
-      system: buildLandscapeSystemPrompt(),
+      system: buildLandscapeSystemPrompt(digest),
       messages: [{ role: "user", content: buildLandscapeUserPrompt(digest) }],
     }));
 
