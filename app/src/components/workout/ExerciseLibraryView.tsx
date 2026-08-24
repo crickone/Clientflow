@@ -117,7 +117,7 @@ export function ExerciseLibraryView({ exercises }: { exercises: ExerciseLibRow[]
           )}
         </div>
       ) : (
-        <RevealGroup style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <RevealGroup immediate style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           {groups.map(([cat, items]) => (
             <Reveal key={cat}>
               <div>

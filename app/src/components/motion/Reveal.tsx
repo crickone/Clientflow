@@ -57,11 +57,22 @@ export function RevealGroup({
   className,
   style,
   stagger,
+  immediate = false,
 }: {
   children: ReactNode;
   className?: string;
   style?: CSSProperties;
   stagger?: number;
+  /** Drive children to "visible" via a persistent `animate` instead of a
+   *  one-shot, scroll-triggered `whileInView`. Use this for DYNAMIC content
+   *  whose children change after the first reveal (e.g. a filtered list): with
+   *  `whileInView` + `viewport.once`, once the group has fired its single
+   *  in-view trigger it stops propagating "visible", so any child that mounts
+   *  AFTERWARD (a new category group appearing on a filter switch) inherits
+   *  only `initial="hidden"` and is stuck at opacity 0 — the list vanishes.
+   *  `animate` keeps driving "visible" so newly-mounted children always resolve.
+   *  Default (false) keeps the scroll-reveal-once behaviour for static content. */
+  immediate?: boolean;
 }) {
   return (
     <InRevealGroup.Provider value={true}>
@@ -70,8 +81,9 @@ export function RevealGroup({
         style={style}
         variants={staggerContainer(stagger)}
         initial="hidden"
-        whileInView="visible"
-        viewport={{ once: true, margin: "-40px" }}
+        animate={immediate ? "visible" : undefined}
+        whileInView={immediate ? undefined : "visible"}
+        viewport={immediate ? undefined : { once: true, margin: "-40px" }}
       >
         {children}
       </motion.div>
