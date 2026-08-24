@@ -106,6 +106,18 @@ a {
   overflow-x: hidden;
 }
 
+/* Full-height flagship views (e.g. /adonis) fill the viewport. On mobile they
+   must ALSO clear the sticky .app-topbar (the hamburger row; display:none on
+   desktop) — otherwise topbar height + 100dvh overflows the screen and the
+   chat's compose box lands just below the fold (you'd have to scroll to it).
+   --app-topbar-h is the single source of truth, enforced on .app-topbar's own
+   height in the mobile media query below so the subtraction is exact. */
+:root { --app-topbar-h: 56px; }
+.adonis-shell { height: 100dvh; }
+@media (max-width: 900px) {
+  .adonis-shell { height: calc(100dvh - var(--app-topbar-h)); }
+}
+
 /* Keyboard-focus baseline — the app is built from inline styles that can't
    express :focus-visible, so keyboard users had no visible focus anywhere.
    Mouse clicks don't trigger :focus-visible, so this only shows for keyboard nav. */
@@ -288,6 +300,11 @@ a {
     display: flex;
     align-items: center;
     gap: 12px;
+    /* Fixed height = the value .adonis-shell (and any other full-height view)
+       subtracts from 100dvh on mobile. Content (34px hamburger) fits within
+       56 − 20 padding − 1 border = 35px. */
+    height: var(--app-topbar-h);
+    box-sizing: border-box;
     position: sticky;
     top: 0;
     z-index: 60;

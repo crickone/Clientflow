@@ -69,10 +69,15 @@ export function AdonisView({
 
   return (
     <div
+      // `.adonis-shell` owns the height: 100dvh on desktop, but on mobile it
+      // subtracts the sticky `.app-topbar` (hamburger row, display:none on
+      // desktop) via calc(100dvh - var(--app-topbar-h)) — otherwise topbar +
+      // 100dvh overflows the screen and the compose box lands below the fold
+      // (see globals.css). Height stays in CSS so the media query can apply.
+      className="adonis-shell"
       style={{
         display: "flex",
         flexDirection: "column",
-        height: "100dvh",
         padding: "18px clamp(14px, 4vw, 24px) 20px",
         boxSizing: "border-box",
       }}
