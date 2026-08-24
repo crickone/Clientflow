@@ -7,11 +7,11 @@ import { checkpointAllOpenConnections, getTenantDbById, runWithTenant } from "@/
 import { automationLog, automationMessages, automationTriggers, clients, tenants } from "@/lib/db/schema";
 import { applyShortcodes, DEFAULT_MESSAGES, isMessageLive, type Channel } from "@/lib/automationModel";
 import { getBusinessProfileForTenant } from "@/lib/businessProfile";
-import { listExercisesForTenant, setExerciseVideoUrlForTenant } from "@/lib/exerciseLibrary";
+import { listAllExercisesForBackfill, selectExercisesNeedingVideo, setExerciseVideoUrl } from "@/lib/exerciseLibrary";
 import { getThemeForTenant } from "@/lib/settings";
 import { seedMarketingSite } from "@/lib/cms/seedMarketingSite";
 import { renderEmailShell, sendEmailForTenant, textToParagraphs } from "@/lib/email";
-import { parseYouTubeId, searchExerciseVideoDetailed } from "@/lib/youtube";
+import { searchExerciseVideoDetailed } from "@/lib/youtube";
 import { publishDueScheduledPosts } from "@/lib/cms/blog";
 import { runBillingForDate } from "@/lib/billing/engine";
 import { dublinToday } from "@/lib/billing/dates";
@@ -115,23 +115,33 @@ function runBlogScheduleForTenant(tenantId: number): number {
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /**
- * Auto-fill YouTube "how-to" videos for exercises that don't have one, a batch
- * at a time. The YouTube Data API allows ~100 searches/day, so we cap per run
- * and stop early once searches start failing (quota/rate limit) — the daily
- * scheduler resumes where it left off until every exercise has a video.
+ * Auto-fill YouTube "how-to" videos for control-plane exercise_library rows
+ * that don't have one yet, a batch at a time — ONE pass over the WHOLE
+ * table (GEL Task 3): global rows (filled once, shared by every tenant)
+ * PLUS every tenant's own customs. Deliberately NOT a per-tenant fan-out:
+ * the library is now a single shared control table (GEL T1/T2 — see
+ * docs/superpowers/specs/2026-08-24-global-exercise-library-design.md), so
+ * looping this per tenant would re-derive mostly the same "missing" set
+ * once per tenant and let quota fairness hinge on tenant iteration order
+ * (whichever tenant's turn came first would exhaust the shared quota on
+ * global rows before later tenants ever got a chance at their OWN customs),
+ * instead of treating the ~100/day YOUTUBE_API_KEY quota as the single
+ * shared resource it actually is. We cap per run and stop early once
+ * searches start failing (quota/rate limit) — the daily scheduler resumes
+ * where it left off until every row has a video.
  */
-async function backfillVideosForTenant(tenantId: number, max: number): Promise<number> {
+async function backfillVideos(max: number): Promise<number> {
   if (!process.env.YOUTUBE_API_KEY) return 0;
-  const missing = listExercisesForTenant(tenantId).filter((e) => !parseYouTubeId(e.videoUrl));
+  const missing = selectExercisesNeedingVideo(listAllExercisesForBackfill()).slice(0, max);
   if (missing.length === 0) return 0;
 
   let filled = 0;
   let consecutiveThrottled = 0;
-  for (const ex of missing.slice(0, max)) {
+  for (const ex of missing) {
     const res = await searchExerciseVideoDetailed(ex.name);
 
     if (res.status === "ok" && res.hit) {
-      setExerciseVideoUrlForTenant(tenantId, ex.id, res.hit.url);
+      setExerciseVideoUrl(ex.id, res.hit.url);
       filled++;
       consecutiveThrottled = 0;
     } else if (res.status === "quota") {
@@ -219,7 +229,6 @@ async function runWeeklyCompetitorRefresh(
 export async function runDailyAutomations(): Promise<{ tenants: number; birthdaysSent: number; videosFilled: number; postsPublished: number }> {
   const list = controlDb.select({ id: tenants.id }).from(tenants).where(eq(tenants.isActive, true)).all();
   let birthdaysSent = 0;
-  let videosFilled = 0;
   let postsPublished = 0;
   for (const t of list) {
     try {
@@ -228,17 +237,24 @@ export async function runDailyAutomations(): Promise<{ tenants: number; birthday
       // one tenant failing must not stop the rest
     }
     try {
-      videosFilled += await backfillVideosForTenant(t.id, 90);
-    } catch {
-      // video backfill is best-effort
-    }
-    try {
       const published = runBlogScheduleForTenant(t.id);
       if (published > 0) console.log(`[blog-schedule] tenant ${t.id}: published ${published} scheduled post(s)`);
       postsPublished += published;
     } catch (err) {
       console.error(`[blog-schedule] tenant ${t.id} failed (will retry next daily tick):`, err);
     }
+  }
+
+  // Video backfill (GEL Task 3): ONE pass over the whole control-plane
+  // exercise_library, not part of the per-tenant loop above — see
+  // backfillVideos's doc for why a per-tenant loop is wrong now that the
+  // library is a single shared table. Best-effort, same as before: a
+  // search/quota error stops this run; the next daily tick resumes.
+  let videosFilled = 0;
+  try {
+    videosFilled = await backfillVideos(90);
+  } catch {
+    // video backfill is best-effort
   }
 
   // Platform billing: renewals + dunning. Own day-claim key, claimed AFTER a

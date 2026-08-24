@@ -4,8 +4,15 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireUser } from "@/lib/auth";
-import { deleteExercise, listExercises, saveExercise, setExerciseVideoUrl, type ExerciseLibInput } from "@/lib/exerciseLibrary";
-import { parseYouTubeId, searchExerciseVideo } from "@/lib/youtube";
+import {
+  deleteExercise,
+  listExercises,
+  saveExercise,
+  selectExercisesNeedingVideo,
+  setExerciseVideoUrl,
+  type ExerciseLibInput,
+} from "@/lib/exerciseLibrary";
+import { searchExerciseVideo } from "@/lib/youtube";
 
 const schema = z.object({
   id: z.number().int().positive().optional(),
@@ -55,13 +62,25 @@ export type BulkVideoResult =
 // of the 10,000/day allowance) and to keep the request within its time budget.
 const BULK_MAX_PER_RUN = 40;
 
-/** Auto-find + attach a YouTube video for every exercise that doesn't have one. */
+/**
+ * Auto-find + attach a YouTube video for every exercise missing one in the
+ * CURRENT tenant's view (global rows + this tenant's own customs).
+ * listExercises()/setExerciseVideoUrl() already read/write the control-plane
+ * exercise_library table (GEL Task 2), so this action already operates on
+ * the shared library; GEL Task 3 only swapped the inline "missing" filter
+ * for the shared selectExercisesNeedingVideo() helper, so this and the
+ * nightly single-pass backfill (lib/automations/scheduler.ts) agree on one
+ * tested definition of "missing". Same requireUser() gate as today — a
+ * stricter tenant-vs-global write guard is GEL Task 4's concern for
+ * saveExerciseAction/deleteExerciseAction, not this one (it only ever fills
+ * a blank video_url, never edits/deletes a row).
+ */
 export async function bulkFindExerciseVideosAction(): Promise<BulkVideoResult> {
   await requireUser();
   if (!process.env.YOUTUBE_API_KEY) {
     return { ok: false, error: "YouTube auto-find isn't set up yet — add a YOUTUBE_API_KEY to enable it." };
   }
-  const missing = listExercises().filter((e) => !parseYouTubeId(e.videoUrl));
+  const missing = selectExercisesNeedingVideo(listExercises());
   const batch = missing.slice(0, BULK_MAX_PER_RUN);
   let found = 0;
   for (const ex of batch) {

@@ -2,6 +2,7 @@ import "server-only";
 
 import { controlSqlite } from "@/lib/db/control";
 import { getCurrentTenant } from "@/lib/db/tenant";
+import { parseYouTubeId } from "@/lib/youtube";
 
 /**
  * Global Exercise Library (GEL Task 2 — see
@@ -19,6 +20,11 @@ import { getCurrentTenant } from "@/lib/db/tenant";
  * signature are UNCHANGED from the pre-rewrite version — the 7 workout
  * pages + 3 builders + ExerciseLibraryView consume `listExercises()`'s
  * return value and must not be touched.
+ *
+ * GEL Task 3 adds the video-backfill helpers at the bottom of this file
+ * (`selectExercisesNeedingVideo`, `listAllExercisesForBackfill`): the
+ * nightly backfill (lib/automations/scheduler.ts) now runs ONE unscoped
+ * pass over the whole control table instead of a per-tenant fan-out.
  */
 
 export interface ExerciseLibInput {
@@ -205,43 +211,93 @@ export function deleteExercise(id: number): void {
 }
 
 /**
- * Set just the video URL for one exercise, by id — used by the CURRENT
- * tenant's "auto-find missing videos" bulk action
- * (bulkFindExerciseVideosAction, app/workout/exercises/actions.ts), which
- * walks THIS tenant's own listExercises() result. That result now includes
- * GLOBAL rows, so — deliberately, like setExerciseVideoUrlForTenant below —
- * this has NO ownership guard: filling in a discovered YouTube link is a
- * narrow, single-field enrichment (not a content edit/delete of someone
- * else's row), so it's allowed to land on a global row rather than throwing
- * mid-loop the first time the bulk action reaches one.
+ * Set just the video URL for one exercise, by id. Two callers, both walking
+ * a list that mixes GLOBAL rows in with tenant-owned ones and neither
+ * wanting an ownership check on a narrow, single-field enrichment:
+ * - the CURRENT tenant's "auto-find missing videos" bulk action
+ *   (bulkFindExerciseVideosAction, app/workout/exercises/actions.ts), over
+ *   THIS tenant's own listExercises() result;
+ * - the nightly single-pass video backfill (lib/automations/scheduler.ts,
+ *   GEL Task 3), over EVERY row in the control table
+ *   (listAllExercisesForBackfill() below) — there's no single "current
+ *   tenant" in that unscoped pass, so it uses this bare setter rather than
+ *   setExerciseVideoUrlForTenant.
+ * Deliberately NO ownership guard, like setExerciseVideoUrlForTenant below:
+ * filling in a discovered YouTube link is not a content edit/delete of
+ * someone else's row, so it's allowed to land on a global row rather than
+ * throwing mid-loop the first time either caller reaches one.
  */
 export function setExerciseVideoUrl(id: number, url: string): void {
   updateExerciseVideoUrlById(id, url);
 }
 
+// ── Video-backfill helpers (GEL Task 3) ────────────────────────────────────────
+
+/**
+ * Rows from a list that are still missing a valid YouTube video — the one
+ * predicate shared by:
+ * - the nightly single-pass backfill (lib/automations/scheduler.ts), over
+ *   listAllExercisesForBackfill() below;
+ * - the manual "Auto-find missing videos" bulk action
+ *   (bulkFindExerciseVideosAction, app/workout/exercises/actions.ts), over
+ *   the current tenant's listExercises().
+ * Pure (no DB access), so both callers share one tested definition of
+ * "missing" instead of duplicating the `!parseYouTubeId(...)` filter, and it
+ * can be unit-tested directly against plain ExerciseLibRow[] fixtures.
+ */
+export function selectExercisesNeedingVideo(rows: ExerciseLibRow[]): ExerciseLibRow[] {
+  return rows.filter((e) => !parseYouTubeId(e.videoUrl));
+}
+
+/**
+ * EVERY control-plane exercise_library row — global rows AND every tenant's
+ * customs, with no `tenant_id` scoping at all. Background-job only: the
+ * nightly video backfill (lib/automations/scheduler.ts) runs a SINGLE pass
+ * over the whole table (GEL Task 3) instead of the old per-tenant fan-out
+ * (one listExercisesForTenant() call per active tenant) — now that the
+ * library is ONE shared control table (T1/T2), looping per tenant would
+ * just re-derive mostly the same "missing" set once per tenant and let
+ * quota fairness hinge on tenant iteration order, instead of treating the
+ * ~100/day YOUTUBE_API_KEY quota as the single shared resource it actually
+ * is. NEVER call this from a tenant-facing code path — unlike
+ * listExercises()/listExercisesForTenant(), it returns every OTHER tenant's
+ * custom exercises too.
+ */
+export function listAllExercisesForBackfill(): ExerciseLibRow[] {
+  return (
+    controlSqlite.prepare(`SELECT * FROM exercise_library ORDER BY name`).all() as ControlExerciseRow[]
+  ).map(toRow);
+}
+
 // ── Tenant-explicit variants (for background jobs with no request scope) ──────
 
 /**
- * Same merge read as listExercises(), for an EXPLICIT tenantId — used by
- * background jobs (the daily video backfill, lib/automations/scheduler.ts)
- * that run outside any request context and so can't rely on
- * getCurrentTenant()'s cookie/session resolution.
+ * Same merge read as listExercises(), for an EXPLICIT tenantId — for
+ * background jobs that run outside any request context and so can't rely on
+ * getCurrentTenant()'s cookie/session resolution, but DO want one specific
+ * tenant's view (global + that tenant's own customs) rather than the
+ * whole-table read listAllExercisesForBackfill() does. Not currently called
+ * in production — the nightly video backfill moved to a single unscoped
+ * pass in GEL Task 3 (see listAllExercisesForBackfill above) — kept as a
+ * general per-tenant primitive and exercised directly by
+ * exerciseLibrary.test.ts.
  */
 export function listExercisesForTenant(tenantId: number): ExerciseLibRow[] {
   return mergedExercisesForTenant(tenantId);
 }
 
 /**
- * Set an exercise's video URL by row id, for the shared nightly backfill
- * (lib/automations/scheduler.ts's backfillVideosForTenant). Deliberately NOT
- * tenant-guarded — unlike saveExercise/deleteExercise's ownership check,
- * this legitimately writes to GLOBAL rows too: the backfill walks every
- * tenant's listExercisesForTenant() (globals included) looking for missing
- * videos, and a global row must actually get filled the first time ANY
- * tenant's pass reaches it — that's the whole point of backfilling the
- * shared library once instead of per tenant. `tenantId` is accepted (for
- * call-site symmetry with listExercisesForTenant) but unused for
- * authorization.
+ * Set an exercise's video URL by row id, for an EXPLICIT tenantId — the
+ * setExerciseVideoUrl() sibling that pairs with listExercisesForTenant()
+ * above. Deliberately NOT tenant-guarded, same as setExerciseVideoUrl():
+ * a global row must be writable regardless of which tenant's pass reaches
+ * it. `tenantId` is accepted (for call-site symmetry with
+ * listExercisesForTenant) but unused for authorization. Not currently
+ * called in production — the nightly backfill moved to a single unscoped
+ * pass in GEL Task 3, writing via the plain setExerciseVideoUrl() instead
+ * (there's no single tenantId to pass in an unscoped run) — kept as a
+ * general per-tenant primitive and exercised directly by
+ * exerciseLibrary.test.ts.
  */
 export function setExerciseVideoUrlForTenant(tenantId: number, id: number, url: string): void {
   void tenantId;

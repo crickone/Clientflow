@@ -371,9 +371,9 @@ export interface RunCampaignSendOpts {
 
 /**
  * The throttled batch send engine — mirrors automations/scheduler.ts's
- * backfillVideosForTenant (lines ~120-147) shape: a bounded loop, a sleep
- * between chunks of work, and a bail-out that leaves the job cleanly resumable
- * rather than half-mutated. Always call this wrapped in
+ * backfillVideos (nightly YouTube video backfill) shape: a bounded loop, a
+ * sleep between chunks of work, and a bail-out that leaves the job cleanly
+ * resumable rather than half-mutated. Always call this wrapped in
  * `runWithTenant(tenantId, ...)` (sendCampaignAction does) — this function
  * itself never touches the ambient `db` proxy (getTenantDbById everywhere),
  * but downstream identity helpers (getBusinessProfileForTenant/
