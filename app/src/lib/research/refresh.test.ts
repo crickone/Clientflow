@@ -129,11 +129,19 @@ function isAdLibraryCallFor(url: string, name: string): boolean {
   return url.startsWith(AD_LIBRARY_URL_BASE) && url.includes(`search_terms=${encodeURIComponent(name)}`);
 }
 
+/** Exact Page-ID ad matching (Task 1) counterpart to isAdLibraryCallFor above -- matches a mock-fetch URL to the `pageId` it was searched for via the `search_page_ids` query param. */
+function isAdLibraryCallForPageId(url: string, pageId: string): boolean {
+  return (
+    url.startsWith(AD_LIBRARY_URL_BASE) &&
+    url.includes(`search_page_ids=${encodeURIComponent(JSON.stringify([pageId]))}`)
+  );
+}
+
 (async () => {
   const { controlSqlite } = requireLocal("../db/control") as typeof import("../db/control");
   const { runWithTenant, getTenantDbById } = requireLocal("../db/tenant") as typeof import("../db/tenant");
   const { schema } = requireLocal("../db") as typeof import("../db");
-  const { upsertCompetitor, listCompetitors, appendMetric, latestMetric, listEvents, upsertAd, listAds } =
+  const { upsertCompetitor, listCompetitors, appendMetric, latestMetric, listEvents, upsertAd, listAds, setCompetitorFacebookPage } =
     requireLocal("./store") as typeof import("./store");
   const { setKey } = requireLocal("../settings") as typeof import("../settings");
   const { researchSpentCents, UNIT_COST_CENTS } = requireLocal("./spend") as typeof import("./spend");
@@ -861,6 +869,167 @@ function isAdLibraryCallFor(url: string, name: string): boolean {
             check(
               "ads/no-token: no ad events raised",
               !runWithTenant(tid, () => listEvents()).some((e) => e.competitorId === compId && (e.type === "new_ad" || e.type === "ad_stopped")),
+            );
+          },
+        );
+      } finally {
+        cleanupScratchTenant(slug, tid);
+      }
+    });
+  });
+
+  // ════════════════════════════════════════════════════════════════════
+  // 10. Exact Page-ID ad matching (Task 1) -- a competitor LINKED to a
+  //     Facebook Page (facebookPageId set via setCompetitorFacebookPage) is
+  //     fetched via search_page_ids and its ads are stored DIRECTLY, with NO
+  //     adPageMatchesCompetitor name filter -- proven by an ad whose
+  //     page_name would FAIL the name filter (it shares no token with the
+  //     competitor's name) still getting stored for the LINKED competitor.
+  //     A second, UNLINKED competitor in the same run keeps the original
+  //     search_terms + name-filter path -- its equivalent mismatched-name ad
+  //     is correctly dropped, proving the routing is per-competitor, not
+  //     global.
+  // ════════════════════════════════════════════════════════════════════
+  await withAdLibraryToken("test-ad-token", async () => {
+    await withApiKey("test-key", async () => {
+      const slug = "refresh-test-pageid-exact";
+      const tid = makeScratchTenant(slug);
+      try {
+        const idLinked = runWithTenant(tid, () =>
+          upsertCompetitor({
+            placeId: "place-linked",
+            name: "Linked Gym",
+            address: "1 Linked St, Clonmel",
+            lat: 52.351,
+            lng: -7.701,
+            distanceKm: 1.0,
+          }),
+        );
+        runWithTenant(tid, () => setCompetitorFacebookPage(idLinked, "999888777", "Linked Gym Official"));
+
+        const idUnlinked = runWithTenant(tid, () =>
+          upsertCompetitor({
+            placeId: "place-unlinked",
+            name: "Unlinked Gym",
+            address: "2 Unlinked St, Clonmel",
+            lat: 52.36,
+            lng: -7.71,
+            distanceKm: 2.0,
+          }),
+        );
+
+        const recentIso = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+
+        await withMockFetch(
+          (url) => {
+            if (url === DETAILS_URL("place-linked")) {
+              return new Response(
+                JSON.stringify({
+                  id: "place-linked",
+                  displayName: { text: "Linked Gym" },
+                  formattedAddress: "1 Linked St, Clonmel",
+                  reviews: [],
+                }),
+                { status: 200 },
+              );
+            }
+            if (url === DETAILS_URL("place-unlinked")) {
+              return new Response(
+                JSON.stringify({
+                  id: "place-unlinked",
+                  displayName: { text: "Unlinked Gym" },
+                  formattedAddress: "2 Unlinked St, Clonmel",
+                  reviews: [],
+                }),
+                { status: 200 },
+              );
+            }
+            if (isAdLibraryCallForPageId(url, "999888777")) {
+              return new Response(
+                JSON.stringify({
+                  data: [
+                    {
+                      id: "exact-1",
+                      ad_creative_bodies: ["Some generic seasonal promo copy"],
+                      publisher_platforms: ["facebook"],
+                      ad_snapshot_url: "https://fb.example/exact-1",
+                      ad_delivery_start_time: recentIso,
+                      // Deliberately a page_name that would FAIL
+                      // adPageMatchesCompetitor("Totally Different Brand",
+                      // "Linked Gym") -- proves the linked path stores it
+                      // anyway because the name filter is skipped entirely.
+                      page_name: "Totally Different Brand",
+                      page_id: "999888777",
+                    },
+                  ],
+                }),
+                { status: 200 },
+              );
+            }
+            if (isAdLibraryCallFor(url, "Unlinked Gym")) {
+              return new Response(
+                JSON.stringify({
+                  data: [
+                    {
+                      id: "mismatched-1",
+                      ad_creative_bodies: ["Unrelated ad copy"],
+                      publisher_platforms: ["facebook"],
+                      ad_snapshot_url: "https://fb.example/mismatched-1",
+                      ad_delivery_start_time: recentIso,
+                      // Same "unrelated brand" page_name -- for the UNLINKED
+                      // competitor this must still be filtered OUT (the
+                      // original adPageMatchesCompetitor path is untouched).
+                      page_name: "Totally Different Brand",
+                    },
+                  ],
+                }),
+                { status: 200 },
+              );
+            }
+            throw new Error(`unexpected fetch: ${url}`);
+          },
+          async (calls) => {
+            const before = researchSpentCents(tid);
+            const result = await runWithTenant(tid, async () => refreshTenant({ rediscover: false }));
+
+            check("pageid-exact: ok:true", result.ok === true);
+            if (result.ok) {
+              check("pageid-exact: metrics loop unaffected -- refreshed === 2", result.refreshed === 2);
+            }
+
+            check(
+              "pageid-exact: the linked competitor was fetched via search_page_ids",
+              calls.some((c) => isAdLibraryCallForPageId(c.url, "999888777")),
+            );
+            check(
+              "pageid-exact: the linked competitor was NOT fetched via search_terms",
+              !calls.some((c) => isAdLibraryCallFor(c.url, "Linked Gym")),
+            );
+            check(
+              "pageid-exact: the unlinked competitor was still fetched via search_terms (original path unchanged)",
+              calls.some((c) => isAdLibraryCallFor(c.url, "Unlinked Gym")),
+            );
+
+            const after = researchSpentCents(tid);
+            check(
+              "pageid-exact: both free Ad Library calls (page-id + name) add ZERO extra spend on top of the two details charges",
+              after - before === 2 * UNIT_COST_CENTS.details,
+            );
+
+            const linkedAds = runWithTenant(tid, () => listAds(idLinked));
+            check(
+              "pageid-exact: the linked competitor's ad is stored even though its page_name would fail the name filter (filter skipped on the linked path)",
+              linkedAds.length === 1 && linkedAds[0].adId === "exact-1",
+            );
+            check(
+              "pageid-exact: the stored ad's pageName round-trips verbatim (not re-checked against the competitor's own name)",
+              linkedAds[0].pageName === "Totally Different Brand",
+            );
+
+            const unlinkedAds = runWithTenant(tid, () => listAds(idUnlinked));
+            check(
+              "pageid-exact: the unlinked competitor's mismatched-page-name ad is correctly filtered OUT (original path unchanged)",
+              unlinkedAds.length === 0,
             );
           },
         );

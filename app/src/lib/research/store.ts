@@ -49,6 +49,15 @@ import type { AdLite } from "./adLibrary";
  * `searchCompetitorAds`'s results down to matching-page ads BEFORE they ever
  * reach `diffAds`/`upsertAd`, so every row this store holds already passed
  * that check.
+ *
+ * Exact Page-ID ad matching (Task 1) added `facebookPageId`/`facebookPageName`
+ * to `competitors` — an operator-set link to a specific Meta Page (Task 2's
+ * admin UI is the intended caller of the two setters below). When set,
+ * refresh.ts switches that one competitor from the search_terms +
+ * adPageMatchesCompetitor filter path to `searchCompetitorAdsByPageId`
+ * (search_page_ids — exact, every ad Meta attributes to that page, no
+ * name-text matching) and uses the results directly, unfiltered. NULL/NULL
+ * (unlinked) is the default for every competitor until explicitly linked.
  */
 
 export type CompetitorRow = {
@@ -70,6 +79,15 @@ export type CompetitorRow = {
   /** Task 5's cached AI ad-angle summary for this competitor's ad set (competitor_ads) — see setCompetitorAdAngle. */
   adAngleJson: string | null;
   adAngleAt: string | null;
+  /** Meta Page this competitor is linked to (exact Page-ID ad matching,
+   *  Task 1) — set via setCompetitorFacebookPage, cleared via
+   *  clearCompetitorFacebookPage. When set, refresh.ts fetches this
+   *  competitor's ads via searchCompetitorAdsByPageId (search_page_ids,
+   *  exact) instead of the name-filtered search_terms path. NULL
+   *  (unlinked) for every competitor until an operator links one. */
+  facebookPageId: string | null;
+  /** Human-readable label for facebookPageId, set together with it — display only, never used for matching. */
+  facebookPageName: string | null;
   addedBy: string;
   firstSeenAt: string;
   lastRefreshedAt: string | null;
@@ -232,6 +250,30 @@ export function setCompetitorThemes(id: number, themesJson: string, at: string):
 
 export function touchRefreshed(id: number, at: string): void {
   db.update(schema.competitors).set({ lastRefreshedAt: at }).where(eq(schema.competitors.id, id)).run();
+}
+
+/**
+ * Links this competitor to a specific Meta Page (exact Page-ID ad matching,
+ * Task 1) — sets BOTH facebook_page_id and facebook_page_name together
+ * (Task 2's admin UI is the intended caller; there's no legitimate way to
+ * have one set without the other). Once linked, refresh.ts's ad-fetch step
+ * switches this competitor from the search_terms + adPageMatchesCompetitor
+ * name-filter path to searchCompetitorAdsByPageId (search_page_ids) — exact,
+ * no name-text matching — see adLibrary.ts's module doc.
+ */
+export function setCompetitorFacebookPage(id: number, pageId: string, pageName: string): void {
+  db.update(schema.competitors)
+    .set({ facebookPageId: pageId, facebookPageName: pageName })
+    .where(eq(schema.competitors.id, id))
+    .run();
+}
+
+/** Unlinks a competitor from its Meta Page — reverts refresh.ts back to the search_terms + adPageMatchesCompetitor filtered path for this competitor. */
+export function clearCompetitorFacebookPage(id: number): void {
+  db.update(schema.competitors)
+    .set({ facebookPageId: null, facebookPageName: null })
+    .where(eq(schema.competitors.id, id))
+    .run();
 }
 
 // ── weekly metrics (rating/review-count time-series) ───────────────────

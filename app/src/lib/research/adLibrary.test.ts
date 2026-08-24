@@ -9,7 +9,7 @@
 // self-contained file per client).
 import assert from "node:assert/strict";
 
-import { adLibraryConfigured, searchCompetitorAds } from "./adLibrary";
+import { adLibraryConfigured, searchCompetitorAds, searchCompetitorAdsByPageId } from "./adLibrary";
 
 let passed = 0;
 function check(name: string, cond: boolean) {
@@ -244,6 +244,103 @@ async function withApiKey<T>(value: string | undefined, fn: () => Promise<T>): P
           const result = await searchCompetitorAds("Iron Gym Clonmel");
           check("searchCompetitorAds: fetch throws -> ok:false (never throws)", result.ok === false);
         });
+      },
+    );
+  });
+
+  // ════════════════════════════════════════════════════════════════════
+  // searchCompetitorAdsByPageId (exact Page-ID ad matching, Task 1) --
+  // same contract as searchCompetitorAds above, except it scopes the search
+  // by `search_page_ids` (a JSON-array string containing the ONE page id,
+  // encoded exactly like ad_reached_countries) instead of `search_terms`.
+  // ════════════════════════════════════════════════════════════════════
+  await withApiKey(undefined, async () => {
+    await withMockFetch(
+      () => {
+        throw new Error("fetch must not be called when unconfigured");
+      },
+      async (calls) => {
+        const result = await searchCompetitorAdsByPageId("1234567890", "IE");
+        check(
+          "searchCompetitorAdsByPageId: not_configured",
+          result.ok === false && result.error === "not_configured",
+        );
+        check("searchCompetitorAdsByPageId: missing token -> zero fetch calls made", calls.length === 0);
+      },
+    );
+  });
+
+  await withApiKey("test-token", async () => {
+    await withMockFetch(
+      () =>
+        new Response(
+          JSON.stringify({
+            data: [
+              {
+                id: "ad-9",
+                ad_creative_bodies: ["50% off this month only"],
+                publisher_platforms: ["facebook"],
+                ad_snapshot_url: "https://www.facebook.com/ads/archive/render_ad/?id=ad-9",
+                ad_delivery_start_time: "2026-03-01T00:00:00Z",
+                page_name: "Iron Gym Clonmel",
+                page_id: "1234567890",
+              },
+            ],
+          }),
+          { status: 200 },
+        ),
+      async (calls) => {
+        const result = await searchCompetitorAdsByPageId("1234567890", "IE");
+        check("searchCompetitorAdsByPageId: ok:true", result.ok === true);
+        if (result.ok) {
+          check("searchCompetitorAdsByPageId: maps data[] -> AdLite[]", result.ads.length === 1);
+          const [ad] = result.ads;
+          check("searchCompetitorAdsByPageId: adId <- id", ad.adId === "ad-9");
+          check("searchCompetitorAdsByPageId: pageId <- page_id", ad.pageId === "1234567890");
+          check("searchCompetitorAdsByPageId: pageName <- page_name", ad.pageName === "Iron Gym Clonmel");
+          check(
+            "searchCompetitorAdsByPageId: bodies <- ad_creative_bodies",
+            ad.bodies.length === 1 && ad.bodies[0] === "50% off this month only",
+          );
+        }
+
+        // ── request shape ──
+        const call = calls[0];
+        const [base, query] = call.url.split("?");
+        check(
+          "searchCompetitorAdsByPageId: hits the ads_archive endpoint",
+          base === "https://graph.facebook.com/v21.0/ads_archive",
+        );
+        check("searchCompetitorAdsByPageId: ad_type=ALL", query.includes("ad_type=ALL"));
+        check(
+          "searchCompetitorAdsByPageId: ad_reached_countries reflects the given country (JSON array, encoded)",
+          query.includes(`ad_reached_countries=${encodeURIComponent(JSON.stringify(["IE"]))}`),
+        );
+        check(
+          "searchCompetitorAdsByPageId: search_page_ids is a JSON-array string containing the one page id, encoded like ad_reached_countries",
+          query.includes(`search_page_ids=${encodeURIComponent(JSON.stringify(["1234567890"]))}`),
+        );
+        check("searchCompetitorAdsByPageId: does NOT send search_terms", !query.includes("search_terms="));
+        check(
+          "searchCompetitorAdsByPageId: same fields mask as searchCompetitorAds",
+          query.includes(
+            `fields=${encodeURIComponent(
+              "id,ad_creative_bodies,ad_creative_link_titles,ad_creative_link_captions,ad_delivery_start_time,ad_delivery_stop_time,publisher_platforms,ad_snapshot_url,page_name,page_id",
+            )}`,
+          ),
+        );
+        check("searchCompetitorAdsByPageId: limit=25", query.includes("limit=25"));
+        check("searchCompetitorAdsByPageId: access_token", query.includes("access_token=test-token"));
+      },
+    );
+  });
+
+  await withApiKey("test-token", async () => {
+    await withMockFetch(
+      () => new Response("Please reduce the amount of calls.", { status: 429, statusText: "Too Many Requests" }),
+      async () => {
+        const result = await searchCompetitorAdsByPageId("1234567890", "IE");
+        check("searchCompetitorAdsByPageId: non-ok Meta response -> ok:false", result.ok === false);
       },
     );
   });

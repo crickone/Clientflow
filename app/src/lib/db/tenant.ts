@@ -2077,6 +2077,31 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     console.error("[db] competitor_ads page_name/page_id migration failed:", err);
   }
 
+  // Exact Page-ID ad matching (Task 1): `facebook_page_id`/`facebook_page_name`
+  // on `competitors` let an operator link a competitor to a specific Meta
+  // Page (Task 2's admin UI sets these via lib/research/store.ts's
+  // setCompetitorFacebookPage/clearCompetitorFacebookPage). When set,
+  // refresh.ts fetches that competitor's ads via searchCompetitorAdsByPageId
+  // (search_page_ids — exact, no name-text matching) instead of the
+  // search_terms + adPageMatchesCompetitor filter path. Column-add
+  // migration, PRAGMA-guarded + idempotent like is_self/ad_angle_json
+  // above; runs once, a rerun sees both columns already there and no-ops.
+  // Additive + nullable: every pre-existing competitor reads back
+  // NULL/NULL (unlinked) and behaves exactly as it did before this task.
+  // Drizzle mirror in schema.ts.
+  try {
+    const cols = sqlite.prepare("PRAGMA table_info(competitors)").all() as Array<{ name: string }>;
+    const colNames = new Set(cols.map((c) => c.name));
+    if (!colNames.has("facebook_page_id")) {
+      sqlite.exec("ALTER TABLE competitors ADD COLUMN facebook_page_id TEXT");
+    }
+    if (!colNames.has("facebook_page_name")) {
+      sqlite.exec("ALTER TABLE competitors ADD COLUMN facebook_page_name TEXT");
+    }
+  } catch (err) {
+    console.error("[db] competitors facebook_page migration failed:", err);
+  }
+
   // Batch 6b (improvement-plan-2026-08.md Theme E1): tracking table for the
   // versioned migration runner (./migrations) — separate from everything
   // above, which is the additive bootstrap. Created here too (in addition to

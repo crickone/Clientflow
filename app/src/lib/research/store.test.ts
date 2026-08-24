@@ -86,6 +86,8 @@ const requireLocal = createRequire(import.meta.url);
     activeAdIds,
     markAdsStopped,
     setCompetitorAdAngle,
+    setCompetitorFacebookPage,
+    clearCompetitorFacebookPage,
   } = requireLocal("./store") as typeof import("./store");
 
   // ── scratch tenant (control row + a real tenant db file) ──
@@ -693,6 +695,72 @@ const requireLocal = createRequire(import.meta.url);
 
     const compB = runWithTenant(tid, () => listCompetitors()).find((c) => c.id === idB)!;
     assert.equal(compB.adAngleJson, null, "setCompetitorAdAngle is scoped to the given competitorId only");
+
+    // ── setCompetitorFacebookPage / clearCompetitorFacebookPage (exact Page-ID ad matching, Task 1) ──
+    let rowForPage = runWithTenant(tid, () => listCompetitors()).find((c) => c.id === idB)!;
+    assert.equal(rowForPage.facebookPageId, null, "facebookPageId is null before any link is set");
+    assert.equal(rowForPage.facebookPageName, null, "facebookPageName is null before any link is set");
+
+    runWithTenant(tid, () => setCompetitorFacebookPage(idB, "1234567890", "PureGym Clonmel Official"));
+    rowForPage = runWithTenant(tid, () => listCompetitors()).find((c) => c.id === idB)!;
+    assert.equal(rowForPage.facebookPageId, "1234567890", "setCompetitorFacebookPage sets facebookPageId");
+    assert.equal(
+      rowForPage.facebookPageName,
+      "PureGym Clonmel Official",
+      "setCompetitorFacebookPage sets facebookPageName",
+    );
+
+    const rowForPageOther = runWithTenant(tid, () => listCompetitors()).find((c) => c.id === idA)!;
+    assert.equal(
+      rowForPageOther.facebookPageId,
+      null,
+      "setCompetitorFacebookPage is scoped to the given competitor id only -- idA is untouched",
+    );
+
+    runWithTenant(tid, () => clearCompetitorFacebookPage(idB));
+    rowForPage = runWithTenant(tid, () => listCompetitors()).find((c) => c.id === idB)!;
+    assert.equal(rowForPage.facebookPageId, null, "clearCompetitorFacebookPage resets facebookPageId back to null");
+    assert.equal(
+      rowForPage.facebookPageName,
+      null,
+      "clearCompetitorFacebookPage resets facebookPageName back to null",
+    );
+
+    // A competitor that has never been linked reads back null/null by default.
+    const rowFreshComp = runWithTenant(tid, () => listCompetitors()).find((c) => c.id === idC)!;
+    assert.equal(rowFreshComp.facebookPageId, null, "a never-linked competitor defaults to facebookPageId null");
+    assert.equal(rowFreshComp.facebookPageName, null, "a never-linked competitor defaults to facebookPageName null");
+
+    // A pre-migration row (raw INSERT omitting the new columns entirely, same
+    // technique as the competitor_ads pre-migration simulation above) reads
+    // back null/null too -- safe, no throw.
+    sqlite
+      .prepare(
+        `INSERT INTO competitors (place_id, name, address, lat, lng, distance_km, first_seen_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        "places/PRE-MIGRATION",
+        "Pre-Migration Gym",
+        "9 Pre St, Clonmel",
+        52.358,
+        -7.703,
+        5.0,
+        "2026-08-01T00:00:00.000Z",
+      );
+    const preMigrationCompetitor = runWithTenant(tid, () => listCompetitors()).find(
+      (c) => c.placeId === "places/PRE-MIGRATION",
+    )!;
+    assert.ok(
+      preMigrationCompetitor,
+      "a raw pre-migration competitor row (facebook_page_id/name columns never written) is still read back, not dropped",
+    );
+    assert.equal(
+      preMigrationCompetitor.facebookPageId,
+      null,
+      "NULL facebook_page_id (pre-migration row) reads back as null, not throwing",
+    );
+    assert.equal(preMigrationCompetitor.facebookPageName, null, "NULL facebook_page_name reads back as null too");
 
     console.log("research/store.test.ts: all assertions passed");
   } finally {

@@ -2392,6 +2392,21 @@ export const competitors = sqliteTable(
     // ensureTenantTables bootstrap).
     adAngleJson: text("ad_angle_json"),
     adAngleAt: text("ad_angle_at"),
+    // Exact Page-ID ad matching (Task 1): when an operator links this
+    // competitor to a specific Facebook Page (facebookPageId = Meta's own
+    // page_id), refresh.ts fetches its ads via search_page_ids instead of
+    // search_terms + the adPageMatchesCompetitor name filter — exact, no
+    // false positives (see adLibrary.ts's searchCompetitorAdsByPageId).
+    // facebookPageName is the human-readable label an operator sees
+    // alongside it (set together, Task 2's admin UI), never used for
+    // matching itself. Additive + nullable, same PRAGMA
+    // table_info-guarded ALTER TABLE pattern as is_self/ad_angle_json
+    // above (lib/db/tenant.ts) — not a new versioned migration. NULL
+    // (unlinked) is the default for every existing and newly-discovered
+    // competitor; only set via setCompetitorFacebookPage/cleared via
+    // clearCompetitorFacebookPage (lib/research/store.ts).
+    facebookPageId: text("facebook_page_id"),
+    facebookPageName: text("facebook_page_name"),
     addedBy: text("added_by").notNull().default("auto"), // 'auto'|'manual'
     firstSeenAt: text("first_seen_at").notNull(),
     lastRefreshedAt: text("last_refreshed_at"),

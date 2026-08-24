@@ -47,6 +47,18 @@ import "server-only";
  * asset). The field stays optional/always-undefined here so a later task
  * (e.g. snapshot scraping) can populate it without a breaking type change.
  * Paging is ignored for v1 — 25 results is plenty per competitor.
+ *
+ * Exact Page-ID ad matching (Task 1) added `searchCompetitorAdsByPageId` —
+ * the accurate successor to the name-token filter (adPageMatch.ts): once a
+ * competitor is linked to a specific Meta Page (store.ts's
+ * `facebookPageId`), refresh.ts fetches its ads by `search_page_ids` instead
+ * of `search_terms`, which is exact (Meta's own attribution) rather than a
+ * text heuristic over ad copy. Both exported functions now share one
+ * private request/parse core (`fetchAdLibraryAds`) — identical
+ * ad_type/fields/limit, identical Meta error-shape-first handling, identical
+ * tolerant `mapAdLite` parsing — differing only in which single query param
+ * scopes the search; `searchCompetitorAds`'s own behaviour/signature is
+ * unchanged by this refactor.
  */
 
 const AD_LIBRARY_ENDPOINT = "https://graph.facebook.com/v21.0/ads_archive";
@@ -127,9 +139,11 @@ export type AdLite = {
    *  the advertiser. Required (not optional) like bodies/platforms above,
    *  defaulting to "" when Meta doesn't return it — see mapAdLite. */
   pageName: string;
-  /** page_id — not used for matching yet (this task stays on the name-token
-   *  filter approach), but stored/threaded now so a later task can switch to
-   *  exact `search_page_ids` matching without another field-plumbing pass.
+  /** page_id — the advertiser's Meta Page id. Originally stored/threaded
+   *  ahead of use so a later task could switch to exact `search_page_ids`
+   *  matching without another field-plumbing pass; that task is
+   *  `searchCompetitorAdsByPageId` above (Exact Page-ID ad matching, Task 1)
+   *  — see store.ts's `facebookPageId`/refresh.ts's per-competitor routing.
    *  Same required-with-"" -default contract as pageName. */
   pageId: string;
 };
@@ -188,10 +202,24 @@ function mapAdLite(raw: unknown): AdLite | null {
   return ad;
 }
 
-export async function searchCompetitorAds(
-  name: string,
-  country?: string,
-): Promise<{ ok: true; ads: AdLite[] } | { ok: false; error: string }> {
+type AdSearchResult = { ok: true; ads: AdLite[] } | { ok: false; error: string };
+
+/**
+ * Shared request/parse core behind both `searchCompetitorAds` (`search_terms`,
+ * ad-copy text search) and `searchCompetitorAdsByPageId` (`search_page_ids`,
+ * exact advertiser match) — see the latter's own doc for why exact matching
+ * exists. The two scope a DIFFERENT ads_archive query param but are
+ * otherwise identical: same `ad_type`/`fields`/`limit`, same Meta
+ * error-shape-first handling (see the module doc's "Error-shape handling"
+ * note), same tolerant `mapAdLite` parsing, same fail-soft/never-throw
+ * contract. `scopeParam` is the caller's ALREADY-encoded
+ * `search_terms=...`/`search_page_ids=...` pair, so this helper stays
+ * agnostic to which one it is. `callerName` only labels the error string's
+ * prefix (kept distinct per caller for a legible log/error) — it never
+ * changes control flow, so `searchCompetitorAds`'s own error text is
+ * byte-identical to before this helper existed.
+ */
+async function fetchAdLibraryAds(scopeParam: string, country: string | undefined, callerName: string): Promise<AdSearchResult> {
   const token = apiToken();
   if (!token) return { ok: false, error: NOT_CONFIGURED_ERROR };
   try {
@@ -201,7 +229,7 @@ export async function searchCompetitorAds(
       [
         `ad_type=ALL`,
         `ad_reached_countries=${encodeURIComponent(reachedCountries)}`,
-        `search_terms=${encodeURIComponent(name)}`,
+        scopeParam,
         `fields=${encodeURIComponent(AD_FIELDS)}`,
         `limit=${RESULT_LIMIT}`,
         `access_token=${encodeURIComponent(token)}`,
@@ -220,7 +248,7 @@ export async function searchCompetitorAds(
     }
     if (!res.ok) {
       const detail = (text.trim() || res.statusText || `HTTP ${res.status}`).slice(0, 500);
-      return { ok: false, error: `searchCompetitorAds failed (${res.status}): ${detail}` };
+      return { ok: false, error: `${callerName} failed (${res.status}): ${detail}` };
     }
 
     const rawAds = Array.isArray(data.data) ? data.data : [];
@@ -231,6 +259,35 @@ export async function searchCompetitorAds(
     }
     return { ok: true, ads };
   } catch (err) {
-    return { ok: false, error: `searchCompetitorAds failed: ${errorMessage(err)}` };
+    return { ok: false, error: `${callerName} failed: ${errorMessage(err)}` };
   }
+}
+
+export async function searchCompetitorAds(name: string, country?: string): Promise<AdSearchResult> {
+  return fetchAdLibraryAds(`search_terms=${encodeURIComponent(name)}`, country, "searchCompetitorAds");
+}
+
+/**
+ * Exact Page-ID ad matching (Task 1): fetches EVERY ad Meta attributes to
+ * `pageId`, via `search_page_ids` — a JSON-array string containing the one
+ * page id, encoded exactly like `ad_reached_countries` above (see the
+ * module doc's "EU scoping" note) — rather than `search_terms`'s ad-copy
+ * text search. This is the accurate successor to adPageMatch.ts's
+ * name-token filter: a page id is Meta's own ground truth for "which
+ * advertiser placed this ad", so refresh.ts uses these results DIRECTLY,
+ * with no `adPageMatchesCompetitor` filtering pass on this path (see
+ * refresh.ts's per-competitor routing). `reachedCountries` is required
+ * (unlike `searchCompetitorAds`'s optional `country`) — every caller today
+ * (refresh.ts) always has one on hand (`AD_LIBRARY_COUNTRY`), so there's no
+ * meaningful "omitted" case to default here. Same `AD_FIELDS`, same
+ * tolerant `mapAdLite` parsing, same fail-soft/never-throw contract as
+ * `searchCompetitorAds`.
+ */
+export async function searchCompetitorAdsByPageId(pageId: string, reachedCountries: string): Promise<AdSearchResult> {
+  const searchPageIds = JSON.stringify([pageId]);
+  return fetchAdLibraryAds(
+    `search_page_ids=${encodeURIComponent(searchPageIds)}`,
+    reachedCountries,
+    "searchCompetitorAdsByPageId",
+  );
 }

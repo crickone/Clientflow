@@ -142,6 +142,8 @@ const requireLocal = createRequire(import.meta.url);
     themesAt: null,
     adAngleJson: null,
     adAngleAt: null,
+    facebookPageId: null,
+    facebookPageName: null,
     addedBy: "manual",
     firstSeenAt: "2026-01-01T00:00:00.000Z",
     lastRefreshedAt: null,

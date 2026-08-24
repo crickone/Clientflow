@@ -21,7 +21,7 @@ import {
 } from "./store";
 import { detectChanges } from "./changeDetect";
 import { discoverCompetitors } from "./discovery";
-import { adLibraryConfigured, searchCompetitorAds } from "./adLibrary";
+import { adLibraryConfigured, searchCompetitorAds, searchCompetitorAdsByPageId, type AdLite } from "./adLibrary";
 import { adPageMatchesCompetitor } from "./adPageMatch";
 import { diffAds } from "./adDiff";
 import { getCurrentTenant } from "@/lib/db/tenant";
@@ -103,6 +103,21 @@ import { getCurrentTenant } from "@/lib/db/tenant";
  *    therefore the AI ad-angle summary and the gallery — only ever contain
  *    ads this competitor's own page actually placed. An empty filtered set
  *    is a normal, honest outcome, not an error.
+ *  - **Exact Page-ID ad matching (Task 1):** when a competitor has been
+ *    explicitly linked to a Facebook Page (`comp.facebookPageId`, set via
+ *    lib/research/store.ts's `setCompetitorFacebookPage` — Task 2's admin
+ *    UI), this step calls `searchCompetitorAdsByPageId` instead of
+ *    `searchCompetitorAds`, and uses its `res.ads` DIRECTLY — the
+ *    `adPageMatchesCompetitor` name filter above is SKIPPED for a linked
+ *    competitor, because `search_page_ids` already scopes the query to
+ *    exactly that page: Meta's own ground truth for "who placed this ad",
+ *    stronger than any name-text heuristic. This also covers a case the
+ *    name filter structurally can't: an ad whose copy never mentions the
+ *    gym's name at all would fail `adPageMatchesCompetitor` and be dropped
+ *    even though it's genuinely this competitor's ad; a linked page id has
+ *    no such blind spot. An unlinked competitor (`facebookPageId` null —
+ *    the default for every existing and newly-discovered competitor) keeps
+ *    the `searchCompetitorAds` + name-filter path above, unchanged.
  *  - The Ad Library API is FREE. `recordResearchSpend(...,
  *    UNIT_COST_CENTS.adlib, "adlib")` still runs on every SUCCESSFUL search
  *    (adlib = 0c) purely so the spend ledger has a uniform row per research
@@ -233,37 +248,66 @@ export async function refreshTenant(opts?: { radiusKm?: number; rediscover?: boo
           // above.
           const prevActive = activeAdIds(comp.id);
 
-          const res = await searchCompetitorAds(comp.name, AD_LIBRARY_COUNTRY);
-          if (!res.ok) {
-            // Per-competitor resilient: one competitor's Ad Library error
-            // (e.g. a 429) must never stop the rest of the watchlist. No
-            // spend recorded for a failed call -- moot here since the call
-            // is free, but kept symmetric with the placeDetails failure
-            // above.
-            console.error(
-              `[research/refresh] searchCompetitorAds failed for competitor ${comp.id} (${comp.name}):`,
-              res.error,
-            );
-            continue;
-          }
-          // FREE API -- this is a ledger entry for observability only
-          // (UNIT_COST_CENTS.adlib is 0c), never a real charge, and
-          // deliberately never gated behind assertUnderResearchCap: an
-          // unrelated Places-spend cap must not block a free API.
-          recordResearchSpend(tenantId, UNIT_COST_CENTS.adlib, "adlib");
+          // Exact Page-ID ad matching (Task 1): a linked competitor
+          // (comp.facebookPageId set via setCompetitorFacebookPage) is
+          // fetched by search_page_ids and its ads used DIRECTLY -- see the
+          // module doc's "Exact Page-ID ad matching" bullet for why the name
+          // filter in the `else` branch below is skipped for this path. An
+          // unlinked competitor keeps the original search_terms +
+          // adPageMatchesCompetitor path verbatim.
+          let ownAds: AdLite[];
+          if (comp.facebookPageId) {
+            const res = await searchCompetitorAdsByPageId(comp.facebookPageId, AD_LIBRARY_COUNTRY);
+            if (!res.ok) {
+              // Per-competitor resilient, same contract as the unlinked
+              // branch below.
+              console.error(
+                `[research/refresh] searchCompetitorAdsByPageId failed for competitor ${comp.id} (${comp.name}):`,
+                res.error,
+              );
+              continue;
+            }
+            // FREE API -- ledger entry only, see the unlinked branch's
+            // identical comment below.
+            recordResearchSpend(tenantId, UNIT_COST_CENTS.adlib, "adlib");
+            // The page id IS the exact match -- no adPageMatchesCompetitor
+            // filtering needed or wanted here. This also stores ads whose
+            // copy never names the gym at all, which the name filter would
+            // otherwise wrongly drop.
+            ownAds = res.ads;
+          } else {
+            const res = await searchCompetitorAds(comp.name, AD_LIBRARY_COUNTRY);
+            if (!res.ok) {
+              // Per-competitor resilient: one competitor's Ad Library error
+              // (e.g. a 429) must never stop the rest of the watchlist. No
+              // spend recorded for a failed call -- moot here since the call
+              // is free, but kept symmetric with the placeDetails failure
+              // above.
+              console.error(
+                `[research/refresh] searchCompetitorAds failed for competitor ${comp.id} (${comp.name}):`,
+                res.error,
+              );
+              continue;
+            }
+            // FREE API -- this is a ledger entry for observability only
+            // (UNIT_COST_CENTS.adlib is 0c), never a real charge, and
+            // deliberately never gated behind assertUnderResearchCap: an
+            // unrelated Places-spend cap must not block a free API.
+            recordResearchSpend(tenantId, UNIT_COST_CENTS.adlib, "adlib");
 
-          // Advertiser-page-match fix: `searchCompetitorAds` matches ad COPY
-          // (Meta's search_terms is full-text over the ad, not the
-          // advertiser), so `res.ads` can and does contain other businesses'
-          // ads whose text happens to share a word with this competitor's
-          // name (the live bug -- see adPageMatch.ts's module doc). Filter
-          // down to ads this competitor's OWN page actually placed BEFORE
-          // diffAds ever sees them, so the stored set, the AI ad-angle
-          // summary (computed from stored ads), and the gallery only ever
-          // hold this competitor's own ads. An empty `ownAds` (every result
-          // was a false positive) is the correct, honest outcome -- "no ads
-          // found" beats junk.
-          const ownAds = res.ads.filter((a) => adPageMatchesCompetitor(a.pageName, comp.name));
+            // Advertiser-page-match fix: `searchCompetitorAds` matches ad COPY
+            // (Meta's search_terms is full-text over the ad, not the
+            // advertiser), so `res.ads` can and does contain other businesses'
+            // ads whose text happens to share a word with this competitor's
+            // name (the live bug -- see adPageMatch.ts's module doc). Filter
+            // down to ads this competitor's OWN page actually placed BEFORE
+            // diffAds ever sees them, so the stored set, the AI ad-angle
+            // summary (computed from stored ads), and the gallery only ever
+            // hold this competitor's own ads. An empty `ownAds` (every result
+            // was a false positive) is the correct, honest outcome -- "no ads
+            // found" beats junk.
+            ownAds = res.ads.filter((a) => adPageMatchesCompetitor(a.pageName, comp.name));
+          }
 
           const nowIso = new Date().toISOString();
           const { upserts, stoppedAdIds, events: adEvents } = diffAds(prevActive, ownAds, comp.id, comp.name, nowIso);
