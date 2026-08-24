@@ -2380,6 +2380,16 @@ export const competitors = sqliteTable(
     isSelf: integer("is_self", { mode: "boolean" }).notNull().default(false),
     themesJson: text("themes_json"), // JSON, AI-derived review themes
     themesAt: text("themes_at"),
+    // Market Research P2 (Task 3, for Task 5's cached ad-angle summary):
+    // mirrors themesJson/themesAt's cache shape above, but for the AI's
+    // derived "ad angle" read of this competitor's ad set (competitor_ads)
+    // instead of its reviews. Additive + nullable, same PRAGMA
+    // table_info-guarded ALTER TABLE pattern as is_self (lib/db/tenant.ts) —
+    // not a new versioned migration (see migrations/index.ts's
+    // division-of-labour doc: additive/nullable columns stay in the
+    // ensureTenantTables bootstrap).
+    adAngleJson: text("ad_angle_json"),
+    adAngleAt: text("ad_angle_at"),
     addedBy: text("added_by").notNull().default("auto"), // 'auto'|'manual'
     firstSeenAt: text("first_seen_at").notNull(),
     lastRefreshedAt: text("last_refreshed_at"),
@@ -2444,8 +2454,50 @@ export const competitorEvents = sqliteTable(
   }),
 );
 
+// ── Market Research P2 (Task 3): a competitor's individual ads ─────────────
+// Sourced from the Meta Ad Library (lib/research/adLibrary.ts's
+// searchCompetitorAds / AdLite) and kept in sync by the later refresh job via
+// lib/research/adDiff.ts's diffAds. `ad_id` (Meta's ads_archive id) is unique
+// PER COMPETITOR, not globally — two different competitors' ads never
+// collide because the id space is scoped by (competitor_id, ad_id) — so a
+// refresh upserts the same row instead of duplicating it (store.ts's
+// upsertAd). No enforced FK on competitor_id, same "follow the literal DDL"
+// precedent as the other three P1 tables above. `bodies`/`platforms` are
+// JSON-encoded string[] on write, parsed back into arrays on read (AdLite's
+// own array shape) — the same JSON-in-TEXT convention as e.g.
+// appointments.therapyIds elsewhere in this file. `active` is the diff's own
+// verdict (isActive in adDiff.ts), written by upsertAd/markAdsStopped rather
+// than re-derived by a query. Timestamp columns are ISO TEXT, matching the
+// P1 research tables' own convention above (not this file's usual integer
+// timestamp_ms). Matches the CREATE TABLE already in ensureTenantTables
+// (lib/db/tenant.ts) — same shape + index names, kept in sync.
+export const competitorAds = sqliteTable(
+  "competitor_ads",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    competitorId: integer("competitor_id").notNull(),
+    adId: text("ad_id").notNull(), // Meta ads_archive id; unique per competitor
+    bodies: text("bodies").notNull().default("[]"), // JSON string[] — ad copy lines
+    linkTitle: text("link_title"),
+    linkCaption: text("link_caption"),
+    platforms: text("platforms").notNull().default("[]"), // JSON string[] e.g. ["facebook","instagram"]
+    snapshotUrl: text("snapshot_url").notNull(),
+    startedAt: text("started_at"),
+    stoppedAt: text("stopped_at"),
+    active: integer("active", { mode: "boolean" }).notNull().default(true),
+    imageUrl: text("image_url"),
+    firstSeenAt: text("first_seen_at").notNull(),
+    lastSeenAt: text("last_seen_at").notNull(),
+  },
+  (t) => ({
+    competitorAdUnique: uniqueIndex("idx_competitor_ads_competitor_ad").on(t.competitorId, t.adId),
+    byCompetitor: index("idx_competitor_ads_competitor").on(t.competitorId),
+  }),
+);
+
 export type Competitor = typeof competitors.$inferSelect;
 export type CompetitorMetricRow = typeof competitorMetrics.$inferSelect;
 export type CompetitorReviewRow = typeof competitorReviews.$inferSelect;
 export type CompetitorEventRow = typeof competitorEvents.$inferSelect;
+export type CompetitorAdRow = typeof competitorAds.$inferSelect;
 export type NewAgentRun = typeof agentRuns.$inferInsert;

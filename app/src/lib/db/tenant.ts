@@ -1979,6 +1979,55 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     console.error("[db] competitors is_self migration failed:", err);
   }
 
+  // Market Research P2 (Task 3 — competitor ads; see lib/research/store.ts's
+  // upsertAd/listAds/activeAdIds/markAdsStopped). `ad_id` (Meta's
+  // ads_archive id) is unique PER COMPETITOR — the composite unique index
+  // below, not a unique column on ad_id alone — so a refresh upserts the
+  // same row instead of duplicating it. No enforced FK on competitor_id,
+  // same "follow the literal DDL" precedent as the P1 tables above.
+  // Timestamp columns are ISO TEXT to match the P1 research tables'
+  // convention. Drizzle mirror in schema.ts — same shape + index names, kept
+  // in sync.
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS competitor_ads (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      competitor_id INTEGER NOT NULL,
+      ad_id TEXT NOT NULL,
+      bodies TEXT NOT NULL DEFAULT '[]',
+      link_title TEXT,
+      link_caption TEXT,
+      platforms TEXT NOT NULL DEFAULT '[]',
+      snapshot_url TEXT NOT NULL,
+      started_at TEXT,
+      stopped_at TEXT,
+      active INTEGER NOT NULL DEFAULT 1,
+      image_url TEXT,
+      first_seen_at TEXT NOT NULL,
+      last_seen_at TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_competitor_ads_competitor_ad ON competitor_ads(competitor_id, ad_id);
+    CREATE INDEX IF NOT EXISTS idx_competitor_ads_competitor ON competitor_ads(competitor_id);
+  `);
+
+  // Market Research P2 (Task 3, for Task 5): `ad_angle_json`/`ad_angle_at`
+  // cache the AI-derived ad-angle summary on the owning competitor row —
+  // same role as themes_json/themes_at above, for ads instead of reviews.
+  // Column-add migration, PRAGMA-guarded + idempotent like is_self above;
+  // runs once, a rerun sees both columns already there and no-ops. Drizzle
+  // mirror in schema.ts.
+  try {
+    const cols = sqlite.prepare("PRAGMA table_info(competitors)").all() as Array<{ name: string }>;
+    const colNames = new Set(cols.map((c) => c.name));
+    if (!colNames.has("ad_angle_json")) {
+      sqlite.exec("ALTER TABLE competitors ADD COLUMN ad_angle_json TEXT");
+    }
+    if (!colNames.has("ad_angle_at")) {
+      sqlite.exec("ALTER TABLE competitors ADD COLUMN ad_angle_at TEXT");
+    }
+  } catch (err) {
+    console.error("[db] competitors ad_angle migration failed:", err);
+  }
+
   // Batch 6b (improvement-plan-2026-08.md Theme E1): tracking table for the
   // versioned migration runner (./migrations) — separate from everything
   // above, which is the additive bootstrap. Created here too (in addition to

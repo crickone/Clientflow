@@ -1,8 +1,9 @@
 import "server-only";
 
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 
 import { db, schema } from "@/lib/db";
+import type { AdLite } from "./adLibrary";
 
 /**
  * Tenant store for Market Research P1's competitor watchlist (Task 4) — CRUD
@@ -29,6 +30,19 @@ import { db, schema } from "@/lib/db";
  * `CompetitorRow` like every other column, settable via `NewCompetitor`,
  * filterable via `listCompetitors({excludeSelf:true})`, and readable
  * directly via `getSelfCompetitor()` below.
+ *
+ * Market Research P2 (Task 3) added `competitor_ads` — a competitor's
+ * individual ads, sourced from the Meta Ad Library
+ * (lib/research/adLibrary.ts's searchCompetitorAds / `AdLite`) and kept in
+ * sync by the later refresh job via lib/research/adDiff.ts's `diffAds`. Same
+ * ambient-`db`/no-tenantId-param contract as everything else here.
+ * `bodies`/`platforms` are JSON-encoded on write and parsed back into arrays
+ * on read (see `toStoredAd` below) — `AdLite`'s own array shape, stored as
+ * TEXT the same way every other JSON-array column in this app is (e.g.
+ * `appointments.therapyIds`). Also added `competitors.adAngleJson`/
+ * `adAngleAt` (`setCompetitorAdAngle`) — Task 5's cached AI ad-angle summary,
+ * mirroring `themesJson`/`themesAt`'s cache-column shape above but for ads
+ * instead of reviews; exposed on `CompetitorRow` the same way `isSelf` was.
  */
 
 export type CompetitorRow = {
@@ -47,6 +61,9 @@ export type CompetitorRow = {
   isSelf: boolean;
   themesJson: string | null;
   themesAt: string | null;
+  /** Task 5's cached AI ad-angle summary for this competitor's ad set (competitor_ads) — see setCompetitorAdAngle. */
+  adAngleJson: string | null;
+  adAngleAt: string | null;
   addedBy: string;
   firstSeenAt: string;
   lastRefreshedAt: string | null;
@@ -339,4 +356,174 @@ export function listEvents(opts: { unseenOnly?: boolean; limit?: number } = {}):
 export function markEventsSeen(ids: number[]): void {
   if (ids.length === 0) return;
   db.update(schema.competitorEvents).set({ seen: true }).where(inArray(schema.competitorEvents.id, ids)).run();
+}
+
+// ── competitor ads (Market Research P2, Task 3) ─────────────────────────
+
+export type StoredAd = {
+  id: number;
+  competitorId: number;
+  adId: string;
+  bodies: string[];
+  linkTitle: string | null;
+  linkCaption: string | null;
+  platforms: string[];
+  snapshotUrl: string;
+  startedAt: string | null;
+  stoppedAt: string | null;
+  active: boolean;
+  imageUrl: string | null;
+  firstSeenAt: string;
+  lastSeenAt: string;
+};
+
+/**
+ * Best-effort JSON-array parse for the `bodies`/`platforms` TEXT columns —
+ * mirrors adLibrary.ts's own defensive style (never throws; a malformed or
+ * non-array value degrades to `[]` rather than blowing up a read). Every
+ * write path in this module always JSON.stringifies a real `string[]` first
+ * (AdLite.bodies/platforms), so this only ever has to tolerate a
+ * hand-edited or pre-migration row in practice.
+ */
+function parseJsonStringArray(json: string): string[] {
+  try {
+    const parsed = JSON.parse(json);
+    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function toStoredAd(row: typeof schema.competitorAds.$inferSelect): StoredAd {
+  return {
+    id: row.id,
+    competitorId: row.competitorId,
+    adId: row.adId,
+    bodies: parseJsonStringArray(row.bodies),
+    linkTitle: row.linkTitle,
+    linkCaption: row.linkCaption,
+    platforms: parseJsonStringArray(row.platforms),
+    snapshotUrl: row.snapshotUrl,
+    startedAt: row.startedAt,
+    stoppedAt: row.stoppedAt,
+    active: row.active,
+    imageUrl: row.imageUrl,
+    firstSeenAt: row.firstSeenAt,
+    lastSeenAt: row.lastSeenAt,
+  };
+}
+
+/**
+ * Upsert-by-(competitorId, adId): a fresh pair inserts a new row
+ * (firstSeenAt = lastSeenAt = `at`, active = true); a pair already stored
+ * updates its mutable fields in place — bodies/linkTitle/linkCaption/
+ * platforms/snapshotUrl/startedAt/stoppedAt/imageUrl/active/lastSeenAt.
+ * `firstSeenAt` is deliberately left out of the conflict `set`, mirroring
+ * upsertCompetitor's exact "keep firstSeenAt" contract — a re-fetch can
+ * never reset when this ad was first seen.
+ *
+ * `active` is unconditionally set true here, even on the update path — an ad
+ * this call is asked to upsert came back from the current Ad Library search,
+ * so it's current by definition; the ONLY way a row becomes inactive is a
+ * later, explicit `markAdsStopped` call (fed by the diff's `stoppedAdIds`)
+ * for ids that DIDN'T come back. Caller order matters: adDiff.ts's `diffAds`
+ * returns `upserts` (every current ad, for this function) and
+ * `stoppedAdIds` separately — a refresh job upserts first, then calls
+ * markAdsStopped, so an ad that's both present-but-past-its-stoppedAt AND in
+ * `stoppedAdIds` still ends up correctly inactive (markAdsStopped runs
+ * second and wins).
+ */
+export function upsertAd(competitorId: number, ad: AdLite, at: string): void {
+  const mutable = {
+    bodies: JSON.stringify(ad.bodies),
+    linkTitle: ad.linkTitle ?? null,
+    linkCaption: ad.linkCaption ?? null,
+    platforms: JSON.stringify(ad.platforms),
+    snapshotUrl: ad.snapshotUrl,
+    startedAt: ad.startedAt ?? null,
+    stoppedAt: ad.stoppedAt ?? null,
+    active: true,
+    imageUrl: ad.imageUrl ?? null,
+    lastSeenAt: at,
+  };
+  db.insert(schema.competitorAds)
+    .values({ competitorId, adId: ad.adId, firstSeenAt: at, ...mutable })
+    .onConflictDoUpdate({
+      target: [schema.competitorAds.competitorId, schema.competitorAds.adId],
+      set: mutable,
+    })
+    .run();
+}
+
+/**
+ * A competitor's stored ads, newest-first by `startedAt`. SQLite treats NULL
+ * as smaller than any other value, so a plain `DESC` naturally sorts ads
+ * with a known start date first (most recently started first) and pushes
+ * ads with no `startedAt` (Meta didn't return one) to the end, rather than
+ * letting them sort arbitrarily first; `id DESC` breaks ties (equal
+ * startedAt, or both null) so the ordering is fully deterministic.
+ * `activeOnly` filters to active=true — the "what's this competitor running
+ * right now" view.
+ */
+export function listAds(competitorId: number, opts: { activeOnly?: boolean } = {}): StoredAd[] {
+  return db
+    .select()
+    .from(schema.competitorAds)
+    .where(
+      and(
+        eq(schema.competitorAds.competitorId, competitorId),
+        opts.activeOnly ? eq(schema.competitorAds.active, true) : undefined,
+      ),
+    )
+    .orderBy(desc(schema.competitorAds.startedAt), desc(schema.competitorAds.id))
+    .all()
+    .map(toStoredAd);
+}
+
+/** The adIds this competitor currently has active=true — feeds adDiff.ts's `prevActiveIds` for the next refresh cycle. */
+export function activeAdIds(competitorId: number): Set<string> {
+  const rows = db
+    .select({ adId: schema.competitorAds.adId })
+    .from(schema.competitorAds)
+    .where(and(eq(schema.competitorAds.competitorId, competitorId), eq(schema.competitorAds.active, true)))
+    .all();
+  return new Set(rows.map((r) => r.adId));
+}
+
+/**
+ * Flips active -> false for the given adIds (scoped to one competitor) and
+ * stamps `stoppedAt`, but ONLY where it isn't already set. Two updates in a
+ * transaction rather than a single COALESCE-in-`set` statement, to keep this
+ * file consistent with its existing plain-drizzle style (replaceReviews
+ * above is the precedent for "wholesale change inside db.transaction")
+ * rather than introduce a new sql-template idiom. This preserves a real
+ * `ad_delivery_stop_time` Meta already gave upsertAd, and makes the call
+ * idempotent: re-running it for an already-stopped id changes active (a
+ * no-op, already false) but never clobbers stoppedAt with a later "now". A
+ * no-op (no transaction opened) on an empty adIds array, mirroring
+ * markEventsSeen's contract.
+ */
+export function markAdsStopped(competitorId: number, adIds: string[], at: string): void {
+  if (adIds.length === 0) return;
+  db.transaction((tx) => {
+    tx.update(schema.competitorAds)
+      .set({ active: false })
+      .where(and(eq(schema.competitorAds.competitorId, competitorId), inArray(schema.competitorAds.adId, adIds)))
+      .run();
+    tx.update(schema.competitorAds)
+      .set({ stoppedAt: at })
+      .where(
+        and(
+          eq(schema.competitorAds.competitorId, competitorId),
+          inArray(schema.competitorAds.adId, adIds),
+          isNull(schema.competitorAds.stoppedAt),
+        ),
+      )
+      .run();
+  });
+}
+
+/** Caches Task 5's AI ad-angle summary on the owning competitor row — mirrors setCompetitorThemes's shape exactly, for ads instead of reviews. */
+export function setCompetitorAdAngle(competitorId: number, adAngleJson: string, at: string): void {
+  db.update(schema.competitors).set({ adAngleJson, adAngleAt: at }).where(eq(schema.competitors.id, competitorId)).run();
 }
