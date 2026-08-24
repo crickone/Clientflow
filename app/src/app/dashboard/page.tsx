@@ -24,7 +24,6 @@ import { getSchedulingMode, getVenueType } from "@/lib/settings";
 import { getVocab } from "@/lib/vocabulary";
 import { isBriefComplete } from "@/lib/businessProfile";
 import { getCurrentTenant } from "@/lib/db/tenant";
-import { AssistantChat } from "@/components/messaging/AssistantChat";
 import { getSetupSummary, isSetupDismissed, setSetupDismissed } from "@/lib/setup/steps";
 import { getCurrentMembership } from "@/lib/auth";
 import { SetupProgressCard } from "@/components/dashboard/SetupProgressCard";
@@ -94,27 +93,10 @@ export default async function DashboardPage() {
         }
       />
 
-      {/* AI daily brief (auto) + the Orchestrator (single front door: it routes
-          to the right specialist, or to the general Concierge toolkit). */}
+      {/* AI daily brief (auto). The Orchestrator ("Adonis") chat now has its own
+          dedicated home at /adonis (pinned top of the nav), so it's no longer
+          embedded here — the dashboard keeps the brief + at-a-glance cards. */}
       <DailyBrief tenantId={tenantId} />
-      <div style={{ marginBottom: 20 }}>
-        <AssistantChat
-          tenantId={tenantId}
-          endpoint="/api/agents/orchestrator/chat"
-          title="Adonis"
-          subtitle="routes any request to the right agent — sales, marketing, ops, or your general concierge"
-          emptyTitle="Ask for anything — I'll route it"
-          emptyBody="Tell me what you need and I'll hand it to the right agent: chasing leads, drafting content, recovering no-shows, or the general stuff — your inbox, invoices, money, and plans. Nothing sends or changes without your approval."
-          suggestions={[
-            "Give me a breakdown of everything important today",
-            "Work my leads and win back anyone who's gone quiet",
-            "Pull together this month's invoices",
-            "Draft a blog about our newest class",
-          ]}
-          placeholder="Ask Adonis…  (Enter to send)"
-          height="clamp(440px, 62vh, 720px)"
-        />
-      </div>
 
       {!briefComplete && (
         <Reveal>

@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { Sparkles, Send, Download, Loader2, Check, History, Plus, Trash2, MessageSquare } from "lucide-react";
+import { EASE } from "@/lib/motion";
 
 import { Button } from "@/components/ui/Button";
 import {
@@ -474,7 +476,10 @@ export function AssistantChat({
     if (el && container) {
       const cRect = container.getBoundingClientRect();
       const eRect = el.getBoundingClientRect();
-      container.scrollTop += eRect.top - cRect.top - 10;
+      // Smoothly glide the question up to the top so the reply flows in below it
+      // (the empty-state hero fades up over the same beat) — Hermes-style, not a
+      // hard snap.
+      container.scrollTo({ top: container.scrollTop + (eRect.top - cRect.top - 10), behavior: "smooth" });
     }
   }, [messages]);
 
@@ -910,57 +915,11 @@ export function AssistantChat({
           display: "flex",
           flexDirection: "column",
           gap: 14,
-          // With a heroSlot, center the [hero + empty-state] group in the
-          // viewport while empty (Hermes-style), then top-anchor once a
-          // conversation starts so the hero scrolls up with the messages.
-          justifyContent: heroSlot && empty ? "center" : undefined,
+          position: "relative",
         }}
       >
-        {heroSlot}
-        {empty ? (
-          <div style={{ margin: heroSlot ? "0 auto" : "auto", textAlign: "center", maxWidth: 460 }}>
-            {!bare && (
-              <Sparkles size={26} strokeWidth={1.5} style={{ color: "var(--accent)", marginBottom: 10 }} />
-            )}
-            {/* In `bare` mode the title moves to the bottom cluster (just above
-                the input, below); here the centered area is the hero alone. */}
-            {!bare && (
-              <div style={{ fontSize: 15, color: "var(--text-primary)", fontWeight: 600, marginBottom: 6 }}>
-                {emptyTitle}
-              </div>
-            )}
-            {emptyBody && (
-              <div style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 18, lineHeight: 1.5 }}>
-                {emptyBody}
-              </div>
-            )}
-            {/* In `bare` mode (the /adonis flagship view) the suggestions move
-                to a compact row just above the input (below) so the hero stays
-                centered and clean; other consumers keep them here. */}
-            {!bare && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {suggestions.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => send(s)}
-                    style={{
-                      textAlign: "left",
-                      padding: "10px 14px",
-                      border: "1px solid var(--hairline)",
-                      borderRadius: "var(--radius)",
-                      background: "var(--surface-2)",
-                      color: "var(--text-secondary)",
-                      fontSize: 13,
-                      cursor: "pointer",
-                    }}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
+        {/* Messages flow normally from the top. */}
+        {!empty &&
           messages.map((m, i) => (
             <div key={i} ref={i === lastUserIdx ? lastUserRef : undefined}>
               <MessageBubble
@@ -981,8 +940,69 @@ export function AssistantChat({
                 onGoAgain={(tweak) => m.pending && goAgain(activeId, i, m.pending.actions, tweak)}
               />
             </div>
-          ))
-        )}
+          ))}
+
+        {/* Empty state = a centered overlay that fades up on the first send, so
+            a big hero (the /adonis mark) gives way SMOOTHLY to the conversation
+            (which flows in from the top underneath) instead of snapping. */}
+        <AnimatePresence initial={false}>
+          {empty && (
+            <motion.div
+              key="chat-empty"
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.32, ease: EASE }}
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                textAlign: "center",
+                padding: 16,
+              }}
+            >
+              {heroSlot}
+              {/* In `bare` mode (the /adonis flagship view) the title +
+                  suggestions live in the bottom cluster above the input, so the
+                  centered overlay is the hero alone; other consumers show them
+                  here. */}
+              {!bare && (
+                <div style={{ maxWidth: 460 }}>
+                  <Sparkles size={26} strokeWidth={1.5} style={{ color: "var(--accent)", marginBottom: 10 }} />
+                  <div style={{ fontSize: 15, color: "var(--text-primary)", fontWeight: 600, marginBottom: 6 }}>
+                    {emptyTitle}
+                  </div>
+                  {emptyBody && (
+                    <div style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 18, lineHeight: 1.5 }}>
+                      {emptyBody}
+                    </div>
+                  )}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {suggestions.map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => send(s)}
+                        style={{
+                          textAlign: "left",
+                          padding: "10px 14px",
+                          border: "1px solid var(--hairline)",
+                          borderRadius: "var(--radius)",
+                          background: "var(--surface-2)",
+                          color: "var(--text-secondary)",
+                          fontSize: 13,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* bare (/adonis): the prompt + compact chips sit right above the input,
