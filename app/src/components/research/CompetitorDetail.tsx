@@ -4,6 +4,7 @@ import { EyeOff, Megaphone } from "lucide-react";
 
 import type { CompetitorRow as CompetitorRowData, EventRow, Metric, StoredReview } from "@/lib/research/store";
 import { parseStoredThemes } from "@/lib/research/themesJson";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { CardLabel } from "@/components/ui/Card";
 import { formatDate } from "@/lib/utils";
@@ -132,9 +133,9 @@ export function CompetitorDetail({ competitor, history, reviews, events, onBuild
                       {r.author || "Anonymous"}
                     </span>
                     {r.ratingMilli != null && (
-                      <span style={{ fontSize: 12, color: "var(--text-tertiary)", flexShrink: 0 }}>
-                        ★ {(r.ratingMilli / 1000).toFixed(1)}
-                      </span>
+                      <Badge tone="neutral" style={{ flexShrink: 0 }}>
+                        {`★ ${(r.ratingMilli / 1000).toFixed(1)}`}
+                      </Badge>
                     )}
                   </div>
                   <p
