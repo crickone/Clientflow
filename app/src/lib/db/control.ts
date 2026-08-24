@@ -494,6 +494,38 @@ export function ensureControlTables() {
     );
     CREATE INDEX IF NOT EXISTS idx_ai_credit_ledger_tenant ON ai_credit_ledger(tenant_id, created_at);
 
+    -- ── Research spend metering (Market Research P1, Task 3) ──────────────────
+    -- Per-tenant monthly spend on external data calls (Google Places/Geocoding
+    -- — see @/lib/research/spend.ts), metered the same CONTROL-PLANE + month-key
+    -- + cap-check contract as ai_usage above, but a SEPARATE table/ledger/cap —
+    -- research spend has its own budget and must never share ai_usage's monthly
+    -- total. Unlike ai_usage's insert-a-row-per-call + SUM-on-read shape, this
+    -- is ONE row per (tenant, month): recordResearchSpend upserts straight into
+    -- it (spent_cents += the clamped amount) — there's no per-call breakdown
+    -- requirement yet (unlike ai_usage's per-agent/per-model rollups), so a
+    -- single accumulator row is the simplest thing that satisfies the same
+    -- "spend resets every new month" behaviour (a new yyyymm has no row -> 0).
+    CREATE TABLE IF NOT EXISTS research_usage (
+      tenant_id   INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      yyyymm      TEXT NOT NULL,           -- billing bucket, e.g. '2026-08'
+      spent_cents INTEGER NOT NULL DEFAULT 0,
+      updated_at  INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+      PRIMARY KEY (tenant_id, yyyymm)
+    );
+
+    -- Per-tenant override of the monthly research-spend cap — deliberately
+    -- sparse, the same shape as tenant_ai_cap above: a tenant that has never
+    -- customized it has NO row here and falls back to the DEFAULT
+    -- (DEFAULT_RESEARCH_CAP_CENTS, €10) — see getResearchCapCents in
+    -- @/lib/research/spend.ts. The setter/admin UI to write a per-tenant
+    -- override is a LATER task; this table exists now purely so
+    -- getResearchCapCents' read-through has somewhere to read from.
+    CREATE TABLE IF NOT EXISTS tenant_research_cap (
+      tenant_id  INTEGER PRIMARY KEY REFERENCES tenants(id) ON DELETE CASCADE,
+      cap_cents  INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+
     -- ── Email marketing credits (GHL-style add-on, Task 1: ledger + pricing) ──
     -- One sparse row per tenant that has ever had a balance or auto-topup
     -- config touched (mirrors tenant_ai_cap's sparse-override shape): a tenant
