@@ -97,12 +97,19 @@ function adCopyText(ad: StoredAd): string {
   return "No ad copy captured for this ad.";
 }
 
+/** formatDate, but null (not the literal "Invalid Date") when the string
+ *  doesn't parse — so adRunDates degrades to "unknown"/"active" rather than
+ *  surfacing a broken date if Meta ever hands back a non-ISO value. */
+function safeFormatDate(iso: string): string | null {
+  return Number.isNaN(new Date(iso).getTime()) ? null : formatDate(iso);
+}
+
 /** "12 Jan 2026 → 3 Feb 2026" once stopped, "12 Jan 2026 → active" while
- *  running — degrades sensibly when Meta didn't supply one side or the
- *  other rather than fabricating a date. */
+ *  running — degrades sensibly when Meta didn't supply (or supplied a bad)
+ *  date on one side or the other rather than fabricating one. */
 function adRunDates(ad: StoredAd): string {
-  const start = ad.startedAt ? formatDate(ad.startedAt) : null;
-  const end = ad.stoppedAt ? formatDate(ad.stoppedAt) : null;
+  const start = ad.startedAt ? safeFormatDate(ad.startedAt) : null;
+  const end = ad.stoppedAt ? safeFormatDate(ad.stoppedAt) : null;
   if (start) return `${start} → ${end ?? "active"}`;
   return end ? `Stopped ${end}` : "Run dates unknown";
 }
