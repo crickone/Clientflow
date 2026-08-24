@@ -41,6 +41,7 @@ const RECOMMENDED_VARS = [
   "FACEBOOK_APP_SECRET", // FB OAuth code exchange + leadgen webhook X-Hub-Signature-256 verification — unset = every leadgen webhook is rejected (fails closed)
   "FACEBOOK_WEBHOOK_VERIFY_TOKEN", // echoed on Facebook's webhook-subscription GET — unset = the leadgen subscription can never be verified
   "APP_URL", // stable absolute origin for links that must work outside a request (unsubscribe links, invite emails); the campaign-send pipeline threads the in-request forwarded host through to its detached continuation as the primary mechanism, so this is belt-and-suspenders, not the only path — see lib/appUrl.ts
+  "GOOGLE_PLACES_API_KEY", // Market Research competitor discovery/refresh (lib/research/places.ts) — unset = placesConfigured() is false, so both the weekly scheduler refresh and manual "Rescan now" silently no-op
 ] as const;
 
 /**

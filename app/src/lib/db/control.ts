@@ -725,6 +725,37 @@ export function shouldRunToday(lastRunDateUtc: string | null, nowMs: number): bo
   return lastRunDateUtc !== today;
 }
 
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Pure decision helper for a WEEKLY (rather than shouldRunToday's daily)
+ * cron_state guard: given the ISO timestamp a job last completed for some
+ * key — or `null` if it never has — is a new run due (>= 7 days elapsed)?
+ * Introduced for Task 9 of Market Research P1 (the weekly per-tenant
+ * competitor refresh, lib/automations/scheduler.ts), but kept free of any
+ * research-specific naming/DB access so it's a generic weekly-cadence
+ * counterpart to shouldRunToday — trivially unit-testable (isWeeklyDue.test.ts)
+ * and safe to reuse for any future weekly (rather than daily) scheduled task.
+ *
+ * ISO timestamps rather than shouldRunToday's YYYY-MM-DD calendar date,
+ * because a weekly gate needs true elapsed time, not a calendar-day
+ * comparison: two date-strings 7 calendar days apart are always >= 7 days
+ * apart, but a job that last ran at 23:59 one Monday and ticks again at
+ * 00:01 the following Monday has NOT actually waited 7 days.
+ *
+ * An unparsable `lastRunIso` (corrupt/legacy value) fails OPEN — returns
+ * true — same "never permanently wedge a background job" philosophy as
+ * this file's other guards; a job that can't tell how long it's been
+ * waiting should run rather than silently stay stuck forever.
+ */
+export function isWeeklyDue(lastRunIso: string | null, nowIso: string): boolean {
+  if (!lastRunIso) return true;
+  const last = Date.parse(lastRunIso);
+  const now = Date.parse(nowIso);
+  if (Number.isNaN(last) || Number.isNaN(now)) return true;
+  return now - last >= WEEK_MS;
+}
+
 /**
  * Atomically claim a once-a-day job (Batch 6a — improvement-plan-2026-08.md
  * Theme E4, multi-instance scheduler locks). `shouldRunToday`'s read-then-write

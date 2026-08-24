@@ -2,8 +2,8 @@ import "server-only";
 
 import { and, asc, eq, gte } from "drizzle-orm";
 
-import { claimDailyRun, controlDb, getCronState, resetDailyClaim, setCronState } from "@/lib/db/control";
-import { checkpointAllOpenConnections, getTenantDbById } from "@/lib/db/tenant";
+import { claimDailyRun, controlDb, getCronState, isWeeklyDue, resetDailyClaim, setCronState } from "@/lib/db/control";
+import { checkpointAllOpenConnections, getTenantDbById, runWithTenant } from "@/lib/db/tenant";
 import { automationLog, automationMessages, automationTriggers, clients, tenants } from "@/lib/db/schema";
 import { applyShortcodes, DEFAULT_MESSAGES, isMessageLive, type Channel } from "@/lib/automationModel";
 import { getBusinessProfileForTenant } from "@/lib/businessProfile";
@@ -15,6 +15,8 @@ import { parseYouTubeId, searchExerciseVideoDetailed } from "@/lib/youtube";
 import { publishDueScheduledPosts } from "@/lib/cms/blog";
 import { runBillingForDate } from "@/lib/billing/engine";
 import { dublinToday } from "@/lib/billing/dates";
+import { placesConfigured } from "@/lib/research/places";
+import { refreshTenant } from "@/lib/research/refresh";
 
 function isLeapYear(y: number): boolean {
   return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
@@ -147,6 +149,72 @@ async function backfillVideosForTenant(tenantId: number, max: number): Promise<n
   return filled;
 }
 
+/**
+ * cron_state key namespacing ONE tenant's weekly competitor-refresh last-run
+ * timestamp (ISO) from every other tenant's — see isWeeklyDue (lib/db/control.ts).
+ * Scheduler-only: Task 11's manual "Rescan now" action must debounce
+ * separately (its own, request-scoped guard) rather than reuse this key, so
+ * an operator can always force a rescan without waiting out this weekly gate.
+ */
+function researchRefreshCronKey(tenantId: number): string {
+  return `research_refresh_last_run:${tenantId}`;
+}
+
+/**
+ * Weekly per-tenant competitor refresh (Task 9, Market Research P1) — keeps
+ * the Marketing → Research dashboard "living" without an operator ever
+ * clicking Rescan. The outer tick (startScheduler below) is still daily, so
+ * this re-checks EVERY active tenant on every daily tick but only actually
+ * calls out to Google for a tenant whose OWN last refresh is >= 7 days old
+ * (isWeeklyDue) — this IS the concurrency/cost guard for the scheduled path
+ * (per-tenant, not a single global claim, so tenants naturally stagger by
+ * whenever they first started refreshing rather than all landing on Google
+ * the same day).
+ *
+ * Fail-soft, matching every other file in lib/research: no
+ * GOOGLE_PLACES_API_KEY configured skips the ENTIRE task before the tenant
+ * list is even touched (zero cost, logged once) rather than looping and
+ * having each tenant's refreshTenant() call fail individually.
+ */
+async function runWeeklyCompetitorRefresh(
+  tenantIds: number[],
+): Promise<{ tenantsRefreshed: number; competitorsRefreshed: number }> {
+  if (!placesConfigured()) {
+    console.log("[research-refresh] GOOGLE_PLACES_API_KEY not set — skipping weekly competitor refresh");
+    return { tenantsRefreshed: 0, competitorsRefreshed: 0 };
+  }
+
+  const nowIso = new Date().toISOString();
+  let tenantsRefreshed = 0;
+  let competitorsRefreshed = 0;
+
+  for (const tenantId of tenantIds) {
+    const key = researchRefreshCronKey(tenantId);
+    if (!isWeeklyDue(getCronState(key), nowIso)) continue;
+
+    // Mark the attempt BEFORE calling out: guarantees at most one
+    // Google-touching pass per tenant per week even if refreshTenant() itself
+    // throws partway through — cost containment wins over retry-on-failure
+    // for this task (a stuck tenant retries next week, not every day until
+    // fixed).
+    setCronState(key, nowIso);
+    try {
+      const result = await runWithTenant(tenantId, () => refreshTenant());
+      if (result.ok) {
+        tenantsRefreshed++;
+        competitorsRefreshed += result.refreshed;
+      } else {
+        console.error(`[research-refresh] tenant ${tenantId} refresh failed:`, result.error);
+      }
+    } catch (err) {
+      // One tenant's failure must not stop the rest.
+      console.error(`[research-refresh] tenant ${tenantId} threw:`, err);
+    }
+  }
+
+  return { tenantsRefreshed, competitorsRefreshed };
+}
+
 /** Run all daily (time-based) automations across every active tenant. */
 export async function runDailyAutomations(): Promise<{ tenants: number; birthdaysSent: number; videosFilled: number; postsPublished: number }> {
   const list = controlDb.select({ id: tenants.id }).from(tenants).where(eq(tenants.isActive, true)).all();
@@ -185,6 +253,21 @@ export async function runDailyAutomations(): Promise<{ tenants: number; birthday
     } catch (err) {
       console.error("[billing] daily run failed (will retry on next tick):", err);
     }
+  }
+
+  // Weekly per-tenant competitor refresh (Task 9, Market Research P1). Own
+  // per-tenant cron_state gate (isWeeklyDue), independent of the once-a-day
+  // claim in startScheduler below — see runWeeklyCompetitorRefresh's doc.
+  // Reuses the SAME active-tenant list as the loop above (no extra query).
+  try {
+    const summary = await runWeeklyCompetitorRefresh(list.map((t) => t.id));
+    if (summary.tenantsRefreshed > 0) {
+      console.log(
+        `[research-refresh] weekly pass: ${summary.tenantsRefreshed} tenant(s), ${summary.competitorsRefreshed} competitor(s) refreshed`,
+      );
+    }
+  } catch (err) {
+    console.error("[research-refresh] weekly pass failed:", err);
   }
 
   return { tenants: list.length, birthdaysSent, videosFilled, postsPublished };
