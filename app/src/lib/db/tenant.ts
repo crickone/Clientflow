@@ -1893,6 +1893,76 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_sends_unique ON campaign_sends(campaign_id, contact_id);
   `);
 
+  // Market Research P1 (Task 4 — competitor watchlist + weekly metrics +
+  // review sample + change feed; see lib/research/store.ts). `competitors`
+  // is tenant-wide for now (site_id reserved, always null in P1 — multi-site
+  // scoping is a later task). `place_id` is unique per tenant so a refresh
+  // upserts the same row instead of duplicating it (store.ts's
+  // upsertCompetitor). The three detail tables hang off competitors.id by
+  // plain integer, no enforced FK — same "follow the literal DDL" precedent
+  // as campaign_sends/email_campaigns above. Timestamp columns are ISO TEXT
+  // (not this function's usual integer ms) to match the research module's
+  // own convention (places.ts's ReviewLite.publishedAt is Google's raw ISO
+  // string) — see schema.ts's Drizzle mirror for the full rationale. Ratings
+  // are `rating_milli` (rating * 1000, INTEGER) so they sort/compare exactly
+  // instead of drifting through float rounding. Drizzle mirror in
+  // schema.ts — same shape + index names, kept in sync.
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS competitors (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      site_id INTEGER,
+      place_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      address TEXT NOT NULL,
+      lat REAL NOT NULL,
+      lng REAL NOT NULL,
+      distance_km REAL NOT NULL,
+      source TEXT NOT NULL DEFAULT 'google',
+      tracked INTEGER NOT NULL DEFAULT 1,
+      muted INTEGER NOT NULL DEFAULT 0,
+      themes_json TEXT,
+      themes_at TEXT,
+      added_by TEXT NOT NULL DEFAULT 'auto',
+      first_seen_at TEXT NOT NULL,
+      last_refreshed_at TEXT
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_competitors_place_id ON competitors(place_id);
+    CREATE INDEX IF NOT EXISTS idx_competitors_distance ON competitors(distance_km);
+
+    CREATE TABLE IF NOT EXISTS competitor_metrics (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      competitor_id INTEGER NOT NULL,
+      captured_at TEXT NOT NULL,
+      rating_milli INTEGER,
+      review_count INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_competitor_metrics_competitor ON competitor_metrics(competitor_id, captured_at);
+
+    CREATE TABLE IF NOT EXISTS competitor_reviews (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      competitor_id INTEGER NOT NULL,
+      external_review_id TEXT NOT NULL,
+      author TEXT NOT NULL,
+      rating_milli INTEGER,
+      text TEXT NOT NULL,
+      published_at TEXT,
+      captured_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_competitor_reviews_competitor ON competitor_reviews(competitor_id);
+
+    CREATE TABLE IF NOT EXISTS competitor_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      competitor_id INTEGER,
+      type TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      detail_json TEXT,
+      occurred_at TEXT NOT NULL,
+      seen INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_competitor_events_occurred ON competitor_events(occurred_at);
+    CREATE INDEX IF NOT EXISTS idx_competitor_events_seen ON competitor_events(seen);
+  `);
+
   // Batch 6b (improvement-plan-2026-08.md Theme E1): tracking table for the
   // versioned migration runner (./migrations) — separate from everything
   // above, which is the additive bootstrap. Created here too (in addition to

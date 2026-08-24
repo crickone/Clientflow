@@ -2336,4 +2336,110 @@ export const agentRuns = sqliteTable("agent_runs", {
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull().default(sql`(unixepoch() * 1000)`),
 });
 export type AgentRun = typeof agentRuns.$inferSelect;
+
+// ── Market Research P1 (Task 4): competitor watchlist + weekly metrics +
+// review sample + change feed ──────────────────────────────────────────────
+// `competitors` is the watchlist; site_id is reserved for future multi-site
+// scoping and always null in P1 (competitors are tenant-wide). The other
+// three tables hang off it by plain integer id, no enforced FK — same
+// "follow the literal DDL" precedent as email_campaigns/campaign_sends above
+// (their id columns can't be a real FK from every angle either; kept
+// consistent here rather than mixing enforcement styles across one feature).
+//
+// Timestamp columns here are ISO TEXT, NOT this file's usual integer
+// timestamp_ms — deliberately, to match the research module's own
+// convention already established by places.ts's `ReviewLite.publishedAt`
+// (Google's raw ISO `publishTime` string): keeping capturedAt/firstSeenAt/
+// occurredAt/etc. as text end-to-end avoids a lossy detour through
+// timestamp_ms for values this store mostly just passes through untouched.
+//
+// Ratings are `ratingMilli` (rating * 1000, INTEGER) rather than a plain
+// REAL rating column, so they sort/compare exactly instead of drifting
+// through float rounding. Matches the CREATE TABLE already in
+// ensureTenantTables (lib/db/tenant.ts) — same shape + index names, kept in
+// sync.
+export const competitors = sqliteTable(
+  "competitors",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    siteId: integer("site_id"), // reserved for multi-site; always null in P1
+    placeId: text("place_id").notNull(), // Google place id; unique per tenant
+    name: text("name").notNull(),
+    address: text("address").notNull(),
+    lat: real("lat").notNull(),
+    lng: real("lng").notNull(),
+    distanceKm: real("distance_km").notNull(),
+    source: text("source").notNull().default("google"),
+    tracked: integer("tracked", { mode: "boolean" }).notNull().default(true),
+    muted: integer("muted", { mode: "boolean" }).notNull().default(false),
+    themesJson: text("themes_json"), // JSON, AI-derived review themes
+    themesAt: text("themes_at"),
+    addedBy: text("added_by").notNull().default("auto"), // 'auto'|'manual'
+    firstSeenAt: text("first_seen_at").notNull(),
+    lastRefreshedAt: text("last_refreshed_at"),
+  },
+  (t) => ({
+    placeIdUnique: uniqueIndex("idx_competitors_place_id").on(t.placeId),
+    byDistance: index("idx_competitors_distance").on(t.distanceKm),
+  }),
+);
+
+// Weekly time-series snapshot per competitor (rating + review count over time).
+export const competitorMetrics = sqliteTable(
+  "competitor_metrics",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    competitorId: integer("competitor_id").notNull(),
+    capturedAt: text("captured_at").notNull(),
+    ratingMilli: integer("rating_milli"),
+    reviewCount: integer("review_count"),
+  },
+  (t) => ({
+    byCompetitor: index("idx_competitor_metrics_competitor").on(t.competitorId, t.capturedAt),
+  }),
+);
+
+// Rolling top-N review sample per competitor — replaced wholesale on each
+// refresh (lib/research/store.ts's replaceReviews), never appended to.
+export const competitorReviews = sqliteTable(
+  "competitor_reviews",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    competitorId: integer("competitor_id").notNull(),
+    externalReviewId: text("external_review_id").notNull(),
+    author: text("author").notNull(),
+    ratingMilli: integer("rating_milli"),
+    text: text("text").notNull(),
+    publishedAt: text("published_at"),
+    capturedAt: text("captured_at").notNull(),
+  },
+  (t) => ({
+    byCompetitor: index("idx_competitor_reviews_competitor").on(t.competitorId),
+  }),
+);
+
+// Change feed / alerts — new competitors + rating/review-volume swings.
+// competitor_id is nullable per the product spec ('new_competitor' events
+// may not point at a single row); the other event types set it.
+export const competitorEvents = sqliteTable(
+  "competitor_events",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    competitorId: integer("competitor_id"), // null for 'new_competitor'
+    type: text("type").notNull(), // 'new_competitor'|'rating_up'|'rating_down'|'review_spike'
+    summary: text("summary").notNull(),
+    detailJson: text("detail_json"),
+    occurredAt: text("occurred_at").notNull(),
+    seen: integer("seen", { mode: "boolean" }).notNull().default(false),
+  },
+  (t) => ({
+    byOccurred: index("idx_competitor_events_occurred").on(t.occurredAt),
+    byUnseen: index("idx_competitor_events_seen").on(t.seen),
+  }),
+);
+
+export type Competitor = typeof competitors.$inferSelect;
+export type CompetitorMetricRow = typeof competitorMetrics.$inferSelect;
+export type CompetitorReviewRow = typeof competitorReviews.$inferSelect;
+export type CompetitorEventRow = typeof competitorEvents.$inferSelect;
 export type NewAgentRun = typeof agentRuns.$inferInsert;
