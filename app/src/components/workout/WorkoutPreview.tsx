@@ -9,10 +9,11 @@ import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { deleteWorkoutAction } from "@/app/workout/workouts/actions";
 import { dayVolume, fmtRest, SECTIONS, type WorkoutInput } from "@/lib/workoutModel";
+import { normalizeExerciseName } from "@/lib/workoutPreviewMedia";
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-export function WorkoutPreview({ workout, media }: { workout: WorkoutInput; media: Record<number, string | null> }) {
+export function WorkoutPreview({ workout, media }: { workout: WorkoutInput; media: Record<string, string | null> }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const confirm = useConfirm();
@@ -68,7 +69,7 @@ export function WorkoutPreview({ workout, media }: { workout: WorkoutInput; medi
               <div style={sectionLabel}>{sec.label}</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
                 {rows.map((ex, i) => {
-                  const url = ex.exerciseId ? media[ex.exerciseId] : null;
+                  const url = media[normalizeExerciseName(ex.name)] ?? null;
                   return (
                     <div key={i} style={exRow}>
                       <span style={{ fontFamily: "var(--font-mono), monospace", fontWeight: 700, color: "var(--text-tertiary)", width: 18, textAlign: "center" }}>{LETTERS[i] ?? "•"}</span>

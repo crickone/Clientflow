@@ -9,10 +9,11 @@ import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { deleteCircuitAction } from "@/app/workout/circuits/actions";
 import { dayVolume, fmtRest, type CircuitInput } from "@/lib/workoutModel";
+import { normalizeExerciseName } from "@/lib/workoutPreviewMedia";
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-export function CircuitPreview({ circuit, media }: { circuit: CircuitInput; media: Record<number, string | null> }) {
+export function CircuitPreview({ circuit, media }: { circuit: CircuitInput; media: Record<string, string | null> }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const confirm = useConfirm();
@@ -75,7 +76,7 @@ export function CircuitPreview({ circuit, media }: { circuit: CircuitInput; medi
           <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-primary)" }}>Circuit</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
             {circuit.exercises.map((ex, i) => {
-              const url = ex.exerciseId ? media[ex.exerciseId] : null;
+              const url = media[normalizeExerciseName(ex.name)] ?? null;
               return (
                 <div key={i} style={exRow}>
                   <span style={{ fontFamily: "var(--font-mono), monospace", fontWeight: 700, color: "var(--text-tertiary)", width: 18, textAlign: "center" }}>{LETTERS[i] ?? "•"}</span>
