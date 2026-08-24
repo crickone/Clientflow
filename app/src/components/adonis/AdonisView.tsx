@@ -36,6 +36,10 @@ export function AdonisView({
   // scroll area (see AssistantChat `heroSlot`). Two theme-specific <img>s,
   // one shown per active theme via the `.adonis-hero-logo--*` CSS in
   // globals.css (dark=white mark, light=ink mark).
+  // Big centered mark, capped by viewport height so it never overflows on a
+  // short screen. No tagline — the mark owns the centre; the prompt + chips
+  // live down by the input (AssistantChat renders them in `bare` mode).
+  const logoHeight = "min(clamp(220px, 34vw, 460px), 48vh)";
   const hero = (
     <div
       style={{
@@ -44,32 +48,22 @@ export function AdonisView({
         flexDirection: "column",
         alignItems: "center",
         textAlign: "center",
-        padding: "8px 16px 22px",
+        padding: "8px 16px 0",
       }}
     >
       <img
         src="/adonis-window-dark.svg"
         alt="Adonis Agent"
         className="adonis-hero-logo adonis-hero-logo--dark"
-        style={{ height: "clamp(96px, 15vw, 148px)", width: "auto" }}
+        style={{ height: logoHeight, width: "auto" }}
       />
       <img
         src="/adonis-window-light.svg"
         alt=""
         aria-hidden
         className="adonis-hero-logo adonis-hero-logo--light"
-        style={{ height: "clamp(96px, 15vw, 148px)", width: "auto" }}
+        style={{ height: logoHeight, width: "auto" }}
       />
-      <div
-        style={{
-          marginTop: 10,
-          fontSize: 14,
-          color: "var(--text-secondary)",
-          letterSpacing: "0.01em",
-        }}
-      >
-        Turning Conversations Into Campaigns
-      </div>
     </div>
   );
 

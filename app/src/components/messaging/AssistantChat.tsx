@@ -922,9 +922,13 @@ export function AssistantChat({
             {!bare && (
               <Sparkles size={26} strokeWidth={1.5} style={{ color: "var(--accent)", marginBottom: 10 }} />
             )}
-            <div style={{ fontSize: 15, color: "var(--text-primary)", fontWeight: 600, marginBottom: 6 }}>
-              {emptyTitle}
-            </div>
+            {/* In `bare` mode the title moves to the bottom cluster (just above
+                the input, below); here the centered area is the hero alone. */}
+            {!bare && (
+              <div style={{ fontSize: 15, color: "var(--text-primary)", fontWeight: 600, marginBottom: 6 }}>
+                {emptyTitle}
+              </div>
+            )}
             {emptyBody && (
               <div style={{ fontSize: 13, color: "var(--text-tertiary)", marginBottom: 18, lineHeight: 1.5 }}>
                 {emptyBody}
@@ -981,28 +985,44 @@ export function AssistantChat({
         )}
       </div>
 
-      {/* bare (/adonis): compact prompt chips sit right above the input, small,
-          only while empty — moved down out of the centered hero group. */}
-      {bare && empty && suggestions.length > 0 && (
-        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 6, padding: "0 2px 10px" }}>
-          {suggestions.map((s) => (
-            <button
-              key={s}
-              onClick={() => send(s)}
-              style={{
-                padding: "5px 11px",
-                border: "1px solid var(--hairline)",
-                borderRadius: 999,
-                background: "transparent",
-                color: "var(--text-tertiary)",
-                fontSize: 11.5,
-                lineHeight: 1.3,
-                cursor: "pointer",
-              }}
-            >
-              {s}
-            </button>
-          ))}
+      {/* bare (/adonis): the prompt + compact chips sit right above the input,
+          only while empty — moved down out of the centered hero group so the
+          big mark owns the centre. */}
+      {bare && empty && (
+        <div style={{ padding: "0 2px 12px" }}>
+          <div
+            style={{
+              textAlign: "center",
+              fontSize: 15,
+              fontWeight: 600,
+              color: "var(--text-primary)",
+              marginBottom: 12,
+            }}
+          >
+            {emptyTitle}
+          </div>
+          {suggestions.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 6 }}>
+              {suggestions.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => send(s)}
+                  style={{
+                    padding: "5px 11px",
+                    border: "1px solid var(--hairline)",
+                    borderRadius: 999,
+                    background: "transparent",
+                    color: "var(--text-tertiary)",
+                    fontSize: 11.5,
+                    lineHeight: 1.3,
+                    cursor: "pointer",
+                  }}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
