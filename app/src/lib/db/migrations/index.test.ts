@@ -182,4 +182,88 @@ import { runMigrations } from "./index";
   console.log("migrations/index.test.ts: new-migration-on-already-migrated-db OK");
 }
 
+// ── 4. `transactional: false`: up() runs OUTSIDE any wrapping transaction,
+//      so a PRAGMA foreign_keys toggle inside it actually takes effect —
+//      unlike the default (transactional: true) path, where SQLite silently
+//      no-ops that pragma while a transaction is pending. Added for the
+//      Global Exercise Library T4 blocking fix (dropExerciseIdFk.ts), which
+//      needs exactly this to rebuild a table and drop a FK constraint. ─────
+{
+  const db = new Database(":memory:");
+  db.pragma("foreign_keys = ON");
+
+  // Default (transactional: true) path: the toggle attempt inside up() is a
+  // documented no-op, because applyOne has already issued BEGIN by the time
+  // up() runs.
+  let observedInsideTransactional: number | bigint | undefined;
+  const transactionalMigrations: Migration[] = [
+    {
+      id: "0001-toggle-inside-transaction",
+      description: "attempts PRAGMA foreign_keys=OFF from inside the default transactional wrapper",
+      up: (sqlite) => {
+        sqlite.pragma("foreign_keys = OFF");
+        observedInsideTransactional = sqlite.pragma("foreign_keys", { simple: true }) as number;
+      },
+    },
+  ];
+  runMigrations(db, transactionalMigrations);
+  assert.equal(
+    observedInsideTransactional,
+    1,
+    "transactional (default) path: PRAGMA foreign_keys=OFF inside up() is a no-op — still ON, because up() runs inside applyOne's BEGIN IMMEDIATE",
+  );
+  assert.equal(
+    db.pragma("foreign_keys", { simple: true }),
+    1,
+    "connection-level foreign_keys is still ON after the transactional migration completes",
+  );
+
+  // transactional: false path: up() runs in autocommit mode, so the SAME
+  // toggle actually takes effect.
+  let observedInsideNonTransactional: number | bigint | undefined;
+  let upCallCount = 0;
+  const nonTransactionalMigrations: Migration[] = [
+    ...transactionalMigrations,
+    {
+      id: "0002-toggle-outside-transaction",
+      description: "toggles PRAGMA foreign_keys from OUTSIDE any wrapping transaction",
+      transactional: false,
+      up: (sqlite) => {
+        upCallCount++;
+        sqlite.pragma("foreign_keys = OFF");
+        observedInsideNonTransactional = sqlite.pragma("foreign_keys", { simple: true }) as number;
+        sqlite.exec("CREATE TABLE marker (id INTEGER)"); // proves up() can still do real DDL work
+        sqlite.pragma("foreign_keys = ON"); // well-behaved up(): restores before returning
+      },
+    },
+  ];
+  runMigrations(db, nonTransactionalMigrations);
+  assert.equal(
+    observedInsideNonTransactional,
+    0,
+    "transactional: false path: PRAGMA foreign_keys=OFF inside up() actually takes effect (connection was in autocommit mode)",
+  );
+  assert.equal(
+    db.pragma("foreign_keys", { simple: true }),
+    1,
+    "foreign_keys back to ON after the non-transactional migration's up() restores it",
+  );
+  const markerTable = db
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='marker'")
+    .get();
+  assert.ok(markerTable, "the non-transactional migration's DDL (CREATE TABLE marker) was actually applied");
+  const recorded = db
+    .prepare("SELECT id FROM schema_migrations WHERE id = ?")
+    .get("0002-toggle-outside-transaction");
+  assert.ok(recorded, "the non-transactional migration's id is recorded in schema_migrations same as any other");
+
+  // Idempotency of the transactional: false path specifically: a second call
+  // must not re-invoke up().
+  runMigrations(db, nonTransactionalMigrations);
+  assert.equal(upCallCount, 1, "transactional: false migration's up() is NOT re-invoked once applied");
+
+  db.close();
+  console.log("migrations/index.test.ts: transactional:false lets PRAGMA foreign_keys toggle outside a transaction OK");
+}
+
 console.log("migrations/index.test.ts: all assertions passed");

@@ -1,6 +1,7 @@
 import type { Database as BetterSqlite3 } from "better-sqlite3";
 import { DEFAULT_STAGES, LEGACY_KEY_TO_ROLE } from "@/lib/pipeline/roles";
 import { runExerciseLibraryBootstrap } from "./exerciseLibraryBootstrap";
+import { dropWorkoutExerciseIdForeignKeys } from "./dropExerciseIdFk";
 
 /**
  * Versioned, transactional migration runner (Batch 6b —
@@ -45,6 +46,32 @@ export interface Migration {
   id: string;
   description: string;
   up: (sqlite: BetterSqlite3) => void;
+  /**
+   * Defaults to true (omit for every ordinary migration): runMigrations
+   * wraps up() in its own BEGIN IMMEDIATE transaction, atomic with recording
+   * the migration's id in schema_migrations.
+   *
+   * Set to false ONLY when up() itself must toggle `PRAGMA foreign_keys` —
+   * e.g. a table rebuild that drops a FK constraint via the standard
+   * CREATE-new/copy/DROP-old/RENAME procedure. SQLite silently no-ops that
+   * pragma while ANY transaction is pending ("This pragma is a no-op within
+   * a transaction" — sqlite.org), and better-sqlite3's `sqlite.transaction()`
+   * wrapper (which applyOne below uses) has already issued BEGIN by the time
+   * up() runs — so a migration that needs the toggle to actually take effect
+   * cannot run inside that wrapper. With transactional: false, runMigrations
+   * invokes up(sqlite) directly, with the connection in autocommit mode, so
+   * up() is free to toggle the pragma itself and manage its own transaction
+   * boundaries (e.g. via its own `sqlite.transaction(fn).immediate()`).
+   *
+   * Trade-off: up() and the "record this id as applied" write are no longer
+   * one atomic transaction, so up() MUST be independently idempotent/
+   * self-atomic — if the process crashes after up() commits its own work but
+   * before this runner records the id, the next boot re-invokes up() from
+   * scratch, and it must be a safe no-op at that point (e.g. a
+   * sqlite_master.sql guard, mirroring exerciseLibraryBootstrap's row-count
+   * guard).
+   */
+  transactional?: boolean;
 }
 
 /**
@@ -77,6 +104,36 @@ export function runMigrations(sqlite: BetterSqlite3, migrations: Migration[]): v
 
   for (const migration of migrations) {
     if (applied.has(migration.id)) continue;
+
+    if (migration.transactional === false) {
+      // up() manages its own transaction boundaries — see the
+      // `transactional` doc comment on the Migration interface above for
+      // why (PRAGMA foreign_keys must be toggled outside any pending
+      // transaction). Run it directly, NOT wrapped in applyOne's BEGIN
+      // IMMEDIATE. Still re-check "already applied" immediately before
+      // calling up() (same race this guards against for the transactional
+      // path below: two processes both reading an empty schema_migrations
+      // before either has run this migration) — up() itself must be
+      // idempotent regardless, so a lost race here just means a harmless
+      // extra no-op call rather than a correctness issue.
+      const already = sqlite
+        .prepare("SELECT 1 FROM schema_migrations WHERE id = ?")
+        .get(migration.id);
+      if (!already) {
+        try {
+          migration.up(sqlite);
+          insertApplied.run(migration.id, Date.now());
+        } catch (err) {
+          console.error(
+            `[db] migration ${migration.id} failed (non-transactional — up() must be safe to retry from scratch on the next boot):`,
+            err,
+          );
+          throw err;
+        }
+      }
+      console.log(`[db] migration applied: ${migration.id} — ${migration.description}`);
+      continue;
+    }
 
     // better-sqlite3's transaction() wraps the callback in BEGIN/COMMIT and,
     // if it throws, automatically issues ROLLBACK before re-throwing the
@@ -166,6 +223,16 @@ export const TENANT_MIGRATIONS: Migration[] = [
         if (stageId != null) setStage.run(stageId, l.id);
       }
     },
+  },
+  {
+    id: "0003-drop-exercise-id-fk",
+    description:
+      "Global Exercise Library blocking fix: drop the exercise_id FK to the (now vestigial) per-tenant exercise_library on workout_exercises/workout_items/circuit_items — exercise_id becomes a plain nullable INTEGER soft reference to the control-plane exercise_library, so saving a workout with a global (control-plane) exercise no longer throws an FK violation. See ./dropExerciseIdFk.ts.",
+    // MUST be non-transactional: up() toggles PRAGMA foreign_keys, which
+    // SQLite only honours outside a pending transaction — see the
+    // `transactional` doc comment on the Migration interface above.
+    transactional: false,
+    up: dropWorkoutExerciseIdForeignKeys,
   },
 ];
 

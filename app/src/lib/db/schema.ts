@@ -2010,9 +2010,13 @@ export const workoutExercises = sqliteTable(
     section: text("section", { enum: ["warmup", "workout", "cooldown"] })
       .notNull()
       .default("workout"),
-    exerciseId: integer("exercise_id").references(() => exerciseLibrary.id, {
-      onDelete: "set null",
-    }),
+    // Soft cross-DB reference into the CONTROL-plane exercise_library (global
+    // + per-tenant customs — see control.ts), deliberately with NO
+    // `.references()` — a real FK can't span DBs anyway, and this was already
+    // soft in practice (name/muscleGroups below are denormalized; render
+    // never re-queries the library). Matches the raw DDL in tenant.ts's
+    // ensureTenantTables + the "0003-drop-exercise-id-fk" migration [GEL T4].
+    exerciseId: integer("exercise_id"),
     name: text("name").notNull(),
     position: integer("position").notNull().default(0),
     sets: integer("sets").notNull().default(0),
@@ -2057,9 +2061,8 @@ export const workoutItems = sqliteTable(
     section: text("section", { enum: ["warmup", "workout", "cooldown"] })
       .notNull()
       .default("workout"),
-    exerciseId: integer("exercise_id").references(() => exerciseLibrary.id, {
-      onDelete: "set null",
-    }),
+    // Soft cross-DB reference — no `.references()`. See workoutExercises above.
+    exerciseId: integer("exercise_id"),
     name: text("name").notNull(),
     position: integer("position").notNull().default(0),
     sets: integer("sets").notNull().default(0),
@@ -2101,9 +2104,8 @@ export const circuitItems = sqliteTable(
     circuitId: integer("circuit_id")
       .notNull()
       .references(() => circuits.id, { onDelete: "cascade" }),
-    exerciseId: integer("exercise_id").references(() => exerciseLibrary.id, {
-      onDelete: "set null",
-    }),
+    // Soft cross-DB reference — no `.references()`. See workoutExercises above.
+    exerciseId: integer("exercise_id"),
     name: text("name").notNull(),
     position: integer("position").notNull().default(0),
     sets: integer("sets").notNull().default(0),

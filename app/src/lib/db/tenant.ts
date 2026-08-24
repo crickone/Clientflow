@@ -874,11 +874,20 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     );
     CREATE INDEX IF NOT EXISTS idx_workout_days_program ON workout_days(program_id);
 
+    -- exercise_id on workout_exercises/workout_items/circuit_items below is a
+    -- plain nullable INTEGER, deliberately with NO FK — it's a SOFT reference
+    -- into the CONTROL-plane exercise_library (global + per-tenant customs;
+    -- see control.ts), not this tenant DB's own (legacy) exercise_library
+    -- table above. A cross-DB FK isn't expressible in SQLite anyway, and it's
+    -- already soft in practice: items denormalize name/muscle_groups and
+    -- render never re-queries the library. Existing tenants get this via the
+    -- "0003-drop-exercise-id-fk" TENANT_MIGRATIONS entry (./migrations);
+    -- fresh tenants get it directly, right here [GEL T4].
     CREATE TABLE IF NOT EXISTS workout_exercises (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       day_id INTEGER NOT NULL REFERENCES workout_days(id) ON DELETE CASCADE,
       section TEXT NOT NULL DEFAULT 'workout',
-      exercise_id INTEGER REFERENCES exercise_library(id) ON DELETE SET NULL,
+      exercise_id INTEGER,
       name TEXT NOT NULL,
       position INTEGER NOT NULL DEFAULT 0,
       sets INTEGER NOT NULL DEFAULT 0,
@@ -899,11 +908,12 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
 
+    -- exercise_id: soft cross-DB reference, no FK — see workout_exercises above.
     CREATE TABLE IF NOT EXISTS workout_items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       workout_id INTEGER NOT NULL REFERENCES workouts(id) ON DELETE CASCADE,
       section TEXT NOT NULL DEFAULT 'workout',
-      exercise_id INTEGER REFERENCES exercise_library(id) ON DELETE SET NULL,
+      exercise_id INTEGER,
       name TEXT NOT NULL,
       position INTEGER NOT NULL DEFAULT 0,
       sets INTEGER NOT NULL DEFAULT 0,
@@ -926,10 +936,11 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
 
+    -- exercise_id: soft cross-DB reference, no FK — see workout_exercises above.
     CREATE TABLE IF NOT EXISTS circuit_items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       circuit_id INTEGER NOT NULL REFERENCES circuits(id) ON DELETE CASCADE,
-      exercise_id INTEGER REFERENCES exercise_library(id) ON DELETE SET NULL,
+      exercise_id INTEGER,
       name TEXT NOT NULL,
       position INTEGER NOT NULL DEFAULT 0,
       sets INTEGER NOT NULL DEFAULT 0,
