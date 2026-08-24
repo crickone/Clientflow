@@ -1,5 +1,6 @@
 import type { Database as BetterSqlite3 } from "better-sqlite3";
 import { DEFAULT_STAGES, LEGACY_KEY_TO_ROLE } from "@/lib/pipeline/roles";
+import { runExerciseLibraryBootstrap } from "./exerciseLibraryBootstrap";
 
 /**
  * Versioned, transactional migration runner (Batch 6b —
@@ -183,5 +184,11 @@ export const CONTROL_MIGRATIONS: Migration[] = [
     up: (sqlite) => {
       sqlite.exec("CREATE INDEX IF NOT EXISTS idx_auth_sessions_user ON auth_sessions(user_id)");
     },
+  },
+  {
+    id: "0002-exercise-library-bootstrap",
+    description:
+      "Global Exercise Library bootstrap: import the Inspire tenant's curated exercise_library rows as GLOBAL control rows (tenant_id NULL) and every other active tenant's existing rows as their own customs. See docs/superpowers/specs/2026-08-24-global-exercise-library-design.md and ./exerciseLibraryBootstrap.ts.",
+    up: runExerciseLibraryBootstrap,
   },
 ];

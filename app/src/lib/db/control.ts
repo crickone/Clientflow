@@ -216,6 +216,34 @@ export function ensureControlTables() {
       created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
 
+    -- Global Exercise Library (Task 1 — see
+    -- docs/superpowers/specs/2026-08-24-global-exercise-library-design.md).
+    -- Mirrors cms_library_assets' nullable-tenant_id pattern directly above:
+    -- tenant_id IS NULL = GLOBAL (every tenant sees it — read via
+    -- WHERE tenant_id = ? OR tenant_id IS NULL, a later task); a set
+    -- tenant_id = that tenant's own private custom exercise. Same columns as
+    -- the per-tenant exercise_library (schema.ts) it supersedes as the
+    -- read/write surface — bootstrap-populated by the
+    -- "0002-exercise-library-bootstrap" CONTROL_MIGRATIONS entry
+    -- (./migrations/exerciseLibraryBootstrap.ts), which imports the Inspire
+    -- tenant's curated exercises as globals + every other tenant's existing
+    -- rows as their own customs. The per-tenant tables are left in place,
+    -- unused, post-bootstrap (not dropped).
+    CREATE TABLE IF NOT EXISTS exercise_library (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id INTEGER REFERENCES tenants(id),
+      name TEXT NOT NULL,
+      category TEXT,
+      muscle_groups TEXT,
+      equipment TEXT,
+      video_url TEXT,
+      image_url TEXT,
+      instructions TEXT,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_exercise_library_tenant ON exercise_library(tenant_id);
+
     -- Staff invitations: a pending "set your password" link emailed to a new
     -- team member. Identity + membership are created up-front; accepting sets
     -- the password and clears must_change_password.
