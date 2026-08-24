@@ -241,6 +241,29 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
+/**
+ * Per-nesting-level sibling labels for every group, computed once from the
+ * static NAV_GROUPS tree. Drives the sidebar's accordion behaviour: opening a
+ * group collapses its SAME-LEVEL siblings only — so opening a nested sub-group
+ * never collapses its parent (which would hide the child). See renderEntry's
+ * onClick. (Group labels are unique across the tree — openGroups is already
+ * keyed by label, so this mirrors that assumption.)
+ */
+const GROUP_SIBLINGS: Record<string, string[]> = (() => {
+  const map: Record<string, string[]> = {};
+  const walk = (entries: NavEntry[]) => {
+    const groupLabels = entries.filter(isGroup).map((g) => g.label);
+    for (const e of entries) {
+      if (isGroup(e)) {
+        map[e.label] = groupLabels.filter((l) => l !== e.label);
+        walk(e.children);
+      }
+    }
+  };
+  walk(NAV_GROUPS);
+  return map;
+})();
+
 export function Sidebar({
   user,
   accounts,
@@ -413,7 +436,20 @@ export function Sidebar({
     return (
       <div key={entry.label}>
         <button
-          onClick={() => setOpenGroups((s) => ({ ...s, [entry.label]: !expanded }))}
+          onClick={() =>
+            setOpenGroups((s) => {
+              // Accordion: opening a group collapses its same-level siblings;
+              // clicking an already-open group just collapses it. Setting a
+              // sibling explicitly `false` overrides the childActive auto-open
+              // fallback in `expanded` above, so the active-route group also
+              // closes when you open a different one (what the user expects).
+              if (expanded) return { ...s, [entry.label]: false };
+              const next = { ...s };
+              for (const sib of GROUP_SIBLINGS[entry.label] ?? []) next[sib] = false;
+              next[entry.label] = true;
+              return next;
+            })
+          }
           className="nav-link"
           style={{
             ...navRowStyle,
