@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/DropdownMenu";
 import {
   BarChart3,
+  Binoculars,
   Bot,
   Calendar,
   CalendarClock,
@@ -205,6 +206,11 @@ const NAV_GROUPS: NavGroup[] = [
       // rail. Same admin-only reasoning as "Marketing" above (Build-campaign
       // here lands on the same requireAdminPage'd /agents/marketing chat).
       { href: "/marketing/calendar", label: "Seasonal calendar", icon: Calendar, adminOnly: true },
+      // Market Research P1 (Task 10): the competitor-tracking dashboard —
+      // ranked list, rating/review trends, a change feed, per-competitor
+      // detail. Admin-gated (requireAdminPage) for the same reason as the
+      // two Campaign Engine links above — keep the nav consistent.
+      { href: "/marketing/research", label: "Research", icon: Binoculars, adminOnly: true },
       { href: "/cms", label: "Sites", icon: Globe, adminOnly: true },
       { href: "/content-studio", label: "Content Studio", icon: Clapperboard },
       {
