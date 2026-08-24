@@ -565,15 +565,24 @@ export function ResearchView({
               padding-top: 8px;
               border-top: 1px solid var(--hairline);
             }
-            .mres-ad-link {
-              font-size: 11px;
-              color: var(--accent-ink);
-              font-family: var(--font-mono), ui-monospace, monospace;
+            .mres-ad-watch {
+              display: inline-flex;
+              align-items: center;
+              gap: 5px;
+              font-size: 11.5px;
+              font-weight: 600;
+              color: var(--text-primary);
+              background: var(--surface-2);
+              border: 1px solid var(--hairline);
+              border-radius: 999px;
+              padding: 5px 11px;
               text-decoration: none;
               white-space: nowrap;
               flex-shrink: 0;
+              transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
             }
-            .mres-ad-link:hover { text-decoration: underline; }
+            .mres-ad-watch svg { flex-shrink: 0; color: var(--accent-ink); }
+            .mres-ad-watch:hover { background: var(--surface-3); border-color: var(--accent-ink); transform: translateY(-1px); }
             @media (max-width: 640px) {
               .mres-row-spark { display: none; }
               .mres-row-rank { display: none; }

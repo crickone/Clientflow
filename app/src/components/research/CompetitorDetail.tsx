@@ -1,6 +1,6 @@
 "use client";
 
-import { EyeOff, Key, Megaphone } from "lucide-react";
+import { EyeOff, Key, Megaphone, Play } from "lucide-react";
 
 import type { CompetitorRow as CompetitorRowData, EventRow, Metric, StoredAd, StoredReview } from "@/lib/research/store";
 import { parseStoredAdAngle } from "@/lib/research/adAngleJson";
@@ -144,8 +144,8 @@ function AdCard({ ad, competitorName }: { ad: StoredAd; competitorName: string }
         >
           {adRunDates(ad)}
         </span>
-        <a href={ad.snapshotUrl} target="_blank" rel="noreferrer" className="mres-ad-link">
-          View on Meta ↗
+        <a href={ad.snapshotUrl} target="_blank" rel="noreferrer" className="mres-ad-watch" title="Opens Meta's Ad Library, where the ad's full creative (image or video) plays">
+          <Play size={11} fill="currentColor" /> Watch on Meta
         </a>
       </div>
     </div>
