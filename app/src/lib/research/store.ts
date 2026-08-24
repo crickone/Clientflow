@@ -43,6 +43,12 @@ import type { AdLite } from "./adLibrary";
  * `adAngleAt` (`setCompetitorAdAngle`) — Task 5's cached AI ad-angle summary,
  * mirroring `themesJson`/`themesAt`'s cache-column shape above but for ads
  * instead of reviews; exposed on `CompetitorRow` the same way `isSelf` was.
+ * The advertiser-page-match fix later added `pageName`/`pageId` to
+ * `competitor_ads` (the Meta page an ad is actually attributed to — see
+ * lib/research/adPageMatch.ts's module doc); refresh.ts filters
+ * `searchCompetitorAds`'s results down to matching-page ads BEFORE they ever
+ * reach `diffAds`/`upsertAd`, so every row this store holds already passed
+ * that check.
  */
 
 export type CompetitorRow = {
@@ -373,6 +379,18 @@ export type StoredAd = {
   stoppedAt: string | null;
   active: boolean;
   imageUrl: string | null;
+  /** The advertiser page Meta attributed this ad to (AdLite.pageName) — see
+   *  the module doc's "advertiser-page-match fix" note. Defaults to `""`
+   *  both for a row Meta genuinely didn't return a page_name for AND for a
+   *  pre-existing row written before this column existed (NULL in the DB
+   *  either way) — same "never null in the app-facing shape" contract as
+   *  linkTitle/linkCaption below use `null`, except this one mirrors
+   *  bodies/platforms' "always a real value" contract instead, matching
+   *  AdLite.pageName being required-with-"" rather than optional. */
+  pageName: string;
+  /** page_id — stored for a later exact-match task; not read by
+   *  adPageMatchesCompetitor today. Same ""-default contract as pageName. */
+  pageId: string;
   firstSeenAt: string;
   lastSeenAt: string;
 };
@@ -408,6 +426,14 @@ function toStoredAd(row: typeof schema.competitorAds.$inferSelect): StoredAd {
     stoppedAt: row.stoppedAt,
     active: row.active,
     imageUrl: row.imageUrl,
+    // NULL -> "" covers both a row Meta returned no page_name for AND a
+    // pre-existing row written before the page_name/page_id columns existed
+    // (see the migration note in lib/db/tenant.ts) -- either way, "" is what
+    // adPageMatchesCompetitor already treats as "no match" (see
+    // adPageMatch.ts), so a stale pre-migration row simply won't appear in
+    // the gallery until the next rescan re-upserts it with a real page_name.
+    pageName: row.pageName ?? "",
+    pageId: row.pageId ?? "",
     firstSeenAt: row.firstSeenAt,
     lastSeenAt: row.lastSeenAt,
   };
@@ -417,7 +443,8 @@ function toStoredAd(row: typeof schema.competitorAds.$inferSelect): StoredAd {
  * Upsert-by-(competitorId, adId): a fresh pair inserts a new row
  * (firstSeenAt = lastSeenAt = `at`, active = true); a pair already stored
  * updates its mutable fields in place — bodies/linkTitle/linkCaption/
- * platforms/snapshotUrl/startedAt/stoppedAt/imageUrl/active/lastSeenAt.
+ * platforms/snapshotUrl/startedAt/stoppedAt/imageUrl/pageName/pageId/
+ * active/lastSeenAt.
  * `firstSeenAt` is deliberately left out of the conflict `set`, mirroring
  * upsertCompetitor's exact "keep firstSeenAt" contract — a re-fetch can
  * never reset when this ad was first seen.
@@ -444,6 +471,12 @@ export function upsertAd(competitorId: number, ad: AdLite, at: string): void {
     stoppedAt: ad.stoppedAt ?? null,
     active: true,
     imageUrl: ad.imageUrl ?? null,
+    // ad.pageName/pageId are always real strings (required on AdLite,
+    // defaulting to "" in mapAdLite -- never undefined), so these just pass
+    // straight through; stored as "" rather than NULL for anything upserted
+    // through this path (only a genuinely pre-migration row is ever NULL).
+    pageName: ad.pageName,
+    pageId: ad.pageId,
     lastSeenAt: at,
   };
   db.insert(schema.competitorAds)

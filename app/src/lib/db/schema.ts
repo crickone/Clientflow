@@ -2488,6 +2488,17 @@ export const competitorAds = sqliteTable(
     stoppedAt: text("stopped_at"),
     active: integer("active", { mode: "boolean" }).notNull().default(true),
     imageUrl: text("image_url"),
+    // Advertiser-page-match fix: the advertiser Meta actually attributes
+    // this ad to (ads_archive's page_name/page_id) — see
+    // lib/research/adPageMatch.ts's module doc for why this exists
+    // (search_terms matches ad COPY, not the advertiser). Additive +
+    // nullable, same PRAGMA table_info-guarded ALTER TABLE pattern as
+    // ad_angle_json/ad_angle_at above (lib/db/tenant.ts) — not a new
+    // versioned migration. Nullable so a pre-existing row (written before
+    // this column existed) reads back fine; lib/research/store.ts's
+    // toStoredAd defaults a NULL page_name to "".
+    pageName: text("page_name"),
+    pageId: text("page_id"),
     firstSeenAt: text("first_seen_at").notNull(),
     lastSeenAt: text("last_seen_at").notNull(),
   },

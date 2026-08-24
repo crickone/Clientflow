@@ -544,7 +544,15 @@ function isAdLibraryCallFor(url: string, name: string): boolean {
         runWithTenant(tid, () =>
           upsertAd(
             compId,
-            { adId: "keep-1", bodies: [], platforms: [], snapshotUrl: "https://fb.example/keep-1", startedAt: "2020-01-01T00:00:00.000Z" },
+            {
+              adId: "keep-1",
+              bodies: [],
+              platforms: [],
+              snapshotUrl: "https://fb.example/keep-1",
+              startedAt: "2020-01-01T00:00:00.000Z",
+              pageName: "Iron Gym",
+              pageId: "iron-gym-page-1",
+            },
             "2020-01-02T00:00:00.000Z",
           ),
         );
@@ -563,13 +571,34 @@ function isAdLibraryCallFor(url: string, name: string): boolean {
               return new Response(
                 JSON.stringify({
                   data: [
-                    { id: "keep-1", ad_snapshot_url: "https://fb.example/keep-1", ad_delivery_start_time: "2020-01-01T00:00:00Z" },
+                    {
+                      id: "keep-1",
+                      ad_snapshot_url: "https://fb.example/keep-1",
+                      ad_delivery_start_time: "2020-01-01T00:00:00Z",
+                      page_name: "Iron Gym",
+                    },
                     {
                       id: "fresh-1",
                       ad_creative_bodies: ["50% off your first month"],
                       publisher_platforms: ["facebook"],
                       ad_snapshot_url: "https://fb.example/fresh-1",
                       ad_delivery_start_time: recentIso,
+                      page_name: "Iron Gym",
+                    },
+                    // Advertiser-page-match fix (the reported live bug,
+                    // reproduced here): Meta's search_terms is a full-text
+                    // search over ad COPY, so an entirely unrelated
+                    // business's ad can ride along in `data[]` just because
+                    // its text shares a word ("gym") with the competitor's
+                    // name. This one must be filtered OUT before it ever
+                    // reaches diffAds/upsertAd -- see the assertions below.
+                    {
+                      id: "unrelated-fitbit",
+                      ad_creative_bodies: ["Track your health and fitness goals with the new Fitbit."],
+                      publisher_platforms: ["facebook"],
+                      ad_snapshot_url: "https://fb.example/unrelated-fitbit",
+                      ad_delivery_start_time: recentIso,
+                      page_name: "Fitbit",
                     },
                   ],
                 }),
@@ -598,11 +627,19 @@ function isAdLibraryCallFor(url: string, name: string): boolean {
             );
 
             const ads = runWithTenant(tid, () => listAds(compId));
-            check("ads/new: both ads stored -- 2 rows", ads.length === 2);
+            check(
+              "ads/new: only the 2 page-matched ads stored -- the unrelated Fitbit ad never reaches diffAds/upsertAd",
+              ads.length === 2,
+            );
+            check(
+              "ads/new: the advertiser-page-match filter drops unrelated-fitbit (page 'Fitbit' doesn't match competitor 'Iron Gym')",
+              !ads.some((a) => a.adId === "unrelated-fitbit"),
+            );
             const fresh = ads.find((a) => a.adId === "fresh-1")!;
             check("ads/new: fresh-1 upserted + active", !!fresh && fresh.active === true);
             check("ads/new: fresh-1's startedAt round-trips", fresh.startedAt === recentIso);
             check("ads/new: fresh-1's bodies round-trip", fresh.bodies.length === 1 && fresh.bodies[0] === "50% off your first month");
+            check("ads/new: fresh-1's pageName round-trips (shown on the AdCard as 'by Iron Gym')", fresh.pageName === "Iron Gym");
             const keep = ads.find((a) => a.adId === "keep-1")!;
             check("ads/new: keep-1 still active (present in this cycle's results too)", !!keep && keep.active === true);
 
@@ -650,7 +687,15 @@ function isAdLibraryCallFor(url: string, name: string): boolean {
         runWithTenant(tid, () =>
           upsertAd(
             compId,
-            { adId: "gone-1", bodies: [], platforms: [], snapshotUrl: "https://fb.example/gone-1", startedAt: "2026-01-01T00:00:00.000Z" },
+            {
+              adId: "gone-1",
+              bodies: [],
+              platforms: [],
+              snapshotUrl: "https://fb.example/gone-1",
+              startedAt: "2026-01-01T00:00:00.000Z",
+              pageName: "Old School Gym",
+              pageId: "old-school-page-1",
+            },
             "2026-01-02T00:00:00.000Z",
           ),
         );
@@ -735,7 +780,14 @@ function isAdLibraryCallFor(url: string, name: string): boolean {
             if (isAdLibraryCallFor(url, "Steady Ads Gym")) {
               return new Response(
                 JSON.stringify({
-                  data: [{ id: "ok-ad-1", ad_snapshot_url: "https://fb.example/ok-ad-1", ad_delivery_start_time: recentIso }],
+                  data: [
+                    {
+                      id: "ok-ad-1",
+                      ad_snapshot_url: "https://fb.example/ok-ad-1",
+                      ad_delivery_start_time: recentIso,
+                      page_name: "Steady Ads Gym",
+                    },
+                  ],
                 }),
                 { status: 200 },
               );

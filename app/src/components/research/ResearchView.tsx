@@ -544,6 +544,15 @@ export function ResearchView({
               margin-bottom: 10px;
               background: var(--surface-2);
             }
+            .mres-ad-advertiser {
+              font-size: 10.5px;
+              color: var(--text-tertiary);
+              font-family: var(--font-mono), ui-monospace, monospace;
+              margin: 0 0 6px;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            }
             .mres-ad-copy {
               font-size: 12.5px;
               color: var(--text-secondary);

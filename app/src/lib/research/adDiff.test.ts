@@ -28,13 +28,20 @@ function daysAgoIso(days: number): string {
   return new Date(NOW_MS - days * DAY_MS).toISOString();
 }
 
-/** Fixture builder: a full AdLite with sane defaults, overridable per field. */
+/** Fixture builder: a full AdLite with sane defaults, overridable per field.
+ *  pageName/pageId default to "" (adLibrary.ts's own tolerant-default for an
+ *  ad Meta didn't attribute to a page) -- diffAds/upsertAd are indifferent
+ *  to their value, so no test below needs to override them; the
+ *  advertiser-page-match FILTER these feed lives in refresh.ts, upstream of
+ *  diffAds, not in this pure module. */
 function ad(over: Partial<AdLite> = {}): AdLite {
   return {
     adId: "ad_1",
     bodies: ["50% off your first month"],
     platforms: ["facebook", "instagram"],
     snapshotUrl: "https://www.facebook.com/ads/library/?id=ad_1",
+    pageName: "",
+    pageId: "",
     ...over,
   };
 }

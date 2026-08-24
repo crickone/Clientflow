@@ -133,6 +133,15 @@ function AdCard({ ad, competitorName }: { ad: StoredAd; competitorName: string }
           <Badge tone="neutral">Meta</Badge>
         )}
       </div>
+      {/* The advertiser page Meta actually attributed this ad to
+          (adLibrary.ts's AdLite.pageName, threaded through
+          refresh.ts's adPageMatchesCompetitor filter before this ad was
+          ever stored) — shown so the operator can verify at a glance that
+          this really is the competitor's own ad, not a false-positive
+          text match. Only rendered when non-empty: a pre-existing row from
+          before the page_name column existed reads back as "" (see
+          store.ts's toStoredAd) and just shows no byline rather than "by ". */}
+      {ad.pageName && <p className="mres-ad-advertiser">by {ad.pageName}</p>}
       <p className="mres-ad-copy">{adCopyText(ad)}</p>
       <div className="mres-ad-footer">
         <span

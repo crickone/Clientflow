@@ -22,6 +22,7 @@ import {
 import { detectChanges } from "./changeDetect";
 import { discoverCompetitors } from "./discovery";
 import { adLibraryConfigured, searchCompetitorAds } from "./adLibrary";
+import { adPageMatchesCompetitor } from "./adPageMatch";
 import { diffAds } from "./adDiff";
 import { getCurrentTenant } from "@/lib/db/tenant";
 
@@ -84,13 +85,24 @@ import { getCurrentTenant } from "@/lib/db/tenant";
  *  - Per competitor: read `activeAdIds` (the set active as of the LAST
  *    cycle) BEFORE this cycle's `searchCompetitorAds`/upserts — same
  *    "read-prev-before-writing-next" rule as `latestMetric` above — then
- *    `diffAds` that snapshot against the fresh result, `upsertAd` every
- *    returned ad, `markAdsStopped` for anything that dropped out of the
- *    active set, and `addEvent` for any `new_ad`/`ad_stopped` the diff
- *    raised.
+ *    `diffAds` that snapshot (filtered, see below) against the fresh
+ *    result, `upsertAd` every returned ad, `markAdsStopped` for anything
+ *    that dropped out of the active set, and `addEvent` for any
+ *    `new_ad`/`ad_stopped` the diff raised.
  *  - `searchCompetitorAds` failing (a 429, a network error) is `continue`d
  *    exactly like a failed `placeDetails` call above — one competitor's Ad
  *    Library error never stops the rest of the watchlist.
+ *  - **Advertiser-page-match filter:** `searchCompetitorAds` queries Meta's
+ *    Ad Library by `search_terms=<competitor name>` — a full-text search
+ *    over ad COPY, not the advertiser — so `res.ads` can contain other
+ *    businesses' ads whose text just happens to share a word with this
+ *    competitor's name (the reported live bug: a gym named "...Inspire..."
+ *    pulling in Fitbit **Inspire** 3 tracker ads). Every successful result
+ *    is filtered through `adPageMatchesCompetitor(ad.pageName, comp.name)`
+ *    (adPageMatch.ts) BEFORE `diffAds` ever sees it, so the stored set — and
+ *    therefore the AI ad-angle summary and the gallery — only ever contain
+ *    ads this competitor's own page actually placed. An empty filtered set
+ *    is a normal, honest outcome, not an error.
  *  - The Ad Library API is FREE. `recordResearchSpend(...,
  *    UNIT_COST_CENTS.adlib, "adlib")` still runs on every SUCCESSFUL search
  *    (adlib = 0c) purely so the spend ledger has a uniform row per research
@@ -240,8 +252,21 @@ export async function refreshTenant(opts?: { radiusKm?: number; rediscover?: boo
           // unrelated Places-spend cap must not block a free API.
           recordResearchSpend(tenantId, UNIT_COST_CENTS.adlib, "adlib");
 
+          // Advertiser-page-match fix: `searchCompetitorAds` matches ad COPY
+          // (Meta's search_terms is full-text over the ad, not the
+          // advertiser), so `res.ads` can and does contain other businesses'
+          // ads whose text happens to share a word with this competitor's
+          // name (the live bug -- see adPageMatch.ts's module doc). Filter
+          // down to ads this competitor's OWN page actually placed BEFORE
+          // diffAds ever sees them, so the stored set, the AI ad-angle
+          // summary (computed from stored ads), and the gallery only ever
+          // hold this competitor's own ads. An empty `ownAds` (every result
+          // was a false positive) is the correct, honest outcome -- "no ads
+          // found" beats junk.
+          const ownAds = res.ads.filter((a) => adPageMatchesCompetitor(a.pageName, comp.name));
+
           const nowIso = new Date().toISOString();
-          const { upserts, stoppedAdIds, events: adEvents } = diffAds(prevActive, res.ads, comp.id, comp.name, nowIso);
+          const { upserts, stoppedAdIds, events: adEvents } = diffAds(prevActive, ownAds, comp.id, comp.name, nowIso);
           for (const ad of upserts) upsertAd(comp.id, ad, nowIso);
           if (stoppedAdIds.length > 0) markAdsStopped(comp.id, stoppedAdIds, nowIso);
           for (const e of adEvents) addEvent(e);

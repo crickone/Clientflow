@@ -2039,6 +2039,32 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     console.error("[db] competitors ad_angle migration failed:", err);
   }
 
+  // Advertiser-page-match fix: `page_name`/`page_id` on competitor_ads are
+  // the advertiser Meta actually attributes each ad to (ads_archive's
+  // page_name/page_id fields) — see lib/research/adPageMatch.ts's module doc
+  // for the bug this closes (search_terms matches ad COPY, not the
+  // advertiser, so an unrelated business's ad could ride along on a shared
+  // word). Column-add migration, PRAGMA-guarded + idempotent like is_self/
+  // ad_angle_json above; runs once, a rerun sees both columns already there
+  // and no-ops. Additive + nullable: a pre-existing competitor_ads row
+  // (written before this migration ran) reads back with page_name/page_id
+  // NULL, which lib/research/store.ts's toStoredAd defaults to "" — it just
+  // won't pass adPageMatchesCompetitor's filter until the next rescan
+  // re-upserts it with a real page_name, same as any other stale cache would
+  // be. Drizzle mirror in schema.ts.
+  try {
+    const cols = sqlite.prepare("PRAGMA table_info(competitor_ads)").all() as Array<{ name: string }>;
+    const colNames = new Set(cols.map((c) => c.name));
+    if (!colNames.has("page_name")) {
+      sqlite.exec("ALTER TABLE competitor_ads ADD COLUMN page_name TEXT");
+    }
+    if (!colNames.has("page_id")) {
+      sqlite.exec("ALTER TABLE competitor_ads ADD COLUMN page_id TEXT");
+    }
+  } catch (err) {
+    console.error("[db] competitor_ads page_name/page_id migration failed:", err);
+  }
+
   // Batch 6b (improvement-plan-2026-08.md Theme E1): tracking table for the
   // versioned migration runner (./migrations) — separate from everything
   // above, which is the additive bootstrap. Created here too (in addition to

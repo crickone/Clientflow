@@ -104,11 +104,13 @@ async function withApiKey<T>(value: string | undefined, fn: () => Promise<T>): P
                 ad_delivery_stop_time: "2026-02-01T00:00:00Z",
                 publisher_platforms: ["facebook", "instagram"],
                 ad_snapshot_url: "https://www.facebook.com/ads/archive/render_ad/?id=ad-1",
+                page_name: "Iron Gym Clonmel",
+                page_id: "1234567890",
               },
               {
                 id: "ad-2",
                 ad_snapshot_url: "https://www.facebook.com/ads/archive/render_ad/?id=ad-2",
-                // no bodies / titles / captions / platforms / start / stop -- Meta omits all of these sometimes
+                // no bodies / titles / captions / platforms / start / stop / page_name / page_id -- Meta omits all of these sometimes
               },
               {
                 // no `id` -- malformed, must be dropped rather than fabricated
@@ -142,6 +144,8 @@ async function withApiKey<T>(value: string | undefined, fn: () => Promise<T>): P
           check("searchCompetitorAds: startedAt <- ad_delivery_start_time", full.startedAt === "2026-01-01T00:00:00Z");
           check("searchCompetitorAds: stoppedAt <- ad_delivery_stop_time", full.stoppedAt === "2026-02-01T00:00:00Z");
           check("searchCompetitorAds: imageUrl never populated (no source field requested)", full.imageUrl === undefined);
+          check("searchCompetitorAds: pageName <- page_name", full.pageName === "Iron Gym Clonmel");
+          check("searchCompetitorAds: pageId <- page_id", full.pageId === "1234567890");
 
           check("searchCompetitorAds: partial ad still maps (id + snapshotUrl only)", partial.adId === "ad-2");
           check("searchCompetitorAds: missing bodies -> [] (not undefined)", Array.isArray(partial.bodies) && partial.bodies.length === 0);
@@ -150,6 +154,8 @@ async function withApiKey<T>(value: string | undefined, fn: () => Promise<T>): P
           check("searchCompetitorAds: missing linkCaption -> undefined", partial.linkCaption === undefined);
           check("searchCompetitorAds: missing startedAt -> undefined", partial.startedAt === undefined);
           check("searchCompetitorAds: missing stoppedAt (still active) -> undefined", partial.stoppedAt === undefined);
+          check("searchCompetitorAds: missing page_name -> '' (required field, tolerant default, not undefined)", partial.pageName === "");
+          check("searchCompetitorAds: missing page_id -> '' (required field, tolerant default, not undefined)", partial.pageId === "");
         }
 
         // ── request shape ──
@@ -167,10 +173,10 @@ async function withApiKey<T>(value: string | undefined, fn: () => Promise<T>): P
           query.includes(`search_terms=${encodeURIComponent("Iron Gym Clonmel")}`),
         );
         check(
-          "searchCompetitorAds: fields mask",
+          "searchCompetitorAds: fields mask (incl. page_name/page_id for the advertiser-page-match filter)",
           query.includes(
             `fields=${encodeURIComponent(
-              "id,ad_creative_bodies,ad_creative_link_titles,ad_creative_link_captions,ad_delivery_start_time,ad_delivery_stop_time,publisher_platforms,ad_snapshot_url",
+              "id,ad_creative_bodies,ad_creative_link_titles,ad_creative_link_captions,ad_delivery_start_time,ad_delivery_stop_time,publisher_platforms,ad_snapshot_url,page_name,page_id",
             )}`,
           ),
         );

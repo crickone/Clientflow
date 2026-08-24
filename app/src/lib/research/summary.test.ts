@@ -159,6 +159,8 @@ const requireLocal = createRequire(import.meta.url);
     stoppedAt: null,
     active: true,
     imageUrl: null,
+    pageName: "",
+    pageId: "",
     firstSeenAt: "2026-01-01T00:00:00.000Z",
     lastSeenAt: "2026-01-01T00:00:00.000Z",
   });
@@ -610,6 +612,8 @@ const requireLocal = createRequire(import.meta.url);
             linkCaption: "Sign up now",
             platforms: ["facebook"],
             snapshotUrl: "https://example.com/ad/1",
+            pageName: "Ad Testable Gym",
+            pageId: "",
           },
           "2026-08-01T00:00:00.000Z",
         ),

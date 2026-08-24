@@ -59,9 +59,15 @@ const DEFAULT_COUNTRY = "IE";
 /** Meta's own hard ceiling isn't this low, but 25 is plenty per competitor for v1 — see the module doc. */
 const RESULT_LIMIT = 25;
 
-/** Exactly the field list the brief specifies — see the module doc's `imageUrl` note for why no image field is in here. */
+/**
+ * `page_name`/`page_id` (the advertiser Meta actually attributes the ad to)
+ * were added for the advertiser-page-match fix — see adPageMatch.ts's module
+ * doc for the bug this closes (search_terms matches ad COPY, not the
+ * advertiser, so an unrelated business's ad could ride along on a shared
+ * word). Everything before them is exactly the original field list.
+ */
 const AD_FIELDS =
-  "id,ad_creative_bodies,ad_creative_link_titles,ad_creative_link_captions,ad_delivery_start_time,ad_delivery_stop_time,publisher_platforms,ad_snapshot_url";
+  "id,ad_creative_bodies,ad_creative_link_titles,ad_creative_link_captions,ad_delivery_start_time,ad_delivery_stop_time,publisher_platforms,ad_snapshot_url,page_name,page_id";
 
 export function adLibraryConfigured(): boolean {
   return !!process.env.META_AD_LIBRARY_TOKEN;
@@ -115,6 +121,17 @@ export type AdLite = {
   startedAt?: string; // ad_delivery_start_time (ISO)
   stoppedAt?: string; // ad_delivery_stop_time (ISO; absent/future => active)
   imageUrl?: string; // only if a usable creative image URL is present (often absent)
+  /** The advertiser page Meta attributes this ad to (page_name) — the
+   *  ground truth adPageMatch.ts's adPageMatchesCompetitor filters
+   *  refresh.ts's results against, since `search_terms` matches ad COPY, not
+   *  the advertiser. Required (not optional) like bodies/platforms above,
+   *  defaulting to "" when Meta doesn't return it — see mapAdLite. */
+  pageName: string;
+  /** page_id — not used for matching yet (this task stays on the name-token
+   *  filter approach), but stored/threaded now so a later task can switch to
+   *  exact `search_page_ids` matching without another field-plumbing pass.
+   *  Same required-with-"" -default contract as pageName. */
+  pageId: string;
 };
 
 /**
@@ -129,7 +146,11 @@ export type AdLite = {
  * Meta's ISO strings verbatim, left undefined when absent (an absent or
  * future stoppedAt means the ad is still active — left for the CALLER to
  * interpret, not encoded here). `imageUrl` is never set — see the module
- * doc.
+ * doc. `pageName`/`pageId` follow the same tolerant contract as bodies/
+ * platforms (required on the type, defaulting to `""` rather than being
+ * left undefined) — never throws, and `adPageMatch.ts`'s empty-pageName ->
+ * false rule means an ad Meta didn't attribute to a page just never passes
+ * refresh.ts's filter, rather than this mapper having to special-case it.
  */
 function mapAdLite(raw: unknown): AdLite | null {
   const adId = prop(raw, "id");
@@ -142,7 +163,13 @@ function mapAdLite(raw: unknown): AdLite | null {
   const rawPlatforms = prop(raw, "publisher_platforms");
   const platforms = Array.isArray(rawPlatforms) ? rawPlatforms.filter((p): p is string => typeof p === "string") : [];
 
-  const ad: AdLite = { adId, bodies, platforms, snapshotUrl };
+  const rawPageName = prop(raw, "page_name");
+  const pageName = typeof rawPageName === "string" ? rawPageName : "";
+
+  const rawPageId = prop(raw, "page_id");
+  const pageId = typeof rawPageId === "string" ? rawPageId : "";
+
+  const ad: AdLite = { adId, bodies, platforms, snapshotUrl, pageName, pageId };
 
   const rawTitles = prop(raw, "ad_creative_link_titles");
   const linkTitle = Array.isArray(rawTitles) ? rawTitles[0] : undefined;

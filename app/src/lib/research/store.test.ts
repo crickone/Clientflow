@@ -468,6 +468,8 @@ const requireLocal = createRequire(import.meta.url);
       platforms: ["facebook", "instagram"],
       snapshotUrl: "https://facebook.com/ads/library/?id=ad-1",
       startedAt: "2026-08-01T00:00:00.000Z",
+      pageName: "Iron Gym Official",
+      pageId: "1000000001",
     };
 
     runWithTenant(tid, () => upsertAd(idA, adA, "2026-08-10T00:00:00.000Z"));
@@ -486,24 +488,32 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(adRowA.active, true, "active defaults to true on insert");
     assert.equal(typeof adRowA.active, "boolean", "active round-trips as a real boolean, not 0/1");
     assert.equal(adRowA.imageUrl, null);
+    assert.equal(adRowA.pageName, "Iron Gym Official", "pageName round-trips (advertiser-page-match fix)");
+    assert.equal(adRowA.pageId, "1000000001", "pageId round-trips too");
     assert.equal(adRowA.firstSeenAt, "2026-08-10T00:00:00.000Z");
     assert.equal(adRowA.lastSeenAt, "2026-08-10T00:00:00.000Z");
     const adAFirstSeen = adRowA.firstSeenAt;
 
     // A second ad with NO startedAt at all -- proves the JSON [] default for
     // an ad with no copy/platforms, and feeds the "nulls sort last" ordering
-    // check below.
+    // check below. pageName/pageId: "" mirrors what mapAdLite (adLibrary.ts)
+    // actually sends when Meta doesn't return page_name/page_id for an ad --
+    // required fields on AdLite, but "" rather than absent.
     const adNoDate: AdLite = {
       adId: "ad-nodate",
       bodies: [],
       platforms: [],
       snapshotUrl: "https://facebook.com/ads/library/?id=ad-nodate",
+      pageName: "",
+      pageId: "",
     };
     runWithTenant(tid, () => upsertAd(idA, adNoDate, "2026-08-10T00:00:00.000Z"));
     const noDateRow = runWithTenant(tid, () => listAds(idA)).find((a) => a.adId === "ad-nodate")!;
     assert.deepEqual(noDateRow.bodies, [], "an empty bodies array round-trips as [], not null");
     assert.deepEqual(noDateRow.platforms, []);
     assert.equal(noDateRow.startedAt, null);
+    assert.equal(noDateRow.pageName, "", "an ad upserted with pageName '' round-trips as '', not null");
+    assert.equal(noDateRow.pageId, "", "same for pageId");
 
     // A third ad with a LATER startedAt than adA.
     const adNewer: AdLite = {
@@ -512,6 +522,8 @@ const requireLocal = createRequire(import.meta.url);
       platforms: ["facebook"],
       snapshotUrl: "https://facebook.com/ads/library/?id=ad-2",
       startedAt: "2026-08-05T00:00:00.000Z",
+      pageName: "Iron Gym Official",
+      pageId: "1000000001",
     };
     runWithTenant(tid, () => upsertAd(idA, adNewer, "2026-08-10T00:00:00.000Z"));
 
@@ -537,6 +549,8 @@ const requireLocal = createRequire(import.meta.url);
           startedAt: "2026-08-01T00:00:00.000Z",
           stoppedAt: "2026-08-20T00:00:00.000Z",
           imageUrl: "https://example.com/creative.png",
+          pageName: "Iron Gym (Rebrand)",
+          pageId: "1000000009",
         },
         "2026-08-12T00:00:00.000Z",
       ),
@@ -548,6 +562,8 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(adRowA.snapshotUrl, "https://facebook.com/ads/library/?id=ad-1-v2");
     assert.equal(adRowA.stoppedAt, "2026-08-20T00:00:00.000Z");
     assert.equal(adRowA.imageUrl, "https://example.com/creative.png");
+    assert.equal(adRowA.pageName, "Iron Gym (Rebrand)", "pageName is a mutable field too -- updates in place on re-upsert");
+    assert.equal(adRowA.pageId, "1000000009", "pageId updates in place too");
     assert.equal(adRowA.lastSeenAt, "2026-08-12T00:00:00.000Z", "lastSeenAt advances to the re-upsert's `at`");
     assert.equal(adRowA.firstSeenAt, adAFirstSeen, "firstSeenAt is preserved across a re-upsert");
     assert.equal(adRowA.active, true, "active is unconditionally true on upsert, even though this row also carries a stoppedAt");
@@ -612,7 +628,14 @@ const requireLocal = createRequire(import.meta.url);
     runWithTenant(tid, () =>
       upsertAd(
         idB,
-        { adId: "ad-b1", bodies: [], platforms: [], snapshotUrl: "https://facebook.com/ads/library/?id=ad-b1" },
+        {
+          adId: "ad-b1",
+          bodies: [],
+          platforms: [],
+          snapshotUrl: "https://facebook.com/ads/library/?id=ad-b1",
+          pageName: "",
+          pageId: "",
+        },
         "2026-08-10T00:00:00.000Z",
       ),
     );
@@ -626,6 +649,34 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(runWithTenant(tid, () => activeAdIds(idB)).size, 1);
     assert.deepEqual(runWithTenant(tid, () => listAds(idC)), [], "a competitor with no ads yet reads as [], not throwing");
     assert.deepEqual(runWithTenant(tid, () => activeAdIds(idC)), new Set(), "same for activeAdIds -- empty Set, not throwing");
+
+    // ── pre-existing row simulation (advertiser-page-match fix's migration
+    //    contract) -- a row written by code from BEFORE page_name/page_id
+    //    existed has NULL in both columns at the SQL level (nullable, no
+    //    default). Bypass upsertAd with a raw INSERT (same underlying
+    //    connection openTenantDb cached above, so it's immediately visible
+    //    to listAds through the ambient `db` proxy too) to reproduce exactly
+    //    that, and prove it reads back as "" rather than null or throwing --
+    //    see store.ts's toStoredAd + the migration note in lib/db/tenant.ts.
+    //    "Only won't match the new filter until re-fetched" (refresh.ts) is
+    //    a refresh.test.ts/adPageMatch.test.ts concern, not this store's. ──
+    sqlite
+      .prepare(
+        `INSERT INTO competitor_ads
+           (competitor_id, ad_id, bodies, platforms, snapshot_url, active, first_seen_at, last_seen_at)
+         VALUES (?, ?, '[]', '[]', ?, 1, ?, ?)`,
+      )
+      .run(
+        idC,
+        "pre-migration-ad",
+        "https://facebook.com/ads/library/?id=pre-migration-ad",
+        "2026-08-01T00:00:00.000Z",
+        "2026-08-01T00:00:00.000Z",
+      );
+    const preMigrationRow = runWithTenant(tid, () => listAds(idC)).find((a) => a.adId === "pre-migration-ad")!;
+    assert.ok(preMigrationRow, "a raw pre-migration row (page_name/page_id columns never written) is still read back, not dropped");
+    assert.equal(preMigrationRow.pageName, "", "NULL page_name (pre-migration row) reads back as '', not null and not throwing");
+    assert.equal(preMigrationRow.pageId, "", "NULL page_id reads back as '' too");
 
     // ── setCompetitorAdAngle (cached on competitors.adAngleJson/adAngleAt, readable via listCompetitors) ──
     let compA = runWithTenant(tid, () => listCompetitors()).find((c) => c.id === idA)!;
