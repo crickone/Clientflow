@@ -1,6 +1,6 @@
 "use client";
 
-import { EyeOff, Key, Megaphone, Play } from "lucide-react";
+import { EyeOff, Key, Megaphone, Pin, Play, Unlink } from "lucide-react";
 
 import type { CompetitorRow as CompetitorRowData, EventRow, Metric, StoredAd, StoredReview } from "@/lib/research/store";
 import { parseStoredAdAngle } from "@/lib/research/adAngleJson";
@@ -47,16 +47,35 @@ interface Props {
   adLibraryConfigured: boolean;
   /** This competitor's own events (pre-filtered by the caller from the tenant-wide feed). */
   events: EventRow[];
+  /** `getCurrentMembership()?.role === "admin"` (page.tsx) — gates the
+   *  Link/Unlink controls in the Ads section below. The page this component
+   *  is always mounted from is already `requireAdminPage()`-gated, so this
+   *  is always true in practice; the prop makes that gate explicit at the
+   *  component that actually renders the write controls (see ResearchView's
+   *  doc comment) — the two Server Actions behind them ALSO `requireAdmin()`
+   *  themselves, so this is defence in depth, not the only thing standing
+   *  between a non-admin and a write. */
+  isAdmin: boolean;
   onBuildCampaign?: (competitorId: number) => void;
   onMarkSeen?: (ids: number[]) => void;
   /** T11: curation (`setCompetitorFlagsAction(id,{muted:true})` upstream) —
    *  stop tracking this competitor. No confirmation UI to un-mute exists yet
    *  (P1.5), so this component confirms before firing it — see the button. */
   onMute?: (competitorId: number) => void;
+  /** Exact Page-ID ad matching, Task 2 — pins this competitor to a specific
+   *  Meta Page (`linkCompetitorPageAction` upstream). Called from an
+   *  individual `AdCard`'s "these are theirs" button with THAT ad's own
+   *  pageId/pageName, only rendered when `isAdmin` and the competitor isn't
+   *  already linked (see the Ads section below). */
+  onLinkPage?: (competitorId: number, pageId: string, pageName: string) => void;
+  /** Undoes onLinkPage (`unlinkCompetitorPageAction` upstream) — shown next
+   *  to the "showing only X's ads" header once a competitor is linked. */
+  onUnlinkPage?: (competitorId: number) => void;
   /** True while ResearchView's shared curation transition is in flight (a
-   *  mark-seen / mute / build-campaign click anywhere on the page) — disables
-   *  both buttons below so a double-click can't fire `onMute` (no undo yet)
-   *  or `onBuildCampaign` twice. */
+   *  mark-seen / mute / build-campaign / link / unlink click anywhere on the
+   *  page) — disables the buttons below so a double-click can't fire
+   *  `onMute` (no undo yet), `onBuildCampaign`, `onLinkPage`, or
+   *  `onUnlinkPage` twice. */
   pending?: boolean;
 }
 
@@ -117,8 +136,34 @@ function adRunDates(ad: StoredAd): string {
 /** One compact card in the Ads gallery below. A stopped ad (still shown —
  *  `ads` is the competitor's full set, not just active ones) dims slightly
  *  rather than disappearing or getting a second "stopped" label — its run
- *  dates already say so. */
-function AdCard({ ad, competitorName }: { ad: StoredAd; competitorName: string }) {
+ *  dates already say so.
+ *
+ *  Exact Page-ID ad matching, Task 2: when this competitor ISN'T linked yet
+ *  (`linked` false), an admin with a non-empty `ad.pageId` gets a "these are
+ *  theirs" button that pins the competitor to THIS ad's own page — the
+ *  mechanism for resolving an ambiguous/franchise name match (several cards
+ *  can carry different pageIds; the admin picks the right one). Hidden once
+ *  linked (`linked` true) — the ad set shown at that point is already the
+ *  exact, unfiltered set for the linked page, so there's nothing left to
+ *  disambiguate — and hidden entirely for non-admins. */
+function AdCard({
+  ad,
+  competitorName,
+  competitorId,
+  linked,
+  isAdmin,
+  pending,
+  onLinkPage,
+}: {
+  ad: StoredAd;
+  competitorName: string;
+  competitorId: number;
+  linked: boolean;
+  isAdmin: boolean;
+  pending: boolean;
+  onLinkPage?: (competitorId: number, pageId: string, pageName: string) => void;
+}) {
+  const canLink = isAdmin && !linked && !!ad.pageId;
   return (
     <div className="mres-ad-card" style={{ opacity: ad.active ? 1 : 0.65 }}>
       {ad.imageUrl && <img src={ad.imageUrl} alt={`${competitorName} ad creative`} className="mres-ad-thumb" />}
@@ -153,9 +198,22 @@ function AdCard({ ad, competitorName }: { ad: StoredAd; competitorName: string }
         >
           {adRunDates(ad)}
         </span>
-        <a href={ad.snapshotUrl} target="_blank" rel="noreferrer" className="mres-ad-watch" title="Opens Meta's Ad Library, where the ad's full creative (image or video) plays">
-          <Play size={11} fill="currentColor" /> Watch on Meta
-        </a>
+        <div className="mres-ad-actions">
+          {canLink && (
+            <button
+              type="button"
+              className="mres-ad-link-btn"
+              disabled={pending}
+              onClick={() => onLinkPage?.(competitorId, ad.pageId, ad.pageName)}
+              title={`Pin ${competitorName} to this Facebook Page — future scans fetch only ${ad.pageName || "this page"}'s ads, no name matching`}
+            >
+              <Pin size={11} /> These are theirs
+            </button>
+          )}
+          <a href={ad.snapshotUrl} target="_blank" rel="noreferrer" className="mres-ad-watch" title="Opens Meta's Ad Library, where the ad's full creative (image or video) plays">
+            <Play size={11} fill="currentColor" /> Watch on Meta
+          </a>
+        </div>
       </div>
     </div>
   );
@@ -168,9 +226,12 @@ export function CompetitorDetail({
   ads,
   adLibraryConfigured,
   events,
+  isAdmin,
   onBuildCampaign,
   onMarkSeen,
   onMute,
+  onLinkPage,
+  onUnlinkPage,
   pending = false,
 }: Props) {
   // Parsing lives in the shared, zero-import lib/research/themesJson.ts (T11)
@@ -293,9 +354,50 @@ export function CompetitorDetail({
             <p style={{ fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.55, margin: "0 0 14px" }}>
               {parsedAdAngle ? parsedAdAngle.angle : "Their ad angle appears after the next scan."}
             </p>
+            {/* Exact Page-ID ad matching, Task 2: once linked, `ads` above is
+                already the exact, unfiltered search_page_ids set (Task 1) —
+                this header just makes that explicit, with an admin-only way
+                to undo it. No per-card link button renders in this branch
+                (see AdCard's `linked` prop). */}
+            {competitor.facebookPageName && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 10,
+                  flexWrap: "wrap",
+                  marginBottom: 12,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 11.5,
+                    color: "var(--text-tertiary)",
+                    fontFamily: "var(--font-mono), ui-monospace, monospace",
+                  }}
+                >
+                  {`✓ Showing only ${competitor.facebookPageName}'s ads`}
+                </span>
+                {isAdmin && (
+                  <Button variant="ghost" size="sm" disabled={pending} onClick={() => onUnlinkPage?.(competitor.id)}>
+                    <Unlink size={12} /> Unlink
+                  </Button>
+                )}
+              </div>
+            )}
             <div className="mres-ad-grid">
               {ads.slice(0, MAX_ADS_SHOWN).map((ad) => (
-                <AdCard key={ad.id} ad={ad} competitorName={competitor.name} />
+                <AdCard
+                  key={ad.id}
+                  ad={ad}
+                  competitorName={competitor.name}
+                  competitorId={competitor.id}
+                  linked={!!competitor.facebookPageName}
+                  isAdmin={isAdmin}
+                  pending={pending}
+                  onLinkPage={onLinkPage}
+                />
               ))}
             </div>
           </>

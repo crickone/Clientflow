@@ -62,6 +62,14 @@ import { ScanningProgress } from "./ScanningProgress";
  * active count to CompetitorRow's "Advertising" pill, the full list +
  * configured flag to CompetitorDetail's Ads section. Same zero-spend
  * contract as everything else here.
+ *
+ * Exact Page-ID ad matching, Task 2: `isAdmin` (page.tsx) and the two new
+ * `onLinkPage`/`onUnlinkPage` Server Actions are forwarded to every
+ * CompetitorDetail exactly like `onSetFlags` above — this component owns the
+ * shared `curating` transition + toast + `router.refresh()` around both
+ * (`handleLinkPage`/`handleUnlinkPage` below), so CompetitorDetail's Ads
+ * section only ever sees plain, synchronous-looking callbacks, same as
+ * `onMute`/`onBuildCampaign`.
  */
 
 export type ResearchState = "no-key" | "no-centre" | "empty" | "populated";
@@ -97,10 +105,19 @@ interface ResearchViewProps {
   self: CompetitorRowData | null;
   /** `self`'s `latestMetric(id)` — null for a self match that hasn't been refreshed yet. Ignored when `self` is null. */
   selfMetric: Metric | null;
+  /** `getCurrentMembership()?.role === "admin"`, read server-side in page.tsx
+   *  — page.tsx is already fully `requireAdminPage()`-gated so this is always
+   *  true in practice (see that file's doc comment); passed through anyway so
+   *  CompetitorDetail's Link/Unlink controls carry their own explicit gate. */
+  isAdmin: boolean;
   onRescan?: () => Promise<RescanResult>;
   onSetFlags?: (id: number, flags: { tracked?: boolean; muted?: boolean }) => Promise<{ ok: boolean }>;
   onMarkSeen?: (ids: number[]) => Promise<{ ok: boolean }>;
   onBuildCampaign?: (competitorId: number) => Promise<{ ok: boolean; href?: string; error?: string }>;
+  /** Exact Page-ID ad matching, Task 2 — links a competitor to a specific Meta Page (marketing/research/actions.ts's linkCompetitorPageAction). */
+  onLinkPage?: (competitorId: number, pageId: string, pageName: string) => Promise<{ ok: boolean; error?: string }>;
+  /** Undoes onLinkPage (unlinkCompetitorPageAction). */
+  onUnlinkPage?: (competitorId: number) => Promise<{ ok: boolean; error?: string }>;
 }
 
 // Mirrors lib/research/discovery.ts's DEFAULT_RADIUS_KM. Not imported: that
@@ -122,10 +139,13 @@ export function ResearchView({
   adLibraryConfigured,
   self,
   selfMetric,
+  isAdmin,
   onRescan,
   onSetFlags,
   onMarkSeen,
   onBuildCampaign,
+  onLinkPage,
+  onUnlinkPage,
 }: ResearchViewProps) {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const router = useRouter();
@@ -192,6 +212,32 @@ export function ResearchView({
         return;
       }
       toast.success("Stopped tracking that competitor.");
+      router.refresh();
+    });
+  }
+
+  function handleLinkPage(id: number, pageId: string, pageName: string) {
+    if (!onLinkPage) return;
+    startCuration(async () => {
+      const result = await onLinkPage(id, pageId, pageName);
+      if (!result.ok) {
+        toast.error("Couldn't link that page — please try again.");
+        return;
+      }
+      toast.success(pageName ? `Now showing only ${pageName}'s ads.` : "Linked to this Facebook Page.");
+      router.refresh();
+    });
+  }
+
+  function handleUnlinkPage(id: number) {
+    if (!onUnlinkPage) return;
+    startCuration(async () => {
+      const result = await onUnlinkPage(id);
+      if (!result.ok) {
+        toast.error("Couldn't unlink that page — please try again.");
+        return;
+      }
+      toast.success("Unlinked — back to filtered ad matching.");
       router.refresh();
     });
   }
@@ -465,9 +511,12 @@ export function ResearchView({
                             ads={ads}
                             adLibraryConfigured={adLibraryConfigured}
                             events={events.filter((e) => e.competitorId === c.id)}
+                            isAdmin={isAdmin}
                             onMarkSeen={handleMarkSeen}
                             onBuildCampaign={handleBuildCampaign}
                             onMute={handleMute}
+                            onLinkPage={handleLinkPage}
+                            onUnlinkPage={handleUnlinkPage}
                             pending={curating}
                           />
                         )}
@@ -592,6 +641,31 @@ export function ResearchView({
             }
             .mres-ad-watch svg { flex-shrink: 0; color: var(--accent-ink); }
             .mres-ad-watch:hover { background: var(--surface-3); border-color: var(--accent-ink); transform: translateY(-1px); }
+            .mres-ad-actions {
+              display: flex;
+              align-items: center;
+              gap: 6px;
+              flex-shrink: 0;
+            }
+            .mres-ad-link-btn {
+              display: inline-flex;
+              align-items: center;
+              gap: 5px;
+              font-size: 10.5px;
+              font-weight: 600;
+              color: var(--text-tertiary);
+              background: transparent;
+              border: 1px solid var(--hairline);
+              border-radius: 999px;
+              padding: 5px 10px;
+              white-space: nowrap;
+              flex-shrink: 0;
+              cursor: pointer;
+              transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+            }
+            .mres-ad-link-btn svg { flex-shrink: 0; }
+            .mres-ad-link-btn:hover:not(:disabled) { background: var(--surface-2); border-color: var(--accent-ink); color: var(--text-primary); }
+            .mres-ad-link-btn:disabled { opacity: 0.5; cursor: not-allowed; }
             @media (max-width: 640px) {
               .mres-row-spark { display: none; }
               .mres-row-rank { display: none; }

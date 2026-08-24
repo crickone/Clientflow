@@ -10,9 +10,11 @@ import { refreshTenant } from "@/lib/research/refresh";
 import { competitorThemes, landscapeSummary, adAngle } from "@/lib/research/summary";
 import { adLibraryConfigured } from "@/lib/research/adLibrary";
 import {
+  clearCompetitorFacebookPage,
   latestMetric,
   listCompetitors,
   markEventsSeen,
+  setCompetitorFacebookPage,
   setCompetitorFlags,
 } from "@/lib/research/store";
 import { ResearchCapError } from "@/lib/research/spend";
@@ -151,6 +153,71 @@ export async function setCompetitorFlagsAction(
   } catch (err) {
     console.error("[marketing/research actions] setCompetitorFlagsAction failed:", err);
     return { ok: false };
+  }
+  revalidatePath(RESEARCH_PATH);
+  return { ok: true };
+}
+
+/** competitor ids are DB autoincrement rows (>=1) — `Number.isInteger` alone still accepts 0/negatives. */
+function isPositiveInt(n: number): boolean {
+  return Number.isInteger(n) && n > 0;
+}
+
+/**
+ * Exact Page-ID ad matching, Task 2: pin a competitor to a specific Meta
+ * Page. The intended (and only) caller is an admin clicking "these are
+ * theirs" on an ad card in CompetitorDetail — `pageId`/`pageName` come
+ * straight off that ad's own `StoredAd.pageId`/`pageName` (Task 1's store),
+ * never typed in by hand. Once linked, refresh.ts's ad-fetch step switches
+ * THIS competitor from the search_terms + adPageMatchesCompetitor
+ * name-filter path to searchCompetitorAdsByPageId (search_page_ids) —
+ * exact, no name-text matching — see store.ts's module doc for the full
+ * contract.
+ *
+ * Validates competitorId/pageId shape here rather than trusting the caller:
+ * a Server Action is its own reachable POST regardless of what rendered the
+ * button that normally calls it (this file's own top doc comment), so a
+ * malformed id or a blank pageId must never reach setCompetitorFacebookPage
+ * — that would "link" a competitor to an empty page id and silently break
+ * the exact-match fetch refresh.ts performs off it. Both strings are
+ * trimmed before storage: facebookPageId is later sent verbatim as Meta's
+ * search_page_ids parameter, so stray whitespace would break the exact
+ * match this whole feature exists to provide. `typeof` guards (rather than
+ * trusting the TS parameter types) cover a crafted/malformed POST body the
+ * same way — TS types give no runtime protection against a direct call.
+ */
+export async function linkCompetitorPageAction(
+  competitorId: number,
+  pageId: string,
+  pageName: string,
+): Promise<{ ok: boolean; error?: string }> {
+  await requireAdmin();
+  if (!isPositiveInt(competitorId)) return { ok: false, error: "invalid_competitor" };
+  const trimmedPageId = typeof pageId === "string" ? pageId.trim() : "";
+  if (!trimmedPageId) return { ok: false, error: "invalid_page" };
+  try {
+    setCompetitorFacebookPage(competitorId, trimmedPageId, typeof pageName === "string" ? pageName.trim() : "");
+  } catch (err) {
+    console.error("[marketing/research actions] linkCompetitorPageAction failed:", err);
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+  revalidatePath(RESEARCH_PATH);
+  return { ok: true };
+}
+
+/**
+ * Undoes linkCompetitorPageAction — reverts this competitor to the
+ * search_terms + adPageMatchesCompetitor filtered path (CompetitorDetail's
+ * admin-only "Unlink" button, shown once a competitor is linked).
+ */
+export async function unlinkCompetitorPageAction(competitorId: number): Promise<{ ok: boolean; error?: string }> {
+  await requireAdmin();
+  if (!isPositiveInt(competitorId)) return { ok: false, error: "invalid_competitor" };
+  try {
+    clearCompetitorFacebookPage(competitorId);
+  } catch (err) {
+    console.error("[marketing/research actions] unlinkCompetitorPageAction failed:", err);
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
   revalidatePath(RESEARCH_PATH);
   return { ok: true };

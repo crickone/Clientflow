@@ -1,4 +1,4 @@
-import { requireAdminPage } from "@/lib/auth";
+import { getCurrentMembership, requireAdminPage } from "@/lib/auth";
 import { getCurrentTenant } from "@/lib/db/tenant";
 import { formatCentsEur } from "@/lib/campaigns/costEstimate";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -27,6 +27,8 @@ import {
   setCompetitorFlagsAction,
   markResearchEventsSeenAction,
   buildCampaignFromCompetitorAction,
+  linkCompetitorPageAction,
+  unlinkCompetitorPageAction,
 } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -78,9 +80,21 @@ function readLandscapeCache(): LandscapeCache | null {
  * network call) or `adAngle` (the AI call) from here; the cached ad-angle
  * text lives in `competitor.adAngleJson`, already inside every `CompetitorRow`
  * this page already reads via `listCompetitors`.
+ *
+ * Exact Page-ID ad matching, Task 2: `isAdmin` is computed below and handed
+ * down (same store-only, zero-cost read as everything else on this page) so
+ * CompetitorDetail can gate its Link/Unlink controls without tracing back up
+ * to this page's own `requireAdminPage()` call — that call already redirects
+ * any non-admin away before ANY of this component's JSX renders, so
+ * `isAdmin` is always true in practice (same "admin-only by construction" as
+ * marketing/campaigns/page.tsx and CapEditor on /agents); it's threaded
+ * through explicitly anyway so the gate is legible at the component that
+ * actually renders the write controls, matching the two new actions'
+ * (./actions.ts) own `requireAdmin()` defence-in-depth.
  */
 export default async function MarketingResearchPage() {
   await requireAdminPage();
+  const isAdmin = getCurrentMembership()?.role === "admin";
 
   const configured = placesConfigured();
   const centre = await getResearchCentre(); // cache-only read — never geocodes (see discovery.ts)
@@ -151,10 +165,13 @@ export default async function MarketingResearchPage() {
         adLibraryConfigured={adsConfigured}
         self={self}
         selfMetric={selfMetric}
+        isAdmin={isAdmin}
         onRescan={rescanNowAction}
         onSetFlags={setCompetitorFlagsAction}
         onMarkSeen={markResearchEventsSeenAction}
         onBuildCampaign={buildCampaignFromCompetitorAction}
+        onLinkPage={linkCompetitorPageAction}
+        onUnlinkPage={unlinkCompetitorPageAction}
       />
     </div>
   );
