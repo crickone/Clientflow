@@ -10,7 +10,7 @@
 - **Reuse the `cms_library_assets` precedent** (`lib/db/control.ts` table with nullable `tenant_id`; `lib/cms/library.ts:117-127` merge read `WHERE tenant_id = ? OR tenant_id IS NULL`). Mirror it exactly.
 - **`ExerciseLibRow` return shape of `listExercises()` MUST NOT change** — the 7 pages + 3 builders + `ExerciseLibraryView` depend on it; do not touch them.
 - **Tenancy:** a tenant sees global + its OWN customs only; can create/edit/delete only its OWN customs; **cannot** edit/delete a global (`tenant_id IS NULL`) row — guard it. Global editing is platform-admin/out-of-scope here.
-- **Existing workouts:** items denormalize `name`/`muscleGroups` + never re-query the library, so **no item-FK remap** — old `exerciseId` values become inert soft refs; render is unaffected. Do NOT migrate workout item rows.
+- **Existing workouts:** items denormalize `name`/`muscleGroups`, so **no item-FK remap** — old `exerciseId` values become inert soft refs. Do NOT migrate workout item rows. _(Correction, GEL whole-branch review: the "never re-query the library / render unaffected" assumption was WRONG — the workout/circuit **preview** pages did re-resolve `exerciseId` for thumbnails, which the bootstrap's id renumbering staled. Fixed by resolving thumbnails on the denormalized `name` instead — see `lib/workoutPreviewMedia.ts` + the corrected design doc.)_
 - **Migration idempotent** (`next build` runs it twice); robust to environments where the Inspire tenant / its rows are absent (import nothing, no error).
 - Money/quota: the video backfill must NOT multiply YouTube searches per tenant (globals filled once).
 - Gate each task: `npm run typecheck` + `node scripts/test.mjs` + `npx next build`.
