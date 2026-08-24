@@ -42,11 +42,18 @@ export class ResearchCapError extends Error {
  *   - Geocoding API:            $5 / 1,000  = 0.5c/call  -> rounds to 1c
  *   - Places API Nearby (New):  $32 / 1,000 = 3.2c/call  -> rounds to 3c
  *   - Places API Details (New): $17 / 1,000 = 1.7c/call  -> rounds to 2c
+ *   - Meta Ad Library (ads_archive), Market Research P2: FREE -> 0c/call.
+ *     Kept in this table (not omitted) purely so recordResearchSpend's
+ *     ledger has a uniform row per research API this app calls — refresh.ts
+ *     never gates the ad-fetch step behind assertUnderResearchCap BECAUSE
+ *     it's free (an unrelated Places-spend cap must never block a €0 call),
+ *     and a 0-cent record can never push a tenant over any cap regardless.
  */
-export const UNIT_COST_CENTS: { geocode: number; nearby: number; details: number } = {
+export const UNIT_COST_CENTS: { geocode: number; nearby: number; details: number; adlib: number } = {
   geocode: 1,
   nearby: 3,
   details: 2,
+  adlib: 0,
 };
 
 /** DEFAULT monthly research-spend cap (cents) — €10/tenant/month; see `getResearchCapCents` for the per-tenant override (admin-adjustable, later task). */

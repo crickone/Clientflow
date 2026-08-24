@@ -32,6 +32,7 @@ import {
   assert.ok(UNIT_COST_CENTS.geocode > 0, "geocode unit cost is positive");
   assert.ok(UNIT_COST_CENTS.nearby > UNIT_COST_CENTS.details, "nearby ($32/1k) costs more than details ($17/1k)");
   assert.ok(UNIT_COST_CENTS.details > UNIT_COST_CENTS.geocode, "details ($17/1k) costs more than geocode ($5/1k)");
+  assert.equal(UNIT_COST_CENTS.adlib, 0, "Meta Ad Library (Market Research P2) is a free API -- 0c/call");
 
   // ── scratch tenant (control row only) ──
   // research_usage.tenant_id REFERENCES tenants(id) and control.ts runs with

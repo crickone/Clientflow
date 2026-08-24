@@ -14,10 +14,15 @@ import {
   replaceReviews,
   addEvent,
   touchRefreshed,
+  activeAdIds,
+  upsertAd,
+  markAdsStopped,
   type Metric,
 } from "./store";
 import { detectChanges } from "./changeDetect";
 import { discoverCompetitors } from "./discovery";
+import { adLibraryConfigured, searchCompetitorAds } from "./adLibrary";
+import { diffAds } from "./adDiff";
 import { getCurrentTenant } from "@/lib/db/tenant";
 
 /**
@@ -59,9 +64,68 @@ import { getCurrentTenant } from "@/lib/db/tenant";
  *  - Any other, truly unexpected error (e.g. a DB write failure) is caught
  *    by the outer try/catch and resolves to `{ok:false,error}` — this
  *    function never throws out.
+ *
+ * Market Research P2, Task 4 bolts a competitor AD step onto the END of the
+ * snapshot loop above: same call, same cadence (a weekly scheduler tick or a
+ * manual "Rescan now"), one more source refreshed per cycle. Deliberately a
+ * SEPARATE pass over the watchlist, not folded into the per-competitor loop
+ * above:
+ *  - Gated on its own `adLibraryConfigured()` check (META_AD_LIBRARY_TOKEN),
+ *    independent of `placesConfigured()` — the two providers are unrelated,
+ *    and a tenant can have either configured without the other. No token ->
+ *    the entire ad step is skipped (zero calls, fail-soft): the metrics/
+ *    reviews loop above still ran, and this function still returns
+ *    `{ok:true,...}` with its normal counts.
+ *  - Skips the tenant's own gym (`isSelf`, P1.1 — `listCompetitors({...,
+ *    excludeSelf:true})`): self isn't a competitor, so it's never
+ *    ad-scanned, even though the metrics loop above DOES still snapshot
+ *    self's own rating/reviews (see store.ts's `listCompetitors` doc for why
+ *    that loop omits `excludeSelf` while this one passes it).
+ *  - Per competitor: read `activeAdIds` (the set active as of the LAST
+ *    cycle) BEFORE this cycle's `searchCompetitorAds`/upserts — same
+ *    "read-prev-before-writing-next" rule as `latestMetric` above — then
+ *    `diffAds` that snapshot against the fresh result, `upsertAd` every
+ *    returned ad, `markAdsStopped` for anything that dropped out of the
+ *    active set, and `addEvent` for any `new_ad`/`ad_stopped` the diff
+ *    raised.
+ *  - `searchCompetitorAds` failing (a 429, a network error) is `continue`d
+ *    exactly like a failed `placeDetails` call above — one competitor's Ad
+ *    Library error never stops the rest of the watchlist.
+ *  - The Ad Library API is FREE. `recordResearchSpend(...,
+ *    UNIT_COST_CENTS.adlib, "adlib")` still runs on every SUCCESSFUL search
+ *    (adlib = 0c) purely so the spend ledger has a uniform row per research
+ *    API this app calls — it can never push a tenant over their cap (adding
+ *    0 to any total changes nothing), which is also why this step is
+ *    deliberately NOT gated behind `assertUnderResearchCap`: an unrelated
+ *    Places-spend cap must never block a free API.
+ *  - Wrapped in its own try/catch: an unexpected failure anywhere in the ad
+ *    step (a bad diff, a DB write error) is logged and swallowed, never
+ *    propagated to the outer catch — the metrics/reviews work already done
+ *    above by this point must never be thrown away because the ad step had
+ *    a bad day.
+ *  - Return shape is UNCHANGED — `refreshed`/`events` still describe the
+ *    metrics loop only, same contract existing callers already read. The
+ *    ad events still land in the `competitor_events` feed table via
+ *    `addEvent` regardless (the dashboard reads that table directly, not
+ *    this function's return value — see store.ts's `listEvents`).
  */
 
 export type RefreshResult = { ok: true; refreshed: number; events: number } | { ok: false; error: string };
+
+/**
+ * Country for the Meta Ad Library query (Market Research P2, Task 4). P1's
+ * own centre/profile signal (`getBusinessProfile().location`, geocoded in
+ * discovery.ts's `resolveCentre`) is a freeform address string with no
+ * structured country field to read off — there's no clean signal to derive
+ * here (see the P2 T4 brief: "if there's no clean country signal, IE is the
+ * P1 default"). "IE" mirrors adLibrary.ts's own DEFAULT_COUNTRY — the whole
+ * client base is Ireland-only today, the same "for now, becomes per-business
+ * later" reasoning lib/whatsapp/phone.ts documents for its own IE default.
+ * Kept as an explicit named constant here (rather than just omitting the
+ * argument and relying on searchCompetitorAds' own internal fallback) so a
+ * later per-tenant country only has to change this one line.
+ */
+const AD_LIBRARY_COUNTRY = "IE";
 
 export async function refreshTenant(opts?: { radiusKm?: number; rediscover?: boolean }): Promise<RefreshResult> {
   try {
@@ -141,6 +205,52 @@ export async function refreshTenant(opts?: { radiusKm?: number; rediscover?: boo
 
       touchRefreshed(comp.id, capturedAt);
       refreshed++;
+    }
+
+    // ── competitor ad-fetch (Market Research P2, Task 4) ───────────────
+    // See the module doc's own section above for the full contract. Kept as
+    // a separate pass over the watchlist (not folded into the loop above)
+    // and wrapped so it can never take the metrics/reviews work above down
+    // with it.
+    if (adLibraryConfigured()) {
+      try {
+        for (const comp of listCompetitors({ trackedOnly: true, excludeSelf: true })) {
+          // Read the PREVIOUS cycle's active set BEFORE this cycle's
+          // upserts -- diffAds needs a real "before" to diff against, same
+          // reasoning as `latestMetric` being read before `appendMetric`
+          // above.
+          const prevActive = activeAdIds(comp.id);
+
+          const res = await searchCompetitorAds(comp.name, AD_LIBRARY_COUNTRY);
+          if (!res.ok) {
+            // Per-competitor resilient: one competitor's Ad Library error
+            // (e.g. a 429) must never stop the rest of the watchlist. No
+            // spend recorded for a failed call -- moot here since the call
+            // is free, but kept symmetric with the placeDetails failure
+            // above.
+            console.error(
+              `[research/refresh] searchCompetitorAds failed for competitor ${comp.id} (${comp.name}):`,
+              res.error,
+            );
+            continue;
+          }
+          // FREE API -- this is a ledger entry for observability only
+          // (UNIT_COST_CENTS.adlib is 0c), never a real charge, and
+          // deliberately never gated behind assertUnderResearchCap: an
+          // unrelated Places-spend cap must not block a free API.
+          recordResearchSpend(tenantId, UNIT_COST_CENTS.adlib, "adlib");
+
+          const nowIso = new Date().toISOString();
+          const { upserts, stoppedAdIds, events: adEvents } = diffAds(prevActive, res.ads, comp.id, comp.name, nowIso);
+          for (const ad of upserts) upsertAd(comp.id, ad, nowIso);
+          if (stoppedAdIds.length > 0) markAdsStopped(comp.id, stoppedAdIds, nowIso);
+          for (const e of adEvents) addEvent(e);
+        }
+      } catch (err) {
+        // Never let an unexpected ad-step failure abort the
+        // already-successful metrics refresh above.
+        console.error("[research/refresh] competitor ad-fetch step failed:", err);
+      }
     }
 
     return { ok: true, refreshed, events };

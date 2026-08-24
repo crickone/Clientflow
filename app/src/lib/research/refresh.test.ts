@@ -101,15 +101,39 @@ async function withApiKey<T>(value: string | undefined, fn: () => Promise<T>): P
   }
 }
 
+/**
+ * Sets META_AD_LIBRARY_TOKEN for the duration of `fn`, restoring it after --
+ * `undefined` deletes it entirely (used to explicitly PROVE the "no token"
+ * scenario 6 rather than merely relying on it being unset by default in this
+ * process — same hermeticity reasoning as withApiKey above).
+ */
+async function withAdLibraryToken<T>(value: string | undefined, fn: () => Promise<T>): Promise<T> {
+  const original = process.env.META_AD_LIBRARY_TOKEN;
+  if (value === undefined) delete process.env.META_AD_LIBRARY_TOKEN;
+  else process.env.META_AD_LIBRARY_TOKEN = value;
+  try {
+    return await fn();
+  } finally {
+    if (original === undefined) delete process.env.META_AD_LIBRARY_TOKEN;
+    else process.env.META_AD_LIBRARY_TOKEN = original;
+  }
+}
+
 const DETAILS_URL = (placeId: string) => `https://places.googleapis.com/v1/places/${placeId}`;
 const NEARBY_URL = "https://places.googleapis.com/v1/places:searchNearby";
 const GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json";
+const AD_LIBRARY_URL_BASE = "https://graph.facebook.com/v21.0/ads_archive";
+
+/** Matches an ads_archive mock-fetch URL to the competitor `name` it was searched for (via the `search_terms` query param), mirroring adLibrary.test.ts's own request-shape checks. */
+function isAdLibraryCallFor(url: string, name: string): boolean {
+  return url.startsWith(AD_LIBRARY_URL_BASE) && url.includes(`search_terms=${encodeURIComponent(name)}`);
+}
 
 (async () => {
   const { controlSqlite } = requireLocal("../db/control") as typeof import("../db/control");
   const { runWithTenant, getTenantDbById } = requireLocal("../db/tenant") as typeof import("../db/tenant");
   const { schema } = requireLocal("../db") as typeof import("../db");
-  const { upsertCompetitor, listCompetitors, appendMetric, latestMetric, listEvents } =
+  const { upsertCompetitor, listCompetitors, appendMetric, latestMetric, listEvents, upsertAd, listAds } =
     requireLocal("./store") as typeof import("./store");
   const { setKey } = requireLocal("../settings") as typeof import("../settings");
   const { researchSpentCents, UNIT_COST_CENTS } = requireLocal("./spend") as typeof import("./spend");
@@ -482,6 +506,316 @@ const GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json";
     } finally {
       cleanupScratchTenant(slug, tid);
     }
+  });
+
+  // ════════════════════════════════════════════════════════════════════
+  // 6. Task 4 (Market Research P2) -- competitor ad-fetch step.
+  //    Token configured, one tracked non-self competitor. The mocked Ad
+  //    Library search returns TWO ads: "keep-1" (already active from a
+  //    PRE-SEEDED prior cycle, started long ago) and "fresh-1" (brand new,
+  //    started a couple of days ago -- within the 30-day recency window).
+  //    This proves several things at once:
+  //     - the metrics/reviews loop still runs untouched (refreshed === 1)
+  //     - a new_ad event fires for fresh-1 ONLY (singular phrasing)
+  //     - "keep-1" raises NO event -- which only holds if `activeAdIds` was
+  //       read BEFORE this cycle's upserts (reading it AFTER would make
+  //       fresh-1 look "already known" and suppress the very event this
+  //       test checks for -- see refresh.ts's doc comment)
+  //     - the free Ad Library call adds ZERO extra spend (adlib = 0c)
+  // ════════════════════════════════════════════════════════════════════
+  await withAdLibraryToken("test-ad-token", async () => {
+    await withApiKey("test-key", async () => {
+      const slug = "refresh-test-ads-new";
+      const tid = makeScratchTenant(slug);
+      try {
+        const compId = runWithTenant(tid, () =>
+          upsertCompetitor({
+            placeId: "place-iron",
+            name: "Iron Gym",
+            address: "1 Iron St, Clonmel",
+            lat: 52.351,
+            lng: -7.701,
+            distanceKm: 1.0,
+          }),
+        );
+        // Pre-seed "keep-1" as already-active from a PRIOR cycle -- old
+        // startedAt (irrelevant to recency: it's already known, so it can
+        // never be new_ad regardless of how its startedAt looks).
+        runWithTenant(tid, () =>
+          upsertAd(
+            compId,
+            { adId: "keep-1", bodies: [], platforms: [], snapshotUrl: "https://fb.example/keep-1", startedAt: "2020-01-01T00:00:00.000Z" },
+            "2020-01-02T00:00:00.000Z",
+          ),
+        );
+
+        const recentIso = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+
+        await withMockFetch(
+          (url) => {
+            if (url === DETAILS_URL("place-iron")) {
+              return new Response(
+                JSON.stringify({ id: "place-iron", displayName: { text: "Iron Gym" }, formattedAddress: "1 Iron St, Clonmel", reviews: [] }),
+                { status: 200 },
+              );
+            }
+            if (isAdLibraryCallFor(url, "Iron Gym")) {
+              return new Response(
+                JSON.stringify({
+                  data: [
+                    { id: "keep-1", ad_snapshot_url: "https://fb.example/keep-1", ad_delivery_start_time: "2020-01-01T00:00:00Z" },
+                    {
+                      id: "fresh-1",
+                      ad_creative_bodies: ["50% off your first month"],
+                      publisher_platforms: ["facebook"],
+                      ad_snapshot_url: "https://fb.example/fresh-1",
+                      ad_delivery_start_time: recentIso,
+                    },
+                  ],
+                }),
+                { status: 200 },
+              );
+            }
+            throw new Error(`unexpected fetch: ${url}`);
+          },
+          async (calls) => {
+            const before = researchSpentCents(tid);
+            const result = await runWithTenant(tid, async () => refreshTenant({ rediscover: false }));
+
+            check("ads/new: ok:true", result.ok === true);
+            if (result.ok) {
+              check("ads/new: metrics loop unaffected -- refreshed === 1", result.refreshed === 1);
+            }
+            check(
+              "ads/new: exactly 2 fetch calls (1 details + 1 ad-library)",
+              calls.length === 2 && calls.some((c) => c.url === DETAILS_URL("place-iron")) && calls.some((c) => isAdLibraryCallFor(c.url, "Iron Gym")),
+            );
+
+            const after = researchSpentCents(tid);
+            check(
+              "ads/new: the free Ad Library call adds ZERO extra spend on top of the details charge",
+              after - before === UNIT_COST_CENTS.details,
+            );
+
+            const ads = runWithTenant(tid, () => listAds(compId));
+            check("ads/new: both ads stored -- 2 rows", ads.length === 2);
+            const fresh = ads.find((a) => a.adId === "fresh-1")!;
+            check("ads/new: fresh-1 upserted + active", !!fresh && fresh.active === true);
+            check("ads/new: fresh-1's startedAt round-trips", fresh.startedAt === recentIso);
+            check("ads/new: fresh-1's bodies round-trip", fresh.bodies.length === 1 && fresh.bodies[0] === "50% off your first month");
+            const keep = ads.find((a) => a.adId === "keep-1")!;
+            check("ads/new: keep-1 still active (present in this cycle's results too)", !!keep && keep.active === true);
+
+            const events = runWithTenant(tid, () => listEvents());
+            const newAdEvents = events.filter((e) => e.competitorId === compId && e.type === "new_ad");
+            check("ads/new: exactly one new_ad event", newAdEvents.length === 1);
+            check("ads/new: singular phrasing (only fresh-1 qualifies)", newAdEvents[0]?.summary === "Iron Gym launched a new ad");
+            const detail = JSON.parse(newAdEvents[0]!.detailJson!) as { ads: { adId: string }[] };
+            check(
+              "ads/new: new_ad detailJson names fresh-1 only, NOT keep-1 (proves activeAdIds was read BEFORE the upsert)",
+              detail.ads.length === 1 && detail.ads[0].adId === "fresh-1",
+            );
+            check(
+              "ads/new: no ad_stopped noise (keep-1 is still present/active)",
+              !events.some((e) => e.competitorId === compId && e.type === "ad_stopped"),
+            );
+          },
+        );
+      } finally {
+        cleanupScratchTenant(slug, tid);
+      }
+    });
+  });
+
+  // ════════════════════════════════════════════════════════════════════
+  // 7. Task 4 -- a competitor's previously-active ad vanishes from this
+  //    cycle's Ad Library results -> ad_stopped event + markAdsStopped
+  //    (active flips false, stoppedAt gets stamped).
+  // ════════════════════════════════════════════════════════════════════
+  await withAdLibraryToken("test-ad-token", async () => {
+    await withApiKey("test-key", async () => {
+      const slug = "refresh-test-ads-stopped";
+      const tid = makeScratchTenant(slug);
+      try {
+        const compId = runWithTenant(tid, () =>
+          upsertCompetitor({
+            placeId: "place-oldschool",
+            name: "Old School Gym",
+            address: "1 Old St, Clonmel",
+            lat: 52.351,
+            lng: -7.701,
+            distanceKm: 1.0,
+          }),
+        );
+        runWithTenant(tid, () =>
+          upsertAd(
+            compId,
+            { adId: "gone-1", bodies: [], platforms: [], snapshotUrl: "https://fb.example/gone-1", startedAt: "2026-01-01T00:00:00.000Z" },
+            "2026-01-02T00:00:00.000Z",
+          ),
+        );
+
+        await withMockFetch(
+          (url) => {
+            if (url === DETAILS_URL("place-oldschool")) {
+              return new Response(
+                JSON.stringify({ id: "place-oldschool", displayName: { text: "Old School Gym" }, formattedAddress: "1 Old St, Clonmel", reviews: [] }),
+                { status: 200 },
+              );
+            }
+            if (isAdLibraryCallFor(url, "Old School Gym")) {
+              return new Response(JSON.stringify({ data: [] }), { status: 200 }); // the ad is gone
+            }
+            throw new Error(`unexpected fetch: ${url}`);
+          },
+          async () => {
+            const result = await runWithTenant(tid, async () => refreshTenant({ rediscover: false }));
+            check("ads/stopped: ok:true", result.ok === true);
+
+            const ads = runWithTenant(tid, () => listAds(compId));
+            const gone = ads.find((a) => a.adId === "gone-1")!;
+            check("ads/stopped: markAdsStopped flipped active to false", !!gone && gone.active === false);
+            check("ads/stopped: stoppedAt was stamped", gone.stoppedAt !== null);
+
+            const events = runWithTenant(tid, () => listEvents());
+            const stoppedEvents = events.filter((e) => e.competitorId === compId && e.type === "ad_stopped");
+            check("ads/stopped: exactly one ad_stopped event", stoppedEvents.length === 1);
+            check("ads/stopped: singular phrasing", stoppedEvents[0]?.summary === "Old School Gym stopped an ad");
+            const detail = JSON.parse(stoppedEvents[0]!.detailJson!) as { adIds: string[] };
+            check("ads/stopped: detailJson names gone-1", detail.adIds.length === 1 && detail.adIds[0] === "gone-1");
+            check(
+              "ads/stopped: no new_ad noise",
+              !events.some((e) => e.competitorId === compId && e.type === "new_ad"),
+            );
+          },
+        );
+      } finally {
+        cleanupScratchTenant(slug, tid);
+      }
+    });
+  });
+
+  // ════════════════════════════════════════════════════════════════════
+  // 8. Task 4 -- per-competitor resilience: one competitor's
+  //    searchCompetitorAds 429s, the OTHER is still fetched/upserted. The
+  //    metrics loop for BOTH still succeeds (refreshed === 2), proving the
+  //    ad step's failure is fully contained and doesn't touch it.
+  // ════════════════════════════════════════════════════════════════════
+  await withAdLibraryToken("test-ad-token", async () => {
+    await withApiKey("test-key", async () => {
+      const slug = "refresh-test-ads-429";
+      const tid = makeScratchTenant(slug);
+      try {
+        const idBad = runWithTenant(tid, () =>
+          upsertCompetitor({ placeId: "place-ads-bad", name: "Flaky Ads Gym", address: "1 Bad Ads St", lat: 52.351, lng: -7.701, distanceKm: 0.5 }),
+        );
+        const idOk = runWithTenant(tid, () =>
+          upsertCompetitor({ placeId: "place-ads-ok", name: "Steady Ads Gym", address: "2 Ok Ads St", lat: 52.36, lng: -7.71, distanceKm: 1.5 }),
+        );
+
+        const recentIso = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString();
+
+        await withMockFetch(
+          (url) => {
+            if (url === DETAILS_URL("place-ads-bad")) {
+              return new Response(
+                JSON.stringify({ id: "place-ads-bad", displayName: { text: "Flaky Ads Gym" }, formattedAddress: "1 Bad Ads St", reviews: [] }),
+                { status: 200 },
+              );
+            }
+            if (url === DETAILS_URL("place-ads-ok")) {
+              return new Response(
+                JSON.stringify({ id: "place-ads-ok", displayName: { text: "Steady Ads Gym" }, formattedAddress: "2 Ok Ads St", reviews: [] }),
+                { status: 200 },
+              );
+            }
+            if (isAdLibraryCallFor(url, "Flaky Ads Gym")) {
+              return new Response("rate limited", { status: 429, statusText: "Too Many Requests" });
+            }
+            if (isAdLibraryCallFor(url, "Steady Ads Gym")) {
+              return new Response(
+                JSON.stringify({
+                  data: [{ id: "ok-ad-1", ad_snapshot_url: "https://fb.example/ok-ad-1", ad_delivery_start_time: recentIso }],
+                }),
+                { status: 200 },
+              );
+            }
+            throw new Error(`unexpected fetch: ${url}`);
+          },
+          async (calls) => {
+            const result = await runWithTenant(tid, async () => refreshTenant({ rediscover: false }));
+            check("ads/429: ok:true (a per-competitor ad-fetch failure is not a whole-run failure)", result.ok === true);
+            if (result.ok) {
+              check("ads/429: BOTH competitors' metrics still refreshed", result.refreshed === 2);
+            }
+            check(
+              "ads/429: both competitors' Ad Library search was attempted",
+              calls.some((c) => isAdLibraryCallFor(c.url, "Flaky Ads Gym")) && calls.some((c) => isAdLibraryCallFor(c.url, "Steady Ads Gym")),
+            );
+
+            check("ads/429: the failing competitor has NO ad rows", runWithTenant(tid, () => listAds(idBad)).length === 0);
+            const okAds = runWithTenant(tid, () => listAds(idOk));
+            check("ads/429: the succeeding competitor's ad WAS upserted", okAds.length === 1 && okAds[0].adId === "ok-ad-1");
+
+            const events = runWithTenant(tid, () => listEvents());
+            check(
+              "ads/429: a new_ad event fired for the succeeding competitor",
+              events.some((e) => e.competitorId === idOk && e.type === "new_ad"),
+            );
+            check(
+              "ads/429: no ad event at all for the failing competitor",
+              !events.some((e) => e.competitorId === idBad && (e.type === "new_ad" || e.type === "ad_stopped")),
+            );
+          },
+        );
+      } finally {
+        cleanupScratchTenant(slug, tid);
+      }
+    });
+  });
+
+  // ════════════════════════════════════════════════════════════════════
+  // 9. Task 4 -- no META_AD_LIBRARY_TOKEN -> the entire ad step is skipped
+  //    (fail-soft, zero ad-library fetch calls, zero ad rows), while the
+  //    metrics/reviews loop still refreshes normally.
+  // ════════════════════════════════════════════════════════════════════
+  await withAdLibraryToken(undefined, async () => {
+    await withApiKey("test-key", async () => {
+      const slug = "refresh-test-ads-no-token";
+      const tid = makeScratchTenant(slug);
+      try {
+        const compId = runWithTenant(tid, () =>
+          upsertCompetitor({ placeId: "place-no-token", name: "No Token Gym", address: "1 No Token St", lat: 52.351, lng: -7.701, distanceKm: 1.0 }),
+        );
+
+        await withMockFetch(
+          (url) => {
+            if (url === DETAILS_URL("place-no-token")) {
+              return new Response(
+                JSON.stringify({ id: "place-no-token", displayName: { text: "No Token Gym" }, formattedAddress: "1 No Token St", reviews: [] }),
+                { status: 200 },
+              );
+            }
+            throw new Error(`unexpected fetch (ad step must be skipped entirely with no token): ${url}`);
+          },
+          async (calls) => {
+            const result = await runWithTenant(tid, async () => refreshTenant({ rediscover: false }));
+            check("ads/no-token: ok:true", result.ok === true);
+            if (result.ok) {
+              check("ads/no-token: metrics loop still refreshes normally", result.refreshed === 1);
+            }
+            check("ads/no-token: exactly 1 fetch call (details only -- zero ad-library calls)", calls.length === 1);
+            check("ads/no-token: zero ad rows stored", runWithTenant(tid, () => listAds(compId)).length === 0);
+            check(
+              "ads/no-token: no ad events raised",
+              !runWithTenant(tid, () => listEvents()).some((e) => e.competitorId === compId && (e.type === "new_ad" || e.type === "ad_stopped")),
+            );
+          },
+        );
+      } finally {
+        cleanupScratchTenant(slug, tid);
+      }
+    });
   });
 
   console.log(`\nrefresh: ${passed} checks passed.`);
