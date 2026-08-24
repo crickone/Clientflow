@@ -234,6 +234,14 @@ export const TENANT_MIGRATIONS: Migration[] = [
     transactional: false,
     up: dropWorkoutExerciseIdForeignKeys,
   },
+  {
+    id: "0004-purge-stale-ad-events",
+    description:
+      "Advertiser-page-match follow-up: delete competitor_events of type new_ad/ad_stopped. Before the page-match filter (lib/research/adPageMatch.ts), these were logged from search_terms matches on ad COPY (unrelated advertisers' ads), and the one-time competitor_ads purge (tenant.ts, on the page_name column-add) cleared the junk ADS but not the EVENTS they generated — leaving stale 'launched N new ads' feed rows contradicting a now-empty gallery. Clearing them once gives a clean slate; the next rescan regenerates accurate ad events from the page-matched set (diffAds over an empty prevActive). competitor_events is a derived feed with no incoming FK; non-ad event types (rating_up/down, review_spike, new_competitor) are deliberately left untouched.",
+    up: (sqlite) => {
+      sqlite.exec("DELETE FROM competitor_events WHERE type IN ('new_ad', 'ad_stopped')");
+    },
+  },
 ];
 
 /**
