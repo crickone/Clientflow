@@ -35,6 +35,20 @@ export function isYouTubeUrl(input: string | null | undefined): boolean {
   return parseYouTubeId(input) !== null;
 }
 
+/**
+ * True iff `videoUrl` resolves to a playable YouTube id — the single
+ * predicate shared by the workout builders' exercise-picker rows (show the
+ * ▶ Play button only when there's something to play: WorkoutBuilder.tsx /
+ * CircuitBuilder.tsx's ChooseExerciseSheet, DetailedBuilder.tsx's inline
+ * autocomplete) and ExercisePreviewModal (embed vs "no video yet" fallback).
+ * Takes anything ExerciseLibRow-shaped rather than importing that type here,
+ * to avoid a needless dependency edge back onto lib/exerciseLibrary.ts (which
+ * already imports FROM this module).
+ */
+export function exerciseHasVideo(exercise: { videoUrl: string | null | undefined }): boolean {
+  return isYouTubeUrl(exercise.videoUrl);
+}
+
 /** Privacy-friendly embed URL for an id (youtube-nocookie). */
 export function youtubeEmbedUrl(id: string): string {
   return `https://www.youtube-nocookie.com/embed/${id}`;

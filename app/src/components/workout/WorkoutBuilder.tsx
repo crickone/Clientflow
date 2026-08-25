@@ -2,12 +2,13 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Dumbbell, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Dumbbell, Play, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
 import { Sheet, SheetContent } from "@/components/ui/Sheet";
 import { Input, Label, Textarea } from "@/components/ui/Input";
+import { ExercisePreviewModal } from "@/components/workout/ExercisePreviewModal";
 import { saveWorkoutAction } from "@/app/workout/workouts/actions";
 import {
   blankExercise,
@@ -18,6 +19,7 @@ import {
   type WorkoutInput,
 } from "@/lib/workoutModel";
 import type { ExerciseLibRow } from "@/lib/exerciseLibrary";
+import { exerciseHasVideo } from "@/lib/youtube";
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
@@ -26,6 +28,7 @@ export function WorkoutBuilder({ initial, exercises }: { initial: WorkoutInput; 
   const [workout, setWorkout] = useState<WorkoutInput>(initial);
   const [tagsText, setTagsText] = useState(initial.tags.join(", "));
   const [pickerSection, setPickerSection] = useState<Section | null>(null);
+  const [preview, setPreview] = useState<ExerciseLibRow | null>(null);
   const [saving, start] = useTransition();
 
   const volume = dayVolume(workout);
@@ -153,7 +156,9 @@ export function WorkoutBuilder({ initial, exercises }: { initial: WorkoutInput; 
         onClose={() => setPickerSection(null)}
         onPick={(lib) => pickerSection && addFromLibrary(pickerSection, lib)}
         onCustom={() => pickerSection && addCustom(pickerSection)}
+        onPreview={setPreview}
       />
+      <ExercisePreviewModal exercise={preview} onClose={() => setPreview(null)} />
     </div>
   );
 }
@@ -200,12 +205,14 @@ function ChooseExerciseSheet({
   onClose,
   onPick,
   onCustom,
+  onPreview,
 }: {
   section: Section | null;
   exercises: ExerciseLibRow[];
   onClose: () => void;
   onPick: (lib: ExerciseLibRow) => void;
   onCustom: () => void;
+  onPreview: (lib: ExerciseLibRow) => void;
 }) {
   const router = useRouter();
   const [q, setQ] = useState("");
@@ -238,23 +245,45 @@ function ChooseExerciseSheet({
               <div style={{ fontSize: 13, color: "var(--text-tertiary)", padding: "8px 0" }}>No exercises found.</div>
             )}
             {matches.map((e) => (
-              <button
+              <div
                 key={e.id}
-                onClick={() => {
-                  onPick(e);
-                  toast.success(`${e.name} added`);
-                }}
-                style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", padding: 8, border: "1px solid var(--hairline)", borderRadius: "var(--radius)", background: "transparent", cursor: "pointer" }}
+                style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: 8, border: "1px solid var(--hairline)", borderRadius: "var(--radius)" }}
               >
                 <Thumb url={e.imageUrl} />
-                <span style={{ minWidth: 0 }}>
+                <span style={{ minWidth: 0, flex: 1 }}>
                   <span style={{ display: "block", fontSize: 13.5, color: "var(--text-primary)", fontWeight: 500 }}>{e.name}</span>
                   {e.muscleGroups.length > 0 && (
                     <span style={{ display: "block", fontSize: 11.5, color: "var(--text-tertiary)" }}>{e.muscleGroups.join(", ")}</span>
                   )}
                 </span>
-                <Plus size={16} style={{ marginLeft: "auto", color: "var(--text-tertiary)", flexShrink: 0 }} />
-              </button>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                  {exerciseHasVideo(e) && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Preview ${e.name}`}
+                      title="Preview video"
+                      onClick={(ev) => {
+                        ev.stopPropagation();
+                        onPreview(e);
+                      }}
+                    >
+                      <Play size={14} fill="currentColor" />
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    aria-label={`Add ${e.name}`}
+                    onClick={(ev) => {
+                      ev.stopPropagation();
+                      onPick(e);
+                      toast.success(`${e.name} added`);
+                    }}
+                  >
+                    <Plus size={14} /> Add
+                  </Button>
+                </div>
+              </div>
             ))}
           </div>
 

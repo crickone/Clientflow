@@ -2,11 +2,12 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Copy, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, Copy, Play, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Textarea } from "@/components/ui/Input";
+import { ExercisePreviewModal } from "@/components/workout/ExercisePreviewModal";
 import { saveProgramAction } from "@/app/workout/actions";
 import {
   blankDay,
@@ -19,6 +20,7 @@ import {
   type WorkoutDayInput,
 } from "@/lib/workoutModel";
 import type { ExerciseLibRow } from "@/lib/exerciseLibrary";
+import { exerciseHasVideo } from "@/lib/youtube";
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
@@ -28,6 +30,7 @@ export function DetailedBuilder({ initial, exercises }: { initial: ProgramInput;
   const [dayIdx, setDayIdx] = useState(0);
   const [tagsText, setTagsText] = useState(initial.tags.join(", "));
   const [focused, setFocused] = useState<number | null>(null); // flat exercise index in the active day
+  const [preview, setPreview] = useState<ExerciseLibRow | null>(null);
   const [saving, start] = useTransition();
 
   const idx = Math.min(dayIdx, program.days.length - 1);
@@ -190,6 +193,7 @@ export function DetailedBuilder({ initial, exercises }: { initial: ProgramInput;
                 onBlur={() => setFocused((f) => (f === i ? null : f))}
                 onPatch={(patch) => setExercise(i, patch)}
                 onRemove={() => removeExercise(i)}
+                onPreview={setPreview}
               />
             ))}
             <div>
@@ -220,6 +224,8 @@ export function DetailedBuilder({ initial, exercises }: { initial: ProgramInput;
           Save &amp; Close
         </Button>
       </div>
+
+      <ExercisePreviewModal exercise={preview} onClose={() => setPreview(null)} />
     </div>
   );
 }
@@ -233,6 +239,7 @@ function ExerciseRow({
   onBlur,
   onPatch,
   onRemove,
+  onPreview,
 }: {
   letter: string;
   ex: ExerciseInput;
@@ -242,6 +249,7 @@ function ExerciseRow({
   onBlur: () => void;
   onPatch: (patch: Partial<ExerciseInput>) => void;
   onRemove: () => void;
+  onPreview: (lib: ExerciseLibRow) => void;
 }) {
   const matches = useMemo(() => {
     const q = ex.name.trim().toLowerCase();
@@ -265,19 +273,47 @@ function ExerciseRow({
           {focused && matches.length > 0 && (
             <div style={dropdown}>
               {matches.map((m) => (
-                <button
-                  key={m.id}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    onPatch({ name: m.name, exerciseId: m.id, muscleGroups: m.muscleGroups });
-                  }}
-                  style={dropItem}
-                >
-                  <span style={{ fontSize: 13, color: "var(--text-primary)" }}>{m.name}</span>
-                  {m.muscleGroups.length > 0 && (
-                    <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--text-tertiary)" }}>{m.muscleGroups.join(", ")}</span>
-                  )}
-                </button>
+                <div key={m.id} style={dropItem}>
+                  <span style={{ minWidth: 0, flex: 1, overflow: "hidden" }}>
+                    <span style={{ fontSize: 13, color: "var(--text-primary)" }}>{m.name}</span>
+                    {m.muscleGroups.length > 0 && (
+                      <span style={{ marginLeft: 8, fontSize: 11, color: "var(--text-tertiary)" }}>{m.muscleGroups.join(", ")}</span>
+                    )}
+                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                    {exerciseHasVideo(m) && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Preview ${m.name}`}
+                        title="Preview video"
+                        // onMouseDown + preventDefault (not onClick): the name
+                        // Input's onBlur fires on focus loss with a 120ms delay
+                        // (see below) — preventing the default mousedown focus
+                        // shift keeps the input focused, so `focused` never
+                        // clears and this dropdown stays open. Same trick the
+                        // Add button below already relied on.
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onPreview(m);
+                        }}
+                      >
+                        <Play size={13} fill="currentColor" />
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      aria-label={`Add ${m.name}`}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        onPatch({ name: m.name, exerciseId: m.id, muscleGroups: m.muscleGroups });
+                      }}
+                    >
+                      <Plus size={13} /> Add
+                    </Button>
+                  </div>
+                </div>
               ))}
             </div>
           )}
@@ -358,10 +394,6 @@ const dropItem: React.CSSProperties = {
   alignItems: "center",
   gap: 8,
   width: "100%",
-  textAlign: "left",
   padding: "8px 12px",
-  background: "transparent",
-  border: "none",
   borderBottom: "1px solid var(--hairline)",
-  cursor: "pointer",
 };
