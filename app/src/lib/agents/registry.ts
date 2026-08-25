@@ -16,12 +16,12 @@ export const AGENT_CATALOG: AgentDef[] = [
   {
     key: "orchestrator",
     name: "Adonis",
-    mandate: "Routes work to the right specialist.",
+    mandate: "Your all-in-one assistant — handles leads, marketing, operations and admin directly.",
     roles: [
-      "Understands what you're asking for",
-      "Routes each request to the right specialist",
-      "Handles general tasks itself — inbox, invoices, plans, admin",
-      "Delegates the work; never does the specialist job directly",
+      "Replies to leads and follows up — no hand-offs",
+      "Drafts on-brand marketing content and campaign kits",
+      "Chases no-shows, fills classes, and wins back lapsed members",
+      "Runs the inbox, invoices, plans, and general admin",
     ],
     status: "active",
     defaultModel: MODELS.sonnet,

@@ -22,12 +22,17 @@ export interface SpecialistConfig {
  * callers fall back to a generic playbook / empty tool slice, and the chat
  * route 404s before ever reaching a specialist lookup for a non-active agent.
  *
- * Orchestrator (Orchestrator Task 2) is registered below exactly like any
- * other active specialist — SAME chat route, SAME `composeAgentSystem`, SAME
- * `runAgentTurn` — except it owns no domain tools of its own: its
- * `toolNames` are the 3 `delegate_to_<specialist>` tools
- * (@/lib/agents/tools.orchestrator), so its whole job is routing + reporting,
- * never doing.
+ * Adonis ("orchestrator") is registered below exactly like any other active
+ * specialist — SAME chat route, SAME `composeAgentSystem`, SAME
+ * `runAgentTurn`. It used to own no domain tools of its own (just the 4
+ * `delegate_to_<specialist>` tools, @/lib/agents/tools.orchestrator) and
+ * route every request to a specialist instead of working it directly. The
+ * Adonis merge task collapsed that into ONE working agent: its `toolNames`
+ * (computed in `specialists/orchestrator.ts`) is now the deduplicated union
+ * of the Concierge's general toolkit + Sales/Marketing/Operations' own
+ * toolNames, so it does the work itself — no routing hop. The 4 delegate
+ * tools stay registered in `TOOLS` (unused by Adonis now, left in place for
+ * a small/reversible diff) — see tools.orchestrator.ts's header comment.
  */
 export const SPECIALISTS: Record<string, SpecialistConfig> = {
   sales: SALES_SPECIALIST,

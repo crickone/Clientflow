@@ -22,11 +22,16 @@
 //          immediately after) — see the inline comment at that assertion for
 //          why this is the only way to genuinely exercise this branch given
 //          ensureAgents' catalog-driven status reconcile.
-//   3. Orchestrator's OWN wiring: every ORCHESTRATOR_SPECIALIST.toolNames
-//      entry resolves to a real TOOLS entry, orchestrator is "active" in
-//      AGENT_CATALOG (flipped from "dormant" by this task), and it's
-//      registered in SPECIALISTS. (specialistToolSlice.test.ts separately
-//      pins orchestrator's exact shape + honesty line, generalizing the same
+//   3. Orchestrator's OWN wiring (Adonis merge task — Adonis is now a full
+//      working agent, not a 4-tool router): ORCHESTRATOR_SPECIALIST.toolNames
+//      is non-empty, every entry resolves to a real TOOLS entry, it holds
+//      ZERO delegate_to_* tools (no routing hop), it's a superset of every
+//      other specialist's own toolNames (the union stays in sync if a
+//      specialist gains a tool), the 4 delegate_to_* tools are still
+//      registered in TOOLS (unused, not deleted) and still not writes,
+//      orchestrator is "active" in AGENT_CATALOG, and it's registered in
+//      SPECIALISTS. (specialistToolSlice.test.ts separately pins
+//      orchestrator's shape + honesty lines, generalizing the same
 //      per-specialist checks it already does for sales/marketing/operations.)
 //   4. First-class-Concierge task (.superpowers/sdd/concierge-agent-brief.md):
 //        - `resolveConciergeModel` (Requirement 2) — the model-selection seam
@@ -272,23 +277,59 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(getAgent(tid, "sales")?.status, "active", "restoring AGENT_CATALOG reconciles the row back to active");
 
     // ════════════════════════════════════════════════════════════════════
-    // 3. Orchestrator's own wiring
+    // 3. Orchestrator's own wiring — Adonis merge task: Adonis is now a full
+    //    working agent, not a 4-tool router. Its toolNames is the
+    //    deduplicated union of the Concierge's general toolkit
+    //    (conciergeToolSlice) plus Sales/Marketing/Operations' own
+    //    toolNames, computed lazily in specialists/orchestrator.ts (a
+    //    getter, not a plain array — see that file's doc comment on why an
+    //    EAGER top-level call into @/lib/assistant/tools would crash at
+    //    module load given the existing tools.ts <-> tools.orchestrator.ts
+    //    <-> specialists/index.ts require cycle).
     // ════════════════════════════════════════════════════════════════════
-    // toolNames all resolve in TOOLS. Concierge Task 1 added a 4th delegate,
-    // delegate_to_concierge — it doesn't go through delegateTo/DELEGATABLE
-    // (see tools.concierge.test.ts for its own registration + guard
-    // coverage), so DELEGATE_NAMES above stays the 3 delegateTo-backed
-    // targets; the orchestrator's real toolNames is that set PLUS it.
+    // (a) non-empty — a real toolkit, not an accidental empty array.
+    assert.ok(ORCHESTRATOR_SPECIALIST.toolNames.length > 0, "ORCHESTRATOR_SPECIALIST.toolNames is non-empty");
+
+    // (b) every entry resolves to a real TOOLS entry — nothing silently
+    // dropped by the chat route's TOOLS.filter((t) => allowed.has(t.name)).
     for (const name of ORCHESTRATOR_SPECIALIST.toolNames) {
       assert.ok(toolsByName.has(name), `ORCHESTRATOR_SPECIALIST.toolNames entry "${name}" resolves in TOOLS`);
     }
-    assert.deepEqual(
-      [...ORCHESTRATOR_SPECIALIST.toolNames].sort(),
-      [...DELEGATE_NAMES, "delegate_to_concierge"].sort(),
-      "ORCHESTRATOR_SPECIALIST.toolNames is exactly the 3 delegateTo-backed tools plus delegate_to_concierge — the orchestrator owns no domain tools of its own",
-    );
 
-    // orchestrator active in AGENT_CATALOG (flipped from "dormant" by this task).
+    // (c) ZERO delegate_to_* — the whole point of this task: Adonis does the
+    // work directly, one runAgentTurn, no delegation hop into a nested turn.
+    assert.ok(
+      !ORCHESTRATOR_SPECIALIST.toolNames.some((n) => n.startsWith("delegate_to_")),
+      "ORCHESTRATOR_SPECIALIST.toolNames contains zero delegate_to_* tools — no routing hop",
+    );
+    for (const name of [...DELEGATE_NAMES, "delegate_to_concierge"]) {
+      assert.ok(
+        !ORCHESTRATOR_SPECIALIST.toolNames.includes(name),
+        `ORCHESTRATOR_SPECIALIST.toolNames no longer includes ${name} — the delegate machinery is left registered in TOOLS but unused`,
+      );
+    }
+
+    // (d) still a proper superset of each specialist's OWN tools, so the
+    // "stays in sync if a specialist gains a tool" property actually holds.
+    for (const [specialistKey, spec] of Object.entries(SPECIALISTS)) {
+      if (specialistKey === "orchestrator") continue;
+      for (const name of spec.toolNames) {
+        assert.ok(
+          ORCHESTRATOR_SPECIALIST.toolNames.includes(name),
+          `ORCHESTRATOR_SPECIALIST.toolNames includes "${name}" (from ${specialistKey}) — Adonis's union is a superset of every specialist's own tools`,
+        );
+      }
+    }
+
+    // (e) the 4 delegate_to_* tools are still registered in TOOLS (unused,
+    // not deleted — a later cleanup task can remove them) and still not
+    // writes — delegation was never gated by WRITE_TOOLS in the first place.
+    for (const name of [...DELEGATE_NAMES, "delegate_to_concierge"]) {
+      assert.ok(toolsByName.has(name), `${name} is still registered in TOOLS (unused by Adonis now, not deleted)`);
+      assert.ok(!WRITE_TOOLS.has(name), `${name} is still not a write tool`);
+    }
+
+    // orchestrator active in AGENT_CATALOG.
     const orchestratorDef = AGENT_CATALOG.find((a) => a.key === "orchestrator");
     assert.ok(orchestratorDef, "orchestrator is a real AGENT_CATALOG entry");
     assert.equal(orchestratorDef!.status, "active", "orchestrator is active in AGENT_CATALOG");

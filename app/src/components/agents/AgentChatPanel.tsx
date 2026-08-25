@@ -16,15 +16,15 @@ import type { Agent } from "@/lib/db/schema";
  * entry here.
  */
 const ORCHESTRATOR_CHAT_COPY = {
-  subtitle: "routes work to Sales, Marketing and Operations and reports back — you approve before anything sends, saves, or publishes",
+  subtitle: "handles leads, marketing, operations and admin directly — you approve before anything sends, saves, or publishes",
   emptyTitle: "Ask Adonis to run the business",
   emptyBody:
-    "It breaks a request into sub-tasks, delegates each to the right specialist, and summarises what came back — nothing any specialist drafts sends, saves, or publishes until you click Approve.",
+    "It works leads, drafts on-brand content, keeps the schedule full, and handles the inbox, invoices and admin — directly, no hand-offs. Nothing it drafts sends, saves, or publishes until you click Approve.",
   suggestions: [
     "Work my leads and win back anyone who's gone quiet",
     "Draft a blog about our new class and line up a win-back for last week's no-shows",
     "What should I focus on today?",
-    "Get Marketing to draft a post and Sales to chase new leads",
+    "Draft a marketing post and follow up on new leads",
   ],
   placeholder: "Ask Adonis…  (Enter to send)",
 };

@@ -34,7 +34,7 @@ interface Props {
  * `server-only` (DB access) and this component runs on the client.
  */
 const MANDATE: Record<string, string> = {
-  orchestrator: "Routes work to the right specialist.",
+  orchestrator: "Your all-in-one assistant — handles leads, marketing, operations and admin directly.",
   sales: "Works leads: instant replies + relentless follow-up.",
   marketing: "Runs the Marketing Brain: campaigns + social.",
   operations: "No-shows, class fill, attendance, admin.",

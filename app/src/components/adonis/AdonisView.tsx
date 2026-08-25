@@ -8,12 +8,14 @@ import { Tooltip } from "@/components/ui/Tooltip";
 
 /**
  * The Hermes-template flagship view (`/adonis`): a full-height, minimal home
- * for the Orchestrator ("Adonis") chat — the same `AssistantChat` component
- * + `/api/agents/orchestrator/chat` endpoint already embedded on the
- * dashboard, so specialist routing + the write-approval gate are completely
- * unchanged. A settings gear top-right opens the existing `/agents` page (org
- * chart, model pickers, spend cap — unchanged, just relocated out of the
- * navbar per the sidebar redesign).
+ * for Adonis's chat — the same `AssistantChat` component + `/api/agents/
+ * orchestrator/chat` endpoint already embedded on the dashboard. Adonis (the
+ * "orchestrator" agent key) now does the work directly — leads, marketing,
+ * operations, and general/admin — with no specialist-routing hop (Adonis
+ * merge task); the write-approval gate is completely unchanged either way. A
+ * settings gear top-right opens the existing `/agents` page (org chart, model
+ * pickers, spend cap — unchanged, just relocated out of the navbar per the
+ * sidebar redesign).
  *
  * `bare` (default-off elsewhere) strips AssistantChat's own header + card
  * chrome so the chat blends into a clean full-page background like the Hermes
@@ -140,7 +142,7 @@ export function AdonisView({
             endpoint="/api/agents/orchestrator/chat"
             bare
             heroSlot={hero}
-            emptyTitle="Ask for anything — I'll route it"
+            emptyTitle="Ask for anything — I'll handle it"
             emptyBody=""
             suggestions={[
               "Give me a breakdown of everything important today",

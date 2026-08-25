@@ -23,10 +23,13 @@
 // Replaces salesToolSlice.test.ts (Task 8) — same checks, generalized to
 // every entry in SPECIALISTS instead of hardcoding SALES_SPECIALIST.
 //
-// Concierge Task 1: orchestrator's toolNames grows a 4th delegate,
-// delegate_to_concierge (checks (f) below updated 3 -> 4 accordingly). The
-// Concierge itself is deliberately NOT a SPECIALISTS entry — see check (g) —
-// its system/tools are computed at runtime by conciergeToolSlice, not a
+// Adonis merge task: orchestrator is no longer a 4-tool router — check (f)
+// below now pins its NEW shape instead: non-empty, every entry resolves in
+// TOOLS, a superset of every other specialist's own toolNames, and — the
+// security-relevant property, now checked for EVERY specialist including
+// orchestrator itself — ZERO delegate_to_* tools anywhere. The Concierge
+// itself is still deliberately NOT a SPECIALISTS entry — see check (g) — its
+// system/tools are computed at runtime by conciergeToolSlice, not a
 // registered playbook + toolNames list like every other specialist here.
 //
 // NOTE: this repo does NOT use vitest — tests are plain node:assert/strict
@@ -187,41 +190,47 @@ const requireLocal = createRequire(import.meta.url);
     "OPERATIONS_SPECIALIST.basePlaybook contains the required honesty line about not marking attendance itself",
   );
 
-  // ── (f) Orchestrator's shape is pinned too (Orchestrator Task 2; Concierge
-  // Task 1 adds the 4th): exactly the 4 delegate_to_<specialist> tools — no
-  // domain tools of its own, since it routes rather than does — and its base
-  // playbook contains, verbatim, the honesty line that a specialist's
-  // proposed writes still require the operator's approval (the same "never
-  // claim work is done" spirit as Marketing's post/schedule line and
-  // Operations' attendance line above, specific to a THIN routing agent whose
-  // only real actions happen inside delegated specialist turns). Also
-  // confirms delegation can't recurse: the orchestrator does not appear in
-  // its own toolNames or any other specialist's — enforced at runtime by
-  // tools.orchestrator.ts's DELEGATABLE allowlist (see
-  // tools.orchestrator.test.ts), pinned here as a static cross-check that no
-  // specialist (including orchestrator itself) is ever given a
-  // delegate_to_* tool. ──
-  assert.equal(SPECIALISTS.orchestrator.toolNames.length, 4, "ORCHESTRATOR_SPECIALIST.toolNames has exactly 4 entries");
-  assert.deepEqual(
-    [...SPECIALISTS.orchestrator.toolNames].sort(),
-    ["delegate_to_concierge", "delegate_to_marketing", "delegate_to_operations", "delegate_to_sales"],
-    "ORCHESTRATOR_SPECIALIST.toolNames is exactly the 4 delegate tools",
+  // ── (f) Orchestrator's shape is pinned too (Adonis merge task: Adonis is
+  // now a full working agent, not a 4-tool router). Its toolNames is the
+  // deduplicated union of the Concierge's general toolkit
+  // (conciergeToolSlice) plus Sales/Marketing/Operations' own toolNames,
+  // computed lazily in specialists/orchestrator.ts. Pinned here: non-empty,
+  // a proper superset of each of the 3 specialists' own toolNames (so "stays
+  // in sync if a specialist gains a tool" actually holds — checked by NAME,
+  // not just count), and its base playbook contains, verbatim, the honesty
+  // lines that it never executes a write itself and states its direct-work
+  // (no hand-off) framing up front — the same "never claim work is done"
+  // spirit as Marketing's post/schedule line and Operations' attendance line
+  // above. Also confirms delegation can't recurse: NO specialist — including
+  // orchestrator itself, unlike before this task — may hold a delegate_to_*
+  // tool anymore, since Adonis now does the work directly instead of
+  // delegating it. ──
+  assert.ok(
+    SPECIALISTS.orchestrator.toolNames.length > 0,
+    "ORCHESTRATOR_SPECIALIST.toolNames is non-empty",
   );
+  for (const specialistKey of ["sales", "marketing", "operations"] as const) {
+    for (const name of SPECIALISTS[specialistKey].toolNames) {
+      assert.ok(
+        SPECIALISTS.orchestrator.toolNames.includes(name),
+        `ORCHESTRATOR_SPECIALIST.toolNames includes "${name}" (from ${specialistKey}) — Adonis's union must be a superset of every specialist's own tools`,
+      );
+    }
+  }
   assert.ok(
     SPECIALISTS.orchestrator.basePlaybook.includes(
-      "still requires the operator's approval",
+      "you never execute a write yourself",
     ),
-    "ORCHESTRATOR_SPECIALIST.basePlaybook contains the required honesty line about needing operator approval",
+    "ORCHESTRATOR_SPECIALIST.basePlaybook contains the required honesty line about never executing a write itself",
   );
   assert.ok(
-    SPECIALISTS.orchestrator.basePlaybook.includes("Concierge"),
-    "ORCHESTRATOR_SPECIALIST.basePlaybook mentions the Concierge as where general/admin/money/inbox/plan work is routed",
+    SPECIALISTS.orchestrator.basePlaybook.includes("no routing, no hand-offs"),
+    "ORCHESTRATOR_SPECIALIST.basePlaybook states its direct-work framing (no routing hop) up front",
   );
   for (const [key, spec] of Object.entries(SPECIALISTS)) {
-    if (key === "orchestrator") continue; // orchestrator legitimately holds all 4 — pinned exactly, above
     assert.ok(
       !spec.toolNames.some((n) => n.startsWith("delegate_to_")),
-      `${key}: no specialist other than orchestrator may hold a delegate_to_* tool — that would allow recursive/nested delegation`,
+      `${key}: no specialist — including orchestrator — may hold a delegate_to_* tool; Adonis works directly instead of delegating`,
     );
   }
 
