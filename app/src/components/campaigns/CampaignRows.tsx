@@ -49,6 +49,17 @@ const td: React.CSSProperties = {
   color: "var(--text-secondary)",
 };
 
+// The expanded panel sits on the page's own dark background (NOT a grey
+// surface-2 block), and every individual figure gets its own card — the same
+// clean card style as the rest of the page (surface-1 + hairline border).
+const PANEL_BG = "var(--bg)";
+const tileCard: React.CSSProperties = {
+  background: "var(--surface-1)",
+  border: "1px solid var(--hairline)",
+  borderRadius: "var(--radius)",
+  padding: "14px 16px",
+};
+
 /** chevron + Name, Season, Status, Assets, Performance, Created — must match page.tsx's <thead> column count for the expanded row's colSpan. */
 const COLUMN_COUNT = 7;
 
@@ -148,7 +159,7 @@ function CampaignPanel({
   badge: { tone: "neutral" | "green" | "red"; label: string };
 }) {
   return (
-    <div style={{ background: "var(--surface-2)", padding: "24px 28px" }}>
+    <div style={{ background: PANEL_BG, padding: "24px 28px" }}>
       <FunnelStrip m={m} />
       <MoneyGrid m={m} badge={badge} />
       <div style={{ marginTop: 24 }}>
@@ -174,7 +185,7 @@ function FunnelStrip({ m }: { m: CampaignMetrics }) {
 
 function FunnelNode({ label, value }: { label: string; value: number }) {
   return (
-    <div style={{ textAlign: "center", minWidth: 110 }}>
+    <div style={{ ...tileCard, textAlign: "center", minWidth: 140 }}>
       <CardValue style={{ fontSize: 28 }}>{value.toLocaleString()}</CardValue>
       <CardLabel style={{ marginTop: 6, marginBottom: 0 }}>{label}</CardLabel>
     </div>
@@ -201,7 +212,7 @@ function FunnelArrow({ rate }: { rate: string }) {
 
 function StatTile({ label, value, subNote }: { label: string; value: string; subNote?: string }) {
   return (
-    <div>
+    <div style={tileCard}>
       <CardLabel>{label}</CardLabel>
       <CardValue style={{ fontSize: 19 }}>{value}</CardValue>
       {subNote && <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 4 }}>{subNote}</div>}
@@ -220,10 +231,8 @@ function MoneyGrid({
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
-        gap: 20,
-        paddingTop: 20,
-        borderTop: "1px solid var(--hairline)",
+        gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+        gap: 12,
       }}
     >
       <StatTile label="Ad spend" value={formatCentsEur(m.adSpendCents)} />
@@ -249,7 +258,7 @@ function MoneyGrid({
         value={m.roas === null ? "—" : `${m.roas.toFixed(1)}×`}
         subNote={m.roas === null ? "No ad spend yet" : undefined}
       />
-      <div>
+      <div style={tileCard}>
         <CardLabel>CFA</CardLabel>
         <div style={{ marginTop: 2 }}>
           <Badge tone={badge.tone}>{badge.label}</Badge>
@@ -272,7 +281,7 @@ function EmailRow({ email }: { email: CampaignEmailMetrics | null }) {
     );
   }
   return (
-    <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, maxWidth: 486 }}>
       <StatTile label="Sent" value={email.sent.toLocaleString()} />
       <StatTile label="Open rate" value={pct(email.openRatePct)} />
       <StatTile label="Click rate" value={pct(email.clickRatePct)} />
