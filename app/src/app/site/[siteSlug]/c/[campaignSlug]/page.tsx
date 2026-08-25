@@ -19,6 +19,7 @@ import { runWithTenant, getCurrentTenant } from "@/lib/db/tenant";
 import {
   findApprovedLandingAsset,
   getCampaignBySlug,
+  incrementCampaignViews,
   listAssets,
   type Campaign,
 } from "@/lib/campaigns/store";
@@ -149,10 +150,31 @@ interface Resolved {
  * Also returns `publicSite` + `host` (unused by the page body itself)
  * purely so generateMetadata can build this page's own canonical URL —
  * same shape lib/cms/render.ts's PageContext carries `resolved`/`host` for.
+ *
+ * `opts.countView` (this task, default false): when true, bumps the
+ * campaign's landing-page view counter (incrementCampaignViews) right after
+ * the landing-asset gate passes below — i.e. only once this function has
+ * already decided a real, live landing page IS about to render, never on a
+ * 404/not-found path. Threaded in as a caller-controlled flag rather than
+ * always-on because this function is called twice per real page view
+ * (generateMetadata AND the page component below both call it, as separate
+ * Next.js render passes with no shared cache — see this doc's own note two
+ * paragraphs up) and counting both would double every real view. Only the
+ * page component opts in. The increment ALSO has to happen HERE, inside the
+ * runWithTenant(...) callback below, rather than after this function
+ * returns: incrementCampaignViews writes through the ambient `db` proxy,
+ * which resolves the current tenant from the runWithTenant AsyncLocalStorage
+ * binding — a binding that's only live for the duration of this callback
+ * (see lib/db/tenant.ts's tenantContext.run). A public visitor here carries
+ * no session cookie at all, so calling it after the callback has returned
+ * would hit getCurrentTenant()'s no-context throw on every single real
+ * view — silently swallowed by the try/catch below, sure, but the counter
+ * would then never actually move.
  */
 function resolveCampaignLanding(
   params: Props["params"],
   searchParams: Props["searchParams"],
+  opts?: { countView?: boolean },
 ): Resolved | null {
   const host = headers().get("host");
   const resolved = resolvePublicSite({
@@ -181,6 +203,18 @@ function resolveCampaignLanding(
     const assets = listAssets(campaign.id);
     const landingAsset = findApprovedLandingAsset(campaign.status, assets);
     if (!landingAsset) return null;
+
+    // Landing-page view counter (this task) — best-effort only: a missed
+    // increment must never take down the page. See opts.countView's doc
+    // above for why this has to live right here (inside runWithTenant, after
+    // both render gates above have already passed).
+    if (opts?.countView) {
+      try {
+        incrementCampaignViews(campaign.id);
+      } catch (err) {
+        console.error("[campaign landing] view-count increment failed:", err);
+      }
+    }
 
     const body = parseLandingBody(landingAsset.body) ?? {
       headline: campaign.name,
@@ -280,7 +314,11 @@ export function generateMetadata({ params, searchParams }: Props): Metadata {
 }
 
 export default function CampaignLandingPage({ params, searchParams }: Props) {
-  const data = resolveCampaignLanding(params, searchParams);
+  // countView: true — this is the actual page render (as opposed to
+  // generateMetadata's separate pass over the same request), so this is the
+  // one call site that should count as a view. See resolveCampaignLanding's
+  // opts.countView doc for the full reasoning.
+  const data = resolveCampaignLanding(params, searchParams, { countView: true });
   if (!data) notFound();
 
   return (

@@ -249,6 +249,7 @@ export async function planCampaignTool(ctx: ToolContext, input: Record<string, u
     endsOn: endsOn || null,
     offer: "",
     adSpendCents: 0,
+    landingViews: 0,
     status: "building",
     createdAt: now,
     updatedAt: now,

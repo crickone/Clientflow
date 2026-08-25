@@ -14,6 +14,21 @@ export function formatEur(amount: number) {
   return eur.format(amount ?? 0);
 }
 
+/**
+ * Format integer cents as a euro string, e.g. `1234` -> `"€12.34"` — for
+ * money stored as integer cents (Campaign Engine, AI usage metering), as
+ * opposed to `formatEur` above (a float euro amount). Lives in this shared,
+ * dependency-free module — not lib/campaigns/costEstimate.ts, which
+ * re-exports it for its existing callers and is where it originally lived —
+ * specifically so a "use client" component can format money without pulling
+ * in costEstimate.ts's transitive server-only AI-pricing chain
+ * (@/lib/ai/client's `import "server-only"`), which Next.js correctly
+ * refuses to bundle for the client.
+ */
+export function formatCentsEur(cents: number): string {
+  return `€${(cents / 100).toFixed(2)}`;
+}
+
 const dateFmt = new Intl.DateTimeFormat("en-IE", {
   day: "2-digit",
   month: "short",

@@ -1440,6 +1440,20 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     console.error("[db] campaigns ad_spend_cents migration failed:", err);
   }
 
+  // Campaign Engine (this task): landing-page view counter, bumped by the
+  // public campaign landing route once per genuinely-served render. Additive/
+  // idempotent like every guard in this block.
+  try {
+    const campViewCols = sqlite
+      .prepare("PRAGMA table_info(campaigns)")
+      .all() as Array<{ name: string }>;
+    if (!campViewCols.some((c) => c.name === "landing_views")) {
+      sqlite.exec("ALTER TABLE campaigns ADD COLUMN landing_views INTEGER NOT NULL DEFAULT 0");
+    }
+  } catch (err) {
+    console.error("[db] campaigns landing_views migration failed:", err);
+  }
+
   // Agent tool-access toggles: a JSON array of tool names the agent may NOT use
   // (the disabled set). Null = nothing disabled = every tool on. Additive/
   // idempotent like every guard in this block. See agents.disabledTools

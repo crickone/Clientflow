@@ -962,6 +962,11 @@ export const campaigns = sqliteTable("campaigns", {
   endsOn: text("ends_on"),
   offer: text("offer").notNull().default(""),
   adSpendCents: integer("ad_spend_cents").notNull().default(0),
+  /** Landing-page view counter (this task) — bumped by the public
+   *  `/site/<slug>/c/<campaignSlug>` route (via incrementCampaignViews,
+   *  lib/campaigns/store.ts) once per genuinely-served render, never on a
+   *  404/not-found. Powers the metrics panel's funnel strip + view→lead rate. */
+  landingViews: integer("landing_views").notNull().default(0),
   status: text("status", {
     enum: ["building", "ready", "active", "complete", "archived"],
   })

@@ -35,6 +35,7 @@ const campaign: Campaign = {
   endsOn: "2026-06-30",
   offer: "20% off all 6-week transformation programmes booked before June 30th",
   adSpendCents: 0,
+  landingViews: 0,
   status: "building",
   createdAt: new Date(),
   updatedAt: new Date(),

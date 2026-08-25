@@ -1,6 +1,6 @@
 import "server-only";
 
-import { asc, desc, eq } from "drizzle-orm";
+import { asc, desc, eq, sql } from "drizzle-orm";
 
 import { db, schema } from "@/lib/db";
 import type { Campaign, CampaignAsset } from "@/lib/db/schema";
@@ -139,6 +139,24 @@ export function setCampaignAdSpend(campaignId: number, cents: number): void {
   const clamped = Math.max(0, Math.round(cents));
   db.update(schema.campaigns)
     .set({ adSpendCents: clamped })
+    .where(eq(schema.campaigns.id, campaignId))
+    .run();
+}
+
+/**
+ * Bump a campaign's landing-page view counter by 1 (this task). Called ONLY
+ * from the public landing route, and only once its own render gate has
+ * already confirmed a real, live landing page is about to be served (see
+ * site/[siteSlug]/c/[campaignSlug]/page.tsx) — this function itself does no
+ * gating of its own, it just increments. A raw `sql` increment (not a
+ * read-then-write) so concurrent visitors can never race-clobber each other's
+ * count. Deliberately does NOT bump updatedAt, same reasoning as
+ * setCampaignAdSpend above — a page view isn't a content edit, so it
+ * shouldn't perturb "last touched" for the campaign list view.
+ */
+export function incrementCampaignViews(campaignId: number): void {
+  db.update(schema.campaigns)
+    .set({ landingViews: sql`landing_views + 1` })
     .where(eq(schema.campaigns.id, campaignId))
     .run();
 }

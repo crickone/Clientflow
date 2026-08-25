@@ -4,6 +4,13 @@
 import { estCostCents } from "@/lib/ai/client";
 import type { AssetKind } from "@/lib/campaigns/plan";
 
+// Re-exported (not defined here anymore) so every existing caller importing
+// `formatCentsEur` from this module keeps working unchanged — see
+// lib/utils.ts's doc on formatCentsEur for why the real definition moved
+// there (a "use client" component needs to format money without dragging in
+// this module's server-only @/lib/ai/client import below).
+export { formatCentsEur } from "@/lib/utils";
+
 /** Average input/output tokens per asset kind. Input is dominated by the
  *  Marketing Brain + prompt (~2–2.5k); output is sized to the asset. Estimates. */
 export const AVG_TOKENS: Record<AssetKind, { in: number; out: number }> = {
@@ -22,8 +29,4 @@ export function estimateCampaignBuildCents(assets: { kind: AssetKind }[], model:
     if (!t) return sum; // unknown kind contributes nothing rather than throwing
     return sum + estCostCents(model, { inputTokens: t.in, outputTokens: t.out });
   }, 0);
-}
-
-export function formatCentsEur(cents: number): string {
-  return `€${(cents / 100).toFixed(2)}`;
 }
