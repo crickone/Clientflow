@@ -17,15 +17,17 @@ test("resolveCampaignBuildModel: unset / empty / unknown / null → CONTENT_MODE
   assert.equal(resolveCampaignBuildModel("garbage"), CONTENT_MODEL);
 });
 
-// Locks C1: meteredCreate (the campaign generation chokepoint) calls native
-// Anthropic directly with no OpenRouter/provider routing, so an
-// `openrouter:`-prefixed id — a real, selectable MODEL_CATALOG entry, valid
-// for the agent-chat picker — must NOT be a valid campaign build model. If
-// this regresses, setCampaignBuildModel would again accept an id that breaks
-// every subsequent campaign generation call.
-test("resolveCampaignBuildModel / isCampaignBuildModelId: an OpenRouter id is REJECTED", () => {
-  assert.equal(resolveCampaignBuildModel("openrouter:z-ai/glm-5.2"), CONTENT_MODEL);
-  assert.equal(isCampaignBuildModelId("openrouter:z-ai/glm-5.2"), false);
+// Campaign generation now routes an `openrouter:`-prefixed build model through
+// meteredComplete (@/lib/ai/metered → the provider-neutral one-shot), so the
+// two OFFERED OpenRouter ids (DeepSeek + GLM) are valid choices. An OpenRouter
+// id NOT in the offered list (e.g. GPT-5) is still rejected, same as any
+// unknown id — the list stays a curated allowlist, not "any OpenRouter id".
+test("resolveCampaignBuildModel / isCampaignBuildModelId: offered OpenRouter ids pass, others rejected", () => {
+  assert.equal(resolveCampaignBuildModel("openrouter:z-ai/glm-5.2"), "openrouter:z-ai/glm-5.2");
+  assert.equal(isCampaignBuildModelId("openrouter:z-ai/glm-5.2"), true);
+  assert.equal(isCampaignBuildModelId("openrouter:deepseek/deepseek-v4-flash-0731"), true);
+  assert.equal(resolveCampaignBuildModel("openrouter:openai/gpt-5"), CONTENT_MODEL);
+  assert.equal(isCampaignBuildModelId("openrouter:openai/gpt-5"), false);
 });
 
 test("isCampaignBuildModelId: choice membership", () => {

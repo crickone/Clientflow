@@ -3,6 +3,7 @@ import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 
 import { getAnthropic } from "./client";
+import { getProvider } from "./providers";
 import { assertAiAllowed, meterAndCharge } from "./usage";
 
 /**
@@ -74,4 +75,37 @@ export async function meteredCreate(
   const message = await getAnthropic().messages.create(params);
   meterAndCharge(meter.tenantId, meter.agentKey, params.model, usageFromMessage(message.usage));
   return message;
+}
+
+/**
+ * Provider-NEUTRAL one-shot metered completion — the same gate-then-meter
+ * wrapper as `meteredCreate`, but routed through `getProvider(model).streamTurn`
+ * (@/lib/ai/providers) so it can run an OpenRouter model too, not only native
+ * Anthropic. A single user prompt in, the assistant's text out — no tools, no
+ * `onText` (it accumulates internally and returns the full text). Usage is
+ * metered under the REQUESTED `model` exactly like `meteredCreate` (PRICING has
+ * entries for the OpenRouter ids). This is NOT raw-SDK access — it goes through
+ * the provider abstraction (the same one `runAgentTurn` uses), so it stays a
+ * proper metering chokepoint the CI guard (meteredGuard.test.ts) is happy with.
+ *
+ * Campaign generation uses this ONLY for its `openrouter:`-prefixed build
+ * models; native Anthropic models keep going through `meteredCreate` above so
+ * their adaptive `thinking` + system prompt caching are preserved unchanged.
+ * `getProvider` throws OPENROUTER_MISSING_KEY_ERROR if an OpenRouter id is
+ * passed with no OPENROUTER_API_KEY — same fail-loud contract as the chat.
+ */
+export async function meteredComplete(
+  meter: MeterContext,
+  args: { model: string; system: string; prompt: string; maxTokens: number },
+): Promise<string> {
+  assertAiAllowed(meter.tenantId);
+  const result = await getProvider(args.model).streamTurn({
+    model: args.model,
+    system: args.system,
+    tools: [],
+    messages: [{ role: "user", content: args.prompt }],
+    maxTokens: args.maxTokens,
+  });
+  meterAndCharge(meter.tenantId, meter.agentKey, args.model, result.usage);
+  return result.text;
 }

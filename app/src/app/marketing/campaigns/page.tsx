@@ -45,6 +45,16 @@ export default async function MarketingCampaignsPage() {
   // check is needed here (same reasoning as CapEditor on /agents).
   const buildModel = await getCampaignBuildModel();
 
+  // OpenRouter build models (DeepSeek / GLM) only run with OPENROUTER_API_KEY —
+  // getProvider throws without it. Offer them only when it's configured (same
+  // gate the agent model picker uses), so an admin can't pick one that would
+  // then fail every generation call. process.env is safe to read here (server
+  // component).
+  const openRouterConfigured = !!process.env.OPENROUTER_API_KEY;
+  const modelChoices = CAMPAIGN_MODEL_CHOICES.filter(
+    (m) => openRouterConfigured || !m.id.startsWith("openrouter:"),
+  );
+
   const campaigns = listCampaigns();
 
   // Full per-campaign metrics roll-up (this task, extending the CFA/ROAS
@@ -188,7 +198,7 @@ export default async function MarketingCampaignsPage() {
               fontFamily: "inherit",
             }}
           >
-            {CAMPAIGN_MODEL_CHOICES.map((m) => (
+            {modelChoices.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.label} — {m.hint}
               </option>

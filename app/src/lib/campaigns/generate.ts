@@ -3,7 +3,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 
 import { getBusinessContext } from "@/lib/ai/businessContext";
 import { CONTENT_MODEL } from "@/lib/ai/client";
-import { meteredCreate, type MeterContext } from "@/lib/ai/metered";
+import { meteredCreate, meteredComplete, type MeterContext } from "@/lib/ai/metered";
 import { draftBlogPost } from "@/lib/ai/draftBlog";
 import { generateCarouselSlides } from "@/lib/ai/generateCarousel";
 import { draftCampaignEmail } from "@/lib/ai/draftCampaign";
@@ -152,6 +152,16 @@ async function generateRaw(
   prompt: string,
   model: string = CONTENT_MODEL,
 ): Promise<string> {
+  const system = `${getBusinessContext()}\n\n${formatRules}`;
+
+  // An OpenRouter build model goes through the provider-neutral one-shot
+  // (meteredComplete): meteredCreate below calls native Anthropic directly and
+  // would reject an OpenRouter id. Native Anthropic models keep meteredCreate's
+  // adaptive thinking + ephemeral system-prompt caching, unchanged.
+  if (model.startsWith("openrouter:")) {
+    return meteredComplete(meter, { model, system, prompt, maxTokens: 4096 });
+  }
+
   const message = await meteredCreate(meter, () => ({
     model,
     max_tokens: 4096,
@@ -159,7 +169,7 @@ async function generateRaw(
     system: [
       {
         type: "text",
-        text: `${getBusinessContext()}\n\n${formatRules}`,
+        text: system,
         cache_control: { type: "ephemeral" },
       },
     ],

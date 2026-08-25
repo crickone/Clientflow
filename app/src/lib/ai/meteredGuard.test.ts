@@ -2,11 +2,14 @@
 //
 // CI GUARD (P1 hardening — centralize AI metering). The per-tenant monthly AI
 // spend cap (@/lib/ai/usage) is only UNSKIPPABLE if every paid model call goes
-// through a chokepoint that enforces it. There are exactly two:
+// through a chokepoint that gates + meters it. The RAW-SDK ones are two:
 //   - meteredCreate (@/lib/ai/metered)         — one-shot, non-streaming calls
 //   - runAgentTurn  (@/lib/agents/runAgentTurn) — the agent tool-use loop,
 //     which streams via AnthropicProvider and meters once per turn
-// Both reach the SDK only through the shared getAnthropic() client. Every other
+// Both reach the SDK only through the shared getAnthropic() client.
+// (meteredComplete, also in @/lib/ai/metered, is a third metering chokepoint,
+// but it goes through the provider abstraction — getProvider().streamTurn — not
+// the raw SDK, so it needs no SDK sanction here; it still gates + meters.) Every other
 // file must go through those, never the raw SDK. This test fails the build if
 // any non-sanctioned file reaches for the SDK directly — `new Anthropic()`,
 // `.messages.create(` / `.messages.stream(`, or `getAnthropic(` — because such
