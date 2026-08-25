@@ -1208,9 +1208,11 @@ function MessageBubble({
           // Long unspaced URLs (Drive/artifact links) must wrap, not scroll the page.
           overflowWrap: "anywhere",
           background: isUser ? "var(--accent)" : "var(--surface-2)",
-          // Dark ink on the accent fill — matches primary buttons, reads on every
-          // theme (the theme's --accent-ink is white-on-bg, wrong for this).
-          color: isUser ? "#1a0a03" : "var(--text-primary)",
+          // Ink that sits ON the accent fill — matches .btn--primary. Uses the
+          // theme-aware --accent-contrast, which flips dark/light with the
+          // accent's own luminance, so it reads in BOTH light and dark mode; the
+          // old hardcoded dark ink went invisible on the dark light-mode accent.
+          color: isUser ? "var(--accent-contrast)" : "var(--text-primary)",
           border: isUser ? "none" : "1px solid var(--hairline)",
           borderRadius: 14,
           padding: "10px 14px",

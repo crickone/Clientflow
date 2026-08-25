@@ -108,7 +108,7 @@ export function CampaignLanding({ body, theme, fonts, logoSrc, business, signupT
                 lineHeight: 1.1,
                 fontWeight: 700,
                 letterSpacing: "-0.01em",
-                color: "#1a0a03",
+                color: "var(--accent-contrast)",
                 overflowWrap: "anywhere",
               }}
             >

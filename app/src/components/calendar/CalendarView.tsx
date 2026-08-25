@@ -102,7 +102,7 @@ export function CalendarView({
                   style={{
                     fontSize: 12,
                     fontWeight: c.isToday ? 700 : 500,
-                    color: c.isToday ? "#1a0a03" : c.inMonth ? "var(--text-secondary)" : "var(--text-tertiary)",
+                    color: c.isToday ? "var(--accent-contrast)" : c.inMonth ? "var(--text-secondary)" : "var(--text-tertiary)",
                     background: c.isToday ? "var(--accent)" : "transparent",
                     borderRadius: 20,
                     minWidth: 20,

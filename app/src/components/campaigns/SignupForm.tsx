@@ -240,11 +240,10 @@ function submitBtnStyle(submitting: boolean): React.CSSProperties {
     borderRadius: 8,
     border: "none",
     background: "var(--accent)",
-    // Dark ink on the accent fill — matches .btn--primary in globals.css /
-    // the message-bubble convention in AssistantChat.tsx: reads on every
-    // theme preset (all bright/mid-saturation), rather than a computed
-    // contrast colour this codebase doesn't otherwise use.
-    color: "#1a0a03",
+    // Ink that sits ON the accent fill — matches .btn--primary in globals.css.
+    // Uses the theme-aware --accent-contrast (flips with the accent's luminance)
+    // so it reads on a dark (light-mode) accent too, not just bright presets.
+    color: "var(--accent-contrast)",
     fontWeight: 600,
     fontSize: 15,
     cursor: submitting ? "default" : "pointer",
