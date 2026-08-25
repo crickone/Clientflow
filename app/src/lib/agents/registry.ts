@@ -26,25 +26,17 @@ export const AGENT_CATALOG: AgentDef[] = [
     status: "active",
     defaultModel: MODELS.sonnet,
   },
-  // Sales/Marketing/Operations/Concierge/Finance CATALOG entries were retired
-  // here (single-agent product, 2026-08-25): the operator chose to show only
-  // Adonis on /agents. Adonis absorbed Sales/Marketing/Operations/Concierge's
-  // tools + playbooks in the prior Adonis-merge task (commit dddfa27) and does
-  // their work directly — no hand-offs; Finance was only ever a dormant
-  // placeholder (never built) and will be folded into Adonis later the same
-  // way. This is a catalog/UI change
-  // ONLY: `specialists/{sales,marketing,operations}.ts` + their entries in
-  // the `SPECIALISTS` map (./specialists/index.ts) are deliberately UNTOUCHED
-  // — `specialists/orchestrator.ts` still imports SALES_SPECIALIST/
-  // MARKETING_SPECIALIST/OPERATIONS_SPECIALIST to build Adonis's deduplicated
-  // 52-tool union (see that file's doc comment). The Concierge never had a
-  // `SPECIALISTS` entry (its system/tools are computed at runtime by
-  // `buildAssistantSystem`/`conciergeToolSlice`, already folded into Adonis's
-  // own toolNames the same way) — removing its catalog row is the whole
-  // change for it. The prune loop below (`ensureAgents`) deletes all five
-  // retired agents' rows from every tenant DB automatically on next load —
-  // agent rows only ever originate from this catalog, so pruning a
-  // now-catalog-absent key is safe by construction, exactly like the
+  // Single-agent product (2026-08-25): AGENT_CATALOG holds exactly one entry,
+  // Adonis ("orchestrator"). The Sales/Marketing/Operations/Concierge
+  // specialists and the dormant Finance placeholder were all retired — Adonis
+  // absorbed the first four's tools + playbooks and now does the work directly,
+  // and the whole delegate_to_* delegation subsystem was removed with them (the
+  // specialist spec files + their SPECIALISTS entries are gone too; their tool
+  // lists live inline in specialists/orchestrator.ts now). Finance was never
+  // built and will fold into Adonis later. The prune loop below (`ensureAgents`)
+  // deletes any tenant `agents` row whose key is no longer in this catalog
+  // automatically on next load — agent rows only ever originate from here, so
+  // pruning a now-catalog-absent key is safe by construction, exactly like the
   // pre-existing "e.g. SEO" prune case already documented there.
 ];
 

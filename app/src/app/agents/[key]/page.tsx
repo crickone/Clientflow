@@ -62,19 +62,16 @@ export default async function AgentDetailPage({
   // exactly below so this page never drifts from what a real chat run sends.
   const spec = SPECIALISTS[key];
 
-  // The Concierge is deliberately NOT a SPECIALISTS entry (see
+  // Vestigial concierge fallback. The Concierge is not a SPECIALISTS entry (see
   // specialistToolSlice.test.ts's pinned `!("concierge" in SPECIALISTS)`
-  // assertion) — its base "playbook" + tool slice are computed at RUNTIME by
-  // buildAssistantSystem/conciergeToolSlice (@/lib/agents/tools.orchestrator's
-  // delegateToConcierge) rather than a fixed registry entry, so `spec` above
-  // is `undefined` for it. Without this, the generic fallbacks below would
-  // show a meaningless "You are a helpful business agent." line and falsely
-  // claim it has NO tools ("this agent isn't running") for an agent that
-  // actually has the full general toolkit — handled gracefully here instead,
-  // per Requirement 5 (.superpowers/sdd/concierge-agent-brief.md): the base
-  // layer explains its remit + that it's the general toolkit, and the Tools
-  // card gets its REAL current tool slice, computed the exact same way
-  // `delegateToConcierge` computes it for a live run.
+  // assertion), so `spec` is `undefined` for `key === "concierge"`; this block
+  // computed its base "playbook" + tool slice at RUNTIME from
+  // buildAssistantSystem/conciergeToolSlice (the general assistant's own system
+  // + tool slice) instead. The Concierge has since been retired as an agent, so
+  // `agents/[key]/page.tsx`'s getAgent/notFound guard 404s for "concierge"
+  // before this component renders — the fallback is no longer reached, kept
+  // only so the generic layers below never mislead if some runtime agent
+  // without a fixed registry entry is surfaced here again.
   const isConcierge = key === "concierge";
   const conciergeToolNames = isConcierge
     ? conciergeToolSlice(getSchedulingMode(), isDriveConnected(tenantId)).map((t) => t.name)

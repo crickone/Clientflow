@@ -141,8 +141,8 @@ export function campaignProgressEventFromResult(name: string, resultText: string
 /**
  * The literal chat message "Go again" sends — the chosen wiring reuses the
  * EXISTING send() path with zero new endpoint (see AssistantChat's own
- * header comment on why). Always contains the words "Go again", which the
- * Marketing agent's playbook (specialists/marketing.ts's basePlaybook)
+ * header comment on why). Always contains the words "Go again", which
+ * Adonis's playbook (specialists/orchestrator.ts's basePlaybook)
  * already anchors on for both the plan step and the per-asset step, so the
  * model reliably maps this to a fresh plan_campaign (plan case) or
  * draft_campaign_asset (asset case) call — using whatever name/assetTitle

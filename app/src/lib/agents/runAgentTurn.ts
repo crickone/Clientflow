@@ -40,13 +40,10 @@ export interface RunAgentTurnArgs {
 }
 
 /**
- * The specialist tool-use loop, extracted verbatim (Orchestrator Task 1) from
- * `/api/agents/[key]/chat` so both that route and the orchestrator's future
- * `delegate_to_<specialist>` tools (Task 2) run the exact same loop, just
- * wired to different callbacks. Pure refactor — no behaviour change: the
- * Sales/Marketing/Operations chat route calls this with `onText`/`onTool`/
- * `onArtifact` wired to its SSE `send()`, so the frames a client receives are
- * unchanged.
+ * The agent tool-use loop, extracted (Orchestrator Task 1) from
+ * `/api/agents/[key]/chat`. The chat route calls this with `onText`/`onTool`/
+ * `onArtifact` wired to its SSE `send()`; Adonis is the only agent that runs it
+ * today.
  *
  * THE SAFETY PROPERTY THIS PRESERVES: a WRITE tool (per `isWriteTool`) is
  * NEVER executed in here — it is collected into `pendingWrites` and returned
@@ -58,41 +55,32 @@ export interface RunAgentTurnArgs {
  * `isWriteTool`/`WRITE_TOOLS` set; that endpoint is untouched by this
  * refactor.
  *
- * Orchestrator Task 2: a READ tool's result can ITSELF carry `pendingWrites`
- * (`ToolResult.pendingWrites?`, @/lib/assistant/tools) — this is how a
- * `delegate_to_<specialist>` tool (@/lib/agents/tools.orchestrator) surfaces
- * writes a DELEGATED specialist's nested `runAgentTurn` deferred. Delegation
- * never bypasses this function's write gate: the specialist's own nested loop
- * defers its writes exactly the same way (delegate tools call this same
- * `runAgentTurn`, recursively), so by the time a write reaches the outer
- * loop's `pendingWrites`, it has already passed through this exact NEVER-
- * execute-a-write branch at least once, possibly twice. The read branch below
- * folds any such nested writes into THIS turn's own `pendingWrites`, so the
- * SAME `if (pendingWrites.length > 0) break` + confirm/Approve path handles a
- * delegated write identically to a direct one — the caller (the chat route)
- * needs no delegation-specific code at all.
+ * A READ tool's result can ITSELF carry `pendingWrites`
+ * (`ToolResult.pendingWrites?`, @/lib/assistant/tools) — the bubble-up path for
+ * a NESTED `runAgentTurn`'s deferred writes: the read branch below folds them
+ * into THIS turn's own `pendingWrites`, so the SAME `if (pendingWrites.length >
+ * 0) break` + confirm/Approve path handles a bubbled-up write identically to a
+ * direct one. No in-tree tool produces a nested turn today (the delegation
+ * layer that did was removed with the single-agent merge), so this is
+ * defensive, harmless-when-absent plumbing — kept because it costs nothing and
+ * keeps the write gate's fold-in correct for any future nested tool.
  *
- * Concierge Task 1: `artifacts` mirrors `pendingWrites` exactly, one field
- * over, for downloadable/viewable outputs (an invoice-bundle ZIP, a plan doc)
- * instead of deferred writes. A READ tool's single `ToolResult.artifact` AND
- * a delegate's possibly-multiple `ToolResult.artifacts` (bubbled up from a
- * NESTED `runAgentTurn` — e.g. `delegate_to_concierge` running `bundle_invoices`
- * inline) both accumulate into THIS turn's own `artifacts` array, in addition
- * to firing the existing `onArtifact` callback (unchanged — the specialist
- * chat route's SSE stream still gets them live, one at a time, as before).
- * The return value additionally hands the caller the full collected list —
- * new, since previously only `onArtifact` ever saw them — so a delegate tool
- * (which has no SSE stream of its own to push onto) can hand its artifacts
- * back up through its own `ToolResult`, exactly like `pendingWrites`.
+ * `artifacts` mirrors `pendingWrites` exactly, one field over, for
+ * downloadable/viewable outputs (an invoice-bundle ZIP, a plan doc) instead of
+ * deferred writes. A READ tool's single `ToolResult.artifact` AND a nested
+ * turn's possibly-multiple `ToolResult.artifacts` both accumulate into THIS
+ * turn's own `artifacts` array, in addition to firing the `onArtifact`
+ * callback (the chat route's SSE stream gets them live, one at a time). The
+ * return value also hands the caller the full collected list. Same status as
+ * `pendingWrites` above: `ToolResult.artifacts` was the delegate bubble-up path
+ * (now removed) — kept as defensive plumbing.
  *
  * `assertAiAllowed` runs once, before the first model call (free monthly
  * tranche, or prepaid AI credits), and its `AiCapError` is deliberately left to
  * propagate — this function knows nothing about SSE, so callers that need the
  * error+done framing (the chat route) catch `AiCapError` themselves around this
- * call. A delegated specialist's nested `runAgentTurn` call runs this same
- * check again at ITS OWN start, so the gate is enforced at every level of a
- * delegation, not just the top. Per-turn `meterAndCharge` records usage and
- * bills any overflow beyond the tranche to credits.
+ * call. Per-turn `meterAndCharge` records usage and bills any overflow beyond
+ * the tranche to credits.
  *
  * MP1 (multi-provider model choice): the actual model call used to be inline
  * here (`anthropic.messages.stream(...)`) — it now goes through an injected
@@ -159,23 +147,23 @@ export async function runAgentTurn(
           pendingWrites.push({ name: call.name, input: call.input, summary: summarizeToolAction(call.name, call.input) });
         } else {
           onTool?.(call.name);
-          // Pass this loop's `model` as `callerModel` so a delegate that runs a
-          // nested loop without its own agent record (delegate_to_concierge)
-          // inherits THIS agent's configured model instead of a hardcoded one.
+          // Pass this loop's `model` as `callerModel` so a tool that runs a
+          // nested loop without its own agent record could inherit THIS agent's
+          // configured model instead of a hardcoded one. (No current tool does;
+          // the field is harmless — see ToolContext in @/lib/assistant/tools.)
           const tr = await executeTool(call.name, call.input, { tenantId, userId, callerModel: model });
           if (tr.artifact) { artifacts.push(tr.artifact); onArtifact?.(tr.artifact); }
-          // A delegate_to_<specialist> tool's result can carry MULTIPLE
-          // artifacts (its own nested runAgentTurn's whole `artifacts`
-          // list) rather than the single `tr.artifact` a normal tool
-          // produces — fold each into this turn's own list, same as below.
+          // A nested runAgentTurn's result can carry MULTIPLE artifacts (its own
+          // whole `artifacts` list) rather than the single `tr.artifact` a
+          // normal tool produces — fold each into this turn's own list.
+          // Defensive: no in-tree tool produces a nested turn now (the
+          // delegation layer that did was removed), same as `pendingWrites` below.
           if (tr.artifacts?.length) { for (const a of tr.artifacts) { artifacts.push(a); onArtifact?.(a); } }
-          // A delegate_to_<specialist> tool is a READ (it never itself
-          // mutates anything) whose result can carry the DELEGATED
-          // specialist's own deferred writes — fold them into this turn's
-          // pendingWrites so they hit the same confirm/Approve path as a
-          // direct write below. The model still sees the normal tool_result
-          // text either way (the human-readable summary), so it can keep
-          // reasoning/synthesising across delegations before this turn ends.
+          // A READ tool's result can carry a nested runAgentTurn's own deferred
+          // writes — fold them into this turn's pendingWrites so they hit the
+          // same confirm/Approve path as a direct write below. The model still
+          // sees the normal tool_result text either way. Defensive plumbing now
+          // (the delegation layer that produced these was removed).
           if (tr.pendingWrites?.length) pendingWrites.push(...tr.pendingWrites);
           toolResults.push({ toolCallId: call.id, content: tr.text });
         }

@@ -1,51 +1,71 @@
 import { conciergeToolSlice } from "@/lib/assistant/tools";
-import { SALES_SPECIALIST } from "./sales";
-import { MARKETING_SPECIALIST } from "./marketing";
-import { OPERATIONS_SPECIALIST } from "./operations";
 
 /**
- * Adonis merge task: Adonis (this file's "orchestrator" key — the agent
- * behind `/adonis` and `/api/agents/orchestrator/chat`) used to be a PURE
- * ROUTER — its only tools were the 4 `delegate_to_*` tools
- * (@/lib/agents/tools.orchestrator), so every request cost 2-3 sequential
- * model turns (route -> specialist works -> orchestrator summarises). It is
- * now a full WORKING agent: `toolNames` below is the deduplicated union of
- * the Concierge's general toolkit (`conciergeToolSlice`,
- * @/lib/assistant/tools) and the Sales/Marketing/Operations specialists' own
- * `toolNames` — i.e. everything those 4 agents could ever call, minus every
- * `delegate_to_*` name. One `runAgentTurn`, Adonis's own tools, no hop.
+ * Adonis — the single working agent behind `/adonis` and
+ * `/api/agents/orchestrator/chat`. Its `key` is still "orchestrator" for
+ * historical/routing reasons, but there is no routing anymore: Adonis does
+ * every job directly with its own tools, in one `runAgentTurn`.
  *
- * `route.ts` (`/api/agents/[key]/chat`) and `tools.orchestrator.ts`'s
- * `delegateTo` both just do `TOOLS.filter((t) => allowed.has(t.name))` over
- * `spec.toolNames` — neither needed to change; they already treat every
- * `SPECIALISTS` entry generically. The 4 `delegate_to_*` tools themselves are
- * left registered in `TOOLS` (unused by Adonis now, not deleted — see
- * tools.orchestrator.ts's header comment) so this stays a small, reversible
- * diff; Sales/Marketing/Operations keep their own separate toolNames/
- * playbooks below unchanged, still reachable as their own agents on /agents.
+ * ── HISTORY (why this file looks the way it does) ──────────────────────────
+ * Adonis used to be a PURE ROUTER whose only tools were four `delegate_to_*`
+ * tools; every request cost 2-3 sequential model turns (route -> a Sales/
+ * Marketing/Operations/Concierge specialist works -> orchestrator summarises).
+ * The Adonis-merge task collapsed that into one working agent, and the
+ * follow-up single-agent cleanup then RETIRED the specialist agents entirely:
+ * their `AGENT_CATALOG` cards, their `specialists/{sales,marketing,operations}.ts`
+ * spec files, the whole `delegate_to_*` / `delegateTo` delegation subsystem
+ * (`tools.orchestrator.ts`), and the Concierge delegate are all gone. What
+ * those specialists actually contributed — their TOOL LISTS — now lives here,
+ * inline, as the three domain groups below. Adonis's tool set is the
+ * deduplicated union of the general assistant's own toolkit
+ * (`conciergeToolSlice`, @/lib/assistant/tools) and those three groups.
  *
- * ⚠ WHY `toolNames` IS A LAZY GETTER, NOT A PLAIN ARRAY — do not "simplify"
- * this to `toolNames: [...]` computed at this file's top level; it WILL
- * crash the app at boot. `@/lib/assistant/tools` (tools.ts) has a documented
- * require cycle with this package: tools.ts's top-level `...ORCHESTRATOR_TOOLS`
- * spread imports `@/lib/agents/tools.orchestrator`, which imports
- * `@/lib/agents/context` (`composeAgentSystem`), which imports `SPECIALISTS`
- * from `./specialists` (this folder's `index.ts`), which imports THIS file.
- * So the first time `specialists/orchestrator.ts` loads, it is very likely
- * loading INSIDE tools.ts's own module evaluation — before tools.ts has
- * reached its `export function conciergeToolSlice` statement — so
- * `conciergeToolSlice` would not exist yet on the partial module object.
- * Calling it eagerly at this file's top level would therefore throw
- * "conciergeToolSlice is not a function" on the very first server boot.
- * `tools.orchestrator.ts`'s own file-level "CIRCULAR IMPORT" comment
- * documents the identical hazard for the same cycle, with the same fix:
- * never touch a cyclically-imported binding at module top level — only from
- * inside a function body that runs LATER, once the whole module graph has
- * finished loading (any real request, or a test reading `.toolNames` after
- * requiring this module). The getter below is that deferral.
- * `SALES_SPECIALIST`/`MARKETING_SPECIALIST`/`OPERATIONS_SPECIALIST` carry no
- * such risk (sales.ts/marketing.ts/operations.ts import nothing at all), so
- * those three are read eagerly, at top level, same as always.
+ * ── THE THREE DOMAIN TOOL GROUPS ───────────────────────────────────────────
+ * Kept as named, commented groups (rather than one flat list) purely for
+ * readability — 30-odd tools are easier to reason about grouped by what they
+ * do. They are NOT separate agents; they are just how Adonis's domain tools
+ * are organised. Overlap between groups (e.g. `get_client`, `business_overview`,
+ * `send_client_email` appear in more than one) is fine — the union dedups.
+ */
+const LEAD_TOOLS = [
+  "list_leads", "get_lead_health", "get_client",
+  "draft_lead_reply", "send_client_email", "send_whatsapp",
+  "set_lead_stage", "log_lead_touch", "create_calendar_event",
+] as const;
+
+const MARKETING_TOOLS = [
+  "list_blog_posts", "draft_blog_post", "save_blog_post",
+  "publish_blog_post", "draft_carousel", "business_overview",
+  // Campaign Engine Slice 1: the campaign-kit build loop.
+  "plan_campaign", "create_campaign", "draft_campaign_asset",
+  "approve_campaign_asset", "launch_campaign",
+] as const;
+
+const OPS_TOOLS = [
+  "list_no_shows", "list_lapsed_members",
+  "list_classes", "list_appointments", "get_client", "business_overview",
+  "send_client_email", "send_client_whatsapp",
+  "reschedule_appointment", "book_client_into_class",
+] as const;
+
+/**
+ * ⚠ WHY `toolNames` IS A LAZY, MEMOIZED GETTER — not a plain array computed at
+ * this file's top level.
+ *
+ * `buildOrchestratorToolNames` calls `conciergeToolSlice`, imported from
+ * @/lib/assistant/tools (tools.ts). Deferring that call into the getter body
+ * (run LATER, on the first real request/test that reads `.toolNames`) keeps
+ * this file completely insensitive to module-load order: by the time the
+ * getter runs, the whole module graph has finished loading and every export is
+ * populated. (Historically this deferral was load-BEARING: tools.ts and the
+ * now-deleted tools.orchestrator.ts formed a genuine require cycle, and an
+ * eager top-level call to `conciergeToolSlice` could hit a not-yet-populated
+ * binding and throw "conciergeToolSlice is not a function" at boot. Removing
+ * `tools.orchestrator.ts` broke that cycle — tools.ts no longer imports
+ * anything that leads back here — so the eager form would likely work now too.
+ * The lazy+memoized getter is kept regardless: it's correct either way, costs
+ * nothing after the first call, and removes any need to reason about load order
+ * again if the import graph changes.)
  */
 let cachedToolNames: string[] | undefined;
 function buildOrchestratorToolNames(): string[] {
@@ -54,11 +74,8 @@ function buildOrchestratorToolNames(): string[] {
   // Appointments vs group-class Timetable) and Google Drive connection —
   // are per-TENANT concerns; this registry entry is static (computed once,
   // shared by every tenant), so it takes the union across BOTH scheduling
-  // modes with drive connected, exactly the "list both, let the model +
-  // business context sort out which applies" shape OPERATIONS_SPECIALIST.
-  // toolNames already uses today (it statically lists BOTH "list_classes"/
-  // "book_client_into_class" [timetable-only] AND "reschedule_appointment"
-  // [appointments-only] side by side).
+  // modes with drive connected: "list every tool that could apply, let the
+  // model + business context sort out which one fits this account".
   const concierge = new Set<string>();
   for (const mode of ["appointments", "timetable"] as const) {
     for (const t of conciergeToolSlice(mode, true)) concierge.add(t.name);
@@ -66,16 +83,15 @@ function buildOrchestratorToolNames(): string[] {
   cachedToolNames = [
     ...new Set<string>([
       ...concierge,
-      ...SALES_SPECIALIST.toolNames,
-      ...MARKETING_SPECIALIST.toolNames,
-      ...OPERATIONS_SPECIALIST.toolNames,
+      ...LEAD_TOOLS,
+      ...MARKETING_TOOLS,
+      ...OPS_TOOLS,
     ]),
   ].filter((n) => !n.startsWith("delegate_to_"));
-  // ^ Belt-and-suspenders, not load-bearing today: conciergeToolSlice already
-  // excludes every delegate_to_* tool, and none of the 3 specialists' own
-  // toolNames hold one. But Adonis must NEVER regain a delegate_to_* tool —
-  // that would reopen the routing hop this task removes — so this filter
-  // stays even if one of the sources above ever changed.
+  // ^ The delegate_to_* filter is belt-and-suspenders only now: the whole
+  // delegation subsystem is gone, so no source above can contribute one. It
+  // stays as a permanent guard — Adonis must NEVER regain a delegate_to_*
+  // tool, which would reintroduce the routing hop this design removed.
   return cachedToolNames;
 }
 

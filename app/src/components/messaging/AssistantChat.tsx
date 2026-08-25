@@ -745,8 +745,8 @@ export function AssistantChat({
    * would run the write) — instead it closes this card (same terminal
    * "cancelled" status cancelPending uses — nothing here was approved
    * either) and sends a normal chat message down the EXISTING send() path,
-   * containing the literal words "Go again" the Marketing agent's own
-   * playbook (specialists/marketing.ts) already anchors on. This was the
+   * containing the literal words "Go again" Adonis's own
+   * playbook (specialists/orchestrator.ts) already anchors on. This was the
    * simplest-reliable option from the task brief: zero new endpoint, zero
    * new SSE frame type, reuses every bit of send()'s existing streaming/
    * durable-run machinery untouched. Message construction (which asset,
