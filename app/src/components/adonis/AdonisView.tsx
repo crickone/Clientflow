@@ -28,9 +28,12 @@ import { Tooltip } from "@/components/ui/Tooltip";
 export function AdonisView({
   tenantId,
   isAdmin,
+  voiceEnabled,
 }: {
   tenantId: number;
   isAdmin: boolean;
+  /** Voice T2: see AssistantChat's `voiceEnabled` doc — computed server-side (page.tsx) via `transcribeConfigured()` and threaded straight through. */
+  voiceEnabled: boolean;
 }) {
   // The Adonis window mark + tagline — rendered at the top of the chat's
   // scroll area (see AssistantChat `heroSlot`). Two theme-specific <img>s,
@@ -147,6 +150,7 @@ export function AdonisView({
             ]}
             placeholder="Ask Adonis…"
             height="100%"
+            voiceEnabled={voiceEnabled}
           />
         </div>
       </div>

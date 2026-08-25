@@ -102,11 +102,14 @@ export function AgentChatPanel({
   agent,
   tenantId,
   initialInput,
+  voiceEnabled = false,
 }: {
   agent: Agent;
   tenantId: number;
   /** Campaign Engine Slice 3: see AssistantChat's `initialInput` doc — threaded straight through, only ever non-empty for the Marketing agent (see AgentDetailPage). */
   initialInput?: string;
+  /** Voice T2: see AssistantChat's `voiceEnabled` doc — threaded straight through from AgentDetail. Defaults false so any other/future caller of this panel keeps rendering without a mic button. */
+  voiceEnabled?: boolean;
 }) {
   if (agent.status !== "active") {
     return (
@@ -183,6 +186,7 @@ export function AgentChatPanel({
       suggestions={copy?.suggestions}
       placeholder={copy?.placeholder}
       initialInput={initialInput}
+      voiceEnabled={voiceEnabled}
     />
   );
 }

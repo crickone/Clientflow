@@ -485,6 +485,27 @@ a {
   border-radius: 2px;
 }
 
+/* Voice T2: the mic button's "live" recording indicator — a small pulsing
+   dot pinned to the button's corner (the button itself gets `position:
+   relative` inline, only while recording — see AssistantChat.tsx). Same
+   box-shadow-ring technique as .tt-next-pulse below, just its own keyframe
+   since that one's ring colour is timetable-specific (--tt-pulse). */
+@keyframes voiceRecPulse {
+  0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.55); }
+  70% { box-shadow: 0 0 0 7px rgba(220, 38, 38, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+}
+.voice-rec-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #dc2626;
+  animation: voiceRecPulse 1.4s ease-out infinite;
+}
+
 /* Combined tab: chat + activity feed side-by-side, stacked on narrow screens */
 .combined-grid {
   display: grid;

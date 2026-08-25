@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Sparkles, Send, Download, Loader2, Check, History, Plus, Trash2, MessageSquare } from "lucide-react";
+import { Sparkles, Send, Download, Loader2, Check, History, Plus, Trash2, MessageSquare, Mic, Square } from "lucide-react";
 import { EASE } from "@/lib/motion";
 
 import { Button } from "@/components/ui/Button";
@@ -13,6 +13,8 @@ import {
   deriveCampaignProgress,
   type CampaignProgressEvent,
 } from "./campaignProgress";
+import { appendTranscript } from "./voiceInput";
+import { useVoiceInput } from "./useVoiceInput";
 
 type Artifact = { url: string; filename: string; label: string };
 type Step = { label: string; done: boolean };
@@ -174,6 +176,7 @@ export function AssistantChat({
   initialInput,
   bare = false,
   heroSlot,
+  voiceEnabled = false,
 }: {
   tenantId: number;
   height?: string;
@@ -228,6 +231,20 @@ export function AssistantChat({
    * renders and every existing consumer is byte-identical.
    */
   heroSlot?: ReactNode;
+  /**
+   * Voice T2: shows a mic button in the compose row (next to Send) that
+   * records the operator's voice via `MediaRecorder`, POSTs it to
+   * `POST /api/assistant/transcribe` (Voice T1), and appends the returned
+   * transcript into `input` for them to review + send — see
+   * `useVoiceInput.ts` for the recording state machine. Defaults to `false`
+   * so every existing/untouched caller renders byte-identical with no mic
+   * button. Each real consumer's SERVER parent computes this via
+   * `transcribeConfigured()` (`@/lib/ai/voiceTranscribe` — true iff
+   * `OPENAI_API_KEY` is set) and threads it down, the same pattern
+   * `openRouterConfigured` uses for the model picker (AgentDetail.tsx): the
+   * client never reads `process.env` itself.
+   */
+  voiceEnabled?: boolean;
 }) {
   // Per-account chat HISTORY in localStorage (survives browser close). Each entry
   // is a saved conversation; "New chat" opens a fresh one and keeps the old ones.
@@ -262,6 +279,30 @@ export function AssistantChat({
   // Campaign Engine Slice 3: guards the initialInput seed effect below to
   // apply (at most) once per mount, same pattern as resumeAttempted.
   const initialInputApplied = useRef(false);
+
+  // Voice T2: a ref on the compose textarea so a landed transcript can
+  // focus it and place the caret at the end (see the effect just below) —
+  // the only reason this component needs a ref on its own textarea at all.
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // One-shot guard: flipped true the instant a transcript is appended,
+  // consumed by the effect below on the very next render — i.e. once
+  // `input`'s new value has actually committed to the textarea's DOM value —
+  // so the caret lands after the appended text rather than wherever a bare
+  // focus() would leave it.
+  const focusAfterVoiceRef = useRef(false);
+  const voice = useVoiceInput((text) => {
+    setInput((cur) => appendTranscript(cur, text));
+    focusAfterVoiceRef.current = true;
+  });
+  useEffect(() => {
+    if (!focusAfterVoiceRef.current) return;
+    focusAfterVoiceRef.current = false;
+    const el = textareaRef.current;
+    if (!el) return;
+    el.focus();
+    const len = el.value.length;
+    el.setSelectionRange(len, len);
+  }, [input]);
 
   const active = conversations.find((c) => c.id === activeId) ?? null;
   const messages = active?.messages ?? [];
@@ -1048,12 +1089,16 @@ export function AssistantChat({
 
       <div style={{ borderTop: bare ? "none" : "1px solid var(--hairline)", padding: bare ? "12px 0 0" : 12, display: "flex", gap: 8 }}>
         <textarea
+          ref={textareaRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              send(input);
+              // Voice T2: a transcript-in-flight shouldn't send a half-dictated
+              // message out from under the operator — mirrors the Send
+              // button's own disabled condition just below.
+              if (voice.state === "idle") send(input);
             }
           }}
           rows={1}
@@ -1074,7 +1119,46 @@ export function AssistantChat({
             outline: "none",
           }}
         />
-        <Button onClick={() => send(input)} disabled={busy || !input.trim()}>
+        {voiceEnabled && (
+          <>
+            {voice.state === "recording" && (
+              <span
+                aria-hidden
+                style={{
+                  alignSelf: "center",
+                  fontSize: 11,
+                  fontVariantNumeric: "tabular-nums",
+                  color: "var(--text-tertiary)",
+                  fontFamily: "var(--font-mono), ui-monospace, monospace",
+                }}
+              >
+                {voice.elapsedLabel}
+              </span>
+            )}
+            <Button
+              variant="secondary"
+              onClick={voice.toggle}
+              disabled={voice.state === "transcribing" || (voice.state === "idle" && busy)}
+              aria-label={voice.state === "recording" ? "Stop and transcribe" : "Start voice input"}
+              title={voice.state === "recording" ? "Stop and transcribe" : "Start voice input"}
+              style={
+                voice.state === "recording" ? { position: "relative", borderColor: "#dc2626", color: "#dc2626" } : undefined
+              }
+            >
+              {voice.state === "transcribing" ? (
+                <Loader2 size={15} className="spin" />
+              ) : voice.state === "recording" ? (
+                <>
+                  <Square size={14} strokeWidth={2} fill="currentColor" />
+                  <span className="voice-rec-dot" aria-hidden />
+                </>
+              ) : (
+                <Mic size={15} strokeWidth={2} />
+              )}
+            </Button>
+          </>
+        )}
+        <Button onClick={() => send(input)} disabled={busy || !input.trim() || voice.state !== "idle"}>
           {busy ? <Loader2 size={15} className="spin" /> : <Send size={15} strokeWidth={2} />}
         </Button>
       </div>

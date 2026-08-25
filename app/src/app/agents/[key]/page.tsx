@@ -9,6 +9,7 @@ import { SAFETY_RAILS } from "@/lib/agents/context";
 import { SPECIALISTS } from "@/lib/agents/specialists";
 import { getBusinessContext } from "@/lib/ai/businessContext";
 import { getMonthlyUsageByAgent, getTenantCapCents } from "@/lib/ai/usage";
+import { transcribeConfigured } from "@/lib/ai/voiceTranscribe";
 import { conciergeToolSlice } from "@/lib/assistant/tools";
 import { getSchedulingMode } from "@/lib/settings";
 import { isDriveConnected } from "@/lib/gmail";
@@ -107,6 +108,14 @@ export default async function AgentDetailPage({
   // picker needs to know to gate the DeepSeek/OpenRouter option.
   const openRouterConfigured = !!process.env.OPENROUTER_API_KEY;
 
+  // Voice T2: same reasoning/pattern as `openRouterConfigured` just above —
+  // computed here (server component) and passed down as a plain boolean so
+  // AgentDetail/AgentChatPanel/AssistantChat (all client components) never
+  // read process.env themselves. `transcribeConfigured()` (NOT
+  // `@/lib/ai/transcribe` — that's a different, pre-existing module for the
+  // Content Studio video-caption pipeline) is true iff OPENAI_API_KEY is set.
+  const voiceEnabled = transcribeConfigured();
+
   return (
     <div className="app-page">
       <Link
@@ -148,6 +157,7 @@ export default async function AgentDetailPage({
         tenantId={tenantId}
         openRouterConfigured={openRouterConfigured}
         initialInput={initialInput}
+        voiceEnabled={voiceEnabled}
       />
     </div>
   );

@@ -1,6 +1,7 @@
 import { getCurrentTenant } from "@/lib/db/tenant";
 import { getCurrentMembership } from "@/lib/auth";
 import { AdonisView } from "@/components/adonis/AdonisView";
+import { transcribeConfigured } from "@/lib/ai/voiceTranscribe";
 
 // Mirrors dashboard/page.tsx: no page-level auth guard call — a signed-out
 // visitor is redirected to /login by `middleware.ts` at the edge before
@@ -17,5 +18,11 @@ export const dynamic = "force-dynamic";
 export default async function AdonisPage() {
   const tenantId = getCurrentTenant().id;
   const isAdmin = getCurrentMembership()?.role === "admin";
-  return <AdonisView tenantId={tenantId} isAdmin={isAdmin} />;
+  // Voice T2: computed here (server component — process.env is safe to
+  // read) and passed down as a plain boolean, same pattern as
+  // `openRouterConfigured` in app/agents/[key]/page.tsx — AdonisView/
+  // AssistantChat are client components and must never read process.env
+  // themselves.
+  const voiceEnabled = transcribeConfigured();
+  return <AdonisView tenantId={tenantId} isAdmin={isAdmin} voiceEnabled={voiceEnabled} />;
 }
