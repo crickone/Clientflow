@@ -18,16 +18,19 @@ test("resolveCampaignBuildModel: unset / empty / unknown / null → CONTENT_MODE
 });
 
 // Campaign generation now routes an `openrouter:`-prefixed build model through
-// meteredComplete (@/lib/ai/metered → the provider-neutral one-shot), so the
-// two OFFERED OpenRouter ids (DeepSeek + GLM) are valid choices. An OpenRouter
-// id NOT in the offered list (e.g. GPT-5) is still rejected, same as any
-// unknown id — the list stays a curated allowlist, not "any OpenRouter id".
-test("resolveCampaignBuildModel / isCampaignBuildModelId: offered OpenRouter ids pass, others rejected", () => {
+// meteredComplete (@/lib/ai/metered → the provider-neutral one-shot), and the
+// campaign list is Haiku + the full MODEL_CATALOG — so EVERY catalog OpenRouter
+// id (DeepSeek, GLM, GPT-5, Gemini, …) is a valid choice. A made-up OpenRouter
+// id NOT in the catalog is still rejected, same as any unknown id — the list is
+// the catalog allowlist, not "any openrouter: string".
+test("resolveCampaignBuildModel / isCampaignBuildModelId: catalog OpenRouter ids pass, unknown ones rejected", () => {
   assert.equal(resolveCampaignBuildModel("openrouter:z-ai/glm-5.2"), "openrouter:z-ai/glm-5.2");
   assert.equal(isCampaignBuildModelId("openrouter:z-ai/glm-5.2"), true);
-  assert.equal(isCampaignBuildModelId("openrouter:deepseek/deepseek-v4-flash-0731"), true);
-  assert.equal(resolveCampaignBuildModel("openrouter:openai/gpt-5"), CONTENT_MODEL);
-  assert.equal(isCampaignBuildModelId("openrouter:openai/gpt-5"), false);
+  assert.equal(isCampaignBuildModelId("openrouter:openai/gpt-5"), true);
+  assert.equal(resolveCampaignBuildModel("openrouter:openai/gpt-5"), "openrouter:openai/gpt-5");
+  // A made-up OpenRouter id not in the catalog is still rejected.
+  assert.equal(resolveCampaignBuildModel("openrouter:made/up-model"), CONTENT_MODEL);
+  assert.equal(isCampaignBuildModelId("openrouter:made/up-model"), false);
 });
 
 test("isCampaignBuildModelId: choice membership", () => {

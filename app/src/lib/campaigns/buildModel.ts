@@ -2,19 +2,20 @@
 // against CAMPAIGN_MODEL_CHOICES, Sonnet fallback. Read/written via the
 // settings KV.
 //
-// A curated subset: the native Anthropic tiers PLUS two cheap, strong-for-
-// generation OpenRouter open models. Campaign generation routes an
-// `openrouter:`-prefixed build model through `meteredComplete`
-// (@/lib/ai/metered → getProvider().streamTurn), the provider-neutral one-shot,
-// while native models keep going through `meteredCreate` (native Anthropic
-// direct, with adaptive thinking + prompt caching). Every id here has a
-// `PRICING` entry (@/lib/ai/client), so the €-estimate + per-tenant metering
-// both work. NOT the full MODEL_CATALOG (@/lib/ai/modelCatalog): the pricier
-// open models (Kimi, Qwen, GPT-5, Gemini) are deliberately left off — this list
-// is the cost/quality picks that make sense for a batch generation job. The
-// OpenRouter options need OPENROUTER_API_KEY (getProvider throws without it):
-// the hub page only offers them when it's set, and getCampaignBuildModel below
-// falls back to the native default if a stored OpenRouter id ever loses its key.
+// The options = Haiku PLUS the full agent-picker catalog (MODEL_CATALOG,
+// @/lib/ai/modelCatalog): Sonnet, Opus, and every OpenRouter open model
+// (DeepSeek, Kimi, Qwen, GLM, GPT-5, Gemini). So a campaign build has the SAME
+// model choice the Adonis chat does — plus Haiku, a cheaper tier MODEL_CATALOG
+// itself omits. Derived from MODEL_CATALOG (not a hand-kept copy) so the two
+// lists never drift. Campaign generation routes an `openrouter:`-prefixed build
+// model through `meteredComplete` (@/lib/ai/metered → getProvider().streamTurn),
+// the provider-neutral one-shot; native models keep going through
+// `meteredCreate` (native Anthropic direct, adaptive thinking + prompt caching).
+// Every id has a `PRICING` entry (@/lib/ai/client), so the €-estimate +
+// per-tenant metering both work. The OpenRouter options need OPENROUTER_API_KEY
+// (getProvider throws without it): the hub page only offers them when it's set,
+// and getCampaignBuildModel below falls back to the native default if a stored
+// OpenRouter id ever loses its key.
 //
 // `@/lib/settings` is imported DYNAMICALLY inside the async getters below (not
 // at module scope): it transitively imports React's server-only `cache()`,
@@ -25,16 +26,14 @@
 // In production (real Next.js react-server runtime) the dynamic import always
 // resolves; the getters are only ever called from async request/action paths.
 import { MODELS, CONTENT_MODEL } from "@/lib/ai/client";
+import { MODEL_CATALOG } from "@/lib/ai/modelCatalog";
 
 export const CAMPAIGN_MODEL_KEY = "campaignBuildModel";
 
-/** The campaign build-model options: native Anthropic tiers + two cheap OpenRouter open models. Each id has a PRICING entry; OpenRouter ids run via meteredComplete (see the file header). */
+/** Haiku + the full agent MODEL_CATALOG (Sonnet/Opus + every OpenRouter model). Each id has a PRICING entry; OpenRouter ids run via meteredComplete (see the file header). Derived from MODEL_CATALOG so the campaign list and the agent picker never drift. */
 export const CAMPAIGN_MODEL_CHOICES: { id: string; label: string; hint: string }[] = [
   { id: MODELS.haiku, label: "Haiku 4.5", hint: "Fastest — lowest cost" },
-  { id: MODELS.sonnet, label: "Sonnet 5", hint: "Balanced — default" },
-  { id: MODELS.opus, label: "Opus 4.8", hint: "Highest quality — dearest" },
-  { id: "openrouter:deepseek/deepseek-v4-flash-0731", label: "DeepSeek V4 Flash", hint: "Open model — very low cost" },
-  { id: "openrouter:z-ai/glm-5.2", label: "GLM 5.2", hint: "Open model — low cost, strong" },
+  ...MODEL_CATALOG.map((m) => ({ id: m.id, label: m.label, hint: m.note ?? "" })),
 ];
 
 const CAMPAIGN_MODEL_IDS = new Set<string>(CAMPAIGN_MODEL_CHOICES.map((c) => c.id));
