@@ -15,6 +15,7 @@ import {
 } from "./campaignProgress";
 import { appendTranscript } from "./voiceInput";
 import { useVoiceInput } from "./useVoiceInput";
+import { Soundwave } from "./Soundwave";
 
 type Artifact = { url: string; filename: string; label: string };
 type Step = { label: string; done: boolean };
@@ -1088,37 +1089,47 @@ export function AssistantChat({
       )}
 
       <div style={{ borderTop: bare ? "none" : "1px solid var(--hairline)", padding: bare ? "12px 0 0" : 12, display: "flex", gap: 8 }}>
-        <textarea
-          ref={textareaRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              // Voice T2: a transcript-in-flight shouldn't send a half-dictated
-              // message out from under the operator — mirrors the Send
-              // button's own disabled condition just below.
-              if (voice.state === "idle") send(input);
-            }
-          }}
-          rows={1}
-          placeholder={placeholder}
-          disabled={busy}
-          style={{
-            flex: 1,
-            resize: "none",
-            background: "var(--bg)",
-            border: "1px solid var(--hairline)",
-            borderRadius: "var(--radius)",
-            padding: "10px 14px",
-            color: "var(--text-primary)",
-            fontSize: 14,
-            fontFamily: "inherit",
-            lineHeight: 1.5,
-            maxHeight: 140,
-            outline: "none",
-          }}
-        />
+        {voice.state === "recording" && voice.stream ? (
+          // While recording, the wave takes the textarea's slot in the row —
+          // the user is talking, not typing. `input` itself lives in this
+          // component's own state (not the DOM node), so swapping the
+          // textarea out and back never loses anything typed before/after;
+          // Soundwave mirrors its box model (border/radius/background/height)
+          // so the row's height doesn't jump either way.
+          <Soundwave stream={voice.stream} />
+        ) : (
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                // Voice T2: a transcript-in-flight shouldn't send a half-dictated
+                // message out from under the operator — mirrors the Send
+                // button's own disabled condition just below.
+                if (voice.state === "idle") send(input);
+              }
+            }}
+            rows={1}
+            placeholder={placeholder}
+            disabled={busy}
+            style={{
+              flex: 1,
+              resize: "none",
+              background: "var(--bg)",
+              border: "1px solid var(--hairline)",
+              borderRadius: "var(--radius)",
+              padding: "10px 14px",
+              color: "var(--text-primary)",
+              fontSize: 14,
+              fontFamily: "inherit",
+              lineHeight: 1.5,
+              maxHeight: 140,
+              outline: "none",
+            }}
+          />
+        )}
         {voiceEnabled && (
           <>
             {voice.state === "recording" && (

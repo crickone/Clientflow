@@ -26,6 +26,12 @@ const TRANSCRIBE_ENDPOINT = "/api/assistant/transcribe";
  * `{ok:false}`, a network/parse failure) surfaces as a `sonner` toast and
  * returns the machine to `idle` — the caller never has to distinguish success
  * from failure itself.
+ *
+ * Also exposes the live `MediaStream` while (and only while) `state ===
+ * "recording"`, purely so the soundwave visualizer (`Soundwave.tsx`) can
+ * read it into a Web Audio AnalyserNode — ownership of the stream doesn't
+ * change: this hook alone still stops its tracks (`releaseMic`, above), the
+ * soundwave only ever reads.
  */
 export function useVoiceInput(onTranscript: (text: string) => void) {
   const [state, setState] = useState<VoiceInputState>("idle");
@@ -182,5 +188,15 @@ export function useVoiceInput(onTranscript: (text: string) => void) {
     // recording before the first transcript lands.
   }, [state, start, stop]);
 
-  return { state, elapsedLabel: formatElapsed(elapsedMs), toggle };
+  return {
+    state,
+    elapsedLabel: formatElapsed(elapsedMs),
+    toggle,
+    // `start()` sets streamRef.current BEFORE setState("recording"), so the
+    // re-render that flips state to "recording" already sees the live
+    // stream; the "stop" listener nulls streamRef.current and moves state
+    // off "recording" together (see releaseMic()/finish() above), so this
+    // and `state === "recording"` never disagree.
+    stream: state === "recording" ? streamRef.current : null,
+  };
 }
