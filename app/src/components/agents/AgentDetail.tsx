@@ -92,19 +92,55 @@ export function AgentDetail({ agent, mandate, roles, layers, toolNames, disabled
   );
 }
 
+/**
+ * Section heading with hierarchy. These labels use a "Title — subtitle"
+ * convention (e.g. "Tools — what this agent can use"); this splits them into a
+ * big heading (the title) with a smaller muted line beneath (the subtitle),
+ * rather than one flat mono-uppercase eyebrow. A label with no "—" (e.g.
+ * "Chat") just renders as the title. Non-string children fall back to the old
+ * single-line eyebrow.
+ */
 function SectionLabel({ children }: { children: ReactNode }) {
+  if (typeof children !== "string") {
+    return (
+      <div
+        style={{
+          fontFamily: "var(--font-mono), ui-monospace, monospace",
+          fontSize: 11,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          color: "var(--text-tertiary)",
+          marginBottom: 14,
+        }}
+      >
+        {children}
+      </div>
+    );
+  }
+
+  const dash = children.indexOf("—");
+  const title = dash >= 0 ? children.slice(0, dash).trim() : children;
+  const subtitle = dash >= 0 ? children.slice(dash + 1).trim() : "";
+
   return (
-    <div
-      style={{
-        fontFamily: "var(--font-mono), ui-monospace, monospace",
-        fontSize: 11,
-        letterSpacing: "0.12em",
-        textTransform: "uppercase",
-        color: "var(--text-tertiary)",
-        marginBottom: 14,
-      }}
-    >
-      {children}
+    <div style={{ marginBottom: 16 }}>
+      <div
+        style={{
+          fontFamily: "var(--font-heading), sans-serif",
+          fontSize: 19,
+          letterSpacing: "-0.01em",
+          textTransform: "uppercase",
+          color: "var(--text-primary)",
+          lineHeight: 1.15,
+        }}
+      >
+        {title}
+      </div>
+      {subtitle && (
+        <div style={{ fontSize: 13, color: "var(--text-tertiary)", marginTop: 4, lineHeight: 1.45 }}>
+          {subtitle}
+        </div>
+      )}
     </div>
   );
 }
