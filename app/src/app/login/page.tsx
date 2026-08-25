@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: { opened?: string };
+  searchParams: { opened?: string; reset?: string };
 }) {
   const user = await getSessionUser();
   if (user) {
@@ -27,10 +27,15 @@ export default async function LoginPage({
   }
   // Surfaced by the platform "Open business" handoff (app/open/route.ts) when
   // its one-time token was missing/expired/already used — never distinguishes
-  // which, same uniform-failure posture as a bad password below.
+  // which, same uniform-failure posture as a bad password below. `reset=1` is
+  // the forgot-password flow's own completion redirect (reset-password's
+  // ResetPasswordForm) — mutually exclusive with `opened`, so a simple
+  // else-if is enough.
   const notice =
     searchParams.opened === "expired"
       ? "That link has expired or was already used. Please sign in."
-      : null;
+      : searchParams.reset === "1"
+        ? "Password updated — sign in with your new password."
+        : null;
   return <LoginForm logoSrc={null} businessName="" notice={notice} />;
 }

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import Link from "next/link";
 
 import { Button } from "@/components/ui/Button";
 import { Input, Label } from "@/components/ui/Input";
@@ -160,6 +161,15 @@ export function LoginForm({
             {busy ? "Signing in…" : "Sign in"}
           </Button>
         </form>
+
+        <div style={{ textAlign: "center", marginTop: 18 }}>
+          <Link
+            href="/forgot-password"
+            style={{ color: "var(--text-tertiary)", fontSize: 13, textDecoration: "none" }}
+          >
+            Forgot password?
+          </Link>
+        </div>
       </div>
     </div>
   );

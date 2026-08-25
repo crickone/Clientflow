@@ -182,9 +182,14 @@ export default async function RootLayout({
   let showPastDue = false;
   const current = user ? getCurrentMembership() : null;
   if (user) {
-    const bare = ["/login", "/change-password", "/select-account", "/accept-invite"].some(
-      (p) => pathname === p || pathname.startsWith(`${p}/`),
-    );
+    const bare = [
+      "/login",
+      "/change-password",
+      "/select-account",
+      "/accept-invite",
+      "/forgot-password",
+      "/reset-password",
+    ].some((p) => pathname === p || pathname.startsWith(`${p}/`));
     if (!bare && !current) {
       redirect("/select-account");
     }

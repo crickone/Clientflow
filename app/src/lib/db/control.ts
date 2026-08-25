@@ -456,6 +456,20 @@ export function ensureControlTables() {
     );
     CREATE INDEX IF NOT EXISTS idx_client_password_resets_cred ON client_password_resets(credential_id);
 
+    -- Staff (operator) password resets: the users-table analogue of
+    -- client_password_resets above. A single-use, expiring token bound to a
+    -- users row, powering the signed-out "Forgot password?" flow on /login.
+    -- Cascades away with the user.
+    CREATE TABLE IF NOT EXISTS user_password_resets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token TEXT NOT NULL UNIQUE,
+      expires_at INTEGER NOT NULL,
+      used_at INTEGER,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_user_password_resets_user ON user_password_resets(user_id);
+
     -- ── AI usage metering (agentic-OS) ────────────────────────────────────
     -- Per-tenant AI spend metering (central so the platform can see + bill cross-gym spend).
     CREATE TABLE IF NOT EXISTS ai_usage (

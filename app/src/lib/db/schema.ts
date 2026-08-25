@@ -574,6 +574,26 @@ export const clientPasswordResets = sqliteTable("client_password_resets", {
 export type ClientPasswordReset = typeof clientPasswordResets.$inferSelect;
 export type NewClientPasswordReset = typeof clientPasswordResets.$inferInsert;
 
+// Staff (operator) password resets — the `users`-table analogue of
+// client_password_resets above (mirrors it exactly, keyed to users instead
+// of client_credentials). Powers the signed-out "Forgot password?" flow on
+// /login (/forgot-password -> emailed token -> /reset-password).
+export const userPasswordResets = sqliteTable("user_password_resets", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  token: text("token").notNull().unique(),
+  expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+  usedAt: integer("used_at", { mode: "timestamp_ms" }),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
+export type UserPasswordReset = typeof userPasswordResets.$inferSelect;
+export type NewUserPasswordReset = typeof userPasswordResets.$inferInsert;
+
 // Staff invitations: a pending "set your password" link emailed to a new team
 // member. The identity + membership are created up-front (so they show in the
 // roster as pending); accepting the invite just sets their password + activates.

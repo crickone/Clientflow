@@ -3,7 +3,12 @@ import { NextResponse, type NextRequest } from "next/server";
 // "/open" is the platform "Open business" token handoff: pre-session (no
 // cookie yet when it's first hit) but does nothing without a valid one-time
 // token — see app/open/route.ts.
-const PUBLIC_PATHS = ["/login", "/accept-invite", "/open"];
+// "/forgot-password" + "/reset-password" are the staff (operator) password
+// reset flow — reached by someone who, by definition, can't sign in yet.
+// Each is self-authorizing past this gate: forgot-password's request action
+// is enumeration-safe, and reset-password requires the emailed single-use
+// token (see lib/userPasswordReset.ts).
+const PUBLIC_PATHS = ["/login", "/accept-invite", "/open", "/forgot-password", "/reset-password"];
 // Logo is shown on the (logged-out) login screen and isn't sensitive.
 // The WhatsApp webhook is a server-to-server callback; it's secret-verified
 // inside the route handler.
