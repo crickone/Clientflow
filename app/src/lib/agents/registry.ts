@@ -46,7 +46,7 @@ export const AGENT_CATALOG: AgentDef[] = [
     mandate: "Runs the Marketing Brain: campaigns + social.",
     roles: [
       "Builds seasonal campaigns from your Marketing Brain",
-      "Proposes offers (Hormozi-style)",
+      "Proposes offers and promotions",
       "Drafts blog, social and email content",
       "Flags what to run next (seasonal radar)",
     ],
