@@ -2,27 +2,28 @@
  * The Build-campaign seed contract (Campaign Engine Slice 3, Task 3): the
  * exact 5 query params any "Build campaign" affordance in the app hands
  * off, plus the two pure helpers that encode (this file) and decode (read
- * by src/app/agents/[key]/page.tsx) them.
+ * by src/app/adonis/page.tsx) them.
  *
  * Campaign creation has no form — /marketing/campaigns/page.tsx's
- * "+ New campaign" (and its empty state) link straight to /agents/orchestrator
- * (Adonis), so the ONLY way a campaign gets created is through Adonis's own
- * chat. That makes the natural seed destination that chat itself, and the
- * payload a pre-filled compose STARTER (never auto-sent — the operator still
- * reviews/edits/hits send, consistent with the write-approval gate) rather
- * than form field values.
+ * "+ New campaign" (and its empty state) link straight to /adonis (Adonis's
+ * chat — the one and only agent chat in the app), so the ONLY way a campaign
+ * gets created is through Adonis's own chat. That makes the natural seed
+ * destination that chat itself, and the payload a pre-filled compose STARTER
+ * (never auto-sent — the operator still reviews/edits/hits send, consistent
+ * with the write-approval gate) rather than form field values.
  *
- * Single-agent product (2026-08-25): this used to point at
- * `/agents/marketing` — the Marketing agent was retired as its own
- * AGENT_CATALOG entry/card, but its campaign-kit tools (plan_campaign,
- * create_campaign, draft_campaign_asset, approve_campaign_asset,
- * launch_campaign) live on, folded into Adonis's own tool union (see
- * specialists/orchestrator.ts) — so the seed now targets Adonis's agent page
- * instead, with no change to the payload shape below.
+ * History: this seed used to point at `/agents/marketing`, then at
+ * `/agents/orchestrator` (Adonis's agent-settings page, which embedded a
+ * chat). That chat was removed — there should be exactly one agent chat in the
+ * app, the /adonis tab — so the seed now targets `/adonis` directly, with no
+ * change to the payload shape below. Adonis's campaign-kit tools
+ * (plan_campaign, create_campaign, draft_campaign_asset,
+ * approve_campaign_asset, launch_campaign) are unchanged — see
+ * specialists/orchestrator.ts.
  *
  * Deliberately zero React/Next/DOM imports (unlike its sibling
  * BuildCampaignLink.tsx, which re-exports everything below verbatim so
- * existing consumers — src/app/agents/[key]/page.tsx — don't need to change
+ * existing consumers — src/app/adonis/page.tsx — don't need to change
  * their import path). That's not just tidiness: the project's test runner
  * (scripts/test.mjs) runs every *.test.ts under plain tsx with
  * `NODE_OPTIONS=--conditions=react-server`, and under that condition
@@ -44,11 +45,11 @@ export interface CampaignSeed {
 }
 
 /**
- * `/agents/orchestrator` (Adonis) plus the non-empty fields of `seed`, using
- * the exact 5 query param names the seed contract promises. Absent/empty
- * fields are simply omitted (never sent as `foo=`), so a link built from a
- * partial seed (e.g. the coming-up rail only ever supplies seedName/
- * startsOn/angle) stays a clean URL.
+ * `/adonis` (Adonis's chat) plus the non-empty fields of `seed`, using the
+ * exact 5 query param names the seed contract promises. Absent/empty fields
+ * are simply omitted (never sent as `foo=`), so a link built from a partial
+ * seed (e.g. the coming-up rail only ever supplies seedName/startsOn/angle)
+ * stays a clean URL.
  */
 export function buildCampaignSeedHref(seed: CampaignSeed): string {
   const qp = new URLSearchParams();
@@ -58,7 +59,7 @@ export function buildCampaignSeedHref(seed: CampaignSeed): string {
   if (seed.endsOn) qp.set("endsOn", seed.endsOn);
   if (seed.angle) qp.set("angle", seed.angle);
   const qs = qp.toString();
-  return `/agents/orchestrator${qs ? `?${qs}` : ""}`;
+  return `/adonis${qs ? `?${qs}` : ""}`;
 }
 
 /**
@@ -72,15 +73,15 @@ export function buildCampaignSeedHref(seed: CampaignSeed): string {
 const str = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
 
 /**
- * The pre-filled chat starter a seed decodes to — read by Adonis's agent
- * page (src/app/agents/[key]/page.tsx) so a "Build campaign" click lands
- * with the compose box already primed instead of blank. Pure + total:
- * genuinely never throws (every field is coerced through `str()` before use,
- * so a non-string runtime value — e.g. the `string[]` a duplicated query key
- * produces — degrades to "" instead of throwing on a bare `.trim()`), and
- * returns null for an effectively-empty seed (e.g. a bare `/agents/orchestrator`
- * visit with no query at all) so the caller can leave the compose box
- * untouched — non-breaking when the params are absent.
+ * The pre-filled chat starter a seed decodes to — read by the Adonis page
+ * (src/app/adonis/page.tsx) so a "Build campaign" click lands with the compose
+ * box already primed instead of blank. Pure + total: genuinely never throws
+ * (every field is coerced through `str()` before use, so a non-string runtime
+ * value — e.g. the `string[]` a duplicated query key produces — degrades to ""
+ * instead of throwing on a bare `.trim()`), and returns null for an
+ * effectively-empty seed (e.g. a bare `/adonis` visit with no query at all) so
+ * the caller can leave the compose box untouched — non-breaking when the params
+ * are absent.
  */
 export function campaignSeedStarterMessage(seed: CampaignSeed): string | null {
   const name = str(seed.seedName);

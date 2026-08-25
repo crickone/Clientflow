@@ -18,7 +18,7 @@ import { setCampaignBuildModelAction } from "./actions";
 export const dynamic = "force-dynamic";
 
 // Campaign Engine hub (Slice 1, Task 7) — the operator-facing list of
-// campaign kits Adonis builds conversationally (see /agents/orchestrator).
+// campaign kits Adonis builds conversationally (see /adonis).
 // Admin-gated to match that agent chat + the email Campaigns group (both
 // requireAdminPage) — see Sidebar.tsx's comment on the Marketing nav item
 // for why. Single-agent product (2026-08-25): this used to be the Marketing
@@ -105,7 +105,7 @@ export default async function MarketingCampaignsPage() {
         title="Campaigns"
         subtitle="Seasonal campaign kits — offer, blog, social posts, emails, ad copy and a video script, drafted by Adonis and approved one asset at a time."
         actions={
-          <Link href="/agents/orchestrator">
+          <Link href="/adonis">
             <Button size="sm">
               <Plus size={14} /> New campaign
             </Button>
@@ -167,7 +167,7 @@ export default async function MarketingCampaignsPage() {
           title="No campaigns yet"
           message="Ask Adonis to build a campaign — open Adonis and describe a season, offer or promotion. It drafts the whole kit (offer, blog, social, email, ad copy, video script) for your approval, one asset at a time."
           action={
-            <Link href="/agents/orchestrator">
+            <Link href="/adonis">
               <Button>
                 <Plus size={15} /> Ask Adonis
               </Button>

@@ -97,7 +97,7 @@ test("buildCampaignSeedHref: round-trips a full seed's fields through the query 
     angle: "Partner / bring-a-friend offer",
   };
   const href = buildCampaignSeedHref(seed);
-  assert.ok(href.startsWith("/agents/orchestrator?"));
+  assert.ok(href.startsWith("/adonis?"));
   const qp = new URLSearchParams(href.split("?")[1]);
   assert.equal(qp.get("seedName"), seed.seedName);
   assert.equal(qp.get("season"), seed.season);
@@ -107,5 +107,5 @@ test("buildCampaignSeedHref: round-trips a full seed's fields through the query 
 });
 
 test("buildCampaignSeedHref: an empty seed yields the bare path with no query string", () => {
-  assert.equal(buildCampaignSeedHref({}), "/agents/orchestrator");
+  assert.equal(buildCampaignSeedHref({}), "/adonis");
 });

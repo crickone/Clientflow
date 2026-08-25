@@ -242,7 +242,7 @@ export async function markResearchEventsSeenAction(ids: number[]): Promise<{ ok:
  * the same seed contract Campaign Engine Slice 3's seasonal calendar already
  * uses (components/marketing/buildCampaignSeed.ts — `CampaignSeed` +
  * `buildCampaignSeedHref`, decoded on the other end by
- * `campaignSeedStarterMessage` in src/app/agents/[key]/page.tsx). The
+ * `campaignSeedStarterMessage` in src/app/adonis/page.tsx). The
  * client is expected to navigate to `href` on success; nothing is sent —
  * the compose box just arrives pre-filled, same as every other
  * BuildCampaignLink in the app, and the campaign builder's own

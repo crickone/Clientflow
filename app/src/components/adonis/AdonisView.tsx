@@ -31,11 +31,14 @@ export function AdonisView({
   tenantId,
   isAdmin,
   voiceEnabled,
+  initialInput,
 }: {
   tenantId: number;
   isAdmin: boolean;
   /** Voice T2: see AssistantChat's `voiceEnabled` doc — computed server-side (page.tsx) via `transcribeConfigured()` and threaded straight through. */
   voiceEnabled: boolean;
+  /** Campaign Engine "Build campaign" seed → a pre-filled compose starter (see app/adonis/page.tsx). Undefined for a normal visit. Threaded to AssistantChat's `initialInput`. */
+  initialInput?: string;
 }) {
   // The Adonis window mark + tagline — rendered at the top of the chat's
   // scroll area (see AssistantChat `heroSlot`). Two theme-specific <img>s,
@@ -153,6 +156,7 @@ export function AdonisView({
             placeholder="Ask Adonis…"
             height="100%"
             voiceEnabled={voiceEnabled}
+            initialInput={initialInput}
           />
         </div>
       </div>

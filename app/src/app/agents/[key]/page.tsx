@@ -9,21 +9,17 @@ import { SAFETY_RAILS } from "@/lib/agents/context";
 import { SPECIALISTS } from "@/lib/agents/specialists";
 import { getBusinessContext } from "@/lib/ai/businessContext";
 import { getMonthlyUsageByAgent, getTenantCapCents } from "@/lib/ai/usage";
-import { transcribeConfigured } from "@/lib/ai/voiceTranscribe";
 import { conciergeToolSlice } from "@/lib/assistant/tools";
 import { getSchedulingMode } from "@/lib/settings";
 import { isDriveConnected } from "@/lib/gmail";
 import { AgentDetail } from "@/components/agents/AgentDetail";
-import { campaignSeedStarterMessage } from "@/components/marketing/BuildCampaignLink";
 
 export const dynamic = "force-dynamic";
 
 export default async function AgentDetailPage({
   params,
-  searchParams,
 }: {
   params: { key: string };
-  searchParams: { seedName?: string; season?: string; startsOn?: string; endsOn?: string; angle?: string };
 }) {
   await requireAdminPage();
   // requireAdminPage guarantees an admin membership in the active tenant.
@@ -32,29 +28,6 @@ export default async function AgentDetailPage({
   const key = params.key;
   const agent = getAgent(tenantId, key);
   if (!agent) notFound();
-
-  // Campaign Engine Slice 3 (Task 3): a "Build campaign" link from the
-  // Seasonal calendar (/marketing/calendar) lands here carrying a seed in
-  // the query string — see BuildCampaignLink.tsx's seed contract. This IS
-  // where campaign creation happens: /marketing/campaigns's "+ New
-  // campaign" (and its empty state) link straight here, no form — so the
-  // seed becomes a pre-filled chat starter (below, threaded into
-  // AgentDetail -> AgentChatPanel -> AssistantChat) rather than form
-  // values. Only the orchestrator (Adonis) agent consumes it — any other
-  // agent key ignores a stray seed param instead of surfacing an unrelated
-  // pre-filled message. `?? undefined` normalises the pure helper's
-  // `string | null` return (null for an empty/absent seed) to the prop's
-  // `string | undefined`.
-  //
-  // Single-agent product (2026-08-25): this used to gate on `key ===
-  // "marketing"` — the Marketing agent was the seed's original destination
-  // (`buildCampaignSeedHref` built a `/agents/marketing?...` URL). Marketing
-  // was retired as its own AGENT_CATALOG entry/card; Adonis absorbed its
-  // campaign-kit tools (plan_campaign/create_campaign/draft_campaign_asset/
-  // approve_campaign_asset/launch_campaign — see specialists/orchestrator.ts's
-  // tool union) in the prior Adonis-merge task, and `buildCampaignSeedHref`
-  // now points at `/agents/orchestrator` to match — so this gate moved with it.
-  const initialInput = key === "orchestrator" ? campaignSeedStarterMessage(searchParams) ?? undefined : undefined;
 
   const catalogEntry = AGENT_CATALOG.find((a) => a.key === key);
   // Same registry composeAgentSystem (@/lib/agents/context) reads from — see
@@ -115,14 +88,6 @@ export default async function AgentDetailPage({
   // picker needs to know to gate the DeepSeek/OpenRouter option.
   const openRouterConfigured = !!process.env.OPENROUTER_API_KEY;
 
-  // Voice T2: same reasoning/pattern as `openRouterConfigured` just above —
-  // computed here (server component) and passed down as a plain boolean so
-  // AgentDetail/AgentChatPanel/AssistantChat (all client components) never
-  // read process.env themselves. `transcribeConfigured()` (NOT
-  // `@/lib/ai/transcribe` — that's a different, pre-existing module for the
-  // Content Studio video-caption pipeline) is true iff OPENAI_API_KEY is set.
-  const voiceEnabled = transcribeConfigured();
-
   return (
     <div className="app-page">
       <Link
@@ -141,19 +106,12 @@ export default async function AgentDetailPage({
       </Link>
       <PageHeader eyebrow="AI Staff" title={agent.name} subtitle={catalogEntry?.mandate} />
       <AgentDetail
-        // Forces a fresh mount (and thus fresh useState seeding — model
-        // picker, operator-instructions dirty state) if this ever renders for
-        // a DIFFERENT agent key without an intervening unmount, e.g. a future
-        // direct agent-to-agent link. Without this, React would reuse the
-        // component instance across a client-side navigation and carry over
-        // the previous agent's local state. Also varies with `initialInput`
-        // (Campaign Engine Slice 3): AssistantChat only ever APPLIES a seed
-        // once per mount (see its initialInputApplied ref), so clicking a
-        // second, different "Build campaign" link for the same agent via a
-        // client-side nav needs its own remount too, or the second seed
-        // would silently be dropped onto an instance that already consumed
-        // the first one.
-        key={initialInput ? `${agent.key}:${initialInput}` : agent.key}
+        // Fresh mount (fresh useState seeding — model picker, operator-
+        // instructions dirty state) if this ever renders for a DIFFERENT agent
+        // key without an intervening unmount, e.g. a future direct agent-to-
+        // agent link — without it React would reuse the instance across a
+        // client-side nav and carry over the previous agent's local state.
+        key={agent.key}
         agent={agent}
         mandate={catalogEntry?.mandate}
         roles={catalogEntry?.roles ?? []}
@@ -162,10 +120,7 @@ export default async function AgentDetailPage({
         disabledTools={parseDisabledTools(agent.disabledTools)}
         usageCents={usageCents}
         capCents={capCents}
-        tenantId={tenantId}
         openRouterConfigured={openRouterConfigured}
-        initialInput={initialInput}
-        voiceEnabled={voiceEnabled}
       />
     </div>
   );

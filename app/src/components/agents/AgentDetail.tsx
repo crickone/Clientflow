@@ -13,7 +13,6 @@ import { MODEL_CATALOG, isCatalogModel, type ModelChoice } from "@/lib/ai/modelC
 import { groupToolsByCategory } from "@/lib/agents/toolCategories";
 import { saveModel, saveDisabledTools } from "@/app/agents/actions";
 import { AgentContextEditor } from "./AgentContextEditor";
-import { AgentChatPanel } from "./AgentChatPanel";
 
 interface Layers {
   base: string;
@@ -34,13 +33,8 @@ interface Props {
   disabledTools: string[];
   usageCents: number;
   capCents: number;
-  tenantId: number;
   /** Whether `OPENROUTER_API_KEY` is set — computed server-side (page.tsx) and passed down so a client component never has to guess at env state. Gates the DeepSeek/OpenRouter option in the model picker below. */
   openRouterConfigured: boolean;
-  /** Campaign Engine Slice 3: see AssistantChat's `initialInput` doc — threaded straight through to the chat panel. */
-  initialInput?: string;
-  /** Voice T2: see AssistantChat's `voiceEnabled` doc — computed server-side (page.tsx) via `transcribeConfigured()`, same threading pattern as `openRouterConfigured` above, threaded straight through to the chat panel. */
-  voiceEnabled: boolean;
 }
 
 /**
@@ -49,7 +43,7 @@ interface Props {
  * `composeAgentSystem` — @/lib/agents/context — actually concatenates them
  * for a live run), and the agent's working chat (or a dormant placeholder).
  */
-export function AgentDetail({ agent, mandate, roles, layers, toolNames, disabledTools, usageCents, capCents, tenantId, openRouterConfigured, initialInput, voiceEnabled }: Props) {
+export function AgentDetail({ agent, mandate, roles, layers, toolNames, disabledTools, usageCents, capCents, openRouterConfigured }: Props) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 36 }}>
       <RevealGroup style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
@@ -79,13 +73,6 @@ export function AgentDetail({ agent, mandate, roles, layers, toolNames, disabled
             <Connector />
             <LockedLayer index={4} title="Safety rails" text={layers.rails} />
           </div>
-        </section>
-      </Reveal>
-
-      <Reveal>
-        <section>
-          <SectionLabel>{agent.status === "active" ? "Working chat" : "Chat"}</SectionLabel>
-          <AgentChatPanel agent={agent} tenantId={tenantId} initialInput={initialInput} voiceEnabled={voiceEnabled} />
         </section>
       </Reveal>
     </div>
