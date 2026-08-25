@@ -118,6 +118,15 @@ a {
   .adonis-shell { height: calc(100dvh - var(--app-topbar-h)); }
 }
 
+/* /adonis is a fixed-viewport view: lock the shell to the dynamic viewport and
+   clip its overflow so the PAGE never scrolls — the chat scrolls inside itself
+   and the sidebar nav scrolls inside itself (Sidebar.tsx's <nav> is already
+   overflow-y:auto). Scoped with :has() so ONLY this route is locked; every
+   other page still scrolls the window normally. With no page scroll, the sticky
+   sidebar stays pinned at the top. (Tooltip/account-switcher menus portal to
+   <body>, so overflow:hidden here never clips them.) */
+.app-shell:has(.adonis-shell) { height: 100dvh; overflow: hidden; }
+
 /* Keyboard-focus baseline — the app is built from inline styles that can't
    express :focus-visible, so keyboard users had no visible focus anywhere.
    Mouse clicks don't trigger :focus-visible, so this only shows for keyboard nav. */
