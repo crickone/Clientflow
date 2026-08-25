@@ -390,11 +390,14 @@ export function Sidebar({
   }
 
   /**
-   * The pinned Adonis row — visually distinct from every other row (accent
-   * text/icon + accent-tinted background at all times, not just on hover/
-   * active) since it's the product's flagship entry point, not a normal nav
-   * item. Active state (on /adonis/**) still gets the shared nav-active-bar
-   * so it reads consistently with the rest of the nav.
+   * The pinned Adonis row — visually distinct from every other row via accent
+   * text/icon + bold weight at ALL times (it's the product's flagship entry
+   * point, not a normal nav item). The accent-tinted BACKGROUND, however, is
+   * applied ONLY when active (on /adonis/**) — like any selected nav row — so
+   * it doesn't read as "selected" while you're on a different route. Inactive,
+   * `nav-link` supplies the standard hover background for affordance (the inline
+   * accent colour wins over nav-link's text colour, so the flagship stays accent
+   * on hover); the shared nav-active-bar still marks the active state.
    */
   function renderAdonisLink(item: NavLink) {
     const active = isActiveLink(item, pathname);
@@ -403,13 +406,14 @@ export function Sidebar({
       <Link
         key={item.href}
         href={item.href}
+        className="nav-link"
         style={{
           ...navRowStyle,
           paddingLeft: indentFor(0),
-          background: "var(--accent-soft)",
           color: "var(--accent)",
           fontSize: 14,
           fontWeight: 800,
+          ...(active ? { background: "var(--accent-soft)" } : {}),
         }}
       >
         {active && (
