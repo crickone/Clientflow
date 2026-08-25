@@ -199,7 +199,7 @@ const NAV_GROUPS: NavGroup[] = [
       // Launch action publishes content live. (The build runs through
       // Adonis's chat on /adonis, which is staff-visible, but only an admin
       // ever reaches the Build-campaign links from these admin-only pages.)
-      { href: "/marketing/campaigns", label: "Marketing", icon: Megaphone, adminOnly: true },
+      { href: "/marketing/campaigns", label: "Campaigns", icon: Megaphone, adminOnly: true },
       // Campaign Engine Slice 3: the year-map of Irish marketing dates +
       // seasons overlaid with real campaigns, plus the AI radar "coming up"
       // rail. Same admin-only reasoning as "Marketing" above (this page is
