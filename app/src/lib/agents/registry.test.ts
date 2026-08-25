@@ -20,6 +20,12 @@
 // and `updateAgentModel` accepts/rejects models for it exactly like every
 // other agent.
 //
+// Extended for the agent-roles brief ("Roles — what this agent handles" on
+// /agents/[key]): AgentDef gained a `roles: string[]` field, catalog-only
+// metadata (like `mandate`) never written to the DB. Covers: every catalog
+// entry — active and dormant alike — has a non-empty `roles` array with no
+// blank entries.
+//
 // NOTE: this repo does NOT use vitest — tests are plain node:assert/strict
 // scripts run via `npm test -- <path>` (see scripts/test.mjs). This mirrors
 // the exact pattern of src/lib/apiKeys.test.ts and src/lib/db/agentsTable.test.ts.
@@ -97,6 +103,25 @@ const requireLocal = createRequire(import.meta.url);
   };
 
   try {
+    // ── roles metadata (agent-roles-brief: "Roles — what this agent handles"
+    // on /agents/[key]): every catalog entry — active AND dormant, Finance
+    // still has roles, it's just not currently running — carries a
+    // non-empty, plain-English `roles` array with no blank entries. Plain
+    // data, no DB/tenant needed; also proves the AgentDef interface change
+    // (adding `roles: string[]`) compiles. `roles` is catalog-only metadata
+    // like `mandate` — never written to the DB (see ensureAgents' insert/
+    // patch below, which only ever touches key/name/status/model/
+    // instructions) — so this static check is the only coverage it needs. ──
+    for (const a of AGENT_CATALOG) {
+      assert.ok(Array.isArray(a.roles) && a.roles.length > 0, `AGENT_CATALOG["${a.key}"].roles is a non-empty array`);
+      for (const role of a.roles) {
+        assert.ok(
+          typeof role === "string" && role.trim().length > 0,
+          `AGENT_CATALOG["${a.key}"].roles has no blank/non-string entries`,
+        );
+      }
+    }
+
     // getTenantDbById(tid) must actually resolve the scratch tenant.
     assert.ok(getTenantDbById(tid), "getTenantDbById resolves the scratch tenant");
 

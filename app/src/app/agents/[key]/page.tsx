@@ -139,6 +139,8 @@ export default async function AgentDetailPage({
         // the first one.
         key={initialInput ? `${agent.key}:${initialInput}` : agent.key}
         agent={agent}
+        mandate={catalogEntry?.mandate}
+        roles={catalogEntry?.roles ?? []}
         layers={layers}
         toolNames={isConcierge ? conciergeToolNames : spec?.toolNames ?? []}
         usageCents={usageCents}

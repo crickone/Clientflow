@@ -5,12 +5,67 @@ import { eq, inArray } from "drizzle-orm";
 import { MODELS } from "@/lib/ai/client";
 import { MODEL_CATALOG } from "@/lib/ai/modelCatalog";
 
-export interface AgentDef { key: string; name: string; mandate: string; status: "active" | "dormant"; defaultModel: string; }
+// `roles` is catalog-only metadata (like `mandate`) — a plain-English list of
+// what this agent is responsible for, shown on its detail page (/agents/[key]
+// -> AgentDetail's "Roles — what this agent handles" section). It's never
+// written to the DB: the seed loop (ensureAgents, below) only persists
+// key/name/status/model/instructions, so adding this field doesn't touch the
+// DB/seed at all.
+export interface AgentDef { key: string; name: string; mandate: string; roles: string[]; status: "active" | "dormant"; defaultModel: string; }
 export const AGENT_CATALOG: AgentDef[] = [
-  { key: "orchestrator", name: "Adonis", mandate: "Routes work to the right specialist.", status: "active", defaultModel: MODELS.sonnet },
-  { key: "sales", name: "Sales", mandate: "Works leads: instant replies + relentless follow-up.", status: "active", defaultModel: MODELS.sonnet },
-  { key: "marketing", name: "Marketing", mandate: "Runs the Marketing Brain: campaigns + social.", status: "active", defaultModel: MODELS.sonnet },
-  { key: "operations", name: "Operations", mandate: "No-shows, class fill, attendance, admin.", status: "active", defaultModel: MODELS.sonnet },
+  {
+    key: "orchestrator",
+    name: "Adonis",
+    mandate: "Routes work to the right specialist.",
+    roles: [
+      "Understands what you're asking for",
+      "Routes each request to the right specialist",
+      "Handles general tasks itself — inbox, invoices, plans, admin",
+      "Delegates the work; never does the specialist job directly",
+    ],
+    status: "active",
+    defaultModel: MODELS.sonnet,
+  },
+  {
+    key: "sales",
+    name: "Sales",
+    mandate: "Works leads: instant replies + relentless follow-up.",
+    roles: [
+      "Replies to new leads instantly",
+      "Follows up relentlessly until they book or opt out",
+      "Moves leads through the pipeline",
+      "Books calls and assessments",
+      "Wins back leads who've gone quiet",
+    ],
+    status: "active",
+    defaultModel: MODELS.sonnet,
+  },
+  {
+    key: "marketing",
+    name: "Marketing",
+    mandate: "Runs the Marketing Brain: campaigns + social.",
+    roles: [
+      "Builds seasonal campaigns from your Marketing Brain",
+      "Proposes offers (Hormozi-style)",
+      "Drafts blog, social and email content",
+      "Flags what to run next (seasonal radar)",
+    ],
+    status: "active",
+    defaultModel: MODELS.sonnet,
+  },
+  {
+    key: "operations",
+    name: "Operations",
+    mandate: "No-shows, class fill, attendance, admin.",
+    roles: [
+      "Chases no-shows",
+      "Fills classes and tracks attendance",
+      "Handles day-to-day admin",
+      "Keeps the schedule moving",
+    ],
+    status: "active",
+    defaultModel: MODELS.sonnet,
+  },
   // First-class Concierge (.superpowers/sdd/concierge-agent-brief.md): the
   // general-purpose worker the Orchestrator's `delegate_to_concierge` tool
   // hands off to (@/lib/agents/tools.orchestrator) for everything outside
@@ -21,8 +76,27 @@ export const AGENT_CATALOG: AgentDef[] = [
   // editable instructions exactly like every other active agent. Seeded by
   // the loop below for every tenant (new + existing, on next `ensureAgents`
   // call) and never pruned, same as any other catalog entry.
-  { key: "concierge", name: "Concierge", mandate: "Inbox/email + WhatsApp, invoices & money, nutrition/workout plans, admin.", status: "active", defaultModel: MODELS.sonnet },
-  { key: "finance", name: "Finance", mandate: "Guards the cash: overdue + failed payments.", status: "dormant", defaultModel: MODELS.sonnet },
+  {
+    key: "concierge",
+    name: "Concierge",
+    mandate: "Inbox/email + WhatsApp, invoices & money, nutrition/workout plans, admin.",
+    roles: [
+      "Combined inbox — email + WhatsApp",
+      "Invoices and money",
+      "Nutrition and workout plans",
+      "General admin and anything else",
+    ],
+    status: "active",
+    defaultModel: MODELS.sonnet,
+  },
+  {
+    key: "finance",
+    name: "Finance",
+    mandate: "Guards the cash: overdue + failed payments.",
+    roles: ["Chases overdue payments", "Handles failed payments"],
+    status: "dormant",
+    defaultModel: MODELS.sonnet,
+  },
 ];
 
 export function ensureAgents(tenantId: number): void {

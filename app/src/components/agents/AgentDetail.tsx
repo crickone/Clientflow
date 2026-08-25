@@ -2,7 +2,7 @@
 
 import { type ReactNode, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { ChevronDown, Cpu, Gauge, Lock, Wrench } from "lucide-react";
+import { ChevronDown, CircleCheck, Cpu, Gauge, Lock, Wrench } from "lucide-react";
 
 import { Card, CardLabel } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -23,6 +23,10 @@ interface Layers {
 
 interface Props {
   agent: Agent;
+  /** The catalog entry's one-line mandate (@/lib/agents/registry's AGENT_CATALOG) — shown as the lead line atop the Roles section below. Undefined only if this agent key somehow isn't in the catalog. */
+  mandate?: string;
+  /** The catalog entry's plain-English responsibilities (AGENT_CATALOG's `roles`) — rendered as the "Roles — what this agent handles" section, complementary to ToolsCard's concrete tool names below. Empty/undefined omits the section entirely rather than rendering an empty box. */
+  roles?: string[];
   layers: Layers;
   toolNames: readonly string[];
   usageCents: number;
@@ -40,7 +44,7 @@ interface Props {
  * `composeAgentSystem` — @/lib/agents/context — actually concatenates them
  * for a live run), and the agent's working chat (or a dormant placeholder).
  */
-export function AgentDetail({ agent, layers, toolNames, usageCents, capCents, tenantId, openRouterConfigured, initialInput }: Props) {
+export function AgentDetail({ agent, mandate, roles, layers, toolNames, usageCents, capCents, tenantId, openRouterConfigured, initialInput }: Props) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 36 }}>
       <RevealGroup style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
@@ -54,6 +58,8 @@ export function AgentDetail({ agent, layers, toolNames, usageCents, capCents, te
           <UsageCard usageCents={usageCents} capCents={capCents} />
         </Reveal>
       </RevealGroup>
+
+      <RolesSection mandate={mandate} roles={roles} dormant={agent.status === "dormant"} />
 
       <Reveal>
         <section>
@@ -94,6 +100,50 @@ function SectionLabel({ children }: { children: ReactNode }) {
     >
       {children}
     </div>
+  );
+}
+
+/**
+ * "Roles — what this agent handles": the plain-English responsibilities from
+ * AGENT_CATALOG (@/lib/agents/registry), one level up from ToolsCard's
+ * concrete tool names — what the agent is FOR, not what it can literally
+ * call. Self-contained (owns its own <Reveal>, like ModelCard/ToolsCard/
+ * UsageCard own their <Card>) so the call site can render it unconditionally
+ * and this component decides whether there's anything worth showing —
+ * mirrors ToolsCard's own empty-state handling, except here "empty" means
+ * omit the whole section rather than show a placeholder, per spec.
+ */
+function RolesSection({ mandate, roles, dormant }: { mandate?: string; roles?: string[]; dormant: boolean }) {
+  if (!roles || roles.length === 0) return null;
+  return (
+    <Reveal>
+      <section>
+        <SectionLabel>Roles — what this agent handles</SectionLabel>
+        <Card>
+          {mandate && (
+            <p style={{ fontSize: 14, lineHeight: 1.55, color: "var(--text-primary)", fontWeight: 500, margin: "0 0 16px" }}>
+              {mandate}
+            </p>
+          )}
+          {dormant && (
+            <div style={{ fontSize: 11, fontStyle: "italic", color: "var(--text-tertiary)", marginBottom: 16 }}>
+              Not currently running
+            </div>
+          )}
+          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+            {roles.map((role) => (
+              <li
+                key={role}
+                style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, lineHeight: 1.55, color: "var(--text-secondary)" }}
+              >
+                <CircleCheck size={14} strokeWidth={1.75} style={{ flexShrink: 0, marginTop: 2, color: "var(--accent)" }} aria-hidden />
+                <span>{role}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      </section>
+    </Reveal>
   );
 }
 
