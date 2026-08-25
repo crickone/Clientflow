@@ -1,8 +1,8 @@
 "use client";
 
-import { type ReactNode, useState, useTransition } from "react";
+import { type ReactNode, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { ChevronDown, CircleCheck, Cpu, Gauge, Lock, Wrench } from "lucide-react";
+import { ChevronDown, CircleCheck, Cpu, Gauge, Lock } from "lucide-react";
 
 import { Card, CardLabel } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -10,7 +10,8 @@ import { Reveal, RevealGroup } from "@/components/motion/Reveal";
 import { formatEur } from "@/lib/utils";
 import type { Agent } from "@/lib/db/schema";
 import { MODEL_CATALOG, isCatalogModel, type ModelChoice } from "@/lib/ai/modelCatalog";
-import { saveModel } from "@/app/agents/actions";
+import { groupToolsByCategory } from "@/lib/agents/toolCategories";
+import { saveModel, saveDisabledTools } from "@/app/agents/actions";
 import { AgentContextEditor } from "./AgentContextEditor";
 import { AgentChatPanel } from "./AgentChatPanel";
 
@@ -29,6 +30,8 @@ interface Props {
   roles?: string[];
   layers: Layers;
   toolNames: readonly string[];
+  /** The agent's OFF list (tool names it may not use) — parsed from agents.disabled_tools in page.tsx via parseDisabledTools. Seeds the tool-access toggles; empty = every tool on. */
+  disabledTools: string[];
   usageCents: number;
   capCents: number;
   tenantId: number;
@@ -46,7 +49,7 @@ interface Props {
  * `composeAgentSystem` — @/lib/agents/context — actually concatenates them
  * for a live run), and the agent's working chat (or a dormant placeholder).
  */
-export function AgentDetail({ agent, mandate, roles, layers, toolNames, usageCents, capCents, tenantId, openRouterConfigured, initialInput, voiceEnabled }: Props) {
+export function AgentDetail({ agent, mandate, roles, layers, toolNames, disabledTools, usageCents, capCents, tenantId, openRouterConfigured, initialInput, voiceEnabled }: Props) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 36 }}>
       <RevealGroup style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
@@ -54,12 +57,13 @@ export function AgentDetail({ agent, mandate, roles, layers, toolNames, usageCen
           <ModelCard agent={agent} openRouterConfigured={openRouterConfigured} />
         </Reveal>
         <Reveal>
-          <ToolsCard toolNames={toolNames} />
-        </Reveal>
-        <Reveal>
           <UsageCard usageCents={usageCents} capCents={capCents} />
         </Reveal>
       </RevealGroup>
+
+      <Reveal>
+        <ToolAccessSection agentKey={agent.key} toolNames={toolNames} disabledTools={disabledTools} />
+      </Reveal>
 
       <RolesSection mandate={mandate} roles={roles} dormant={agent.status === "dormant"} />
 
@@ -284,25 +288,174 @@ function ModelCard({ agent, openRouterConfigured }: { agent: Agent; openRouterCo
   );
 }
 
-function ToolsCard({ toolNames }: { toolNames: readonly string[] }) {
+/** A small on/off switch. Knob colour flips by state so it stays visible on
+ *  both the accent (on) and surface-3 (off) tracks in light AND dark themes —
+ *  `--accent-contrast` is the theme-aware ink-on-accent, `--text-secondary`
+ *  reads on the muted off-track either way. */
+function Toggle({ on, onToggle, pending, label }: { on: boolean; onToggle: () => void; pending: boolean; label: string }) {
   return (
-    <Card>
-      <CardLabel>
-        <Wrench size={11} style={{ display: "inline", verticalAlign: -1, marginRight: 6 }} />
-        Tools
-      </CardLabel>
-      {toolNames.length === 0 ? (
-        <p style={{ fontSize: 12.5, color: "var(--text-tertiary)", fontStyle: "italic", margin: 0 }}>
-          No tools yet — this agent isn&apos;t running.
-        </p>
-      ) : (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-          {toolNames.map((t) => (
-            <Badge key={t}>{t.replace(/_/g, " ")}</Badge>
-          ))}
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      onClick={onToggle}
+      disabled={pending}
+      style={{
+        width: 38,
+        height: 22,
+        borderRadius: 999,
+        background: on ? "var(--accent)" : "var(--surface-3)",
+        border: "1px solid var(--hairline)",
+        position: "relative",
+        cursor: pending ? "default" : "pointer",
+        flexShrink: 0,
+        padding: 0,
+        transition: "background 0.15s var(--ease)",
+      }}
+    >
+      <span
+        aria-hidden
+        style={{
+          position: "absolute",
+          top: 2,
+          left: on ? 17 : 2,
+          width: 16,
+          height: 16,
+          borderRadius: "50%",
+          background: on ? "var(--accent-contrast)" : "var(--text-secondary)",
+          transition: "left 0.15s var(--ease)",
+        }}
+      />
+    </button>
+  );
+}
+
+/**
+ * Tool access — a full-width section (not a 1/3 control-row card: 50-odd tools
+ * in 10 categories need the room) letting an admin switch each of the agent's
+ * tools on or off, grouped by category (@/lib/agents/toolCategories). A tool
+ * switched OFF is dropped from the agent's toolkit in the chat route
+ * (@/api/agents/[key]/chat) — it can't call it and never sees it. Optimistic,
+ * mirroring ModelCard: local state updates immediately, the whole disabled set
+ * is persisted via `saveDisabledTools`, and a rejected save reverts + toasts.
+ * We store the DISABLED (off) set, so an unchanged tool stays on by default.
+ */
+function ToolAccessSection({ agentKey, toolNames, disabledTools }: { agentKey: string; toolNames: readonly string[]; disabledTools: string[] }) {
+  const [disabled, setDisabled] = useState<Set<string>>(() => new Set(disabledTools));
+  const [pending, startTransition] = useTransition();
+  const groups = useMemo(() => groupToolsByCategory(toolNames), [toolNames]);
+  const enabledCount = toolNames.filter((t) => !disabled.has(t)).length;
+
+  function persist(next: Set<string>) {
+    const prev = disabled;
+    setDisabled(next); // optimistic
+    startTransition(async () => {
+      try {
+        await saveDisabledTools(agentKey, [...next]);
+      } catch (err) {
+        setDisabled(prev); // revert — the server rejected it
+        toast.error(err instanceof Error ? err.message : "Could not update tool access.");
+      }
+    });
+  }
+  function toggleTool(t: string) {
+    const next = new Set(disabled);
+    if (next.has(t)) next.delete(t);
+    else next.add(t);
+    persist(next);
+  }
+  function setCategory(tools: string[], enableAll: boolean) {
+    const next = new Set(disabled);
+    for (const t of tools) {
+      if (enableAll) next.delete(t);
+      else next.add(t);
+    }
+    persist(next);
+  }
+
+  if (toolNames.length === 0) {
+    return (
+      <section>
+        <SectionLabel>Tools — what this agent can use</SectionLabel>
+        <Card>
+          <p style={{ fontSize: 12.5, color: "var(--text-tertiary)", fontStyle: "italic", margin: 0 }}>
+            No tools yet — this agent isn&apos;t running.
+          </p>
+        </Card>
+      </section>
+    );
+  }
+
+  return (
+    <section>
+      <SectionLabel>Tools — what this agent can use</SectionLabel>
+      <Card>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
+          <p style={{ fontSize: 12.5, color: "var(--text-tertiary)", margin: 0, lineHeight: 1.5, maxWidth: 620 }}>
+            Turn individual tools on or off. A tool switched off is removed from the agent&apos;s toolkit entirely — it can&apos;t use it and won&apos;t know it exists. Sends and other changes still need your approval regardless.
+          </p>
+          <span style={{ fontFamily: "var(--font-mono), ui-monospace, monospace", fontSize: 12, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+            {enabledCount} / {toolNames.length} on
+          </span>
         </div>
-      )}
-    </Card>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
+          {groups.map((g) => {
+            const total = g.tools.length;
+            const on = g.tools.filter((t) => !disabled.has(t)).length;
+            const allOn = on === total;
+            return (
+              <div
+                key={g.key}
+                style={{ border: "1px solid var(--hairline)", borderRadius: "var(--radius)", padding: 12, background: "var(--surface-2)" }}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>{g.label}</div>
+                    <div style={{ fontFamily: "var(--font-mono), ui-monospace, monospace", fontSize: 10.5, color: "var(--text-tertiary)", marginTop: 2 }}>
+                      {on}/{total} on
+                    </div>
+                  </div>
+                  <Toggle
+                    on={allOn}
+                    pending={pending}
+                    label={`Turn all ${g.label} tools ${allOn ? "off" : "on"}`}
+                    onToggle={() => setCategory(g.tools, !allOn)}
+                  />
+                </div>
+                <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+                  {g.tools.map((t) => {
+                    const isOn = !disabled.has(t);
+                    return (
+                      <li key={t} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "6px 0", borderTop: "1px solid var(--hairline)" }}>
+                        <span
+                          style={{
+                            fontSize: 12.5,
+                            color: isOn ? "var(--text-secondary)" : "var(--text-tertiary)",
+                            textTransform: "capitalize",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {t.replace(/_/g, " ")}
+                        </span>
+                        <Toggle
+                          on={isOn}
+                          pending={pending}
+                          label={`${isOn ? "Disable" : "Enable"} ${t.replace(/_/g, " ")}`}
+                          onToggle={() => toggleTool(t)}
+                        />
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+    </section>
   );
 }
 

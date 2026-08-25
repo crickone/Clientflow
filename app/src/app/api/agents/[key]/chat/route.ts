@@ -6,7 +6,7 @@ import { rateLimit } from "@/lib/rateLimit";
 import { TOOLS, type ToolArtifact } from "@/lib/assistant/tools";
 import { AiCapError } from "@/lib/ai/usage";
 import { runWithTenant } from "@/lib/db/tenant";
-import { getAgent } from "@/lib/agents/registry";
+import { getAgent, parseDisabledTools } from "@/lib/agents/registry";
 import { composeAgentSystem } from "@/lib/agents/context";
 import { SPECIALISTS } from "@/lib/agents/specialists";
 import { runAgentTurn, type PendingWrite } from "@/lib/agents/runAgentTurn";
@@ -114,7 +114,15 @@ export async function POST(
   // Set<string> (not the inferred literal-union type): compared below against
   // t.name, which is a plain `string` on the Anthropic.Tool type.
   const allowed = new Set<string>(spec.toolNames); // per-agent tool slice
-  const tools = TOOLS.filter((t) => allowed.has(t.name));
+  // Tool-access toggles (admin-editable on /agents/[key]): the operator can
+  // switch individual tools OFF for this agent. `disabled_tools` is the OFF
+  // set — drop those here so a disabled tool is fully absent from the agent's
+  // toolkit (it can't call it, and never sees it in the tool list). This is
+  // ACCESS control, upstream of and independent from the write-approval gate
+  // (WRITE_TOOLS): a still-enabled write tool is deferred for Approve exactly
+  // as before; a disabled tool simply isn't offered at all.
+  const disabled = new Set<string>(parseDisabledTools(agent.disabledTools));
+  const tools = TOOLS.filter((t) => allowed.has(t.name) && !disabled.has(t.name));
   const model = agent.model; // registry model: Sonnet default, Opus if upgraded — never hardcoded
 
   const encoder = new TextEncoder();

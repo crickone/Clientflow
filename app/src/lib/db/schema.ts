@@ -2326,6 +2326,16 @@ export const agents = sqliteTable("agents", {
   status: text("status", { enum: ["active", "dormant"] }).notNull().default("dormant"),
   instructions: text("instructions").notNull().default(""),
   model: text("model").notNull().default("claude-sonnet-5"),
+  // Per-tenant tool ACCESS toggles: a JSON array of tool names this agent is
+  // NOT allowed to use (the DISABLED set — storing what's OFF, not what's ON,
+  // so a tool added to the agent later defaults to ON for every existing
+  // tenant). Null/absent = nothing disabled = every tool available. The chat
+  // route drops these when it builds the agent's toolkit; edited from the
+  // Agents tab (admin-only). Distinct from the write-approval gate: this
+  // controls whether the agent can call a tool AT ALL, not whether a call
+  // runs without operator approval. Parse via `parseDisabledTools`
+  // (@/lib/agents/registry).
+  disabledTools: text("disabled_tools"),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull().default(sql`(unixepoch() * 1000)`),
 });
 export type Agent = typeof agents.$inferSelect;

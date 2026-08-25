@@ -1440,6 +1440,21 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     console.error("[db] campaigns ad_spend_cents migration failed:", err);
   }
 
+  // Agent tool-access toggles: a JSON array of tool names the agent may NOT use
+  // (the disabled set). Null = nothing disabled = every tool on. Additive/
+  // idempotent like every guard in this block. See agents.disabledTools
+  // (schema.ts) + parseDisabledTools (@/lib/agents/registry).
+  try {
+    const agentCols = sqlite
+      .prepare("PRAGMA table_info(agents)")
+      .all() as Array<{ name: string }>;
+    if (!agentCols.some((c) => c.name === "disabled_tools")) {
+      sqlite.exec("ALTER TABLE agents ADD COLUMN disabled_tools TEXT");
+    }
+  } catch (err) {
+    console.error("[db] agents disabled_tools migration failed:", err);
+  }
+
   try {
     const cols = sqlite
       .prepare("PRAGMA table_info(gift_vouchers)")

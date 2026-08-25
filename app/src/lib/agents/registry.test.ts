@@ -83,6 +83,8 @@ const requireLocal = createRequire(import.meta.url);
     getAgent,
     updateAgentInstructions,
     updateAgentModel,
+    updateAgentDisabledTools,
+    parseDisabledTools,
   } = requireLocal("./registry") as typeof import("./registry");
 
   // ── scratch tenant (control row + a real tenant DB file, so
@@ -201,6 +203,33 @@ const requireLocal = createRequire(import.meta.url);
       openRouterEntry!.id,
       "rejected unknown-model update did not mutate the row",
     );
+
+    // ── tool-access toggles (disabled_tools): round-trip + fail-soft parse.
+    // The chat route drops these from the agent's toolkit; the Agent page
+    // seeds the toggles from them. Default is nothing disabled. ──
+    assert.deepEqual(
+      parseDisabledTools(getAgent(tid, "orchestrator")!.disabledTools),
+      [],
+      "a freshly-seeded agent disables no tools (null disabled_tools -> [])",
+    );
+    updateAgentDisabledTools(tid, "orchestrator", ["send_client_email", "launch_campaign", "send_client_email"]);
+    assert.deepEqual(
+      parseDisabledTools(getAgent(tid, "orchestrator")!.disabledTools).sort(),
+      ["launch_campaign", "send_client_email"],
+      "updateAgentDisabledTools persists a DEDUPED disabled set that parseDisabledTools reads back",
+    );
+    updateAgentDisabledTools(tid, "orchestrator", []);
+    assert.deepEqual(
+      parseDisabledTools(getAgent(tid, "orchestrator")!.disabledTools),
+      [],
+      "an empty set clears all tool restrictions",
+    );
+    // parseDisabledTools is fail-soft — a corrupt value must never crash a chat
+    // turn or the agent page; it just means "no restrictions".
+    assert.deepEqual(parseDisabledTools(null), [], "parseDisabledTools(null) -> []");
+    assert.deepEqual(parseDisabledTools("not json"), [], "parseDisabledTools(malformed JSON) -> []");
+    assert.deepEqual(parseDisabledTools('{"a":1}'), [], "parseDisabledTools(non-array) -> []");
+    assert.deepEqual(parseDisabledTools('["a", 2, "b", null]'), ["a", "b"], "parseDisabledTools keeps only string entries");
 
     // ── status-reconcile: AGENT_CATALOG is the single source of truth for
     // `status` — there is no UI/API to change it directly (unlike

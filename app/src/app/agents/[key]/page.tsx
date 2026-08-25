@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/PageHeader";
 import { requireAdminPage, getCurrentMembership } from "@/lib/auth";
-import { AGENT_CATALOG, getAgent } from "@/lib/agents/registry";
+import { AGENT_CATALOG, getAgent, parseDisabledTools } from "@/lib/agents/registry";
 import { SAFETY_RAILS } from "@/lib/agents/context";
 import { SPECIALISTS } from "@/lib/agents/specialists";
 import { getBusinessContext } from "@/lib/ai/businessContext";
@@ -159,6 +159,7 @@ export default async function AgentDetailPage({
         roles={catalogEntry?.roles ?? []}
         layers={layers}
         toolNames={isConcierge ? conciergeToolNames : spec?.toolNames ?? []}
+        disabledTools={parseDisabledTools(agent.disabledTools)}
         usageCents={usageCents}
         capCents={capCents}
         tenantId={tenantId}

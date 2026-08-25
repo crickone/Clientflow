@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 
 import { requireAdmin, getCurrentMembership } from "@/lib/auth";
-import { AGENT_CATALOG, updateAgentInstructions, updateAgentModel } from "@/lib/agents/registry";
+import { AGENT_CATALOG, updateAgentInstructions, updateAgentModel, updateAgentDisabledTools } from "@/lib/agents/registry";
+import { SPECIALISTS } from "@/lib/agents/specialists";
 import { setTenantCapCents } from "@/lib/ai/usage";
 
 /**
@@ -44,6 +45,26 @@ export async function saveModel(key: string, model: string): Promise<void> {
   // exactly the catalog (Sonnet 5, Opus 4.8, DeepSeek via OpenRouter), so in
   // normal use this never throws.
   updateAgentModel(tenantId, key, model);
+  revalidatePath(`/agents/${key}`);
+}
+
+/**
+ * Tool-access toggles (Agent detail page): persist the set of tools this agent
+ * is NOT allowed to use. `disabled` is the full OFF list the client holds in
+ * state (it sends the whole set on every toggle — single tool or a whole
+ * category at once — so this is idempotent). We store ONLY names that are real
+ * tools this agent actually has, so a stale/renamed/garbage name can never
+ * linger in the set and a tool the agent doesn't have can't be "disabled".
+ * Admin-only + tenant-derived like every action here; the chat route reads
+ * this back to drop the disabled tools from the agent's toolkit.
+ */
+export async function saveDisabledTools(key: string, disabled: string[]): Promise<void> {
+  await requireAdmin();
+  assertKnownAgent(key);
+  const tenantId = getCurrentMembership()!.tenant.id;
+  const known = new Set<string>(SPECIALISTS[key]?.toolNames ?? []);
+  const clean = [...new Set(disabled)].filter((t) => known.has(t));
+  updateAgentDisabledTools(tenantId, key, clean);
   revalidatePath(`/agents/${key}`);
 }
 

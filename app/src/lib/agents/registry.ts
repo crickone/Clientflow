@@ -99,3 +99,36 @@ export function updateAgentModel(tenantId: number, key: string, model: string): 
   if (!allowed.has(model)) throw new Error("Unsupported model");
   getTenantDbById(tenantId).update(agents).set({ model, updatedAt: new Date() }).where(eq(agents.key, key)).run();
 }
+
+/**
+ * Parse the `agents.disabled_tools` column (a JSON array of tool names the
+ * agent may NOT use) into a plain string[]. Fail-soft to `[]` for null/absent
+ * (nothing disabled = every tool on), malformed JSON, or a non-array/non-string
+ * payload — a corrupt value must never crash a chat turn or the agent page, it
+ * just means "no restrictions". Used by the chat route (to drop disabled tools
+ * from the agent's toolkit) and the Agent detail page (to seed the toggles).
+ */
+export function parseDisabledTools(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Persist the agent's disabled-tools set (the OFF list) for this tenant.
+ * Deduped and stored as a JSON array; an empty array clears all restrictions.
+ * Caller (saveDisabledTools, @/app/agents/actions) validates the names against
+ * the agent's real toolNames + re-checks admin first.
+ */
+export function updateAgentDisabledTools(tenantId: number, key: string, disabled: string[]): void {
+  const clean = [...new Set(disabled.filter((x) => typeof x === "string"))];
+  getTenantDbById(tenantId)
+    .update(agents)
+    .set({ disabledTools: JSON.stringify(clean), updatedAt: new Date() })
+    .where(eq(agents.key, key))
+    .run();
+}
