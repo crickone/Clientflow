@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowRight, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 
 import { formatCentsEur, formatDate } from "@/lib/utils";
 import type { CampaignMetrics } from "@/lib/campaigns/panelMetrics";
@@ -138,7 +138,7 @@ export function CampaignRows({ rows }: { rows: CampaignMetrics[] }) {
             {isOpen && (
               <tr>
                 <td colSpan={COLUMN_COUNT} style={{ padding: 0, borderBottom: "1px solid var(--hairline)" }}>
-                  <CampaignPanel m={m} badge={badge} />
+                  <CampaignPanel m={m} />
                 </td>
               </tr>
             )}
@@ -151,123 +151,83 @@ export function CampaignRows({ rows }: { rows: CampaignMetrics[] }) {
 
 // ── the expanded panel ─────────────────────────────────────────────────────
 
-function CampaignPanel({
-  m,
-  badge,
-}: {
-  m: CampaignMetrics;
-  badge: { tone: "neutral" | "green" | "red"; label: string };
-}) {
+function CampaignPanel({ m }: { m: CampaignMetrics }) {
   return (
     <div style={{ background: PANEL_BG, padding: "24px 28px" }}>
-      <FunnelStrip m={m} />
-      <MoneyGrid m={m} badge={badge} />
+      {/* Headline — the three numbers that matter most, as big bento tiles.
+          The funnel rates fold in as each tile's sub-line rather than a
+          separate strip. */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12 }}>
+        <HeroTile
+          label="Leads"
+          value={m.leads.toLocaleString()}
+          sub={m.viewToLeadPct === null ? undefined : `${m.viewToLeadPct.toFixed(1)}% of page views`}
+        />
+        <HeroTile
+          label="Sales"
+          value={m.converts.toLocaleString()}
+          sub={m.conversionRatePct === null ? undefined : `${m.conversionRatePct.toFixed(1)}% of leads convert`}
+        />
+        <HeroTile
+          label="Cash collected"
+          value={formatCentsEur(m.totalUpfrontCents)}
+          sub={m.converts > 0 ? `from ${m.converts} sale${m.converts === 1 ? "" : "s"}` : undefined}
+        />
+      </div>
+
+      {/* Supporting metrics — a bento grid over 6 columns: two wider tiles up
+          top, three smaller ones below. */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 12, marginTop: 12 }}>
+        <BentoTile span={3} label="Page views" value={m.landingViews.toLocaleString()} />
+        <BentoTile span={3} label="Ad spend" value={formatCentsEur(m.adSpendCents)} />
+        <BentoTile
+          span={2}
+          label="CAC"
+          value={m.cacCents === null ? "—" : formatCentsEur(m.cacCents)}
+          subNote={m.cacCents === null ? "No sale yet" : undefined}
+        />
+        <BentoTile
+          span={2}
+          label="Cost per lead"
+          value={m.costPerLeadCents === null ? "—" : formatCentsEur(m.costPerLeadCents)}
+          subNote={m.costPerLeadCents === null ? "No spend or leads yet" : undefined}
+        />
+        <BentoTile
+          span={2}
+          label="ROAS"
+          value={m.roas === null ? "—" : `${m.roas.toFixed(1)}×`}
+          subNote={m.roas === null ? "No ad spend yet" : undefined}
+        />
+      </div>
+
       <div style={{ marginTop: 24 }}>
         <CardLabel style={{ marginBottom: 10 }}>Email</CardLabel>
         <EmailRow email={m.email} />
       </div>
+
       <MetaLine m={m} />
     </div>
   );
 }
 
-function FunnelStrip({ m }: { m: CampaignMetrics }) {
+/** Big headline tile (leads / sales / cash collected) — the top row of the bento. */
+function HeroTile({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", marginBottom: 28 }}>
-      <FunnelNode label="Page views" value={m.landingViews} />
-      <FunnelArrow rate={pct(m.viewToLeadPct)} />
-      <FunnelNode label="Sign-ups (leads)" value={m.leads} />
-      <FunnelArrow rate={pct(m.conversionRatePct)} />
-      <FunnelNode label="Sales (converts)" value={m.converts} />
+    <div style={{ ...tileCard, padding: "18px 20px" }}>
+      <CardLabel>{label}</CardLabel>
+      <CardValue style={{ fontSize: 34, marginTop: 2 }}>{value}</CardValue>
+      {sub && <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 6 }}>{sub}</div>}
     </div>
   );
 }
 
-function FunnelNode({ label, value }: { label: string; value: number }) {
+/** A supporting bento tile spanning `span` of the parent 6-column grid. */
+function BentoTile({ span, label, value, subNote }: { span: number; label: string; value: string; subNote?: string }) {
   return (
-    <div style={{ ...tileCard, textAlign: "center", minWidth: 140 }}>
-      <CardValue style={{ fontSize: 28 }}>{value.toLocaleString()}</CardValue>
-      <CardLabel style={{ marginTop: 6, marginBottom: 0 }}>{label}</CardLabel>
-    </div>
-  );
-}
-
-function FunnelArrow({ rate }: { rate: string }) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        padding: "0 18px",
-        color: "var(--text-tertiary)",
-        flexShrink: 0,
-      }}
-    >
-      <span style={{ fontFamily: "var(--font-mono), ui-monospace, monospace", fontSize: 11 }}>{rate}</span>
-      <ArrowRight size={16} strokeWidth={1.75} style={{ marginTop: 2 }} aria-hidden />
-    </div>
-  );
-}
-
-function StatTile({ label, value, subNote }: { label: string; value: string; subNote?: string }) {
-  return (
-    <div style={tileCard}>
+    <div style={{ ...tileCard, gridColumn: `span ${span}` }}>
       <CardLabel>{label}</CardLabel>
       <CardValue style={{ fontSize: 19 }}>{value}</CardValue>
       {subNote && <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 4 }}>{subNote}</div>}
-    </div>
-  );
-}
-
-function MoneyGrid({
-  m,
-  badge,
-}: {
-  m: CampaignMetrics;
-  badge: { tone: "neutral" | "green" | "red"; label: string };
-}) {
-  return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-        gap: 12,
-      }}
-    >
-      <StatTile label="Ad spend" value={formatCentsEur(m.adSpendCents)} />
-      <StatTile label="Cash collected" value={formatCentsEur(m.totalUpfrontCents)} />
-      <StatTile label="MRR added" value={`${formatCentsEur(m.mrrCents)}/mo`} />
-      <StatTile
-        label="CAC"
-        value={m.cacCents === null ? "—" : formatCentsEur(m.cacCents)}
-        subNote={m.cacCents === null ? "No sale yet" : undefined}
-      />
-      <StatTile
-        label="Cost per lead"
-        value={m.costPerLeadCents === null ? "—" : formatCentsEur(m.costPerLeadCents)}
-        subNote={m.costPerLeadCents === null ? "No spend or leads yet" : undefined}
-      />
-      <StatTile
-        label="Revenue per sale"
-        value={m.revenuePerSaleCents === null ? "—" : formatCentsEur(m.revenuePerSaleCents)}
-        subNote={m.revenuePerSaleCents === null ? "No sale yet" : undefined}
-      />
-      <StatTile
-        label="ROAS"
-        value={m.roas === null ? "—" : `${m.roas.toFixed(1)}×`}
-        subNote={m.roas === null ? "No ad spend yet" : undefined}
-      />
-      <div style={tileCard}>
-        <CardLabel>CFA</CardLabel>
-        <div style={{ marginTop: 2 }}>
-          <Badge tone={badge.tone}>{badge.label}</Badge>
-        </div>
-        <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 6 }}>
-          {m.cfaRatioPct === null ? "No ad spend recorded" : `Covers ${m.cfaRatioPct.toFixed(1)}% of spend`}
-        </div>
-      </div>
-      <StatTile label="AI build cost" value={formatCentsEur(m.aiBuildCents)} />
     </div>
   );
 }
@@ -281,10 +241,10 @@ function EmailRow({ email }: { email: CampaignEmailMetrics | null }) {
     );
   }
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, maxWidth: 486 }}>
-      <StatTile label="Sent" value={email.sent.toLocaleString()} />
-      <StatTile label="Open rate" value={pct(email.openRatePct)} />
-      <StatTile label="Click rate" value={pct(email.clickRatePct)} />
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 12, maxWidth: 486 }}>
+      <BentoTile span={2} label="Sent" value={email.sent.toLocaleString()} />
+      <BentoTile span={2} label="Open rate" value={pct(email.openRatePct)} />
+      <BentoTile span={2} label="Click rate" value={pct(email.clickRatePct)} />
     </div>
   );
 }
@@ -315,6 +275,8 @@ function MetaLine({ m }: { m: CampaignMetrics }) {
       <Badge tone={STATUS_TONE[m.status] ?? "neutral"}>{m.status}</Badge>
       <Dot />
       <span>Created {formatDate(m.createdAt)}</span>
+      <Dot />
+      <span>AI build {formatCentsEur(m.aiBuildCents)}</span>
       {m.offer && (
         <>
           <Dot />
