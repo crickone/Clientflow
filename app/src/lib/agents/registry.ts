@@ -26,11 +26,13 @@ export const AGENT_CATALOG: AgentDef[] = [
     status: "active",
     defaultModel: MODELS.sonnet,
   },
-  // Sales/Marketing/Operations/Concierge CATALOG entries were retired here
-  // (single-agent product, 2026-08-25): the operator chose to show only
-  // Adonis + dormant Finance on /agents. Adonis absorbed all four agents'
-  // tools + playbooks in the prior Adonis-merge task (commit dddfa27) and
-  // does their work directly — no hand-offs. This is a catalog/UI change
+  // Sales/Marketing/Operations/Concierge/Finance CATALOG entries were retired
+  // here (single-agent product, 2026-08-25): the operator chose to show only
+  // Adonis on /agents. Adonis absorbed Sales/Marketing/Operations/Concierge's
+  // tools + playbooks in the prior Adonis-merge task (commit dddfa27) and does
+  // their work directly — no hand-offs; Finance was only ever a dormant
+  // placeholder (never built) and will be folded into Adonis later the same
+  // way. This is a catalog/UI change
   // ONLY: `specialists/{sales,marketing,operations}.ts` + their entries in
   // the `SPECIALISTS` map (./specialists/index.ts) are deliberately UNTOUCHED
   // — `specialists/orchestrator.ts` still imports SALES_SPECIALIST/
@@ -38,20 +40,12 @@ export const AGENT_CATALOG: AgentDef[] = [
   // 52-tool union (see that file's doc comment). The Concierge never had a
   // `SPECIALISTS` entry (its system/tools are computed at runtime by
   // `buildAssistantSystem`/`conciergeToolSlice`, already folded into Adonis's
-  // own toolNames the same way) — removing its catalog row here is the whole
-  // change for it. The prune loop below (`ensureAgents`) deletes all four
-  // agents' rows from every tenant DB automatically on next load — agent rows
-  // only ever originate from this catalog, so pruning a now-catalog-absent
-  // key is safe by construction, exactly like the pre-existing "e.g. SEO"
-  // prune case already documented there.
-  {
-    key: "finance",
-    name: "Finance",
-    mandate: "Guards the cash: overdue + failed payments.",
-    roles: ["Chases overdue payments", "Handles failed payments"],
-    status: "dormant",
-    defaultModel: MODELS.sonnet,
-  },
+  // own toolNames the same way) — removing its catalog row is the whole
+  // change for it. The prune loop below (`ensureAgents`) deletes all five
+  // retired agents' rows from every tenant DB automatically on next load —
+  // agent rows only ever originate from this catalog, so pruning a
+  // now-catalog-absent key is safe by construction, exactly like the
+  // pre-existing "e.g. SEO" prune case already documented there.
 ];
 
 export function ensureAgents(tenantId: number): void {

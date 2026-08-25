@@ -1,8 +1,8 @@
 // Run: npm test -- src/lib/agents/registry.test.ts
 //
 // Verifies Task 5 (agent registry): AGENT_CATALOG seeding is idempotent and
-// covers every catalog role, per-agent status defaults (orchestrator active,
-// finance dormant), the instructions mutation persists, and the model
+// covers every catalog role, per-agent status defaults (orchestrator active —
+// the only entry now), the instructions mutation persists, and the model
 // mutation persists allowed tiers while permanently rejecting Fable.
 //
 // Extended for multi-provider Task 3 (MP3): updateAgentModel's allowlist is
@@ -14,21 +14,21 @@
 // Extended for the agent-roles brief ("Roles — what this agent handles" on
 // /agents/[key]): AgentDef gained a `roles: string[]` field, catalog-only
 // metadata (like `mandate`) never written to the DB. Covers: every catalog
-// entry — active and dormant alike — has a non-empty `roles` array with no
-// blank entries.
+// entry has a non-empty `roles` array with no blank entries.
 //
 // Single-agent product (2026-08-25): AGENT_CATALOG's `sales`/`marketing`/
-// `operations`/`concierge` entries were retired — /agents now shows only
-// Adonis (`orchestrator`) + dormant Finance; Adonis absorbed all four
-// agents' tools/playbooks in the prior Adonis-merge task (commit dddfa27).
-// This removed the generic active-agent role "sales" used to play in the
-// mutation checks below (instructions/model persistence, Fable rejection,
-// OpenRouter catalog ids) — `orchestrator` plays it now, since it's the only
-// active entry left. It also removed the first-class-Concierge coverage this
-// file used to carry in full (concierge seeding active with a model,
-// surviving a second `ensureAgents` call, per-agent `updateAgentModel`) —
-// that behaviour is gone along with the Concierge's own `agents` row/card,
-// so it's replaced below by an assertion that the 4 retired keys are neither
+// `operations`/`concierge` entries were retired, and then Finance too —
+// /agents now shows ONLY Adonis (`orchestrator`); Adonis absorbed the first
+// four agents' tools/playbooks in the prior Adonis-merge task (commit
+// dddfa27), and Finance (only ever a dormant placeholder, never built) will
+// be folded in later. This removed the generic active-agent role "sales" used
+// to play in the mutation checks below (instructions/model persistence, Fable
+// rejection, OpenRouter catalog ids) — `orchestrator` plays it now, since
+// it's the only entry left. It also removed the first-class-Concierge
+// coverage this file used to carry in full (concierge seeding active with a
+// model, surviving a second `ensureAgents` call, per-agent `updateAgentModel`)
+// — that behaviour is gone along with the Concierge's own `agents` row/card,
+// so it's replaced below by an assertion that the 5 retired keys are neither
 // in AGENT_CATALOG nor seed a row at all. The status-reconcile check
 // (originally keyed on "marketing", covering a tenant row seeded under an
 // older catalog with a stale `status`) now uses "orchestrator" — the same
@@ -113,14 +113,13 @@ const requireLocal = createRequire(import.meta.url);
 
   try {
     // ── roles metadata (agent-roles-brief: "Roles — what this agent handles"
-    // on /agents/[key]): every catalog entry — active AND dormant, Finance
-    // still has roles, it's just not currently running — carries a
-    // non-empty, plain-English `roles` array with no blank entries. Plain
-    // data, no DB/tenant needed; also proves the AgentDef interface change
-    // (adding `roles: string[]`) compiles. `roles` is catalog-only metadata
-    // like `mandate` — never written to the DB (see ensureAgents' insert/
-    // patch below, which only ever touches key/name/status/model/
-    // instructions) — so this static check is the only coverage it needs. ──
+    // on /agents/[key]): every catalog entry carries a non-empty, plain-
+    // English `roles` array with no blank entries. Plain data, no DB/tenant
+    // needed; also proves the AgentDef interface change (adding
+    // `roles: string[]`) compiles. `roles` is catalog-only metadata like
+    // `mandate` — never written to the DB (see ensureAgents' insert/patch
+    // below, which only ever touches key/name/status/model/instructions) — so
+    // this static check is the only coverage it needs. ──
     for (const a of AGENT_CATALOG) {
       assert.ok(Array.isArray(a.roles) && a.roles.length > 0, `AGENT_CATALOG["${a.key}"].roles is a non-empty array`);
       for (const role of a.roles) {
@@ -134,7 +133,7 @@ const requireLocal = createRequire(import.meta.url);
     // getTenantDbById(tid) must actually resolve the scratch tenant.
     assert.ok(getTenantDbById(tid), "getTenantDbById resolves the scratch tenant");
 
-    // ── seeds the whole AGENT_CATALOG once (idempotent), orchestrator active / finance dormant ──
+    // ── seeds the whole AGENT_CATALOG once (idempotent); orchestrator is the sole entry, active ──
     ensureAgents(tid);
     ensureAgents(tid); // calling twice must not duplicate rows or throw
     const all = listAgents(tid);
@@ -145,14 +144,13 @@ const requireLocal = createRequire(import.meta.url);
       "listAgents returns exactly the AGENT_CATALOG keys, one row each",
     );
     assert.equal(getAgent(tid, "orchestrator")!.status, "active");
-    assert.equal(getAgent(tid, "finance")!.status, "dormant");
 
     // ── single-agent product (2026-08-25): sales/marketing/operations/
-    // concierge are retired — not in AGENT_CATALOG, and (the real proof, not
-    // just a catalog-shape check) ensureAgents never seeds a row for any of
-    // them, so /agents can never resurface one of their cards from a
-    // leftover DB row either ──
-    for (const retiredKey of ["sales", "marketing", "operations", "concierge"]) {
+    // concierge — and now Finance — are retired: not in AGENT_CATALOG, and
+    // (the real proof, not just a catalog-shape check) ensureAgents never
+    // seeds a row for any of them, so /agents can never resurface one of
+    // their cards from a leftover DB row either ──
+    for (const retiredKey of ["sales", "marketing", "operations", "concierge", "finance"]) {
       assert.ok(!AGENT_CATALOG.some((a) => a.key === retiredKey), `${retiredKey} is not an AGENT_CATALOG entry`);
       assert.equal(getAgent(tid, retiredKey), undefined, `${retiredKey} has no seeded agent row`);
     }
@@ -252,15 +250,6 @@ const requireLocal = createRequire(import.meta.url);
       orchestratorRow.model,
       "claude-opus-4-8",
       "ensureAgents' status reconcile does NOT touch tenant-owned model",
-    );
-
-    // Finance was already correct ("dormant") throughout — the reconcile
-    // must be a no-op for rows that already match the catalog, not just
-    // harmless for the one row that changed.
-    assert.equal(
-      getAgent(tid, "finance")!.status,
-      "dormant",
-      "finance status is untouched by the orchestrator reconcile",
     );
 
     // ── prune (single-agent product, 2026-08-25): a tenant whose row was

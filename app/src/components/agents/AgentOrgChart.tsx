@@ -2,7 +2,7 @@
 
 import { type CSSProperties } from "react";
 import Link from "next/link";
-import { Bot, Wallet, Workflow } from "lucide-react";
+import { Bot, Workflow } from "lucide-react";
 
 import { Card, CardLabel } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -26,8 +26,8 @@ interface Props {
  * `server-only` (DB access) and this component runs on the client.
  *
  * Single-agent product (2026-08-25): AGENT_CATALOG now holds only
- * "orchestrator" (Adonis) + dormant "finance" — the Sales/Marketing/
- * Operations/Concierge entries were retired (see registry.ts's doc comment).
+ * "orchestrator" (Adonis) — the Sales/Marketing/Operations/Concierge and the
+ * dormant Finance entries were all retired (see registry.ts's doc comment).
  * This map is trimmed to match: it's rendered by keying off whatever agents
  * `listAgents()` actually returns (below), never a hardcoded key list, so a
  * removed catalog key can't leave a dangling node here — only a dangling
@@ -36,20 +36,20 @@ interface Props {
  */
 const MANDATE: Record<string, string> = {
   orchestrator: "Your all-in-one assistant — handles leads, marketing, operations and admin directly.",
-  finance: "Guards the cash: overdue + failed payments.",
 };
 
 /** Per-agent icon — purely presentational, keyed by agent key. Kept in sync with MANDATE/AGENT_CATALOG above. */
 const ICON: Record<string, typeof Bot> = {
   orchestrator: Workflow,
-  finance: Wallet,
 };
 
 /**
  * The "AI staff org chart": one Orchestrator node on top, with every other
- * agent `listAgents()` returns (today: just dormant Finance) below it in a
- * responsive grid, connected by SVG lines so the whole thing reads as a
- * hierarchy rather than a list or table. The set of non-Orchestrator (the
+ * agent `listAgents()` returns below it in a responsive grid, connected by
+ * SVG lines so the whole thing reads as a hierarchy rather than a list or
+ * table. Today the roster is just Adonis (the Sales/Marketing/Operations/
+ * Concierge + Finance entries were retired), so there are no sub-agent cards
+ * and the connector block is skipped — but the set of non-Orchestrator (the
  * "specialist" variant, below) cards is driven entirely by the `agents` prop
  * — never a hardcoded key list — so it tracks AGENT_CATALOG automatically as
  * agents are added or retired.
@@ -154,32 +154,37 @@ export function AgentOrgChart({ agents, usageByAgent, usageByModel, capCents, mo
           />
         )}
 
-        {/* Decorative connectors: a fan-out SVG at wide viewports (synced to
-            the fixed 5-column grid below), collapsing to a single trunk line
-            once the grid reflows and per-card x-positions are no longer
-            known. Either way it sits behind the cards (z-index 0). */}
-        <div className="agent-orgchart-links" aria-hidden="true">
-          <svg
-            className="agent-orgchart-svg"
-            viewBox="0 0 100 48"
-            preserveAspectRatio="none"
-          >
-            {specialists.map((s, i) => {
-              const x = ((i + 0.5) / specialists.length) * 100;
-              return (
-                <path
-                  key={s.key}
-                  d={`M 50 0 C 50 24, ${x} 20, ${x} 48`}
-                  fill="none"
-                  stroke="var(--hairline)"
-                  strokeWidth={1}
-                  vectorEffect="non-scaling-stroke"
-                />
-              );
-            })}
-          </svg>
-          <div className="agent-orgchart-trunk" />
-        </div>
+        {/* Decorative connectors (only when there ARE sub-agents below the
+            Orchestrator): a fan-out SVG at wide viewports (synced to the fixed
+            5-column grid below), collapsing to a single trunk line once the
+            grid reflows and per-card x-positions are no longer known. Either
+            way it sits behind the cards (z-index 0). With a single-agent
+            roster (just Adonis) there's nothing to connect, so the whole block
+            is skipped — no trunk line left dangling above an empty grid. */}
+        {specialists.length > 0 && (
+          <div className="agent-orgchart-links" aria-hidden="true">
+            <svg
+              className="agent-orgchart-svg"
+              viewBox="0 0 100 48"
+              preserveAspectRatio="none"
+            >
+              {specialists.map((s, i) => {
+                const x = ((i + 0.5) / specialists.length) * 100;
+                return (
+                  <path
+                    key={s.key}
+                    d={`M 50 0 C 50 24, ${x} 20, ${x} 48`}
+                    fill="none"
+                    stroke="var(--hairline)"
+                    strokeWidth={1}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                );
+              })}
+            </svg>
+            <div className="agent-orgchart-trunk" />
+          </div>
+        )}
 
         <div className="agent-orgchart-grid" style={{ "--cols": specialists.length } as CSSProperties}>
           {/* Each specialist card is a STANDALONE Reveal (fades/rises on

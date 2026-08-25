@@ -228,10 +228,13 @@ const requireLocal = createRequire(import.meta.url);
       "Cannot delegate to orchestrator.",
       "delegating to \"orchestrator\" is rejected — the DELEGATABLE guard names the rejected target",
     );
-    // A dormant, non-specialist AGENT_CATALOG key (finance): also outside
-    // DELEGATABLE, so rejected the same way — never even reaches getAgent.
+    // "finance" — a former catalog key, retired in the single-agent product
+    // (2026-08-25): the DELEGATABLE guard is a static allowlist that never
+    // consults AGENT_CATALOG, so whether "finance" is a live entry, a dormant
+    // one, or fully retired (as now), it's outside DELEGATABLE and rejected
+    // the same way — never even reaching getAgent.
     const toFinance = JSON.parse((await delegateTo("finance", ctx, { task: "do something" })).text);
-    assert.equal(toFinance.error, "Cannot delegate to finance.", "a non-DELEGATABLE catalog key is rejected the same way");
+    assert.equal(toFinance.error, "Cannot delegate to finance.", "a non-DELEGATABLE key is rejected the same way");
     // A key that isn't in AGENT_CATALOG at all.
     const toBogus = JSON.parse((await delegateTo("bogus", ctx, { task: "do something" })).text);
     assert.equal(toBogus.error, "Cannot delegate to bogus.", "an unknown key is rejected by the same guard");

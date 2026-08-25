@@ -219,12 +219,12 @@ const requireLocal = createRequire(import.meta.url);
   }
   assert.ok(
     SPECIALISTS.orchestrator.basePlaybook.includes(
-      "you never execute a write yourself",
+      "you never send or save it yourself",
     ),
     "ORCHESTRATOR_SPECIALIST.basePlaybook contains the required honesty line about never executing a write itself",
   );
   assert.ok(
-    SPECIALISTS.orchestrator.basePlaybook.includes("no routing, no hand-offs"),
+    SPECIALISTS.orchestrator.basePlaybook.includes("you're the whole team in one"),
     "ORCHESTRATOR_SPECIALIST.basePlaybook states its direct-work framing (no routing hop) up front",
   );
   for (const [key, spec] of Object.entries(SPECIALISTS)) {
