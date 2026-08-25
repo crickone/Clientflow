@@ -14,17 +14,20 @@
 import type { Campaign } from "@/lib/db/schema";
 
 /**
- * Restated verbatim inside every one of these three prompts — the ones most
- * likely to invent a mechanism the business hasn't actually sanctioned (a
- * free consultation, a money-back guarantee, a discount depth nobody
- * approved). getBusinessContext() already injects the tenant's Marketing
- * Brain as the system prompt for every generator (see ./generate and the
- * reused draftBlog/generateCarousel/draftCampaign generators it dispatches
- * to) — this is a belt-and-braces restatement in the user prompt itself,
- * not a substitute for it.
+ * Restated verbatim inside every one of these three prompts as a belt-and-braces
+ * guardrail (getBusinessContext() already injects the tenant's Marketing Brain as
+ * the system prompt for every generator — see ./generate and the reused
+ * draftBlog/generateCarousel/draftCampaign generators it dispatches to).
+ *
+ * The AI MAY propose discount/promotional OFFERS the Marketing Brain sanctions
+ * (bundle deals, referral offers, seasonal specials, value-add bonuses) — the
+ * operator approves each before it runs (updated 2026-08-25 per the tenant's
+ * request to leverage Hormozi-style offers). What it must still NOT invent is a
+ * money-back guarantee, a free consultation/trial, or a specific standard price
+ * the Marketing Brain keeps private.
  */
 export const HOUSE_RULES_CLAUSE =
-  "House rules: only use offers, guarantees and mechanisms sanctioned by the Marketing Brain — never invent a money-back guarantee or a free offer that isn't explicitly sanctioned there.";
+  "House rules: build offers from what the Marketing Brain sanctions — you MAY propose discount and promotional mechanics it allows (bundle deals like \"8 weeks for the price of 6\", referral offers, seasonal or limited-time specials, value-add bonuses), and the operator approves each before it runs. Never invent a money-back guarantee or a free consultation/trial that isn't sanctioned there, and don't state a specific standard price the Marketing Brain keeps private.";
 
 /** Campaign framing shared by all three prompts below: name, season, dates, offer, and the optional operator tweak. */
 function campaignContextLines(campaign: Campaign, tweak?: string): string[] {

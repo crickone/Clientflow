@@ -64,7 +64,7 @@ Formatting:
 - Plain text only. No markdown, no emojis.
 - 2-4 short sentences: what the offer actually is, what's included, and any dates or terms that matter.
 - Be concrete and specific — a reader should know exactly what they get and how to claim it.
-- Do not invent a discount, guarantee, bonus or deadline beyond what you've been given.
+- You MAY design a promotional offer using mechanics the Marketing Brain sanctions — a value bundle (e.g. "8 weeks for the price of 6"), a referral offer, a seasonal or limited-time special, or a value-add bonus. Build it Hormozi-style: lead with the outcome and stack the value, then sweeten with the deal and a reason to act now. The operator approves the offer before it runs. Do NOT invent a money-back guarantee or a free consultation/trial the Marketing Brain hasn't sanctioned, and do NOT state a specific standard price it keeps private — express the deal as the mechanic (a ratio, a % off, weeks free), not the underlying price list.
 
 Output format:
 - Return ONLY the offer description. No heading, no preamble, no notes about the writing process.`;
@@ -80,7 +80,7 @@ Formatting:
 - ctaLabel: always exactly "Sign up" — never a price, a booking action, or a guarantee.
 - metaTitle: search-engine page title, 60 characters or fewer, names the offer or business, compelling but never clickbait.
 - metaDescription: search-engine snippet, 155 characters or fewer, benefit-led, reads as a natural search-result snippet — not just a repeat of the headline.
-- Do not invent a discount, guarantee, bonus or deadline beyond what you've been given.
+- Represent the campaign's offer faithfully — don't add discounts, guarantees, bonuses or deadlines the offer doesn't already state, and don't publish a specific standard price.
 
 Output format:
 - Return ONLY the JSON object described above. No heading, no preamble, no code fences, no notes about the writing process.`;
@@ -93,7 +93,7 @@ Formatting:
     Headline: (short and attention-grabbing, under 40 characters)
     Primary text: (2-4 short sentences, scannable, builds on the headline)
     CTA: (one short call to action, e.g. "Book your first session")
-- Do not invent a discount, guarantee, bonus or deadline beyond what you've been given.
+- Represent the campaign's offer faithfully — don't add discounts, guarantees, bonuses or deadlines the offer doesn't already state, and don't publish a specific standard price.
 
 Output format:
 - Return ONLY the three labelled lines above. No extra preamble or sign-off.`;
@@ -106,7 +106,7 @@ Formatting:
     1. [on-screen / voiceover direction] Line of dialogue or narration.
 - Open with a hook in beat 1, develop 2-3 beats grounded in the offer, and close with a clear call to action naming the business.
 - Keep total narration tight enough to fit 30-45 seconds (roughly 70-110 words of spoken narration).
-- Do not invent a discount, guarantee, bonus or deadline beyond what you've been given.
+- Represent the campaign's offer faithfully — don't add discounts, guarantees, bonuses or deadlines the offer doesn't already state, and don't publish a specific standard price.
 
 Output format:
 - Return ONLY the numbered beat list. No heading, no preamble, no notes about the writing process.`;

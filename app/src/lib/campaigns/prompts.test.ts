@@ -18,9 +18,13 @@ function check(name: string, cond: boolean) {
   console.log("  ✓", name);
 }
 
-// Verbatim substring the spec requires HOUSE_RULES_CLAUSE to carry.
-const HOUSE_RULES_SUBSTRING =
-  "only use offers, guarantees and mechanisms sanctioned by the Marketing Brain — never invent a money-back guarantee or a free offer";
+// Verbatim substrings the policy requires HOUSE_RULES_CLAUSE to carry: it now
+// PERMITS proposing sanctioned discount/promotional offers (2026-08-25 policy
+// change), while still banning invented money-back guarantees / free consults.
+const HOUSE_RULES_ALLOWS_OFFERS =
+  "you MAY propose discount and promotional mechanics it allows";
+const HOUSE_RULES_BANS =
+  "Never invent a money-back guarantee or a free consultation/trial";
 
 const campaign: Campaign = {
   id: 1,
@@ -37,8 +41,12 @@ const campaign: Campaign = {
 };
 
 check(
-  "HOUSE_RULES_CLAUSE carries the verbatim house-rule substring",
-  HOUSE_RULES_CLAUSE.includes(HOUSE_RULES_SUBSTRING),
+  "HOUSE_RULES_CLAUSE permits proposing sanctioned discount/promotional offers",
+  HOUSE_RULES_CLAUSE.includes(HOUSE_RULES_ALLOWS_OFFERS),
+);
+check(
+  "HOUSE_RULES_CLAUSE still bans invented money-back guarantees / free consultations",
+  HOUSE_RULES_CLAUSE.includes(HOUSE_RULES_BANS),
 );
 
 const builders: Array<[string, (c: Campaign, tweak?: string) => string]> = [
