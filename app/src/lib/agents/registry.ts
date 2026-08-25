@@ -26,69 +26,24 @@ export const AGENT_CATALOG: AgentDef[] = [
     status: "active",
     defaultModel: MODELS.sonnet,
   },
-  {
-    key: "sales",
-    name: "Sales",
-    mandate: "Works leads: instant replies + relentless follow-up.",
-    roles: [
-      "Replies to new leads instantly",
-      "Follows up relentlessly until they book or opt out",
-      "Moves leads through the pipeline",
-      "Books calls and assessments",
-      "Wins back leads who've gone quiet",
-    ],
-    status: "active",
-    defaultModel: MODELS.sonnet,
-  },
-  {
-    key: "marketing",
-    name: "Marketing",
-    mandate: "Runs the Marketing Brain: campaigns + social.",
-    roles: [
-      "Builds seasonal campaigns from your Marketing Brain",
-      "Proposes offers and promotions",
-      "Drafts blog, social and email content",
-      "Flags what to run next (seasonal radar)",
-    ],
-    status: "active",
-    defaultModel: MODELS.sonnet,
-  },
-  {
-    key: "operations",
-    name: "Operations",
-    mandate: "No-shows, class fill, attendance, admin.",
-    roles: [
-      "Chases no-shows",
-      "Fills classes and tracks attendance",
-      "Handles day-to-day admin",
-      "Keeps the schedule moving",
-    ],
-    status: "active",
-    defaultModel: MODELS.sonnet,
-  },
-  // First-class Concierge (.superpowers/sdd/concierge-agent-brief.md): the
-  // general-purpose worker the Orchestrator's `delegate_to_concierge` tool
-  // hands off to (@/lib/agents/tools.orchestrator) for everything outside
-  // Sales/Marketing/Operations. Unlike those three it has no fixed
-  // `SPECIALISTS` playbook/tool slice — its system + tools are computed at
-  // RUNTIME by `buildAssistantSystem`/`conciergeToolSlice` — but it gets a
-  // real row here so it gets its own card/org-chart node, model picker, and
-  // editable instructions exactly like every other active agent. Seeded by
-  // the loop below for every tenant (new + existing, on next `ensureAgents`
-  // call) and never pruned, same as any other catalog entry.
-  {
-    key: "concierge",
-    name: "Concierge",
-    mandate: "Inbox/email + WhatsApp, invoices & money, nutrition/workout plans, admin.",
-    roles: [
-      "Combined inbox — email + WhatsApp",
-      "Invoices and money",
-      "Nutrition and workout plans",
-      "General admin and anything else",
-    ],
-    status: "active",
-    defaultModel: MODELS.sonnet,
-  },
+  // Sales/Marketing/Operations/Concierge CATALOG entries were retired here
+  // (single-agent product, 2026-08-25): the operator chose to show only
+  // Adonis + dormant Finance on /agents. Adonis absorbed all four agents'
+  // tools + playbooks in the prior Adonis-merge task (commit dddfa27) and
+  // does their work directly — no hand-offs. This is a catalog/UI change
+  // ONLY: `specialists/{sales,marketing,operations}.ts` + their entries in
+  // the `SPECIALISTS` map (./specialists/index.ts) are deliberately UNTOUCHED
+  // — `specialists/orchestrator.ts` still imports SALES_SPECIALIST/
+  // MARKETING_SPECIALIST/OPERATIONS_SPECIALIST to build Adonis's deduplicated
+  // 52-tool union (see that file's doc comment). The Concierge never had a
+  // `SPECIALISTS` entry (its system/tools are computed at runtime by
+  // `buildAssistantSystem`/`conciergeToolSlice`, already folded into Adonis's
+  // own toolNames the same way) — removing its catalog row here is the whole
+  // change for it. The prune loop below (`ensureAgents`) deletes all four
+  // agents' rows from every tenant DB automatically on next load — agent rows
+  // only ever originate from this catalog, so pruning a now-catalog-absent
+  // key is safe by construction, exactly like the pre-existing "e.g. SEO"
+  // prune case already documented there.
   {
     key: "finance",
     name: "Finance",

@@ -18,10 +18,10 @@ export type { CampaignSeed } from "./buildCampaignSeed";
 export { buildCampaignSeedHref, campaignSeedStarterMessage } from "./buildCampaignSeed";
 
 /**
- * The seed-carrying CTA — a plain link (no client JS needed) to the
- * Marketing agent chat, pre-loaded with a suggested campaign. Renders
- * wherever a suggested campaign appears in SeasonalCalendar.tsx: the
- * coming-up radar rail, an unbuilt catalog date, and an empty month.
+ * The seed-carrying CTA — a plain link (no client JS needed) to Adonis's
+ * chat, pre-loaded with a suggested campaign. Renders wherever a suggested
+ * campaign appears in SeasonalCalendar.tsx: the coming-up radar rail, an
+ * unbuilt catalog date, and an empty month.
  *
  * `iconOnly` renders just the icon (for dense per-date rows where a full
  * label would clutter the cell) with the label moved to `title`/`aria-label`

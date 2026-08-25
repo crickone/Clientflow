@@ -1,9 +1,9 @@
 // Run: npm test -- src/lib/agents/registry.test.ts
 //
 // Verifies Task 5 (agent registry): AGENT_CATALOG seeding is idempotent and
-// covers every catalog role, per-agent status defaults (sales active, finance
-// dormant), the instructions mutation persists, and the model mutation
-// persists allowed tiers while permanently rejecting Fable.
+// covers every catalog role, per-agent status defaults (orchestrator active,
+// finance dormant), the instructions mutation persists, and the model
+// mutation persists allowed tiers while permanently rejecting Fable.
 //
 // Extended for multi-provider Task 3 (MP3): updateAgentModel's allowlist is
 // now MODEL_CATALOG (@/lib/ai/modelCatalog) itself, not a hand-maintained
@@ -11,20 +11,29 @@
 // catalog id, and still reject anything NOT in the catalog (Fable, and any
 // other unknown id).
 //
-// Extended for the first-class-Concierge task
-// (.superpowers/sdd/concierge-agent-brief.md, Requirement 1): the Concierge
-// is now a real AGENT_CATALOG entry (previously it had no `agents` row at
-// all — see .superpowers/sdd/concierge-task-1-brief.md). Covers: it seeds
-// active with a model, its model/instructions persist and survive a second
-// `ensureAgents` call (idempotent — not reset, not duplicated, not pruned),
-// and `updateAgentModel` accepts/rejects models for it exactly like every
-// other agent.
-//
 // Extended for the agent-roles brief ("Roles — what this agent handles" on
 // /agents/[key]): AgentDef gained a `roles: string[]` field, catalog-only
 // metadata (like `mandate`) never written to the DB. Covers: every catalog
 // entry — active and dormant alike — has a non-empty `roles` array with no
 // blank entries.
+//
+// Single-agent product (2026-08-25): AGENT_CATALOG's `sales`/`marketing`/
+// `operations`/`concierge` entries were retired — /agents now shows only
+// Adonis (`orchestrator`) + dormant Finance; Adonis absorbed all four
+// agents' tools/playbooks in the prior Adonis-merge task (commit dddfa27).
+// This removed the generic active-agent role "sales" used to play in the
+// mutation checks below (instructions/model persistence, Fable rejection,
+// OpenRouter catalog ids) — `orchestrator` plays it now, since it's the only
+// active entry left. It also removed the first-class-Concierge coverage this
+// file used to carry in full (concierge seeding active with a model,
+// surviving a second `ensureAgents` call, per-agent `updateAgentModel`) —
+// that behaviour is gone along with the Concierge's own `agents` row/card,
+// so it's replaced below by an assertion that the 4 retired keys are neither
+// in AGENT_CATALOG nor seed a row at all. The status-reconcile check
+// (originally keyed on "marketing", covering a tenant row seeded under an
+// older catalog with a stale `status`) now uses "orchestrator" — the same
+// generic mechanism, just replayed against a key that's still in the
+// catalog to reconcile against.
 //
 // NOTE: this repo does NOT use vitest — tests are plain node:assert/strict
 // scripts run via `npm test -- <path>` (see scripts/test.mjs). This mirrors
@@ -125,7 +134,7 @@ const requireLocal = createRequire(import.meta.url);
     // getTenantDbById(tid) must actually resolve the scratch tenant.
     assert.ok(getTenantDbById(tid), "getTenantDbById resolves the scratch tenant");
 
-    // ── seeds the whole AGENT_CATALOG once (idempotent), sales active / finance dormant ──
+    // ── seeds the whole AGENT_CATALOG once (idempotent), orchestrator active / finance dormant ──
     ensureAgents(tid);
     ensureAgents(tid); // calling twice must not duplicate rows or throw
     const all = listAgents(tid);
@@ -135,41 +144,39 @@ const requireLocal = createRequire(import.meta.url);
       [...AGENT_CATALOG.map((a) => a.key)].sort(),
       "listAgents returns exactly the AGENT_CATALOG keys, one row each",
     );
-    assert.equal(getAgent(tid, "sales")!.status, "active");
+    assert.equal(getAgent(tid, "orchestrator")!.status, "active");
     assert.equal(getAgent(tid, "finance")!.status, "dormant");
 
-    // ── first-class Concierge (Requirement 1): seeded ACTIVE, with a real
-    // model — unlike every other agent above, before this task it had NO
-    // `agents` row at all (getAgent(tid, "concierge") returned undefined) ──
-    const concierge = getAgent(tid, "concierge");
-    assert.equal(concierge?.status, "active", "concierge seeds as an active agent, not dormant");
-    assert.ok(concierge?.model, "concierge is seeded with a (non-empty) model");
-    assert.equal(
-      concierge!.model,
-      MODELS.sonnet,
-      "concierge defaults to the same default model (MODELS.sonnet) as the other active specialists",
-    );
+    // ── single-agent product (2026-08-25): sales/marketing/operations/
+    // concierge are retired — not in AGENT_CATALOG, and (the real proof, not
+    // just a catalog-shape check) ensureAgents never seeds a row for any of
+    // them, so /agents can never resurface one of their cards from a
+    // leftover DB row either ──
+    for (const retiredKey of ["sales", "marketing", "operations", "concierge"]) {
+      assert.ok(!AGENT_CATALOG.some((a) => a.key === retiredKey), `${retiredKey} is not an AGENT_CATALOG entry`);
+      assert.equal(getAgent(tid, retiredKey), undefined, `${retiredKey} has no seeded agent row`);
+    }
 
     // ── persists edited instructions ──
-    updateAgentInstructions(tid, "sales", "Always mention the 7-day trial.");
+    updateAgentInstructions(tid, "orchestrator", "Always mention the 7-day trial.");
     assert.ok(
-      getAgent(tid, "sales")!.instructions.includes("7-day trial"),
+      getAgent(tid, "orchestrator")!.instructions.includes("7-day trial"),
       "updateAgentInstructions persists the new text",
     );
 
     // ── model mutation: allowed tiers persist ──
-    updateAgentModel(tid, "sales", MODELS.opus);
-    assert.equal(getAgent(tid, "sales")!.model, MODELS.opus, "updateAgentModel persists an allowed model");
+    updateAgentModel(tid, "orchestrator", MODELS.opus);
+    assert.equal(getAgent(tid, "orchestrator")!.model, MODELS.opus, "updateAgentModel persists an allowed model");
 
     // ── NEVER Fable: an unsupported model id is rejected, and the previous
     // (already-mutated) model is left untouched by the rejected attempt ──
     assert.throws(
-      () => updateAgentModel(tid, "sales", "claude-fable-5"),
+      () => updateAgentModel(tid, "orchestrator", "claude-fable-5"),
       /Unsupported model/,
       "updateAgentModel throws on a non-allowlisted model (Fable guard)",
     );
     assert.equal(
-      getAgent(tid, "sales")!.model,
+      getAgent(tid, "orchestrator")!.model,
       MODELS.opus,
       "rejected model update did not mutate the row",
     );
@@ -180,117 +187,105 @@ const requireLocal = createRequire(import.meta.url);
     // catalog must still be rejected (not just Fable specifically) ──
     const openRouterEntry = MODEL_CATALOG.find((m) => m.provider === "openrouter");
     assert.ok(openRouterEntry, "MODEL_CATALOG has an OpenRouter (DeepSeek) entry to test against");
-    updateAgentModel(tid, "sales", openRouterEntry!.id);
+    updateAgentModel(tid, "orchestrator", openRouterEntry!.id);
     assert.equal(
-      getAgent(tid, "sales")!.model,
+      getAgent(tid, "orchestrator")!.model,
       openRouterEntry!.id,
       "updateAgentModel persists the DeepSeek/OpenRouter catalog id",
     );
     assert.throws(
-      () => updateAgentModel(tid, "sales", "not-a-real-model-id"),
+      () => updateAgentModel(tid, "orchestrator", "not-a-real-model-id"),
       /Unsupported model/,
       "updateAgentModel throws on an id that is in neither the catalog nor any legacy allowlist",
     );
     assert.equal(
-      getAgent(tid, "sales")!.model,
+      getAgent(tid, "orchestrator")!.model,
       openRouterEntry!.id,
       "rejected unknown-model update did not mutate the row",
     );
 
-    // ── first-class Concierge (Requirement 4): updateAgentModel works for it
-    // exactly like every other agent — it already calls the SAME generic
-    // function, gated only by the SAME MODEL_CATALOG allowlist, with no
-    // per-key special-casing anywhere in registry.ts ──
-    updateAgentModel(tid, "concierge", MODELS.opus);
-    assert.equal(getAgent(tid, "concierge")!.model, MODELS.opus, "updateAgentModel persists an allowed model for concierge");
-    updateAgentModel(tid, "concierge", openRouterEntry!.id);
-    assert.equal(
-      getAgent(tid, "concierge")!.model,
-      openRouterEntry!.id,
-      "updateAgentModel persists the DeepSeek/OpenRouter catalog id for concierge too (Requirement 4 — OpenRouter models like Kimi)",
-    );
-    assert.throws(
-      () => updateAgentModel(tid, "concierge", "claude-fable-5"),
-      /Unsupported model/,
-      "updateAgentModel rejects a non-catalog model for concierge (Fable guard applies here too)",
-    );
-    assert.equal(
-      getAgent(tid, "concierge")!.model,
-      openRouterEntry!.id,
-      "rejected model update did not mutate the concierge row",
-    );
-
-    // ── first-class Concierge (Requirement 1): survives a second
-    // ensureAgents call — tenant-owned model/instructions are neither reset
-    // to catalog defaults nor duplicated into a second row, and the row is
-    // NOT pruned (the prune pass only deletes rows whose key is missing from
-    // AGENT_CATALOG; concierge is now a permanent member of it) ──
-    updateAgentInstructions(tid, "concierge", "CONCIERGE-KEEP-ME");
-    ensureAgents(tid); // the function under test, called again on an already-seeded tenant
-    const concierges = listAgents(tid).filter((a) => a.key === "concierge");
-    assert.equal(concierges.length, 1, "ensureAgents does not duplicate the concierge row on a second call");
-    const conciergeAfter = getAgent(tid, "concierge")!;
-    assert.equal(conciergeAfter.status, "active", "concierge is not pruned/reset by a second ensureAgents call");
-    assert.equal(conciergeAfter.model, openRouterEntry!.id, "a second ensureAgents call does not reset concierge's model");
-    assert.equal(
-      conciergeAfter.instructions,
-      "CONCIERGE-KEEP-ME",
-      "a second ensureAgents call does not reset concierge's instructions",
-    );
-
-    // ── status-reconcile (Marketing Task 2): AGENT_CATALOG is the single
-    // source of truth for `status` — there is no UI/API to change it
-    // directly (unlike instructions/model above), so a tenant whose row was
-    // seeded under an OLDER catalog (Marketing used to default to "dormant")
-    // needs ensureAgents to bring status in line on every call. Force the
-    // marketing row back to a stale "dormant" via a raw update — bypassing
-    // ensureAgents entirely — and set distinctive tenant-owned
-    // instructions/model, so the assertions below can prove the reconcile
-    // touches ONLY `status` and leaves those two alone. ──
-    const marketingTenantDb = getTenantDbById(tid);
-    marketingTenantDb
+    // ── status-reconcile: AGENT_CATALOG is the single source of truth for
+    // `status` — there is no UI/API to change it directly (unlike
+    // instructions/model above), so a tenant whose row was seeded under an
+    // OLDER catalog needs ensureAgents to bring status in line on every
+    // call. Force the orchestrator row back to a stale "dormant" via a raw
+    // update — bypassing ensureAgents entirely — and set distinctive
+    // tenant-owned instructions/model, so the assertions below can prove the
+    // reconcile touches ONLY `status` and leaves those two alone. (This used
+    // to force "marketing" dormant — Marketing was dormant before it went
+    // live — but marketing is retired from AGENT_CATALOG now, below, so
+    // orchestrator stands in: registry.ts's own comment notes its real
+    // history includes exactly this kind of reconcile, having been renamed
+    // from "Orchestrator" to "Adonis".) ──
+    const reconcileTenantDb = getTenantDbById(tid);
+    reconcileTenantDb
       .update(agents)
       .set({ status: "dormant", instructions: "KEEP ME", model: "claude-opus-4-8" })
-      .where(eq(agents.key, "marketing"))
+      .where(eq(agents.key, "orchestrator"))
       .run();
     // Confirm the forced write landed by reading the raw row DIRECTLY —
     // deliberately NOT via getAgent()/listAgents(), since both call
     // ensureAgents() as their first line and would immediately reconcile
     // status back to "active" before this setup check ever ran, defeating
     // the point of it.
-    const beforeReconcile = marketingTenantDb.select().from(agents).where(eq(agents.key, "marketing")).get();
+    const beforeReconcile = reconcileTenantDb.select().from(agents).where(eq(agents.key, "orchestrator")).get();
     assert.equal(
       beforeReconcile?.status,
       "dormant",
-      "setup: marketing row forced back to a stale \"dormant\" directly (bypassing ensureAgents)",
+      "setup: orchestrator row forced back to a stale \"dormant\" directly (bypassing ensureAgents)",
     );
 
     ensureAgents(tid); // the function under test — must reconcile the stale row above
 
-    const marketing = getAgent(tid, "marketing")!;
+    const orchestratorRow = getAgent(tid, "orchestrator")!;
     assert.equal(
-      marketing.status,
+      orchestratorRow.status,
       "active",
-      "ensureAgents reconciles an existing row's status to match AGENT_CATALOG (marketing dormant -> active)",
+      "ensureAgents reconciles an existing row's status to match AGENT_CATALOG (dormant -> active)",
     );
     assert.equal(
-      marketing.instructions,
+      orchestratorRow.instructions,
       "KEEP ME",
       "ensureAgents' status reconcile does NOT touch tenant-owned instructions",
     );
     assert.equal(
-      marketing.model,
+      orchestratorRow.model,
       "claude-opus-4-8",
       "ensureAgents' status reconcile does NOT touch tenant-owned model",
     );
 
-    // Sales was already correct ("active") throughout — the reconcile must
-    // be a no-op for rows that already match the catalog, not just harmless
-    // for the one row that changed.
+    // Finance was already correct ("dormant") throughout — the reconcile
+    // must be a no-op for rows that already match the catalog, not just
+    // harmless for the one row that changed.
     assert.equal(
-      getAgent(tid, "sales")!.status,
-      "active",
-      "sales status is untouched by the marketing reconcile",
+      getAgent(tid, "finance")!.status,
+      "dormant",
+      "finance status is untouched by the orchestrator reconcile",
+    );
+
+    // ── prune (single-agent product, 2026-08-25): a tenant whose row was
+    // seeded under an OLDER catalog that still had "marketing" (or sales/
+    // operations/concierge) keeps a stale row the seed loop above never
+    // deletes on its own — that's what the prune pass at the bottom of
+    // ensureAgents is for. Simulate that by raw-inserting a "marketing" row
+    // directly (ensureAgents itself would never create one for a
+    // catalog-absent key — that's the retired-keys check earlier in this
+    // test), then confirm ensureAgents actually removes it: the concrete,
+    // end-to-end proof — not just a catalog-shape assertion — that a retired
+    // agent's row can never linger and resurface its card on /agents. ──
+    reconcileTenantDb
+      .insert(agents)
+      .values({ key: "marketing", name: "Marketing", status: "active", model: MODELS.sonnet, instructions: "" })
+      .run();
+    assert.ok(
+      reconcileTenantDb.select().from(agents).where(eq(agents.key, "marketing")).get(),
+      "setup: a stale \"marketing\" row exists directly in the DB (bypassing ensureAgents)",
+    );
+    ensureAgents(tid); // the function under test — must prune the stale row above
+    assert.equal(
+      getAgent(tid, "marketing"),
+      undefined,
+      "ensureAgents prunes a stale row whose key is no longer in AGENT_CATALOG",
     );
 
     console.log("registry.test.ts: all assertions passed");

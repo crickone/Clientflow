@@ -40,11 +40,21 @@ export default async function AgentDetailPage({
   // campaign" (and its empty state) link straight here, no form — so the
   // seed becomes a pre-filled chat starter (below, threaded into
   // AgentDetail -> AgentChatPanel -> AssistantChat) rather than form
-  // values. Only the Marketing agent consumes it — any other agent key
-  // ignores a stray seed param instead of surfacing an unrelated pre-filled
-  // message. `?? undefined` normalises the pure helper's `string | null`
-  // return (null for an empty/absent seed) to the prop's `string | undefined`.
-  const initialInput = key === "marketing" ? campaignSeedStarterMessage(searchParams) ?? undefined : undefined;
+  // values. Only the orchestrator (Adonis) agent consumes it — any other
+  // agent key ignores a stray seed param instead of surfacing an unrelated
+  // pre-filled message. `?? undefined` normalises the pure helper's
+  // `string | null` return (null for an empty/absent seed) to the prop's
+  // `string | undefined`.
+  //
+  // Single-agent product (2026-08-25): this used to gate on `key ===
+  // "marketing"` — the Marketing agent was the seed's original destination
+  // (`buildCampaignSeedHref` built a `/agents/marketing?...` URL). Marketing
+  // was retired as its own AGENT_CATALOG entry/card; Adonis absorbed its
+  // campaign-kit tools (plan_campaign/create_campaign/draft_campaign_asset/
+  // approve_campaign_asset/launch_campaign — see specialists/orchestrator.ts's
+  // tool union) in the prior Adonis-merge task, and `buildCampaignSeedHref`
+  // now points at `/agents/orchestrator` to match — so this gate moved with it.
+  const initialInput = key === "orchestrator" ? campaignSeedStarterMessage(searchParams) ?? undefined : undefined;
 
   const catalogEntry = AGENT_CATALOG.find((a) => a.key === key);
   // Same registry composeAgentSystem (@/lib/agents/context) reads from — see

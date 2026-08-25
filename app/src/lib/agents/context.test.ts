@@ -107,7 +107,13 @@ const requireLocal = createRequire(import.meta.url);
     // the doc comment on composeAgentSystem.
 
     // ── (b) rails always present, even with empty (never-edited) instructions ──
-    const withEmpty = runWithTenant(tid, () => composeAgentSystem(tid, "sales"));
+    // Uses "orchestrator" (Adonis) — the single-agent product (2026-08-25)
+    // retired sales as its own AGENT_CATALOG entry, so it no longer seeds an
+    // `agents` row that updateAgentInstructions below could persist to;
+    // orchestrator is the only active entry left, and SPECIALISTS still
+    // carries its own base playbook (composeAgentSystem's other input) same
+    // as it does for the retained sales/marketing/operations specs.
+    const withEmpty = runWithTenant(tid, () => composeAgentSystem(tid, "orchestrator"));
     assert.ok(
       withEmpty.includes(SAFETY_RAILS),
       "SAFETY_RAILS is present verbatim even when operator instructions are empty",
@@ -119,9 +125,9 @@ const requireLocal = createRequire(import.meta.url);
 
     // ── set a distinctive marker as the operator's custom instructions ──
     const marker = "OPERATOR-MARKER-9F2Q-always-mention-the-free-parking-voucher";
-    updateAgentInstructions(tid, "sales", marker);
+    updateAgentInstructions(tid, "orchestrator", marker);
 
-    const out = runWithTenant(tid, () => composeAgentSystem(tid, "sales"));
+    const out = runWithTenant(tid, () => composeAgentSystem(tid, "orchestrator"));
 
     // ── (a) the custom-instructions marker appears, and strictly BEFORE the
     // safety rails. Guard both indexOf calls against -1 first: a naive

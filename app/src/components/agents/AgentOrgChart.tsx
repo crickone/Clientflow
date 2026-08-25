@@ -2,15 +2,7 @@
 
 import { type CSSProperties } from "react";
 import Link from "next/link";
-import {
-  Bot,
-  ClipboardCheck,
-  ConciergeBell,
-  Handshake,
-  Megaphone,
-  Wallet,
-  Workflow,
-} from "lucide-react";
+import { Bot, Wallet, Workflow } from "lucide-react";
 
 import { Card, CardLabel } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -32,30 +24,35 @@ interface Props {
  * Display copy for the org chart. Mirrors AGENT_CATALOG's `mandate` field in
  * `@/lib/agents/registry` — duplicated (not imported) because that module is
  * `server-only` (DB access) and this component runs on the client.
+ *
+ * Single-agent product (2026-08-25): AGENT_CATALOG now holds only
+ * "orchestrator" (Adonis) + dormant "finance" — the Sales/Marketing/
+ * Operations/Concierge entries were retired (see registry.ts's doc comment).
+ * This map is trimmed to match: it's rendered by keying off whatever agents
+ * `listAgents()` actually returns (below), never a hardcoded key list, so a
+ * removed catalog key can't leave a dangling node here — only a dangling
+ * COPY entry was possible, and that's what this trim removes. Keep this in
+ * sync with AGENT_CATALOG if the roster ever changes again.
  */
 const MANDATE: Record<string, string> = {
   orchestrator: "Your all-in-one assistant — handles leads, marketing, operations and admin directly.",
-  sales: "Works leads: instant replies + relentless follow-up.",
-  marketing: "Runs the Marketing Brain: campaigns + social.",
-  operations: "No-shows, class fill, attendance, admin.",
-  concierge: "Inbox/email + WhatsApp, invoices & money, nutrition/workout plans, admin.",
   finance: "Guards the cash: overdue + failed payments.",
 };
 
-/** Per-agent icon — purely presentational, keyed by agent key. */
+/** Per-agent icon — purely presentational, keyed by agent key. Kept in sync with MANDATE/AGENT_CATALOG above. */
 const ICON: Record<string, typeof Bot> = {
   orchestrator: Workflow,
-  sales: Handshake,
-  marketing: Megaphone,
-  operations: ClipboardCheck,
-  concierge: ConciergeBell,
   finance: Wallet,
 };
 
 /**
- * The "AI staff org chart": one Orchestrator node on top, five specialist
- * nodes below it in a responsive grid, connected by SVG lines so the whole
- * thing reads as a hierarchy rather than a list or table.
+ * The "AI staff org chart": one Orchestrator node on top, with every other
+ * agent `listAgents()` returns (today: just dormant Finance) below it in a
+ * responsive grid, connected by SVG lines so the whole thing reads as a
+ * hierarchy rather than a list or table. The set of non-Orchestrator (the
+ * "specialist" variant, below) cards is driven entirely by the `agents` prop
+ * — never a hardcoded key list — so it tracks AGENT_CATALOG automatically as
+ * agents are added or retired.
  */
 export function AgentOrgChart({ agents, usageByAgent, usageByModel, capCents, monthCents }: Props) {
   const orchestrator = agents.find((a) => a.key === "orchestrator");

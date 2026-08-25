@@ -31,7 +31,7 @@ export default async function AgentsPage() {
       <PageHeader
         eyebrow="AI Staff"
         title="Agents"
-        subtitle="Adonis handles the business directly — specialist agents are here for deep-dive work."
+        subtitle="Adonis handles the business directly — leads, marketing, operations and admin, no hand-offs."
       />
       <AgentOrgChart
         agents={agents}

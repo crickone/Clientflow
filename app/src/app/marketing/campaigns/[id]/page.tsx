@@ -220,7 +220,7 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
               </Button>
             </Link>
             {campaign.status === "building" && (
-              <Link href="/agents/marketing">
+              <Link href="/agents/orchestrator">
                 <Button variant="secondary">
                   <MessageSquarePlus size={15} /> Continue building
                 </Button>

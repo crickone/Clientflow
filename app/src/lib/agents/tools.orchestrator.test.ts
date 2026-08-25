@@ -16,12 +16,15 @@
 //          to X." This is the concrete proof of the "no recursion" rule: an
 //          orchestrator can never be made to delegate to another
 //          orchestrator, even if a caller tried to force it.
-//        - a DELEGATABLE target that isn't actually runnable right now
-//          (dormant) -> "... isn't available." Simulated by temporarily
-//          flipping AGENT_CATALOG's "sales" entry to "dormant" (restored
-//          immediately after) — see the inline comment at that assertion for
-//          why this is the only way to genuinely exercise this branch given
-//          ensureAgents' catalog-driven status reconcile.
+//        - a DELEGATABLE target that is not actually runnable right now ->
+//          "... isn't available." Single-agent product (2026-08-25):
+//          sales/marketing/operations are retired from AGENT_CATALOG (Adonis
+//          does their work directly now — see specialists/orchestrator.ts),
+//          so this branch fires unconditionally for "sales": getAgent(tid,
+//          "sales") is undefined on every call, no more dormant-flip
+//          simulation needed to reach it (see the inline comment at that
+//          assertion for the mechanism this replaced, back when sales was
+//          still a real, temporarily-dormant-able catalog entry).
 //   3. Orchestrator's OWN wiring (Adonis merge task — Adonis is now a full
 //      working agent, not a 4-tool router): ORCHESTRATOR_SPECIALIST.toolNames
 //      is non-empty, every entry resolves to a real TOOLS entry, it holds
@@ -33,27 +36,27 @@
 //      SPECIALISTS. (specialistToolSlice.test.ts separately pins
 //      orchestrator's shape + honesty lines, generalizing the same
 //      per-specialist checks it already does for sales/marketing/operations.)
-//   4. First-class-Concierge task (.superpowers/sdd/concierge-agent-brief.md):
-//        - `resolveConciergeModel` (Requirement 2) — the model-selection seam
-//          `delegateToConcierge` uses — returns the Concierge's OWN
-//          `agents` row model (set via updateAgentModel, exactly like the
-//          Agents-tab picker would), NOT `ctx.callerModel`, even when both are
-//          set to different models (proves the priority order, not just that
-//          A value comes back); and still falls back to `ctx.callerModel`
-//          then a hardcoded Sonnet if called with a tenant that has no
-//          concierge row at all (simulated the same way the dormant-sales
-//          guard below simulates an edge case AGENT_CATALOG wouldn't
-//          otherwise let a real tenant reach).
-//        - `buildConciergeSystem` (Requirement 5) — appends the tenant's
-//          saved concierge instructions to `buildAssistantSystem`'s output
-//          (mirroring `composeAgentSystem`'s labelled-block layering), is a
-//          no-op (byte-identical to `buildAssistantSystem`'s own output) when
-//          instructions are empty/unset, and never mutates/duplicates the
-//          base text it's built from.
-//        - `delegateToConcierge`'s source actually CALLS
-//          `resolveConciergeModel`/`buildConciergeSystem` (not re-derived
-//          equivalents) — same "no second driftable copy" proof
-//          tools.concierge.test.ts already does for `conciergeToolSlice`.
+//   4. Concierge delegation helpers (originally
+//      .superpowers/sdd/concierge-agent-brief.md; downstream of the
+//      single-agent-product retirement, 2026-08-25, which removed the
+//      Concierge's own AGENT_CATALOG entry/row alongside its card):
+//        - `resolveConciergeModel` — the model-selection seam
+//          `delegateToConcierge` uses — now ALWAYS falls back to
+//          `ctx.callerModel` (then a hardcoded Sonnet): there is no more
+//          concierge `agents` row for it to prefer — getAgent(tid,
+//          "concierge") is unconditionally undefined post-retirement, since
+//          ensureAgents prunes any row whose key isn't in AGENT_CATALOG on
+//          every read (even a raw-inserted one). Pinned as the new,
+//          permanent behaviour rather than an edge case.
+//        - `buildConciergeSystem` — same story: with no concierge row ever
+//          reachable, its output is now always byte-identical to
+//          `buildAssistantSystem`'s own output, for any mode/driveConnected
+//          combination — proven rather than assumed, so a future regression
+//          (e.g. a stray undefined-instructions block) would be caught.
+//        - `delegateToConcierge`'s source still CALLS
+//          `resolveConciergeModel`/`buildConciergeSystem` directly (not
+//          re-derived equivalents) — same "no second driftable copy" proof
+//          as before, verified by source inspection.
 //
 // NOT tested here (deliberately, per the task brief): the live-delegation
 // happy path (a real delegate_to_sales call that reaches runAgentTurn and
@@ -135,7 +138,7 @@ const requireLocal = createRequire(import.meta.url);
   // module runs to completion (its own runAgentTurn import hits the safe,
   // deferred-usage case instead) before control returns to tools.ts.
   const { TOOLS, WRITE_TOOLS } = requireLocal("../assistant/tools") as typeof import("../assistant/tools");
-  const { AGENT_CATALOG, getAgent, updateAgentModel, updateAgentInstructions } =
+  const { AGENT_CATALOG, getAgent } =
     requireLocal("./registry") as typeof import("./registry");
   const { SPECIALISTS } = requireLocal("./specialists") as typeof import("./specialists");
   const { ORCHESTRATOR_SPECIALIST } = requireLocal("./specialists/orchestrator") as typeof import("./specialists/orchestrator");
@@ -234,47 +237,34 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(toBogus.error, "Cannot delegate to bogus.", "an unknown key is rejected by the same guard");
 
     // ════════════════════════════════════════════════════════════════════
-    // 2c. Guard: a DELEGATABLE target that IS registered but not runnable
-    //     right now (dormant) -> "... isn't available."
+    // 2c. Guard: a DELEGATABLE target that is not actually runnable right
+    //     now -> "... isn't available."
     // ════════════════════════════════════════════════════════════════════
-    // getAgent() calls ensureAgents() on every call, which reconciles a
-    // tenant's row status to CURRENTLY match AGENT_CATALOG (see registry.ts)
-    // — so there is no way to leave "sales" dormant on a scratch tenant by
-    // seeding the row directly; ensureAgents would just flip it back to
-    // "active" on the very next getAgent() call, including the one inside
-    // delegateTo. The only faithful way to exercise this branch is to
-    // temporarily flip AGENT_CATALOG's own "sales" entry to "dormant" (it's a
-    // plain mutable array of objects, not deep-frozen) so ensureAgents seeds/
-    // reconciles the scratch tenant's row to "dormant" too, then restore it
-    // immediately so nothing past this point (or in another test file, not
-    // that it would matter — each test file is its own process) sees a
-    // permanently-dormant sales agent.
-    const salesCatalogEntry = AGENT_CATALOG.find((a) => a.key === "sales")!;
-    assert.equal(salesCatalogEntry.status, "active", "setup: sales starts active in AGENT_CATALOG, as expected");
-    salesCatalogEntry.status = "dormant";
-    try {
-      const dormantResult = JSON.parse((await delegateToSalesTool(ctx, { task: "chase a lead" })).text);
-      assert.equal(
-        dormantResult.error,
-        "The sales agent isn't available.",
-        "delegating to a dormant specialist is rejected with the exact guard text",
-      );
-      // Confirm the underlying agent row really was seeded/reconciled dormant
-      // (not just that delegateTo happened to say so) — the real proof.
-      const agentRow = getAgent(tid, "sales");
-      assert.equal(agentRow?.status, "dormant", "the scratch tenant's sales row was actually reconciled to dormant");
-    } finally {
-      salesCatalogEntry.status = "active"; // restore — AGENT_CATALOG is a shared module-level singleton for this process
-    }
-    // Confirm the restore actually took, by re-reading the registry directly
-    // — deliberately NOT by calling delegateToSalesTool again: past the
-    // dormant guard, delegateTo proceeds to runAgentTurn (MP1: which resolves
-    // a ModelProvider and, for a claude-* model, that provider calls
-    // getAnthropic()), and if ANTHROPIC_API_KEY happened to be set in
-    // whatever environment runs this suite, that would be a real, live Claude
-    // call — exactly what this test file must never do (see the file-level
-    // comment).
-    assert.equal(getAgent(tid, "sales")?.status, "active", "restoring AGENT_CATALOG reconciles the row back to active");
+    // Single-agent product (2026-08-25): "sales" was retired from
+    // AGENT_CATALOG (Adonis absorbed its tools/playbook — see
+    // specialists/orchestrator.ts), so — unlike before that retirement —
+    // there is no need to temporarily flip anything dormant to reach this
+    // branch: getAgent(tid, "sales") is unconditionally undefined now
+    // (ensureAgents never seeds a row for a catalog-absent key), so the exact
+    // same `!agent` guard fires every time, with the identical error text a
+    // genuinely dormant specialist would have produced. DELEGATABLE itself
+    // (this file) still lists "sales" — it's deliberately left registered,
+    // dead code, same as the delegate_to_* tools themselves (see this file's
+    // header comment) — so this also proves the vestigial delegate_to_sales
+    // tool degrades cleanly (a clean error result) rather than crashing now
+    // that its target is gone.
+    assert.ok(
+      !AGENT_CATALOG.some((a) => a.key === "sales"),
+      "setup: sales is no longer an AGENT_CATALOG entry (single-agent product)",
+    );
+    const agentRow = getAgent(tid, "sales");
+    assert.equal(agentRow, undefined, "sales has no seeded agent row — ensureAgents never creates one for a retired key");
+    const dormantResult = JSON.parse((await delegateToSalesTool(ctx, { task: "chase a lead" })).text);
+    assert.equal(
+      dormantResult.error,
+      "The sales agent isn't available.",
+      "delegating to a retired/unavailable specialist is rejected with the exact guard text, no crash",
+    );
 
     // ════════════════════════════════════════════════════════════════════
     // 3. Orchestrator's own wiring — Adonis merge task: Adonis is now a full
@@ -342,55 +332,45 @@ const requireLocal = createRequire(import.meta.url);
     );
 
     // ════════════════════════════════════════════════════════════════════
-    // 4. First-class Concierge (.superpowers/sdd/concierge-agent-brief.md):
-    //    model resolution + editable-context wiring
+    // 4. Concierge delegation helpers: model resolution + editable-context
+    //    wiring, now permanently fallback-only post-retirement (see the
+    //    file-level header comment's section 4 for why)
     // ════════════════════════════════════════════════════════════════════
 
-    // ── 4a. resolveConciergeModel (Requirement 2): the Concierge's OWN
-    // configured model wins — proven by setting it to something DIFFERENT
-    // from ctx.callerModel, not just checking that "a" value comes back.
-    // Both values used here must be real MODEL_CATALOG picker options (NOT
-    // e.g. MODELS.haiku, which — unlike sonnet/opus — isn't in the curated
-    // picker catalog and updateAgentModel would reject it, same as Fable). ──
-    updateAgentModel(tid, "concierge", MODELS.opus);
-    assert.equal(
-      resolveConciergeModel({ tenantId: tid, callerModel: MODELS.sonnet }),
-      MODELS.opus,
-      "resolveConciergeModel uses the Concierge's OWN configured model, not the caller's, when both are set and differ",
-    );
-
-    // Change it again — this time to an OpenRouter catalog id (Requirement 4:
-    // its picker must work for OpenRouter models too, e.g. Kimi) — proves
-    // resolution is read live from the row on every call, not cached, and
-    // confirms "changeable anytime" actually holds for a non-Anthropic model
-    // too, not just Sonnet/Opus.
-    const openRouterEntry = MODEL_CATALOG.find((m) => m.provider === "openrouter")!;
-    assert.ok(openRouterEntry, "sanity: MODEL_CATALOG has an OpenRouter entry to test against");
-    updateAgentModel(tid, "concierge", openRouterEntry.id);
+    // ── 4a. resolveConciergeModel: single-agent product (2026-08-25) retired
+    // "concierge" from AGENT_CATALOG, so there is no more concierge `agents`
+    // row to read a model from — getAgent(tid, "concierge") is
+    // unconditionally undefined (ensureAgents prunes any row whose key isn't
+    // in AGENT_CATALOG, on every read, even one inserted directly — see
+    // registry.test.ts's prune coverage). What used to be a defensive
+    // fallback tail is now the ONLY reachable path: the caller's own model
+    // always wins... ──
     assert.equal(
       resolveConciergeModel({ tenantId: tid, callerModel: MODELS.opus }),
-      openRouterEntry.id,
-      "resolveConciergeModel picks up a changed concierge model immediately, including an OpenRouter model",
+      MODELS.opus,
+      "resolveConciergeModel falls back to ctx.callerModel — the concierge row is permanently unreachable now that \"concierge\" is retired from AGENT_CATALOG",
     );
-
-    // No ctx.callerModel at all — the concierge's own model alone is enough,
-    // proving it isn't a required input, just a defensive fallback.
+    // ...and its picker must work for OpenRouter models too (e.g. Kimi), not
+    // just Anthropic tiers — proving the fallback returns whatever
+    // callerModel is, verbatim, not just a hardcoded Sonnet/Opus.
+    const openRouterEntry = MODEL_CATALOG.find((m) => m.provider === "openrouter")!;
+    assert.ok(openRouterEntry, "sanity: MODEL_CATALOG has an OpenRouter entry to test against");
+    assert.equal(
+      resolveConciergeModel({ tenantId: tid, callerModel: openRouterEntry.id }),
+      openRouterEntry.id,
+      "resolveConciergeModel's callerModel fallback works for any model id, including an OpenRouter one",
+    );
+    // ...and a hardcoded Sonnet is the final fallback when even that's absent.
     assert.equal(
       resolveConciergeModel({ tenantId: tid }),
-      openRouterEntry.id,
-      "resolveConciergeModel works with no ctx.callerModel — the concierge row is the primary source",
+      MODELS.sonnet,
+      "resolveConciergeModel falls all the way back to MODELS.sonnet with no concierge row and no ctx.callerModel",
     );
 
-    // The `ctx.callerModel ?? MODELS.sonnet` tail only matters for a
-    // concierge row that doesn't exist — which, for any REAL tenant id,
-    // getAgent's own ensureAgents() call rules out (proven throughout this
-    // file and registry.test.ts: the row always gets seeded). A tenant id
-    // with no control-plane row at all makes getTenantDbById THROW (see
-    // @/lib/db/tenant), not return undefined, so that branch can't be forced
-    // via a clean runtime call either. Verified by source inspection instead
-    // — the same technique tools.concierge.test.ts already uses to pin
-    // delegateToConcierge's call shape — which also doubles as the "delegate
-    // actually calls the seam, not a re-derived equivalent" proof.
+    // Verified by source inspection too — the same technique
+    // tools.concierge.test.ts already uses to pin delegateToConcierge's call
+    // shape — which also doubles as the "delegate actually calls the seam,
+    // not a re-derived equivalent" proof.
     const orchestratorSrc = fs.readFileSync(
       path.join(process.cwd(), "src/lib/agents/tools.orchestrator.ts"),
       "utf8",
@@ -406,51 +386,28 @@ const requireLocal = createRequire(import.meta.url);
       "delegateToConcierge's model comes from calling resolveConciergeModel(ctx) directly",
     );
 
-    // ── 4b. buildConciergeSystem (Requirement 5): empty/never-edited
-    // instructions -> byte-identical to buildAssistantSystem's own output —
-    // a no-op, matching composeAgentSystem's own empty-custom-instructions
-    // behaviour (see context.test.ts). buildAssistantSystem calls
-    // getBusinessProfile() internally, which — like getBusinessContext() in
-    // composeAgentSystem's doc comment — reads the AMBIENT tenant rather than
-    // taking one as an argument, so every call below is wrapped in
-    // runWithTenant(tid, ...), the exact same requirement context.test.ts
-    // documents and follows for composeAgentSystem. ──
+    // ── 4b. buildConciergeSystem: same story — with no concierge row ever
+    // reachable now, this always equals buildAssistantSystem's own output,
+    // byte-identical, for any mode/driveConnected combination. Still real
+    // coverage: proves the wrapper never crashes and never appends a stray
+    // instructions block when getAgent(..., "concierge") misses.
+    // buildAssistantSystem calls getBusinessProfile() internally, which —
+    // like getBusinessContext() in composeAgentSystem's doc comment — reads
+    // the AMBIENT tenant rather than taking one as an argument, so every call
+    // below is wrapped in runWithTenant(tid, ...), the exact same
+    // requirement context.test.ts documents and follows for
+    // composeAgentSystem. ──
     const mode = "appointments" as const;
     const baseline = runWithTenant(tid, () => buildAssistantSystem(mode, false));
     assert.equal(
       runWithTenant(tid, () => buildConciergeSystem(tid, mode, false)),
       baseline,
-      "buildConciergeSystem with no saved instructions is byte-identical to buildAssistantSystem's own output",
+      "buildConciergeSystem is byte-identical to buildAssistantSystem's own output — no concierge row is ever reachable post-retirement",
     );
-
-    // ── set a distinctive marker as the Concierge's saved instructions
-    // (the SAME AgentDetail "Operator instructions" editor every specialist
-    // uses) and confirm it's appended, labelled, and never mutates the base ──
-    const marker = "CONCIERGE-MARKER-7K1P-always-confirm-the-clinic-address";
-    updateAgentInstructions(tid, "concierge", marker);
-    const withInstructions = runWithTenant(tid, () => buildConciergeSystem(tid, mode, false));
-    assert.ok(
-      withInstructions.startsWith(baseline),
-      "buildConciergeSystem's output starts with buildAssistantSystem's UNCHANGED output — the append never mutates the base",
-    );
-    assert.ok(
-      withInstructions.includes("=== OPERATOR INSTRUCTIONS (from the Agents tab) ==="),
-      "buildConciergeSystem labels the appended block the same way composeAgentSystem labels a specialist's editable layer",
-    );
-    assert.equal(
-      withInstructions,
-      baseline + "\n\n=== OPERATOR INSTRUCTIONS (from the Agents tab) ===\n" + marker,
-      "buildConciergeSystem's output is exactly base + the labelled instructions block, nothing more",
-    );
-
-    // mode/driveConnected still thread through to buildAssistantSystem
-    // unchanged (not hardcoded/dropped by the wrapper).
     assert.equal(
       runWithTenant(tid, () => buildConciergeSystem(tid, "timetable", true)),
-      runWithTenant(tid, () => buildAssistantSystem("timetable", true)) +
-        "\n\n=== OPERATOR INSTRUCTIONS (from the Agents tab) ===\n" +
-        marker,
-      "buildConciergeSystem threads mode/driveConnected through to buildAssistantSystem unchanged",
+      runWithTenant(tid, () => buildAssistantSystem("timetable", true)),
+      "buildConciergeSystem threads mode/driveConnected through to buildAssistantSystem unchanged, still with no appended instructions block",
     );
     assert.ok(
       /system:\s*buildConciergeSystem\(ctx\.tenantId,\s*mode,\s*drive\)/.test(orchestratorSrc),

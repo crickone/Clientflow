@@ -18,10 +18,13 @@ import { setCampaignBuildModelAction } from "./actions";
 export const dynamic = "force-dynamic";
 
 // Campaign Engine hub (Slice 1, Task 7) — the operator-facing list of
-// campaign kits the Marketing agent builds conversationally (see
-// /agents/marketing). Admin-gated to match that agent chat + the email
-// Campaigns group (both requireAdminPage) — see Sidebar.tsx's comment on the
-// Marketing nav item for why.
+// campaign kits Adonis builds conversationally (see /agents/orchestrator).
+// Admin-gated to match that agent chat + the email Campaigns group (both
+// requireAdminPage) — see Sidebar.tsx's comment on the Marketing nav item
+// for why. Single-agent product (2026-08-25): this used to be the Marketing
+// agent's own chat at /agents/marketing — that agent card was retired, and
+// Adonis (which absorbed its campaign-kit tools) is now the only place this
+// build happens.
 const STATUS_TONE: Record<string, "neutral" | "amber" | "green" | "red"> = {
   building: "neutral",
   ready: "amber",
@@ -100,9 +103,9 @@ export default async function MarketingCampaignsPage() {
       <PageHeader
         eyebrow="Marketing"
         title="Campaigns"
-        subtitle="Seasonal campaign kits — offer, blog, social posts, emails, ad copy and a video script, drafted by the Marketing agent and approved one asset at a time."
+        subtitle="Seasonal campaign kits — offer, blog, social posts, emails, ad copy and a video script, drafted by Adonis and approved one asset at a time."
         actions={
-          <Link href="/agents/marketing">
+          <Link href="/agents/orchestrator">
             <Button size="sm">
               <Plus size={14} /> New campaign
             </Button>
@@ -162,9 +165,9 @@ export default async function MarketingCampaignsPage() {
         <EmptyState
           icon={<Megaphone size={32} strokeWidth={1.4} />}
           title="No campaigns yet"
-          message="Ask Adonis to build a campaign — open the Marketing agent and describe a season, offer or promotion. It drafts the whole kit (offer, blog, social, email, ad copy, video script) for your approval, one asset at a time."
+          message="Ask Adonis to build a campaign — open Adonis and describe a season, offer or promotion. It drafts the whole kit (offer, blog, social, email, ad copy, video script) for your approval, one asset at a time."
           action={
-            <Link href="/agents/marketing">
+            <Link href="/agents/orchestrator">
               <Button>
                 <Plus size={15} /> Ask Adonis
               </Button>

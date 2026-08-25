@@ -192,19 +192,19 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Marketing",
     icon: Megaphone,
     children: [
-      // Campaign Engine hub (Slice 1): the Marketing agent builds a full
-      // seasonal kit (offer/blog/social/email/ads/video script) here, one
-      // asset at a time. Admin-only for the same reason the email Campaigns
-      // group below is — the detail page's Launch action publishes content
-      // live and the build itself only ever runs through the Marketing
-      // agent chat (/agents/marketing), which is itself requireAdminPage'd —
-      // so keep the nav consistent rather than show staff a link that just
+      // Campaign Engine hub (Slice 1): Adonis builds a full seasonal kit
+      // (offer/blog/social/email/ads/video script) here, one asset at a
+      // time. Admin-only for the same reason the email Campaigns group
+      // below is — the detail page's Launch action publishes content live
+      // and the build itself only ever runs through Adonis's chat
+      // (/agents/orchestrator), which is itself requireAdminPage'd — so
+      // keep the nav consistent rather than show staff a link that just
       // redirects them to /dashboard.
       { href: "/marketing/campaigns", label: "Marketing", icon: Megaphone, adminOnly: true },
       // Campaign Engine Slice 3: the year-map of Irish marketing dates +
       // seasons overlaid with real campaigns, plus the AI radar "coming up"
       // rail. Same admin-only reasoning as "Marketing" above (Build-campaign
-      // here lands on the same requireAdminPage'd /agents/marketing chat).
+      // here lands on the same requireAdminPage'd /agents/orchestrator chat).
       { href: "/marketing/calendar", label: "Seasonal calendar", icon: Calendar, adminOnly: true },
       // Market Research P1 (Task 10): the competitor-tracking dashboard —
       // ranked list, rating/review trends, a change feed, per-competitor
