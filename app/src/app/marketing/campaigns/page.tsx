@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { setCampaignBuildModelAction } from "./actions";
+import { setCampaignBuildModelAction, seedTestCampaignAction, removeTestCampaignAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -159,6 +159,42 @@ export default async function MarketingCampaignsPage() {
             Save
           </Button>
         </form>
+      </Card>
+
+      {/* Demo data (admin-only page): seed a fully-populated "Test Campaign"
+          to preview how a live campaign renders, then remove it. Adds a few
+          clearly-marked demo leads/clients so the Performance columns light
+          up; "Remove" pulls it all back out. */}
+      <Card
+        style={{
+          padding: 16,
+          marginBottom: 24,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 16,
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <div style={{ fontSize: 13.5, fontWeight: 500, color: "var(--text-primary)" }}>Demo data</div>
+          <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2, maxWidth: 560, lineHeight: 1.5 }}>
+            Seed a fully-populated &ldquo;Test Campaign&rdquo; to preview this page — adds a few clearly-marked demo
+            leads &amp; clients so leads/converts/ROAS show. &ldquo;Remove&rdquo; deletes it and the demo records.
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+          <form action={seedTestCampaignAction}>
+            <Button type="submit" size="sm" variant="outline">
+              Seed test campaign
+            </Button>
+          </form>
+          <form action={removeTestCampaignAction}>
+            <Button type="submit" size="sm" variant="outline">
+              Remove
+            </Button>
+          </form>
+        </div>
       </Card>
 
       {campaigns.length === 0 ? (

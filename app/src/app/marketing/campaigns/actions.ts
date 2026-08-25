@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { setCampaignBuildModel } from "@/lib/campaigns/buildModel";
 import { setCampaignAdSpend } from "@/lib/campaigns/store";
+import { seedTestCampaign, removeTestCampaign } from "@/lib/campaigns/demoSeed";
 
 /**
  * Campaign Engine Slice 4, Task 5 — admin action behind the "Campaign build
@@ -68,4 +69,25 @@ export async function setCampaignAdSpendAction(formData: FormData): Promise<void
   const cents = Math.round((Number.isFinite(eur) ? Math.max(0, eur) : 0) * 100);
   setCampaignAdSpend(campaignId, cents);
   revalidatePath(`/marketing/campaigns/${campaignId}`);
+}
+
+/**
+ * Demo-data controls behind the "Demo data" card on the campaigns hub
+ * (./page.tsx) — seed a fully-populated "Test Campaign" (+ a few clearly-marked
+ * demo leads/clients so the Performance columns light up) to preview the page,
+ * and remove it again. Both `requireAdmin`-gated FIRST like every action here:
+ * a server action is its own POST endpoint, so the page's requireAdminPage()
+ * render gate can't be the only guard. Tenant is the caller's own (the seed
+ * runs through the ambient tenant `db` proxy — see @/lib/campaigns/demoSeed).
+ */
+export async function seedTestCampaignAction(): Promise<void> {
+  await requireAdmin();
+  seedTestCampaign();
+  revalidatePath("/marketing/campaigns");
+}
+
+export async function removeTestCampaignAction(): Promise<void> {
+  await requireAdmin();
+  removeTestCampaign();
+  revalidatePath("/marketing/campaigns");
 }
