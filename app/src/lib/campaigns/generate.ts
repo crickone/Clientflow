@@ -58,7 +58,22 @@ export interface GeneratedAsset {
 // call time in generateRaw() below; these consts supply just the task +
 // output-format rules for that one asset kind.
 
+/**
+ * A compact, always-applied offer-construction rubric (Alex Hormozi, "$100M
+ * Offers") baked into the OFFER asset — so every tenant gets systematic offer
+ * design even when their Marketing Brain field doesn't spell it out. The
+ * tenant's own Marketing Brain (via getBusinessContext) still supplies the
+ * specifics — dream outcome, sanctioned offer mechanics, the house rules —
+ * while this is the METHOD for assembling them.
+ */
+const HORMOZI_OFFER_RUBRIC = `How to construct the offer (Alex Hormozi, "$100M Offers") — apply this method:
+- Work the VALUE EQUATION: Value = (Dream Outcome × Perceived Likelihood of Achievement) ÷ (Time Delay × Effort & Sacrifice). Make the offer more compelling by raising the top (a vivid dream outcome + believable proof/mechanism) and shrinking the bottom (faster results, less effort and hassle).
+- Assemble it in this order: (1) lead with the DREAM OUTCOME — the felt transformation, not the service; (2) STACK THE VALUE — name what's included and why each piece matters; (3) sweeten with the DEAL — a value bundle (e.g. "8 weeks for the price of 6"), a seasonal or limited-time special, a referral offer, or a value-add bonus; (4) add real URGENCY or SCARCITY — an intake date or limited spots — ONLY when it is genuinely true; (5) give the offer a specific NAME.
+- Prefer value-adds and BONUSES over deep discounts: bonuses plus urgency raise perceived value, while heavy discounting erodes it (discounts are allowed — but lead with value).`;
+
 const OFFER_FORMAT_RULES = `You are writing the CORE OFFER for a marketing campaign — the single source-of-truth description every other asset in the kit (blog post, social carousel, emails, ad copy, video script) is written from.
+
+${HORMOZI_OFFER_RUBRIC}
 
 Formatting:
 - Plain text only. No markdown, no emojis.
