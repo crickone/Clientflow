@@ -7,7 +7,9 @@ import { Building2, Crown, Key, MapPin, MessageSquareText, RefreshCw, Search, St
 import { toast } from "sonner";
 
 import type { CompetitorRow as CompetitorRowData, EventRow, Metric, StoredAd, StoredReview } from "@/lib/research/store";
-import type { RescanResult } from "@/app/marketing/research/actions";
+import type { ContentGap } from "@/lib/research/gaps";
+import type { ContentGapPerCompetitor } from "@/lib/research/contentScan";
+import type { RescanResult, ScanContentActionResult } from "@/app/marketing/research/actions";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardLabel } from "@/components/ui/Card";
@@ -17,6 +19,7 @@ import { relativeTime } from "@/lib/utils";
 import { ChangedFeed } from "./ChangedFeed";
 import { CompetitorDetail } from "./CompetitorDetail";
 import { CompetitorRow } from "./CompetitorRow";
+import { ContentGaps } from "./ContentGaps";
 import { ScanningProgress } from "./ScanningProgress";
 
 /**
@@ -70,6 +73,17 @@ import { ScanningProgress } from "./ScanningProgress";
  * (`handleLinkPage`/`handleUnlinkPage` below), so CompetitorDetail's Ads
  * section only ever sees plain, synchronous-looking callbacks, same as
  * `onMute`/`onBuildCampaign`.
+ *
+ * Content-gap analysis: a new `ContentGaps` section rendered as its own Card
+ * beneath the Competitors card (populated state only) — `contentGaps`/
+ * `contentGapCompetitors`/`researchKeywords` are `getContentGaps(tenantId)`'s
+ * plain read (page.tsx), and `onScanContent`/`onSaveResearchKeywords` are two
+ * more admin-only Server Actions forwarded the same prop-handoff way as
+ * `onRescan` et al. Unlike every other action on this page, ContentGaps owns
+ * its OWN dispatch/pending/result state internally (`useFormState` +
+ * `<form action>`, matching src/components/cms/DomainsManager.tsx's style)
+ * rather than routing through this component's shared `rescanning`/`curating`
+ * transitions — see that file's own doc comment.
  */
 
 export type ResearchState = "no-key" | "no-centre" | "empty" | "populated";
@@ -118,6 +132,24 @@ interface ResearchViewProps {
   onLinkPage?: (competitorId: number, pageId: string, pageName: string) => Promise<{ ok: boolean; error?: string }>;
   /** Undoes onLinkPage (unlinkCompetitorPageAction). */
   onUnlinkPage?: (competitorId: number) => Promise<{ ok: boolean; error?: string }>;
+  /** Content-gap analysis: `getContentGaps(tenantId)`'s three plain reads
+   *  (page.tsx), passed straight through to the new ContentGaps section
+   *  below — already ranked/capped (`gaps`), never re-derived here.
+   *  `contentGapCompetitors` is deliberately a SEPARATE prop from
+   *  `competitors` above: it's the self-INCLUDING tracked watchlist
+   *  (content-gap math needs your own site's topics to know what NOT to
+   *  flag — see contentScan.ts), not the self-excluding ranked list this
+   *  view's Landscape/Competitors sections use. */
+  contentGaps: ContentGap[];
+  contentGapCompetitors: ContentGapPerCompetitor[];
+  researchKeywords: string[];
+  /** "Scan competitor sites" (scanContentAction) — same admin-only Server
+   *  Action-as-prop pattern as onRescan above, but owned/dispatched by
+   *  ContentGaps itself via useFormState rather than this component's shared
+   *  `curating` transition (see that file's own doc comment). */
+  onScanContent?: () => Promise<ScanContentActionResult>;
+  /** Saves the tenant's target keyword list (saveResearchKeywordsAction). */
+  onSaveResearchKeywords?: (formData: FormData) => Promise<{ ok: boolean; error?: string }>;
 }
 
 // Mirrors lib/research/discovery.ts's DEFAULT_RADIUS_KM. Not imported: that
@@ -146,6 +178,11 @@ export function ResearchView({
   onBuildCampaign,
   onLinkPage,
   onUnlinkPage,
+  contentGaps,
+  contentGapCompetitors,
+  researchKeywords,
+  onScanContent,
+  onSaveResearchKeywords,
 }: ResearchViewProps) {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const router = useRouter();
@@ -525,6 +562,15 @@ export function ResearchView({
                   })}
                 </div>
               </Card>
+
+              <ContentGaps
+                gaps={contentGaps}
+                perCompetitor={contentGapCompetitors}
+                seedKeywords={researchKeywords}
+                isAdmin={isAdmin}
+                onScanContent={onScanContent}
+                onSaveKeywords={onSaveResearchKeywords}
+              />
             </div>
           </SwapPane>
         )}

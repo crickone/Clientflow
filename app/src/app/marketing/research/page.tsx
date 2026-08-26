@@ -3,6 +3,7 @@ import { getCurrentTenant } from "@/lib/db/tenant";
 import { formatCentsEur } from "@/lib/campaigns/costEstimate";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { adLibraryConfigured } from "@/lib/research/adLibrary";
+import { getContentGaps } from "@/lib/research/contentScan";
 import { getResearchCentre } from "@/lib/research/discovery";
 import { placesConfigured } from "@/lib/research/places";
 import { getResearchCapCents, researchSpentCents } from "@/lib/research/spend";
@@ -29,6 +30,8 @@ import {
   buildCampaignFromCompetitorAction,
   linkCompetitorPageAction,
   unlinkCompetitorPageAction,
+  scanContentAction,
+  saveResearchKeywordsAction,
 } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -91,6 +94,17 @@ function readLandscapeCache(): LandscapeCache | null {
  * through explicitly anyway so the gate is legible at the component that
  * actually renders the write controls, matching the two new actions'
  * (./actions.ts) own `requireAdmin()` defence-in-depth.
+ *
+ * Content-gap analysis: `getContentGaps(tenantId)` (lib/research/contentScan.ts)
+ * is one more plain, free read — never crawls, never calls the AI, same
+ * "always free to browse" contract as everything else on this page — feeding
+ * ResearchView's new ContentGaps section its `gaps`/`contentGapCompetitors`/
+ * `researchKeywords` props, plus the two admin-only Server Actions
+ * (`scanContentAction`/`saveResearchKeywordsAction`) that section's own forms
+ * dispatch. Deliberately NOT gated behind `state` here (unlike the
+ * per-competitor loop below, which only makes sense once `competitors` is
+ * non-empty) — `getContentGaps` degrades to an all-empty result on its own
+ * when nothing's tracked yet, so there's no reason to branch this read too.
  */
 export default async function MarketingResearchPage() {
   await requireAdminPage();
@@ -138,6 +152,11 @@ export default async function MarketingResearchPage() {
   const tenantId = getCurrentTenant().id;
   const spendLabel = `${formatCentsEur(researchSpentCents(tenantId))} / ${formatCentsEur(getResearchCapCents(tenantId))} this month`;
 
+  // Content-gap analysis — see this function's own doc comment above. Never
+  // throws (getContentGaps's own contract); always a free read.
+  const { gaps: contentGaps, perCompetitor: contentGapCompetitors, seedKeywords: researchKeywords } =
+    await getContentGaps(tenantId);
+
   // Market Research P2, Task 6 — a sync env-var presence check only (mirrors
   // `configured`/`placesConfigured()` above), never a network call; decides
   // whether a competitor with no ads shows "none found" or a "connect the Ad
@@ -172,6 +191,11 @@ export default async function MarketingResearchPage() {
         onBuildCampaign={buildCampaignFromCompetitorAction}
         onLinkPage={linkCompetitorPageAction}
         onUnlinkPage={unlinkCompetitorPageAction}
+        contentGaps={contentGaps}
+        contentGapCompetitors={contentGapCompetitors}
+        researchKeywords={researchKeywords}
+        onScanContent={scanContentAction}
+        onSaveResearchKeywords={saveResearchKeywordsAction}
       />
     </div>
   );
