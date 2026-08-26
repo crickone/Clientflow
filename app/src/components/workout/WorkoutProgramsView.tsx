@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Archive,
@@ -21,6 +21,14 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/DropdownMenu";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Reveal, RevealGroup } from "@/components/motion/Reveal";
 import { Input } from "@/components/ui/Input";
 import { PROGRAM_TYPE_LABEL, type ProgramStatus, type ProgramType } from "@/lib/workoutModel";
@@ -77,29 +85,32 @@ export function WorkoutProgramsView({ programs }: { programs: ProgramRow[] }) {
         </div>
       </div>
 
-      <div style={{ border: "1px solid var(--hairline)", borderRadius: "var(--radius)", overflow: "hidden" }}>
-        <div style={{ overflowX: "auto" }}>
-          <div style={{ minWidth: 900 }}>
-            <div style={{ ...row, ...headRow }}>
-              <div>Program name</div>
-              <div>Created</div>
-              <div>Type</div>
-              <div style={{ textAlign: "right" }}>Days</div>
-              <div>Tags</div>
-              <div>Last edit</div>
-              <div style={{ textAlign: "right" }}>Actions</div>
-            </div>
-            {filtered.length === 0 && (
-              <div style={{ padding: "40px 16px", textAlign: "center", color: "var(--text-tertiary)", fontSize: 13.5 }}>
-                No programs yet. Click <strong>Add Workout Program</strong> to build your first.
+      {filtered.length === 0 ? (
+        <EmptyState
+          icon={<Dumbbell size={32} strokeWidth={1.4} />}
+          title="No programs yet"
+          message="Click Add Workout Program to build your first."
+        />
+      ) : (
+        <div style={{ border: "1px solid var(--hairline)", borderRadius: "var(--radius)", overflow: "hidden" }}>
+          <div style={{ overflowX: "auto" }}>
+            <div style={{ minWidth: 900 }}>
+              <div style={{ ...row, ...headRow }}>
+                <div>Program name</div>
+                <div>Created</div>
+                <div>Type</div>
+                <div style={{ textAlign: "right" }}>Days</div>
+                <div>Tags</div>
+                <div>Last edit</div>
+                <div style={{ textAlign: "right" }}>Actions</div>
               </div>
-            )}
-            {filtered.map((p) => (
-              <ProgramRowItem key={p.id} program={p} onGo={() => router.push(`/workout/${p.id}`)} />
-            ))}
+              {filtered.map((p) => (
+                <ProgramRowItem key={p.id} program={p} onGo={() => router.push(`/workout/${p.id}`)} />
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <CreateTypeDialog open={createOpen} onClose={() => setCreateOpen(false)} />
     </div>
@@ -194,92 +205,50 @@ function RowMenu({
   onDownload?: () => void;
   disabled: boolean;
 }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const h = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, [open]);
-
-  const item = (label: string, icon: React.ReactNode, onClick: () => void, danger = false) => (
-    <button
-      onClick={() => {
-        setOpen(false);
-        onClick();
-      }}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 9,
-        width: "100%",
-        textAlign: "left",
-        padding: "8px 12px",
-        background: "transparent",
-        border: "none",
-        cursor: "pointer",
-        fontSize: 13,
-        color: danger ? "#f87171" : "var(--text-primary)",
-      }}
-    >
-      {icon}
-      {label}
-    </button>
-  );
-
   return (
-    <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        disabled={disabled}
-        aria-label="Actions"
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: 30,
-          height: 30,
-          borderRadius: "var(--radius)",
-          border: "1px solid var(--hairline)",
-          background: "transparent",
-          color: "var(--text-secondary)",
-          cursor: "pointer",
-        }}
-      >
-        <MoreHorizontal size={16} />
-      </button>
-      {open && (
-        <div
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          disabled={disabled}
+          aria-label="Actions"
           style={{
-            position: "absolute",
-            right: 0,
-            top: "calc(100% + 4px)",
-            zIndex: 30,
-            minWidth: 176,
-            background: "var(--surface-1)",
-            border: "1px solid var(--hairline)",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 30,
+            height: 30,
             borderRadius: "var(--radius)",
-            boxShadow: "0 8px 28px rgba(0,0,0,0.28)",
-            overflow: "hidden",
-            padding: "4px 0",
+            border: "1px solid var(--hairline)",
+            background: "transparent",
+            color: "var(--text-secondary)",
+            cursor: "pointer",
           }}
         >
-          {item("Edit", <Pencil size={14} />, onEdit)}
-          {onDownload && item("Download", <Download size={14} />, onDownload)}
-          {item("Duplicate", <Copy size={14} />, onDuplicate)}
-          {item(
-            status === "active" ? "Archive" : "Restore",
-            status === "active" ? <Archive size={14} /> : <ArchiveRestore size={14} />,
-            onArchive,
-          )}
-          <div style={{ height: 1, background: "var(--hairline)", margin: "4px 0" }} />
-          {item("Delete", <Trash2 size={14} />, onDelete, true)}
-        </div>
-      )}
-    </div>
+          <MoreHorizontal size={16} />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onSelect={onEdit} style={{ color: "var(--text-primary)" }}>
+          <Pencil size={14} /> Edit
+        </DropdownMenuItem>
+        {onDownload && (
+          <DropdownMenuItem onSelect={onDownload} style={{ color: "var(--text-primary)" }}>
+            <Download size={14} /> Download
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem onSelect={onDuplicate} style={{ color: "var(--text-primary)" }}>
+          <Copy size={14} /> Duplicate
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={onArchive} style={{ color: "var(--text-primary)" }}>
+          {status === "active" ? <Archive size={14} /> : <ArchiveRestore size={14} />}
+          {status === "active" ? "Archive" : "Restore"}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={onDelete} destructive>
+          <Trash2 size={14} /> Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

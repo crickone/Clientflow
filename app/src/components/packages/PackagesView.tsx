@@ -2,13 +2,14 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Calendar, ChevronRight, Mail, Minus, Pencil, Plus, Trash2, UserPlus } from "lucide-react";
+import { Calendar, ChevronRight, Mail, Minus, Package as PackageIcon, Pencil, Plus, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Sheet, SheetContent } from "@/components/ui/Sheet";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Input, Label, Textarea } from "@/components/ui/Input";
 import { Avatar } from "@/components/ui/Avatar";
 import { Reveal, RevealGroup } from "@/components/motion/Reveal";
@@ -168,7 +169,11 @@ export function PackagesView({
         </div>
 
         {catalog.length === 0 ? (
-          <div style={emptyBox}>No packages yet. Create your first prepaid bundle.</div>
+          <EmptyState
+            icon={<PackageIcon size={32} strokeWidth={1.4} />}
+            title="No packages yet"
+            message="Create your first prepaid bundle."
+          />
         ) : (
           <RevealGroup style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 14 }}>
             {catalog.map((m) => (

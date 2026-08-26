@@ -2,10 +2,11 @@
 
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { Pencil, Plus, Salad, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Sheet, SheetContent } from "@/components/ui/Sheet";
 import { Input, Label, Textarea } from "@/components/ui/Input";
 import { deleteMealAction, getMealAction, saveMealAction } from "@/app/nutrition/meals/actions";
@@ -78,47 +79,50 @@ export function MealsView({ meals, foods }: { meals: MealRow[]; foods: FoodRow[]
         </div>
       </div>
 
-      <div style={{ border: "1px solid var(--hairline)", borderRadius: "var(--radius)", overflow: "hidden" }}>
-        <div style={{ overflowX: "auto" }}>
-          <div style={{ minWidth: 720 }}>
-            <div style={{ ...row, ...headRow }}>
-              <div>Meal</div>
-              <div style={{ textAlign: "right" }}>Foods</div>
-              <div style={{ textAlign: "right" }}>Protein</div>
-              <div style={{ textAlign: "right" }}>Carbs</div>
-              <div style={{ textAlign: "right" }}>Fat</div>
-              <div style={{ textAlign: "right" }}>Calories</div>
-              <div style={{ textAlign: "right" }}>Actions</div>
-            </div>
-            {filtered.length === 0 && (
-              <div style={{ padding: "36px 16px", textAlign: "center", color: "var(--text-tertiary)", fontSize: 13.5 }}>
-                No meals yet. Click <strong>Create meal</strong> to build one from your foods.
+      {filtered.length === 0 ? (
+        <EmptyState
+          icon={<Salad size={32} strokeWidth={1.4} />}
+          title="No meals yet"
+          message="Click Create meal to build one from your foods."
+        />
+      ) : (
+        <div style={{ border: "1px solid var(--hairline)", borderRadius: "var(--radius)", overflow: "hidden" }}>
+          <div style={{ overflowX: "auto" }}>
+            <div style={{ minWidth: 720 }}>
+              <div style={{ ...row, ...headRow }}>
+                <div>Meal</div>
+                <div style={{ textAlign: "right" }}>Foods</div>
+                <div style={{ textAlign: "right" }}>Protein</div>
+                <div style={{ textAlign: "right" }}>Carbs</div>
+                <div style={{ textAlign: "right" }}>Fat</div>
+                <div style={{ textAlign: "right" }}>Calories</div>
+                <div style={{ textAlign: "right" }}>Actions</div>
               </div>
-            )}
-            {filtered.map((m) => (
-              <div key={m.id} style={row}>
-                <button
-                  onClick={() => openEdit(m.id)}
-                  style={{ textAlign: "left", background: "transparent", border: "none", cursor: "pointer", padding: 0, minWidth: 0 }}
-                >
-                  <div style={{ fontSize: 14, color: "var(--text-primary)", fontWeight: 500 }}>{m.name}</div>
-                  {m.category && <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{m.category}</div>}
-                </button>
-                <Cell v={m.itemCount} />
-                <Cell v={m.totals.protein} suffix="g" />
-                <Cell v={m.totals.carbs} suffix="g" />
-                <Cell v={m.totals.fat} suffix="g" />
-                <Cell v={m.totals.calories} />
-                <div style={{ textAlign: "right" }}>
-                  <button onClick={() => openEdit(m.id)} aria-label="Edit" style={iconBtn}>
-                    <Pencil size={14} />
+              {filtered.map((m) => (
+                <div key={m.id} style={row}>
+                  <button
+                    onClick={() => openEdit(m.id)}
+                    style={{ textAlign: "left", background: "transparent", border: "none", cursor: "pointer", padding: 0, minWidth: 0 }}
+                  >
+                    <div style={{ fontSize: 14, color: "var(--text-primary)", fontWeight: 500 }}>{m.name}</div>
+                    {m.category && <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{m.category}</div>}
                   </button>
+                  <Cell v={m.itemCount} />
+                  <Cell v={m.totals.protein} suffix="g" />
+                  <Cell v={m.totals.carbs} suffix="g" />
+                  <Cell v={m.totals.fat} suffix="g" />
+                  <Cell v={m.totals.calories} />
+                  <div style={{ textAlign: "right" }}>
+                    <button onClick={() => openEdit(m.id)} aria-label="Edit" style={iconBtn}>
+                      <Pencil size={14} />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <MealSheet
         open={open}

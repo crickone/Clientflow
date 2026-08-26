@@ -1,12 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, Eye, MoreHorizontal, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Copy, Dumbbell, Eye, MoreHorizontal, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/DropdownMenu";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/Input";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { deleteCircuitAction, duplicateCircuitAction } from "@/app/workout/circuits/actions";
@@ -51,29 +59,32 @@ export function CircuitsView({ circuits }: { circuits: CircuitRow[] }) {
         </div>
       </div>
 
-      <div style={{ border: "1px solid var(--hairline)", borderRadius: "var(--radius)", overflow: "hidden" }}>
-        <div style={{ overflowX: "auto" }}>
-          <div style={{ minWidth: 820 }}>
-            <div style={{ ...row, ...headRow }}>
-              <div>Circuit name</div>
-              <div>Created</div>
-              <div style={{ textAlign: "right" }}>Exercises</div>
-              <div>Tags</div>
-              <div>Last edit</div>
-              <div style={{ textAlign: "right" }}>Actions</div>
-              <div style={{ textAlign: "center" }}>View</div>
-            </div>
-            {filtered.length === 0 && (
-              <div style={{ padding: "40px 16px", textAlign: "center", color: "var(--text-tertiary)", fontSize: 13.5 }}>
-                No circuits yet. Click <strong>Add Circuit</strong> to build your first.
+      {filtered.length === 0 ? (
+        <EmptyState
+          icon={<Dumbbell size={32} strokeWidth={1.4} />}
+          title="No circuits yet"
+          message="Click Add Circuit to build your first."
+        />
+      ) : (
+        <div style={{ border: "1px solid var(--hairline)", borderRadius: "var(--radius)", overflow: "hidden" }}>
+          <div style={{ overflowX: "auto" }}>
+            <div style={{ minWidth: 820 }}>
+              <div style={{ ...row, ...headRow }}>
+                <div>Circuit name</div>
+                <div>Created</div>
+                <div style={{ textAlign: "right" }}>Exercises</div>
+                <div>Tags</div>
+                <div>Last edit</div>
+                <div style={{ textAlign: "right" }}>Actions</div>
+                <div style={{ textAlign: "center" }}>View</div>
               </div>
-            )}
-            {filtered.map((c) => (
-              <CircuitRowItem key={c.id} circuit={c} />
-            ))}
+              {filtered.map((c) => (
+                <CircuitRowItem key={c.id} circuit={c} />
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -135,37 +146,29 @@ function CircuitRowItem({ circuit }: { circuit: CircuitRow }) {
 }
 
 function RowMenu({ onEdit, onView, onDuplicate, onDelete, disabled }: { onEdit: () => void; onView: () => void; onDuplicate: () => void; onDelete: () => void; disabled: boolean }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const h = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, [open]);
-  const item = (label: string, icon: React.ReactNode, onClick: () => void, danger = false) => (
-    <button onClick={() => { setOpen(false); onClick(); }} style={{ display: "flex", alignItems: "center", gap: 9, width: "100%", textAlign: "left", padding: "8px 12px", background: "transparent", border: "none", cursor: "pointer", fontSize: 13, color: danger ? "#f87171" : "var(--text-primary)" }}>
-      {icon}
-      {label}
-    </button>
-  );
   return (
-    <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
-      <button onClick={() => setOpen((v) => !v)} disabled={disabled} aria-label="Actions" style={iconBtn}>
-        <MoreHorizontal size={16} />
-      </button>
-      {open && (
-        <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", zIndex: 30, minWidth: 160, background: "var(--surface-1)", border: "1px solid var(--hairline)", borderRadius: "var(--radius)", boxShadow: "0 8px 28px rgba(0,0,0,0.28)", overflow: "hidden", padding: "4px 0" }}>
-          {item("Edit", <Pencil size={14} />, onEdit)}
-          {item("Preview", <Eye size={14} />, onView)}
-          {item("Duplicate", <Copy size={14} />, onDuplicate)}
-          <div style={{ height: 1, background: "var(--hairline)", margin: "4px 0" }} />
-          {item("Delete", <Trash2 size={14} />, onDelete, true)}
-        </div>
-      )}
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button disabled={disabled} aria-label="Actions" style={iconBtn}>
+          <MoreHorizontal size={16} />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onSelect={onEdit} style={{ color: "var(--text-primary)" }}>
+          <Pencil size={14} /> Edit
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={onView} style={{ color: "var(--text-primary)" }}>
+          <Eye size={14} /> Preview
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={onDuplicate} style={{ color: "var(--text-primary)" }}>
+          <Copy size={14} /> Duplicate
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={onDelete} destructive>
+          <Trash2 size={14} /> Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

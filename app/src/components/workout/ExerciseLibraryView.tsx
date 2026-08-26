@@ -2,10 +2,11 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Play, Plus, Search, Sparkles, Trash2 } from "lucide-react";
+import { Dumbbell, Pencil, Play, Plus, Search, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Reveal, RevealGroup } from "@/components/motion/Reveal";
 import { Sheet, SheetContent } from "@/components/ui/Sheet";
 import { Input, Label, Textarea } from "@/components/ui/Input";
@@ -109,13 +110,15 @@ export function ExerciseLibraryView({ exercises }: { exercises: ExerciseLibRow[]
       </div>
 
       {filtered.length === 0 ? (
-        <div style={{ padding: "36px 16px", textAlign: "center", color: "var(--text-tertiary)", fontSize: 13.5, border: "1px solid var(--hairline)", borderRadius: "var(--radius)" }}>
-          {exercises.length === 0 ? (
-            <>No exercises yet. Click <strong>Add exercise</strong> to build your library.</>
-          ) : (
-            <>No exercises match your search.</>
-          )}
-        </div>
+        <EmptyState
+          icon={<Dumbbell size={32} strokeWidth={1.4} />}
+          title={exercises.length === 0 ? "No exercises yet" : "No matches"}
+          message={
+            exercises.length === 0
+              ? "Click Add exercise to build your library."
+              : "No exercises match your search."
+          }
+        />
       ) : (
         <RevealGroup immediate style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           {groups.map(([cat, items]) => (

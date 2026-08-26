@@ -2,13 +2,14 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Calendar, Check, ChevronRight, Laptop, Mail, Pencil, Plus, Trash2, UserPlus } from "lucide-react";
+import { Calendar, Check, ChevronRight, CreditCard, Laptop, Mail, Pencil, Plus, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Sheet, SheetContent } from "@/components/ui/Sheet";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Input, Label, Textarea } from "@/components/ui/Input";
 import { Avatar } from "@/components/ui/Avatar";
 import { Reveal, RevealGroup } from "@/components/motion/Reveal";
@@ -154,9 +155,11 @@ export function MembershipsView({
         </div>
 
         {catalog.length === 0 ? (
-          <div style={emptyBox}>
-            No memberships yet. Create your first recurring plan.
-          </div>
+          <EmptyState
+            icon={<CreditCard size={32} strokeWidth={1.4} />}
+            title="No memberships yet"
+            message="Create your first recurring plan."
+          />
         ) : (
           <RevealGroup
             style={{

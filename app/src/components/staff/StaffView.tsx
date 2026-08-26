@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, UserCog } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
@@ -10,6 +10,7 @@ import { Sheet, SheetContent } from "@/components/ui/Sheet";
 import { Input, Label, Textarea } from "@/components/ui/Input";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { Reveal, RevealGroup } from "@/components/motion/Reveal";
 import { initialsOf } from "@/lib/utils";
 import type { PayrollRow, PerformanceRow } from "@/lib/staff";
@@ -108,7 +109,11 @@ export function StaffView({
         </div>
 
         {roster.length === 0 ? (
-          <div style={emptyBox}>No staff yet. Add your instructors to track payroll and performance.</div>
+          <EmptyState
+            icon={<UserCog size={32} strokeWidth={1.4} />}
+            title="No staff yet"
+            message="Add your instructors to track payroll and performance."
+          />
         ) : (
           <RevealGroup style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
             {roster.map((s) => (
@@ -508,15 +513,6 @@ const card: React.CSSProperties = {
   background: "var(--surface-1)",
   padding: 16,
   cursor: "pointer",
-};
-const emptyBox: React.CSSProperties = {
-  border: "1px dashed var(--hairline)",
-  borderRadius: "var(--radius)",
-  padding: "26px 20px",
-  textAlign: "center",
-  color: "var(--text-tertiary)",
-  fontSize: 13,
-  lineHeight: 1.6,
 };
 const emptyRow: React.CSSProperties = {
   padding: "26px 16px",
