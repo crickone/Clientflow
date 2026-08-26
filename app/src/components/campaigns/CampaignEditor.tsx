@@ -184,7 +184,7 @@ export function CampaignEditor({
   }
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 24, alignItems: "start" }}>
+    <div className="campaign-editor-grid" style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 24, alignItems: "start" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 20, minWidth: 0 }}>
         <Card style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
           <div>

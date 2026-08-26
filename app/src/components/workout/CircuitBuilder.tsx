@@ -98,9 +98,17 @@ export function CircuitBuilder({ initial, exercises }: { initial: CircuitInput; 
       <div style={card}>
         <div style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-secondary)", fontFamily: "var(--font-mono), monospace" }}>Circuit</div>
         {circuit.exercises.length === 0 && <div style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>No exercises yet.</div>}
-        {circuit.exercises.map((ex, i) => (
-          <ExerciseRow key={i} letter={LETTERS[i] ?? "•"} ex={ex} onPatch={(patch) => setExercise(i, patch)} onRemove={() => removeExercise(i)} />
-        ))}
+        {circuit.exercises.length > 0 && (
+          // Horizontal scroll on narrow screens instead of crushing the name
+          // column (same pattern the *View list tables use — grep overflowX).
+          <div style={{ overflowX: "auto" }}>
+            <div style={{ minWidth: 560, display: "flex", flexDirection: "column", gap: 14 }}>
+              {circuit.exercises.map((ex, i) => (
+                <ExerciseRow key={i} letter={LETTERS[i] ?? "•"} ex={ex} onPatch={(patch) => setExercise(i, patch)} onRemove={() => removeExercise(i)} />
+              ))}
+            </div>
+          </div>
+        )}
         <div>
           <Button variant="outline" size="sm" onClick={() => setPickerOpen(true)}>
             <Plus size={14} /> Add an Exercise

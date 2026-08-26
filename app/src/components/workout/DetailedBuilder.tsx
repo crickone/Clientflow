@@ -183,20 +183,35 @@ export function DetailedBuilder({ initial, exercises }: { initial: ProgramInput;
             {rows.length === 0 && (
               <div style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>No exercises in this section yet.</div>
             )}
-            {rows.map(({ ex, i }, li) => (
-              <ExerciseRow
-                key={i}
-                letter={LETTERS[li] ?? "•"}
-                ex={ex}
-                library={exercises}
-                focused={focused === i}
-                onFocus={() => setFocused(i)}
-                onBlur={() => setFocused((f) => (f === i ? null : f))}
-                onPatch={(patch) => setExercise(i, patch)}
-                onRemove={() => removeExercise(i)}
-                onPreview={setPreview}
-              />
-            ))}
+            {rows.length > 0 && (
+              // Horizontal scroll on narrow screens instead of crushing the name
+              // column (same pattern the *View list tables use — grep overflowX).
+              // paddingBottom+marginBottom cancel out for layout (net-zero height
+              // contribution below) but extend this scroll container's own clip
+              // box downward, so the name-search dropdown (position:absolute,
+              // up to ~240px tall) doesn't get cut off when it opens on the last
+              // row — overflow-x:auto here forces overflow-y to compute as "auto"
+              // too (an axis can't stay "visible" once the other isn't), which
+              // would otherwise clip it.
+              <div style={{ overflowX: "auto", paddingBottom: 260, marginBottom: -260 }}>
+                <div style={{ minWidth: 560, display: "flex", flexDirection: "column", gap: 14 }}>
+                  {rows.map(({ ex, i }, li) => (
+                    <ExerciseRow
+                      key={i}
+                      letter={LETTERS[li] ?? "•"}
+                      ex={ex}
+                      library={exercises}
+                      focused={focused === i}
+                      onFocus={() => setFocused(i)}
+                      onBlur={() => setFocused((f) => (f === i ? null : f))}
+                      onPatch={(patch) => setExercise(i, patch)}
+                      onRemove={() => removeExercise(i)}
+                      onPreview={setPreview}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
             <div>
               <Button variant="ghost" size="sm" onClick={() => addExercise(sec.key)}>
                 <Plus size={14} /> Add an Exercise

@@ -158,7 +158,7 @@ export function BlogPostEditor({
   const scheduled = post.publishState === "scheduled";
 
   return (
-    <div style={{ display: "grid", gap: 16, gridTemplateColumns: "minmax(0,1fr) 320px" }}>
+    <div className="cms-editor-grid" style={{ display: "grid", gap: 16, gridTemplateColumns: "minmax(0,1fr) 320px" }}>
       <form action={onSave}>
         <Card style={{ display: "grid", gap: 16 }}>
           <div>

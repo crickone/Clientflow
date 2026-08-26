@@ -535,6 +535,25 @@ a {
   .combined-grid { grid-template-columns: 1fr; }
 }
 
+/* Campaign composer: fixed 1fr/320px two-pane grid (composer + audience/
+   actions sidebar) — stack to one column on narrow screens so the sidebar
+   doesn't crush the composer fields. Inline style sets grid-template-columns
+   directly, hence !important to win (mirrors .dash-split above). */
+@media (max-width: 860px) {
+  .campaign-editor-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* CMS Page/Blog editors: fixed minmax(0,1fr)/320px grid — same fix, the
+   320px settings sidebar drops below the main editing column on narrow
+   screens instead of crushing it. */
+@media (max-width: 860px) {
+  .cms-editor-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 /* Timetable "next class" pulse — ring colour comes from --tt-pulse on the element */
 @keyframes ttNextPulse {
   0% {

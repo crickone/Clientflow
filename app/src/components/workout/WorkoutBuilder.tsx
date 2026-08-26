@@ -114,15 +114,23 @@ export function WorkoutBuilder({ initial, exercises }: { initial: WorkoutInput; 
             <div style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-secondary)", fontFamily: "var(--font-mono), monospace" }}>
               {sec.label}
             </div>
-            {rows.map(({ ex, i }, li) => (
-              <ExerciseRow
-                key={i}
-                letter={LETTERS[li] ?? "•"}
-                ex={ex}
-                onPatch={(patch) => setExercise(i, patch)}
-                onRemove={() => removeExercise(i)}
-              />
-            ))}
+            {rows.length > 0 && (
+              // Horizontal scroll on narrow screens instead of crushing the name
+              // column (same pattern the *View list tables use — grep overflowX).
+              <div style={{ overflowX: "auto" }}>
+                <div style={{ minWidth: 560, display: "flex", flexDirection: "column", gap: 14 }}>
+                  {rows.map(({ ex, i }, li) => (
+                    <ExerciseRow
+                      key={i}
+                      letter={LETTERS[li] ?? "•"}
+                      ex={ex}
+                      onPatch={(patch) => setExercise(i, patch)}
+                      onRemove={() => removeExercise(i)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
             <div>
               <Button variant="outline" size="sm" onClick={() => setPickerSection(sec.key)}>
                 <Plus size={14} /> Add an Exercise
