@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import { ExternalLink, FileText } from "lucide-react";
 
 export function euros(cents: number) {
   return `€${(cents / 100).toLocaleString("en-IE", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
@@ -31,5 +32,25 @@ export function PageTitle({ children, sub }: { children: ReactNode; sub?: string
       <h1 style={{ margin: 0, fontFamily: "var(--font-heading), sans-serif", fontSize: 24, textTransform: "uppercase", color: "var(--text-primary)" }}>{children}</h1>
       {sub && <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 3 }}>{sub}</div>}
     </div>
+  );
+}
+
+/** A tappable card linking out to an attached document (uploaded plan/program). Plain <a> — no
+ *  event handler, so (like Card/PageTitle above) it's safe to render from a Server Component too;
+ *  it just also happens to get used from the client-only plan/program detail views. */
+export function DocumentCard({ href, name, sub }: { href: string; name: string; sub?: string }) {
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+      <Card style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <span style={{ width: 40, height: 40, borderRadius: 10, background: "var(--surface-2)", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--accent-ink)", flexShrink: 0 }}>
+          <FileText size={18} />
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
+          <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{sub ?? "Tap to open"}</div>
+        </div>
+        <ExternalLink size={16} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
+      </Card>
+    </a>
   );
 }

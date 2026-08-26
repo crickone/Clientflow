@@ -1,4 +1,5 @@
-import { Salad } from "lucide-react";
+import Link from "next/link";
+import { ChevronRight, Salad } from "lucide-react";
 
 import { requireClientPage } from "@/lib/clientAuth";
 import { assignedNutritionPlans } from "@/lib/clientApp";
@@ -19,13 +20,16 @@ export default async function ClientNutritionPage() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {plans.map((p) => (
-            <Card key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px" }}>
-              <span style={iconBox}><Salad size={18} /></span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14.5, fontWeight: 600, color: "var(--text-primary)" }}>{p.title}</div>
-                <div style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>{TYPE_LABEL[p.type] ?? p.type}</div>
-              </div>
-            </Card>
+            <Link key={p.id} href={`/app/nutrition/${p.id}`}>
+              <Card style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px" }}>
+                <span style={iconBox}><Salad size={18} /></span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14.5, fontWeight: 600, color: "var(--text-primary)" }}>{p.title}</div>
+                  <div style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>{TYPE_LABEL[p.type] ?? p.type}</div>
+                </div>
+                <ChevronRight size={18} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
+              </Card>
+            </Link>
           ))}
         </div>
       )}

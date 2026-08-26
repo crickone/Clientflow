@@ -135,6 +135,22 @@ export function middleware(req: NextRequest) {
     return pass();
   }
 
+  // Client mobile app API routes (e.g. the assigned-plan document download).
+  // Same client session cookie as the /app/* pages above, but these are
+  // fetched/opened by API callers rather than navigated to — an HTML redirect
+  // to a login PAGE would be the wrong response here, so this is a 401 JSON
+  // instead. Without this branch these would fall through to the generic
+  // STAFF-session gate below and 307 a signed-in client (who has no staff
+  // `clientflow_session` cookie) to the staff /login. Real auth + per-client
+  // ownership is still enforced server-side in the route handler either way —
+  // this is just the fast edge-runtime gate, same as every other branch here.
+  if (pathname.startsWith("/api/app/")) {
+    if (!req.cookies.has("cf_client_session")) {
+      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    }
+    return pass();
+  }
+
   // Everything else requires the session cookie. Actual validation happens
   // server-side (route handlers / server components) — this is just a fast
   // edge-runtime gate before any heavy work runs.

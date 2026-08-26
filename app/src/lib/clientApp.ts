@@ -14,6 +14,10 @@ import {
   workoutPrograms,
 } from "@/lib/db/schema";
 import { addDaysIso, materializeWeek, todayIso, weekStartMonday } from "@/lib/timetable";
+import { getPlan } from "@/lib/nutrition";
+import type { PlanInput } from "@/lib/nutritionModel";
+import { getProgram } from "@/lib/workout";
+import type { ProgramInput } from "@/lib/workoutModel";
 
 // ── membership ─────────────────────────────────────────────────────────────────
 
@@ -249,4 +253,37 @@ export function assignedWorkoutPrograms(clientId: number): NamedPlan[] {
     .where(eq(clientWorkoutPrograms.clientId, clientId))
     .orderBy(desc(clientWorkoutPrograms.assignedAt))
     .all();
+}
+
+/**
+ * The FULL nutrition plan (days → meals → foods), but only when `planId` is
+ * actually assigned to `clientId` — the ownership check IS the query (an
+ * inner-join existence check against client_nutrition_plans), so a client can
+ * never open another client's plan, or one that exists tenant-wide but was
+ * never assigned to them, by guessing an id. Returns null for both cases
+ * (indistinguishable from "doesn't exist" on purpose — see the [id] pages,
+ * which turn this into a plain notFound()). Tenant isolation is separately
+ * guaranteed by `db` itself (see lib/db/tenant.ts): it's a per-request proxy
+ * bound to the signed-in client's own tenant file, so `planId` can only ever
+ * resolve within that tenant's data even before the ownership check runs.
+ */
+export function assignedNutritionPlanDetail(clientId: number, planId: number): PlanInput | null {
+  const owns = db
+    .select({ id: clientNutritionPlans.id })
+    .from(clientNutritionPlans)
+    .where(and(eq(clientNutritionPlans.clientId, clientId), eq(clientNutritionPlans.planId, planId)))
+    .get();
+  if (!owns) return null;
+  return getPlan(planId);
+}
+
+/** The FULL workout program (days → sections → exercises) — see assignedNutritionPlanDetail above. */
+export function assignedWorkoutProgramDetail(clientId: number, programId: number): ProgramInput | null {
+  const owns = db
+    .select({ id: clientWorkoutPrograms.id })
+    .from(clientWorkoutPrograms)
+    .where(and(eq(clientWorkoutPrograms.clientId, clientId), eq(clientWorkoutPrograms.programId, programId)))
+    .get();
+  if (!owns) return null;
+  return getProgram(programId);
 }
