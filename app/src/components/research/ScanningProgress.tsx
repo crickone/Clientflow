@@ -180,10 +180,7 @@ export function ScanningProgress({ active, result, onFinished, trackedCount }: S
 
   const succeeded = settled && !!result?.ok && !result.skipped;
   const refreshed = result?.refreshed ?? 0;
-  const eventCount = result?.events ?? 0;
-  const summaryLabel = `${refreshed} competitor${refreshed === 1 ? "" : "s"} refreshed${
-    eventCount > 0 ? ` · ${eventCount} change${eventCount === 1 ? "" : "s"} detected` : ""
-  }`;
+  const summaryLabel = `${refreshed} competitor${refreshed === 1 ? "" : "s"} refreshed`;
   const liveText = succeeded ? `Scan complete — ${summaryLabel}` : SCAN_STEPS[Math.min(stepIndex, LAST_STEP)].label;
 
   // Deliberately keyed on `succeeded`, not `settled`: a failure/skip must

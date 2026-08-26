@@ -2,7 +2,7 @@
 
 import { EyeOff, Key, Megaphone, Pin, Play, Unlink } from "lucide-react";
 
-import type { CompetitorRow as CompetitorRowData, EventRow, Metric, StoredAd, StoredReview } from "@/lib/research/store";
+import type { CompetitorRow as CompetitorRowData, Metric, StoredAd, StoredReview } from "@/lib/research/store";
 import { parseStoredAdAngle } from "@/lib/research/adAngleJson";
 import { parseStoredThemes } from "@/lib/research/themesJson";
 import { Badge } from "@/components/ui/Badge";
@@ -10,18 +10,17 @@ import { Button } from "@/components/ui/Button";
 import { CardLabel } from "@/components/ui/Card";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { formatDate } from "@/lib/utils";
-import { ChangedFeed } from "./ChangedFeed";
 import { Sparkline } from "./Sparkline";
 
 /**
  * The inline expand panel under a ranked row — Market Research P1, Task 10
- * (view) + Task 11 (the mute button + real onMarkSeen/onBuildCampaign
- * handlers ResearchView now passes down); Market Research P2, Task 6 added
+ * (view) + Task 11 (the mute button + real onBuildCampaign handler
+ * ResearchView now passes down); Market Research P2, Task 6 added
  * the "Ads" section below the reviews/themes grid. Renders ONLY from what
  * the parent (ResearchView, in turn fed by page.tsx) already has in hand:
  * this competitor's metric history, cached review sample, cached AI themes,
- * its stored ads (`listAds`, ALL of them — active and stopped — see the Ads
- * section below) + cached AI ad-angle, and its own slice of the event feed.
+ * and its stored ads (`listAds`, ALL of them — active and stopped — see the
+ * Ads section below) + cached AI ad-angle.
  * No fetch, no AI call, no Google/Meta call — every callback prop here is a
  * plain, synchronous-looking function; ResearchView owns the actual Server
  * Action calls behind them.
@@ -46,8 +45,6 @@ interface Props {
    *  genuinely none) vs. a quiet "connect the Ad Library" nudge
    *  (unconfigured) — never an error either way. */
   adLibraryConfigured: boolean;
-  /** This competitor's own events (pre-filtered by the caller from the tenant-wide feed). */
-  events: EventRow[];
   /** `getCurrentMembership()?.role === "admin"` (page.tsx) — gates the
    *  Link/Unlink controls in the Ads section below. The page this component
    *  is always mounted from is already `requireAdminPage()`-gated, so this
@@ -58,7 +55,6 @@ interface Props {
    *  between a non-admin and a write. */
   isAdmin: boolean;
   onBuildCampaign?: (competitorId: number) => void;
-  onMarkSeen?: (ids: number[]) => void;
   /** T11: curation (`setCompetitorFlagsAction(id,{muted:true})` upstream) —
    *  stop tracking this competitor. No confirmation UI to un-mute exists yet
    *  (P1.5), so this component confirms before firing it — see the button. */
@@ -195,6 +191,10 @@ function AdCard({
             fontSize: 10.5,
             color: "var(--text-tertiary)",
             fontFamily: "var(--font-mono), ui-monospace, monospace",
+            minWidth: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
           }}
         >
           {adRunDates(ad)}
@@ -226,10 +226,8 @@ export function CompetitorDetail({
   reviews,
   ads,
   adLibraryConfigured,
-  events,
   isAdmin,
   onBuildCampaign,
-  onMarkSeen,
   onMute,
   onLinkPage,
   onUnlinkPage,
@@ -413,16 +411,6 @@ export function CompetitorDetail({
             </p>
           </div>
         )}
-      </div>
-
-      <div style={{ marginTop: 20 }}>
-        <ChangedFeed
-          events={events}
-          title="Activity"
-          bordered={false}
-          emptyMessage="No changes recorded for this competitor yet."
-          onMarkSeen={onMarkSeen}
-        />
       </div>
 
       <div style={{ marginTop: 20, display: "flex", gap: 10, flexWrap: "wrap" }}>

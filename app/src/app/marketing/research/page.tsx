@@ -12,10 +12,8 @@ import {
   latestMetric,
   listAds,
   listCompetitors,
-  listEvents,
   metricHistory,
   type CompetitorRow,
-  type EventRow,
   type Metric,
   type StoredAd,
   type StoredReview,
@@ -25,7 +23,6 @@ import { ResearchView, type LandscapeCache, type ResearchState } from "@/compone
 import {
   rescanNowAction,
   setCompetitorFlagsAction,
-  markResearchEventsSeenAction,
   buildCampaignFromCompetitorAction,
   linkCompetitorPageAction,
   unlinkCompetitorPageAction,
@@ -54,7 +51,7 @@ function readLandscapeCache(): LandscapeCache | null {
 /**
  * Market Research P1, Task 10 (view) + Task 11 (the actions wired in below)
  * — the visible dashboard: a ranked competitor list with rating/review
- * trends, a "what changed" feed, and per-competitor detail. Every read below
+ * trends and per-competitor detail. Every read below
  * is a plain store/KV select (see the imports — store.ts, discovery.ts's
  * cache-only getResearchCentre, settings.ts's readKey, spend.ts's two pure
  * read-throughs) — NEVER a Google Places call or an AI call. Browsing this
@@ -132,7 +129,6 @@ export default async function MarketingResearchPage() {
     adsById[c.id] = listAds(c.id);
   }
 
-  const events: EventRow[] = listEvents({ limit: 20 });
   const landscape = readLandscapeCache();
 
   const tenantId = getCurrentTenant().id;
@@ -150,7 +146,7 @@ export default async function MarketingResearchPage() {
       <PageHeader
         eyebrow="Marketing"
         title="Research"
-        subtitle="Nearby competitors — ratings, reviews and a weekly change feed. Browsing is always free; only a scan spends."
+        subtitle="Nearby competitors — ratings, reviews and the ads they're running. Browsing is always free; only a scan spends."
       />
       <ResearchView
         state={state}
@@ -159,7 +155,6 @@ export default async function MarketingResearchPage() {
         historyById={historyById}
         reviewsById={reviewsById}
         adsById={adsById}
-        events={events}
         landscape={landscape}
         spendLabel={spendLabel}
         adLibraryConfigured={adsConfigured}
@@ -168,7 +163,6 @@ export default async function MarketingResearchPage() {
         isAdmin={isAdmin}
         onRescan={rescanNowAction}
         onSetFlags={setCompetitorFlagsAction}
-        onMarkSeen={markResearchEventsSeenAction}
         onBuildCampaign={buildCampaignFromCompetitorAction}
         onLinkPage={linkCompetitorPageAction}
         onUnlinkPage={unlinkCompetitorPageAction}

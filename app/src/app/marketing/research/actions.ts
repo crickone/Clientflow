@@ -13,7 +13,6 @@ import {
   clearCompetitorFacebookPage,
   latestMetric,
   listCompetitors,
-  markEventsSeen,
   setCompetitorFacebookPage,
   setCompetitorFlags,
 } from "@/lib/research/store";
@@ -218,18 +217,6 @@ export async function unlinkCompetitorPageAction(competitorId: number): Promise<
   } catch (err) {
     console.error("[marketing/research actions] unlinkCompetitorPageAction failed:", err);
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
-  }
-  revalidatePath(RESEARCH_PATH);
-  return { ok: true };
-}
-
-export async function markResearchEventsSeenAction(ids: number[]): Promise<{ ok: boolean }> {
-  await requireAdmin();
-  try {
-    markEventsSeen(ids);
-  } catch (err) {
-    console.error("[marketing/research actions] markResearchEventsSeenAction failed:", err);
-    return { ok: false };
   }
   revalidatePath(RESEARCH_PATH);
   return { ok: true };

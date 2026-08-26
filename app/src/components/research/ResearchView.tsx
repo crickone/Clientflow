@@ -6,7 +6,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Building2, Crown, Key, MapPin, MessageSquareText, RefreshCw, Search, Star, Users } from "lucide-react";
 import { toast } from "sonner";
 
-import type { CompetitorRow as CompetitorRowData, EventRow, Metric, StoredAd, StoredReview } from "@/lib/research/store";
+import type { CompetitorRow as CompetitorRowData, Metric, StoredAd, StoredReview } from "@/lib/research/store";
 import type { RescanResult } from "@/app/marketing/research/actions";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -14,7 +14,6 @@ import { Card, CardLabel } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { DUR, EASE } from "@/lib/motion";
 import { relativeTime } from "@/lib/utils";
-import { ChangedFeed } from "./ChangedFeed";
 import { CompetitorDetail } from "./CompetitorDetail";
 import { CompetitorRow } from "./CompetitorRow";
 import { ScanningProgress } from "./ScanningProgress";
@@ -36,17 +35,16 @@ import { ScanningProgress } from "./ScanningProgress";
  * `state` is decided by the server page (see that file's comment) and
  * simply switched on here — this component never re-derives it.
  *
- * `onRescan`/`onSetFlags`/`onMarkSeen`/`onBuildCampaign` are real Server
+ * `onRescan`/`onSetFlags`/`onBuildCampaign` are real Server
  * Actions (marketing/research/actions.ts), passed straight down from
  * page.tsx as props — a Server Component may hand a Server Action to a
  * Client Component this way; Next.js serialises it into a callable
  * reference. Still optional (never a hard requirement to render) so this
  * component degrades to inert buttons rather than crashing if ever mounted
  * without them. This component owns the useTransition/toast/router.refresh
- * plumbing around each call and hands its CHILDREN (ChangedFeed,
- * CompetitorDetail) the same plain, synchronous-looking callback shapes T10
- * already built them against — nothing below this component needs to know
- * a Server Action is involved at all.
+ * plumbing around each call and hands its CHILD (CompetitorDetail) the same
+ * plain, synchronous-looking callback shapes T10 already built it against —
+ * nothing below this component needs to know a Server Action is involved at all.
  *
  * P1.1 self-detection: `competitors` (and everything derived from it —
  * `computeCompetitorStats`, the Landscape stat tiles, the highlight badges)
@@ -90,8 +88,6 @@ interface ResearchViewProps {
    *  — ALL rows, active and stopped. Feeds both CompetitorRow's "Advertising"
    *  pill (active count) and CompetitorDetail's Ads gallery (the full list). */
   adsById: Record<number, StoredAd[]>;
-  /** Tenant-wide, newest-first, already capped (page.tsx calls listEvents({limit:20})). */
-  events: EventRow[];
   landscape: LandscapeCache | null;
   /** Pre-formatted ("€0.03 / €10.00 this month") — computed server-side so this
    *  client component never needs to import the AI-cost formatter (which
@@ -112,7 +108,6 @@ interface ResearchViewProps {
   isAdmin: boolean;
   onRescan?: () => Promise<RescanResult>;
   onSetFlags?: (id: number, flags: { tracked?: boolean; muted?: boolean }) => Promise<{ ok: boolean }>;
-  onMarkSeen?: (ids: number[]) => Promise<{ ok: boolean }>;
   onBuildCampaign?: (competitorId: number) => Promise<{ ok: boolean; href?: string; error?: string }>;
   /** Exact Page-ID ad matching, Task 2 — links a competitor to a specific Meta Page (marketing/research/actions.ts's linkCompetitorPageAction). */
   onLinkPage?: (competitorId: number, pageId: string, pageName: string) => Promise<{ ok: boolean; error?: string }>;
@@ -133,7 +128,6 @@ export function ResearchView({
   historyById,
   reviewsById,
   adsById,
-  events,
   landscape,
   spendLabel,
   adLibraryConfigured,
@@ -142,7 +136,6 @@ export function ResearchView({
   isAdmin,
   onRescan,
   onSetFlags,
-  onMarkSeen,
   onBuildCampaign,
   onLinkPage,
   onUnlinkPage,
@@ -185,20 +178,7 @@ export function ResearchView({
         return;
       }
       const n = result.refreshed ?? 0;
-      const evLabel = result.events ? `, ${result.events} change${result.events === 1 ? "" : "s"} detected` : "";
-      toast.success(`Rescan complete — ${n} competitor${n === 1 ? "" : "s"} refreshed${evLabel}.`);
-      router.refresh();
-    });
-  }
-
-  function handleMarkSeen(ids: number[]) {
-    if (!onMarkSeen) return;
-    startCuration(async () => {
-      const result = await onMarkSeen(ids);
-      if (!result.ok) {
-        toast.error("Couldn't mark as seen — please try again.");
-        return;
-      }
+      toast.success(`Rescan complete — ${n} competitor${n === 1 ? "" : "s"} refreshed.`);
       router.refresh();
     });
   }
@@ -310,14 +290,6 @@ export function ResearchView({
   }
 
   const stats = computeCompetitorStats(competitors, metricsById);
-  // Feeds ChangedFeed's forward-looking classification (isForwardLookingFeed,
-  // lib/research/feedState.ts) — has ANY tracked competitor had a second
-  // metric capture yet, i.e. has a refresh cycle beyond the very first ever
-  // run? historyById already excludes self (built from this same
-  // self-excluding `competitors` list), which is fine: it only takes ONE
-  // real competitor's history to carry this signal, and ChangedFeed can't
-  // render at all with zero real competitors (state would be "empty").
-  const hasSubsequentScan = Object.values(historyById).some((h) => h.length > 1);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
@@ -406,8 +378,6 @@ export function ResearchView({
                   <p style={{ fontSize: 13.5, color: "var(--text-tertiary)", margin: 0 }}>Run a scan to generate a landscape summary.</p>
                 )}
               </Card>
-
-              <ChangedFeed events={events} onMarkSeen={handleMarkSeen} hasSubsequentScan={hasSubsequentScan} />
 
               <Card style={{ padding: 0, overflow: "hidden" }}>
                 <div style={{ padding: "16px 16px 4px" }}>
@@ -510,9 +480,7 @@ export function ResearchView({
                             reviews={reviewsById[c.id] ?? []}
                             ads={ads}
                             adLibraryConfigured={adLibraryConfigured}
-                            events={events.filter((e) => e.competitorId === c.id)}
                             isAdmin={isAdmin}
-                            onMarkSeen={handleMarkSeen}
                             onBuildCampaign={handleBuildCampaign}
                             onMute={handleMute}
                             onLinkPage={handleLinkPage}
@@ -579,10 +547,19 @@ export function ResearchView({
             .mres-ad-card {
               display: flex;
               flex-direction: column;
+              min-width: 0;
+              overflow: hidden;
               background: var(--surface-1);
               border: 1px solid var(--hairline);
               border-radius: var(--radius);
-              padding: 12px;
+              padding: 14px;
+              box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+              transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
+            }
+            .mres-ad-card:hover {
+              transform: translateY(-3px);
+              box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
+              border-color: var(--accent-ink);
             }
             .mres-ad-thumb {
               display: block;
@@ -619,8 +596,10 @@ export function ResearchView({
               align-items: center;
               justify-content: space-between;
               gap: 8px;
+              row-gap: 8px;
+              flex-wrap: wrap;
               margin-top: auto;
-              padding-top: 8px;
+              padding-top: 10px;
               border-top: 1px solid var(--hairline);
             }
             .mres-ad-watch {
