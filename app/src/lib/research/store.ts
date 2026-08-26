@@ -88,6 +88,12 @@ export type CompetitorRow = {
   facebookPageId: string | null;
   /** Human-readable label for facebookPageId, set together with it — display only, never used for matching. */
   facebookPageName: string | null;
+  /** Content-gap analysis: the competitor's own site (Google Places' websiteUri, or admin-set) — see setCompetitorWebsite. Null until Google returns one or an admin sets it. */
+  websiteUri: string | null;
+  /** When contentScan.ts's scanCompetitorContent last crawled this site — a real JS Date (drizzle's timestamp_ms mode), null before the first scan. Convert with `.getTime()` where an epoch number is more convenient (see getContentGaps). */
+  contentScannedAt: Date | null;
+  /** AI-derived site-level topic set from the last content scan (topics.ts's deriveSiteTopics), a plain JSON string[] — see setCompetitorContentTopics. Null before the first scan. */
+  contentTopicsJson: string | null;
   addedBy: string;
   firstSeenAt: string;
   lastRefreshedAt: string | null;
@@ -601,4 +607,169 @@ export function markAdsStopped(competitorId: number, adIds: string[], at: string
 /** Caches Task 5's AI ad-angle summary on the owning competitor row — mirrors setCompetitorThemes's shape exactly, for ads instead of reviews. */
 export function setCompetitorAdAngle(competitorId: number, adAngleJson: string, at: string): void {
   db.update(schema.competitors).set({ adAngleJson, adAngleAt: at }).where(eq(schema.competitors.id, competitorId)).run();
+}
+
+// ── content-gap analysis (competitor site pages + crawl bookkeeping) ────
+
+/**
+ * Sets a competitor's own site. The ONLY legitimate callers are refresh.ts
+ * (Google Places' `websiteUri`, guarded there on `if (detail.websiteUri)` so
+ * a cycle where Google omits the field never clobbers what's already
+ * stored) and a future admin "set website by hand" control — either way,
+ * this setter itself always takes a real, non-empty URL string; there is no
+ * "clear" counterpart because nothing in this feature needs one yet.
+ */
+export function setCompetitorWebsite(id: number, websiteUri: string): void {
+  db.update(schema.competitors).set({ websiteUri }).where(eq(schema.competitors.id, id)).run();
+}
+
+/** Stamps when contentScan.ts's scanCompetitorContent last crawled this competitor's site — a real JS Date (drizzle's timestamp_ms mode), mirroring runStore.ts's `new Date()` convention for its own timestamp_ms columns (not this table's usual ISO-string touchRefreshed/setCompetitorThemes calls). */
+export function setCompetitorContentScannedAt(id: number, at: Date): void {
+  db.update(schema.competitors).set({ contentScannedAt: at }).where(eq(schema.competitors.id, id)).run();
+}
+
+/** Caches the AI-derived site-level topic set (topics.ts's deriveSiteTopics) as a plain JSON string[] — no companion `_at` column, unlike themesJson/adAngleJson, because contentScannedAt (set in the same crawl pass) already timestamps it. */
+export function setCompetitorContentTopics(id: number, topicsJson: string): void {
+  db.update(schema.competitors).set({ contentTopicsJson: topicsJson }).where(eq(schema.competitors.id, id)).run();
+}
+
+/** The on-page SEO read of one crawled page (lib/research/seo.ts's PageSeo) plus where it was found — the shape `replaceCompetitorPages` inserts and `listCompetitorPages`/`listAllCompetitorPagesWithCompetitor` read back. `topic` is optional on write (omitted/undefined -> stored NULL) — a future per-page AI mapping step's hook; contentScan.ts never sets it today (see schema.ts's module doc). */
+export type NewCompetitorPage = {
+  url: string;
+  path: string;
+  title: string | null;
+  metaDescription: string | null;
+  h1: string | null;
+  h2s: string[];
+  wordCount: number;
+  topic?: string | null;
+};
+
+/** A stored competitor_pages row, JSON/Date-parsed back into app shapes — mirrors StoredAd's role for competitor_ads. `fetchedAt` is epoch ms (converted from the column's real Date via `.getTime()`, mirroring runStore.ts's RunRecord conversion) rather than a Date, so this type stays plain-JSON-serialisable for a Server Component prop / API response. */
+export type StoredCompetitorPage = {
+  id: number;
+  competitorId: number;
+  url: string;
+  path: string;
+  title: string | null;
+  metaDescription: string | null;
+  h1: string | null;
+  h2s: string[];
+  wordCount: number;
+  topic: string | null;
+  fetchedAt: number;
+};
+
+function toStoredCompetitorPage(row: typeof schema.competitorPages.$inferSelect): StoredCompetitorPage {
+  return {
+    id: row.id,
+    competitorId: row.competitorId,
+    url: row.url,
+    path: row.path,
+    title: row.title,
+    metaDescription: row.metaDescription,
+    h1: row.h1,
+    h2s: parseJsonStringArray(row.h2sJson ?? "[]"),
+    wordCount: row.wordCount,
+    topic: row.topic,
+    fetchedAt: row.fetchedAt.getTime(),
+  };
+}
+
+/**
+ * Wholesale swap, same "delete + re-insert in one transaction" contract as
+ * replaceReviews above: a scan REPLACES a competitor's whole crawled page
+ * set, never appends to it, so a reader never sees a moment with zero pages
+ * between the delete and the insert, and a competitor's page list always
+ * reflects only its most recent crawl. `fetchedAt` is a single shared
+ * timestamp for the whole crawl batch (mirrors replaceReviews' own
+ * `capturedAt` parameter) rather than a per-page value — the pages of one
+ * scan are conceptually "captured together", even though the underlying
+ * fetches were paced with a small delay between requests (see crawl.ts).
+ */
+export function replaceCompetitorPages(competitorId: number, pages: NewCompetitorPage[], fetchedAt: Date): void {
+  db.transaction((tx) => {
+    tx.delete(schema.competitorPages).where(eq(schema.competitorPages.competitorId, competitorId)).run();
+    if (pages.length > 0) {
+      tx.insert(schema.competitorPages)
+        .values(
+          pages.map((p) => ({
+            competitorId,
+            url: p.url,
+            path: p.path,
+            title: p.title,
+            metaDescription: p.metaDescription,
+            h1: p.h1,
+            h2sJson: JSON.stringify(p.h2s),
+            wordCount: p.wordCount,
+            topic: p.topic ?? null,
+            fetchedAt,
+          })),
+        )
+        .run();
+    }
+  });
+}
+
+/** One competitor's crawled pages, in crawl/insertion order (id asc — the order discoverUrls returned them in). Empty array (never throwing) for a competitor never scanned yet, mirroring getReviews'/listAds' "nothing yet -> []" contract. */
+export function listCompetitorPages(competitorId: number): StoredCompetitorPage[] {
+  return db
+    .select()
+    .from(schema.competitorPages)
+    .where(eq(schema.competitorPages.competitorId, competitorId))
+    .orderBy(asc(schema.competitorPages.id))
+    .all()
+    .map(toStoredCompetitorPage);
+}
+
+export type CompetitorPageWithCompetitor = StoredCompetitorPage & {
+  competitorName: string;
+  isSelf: boolean;
+};
+
+/**
+ * Every tracked-or-not competitor's crawled pages, tenant-wide, joined to
+ * the owning competitor's name/isSelf — the read the gap computation
+ * (contentScan.ts's getContentGaps) and the UI's per-competitor site
+ * breakdown both need, so neither has to N+1 across `listCompetitorPages`
+ * per competitor. Ordered by competitor then page id, so a caller grouping
+ * by `competitorId` gets each competitor's pages back in the same
+ * crawl/insertion order `listCompetitorPages` would.
+ */
+export function listAllCompetitorPagesWithCompetitor(): CompetitorPageWithCompetitor[] {
+  return db
+    .select({
+      id: schema.competitorPages.id,
+      competitorId: schema.competitorPages.competitorId,
+      url: schema.competitorPages.url,
+      path: schema.competitorPages.path,
+      title: schema.competitorPages.title,
+      metaDescription: schema.competitorPages.metaDescription,
+      h1: schema.competitorPages.h1,
+      h2sJson: schema.competitorPages.h2sJson,
+      wordCount: schema.competitorPages.wordCount,
+      topic: schema.competitorPages.topic,
+      fetchedAt: schema.competitorPages.fetchedAt,
+      competitorName: schema.competitors.name,
+      isSelf: schema.competitors.isSelf,
+    })
+    .from(schema.competitorPages)
+    .innerJoin(schema.competitors, eq(schema.competitors.id, schema.competitorPages.competitorId))
+    .orderBy(asc(schema.competitorPages.competitorId), asc(schema.competitorPages.id))
+    .all()
+    .map((r) => ({
+      id: r.id,
+      competitorId: r.competitorId,
+      url: r.url,
+      path: r.path,
+      title: r.title,
+      metaDescription: r.metaDescription,
+      h1: r.h1,
+      h2s: parseJsonStringArray(r.h2sJson ?? "[]"),
+      wordCount: r.wordCount,
+      topic: r.topic,
+      fetchedAt: r.fetchedAt.getTime(),
+      competitorName: r.competitorName,
+      isSelf: r.isSelf,
+    }));
 }

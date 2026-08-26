@@ -88,6 +88,12 @@ const requireLocal = createRequire(import.meta.url);
     setCompetitorAdAngle,
     setCompetitorFacebookPage,
     clearCompetitorFacebookPage,
+    setCompetitorWebsite,
+    setCompetitorContentScannedAt,
+    setCompetitorContentTopics,
+    replaceCompetitorPages,
+    listCompetitorPages,
+    listAllCompetitorPagesWithCompetitor,
   } = requireLocal("./store") as typeof import("./store");
 
   // ── scratch tenant (control row + a real tenant db file) ──
@@ -460,6 +466,7 @@ const requireLocal = createRequire(import.meta.url);
     assert.ok(indexNames("competitor_events").includes("idx_competitor_events_seen"));
     assert.ok(indexNames("competitor_ads").includes("idx_competitor_ads_competitor_ad"));
     assert.ok(indexNames("competitor_ads").includes("idx_competitor_ads_competitor"));
+    assert.ok(indexNames("competitor_pages").includes("idx_competitor_pages_competitor"));
 
     // ── 8. competitor ads (Market Research P2, Task 3) ──
     const adA: AdLite = {
@@ -761,6 +768,123 @@ const requireLocal = createRequire(import.meta.url);
       "NULL facebook_page_id (pre-migration row) reads back as null, not throwing",
     );
     assert.equal(preMigrationCompetitor.facebookPageName, null, "NULL facebook_page_name reads back as null too");
+
+    // ── 9. Content-gap analysis: website + content-scan bookkeeping ──
+    let compForWebsite = runWithTenant(tid, () => listCompetitors()).find((c) => c.id === idA)!;
+    assert.equal(compForWebsite.websiteUri, null, "websiteUri is null before any scan/Places response sets it");
+    assert.equal(compForWebsite.contentScannedAt, null, "contentScannedAt is null before the first scan");
+    assert.equal(compForWebsite.contentTopicsJson, null, "contentTopicsJson is null before the first scan");
+
+    runWithTenant(tid, () => setCompetitorWebsite(idA, "https://irongym.example.com"));
+    compForWebsite = runWithTenant(tid, () => listCompetitors()).find((c) => c.id === idA)!;
+    assert.equal(compForWebsite.websiteUri, "https://irongym.example.com", "setCompetitorWebsite persists");
+
+    const scannedAt = new Date("2026-08-20T09:00:00.000Z");
+    runWithTenant(tid, () => setCompetitorContentScannedAt(idA, scannedAt));
+    compForWebsite = runWithTenant(tid, () => listCompetitors()).find((c) => c.id === idA)!;
+    assert.ok(compForWebsite.contentScannedAt instanceof Date, "contentScannedAt round-trips as a real Date (timestamp_ms mode)");
+    assert.equal(compForWebsite.contentScannedAt!.getTime(), scannedAt.getTime(), "setCompetitorContentScannedAt persists the exact instant");
+
+    runWithTenant(tid, () => setCompetitorContentTopics(idA, JSON.stringify(["sports massage", "deep tissue massage"])));
+    compForWebsite = runWithTenant(tid, () => listCompetitors()).find((c) => c.id === idA)!;
+    assert.deepEqual(JSON.parse(compForWebsite.contentTopicsJson!), ["sports massage", "deep tissue massage"]);
+    assert.equal(compForWebsite.themesJson, null, "setCompetitorContentTopics only touches its own column, not the sibling themesJson cache");
+
+    const compForWebsiteOther = runWithTenant(tid, () => listCompetitors()).find((c) => c.id === idB)!;
+    assert.equal(compForWebsiteOther.websiteUri, null, "setCompetitorWebsite is scoped to the given competitor id only");
+
+    // ── 10. replaceCompetitorPages / listCompetitorPages (wholesale swap) ──
+    assert.deepEqual(runWithTenant(tid, () => listCompetitorPages(idA)), [], "a competitor with no crawl yet reads as [], not throwing");
+
+    const fetchedAt1 = new Date("2026-08-20T09:05:00.000Z");
+    runWithTenant(tid, () =>
+      replaceCompetitorPages(
+        idA,
+        [
+          {
+            url: "https://irongym.example.com/",
+            path: "/",
+            title: "Iron Gym | Home",
+            metaDescription: "Welcome to Iron Gym",
+            h1: "Welcome to Iron Gym",
+            h2s: ["Our classes", "Opening hours"],
+            wordCount: 180,
+          },
+          {
+            url: "https://irongym.example.com/services/sports-massage",
+            path: "/services/sports-massage",
+            title: "Sports Massage",
+            metaDescription: null,
+            h1: "Sports Massage",
+            h2s: [],
+            wordCount: 320,
+            topic: "sports massage",
+          },
+        ],
+        fetchedAt1,
+      ),
+    );
+    let pagesA = runWithTenant(tid, () => listCompetitorPages(idA));
+    assert.equal(pagesA.length, 2, "both pages inserted");
+    assert.deepEqual(pagesA.map((p) => p.url), ["https://irongym.example.com/", "https://irongym.example.com/services/sports-massage"], "insertion order preserved (id asc)");
+    const homePage = pagesA[0];
+    assert.equal(homePage.competitorId, idA);
+    assert.equal(homePage.path, "/");
+    assert.equal(homePage.title, "Iron Gym | Home");
+    assert.equal(homePage.metaDescription, "Welcome to Iron Gym");
+    assert.equal(homePage.h1, "Welcome to Iron Gym");
+    assert.deepEqual(homePage.h2s, ["Our classes", "Opening hours"], "h2s round-trips as a real array, not a JSON string");
+    assert.equal(homePage.wordCount, 180);
+    assert.equal(homePage.topic, null, "topic defaults to null when omitted");
+    assert.equal(typeof homePage.fetchedAt, "number", "fetchedAt round-trips as epoch ms (a number), not a Date");
+    assert.equal(homePage.fetchedAt, fetchedAt1.getTime());
+    const servicePage = pagesA[1];
+    assert.deepEqual(servicePage.h2s, [], "an empty h2s array round-trips as [], not null");
+    assert.equal(servicePage.topic, "sports massage", "an explicit topic is stored when given");
+
+    assert.deepEqual(runWithTenant(tid, () => listCompetitorPages(idB)), [], "replaceCompetitorPages is scoped to the given competitor id only -- idB unaffected");
+
+    // Swap again with a different, smaller set (down to 1 page) -- the OLD rows must be gone, not appended to.
+    const fetchedAt2 = new Date("2026-08-21T09:00:00.000Z");
+    runWithTenant(tid, () =>
+      replaceCompetitorPages(
+        idA,
+        [{ url: "https://irongym.example.com/about", path: "/about", title: "About", metaDescription: null, h1: null, h2s: [], wordCount: 50 }],
+        fetchedAt2,
+      ),
+    );
+    pagesA = runWithTenant(tid, () => listCompetitorPages(idA));
+    assert.equal(pagesA.length, 1, "the previous 2-page crawl was fully replaced, not appended to");
+    assert.equal(pagesA[0].url, "https://irongym.example.com/about");
+    assert.equal(pagesA[0].fetchedAt, fetchedAt2.getTime());
+
+    // Swap down to zero pages (e.g. a re-scan that found nothing crawlable).
+    runWithTenant(tid, () => replaceCompetitorPages(idA, [], new Date("2026-08-22T09:00:00.000Z")));
+    assert.deepEqual(runWithTenant(tid, () => listCompetitorPages(idA)), [], "an empty page set clears the crawl entirely");
+
+    // ── 11. listAllCompetitorPagesWithCompetitor (tenant-wide join) ──
+    runWithTenant(tid, () =>
+      replaceCompetitorPages(
+        idA,
+        [{ url: "https://irongym.example.com/", path: "/", title: "Iron Gym", metaDescription: null, h1: null, h2s: [], wordCount: 10 }],
+        new Date("2026-08-23T00:00:00.000Z"),
+      ),
+    );
+    runWithTenant(tid, () =>
+      replaceCompetitorPages(
+        idB,
+        [{ url: "https://puregym.example.com/", path: "/", title: "PureGym", metaDescription: null, h1: null, h2s: [], wordCount: 10 }],
+        new Date("2026-08-23T00:00:00.000Z"),
+      ),
+    );
+    const allPages = runWithTenant(tid, () => listAllCompetitorPagesWithCompetitor());
+    assert.equal(allPages.length, 2, "tenant-wide -- both competitors' pages show up in one call");
+    const allPagesForA = allPages.find((p) => p.competitorId === idA)!;
+    assert.equal(allPagesForA.competitorName, "Anytime Fitness Clonmel (renamed)", "joined competitorName matches the owning competitor's current name");
+    assert.equal(allPagesForA.isSelf, false, "joined isSelf reflects the owning competitor's current flag");
+    assert.equal(allPagesForA.title, "Iron Gym", "the page's own StoredCompetitorPage fields are still all present");
+    const allPagesForB = allPages.find((p) => p.competitorId === idB)!;
+    assert.equal(allPagesForB.competitorName, "PureGym Clonmel");
 
     console.log("research/store.test.ts: all assertions passed");
   } finally {

@@ -2131,6 +2131,65 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     console.error("[db] competitors facebook_page migration failed:", err);
   }
 
+  // Content-gap analysis: `website_uri` (sourced from Google Places'
+  // websiteUri via refresh.ts, or set by hand — see lib/research/store.ts's
+  // setCompetitorWebsite), `content_scanned_at` (when contentScan.ts last
+  // crawled this site; INTEGER timestamp_ms, not this table's usual ISO
+  // TEXT — see schema.ts's Drizzle mirror for why), and `content_topics_json`
+  // (the AI-derived site-level topic set contentScan.ts caches after each
+  // crawl — a plain JSON string[], no companion `_at` column needed since
+  // content_scanned_at already timestamps the same pass). Column-add
+  // migration, PRAGMA-guarded + idempotent like is_self/ad_angle_json/
+  // facebook_page above; runs once, a rerun sees all three already there and
+  // no-ops. Additive + nullable: every pre-existing competitor reads back
+  // NULL/NULL/NULL (no site scanned yet) and behaves exactly as it did
+  // before this feature. Drizzle mirror in schema.ts.
+  try {
+    const cols = sqlite.prepare("PRAGMA table_info(competitors)").all() as Array<{ name: string }>;
+    const colNames = new Set(cols.map((c) => c.name));
+    if (!colNames.has("website_uri")) {
+      sqlite.exec("ALTER TABLE competitors ADD COLUMN website_uri TEXT");
+    }
+    if (!colNames.has("content_scanned_at")) {
+      sqlite.exec("ALTER TABLE competitors ADD COLUMN content_scanned_at INTEGER");
+    }
+    if (!colNames.has("content_topics_json")) {
+      sqlite.exec("ALTER TABLE competitors ADD COLUMN content_topics_json TEXT");
+    }
+  } catch (err) {
+    console.error("[db] competitors content-gap migration failed:", err);
+  }
+
+  // Content-gap analysis: one row per page a competitor's site crawl found +
+  // read the on-page SEO of (lib/research/seo.ts + crawl.ts + contentScan.ts).
+  // A scan replaces a competitor's whole page set wholesale
+  // (lib/research/store.ts's replaceCompetitorPages), never appended to. A
+  // REAL enforced FK with ON DELETE CASCADE (unlike the other competitor_*
+  // tables above, which deliberately follow the literal "no enforced FK" DDL)
+  // — `foreign_keys = ON` is already set for every tenant connection (see
+  // openTenantDb above), and this app already uses the identical
+  // REFERENCES ... ON DELETE CASCADE pattern extensively elsewhere (e.g.
+  // carousel_slides -> carousel_sets). `fetched_at` is INTEGER timestamp_ms,
+  // matching content_scanned_at's same deliberate deviation from this table
+  // group's usual ISO TEXT convention. Drizzle mirror in schema.ts — same
+  // shape + index name, kept in sync.
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS competitor_pages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      competitor_id INTEGER NOT NULL REFERENCES competitors(id) ON DELETE CASCADE,
+      url TEXT NOT NULL,
+      path TEXT NOT NULL,
+      title TEXT,
+      meta_description TEXT,
+      h1 TEXT,
+      h2s_json TEXT,
+      word_count INTEGER NOT NULL DEFAULT 0,
+      topic TEXT,
+      fetched_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_competitor_pages_competitor ON competitor_pages(competitor_id);
+  `);
+
   // Batch 6b (improvement-plan-2026-08.md Theme E1): tracking table for the
   // versioned migration runner (./migrations) — separate from everything
   // above, which is the additive bootstrap. Created here too (in addition to

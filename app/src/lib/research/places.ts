@@ -82,7 +82,14 @@ const INCLUDED_PLACE_TYPES = ["gym", "fitness_center", "sports_complex", "swimmi
 
 const NEARBY_FIELD_MASK =
   "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount";
-const DETAILS_FIELD_MASK = "id,displayName,formattedAddress,rating,userRatingCount,reviews";
+// `websiteUri` (Content-gap analysis): the competitor's own site, threaded
+// through PlaceDetail below so refresh.ts can persist it onto
+// competitors.websiteUri (lib/research/store.ts's setCompetitorWebsite) —
+// the seed URL lib/research/crawl.ts's discoverUrls crawls. Google omits the
+// field entirely for a place with no website on file, same "genuinely
+// optional, left undefined rather than coerced" contract as rating/
+// reviewCount below.
+const DETAILS_FIELD_MASK = "id,displayName,formattedAddress,rating,userRatingCount,reviews,websiteUri";
 
 export function placesConfigured(): boolean {
   return !!process.env.GOOGLE_PLACES_API_KEY;
@@ -138,6 +145,8 @@ export type PlaceDetail = {
   rating?: number;
   reviewCount?: number;
   reviews: ReviewLite[];
+  /** Content-gap analysis: Google's `websiteUri` for this place — undefined when Google has none on file (never coerced to ""). */
+  websiteUri?: string;
 };
 
 /**
@@ -304,6 +313,8 @@ export async function placeDetails(
     if (typeof rating === "number") detail.rating = rating;
     const reviewCount = prop(data, "userRatingCount");
     if (typeof reviewCount === "number") detail.reviewCount = reviewCount;
+    const websiteUri = prop(data, "websiteUri");
+    if (typeof websiteUri === "string" && websiteUri.length > 0) detail.websiteUri = websiteUri;
     return { ok: true, detail };
   } catch (err) {
     return { ok: false, error: `placeDetails failed: ${errorMessage(err)}` };

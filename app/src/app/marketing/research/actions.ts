@@ -3,12 +3,15 @@
 import { revalidatePath } from "next/cache";
 
 import { requireAdmin } from "@/lib/auth";
+import { getCurrentTenant } from "@/lib/db/tenant";
 import { buildCampaignSeedHref } from "@/components/marketing/buildCampaignSeed";
 import { buildCompetitorGapSeed } from "@/lib/research/campaignGap";
 import { mostRecentRefreshAt, wasRecentlyScanned } from "@/lib/research/debounce";
 import { refreshTenant } from "@/lib/research/refresh";
 import { competitorThemes, landscapeSummary, adAngle } from "@/lib/research/summary";
 import { adLibraryConfigured } from "@/lib/research/adLibrary";
+import { scanCompetitorContent } from "@/lib/research/contentScan";
+import { setResearchKeywords } from "@/lib/research/keywords";
 import {
   clearCompetitorFacebookPage,
   latestMetric,
@@ -286,4 +289,70 @@ export async function buildCampaignFromCompetitorAction(
     console.error("[marketing/research actions] buildCampaignFromCompetitorAction failed:", err);
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
+}
+
+// ── content-gap analysis ─────────────────────────────────────────────────
+
+export type ScanContentActionResult = {
+  ok: boolean;
+  scanned?: number;
+  pages?: number;
+  failures?: number;
+  error?: string;
+};
+
+/**
+ * "Scan competitor sites": requireAdmin -> `scanCompetitorContent(tenantId)`
+ * -> revalidate. Synchronous/blocking, same shape as `rescanNowAction`
+ * above (the button awaits this and shows the returned counts in a toast) —
+ * see that action's own doc comment for why this file is the only place in
+ * the feature that spends. `scanCompetitorContent` itself already never
+ * throws (lib/research/contentScan.ts's own contract: a per-competitor
+ * failure is caught, counted, and logged there, never propagated) — the
+ * try/catch here is defense in depth only, matching every other action in
+ * this file.
+ *
+ * Deliberately no debounce (unlike `rescanNowAction`'s 5-minute window): a
+ * content scan is an explicit, comparatively expensive, admin-only action
+ * with its own visible progress/result, not something wired into an
+ * opportunistic background cadence yet — a double-click wastes a little
+ * crawl/AI spend but can't corrupt anything (every write here is a wholesale
+ * replace, not an append).
+ */
+export async function scanContentAction(): Promise<ScanContentActionResult> {
+  await requireAdmin();
+  try {
+    const tenantId = getCurrentTenant().id;
+    const result = await scanCompetitorContent(tenantId);
+    revalidatePath(RESEARCH_PATH);
+    return { ok: true, scanned: result.scanned, pages: result.pages, failures: result.failures };
+  } catch (err) {
+    console.error("[marketing/research actions] scanContentAction failed:", err);
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Saves the tenant's target keyword list from a `<textarea name="keywords">`
+ * (a server-action `<form>`, per this file's usual style) — one keyword per
+ * line OR comma-separated, either works (split on both). Sanitisation
+ * (trim/dedupe/cap) happens inside `setResearchKeywords` itself
+ * (lib/research/keywords.ts) — this action just turns the raw textarea text
+ * into a plain string list.
+ */
+export async function saveResearchKeywordsAction(formData: FormData): Promise<{ ok: boolean; error?: string }> {
+  await requireAdmin();
+  try {
+    const raw = String(formData.get("keywords") ?? "");
+    const list = raw
+      .split(/[\n,]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    await setResearchKeywords(list);
+  } catch (err) {
+    console.error("[marketing/research actions] saveResearchKeywordsAction failed:", err);
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+  revalidatePath(RESEARCH_PATH);
+  return { ok: true };
 }

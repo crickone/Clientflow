@@ -2442,6 +2442,27 @@ export const competitors = sqliteTable(
     // clearCompetitorFacebookPage (lib/research/store.ts).
     facebookPageId: text("facebook_page_id"),
     facebookPageName: text("facebook_page_name"),
+    // Content-gap analysis: the competitor's own site, sourced from Google
+    // Places (New) `websiteUri` (places.ts's DETAILS_FIELD_MASK; wired onto
+    // this column by refresh.ts, never clobbered with null when Google omits
+    // it — see setCompetitorWebsite in lib/research/store.ts) or set by hand.
+    // `contentScannedAt`/`contentTopicsJson` are the crawl's own bookkeeping:
+    // when lib/research/contentScan.ts's scanCompetitorContent last crawled
+    // this site, and the AI-derived site-level topic set (topics.ts's
+    // deriveSiteTopics) it cached from that crawl — a PLAIN JSON string[],
+    // unlike themesJson/adAngleJson above (those wrap a `{..., at}` object;
+    // this column doesn't need a companion `_at` field of its own because
+    // contentScannedAt already timestamps the single crawl pass that fills
+    // both). Additive + nullable, same PRAGMA table_info-guarded ALTER TABLE
+    // pattern as every other column-add migration on this table
+    // (lib/db/tenant.ts) — not a new versioned migration. Deliberately
+    // INTEGER timestamp_ms (not this table's usual ISO TEXT convention —
+    // see the module doc above) to match agent_runs' created_at/updated_at
+    // convention instead; reads back as a JS Date via drizzle, converted to
+    // epoch ms at the store layer (see StoredCompetitorPage/getContentGaps).
+    websiteUri: text("website_uri"),
+    contentScannedAt: integer("content_scanned_at", { mode: "timestamp_ms" }),
+    contentTopicsJson: text("content_topics_json"),
     addedBy: text("added_by").notNull().default("auto"), // 'auto'|'manual'
     firstSeenAt: text("first_seen_at").notNull(),
     lastRefreshedAt: text("last_refreshed_at"),
@@ -2558,9 +2579,56 @@ export const competitorAds = sqliteTable(
   }),
 );
 
+// ── Content-gap analysis: one row per page a competitor's site crawl
+// (lib/research/crawl.ts + contentScan.ts) found and read the on-page SEO of
+// (lib/research/seo.ts's extractSeo, regex-only — no cheerio/jsdom). A scan
+// REPLACES a competitor's whole page set wholesale (lib/research/store.ts's
+// replaceCompetitorPages) — same "delete + re-insert in one transaction"
+// contract as replaceReviews above — never appended to, so a competitor's
+// page list always reflects only its MOST RECENT crawl. `competitor_id` is a
+// REAL enforced FK with ON DELETE CASCADE (unlike the other four
+// competitor_* tables above, which deliberately follow the literal
+// "no enforced FK" DDL) so deleting a competitor can never orphan its page
+// rows; `foreign_keys = ON` is already set for every tenant connection (see
+// lib/db/tenant.ts's openTenantDb), and this app already uses the identical
+// REFERENCES ... ON DELETE CASCADE pattern extensively elsewhere (e.g.
+// carousel_slides -> carousel_sets). `h2s_json` is a JSON string[], the same
+// JSON-in-TEXT convention as competitor_ads.bodies/platforms above. `topic`
+// is the (optional) AI-derived per-page topic — topics.ts's deriveSiteTopics
+// only derives a SITE-level topic set today (cached on competitors.
+// content_topics_json), so this column is currently always null on write;
+// it exists so a future per-page mapping step has somewhere to land without
+// another migration. `fetched_at` is INTEGER timestamp_ms (not this table
+// group's usual ISO TEXT) — matches competitors.content_scanned_at's same
+// deliberate deviation, see that column's doc comment. Matches the CREATE
+// TABLE in ensureTenantTables (lib/db/tenant.ts) — same shape + index name,
+// kept in sync.
+export const competitorPages = sqliteTable(
+  "competitor_pages",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    competitorId: integer("competitor_id")
+      .notNull()
+      .references(() => competitors.id, { onDelete: "cascade" }),
+    url: text("url").notNull(),
+    path: text("path").notNull(),
+    title: text("title"),
+    metaDescription: text("meta_description"),
+    h1: text("h1"),
+    h2sJson: text("h2s_json"), // JSON string[], capped ~10 by seo.ts's extractSeo
+    wordCount: integer("word_count").notNull().default(0),
+    topic: text("topic"), // AI-derived per-page topic; currently always null on write (see module doc above)
+    fetchedAt: integer("fetched_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => ({
+    byCompetitor: index("idx_competitor_pages_competitor").on(t.competitorId),
+  }),
+);
+
 export type Competitor = typeof competitors.$inferSelect;
 export type CompetitorMetricRow = typeof competitorMetrics.$inferSelect;
 export type CompetitorReviewRow = typeof competitorReviews.$inferSelect;
+export type CompetitorPageRow = typeof competitorPages.$inferSelect;
 export type CompetitorEventRow = typeof competitorEvents.$inferSelect;
 export type CompetitorAdRow = typeof competitorAds.$inferSelect;
 export type NewAgentRun = typeof agentRuns.$inferInsert;
