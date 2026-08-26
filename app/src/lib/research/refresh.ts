@@ -17,7 +17,6 @@ import {
   activeAdIds,
   upsertAd,
   markAdsStopped,
-  setCompetitorWebsite,
   type Metric,
 } from "./store";
 import { detectChanges } from "./changeDetect";
@@ -213,15 +212,6 @@ export async function refreshTenant(opts?: { radiusKm?: number; rediscover?: boo
       const reviewCount = detail.reviewCount ?? null;
       const capturedAt = new Date().toISOString();
       const next: Metric = { id: 0, competitorId: comp.id, capturedAt, ratingMilli, reviewCount };
-
-      // Content-gap analysis: only ever overwrite with a REAL Google-returned
-      // website — never clobber an existing (Google- or admin-set) URL with
-      // null just because this cycle's response happened to omit the field
-      // (places.ts already leaves `websiteUri` undefined rather than "" for
-      // exactly this reason — see its own doc comment).
-      if (detail.websiteUri) {
-        setCompetitorWebsite(comp.id, detail.websiteUri);
-      }
 
       appendMetric(comp.id, ratingMilli, reviewCount, capturedAt);
       replaceReviews(

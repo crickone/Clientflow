@@ -282,77 +282,9 @@ async function withApiKey<T>(value: string | undefined, fn: () => Promise<T>): P
         const headers = call.init?.headers as Record<string, string> | undefined;
         check("placeDetails: X-Goog-Api-Key header", headers?.["X-Goog-Api-Key"] === "test-key");
         check(
-          "placeDetails: X-Goog-FieldMask header (Content-gap analysis added websiteUri)",
-          headers?.["X-Goog-FieldMask"] === "id,displayName,formattedAddress,rating,userRatingCount,reviews,websiteUri",
+          "placeDetails: X-Goog-FieldMask header",
+          headers?.["X-Goog-FieldMask"] === "id,displayName,formattedAddress,rating,userRatingCount,reviews",
         );
-      },
-    );
-  });
-
-  // ════════════════════════════════════════════════════════════════════
-  // placeDetails — websiteUri (Content-gap analysis)
-  // ════════════════════════════════════════════════════════════════════
-  await withApiKey("test-key", async () => {
-    await withMockFetch(
-      () =>
-        new Response(
-          JSON.stringify({
-            id: "place-3",
-            displayName: { text: "Website Gym" },
-            formattedAddress: "4 Fourth St, Clonmel",
-            reviews: [],
-            websiteUri: "https://websitegym.example.com/",
-          }),
-          { status: 200 },
-        ),
-      async () => {
-        const result = await placeDetails("place-3");
-        check("placeDetails: websiteUri parsed when present", result.ok === true && result.detail.websiteUri === "https://websitegym.example.com/");
-      },
-    );
-  });
-
-  // Missing websiteUri entirely -> undefined (never "", never null) —
-  // Google omits the field for a place with no website on file, same
-  // "genuinely optional, left undefined" contract as rating/reviewCount.
-  await withApiKey("test-key", async () => {
-    await withMockFetch(
-      () =>
-        new Response(
-          JSON.stringify({
-            id: "place-4",
-            displayName: { text: "No Website Gym" },
-            formattedAddress: "5 Fifth St, Clonmel",
-            reviews: [],
-          }),
-          { status: 200 },
-        ),
-      async () => {
-        const result = await placeDetails("place-4");
-        check("placeDetails: missing websiteUri -> undefined", result.ok === true && result.detail.websiteUri === undefined);
-      },
-    );
-  });
-
-  // An empty-string websiteUri (defensive — shouldn't happen from Google,
-  // but a malformed/edge-case response must never store an empty URL) is
-  // treated the same as absent.
-  await withApiKey("test-key", async () => {
-    await withMockFetch(
-      () =>
-        new Response(
-          JSON.stringify({
-            id: "place-5",
-            displayName: { text: "Blank Website Gym" },
-            formattedAddress: "6 Sixth St, Clonmel",
-            reviews: [],
-            websiteUri: "",
-          }),
-          { status: 200 },
-        ),
-      async () => {
-        const result = await placeDetails("place-5");
-        check("placeDetails: an empty-string websiteUri -> undefined, not stored as ''", result.ok === true && result.detail.websiteUri === undefined);
       },
     );
   });

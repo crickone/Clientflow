@@ -24,13 +24,6 @@
 //      logged and does NOT abort the refresh -- the snapshot loop still
 //      runs over the existing watchlist.
 //
-// Content-gap analysis added `websiteUri` persistence (scenario 1's happy
-// path now also asserts it round-trips from Google's response, or stays
-// null when omitted) plus its own dedicated scenario 11: an EXISTING
-// websiteUri survives a cycle whose Google response omits the field, since
-// refresh.ts only ever calls setCompetitorWebsite when Google actually
-// returns one.
-//
 // Covered end-to-end against a REAL scratch-tenant SQLite file (not mocked
 // -- same reasoning as store.test.ts/discovery.test.ts) with `fetch` mocked
 // exactly like places.test.ts (save/restore globalThis.fetch; zero live
@@ -148,7 +141,7 @@ function isAdLibraryCallForPageId(url: string, pageId: string): boolean {
   const { controlSqlite } = requireLocal("../db/control") as typeof import("../db/control");
   const { runWithTenant, getTenantDbById } = requireLocal("../db/tenant") as typeof import("../db/tenant");
   const { schema } = requireLocal("../db") as typeof import("../db");
-  const { upsertCompetitor, listCompetitors, appendMetric, latestMetric, listEvents, upsertAd, listAds, setCompetitorFacebookPage, setCompetitorWebsite } =
+  const { upsertCompetitor, listCompetitors, appendMetric, latestMetric, listEvents, upsertAd, listAds, setCompetitorFacebookPage } =
     requireLocal("./store") as typeof import("./store");
   const { setKey } = requireLocal("../settings") as typeof import("../settings");
   const { researchSpentCents, UNIT_COST_CENTS } = requireLocal("./spend") as typeof import("./spend");
@@ -236,7 +229,6 @@ function isAdLibraryCallForPageId(url: string, pageId: string): boolean {
                 formattedAddress: "1 A St, Clonmel",
                 rating: 4.3,
                 userRatingCount: 65,
-                websiteUri: "https://gyma.example.com",
                 reviews: [
                   {
                     name: "places/place-a/reviews/r1",
@@ -302,14 +294,6 @@ function isAdLibraryCallForPageId(url: string, pageId: string): boolean {
           const latestB = runWithTenant(tid, () => latestMetric(idB))!;
           check("happy path: B's missing rating -> ratingMilli null (not 0)", latestB.ratingMilli === null);
           check("happy path: B's missing userRatingCount -> reviewCount null (not 0)", latestB.reviewCount === null);
-
-          // Content-gap analysis: Google's websiteUri persists onto the
-          // competitor row when present (A); B's response omits it entirely
-          // -> stays null, never coerced to "".
-          const compA = runWithTenant(tid, () => listCompetitors()).find((c) => c.id === idA)!;
-          check("happy path: A's websiteUri <- Google's websiteUri", compA.websiteUri === "https://gyma.example.com");
-          const compB = runWithTenant(tid, () => listCompetitors()).find((c) => c.id === idB)!;
-          check("happy path: B's missing websiteUri -> null (not '')", compB.websiteUri === null);
 
           const reviewsA = reviewRowsFor(tid, idA);
           check("happy path: A's reviews replaced -- 2 rows", reviewsA.length === 2);
@@ -1053,56 +1037,6 @@ function isAdLibraryCallForPageId(url: string, pageId: string): boolean {
         cleanupScratchTenant(slug, tid);
       }
     });
-  });
-
-  // ════════════════════════════════════════════════════════════════════
-  // 11. Content-gap analysis — a competitor's EXISTING websiteUri (set by a
-  //     previous cycle, or by hand) survives a cycle whose Google response
-  //     omits the field entirely: setCompetitorWebsite is only ever called
-  //     when Google actually returns one (see refresh.ts's own guard), so
-  //     an omission this cycle must never clobber what's already stored.
-  // ════════════════════════════════════════════════════════════════════
-  await withApiKey("test-key", async () => {
-    const slug = "refresh-test-website-no-clobber";
-    const tid = makeScratchTenant(slug);
-    try {
-      const idA = runWithTenant(tid, () =>
-        upsertCompetitor({ placeId: "place-website-a", name: "Gym A", address: "1 A St", lat: 52.351, lng: -7.701, distanceKm: 1.0 }),
-      );
-      runWithTenant(tid, () => setCompetitorWebsite(idA, "https://existing-site.example.com"));
-
-      await withMockFetch(
-        (url) => {
-          if (url === DETAILS_URL("place-website-a")) {
-            return new Response(
-              JSON.stringify({
-                id: "place-website-a",
-                displayName: { text: "Gym A" },
-                formattedAddress: "1 A St",
-                reviews: [],
-                // no websiteUri this cycle -- Google can omit it even for a
-                // place that had one before (e.g. a transient field-mask
-                // hiccup); must never be treated as "the site was removed".
-              }),
-              { status: 200 },
-            );
-          }
-          throw new Error(`unexpected fetch: ${url}`);
-        },
-        async () => {
-          const result = await runWithTenant(tid, async () => refreshTenant({ rediscover: false }));
-          check("no-clobber: refresh still succeeds", result.ok === true);
-
-          const row = runWithTenant(tid, () => listCompetitors()).find((c) => c.id === idA)!;
-          check(
-            "no-clobber: the existing websiteUri survives a cycle whose response omits it",
-            row.websiteUri === "https://existing-site.example.com",
-          );
-        },
-      );
-    } finally {
-      cleanupScratchTenant(slug, tid);
-    }
   });
 
   console.log(`\nrefresh: ${passed} checks passed.`);

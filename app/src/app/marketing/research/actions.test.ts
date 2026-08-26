@@ -14,18 +14,6 @@
 //      touching the existing link.
 //   4. an ADMIN session's unlinkCompetitorPageAction call succeeds and the
 //      store reflects the clear; its own competitorId guard is covered too.
-//   5. Content-gap analysis's two actions (scanContentAction,
-//      saveResearchKeywordsAction) get the SAME requireAdmin-enforced-for-
-//      real treatment as step 1 — staff rejected, unauthenticated rejected.
-//      Their own behaviour once past that gate is NOT re-tested here:
-//      scanContentAction thinly wraps scanCompetitorContent, already
-//      covered end-to-end (mocked fetch, real scratch tenant) by
-//      lib/research/contentScan.test.ts; saveResearchKeywordsAction thinly
-//      wraps setResearchKeywords, which — like every @/lib/settings
-//      consumer in lib/research/keywords.ts — is imported DYNAMICALLY and so
-//      cannot be exercised for real under this test runner's
-//      `--conditions=react-server` (see keywords.ts's own doc comment) —
-//      only requireAdmin's gate is safely provable here.
 //
 // Unlike most *.test.ts files in this repo, this one exercises the REAL
 // "use server" actions end-to-end INCLUDING their real requireAdmin() gate
@@ -104,8 +92,8 @@ const requireLocal = createRequire(import.meta.url);
   const { runWithTenant } = requireLocal("../../../lib/db/tenant") as typeof import("../../../lib/db/tenant");
   const { upsertCompetitor, listCompetitors } = requireLocal("../../../lib/research/store") as
     typeof import("../../../lib/research/store");
-  const { linkCompetitorPageAction, unlinkCompetitorPageAction, scanContentAction, saveResearchKeywordsAction } =
-    requireLocal("./actions") as typeof import("./actions");
+  const { linkCompetitorPageAction, unlinkCompetitorPageAction } = requireLocal("./actions") as
+    typeof import("./actions");
 
   const slug = "pageid-t2-actions-test";
   const dbFile = `tenants/${slug}/${slug}.db`;
@@ -251,37 +239,6 @@ const requireLocal = createRequire(import.meta.url);
     row = rowOf();
     assert.equal(row.facebookPageId, null, "facebookPageId cleared");
     assert.equal(row.facebookPageName, null, "facebookPageName cleared");
-
-    // ── 5. Content-gap analysis actions — requireAdmin is enforced for real ─
-    // Same technique as step 1: a staff session is FORBIDDEN, no cookie at
-    // all is UNAUTHENTICATED, for BOTH new actions. This is the important
-    // security property to lock in here; scanCompetitorContent's own crawl
-    // behaviour (mocked fetch, real scratch tenant) is exercised thoroughly
-    // in lib/research/contentScan.test.ts instead — no need to re-prove the
-    // same crawl logic a second time through this thin action wrapper.
-    cookieToken = staffSession.id;
-    await assert.rejects(
-      () => scanContentAction(),
-      /FORBIDDEN/,
-      "scanContentAction rejects a non-admin session",
-    );
-    await assert.rejects(
-      () => saveResearchKeywordsAction(new FormData()),
-      /FORBIDDEN/,
-      "saveResearchKeywordsAction rejects a non-admin session",
-    );
-
-    cookieToken = undefined;
-    await assert.rejects(
-      () => scanContentAction(),
-      /UNAUTHENTICATED/,
-      "scanContentAction rejects an unauthenticated call",
-    );
-    await assert.rejects(
-      () => saveResearchKeywordsAction(new FormData()),
-      /UNAUTHENTICATED/,
-      "saveResearchKeywordsAction rejects an unauthenticated call",
-    );
 
     console.log("marketing/research/actions.test.ts: all assertions passed");
   } finally {
