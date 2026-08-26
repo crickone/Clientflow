@@ -97,18 +97,28 @@ export default async function RootLayout({
   // see above), but unlike /site and /f it's an authenticated, admin-only
   // internal tool (auth enforced in the page itself) that needs the themed
   // confirm dialog for its own destructive actions (e.g. discarding unsaved
-  // edits — see StudioShell's navigate()). ConfirmProvider is self-contained
-  // (Radix Dialog + inline styles off the same CSS custom properties
-  // globals.css already defines on :root, no MotionRoot dependency), so it's
-  // mounted here rather than pulling in the full AppShell/MotionRoot/Toaster
-  // stack this route intentionally opts out of. Scoped to isStudio only —
-  // /site and /f stay exactly as bare as before, so public-site bundles don't
-  // pick up Radix Dialog for a dialog they never use.
+  // edits — see StudioShell's navigate()) plus toast feedback for its
+  // save/upload calls (StudioShell calls toast.success/toast.error directly).
+  // ConfirmProvider and Toaster are both self-contained (no MotionRoot
+  // dependency), so they're mounted here rather than pulling in the full
+  // AppShell/MotionRoot stack this route intentionally opts out of. Scoped to
+  // isStudio only — /site and /f stay exactly as bare as before, so
+  // public-site bundles don't pick up Radix Dialog for a dialog they never use.
   if (isStudio) {
     return (
       <html lang="en" className={FONT_VARS}>
         <body>
           <ConfirmProvider>{children}</ConfirmProvider>
+          <Toaster
+            richColors
+            position="top-right"
+            toastOptions={{
+              style: {
+                fontFamily: "var(--font-body), sans-serif",
+                border: "1px solid var(--hairline)",
+              },
+            }}
+          />
         </body>
       </html>
     );

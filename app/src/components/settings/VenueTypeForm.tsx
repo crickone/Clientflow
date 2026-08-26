@@ -29,10 +29,16 @@ export function VenueTypeForm({ current }: { current: VenueType }) {
 
   function save() {
     startTransition(async () => {
-      const res = await updateVenueType(selected);
-      if (res.ok) {
-        toast.success(`Venue type set to ${res.venueType}.`);
-        router.refresh();
+      try {
+        const res = await updateVenueType(selected);
+        if (res.ok) {
+          toast.success(`Venue type set to ${res.venueType}.`);
+          router.refresh();
+        } else {
+          toast.error("Couldn't save — please try again.");
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Couldn't save — please try again.");
       }
     });
   }

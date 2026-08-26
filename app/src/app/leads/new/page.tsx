@@ -2,9 +2,9 @@ import { db } from "@/lib/db";
 import { therapies } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { Button } from "@/components/ui/Button";
 import { Card, CardLabel } from "@/components/ui/Card";
 import { Input, Label, Textarea } from "@/components/ui/Input";
+import { LeadSubmitButton } from "@/components/leads/LeadSubmitButton";
 import { createManualLeadAction } from "../actions";
 import { getVenueType } from "@/lib/settings";
 import { getVocab } from "@/lib/vocabulary";
@@ -107,7 +107,7 @@ export default function NewLeadPage() {
         </Card>
 
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <Button type="submit">Add lead</Button>
+          <LeadSubmitButton />
         </div>
       </form>
     </div>

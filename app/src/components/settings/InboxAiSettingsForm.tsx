@@ -53,10 +53,16 @@ export function InboxAiSettingsForm({
 
   function save() {
     startSave(async () => {
-      const res = await updateInboxAiSettings(s);
-      if (res.ok) {
-        toast.success("Inbox AI settings saved.");
-        router.refresh();
+      try {
+        const res = await updateInboxAiSettings(s);
+        if (res.ok) {
+          toast.success("Inbox AI settings saved.");
+          router.refresh();
+        } else {
+          toast.error("Couldn't save — please try again.");
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Couldn't save — please try again.");
       }
     });
   }

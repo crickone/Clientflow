@@ -72,10 +72,16 @@ export function BusinessProfileForm({ initial }: { initial: BusinessProfile }) {
 
   function save() {
     startTransition(async () => {
-      const res = await updateBusinessProfile(profile);
-      if (res.ok) {
-        toast.success("Business profile saved.");
-        router.refresh();
+      try {
+        const res = await updateBusinessProfile(profile);
+        if (res.ok) {
+          toast.success("Business profile saved.");
+          router.refresh();
+        } else {
+          toast.error("Couldn't save — please try again.");
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Couldn't save — please try again.");
       }
     });
   }

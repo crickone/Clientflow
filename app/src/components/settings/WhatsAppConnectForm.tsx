@@ -51,10 +51,16 @@ export function WhatsAppConnectForm({
 
   function save() {
     startTransition(async () => {
-      const res = await updateWhatsAppConfig({ token, channel, baseUrl });
-      if (res.ok) {
-        toast.success("WhatsApp settings saved.");
-        refresh();
+      try {
+        const res = await updateWhatsAppConfig({ token, channel, baseUrl });
+        if (res.ok) {
+          toast.success("WhatsApp settings saved.");
+          refresh();
+        } else {
+          toast.error("Couldn't save — please try again.");
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Couldn't save — please try again.");
       }
     });
   }

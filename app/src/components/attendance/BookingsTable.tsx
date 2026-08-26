@@ -171,9 +171,11 @@ export function BookingsTable({
                             background: "transparent",
                             border: "none",
                             color: "var(--text-tertiary)",
-                            cursor: "pointer",
+                            cursor: pending ? "not-allowed" : "pointer",
+                            opacity: pending ? 0.5 : 1,
                             display: "inline-flex",
                             padding: 4,
+                            transition: "opacity 0.15s var(--ease)",
                           }}
                         >
                           <Trash2 size={14} />
@@ -188,9 +190,11 @@ export function BookingsTable({
                           border: "1px solid var(--hairline)",
                           borderRadius: "var(--radius)",
                           color: "var(--text-secondary)",
-                          cursor: "pointer",
+                          cursor: pending ? "not-allowed" : "pointer",
+                          opacity: pending ? 0.5 : 1,
                           fontSize: 11,
                           padding: "4px 10px",
+                          transition: "opacity 0.15s var(--ease)",
                         }}
                       >
                         Restore
@@ -235,10 +239,12 @@ function AttButton({
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        cursor: "pointer",
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.5 : 1,
         border: active ? `1px solid ${activeColor}` : "1px solid var(--hairline)",
         background: active ? activeColor : "transparent",
         color: active ? "#04140a" : "var(--text-tertiary)",
+        transition: "opacity 0.15s var(--ease)",
       }}
     >
       {children}

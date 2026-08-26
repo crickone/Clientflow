@@ -29,9 +29,16 @@ export function SchedulingModeForm({ current }: { current: SchedulingMode }) {
 
   function save() {
     start(async () => {
-      const res = await updateSchedulingMode(value);
-      if (!res.ok) return;
-      toast.success("Scheduling updated");
+      try {
+        const res = await updateSchedulingMode(value);
+        if (!res.ok) {
+          toast.error("Couldn't save — please try again.");
+          return;
+        }
+        toast.success("Scheduling updated");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Couldn't save — please try again.");
+      }
     });
   }
 
