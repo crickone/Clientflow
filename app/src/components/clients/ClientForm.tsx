@@ -153,6 +153,7 @@ function Field({
         type={type}
         defaultValue={defaultValue}
         required={required}
+        error={error}
       />
       <FieldError message={error} />
     </div>

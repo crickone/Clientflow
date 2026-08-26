@@ -3,13 +3,18 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
+/** Truthy = the field is in error (a `string` reason is accepted so callers
+ * can pass the same value they hand to `FieldError` without coercing it). */
+type FieldErrorProp = boolean | string | undefined;
+
 export const Input = React.forwardRef<
   HTMLInputElement,
-  React.InputHTMLAttributes<HTMLInputElement>
->(({ className, style, ...rest }, ref) => (
+  React.InputHTMLAttributes<HTMLInputElement> & { error?: FieldErrorProp }
+>(({ className, style, error, "aria-invalid": ariaInvalid, ...rest }, ref) => (
   <input
     ref={ref}
-    className={cn("field", className)}
+    className={cn("field", error && "field--error", className)}
+    aria-invalid={error ? true : ariaInvalid}
     style={{
       width: "100%",
       background: "var(--surface-1)",
@@ -21,6 +26,7 @@ export const Input = React.forwardRef<
       outline: "none",
       fontFamily: "inherit",
       transition: "border-color 0.15s var(--ease), box-shadow 0.15s var(--ease)",
+      ...(error ? { borderColor: "#dc2626" } : null),
       ...style,
     }}
     {...rest}
@@ -30,11 +36,12 @@ Input.displayName = "Input";
 
 export const Textarea = React.forwardRef<
   HTMLTextAreaElement,
-  React.TextareaHTMLAttributes<HTMLTextAreaElement>
->(({ className, style, ...rest }, ref) => (
+  React.TextareaHTMLAttributes<HTMLTextAreaElement> & { error?: FieldErrorProp }
+>(({ className, style, error, "aria-invalid": ariaInvalid, ...rest }, ref) => (
   <textarea
     ref={ref}
-    className={cn("field", className)}
+    className={cn("field", error && "field--error", className)}
+    aria-invalid={error ? true : ariaInvalid}
     style={{
       width: "100%",
       background: "var(--surface-1)",
@@ -48,6 +55,7 @@ export const Textarea = React.forwardRef<
       minHeight: 90,
       resize: "vertical",
       transition: "border-color 0.15s var(--ease), box-shadow 0.15s var(--ease)",
+      ...(error ? { borderColor: "#dc2626" } : null),
       ...style,
     }}
     {...rest}

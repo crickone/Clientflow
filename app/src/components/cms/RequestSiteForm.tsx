@@ -25,7 +25,7 @@ export function RequestSiteForm() {
       <Card style={{ maxWidth: 560, display: "grid", gap: 16 }}>
         <div>
           <Label htmlFor="businessName">Business name</Label>
-          <Input id="businessName" name="businessName" placeholder="Acme Wellness" required />
+          <Input id="businessName" name="businessName" placeholder="Acme Wellness" required error={state.error} />
         </div>
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 200 }}>

@@ -26,7 +26,7 @@ export function NewPostForm({ siteSlug }: { siteSlug: string }) {
       <Card style={{ maxWidth: 640, display: "grid", gap: 16 }}>
         <div>
           <Label htmlFor="title">Title</Label>
-          <Input id="title" name="title" placeholder="Your blog post title" required />
+          <Input id="title" name="title" placeholder="Your blog post title" required error={state.error} />
         </div>
         <div>
           <Label htmlFor="prompt">Direction for the AI (optional)</Label>

@@ -25,11 +25,11 @@ export function AddSiteForm() {
       <Card style={{ maxWidth: 540, display: "grid", gap: 16 }}>
         <div>
           <Label htmlFor="name">Site name</Label>
-          <Input id="name" name="name" placeholder="Acme Wellness" required />
+          <Input id="name" name="name" placeholder="Acme Wellness" required error={state.error} />
         </div>
         <div>
           <Label htmlFor="slug">Slug (optional)</Label>
-          <Input id="slug" name="slug" placeholder="acme" />
+          <Input id="slug" name="slug" placeholder="acme" error={state.error} />
           <p style={{ color: "var(--text-tertiary)", fontSize: 12, marginTop: 6 }}>
             Used internally and as the dev preview path. Auto-derived from the name
             if blank.

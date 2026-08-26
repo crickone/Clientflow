@@ -36,9 +36,22 @@ const manualSchema = z.object({
   notes: z.string().optional(),
 });
 
-export async function createManualLeadAction(formData: FormData) {
+export type LeadFormState = {
+  ok: boolean;
+  errors?: Record<string, string>;
+};
+
+/** `useFormState`-compatible: bad input (e.g. a malformed email) used to
+ * throw straight out of `manualSchema.parse()` with no catch anywhere on the
+ * call path, crashing the whole page instead of showing an inline error —
+ * `safeParse` + a returned error map (same shape as `ClientFormState`, see
+ * app/clients/actions.ts) fixes that. */
+export async function createManualLeadAction(
+  _prev: LeadFormState | null,
+  formData: FormData,
+): Promise<LeadFormState> {
   await requireUser();
-  const parsed = manualSchema.parse({
+  const parsed = manualSchema.safeParse({
     firstName: formData.get("firstName"),
     lastName: formData.get("lastName") || undefined,
     email: formData.get("email") || "",
@@ -47,21 +60,29 @@ export async function createManualLeadAction(formData: FormData) {
     campaign: formData.get("campaign") || undefined,
     notes: formData.get("notes") || undefined,
   });
+  if (!parsed.success) {
+    const errors: Record<string, string> = {};
+    for (const issue of parsed.error.issues) {
+      errors[issue.path.join(".")] = issue.message;
+    }
+    return { ok: false, errors };
+  }
+  const v = parsed.data;
 
   const { lead } = upsertLead({
     source: "manual",
-    firstName: parsed.firstName,
-    lastName: parsed.lastName ?? null,
-    email: parsed.email || null,
-    phone: parsed.phone ?? null,
-    therapyInterest: parsed.therapyInterest ?? null,
-    campaign: parsed.campaign ?? null,
-    notes: parsed.notes ?? null,
+    firstName: v.firstName,
+    lastName: v.lastName ?? null,
+    email: v.email || null,
+    phone: v.phone ?? null,
+    therapyInterest: v.therapyInterest ?? null,
+    campaign: v.campaign ?? null,
+    notes: v.notes ?? null,
   });
 
   await logActivity(
     "lead.new",
-    `Lead added manually: ${parsed.firstName} ${parsed.lastName ?? ""}`.trim(),
+    `Lead added manually: ${v.firstName} ${v.lastName ?? ""}`.trim(),
     { leadId: lead.id },
   );
 

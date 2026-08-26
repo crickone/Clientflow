@@ -523,6 +523,7 @@ function EditUserDialog({ user, isMe }: { user: UserRow; isMe: boolean }) {
                 if (emailError) setEmailError(undefined);
               }}
               disabled={pending}
+              error={emailError}
             />
             <FieldError message={emailError} />
             <div style={{ color: "var(--text-tertiary)", fontSize: 12, marginTop: 6 }}>

@@ -243,6 +243,15 @@ a {
 .field:focus-visible { box-shadow: 0 0 0 3px var(--accent-soft); }
 .field:disabled { opacity: 0.55; cursor: not-allowed; }
 
+/* Error state (Input/Textarea `error` prop). Resting border colour is set
+   inline per-field (the base border is inline too, see components/ui/
+   Input.tsx) — this class only owns the focus ring, which .field can't
+   express inline. Declared after .field:focus so it wins the specificity
+   tie when both classes are present. Same red as FieldError's message text
+   (#dc2626 / rgb(220,38,38)) — there's no --danger token yet. */
+.field--error:focus,
+.field--error:focus-visible { box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.14); }
+
 /* Sidebar nav rows — color/background now live here so :hover works. */
 .nav-link { color: var(--text-secondary); background: transparent; }
 .nav-link:hover { background: var(--surface-2); color: var(--text-primary); }

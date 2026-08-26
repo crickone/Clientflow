@@ -37,7 +37,7 @@ export function NewPageForm({
           </div>
           <div style={{ flex: 1, minWidth: 200 }}>
             <Label htmlFor="path">Path</Label>
-            <Input id="path" name="path" placeholder="/about" required />
+            <Input id="path" name="path" placeholder="/about" required error={state.error} />
           </div>
         </div>
         <div>
