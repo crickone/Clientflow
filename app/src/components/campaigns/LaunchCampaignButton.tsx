@@ -6,6 +6,7 @@ import { Rocket } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 /**
  * Launches a "ready" campaign from the hub detail page — fires launch_campaign
@@ -19,8 +20,8 @@ import { Button } from "@/components/ui/Button";
  * gated the same way an operator action is gated everywhere else in this
  * app: an explicit confirm (mirrors CampaignEditor's send() — the closest
  * analogous irreversible, real-world-effecting action in this codebase —
- * which also uses a plain window.confirm rather than the fancier
- * useConfirm() dialog).
+ * both now go through the themed useConfirm() dialog rather than a raw
+ * window.confirm).
  *
  * Only ever rendered by the detail page when campaign.status === "ready"
  * (every asset approved) — launchCampaignTool itself re-checks that
@@ -34,13 +35,17 @@ export function LaunchCampaignButton({
   campaignName: string;
 }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [pending, startTransition] = useTransition();
 
-  function launch() {
+  async function launch() {
     if (
-      !window.confirm(
-        `Launch "${campaignName}" now? This publishes the blog post live and queues the email/social assets for you to send or post manually. This can't be undone.`,
-      )
+      !(await confirm({
+        title: "Launch this campaign?",
+        body: `Launch "${campaignName}" now? This publishes the blog post live and queues the email/social assets for you to send or post manually. This can't be undone.`,
+        confirmLabel: "Launch",
+        destructive: true,
+      }))
     ) {
       return;
     }

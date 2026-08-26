@@ -85,10 +85,31 @@ export default async function RootLayout({
   // DEFAULT tenant) instead of seeing a standalone branded form.
   const pathname = headers().get("x-pathname") ?? "";
   const isStudio = /^\/cms\/[^/]+\/studio(\/|$)/.test(pathname);
-  if (pathname.startsWith("/site/") || pathname.startsWith("/f/") || isStudio) {
+  if (pathname.startsWith("/site/") || pathname.startsWith("/f/")) {
     return (
       <html lang="en" className={FONT_VARS}>
         <body>{children}</body>
+      </html>
+    );
+  }
+
+  // The Studio visual editor is also a "bare" route (no admin sidebar/topbar —
+  // see above), but unlike /site and /f it's an authenticated, admin-only
+  // internal tool (auth enforced in the page itself) that needs the themed
+  // confirm dialog for its own destructive actions (e.g. discarding unsaved
+  // edits — see StudioShell's navigate()). ConfirmProvider is self-contained
+  // (Radix Dialog + inline styles off the same CSS custom properties
+  // globals.css already defines on :root, no MotionRoot dependency), so it's
+  // mounted here rather than pulling in the full AppShell/MotionRoot/Toaster
+  // stack this route intentionally opts out of. Scoped to isStudio only —
+  // /site and /f stay exactly as bare as before, so public-site bundles don't
+  // pick up Radix Dialog for a dialog they never use.
+  if (isStudio) {
+    return (
+      <html lang="en" className={FONT_VARS}>
+        <body>
+          <ConfirmProvider>{children}</ConfirmProvider>
+        </body>
       </html>
     );
   }

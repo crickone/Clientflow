@@ -8,6 +8,7 @@ import { parseStoredThemes } from "@/lib/research/themesJson";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { CardLabel } from "@/components/ui/Card";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { formatDate } from "@/lib/utils";
 import { ChangedFeed } from "./ChangedFeed";
 import { Sparkline } from "./Sparkline";
@@ -234,6 +235,7 @@ export function CompetitorDetail({
   onUnlinkPage,
   pending = false,
 }: Props) {
+  const confirm = useConfirm();
   // Parsing lives in the shared, zero-import lib/research/themesJson.ts (T11)
   // rather than a local copy: lib/research/campaignGap.ts (the "Build a
   // campaign from this gap" seed builder) now needs the identical parse, and
@@ -431,11 +433,14 @@ export function CompetitorDetail({
           variant="ghost"
           size="sm"
           disabled={pending}
-          onClick={() => {
+          onClick={async () => {
             if (
-              window.confirm(
-                `Stop tracking ${competitor.name}? It'll drop off this list — there's no un-track control yet, so this can't be easily undone.`,
-              )
+              await confirm({
+                title: "Stop tracking this competitor?",
+                body: `${competitor.name} will drop off this list. There's no un-track control yet, so this can't be easily undone.`,
+                confirmLabel: "Stop tracking",
+                destructive: true,
+              })
             ) {
               onMute?.(competitor.id);
             }

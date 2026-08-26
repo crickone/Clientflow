@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { savePageHtmlAction } from "@/app/cms/[siteSlug]/studio/actions";
 
 type PageRow = { path: string; title: string };
@@ -47,6 +48,7 @@ export function StudioShell({
   pages: PageRow[];
   initialPath: string;
 }) {
+  const confirm = useConfirm();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [path, setPath] = useState(initialPath);
   const [dirty, setDirty] = useState(false);
@@ -167,8 +169,18 @@ export function StudioShell({
     return () => window.removeEventListener("message", onMsg);
   }, [siteSlug, path]);
 
-  function navigate(p: string) {
-    if (dirty && !confirm("Discard unsaved changes?")) return;
+  async function navigate(p: string) {
+    if (
+      dirty &&
+      !(await confirm({
+        title: "Discard unsaved changes?",
+        body: "Switching screens now will lose edits that haven't saved yet.",
+        confirmLabel: "Discard",
+        destructive: true,
+      }))
+    ) {
+      return;
+    }
     setDirty(false);
     setPath(p);
     if (iframeRef.current) iframeRef.current.src = src(p);

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Input, Label } from "@/components/ui/Input";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import {
   connectSendingDomainAction,
   disconnectSendingDomainAction,
@@ -36,6 +37,7 @@ const STATE_TONE: Record<SendingDomainRecord["state"], "neutral" | "amber" | "gr
  */
 export function DomainConnectCard({ domain }: { domain: SendingDomainRecord | null }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [connecting, startConnect] = useTransition();
@@ -74,7 +76,19 @@ export function DomainConnectCard({ domain }: { domain: SendingDomainRecord | nu
     });
   }
 
-  function disconnect() {
+  async function disconnect() {
+    if (
+      !(await confirm({
+        title: "Disconnect this sending domain?",
+        body: domain
+          ? `Campaigns will stop sending from ${domain.domain} until you reconnect and re-verify it.`
+          : "Campaigns will stop sending from this domain until you reconnect and re-verify it.",
+        confirmLabel: "Disconnect",
+        destructive: true,
+      }))
+    ) {
+      return;
+    }
     startDisconnect(async () => {
       const res = await disconnectSendingDomainAction();
       if (!res.ok) {

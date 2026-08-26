@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Label } from "@/components/ui/Input";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import {
   connectImapAction,
   disconnectImapAction,
@@ -60,6 +61,7 @@ export function ImapConnectCard({
   active: boolean;
 }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
@@ -139,7 +141,17 @@ export function ImapConnectCard({
     });
   }
 
-  function disconnect() {
+  async function disconnect() {
+    if (
+      !(await confirm({
+        title: "Disconnect this mailbox?",
+        body: "Emails will stop sending from this mailbox, and replies will stop syncing into Communication until you reconnect.",
+        confirmLabel: "Disconnect",
+        destructive: true,
+      }))
+    ) {
+      return;
+    }
     startDisconnect(async () => {
       const res = await disconnectImapAction();
       if (!res.ok) {

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { disconnectGmailAction } from "@/app/settings/email/gmailActions";
 
 export function GmailConnectCard({
@@ -23,9 +24,20 @@ export function GmailConnectCard({
   connectedParam: string | null;
   errorParam: string | null;
 }) {
+  const confirm = useConfirm();
   const [pending, start] = useTransition();
 
-  function disconnect() {
+  async function disconnect() {
+    if (
+      !(await confirm({
+        title: "Disconnect Gmail?",
+        body: "Invites and client emails will stop sending from this address, and replies will stop syncing into Communication until you reconnect.",
+        confirmLabel: "Disconnect",
+        destructive: true,
+      }))
+    ) {
+      return;
+    }
     start(async () => {
       const res = await disconnectGmailAction();
       if (!res.ok) { toast.error(res.error); return; }

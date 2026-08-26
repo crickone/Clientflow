@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { FieldError, Input, Label } from "@/components/ui/Input";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import {
   addDomainAction,
   removeDomainAction,
@@ -43,6 +44,7 @@ export function DomainsManager({
   }[];
 }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [, startTransition] = useTransition();
   const action = addDomainAction.bind(null, siteSlug);
   const [state, formAction] = useFormState(action, initial);
@@ -104,12 +106,22 @@ export function DomainsManager({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() =>
+                  onClick={async () => {
+                    if (
+                      !(await confirm({
+                        title: "Remove this domain?",
+                        body: `The site will stop serving on ${d.host}${d.isPrimary ? " — it's currently the primary host" : ""} until it's re-added and re-verified.`,
+                        confirmLabel: "Remove",
+                        destructive: true,
+                      }))
+                    ) {
+                      return;
+                    }
                     startTransition(async () => {
                       await removeDomainAction(siteSlug, d.id);
                       router.refresh();
-                    })
-                  }
+                    });
+                  }}
                 >
                   <Trash2 size={14} />
                 </Button>

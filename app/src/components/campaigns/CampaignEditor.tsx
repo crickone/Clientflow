@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Input, Textarea, Label } from "@/components/ui/Input";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import {
   createCampaignAction,
   draftCampaignBodyAction,
@@ -59,6 +60,7 @@ export function CampaignEditor({
   sendingDomain,
 }: Props) {
   const router = useRouter();
+  const confirm = useConfirm();
   const isNew = campaign === null;
   const locked = campaign !== null && campaign.status !== "draft";
 
@@ -120,7 +122,7 @@ export function CampaignEditor({
     });
   }
 
-  function draft() {
+  async function draft() {
     if (!subject.trim()) {
       toast.error("Add a subject line first.");
       return;
@@ -129,7 +131,15 @@ export function CampaignEditor({
       toast.error("Describe what this email is about.");
       return;
     }
-    if (body.trim() && !window.confirm("Replace the current body with a new AI draft?")) {
+    if (
+      body.trim() &&
+      !(await confirm({
+        title: "Replace the current draft?",
+        body: "This overwrites your current body with a new AI draft.",
+        confirmLabel: "Replace",
+        destructive: true,
+      }))
+    ) {
       return;
     }
     startDraft(async () => {
@@ -149,10 +159,17 @@ export function CampaignEditor({
     });
   }
 
-  function send() {
+  async function send() {
     if (!campaign) return;
     const who = recipientCount != null ? `${recipientCount.toLocaleString()} recipient${recipientCount === 1 ? "" : "s"}` : "your audience";
-    if (!window.confirm(`Send "${campaign.name}" to ${who} now? This can't be undone.`)) {
+    if (
+      !(await confirm({
+        title: "Send this campaign?",
+        body: `This sends "${campaign.name}" to ${who} and can't be undone.`,
+        confirmLabel: "Send",
+        destructive: true,
+      }))
+    ) {
       return;
     }
     startSend(async () => {

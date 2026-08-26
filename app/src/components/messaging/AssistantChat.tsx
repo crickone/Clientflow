@@ -7,6 +7,7 @@ import { Sparkles, Send, Download, Loader2, Check, History, Plus, Trash2, Messag
 import { EASE } from "@/lib/motion";
 
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import {
   campaignGoAgainMessage,
   campaignPlanEventFromActions,
@@ -269,6 +270,7 @@ export function AssistantChat({
     endpoint === DEFAULT_ENDPOINT
       ? `cf_assistant_chats_v2_${tenantId}`
       : `cf_assistant_chats_v2_${tenantId}_${endpoint.replace(/[^a-zA-Z0-9]+/g, "-")}`;
+  const confirm = useConfirm();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string>("");
   const [input, setInput] = useState("");
@@ -787,7 +789,18 @@ export function AssistantChat({
     setActiveId(id);
     setHistoryOpen(false);
   }
-  function deleteChat(id: string) {
+  async function deleteChat(id: string) {
+    const target = conversations.find((c) => c.id === id);
+    if (
+      !(await confirm({
+        title: "Delete conversation?",
+        body: `Delete "${target?.title || "this chat"}"? This can't be undone.`,
+        confirmLabel: "Delete",
+        destructive: true,
+      }))
+    ) {
+      return;
+    }
     const next = conversations.filter((c) => c.id !== id);
     if (next.length === 0) {
       const nid = newId();

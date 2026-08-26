@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { disconnectFacebookPageAction } from "@/app/settings/integrations/facebook/actions";
 // Type-only — lib/facebook/pages.ts is `server-only`; importing just the type
 // keeps it out of this client bundle (mirrors ImapConnectCard / DomainConnectCard).
@@ -32,9 +33,21 @@ export function FacebookConnectCard({
   webhookUrl: string;
 }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [disconnecting, startDisconnect] = useTransition();
 
-  function disconnect(pageId: string) {
+  async function disconnect(pageId: string) {
+    const page = pages.find((p) => p.pageId === pageId);
+    if (
+      !(await confirm({
+        title: "Disconnect this Page?",
+        body: `Leads from ${page?.pageName ?? "this Page"} will stop flowing into Leads until you reconnect it.`,
+        confirmLabel: "Disconnect",
+        destructive: true,
+      }))
+    ) {
+      return;
+    }
     startDisconnect(async () => {
       const res = await disconnectFacebookPageAction(pageId);
       if (!res.ok) {
