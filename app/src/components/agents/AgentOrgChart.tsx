@@ -2,7 +2,7 @@
 
 import { type CSSProperties } from "react";
 import Link from "next/link";
-import { Bot, Workflow } from "lucide-react";
+import { Bot, Settings, Workflow } from "lucide-react";
 
 import { Card, CardLabel } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -273,11 +273,12 @@ function AgentCard({
   return (
     <Link
       href={`/agents/${agent.key}`}
+      aria-label={`${agent.name} — open agent settings`}
       style={
         isOrchestrator
           ? {
               display: "block",
-              width: "min(360px, 100%)",
+              width: "min(620px, 100%)",
               margin: "0 auto",
               textDecoration: "none",
               color: "inherit",
@@ -292,6 +293,7 @@ function AgentCard({
           height: "100%",
           display: "flex",
           flexDirection: "column",
+          padding: isOrchestrator ? 30 : undefined,
         }}
       >
         <div
@@ -300,29 +302,29 @@ function AgentCard({
             alignItems: "flex-start",
             justifyContent: "space-between",
             gap: 12,
-            marginBottom: 12,
+            marginBottom: isOrchestrator ? 16 : 12,
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: isOrchestrator ? 14 : 10, minWidth: 0 }}>
             <span
               style={{
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
-                width: 32,
-                height: 32,
+                width: isOrchestrator ? 44 : 32,
+                height: isOrchestrator ? 44 : 32,
                 borderRadius: "var(--radius)",
                 background: active ? "var(--accent-soft)" : "var(--surface-2)",
                 color: active ? "var(--accent-ink)" : "var(--text-secondary)",
                 flexShrink: 0,
               }}
             >
-              <Icon size={16} strokeWidth={1.75} />
+              <Icon size={isOrchestrator ? 22 : 16} strokeWidth={1.75} />
             </span>
             <span
               style={{
                 fontFamily: "var(--font-heading), sans-serif",
-                fontSize: isOrchestrator ? 19 : 16,
+                fontSize: isOrchestrator ? 23 : 16,
                 color: "var(--text-primary)",
                 textTransform: "uppercase",
                 letterSpacing: "-0.005em",
@@ -334,15 +336,37 @@ function AgentCard({
               {agent.name}
             </span>
           </div>
-          <StatusPill active={active} />
+          {/* Status + a settings gear. The whole card is already a Link to
+              `/agents/<key>` (this agent's settings), so the gear is a visual
+              affordance signalling that — decorative (aria-hidden); the Link's
+              own aria-label carries the accessible name. */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+            <StatusPill active={active} />
+            <span
+              aria-hidden
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 34,
+                height: 34,
+                borderRadius: "var(--radius)",
+                border: "1px solid var(--hairline)",
+                color: "var(--text-tertiary)",
+                flexShrink: 0,
+              }}
+            >
+              <Settings size={16} strokeWidth={1.75} />
+            </span>
+          </div>
         </div>
 
         <p
           style={{
             color: "var(--text-secondary)",
-            fontSize: 13,
-            lineHeight: 1.5,
-            margin: "0 0 12px",
+            fontSize: isOrchestrator ? 14 : 13,
+            lineHeight: 1.55,
+            margin: isOrchestrator ? "0 0 18px" : "0 0 12px",
           }}
         >
           {mandate}
