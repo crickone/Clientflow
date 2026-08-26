@@ -313,10 +313,16 @@ function MessageCard({
         </div>
       </div>
 
+      {/* No sending engine exists yet (automations are a stub — see the
+          module-level note in lib/automations), so this stays visible but
+          honestly disabled rather than faking a queued test send. */}
       <div>
-        <Button variant="ghost" size="sm" onClick={() => toast.success("Test send queued (demo).")}>
+        <Button variant="ghost" size="sm" disabled title="Sending isn't wired up yet">
           Send test
         </Button>
+        <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 6 }}>
+          Sending isn&apos;t wired up yet — there&apos;s no dispatcher to queue a test message with.
+        </div>
       </div>
     </div>
   );

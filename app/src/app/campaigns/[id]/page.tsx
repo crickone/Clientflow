@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 
 import { getCurrentMembership, requireAdminPage } from "@/lib/auth";
 import { getCampaign, listContactTags, resolveAudience } from "@/lib/marketing/campaigns";
@@ -6,6 +8,7 @@ import { getSendingDomain } from "@/lib/marketing/domains";
 import { getCampaignSendCounts } from "@/lib/marketing/events";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { CampaignEditor } from "@/components/campaigns/CampaignEditor";
+import { Button } from "@/components/ui/Button";
 import { Card, CardLabel, CardValue } from "@/components/ui/Card";
 
 export const dynamic = "force-dynamic";
@@ -58,6 +61,13 @@ export default async function CampaignDetailPage({
         eyebrow="Email marketing"
         title={campaign.name}
         subtitle={`Status: ${campaign.status}`}
+        actions={
+          <Link href="/campaigns">
+            <Button variant="outline">
+              <ArrowLeft size={15} /> Campaigns
+            </Button>
+          </Link>
+        }
       />
       <CampaignEditor
         campaign={campaign}

@@ -20,7 +20,7 @@ export function RevenueBars({ data, height = 220 }: Props) {
     <div style={{ width: "100%", height, minWidth: 0 }}>
       <ResponsiveContainer width="99%" height="100%">
         <BarChart data={data} margin={{ top: 8, left: 0, right: 8, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--hairline)" />
           <XAxis
             dataKey="day"
             tick={{ fontSize: 11, fill: "var(--text-tertiary)" }}
@@ -36,7 +36,7 @@ export function RevenueBars({ data, height = 220 }: Props) {
             tickFormatter={(v) => `€${v}`}
           />
           <Tooltip
-            cursor={{ fill: "rgba(0,0,0,0.04)" }}
+            cursor={{ fill: "var(--text-tertiary)", fillOpacity: 0.2 }}
             contentStyle={{
               background: "var(--bg)",
               border: "1px solid var(--hairline)",

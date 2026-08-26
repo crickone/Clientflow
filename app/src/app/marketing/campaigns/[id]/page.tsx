@@ -28,6 +28,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Card, CardLabel, CardValue } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { CopyAssetButton } from "@/components/campaigns/CopyAssetButton";
 import { LaunchCampaignButton } from "@/components/campaigns/LaunchCampaignButton";
 import { setCampaignAdSpendAction } from "../actions";
@@ -420,6 +421,20 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
         </div>
       </Card>
 
+      {assets.length === 0 ? (
+        <EmptyState
+          icon={<Megaphone size={32} strokeWidth={1.4} />}
+          title="No assets yet"
+          message="Adonis hasn't drafted anything for this campaign yet. Head to Adonis and continue the conversation to generate the kit — offer, blog, social, email, ad copy, video script."
+          action={
+            <Link href="/adonis">
+              <Button variant="secondary">
+                <MessageSquarePlus size={15} /> Continue building
+              </Button>
+            </Link>
+          }
+        />
+      ) : (
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {assets.map((asset, i) => {
           const Icon = KIND_ICON[asset.kind];
@@ -485,6 +500,7 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
           );
         })}
       </div>
+      )}
     </div>
   );
 }

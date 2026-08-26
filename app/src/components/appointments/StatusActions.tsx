@@ -167,6 +167,7 @@ function CompleteForm({
   onDone: () => void;
 }) {
   const [pending, start] = useTransition();
+  const [outcomeRating, setOutcomeRating] = useState<number | null>(null);
   const vocab = useVocab();
 
   function submit(e: React.FormEvent<HTMLFormElement>) {
@@ -193,30 +194,37 @@ function CompleteForm({
       <div>
         <Label htmlFor="outcomeRating">Outcome (1–5)</Label>
         <div style={{ display: "flex", gap: 6 }}>
-          {[1, 2, 3, 4, 5].map((n) => (
-            <label
-              key={n}
-              style={{
-                flex: 1,
-                border: "1px solid var(--hairline)",
-                borderRadius: "var(--radius)",
-                padding: "10px 0",
-                textAlign: "center",
-                cursor: "pointer",
-                color: "var(--text-secondary)",
-                fontSize: 14,
-                fontWeight: 500,
-              }}
-            >
-              <input
-                type="radio"
-                name="outcomeRating"
-                value={n}
-                style={{ display: "none" }}
-              />
-              {n}
-            </label>
-          ))}
+          {[1, 2, 3, 4, 5].map((n) => {
+            const selected = outcomeRating === n;
+            return (
+              <label
+                key={n}
+                style={{
+                  flex: 1,
+                  border: selected ? "1px solid var(--accent)" : "1px solid var(--hairline)",
+                  borderRadius: "var(--radius)",
+                  padding: "10px 0",
+                  textAlign: "center",
+                  cursor: "pointer",
+                  background: selected ? "var(--accent-soft)" : "transparent",
+                  color: selected ? "var(--accent-ink)" : "var(--text-secondary)",
+                  fontSize: 14,
+                  fontWeight: selected ? 700 : 500,
+                  transition: "background 0.15s var(--ease), border-color 0.15s var(--ease), color 0.15s var(--ease)",
+                }}
+              >
+                <input
+                  type="radio"
+                  name="outcomeRating"
+                  value={n}
+                  checked={selected}
+                  onChange={() => setOutcomeRating(n)}
+                  style={{ display: "none" }}
+                />
+                {n}
+              </label>
+            );
+          })}
         </div>
       </div>
       {activePackages.length > 0 && (
