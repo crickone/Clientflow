@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Settings } from "lucide-react";
 
@@ -47,6 +48,13 @@ export function AdonisView({
   // Big centered mark, capped by viewport height so it never overflows on a
   // short screen. No tagline — the mark owns the centre; the prompt + chips
   // live down by the input (AssistantChat renders them in `bare` mode).
+  // /adonis renders AssistantChat's History + New-chat controls in the top bar
+  // (top-left) instead of inside the chat: AssistantChat PORTALS them into this
+  // container via its `controlsContainer` prop, so all the chat/history state
+  // stays inside that one component. A callback ref into state so the portal
+  // target is available on the render right after this div mounts.
+  const [controlsEl, setControlsEl] = useState<HTMLDivElement | null>(null);
+
   const logoHeight = "min(clamp(220px, 34vw, 460px), 48vh)";
   const hero = (
     <div
@@ -90,18 +98,23 @@ export function AdonisView({
         boxSizing: "border-box",
       }}
     >
-      {/* Top bar — minimal: just the settings gear, top-right. Admin-only:
-          its target (/agents) is requireAdminPage()-gated, so we never render
-          a gear that would silently bounce a non-admin staff user. The row is
-          kept (fixed height) for both so the layout is stable. */}
+      {/* Top bar: New chat + History on the LEFT (AssistantChat portals its
+          controls into the ref'd container below — see its controlsContainer
+          prop), the settings gear on the RIGHT. The gear is admin-only: its
+          target (/agents) is requireAdminPage()-gated, so we never render one
+          that would silently bounce a non-admin. Fixed height so the layout is
+          stable whether or not the gear renders. */}
       <div
         style={{
           display: "flex",
-          justifyContent: "flex-end",
+          alignItems: "center",
+          justifyContent: "space-between",
           flexShrink: 0,
           minHeight: 36,
         }}
       >
+        {/* Portal target for AssistantChat's History + New-chat controls. */}
+        <div ref={setControlsEl} style={{ display: "flex", alignItems: "center", gap: 4 }} />
         {isAdmin && (
           <Tooltip label="Agent settings">
             <Link
@@ -157,6 +170,7 @@ export function AdonisView({
             height="100%"
             voiceEnabled={voiceEnabled}
             initialInput={initialInput}
+            controlsContainer={controlsEl}
           />
         </div>
       </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { createPortal } from "react-dom";
 import { Sparkles, Send, Download, Loader2, Check, History, Plus, Trash2, MessageSquare, Mic, Square } from "lucide-react";
 import { EASE } from "@/lib/motion";
 
@@ -178,6 +179,7 @@ export function AssistantChat({
   bare = false,
   heroSlot,
   voiceEnabled = false,
+  controlsContainer,
 }: {
   tenantId: number;
   height?: string;
@@ -232,6 +234,15 @@ export function AssistantChat({
    * renders and every existing consumer is byte-identical.
    */
   heroSlot?: ReactNode;
+  /**
+   * Optional DOM node to PORTAL the History + New-chat controls into instead of
+   * rendering them in this component's own header — used by /adonis to place
+   * them in its top bar's top-left corner. When set, the header renders no
+   * controls and the history dropdown flips to left-aligned so it opens at the
+   * top-left. Undefined (every other consumer) → controls stay in the header,
+   * byte-identical to before.
+   */
+  controlsContainer?: HTMLElement | null;
   /**
    * Voice T2: shows a mic button in the compose row (next to Send) that
    * records the operator's voice via `MediaRecorder`, POSTs it to
@@ -803,6 +814,78 @@ export function AssistantChat({
     if (messages[i].role === "user") { lastUserIdx = i; break; }
   }
 
+  // History + New-chat controls — rendered inline in the header by default, or
+  // portaled into `controlsContainer` (e.g. /adonis's top bar) when provided.
+  const controlsStrip = (
+    <div style={{ marginLeft: controlsContainer ? 0 : "auto", display: "flex", gap: 2, position: "relative" }}>
+      <Button variant="ghost" size="sm" onClick={() => setHistoryOpen((v) => !v)}>
+        <History size={14} /> History{historyList.length ? ` (${historyList.length})` : ""}
+      </Button>
+      <Button variant="ghost" size="sm" onClick={newChat} disabled={busy}>
+        <Plus size={14} /> New chat
+      </Button>
+      {historyOpen && (
+        <>
+          <div onClick={() => setHistoryOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+          <div
+            style={{
+              position: "absolute",
+              top: "calc(100% + 6px)",
+              left: controlsContainer ? 0 : "auto",
+              right: controlsContainer ? "auto" : 0,
+              zIndex: 41,
+              width: 300,
+              maxHeight: 360,
+              overflowY: "auto",
+              background: "var(--surface-1)",
+              border: "1px solid var(--hairline)",
+              borderRadius: "var(--radius)",
+              boxShadow: "0 12px 32px -8px rgba(0,0,0,0.5)",
+              padding: 6,
+            }}
+          >
+            {historyList.length === 0 ? (
+              <div style={{ padding: 14, fontSize: 13, color: "var(--text-tertiary)", textAlign: "center" }}>
+                No saved chats yet.
+              </div>
+            ) : (
+              historyList.map((c) => (
+                <div
+                  key={c.id}
+                  onClick={() => openChat(c.id)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "8px 10px",
+                    borderRadius: 8,
+                    cursor: "pointer",
+                    background: c.id === activeId ? "var(--surface-2)" : "transparent",
+                  }}
+                >
+                  <MessageSquare size={13} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {c.title || "Untitled"}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{ago(c.updatedAt)}</div>
+                  </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); deleteChat(c.id); }}
+                    title="Delete chat"
+                    style={{ background: "transparent", border: "none", color: "var(--text-tertiary)", cursor: "pointer", padding: 2, flexShrink: 0, display: "inline-flex" }}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+
   return (
     <div
       style={{
@@ -830,72 +913,8 @@ export function AssistantChat({
         {!bare && (
           <span style={{ fontSize: 12, color: "var(--text-tertiary)" }} className="ai-subtitle">{subtitle}</span>
         )}
-        <div style={{ marginLeft: "auto", display: "flex", gap: 2, position: "relative" }}>
-          <Button variant="ghost" size="sm" onClick={() => setHistoryOpen((v) => !v)}>
-            <History size={14} /> History{historyList.length ? ` (${historyList.length})` : ""}
-          </Button>
-          <Button variant="ghost" size="sm" onClick={newChat} disabled={busy}>
-            <Plus size={14} /> New chat
-          </Button>
-          {historyOpen && (
-            <>
-              <div onClick={() => setHistoryOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
-              <div
-                style={{
-                  position: "absolute",
-                  top: "calc(100% + 6px)",
-                  right: 0,
-                  zIndex: 41,
-                  width: 300,
-                  maxHeight: 360,
-                  overflowY: "auto",
-                  background: "var(--surface-1)",
-                  border: "1px solid var(--hairline)",
-                  borderRadius: "var(--radius)",
-                  boxShadow: "0 12px 32px -8px rgba(0,0,0,0.5)",
-                  padding: 6,
-                }}
-              >
-                {historyList.length === 0 ? (
-                  <div style={{ padding: 14, fontSize: 13, color: "var(--text-tertiary)", textAlign: "center" }}>
-                    No saved chats yet.
-                  </div>
-                ) : (
-                  historyList.map((c) => (
-                    <div
-                      key={c.id}
-                      onClick={() => openChat(c.id)}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        padding: "8px 10px",
-                        borderRadius: 8,
-                        cursor: "pointer",
-                        background: c.id === activeId ? "var(--surface-2)" : "transparent",
-                      }}
-                    >
-                      <MessageSquare size={13} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {c.title || "Untitled"}
-                        </div>
-                        <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{ago(c.updatedAt)}</div>
-                      </div>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); deleteChat(c.id); }}
-                        title="Delete chat"
-                        style={{ background: "transparent", border: "none", color: "var(--text-tertiary)", cursor: "pointer", padding: 2, flexShrink: 0, display: "inline-flex" }}
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </>
-          )}
-        </div>
+        {!controlsContainer && controlsStrip}
+        {controlsContainer && createPortal(controlsStrip, controlsContainer)}
       </div>
 
       {campaignProgress && (
