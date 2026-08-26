@@ -1134,15 +1134,17 @@ const QUESTION_HOOK: Template = {
       paintLines(ctx, bodyLines, padX, bodyTop + bodySize, bodyLine);
     }
 
-    // Footer — brand on left, swipe hint on right
+    // Footer — brand on left, swipe hint bottom-center (bottom-right is
+    // reserved for the tenant logo overlay, stamped after render() by the
+    // canvas renderers — see drawLogoOverlay)
     ctx.fillStyle = "rgba(255,255,255,0.7)";
     ctx.font = `500 ${Math.round(H * 0.015)}px ${fonts.body}`;
     ctx.textAlign = "left";
     ctx.fillText(brandName(design), padX, H - padBottom);
     ctx.fillStyle = design.accentColor;
     ctx.font = `600 ${Math.round(H * 0.016)}px ${fonts.body}`;
-    ctx.textAlign = "right";
-    ctx.fillText("SWIPE  →", W - padX, H - padBottom);
+    ctx.textAlign = "center";
+    ctx.fillText("SWIPE  →", W / 2, H - padBottom);
     ctx.restore();
   },
 };
@@ -1626,11 +1628,13 @@ const CAROUSEL_COVER: Template = {
     ctx.fillStyle = "#ffffff";
     ctx.fillText(tagline, W - padX, padTop + indicatorSize);
 
-    // "SWIPE →" hint in bottom-right
+    // "SWIPE →" hint, bottom-center (bottom-right is reserved for the
+    // tenant logo overlay, stamped after render() — see drawLogoOverlay)
     const hintSize = Math.round(H * 0.018);
     ctx.font = `600 ${hintSize}px ${fonts.body}`;
     ctx.fillStyle = design.accentColor;
-    ctx.fillText("SWIPE  →", W - padX, H - padBottom);
+    ctx.textAlign = "center";
+    ctx.fillText("SWIPE  →", W / 2, H - padBottom);
 
     // Brand eyebrow (top-left)
     ctx.fillStyle = "#ffffff";
@@ -1778,14 +1782,15 @@ const CAROUSEL_CONTENT: Template = {
       paintLines(ctx, bodyLines, padX, bodyTop + bodySize, bodyLine);
     }
 
-    // Footer
+    // Footer — brand + locality on left, swipe hint bottom-center
+    // (bottom-right is reserved for the tenant logo overlay — see drawLogoOverlay)
     ctx.fillStyle = "rgba(10,10,10,0.45)";
     ctx.font = `500 ${Math.round(H * 0.015)}px ${fonts.body}`;
     ctx.fillText(`${brandName(design)}  ·  ${brandLocality(design).toUpperCase()}`, padX, H - padBottom);
-    ctx.textAlign = "right";
+    ctx.textAlign = "center";
     ctx.fillStyle = design.accentColor;
     ctx.font = `600 ${Math.round(H * 0.016)}px ${fonts.body}`;
-    ctx.fillText("SWIPE  →", W - padX, H - padBottom);
+    ctx.fillText("SWIPE  →", W / 2, H - padBottom);
     ctx.restore();
   },
 };
@@ -1967,15 +1972,16 @@ const CAROUSEL_TIP: Template = {
       paintLines(ctx, bodyLines, padX, bodyTop + bodySize, bodyLine);
     }
 
-    // Footer
+    // Footer — brand + locality on left, swipe hint bottom-center
+    // (bottom-right is reserved for the tenant logo overlay — see drawLogoOverlay)
     const padBottom = Math.round(H * 0.075);
     ctx.fillStyle = "rgba(10,10,10,0.5)";
     ctx.font = `500 ${Math.round(H * 0.015)}px ${fonts.body}`;
     ctx.fillText(`${brandName(design)}  ·  ${brandLocality(design).toUpperCase()}`, padX, H - padBottom);
-    ctx.textAlign = "right";
+    ctx.textAlign = "center";
     ctx.fillStyle = design.accentColor;
     ctx.font = `600 ${Math.round(H * 0.016)}px ${fonts.body}`;
-    ctx.fillText("SWIPE  →", W - padX, H - padBottom);
+    ctx.fillText("SWIPE  →", W / 2, H - padBottom);
     ctx.restore();
   },
 };
@@ -2062,14 +2068,15 @@ const CAROUSEL_QUOTE_SLIDE: Template = {
       paintLines(ctx, bodyLines, padX, bodyTop + bodySize, bodyLine);
     }
 
-    // Footer
+    // Footer — brand on left, swipe hint bottom-center (bottom-right is
+    // reserved for the tenant logo overlay — see drawLogoOverlay)
     ctx.fillStyle = "rgba(255,255,255,0.6)";
     ctx.font = `500 ${Math.round(H * 0.014)}px ${fonts.body}`;
     ctx.fillText(brandName(design), padX, H - padBottom);
-    ctx.textAlign = "right";
+    ctx.textAlign = "center";
     ctx.fillStyle = design.accentColor;
     ctx.font = `600 ${Math.round(H * 0.016)}px ${fonts.body}`;
-    ctx.fillText("SWIPE  →", W - padX, H - padBottom);
+    ctx.fillText("SWIPE  →", W / 2, H - padBottom);
     ctx.restore();
   },
 };
@@ -2150,10 +2157,12 @@ const QUOTE_PORTRAIT: Template = {
       paintLines(ctx, bodyLines, padX, bodyTop + bodySize, bodyLine);
     }
 
+    // Footer — bottom-left (bottom-right is reserved for the tenant logo
+    // overlay, stamped after render() — see drawLogoOverlay)
     ctx.fillStyle = "rgba(10,10,10,0.5)";
     ctx.font = `500 ${Math.round(H * 0.015)}px ${fonts.body}`;
-    ctx.textAlign = "right";
-    ctx.fillText(brandWeb(design), W - padX, cardBottom);
+    ctx.textAlign = "left";
+    ctx.fillText(brandWeb(design), padX, cardBottom);
     ctx.restore();
   },
 };
@@ -2436,11 +2445,12 @@ const RESULT_CARD: Template = {
       paintLines(ctx, bodyLines, padX, bodyTop + bodySize, bodyLine);
     }
 
-    // Footer
+    // Footer — bottom-left (bottom-right is reserved for the tenant logo
+    // overlay, stamped after render() — see drawLogoOverlay)
     ctx.fillStyle = "rgba(10,10,10,0.5)";
     ctx.font = `500 ${Math.round(H * 0.014)}px ${fonts.body}`;
-    ctx.textAlign = "right";
-    ctx.fillText(brandWeb(design), W - padX, H - padBottom);
+    ctx.textAlign = "left";
+    ctx.fillText(brandWeb(design), padX, H - padBottom);
     ctx.restore();
   },
 };
