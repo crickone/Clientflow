@@ -6,6 +6,7 @@ import { Film, ImageIcon, Loader2, Trash2, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 type Asset = {
   id: number;
@@ -249,22 +250,24 @@ export function LibraryManager({ initialAssets }: { initialAssets: Asset[] }) {
                   >
                     {a.label || a.originalName}
                   </div>
-                  <button
-                    onClick={() => remove(a.id)}
-                    disabled={busyId === a.id}
-                    title="Delete"
-                    style={{
-                      border: "none",
-                      background: "transparent",
-                      color: "var(--text-tertiary)",
-                      cursor: "pointer",
-                      padding: 4,
-                      display: "grid",
-                      placeItems: "center",
-                    }}
-                  >
-                    {busyId === a.id ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} />}
-                  </button>
+                  <Tooltip label="Delete">
+                    <button
+                      onClick={() => remove(a.id)}
+                      disabled={busyId === a.id}
+                      aria-label="Delete"
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        color: "var(--text-tertiary)",
+                        cursor: "pointer",
+                        padding: 4,
+                        display: "grid",
+                        placeItems: "center",
+                      }}
+                    >
+                      {busyId === a.id ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} />}
+                    </button>
+                  </Tooltip>
                 </div>
               </div>
             );

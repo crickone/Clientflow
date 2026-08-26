@@ -23,6 +23,7 @@ import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { Sheet, SheetContent } from "@/components/ui/Sheet";
 import { Avatar } from "@/components/ui/Avatar";
 import { Input, Label, Textarea } from "@/components/ui/Input";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { initialsOf } from "@/lib/utils";
 import {
   bookAction,
@@ -1182,26 +1183,27 @@ function SessionSheet({
                         </div>
                       )}
                     </div>
-                    <button
-                      onClick={() => toggleAttended(a.bookingId, attended)}
-                      disabled={pending}
-                      title={attended ? "Mark not attended" : "Mark attended"}
-                      aria-label="Toggle attendance"
-                      style={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: "50%",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        cursor: "pointer",
-                        border: attended ? "1px solid #22c55e" : "1px solid var(--hairline)",
-                        background: attended ? "#22c55e" : "transparent",
-                        color: attended ? "#04140a" : "var(--text-tertiary)",
-                      }}
-                    >
-                      <Check size={15} />
-                    </button>
+                    <Tooltip label={attended ? "Mark not attended" : "Mark attended"}>
+                      <button
+                        onClick={() => toggleAttended(a.bookingId, attended)}
+                        disabled={pending}
+                        aria-label="Toggle attendance"
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: "50%",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          cursor: "pointer",
+                          border: attended ? "1px solid #22c55e" : "1px solid var(--hairline)",
+                          background: attended ? "#22c55e" : "transparent",
+                          color: attended ? "#04140a" : "var(--text-tertiary)",
+                        }}
+                      >
+                        <Check size={15} />
+                      </button>
+                    </Tooltip>
                     <button
                       onClick={() => unbook(a.clientId)}
                       disabled={pending}

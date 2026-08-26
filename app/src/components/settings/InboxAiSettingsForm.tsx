@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardLabel } from "@/components/ui/Card";
 import { Input, Label } from "@/components/ui/Input";
 import { Badge } from "@/components/ui/Badge";
+import { Tooltip } from "@/components/ui/Tooltip";
 import {
   updateInboxAiSettings,
   promoteTagAction,
@@ -347,37 +348,41 @@ function TagGroup({
             >
               <Badge colour={t.color ?? undefined}>{t.label}</Badge>
               {onPromote && (
+                <Tooltip label="Promote to core">
+                  <button
+                    type="button"
+                    aria-label="Promote to core"
+                    disabled={busy}
+                    onClick={() => onPromote(t.id)}
+                    style={{
+                      border: "none",
+                      background: "none",
+                      cursor: "pointer",
+                      color: "var(--text-secondary)",
+                      display: "inline-flex",
+                    }}
+                  >
+                    <ArrowUp size={14} />
+                  </button>
+                </Tooltip>
+              )}
+              <Tooltip label="Delete tag">
                 <button
                   type="button"
-                  title="Promote to core"
+                  aria-label="Delete tag"
                   disabled={busy}
-                  onClick={() => onPromote(t.id)}
+                  onClick={() => onDelete(t.id)}
                   style={{
                     border: "none",
                     background: "none",
                     cursor: "pointer",
-                    color: "var(--text-secondary)",
+                    color: "var(--text-tertiary)",
                     display: "inline-flex",
                   }}
                 >
-                  <ArrowUp size={14} />
+                  <Trash2 size={13} />
                 </button>
-              )}
-              <button
-                type="button"
-                title="Delete tag"
-                disabled={busy}
-                onClick={() => onDelete(t.id)}
-                style={{
-                  border: "none",
-                  background: "none",
-                  cursor: "pointer",
-                  color: "var(--text-tertiary)",
-                  display: "inline-flex",
-                }}
-              >
-                <Trash2 size={13} />
-              </button>
+              </Tooltip>
             </span>
           ))}
         </div>

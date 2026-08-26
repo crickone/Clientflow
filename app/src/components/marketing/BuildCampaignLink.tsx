@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { Wand2 } from "lucide-react";
 
+import { Tooltip } from "@/components/ui/Tooltip";
 import { buildCampaignSeedHref, type CampaignSeed } from "./buildCampaignSeed";
 
 /**
@@ -40,10 +41,9 @@ export function BuildCampaignLink({
   const href = buildCampaignSeedHref({ seedName, season, startsOn, endsOn, angle });
   const label = children ?? "Build campaign";
   const a11yLabel = seedName ? `Build campaign: ${seedName}` : typeof label === "string" ? label : "Build campaign";
-  return (
+  const link = (
     <Link
       href={href}
-      title={iconOnly ? a11yLabel : undefined}
       aria-label={iconOnly ? a11yLabel : undefined}
       style={{
         display: "inline-flex",
@@ -67,4 +67,9 @@ export function BuildCampaignLink({
       {!iconOnly && <span style={{ lineHeight: 1.4 }}>{label}</span>}
     </Link>
   );
+  // Icon-only rendering has no visible label, so the tooltip is the only
+  // hint of meaning — a native `title` never shows on touch/keyboard, so
+  // swap in the real Tooltip component. Labelled rendering already has a
+  // visible label; no tooltip needed there.
+  return iconOnly ? <Tooltip label={a11yLabel}>{link}</Tooltip> : link;
 }

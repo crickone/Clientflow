@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { ChevronLeft } from "lucide-react";
 import { useDroppable } from "@dnd-kit/core";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 export interface StageColumnProps {
   stageId: number;
@@ -74,14 +75,16 @@ export function StageColumn({ stageId, stage, count, total, rail = false, expand
           {total != null && total !== count ? `${count} / ${total}` : count}
         </span>
         {rail && onToggle && (
-          <button
-            type="button"
-            onClick={onToggle}
-            title="Collapse"
-            style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--text-tertiary)", display: "inline-flex" }}
-          >
-            <ChevronLeft size={14} />
-          </button>
+          <Tooltip label="Collapse">
+            <button
+              type="button"
+              onClick={onToggle}
+              aria-label="Collapse"
+              style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--text-tertiary)", display: "inline-flex" }}
+            >
+              <ChevronLeft size={14} />
+            </button>
+          </Tooltip>
         )}
       </div>
       <div

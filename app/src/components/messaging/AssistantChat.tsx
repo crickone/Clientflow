@@ -8,6 +8,7 @@ import { EASE } from "@/lib/motion";
 
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { Tooltip } from "@/components/ui/Tooltip";
 import {
   campaignGoAgainMessage,
   campaignPlanEventFromActions,
@@ -883,13 +884,15 @@ export function AssistantChat({
                     </div>
                     <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{ago(c.updatedAt)}</div>
                   </div>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); deleteChat(c.id); }}
-                    title="Delete chat"
-                    style={{ background: "transparent", border: "none", color: "var(--text-tertiary)", cursor: "pointer", padding: 2, flexShrink: 0, display: "inline-flex" }}
-                  >
-                    <Trash2 size={13} />
-                  </button>
+                  <Tooltip label="Delete chat">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteChat(c.id); }}
+                      aria-label="Delete chat"
+                      style={{ background: "transparent", border: "none", color: "var(--text-tertiary)", cursor: "pointer", padding: 2, flexShrink: 0, display: "inline-flex" }}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </Tooltip>
                 </div>
               ))
             )}
@@ -1178,27 +1181,28 @@ export function AssistantChat({
                 {voice.elapsedLabel}
               </span>
             )}
-            <Button
-              variant="secondary"
-              onClick={voice.toggle}
-              disabled={voice.state === "transcribing" || (voice.state === "idle" && busy)}
-              aria-label={voice.state === "recording" ? "Stop and transcribe" : "Start voice input"}
-              title={voice.state === "recording" ? "Stop and transcribe" : "Start voice input"}
-              style={
-                voice.state === "recording" ? { position: "relative", borderColor: "#dc2626", color: "#dc2626" } : undefined
-              }
-            >
-              {voice.state === "transcribing" ? (
-                <Loader2 size={15} className="spin" />
-              ) : voice.state === "recording" ? (
-                <>
-                  <Square size={14} strokeWidth={2} fill="currentColor" />
-                  <span className="voice-rec-dot" aria-hidden />
-                </>
-              ) : (
-                <Mic size={15} strokeWidth={2} />
-              )}
-            </Button>
+            <Tooltip label={voice.state === "recording" ? "Stop and transcribe" : "Start voice input"}>
+              <Button
+                variant="secondary"
+                onClick={voice.toggle}
+                disabled={voice.state === "transcribing" || (voice.state === "idle" && busy)}
+                aria-label={voice.state === "recording" ? "Stop and transcribe" : "Start voice input"}
+                style={
+                  voice.state === "recording" ? { position: "relative", borderColor: "#dc2626", color: "#dc2626" } : undefined
+                }
+              >
+                {voice.state === "transcribing" ? (
+                  <Loader2 size={15} className="spin" />
+                ) : voice.state === "recording" ? (
+                  <>
+                    <Square size={14} strokeWidth={2} fill="currentColor" />
+                    <span className="voice-rec-dot" aria-hidden />
+                  </>
+                ) : (
+                  <Mic size={15} strokeWidth={2} />
+                )}
+              </Button>
+            </Tooltip>
           </>
         )}
         <Button onClick={() => send(input)} disabled={busy || !input.trim() || voice.state !== "idle"}>

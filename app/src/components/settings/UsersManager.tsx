@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Tooltip } from "@/components/ui/Tooltip";
 import {
   Dialog,
   DialogClose,
@@ -167,15 +168,17 @@ function ResendInviteButton({ user }: { user: UserRow }) {
     });
   }
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      title="Resend invite email"
-      onClick={resend}
-      disabled={pending}
-    >
-      <Mail size={14} strokeWidth={1.75} />
-    </Button>
+    <Tooltip label="Resend invite email">
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="Resend invite email"
+        onClick={resend}
+        disabled={pending}
+      >
+        <Mail size={14} strokeWidth={1.75} />
+      </Button>
+    </Tooltip>
   );
 }
 
@@ -505,11 +508,13 @@ function EditUserDialog({ user, isMe }: { user: UserRow; isMe: boolean }) {
         }
       }}
     >
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" title="Edit">
-          <Pencil size={14} strokeWidth={1.75} />
-        </Button>
-      </DialogTrigger>
+      <Tooltip label="Edit">
+        <DialogTrigger asChild>
+          <Button variant="ghost" size="icon" aria-label="Edit">
+            <Pencil size={14} strokeWidth={1.75} />
+          </Button>
+        </DialogTrigger>
+      </Tooltip>
       <DialogContent title="Edit membership">
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
@@ -617,11 +622,13 @@ function ResetPasswordDialog({ user }: { user: UserRow }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" title="Reset password">
-          <KeyRound size={14} strokeWidth={1.75} />
-        </Button>
-      </DialogTrigger>
+      <Tooltip label="Reset password">
+        <DialogTrigger asChild>
+          <Button variant="ghost" size="icon" aria-label="Reset password">
+            <KeyRound size={14} strokeWidth={1.75} />
+          </Button>
+        </DialogTrigger>
+      </Tooltip>
       <DialogContent title="Reset password" description={user.email}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
@@ -697,17 +704,19 @@ function RemoveMemberButton({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          title={disabled ? "You can't remove yourself from a clinic" : "Remove from clinic"}
-          disabled={disabled}
-          style={disabled ? { opacity: 0.4, cursor: "not-allowed" } : undefined}
-        >
-          <UserMinus size={14} strokeWidth={1.75} />
-        </Button>
-      </DialogTrigger>
+      <Tooltip label={disabled ? "You can't remove yourself from a clinic" : "Remove from clinic"}>
+        <DialogTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={disabled ? "You can't remove yourself from a clinic" : "Remove from clinic"}
+            disabled={disabled}
+            style={disabled ? { opacity: 0.4, cursor: "not-allowed" } : undefined}
+          >
+            <UserMinus size={14} strokeWidth={1.75} />
+          </Button>
+        </DialogTrigger>
+      </Tooltip>
       <DialogContent title="Remove from clinic" description={user.email} width={420}>
         <p style={{ color: "var(--text-secondary)", fontSize: 14, lineHeight: 1.5 }}>
           This revokes <strong>{user.name || user.email}</strong>&apos;s access to

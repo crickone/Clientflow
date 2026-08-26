@@ -11,6 +11,7 @@ import {
 } from "react";
 import { Pause, Play, SkipBack, SkipForward } from "lucide-react";
 
+import { Tooltip } from "@/components/ui/Tooltip";
 import type { VideoAsset } from "@/lib/db/schema";
 import type { TranscriptWord } from "@/lib/ai/transcribe";
 import type { TimelineDoc } from "@/lib/video/timeline";
@@ -466,25 +467,27 @@ function TransportButton({
   primary?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      style={{
-        width: primary ? 40 : 34,
-        height: primary ? 40 : 34,
-        borderRadius: 8,
-        border: "1px solid var(--hairline-strong, var(--hairline))",
-        background: primary ? "var(--accent, #ef5a24)" : "var(--bg)",
-        color: primary ? "#fff" : "var(--text-primary)",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        cursor: "pointer",
-        padding: 0,
-      }}
-    >
-      {children}
-    </button>
+    <Tooltip label={title}>
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={title}
+        style={{
+          width: primary ? 40 : 34,
+          height: primary ? 40 : 34,
+          borderRadius: 8,
+          border: "1px solid var(--hairline-strong, var(--hairline))",
+          background: primary ? "var(--accent, #ef5a24)" : "var(--bg)",
+          color: primary ? "#fff" : "var(--text-primary)",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "pointer",
+          padding: 0,
+        }}
+      >
+        {children}
+      </button>
+    </Tooltip>
   );
 }

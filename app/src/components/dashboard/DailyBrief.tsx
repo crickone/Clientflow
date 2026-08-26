@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Sparkles, RefreshCw } from "lucide-react";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const BRIEF_TTL_MS = 10 * 60 * 1000; // 10 minutes
@@ -73,14 +74,16 @@ export function DailyBrief({ tenantId }: { tenantId: number }) {
         <Sparkles size={15} strokeWidth={1.75} style={{ color: "var(--accent)" }} />
         <strong style={{ fontSize: 13.5, color: "var(--text-primary)" }}>{heading()}</strong>
         <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>· your brief</span>
-        <button
-          onClick={() => load(true)}
-          disabled={loading}
-          title="Refresh brief"
-          style={{ marginLeft: "auto", background: "transparent", border: "none", color: "var(--text-tertiary)", cursor: "pointer", display: "inline-flex", padding: 2 }}
-        >
-          <RefreshCw size={14} className={loading ? "spin" : undefined} />
-        </button>
+        <Tooltip label="Refresh brief">
+          <button
+            onClick={() => load(true)}
+            disabled={loading}
+            aria-label="Refresh brief"
+            style={{ marginLeft: "auto", background: "transparent", border: "none", color: "var(--text-tertiary)", cursor: "pointer", display: "inline-flex", padding: 2 }}
+          >
+            <RefreshCw size={14} className={loading ? "spin" : undefined} />
+          </button>
+        </Tooltip>
       </div>
       {loading ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

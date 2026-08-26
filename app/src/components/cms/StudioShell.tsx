@@ -22,6 +22,7 @@ import {
 
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { savePageHtmlAction } from "@/app/cms/[siteSlug]/studio/actions";
 
 type PageRow = { path: string; title: string };
@@ -236,21 +237,22 @@ export function StudioShell({
           {(Object.keys(DEVICES) as Device[]).map((dv) => {
             const Icon = DEVICES[dv].icon;
             return (
-              <button
-                key={dv}
-                onClick={() => setDevice(dv)}
-                title={dv}
-                style={{
-                  border: "none",
-                  background: device === dv ? "var(--surface-2)" : "transparent",
-                  color: device === dv ? "var(--text-primary)" : "var(--text-tertiary)",
-                  borderRadius: 6,
-                  padding: 6,
-                  cursor: "pointer",
-                }}
-              >
-                <Icon size={16} />
-              </button>
+              <Tooltip label={dv} key={dv}>
+                <button
+                  onClick={() => setDevice(dv)}
+                  aria-label={dv}
+                  style={{
+                    border: "none",
+                    background: device === dv ? "var(--surface-2)" : "transparent",
+                    color: device === dv ? "var(--text-primary)" : "var(--text-tertiary)",
+                    borderRadius: 6,
+                    padding: 6,
+                    cursor: "pointer",
+                  }}
+                >
+                  <Icon size={16} />
+                </button>
+              </Tooltip>
             );
           })}
           <a

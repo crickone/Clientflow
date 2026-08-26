@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 
 import { ImagePicker } from "@/components/content-studio/ImagePicker";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 /**
  * Reusable WYSIWYG markdown editor (TipTap). Edits visually but the source of
@@ -127,8 +128,10 @@ function ToolButton({
   active?: boolean;
 }) {
   return (
-    <button type="button" title={title} aria-label={title} aria-pressed={active} onClick={onClick} className="md-toolbar-btn">
-      <Icon size={15} />
-    </button>
+    <Tooltip label={title}>
+      <button type="button" aria-label={title} aria-pressed={active} onClick={onClick} className="md-toolbar-btn">
+        <Icon size={15} />
+      </button>
+    </Tooltip>
   );
 }

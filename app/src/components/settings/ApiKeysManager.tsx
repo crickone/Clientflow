@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Tooltip } from "@/components/ui/Tooltip";
 import {
   Dialog,
   DialogClose,
@@ -214,9 +215,11 @@ function CreateKeyButton() {
               >
                 {created.raw}
               </code>
-              <Button variant="ghost" size="icon" onClick={copyKey} title="Copy key">
-                {copied ? <Check size={15} /> : <Copy size={15} />}
-              </Button>
+              <Tooltip label="Copy key">
+                <Button variant="ghost" size="icon" onClick={copyKey} aria-label="Copy key">
+                  {copied ? <Check size={15} /> : <Copy size={15} />}
+                </Button>
+              </Tooltip>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
               <DialogClose asChild>
@@ -280,11 +283,13 @@ function RevokeKeyButton({ apiKey: k }: { apiKey: ApiKeyRow }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" title="Revoke key">
-          <Trash2 size={14} strokeWidth={1.75} />
-        </Button>
-      </DialogTrigger>
+      <Tooltip label="Revoke key">
+        <DialogTrigger asChild>
+          <Button variant="ghost" size="icon" aria-label="Revoke key">
+            <Trash2 size={14} strokeWidth={1.75} />
+          </Button>
+        </DialogTrigger>
+      </Tooltip>
       <DialogContent title="Revoke API key" description={k.label || k.prefix + "…"} width={420}>
         <p style={{ color: "var(--text-secondary)", fontSize: 14, lineHeight: 1.5 }}>
           Any integration using this key will immediately start getting{" "}

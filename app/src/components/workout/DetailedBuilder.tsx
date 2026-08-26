@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
 import { Input, Label, Textarea } from "@/components/ui/Input";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { ExercisePreviewModal } from "@/components/workout/ExercisePreviewModal";
 import { saveProgramAction } from "@/app/workout/actions";
 import {
@@ -282,25 +283,26 @@ function ExerciseRow({
                   </span>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
                     {exerciseHasVideo(m) && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Preview ${m.name}`}
-                        title="Preview video"
-                        // onMouseDown + preventDefault (not onClick): the name
-                        // Input's onBlur fires on focus loss with a 120ms delay
-                        // (see below) — preventing the default mousedown focus
-                        // shift keeps the input focused, so `focused` never
-                        // clears and this dropdown stays open. Same trick the
-                        // Add button below already relied on.
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          onPreview(m);
-                        }}
-                      >
-                        <Play size={13} fill="currentColor" />
-                      </Button>
+                      <Tooltip label="Preview video">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Preview ${m.name}`}
+                          // onMouseDown + preventDefault (not onClick): the name
+                          // Input's onBlur fires on focus loss with a 120ms delay
+                          // (see below) — preventing the default mousedown focus
+                          // shift keeps the input focused, so `focused` never
+                          // clears and this dropdown stays open. Same trick the
+                          // Add button below already relied on.
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onPreview(m);
+                          }}
+                        >
+                          <Play size={13} fill="currentColor" />
+                        </Button>
+                      </Tooltip>
                     )}
                     <Button
                       size="sm"

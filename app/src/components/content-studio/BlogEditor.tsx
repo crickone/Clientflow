@@ -37,6 +37,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Input } from "@/components/ui/Input";
+import { Tooltip } from "@/components/ui/Tooltip";
 import {
   ImagePicker,
   type PickedImage,
@@ -71,17 +72,18 @@ function ToolButton({
   active?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      title={title}
-      aria-label={title}
-      aria-pressed={active}
-      onClick={onClick}
-      disabled={disabled}
-      className="md-toolbar-btn"
-    >
-      <Icon size={15} />
-    </button>
+    <Tooltip label={title}>
+      <button
+        type="button"
+        aria-label={title}
+        aria-pressed={active}
+        onClick={onClick}
+        disabled={disabled}
+        className="md-toolbar-btn"
+      >
+        <Icon size={15} />
+      </button>
+    </Tooltip>
   );
 }
 

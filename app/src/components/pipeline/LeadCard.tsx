@@ -3,6 +3,7 @@
 import { Sparkles, MessageCircle } from "lucide-react";
 import type { LeadWithSla } from "@/lib/leads";
 import { Badge } from "@/components/ui/Badge";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { slaTone, isStale } from "@/lib/pipeline/boardMetrics";
 import { initialsOf } from "@/lib/utils";
 
@@ -119,31 +120,35 @@ export function LeadCard({ lead, now, onDraft, onWhatsApp }: LeadCardProps) {
           </span>
         )}
         <span style={{ marginLeft: "auto", display: "inline-flex", gap: 4 }}>
-          <button
-            type="button"
-            title="AI draft"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              onDraft(lead.id);
-            }}
-            style={iconBtn}
-          >
-            <Sparkles size={14} />
-          </button>
-          {lead.phone && (
+          <Tooltip label="AI draft">
             <button
               type="button"
-              title="WhatsApp"
+              aria-label="AI draft"
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
-                onWhatsApp(lead.id);
+                onDraft(lead.id);
               }}
               style={iconBtn}
             >
-              <MessageCircle size={14} />
+              <Sparkles size={14} />
             </button>
+          </Tooltip>
+          {lead.phone && (
+            <Tooltip label="WhatsApp">
+              <button
+                type="button"
+                aria-label="WhatsApp"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onWhatsApp(lead.id);
+                }}
+                style={iconBtn}
+              >
+                <MessageCircle size={14} />
+              </button>
+            </Tooltip>
           )}
         </span>
       </div>

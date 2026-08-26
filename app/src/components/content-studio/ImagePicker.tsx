@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ImagePlus, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 interface LibAsset {
   id: number;
@@ -185,37 +186,37 @@ export function ImagePicker({
               }}
             >
               {assets.map((a) => (
-                <button
-                  key={a.id}
-                  type="button"
-                  onClick={() =>
-                    onSelect({ url: a.url, alt: a.alt ?? a.originalName ?? "" })
-                  }
-                  title={a.originalName}
-                  style={{
-                    display: "block",
-                    padding: 0,
-                    border: "1px solid var(--hairline)",
-                    borderRadius: "var(--radius)",
-                    overflow: "hidden",
-                    background: "var(--bg)",
-                    cursor: "pointer",
-                    aspectRatio: "4 / 3",
-                  }}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={a.url}
-                    alt={a.alt ?? a.originalName}
-                    loading="lazy"
+                <Tooltip label={a.originalName} key={a.id}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onSelect({ url: a.url, alt: a.alt ?? a.originalName ?? "" })
+                    }
                     style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
                       display: "block",
+                      padding: 0,
+                      border: "1px solid var(--hairline)",
+                      borderRadius: "var(--radius)",
+                      overflow: "hidden",
+                      background: "var(--bg)",
+                      cursor: "pointer",
+                      aspectRatio: "4 / 3",
                     }}
-                  />
-                </button>
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={a.url}
+                      alt={a.alt ?? a.originalName}
+                      loading="lazy"
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                        display: "block",
+                      }}
+                    />
+                  </button>
+                </Tooltip>
               ))}
             </div>
           )}

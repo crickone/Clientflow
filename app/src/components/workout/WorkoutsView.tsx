@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Input } from "@/components/ui/Input";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { deleteWorkoutAction, duplicateWorkoutAction } from "@/app/workout/workouts/actions";
 
 interface WorkoutRow {
@@ -125,9 +126,11 @@ function WorkoutRowItem({ workout }: { workout: WorkoutRow }) {
         <RowMenu onEdit={onEdit} onView={onView} onDuplicate={duplicate} onDelete={remove} disabled={pending} />
       </div>
       <div style={{ textAlign: "center" }}>
-        <button onClick={onView} aria-label="View" title="Preview" style={iconBtn}>
-          <Eye size={15} />
-        </button>
+        <Tooltip label="Preview">
+          <button onClick={onView} aria-label="View" style={iconBtn}>
+            <Eye size={15} />
+          </button>
+        </Tooltip>
       </div>
     </div>
   );

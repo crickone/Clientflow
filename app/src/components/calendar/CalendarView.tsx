@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { Input, Label } from "@/components/ui/Input";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { deleteEventAction, saveEventAction } from "@/app/calendar/actions";
 import type { CalendarEvent } from "@/lib/calendar";
 
@@ -56,10 +57,14 @@ export function CalendarView({
     <>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
         <Link href={`/calendar?m=${prevMonth}`}>
-          <Button variant="ghost" size="icon" title="Previous month"><ChevronLeft size={16} /></Button>
+          <Tooltip label="Previous month">
+            <Button variant="ghost" size="icon" aria-label="Previous month"><ChevronLeft size={16} /></Button>
+          </Tooltip>
         </Link>
         <Link href={`/calendar?m=${nextMonth}`}>
-          <Button variant="ghost" size="icon" title="Next month"><ChevronRight size={16} /></Button>
+          <Tooltip label="Next month">
+            <Button variant="ghost" size="icon" aria-label="Next month"><ChevronRight size={16} /></Button>
+          </Tooltip>
         </Link>
         <h2 style={{ fontSize: 18, fontWeight: 600, color: "var(--text-primary)", margin: "0 6px" }}>{label}</h2>
         <Link href={`/calendar?m=${thisMonth}`}>
@@ -259,20 +264,21 @@ function EventDialog({ draft, onClose }: { draft: Draft; onClose: () => void }) 
               {COLORS.map((c) => {
                 const selected = color === c.hex;
                 return (
-                  <button
-                    key={c.name}
-                    onClick={() => setColor(c.hex)}
-                    title={c.name}
-                    disabled={pending}
-                    style={{
-                      width: 26,
-                      height: 26,
-                      borderRadius: "50%",
-                      background: c.hex || "var(--accent)",
-                      border: selected ? "2px solid var(--text-primary)" : "2px solid transparent",
-                      cursor: "pointer",
-                    }}
-                  />
+                  <Tooltip label={c.name} key={c.name}>
+                    <button
+                      onClick={() => setColor(c.hex)}
+                      aria-label={c.name}
+                      disabled={pending}
+                      style={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: "50%",
+                        background: c.hex || "var(--accent)",
+                        border: selected ? "2px solid var(--text-primary)" : "2px solid transparent",
+                        cursor: "pointer",
+                      }}
+                    />
+                  </Tooltip>
                 );
               })}
             </div>

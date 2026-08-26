@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Sheet, SheetContent } from "@/components/ui/Sheet";
 import { Input, Label, Textarea } from "@/components/ui/Input";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { ExercisePreviewModal } from "@/components/workout/ExercisePreviewModal";
 import { saveWorkoutAction } from "@/app/workout/workouts/actions";
 import {
@@ -258,18 +259,19 @@ function ChooseExerciseSheet({
                 </span>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
                   {exerciseHasVideo(e) && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Preview ${e.name}`}
-                      title="Preview video"
-                      onClick={(ev) => {
-                        ev.stopPropagation();
-                        onPreview(e);
-                      }}
-                    >
-                      <Play size={14} fill="currentColor" />
-                    </Button>
+                    <Tooltip label="Preview video">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Preview ${e.name}`}
+                        onClick={(ev) => {
+                          ev.stopPropagation();
+                          onPreview(e);
+                        }}
+                      >
+                        <Play size={14} fill="currentColor" />
+                      </Button>
+                    </Tooltip>
                   )}
                   <Button
                     size="sm"

@@ -6,6 +6,7 @@ import { Check, Trash2, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
+import { Tooltip } from "@/components/ui/Tooltip";
 import type { BookingRow } from "@/lib/attendance";
 import { cancelBookingAction, setAttendanceAction } from "@/app/attendance/actions";
 
@@ -147,7 +148,7 @@ export function BookingsTable({
                         <AttButton
                           active={r.status === "attended"}
                           activeColor="#22c55e"
-                          title="Mark attended"
+                          label="Mark attended"
                           disabled={pending}
                           onClick={() => setStatus(r.bookingId, r.status === "attended" ? "booked" : "attended")}
                         >
@@ -156,30 +157,31 @@ export function BookingsTable({
                         <AttButton
                           active={r.status === "no_show"}
                           activeColor="#ef4444"
-                          title="Mark no-show"
+                          label="Mark no-show"
                           disabled={pending}
                           onClick={() => setStatus(r.bookingId, r.status === "no_show" ? "booked" : "no_show")}
                         >
                           <X size={14} />
                         </AttButton>
-                        <button
-                          onClick={() => cancel(r.bookingId)}
-                          disabled={pending}
-                          title="Cancel booking"
-                          aria-label="Cancel booking"
-                          style={{
-                            background: "transparent",
-                            border: "none",
-                            color: "var(--text-tertiary)",
-                            cursor: pending ? "not-allowed" : "pointer",
-                            opacity: pending ? 0.5 : 1,
-                            display: "inline-flex",
-                            padding: 4,
-                            transition: "opacity 0.15s var(--ease)",
-                          }}
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        <Tooltip label="Cancel booking">
+                          <button
+                            onClick={() => cancel(r.bookingId)}
+                            disabled={pending}
+                            aria-label="Cancel booking"
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              color: "var(--text-tertiary)",
+                              cursor: pending ? "not-allowed" : "pointer",
+                              opacity: pending ? 0.5 : 1,
+                              display: "inline-flex",
+                              padding: 4,
+                              transition: "opacity 0.15s var(--ease)",
+                            }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </Tooltip>
                       </>
                     ) : (
                       <button
@@ -215,40 +217,41 @@ function AttButton({
   children,
   active,
   activeColor,
-  title,
+  label,
   disabled,
   onClick,
 }: {
   children: React.ReactNode;
   active: boolean;
   activeColor: string;
-  title: string;
+  label: string;
   disabled?: boolean;
   onClick: () => void;
 }) {
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-      aria-label={title}
-      style={{
-        width: 28,
-        height: 28,
-        borderRadius: "50%",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        cursor: disabled ? "not-allowed" : "pointer",
-        opacity: disabled ? 0.5 : 1,
-        border: active ? `1px solid ${activeColor}` : "1px solid var(--hairline)",
-        background: active ? activeColor : "transparent",
-        color: active ? "#04140a" : "var(--text-tertiary)",
-        transition: "opacity 0.15s var(--ease)",
-      }}
-    >
-      {children}
-    </button>
+    <Tooltip label={label}>
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={label}
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: "50%",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: disabled ? "not-allowed" : "pointer",
+          opacity: disabled ? 0.5 : 1,
+          border: active ? `1px solid ${activeColor}` : "1px solid var(--hairline)",
+          background: active ? activeColor : "transparent",
+          color: active ? "#04140a" : "var(--text-tertiary)",
+          transition: "opacity 0.15s var(--ease)",
+        }}
+      >
+        {children}
+      </button>
+    </Tooltip>
   );
 }
 

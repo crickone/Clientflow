@@ -29,6 +29,7 @@ import {
   DialogClose,
 } from "@/components/ui/Dialog";
 import { Input, Label, Textarea } from "@/components/ui/Input";
+import { Tooltip } from "@/components/ui/Tooltip";
 import type {
   CarouselSlide,
   ImageLibraryAsset,
@@ -1477,23 +1478,25 @@ export function ImageDesigner({
           <div>
             <Label>Background colour</Label>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-              <button
-                type="button"
-                onClick={() => updateActiveSlide({ backgroundColor: null })}
-                title="No colour"
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: "var(--radius)",
-                  background:
-                    "repeating-conic-gradient(#888 0% 25%, #ccc 0% 50%) 50% / 12px 12px",
-                  border: !activeSlide.backgroundColor
-                    ? "2px solid var(--text-primary)"
-                    : "1px solid var(--hairline-strong)",
-                  cursor: "pointer",
-                  padding: 0,
-                }}
-              />
+              <Tooltip label="No colour">
+                <button
+                  type="button"
+                  onClick={() => updateActiveSlide({ backgroundColor: null })}
+                  aria-label="No colour"
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: "var(--radius)",
+                    background:
+                      "repeating-conic-gradient(#888 0% 25%, #ccc 0% 50%) 50% / 12px 12px",
+                    border: !activeSlide.backgroundColor
+                      ? "2px solid var(--text-primary)"
+                      : "1px solid var(--hairline-strong)",
+                    cursor: "pointer",
+                    padding: 0,
+                  }}
+                />
+              </Tooltip>
               {BACKGROUND_SWATCHES.map((c) => {
                 const active =
                   (activeSlide.backgroundColor ?? "").toLowerCase() ===
@@ -1675,31 +1678,33 @@ export function ImageDesigner({
                             display: "block",
                           }}
                         />
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteAsset(asset.id);
-                          }}
-                          title="Remove from library"
-                          style={{
-                            position: "absolute",
-                            top: 4,
-                            right: 4,
-                            background: "rgba(0,0,0,0.6)",
-                            color: "#fff",
-                            borderRadius: "var(--radius)",
-                            border: "none",
-                            width: 22,
-                            height: 22,
-                            cursor: "pointer",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                        >
-                          <Trash2 size={11} />
-                        </button>
+                        <Tooltip label="Remove from library">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteAsset(asset.id);
+                            }}
+                            aria-label="Remove from library"
+                            style={{
+                              position: "absolute",
+                              top: 4,
+                              right: 4,
+                              background: "rgba(0,0,0,0.6)",
+                              color: "#fff",
+                              borderRadius: "var(--radius)",
+                              border: "none",
+                              width: 22,
+                              height: 22,
+                              cursor: "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            <Trash2 size={11} />
+                          </button>
+                        </Tooltip>
                       </div>
                     );
                   })}

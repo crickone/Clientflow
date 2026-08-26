@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Input, Label } from "@/components/ui/Input";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { Tooltip } from "@/components/ui/Tooltip";
 import {
   connectSendingDomainAction,
   disconnectSendingDomainAction,
@@ -231,34 +232,35 @@ function CopyCell({ text, breakAll = false }: { text: string; breakAll?: boolean
 
   return (
     <td style={{ ...td, ...mono, padding: 0, ...(breakAll ? { wordBreak: "break-all" } : null) }}>
-      <button
-        type="button"
-        onClick={copy}
-        title="Click to copy"
-        aria-label={copied ? "Copied" : `Copy ${text}`}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          width: "100%",
-          padding: "10px 12px",
-          background: copied ? "rgba(22,163,74,0.10)" : "transparent",
-          border: "none",
-          cursor: "pointer",
-          font: "inherit",
-          color: "inherit",
-          textAlign: "left",
-          transition: "background 140ms ease",
-          ...(breakAll ? { wordBreak: "break-all" } : null),
-        }}
-      >
-        <span style={{ flex: 1, minWidth: 0 }}>{text}</span>
-        {copied ? (
-          <Check size={13} strokeWidth={2} style={{ color: "#16a34a", flexShrink: 0 }} />
-        ) : (
-          <Copy size={13} strokeWidth={1.75} style={{ opacity: 0.4, flexShrink: 0 }} />
-        )}
-      </button>
+      <Tooltip label="Click to copy">
+        <button
+          type="button"
+          onClick={copy}
+          aria-label={copied ? "Copied" : `Copy ${text}`}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            width: "100%",
+            padding: "10px 12px",
+            background: copied ? "rgba(22,163,74,0.10)" : "transparent",
+            border: "none",
+            cursor: "pointer",
+            font: "inherit",
+            color: "inherit",
+            textAlign: "left",
+            transition: "background 140ms ease",
+            ...(breakAll ? { wordBreak: "break-all" } : null),
+          }}
+        >
+          <span style={{ flex: 1, minWidth: 0 }}>{text}</span>
+          {copied ? (
+            <Check size={13} strokeWidth={2} style={{ color: "#16a34a", flexShrink: 0 }} />
+          ) : (
+            <Copy size={13} strokeWidth={1.75} style={{ opacity: 0.4, flexShrink: 0 }} />
+          )}
+        </button>
+      </Tooltip>
     </td>
   );
 }

@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { CardLabel } from "@/components/ui/Card";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { formatDate } from "@/lib/utils";
 import { Sparkline } from "./Sparkline";
 
@@ -201,19 +202,22 @@ function AdCard({
         </span>
         <div className="mres-ad-actions">
           {canLink && (
-            <button
-              type="button"
-              className="mres-ad-link-btn"
-              disabled={pending}
-              onClick={() => onLinkPage?.(competitorId, ad.pageId, ad.pageName)}
-              title={`Pin ${competitorName} to this Facebook Page — future scans fetch only ${ad.pageName || "this page"}'s ads, no name matching`}
-            >
-              <Pin size={11} /> These are theirs
-            </button>
+            <Tooltip label={`Pin ${competitorName} to this Facebook Page — future scans fetch only ${ad.pageName || "this page"}'s ads, no name matching`}>
+              <button
+                type="button"
+                className="mres-ad-link-btn"
+                disabled={pending}
+                onClick={() => onLinkPage?.(competitorId, ad.pageId, ad.pageName)}
+              >
+                <Pin size={11} /> These are theirs
+              </button>
+            </Tooltip>
           )}
-          <a href={ad.snapshotUrl} target="_blank" rel="noreferrer" className="mres-ad-watch" title="Opens Meta's Ad Library, where the ad's full creative (image or video) plays">
-            <Play size={11} fill="currentColor" /> Watch on Meta
-          </a>
+          <Tooltip label="Opens Meta's Ad Library, where the ad's full creative (image or video) plays">
+            <a href={ad.snapshotUrl} target="_blank" rel="noreferrer" className="mres-ad-watch">
+              <Play size={11} fill="currentColor" /> Watch on Meta
+            </a>
+          </Tooltip>
         </div>
       </div>
     </div>

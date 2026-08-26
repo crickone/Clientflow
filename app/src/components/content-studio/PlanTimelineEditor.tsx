@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { Pause, Play, Trash2 } from "lucide-react";
+import { Tooltip } from "@/components/ui/Tooltip";
 import type { VideoAsset } from "@/lib/db/schema";
 
 export interface PlanInsertDraft {
@@ -557,26 +558,28 @@ export function PlanTimelineEditor({
                 gap: 10,
               }}
             >
-              <button
-                type="button"
-                onClick={togglePlay}
-                style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: "var(--radius)",
-                  border: "1px solid var(--hairline-strong)",
-                  background: "var(--bg)",
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "var(--text-primary)",
-                  padding: 0,
-                }}
-                title={isPlaying ? "Pause" : "Play"}
-              >
-                {isPlaying ? <Pause size={16} /> : <Play size={16} />}
-              </button>
+              <Tooltip label={isPlaying ? "Pause" : "Play"}>
+                <button
+                  type="button"
+                  onClick={togglePlay}
+                  aria-label={isPlaying ? "Pause" : "Play"}
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: "var(--radius)",
+                    border: "1px solid var(--hairline-strong)",
+                    background: "var(--bg)",
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "var(--text-primary)",
+                    padding: 0,
+                  }}
+                >
+                  {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+                </button>
+              </Tooltip>
               <div
                 style={{
                   fontFamily:
