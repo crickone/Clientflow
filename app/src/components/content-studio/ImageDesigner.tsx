@@ -13,6 +13,7 @@ import {
   Copy,
   Download,
   Image as ImageIcon,
+  Loader2,
   Plus,
   RefreshCw,
   Sparkles,
@@ -2355,7 +2356,9 @@ function SlideCanvas({
       bgRef.current,
       fontFamilies,
     );
-    if (logo) drawLogoOverlay(ctx, canvas.width, canvas.height, logo);
+    if (logo) {
+      drawLogoOverlay(ctx, canvas.width, canvas.height, logo, template.logoPlacement);
+    }
   }, [slide, slideIdx, total, fontsReady, fontFamilies, tick, brand, logo]);
 
   const template = getTemplate(slide.templateId);
@@ -2403,6 +2406,7 @@ function SlideThumb({
   logo?: HTMLImageElement | null;
 }) {
   const template = getTemplate(slide.templateId);
+  const generating = slide.imageStatus === "generating";
   return (
     <button
       type="button"
@@ -2421,8 +2425,13 @@ function SlideThumb({
         fontFamily: "inherit",
         textAlign: "left",
       }}
-      aria-label={`Edit slide ${slideIdx + 1}`}
+      aria-label={
+        generating
+          ? `Slide ${slideIdx + 1} — generating image`
+          : `Edit slide ${slideIdx + 1}`
+      }
       aria-pressed={isActive}
+      aria-busy={generating}
     >
       <div
         style={{
@@ -2442,17 +2451,47 @@ function SlideThumb({
           {template?.aspectRatio ?? ""}
         </span>
       </div>
-      <SlideCanvas
-        slide={slide}
-        slideIdx={slideIdx}
-        total={total}
-        library={library}
-        fontsReady={fontsReady}
-        defaultHeadingFontId={defaultHeadingFontId}
-        defaultBodyFontId={defaultBodyFontId}
-        brand={brand}
-        logo={logo}
-      />
+      <div style={{ position: "relative" }}>
+        <SlideCanvas
+          slide={slide}
+          slideIdx={slideIdx}
+          total={total}
+          library={library}
+          fontsReady={fontsReady}
+          defaultHeadingFontId={defaultHeadingFontId}
+          defaultBodyFontId={defaultBodyFontId}
+          brand={brand}
+          logo={logo}
+        />
+        {generating && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              borderRadius: "var(--radius)",
+              background: "rgba(10,10,10,0.6)",
+              color: "#fff",
+            }}
+          >
+            <Loader2 size={18} className="spin" />
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: "0.05em",
+                textTransform: "uppercase",
+              }}
+            >
+              Generating…
+            </span>
+          </div>
+        )}
+      </div>
     </button>
   );
 }
@@ -2526,7 +2565,7 @@ async function renderSlideToBlob(
     bg,
     fontFamilies,
   );
-  if (logo) drawLogoOverlay(ctx, canvas.width, canvas.height, logo);
+  if (logo) drawLogoOverlay(ctx, canvas.width, canvas.height, logo, template.logoPlacement);
 
   return new Promise<Blob | null>((resolve) => {
     canvas.toBlob((b) => resolve(b), "image/png");

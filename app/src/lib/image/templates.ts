@@ -121,6 +121,14 @@ export interface Template {
    * something.
    */
   requiresPhoto?: boolean;
+  /**
+   * Where drawLogoOverlay stamps the tenant logo after render() runs.
+   * Unset defaults to "bottom-right" (the original, and still correct spot
+   * for every non-carousel template — full-bleed photo posts with nothing
+   * else claiming that corner). Carousel templates reserve bottom-right for
+   * the "SWIPE →" hint and set this explicitly instead.
+   */
+  logoPlacement?: "top-left" | "top-center" | "bottom-right";
   render: (
     ctx: CanvasRenderingContext2D,
     design: DesignState,
@@ -1062,6 +1070,10 @@ const QUESTION_HOOK: Template = {
   requiresPhoto: true,
   usesTagline: true,
   taglineHint: "01 / 05",
+  // Full-bleed dimmed photo, left-aligned heading/body/brand — logo pairs
+  // with that left edge up top (the big "?" glyph reads well below the
+  // logo's small footprint, see report).
+  logoPlacement: "top-left",
   render(ctx, design, bg, fonts) {
     const W = this.width;
     const H = this.height;
@@ -1134,7 +1146,7 @@ const QUESTION_HOOK: Template = {
       paintLines(ctx, bodyLines, padX, bodyTop + bodySize, bodyLine);
     }
 
-    // Footer — brand on left, swipe hint bottom-center (bottom-right is
+    // Footer — brand bottom-left, swipe hint bottom-right (top-left is
     // reserved for the tenant logo overlay, stamped after render() by the
     // canvas renderers — see drawLogoOverlay)
     ctx.fillStyle = "rgba(255,255,255,0.7)";
@@ -1143,8 +1155,8 @@ const QUESTION_HOOK: Template = {
     ctx.fillText(brandName(design), padX, H - padBottom);
     ctx.fillStyle = design.accentColor;
     ctx.font = `600 ${Math.round(H * 0.016)}px ${fonts.body}`;
-    ctx.textAlign = "center";
-    ctx.fillText("SWIPE  →", W / 2, H - padBottom);
+    ctx.textAlign = "right";
+    ctx.fillText("SWIPE  →", W - padX, H - padBottom);
     ctx.restore();
   },
 };
@@ -1604,6 +1616,9 @@ const CAROUSEL_COVER: Template = {
   requiresPhoto: true,
   usesTagline: true,
   taglineHint: "01 / 05",
+  // Full-bleed dimmed photo, left-aligned heading/brand/body — pairs with a
+  // top-left logo.
+  logoPlacement: "top-left",
   render(ctx, design, bg, fonts) {
     const W = this.width;
     const H = this.height;
@@ -1627,20 +1642,7 @@ const CAROUSEL_COVER: Template = {
     ctx.textAlign = "right";
     ctx.fillStyle = "#ffffff";
     ctx.fillText(tagline, W - padX, padTop + indicatorSize);
-
-    // "SWIPE →" hint, bottom-center (bottom-right is reserved for the
-    // tenant logo overlay, stamped after render() — see drawLogoOverlay)
-    const hintSize = Math.round(H * 0.018);
-    ctx.font = `600 ${hintSize}px ${fonts.body}`;
-    ctx.fillStyle = design.accentColor;
-    ctx.textAlign = "center";
-    ctx.fillText("SWIPE  →", W / 2, H - padBottom);
-
-    // Brand eyebrow (top-left)
-    ctx.fillStyle = "#ffffff";
-    ctx.font = `600 ${Math.round(H * 0.018)}px ${fonts.body}`;
     ctx.textAlign = "left";
-    ctx.fillText(brandName(design), padX, padTop + indicatorSize);
 
     // Centred heading (vertically)
     const heading = (design.headingText || "5 quick tips to get started").toUpperCase();
@@ -1683,6 +1685,19 @@ const CAROUSEL_COVER: Template = {
       );
     }
 
+    // Footer — brand bottom-left, swipe hint bottom-right (top-left is now
+    // reserved for the tenant logo overlay — see drawLogoOverlay). Brand used
+    // to be a top-left eyebrow; restyled to the same quiet footer-credit
+    // treatment the other carousel templates use, since it now sits with them.
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    ctx.font = `500 ${Math.round(H * 0.015)}px ${fonts.body}`;
+    ctx.textAlign = "left";
+    ctx.fillText(brandName(design), padX, H - padBottom);
+    ctx.fillStyle = design.accentColor;
+    ctx.font = `600 ${Math.round(H * 0.016)}px ${fonts.body}`;
+    ctx.textAlign = "right";
+    ctx.fillText("SWIPE  →", W - padX, H - padBottom);
+
     ctx.restore();
   },
 };
@@ -1697,6 +1712,9 @@ const CAROUSEL_CONTENT: Template = {
   height: 1080,
   usesTagline: true,
   taglineHint: "02",
+  // Light card, left-aligned content block — pairs with a top-left logo. The
+  // optional photo sits top-right, so nothing collides with it either.
+  logoPlacement: "top-left",
   render(ctx, design, bg, fonts) {
     const W = this.width;
     const H = this.height;
@@ -1715,8 +1733,9 @@ const CAROUSEL_CONTENT: Template = {
     const innerW = W - padX * 2;
 
     // Optional photo block in the top-right
-    if (bg) {
-      const photoSize = Math.round(W * 0.32);
+    const hasPhoto = !!bg;
+    const photoSize = Math.round(W * 0.32);
+    if (hasPhoto) {
       paintBackground(
         ctx,
         bg,
@@ -1734,15 +1753,24 @@ const CAROUSEL_CONTENT: Template = {
     ctx.textBaseline = "alphabetic";
     ctx.textAlign = "left";
 
-    // Big slide number
+    // Content block start. Top-left is reserved for the tenant logo, so this
+    // always clears it (logo's bottom edge sits at ~0.095H); when a photo is
+    // present the block also has to clear the photo's bottom edge so no text
+    // ever crosses the image.
+    const contentTop = hasPhoto
+      ? padTop + photoSize + Math.round(H * 0.045)
+      : padTop + Math.round(H * 0.06);
+
+    // Slide number — a compact numeral eyebrow just above the heading (was a
+    // giant top-left numeral; that spot now belongs to the logo).
     const tagline = (design.tagline ?? "").trim() || "02";
-    const numberSize = Math.round(H * 0.16);
+    const numberSize = Math.round(H * 0.05);
     ctx.font = `400 ${numberSize}px ${fonts.heading}`;
     ctx.fillStyle = design.accentColor;
-    ctx.fillText(tagline, padX, padTop + numberSize);
+    ctx.fillText(tagline, padX, contentTop + numberSize);
 
     // Accent rule below number
-    const ruleY = padTop + numberSize + Math.round(H * 0.02);
+    const ruleY = contentTop + numberSize + Math.round(H * 0.018);
     ctx.fillRect(padX, ruleY, Math.round(W * 0.08), 3);
 
     // Heading
@@ -1759,13 +1787,14 @@ const CAROUSEL_CONTENT: Template = {
     );
     const headingLine = Math.round(fit.size * 1.08);
     const headingBlock = fit.lines.length * headingLine;
-    const headingTop = ruleY + Math.round(H * 0.035);
+    const headingTop = ruleY + Math.round(H * 0.03);
 
     ctx.fillStyle = "#0a0a0a";
     ctx.font = `400 ${fit.size}px ${fonts.heading}`;
     paintLines(ctx, fit.lines, padX, headingTop + fit.size, headingLine);
 
-    // Body
+    // Body — capped to fewer lines when a photo is eating vertical space, so
+    // the block can't run into the footer.
     const bodySize = Math.round(H * 0.022);
     const bodyLine = Math.round(bodySize * 1.55);
     ctx.font = `400 ${bodySize}px ${fonts.body}`;
@@ -1774,7 +1803,7 @@ const CAROUSEL_CONTENT: Template = {
       design.bodyText ||
         "Add your supporting copy here.",
       innerW,
-    ).slice(0, 6);
+    ).slice(0, hasPhoto ? 4 : 6);
 
     if (bodyLines.length) {
       ctx.fillStyle = "rgba(10,10,10,0.72)";
@@ -1782,15 +1811,16 @@ const CAROUSEL_CONTENT: Template = {
       paintLines(ctx, bodyLines, padX, bodyTop + bodySize, bodyLine);
     }
 
-    // Footer — brand + locality on left, swipe hint bottom-center
-    // (bottom-right is reserved for the tenant logo overlay — see drawLogoOverlay)
+    // Footer — brand + locality bottom-left, swipe hint bottom-right
+    // (top-left is reserved for the tenant logo overlay — see drawLogoOverlay)
     ctx.fillStyle = "rgba(10,10,10,0.45)";
     ctx.font = `500 ${Math.round(H * 0.015)}px ${fonts.body}`;
+    ctx.textAlign = "left";
     ctx.fillText(`${brandName(design)}  ·  ${brandLocality(design).toUpperCase()}`, padX, H - padBottom);
-    ctx.textAlign = "center";
     ctx.fillStyle = design.accentColor;
     ctx.font = `600 ${Math.round(H * 0.016)}px ${fonts.body}`;
-    ctx.fillText("SWIPE  →", W / 2, H - padBottom);
+    ctx.textAlign = "right";
+    ctx.fillText("SWIPE  →", W - padX, H - padBottom);
     ctx.restore();
   },
 };
@@ -1805,6 +1835,11 @@ const CAROUSEL_CTA: Template = {
   height: 1080,
   usesTagline: true,
   taglineHint: "05 / 05",
+  // Everything on this slide (eyebrow, heading, body, CTA pill) is drawn
+  // centred at W/2 — the logo matches that with top-center instead of
+  // top-left. No swipe hint here: it's the closing slide, nothing to swipe
+  // to next.
+  logoPlacement: "top-center",
   render(ctx, design, bg, fonts) {
     const W = this.width;
     const H = this.height;
@@ -1911,6 +1946,11 @@ const CAROUSEL_TIP: Template = {
   requiresPhoto: true,
   usesTagline: true,
   taglineHint: "TIP 02",
+  // Photo band up top spans the full width (incl. the top-left corner), same
+  // as every other full-bleed-photo template the logo already sits on — and
+  // the tip label/heading/body (left-aligned) all start well below it, in the
+  // card, so nothing here collides with a top-left logo.
+  logoPlacement: "top-left",
   render(ctx, design, bg, fonts) {
     const W = this.width;
     const H = this.height;
@@ -1972,16 +2012,17 @@ const CAROUSEL_TIP: Template = {
       paintLines(ctx, bodyLines, padX, bodyTop + bodySize, bodyLine);
     }
 
-    // Footer — brand + locality on left, swipe hint bottom-center
-    // (bottom-right is reserved for the tenant logo overlay — see drawLogoOverlay)
+    // Footer — brand + locality bottom-left, swipe hint bottom-right
+    // (top-left is reserved for the tenant logo overlay — see drawLogoOverlay)
     const padBottom = Math.round(H * 0.075);
     ctx.fillStyle = "rgba(10,10,10,0.5)";
     ctx.font = `500 ${Math.round(H * 0.015)}px ${fonts.body}`;
+    ctx.textAlign = "left";
     ctx.fillText(`${brandName(design)}  ·  ${brandLocality(design).toUpperCase()}`, padX, H - padBottom);
-    ctx.textAlign = "center";
     ctx.fillStyle = design.accentColor;
     ctx.font = `600 ${Math.round(H * 0.016)}px ${fonts.body}`;
-    ctx.fillText("SWIPE  →", W / 2, H - padBottom);
+    ctx.textAlign = "right";
+    ctx.fillText("SWIPE  →", W - padX, H - padBottom);
     ctx.restore();
   },
 };
@@ -1996,6 +2037,9 @@ const CAROUSEL_QUOTE_SLIDE: Template = {
   height: 1080,
   usesTagline: true,
   taglineHint: "03 / 05",
+  // Dark card, left-aligned quote mark/heading/body/brand — pairs with a
+  // top-left logo (the small quote-mark block sits lower and clear of it).
+  logoPlacement: "top-left",
   render(ctx, design, bg, fonts) {
     const W = this.width;
     const H = this.height;
@@ -2068,15 +2112,16 @@ const CAROUSEL_QUOTE_SLIDE: Template = {
       paintLines(ctx, bodyLines, padX, bodyTop + bodySize, bodyLine);
     }
 
-    // Footer — brand on left, swipe hint bottom-center (bottom-right is
+    // Footer — brand bottom-left, swipe hint bottom-right (top-left is
     // reserved for the tenant logo overlay — see drawLogoOverlay)
     ctx.fillStyle = "rgba(255,255,255,0.6)";
     ctx.font = `500 ${Math.round(H * 0.014)}px ${fonts.body}`;
+    ctx.textAlign = "left";
     ctx.fillText(brandName(design), padX, H - padBottom);
-    ctx.textAlign = "center";
     ctx.fillStyle = design.accentColor;
     ctx.font = `600 ${Math.round(H * 0.016)}px ${fonts.body}`;
-    ctx.fillText("SWIPE  →", W / 2, H - padBottom);
+    ctx.textAlign = "right";
+    ctx.fillText("SWIPE  →", W - padX, H - padBottom);
     ctx.restore();
   },
 };
@@ -3389,8 +3434,9 @@ export function templatesByCategory(
 }
 
 /**
- * Draw the tenant's uploaded logo bottom-right on a rendered slide. Called by
- * the canvas renderers AFTER template.render — both the live preview and the
+ * Draw the tenant's uploaded logo on a rendered slide, positioned per the
+ * active template's `logoPlacement` (default "bottom-right"). Called by the
+ * canvas renderers AFTER template.render — both the live preview and the
  * PNG export — never by templates themselves, so every template gets it from
  * one shared implementation.
  */
@@ -3399,6 +3445,7 @@ export function drawLogoOverlay(
   width: number,
   height: number,
   logo: HTMLImageElement,
+  placement: "top-left" | "top-center" | "bottom-right" = "bottom-right",
 ) {
   const nw = logo.naturalWidth || logo.width;
   const nh = logo.naturalHeight || logo.height;
@@ -3411,6 +3458,23 @@ export function drawLogoOverlay(
     drawW = maxW;
     drawH = Math.round((nh / nw) * drawW);
   }
+  let x: number;
+  let y: number;
+  switch (placement) {
+    case "top-left":
+      x = margin;
+      y = margin;
+      break;
+    case "top-center":
+      x = (width - drawW) / 2;
+      y = margin;
+      break;
+    case "bottom-right":
+    default:
+      x = width - margin - drawW;
+      y = height - margin - drawH;
+      break;
+  }
   ctx.save();
   ctx.globalAlpha = 0.92;
   // Soft dark drop-shadow, rendered from the logo's own alpha: tenant logos
@@ -3421,6 +3485,6 @@ export function drawLogoOverlay(
   ctx.shadowColor = "rgba(0, 0, 0, 0.55)";
   ctx.shadowBlur = Math.max(4, Math.round(drawH * 0.22));
   ctx.shadowOffsetY = Math.max(1, Math.round(drawH * 0.05));
-  ctx.drawImage(logo, width - margin - drawW, height - margin - drawH, drawW, drawH);
+  ctx.drawImage(logo, x, y, drawW, drawH);
   ctx.restore();
 }
