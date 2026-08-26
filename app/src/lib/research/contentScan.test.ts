@@ -345,6 +345,51 @@ function html(body: string): Response {
     }
   })();
 
+  // ════════════════════════════════════════════════════════════════════
+  // 7. scanCompetitorContent pre-flights the AI cap: an already-exhausted
+  //    tenant is reported as capReached WITHOUT crawling (no wasted crawl
+  //    spend), rather than a silent "scanned 0" (whole-branch review finding).
+  // ════════════════════════════════════════════════════════════════════
+  await (async () => {
+    const slug = "contentscan-test-capped";
+    const tid = makeScratchTenant(slug);
+    try {
+      const id = runWithTenant(tid, () =>
+        upsertCompetitor({ placeId: "place-capped", name: "Capped Gym", address: "x", lat: 0, lng: 0, distanceKm: 1 }),
+      );
+      runWithTenant(tid, () => setCompetitorWebsite(id, "https://capped.test"));
+
+      // Push this month's AI spend over the default €25 tranche (2500c) with
+      // no prepaid credits -> assertAiAllowed throws AiCapError. Insert the
+      // ai_usage row directly (same control-DB style makeScratchTenant uses),
+      // in the same yyyymm bucket getMonthlyUsageCents reads (UTC 'YYYY-MM').
+      const now = new Date();
+      const yyyymm = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+      controlSqlite
+        .prepare(
+          `INSERT INTO ai_usage (tenant_id, yyyymm, agent_key, model, input_tokens, output_tokens, cache_read_tokens, cache_create_tokens, cost_cents)
+           VALUES (?,?,?,?,?,?,?,?,?)`,
+        )
+        .run(tid, yyyymm, "research", "test-model", 0, 0, 0, 0, 999_999);
+
+      await withMockFetch(
+        () => {
+          throw new Error("fetch must not be called when the AI cap is already reached");
+        },
+        async (calls) => {
+          const result = await runWithTenant(tid, async () => scanCompetitorContent(tid));
+          check("cap reached: scanCompetitorContent returns capReached:true", result.capReached === true);
+          check("cap reached: scanned + pages stay 0 (aborted up front, before any crawl)", result.scanned === 0 && result.pages === 0);
+          check("cap reached: NOT a single site was crawled (zero fetch calls)", calls.length === 0);
+          const row = runWithTenant(tid, () => listCompetitors()).find((r) => r.id === id)!;
+          check("cap reached: the competitor was never scanned (contentScannedAt stays null)", row.contentScannedAt === null);
+        },
+      );
+    } finally {
+      cleanupScratchTenant(slug, tid);
+    }
+  })();
+
   console.log(`\ncontentScan: ${passed} checks passed.`);
 })().catch((e) => {
   console.error(e);

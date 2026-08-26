@@ -325,6 +325,10 @@ export async function scanContentAction(): Promise<ScanContentActionResult> {
     const tenantId = getCurrentTenant().id;
     const result = await scanCompetitorContent(tenantId);
     revalidatePath(RESEARCH_PATH);
+    // A fully-spent AI cap is reported up front by scanCompetitorContent
+    // (no topics could be derived) — surface it as the same `cap_reached`
+    // toast rescanNowAction uses, not a misleading "scanned 0 sites".
+    if (result.capReached) return { ok: false, error: "cap_reached" };
     return { ok: true, scanned: result.scanned, pages: result.pages, failures: result.failures };
   } catch (err) {
     console.error("[marketing/research actions] scanContentAction failed:", err);

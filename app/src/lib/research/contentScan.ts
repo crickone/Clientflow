@@ -14,6 +14,7 @@ import { extractSeo } from "./seo";
 import { deriveSiteTopics } from "./topics";
 import { computeContentGaps, type ContentGap } from "./gaps";
 import { getResearchKeywords } from "./keywords";
+import { assertAiAllowed, AiCapError } from "@/lib/ai/usage";
 
 /**
  * Content-gap analysis's scan orchestrator — ties crawl.ts + seo.ts +
@@ -75,7 +76,17 @@ import { getResearchKeywords } from "./keywords";
 // limit expected to bind in practice.
 const MAX_COMPETITORS_PER_SCAN = 8;
 
-export type ScanContentResult = { scanned: number; pages: number; failures: number };
+export type ScanContentResult = {
+  scanned: number;
+  pages: number;
+  failures: number;
+  /** True when the scan was abandoned up front because the tenant's AI spend
+   *  cap is already exhausted — every per-site `deriveSiteTopics` call would
+   *  fail-soft to `[]`, so there's no point spending the crawl. The action
+   *  surfaces this to the admin as `cap_reached` instead of a misleading
+   *  "scanned 0 sites". */
+  capReached?: boolean;
+};
 
 export async function scanCompetitorContent(tenantId: number): Promise<ScanContentResult> {
   let scanned = 0;
@@ -83,6 +94,20 @@ export async function scanCompetitorContent(tenantId: number): Promise<ScanConte
   let failures = 0;
 
   try {
+    // Pre-flight the AI cap: if it's already spent, deriveSiteTopics would
+    // fail-soft to [] for EVERY site — the full crawl would run and still
+    // produce no topics and no gaps, a silent no-op. Signal cap_reached
+    // before spending any crawl bandwidth so the admin is told to raise the
+    // cap. (A cap crossed MID-scan still degrades fail-soft to partial
+    // topics — an accepted edge for v1; this catches the common "already
+    // capped" case.)
+    try {
+      assertAiAllowed(tenantId);
+    } catch (err) {
+      if (err instanceof AiCapError) return { scanned: 0, pages: 0, failures: 0, capReached: true };
+      throw err;
+    }
+
     const candidates = listCompetitors({ trackedOnly: true }).filter((c) => !!c.websiteUri);
     const targets = candidates.slice(0, MAX_COMPETITORS_PER_SCAN);
 

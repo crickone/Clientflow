@@ -21,6 +21,8 @@ import {
   parseRobotsDisallow,
   isBlockedByRobots,
   isNonContentUrl,
+  isPrivateHost,
+  sameOrigin,
   parseSitemapLocs,
   isSitemapIndex,
   extractLinks,
@@ -111,6 +113,36 @@ function notFound(): Response {
     check("isNonContentUrl: a malformed URL is non-content", isNonContentUrl("not a url"));
     check("isNonContentUrl: a normal page URL is content", !isNonContentUrl("https://x.test/services/massage"));
     check("isNonContentUrl: extension check is case-insensitive", isNonContentUrl("https://x.test/BROCHURE.PDF"));
+  }
+
+  // ── isPrivateHost (SSRF guard) ──
+  {
+    check("isPrivateHost: localhost", isPrivateHost("localhost"));
+    check("isPrivateHost: *.local", isPrivateHost("printer.local"));
+    check("isPrivateHost: *.internal", isPrivateHost("db.internal"));
+    check("isPrivateHost: IPv4 loopback 127.x", isPrivateHost("127.0.0.1"));
+    check("isPrivateHost: IPv4 10.x private", isPrivateHost("10.1.2.3"));
+    check("isPrivateHost: IPv4 192.168.x private", isPrivateHost("192.168.1.10"));
+    check("isPrivateHost: IPv4 172.16-31.x private", isPrivateHost("172.20.0.5"));
+    check("isPrivateHost: IPv4 172.15.x is PUBLIC (just below the private block)", !isPrivateHost("172.15.0.5"));
+    check("isPrivateHost: IPv4 172.32.x is PUBLIC (just above the private block)", !isPrivateHost("172.32.0.5"));
+    check("isPrivateHost: 169.254.169.254 cloud metadata", isPrivateHost("169.254.169.254"));
+    check("isPrivateHost: 0.0.0.0", isPrivateHost("0.0.0.0"));
+    check("isPrivateHost: IPv6 loopback ::1 (bracket-stripped)", isPrivateHost("[::1]") && isPrivateHost("::1"));
+    check("isPrivateHost: IPv6 link-local fe80::", isPrivateHost("fe80::1"));
+    check("isPrivateHost: IPv6 unique-local fc00::/fd00::", isPrivateHost("fc00::1") && isPrivateHost("fd12:3456::1"));
+    check("isPrivateHost: a public IPv4 (8.8.8.8) is allowed", !isPrivateHost("8.8.8.8"));
+    check("isPrivateHost: a public hostname is allowed", !isPrivateHost("optimalhealthatinspire.ie"));
+    check("isPrivateHost: a public IPv6 is allowed", !isPrivateHost("2001:4860:4860::8888"));
+  }
+
+  // ── sameOrigin ──
+  {
+    check("sameOrigin: identical origin", sameOrigin("https://x.test/sitemap-1.xml", "https://x.test"));
+    check("sameOrigin: different host", !sameOrigin("https://other.test/sitemap.xml", "https://x.test"));
+    check("sameOrigin: different scheme", !sameOrigin("http://x.test/sitemap.xml", "https://x.test"));
+    check("sameOrigin: different port", !sameOrigin("https://x.test:8443/sitemap.xml", "https://x.test"));
+    check("sameOrigin: malformed url -> false", !sameOrigin("not a url", "https://x.test"));
   }
 
   // ── parseSitemapLocs / isSitemapIndex ──
@@ -402,6 +434,45 @@ function notFound(): Response {
       const result = await fetchPage("https://x.test/huge-page");
       check("fetchPage: a response over the byte cap is truncated, not rejected outright", result !== null);
       check("fetchPage: truncated content is capped at exactly ~500KB, not the full 600KB+", (result?.html.length ?? 0) === 500_000);
+    },
+  );
+
+  // SSRF: a sitemap INDEX listing an OFF-SITE child <loc> — the off-site child
+  // is never fetched (the same-origin filter runs BEFORE the child fetch,
+  // unlike page URLs which are filtered afterward); the same-origin child is.
+  await withMockFetch(
+    (url) => {
+      if (url === "https://x.test/robots.txt") return notFound();
+      if (url === "https://x.test/sitemap.xml") {
+        return xmlResponse(
+          `<sitemapindex><sitemap><loc>https://x.test/sitemap-ok.xml</loc></sitemap><sitemap><loc>https://evil.test/sitemap-evil.xml</loc></sitemap></sitemapindex>`,
+        );
+      }
+      if (url === "https://x.test/sitemap-ok.xml") return xmlResponse(`<urlset><url><loc>https://x.test/ok-page</loc></url></urlset>`);
+      throw new Error(`unexpected fetch: ${url}`);
+    },
+    async (calls) => {
+      const urls = await discoverUrls("https://x.test");
+      check(
+        "discoverUrls: an off-site child sitemap <loc> is NEVER fetched (SSRF same-origin filter)",
+        !calls.some((c) => c.url === "https://evil.test/sitemap-evil.xml"),
+      );
+      check("discoverUrls: the same-origin child sitemap IS fetched + its pages pooled", urls.includes("https://x.test/ok-page"));
+    },
+  );
+
+  // SSRF: a private/internal target is refused BEFORE any network call — the
+  // isPrivateHost guard returns null without ever invoking fetch.
+  await withMockFetch(
+    () => {
+      throw new Error("fetch must not be called for a private/internal host");
+    },
+    async (calls) => {
+      check("fetchPage: a loopback host -> null (no fetch)", (await fetchPage("http://127.0.0.1/admin")) === null);
+      check("fetchPage: the cloud-metadata IP -> null (no fetch)", (await fetchPage("http://169.254.169.254/latest/meta-data/")) === null);
+      check("fetchPage: localhost -> null (no fetch)", (await fetchPage("http://localhost:9200/")) === null);
+      check("discoverUrls: a private baseUrl -> [] (no fetch)", (await discoverUrls("http://10.0.0.5")).length === 0);
+      check("fetchPage/discoverUrls: truly zero network calls for any private host", calls.length === 0);
     },
   );
 

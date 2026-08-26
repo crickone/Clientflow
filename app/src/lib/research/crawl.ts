@@ -32,6 +32,12 @@ import "server-only";
  *     malformed URL all resolve to `null` (fetchPage) or `[]`
  *     (discoverUrls), exactly like places.ts's contract for the exact same
  *     reason: one bad site must never abort a scan.
+ *   - SSRF guard (`isPrivateHost`) — refuses an internal/private target
+ *     (localhost, loopback, RFC-1918, 169.254 metadata, IPv6 local) before
+ *     any network call, AND re-checks the response's final post-redirect URL.
+ *     A sitemap INDEX's child `<loc>`s are additionally same-origin-filtered
+ *     (`sameOrigin`) before being fetched, since they don't pass through
+ *     `filterAndCapUrls` first the way page URLs do.
  *   - `SAME_HOST_DELAY_MS` (~250ms) between same-host requests — see
  *     `politeDelay` below.
  *
@@ -160,6 +166,48 @@ export function isNonContentUrl(url: string): boolean {
   return NON_CONTENT_EXTENSIONS.some((ext) => lowerPath.endsWith(ext));
 }
 
+/**
+ * SSRF guard — true for a hostname the crawler must NEVER fetch: localhost,
+ * loopback, RFC-1918 private ranges, link-local (incl. the 169.254.169.254
+ * cloud-metadata endpoint), and IPv6 loopback/unspecified/link-local
+ * (fe80::/10)/unique-local (fc00::/7). Even though a competitor's website URL
+ * comes from Google Places today, a crafted sitemap `<loc>` or an HTTP
+ * redirect could otherwise drive a server-side GET at an internal address —
+ * `fetchTextCapped` calls this before every fetch AND again on the response's
+ * final (post-redirect) URL. This is a LITERAL-host check only: a public
+ * hostname that RESOLVES (via DNS) to a private IP is deliberately not caught
+ * here — that hardening (a resolve-then-check, or a pinned agent) is a
+ * documented follow-up, out of scope for an admin-only, Places-sourced v1.
+ * Pure, exported for direct unit testing.
+ */
+export function isPrivateHost(hostname: string): boolean {
+  const h = hostname.trim().toLowerCase().replace(/^\[/, "").replace(/\]$/, "");
+  if (!h || h === "localhost" || h.endsWith(".localhost") || h.endsWith(".local") || h.endsWith(".internal")) return true;
+  // IPv6 loopback / unspecified / link-local (fe80::/10) / unique-local (fc00::/7)
+  if (h === "::1" || h === "::") return true;
+  if (h.startsWith("fe80:") || /^f[cd][0-9a-f]{2}:/.test(h)) return true;
+  // IPv4 (also matches an IPv4-mapped IPv6 tail like ::ffff:127.0.0.1)
+  const v4 = h.match(/(?:^|:)(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (v4) {
+    const a = Number(v4[1]);
+    const b = Number(v4[2]);
+    if (a === 0 || a === 127 || a === 10) return true;
+    if (a === 169 && b === 254) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+  }
+  return false;
+}
+
+/** True if `url` parses and shares `origin` (scheme+host+port). A malformed url -> false. Used to keep a sitemap INDEX's child `<loc>`s (and thus every fetch they drive) on the same site. Pure, exported for unit testing. */
+export function sameOrigin(url: string, origin: string): boolean {
+  try {
+    return new URL(url).origin === origin;
+  } catch {
+    return false;
+  }
+}
+
 function decodeXmlEntities(s: string): string {
   return s.replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&apos;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">");
 }
@@ -254,11 +302,27 @@ async function fetchTextCapped(
   url: string,
   opts: { maxBytes: number; acceptContentType?: (contentType: string) => boolean },
 ): Promise<FetchTextResult | null> {
+  // SSRF guard (before any network): never fetch an internal/private host.
+  // An unparseable url has nothing to fetch either.
+  try {
+    if (isPrivateHost(new URL(url).hostname)) return null;
+  } catch {
+    return null;
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
     const res = await fetch(url, { signal: controller.signal, headers: { "User-Agent": USER_AGENT } });
     if (!res.ok) return null;
+    // A redirect may have moved us to a different (possibly internal) host —
+    // re-check the FINAL url. `res.url` is empty on a synthetic Response (unit
+    // tests), which safely skips this second check.
+    try {
+      if (res.url && isPrivateHost(new URL(res.url).hostname)) return null;
+    } catch {
+      /* res.url malformed — fall through; the body read below is still capped */
+    }
     const contentType = (res.headers.get("content-type") ?? "").toLowerCase();
     if (contentType && opts.acceptContentType && !opts.acceptContentType(contentType)) return null;
 
@@ -306,7 +370,14 @@ async function fetchSitemapUrls(origin: string): Promise<string[]> {
   if (!primary) return [];
   if (!isSitemapIndex(primary.text)) return parseSitemapLocs(primary.text);
 
-  const childUrls = parseSitemapLocs(primary.text).slice(0, MAX_CHILD_SITEMAPS);
+  // A sitemap INDEX's child `<loc>`s are fetched directly (unlike page URLs,
+  // which only reach `fetchPage` AFTER `filterAndCapUrls`), so they must be
+  // constrained to the same origin HERE — a crafted index must not drive a
+  // fetch at an off-site or internal host (fetchTextCapped's isPrivateHost
+  // guard is the second line of defence; this is the first).
+  const childUrls = parseSitemapLocs(primary.text)
+    .filter((u) => sameOrigin(u, origin))
+    .slice(0, MAX_CHILD_SITEMAPS);
   const collected: string[] = [];
   for (const childUrl of childUrls) {
     await politeDelay();
