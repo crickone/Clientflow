@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { AlertTriangle, Mail, Send } from "lucide-react";
 import { toast } from "sonner";
 
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input, Label } from "@/components/ui/Input";
@@ -141,17 +142,9 @@ export function ClientEmailPanel({
                   {m.subject}
                 </strong>
                 {m.status === "failed" && (
-                  <span
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 4,
-                      fontSize: 11,
-                      color: "#dc2626",
-                    }}
-                  >
+                  <Badge tone="red">
                     <AlertTriangle size={12} /> Failed
-                  </span>
+                  </Badge>
                 )}
                 <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--text-tertiary)" }}>
                   {fmt(m.createdAt)}

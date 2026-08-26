@@ -242,13 +242,13 @@ export function BlogPostEditor({
         <Card style={{ display: "grid", gap: 12 }}>
           <CardLabel>Status</CardLabel>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <Badge colour={published ? "#3fb950" : scheduled ? "#d29922" : "#8b949e"}>{post.publishState}</Badge>
+            <Badge tone={published ? "green" : scheduled ? "amber" : "neutral"}>{post.publishState}</Badge>
             {scheduled && post.scheduledFor && (
               <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
                 {formatScheduledFor(post.scheduledFor)}
               </span>
             )}
-            {post.status === "failed" && <Badge colour="#f85149">generation failed</Badge>}
+            {post.status === "failed" && <Badge tone="red">generation failed</Badge>}
           </div>
           {post.error && (
             <p style={{ color: "#f85149", fontSize: 12 }}>{post.error}</p>

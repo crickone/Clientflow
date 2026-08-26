@@ -186,7 +186,7 @@ export function PageEditor({
       <div style={{ display: "grid", gap: 16, alignContent: "start" }}>
         <Card style={{ display: "grid", gap: 12 }}>
           <CardLabel>Status</CardLabel>
-          <Badge colour={published ? "#3fb950" : "#8b949e"}>{page.status}</Badge>
+          <Badge tone={published ? "green" : "neutral"}>{page.status}</Badge>
           {published ? (
             <Button
               variant="ghost"

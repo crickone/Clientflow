@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Calendar, ChevronRight, Mail, Minus, Pencil, Plus, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Sheet, SheetContent } from "@/components/ui/Sheet";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
@@ -183,14 +184,14 @@ export function PackagesView({
                   </div>
                   <div style={{ fontSize: 12.5, color: "var(--text-tertiary)", marginTop: 4 }}>{durationLabel(m)}</div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
-                    {m.singlePurchase && <span style={pill("rgba(255,255,255,0.06)", "var(--text-tertiary)")}>Single purchase</span>}
-                    {m.activateOnFirstBooking && <span style={pill("rgba(255,255,255,0.06)", "var(--text-tertiary)")}>Activates on booking</span>}
+                    {m.singlePurchase && <Badge tone="neutral">Single purchase</Badge>}
+                    {m.activateOnFirstBooking && <Badge tone="neutral">Activates on booking</Badge>}
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
                     {m.forSale ? (
-                      <span style={pill("rgba(34,197,94,0.14)", "#22c55e")}>For sale</span>
+                      <Badge tone="green">For sale</Badge>
                     ) : (
-                      <span style={pill("rgba(255,255,255,0.06)", "var(--text-tertiary)")}>Not for sale</span>
+                      <Badge tone="neutral">Not for sale</Badge>
                     )}
                     <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{plural(m.activePayments, "active")}</span>
                   </div>
@@ -675,7 +676,7 @@ function PackageDetailSheet({
             <div style={{ display: "flex", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
               <StatusBadge status={d.status} />
               <PaceBadge pace={d.pace} />
-              {!d.activated && <span style={pill("rgba(234,179,8,0.14)", "#eab308")}>Not activated</span>}
+              {!d.activated && <Badge tone="amber">Not activated</Badge>}
             </div>
           </div>
 
@@ -771,45 +772,31 @@ function Toggle({ on, onChange, label, hint }: { on: boolean; onChange: (v: bool
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { label: string; bg: string; fg: string }> = {
-    active: { label: "Active", bg: "rgba(34,197,94,0.14)", fg: "#22c55e" },
-    expired: { label: "Expired", bg: "rgba(234,179,8,0.14)", fg: "#eab308" },
-    cancelled: { label: "Cancelled", bg: "rgba(255,255,255,0.06)", fg: "var(--text-tertiary)" },
+  const map: Record<string, { label: string; tone: "neutral" | "amber" | "green" | "red" }> = {
+    active: { label: "Active", tone: "green" },
+    expired: { label: "Expired", tone: "amber" },
+    cancelled: { label: "Cancelled", tone: "neutral" },
   };
   const m = map[status] ?? map.active;
-  return <span style={pill(m.bg, m.fg)}>{m.label}</span>;
+  return <Badge tone={m.tone}>{m.label}</Badge>;
 }
 
 function PaceBadge({ pace }: { pace: Pace }) {
-  const map: Record<Pace, { label: string; bg: string; fg: string } | null> = {
-    ahead: { label: "Ahead", bg: "rgba(59,130,246,0.16)", fg: "#60a5fa" },
-    behind: { label: "Behind", bg: "rgba(234,179,8,0.16)", fg: "#eab308" },
-    on_track: { label: "On track", bg: "rgba(34,197,94,0.14)", fg: "#22c55e" },
+  const map: Record<Pace, { label: string; tone: "neutral" | "amber" | "green" | "red" } | null> = {
+    ahead: { label: "Ahead", tone: "neutral" },
+    behind: { label: "Behind", tone: "amber" },
+    on_track: { label: "On track", tone: "green" },
     na: null,
   };
   const m = map[pace];
   if (!m) return <span style={{ color: "var(--text-tertiary)", fontSize: 12 }}>—</span>;
-  return <span style={pill(m.bg, m.fg)}>{m.label}</span>;
+  return <Badge tone={m.tone}>{m.label}</Badge>;
 }
 
 function initials(name: string) {
   const [a, b = ""] = name.trim().split(/\s+/);
   return initialsOf(a ?? "", b) || "?";
 }
-function pill(bg: string, fg: string): React.CSSProperties {
-  return {
-    display: "inline-block",
-    fontSize: 10.5,
-    textTransform: "uppercase",
-    letterSpacing: "0.04em",
-    fontFamily: "var(--font-mono), monospace",
-    padding: "2px 8px",
-    borderRadius: 5,
-    background: bg,
-    color: fg,
-  };
-}
-
 const sectionTitle: React.CSSProperties = {
   margin: 0,
   fontFamily: "var(--font-heading), sans-serif",

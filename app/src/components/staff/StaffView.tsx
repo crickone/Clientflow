@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Sheet, SheetContent } from "@/components/ui/Sheet";
 import { Input, Label, Textarea } from "@/components/ui/Input";
 import { Avatar } from "@/components/ui/Avatar";
+import { Badge } from "@/components/ui/Badge";
 import { Reveal, RevealGroup } from "@/components/motion/Reveal";
 import { initialsOf } from "@/lib/utils";
 import type { PayrollRow, PerformanceRow } from "@/lib/staff";
@@ -122,11 +123,11 @@ export function StaffView({
                   </div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 12 }}>
                     {s.isActive
-                      ? <span style={pill("rgba(34,197,94,0.14)", "#22c55e")}>Active</span>
-                      : <span style={pill("rgba(255,255,255,0.06)", "var(--text-tertiary)")}>Inactive</span>}
+                      ? <Badge tone="green">Active</Badge>
+                      : <Badge tone="neutral">Inactive</Badge>}
                     {s.isApproved
-                      ? <span style={pill("rgba(59,130,246,0.16)", "#60a5fa")}>Approved</span>
-                      : <span style={pill("rgba(234,179,8,0.14)", "#eab308")}>Pending</span>}
+                      ? <Badge tone="green">Approved</Badge>
+                      : <Badge tone="amber">Pending</Badge>}
                   </div>
                   <div style={{ fontSize: 12, color: "var(--text-secondary)", marginTop: 10 }}>
                     {PAY_TYPE_LABEL[s.payType]} · {euros(s.payRateCents)}
@@ -490,20 +491,6 @@ function Toggle({ on, onChange, label, hint }: { on: boolean; onChange: (v: bool
       </span>
     </button>
   );
-}
-
-function pill(bg: string, fg: string): React.CSSProperties {
-  return {
-    display: "inline-block",
-    fontSize: 10.5,
-    textTransform: "uppercase",
-    letterSpacing: "0.04em",
-    fontFamily: "var(--font-mono), monospace",
-    padding: "2px 8px",
-    borderRadius: 5,
-    background: bg,
-    color: fg,
-  };
 }
 
 const sectionTitle: React.CSSProperties = {

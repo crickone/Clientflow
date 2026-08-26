@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Dumbbell, KeyRound, Plus, Salad, Send, Smartphone, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Input, Label } from "@/components/ui/Input";
@@ -155,9 +156,9 @@ function LoginCard({ clientId, clientEmail, login }: { clientId: number; clientE
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <div style={{ fontSize: 13.5, color: "var(--text-primary)", fontFamily: "var(--font-mono), monospace" }}>{login.email}</div>
-            <span style={pill(login.isActive ? "rgba(34,197,94,0.14)" : "rgba(255,255,255,0.06)", login.isActive ? "#22c55e" : "var(--text-tertiary)")}>
+            <Badge tone={login.isActive ? "green" : "neutral"}>
               {login.isActive ? "Active" : "Disabled"}
-            </span>
+            </Badge>
             <span style={{ fontSize: 12, color: "var(--text-tertiary)", marginLeft: "auto" }}>
               {login.lastLoginAt ? `Last login ${new Date(login.lastLoginAt).toLocaleDateString("en-IE", { day: "2-digit", month: "short", year: "numeric" })}` : "Never signed in"}
             </span>
@@ -275,9 +276,6 @@ function Head({ icon, title }: { icon: React.ReactNode; title: string }) {
   );
 }
 
-function pill(bg: string, fg: string): React.CSSProperties {
-  return { display: "inline-block", fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.04em", fontFamily: "var(--font-mono), monospace", padding: "2px 8px", borderRadius: 5, background: bg, color: fg };
-}
 const card: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",

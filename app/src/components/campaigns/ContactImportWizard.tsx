@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CheckCircle2, FileUp, Upload } from "lucide-react";
 import { toast } from "sonner";
 
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import {
   dedupeKey,
@@ -320,17 +321,14 @@ function Stepper({ step }: { step: number }) {
 }
 
 function StatusPill({ status }: { status: RowStatus }) {
-  const map = {
-    new: { bg: "rgba(34,197,94,0.14)", fg: "#22c55e", label: "New" },
-    duplicate: { bg: "rgba(255,255,255,0.06)", fg: "var(--text-tertiary)", label: "Duplicate" },
-    suppressed: { bg: "rgba(96,165,250,0.14)", fg: "#60a5fa", label: "Suppressed" },
-    invalid: { bg: "rgba(239,68,68,0.14)", fg: "#f87171", label: "Invalid" },
-  }[status];
-  return (
-    <span style={{ display: "inline-block", fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.04em", padding: "2px 7px", borderRadius: 5, background: map.bg, color: map.fg }}>
-      {map.label}
-    </span>
-  );
+  const map: Record<RowStatus, { label: string; tone: "neutral" | "amber" | "green" | "red" }> = {
+    new: { label: "New", tone: "green" },
+    duplicate: { label: "Duplicate", tone: "neutral" },
+    suppressed: { label: "Suppressed", tone: "amber" },
+    invalid: { label: "Invalid", tone: "red" },
+  };
+  const m = map[status];
+  return <Badge tone={m.tone}>{m.label}</Badge>;
 }
 
 function Stat({ label, tone }: { label: string; tone: "good" | "bad" | "muted" | "info" }) {

@@ -53,7 +53,7 @@ export default async function SitePagesList({
                     {p.path} · {templateLabel.get(p.templateId) ?? p.templateId}
                   </div>
                 </div>
-                <Badge colour={p.status === "published" ? "#3fb950" : "#8b949e"}>
+                <Badge tone={p.status === "published" ? "green" : "neutral"}>
                   {p.status}
                 </Badge>
               </Card>

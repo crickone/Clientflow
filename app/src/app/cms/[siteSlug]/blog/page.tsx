@@ -14,10 +14,10 @@ import { formatDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-const STATE_COLOUR: Record<string, string> = {
-  published: "#3fb950",
-  scheduled: "#d29922",
-  draft: "#8b949e",
+const STATE_TONE: Record<string, "neutral" | "amber" | "green" | "red"> = {
+  published: "green",
+  scheduled: "amber",
+  draft: "neutral",
 };
 
 export default async function SiteBlogList({
@@ -73,11 +73,11 @@ export default async function SiteBlogList({
                   </div>
                 </div>
                 {p.status !== "ready" && (
-                  <Badge colour={p.status === "failed" ? "#f85149" : "#58a6ff"}>
+                  <Badge tone={p.status === "failed" ? "red" : "amber"}>
                     {p.status === "generating" ? "generating…" : p.status}
                   </Badge>
                 )}
-                <Badge colour={STATE_COLOUR[p.publishState] ?? "#8b949e"}>
+                <Badge tone={STATE_TONE[p.publishState] ?? "neutral"}>
                   {p.publishState}
                 </Badge>
               </Card>

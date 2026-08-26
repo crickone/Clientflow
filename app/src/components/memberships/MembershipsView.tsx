@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Calendar, Check, ChevronRight, Laptop, Mail, Pencil, Plus, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Sheet, SheetContent } from "@/components/ui/Sheet";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
@@ -186,9 +187,9 @@ export function MembershipsView({
                     }}
                   >
                     {m.forSale ? (
-                      <span style={pill("rgba(34,197,94,0.14)", "#22c55e")}>For sale</span>
+                      <Badge tone="green">For sale</Badge>
                     ) : (
-                      <span style={pill("rgba(255,255,255,0.06)", "var(--text-tertiary)")}>Not for sale</span>
+                      <Badge tone="neutral">Not for sale</Badge>
                     )}
                     <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
                       {plural(m.activePayments, "active payment")}
@@ -475,14 +476,9 @@ function PurchasedDetailSheet({
                       {fmtDate(b.date)} · {b.startTime}
                     </div>
                   </div>
-                  <span
-                    style={pill(
-                      b.status === "attended" ? "rgba(34,197,94,0.14)" : "rgba(255,255,255,0.06)",
-                      b.status === "attended" ? "#22c55e" : "var(--text-tertiary)",
-                    )}
-                  >
+                  <Badge tone={b.status === "attended" ? "green" : "neutral"}>
                     {b.status === "attended" ? "Attended" : b.status === "no_show" ? "No-show" : "Booked"}
-                  </span>
+                  </Badge>
                 </div>
               ))}
             </div>
@@ -938,49 +934,19 @@ function Toggle({
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { label: string; bg: string; fg: string }> = {
-    active: { label: "Active", bg: "rgba(34,197,94,0.14)", fg: "#22c55e" },
-    expired: { label: "Expired", bg: "rgba(234,179,8,0.14)", fg: "#eab308" },
-    cancelled: { label: "Cancelled", bg: "rgba(255,255,255,0.06)", fg: "var(--text-tertiary)" },
+  const map: Record<string, { label: string; tone: "neutral" | "amber" | "green" | "red" }> = {
+    active: { label: "Active", tone: "green" },
+    expired: { label: "Expired", tone: "amber" },
+    cancelled: { label: "Cancelled", tone: "neutral" },
   };
   const m = map[status] ?? map.active;
-  return (
-    <span
-      style={{
-        display: "inline-block",
-        fontSize: 10.5,
-        textTransform: "uppercase",
-        letterSpacing: "0.04em",
-        fontFamily: "var(--font-mono), monospace",
-        padding: "2px 8px",
-        borderRadius: 5,
-        background: m.bg,
-        color: m.fg,
-      }}
-    >
-      {m.label}
-    </span>
-  );
+  return <Badge tone={m.tone}>{m.label}</Badge>;
 }
 
 function initials(name: string) {
   const [a, b = ""] = name.trim().split(/\s+/);
   return initialsOf(a ?? "", b) || "?";
 }
-function pill(bg: string, fg: string): React.CSSProperties {
-  return {
-    display: "inline-block",
-    fontSize: 10.5,
-    textTransform: "uppercase",
-    letterSpacing: "0.04em",
-    fontFamily: "var(--font-mono), monospace",
-    padding: "2px 8px",
-    borderRadius: 5,
-    background: bg,
-    color: fg,
-  };
-}
-
 const sectionTitle: React.CSSProperties = {
   margin: 0,
   fontFamily: "var(--font-heading), sans-serif",

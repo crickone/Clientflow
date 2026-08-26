@@ -1,5 +1,6 @@
 import { requireClientPage } from "@/lib/clientAuth";
 import { clientMembership } from "@/lib/clientApp";
+import { Badge } from "@/components/ui/Badge";
 import { Card, dayLabel, euros, PageTitle } from "@/components/clientapp/ui";
 
 export const dynamic = "force-dynamic";
@@ -21,9 +22,9 @@ export default async function ClientMembershipPage() {
               <span style={{ fontFamily: "var(--font-heading), sans-serif", fontSize: 26, color: "var(--text-primary)" }}>{euros(m.priceCents)}</span>
               <span style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>/ month</span>
             </div>
-            <span style={{ display: "inline-block", marginTop: 12, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em", fontFamily: "var(--font-mono), monospace", padding: "3px 10px", borderRadius: 5, background: "rgba(34,197,94,0.14)", color: "#22c55e" }}>
-              {m.status}
-            </span>
+            <div style={{ marginTop: 12 }}>
+              <Badge tone="green">{m.status}</Badge>
+            </div>
           </Card>
 
           <Card>

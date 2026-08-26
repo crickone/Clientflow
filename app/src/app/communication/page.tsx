@@ -2,6 +2,7 @@ import Link from "next/link";
 import { MessageCircle, Mail, AlertTriangle } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Card } from "@/components/ui/Card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/Tabs";
@@ -96,9 +97,9 @@ export default async function CommunicationPage() {
                         {m.toEmail}
                       </span>
                       {m.status === "failed" && (
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "#dc2626" }}>
+                        <Badge tone="red">
                           <AlertTriangle size={12} /> Failed
-                        </span>
+                        </Badge>
                       )}
                       <span style={{ marginLeft: "auto", fontSize: 12, color: "var(--text-tertiary)" }}>
                         {fmt(m.createdAt)}

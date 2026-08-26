@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Trash2, X } from "lucide-react";
 
+import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 import type { BookingRow } from "@/lib/attendance";
 import { cancelBookingAction, setAttendanceAction } from "@/app/attendance/actions";
@@ -246,30 +247,14 @@ function AttButton({
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { label: string; bg: string; fg: string }> = {
-    booked: { label: "Booked", bg: "rgba(59,130,246,0.14)", fg: "#60a5fa" },
-    attended: { label: "Attended", bg: "rgba(34,197,94,0.14)", fg: "#22c55e" },
-    no_show: { label: "No-show", bg: "rgba(239,68,68,0.14)", fg: "#ef4444" },
-    cancelled: { label: "Cancelled", bg: "rgba(255,255,255,0.06)", fg: "var(--text-tertiary)" },
+  const map: Record<string, { label: string; tone: "neutral" | "amber" | "green" | "red" }> = {
+    booked: { label: "Booked", tone: "amber" },
+    attended: { label: "Attended", tone: "green" },
+    no_show: { label: "No-show", tone: "red" },
+    cancelled: { label: "Cancelled", tone: "neutral" },
   };
   const m = map[status] ?? map.booked;
-  return (
-    <span
-      style={{
-        display: "inline-block",
-        fontSize: 10.5,
-        textTransform: "uppercase",
-        letterSpacing: "0.04em",
-        fontFamily: "var(--font-mono), monospace",
-        padding: "2px 8px",
-        borderRadius: 5,
-        background: m.bg,
-        color: m.fg,
-      }}
-    >
-      {m.label}
-    </span>
-  );
+  return <Badge tone={m.tone}>{m.label}</Badge>;
 }
 
 const gridRow: React.CSSProperties = {

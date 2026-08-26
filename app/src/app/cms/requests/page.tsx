@@ -11,11 +11,11 @@ import { formatDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-const STATUS_COLOUR: Record<string, string> = {
-  new: "#58a6ff",
-  approved: "#d29922",
-  declined: "#8b949e",
-  fulfilled: "#3fb950",
+const STATUS_TONE: Record<string, "neutral" | "amber" | "green" | "red"> = {
+  new: "amber",
+  approved: "green",
+  declined: "neutral",
+  fulfilled: "green",
 };
 
 export default async function RequestsPage() {
@@ -41,7 +41,7 @@ export default async function RequestsPage() {
                   <span style={{ color: "var(--text-primary)", fontWeight: 500 }}>
                     {r.businessName}
                   </span>
-                  <Badge colour={STATUS_COLOUR[r.status]}>{r.status}</Badge>
+                  <Badge tone={STATUS_TONE[r.status] ?? "neutral"}>{r.status}</Badge>
                 </div>
                 <div style={{ color: "var(--text-tertiary)", fontSize: 12, marginTop: 3 }}>
                   {[r.contactName, r.contactEmail].filter(Boolean).join(" · ") || "No contact"} ·{" "}

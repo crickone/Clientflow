@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { Sheet, SheetContent } from "@/components/ui/Sheet";
@@ -1176,14 +1177,8 @@ function SessionSheet({
                         {a.name}
                       </div>
                       {attended && (
-                        <div
-                          style={{
-                            fontSize: 10.5,
-                            color: "#22c55e",
-                            fontFamily: "var(--font-mono), monospace",
-                          }}
-                        >
-                          Attended
+                        <div style={{ marginTop: 2 }}>
+                          <Badge tone="green">Attended</Badge>
                         </div>
                       )}
                     </div>

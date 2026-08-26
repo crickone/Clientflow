@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowUpRight, TrendingDown, TrendingUp } from "lucide-react";
 
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import type { AttendanceStats, ClientActivityRow } from "@/lib/attendance";
@@ -280,28 +281,13 @@ function ChangeBadge({ pct, prev }: { pct: number; prev: number }) {
 }
 
 function StatusPill({ status }: { status: ClientActivityRow["status"] }) {
-  const map = {
-    active: { label: "Active", bg: "rgba(34,197,94,0.14)", fg: "#22c55e" },
-    inactive: { label: "Inactive", bg: "rgba(234,179,8,0.14)", fg: "#eab308" },
-    never: { label: "Never", bg: "rgba(255,255,255,0.06)", fg: "var(--text-tertiary)" },
-  }[status];
-  return (
-    <span
-      style={{
-        display: "inline-block",
-        fontSize: 10.5,
-        textTransform: "uppercase",
-        letterSpacing: "0.04em",
-        fontFamily: "var(--font-mono), monospace",
-        padding: "2px 8px",
-        borderRadius: 5,
-        background: map.bg,
-        color: map.fg,
-      }}
-    >
-      {map.label}
-    </span>
-  );
+  const map: Record<ClientActivityRow["status"], { label: string; tone: "neutral" | "amber" | "green" | "red" }> = {
+    active: { label: "Active", tone: "green" },
+    inactive: { label: "Inactive", tone: "amber" },
+    never: { label: "Never", tone: "neutral" },
+  };
+  const m = map[status];
+  return <Badge tone={m.tone}>{m.label}</Badge>;
 }
 
 function DailyChart({ daily }: { daily: { date: string; count: number }[] }) {

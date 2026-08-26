@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
@@ -190,9 +191,9 @@ function PlanRowItem({ plan, onGo }: { plan: PlanRow; onGo: () => void }) {
 
       <div>
         {plan.status === "active" ? (
-          <span style={pill("rgba(34,197,94,0.14)", "#22c55e")}>Active</span>
+          <Badge tone="green">Active</Badge>
         ) : (
-          <span style={pill("rgba(255,255,255,0.06)", "var(--text-tertiary)")}>Archived</span>
+          <Badge tone="neutral">Archived</Badge>
         )}
       </div>
 

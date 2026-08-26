@@ -3,15 +3,16 @@ import { ChevronRight, Mail, Phone } from "lucide-react";
 
 import { requireClientPage } from "@/lib/clientAuth";
 import { clientHistory, clientMembership } from "@/lib/clientApp";
+import { Badge } from "@/components/ui/Badge";
 import { Card, dayLabel, PageTitle, SectionTitle } from "@/components/clientapp/ui";
 import { LogoutButton } from "@/components/clientapp/LogoutButton";
 
 export const dynamic = "force-dynamic";
 
-const STATUS: Record<string, { label: string; color: string }> = {
-  attended: { label: "Attended", color: "#22c55e" },
-  no_show: { label: "Missed", color: "#f87171" },
-  booked: { label: "Booked", color: "var(--text-tertiary)" },
+const STATUS: Record<string, { label: string; tone: "neutral" | "amber" | "green" | "red" }> = {
+  attended: { label: "Attended", tone: "green" },
+  no_show: { label: "Missed", tone: "red" },
+  booked: { label: "Booked", tone: "neutral" },
 };
 
 export default async function ClientProfilePage() {
@@ -62,7 +63,7 @@ export default async function ClientProfilePage() {
                       <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>{b.name}</div>
                       <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{dayLabel(b.date)} · {b.startTime}</div>
                     </div>
-                    <span style={{ fontSize: 11.5, fontWeight: 600, color: s.color }}>{s.label}</span>
+                    <Badge tone={s.tone}>{s.label}</Badge>
                   </div>
                 </Card>
               );

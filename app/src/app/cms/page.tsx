@@ -103,7 +103,7 @@ export default async function CmsSitesPage({
                     /{s.slug}
                   </div>
                 </div>
-                <Badge colour={s.status === "live" ? "#3fb950" : "#8b949e"}>
+                <Badge tone={s.status === "live" ? "green" : "neutral"}>
                   {s.status}
                 </Badge>
               </div>

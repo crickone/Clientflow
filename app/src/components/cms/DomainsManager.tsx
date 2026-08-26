@@ -83,11 +83,11 @@ export function DomainsManager({
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{ flex: 1, fontWeight: 500 }}>{d.host}</div>
                 {d.verified ? (
-                  <Badge colour="#3fb950">verified</Badge>
+                  <Badge tone="green">verified</Badge>
                 ) : (
-                  <Badge colour="#d29922">pending verification</Badge>
+                  <Badge tone="amber">pending verification</Badge>
                 )}
-                {d.isPrimary && <Badge colour="#3fb950">primary</Badge>}
+                {d.isPrimary && <Badge tone="green">primary</Badge>}
                 {!d.isPrimary && (
                   <Button
                     variant="ghost"
