@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { Input } from "@/components/ui/Input";
-import { Tabs } from "@/components/automations/TriggerListView";
+import { AutomationsTabs } from "@/components/automations/TriggerListView";
 
 interface SentRow {
   id: number;
@@ -39,7 +39,7 @@ export function SentMessagesView({ sent }: { sent: SentRow[] }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <Tabs active="sent" />
+      <AutomationsTabs active="sent" />
       <div style={{ maxWidth: 280 }}>
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" />
       </div>

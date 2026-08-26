@@ -85,7 +85,7 @@ function buildSections(vocab: ReturnType<typeof getVocab>) {
     href: "/settings/appearance",
     icon: Palette,
     title: "Appearance",
-    desc: "Theme the whole app — background & accent colour — and upload the logo shown at the top.",
+    desc: "Theme the whole app — background & accent colour — and pick the heading font.",
   },
   {
     href: "/settings/branding",

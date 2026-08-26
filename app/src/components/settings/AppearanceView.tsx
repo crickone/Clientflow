@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ImagePlus, Loader2, RotateCcw, Trash2, Upload } from "lucide-react";
+import Link from "next/link";
+import { Check, Loader2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
@@ -24,11 +25,9 @@ function applyLiveFont(headingFont: string) {
 
 export function AppearanceView({
   theme,
-  hasLogo,
   businessName,
 }: {
   theme: ThemeConfig;
-  hasLogo: boolean;
   businessName: string;
 }) {
   const router = useRouter();
@@ -166,7 +165,15 @@ export function AppearanceView({
       </Section>
 
       {/* ── Logo ─────────────────────────────────────────────────── */}
-      <LogoManager hasLogo={hasLogo} />
+      <Section title="Logo">
+        <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6 }}>
+          Logo upload now lives on the{" "}
+          <Link href="/settings/branding" style={{ color: "var(--accent-ink)" }}>
+            Branding
+          </Link>{" "}
+          page.
+        </div>
+      </Section>
     </div>
   );
 }
@@ -260,130 +267,6 @@ const navPill: React.CSSProperties = {
   padding: "5px 8px",
   borderRadius: 6,
 };
-
-// ── logo manager (reuses /api/branding/logo) ──────────────────────────────────
-
-function LogoManager({ hasLogo }: { hasLogo: boolean }) {
-  const router = useRouter();
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [cacheKey, setCacheKey] = useState(() => String(Date.now()));
-
-  async function uploadFile(file: File) {
-    if (file.size > 5 * 1024 * 1024) {
-      setError("Logo must be under 5 MB.");
-      return;
-    }
-    setError(null);
-    setBusy(true);
-    try {
-      const fd = new FormData();
-      fd.set("file", file);
-      const res = await fetch("/api/branding/logo", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error ?? "Upload failed.");
-      setCacheKey(String(Date.now()));
-      toast.success("Logo updated.");
-      router.refresh();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Upload failed.";
-      setError(msg);
-      toast.error(msg);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function removeLogo() {
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/branding/logo", { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error ?? "Could not remove logo.");
-      toast.success("Logo removed.");
-      router.refresh();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Could not remove logo.";
-      setError(msg);
-      toast.error(msg);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Section title="Logo">
-      <div style={{ display: "grid", gap: 16 }}>
-        <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6 }}>
-          Your business logo, shown at the top of the sidebar (and on Content Studio intro/outro
-          cards). When no logo is set, the AdonisAgent wordmark is used.
-        </div>
-
-        {/* preview on the actual sidebar surface */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 24,
-            borderRadius: "var(--radius)",
-            border: "1px dashed var(--hairline-strong)",
-            background: "var(--surface-1)",
-            minHeight: 120,
-          }}
-        >
-          {hasLogo ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={`/api/branding/logo?v=${cacheKey}`}
-              alt="Business logo"
-              style={{ maxHeight: 80, maxWidth: "100%", objectFit: "contain" }}
-            />
-          ) : (
-            <div style={{ color: "var(--text-tertiary)", fontSize: 13, textAlign: "center" }}>
-              <ImagePlus size={26} style={{ marginBottom: 8, opacity: 0.6 }} />
-              <div>No logo uploaded yet.</div>
-            </div>
-          )}
-        </div>
-
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/png,image/jpeg,image/webp,image/svg+xml"
-          style={{ display: "none" }}
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) uploadFile(f);
-            e.target.value = "";
-          }}
-        />
-
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <Button type="button" onClick={() => fileRef.current?.click()} disabled={busy}>
-            <Upload size={14} />
-            {hasLogo ? "Replace logo" : "Upload logo"}
-          </Button>
-          {hasLogo && (
-            <Button type="button" variant="outline" onClick={removeLogo} disabled={busy}>
-              <Trash2 size={14} />
-              Remove
-            </Button>
-          )}
-        </div>
-
-        {error && <div style={{ color: "#dc2626", fontSize: 13 }}>{error}</div>}
-
-        <div style={{ fontSize: 12, color: "var(--text-tertiary)", lineHeight: 1.6 }}>
-          <strong>Tips:</strong> a transparent PNG (or SVG-flat PNG) works best so it sits cleanly on
-          the sidebar surface. Square or horizontal logos look best. PNG / JPG / WEBP, max 5 MB.
-        </div>
-      </div>
-    </Section>
-  );
-}
 
 // ── shared section shell ──────────────────────────────────────────────────────
 

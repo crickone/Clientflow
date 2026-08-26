@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { toggleTriggerAction } from "@/app/automations/actions";
 import type { TriggerStatus } from "@/lib/automationModel";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/Tabs";
 
 interface TriggerRow {
   key: string;
@@ -20,7 +21,7 @@ interface TriggerRow {
 export function TriggerListView({ triggers }: { triggers: TriggerRow[] }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <Tabs active="triggers" />
+      <AutomationsTabs active="triggers" />
       <div style={{ border: "1px solid var(--hairline)", borderRadius: "var(--radius)", overflow: "hidden" }}>
         <div style={{ ...row, ...headRow }}>
           <div>Name</div>
@@ -132,33 +133,22 @@ export function ComingSoonBadge() {
   );
 }
 
-export function Tabs({ active }: { active: "triggers" | "sent" }) {
+/** Shared nav strip between the two Automations pages (Trigger List / Sent
+ *  Messages) — each `value` navigates to its own route (separate server
+ *  components with their own data fetch), so this renders the real Tabs'
+ *  list/trigger chrome (keyboard nav, ARIA) without a `TabsContent` panel. */
+export function AutomationsTabs({ active }: { active: "triggers" | "sent" }) {
   const router = useRouter();
-  const tab = (label: string, key: "triggers" | "sent", href: string) => {
-    const isActive = active === key;
-    return (
-      <button
-        onClick={() => router.push(href)}
-        style={{
-          padding: "8px 16px",
-          borderRadius: "var(--radius)",
-          border: "1px solid var(--hairline)",
-          background: isActive ? "var(--accent)" : "transparent",
-          color: isActive ? "#fff" : "var(--text-secondary)",
-          cursor: "pointer",
-          fontSize: 13,
-          fontWeight: 500,
-        }}
-      >
-        {label}
-      </button>
-    );
-  };
   return (
-    <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-      {tab("Trigger List", "triggers", "/automations")}
-      {tab("Sent Messages", "sent", "/automations/sent")}
-    </div>
+    <Tabs
+      value={active}
+      onValueChange={(value) => router.push(value === "triggers" ? "/automations" : "/automations/sent")}
+    >
+      <TabsList>
+        <TabsTrigger value="triggers">Trigger List</TabsTrigger>
+        <TabsTrigger value="sent">Sent Messages</TabsTrigger>
+      </TabsList>
+    </Tabs>
   );
 }
 
