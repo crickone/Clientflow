@@ -123,10 +123,13 @@ export interface Template {
   requiresPhoto?: boolean;
   /**
    * Where drawLogoOverlay stamps the tenant logo after render() runs.
-   * Unset defaults to "bottom-right" (the original, and still correct spot
-   * for every non-carousel template — full-bleed photo posts with nothing
-   * else claiming that corner). Carousel templates reserve bottom-right for
-   * the "SWIPE →" hint and set this explicitly instead.
+   * Unset defaults to "bottom-right" — correct for most non-carousel
+   * templates (full-bleed photo posts with nothing else claiming that
+   * corner). A handful set this explicitly instead, each with a comment at
+   * the call site explaining why: carousel templates reserve bottom-right
+   * for the "SWIPE →" hint, and a few non-carousel templates have their own
+   * bottom-right content (a footer that runs wide, a decorative corner dot)
+   * that a real tenant logo can collide with.
    */
   logoPlacement?: "top-left" | "top-center" | "bottom-right";
   render: (
@@ -487,6 +490,10 @@ const SIDE_CARD: Template = {
   width: 1080,
   height: 1080,
   requiresPhoto: true,
+  // The card's website footer sits close enough to centre that a longer
+  // domain can reach into the bottom-right corner. The left photo has
+  // nothing on it, so the logo pairs with that instead.
+  logoPlacement: "top-left",
   render(ctx, design, bg, fonts) {
     const W = this.width;
     const H = this.height;
@@ -1429,6 +1436,10 @@ const STORY_QUOTE: Template = {
   width: 1080,
   height: 1920,
   requiresPhoto: true,
+  // The centred "business name · locality" footer runs wide enough to reach
+  // the bottom-right corner; moving it off-centre would break the deliberately
+  // symmetric layout, so the logo pairs with the (empty) top-left instead.
+  logoPlacement: "top-left",
   render(ctx, design, bg, fonts) {
     const W = this.width;
     const H = this.height;
@@ -2606,6 +2617,10 @@ const VOUCHER_CARD: Template = {
   requiresPhoto: false,
   usesTagline: true,
   taglineHint: "GIFT VOUCHER",
+  // The inset frame has a decorative dot in each corner, incl. bottom-right —
+  // the logo would sit right on top of it. All copy is centred, so top-centre
+  // clears both the dots and the tag/mark up top (verified with margin).
+  logoPlacement: "top-center",
   render(ctx, design, bg, fonts) {
     const W = this.width;
     const H = this.height;
@@ -2836,6 +2851,11 @@ const COUNTDOWN_STORY: Template = {
   requiresPhoto: true,
   usesTagline: true,
   taglineHint: "ENDS FRIDAY",
+  // The centred "website · phone" footer is long enough on this narrower
+  // 9:16 canvas to reach the bottom-right corner. Top-centre isn't free
+  // either (the "ENDS FRIDAY" pill lives there), so the logo pairs with the
+  // (empty) top-left instead of breaking the centred layout to dodge it.
+  logoPlacement: "top-left",
   render(ctx, design, bg, fonts) {
     const W = this.width;
     const H = this.height;
