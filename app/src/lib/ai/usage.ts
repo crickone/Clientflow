@@ -1,6 +1,7 @@
 import "server-only";
 
 import { controlSqlite } from "@/lib/db/control";
+import { assertUnderMonthlyCap, currentMonthKey, readTenantCapCents } from "@/lib/monthlyCap";
 import { estCostCents, type Usage } from "./client";
 import { getAiBalanceCents, isAiSuspended, recordAiSpend, withMargin } from "./creditsLedger";
 
@@ -40,13 +41,6 @@ export class AiCapError extends Error {
   }
 }
 
-function currentMonth(): string {
-  // UTC month bucket, e.g. '2026-08'. (Date.now is fine in app runtime; only
-  // workflow scripts forbid it.)
-  const d = new Date();
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-}
-
 /** Record one AI call's token usage against a tenant's monthly `ai_usage` bucket; returns the estimated RAW cost (cents) it recorded — `meterAndCharge` uses that to bill any overflow beyond the free tranche. */
 export function recordUsage(
   tenantId: number,
@@ -62,7 +56,7 @@ export function recordUsage(
     )
     .run(
       tenantId,
-      currentMonth(),
+      currentMonthKey(),
       agentKey,
       model,
       u.inputTokens,
@@ -75,7 +69,7 @@ export function recordUsage(
 }
 
 /** Total estimated spend (cents) for a tenant in a given month (defaults to the current month). */
-export function getMonthlyUsageCents(tenantId: number, yyyymm = currentMonth()): number {
+export function getMonthlyUsageCents(tenantId: number, yyyymm = currentMonthKey()): number {
   const row = controlSqlite
     .prepare("SELECT COALESCE(SUM(cost_cents),0) c FROM ai_usage WHERE tenant_id = ? AND yyyymm = ?")
     .get(tenantId, yyyymm) as { c: number };
@@ -85,7 +79,7 @@ export function getMonthlyUsageCents(tenantId: number, yyyymm = currentMonth()):
 /** Same total, broken down by agent_key — for an operator-facing spend breakdown. */
 export function getMonthlyUsageByAgent(
   tenantId: number,
-  yyyymm = currentMonth(),
+  yyyymm = currentMonthKey(),
 ): Record<string, number> {
   const rows = controlSqlite
     .prepare(
@@ -102,7 +96,7 @@ export function getMonthlyUsageByAgent(
  */
 export function getMonthlyUsageByModel(
   tenantId: number,
-  yyyymm = currentMonth(),
+  yyyymm = currentMonthKey(),
 ): { model: string; cents: number }[] {
   const rows = controlSqlite
     .prepare(
@@ -115,19 +109,17 @@ export function getMonthlyUsageByModel(
 /**
  * Reads a tenant's configured monthly AI spend cap (cents) — a primary-key
  * lookup against the control-plane `tenant_ai_cap` table (see
- * `ensureControlTables` in @/lib/db/control), the same connection + shape as
- * every other per-tenant control read in this file (`ai_usage`). Falls back
- * to the DEFAULT `MONTHLY_CAP_CENTS` when the tenant has never customized it
- * (no row) — this is the ONLY thing that changed from the old hardcoded
- * constant: `assertUnderCap` below, and both agent pages' `capCents` prop,
- * now read THIS instead of the bare constant. Fast enough for the hot path
- * (an indexed PK lookup on every AI call).
+ * `ensureControlTables` in @/lib/db/control) via the shared
+ * `readTenantCapCents` read-through (@/lib/monthlyCap), the same one
+ * `getResearchCapCents` in @/lib/research/spend.ts uses against its own
+ * table. Falls back to the DEFAULT `MONTHLY_CAP_CENTS` when the tenant has
+ * never customized it (no row) — this is the ONLY thing that changed from
+ * the old hardcoded constant: `assertUnderCap` below, and both agent pages'
+ * `capCents` prop, now read THIS instead of the bare constant. Fast enough
+ * for the hot path (an indexed PK lookup on every AI call).
  */
 export function getTenantCapCents(tenantId: number): number {
-  const row = controlSqlite
-    .prepare("SELECT cap_cents FROM tenant_ai_cap WHERE tenant_id = ?")
-    .get(tenantId) as { cap_cents: number } | undefined;
-  return row?.cap_cents ?? MONTHLY_CAP_CENTS;
+  return readTenantCapCents("tenant_ai_cap", tenantId, MONTHLY_CAP_CENTS);
 }
 
 /**
@@ -160,9 +152,9 @@ export function isOverFreeTranche(tenantId: number): boolean {
   return getMonthlyUsageCents(tenantId) >= getTenantCapCents(tenantId);
 }
 
-/** The pure free-tranche gate (no credit awareness) — throws AiCapError once the monthly free tranche is used up. Prefer `assertAiAllowed` at call sites; retained for the free-tranche-only checks. */
+/** The pure free-tranche gate (no credit awareness) — throws AiCapError once the monthly free tranche is used up. Prefer `assertAiAllowed` at call sites; retained for the free-tranche-only checks. Same shared `assertUnderMonthlyCap` gate (@/lib/monthlyCap) that `assertUnderResearchCap` in @/lib/research/spend.ts throws through. */
 export function assertUnderCap(tenantId: number): void {
-  if (isOverFreeTranche(tenantId)) throw new AiCapError();
+  assertUnderMonthlyCap(getMonthlyUsageCents(tenantId), getTenantCapCents(tenantId), () => new AiCapError());
 }
 
 /**
@@ -238,7 +230,7 @@ export function recordFlatUsage(
       `INSERT INTO ai_usage (tenant_id, yyyymm, agent_key, model, input_tokens, output_tokens, cache_read_tokens, cache_create_tokens, cost_cents)
        VALUES (?,?,?,?,0,0,0,0,?)`,
     )
-    .run(tenantId, currentMonth(), agentKey, model, costCents);
+    .run(tenantId, currentMonthKey(), agentKey, model, costCents);
   return costCents;
 }
 

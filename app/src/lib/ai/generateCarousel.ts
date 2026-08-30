@@ -3,6 +3,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { getBusinessContext } from "@/lib/ai/businessContext";
 import { CONTENT_MODEL } from "@/lib/ai/client";
 import { meteredCreate, type MeterContext } from "@/lib/ai/metered";
+import { templatesByCategory } from "@/lib/image/templates";
 
 // Carousel-specific task + format rules. Business identity, services, and voice
 // come from getBusinessContext() (venue-aware) and are prepended at call time.
@@ -84,14 +85,13 @@ export interface GenerateResult {
   };
 }
 
-const ALLOWED_TEMPLATES = new Set([
-  "carousel-cover",
-  "carousel-content",
-  "carousel-tip",
-  "carousel-quote-slide",
-  "carousel-cta",
-  "question-hook",
-]);
+// Derived from templates.ts — the single source of truth for which template
+// ids are carousel slides — instead of a hand-mirrored list here, so a
+// template rename/add in templates.ts can't silently desync from what this
+// generator's post-processing will accept.
+const ALLOWED_TEMPLATES = new Set(
+  templatesByCategory("carousels").map((t) => t.id),
+);
 
 /**
  * Map each slot key to a distinct visual recipe. The slot is the template tab

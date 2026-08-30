@@ -1,6 +1,7 @@
 import "server-only";
 
 import { controlSqlite } from "@/lib/db/control";
+import { assertUnderMonthlyCap, currentMonthKey, readTenantCapCents } from "@/lib/monthlyCap";
 
 /**
  * Per-tenant monthly metering + hard cap for RESEARCH spend — Google Places/
@@ -9,7 +10,12 @@ import { controlSqlite } from "@/lib/db/control";
  * storage, same month-key + cap-check contract, integer cents throughout —
  * but a SEPARATE meter with its own table and its own cap, since research
  * spend is a different budget from AI spend and must never share ai_usage's
- * monthly total.
+ * monthly total. The month-key helper, the per-tenant cap read-through, and
+ * the hard-cap assertion are genuinely identical between the two meters, so
+ * both pieces of plumbing now come from the shared `@/lib/monthlyCap`
+ * (architecture review, 2026-08-30) instead of being hand-duplicated here;
+ * everything below that — the unit-cost table, the accumulator shape, the
+ * error type — is this meter's own and stays local.
  *
  * The invariant callers must uphold mirrors ai/usage.ts's `assertUnderCap`/
  * `recordUsage` pairing: `assertUnderResearchCap()` runs BEFORE a metered
@@ -59,20 +65,13 @@ export const UNIT_COST_CENTS: { geocode: number; nearby: number; details: number
 /** DEFAULT monthly research-spend cap (cents) — €10/tenant/month; see `getResearchCapCents` for the per-tenant override (admin-adjustable, later task). */
 export const DEFAULT_RESEARCH_CAP_CENTS = 1000;
 
-function currentMonth(): string {
-  // UTC month bucket, e.g. '2026-08' — same format/derivation as ai/usage.ts's
-  // currentMonth(), so the two meters' month keys are always in lockstep.
-  const d = new Date();
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-}
-
 /**
  * Total research spend (cents) for a tenant in a given month (defaults to
  * the current month). A month with no `research_usage` row (never spent, or
  * a month that's rolled over) reads as 0 — this is how "new month -> spend
  * resets" falls out naturally, with nothing to reset.
  */
-export function researchSpentCents(tenantId: number, month: string = currentMonth()): number {
+export function researchSpentCents(tenantId: number, month: string = currentMonthKey()): number {
   const row = controlSqlite
     .prepare("SELECT spent_cents FROM research_usage WHERE tenant_id = ? AND yyyymm = ?")
     .get(tenantId, month) as { spent_cents: number } | undefined;
@@ -82,32 +81,29 @@ export function researchSpentCents(tenantId: number, month: string = currentMont
 /**
  * Reads a tenant's configured monthly research-spend cap (cents) — a
  * primary-key lookup against the control-plane `tenant_research_cap` table
- * (see `ensureControlTables` in @/lib/db/control), the exact same
- * read-through shape as ai/usage.ts's `getTenantCapCents`. Falls back to
- * `DEFAULT_RESEARCH_CAP_CENTS` when the tenant has never customized it (no
- * row) — storing/editing the cap from an admin UI is a LATER task; this is
- * just the default + read-through half.
+ * (see `ensureControlTables` in @/lib/db/control) via the shared
+ * `readTenantCapCents` read-through (@/lib/monthlyCap), the exact same one
+ * ai/usage.ts's `getTenantCapCents` uses against its own table. Falls back
+ * to `DEFAULT_RESEARCH_CAP_CENTS` when the tenant has never customized it
+ * (no row) — storing/editing the cap from an admin UI is a LATER task; this
+ * is just the default + read-through half.
  */
 export function getResearchCapCents(tenantId: number): number {
-  const row = controlSqlite
-    .prepare("SELECT cap_cents FROM tenant_research_cap WHERE tenant_id = ?")
-    .get(tenantId) as { cap_cents: number } | undefined;
-  return row?.cap_cents ?? DEFAULT_RESEARCH_CAP_CENTS;
+  return readTenantCapCents("tenant_research_cap", tenantId, DEFAULT_RESEARCH_CAP_CENTS);
 }
 
 /**
  * The runtime gate every metered Places/Geocoding call passes BEFORE
  * spending. Throws `ResearchCapError` once this month's recorded spend has
- * reached (or passed) the tenant's cap — pre-check contract, matching
- * ai/usage.ts's `assertUnderCap` exactly: called BEFORE the external call,
- * so a call that would push spend over the cap is allowed to complete (its
- * cost recorded afterwards via `recordResearchSpend`), and only the NEXT
- * call is blocked.
+ * reached (or passed) the tenant's cap — the shared `assertUnderMonthlyCap`
+ * gate (@/lib/monthlyCap), the exact same pre-check contract ai/usage.ts's
+ * `assertUnderCap` throws through: called BEFORE the external call, so a
+ * call that would push spend over the cap is allowed to complete (its cost
+ * recorded afterwards via `recordResearchSpend`), and only the NEXT call is
+ * blocked.
  */
 export function assertUnderResearchCap(tenantId: number): void {
-  if (researchSpentCents(tenantId) >= getResearchCapCents(tenantId)) {
-    throw new ResearchCapError();
-  }
+  assertUnderMonthlyCap(researchSpentCents(tenantId), getResearchCapCents(tenantId), () => new ResearchCapError());
 }
 
 /**
@@ -126,7 +122,7 @@ export function assertUnderResearchCap(tenantId: number): void {
 export function recordResearchSpend(tenantId: number, cents: number, kind: string): void {
   void kind; // reserved for a future by-kind breakdown; see doc comment above
   const clamped = Math.max(0, Math.round(cents));
-  const month = currentMonth();
+  const month = currentMonthKey();
   controlSqlite
     .prepare(
       `INSERT INTO research_usage (tenant_id, yyyymm, spent_cents, updated_at)

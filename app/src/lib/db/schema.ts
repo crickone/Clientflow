@@ -839,37 +839,6 @@ export const imageLibraryAssets = sqliteTable("image_library_assets", {
     .default(sql`(unixepoch() * 1000)`),
 });
 
-export const imageDesigns = sqliteTable("image_designs", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull(),
-  templateId: text("template_id").notNull(),
-  aspectRatio: text("aspect_ratio", {
-    enum: ["1:1", "9:16", "4:5"],
-  }).notNull(),
-  headingText: text("heading_text").notNull().default(""),
-  bodyText: text("body_text").notNull().default(""),
-  tagline: text("tagline"),
-  accentColor: text("accent_color").notNull().default("#2c6ce0"),
-  backgroundAssetId: integer("background_asset_id").references(
-    () => imageLibraryAssets.id,
-    { onDelete: "set null" },
-  ),
-  backgroundFit: text("background_fit", {
-    enum: ["cover", "contain"],
-  })
-    .notNull()
-    .default("cover"),
-  backgroundOffsetX: real("background_offset_x").notNull().default(0.5),
-  backgroundOffsetY: real("background_offset_y").notNull().default(0.5),
-  backgroundZoom: real("background_zoom").notNull().default(1),
-  createdAt: integer("created_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch() * 1000)`),
-  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch() * 1000)`),
-});
-
 export const carouselSets = sqliteTable("carousel_sets", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
@@ -1517,8 +1486,6 @@ export type BlogPost = typeof blogPosts.$inferSelect;
 export type NewBlogPost = typeof blogPosts.$inferInsert;
 export type ImageLibraryAsset = typeof imageLibraryAssets.$inferSelect;
 export type NewImageLibraryAsset = typeof imageLibraryAssets.$inferInsert;
-export type ImageDesign = typeof imageDesigns.$inferSelect;
-export type NewImageDesign = typeof imageDesigns.$inferInsert;
 export type CarouselSet = typeof carouselSets.$inferSelect;
 export type NewCarouselSet = typeof carouselSets.$inferInsert;
 export type CarouselSlide = typeof carouselSlides.$inferSelect;
