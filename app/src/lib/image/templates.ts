@@ -98,6 +98,77 @@ export interface FontFamilies {
   body: string;
 }
 
+/**
+ * Declares a carousel slide's "chrome" — the small recurring furniture drawn
+ * around a template's own body content: the brand credit, the slide-progress
+ * indicator, the "SWIPE →" hint, and the tenant logo. It DECLARES the chrome
+ * (what the slide wants), never coordinates (where it goes) — every pixel of
+ * font-size/colour/padding is computed by paintSlideChrome() (bottom of this
+ * file, next to drawLogoOverlay, which it calls) from a single set of
+ * formulas derived from H, so all six carousels draw identically instead of
+ * each hand-rolling a slightly-different version. See paintSlideChrome's own
+ * doc comment for the measured logo-corner rule.
+ */
+export type ChromeIntent = {
+  /**
+   * Bottom-left brand credit. "name" draws the business name; "name-locality"
+   * appends the town/locality from the profile's free-text location (e.g.
+   * "RENOVA  ·  CLONMEL"). Omit/false draws no brand credit — e.g.
+   * carousel-cta, whose centred CTA pill already carries the business's
+   * contact details as BODY content (not chrome).
+   */
+  brand?: "name" | "name-locality" | false;
+  /**
+   * Top-right slide-progress indicator (e.g. "01 / 05"). The string is the
+   * fallback text shown when design.tagline is blank — the same role
+   * `taglineHint` plays for the editor's placeholder. Omit/false draws no
+   * indicator — used by templates that repurpose the tagline as BODY content
+   * instead (carousel-content's big numeral, carousel-tip's "TIP 02" label),
+   * which stays in their own render().
+   */
+  indicator?: string | false;
+  /** Bottom-right "SWIPE  →" hint. Omit on a closing slide (carousel-cta). */
+  swipe?: boolean;
+  /**
+   * Ink for the brand + indicator text. "light" = white-on-dark, for photo
+   * or dark-card grounds. "dark" = near-black, for light-card grounds.
+   * "auto" derives from the slide's own accent-colour ground via
+   * readableTextOn() — needed by carousel-cta, the one carousel whose
+   * background IS the tenant's accent colour, where a fixed choice could
+   * disappear. Default "light". The swipe hint is always drawn in the accent
+   * colour regardless of ink — safe because no carousel that sets swipe:true
+   * also paints a solid-accent ground (the one that does, carousel-cta, sets
+   * swipe:false).
+   */
+  ink?: "light" | "dark" | "auto";
+  /**
+   * Edge padding as a fraction of H, applied uniformly to the chrome's
+   * left/top/right/bottom insets (every carousel is 1:1, so W === H).
+   * Default 0.085 — shared by every carousel except carousel-quote-slide,
+   * which widens to 0.1 to clear its own decorative accent-frame border and
+   * stay flush with that template's body content, which starts at the same
+   * 0.1 inset.
+   */
+  inset?: number;
+  /**
+   * Preferred logo corner — the template author's promise that its BODY
+   * content is clear there. paintSlideChrome measures its OWN drawn boxes
+   * (brand/indicator/swipe) against the logo's box at this corner and, if
+   * they would overlap, shifts the logo to the other top corner instead. It
+   * cannot know about the template's body content — keeping the promised
+   * corner clear of body content is that template's own responsibility.
+   */
+  logo?: "top-left" | "top-center";
+  /**
+   * The slide's overall composition alignment. Currently used only to pick
+   * the default logo corner when `logo` itself is omitted ("center" ->
+   * "top-center", otherwise "top-left"); reserved for any future chrome
+   * that varies by alignment. Every current carousel sets `logo` explicitly,
+   * so this is belt-and-suspenders today, not load-bearing.
+   */
+  align?: "left" | "center";
+};
+
 export interface Template {
   id: string;
   name: string;
@@ -126,12 +197,20 @@ export interface Template {
    * Unset defaults to "bottom-right" — correct for most non-carousel
    * templates (full-bleed photo posts with nothing else claiming that
    * corner). A handful set this explicitly instead, each with a comment at
-   * the call site explaining why: carousel templates reserve bottom-right
-   * for the "SWIPE →" hint, and a few non-carousel templates have their own
-   * bottom-right content (a footer that runs wide, a decorative corner dot)
-   * that a real tenant logo can collide with.
+   * the call site explaining why: a few non-carousel templates have their
+   * own bottom-right content (a footer that runs wide, a decorative corner
+   * dot) that a real tenant logo can collide with. The 6 carousel templates
+   * (see `chrome` below) do NOT use this field — their logo placement is
+   * measured, not static.
    */
   logoPlacement?: "top-left" | "top-center" | "bottom-right";
+  /**
+   * Carousel slide chrome (brand credit, indicator, swipe hint, measured
+   * logo corner), drawn by paintSlideChrome() after render(). Only the 6
+   * carousel templates set this; every other template leaves it unset and
+   * keeps using `logoPlacement` + its own hand-drawn footer, unchanged.
+   */
+  chrome?: ChromeIntent;
   render: (
     ctx: CanvasRenderingContext2D,
     design: DesignState,
@@ -1113,8 +1192,15 @@ const QUESTION_HOOK: Template = {
   taglineHint: "01 / 05",
   // Full-bleed dimmed photo, left-aligned heading/body/brand — logo pairs
   // with that left edge up top (the big "?" glyph reads well below the
-  // logo's small footprint, see report).
-  logoPlacement: "top-left",
+  // logo's small footprint). Chrome (indicator/brand/swipe) is drawn by
+  // paintSlideChrome — see ChromeIntent.
+  chrome: {
+    brand: "name",
+    indicator: "01 / 05",
+    swipe: true,
+    ink: "light",
+    logo: "top-left",
+  },
   render(ctx, design, bg, fonts) {
     const W = this.width;
     const H = this.height;
@@ -1126,7 +1212,6 @@ const QUESTION_HOOK: Template = {
 
     const padX = Math.round(W * 0.085);
     const padTop = Math.round(H * 0.085);
-    const padBottom = Math.round(H * 0.085);
     const innerW = W - padX * 2;
 
     ctx.textBaseline = "alphabetic";
@@ -1137,13 +1222,6 @@ const QUESTION_HOOK: Template = {
     ctx.fillStyle = design.accentColor;
     ctx.font = `400 ${markSize}px ${fonts.heading}`;
     ctx.fillText("?", padX, padTop + markSize);
-
-    // Slide indicator (top-right, from tagline)
-    const tagline = (design.tagline ?? "").trim() || "01 / 05";
-    ctx.fillStyle = "#ffffff";
-    ctx.font = `600 ${Math.round(H * 0.02)}px ${fonts.body}`;
-    ctx.textAlign = "right";
-    ctx.fillText(tagline, W - padX, padTop + Math.round(H * 0.025));
 
     // Heading (the question)
     const heading = (design.headingText || "Ask your audience a question here.").toUpperCase();
@@ -1188,18 +1266,6 @@ const QUESTION_HOOK: Template = {
       const bodyTop = ruleY + Math.round(H * 0.035);
       paintLines(ctx, bodyLines, padX, bodyTop + bodySize, bodyLine);
     }
-
-    // Footer — brand bottom-left, swipe hint bottom-right (top-left is
-    // reserved for the tenant logo overlay, stamped after render() by the
-    // canvas renderers — see drawLogoOverlay)
-    ctx.fillStyle = "rgba(255,255,255,0.7)";
-    ctx.font = `500 ${Math.round(H * 0.015)}px ${fonts.body}`;
-    ctx.textAlign = "left";
-    ctx.fillText(brandName(design), padX, H - padBottom);
-    ctx.fillStyle = design.accentColor;
-    ctx.font = `600 ${Math.round(H * 0.016)}px ${fonts.body}`;
-    ctx.textAlign = "right";
-    ctx.fillText("SWIPE  →", W - padX, H - padBottom);
     ctx.restore();
   },
 };
@@ -1671,8 +1737,15 @@ const CAROUSEL_COVER: Template = {
   usesTagline: true,
   taglineHint: "01 / 05",
   // Full-bleed dimmed photo, left-aligned heading/brand/body — pairs with a
-  // top-left logo.
-  logoPlacement: "top-left",
+  // top-left logo. Chrome (indicator/brand/swipe) is drawn by
+  // paintSlideChrome — see ChromeIntent.
+  chrome: {
+    brand: "name",
+    indicator: "01 / 05",
+    swipe: true,
+    ink: "light",
+    logo: "top-left",
+  },
   render(ctx, design, bg, fonts) {
     const W = this.width;
     const H = this.height;
@@ -1684,19 +1757,9 @@ const CAROUSEL_COVER: Template = {
     ctx.fillRect(0, 0, W, H);
 
     const padX = Math.round(W * 0.085);
-    const padTop = Math.round(H * 0.085);
-    const padBottom = Math.round(H * 0.085);
     const innerW = W - padX * 2;
 
     ctx.textBaseline = "alphabetic";
-
-    // Slide indicator (top-right)
-    const tagline = (design.tagline ?? "").trim() || "01 / 05";
-    const indicatorSize = Math.round(H * 0.022);
-    ctx.font = `600 ${indicatorSize}px ${fonts.body}`;
-    ctx.textAlign = "right";
-    ctx.fillStyle = "#ffffff";
-    ctx.fillText(tagline, W - padX, padTop + indicatorSize);
     ctx.textAlign = "left";
 
     // Centred heading (vertically)
@@ -1740,19 +1803,6 @@ const CAROUSEL_COVER: Template = {
       );
     }
 
-    // Footer — brand bottom-left, swipe hint bottom-right (top-left is now
-    // reserved for the tenant logo overlay — see drawLogoOverlay). Brand used
-    // to be a top-left eyebrow; restyled to the same quiet footer-credit
-    // treatment the other carousel templates use, since it now sits with them.
-    ctx.fillStyle = "rgba(255,255,255,0.7)";
-    ctx.font = `500 ${Math.round(H * 0.015)}px ${fonts.body}`;
-    ctx.textAlign = "left";
-    ctx.fillText(brandName(design), padX, H - padBottom);
-    ctx.fillStyle = design.accentColor;
-    ctx.font = `600 ${Math.round(H * 0.016)}px ${fonts.body}`;
-    ctx.textAlign = "right";
-    ctx.fillText("SWIPE  →", W - padX, H - padBottom);
-
     ctx.restore();
   },
 };
@@ -1769,7 +1819,15 @@ const CAROUSEL_CONTENT: Template = {
   taglineHint: "02",
   // Light card, left-aligned content block — pairs with a top-left logo. The
   // optional photo sits top-right, so nothing collides with it either.
-  logoPlacement: "top-left",
+  // Chrome (brand+locality/swipe) is drawn by paintSlideChrome — see
+  // ChromeIntent. No `indicator`: the tagline is repurposed as the big
+  // numeral eyebrow below, which is BODY content and stays here.
+  chrome: {
+    brand: "name-locality",
+    swipe: true,
+    ink: "dark",
+    logo: "top-left",
+  },
   render(ctx, design, bg, fonts) {
     const W = this.width;
     const H = this.height;
@@ -1785,7 +1843,6 @@ const CAROUSEL_CONTENT: Template = {
 
     const padX = Math.round(W * 0.085);
     const padTop = Math.round(H * 0.08);
-    const padBottom = Math.round(H * 0.08);
     const innerW = W - padX * 2;
 
     // Optional photo block in the top-right
@@ -1867,17 +1924,6 @@ const CAROUSEL_CONTENT: Template = {
       const bodyTop = headingTop + headingBlock + Math.round(H * 0.03);
       paintLines(ctx, bodyLines, padX, bodyTop + bodySize, bodyLine);
     }
-
-    // Footer — brand + locality bottom-left, swipe hint bottom-right
-    // (top-left is reserved for the tenant logo overlay — see drawLogoOverlay)
-    ctx.fillStyle = "rgba(10,10,10,0.45)";
-    ctx.font = `500 ${Math.round(H * 0.015)}px ${fonts.body}`;
-    ctx.textAlign = "left";
-    ctx.fillText(`${brandName(design)}  ·  ${brandLocality(design).toUpperCase()}`, padX, H - padBottom);
-    ctx.fillStyle = design.accentColor;
-    ctx.font = `600 ${Math.round(H * 0.016)}px ${fonts.body}`;
-    ctx.textAlign = "right";
-    ctx.fillText("SWIPE  →", W - padX, H - padBottom);
     ctx.restore();
   },
 };
@@ -1895,8 +1941,18 @@ const CAROUSEL_CTA: Template = {
   // Everything on this slide (eyebrow, heading, body, CTA pill) is drawn
   // centred at W/2 — the logo matches that with top-center instead of
   // top-left. No swipe hint here: it's the closing slide, nothing to swipe
-  // to next.
-  logoPlacement: "top-center",
+  // to next. No brand credit either: the CTA pill below is BODY content and
+  // already carries the business's contact details. Chrome (indicator) is
+  // drawn by paintSlideChrome — see ChromeIntent. ink:"auto" because this
+  // slide's own ground IS the tenant's accent colour (a fixed ink could
+  // vanish against it) — same readableTextOn() this render used to call
+  // directly for its own text.
+  chrome: {
+    indicator: "05 / 05",
+    ink: "auto",
+    logo: "top-center",
+    align: "center",
+  },
   render(ctx, design, bg, fonts) {
     const W = this.width;
     const H = this.height;
@@ -1918,18 +1974,10 @@ const CAROUSEL_CTA: Template = {
     const subtle = textColor === "#ffffff" ? "rgba(255,255,255,0.85)" : "rgba(10,10,10,0.72)";
 
     const padX = Math.round(W * 0.085);
-    const padTop = Math.round(H * 0.085);
     const padBottom = Math.round(H * 0.085);
     const innerW = W - padX * 2;
 
     ctx.textBaseline = "alphabetic";
-
-    // Slide indicator
-    const tagline = (design.tagline ?? "").trim() || "05 / 05";
-    ctx.font = `600 ${Math.round(H * 0.022)}px ${fonts.body}`;
-    ctx.textAlign = "right";
-    ctx.fillStyle = textColor;
-    ctx.fillText(tagline, W - padX, padTop + Math.round(H * 0.022));
 
     // Eyebrow
     ctx.fillStyle = textColor;
@@ -2007,8 +2055,16 @@ const CAROUSEL_TIP: Template = {
   // Photo band up top spans the full width (incl. the top-left corner), same
   // as every other full-bleed-photo template the logo already sits on — and
   // the tip label/heading/body (left-aligned) all start well below it, in the
-  // card, so nothing here collides with a top-left logo.
-  logoPlacement: "top-left",
+  // card, so nothing here collides with a top-left logo. Chrome
+  // (brand+locality/swipe) is drawn by paintSlideChrome — see ChromeIntent.
+  // No `indicator`: the tagline is repurposed as the "TIP 02" label below,
+  // which is BODY content and stays here.
+  chrome: {
+    brand: "name-locality",
+    swipe: true,
+    ink: "dark",
+    logo: "top-left",
+  },
   render(ctx, design, bg, fonts) {
     const W = this.width;
     const H = this.height;
@@ -2071,18 +2127,6 @@ const CAROUSEL_TIP: Template = {
       const bodyTop = headingTop + headingBlock + Math.round(H * 0.03);
       paintLines(ctx, bodyLines, padX, bodyTop + bodySize, bodyLine);
     }
-
-    // Footer — brand + locality bottom-left, swipe hint bottom-right
-    // (top-left is reserved for the tenant logo overlay — see drawLogoOverlay)
-    const padBottom = Math.round(H * 0.075);
-    ctx.fillStyle = "rgba(10,10,10,0.5)";
-    ctx.font = `500 ${Math.round(H * 0.015)}px ${fonts.body}`;
-    ctx.textAlign = "left";
-    ctx.fillText(`${brandName(design)}  ·  ${brandLocality(design).toUpperCase()}`, padX, H - padBottom);
-    ctx.fillStyle = design.accentColor;
-    ctx.font = `600 ${Math.round(H * 0.016)}px ${fonts.body}`;
-    ctx.textAlign = "right";
-    ctx.fillText("SWIPE  →", W - padX, H - padBottom);
     ctx.restore();
   },
 };
@@ -2099,7 +2143,18 @@ const CAROUSEL_QUOTE_SLIDE: Template = {
   taglineHint: "03 / 05",
   // Dark card, left-aligned quote mark/heading/body/brand — pairs with a
   // top-left logo (the small quote-mark block sits lower and clear of it).
-  logoPlacement: "top-left",
+  // Chrome (indicator/brand/swipe) is drawn by paintSlideChrome — see
+  // ChromeIntent. inset 0.1 (wider than the 0.085 default) matches this
+  // template's own body inset, both driven by clearing the accent frame
+  // below.
+  chrome: {
+    brand: "name",
+    indicator: "03 / 05",
+    swipe: true,
+    ink: "light",
+    logo: "top-left",
+    inset: 0.1,
+  },
   render(ctx, design, bg, fonts) {
     const W = this.width;
     const H = this.height;
@@ -2119,16 +2174,8 @@ const CAROUSEL_QUOTE_SLIDE: Template = {
     const padX = Math.round(W * 0.1);
     const innerW = W - padX * 2;
     const padTop = Math.round(H * 0.1);
-    const padBottom = Math.round(H * 0.1);
 
     ctx.textBaseline = "alphabetic";
-
-    // Slide number (top-right)
-    const tagline = (design.tagline ?? "").trim() || "03 / 05";
-    ctx.fillStyle = "#ffffff";
-    ctx.font = `600 ${Math.round(H * 0.02)}px ${fonts.body}`;
-    ctx.textAlign = "right";
-    ctx.fillText(tagline, W - padX, padTop + Math.round(H * 0.02));
 
     // Big accent quote mark
     const markH = Math.round(H * 0.05);
@@ -2173,17 +2220,6 @@ const CAROUSEL_QUOTE_SLIDE: Template = {
       const bodyTop = headingTop + headingBlock + Math.round(H * 0.04);
       paintLines(ctx, bodyLines, padX, bodyTop + bodySize, bodyLine);
     }
-
-    // Footer — brand bottom-left, swipe hint bottom-right (top-left is
-    // reserved for the tenant logo overlay — see drawLogoOverlay)
-    ctx.fillStyle = "rgba(255,255,255,0.6)";
-    ctx.font = `500 ${Math.round(H * 0.014)}px ${fonts.body}`;
-    ctx.textAlign = "left";
-    ctx.fillText(brandName(design), padX, H - padBottom);
-    ctx.fillStyle = design.accentColor;
-    ctx.font = `600 ${Math.round(H * 0.016)}px ${fonts.body}`;
-    ctx.textAlign = "right";
-    ctx.fillText("SWIPE  →", W - padX, H - padBottom);
     ctx.restore();
   },
 };
@@ -3579,5 +3615,197 @@ export function drawLogoOverlay(
   ctx.shadowBlur = Math.max(4, Math.round(drawH * 0.22));
   ctx.shadowOffsetY = Math.max(1, Math.round(drawH * 0.05));
   ctx.drawImage(logo, x, y, drawW, drawH);
+  ctx.restore();
+}
+
+// -------------------------------------------------------------------------
+//  Carousel chrome — see the ChromeIntent type (near the Template interface,
+//  top of this file) for what each field means and why. This is its home:
+//  one place that knows how to draw a carousel slide's brand credit,
+//  indicator, swipe hint, and measured logo corner.
+// -------------------------------------------------------------------------
+
+type ChromeBox = { x: number; y: number; w: number; h: number };
+
+function chromeBoxesOverlap(a: ChromeBox, b: ChromeBox): boolean {
+  return (
+    a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y
+  );
+}
+
+/**
+ * Bounding box for one line of fillText'd chrome text, from its anchor point
+ * and baseline. Only used to test for overlap with the logo, so it doesn't
+ * need to be pixel-exact: a full em above the baseline (ascent) and 0.3em
+ * below (descenders) is generous enough to catch real collisions without
+ * false-positiving on ordinary letterforms.
+ */
+function chromeTextBox(
+  measure: MeasureText,
+  text: string,
+  font: string,
+  sizePx: number,
+  anchorX: number,
+  baselineY: number,
+  align: "left" | "right",
+): ChromeBox {
+  const w = measure(text, font);
+  const x = align === "right" ? anchorX - w : anchorX;
+  return { x, y: baselineY - sizePx, w, h: sizePx * 1.3 };
+}
+
+/**
+ * The logo's box at one of the two top corners paintSlideChrome ever offers
+ * a carousel. Deliberately mirrors drawLogoOverlay's own top-left/top-center
+ * sizing math (margin/drawH/drawW/maxW) so this collision test matches what
+ * drawLogoOverlay will actually paint — duplicated rather than factored out
+ * of it because drawLogoOverlay is left untouched (still called directly by
+ * the 26 non-carousel templates' own logoPlacement path). bottom-right is
+ * never offered here: it's the one corner drawLogoOverlay supports that this
+ * function doesn't try, because it's exactly the corner a swipe-bearing
+ * carousel's own "SWIPE →" chrome already sits in.
+ */
+function logoBoxAtTopCorner(
+  corner: "top-left" | "top-center",
+  W: number,
+  H: number,
+  logo: HTMLImageElement,
+): ChromeBox | null {
+  const nw = logo.naturalWidth || logo.width;
+  const nh = logo.naturalHeight || logo.height;
+  if (!nw || !nh) return null;
+  const margin = Math.round(H * 0.04);
+  let drawH = Math.round(H * 0.055);
+  let drawW = Math.round((nw / nh) * drawH);
+  const maxW = Math.round(W * 0.22);
+  if (drawW > maxW) {
+    drawW = maxW;
+    drawH = Math.round((nh / nw) * drawW);
+  }
+  const x = corner === "top-center" ? (W - drawW) / 2 : margin;
+  return { x, y: margin, w: drawW, h: drawH };
+}
+
+/**
+ * Paints a carousel slide's chrome — brand credit, slide indicator, "SWIPE
+ * →" hint, and the tenant logo — from a declared ChromeIntent, all from one
+ * set of font-size/colour/padding formulas derived from H. Called by
+ * paintSlide() in ImageDesigner.tsx AFTER template.render(), so it draws on
+ * top of a finished body; each of the 6 carousel templates' render() now
+ * paints ONLY its own body (heading/body/photo/number) and leaves chrome to
+ * this function entirely.
+ *
+ * Draw order: indicator, then brand, then swipe — measuring each one's box
+ * as it's drawn — and the logo LAST, at `intent.logo`'s corner (falling back
+ * to "top-center" if `align` is "center" and `logo` itself is unset,
+ * otherwise "top-left") UNLESS that corner's box would overlap one of the
+ * boxes just measured, in which case it shifts to the other top corner — the
+ * only fallback drawLogoOverlay actually supports that isn't already a
+ * chrome corner (see logoBoxAtTopCorner). If BOTH top corners collide (only
+ * realistically possible with a very long user-entered tagline pushing the
+ * indicator far enough left to reach the far corner too) it keeps the
+ * preferred corner and draws the logo last, on top — better than losing it
+ * under text entirely. This only ever measures what THIS function draws,
+ * plus the two logo corners it can choose between — never the template's
+ * own body content, which stays that template's responsibility (see
+ * ChromeIntent.logo's own doc comment).
+ */
+export function paintSlideChrome(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  intent: ChromeIntent,
+  measure: MeasureText,
+  fonts: FontFamilies,
+  design: DesignState,
+  logo: HTMLImageElement | null,
+): void {
+  ctx.save();
+  ctx.textBaseline = "alphabetic";
+
+  const inset = intent.inset ?? 0.085;
+  const padX = Math.round(W * inset);
+  const padTop = Math.round(H * inset);
+  const padBottom = Math.round(H * inset);
+
+  const ink: "#ffffff" | "#0a0a0a" =
+    intent.ink === "dark"
+      ? "#0a0a0a"
+      : intent.ink === "auto"
+        ? readableTextOn(design.accentColor)
+        : "#ffffff";
+  const brandColor =
+    ink === "#ffffff" ? "rgba(255,255,255,0.7)" : "rgba(10,10,10,0.5)";
+
+  const chromeBoxes: ChromeBox[] = [];
+
+  // Indicator — top-right.
+  if (intent.indicator) {
+    const text = (design.tagline ?? "").trim() || intent.indicator;
+    const size = Math.round(H * 0.02);
+    const font = `600 ${size}px ${fonts.body}`;
+    const anchorX = W - padX;
+    const baselineY = padTop + size;
+    ctx.fillStyle = ink;
+    ctx.font = font;
+    ctx.textAlign = "right";
+    ctx.fillText(text, anchorX, baselineY);
+    chromeBoxes.push(
+      chromeTextBox(measure, text, font, size, anchorX, baselineY, "right"),
+    );
+  }
+
+  // Brand credit — bottom-left.
+  if (intent.brand) {
+    const text =
+      intent.brand === "name-locality"
+        ? `${brandName(design)}  ·  ${brandLocality(design).toUpperCase()}`
+        : brandName(design);
+    const size = Math.round(H * 0.015);
+    const font = `500 ${size}px ${fonts.body}`;
+    const anchorX = padX;
+    const baselineY = H - padBottom;
+    ctx.fillStyle = brandColor;
+    ctx.font = font;
+    ctx.textAlign = "left";
+    ctx.fillText(text, anchorX, baselineY);
+    chromeBoxes.push(
+      chromeTextBox(measure, text, font, size, anchorX, baselineY, "left"),
+    );
+  }
+
+  // Swipe hint — bottom-right. Always accent-coloured — see ChromeIntent.ink
+  // for why that's safe regardless of `ink`.
+  if (intent.swipe) {
+    const text = "SWIPE  →";
+    const size = Math.round(H * 0.016);
+    const font = `600 ${size}px ${fonts.body}`;
+    const anchorX = W - padX;
+    const baselineY = H - padBottom;
+    ctx.fillStyle = design.accentColor;
+    ctx.font = font;
+    ctx.textAlign = "right";
+    ctx.fillText(text, anchorX, baselineY);
+    chromeBoxes.push(
+      chromeTextBox(measure, text, font, size, anchorX, baselineY, "right"),
+    );
+  }
+
+  // Logo — measured last, against everything drawn above.
+  if (logo) {
+    const preferred: "top-left" | "top-center" =
+      intent.logo ?? (intent.align === "center" ? "top-center" : "top-left");
+    const other: "top-left" | "top-center" =
+      preferred === "top-left" ? "top-center" : "top-left";
+    const isClear = (box: ChromeBox | null) =>
+      box !== null && !chromeBoxes.some((c) => chromeBoxesOverlap(box, c));
+    const corner = isClear(logoBoxAtTopCorner(preferred, W, H, logo))
+      ? preferred
+      : isClear(logoBoxAtTopCorner(other, W, H, logo))
+        ? other
+        : preferred;
+    drawLogoOverlay(ctx, W, H, logo, corner);
+  }
+
   ctx.restore();
 }

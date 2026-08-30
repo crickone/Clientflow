@@ -37,9 +37,12 @@ import type {
 } from "@/lib/db/schema";
 import {
   CATEGORIES,
+  canvasMeasure,
   drawLogoOverlay,
   getTemplate,
+  paintSlideChrome,
   templatesByCategory,
+  type DesignState,
   type Template,
   type TemplateCategory,
 } from "@/lib/image/templates";
@@ -2259,7 +2262,7 @@ function AiImagePanel({
 
 /**
  * Shared paint tail: builds the DesignState from `slide` + `brand`, resolves
- * the template, renders it, then stamps the tenant logo on top — the exact
+ * the template, renders it, then draws the tenant logo on top — the exact
  * sequence run by both SlideCanvas's live-preview effect and
  * renderSlideToBlob's PNG export (the two only ever drift when someone edits
  * one and forgets the other — see f7be3e6). Background image LOADING is
@@ -2267,6 +2270,14 @@ function AiImagePanel({
  * (bgRef, aborted mid-load via a token) while the export does a one-shot
  * `await` — so callers resolve `bg` their own way and hand it in already
  * settled (an HTMLImageElement, or null).
+ *
+ * The logo step forks on `template.chrome`: the 6 carousel templates declare
+ * one (see ChromeIntent, in templates.ts) and get their brand credit/
+ * indicator/swipe hint plus a MEASURED logo corner from paintSlideChrome, in
+ * one pass. Every other template has no `chrome` and keeps the old direct
+ * drawLogoOverlay(..., template.logoPlacement) call, unchanged. Exactly one
+ * of the two branches ever runs, so no template can get the logo drawn
+ * twice.
  */
 function paintSlide(
   ctx: CanvasRenderingContext2D,
@@ -2282,27 +2293,36 @@ function paintSlide(
 ): void {
   const template = getTemplate(slide.templateId);
   if (!template) return;
-  template.render(
-    ctx,
-    {
-      headingText: slide.headingText,
-      bodyText: slide.bodyText,
-      tagline: slide.tagline?.trim() || autoTagline(slideIdx, total),
-      accentColor: slide.accentColor,
-      backgroundColor: slide.backgroundColor,
-      backgroundFit: slide.backgroundFit,
-      backgroundOffsetX: slide.backgroundOffsetX,
-      backgroundOffsetY: slide.backgroundOffsetY,
-      backgroundZoom: slide.backgroundZoom,
-      businessName: brand?.businessName,
-      website: brand?.website,
-      location: brand?.location,
-      phone: brand?.phone,
-    },
-    bg,
-    fontFamilies,
-  );
-  if (logo) drawLogoOverlay(ctx, canvasW, canvasH, logo, template.logoPlacement);
+  const design: DesignState = {
+    headingText: slide.headingText,
+    bodyText: slide.bodyText,
+    tagline: slide.tagline?.trim() || autoTagline(slideIdx, total),
+    accentColor: slide.accentColor,
+    backgroundColor: slide.backgroundColor,
+    backgroundFit: slide.backgroundFit,
+    backgroundOffsetX: slide.backgroundOffsetX,
+    backgroundOffsetY: slide.backgroundOffsetY,
+    backgroundZoom: slide.backgroundZoom,
+    businessName: brand?.businessName,
+    website: brand?.website,
+    location: brand?.location,
+    phone: brand?.phone,
+  };
+  template.render(ctx, design, bg, fontFamilies);
+  if (template.chrome) {
+    paintSlideChrome(
+      ctx,
+      canvasW,
+      canvasH,
+      template.chrome,
+      canvasMeasure(ctx),
+      fontFamilies,
+      design,
+      logo,
+    );
+  } else if (logo) {
+    drawLogoOverlay(ctx, canvasW, canvasH, logo, template.logoPlacement);
+  }
 }
 
 /**
