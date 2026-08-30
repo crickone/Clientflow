@@ -227,8 +227,30 @@ function paintBackground(
   ctx.restore();
 }
 
-function wrapLines(
-  ctx: CanvasRenderingContext2D,
+/**
+ * Text-measurement port. wrapLines/autoFitHeading only ever need "how wide is
+ * this string in this font" — not a live canvas — so they depend on this
+ * instead of a CanvasRenderingContext2D. That's what lets a plain-node test
+ * (no jsdom/canvas) exercise the wrapping/auto-fit math with a fake measurer.
+ */
+export type MeasureText = (text: string, font: string) => number;
+
+/**
+ * Production adapter: backs MeasureText with a real canvas context. Sets
+ * ctx.font before measuring — exactly what the pre-seam code did inline —
+ * so this reproduces both the returned width AND the ctx.font side effect
+ * (ctx.font is left set to the last-measured font after a measure() call).
+ */
+export function canvasMeasure(ctx: CanvasRenderingContext2D): MeasureText {
+  return (text, font) => {
+    ctx.font = font;
+    return ctx.measureText(text).width;
+  };
+}
+
+export function wrapLines(
+  measure: MeasureText,
+  font: string,
   text: string,
   maxWidth: number,
 ): string[] {
@@ -240,7 +262,7 @@ function wrapLines(
     let line = "";
     for (const word of words) {
       const test = line ? `${line} ${word}` : word;
-      const w = ctx.measureText(test).width;
+      const w = measure(test, font);
       if (w > maxWidth && line) {
         out.push(line);
         line = word;
@@ -334,8 +356,8 @@ function drawStar(
   ctx.fill();
 }
 
-function autoFitHeading(
-  ctx: CanvasRenderingContext2D,
+export function autoFitHeading(
+  measure: MeasureText,
   text: string,
   weight: string,
   family: string,
@@ -346,15 +368,15 @@ function autoFitHeading(
 ): { size: number; lines: string[] } {
   let size = startSize;
   while (size >= minSize) {
-    ctx.font = `${weight} ${size}px ${family}`;
-    const lines = wrapLines(ctx, text, maxWidth);
+    const font = `${weight} ${size}px ${family}`;
+    const lines = wrapLines(measure, font, text, maxWidth);
     if (lines.length <= maxLines) {
       return { size, lines };
     }
     size -= 2;
   }
-  ctx.font = `${weight} ${minSize}px ${family}`;
-  return { size: minSize, lines: wrapLines(ctx, text, maxWidth) };
+  const font = `${weight} ${minSize}px ${family}`;
+  return { size: minSize, lines: wrapLines(measure, font, text, maxWidth) };
 }
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
@@ -394,6 +416,7 @@ const BOLD_HEADLINE: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
     paintBackground(ctx, bg, { x: 0, y: 0, w: W, h: H }, design);
     bottomGradient(ctx, W, H, H * 0.38);
 
@@ -430,7 +453,8 @@ const BOLD_HEADLINE: Template = {
     const bodyLine = Math.round(bodySize * 1.4);
     ctx.font = `400 ${bodySize}px ${fonts.body}`;
     const bodyLines = wrapLines(
-      ctx,
+      measure,
+      `400 ${bodySize}px ${fonts.body}`,
       design.bodyText || "Optional supporting copy goes here.",
       innerW,
     ).slice(0, 2);
@@ -438,7 +462,7 @@ const BOLD_HEADLINE: Template = {
     // Heading
     const heading = (design.headingText || "Your heading here").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       heading,
       "400",
       fonts.heading,
@@ -498,6 +522,7 @@ const SIDE_CARD: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
     const splitX = Math.round(W * 0.52);
     paintBackground(ctx, bg, { x: 0, y: 0, w: splitX, h: H }, design);
     ctx.fillStyle = "#ffffff";
@@ -518,14 +543,15 @@ const SIDE_CARD: Template = {
     const bodyLine = Math.round(bodySize * 1.45);
     ctx.font = `400 ${bodySize}px ${fonts.body}`;
     const bodyLines = wrapLines(
-      ctx,
+      measure,
+      `400 ${bodySize}px ${fonts.body}`,
       design.bodyText || "Add your supporting copy here.",
       innerW,
     ).slice(0, 4);
 
     const heading = (design.headingText || "Add your supporting line here.").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       heading,
       "400",
       fonts.heading,
@@ -594,6 +620,7 @@ const CENTERED_STATEMENT: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
     paintBackground(ctx, bg, { x: 0, y: 0, w: W, h: H }, design);
 
     // Full-canvas dark overlay so big text is always readable
@@ -615,7 +642,7 @@ const CENTERED_STATEMENT: Template = {
     // Heading centred vertically
     const heading = (design.headingText || "Your headline\ngoes here.").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       heading,
       "400",
       fonts.heading,
@@ -643,7 +670,7 @@ const CENTERED_STATEMENT: Template = {
       const bodySize = Math.round(H * 0.022);
       const bodyLine = Math.round(bodySize * 1.45);
       ctx.font = `400 ${bodySize}px ${fonts.body}`;
-      const bodyLines = wrapLines(ctx, design.bodyText, innerW).slice(0, 2);
+      const bodyLines = wrapLines(measure, `400 ${bodySize}px ${fonts.body}`, design.bodyText, innerW).slice(0, 2);
       ctx.fillStyle = "rgba(255,255,255,0.86)";
       paintLines(
         ctx,
@@ -675,6 +702,7 @@ const TOP_BANNER: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
     const bandH = Math.round(H * 0.36);
     // Photo zone (bottom)
     paintBackground(
@@ -709,7 +737,7 @@ const TOP_BANNER: Template = {
     // Heading inside band
     const heading = (design.headingText || "Your headline goes here.").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       heading,
       "400",
       fonts.heading,
@@ -731,7 +759,8 @@ const TOP_BANNER: Template = {
     const bodyLine = Math.round(bodySize * 1.45);
     ctx.font = `400 ${bodySize}px ${fonts.body}`;
     const bodyLines = wrapLines(
-      ctx,
+      measure,
+      `400 ${bodySize}px ${fonts.body}`,
       design.bodyText || "60 minutes in Clonmel can change the rest of your week.",
       innerW,
     ).slice(0, 3);
@@ -761,6 +790,7 @@ const STAT_BLOCK: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
     paintBackground(ctx, bg, { x: 0, y: 0, w: W, h: H }, design);
     ctx.fillStyle = "rgba(10,10,10,0.62)";
     ctx.fillRect(0, 0, W, H);
@@ -781,7 +811,7 @@ const STAT_BLOCK: Template = {
     // Giant stat (heading) — wraps to fit width so a long heading can't overflow.
     const stat = (design.headingText || "60").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       stat,
       "400",
       fonts.heading,
@@ -824,7 +854,7 @@ const STAT_BLOCK: Template = {
       const bodySize = Math.round(H * 0.022);
       const bodyLine = Math.round(bodySize * 1.5);
       ctx.font = `400 ${bodySize}px ${fonts.body}`;
-      const bodyLines = wrapLines(ctx, design.bodyText, innerW).slice(0, 3);
+      const bodyLines = wrapLines(measure, `400 ${bodySize}px ${fonts.body}`, design.bodyText, innerW).slice(0, 3);
       ctx.fillStyle = "rgba(255,255,255,0.88)";
       paintLines(
         ctx,
@@ -856,6 +886,7 @@ const FRAME: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
 
     // Off-white background with a soft accent tint
     const { r, g, b } = hexToRgb(design.accentColor);
@@ -881,7 +912,7 @@ const FRAME: Template = {
     // Heading
     const heading = (design.headingText || "A new way to feel like yourself.").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       heading,
       "400",
       fonts.heading,
@@ -905,7 +936,8 @@ const FRAME: Template = {
     const bodyLine = Math.round(bodySize * 1.5);
     ctx.font = `400 ${bodySize}px ${fonts.body}`;
     const bodyLines = wrapLines(
-      ctx,
+      measure,
+      `400 ${bodySize}px ${fonts.body}`,
       design.bodyText ||
         "Add your supporting copy here.",
       innerW,
@@ -975,6 +1007,7 @@ const MAGAZINE: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
     paintBackground(ctx, bg, { x: 0, y: 0, w: W, h: H }, design);
 
     // Bottom dark gradient for heading legibility
@@ -1022,7 +1055,7 @@ const MAGAZINE: Template = {
     // Heading anchored from bottom
     const heading = (design.headingText || "The week we slowed down to come back stronger.").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       heading,
       "400",
       fonts.heading,
@@ -1038,7 +1071,8 @@ const MAGAZINE: Template = {
     const bodyLine = Math.round(bodySize * 1.45);
     ctx.font = `400 ${bodySize}px ${fonts.body}`;
     const bodyLines = wrapLines(
-      ctx,
+      measure,
+      `400 ${bodySize}px ${fonts.body}`,
       design.bodyText ||
         "Add your supporting copy here.",
       innerW,
@@ -1085,6 +1119,7 @@ const QUESTION_HOOK: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
     paintBackground(ctx, bg, { x: 0, y: 0, w: W, h: H }, design);
     ctx.fillStyle = "rgba(10,10,10,0.66)";
     ctx.fillRect(0, 0, W, H);
@@ -1113,7 +1148,7 @@ const QUESTION_HOOK: Template = {
     // Heading (the question)
     const heading = (design.headingText || "Ask your audience a question here.").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       heading,
       "400",
       fonts.heading,
@@ -1141,7 +1176,8 @@ const QUESTION_HOOK: Template = {
     const bodyLine = Math.round(bodySize * 1.5);
     ctx.font = `400 ${bodySize}px ${fonts.body}`;
     const bodyLines = wrapLines(
-      ctx,
+      measure,
+      `400 ${bodySize}px ${fonts.body}`,
       design.bodyText ||
         "Add your supporting copy here.",
       innerW,
@@ -1185,6 +1221,7 @@ const STORY_HERO: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
     paintBackground(ctx, bg, { x: 0, y: 0, w: W, h: H }, design);
     topGradient(ctx, W, Math.round(H * 0.22));
     bottomGradient(ctx, W, H, Math.round(H * 0.4));
@@ -1210,7 +1247,8 @@ const STORY_HERO: Template = {
     const bodyLine = Math.round(bodySize * 1.5);
     ctx.font = `400 ${bodySize}px ${fonts.body}`;
     const bodyLines = wrapLines(
-      ctx,
+      measure,
+      `400 ${bodySize}px ${fonts.body}`,
       design.bodyText ||
         "Add your supporting copy here.",
       innerW,
@@ -1218,7 +1256,7 @@ const STORY_HERO: Template = {
 
     const heading = (design.headingText || "Your headline goes here").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       heading,
       "400",
       fonts.heading,
@@ -1276,6 +1314,7 @@ const STORY_SPLIT: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
     const splitY = Math.round(H * 0.5);
     paintBackground(ctx, bg, { x: 0, y: 0, w: W, h: splitY }, design);
     ctx.fillStyle = "#ffffff";
@@ -1298,7 +1337,7 @@ const STORY_SPLIT: Template = {
 
     const heading = (design.headingText || "Your headline goes here.").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       heading,
       "400",
       fonts.heading,
@@ -1319,7 +1358,8 @@ const STORY_SPLIT: Template = {
     const bodyLine = Math.round(bodySize * 1.5);
     ctx.font = `400 ${bodySize}px ${fonts.body}`;
     const bodyLines = wrapLines(
-      ctx,
+      measure,
+      `400 ${bodySize}px ${fonts.body}`,
       design.bodyText ||
         "Add your supporting copy here.",
       innerW,
@@ -1351,6 +1391,7 @@ const STORY_MINIMAL: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
 
     // Solid background in accent colour
     ctx.fillStyle = design.accentColor;
@@ -1381,7 +1422,7 @@ const STORY_MINIMAL: Template = {
     // Heading
     const heading = (design.headingText || "Your headline goes here.").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       heading,
       "400",
       fonts.heading,
@@ -1408,7 +1449,7 @@ const STORY_MINIMAL: Template = {
       const bodySize = Math.round(H * 0.02);
       const bodyLine = Math.round(bodySize * 1.5);
       ctx.font = `400 ${bodySize}px ${fonts.body}`;
-      const bodyLines = wrapLines(ctx, design.bodyText, innerW).slice(0, 3);
+      const bodyLines = wrapLines(measure, `400 ${bodySize}px ${fonts.body}`, design.bodyText, innerW).slice(0, 3);
       ctx.fillStyle = subtle;
       paintLines(
         ctx,
@@ -1444,6 +1485,7 @@ const STORY_QUOTE: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
     paintBackground(ctx, bg, { x: 0, y: 0, w: W, h: H }, design);
     ctx.fillStyle = "rgba(10,10,10,0.6)";
     ctx.fillRect(0, 0, W, H);
@@ -1470,7 +1512,7 @@ const STORY_QUOTE: Template = {
     // Quote heading
     const heading = (design.headingText || "Add a client quote here.").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       heading,
       "400",
       fonts.heading,
@@ -1498,7 +1540,7 @@ const STORY_QUOTE: Template = {
       const bodySize = Math.round(H * 0.018);
       const bodyLine = Math.round(bodySize * 1.5);
       ctx.font = `400 ${bodySize}px ${fonts.body}`;
-      const bodyLines = wrapLines(ctx, design.bodyText, innerW).slice(0, 3);
+      const bodyLines = wrapLines(measure, `400 ${bodySize}px ${fonts.body}`, design.bodyText, innerW).slice(0, 3);
       ctx.fillStyle = "rgba(255,255,255,0.86)";
       paintLines(
         ctx,
@@ -1536,6 +1578,7 @@ const STORY_STAT: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
     paintBackground(ctx, bg, { x: 0, y: 0, w: W, h: H }, design);
     ctx.fillStyle = "rgba(10,10,10,0.66)";
     ctx.fillRect(0, 0, W, H);
@@ -1556,7 +1599,7 @@ const STORY_STAT: Template = {
     // Giant stat — wraps to fit width so a long heading can't overflow.
     const stat = (design.headingText || "60").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       stat,
       "400",
       fonts.heading,
@@ -1593,7 +1636,7 @@ const STORY_STAT: Template = {
       const bodySize = Math.round(H * 0.018);
       const bodyLine = Math.round(bodySize * 1.5);
       ctx.font = `400 ${bodySize}px ${fonts.body}`;
-      const bodyLines = wrapLines(ctx, design.bodyText, innerW).slice(0, 3);
+      const bodyLines = wrapLines(measure, `400 ${bodySize}px ${fonts.body}`, design.bodyText, innerW).slice(0, 3);
       ctx.fillStyle = "rgba(255,255,255,0.86)";
       paintLines(
         ctx,
@@ -1634,6 +1677,7 @@ const CAROUSEL_COVER: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
     paintBackground(ctx, bg, { x: 0, y: 0, w: W, h: H }, design);
     // Strong overlay so cover reads at thumb size
     ctx.fillStyle = "rgba(10,10,10,0.55)";
@@ -1658,7 +1702,7 @@ const CAROUSEL_COVER: Template = {
     // Centred heading (vertically)
     const heading = (design.headingText || "5 quick tips to get started").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       heading,
       "400",
       fonts.heading,
@@ -1685,7 +1729,7 @@ const CAROUSEL_COVER: Template = {
       const bodySize = Math.round(H * 0.022);
       const bodyLine = Math.round(bodySize * 1.5);
       ctx.font = `400 ${bodySize}px ${fonts.body}`;
-      const bodyLines = wrapLines(ctx, design.bodyText, innerW).slice(0, 2);
+      const bodyLines = wrapLines(measure, `400 ${bodySize}px ${fonts.body}`, design.bodyText, innerW).slice(0, 2);
       ctx.fillStyle = "rgba(255,255,255,0.86)";
       paintLines(
         ctx,
@@ -1730,6 +1774,7 @@ const CAROUSEL_CONTENT: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
 
     // Soft accent-tinted background
     const { r, g, b } = hexToRgb(design.accentColor);
@@ -1787,7 +1832,7 @@ const CAROUSEL_CONTENT: Template = {
     // Heading
     const heading = (design.headingText || "Why this works for you").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       heading,
       "400",
       fonts.heading,
@@ -1810,7 +1855,8 @@ const CAROUSEL_CONTENT: Template = {
     const bodyLine = Math.round(bodySize * 1.55);
     ctx.font = `400 ${bodySize}px ${fonts.body}`;
     const bodyLines = wrapLines(
-      ctx,
+      measure,
+      `400 ${bodySize}px ${fonts.body}`,
       design.bodyText ||
         "Add your supporting copy here.",
       innerW,
@@ -1855,6 +1901,7 @@ const CAROUSEL_CTA: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
 
     // Solid accent background
     ctx.fillStyle = design.accentColor;
@@ -1893,7 +1940,7 @@ const CAROUSEL_CTA: Template = {
     // Big heading
     const heading = (design.headingText || "We're 30 minutes\nfrom you.").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       heading,
       "400",
       fonts.heading,
@@ -1915,7 +1962,7 @@ const CAROUSEL_CTA: Template = {
       const bodySize = Math.round(H * 0.022);
       const bodyLine = Math.round(bodySize * 1.5);
       ctx.font = `400 ${bodySize}px ${fonts.body}`;
-      const bodyLines = wrapLines(ctx, design.bodyText, innerW).slice(0, 3);
+      const bodyLines = wrapLines(measure, `400 ${bodySize}px ${fonts.body}`, design.bodyText, innerW).slice(0, 3);
       ctx.fillStyle = subtle;
       paintLines(
         ctx,
@@ -1966,6 +2013,7 @@ const CAROUSEL_TIP: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
     const splitY = Math.round(H * 0.38);
     paintBackground(ctx, bg, { x: 0, y: 0, w: W, h: splitY }, design);
 
@@ -1990,7 +2038,7 @@ const CAROUSEL_TIP: Template = {
     // Heading
     const heading = (design.headingText || "Add your tip heading here.").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       heading,
       "400",
       fonts.heading,
@@ -2012,7 +2060,8 @@ const CAROUSEL_TIP: Template = {
     const bodyLine = Math.round(bodySize * 1.55);
     ctx.font = `400 ${bodySize}px ${fonts.body}`;
     const bodyLines = wrapLines(
-      ctx,
+      measure,
+      `400 ${bodySize}px ${fonts.body}`,
       design.bodyText ||
         "Add the detail for this tip here.",
       innerW,
@@ -2055,6 +2104,7 @@ const CAROUSEL_QUOTE_SLIDE: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
 
     // Dark base
     ctx.fillStyle = "#0a0a0a";
@@ -2089,7 +2139,7 @@ const CAROUSEL_QUOTE_SLIDE: Template = {
     // Quote heading
     const heading = (design.headingText || "Add a client quote here.").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       heading,
       "400",
       fonts.heading,
@@ -2112,7 +2162,8 @@ const CAROUSEL_QUOTE_SLIDE: Template = {
     const bodyLine = Math.round(bodySize * 1.5);
     ctx.font = `400 ${bodySize}px ${fonts.body}`;
     const bodyLines = wrapLines(
-      ctx,
+      measure,
+      `400 ${bodySize}px ${fonts.body}`,
       design.bodyText || "— Your client",
       innerW,
     ).slice(0, 2);
@@ -2154,6 +2205,7 @@ const QUOTE_PORTRAIT: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
     const splitY = Math.round(H * 0.55);
     paintBackground(ctx, bg, { x: 0, y: 0, w: W, h: splitY }, design);
 
@@ -2179,14 +2231,15 @@ const QUOTE_PORTRAIT: Template = {
     const bodyLine = Math.round(bodySize * 1.5);
     ctx.font = `400 ${bodySize}px ${fonts.body}`;
     const bodyLines = wrapLines(
-      ctx,
+      measure,
+      `400 ${bodySize}px ${fonts.body}`,
       design.bodyText || "— Happy client",
       innerW,
     ).slice(0, 3);
 
     const heading = (design.headingText || "Add a client quote here.").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       heading,
       "400",
       fonts.heading,
@@ -2236,6 +2289,7 @@ const PHOTO_QUOTE: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
     paintBackground(ctx, bg, { x: 0, y: 0, w: W, h: H }, design);
     ctx.fillStyle = "rgba(10,10,10,0.55)";
     ctx.fillRect(0, 0, W, H);
@@ -2255,7 +2309,7 @@ const PHOTO_QUOTE: Template = {
     // Heading (the quote itself)
     const heading = (design.headingText || "Add a client quote here.").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       heading,
       "400",
       fonts.heading,
@@ -2282,7 +2336,8 @@ const PHOTO_QUOTE: Template = {
     const bodyLine = Math.round(bodySize * 1.5);
     ctx.font = `400 ${bodySize}px ${fonts.body}`;
     const bodyLines = wrapLines(
-      ctx,
+      measure,
+      `400 ${bodySize}px ${fonts.body}`,
       design.bodyText || "— Your client",
       innerW,
     ).slice(0, 3);
@@ -2314,6 +2369,7 @@ const STAR_RATING: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
     paintBackground(ctx, bg, { x: 0, y: 0, w: W, h: H }, design);
     ctx.fillStyle = "rgba(10,10,10,0.62)";
     ctx.fillRect(0, 0, W, H);
@@ -2350,7 +2406,7 @@ const STAR_RATING: Template = {
     // Quote heading
     const heading = (design.headingText || "Worth every cent. I felt the difference within an hour.").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       heading,
       "400",
       fonts.heading,
@@ -2372,7 +2428,8 @@ const STAR_RATING: Template = {
     const bodyLine = Math.round(bodySize * 1.5);
     ctx.font = `400 ${bodySize}px ${fonts.body}`;
     const bodyLines = wrapLines(
-      ctx,
+      measure,
+      `400 ${bodySize}px ${fonts.body}`,
       design.bodyText || "— Your client",
       innerW,
     ).slice(0, 2);
@@ -2411,6 +2468,7 @@ const RESULT_CARD: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
     const splitY = Math.round(H * 0.5);
     paintBackground(ctx, bg, { x: 0, y: 0, w: W, h: splitY }, design);
     ctx.fillStyle = "rgba(10,10,10,0.42)";
@@ -2467,7 +2525,7 @@ const RESULT_CARD: Template = {
     // Heading
     const heading = (design.headingText || "Add a client result here.").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       heading,
       "400",
       fonts.heading,
@@ -2489,7 +2547,8 @@ const RESULT_CARD: Template = {
     const bodyLine = Math.round(bodySize * 1.5);
     ctx.font = `400 ${bodySize}px ${fonts.body}`;
     const bodyLines = wrapLines(
-      ctx,
+      measure,
+      `400 ${bodySize}px ${fonts.body}`,
       design.bodyText ||
         "— Your client",
       innerW,
@@ -2530,6 +2589,7 @@ const PRICE_TAG: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
     paintBackground(ctx, bg, { x: 0, y: 0, w: W, h: H }, design, {
       showPlaceholder: false,
     });
@@ -2564,7 +2624,7 @@ const PRICE_TAG: Template = {
     // Heading (the offer)
     const heading = (design.headingText || "€00\nYOUR OFFER").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       heading,
       "400",
       fonts.heading,
@@ -2586,7 +2646,8 @@ const PRICE_TAG: Template = {
     const bodyLine = Math.round(bodySize * 1.45);
     ctx.font = `400 ${bodySize}px ${fonts.body}`;
     const bodyLines = wrapLines(
-      ctx,
+      measure,
+      `400 ${bodySize}px ${fonts.body}`,
       design.bodyText ||
         "60 minutes of pressurised oxygen. Walk-ins welcome — book online or call.",
       innerW,
@@ -2625,6 +2686,7 @@ const VOUCHER_CARD: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
 
     // Dark base with subtle accent tint
     const { r, g, b } = hexToRgb(design.accentColor);
@@ -2675,7 +2737,7 @@ const VOUCHER_CARD: Template = {
     // Big value (heading)
     const heading = (design.headingText || "€95").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       heading,
       "400",
       fonts.heading,
@@ -2706,7 +2768,8 @@ const VOUCHER_CARD: Template = {
     const bodyLine = Math.round(bodySize * 1.5);
     ctx.font = `400 ${bodySize}px ${fonts.body}`;
     const bodyLines = wrapLines(
-      ctx,
+      measure,
+      `400 ${bodySize}px ${fonts.body}`,
       design.bodyText ||
         "Add your offer details here.",
       innerW,
@@ -2745,6 +2808,7 @@ const PACKAGE_DEAL: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
     paintBackground(ctx, bg, { x: 0, y: 0, w: W, h: H }, design, {
       showPlaceholder: false,
     });
@@ -2784,7 +2848,7 @@ const PACKAGE_DEAL: Template = {
     // Heading
     const heading = (design.headingText || "Buy 3 sessions,\nget 1 free.").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       heading,
       "400",
       fonts.heading,
@@ -2816,7 +2880,8 @@ const PACKAGE_DEAL: Template = {
     const bodyLine = Math.round(bodySize * 1.5);
     ctx.font = `400 ${bodySize}px ${fonts.body}`;
     const bodyLines = wrapLines(
-      ctx,
+      measure,
+      `400 ${bodySize}px ${fonts.body}`,
       design.bodyText ||
         "Add your offer details here.",
       innerW,
@@ -2860,6 +2925,7 @@ const COUNTDOWN_STORY: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
     paintBackground(ctx, bg, { x: 0, y: 0, w: W, h: H }, design, {
       showPlaceholder: false,
     });
@@ -2898,7 +2964,7 @@ const COUNTDOWN_STORY: Template = {
     // Heading
     const heading = (design.headingText || "Book this week.\nFirst session 50% off.").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       heading,
       "400",
       fonts.heading,
@@ -2930,7 +2996,8 @@ const COUNTDOWN_STORY: Template = {
     const bodyLine = Math.round(bodySize * 1.5);
     ctx.font = `400 ${bodySize}px ${fonts.body}`;
     const bodyLines = wrapLines(
-      ctx,
+      measure,
+      `400 ${bodySize}px ${fonts.body}`,
       design.bodyText ||
         "Add your offer details here.",
       innerW,
@@ -2971,6 +3038,7 @@ const FACT_STACK: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
 
     // Top accent band (35%)
     const bandH = Math.round(H * 0.32);
@@ -3009,7 +3077,7 @@ const FACT_STACK: Template = {
     // Heading in band
     const heading = (design.headingText || "3 things to know").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       heading,
       "400",
       fonts.heading,
@@ -3060,7 +3128,7 @@ const FACT_STACK: Template = {
       // Fact text — vertically centred against the number cap height
       ctx.fillStyle = "rgba(10,10,10,0.78)";
       ctx.font = `400 ${factSize}px ${fonts.body}`;
-      const lines = wrapLines(ctx, fact, textW).slice(0, 3);
+      const lines = wrapLines(measure, `400 ${factSize}px ${fonts.body}`, fact, textW).slice(0, 3);
       const firstBaselineY =
         slotY + numberSize - (numberSize - factSize) * 0.45;
       paintLines(ctx, lines, textX, firstBaselineY, factLine);
@@ -3095,6 +3163,7 @@ const DEFINITION_CARD: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
 
     // Cream background with subtle accent wash
     const { r, g, b } = hexToRgb(design.accentColor);
@@ -3119,7 +3188,7 @@ const DEFINITION_CARD: Template = {
     // Term (heading)
     const heading = (design.headingText || "Your service name").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       heading,
       "400",
       fonts.heading,
@@ -3156,7 +3225,8 @@ const DEFINITION_CARD: Template = {
     const bodyLine = Math.round(bodySize * 1.5);
     ctx.font = `400 ${bodySize}px ${fonts.body}`;
     const bodyLines = wrapLines(
-      ctx,
+      measure,
+      `400 ${bodySize}px ${fonts.body}`,
       design.bodyText ||
         "Add a description of your service here.",
       innerW,
@@ -3188,6 +3258,7 @@ const DID_YOU_KNOW: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
     paintBackground(ctx, bg, { x: 0, y: 0, w: W, h: H }, design, {
       showPlaceholder: false,
     });
@@ -3221,7 +3292,7 @@ const DID_YOU_KNOW: Template = {
     // Heading (fact)
     const heading = (design.headingText || "Add a key stat or fact here.").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       heading,
       "400",
       fonts.heading,
@@ -3248,7 +3319,8 @@ const DID_YOU_KNOW: Template = {
     const bodyLine = Math.round(bodySize * 1.5);
     ctx.font = `400 ${bodySize}px ${fonts.body}`;
     const bodyLines = wrapLines(
-      ctx,
+      measure,
+      `400 ${bodySize}px ${fonts.body}`,
       design.bodyText ||
         "Pressurised air pushes oxygen into your plasma, not just red blood cells — which is how it reaches tissue that normal breathing can't.",
       innerW,
@@ -3280,6 +3352,7 @@ const HOW_IT_WORKS: Template = {
     const W = this.width;
     const H = this.height;
     ctx.save();
+    const measure = canvasMeasure(ctx);
 
     // Accent header band
     const bandH = Math.round(H * 0.26);
@@ -3317,7 +3390,7 @@ const HOW_IT_WORKS: Template = {
     // Heading in band
     const heading = (design.headingText || "Your headline goes here.").toUpperCase();
     const fit = autoFitHeading(
-      ctx,
+      measure,
       heading,
       "400",
       fonts.heading,
@@ -3372,7 +3445,7 @@ const HOW_IT_WORKS: Template = {
       ctx.textBaseline = "alphabetic";
       ctx.fillStyle = "rgba(10,10,10,0.78)";
       ctx.font = `400 ${stepSize}px ${fonts.body}`;
-      const lines = wrapLines(ctx, step, textW).slice(0, 3);
+      const lines = wrapLines(measure, `400 ${stepSize}px ${fonts.body}`, step, textW).slice(0, 3);
       paintLines(
         ctx,
         lines,
