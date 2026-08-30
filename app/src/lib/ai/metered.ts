@@ -109,3 +109,63 @@ export async function meteredComplete(
   meterAndCharge(meter.tenantId, meter.agentKey, args.model, result.usage);
   return result.text;
 }
+
+/**
+ * The ONE shape for a metered, best-effort text completion that NEVER
+ * throws — "gate → call → extract text → parse → NEVER throw → return a
+ * neutral default". Before this existed, ~5 call sites (research/summary.ts's
+ * competitorThemes/landscapeSummary/adAngle, ai/altText.ts's generateAltText,
+ * marketing/campaignRadar.ts's getCampaignRadar) hand-rolled this same shell
+ * around their own `try { meteredCreate(...); extract text; parse; } catch
+ * { log; return fallback; }` — identical plumbing, only the prompt, the
+ * parse/validation step, and the fallback value actually varied per call
+ * site. Centralizing the plumbing here means a new best-effort call site
+ * can't forget the catch, forget to log, or accidentally let something
+ * throw past it.
+ *
+ * Routes through `meteredCreate` above (not the raw SDK), so `assertAiAllowed`
+ * (the cap gate) and `meterAndCharge` (usage recording) still run exactly as
+ * they did inline, and the CI guard (meteredGuard.test.ts) — which only
+ * sanctions this file, `client.ts`, `providers/anthropic.ts`, and
+ * `image/falClient.ts` to touch the SDK directly — stays satisfied, since
+ * this is a same-module call to `meteredCreate`, not a new SDK access point.
+ * `buildParams` keeps the same THUNK contract `meteredCreate` documents above
+ * (gate runs before any per-call work); it's called unchanged, so a blocked
+ * tenant still fails fast before prompt assembly.
+ *
+ * Text extraction is the ONE fixed shape every migrated call site already
+ * used: filter to text blocks, join with "\n", trim. `parseText` receives
+ * that trimmed text and turns it into the caller's `T` — this is where each
+ * call site's own validation lives (e.g. a no-fabrication line-parser, a
+ * JSON parse, a plain pass-through), including any caching/side-effect work
+ * a caller used to do inline after a successful parse (throwing from
+ * `parseText` — e.g. a cache write failing — lands in the same catch as a
+ * network error, exactly like the hand-rolled version did when that write
+ * was still inside its `try`).
+ *
+ * NEVER throws: `meteredCreate` failing (`AiCapError` from an over-cap
+ * tenant, a missing/misconfigured API key, a network error) and `parseText`
+ * throwing both land in the same catch, get logged as
+ * `[${logTag}] fallback: <err>`, and resolve to `fallback` — the neutral,
+ * locally-computed default every migrated call site already had on hand.
+ */
+export async function meteredCreateFailSoft<T>(
+  meter: MeterContext,
+  buildParams: () => Anthropic.MessageCreateParamsNonStreaming,
+  parseText: (text: string) => T,
+  fallback: T,
+  logTag: string,
+): Promise<T> {
+  try {
+    const message = await meteredCreate(meter, buildParams);
+    const text = message.content
+      .filter((b): b is Anthropic.TextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("\n")
+      .trim();
+    return parseText(text);
+  } catch (err) {
+    console.error(`[${logTag}] fallback:`, err);
+    return fallback;
+  }
+}

@@ -1,10 +1,7 @@
 import "server-only";
 
-import type Anthropic from "@anthropic-ai/sdk";
-
 import { MODELS } from "@/lib/ai/client";
-import { AiCapError } from "@/lib/ai/usage";
-import { meteredCreate } from "@/lib/ai/metered";
+import { meteredCreateFailSoft } from "@/lib/ai/metered";
 
 /**
  * Generate concise, descriptive alt text for an image using Claude vision.
@@ -13,11 +10,16 @@ import { meteredCreate } from "@/lib/ai/metered";
  * fails — callers store null and the user can still type alt manually. A
  * fast/cheap vision model is used.
  *
- * This is the "background/auto" cap-handling case: AiCapError is caught
- * (distinguished from a genuine failure only in the log line) and swallowed
- * exactly like any other failure here, never thrown — matching this
- * function's existing best-effort contract and the brief's requirement that
- * an alt-text backfill never break on a capped tenant.
+ * Routed through `meteredCreateFailSoft` (@/lib/ai/metered) — the shared
+ * gate->call->extract->parse->fallback shell. AiCapError (an over-cap
+ * tenant), a missing/misconfigured API key, and a network error all land in
+ * its one catch, get logged, and resolve to `null` — the same best-effort
+ * contract this function always had, and the brief's requirement that an
+ * alt-text backfill never break on a capped tenant. (Before this refactor,
+ * the catch distinguished AiCapError from a generic failure ONLY in the log
+ * line, never in the returned value — meteredCreateFailSoft's one shared log
+ * line collapses that distinction; the return value, `null` either way, is
+ * unchanged.)
  */
 
 const VISION_MIME = new Set([
@@ -36,13 +38,16 @@ export async function generateAltText(
   const mime = (mimeType || "").toLowerCase();
   if (!VISION_MIME.has(mime)) return null;
 
-  try {
-    // meteredCreate enforces the cap (assertUnderCap) FIRST — before it builds
-    // the params thunk below or touches the network — then records usage after,
-    // so this best-effort path can't dodge the tenant's monthly AI cap. A
-    // missing ANTHROPIC_API_KEY now throws from inside meteredCreate and is
-    // caught below (returned as null), same clean best-effort outcome as before.
-    const resp = await meteredCreate({ tenantId, agentKey: "media" }, () => ({
+  // meteredCreateFailSoft's meteredCreate call enforces the cap
+  // (assertAiAllowed) FIRST — before it builds the params thunk below or
+  // touches the network — then records usage after, so this best-effort
+  // path can't dodge the tenant's monthly AI cap. A missing
+  // ANTHROPIC_API_KEY now throws from inside meteredCreate and is caught
+  // inside meteredCreateFailSoft (resolved to null below), same clean
+  // best-effort outcome as before.
+  return meteredCreateFailSoft(
+    { tenantId, agentKey: "media" },
+    () => ({
       model: MODELS.haiku,
       max_tokens: 120,
       system:
@@ -74,23 +79,12 @@ export async function generateAltText(
           ],
         },
       ],
-    }));
-
-    const text = resp.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join(" ")
-      .trim()
-      .replace(/^["']|["']$/g, "")
-      .slice(0, 160);
-
-    return text || null;
-  } catch (err) {
-    if (err instanceof AiCapError) {
-      console.error("[alt-text] skipped — tenant is over its monthly AI cap");
-    } else {
-      console.error("[alt-text] generation failed:", err);
-    }
-    return null;
-  }
+    }),
+    (text) => {
+      const cleaned = text.replace(/^["']|["']$/g, "").slice(0, 160);
+      return cleaned || null;
+    },
+    null,
+    "alt-text",
+  );
 }

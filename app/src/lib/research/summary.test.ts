@@ -44,6 +44,16 @@
 // already use, just aimed at a module this file's tests want to control
 // instead of one they just need to not crash on.
 //
+// summary.ts's three helpers call `meteredCreateFailSoft` (the shared
+// gate->call->extract->parse->fallback shell, @/lib/ai/metered), not
+// `meteredCreate` directly, so the shim's fake module below reimplements that
+// same tiny shell on top of the ALREADY-mockable `meteredCreate` dispatcher
+// (rather than delegating to the real `meteredCreateFailSoft`, whose own
+// internal call to `meteredCreate` is a same-module reference this
+// require-shim can't see, let alone redirect). This keeps section 5c's
+// `mockMeteredCreateImpl` swap-in working exactly as before, and leaves every
+// assertion in this file untouched.
+//
 // ./summary -> @/lib/db/tenant (react `cache`) and -> ./store -> @/lib/db ->
 // ./tenant -> @/lib/tenants -> @/lib/auth -> next/navigation; also ->
 // @/lib/ai/metered -> @/lib/ai/usage -> @/lib/db/control (draftFollowup.test.ts
@@ -85,8 +95,32 @@ mod._load = function (this: unknown, request: string, ...rest: unknown[]) {
       const real = realLoad.call(this, request, ...rest) as { meteredCreate: MeteredCreateFn };
       realMeteredCreate = real.meteredCreate;
     }
+    const dispatch = (...callArgs: unknown[]) => (mockMeteredCreateImpl ?? realMeteredCreate!)(...callArgs);
     return {
-      meteredCreate: (...callArgs: unknown[]) => (mockMeteredCreateImpl ?? realMeteredCreate!)(...callArgs),
+      meteredCreate: dispatch,
+      // Same shell as the real meteredCreateFailSoft (metered.ts): gate+call
+      // via `dispatch` above (so it's mockable), extract text the same way,
+      // parseText it, never throw -- catch logs + resolves to `fallback`.
+      meteredCreateFailSoft: async (
+        meter: unknown,
+        buildParams: () => unknown,
+        parseText: (text: string) => unknown,
+        fallback: unknown,
+        logTag: string,
+      ) => {
+        try {
+          const message = (await dispatch(meter, buildParams)) as { content: { type: string; text?: string }[] };
+          const text = message.content
+            .filter((b) => b.type === "text")
+            .map((b) => b.text ?? "")
+            .join("\n")
+            .trim();
+          return parseText(text);
+        } catch (err) {
+          console.error(`[${logTag}] fallback:`, err);
+          return fallback;
+        }
+      },
     };
   }
   return realLoad.call(this, request, ...rest);

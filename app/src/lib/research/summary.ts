@@ -1,9 +1,7 @@
 import "server-only";
 
-import type Anthropic from "@anthropic-ai/sdk";
-
 import { CONTENT_MODEL } from "@/lib/ai/client";
-import { meteredCreate } from "@/lib/ai/metered";
+import { meteredCreateFailSoft } from "@/lib/ai/metered";
 import { getCurrentTenant } from "@/lib/db/tenant";
 import {
   listCompetitors,
@@ -51,7 +49,10 @@ import {
  * the arithmetic (fallback text, the landscape digest, parsing the model's
  * theme lines) lives in small pure functions exported for direct unit
  * testing; the two async entry points stay thin wrappers around
- * meteredCreate + a try/catch. See summary.test.ts.
+ * `meteredCreateFailSoft` (@/lib/ai/metered) — the shared gate → call →
+ * extract → parse → never-throw → fallback shell, with just the
+ * prompt-building, parsing, and fallback value supplied per call. See
+ * summary.test.ts.
  *
  * P1.1 unlocked a "you vs them" read in `landscapeSummary`: once discovery
  * has matched the tenant's own gym (isSelf on `competitors` — see
@@ -170,35 +171,32 @@ export async function competitorThemes(competitorId: number): Promise<string> {
 
   const tenantId = getCurrentTenant().id;
 
-  try {
-    const message = await meteredCreate({ tenantId, agentKey: AGENT_KEY }, () => ({
+  return meteredCreateFailSoft(
+    { tenantId, agentKey: AGENT_KEY },
+    () => ({
       model: CONTENT_MODEL,
       max_tokens: 300,
       system: buildThemesSystemPrompt(),
       messages: [{ role: "user", content: buildThemesUserPrompt(reviews) }],
-    }));
+    }),
+    (text) => {
+      const themes = parseThemeLines(text);
+      if (themes.length === 0) return buildThemesFallback(reviews);
 
-    const text = message.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("\n")
-      .trim();
-
-    const themes = parseThemeLines(text);
-    if (themes.length === 0) return buildThemesFallback(reviews);
-
-    // Cache alongside the model call (inside the try): a write failure here
-    // is rare (a plain synchronous SQLite write already covered by
-    // store.test.ts) and treating it the same as a model failure — fall back
-    // rather than return an answer that silently failed to persist — is the
-    // simpler, still-never-throws choice.
-    const nowIso = new Date().toISOString();
-    setCompetitorThemes(competitorId, JSON.stringify({ themes, at: nowIso }), nowIso);
-    return themes.join("\n");
-  } catch (err) {
-    console.error(`[research/summary] competitorThemes(${competitorId}) fallback:`, err);
-    return buildThemesFallback(reviews);
-  }
+      // Cache alongside the model call (inside this parseText step, itself
+      // inside meteredCreateFailSoft's try): a write failure here is rare (a
+      // plain synchronous SQLite write already covered by store.test.ts) and
+      // treating it the same as a model failure — a throw here lands in
+      // meteredCreateFailSoft's shared catch and resolves to the `fallback`
+      // below, same as it fell back when this write was still inline inside
+      // the old try block — is the simpler, still-never-throws choice.
+      const nowIso = new Date().toISOString();
+      setCompetitorThemes(competitorId, JSON.stringify({ themes, at: nowIso }), nowIso);
+      return themes.join("\n");
+    },
+    buildThemesFallback(reviews),
+    `research/summary competitorThemes(${competitorId})`,
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -417,25 +415,18 @@ export async function landscapeSummary(): Promise<string> {
 
   const tenantId = getCurrentTenant().id;
 
-  try {
-    const message = await meteredCreate({ tenantId, agentKey: AGENT_KEY }, () => ({
+  return meteredCreateFailSoft(
+    { tenantId, agentKey: AGENT_KEY },
+    () => ({
       model: CONTENT_MODEL,
       max_tokens: 400,
       system: buildLandscapeSystemPrompt(digest),
       messages: [{ role: "user", content: buildLandscapeUserPrompt(digest) }],
-    }));
-
-    const text = message.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("\n")
-      .trim();
-
-    return text.length > 0 ? text : buildLandscapeFallback(digest);
-  } catch (err) {
-    console.error("[research/summary] landscapeSummary fallback:", err);
-    return buildLandscapeFallback(digest);
-  }
+    }),
+    (text) => (text.length > 0 ? text : buildLandscapeFallback(digest)),
+    buildLandscapeFallback(digest),
+    "research/summary landscapeSummary",
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -513,32 +504,28 @@ export async function adAngle(competitorId: number): Promise<string> {
 
   const tenantId = getCurrentTenant().id;
 
-  try {
-    const message = await meteredCreate({ tenantId, agentKey: AGENT_KEY }, () => ({
+  return meteredCreateFailSoft(
+    { tenantId, agentKey: AGENT_KEY },
+    () => ({
       model: CONTENT_MODEL,
       max_tokens: 200,
       system: buildAdAngleSystemPrompt(),
       messages: [{ role: "user", content: buildAdAngleUserPrompt(ads) }],
-    }));
+    }),
+    (text) => {
+      if (text.length === 0) return buildAdAngleFallback(ads);
 
-    const text = message.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("\n")
-      .trim();
-
-    if (text.length === 0) return buildAdAngleFallback(ads);
-
-    // Cache alongside the model call (inside the try): same reasoning as
-    // competitorThemes — a write failure here is rare (a plain synchronous
-    // SQLite write) and treating it like a model failure (fall back rather
-    // than return an answer that silently failed to persist) is the
-    // simpler, still-never-throws choice.
-    const nowIso = new Date().toISOString();
-    setCompetitorAdAngle(competitorId, JSON.stringify({ angle: text, at: nowIso }), nowIso);
-    return text;
-  } catch (err) {
-    console.error(`[research/summary] adAngle(${competitorId}) fallback:`, err);
-    return buildAdAngleFallback(ads);
-  }
+      // Cache alongside the model call (inside this parseText step — same
+      // reasoning as competitorThemes above): a write failure here is rare
+      // (a plain synchronous SQLite write) and treating it like a model
+      // failure (a throw here lands in meteredCreateFailSoft's shared catch
+      // and resolves to the `fallback` below) is the simpler,
+      // still-never-throws choice.
+      const nowIso = new Date().toISOString();
+      setCompetitorAdAngle(competitorId, JSON.stringify({ angle: text, at: nowIso }), nowIso);
+      return text;
+    },
+    buildAdAngleFallback(ads),
+    `research/summary adAngle(${competitorId})`,
+  );
 }
