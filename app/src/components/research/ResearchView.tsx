@@ -6,7 +6,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Building2, Crown, Key, MapPin, MessageSquareText, RefreshCw, Search, Star, Users } from "lucide-react";
 import { toast } from "sonner";
 
-import type { CompetitorRow as CompetitorRowData, Metric, StoredAd, StoredReview } from "@/lib/research/store";
+import type { CompetitorRow as CompetitorRowData, HydratedCompetitor, Metric } from "@/lib/research/store";
 import type { RescanResult } from "@/app/marketing/research/actions";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -48,18 +48,26 @@ import { ScanningProgress } from "./ScanningProgress";
  *
  * P1.1 self-detection: `competitors` (and everything derived from it —
  * `computeCompetitorStats`, the Landscape stat tiles, the highlight badges)
- * is ALREADY the self-EXCLUDING list (page.tsx calls
- * `listCompetitors({trackedOnly:true, excludeSelf:true})`) — this component
- * never filters self out itself. `self`/`selfMetric` are the tenant's own
- * gym, fetched separately, rendered as a distinct "Your gym" reference row
- * above the ranked list — never numbered among competitors.
+ * is ALREADY built from the self-EXCLUDING list (page.tsx calls
+ * `hydrateCompetitors(listCompetitors({trackedOnly:true, excludeSelf:true}))`)
+ * — this component never filters self out itself. `self`/`selfMetric` are
+ * the tenant's own gym, fetched separately, rendered as a distinct "Your
+ * gym" reference row above the ranked list — never numbered among
+ * competitors.
  *
- * Market Research P2, Task 6: `adsById` (page.tsx's `listAds(id)` per
- * competitor, ALL rows) and `adLibraryConfigured` (a sync env-var check, no
- * network) are plumbed the same store-only way and forwarded per-row — an
- * active count to CompetitorRow's "Advertising" pill, the full list +
- * configured flag to CompetitorDetail's Ads section. Same zero-spend
- * contract as everything else here.
+ * `competitors` is `HydratedCompetitor[]` (lib/research/store.ts) — each
+ * entry bundles one competitor with its metric/history/reviews/ads. This
+ * replaces four separate `metricsById`/`historyById`/`reviewsById`/`adsById`
+ * maps this component used to re-zip by competitor id at every read site
+ * below; the loop that renders CompetitorRow/CompetitorDetail now just
+ * destructures each entry instead.
+ *
+ * Market Research P2, Task 6: each hydrated competitor's `ads` (page.tsx's
+ * `listAds(id)` per competitor, ALL rows) and `adLibraryConfigured` (a sync
+ * env-var check, no network) are plumbed the same store-only way and
+ * forwarded per-row — an active count to CompetitorRow's "Advertising" pill,
+ * the full list + configured flag to CompetitorDetail's Ads section. Same
+ * zero-spend contract as everything else here.
  *
  * Exact Page-ID ad matching, Task 2: `isAdmin` (page.tsx) and the two new
  * `onLinkPage`/`onUnlinkPage` Server Actions are forwarded to every
@@ -79,15 +87,13 @@ export interface LandscapeCache {
 
 interface ResearchViewProps {
   state: ResearchState;
-  /** Ranked nearest-first, EXCLUDING the tenant's own gym (page.tsx's `listCompetitors({trackedOnly:true, excludeSelf:true})`) — see `self` below for that reference. */
-  competitors: CompetitorRowData[];
-  metricsById: Record<number, Metric | null>;
-  historyById: Record<number, Metric[]>;
-  reviewsById: Record<number, StoredReview[]>;
-  /** Each competitor's stored ads (`listAds(id)`, Market Research P2 Task 6)
-   *  — ALL rows, active and stopped. Feeds both CompetitorRow's "Advertising"
-   *  pill (active count) and CompetitorDetail's Ads gallery (the full list). */
-  adsById: Record<number, StoredAd[]>;
+  /** Ranked nearest-first, EXCLUDING the tenant's own gym (page.tsx's
+   *  `hydrateCompetitors(listCompetitors({trackedOnly:true, excludeSelf:true}))`,
+   *  lib/research/store.ts) — each entry already bundles that competitor's
+   *  metric/history/reviews/ads, so this component never re-zips a separate
+   *  id-keyed map to find them. See `self` below for the "Your gym"
+   *  reference, which is NOT part of this list. */
+  competitors: HydratedCompetitor[];
   landscape: LandscapeCache | null;
   /** Pre-formatted ("€0.03 / €10.00 this month") — computed server-side so this
    *  client component never needs to import the AI-cost formatter (which
@@ -124,10 +130,6 @@ const RESEARCH_RADIUS_KM = 20;
 export function ResearchView({
   state,
   competitors,
-  metricsById,
-  historyById,
-  reviewsById,
-  adsById,
   landscape,
   spendLabel,
   adLibraryConfigured,
@@ -289,7 +291,7 @@ export function ResearchView({
     );
   }
 
-  const stats = computeCompetitorStats(competitors, metricsById);
+  const stats = computeCompetitorStats(competitors);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
@@ -458,16 +460,16 @@ export function ResearchView({
                   </div>
                 )}
                 <div>
-                  {competitors.map((c, i) => {
+                  {competitors.map((hydrated, i) => {
+                    const { competitor: c, metric, history, ads } = hydrated;
                     const expanded = expandedId === c.id;
-                    const ads = adsById[c.id] ?? [];
                     return (
                       <div key={c.id} style={{ borderTop: "1px solid var(--hairline)" }}>
                         <CompetitorRow
                           rank={i + 1}
                           competitor={c}
-                          metric={metricsById[c.id] ?? null}
-                          history={historyById[c.id] ?? []}
+                          metric={metric}
+                          history={history}
                           maxReviewCount={stats.maxReviewCount}
                           activeAdCount={ads.filter((a) => a.active).length}
                           expanded={expanded}
@@ -475,10 +477,7 @@ export function ResearchView({
                         />
                         {expanded && (
                           <CompetitorDetail
-                            competitor={c}
-                            history={historyById[c.id] ?? []}
-                            reviews={reviewsById[c.id] ?? []}
-                            ads={ads}
+                            data={hydrated}
                             adLibraryConfigured={adLibraryConfigured}
                             isAdmin={isAdmin}
                             onBuildCampaign={handleBuildCampaign}
@@ -752,9 +751,9 @@ interface CompetitorStats {
   avgRating: number | null;
   topRated: { competitor: CompetitorRowData; rating: number } | null;
   mostReviewed: { competitor: CompetitorRowData; count: number } | null;
-  /** `competitors[0]` — the store's own listCompetitors() is already
-   *  nearest-first (see that contract note on ResearchViewProps above), so
-   *  this needs no distance comparison of its own. */
+  /** `competitors[0].competitor` — the store's own listCompetitors() is
+   *  already nearest-first (see that contract note on ResearchViewProps
+   *  above), so this needs no distance comparison of its own. */
   closest: CompetitorRowData | null;
   /** The highest tracked reviewCount — the denominator CompetitorRow's
    *  review-volume bar scales every row's width against. */
@@ -762,24 +761,20 @@ interface CompetitorStats {
 }
 
 /**
- * Pure roll-up over props already in hand (competitors + their latest
- * metric) — the Landscape stat strip and the Competitors highlight chips
+ * Pure roll-up over props already in hand (each competitor's bundled
+ * `.metric`) — the Landscape stat strip and the Competitors highlight chips
  * both read from one pass rather than each re-deriving their own. Never
  * reads history/reviews, never touches lib/research: this is display math
  * over data page.tsx already fetched for free.
  */
-function computeCompetitorStats(
-  competitors: CompetitorRowData[],
-  metricsById: Record<number, Metric | null>,
-): CompetitorStats {
+function computeCompetitorStats(competitors: HydratedCompetitor[]): CompetitorStats {
   let ratingSum = 0;
   let ratingCount = 0;
   let topRated: CompetitorStats["topRated"] = null;
   let mostReviewed: CompetitorStats["mostReviewed"] = null;
   let maxReviewCount = 0;
 
-  for (const competitor of competitors) {
-    const metric = metricsById[competitor.id];
+  for (const { competitor, metric } of competitors) {
     if (metric?.ratingMilli != null) {
       const rating = metric.ratingMilli / 1000;
       ratingSum += rating;
@@ -797,7 +792,7 @@ function computeCompetitorStats(
     avgRating: ratingCount > 0 ? ratingSum / ratingCount : null,
     topRated,
     mostReviewed,
-    closest: competitors[0] ?? null,
+    closest: competitors[0]?.competitor ?? null,
     maxReviewCount,
   };
 }

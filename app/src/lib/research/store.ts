@@ -58,6 +58,16 @@ import type { AdLite } from "./adLibrary";
  * (search_page_ids — exact, every ad Meta attributes to that page, no
  * name-text matching) and uses the results directly, unfiltered. NULL/NULL
  * (unlinked) is the default for every competitor until explicitly linked.
+ *
+ * `hydrateCompetitors` (bottom of this file) is a later shape-only deepening,
+ * not a new Market Research task: it bundles the four per-competitor reads
+ * above (`latestMetric`/`metricHistory`/`getReviews`/`listAds`) into one
+ * `HydratedCompetitor` per row. It replaces four parallel
+ * `Record<number, T>` maps (`metricsById`/`historyById`/`reviewsById`/
+ * `adsById`) that marketing/research/page.tsx used to hand-build every
+ * render and that ResearchView/CompetitorDetail used to re-zip by
+ * competitor id — same reads, same order, same data, just one shape per
+ * competitor instead of four id-keyed maps.
  */
 
 export type CompetitorRow = {
@@ -601,4 +611,52 @@ export function markAdsStopped(competitorId: number, adIds: string[], at: string
 /** Caches Task 5's AI ad-angle summary on the owning competitor row — mirrors setCompetitorThemes's shape exactly, for ads instead of reviews. */
 export function setCompetitorAdAngle(competitorId: number, adAngleJson: string, at: string): void {
   db.update(schema.competitors).set({ adAngleJson, adAngleAt: at }).where(eq(schema.competitors.id, competitorId)).run();
+}
+
+// ── hydrated bundle (one shape per competitor, not four id-keyed maps) ──
+
+/**
+ * One competitor bundled with everything the market-research dashboard
+ * renders about it — see `hydrateCompetitors` below, its sole builder, and
+ * the module doc's "later shape-only deepening" note for why this exists.
+ * Deliberately just a plain data bag (no methods, no lazy fields): every
+ * sub-field is exactly what the read functions above already return, so a
+ * caller that only needs one of them (e.g. `.metric`) can still destructure
+ * it out directly instead of this becoming its own thing to learn.
+ */
+export interface HydratedCompetitor {
+  competitor: CompetitorRow;
+  /** `latestMetric(competitor.id)` — null for a competitor no scan has captured a metric for yet. */
+  metric: Metric | null;
+  /** `metricHistory(competitor.id)`, newest-first (see that function's own doc comment). */
+  history: Metric[];
+  /** `getReviews(competitor.id)`, Google's own relevance order (see that function's own doc comment). */
+  reviews: StoredReview[];
+  /** `listAds(competitor.id)`, ALL rows — active and stopped — newest-started-first (see that function's own doc comment). */
+  ads: StoredAd[];
+}
+
+/**
+ * Bundles each given competitor with its metric/history/reviews/ads — the
+ * exact four per-competitor reads (`latestMetric`, `metricHistory`,
+ * `getReviews`, `listAds`) marketing/research/page.tsx's own loop used to
+ * perform directly, in the same order, now composed here once instead of at
+ * every call site. Output order mirrors the input array exactly (no
+ * re-sorting) — since `listCompetitors` is nearest-first, a caller handed
+ * the result of `hydrateCompetitors(listCompetitors(...))` can zip "row i"
+ * back to its rank by array index, no `.id` lookup required.
+ *
+ * N synchronous reads here — same "cheap at this scale" call page.tsx's
+ * former loop (and marketing/campaigns/page.tsx's own per-row roll-up)
+ * already made; Google's Nearby call caps a single scan at 20 places
+ * (places.ts's nearbyGyms maxResultCount), so N is always small.
+ */
+export function hydrateCompetitors(competitors: CompetitorRow[]): HydratedCompetitor[] {
+  return competitors.map((competitor) => ({
+    competitor,
+    metric: latestMetric(competitor.id),
+    history: metricHistory(competitor.id),
+    reviews: getReviews(competitor.id),
+    ads: listAds(competitor.id),
+  }));
 }

@@ -7,16 +7,12 @@ import { getResearchCentre } from "@/lib/research/discovery";
 import { placesConfigured } from "@/lib/research/places";
 import { getResearchCapCents, researchSpentCents } from "@/lib/research/spend";
 import {
-  getReviews,
   getSelfCompetitor,
+  hydrateCompetitors,
   latestMetric,
-  listAds,
   listCompetitors,
-  metricHistory,
   type CompetitorRow,
-  type Metric,
-  type StoredAd,
-  type StoredReview,
+  type HydratedCompetitor,
 } from "@/lib/research/store";
 import { readKey } from "@/lib/settings";
 import { ResearchView, type LandscapeCache, type ResearchState } from "@/components/research/ResearchView";
@@ -69,14 +65,15 @@ function readLandscapeCache(): LandscapeCache | null {
  * + its `latestMetric`) are read separately and handed down for
  * ResearchView's "Your gym" reference row.
  *
- * Market Research P2, Task 6: `adsById` (`listAds(id)`, per competitor — ALL
- * rows, active and stopped) and `adLibraryConfigured` (a sync env-var check,
- * `adLibraryConfigured()` from lib/research/adLibrary.ts) are read the same
- * store-only way and handed down for CompetitorDetail's Ads section +
- * CompetitorRow's "Advertising" pill — NEVER `searchCompetitorAds` (the
- * network call) or `adAngle` (the AI call) from here; the cached ad-angle
- * text lives in `competitor.adAngleJson`, already inside every `CompetitorRow`
- * this page already reads via `listCompetitors`.
+ * Market Research P2, Task 6: each hydrated competitor's `ads` (`listAds(id)`,
+ * ALL rows, active and stopped — see `hydrateCompetitors` below) and
+ * `adLibraryConfigured` (a sync env-var check, `adLibraryConfigured()` from
+ * lib/research/adLibrary.ts) are read the same store-only way and handed
+ * down for CompetitorDetail's Ads section + CompetitorRow's "Advertising"
+ * pill — NEVER `searchCompetitorAds` (the network call) or `adAngle` (the AI
+ * call) from here; the cached ad-angle text lives in `competitor.adAngleJson`,
+ * already inside every `CompetitorRow` this page already reads via
+ * `listCompetitors`.
  *
  * Exact Page-ID ad matching, Task 2: `isAdmin` is computed below and handed
  * down (same store-only, zero-cost read as everything else on this page) so
@@ -113,21 +110,17 @@ export default async function MarketingResearchPage() {
     state = "populated";
   }
 
-  // Per-competitor snapshots for every tracked row — Google's Nearby call
-  // caps a single scan at 20 places (places.ts's nearbyGyms maxResultCount),
-  // so N synchronous store reads here is the same "cheap at this scale" call
+  // Per-competitor snapshots for every tracked row, bundled by
+  // hydrateCompetitors (lib/research/store.ts) — the same four per-competitor
+  // store reads (latestMetric/metricHistory/getReviews/listAds) this loop
+  // used to hand-build into four separate `Record<number, T>` maps, now one
+  // HydratedCompetitor per row instead (see that function's own doc
+  // comment). Google's Nearby call caps a single scan at 20 places
+  // (places.ts's nearbyGyms maxResultCount), so N synchronous store reads
+  // here is still the same "cheap at this scale" call
   // marketing/campaigns/page.tsx already makes for its own per-row roll-up
   // (see that file's comment on why an N-way Promise.all/loop is fine).
-  const metricsById: Record<number, Metric | null> = {};
-  const historyById: Record<number, Metric[]> = {};
-  const reviewsById: Record<number, StoredReview[]> = {};
-  const adsById: Record<number, StoredAd[]> = {};
-  for (const c of competitors) {
-    metricsById[c.id] = latestMetric(c.id);
-    historyById[c.id] = metricHistory(c.id);
-    reviewsById[c.id] = getReviews(c.id);
-    adsById[c.id] = listAds(c.id);
-  }
+  const hydratedCompetitors: HydratedCompetitor[] = hydrateCompetitors(competitors);
 
   const landscape = readLandscapeCache();
 
@@ -150,11 +143,7 @@ export default async function MarketingResearchPage() {
       />
       <ResearchView
         state={state}
-        competitors={competitors}
-        metricsById={metricsById}
-        historyById={historyById}
-        reviewsById={reviewsById}
-        adsById={adsById}
+        competitors={hydratedCompetitors}
         landscape={landscape}
         spendLabel={spendLabel}
         adLibraryConfigured={adsConfigured}

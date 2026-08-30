@@ -2,7 +2,7 @@
 
 import { EyeOff, Key, Megaphone, Pin, Play, Unlink } from "lucide-react";
 
-import type { CompetitorRow as CompetitorRowData, Metric, StoredAd, StoredReview } from "@/lib/research/store";
+import type { HydratedCompetitor, Metric, StoredAd } from "@/lib/research/store";
 import { parseStoredAdAngle } from "@/lib/research/adAngleJson";
 import { parseStoredThemes } from "@/lib/research/themesJson";
 import { Badge } from "@/components/ui/Badge";
@@ -28,18 +28,20 @@ import { Sparkline } from "./Sparkline";
  */
 
 interface Props {
-  competitor: CompetitorRowData;
-  /** This competitor's `metricHistory(id)`, newest-first. */
-  history: Metric[];
-  /** This competitor's `getReviews(id)`, Google's own relevance order. */
-  reviews: StoredReview[];
-  /** This competitor's stored ads (`listAds(id)`, Market Research P2 Task 6)
-   *  — ALL rows, active and stopped, newest-started-first per the store's
-   *  own contract; the Ads section below decides how to present each. Empty
-   *  when this competitor has none tracked (or the Ad Library was never
-   *  configured — see `adLibraryConfigured`, which disambiguates the two for
-   *  the empty-state copy). */
-  ads: StoredAd[];
+  /** This competitor bundled with its metric history, review sample, and
+   *  stored ads — `hydrateCompetitors()` (lib/research/store.ts), the same
+   *  bundle ResearchView iterates to hand down to each expanded row.
+   *  Replaces the four separate `competitor`/`history`/`reviews`/`ads` props
+   *  this component used to take:
+   *   - `history`: this competitor's `metricHistory(id)`, newest-first.
+   *   - `reviews`: this competitor's `getReviews(id)`, Google's own relevance order.
+   *   - `ads`: this competitor's stored ads (`listAds(id)`, Market Research P2
+   *     Task 6) — ALL rows, active and stopped, newest-started-first per the
+   *     store's own contract; the Ads section below decides how to present
+   *     each. Empty when this competitor has none tracked (or the Ad Library
+   *     was never configured — see `adLibraryConfigured`, which
+   *     disambiguates the two for the empty-state copy). */
+  data: HydratedCompetitor;
   /** `adLibraryConfigured()` (lib/research/adLibrary.ts), read server-side
    *  in page.tsx — true once META_AD_LIBRARY_TOKEN is set. Governs which
    *  empty-ads message the Ads section shows: "no ads found" (configured,
@@ -225,10 +227,7 @@ function AdCard({
 }
 
 export function CompetitorDetail({
-  competitor,
-  history,
-  reviews,
-  ads,
+  data,
   adLibraryConfigured,
   isAdmin,
   onBuildCampaign,
@@ -238,6 +237,12 @@ export function CompetitorDetail({
   pending = false,
 }: Props) {
   const confirm = useConfirm();
+  // This competitor bundled with its metric history, review sample, and
+  // stored ads (hydrateCompetitors, lib/research/store.ts) — destructured
+  // once here so the rest of this component reads exactly as it did with
+  // four separate props; see the `data` prop's own doc comment above for
+  // each field's contract.
+  const { competitor, history, reviews, ads } = data;
   // Parsing lives in the shared, zero-import lib/research/themesJson.ts (T11)
   // rather than a local copy: lib/research/campaignGap.ts (the "Build a
   // campaign from this gap" seed builder) now needs the identical parse, and

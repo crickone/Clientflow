@@ -27,6 +27,11 @@
 //      and an omitted occurredAt defaults to ~now.
 //   7. A light DDL smoke test: the indexes ensureTenantTables declares
 //      actually exist.
+//   9. hydrateCompetitors (a later shape-only deepening, not a new Market
+//      Research task): bundles latestMetric/metricHistory/getReviews/listAds
+//      per competitor, preserves input order (not re-sorted), never crosses
+//      one competitor's data into another's, degrades to null/[]/[]/[] for a
+//      competitor with none of the three yet, and [] in -> [] out.
 //
 // ./store -> @/lib/db (the ambient `db` proxy) -> @/lib/db/tenant (react
 // `cache`) and -> @/lib/tenants -> @/lib/auth -> next/navigation. Same
@@ -88,6 +93,7 @@ const requireLocal = createRequire(import.meta.url);
     setCompetitorAdAngle,
     setCompetitorFacebookPage,
     clearCompetitorFacebookPage,
+    hydrateCompetitors,
   } = requireLocal("./store") as typeof import("./store");
 
   // ── scratch tenant (control row + a real tenant db file) ──
@@ -761,6 +767,108 @@ const requireLocal = createRequire(import.meta.url);
       "NULL facebook_page_id (pre-migration row) reads back as null, not throwing",
     );
     assert.equal(preMigrationCompetitor.facebookPageName, null, "NULL facebook_page_name reads back as null too");
+
+    // ── 9. hydrateCompetitors: bundles the four reads above into one shape ──
+    // Two fresh competitors with clearly distinct, minimal state -- avoids
+    // having to trace idA/idB/idC's mutation history above to know what to
+    // expect here.
+    const idHydrateX = runWithTenant(tid, () =>
+      upsertCompetitor({
+        placeId: "places/HYDRATE-X",
+        name: "Hydrate Test Gym X",
+        address: "10 Test St, Clonmel",
+        lat: 52.36,
+        lng: -7.71,
+        distanceKm: 2.0,
+      }),
+    );
+    const idHydrateY = runWithTenant(tid, () =>
+      upsertCompetitor({
+        placeId: "places/HYDRATE-Y",
+        name: "Hydrate Test Gym Y",
+        address: "11 Test St, Clonmel",
+        lat: 52.361,
+        lng: -7.711,
+        distanceKm: 2.5,
+      }),
+    );
+
+    // X gets a metric, a review, and an ad; Y is left with none of the three
+    // -- proves hydrateCompetitors degrades to null/[]/[]/[] per competitor
+    // exactly like the underlying reads do, and never crosses X's data into
+    // Y's bundle (or vice versa).
+    runWithTenant(tid, () => appendMetric(idHydrateX, 4500, 87, "2026-08-14"));
+    runWithTenant(tid, () =>
+      replaceReviews(
+        idHydrateX,
+        [{ externalReviewId: "hydrate-r1", author: "Robin", ratingMilli: 4000, text: "Solid gym", publishedAt: null }],
+        "2026-08-14",
+      ),
+    );
+    runWithTenant(tid, () =>
+      upsertAd(
+        idHydrateX,
+        {
+          adId: "hydrate-ad-1",
+          bodies: ["Join for summer"],
+          platforms: ["facebook"],
+          snapshotUrl: "https://facebook.com/ads/library/?id=hydrate-ad-1",
+          pageName: "Hydrate Test Gym X",
+          pageId: "5000000001",
+        },
+        "2026-08-14T00:00:00.000Z",
+      ),
+    );
+
+    const xRow = runWithTenant(tid, () => listCompetitors()).find((c) => c.id === idHydrateX)!;
+    const yRow = runWithTenant(tid, () => listCompetitors()).find((c) => c.id === idHydrateY)!;
+
+    // Reversed order (Y before X) -- proves hydrateCompetitors preserves
+    // whatever order it's handed rather than re-sorting by id or distance.
+    const hydrated = runWithTenant(tid, () => hydrateCompetitors([yRow, xRow]));
+    assert.equal(hydrated.length, 2);
+    assert.equal(hydrated[0].competitor.id, idHydrateY, "input order is preserved, not re-sorted");
+    assert.equal(hydrated[1].competitor.id, idHydrateX);
+
+    const [yBundle, xBundle] = hydrated;
+    assert.deepEqual(yBundle.competitor, yRow, "bundle's competitor is exactly the row it was given");
+    assert.equal(yBundle.metric, null, "Y has no metric yet -- bundles as null, matching latestMetric's own contract");
+    assert.deepEqual(yBundle.history, [], "Y has no history -- bundles as [], matching metricHistory's own contract");
+    assert.deepEqual(yBundle.reviews, [], "Y has no reviews -- bundles as [], matching getReviews' own contract");
+    assert.deepEqual(yBundle.ads, [], "Y has no ads -- bundles as [], matching listAds' own contract");
+
+    assert.deepEqual(xBundle.competitor, xRow);
+    assert.ok(xBundle.metric, "X's metric bundles in");
+    assert.equal(xBundle.metric!.ratingMilli, 4500);
+    assert.equal(xBundle.metric!.reviewCount, 87);
+    assert.deepEqual(
+      xBundle.metric,
+      runWithTenant(tid, () => latestMetric(idHydrateX)),
+      "bundled metric is exactly latestMetric(id)'s own return",
+    );
+    assert.deepEqual(
+      xBundle.history,
+      runWithTenant(tid, () => metricHistory(idHydrateX)),
+      "bundled history is exactly metricHistory(id)'s own return",
+    );
+    assert.equal(xBundle.history.length, 1);
+    assert.equal(xBundle.reviews.length, 1);
+    assert.equal(xBundle.reviews[0].externalReviewId, "hydrate-r1");
+    assert.deepEqual(
+      xBundle.reviews,
+      runWithTenant(tid, () => getReviews(idHydrateX)),
+      "bundled reviews is exactly getReviews(id)'s own return",
+    );
+    assert.equal(xBundle.ads.length, 1);
+    assert.equal(xBundle.ads[0].adId, "hydrate-ad-1");
+    assert.deepEqual(
+      xBundle.ads,
+      runWithTenant(tid, () => listAds(idHydrateX)),
+      "bundled ads is exactly listAds(id)'s own return",
+    );
+
+    // Empty input -> empty output, not throwing.
+    assert.deepEqual(runWithTenant(tid, () => hydrateCompetitors([])), [], "hydrateCompetitors([]) is []");
 
     console.log("research/store.test.ts: all assertions passed");
   } finally {
