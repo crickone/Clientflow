@@ -23,6 +23,7 @@ import {
   setCampaignStatus,
 } from "@/lib/campaigns/store";
 import type { AssetDef, AssetKind, Campaign, CampaignAsset } from "@/lib/campaigns/store";
+import type { ToolContext, ToolResult } from "@/lib/agents/toolKit";
 
 /**
  * Marketing-agent tools (Campaign Engine Slice 1, Tasks 3-4): the five tools
@@ -40,13 +41,13 @@ import type { AssetDef, AssetKind, Campaign, CampaignAsset } from "@/lib/campaig
  * the central tool registry by `@/lib/assistant/tools` (TOOLS/executeTool/
  * WRITE_TOOLS/summarizeToolAction), exactly like tools.marketing.ts.
  *
- * `ToolArtifact`/`ToolResult`/`ToolContext` below are deliberately LOCAL,
- * structurally-identical copies of the ones in `@/lib/assistant/tools`
- * rather than imports from it — same circular-dependency reason documented
- * in `tools.marketing.ts`: that file imports THIS module's schemas and
- * executors to register them, so importing back from it here would cycle.
- * TypeScript's structural typing makes these interchangeable at every call
- * site.
+ * `ToolContext`/`ToolResult` come from `@/lib/agents/toolKit` — the single
+ * source shared by every tool file, including `@/lib/assistant/tools` itself
+ * (which used to be this file's canonical copy, back when each tool file
+ * carried its own structurally-identical duplicate to dodge a circular
+ * import; see toolKit.ts's header for the full history). Re-exported below
+ * so any existing external import of `ToolContext`/`ToolResult` from THIS
+ * file keeps working unchanged.
  *
  * No local `tdb`/`resolveSite` helper (unlike tools.marketing.ts): every
  * `@/lib/campaigns/store` function reads/writes through the ambient,
@@ -81,9 +82,7 @@ import type { AssetDef, AssetKind, Campaign, CampaignAsset } from "@/lib/campaig
  * agentKey the rest of the Marketing agent's tools use, so the Agents page's
  * per-agent spend breakdown stays meaningful.
  */
-type ToolArtifact = { url: string; filename: string; label: string };
-export type ToolResult = { text: string; artifact?: ToolArtifact };
-export type ToolContext = { tenantId: number; userId?: number };
+export type { ToolContext, ToolResult };
 
 const ASSET_KIND_SET = new Set<string>(ASSET_ORDER);
 

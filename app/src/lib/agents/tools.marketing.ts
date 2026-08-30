@@ -2,7 +2,6 @@ import "server-only";
 
 import type Anthropic from "@anthropic-ai/sdk";
 
-import { getTenantDbById } from "@/lib/db/tenant";
 import { sites } from "@/lib/db/schema";
 import { draftBlogPost } from "@/lib/ai/draftBlog";
 import { generateCarouselSlides } from "@/lib/ai/generateCarousel";
@@ -14,6 +13,7 @@ import {
   updateBlogMeta,
 } from "@/lib/cms/blog";
 import { updateBlogContent } from "@/lib/blog/posts";
+import { tdb, type ToolContext, type ToolResult } from "@/lib/agents/toolKit";
 
 /**
  * Marketing-agent tools (Marketing Task 1): draft/list/save/publish blog posts
@@ -24,12 +24,13 @@ import { updateBlogContent } from "@/lib/blog/posts";
  * by `@/lib/assistant/tools` (TOOLS/executeTool/WRITE_TOOLS/
  * summarizeToolAction), exactly like the sales tools in `tools.sales.ts`.
  *
- * `ToolContext`/`ToolResult`/`tdb` below are deliberately LOCAL,
- * structurally-identical copies of the ones in `@/lib/assistant/tools`
- * rather than imports from it — same circular-dependency reason documented
- * in `tools.sales.ts`: that file imports THIS module's schemas and executors
- * to register them, so importing back from it here would cycle. TypeScript's
- * structural typing makes these interchangeable at every call site.
+ * `ToolContext`/`ToolResult`/`tdb` come from `@/lib/agents/toolKit` — the
+ * single source shared by every tool file, including `@/lib/assistant/tools`
+ * itself (which used to be this file's canonical copy, back when each tool
+ * file carried its own structurally-identical duplicate to dodge a circular
+ * import; see toolKit.ts's header for the full history). Re-exported below
+ * so any existing external import of `ToolContext`/`ToolResult` from THIS
+ * file keeps working unchanged.
  *
  * Metering: `draftBlogPost` and `generateCarouselSlides` now self-meter — each
  * goes through `meteredCreate` (@/lib/ai/metered), which enforces the tenant's
@@ -41,13 +42,7 @@ import { updateBlogContent } from "@/lib/blog/posts";
  * per-agent spend breakdown stays meaningful. AiCapError surfaces through each
  * tool's own try/catch below as a normal `{ error }` tool result.
  */
-type ToolArtifact = { url: string; filename: string; label: string };
-export type ToolResult = { text: string; artifact?: ToolArtifact };
-export type ToolContext = { tenantId: number; userId?: number };
-
-function tdb(ctx: ToolContext) {
-  return getTenantDbById(ctx.tenantId);
-}
+export type { ToolContext, ToolResult };
 
 type ResolvedSite = { id: number; name: string; slug: string };
 type SiteResolution = ResolvedSite | { error: ToolResult };

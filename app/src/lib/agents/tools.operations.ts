@@ -3,12 +3,12 @@ import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import { and, desc, eq, gte, like, lt, or, sql } from "drizzle-orm";
 
-import { getTenantDbById } from "@/lib/db/tenant";
 import { appointments, clients } from "@/lib/db/schema";
 import { getSchedulingMode } from "@/lib/settings";
 import { clientActivity, listBookings } from "@/lib/attendance";
 import { listClients } from "@/lib/queries";
 import { sendWhatsApp } from "@/lib/whatsapp/send";
+import { tdb, type ToolContext, type ToolResult } from "@/lib/agents/toolKit";
 
 /**
  * Operations-agent tools (Operations Task 1): no-show recovery, lapsed-member
@@ -24,25 +24,24 @@ import { sendWhatsApp } from "@/lib/whatsapp/send";
  * reschedule_appointment, book_client_into_class) already exists in
  * `@/lib/assistant/tools` and is reused as-is via the specialist's toolNames.
  *
- * `ToolArtifact`/`ToolResult`/`ToolContext`/`tdb`/`ClientMatch`/
- * `findOneClient`/`clientName` below are deliberately LOCAL, structurally-
- * identical copies of the ones in `@/lib/assistant/tools` rather than imports
- * from it — same circular-dependency reason documented in `tools.sales.ts`:
- * that file imports THIS module's schemas and executors to register them, so
- * importing back from it here would cycle. TypeScript's structural typing
- * makes these interchangeable at every call site.
+ * `ToolContext`/`ToolResult`/`tdb` come from `@/lib/agents/toolKit` — the
+ * single source shared by every tool file, including `@/lib/assistant/tools`
+ * itself (which used to be this file's canonical copy, back when each tool
+ * file carried its own structurally-identical duplicate to dodge a circular
+ * import; see toolKit.ts's header for the full history). Re-exported below
+ * so any existing external import of `ToolContext`/`ToolResult` from THIS
+ * file keeps working unchanged.
+ *
+ * `ClientMatch`/`findOneClient`/`clientName` below are a SEPARATE, still-
+ * local duplicate of the same-named helpers in `@/lib/assistant/tools` (out
+ * of scope for the toolKit single-sourcing above — only the four primitives
+ * named there were consolidated).
  *
  * Registered into the central tool registry by `@/lib/assistant/tools`
  * (TOOLS/executeTool/WRITE_TOOLS/summarizeToolAction), exactly like the sales
  * and marketing tools.
  */
-type ToolArtifact = { url: string; filename: string; label: string };
-export type ToolResult = { text: string; artifact?: ToolArtifact };
-export type ToolContext = { tenantId: number; userId?: number };
-
-function tdb(ctx: ToolContext) {
-  return getTenantDbById(ctx.tenantId);
-}
+export type { ToolContext, ToolResult };
 
 const DAY = 86_400_000;
 const iso = (d: Date) => d.toISOString().slice(0, 10);
