@@ -1,6 +1,6 @@
 import "server-only";
 
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 
 import { db, schema } from "@/lib/db";
 import type { SiteRequest } from "@/lib/db/schema";
@@ -35,6 +35,20 @@ export function listRequests(): SiteRequest[] {
     .from(siteRequests)
     .orderBy(desc(siteRequests.createdAt))
     .all();
+}
+
+/**
+ * Cheap COUNT of pending ("new") site requests — powers the sidebar's Sites
+ * nav badge. A single indexed-by-status count, safe to run on every page load.
+ */
+export function countPendingRequests(): number {
+  return (
+    db
+      .select({ n: sql<number>`count(*)` })
+      .from(siteRequests)
+      .where(eq(siteRequests.status, "new"))
+      .get()?.n ?? 0
+  );
 }
 
 export function getRequest(id: number): SiteRequest | null {

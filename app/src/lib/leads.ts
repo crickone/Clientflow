@@ -221,6 +221,24 @@ export function countLeadsByCampaign(campaign: string): number {
   );
 }
 
+/**
+ * Cheap COUNT of leads currently sitting in the pipeline's entry stage (where
+ * fresh leads land — see resolveEntryStageId) — i.e. new/unworked leads.
+ * Powers the sidebar's Leads nav badge; two small per-tenant queries (stage
+ * list + a single indexed-by-FK count), safe to run on every page load.
+ */
+export function countLeadsInEntryStage(): number {
+  const stageId = resolveEntryStageId();
+  if (stageId == null) return 0;
+  return (
+    db
+      .select({ n: sql<number>`count(*)` })
+      .from(leads)
+      .where(eq(leads.stageId, stageId))
+      .get()?.n ?? 0
+  );
+}
+
 /** A board lead: the full row plus the epoch-ms of its first *sent* outbound message (or null). */
 export type LeadWithSla = Lead & {
   firstOutboundAt: number | null;

@@ -272,6 +272,7 @@ export function Sidebar({
   logoSrc,
   businessName,
   showSetup,
+  navBadges = {},
   themeMode,
   open = false,
   onClose,
@@ -284,6 +285,8 @@ export function Sidebar({
   logoSrc: string | null;
   businessName: string;
   showSetup: boolean;
+  /** Nav-row count pills, keyed by href (e.g. `{ "/leads": 3 }`). 0/absent = no pill. */
+  navBadges?: Record<string, number>;
   themeMode: ThemeMode;
   open?: boolean;
   onClose?: () => void;
@@ -351,6 +354,7 @@ export function Sidebar({
   function renderLink(item: NavLink, depth = 0) {
     const active = isActiveLink(item, pathname);
     const Icon = item.icon;
+    const badge = navBadges[item.href] ?? 0;
     return (
       <Link
         key={item.href}
@@ -371,11 +375,33 @@ export function Sidebar({
         )}
         <Icon size={depth === 0 ? 16 : 15} strokeWidth={1.75} />
         <span>{item.labelKey ? vocab[item.labelKey] : item.label}</span>
+        {badge > 0 && (
+          <span
+            className="nav-badge"
+            style={{
+              marginLeft: "auto",
+              flexShrink: 0,
+              minWidth: 17,
+              height: 17,
+              padding: "0 5px",
+              borderRadius: 999,
+              background: "var(--accent-soft)",
+              color: "var(--accent-ink)",
+              fontFamily: "var(--font-mono), ui-monospace, monospace",
+              fontSize: 10,
+              fontWeight: 700,
+              lineHeight: "17px",
+              textAlign: "center",
+            }}
+          >
+            {badge > 99 ? "99+" : badge}
+          </span>
+        )}
         {item.dot && (
           <span
             aria-hidden
             style={{
-              marginLeft: "auto",
+              marginLeft: badge > 0 ? 6 : "auto",
               width: 7,
               height: 7,
               borderRadius: "50%",

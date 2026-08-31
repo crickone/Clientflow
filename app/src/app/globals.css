@@ -136,6 +136,16 @@ a {
   border-radius: var(--radius-sm);
 }
 
+/* Log-session outcome-rating pills (StatusActions): the radio is visually
+   hidden (sr-only, not display:none) so it stays focusable — Tab reaches the
+   group and arrow keys move the native radio selection. The input itself has
+   no visible box to outline, so the ring is drawn on the wrapping label via
+   :has() when its radio is keyboard-focused. */
+.outcome-pill:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* Two-pane WhatsApp inbox → stack to a single column on narrow screens so the
    thread pane isn't crushed to a few pixels. */
 @media (max-width: 760px) {

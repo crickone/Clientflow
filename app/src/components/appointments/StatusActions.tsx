@@ -199,7 +199,9 @@ function CompleteForm({
             return (
               <label
                 key={n}
+                className="outcome-pill"
                 style={{
+                  position: "relative",
                   flex: 1,
                   border: selected ? "1px solid var(--accent)" : "1px solid var(--hairline)",
                   borderRadius: "var(--radius)",
@@ -219,7 +221,18 @@ function CompleteForm({
                   value={n}
                   checked={selected}
                   onChange={() => setOutcomeRating(n)}
-                  style={{ display: "none" }}
+                  style={{
+                    position: "absolute",
+                    width: 1,
+                    height: 1,
+                    padding: 0,
+                    margin: -1,
+                    overflow: "hidden",
+                    clip: "rect(0, 0, 0, 0)",
+                    whiteSpace: "nowrap",
+                    border: 0,
+                    opacity: 0,
+                  }}
                 />
                 {n}
               </label>

@@ -26,6 +26,7 @@ export function AppShell({
   logoSrc,
   businessName,
   showSetup,
+  navBadges,
   themeMode,
   children,
 }: {
@@ -38,6 +39,8 @@ export function AppShell({
   logoSrc: string | null;
   businessName: string;
   showSetup: boolean;
+  /** Nav-row count pills, keyed by href — see Sidebar's renderLink. */
+  navBadges?: Record<string, number>;
   themeMode: ThemeMode;
   children: React.ReactNode;
 }) {
@@ -69,6 +72,7 @@ export function AppShell({
           logoSrc={logoSrc}
           businessName={businessName}
           showSetup={showSetup}
+          navBadges={navBadges}
           themeMode={themeMode}
           open={navOpen}
           onClose={() => setNavOpen(false)}

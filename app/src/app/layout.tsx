@@ -29,6 +29,8 @@ import { getBusinessProfile } from "@/lib/businessProfile";
 import { getChromeLogoSrc } from "@/lib/branding";
 import { isSetupDismissed } from "@/lib/setup/steps";
 import { getBilling } from "@/lib/billing/engine";
+import { countLeadsInEntryStage } from "@/lib/leads";
+import { countPendingRequests } from "@/lib/cms/requests";
 import { PastDueBanner } from "@/components/billing/PastDueBanner";
 // Side-effect import: boots the daily automation scheduler (birthdays etc.) on
 // the server. This is a nodejs-only server component, so better-sqlite3 stays
@@ -273,6 +275,16 @@ export default async function RootLayout({
   // touches the tenant-scoped `db` proxy, which throws when no tenant is
   // resolved (e.g. a signed-in multi-account user still on /select-account).
   const showSetup = current ? !isSetupDismissed() : false;
+  // Sidebar nav badges — cheap, indexed-ish per-tenant counts only (no full
+  // feed fetches). Keyed by nav href; Sidebar shows a pill only when > 0.
+  // Requests is admin-only (mirrors the Sites nav link's adminOnly gate), so
+  // that count is skipped entirely for non-admins rather than computed unused.
+  const navBadges: Record<string, number> = current
+    ? {
+        "/leads": countLeadsInEntryStage(),
+        "/cms": user?.role === "admin" ? countPendingRequests() : 0,
+      }
+    : {};
   return (
     <html lang="en" className={FONT_VARS} data-theme={themeMode}>
       <body>
@@ -293,6 +305,7 @@ export default async function RootLayout({
                 tenantSlug={tenantSlug}
                 schedulingMode={schedulingMode}
                 showSetup={showSetup}
+                navBadges={navBadges}
                 themeMode={themeMode}
                 user={
                   user
