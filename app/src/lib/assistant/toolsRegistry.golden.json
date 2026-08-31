@@ -1,0 +1,208 @@
+{
+  "_note": "Golden master captured from tools.ts BEFORE the WRITE_TOOL_META refactor. Do not hand-edit; regenerate only via _capture if the summaries deliberately change.",
+  "full": {
+    "title": "Sample Title",
+    "date": "2026-09-01",
+    "startTime": "10:00",
+    "name": "Sample Name",
+    "firstName": "Jane",
+    "lastName": "Doe",
+    "clientName": "Jane Doe",
+    "subject": "Hello",
+    "amountEur": 50,
+    "planTitle": "Plan A",
+    "programTitle": "Program B",
+    "planName": "Gold",
+    "packageName": "10-Pack",
+    "text": "Hi there",
+    "leadId": 7,
+    "clientId": 9,
+    "stage": "Won",
+    "postId": 3,
+    "campaignName": "Summer",
+    "campaignId": 4,
+    "assetId": 5,
+    "assetTitle": "Poster",
+    "assets": [
+      1,
+      2,
+      3
+    ]
+  },
+  "frozenWriteTools": [
+    "create_calendar_event",
+    "create_client",
+    "create_appointment",
+    "log_payment",
+    "send_client_email",
+    "add_food",
+    "create_nutrition_plan",
+    "add_exercise",
+    "create_workout_program",
+    "assign_nutrition_plan",
+    "assign_workout_program",
+    "create_lead",
+    "assign_membership",
+    "create_class",
+    "book_client_into_class",
+    "update_client",
+    "cancel_appointment",
+    "reschedule_appointment",
+    "cancel_class",
+    "cancel_booking",
+    "cancel_membership",
+    "assign_package",
+    "create_form",
+    "upload_invoices_to_drive",
+    "send_whatsapp",
+    "set_lead_stage",
+    "log_lead_touch",
+    "save_blog_post",
+    "publish_blog_post",
+    "create_campaign",
+    "approve_campaign_asset",
+    "launch_campaign",
+    "send_client_whatsapp"
+  ],
+  "golden": {
+    "create_calendar_event": [
+      "Add “Sample Title” to the calendar on 2026-09-01",
+      "Add “” to the calendar"
+    ],
+    "create_client": [
+      "Create client “Jane Doe”",
+      "Create client “”"
+    ],
+    "create_appointment": [
+      "Book an appointment for Jane Doe on 2026-09-01 at 10:00",
+      "Book an appointment"
+    ],
+    "log_payment": [
+      "Log a payment of €50 for Jane Doe",
+      "Log a payment"
+    ],
+    "send_client_email": [
+      "Send an email to Jane Doe — “Hello”",
+      "Send an email to a client"
+    ],
+    "add_food": [
+      "Add food “Sample Name” to the library",
+      "Add food “” to the library"
+    ],
+    "create_nutrition_plan": [
+      "Create nutrition plan “Sample Title”",
+      "Create nutrition plan “”"
+    ],
+    "add_exercise": [
+      "Add exercise “Sample Name” to the library",
+      "Add exercise “” to the library"
+    ],
+    "create_workout_program": [
+      "Create workout program “Sample Title”",
+      "Create workout program “”"
+    ],
+    "assign_nutrition_plan": [
+      "Assign nutrition plan “Plan A” to Jane Doe",
+      "Assign nutrition plan “” to a client"
+    ],
+    "assign_workout_program": [
+      "Assign workout program “Program B” to Jane Doe",
+      "Assign workout program “” to a client"
+    ],
+    "create_lead": [
+      "Create lead Jane Doe",
+      "Create lead"
+    ],
+    "assign_membership": [
+      "Give Jane Doe the Gold",
+      "Give a client the membership"
+    ],
+    "create_class": [
+      "Create a class “Sample Name”",
+      "Create a class"
+    ],
+    "book_client_into_class": [
+      "Book Jane Doe into a class",
+      "Book a client into a class"
+    ],
+    "update_client": [
+      "Update client Jane Doe",
+      "Update client details"
+    ],
+    "cancel_appointment": [
+      "Cancel the appointment for Jane Doe on 2026-09-01",
+      "Cancel the appointment"
+    ],
+    "reschedule_appointment": [
+      "Reschedule Jane Doe's appointment to 2026-09-01",
+      "Reschedule an appointment"
+    ],
+    "cancel_class": [
+      "Cancel a class on 2026-09-01",
+      "Cancel a class"
+    ],
+    "cancel_booking": [
+      "Cancel Jane Doe's booking",
+      "Cancel a booking"
+    ],
+    "cancel_membership": [
+      "Cancel Jane Doe's membership",
+      "Cancel a membership"
+    ],
+    "assign_package": [
+      "Give Jane Doe the 10-Pack",
+      "Give a client the package"
+    ],
+    "create_form": [
+      "Create a form “Sample Title”",
+      "Create a form"
+    ],
+    "upload_invoices_to_drive": [
+      "Upload the invoices to your Google Drive",
+      "Upload the invoices to your Google Drive"
+    ],
+    "send_whatsapp": [
+      "Send a WhatsApp to Jane Doe — “Hi there”",
+      "Send a WhatsApp to lead #?"
+    ],
+    "set_lead_stage": [
+      "Move Jane Doe to \"Won\"",
+      "Move lead #? to \"a new stage\""
+    ],
+    "log_lead_touch": [
+      "Log a touch for Jane Doe",
+      "Log a touch for lead #?"
+    ],
+    "save_blog_post": [
+      "Save blog post \"Sample Title\" as a draft",
+      "Save blog post \"Untitled\" as a draft"
+    ],
+    "publish_blog_post": [
+      "Publish blog post \"Sample Title\" to the live site",
+      "Publish blog post #? to the live site"
+    ],
+    "create_campaign": [
+      "Create campaign \"Sample Name\" and 3 assets",
+      "Create campaign \"Untitled\""
+    ],
+    "approve_campaign_asset": [
+      "Approve the Poster for \"Summer\"",
+      "Approve the asset #?"
+    ],
+    "launch_campaign": [
+      "Launch \"Summer\"",
+      "Launch campaign #?"
+    ],
+    "send_client_whatsapp": [
+      "Send a WhatsApp to Jane Doe — “Hi there”",
+      "Send a WhatsApp to client #?"
+    ]
+  },
+  "readSamplesAllFalse": [
+    "business_overview",
+    "list_leads",
+    "draft_carousel",
+    "plan_campaign",
+    "get_client"
+  ]
+}

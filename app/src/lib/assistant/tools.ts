@@ -102,155 +102,91 @@ export type { ToolArtifact, ToolResult, ToolContext };
  * operator approves it in the UI. Read tools (which only ever read the tenant's
  * own data) are NOT here and run freely.
  */
-export const WRITE_TOOLS = new Set<string>([
-  "create_calendar_event", "create_client", "create_appointment", "log_payment",
-  "send_client_email", "add_food", "create_nutrition_plan", "add_exercise",
-  "create_workout_program", "assign_nutrition_plan", "assign_workout_program",
-  "create_lead", "assign_membership", "create_class", "book_client_into_class",
-  "update_client", "cancel_appointment", "reschedule_appointment", "cancel_class",
-  "cancel_booking", "cancel_membership", "assign_package", "create_form",
-  "upload_invoices_to_drive",
+/**
+ * WRITE_TOOL_META — the single source of truth for every write tool. A tool's
+ * PRESENCE here is what marks it a write (so the gate above defers it for
+ * Approve); its `label` is the fallback name for the Approve card; its optional
+ * `summarize` renders the one-line description the operator reads. WRITE_TOOLS,
+ * isWriteTool and summarizeToolAction are ALL derived from this map, so a write
+ * tool can no longer be listed in one structure and forgotten in another — the
+ * failure mode that would silently un-gate a write. Read tools are simply
+ * absent (and a handful of deliberate "looks-like-a-write-but-is-a-read" cases
+ * are called out in the group comments below).
+ *
+ * Insertion order is preserved into WRITE_TOOLS; keep new tools grouped with
+ * their agent.
+ */
+type SummarizeArgs = { v: (k: string) => string; who: string; input: Record<string, unknown> };
+type WriteToolMeta = { label: string; summarize?: (a: SummarizeArgs) => string };
+
+const WRITE_TOOL_META: Record<string, WriteToolMeta> = {
+  create_calendar_event: { label: "Add calendar event", summarize: ({ v }) => `Add “${v("title")}” to the calendar${v("date") ? ` on ${v("date")}` : ""}` },
+  create_client: { label: "Create client", summarize: ({ v, who }) => `Create client “${[v("firstName"), v("lastName")].filter(Boolean).join(" ") || who}”` },
+  create_appointment: { label: "Book appointment", summarize: ({ v, who }) => `Book an appointment${who ? ` for ${who}` : ""}${v("date") ? ` on ${v("date")}` : ""}${v("startTime") ? ` at ${v("startTime")}` : ""}` },
+  log_payment: { label: "Log payment", summarize: ({ v, who }) => `Log a payment${v("amountEur") ? ` of €${v("amountEur")}` : ""}${who ? ` for ${who}` : ""}` },
+  send_client_email: { label: "Send email", summarize: ({ v, who }) => `Send an email to ${who || "a client"}${v("subject") ? ` — “${v("subject")}”` : ""}` },
+  add_food: { label: "Add food to library", summarize: ({ v }) => `Add food “${v("name")}” to the library` },
+  create_nutrition_plan: { label: "Create nutrition plan", summarize: ({ v }) => `Create nutrition plan “${v("title")}”` },
+  add_exercise: { label: "Add exercise to library", summarize: ({ v }) => `Add exercise “${v("name")}” to the library` },
+  create_workout_program: { label: "Create workout program", summarize: ({ v }) => `Create workout program “${v("title")}”` },
+  assign_nutrition_plan: { label: "Assign nutrition plan", summarize: ({ v, who }) => `Assign nutrition plan “${v("planTitle")}” to ${who || "a client"}` },
+  assign_workout_program: { label: "Assign workout program", summarize: ({ v, who }) => `Assign workout program “${v("programTitle") || v("title")}” to ${who || "a client"}` },
+  create_lead: { label: "Create lead", summarize: ({ who }) => `Create lead ${who}`.trim() },
+  assign_membership: { label: "Assign membership", summarize: ({ v, who }) => `Give ${who || "a client"} the ${v("planName") || "membership"}` },
+  create_class: { label: "Create class", summarize: ({ v }) => `Create a class${v("name") ? ` “${v("name")}”` : ""}` },
+  book_client_into_class: { label: "Book into class", summarize: ({ who }) => `Book ${who || "a client"} into a class` },
+  update_client: { label: "Update client", summarize: ({ who }) => `Update client ${who || "details"}` },
+  cancel_appointment: { label: "Cancel appointment", summarize: ({ v, who }) => `Cancel the appointment${who ? ` for ${who}` : ""}${v("date") ? ` on ${v("date")}` : ""}` },
+  reschedule_appointment: { label: "Reschedule appointment", summarize: ({ v, who }) => `Reschedule ${who ? `${who}'s` : "an"} appointment${v("date") ? ` to ${v("date")}` : ""}` },
+  cancel_class: { label: "Cancel class", summarize: ({ v }) => `Cancel a class${v("date") ? ` on ${v("date")}` : ""}` },
+  cancel_booking: { label: "Cancel booking", summarize: ({ who }) => `Cancel ${who ? `${who}'s` : "a"} booking` },
+  cancel_membership: { label: "Cancel membership", summarize: ({ who }) => `Cancel ${who ? `${who}'s` : "a"} membership` },
+  assign_package: { label: "Assign package", summarize: ({ v, who }) => `Give ${who || "a client"} the ${v("packageName") || "package"}` },
+  create_form: { label: "Create form", summarize: ({ v }) => `Create a form${v("title") ? ` “${v("title")}”` : ""}` },
+  upload_invoices_to_drive: { label: "Upload invoices to Google Drive", summarize: () => "Upload the invoices to your Google Drive" },
+
   // Sales agent (Task 7): WhatsApp send + lead-mutating tools — never
   // auto-execute; deferred to the Approve card like every other write above.
-  "send_whatsapp", "set_lead_stage", "log_lead_touch",
+  // The 3 read tools (list_leads, get_lead_health, draft_lead_reply) are absent.
+  send_whatsapp: { label: "Send WhatsApp", summarize: ({ v, who }) => `Send a WhatsApp to ${who || `lead #${v("leadId") || "?"}`}${v("text") ? ` — “${v("text")}”` : ""}` },
+  set_lead_stage: { label: "Change lead stage", summarize: ({ v, who }) => `Move ${who || `lead #${v("leadId") || "?"}`} to "${v("stage") || "a new stage"}"` },
+  log_lead_touch: { label: "Log lead touch", summarize: ({ v, who }) => `Log a touch for ${who || `lead #${v("leadId") || "?"}`}` },
+
   // Marketing agent (Marketing Task 1): persisting a draft is low-stakes, but
-  // publishing pushes to the LIVE public site — both require an operator
-  // Approve click. The 3 read tools (list_blog_posts, draft_blog_post,
-  // draft_carousel) are NOT here and run freely.
-  "save_blog_post", "publish_blog_post",
-  // Marketing agent (Campaign Engine Slice 1, Task 3): persisting the
-  // campaign + approving an asset + launching all require an operator
-  // Approve click. The 2 read tools (plan_campaign, draft_campaign_asset)
-  // are NOT here and run freely — draft_campaign_asset DOES persist a
-  // "drafted" row, but never beyond that until approve_campaign_asset (see
-  // tools.campaign.ts's header comment for why that's still a READ).
-  "create_campaign", "approve_campaign_asset", "launch_campaign",
+  // publishing pushes to the LIVE public site — both gated. The 3 read tools
+  // (list_blog_posts, draft_blog_post, draft_carousel) are absent and run freely.
+  save_blog_post: { label: "Save blog post draft", summarize: ({ v }) => `Save blog post "${v("title") || "Untitled"}" as a draft` },
+  publish_blog_post: { label: "Publish blog post", summarize: ({ v }) => `Publish blog post ${v("title") ? `"${v("title")}"` : `#${v("postId") || "?"}`} to the live site` },
+
+  // Marketing agent (Campaign Engine Slice 1): persist campaign + approve asset
+  // + launch, all gated. The 2 read tools (plan_campaign, draft_campaign_asset)
+  // are absent — draft_campaign_asset DOES persist a "drafted" row, but never
+  // beyond that until approve_campaign_asset (see tools.campaign.ts for why
+  // that's still a READ).
+  create_campaign: { label: "Create campaign", summarize: ({ v, input }) => { const assetCount = Array.isArray(input.assets) ? input.assets.length : 0; return `Create campaign "${v("name") || "Untitled"}"${assetCount ? ` and ${assetCount} asset${assetCount === 1 ? "" : "s"}` : ""}`; } },
+  approve_campaign_asset: { label: "Approve campaign asset", summarize: ({ v }) => { const assetLabel = v("assetTitle") || `asset #${v("assetId") || "?"}`; return `Approve the ${assetLabel}${v("campaignName") ? ` for "${v("campaignName")}"` : ""}`; } },
+  launch_campaign: { label: "Launch campaign", summarize: ({ v }) => `Launch ${v("campaignName") ? `"${v("campaignName")}"` : `campaign #${v("campaignId") || "?"}`}` },
+
   // Operations agent (Operations Task 1): WhatsApp send to a CLIENT (distinct
-  // from the sales agent's lead-scoped send_whatsapp above) — never
-  // auto-executes; deferred to the Approve card like every other write above.
-  // The 2 read tools (list_no_shows, list_lapsed_members) are NOT here and
-  // run freely.
-  "send_client_whatsapp",
-]);
+  // from the sales agent's lead-scoped send_whatsapp above) — gated. The 2 read
+  // tools (list_no_shows, list_lapsed_members) are absent and run freely.
+  send_client_whatsapp: { label: "Send WhatsApp", summarize: ({ v, who }) => `Send a WhatsApp to ${who || `client #${v("clientId") || "?"}`}${v("text") ? ` — “${v("text")}”` : ""}` },
+};
+
+/** The write-approval gate's tool set — derived from WRITE_TOOL_META (see above). */
+export const WRITE_TOOLS = new Set<string>(Object.keys(WRITE_TOOL_META));
 
 export function isWriteTool(name: string): boolean {
   return WRITE_TOOLS.has(name);
 }
 
-const WRITE_LABELS: Record<string, string> = {
-  create_calendar_event: "Add calendar event",
-  create_client: "Create client",
-  create_appointment: "Book appointment",
-  log_payment: "Log payment",
-  send_client_email: "Send email",
-  add_food: "Add food to library",
-  create_nutrition_plan: "Create nutrition plan",
-  add_exercise: "Add exercise to library",
-  create_workout_program: "Create workout program",
-  assign_nutrition_plan: "Assign nutrition plan",
-  assign_workout_program: "Assign workout program",
-  create_lead: "Create lead",
-  assign_membership: "Assign membership",
-  create_class: "Create class",
-  book_client_into_class: "Book into class",
-  update_client: "Update client",
-  cancel_appointment: "Cancel appointment",
-  reschedule_appointment: "Reschedule appointment",
-  cancel_class: "Cancel class",
-  cancel_booking: "Cancel booking",
-  cancel_membership: "Cancel membership",
-  assign_package: "Assign package",
-  create_form: "Create form",
-  upload_invoices_to_drive: "Upload invoices to Google Drive",
-  send_whatsapp: "Send WhatsApp",
-  set_lead_stage: "Change lead stage",
-  log_lead_touch: "Log lead touch",
-  save_blog_post: "Save blog post draft",
-  publish_blog_post: "Publish blog post",
-  send_client_whatsapp: "Send WhatsApp",
-  create_campaign: "Create campaign",
-  approve_campaign_asset: "Approve campaign asset",
-  launch_campaign: "Launch campaign",
-};
-
 /** One-line, human-readable description of a pending write, for the Approve card. */
 export function summarizeToolAction(name: string, input: Record<string, unknown>): string {
+  const meta = WRITE_TOOL_META[name];
+  if (!meta) return name.replace(/_/g, " ");
   const v = (k: string) => { const x = input[k]; return x == null ? "" : String(x).trim(); };
   const who = v("clientName") || v("name");
-  switch (name) {
-    case "send_client_email":
-      return `Send an email to ${who || "a client"}${v("subject") ? ` — “${v("subject")}”` : ""}`;
-    case "create_client":
-      return `Create client “${[v("firstName"), v("lastName")].filter(Boolean).join(" ") || who}”`;
-    case "update_client":
-      return `Update client ${who || "details"}`;
-    case "log_payment":
-      return `Log a payment${v("amountEur") ? ` of €${v("amountEur")}` : ""}${who ? ` for ${who}` : ""}`;
-    case "assign_nutrition_plan":
-      return `Assign nutrition plan “${v("planTitle")}” to ${who || "a client"}`;
-    case "assign_workout_program":
-      return `Assign workout program “${v("programTitle") || v("title")}” to ${who || "a client"}`;
-    case "assign_membership":
-      return `Give ${who || "a client"} the ${v("planName") || "membership"}`;
-    case "assign_package":
-      return `Give ${who || "a client"} the ${v("packageName") || "package"}`;
-    case "cancel_appointment":
-      return `Cancel the appointment${who ? ` for ${who}` : ""}${v("date") ? ` on ${v("date")}` : ""}`;
-    case "cancel_class":
-      return `Cancel a class${v("date") ? ` on ${v("date")}` : ""}`;
-    case "cancel_booking":
-      return `Cancel ${who ? `${who}'s` : "a"} booking`;
-    case "cancel_membership":
-      return `Cancel ${who ? `${who}'s` : "a"} membership`;
-    case "create_appointment":
-      return `Book an appointment${who ? ` for ${who}` : ""}${v("date") ? ` on ${v("date")}` : ""}${v("startTime") ? ` at ${v("startTime")}` : ""}`;
-    case "reschedule_appointment":
-      return `Reschedule ${who ? `${who}'s` : "an"} appointment${v("date") ? ` to ${v("date")}` : ""}`;
-    case "create_calendar_event":
-      return `Add “${v("title")}” to the calendar${v("date") ? ` on ${v("date")}` : ""}`;
-    case "create_nutrition_plan":
-      return `Create nutrition plan “${v("title")}”`;
-    case "create_workout_program":
-      return `Create workout program “${v("title")}”`;
-    case "create_class":
-      return `Create a class${v("name") ? ` “${v("name")}”` : ""}`;
-    case "book_client_into_class":
-      return `Book ${who || "a client"} into a class`;
-    case "create_lead":
-      return `Create lead ${who}`.trim();
-    case "create_form":
-      return `Create a form${v("title") ? ` “${v("title")}”` : ""}`;
-    case "add_food":
-      return `Add food “${v("name")}” to the library`;
-    case "add_exercise":
-      return `Add exercise “${v("name")}” to the library`;
-    case "upload_invoices_to_drive":
-      return "Upload the invoices to your Google Drive";
-    case "send_whatsapp":
-      return `Send a WhatsApp to ${who || `lead #${v("leadId") || "?"}`}${v("text") ? ` — “${v("text")}”` : ""}`;
-    case "send_client_whatsapp":
-      return `Send a WhatsApp to ${who || `client #${v("clientId") || "?"}`}${v("text") ? ` — “${v("text")}”` : ""}`;
-    case "set_lead_stage":
-      return `Move ${who || `lead #${v("leadId") || "?"}`} to "${v("stage") || "a new stage"}"`;
-    case "log_lead_touch":
-      return `Log a touch for ${who || `lead #${v("leadId") || "?"}`}`;
-    case "save_blog_post":
-      return `Save blog post "${v("title") || "Untitled"}" as a draft`;
-    case "publish_blog_post":
-      return `Publish blog post ${v("title") ? `"${v("title")}"` : `#${v("postId") || "?"}`} to the live site`;
-    case "create_campaign": {
-      const assetCount = Array.isArray(input.assets) ? input.assets.length : 0;
-      return `Create campaign "${v("name") || "Untitled"}"${assetCount ? ` and ${assetCount} asset${assetCount === 1 ? "" : "s"}` : ""}`;
-    }
-    case "approve_campaign_asset": {
-      const assetLabel = v("assetTitle") || `asset #${v("assetId") || "?"}`;
-      return `Approve the ${assetLabel}${v("campaignName") ? ` for "${v("campaignName")}"` : ""}`;
-    }
-    case "launch_campaign":
-      return `Launch ${v("campaignName") ? `"${v("campaignName")}"` : `campaign #${v("campaignId") || "?"}`}`;
-    default:
-      return WRITE_LABELS[name] ?? name.replace(/_/g, " ");
-  }
+  return meta.summarize ? meta.summarize({ v, who, input }) : meta.label;
 }
 
 const DAY = 86_400_000;
