@@ -2,55 +2,39 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileText, FolderOpen, Image as ImageIcon, Video } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
-const TABS = [
-  { href: "/content-studio/videos", label: "Videos", icon: Video },
-  { href: "/content-studio/images", label: "Images", icon: ImageIcon },
-  { href: "/content-studio/blogs", label: "Blogs", icon: FileText },
-  { href: "/content-studio/library", label: "Library", icon: FolderOpen },
-] as const;
-
+/**
+ * Content Studio nav. The home (`/content-studio`) is the hub — create tiles +
+ * a unified, filterable work grid — so it needs no nav of its own. Every other
+ * Content Studio route (the per-type lists, the create flows, the editors) gets
+ * a single "back to Content Studio" link instead of the old 4-tab bar (which
+ * duplicated the home's own filter tabs and was one of three competing tab
+ * styles on screen).
+ */
 export function ContentStudioTabs() {
   const pathname = usePathname() ?? "";
+  if (pathname === "/content-studio") return null;
   return (
-    <div
+    <Link
+      href="/content-studio"
       style={{
-        display: "flex",
-        gap: 4,
-        borderBottom: "1px solid var(--hairline)",
-        marginBottom: 28,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 24,
+        fontFamily: "var(--font-mono), ui-monospace, monospace",
+        fontSize: 12,
+        letterSpacing: "0.04em",
+        textTransform: "uppercase",
+        color: "var(--text-tertiary)",
+        textDecoration: "none",
+        transition: "color 0.15s var(--ease)",
       }}
+      className="cs-back"
     >
-      {TABS.map((tab) => {
-        const active = pathname.startsWith(tab.href);
-        const Icon = tab.icon;
-        return (
-          <Link
-            key={tab.href}
-            href={tab.href}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "12px 18px",
-              color: active ? "var(--text-primary)" : "var(--text-secondary)",
-              borderBottom: `2px solid ${
-                active ? "var(--text-primary)" : "transparent"
-              }`,
-              marginBottom: -1,
-              fontSize: 14,
-              fontWeight: 500,
-              letterSpacing: "-0.005em",
-              textDecoration: "none",
-              transition: "color 0.18s var(--ease), border-color 0.18s var(--ease)",
-            }}
-          >
-            <Icon size={15} strokeWidth={1.75} />
-            {tab.label}
-          </Link>
-        );
-      })}
-    </div>
+      <ArrowLeft size={14} />
+      Content Studio
+    </Link>
   );
 }

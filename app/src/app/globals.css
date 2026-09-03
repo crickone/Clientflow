@@ -29,6 +29,14 @@
   --accent-hbot: #4d8df0;       /* per-therapy — charts/data only */
   --accent-ir: #e0843a;
   --accent-pemf: #a366e6;
+  /* Semantic status colours — success/info/warning/danger + soft (14%) fills for
+     badge/pill backgrounds. Tuned for the dark canvas; used by StatusBadge, the
+     Content Studio status pills, and anywhere state is shown (retires the six
+     hardcoded hex literals that were duplicated across the app). */
+  --success: #3fb950;  --success-soft: rgba(63, 185, 80, 0.14);
+  --info: #4d8df0;     --info-soft: rgba(77, 141, 240, 0.14);
+  --warning: #d6a635;  --warning-soft: rgba(214, 166, 53, 0.14);
+  --danger: #f85149;   --danger-soft: rgba(248, 81, 73, 0.14);
   --max-width: 1200px;
   --radius-sm: 6px;
   --radius: 9px;
@@ -41,6 +49,11 @@
      dark mode so they don't fall back to black-on-light. */
   color-scheme: dark;
 }
+
+/* Pulsing status dot (Badge `pulse` — e.g. "Generating"). */
+@keyframes badge-dot-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+.badge-dot-pulse { animation: badge-dot-pulse 1.4s var(--ease) infinite; }
+@media (prefers-reduced-motion: reduce) { .badge-dot-pulse { animation: none; } }
 
 /* Native form controls default to the dark theme palette. */
 select,
@@ -272,6 +285,48 @@ a {
    active accent still comes from the [data-state="active"] !important rule. */
 .tab-trigger { color: var(--text-secondary); }
 .tab-trigger:hover { color: var(--text-primary); }
+
+/* ── Content Studio home (hub: create tiles + unified work grid) ─────────── */
+.cs-create { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 30px; }
+.cs-tile { display: flex; align-items: center; gap: 14px; padding: 18px; background: var(--surface-1); border: 1px solid var(--hairline); border-radius: var(--radius); color: inherit; text-decoration: none; transition: transform 0.16s var(--ease), border-color 0.16s var(--ease), background 0.16s var(--ease); }
+.cs-tile:hover { transform: translateY(-2px); border-color: var(--hairline-strong); background: var(--surface-2); }
+.cs-tile:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
+.cs-tile-ic { width: 44px; height: 44px; flex-shrink: 0; border-radius: 11px; display: grid; place-items: center; background: var(--surface-3); color: var(--text-primary); }
+.cs-tile-t { display: block; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 3px; }
+.cs-tile-s { display: block; font-size: 12.5px; color: var(--text-tertiary); }
+.cs-tile-plus { margin-left: auto; color: var(--text-tertiary); display: flex; }
+
+.cs-filter { display: flex; gap: 4px; border-bottom: 1px solid var(--hairline); margin-bottom: 22px; overflow-x: auto; scrollbar-width: none; }
+.cs-filter::-webkit-scrollbar { display: none; }
+.cs-filter button { font-family: var(--font-mono), ui-monospace, monospace; font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; padding: 11px 15px; background: none; border: none; border-bottom: 1.5px solid transparent; margin-bottom: -1px; color: var(--text-tertiary); cursor: pointer; white-space: nowrap; transition: color 0.15s var(--ease), border-color 0.15s var(--ease); }
+.cs-filter button:hover { color: var(--text-secondary); }
+.cs-filter button[aria-selected="true"] { color: var(--text-primary); border-bottom-color: var(--text-primary); }
+.cs-filter .cs-n { color: var(--text-tertiary); margin-left: 6px; }
+
+.cs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(248px, 1fr)); gap: 16px; }
+.cs-card { display: block; background: var(--surface-1); border: 1px solid var(--hairline); border-radius: var(--radius); overflow: hidden; color: inherit; text-decoration: none; transition: transform 0.16s var(--ease), border-color 0.16s var(--ease), box-shadow 0.16s var(--ease); }
+.cs-card:hover { transform: translateY(-3px); border-color: var(--hairline-strong); box-shadow: var(--shadow-2); }
+.cs-card:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
+.cs-thumb { position: relative; aspect-ratio: 4 / 3; overflow: hidden; background: #0a0a0a; }
+.cs-thumb > img, .cs-thumb > video { width: 100%; height: 100%; object-fit: cover; object-position: center; display: block; }
+/* SlideCanvas ships inline styling for the editor's standalone preview (own
+   aspect/radius/shadow); inside a thumb stage we override it to cover the 4:3
+   frame. It sits under the LazyMount wrapper div, hence the descendant selector. */
+.cs-thumb canvas { width: 100% !important; height: 100% !important; aspect-ratio: auto !important; object-fit: cover; object-position: center; border-radius: 0 !important; box-shadow: none !important; display: block; }
+.cs-thumb-ov { position: absolute; inset: 0; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; }
+.cs-thumb-top { display: flex; justify-content: flex-end; align-items: flex-start; gap: 8px; }
+.cs-chip { align-self: flex-start; display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-mono), monospace; font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; padding: 4px 8px; border-radius: 5px; background: rgba(12,13,16,0.62); backdrop-filter: blur(6px); color: #fff; border: 1px solid rgba(255,255,255,0.14); }
+.cs-play { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.cs-play span { width: 44px; height: 44px; border-radius: 50%; background: rgba(12,13,16,0.5); backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.4); display: grid; place-items: center; color: #fff; }
+.cs-ph { position: absolute; inset: 0; display: flex; align-items: flex-end; padding: 16px; }
+.cs-ph-t { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.25; color: #fff; }
+.cs-card-body { padding: 13px 14px 15px; }
+.cs-card-title { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.3; margin: 0 0 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.cs-card-meta { display: flex; align-items: center; gap: 7px; font-family: var(--font-mono), monospace; font-size: 11px; color: var(--text-tertiary); letter-spacing: 0.02em; }
+.cs-card-meta .cs-sep { opacity: 0.5; }
+.cs-back:hover { color: var(--text-secondary) !important; }
+
+@media (max-width: 720px) { .cs-create { grid-template-columns: 1fr; } }
 
 /* Radix dropdown items highlight on hover AND keyboard nav (data-highlighted). */
 .dropdown-item[data-highlighted] { background: var(--surface-2); }

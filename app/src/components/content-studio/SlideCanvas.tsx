@@ -1,0 +1,181 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { CarouselSlide, ImageLibraryAsset } from "@/lib/db/schema";
+import {
+  libraryFileUrl,
+  paintSlide,
+  type BrandLabels,
+} from "@/lib/image/paintSlide";
+import {
+  DEFAULT_BODY_FONT_ID,
+  DEFAULT_HEADING_FONT_ID,
+  FONT_OPTIONS,
+  resolveCanvasFont,
+} from "@/lib/image/fonts";
+import { getTemplate } from "@/lib/image/templates";
+
+/**
+ * Pre-load every registered Content Studio font so canvas renders use them
+ * immediately instead of falling back to system fonts on first paint.
+ */
+export function useCanvasFonts(): boolean {
+  const [fontsReady, setFontsReady] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    (async () => {
+      try {
+        const families = FONT_OPTIONS.map((opt) => {
+          const resolved = getComputedStyle(document.documentElement)
+            .getPropertyValue(opt.cssVar)
+            .trim();
+          return resolved || opt.fallback;
+        });
+        await Promise.all(
+          families.flatMap((family) => [
+            document.fonts.load(`700 96px ${family}`),
+            document.fonts.load(`400 32px ${family}`),
+          ]),
+        );
+      } catch {}
+      setFontsReady(true);
+    })();
+  }, []);
+
+  return fontsReady;
+}
+
+/**
+ * Tenant logo overlay — loaded once client-side (same-origin, so the export
+ * canvas stays untainted).
+ */
+export function useLogoImage(
+  logoUrl: string | null | undefined,
+): HTMLImageElement | null {
+  const [logoImg, setLogoImg] = useState<HTMLImageElement | null>(null);
+  useEffect(() => {
+    if (!logoUrl) {
+      setLogoImg(null);
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = "anonymous"; // same-origin /api/branding/logo — keeps export canvases untainted
+    img.src = logoUrl;
+    img.onload = () => setLogoImg(img);
+    img.onerror = () => setLogoImg(null);
+  }, [logoUrl]);
+  return logoImg;
+}
+
+/**
+ * Self-contained canvas that loads its own background image and re-renders
+ * whenever the slide / library / fonts change. Used both for the big single
+ * preview and for each thumbnail in the carousel grid.
+ */
+export function SlideCanvas({
+  slide,
+  slideIdx,
+  total,
+  library,
+  fontsReady,
+  defaultHeadingFontId = DEFAULT_HEADING_FONT_ID,
+  defaultBodyFontId = DEFAULT_BODY_FONT_ID,
+  brand,
+  logo = null,
+}: {
+  slide: CarouselSlide;
+  slideIdx: number;
+  total: number;
+  library: ImageLibraryAsset[];
+  fontsReady: boolean;
+  defaultHeadingFontId?: string;
+  defaultBodyFontId?: string;
+  brand?: BrandLabels;
+  logo?: HTMLImageElement | null;
+}) {
+  const fontFamilies = useMemo(
+    () => ({
+      heading: resolveCanvasFont(slide.headingFont, defaultHeadingFontId),
+      body: resolveCanvasFont(slide.bodyFont, defaultBodyFontId),
+    }),
+    [slide.headingFont, slide.bodyFont, defaultHeadingFontId, defaultBodyFontId],
+  );
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const bgRef = useRef<HTMLImageElement | null>(null);
+  const tokenRef = useRef(0);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    if (slide.backgroundAssetId == null) {
+      bgRef.current = null;
+      setTick((t) => t + 1);
+      return;
+    }
+    const asset = library.find((a) => a.id === slide.backgroundAssetId);
+    if (!asset) {
+      bgRef.current = null;
+      setTick((t) => t + 1);
+      return;
+    }
+    const token = ++tokenRef.current;
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = libraryFileUrl(asset.filename);
+    img.onload = () => {
+      if (token === tokenRef.current) {
+        bgRef.current = img;
+        setTick((t) => t + 1);
+      }
+    };
+    img.onerror = () => {
+      if (token === tokenRef.current) {
+        bgRef.current = null;
+        setTick((t) => t + 1);
+      }
+    };
+  }, [slide.backgroundAssetId, library]);
+
+  useEffect(() => {
+    if (!fontsReady) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const template = getTemplate(slide.templateId);
+    if (!template) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    canvas.width = template.width;
+    canvas.height = template.height;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    paintSlide(
+      ctx,
+      canvas.width,
+      canvas.height,
+      slide,
+      slideIdx,
+      total,
+      brand,
+      fontFamilies,
+      bgRef.current,
+      logo,
+    );
+  }, [slide, slideIdx, total, fontsReady, fontFamilies, tick, brand, logo]);
+
+  const template = getTemplate(slide.templateId);
+  const aspect = template?.aspectRatio ?? "1:1";
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{
+        width: "100%",
+        height: "auto",
+        aspectRatio: aspect.replace(":", " / "),
+        borderRadius: "var(--radius)",
+        boxShadow: "var(--shadow-1)",
+        background: "#0a0a0a",
+        display: "block",
+      }}
+    />
+  );
+}
