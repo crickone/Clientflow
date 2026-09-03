@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
+  Loader2,
   RefreshCw,
   AlertTriangle,
   Sparkles,
@@ -195,6 +197,17 @@ export function ProjectDetail({
       return null;
     }
   }, [project.transcriptJson]);
+
+  // Once a transcript exists, the CapCut-style NLE is the SINGLE editor for this
+  // project. Hand off to it — page.tsx re-routes this same URL to VideoEditor on
+  // refresh. This retires the old post-transcript ProjectDetail surface (and its
+  // b-roll plan editor, whose edits the render silently ignored once the NLE had
+  // written a timeline). The poll above brings transcriptJson into state the
+  // moment transcription finishes, firing this.
+  const router = useRouter();
+  useEffect(() => {
+    if (project.transcriptJson) router.refresh();
+  }, [project.transcriptJson, router]);
 
   const plan: CutPlan | null = useMemo(() => {
     if (!project.planJson) return null;
@@ -529,6 +542,33 @@ export function ProjectDetail({
     });
   })();
 
+  // Transcript ready → the NLE takes over (the router.refresh above re-routes
+  // this URL to VideoEditor). Show a brief hand-off state instead of the legacy
+  // post-transcript sections while that navigation resolves.
+  if (project.transcriptJson) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 14,
+          padding: "64px 20px",
+          background: "var(--surface-1)",
+          border: "1px solid var(--hairline)",
+          borderRadius: "var(--radius)",
+          textAlign: "center",
+        }}
+      >
+        <Loader2 size={22} className="spin" style={{ color: "var(--text-secondary)" }} />
+        <div style={{ fontSize: 15, fontWeight: 600 }}>Transcription complete</div>
+        <div style={{ fontSize: 13, color: "var(--text-tertiary)" }}>
+          Opening your editor…
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: "grid", gap: 20 }}>
       <div
@@ -640,6 +680,17 @@ export function ProjectDetail({
           </div>
         )}
       </div>
+
+      <Section title="First cut">
+        <ToggleRow
+          icon={<Scissors size={14} />}
+          label="Auto-trim silences"
+          hint="Cuts long pauses down to a natural ~0.2s in the first cut, before you open the editor. You can still fine-tune every clip afterwards."
+          checked={!!project.autoTrimSilence}
+          onChange={toggleTrim}
+          disabled={busy}
+        />
+      </Section>
 
       {project.status === "rendered" && project.outputFilename && (
         <Section title="Output">

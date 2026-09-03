@@ -363,6 +363,22 @@ function DefaultPanel({
         />
         <Film size={13} /> Logo intro
       </label>
+      {fields.showIntroOutro && (
+        <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)" }}>
+          Intro length · {fields.introDurationSec.toFixed(1)}s
+          <input
+            type="range"
+            min={0.5}
+            max={10}
+            step={0.1}
+            defaultValue={fields.introDurationSec}
+            onPointerUp={(e) =>
+              onPatchFields({ introDurationSec: Number((e.target as HTMLInputElement).value) })
+            }
+            style={{ width: "100%", marginTop: 6 }}
+          />
+        </label>
+      )}
 
       <Button onClick={onExport} disabled={busy}>
         <Download size={14} /> Export MP4
