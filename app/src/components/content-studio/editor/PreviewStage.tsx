@@ -24,6 +24,24 @@ import {
 } from "@/lib/video/captionPhrases";
 import { coverFitStyle } from "@/lib/video/rotationStyle";
 
+/**
+ * The caption font stored on the project is a human name from CAPTION_FONTS
+ * ("Nebula", "Nebula Hollow"). The brand fonts are self-hosted by next/font
+ * under hashed families reachable only via their CSS vars, so the raw names
+ * don't resolve in the browser and silently fall back to Arial. Map the known
+ * brand fonts to their CSS var; OS fonts (Arial Black / Impact) pass through.
+ * The ffmpeg render matches by the OTF's internal family name and is already
+ * correct — this is a preview-only fidelity fix.
+ */
+const CAPTION_FONT_CSS: Record<string, string> = {
+  Nebula: "var(--font-nebula)",
+  "Nebula Hollow": "var(--font-heading-hollow)",
+};
+function captionFontFamily(name: string | null | undefined): string {
+  if (!name) return "Arial Black";
+  return CAPTION_FONT_CSS[name] ?? name;
+}
+
 /** Imperative API so a parent timeline can scrub/play the preview. */
 export interface PreviewHandle {
   seekTo(outputSec: number): void;
@@ -407,7 +425,7 @@ export const PreviewStage = forwardRef<PreviewHandle, Props>(function PreviewSta
               bottom: `${capBottomPct}%`,
               textAlign: "center",
               pointerEvents: "none",
-              fontFamily: `${captionFont ?? "Arial Black"}, Arial, sans-serif`,
+              fontFamily: `${captionFontFamily(captionFont)}, Arial, sans-serif`,
               fontWeight: 900,
               fontSize: `${capFontVw}cqw`,
               lineHeight: 1.05,

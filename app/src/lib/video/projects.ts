@@ -56,6 +56,10 @@ export function createProject(input: CreateProjectInput) {
       aspectRatio: input.aspectRatio,
       targetSeconds: input.targetSeconds,
       toneNotes: input.toneNotes,
+      // "Auto-cut a reel": trim silence on the first cut by default. Users can
+      // turn it off via the pre-transcribe "First cut" toggle before
+      // transcribing. Existing projects keep whatever value they already have.
+      autoTrimSilence: true,
       status: "queued",
     })
     .returning()
@@ -245,6 +249,37 @@ export function runTranscription(projectId: number): void {
         transcriptJson: JSON.stringify(transcript),
         error: null,
       });
+
+      // "Auto-cut a reel": as soon as we have a transcript, run the AI b-roll
+      // plan so the editor opens on an already-edited first cut (silence-trim is
+      // applied when the timeline is synthesized from autoTrimSilence). This is
+      // the one metered plan call per video; it persists planJson so
+      // synthesizeTimeline folds the cutaways in on first open. GUARDED — if
+      // planning fails (e.g. the monthly AI cap is reached) the transcript stays
+      // intact at "transcribed"; the user can retry with "Re-suggest b-roll".
+      const brollAssets = assets.filter((a) => a.kind === "broll");
+      if (brollAssets.length > 0) {
+        try {
+          const plan = await planCut({
+            transcript,
+            broll: brollAssets.map((b) => ({
+              assetId: b.id,
+              originalName: b.originalName,
+              durationSeconds: b.durationSeconds ?? 0,
+            })),
+            toneNotes: getProject(projectId)?.toneNotes ?? null,
+            tenantId,
+          });
+          setStatus(projectId, "transcribed", {
+            planJson: JSON.stringify(plan),
+            error: null,
+          });
+        } catch (planErr) {
+          logPlanOutcome(projectId, planErr);
+          // Leave status "transcribed" (transcript intact, planJson null →
+          // empty b-roll but retriable). Do NOT fail the whole project.
+        }
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(`[content-studio] transcription failed for ${projectId}:`, err);
