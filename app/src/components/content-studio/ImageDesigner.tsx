@@ -56,6 +56,7 @@ import {
   type BrandLabels,
 } from "@/lib/image/paintSlide";
 import { SlideCanvas, useCanvasFonts, useLogoImage } from "./SlideCanvas";
+import { EditorSection } from "./EditorSection";
 
 const ACCENT_SWATCHES = [
   "#2c6ce0",
@@ -94,6 +95,96 @@ interface Props {
   logoUrl?: string | null;
   /** Whether this design currently draws the logo on its slides (persisted per-design). */
   initialShowLogo?: boolean;
+}
+
+/**
+ * Draggable focal point overlaid on the slide preview. Replaces the two
+ * abstract 0–1 "horizontal/vertical position" sliders: the point sits at
+ * (x, y) over the canvas and drag anywhere on the preview repositions the
+ * background photo. x/y are the slide's backgroundOffsetX/Y (0–1) unchanged.
+ */
+function FocalOverlay({
+  x,
+  y,
+  onChange,
+}: {
+  x: number;
+  y: number;
+  onChange: (x: number, y: number) => void;
+}) {
+  const layerRef = useRef<HTMLDivElement | null>(null);
+  const [dragging, setDragging] = useState(false);
+
+  const apply = useCallback(
+    (clientX: number, clientY: number) => {
+      const el = layerRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) return;
+      const nx = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
+      const ny = Math.min(1, Math.max(0, (clientY - r.top) / r.height));
+      onChange(Math.round(nx * 1000) / 1000, Math.round(ny * 1000) / 1000);
+    },
+    [onChange],
+  );
+
+  useEffect(() => {
+    if (!dragging) return;
+    const move = (e: PointerEvent) => {
+      e.preventDefault();
+      apply(e.clientX, e.clientY);
+    };
+    const up = () => setDragging(false);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+  }, [dragging, apply]);
+
+  return (
+    <div
+      ref={layerRef}
+      onPointerDown={(e) => {
+        e.preventDefault();
+        setDragging(true);
+        apply(e.clientX, e.clientY);
+      }}
+      style={{
+        position: "absolute",
+        inset: 0,
+        cursor: dragging ? "grabbing" : "crosshair",
+        touchAction: "none",
+      }}
+      aria-label="Background focal point — drag to reposition the photo"
+    >
+      <div
+        style={{
+          position: "absolute",
+          left: `${x * 100}%`,
+          top: `${y * 100}%`,
+          width: 26,
+          height: 26,
+          transform: "translate(-50%, -50%)",
+          borderRadius: "50%",
+          border: "2px solid #fff",
+          boxShadow: "0 0 0 2px rgba(0,0,0,0.45), 0 2px 10px rgba(0,0,0,0.6)",
+          background: "rgba(255,255,255,0.12)",
+          pointerEvents: "none",
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            inset: 8,
+            borderRadius: "50%",
+            background: "#fff",
+          }}
+        />
+      </div>
+    </div>
+  );
 }
 
 export function ImageDesigner({
@@ -859,6 +950,7 @@ export function ImageDesigner({
 
       {/* Main layout */}
       <div
+        className="cms-editor-grid"
         style={{
           display: "grid",
           gridTemplateColumns: "minmax(320px, 480px) 1fr",
@@ -867,7 +959,7 @@ export function ImageDesigner({
         }}
       >
         {/* Preview */}
-        <div style={{ display: "grid", gap: 14, position: "sticky", top: 24 }}>
+        <div className="cms-preview-col" style={{ display: "grid", gap: 14, position: "sticky", top: 24 }}>
           {isEmptySlot ? (
             <div
               style={{
@@ -974,6 +1066,15 @@ export function ImageDesigner({
                     brand={brand}
                     logo={showLogo ? logoImg : null}
                   />
+                  {activeSlide.backgroundAssetId != null && (
+                    <FocalOverlay
+                      x={activeSlide.backgroundOffsetX}
+                      y={activeSlide.backgroundOffsetY}
+                      onChange={(backgroundOffsetX, backgroundOffsetY) =>
+                        updateActiveSlide({ backgroundOffsetX, backgroundOffsetY })
+                      }
+                    />
+                  )}
                   {activeSlide?.imageStatus === "generating" && (
                     <div
                       style={{
@@ -1101,8 +1202,9 @@ export function ImageDesigner({
           )}
         </div>
 
-        {/* Controls column */}
-        <div style={{ display: "grid", gap: 22 }}>
+        {/* Controls column — grouped into collapsible Template / Content / Style / Layout sections */}
+        <div style={{ display: "grid", gap: 12 }}>
+          <EditorSection title="Template" defaultOpen>
           <div>
             <Label>Template</Label>
             <div
@@ -1264,9 +1366,11 @@ export function ImageDesigner({
               })}
             </div>
           </div>
+          </EditorSection>
 
           {activeSlide && template && (
           <>
+          <EditorSection title="Content" defaultOpen>
           {template.usesTagline && (
             <div>
               <Label htmlFor="tagline">
@@ -1311,7 +1415,9 @@ export function ImageDesigner({
               }
             />
           </div>
+          </EditorSection>
 
+          <EditorSection title="Style" defaultOpen>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <div>
               <Label htmlFor="heading-font">Heading font</Label>
@@ -1514,7 +1620,9 @@ export function ImageDesigner({
               />
             </div>
           )}
+          </EditorSection>
 
+          <EditorSection title="Layout & photo" defaultOpen>
           <div>
             <Label>Background photo</Label>
             <div
@@ -1725,40 +1833,34 @@ export function ImageDesigner({
                   style={{ width: "100%" }}
                 />
               </div>
-              <div>
-                <Label>Horizontal position</Label>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={activeSlide.backgroundOffsetX}
-                  onChange={(e) =>
-                    updateActiveSlide({
-                      backgroundOffsetX: Number(e.target.value),
-                    })
-                  }
-                  style={{ width: "100%" }}
-                />
-              </div>
-              <div>
-                <Label>Vertical position</Label>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={activeSlide.backgroundOffsetY}
-                  onChange={(e) =>
-                    updateActiveSlide({
-                      backgroundOffsetY: Number(e.target.value),
-                    })
-                  }
-                  style={{ width: "100%" }}
-                />
+              <div style={{ gridColumn: "1 / -1" }}>
+                <Label>Photo position</Label>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    fontSize: 12,
+                    padding: "6px 0 2px",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: "var(--font-mono), ui-monospace, monospace",
+                      color: "var(--text-secondary)",
+                    }}
+                  >
+                    x {Math.round(activeSlide.backgroundOffsetX * 100)}% · y{" "}
+                    {Math.round(activeSlide.backgroundOffsetY * 100)}%
+                  </span>
+                  <span style={{ color: "var(--text-tertiary)" }}>
+                    — drag the point on the preview
+                  </span>
+                </div>
               </div>
             </div>
           )}
+          </EditorSection>
           </>
           )}
         </div>

@@ -617,6 +617,11 @@ a {
   .cms-editor-grid {
     grid-template-columns: 1fr !important;
   }
+  /* Stacked on mobile, an editor's sticky preview would pin over its own
+     controls — let it scroll away instead. */
+  .cms-preview-col {
+    position: static !important;
+  }
 }
 
 /* Timetable "next class" pulse — ring colour comes from --tt-pulse on the element */
