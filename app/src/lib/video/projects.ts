@@ -245,20 +245,21 @@ export function runTranscription(projectId: number): void {
       if (!main) throw new Error("No main video uploaded.");
       const filePath = path.join(uploadDir(projectId), main.filename);
       const transcript = await transcribeVideo(filePath);
-      setStatus(projectId, "transcribed", {
-        transcriptJson: JSON.stringify(transcript),
-        error: null,
-      });
 
-      // "Auto-cut a reel": as soon as we have a transcript, run the AI b-roll
-      // plan so the editor opens on an already-edited first cut (silence-trim is
-      // applied when the timeline is synthesized from autoTrimSilence). This is
-      // the one metered plan call per video; it persists planJson so
-      // synthesizeTimeline folds the cutaways in on first open. GUARDED — if
-      // planning fails (e.g. the monthly AI cap is reached) the transcript stays
-      // intact at "transcribed"; the user can retry with "Re-suggest b-roll".
+      // "Auto-cut a reel": run the AI b-roll plan BEFORE persisting
+      // transcriptJson. The editor hand-off fires the instant transcriptJson
+      // appears (ProjectDetail polls for it), so exposing the transcript first
+      // would race the plan and the editor would open on an empty timeline.
+      // Instead go transcribing -> planning, run the one metered plan call, then
+      // persist transcript + plan TOGETHER so the hand-off lands on an
+      // already-edited first cut (silence-trim is applied at timeline synthesis
+      // from autoTrimSilence). GUARDED — if planning fails (e.g. the monthly AI
+      // cap is hit) we still save the transcript with no plan; b-roll is then
+      // empty but retriable via "Re-suggest b-roll".
       const brollAssets = assets.filter((a) => a.kind === "broll");
+      let planJson: string | null = null;
       if (brollAssets.length > 0) {
+        setStatus(projectId, "planning", { error: null });
         try {
           const plan = await planCut({
             transcript,
@@ -270,16 +271,16 @@ export function runTranscription(projectId: number): void {
             toneNotes: getProject(projectId)?.toneNotes ?? null,
             tenantId,
           });
-          setStatus(projectId, "transcribed", {
-            planJson: JSON.stringify(plan),
-            error: null,
-          });
+          planJson = JSON.stringify(plan);
         } catch (planErr) {
           logPlanOutcome(projectId, planErr);
-          // Leave status "transcribed" (transcript intact, planJson null →
-          // empty b-roll but retriable). Do NOT fail the whole project.
         }
       }
+      setStatus(projectId, "transcribed", {
+        transcriptJson: JSON.stringify(transcript),
+        ...(planJson ? { planJson } : {}),
+        error: null,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(`[content-studio] transcription failed for ${projectId}:`, err);
