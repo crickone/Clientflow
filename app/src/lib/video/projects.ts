@@ -103,6 +103,12 @@ export function addAsset(input: {
   width: number | null;
   height: number | null;
   rotation?: number;
+  /**
+   * The rotation read from the file's own metadata — what the browser applies
+   * by itself. Equal to `rotation` at upload; they diverge once the operator
+   * overrides. 0 when the file carries no rotation flag.
+   */
+  metaRotation?: number;
   /** AI-suggested clockwise rotation (sideways-shot footage); 0 = none. */
   suggestedRotation?: number;
 }) {
@@ -111,6 +117,7 @@ export function addAsset(input: {
     .values({
       ...input,
       rotation: input.rotation ?? 0,
+      metaRotation: input.metaRotation ?? 0,
       suggestedRotation: input.suggestedRotation ?? 0,
     })
     .returning()

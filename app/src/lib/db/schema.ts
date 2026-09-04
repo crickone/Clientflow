@@ -819,6 +819,16 @@ export const videoAssets = sqliteTable("video_assets", {
   /** Display rotation in degrees (0/90/180/270). Used to transpose at render. */
   rotation: integer("rotation").notNull().default(0),
   /**
+   * The rotation that came from the FILE'S OWN metadata (the mp4 display
+   * matrix), which the BROWSER applies by itself when it plays the raw file.
+   * `rotation` above is the EFFECTIVE/desired rotation — the metadata value at
+   * upload, or whatever the operator later set. Keeping the two apart lets the
+   * preview rotate by only the delta the browser has not already applied
+   * (`rotation - metaRotation`), while the renderer keeps using the full
+   * `rotation` because it opts out of the matrix with `-noautorotate`.
+   */
+  metaRotation: integer("meta_rotation").notNull().default(0),
+  /**
    * AI-suggested clockwise rotation for footage shot with the camera turned on
    * its side (no rotation metadata to read). Purely a SUGGESTION shown to the
    * operator — `rotation` above is what the renderer uses, and only a confirmed

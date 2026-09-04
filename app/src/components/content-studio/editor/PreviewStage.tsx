@@ -42,6 +42,29 @@ function captionFontFamily(name: string | null | undefined): string {
   return CAPTION_FONT_CSS[name] ?? name;
 }
 
+/**
+ * How much the PREVIEW still has to rotate, in CSS — the DELTA between the
+ * asset's effective `rotation` and the `metaRotation` the browser has already
+ * applied for us.
+ *
+ * The <video> is served the raw uploaded file, and browsers honour an mp4's own
+ * display matrix, so phone footage arrives on screen already upright. Handing
+ * `coverFitStyle` the full `rotation` would turn it a second time (and, on a
+ * quarter turn, crop the frame — that helper pre-sizes with swapped width/height
+ * and the video is `objectFit: cover`). The RENDERER uses the full `rotation`
+ * instead, because it opts out of the matrix with `-noautorotate` (render.ts)
+ * and transposes everything itself.
+ *
+ * So: an untouched phone clip → 0 (browser did it all). A sideways-shot clip
+ * with no metadata but an operator/AI rotation → the full rotation. An operator
+ * override on a phone clip → just the difference.
+ */
+function previewRotation(asset: VideoAsset | null | undefined): number {
+  const rotation = asset?.rotation ?? 0;
+  const metaRotation = asset?.metaRotation ?? 0;
+  return (((rotation - metaRotation) % 360) + 360) % 360;
+}
+
 /** Imperative API so a parent timeline can scrub/play the preview. */
 export interface PreviewHandle {
   seekTo(outputSec: number): void;
@@ -159,7 +182,7 @@ export const PreviewStage = forwardRef<PreviewHandle, Props>(function PreviewSta
     [onPlayheadChange],
   );
 
-  const mainRotation = mainAsset?.rotation ?? 0;
+  const mainRotation = previewRotation(mainAsset);
 
   // ── active b-roll at the current playhead ────────────────────────────────
   const activeInsert = useMemo(() => {
@@ -409,7 +432,7 @@ export const PreviewStage = forwardRef<PreviewHandle, Props>(function PreviewSta
               preload="auto"
               style={{
                 display: "block",
-                ...coverFitStyle(activeBroll?.rotation ?? 0, wrapperSize),
+                ...coverFitStyle(previewRotation(activeBroll), wrapperSize),
               }}
             />
           </div>

@@ -112,6 +112,7 @@ export async function POST(
       width: probed.width,
       height: probed.height,
       rotation: probed.rotation,
+      metaRotation: probed.rotation,
       suggestedRotation,
     });
     created.push(asset.id);

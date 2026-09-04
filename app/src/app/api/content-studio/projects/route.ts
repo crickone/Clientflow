@@ -117,6 +117,7 @@ export async function POST(req: Request) {
       width: probed.width,
       height: probed.height,
       rotation: probed.rotation,
+      metaRotation: probed.rotation,
       suggestedRotation,
     });
   }
@@ -151,6 +152,7 @@ export async function POST(req: Request) {
       width: probed.width,
       height: probed.height,
       rotation: probed.rotation,
+      metaRotation: probed.rotation,
     });
   }
 

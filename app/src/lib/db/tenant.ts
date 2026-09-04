@@ -1470,6 +1470,23 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     console.error("[db] video_assets suggested_rotation migration failed:", err);
   }
 
+  // The rotation that came from the file's own metadata (the display matrix the
+  // BROWSER applies by itself). `rotation` is the effective/desired value; the
+  // preview rotates by the delta between them. Additive/idempotent — existing
+  // rows default to 0.
+  try {
+    const metaRotCols = sqlite
+      .prepare("PRAGMA table_info(video_assets)")
+      .all() as Array<{ name: string }>;
+    if (metaRotCols.length > 0 && !metaRotCols.some((c) => c.name === "meta_rotation")) {
+      sqlite.exec(
+        "ALTER TABLE video_assets ADD COLUMN meta_rotation INTEGER NOT NULL DEFAULT 0",
+      );
+    }
+  } catch (err) {
+    console.error("[db] video_assets meta_rotation migration failed:", err);
+  }
+
   // AI-generated b-roll: a clip row exists while fal renders it, so the editor
   // can show a "generating" placeholder and poll. Additive/idempotent.
   try {
