@@ -686,6 +686,7 @@ export function Sidebar({
       </div>
 
       <div
+        className="sidebar-clock"
         style={{
           padding: "10px 20px 16px",
           borderTop: "1px solid var(--grid)",

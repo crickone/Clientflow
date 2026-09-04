@@ -439,15 +439,21 @@ a {
   margin-left: 0 !important;
 }
 .app-sidebar.is-collapsed .nav-active-bar { display: none; }
-/* Header + footer have no room for a row of controls on the rail — stack them. */
+/* Header + footer have no room for a row of controls on the rail — stack them,
+   centred, so the avatar/theme/sign-out sit in a tidy column instead of a
+   ragged row. */
 .app-sidebar.is-collapsed .sidebar-header,
 .app-sidebar.is-collapsed .sidebar-footer {
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   padding-left: 8px !important;
   padding-right: 8px !important;
   justify-content: center;
+  align-items: center;
 }
+/* The date/time can't fit 76px — it wrapped onto four ragged lines. */
+.app-sidebar.is-collapsed .sidebar-clock { display: none; }
+.app-sidebar.is-collapsed .sidebar-footer { border-top-color: transparent; }
 
 .app-sidebar-toggle {
   display: flex;
