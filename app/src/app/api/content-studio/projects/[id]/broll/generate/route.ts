@@ -72,10 +72,13 @@ export async function POST(
   // A typed preset unless the operator wrote their own words.
   const preset: MotionPreset =
     input.motion === "camera" || input.motion === "pan" ? input.motion : "action";
-  const basePrompt =
+  // Only the operator's OWN words are passed through; when they wrote none the
+  // prompt is written per-photo at generation time (see describeMotionPrompt),
+  // which needs the image and so can't happen here.
+  const customPrompt =
     typeof input.prompt === "string" && input.prompt.trim()
       ? input.prompt.trim().slice(0, 400)
-      : MOTION_PRESETS[preset];
+      : undefined;
 
   const created: number[] = [];
   ensureUploadDir(projectId);
@@ -95,7 +98,7 @@ export async function POST(
       height: null,
     });
     db.update(schema.videoAssets)
-      .set({ genStatus: "generating", genPrompt: basePrompt })
+      .set({ genStatus: "generating", genPrompt: customPrompt ?? MOTION_PRESETS[preset] })
       .where(eq(schema.videoAssets.id, asset.id))
       .run();
     created.push(asset.id);
@@ -103,7 +106,8 @@ export async function POST(
       assetId: asset.id,
       projectId,
       libraryAssetId,
-      prompt: basePrompt,
+      prompt: customPrompt,
+      preset,
       durationSec,
     });
   }

@@ -23,6 +23,8 @@ import {
   RUNWAY_MODEL_ID,
 } from "./runwayClient";
 import { getProject } from "@/lib/video/projects";
+import { describeMotionPrompt } from "./describeMotion";
+import type { MotionPreset } from "./motionPresets";
 
 /**
  * The ONE metered path for AI b-roll — the video counterpart of
@@ -42,7 +44,10 @@ export function runBrollGeneration(input: {
   assetId: number;
   projectId: number;
   libraryAssetId: number;
-  prompt: string;
+  /** The operator's own words, when they wrote any. */
+  prompt?: string;
+  /** Which motion the operator picked — drives the AI-written prompt. */
+  preset: MotionPreset;
   durationSec: 5 | 10;
 }): void {
   const tenantId = getCurrentTenant().id;
@@ -62,6 +67,23 @@ export function runBrollGeneration(input: {
       const srcPath = libraryFilePath(source.filename);
       const imageBytes = fs.readFileSync(srcPath);
 
+      // A prompt written FOR this photo beats a generic preset: naming the
+      // actual subject, action and equipment is what makes an image-to-video
+      // model produce usable footage instead of a zooming still. The operator's
+      // own words always win; otherwise the vision model writes it (and falls
+      // back to the preset if that call can't run).
+      const prompt =
+        input.prompt?.trim() ||
+        (await describeMotionPrompt(
+          { imageBytes, imageMime: source.mimeType || "image/jpeg", preset: input.preset },
+          tenantId,
+        ));
+      // Record what was actually used, so the operator can see it on the clip.
+      db.update(schema.videoAssets)
+        .set({ genPrompt: prompt })
+        .where(eq(schema.videoAssets.id, input.assetId))
+        .run();
+
       // Runway Gen-4 holds up better on human motion, which is what gym b-roll
       // is — so it's preferred whenever its key is set, with fal/Kling as the
       // fallback so the feature still works without a Runway account.
@@ -71,14 +93,14 @@ export function runBrollGeneration(input: {
         ? await runwayGenerateVideo({
             imageBytes,
             imageMime: source.mimeType || "image/jpeg",
-            prompt: input.prompt,
+            prompt,
             durationSec: input.durationSec,
             aspectRatio,
           })
         : await falGenerateVideo({
             imageBytes,
             imageMime: source.mimeType || "image/jpeg",
-            prompt: input.prompt,
+            prompt,
             durationSec: input.durationSec,
           });
 
