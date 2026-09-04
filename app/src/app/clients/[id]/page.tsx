@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Mail, Pencil, Phone } from "lucide-react";
+import { Mail, Pencil, Phone, Star } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Card, CardLabel } from "@/components/ui/Card";
@@ -287,6 +287,7 @@ export default async function ClientProfile({
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {sessions.map((s) => {
                 const t = therapyMap.get(s.therapyId);
+                const outcomeRating = s.outcomeRating ?? 0;
                 return (
                   <Card key={s.id}>
                     <div
@@ -303,10 +304,14 @@ export default async function ClientProfile({
                           {formatDate(s.date)} · {s.durationMinutes}min
                         </span>
                       </div>
-                      {s.outcomeRating && (
-                        <span style={{ color: "var(--text-tertiary)", fontSize: 12 }}>
-                          {"★".repeat(s.outcomeRating)}
-                          {"☆".repeat(5 - s.outcomeRating)}
+                      {outcomeRating > 0 && (
+                        <span
+                          style={{ display: "flex", alignItems: "center", gap: 1, color: "var(--text-tertiary)" }}
+                          aria-label={`${outcomeRating} out of 5`}
+                        >
+                          {Array.from({ length: 5 }, (_, i) => (
+                            <Star key={i} size={12} fill={i < outcomeRating ? "currentColor" : "none"} />
+                          ))}
                         </span>
                       )}
                     </div>

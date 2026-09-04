@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { CheckCircle2, FileUp, Upload } from "lucide-react";
+import { Check, CheckCircle2, FileUp, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/Badge";
@@ -309,7 +309,7 @@ function Stepper({ step }: { step: number }) {
                 border: "1px solid var(--hairline)",
               }}
             >
-              {done ? "✓" : n}
+              {done ? <Check size={12} /> : n}
             </span>
             {label}
             {n < labels.length && <span style={{ color: "var(--text-tertiary)", marginLeft: 2 }}>›</span>}

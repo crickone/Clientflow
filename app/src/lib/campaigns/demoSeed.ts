@@ -68,7 +68,7 @@ export function removeTestCampaign(): void {
  *
  * The numbers are chosen to show a healthy, self-funded campaign:
  *   6 leads · 2 converts · €150 ad spend · €198 upfront (2 × €99 first month)
- *   → 1.3× ROAS · CFA "✓ Self-funded" (upfront €198 ≥ spend €150).
+ *   → 1.3× ROAS · CFA "Self-funded" (upfront €198 ≥ spend €150).
  */
 export function seedTestCampaign(): void {
   removeTestCampaign();

@@ -28,7 +28,7 @@ function check(name: string, cond: boolean) {
     adAngleJson: null,
   });
   check("full data: seedName names the competitor", fullSeed.seedName === "Win over Iron Gym Clonmel's members");
-  check("full data: angle carries the real rating", fullSeed.angle.includes("★4.3"));
+  check("full data: angle carries the real rating", fullSeed.angle.includes("4.3 stars"));
   check("full data: angle carries the real review count", fullSeed.angle.includes("128 review"));
   check(
     "full data: angle quotes ONLY the FIRST cached theme, not the second",
@@ -44,7 +44,7 @@ function check(name: string, cond: boolean) {
     themesJson: null,
     adAngleJson: null,
   });
-  check("no themes: still carries the real stats", noThemes.angle.includes("★4.1") && noThemes.angle.includes("40 review"));
+  check("no themes: still carries the real stats", noThemes.angle.includes("4.1 stars") && noThemes.angle.includes("40 review"));
   check("no themes: falls back to a generic angle (no quote mark)", !noThemes.angle.includes('"'));
   check("no themes: seedName still set", noThemes.seedName === "Win over Riverside Fitness's members");
 
@@ -66,7 +66,7 @@ function check(name: string, cond: boolean) {
     themesJson: null,
     adAngleJson: null,
   });
-  check("bare minimum: no fabricated rating in the angle", !bareMinimum.angle.includes("★"));
+  check("bare minimum: no fabricated rating in the angle", !bareMinimum.angle.includes("stars"));
   check("bare minimum: no fabricated review count in the angle", !/\d+ reviews?/.test(bareMinimum.angle));
   check("bare minimum: names the competitor regardless", bareMinimum.angle.includes("New Gym Down The Road"));
   check("bare minimum: never contains a fabrication artifact (undefined/null/NaN leaking into the string)",
@@ -75,12 +75,12 @@ function check(name: string, cond: boolean) {
 
   // ── rating present, review count absent (and vice versa) -> only the known half shows ──
   const ratingOnly = buildCompetitorGapSeed({ name: "X", ratingStars: 3.9, reviewCount: null, themesJson: null, adAngleJson: null });
-  check("rating only: shows the rating", ratingOnly.angle.includes("★3.9"));
+  check("rating only: shows the rating", ratingOnly.angle.includes("3.9 stars"));
   check("rating only: no review-count fragment", !/\d+ reviews?/.test(ratingOnly.angle));
 
   const reviewsOnly = buildCompetitorGapSeed({ name: "X", ratingStars: null, reviewCount: 7, themesJson: null, adAngleJson: null });
   check("reviews only: shows the review count", reviewsOnly.angle.includes("7 review"));
-  check("reviews only: no rating fragment", !reviewsOnly.angle.includes("★"));
+  check("reviews only: no rating fragment", !reviewsOnly.angle.includes("stars"));
 
   // singular/plural review count wording
   const singularReview = buildCompetitorGapSeed({ name: "X", ratingStars: null, reviewCount: 1, themesJson: null, adAngleJson: null });

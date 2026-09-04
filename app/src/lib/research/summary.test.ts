@@ -205,11 +205,11 @@ const requireLocal = createRequire(import.meta.url);
   {
     assert.equal(
       buildThemesFallback([review(5000), review(3000), review(4000)]),
-      "3 reviews, avg 4.0★ — connect AI for theme analysis.",
+      "3 reviews, avg 4.0 stars — connect AI for theme analysis.",
     );
     assert.equal(
       buildThemesFallback([review(5000)]),
-      "1 review, avg 5.0★ — connect AI for theme analysis.",
+      "1 review, avg 5.0 stars — connect AI for theme analysis.",
       "singular 'review', not 'reviews'",
     );
     assert.equal(
@@ -218,7 +218,7 @@ const requireLocal = createRequire(import.meta.url);
     );
     assert.equal(
       buildThemesFallback([review(5000), review(null)]),
-      "2 reviews, avg 5.0★ — connect AI for theme analysis.",
+      "2 reviews, avg 5.0 stars — connect AI for theme analysis.",
       "the average is over RATED reviews only — a null-rating review isn't treated as a 0",
     );
     assert.equal(
@@ -388,7 +388,7 @@ const requireLocal = createRequire(import.meta.url);
     });
     assert.equal(
       buildSelfClause(fullDigest),
-      " You: 4.8★ (120 reviews) vs pack avg 4.2★.",
+      " You: 4.8 stars (120 reviews) vs pack avg 4.2 stars.",
       "states the self rating, review count (correct singular/plural), and the pack average -- all real numbers already in the digest",
     );
 
@@ -397,7 +397,7 @@ const requireLocal = createRequire(import.meta.url);
       ratingStars: 5.0,
       reviewCount: 1,
     });
-    assert.equal(buildSelfClause(singleReviewDigest), " You: 5.0★ (1 review) vs pack avg 4.2★.", "singular 'review'");
+    assert.equal(buildSelfClause(singleReviewDigest), " You: 5.0 stars (1 review) vs pack avg 4.2 stars.", "singular 'review'");
 
     const noReviewCountDigest = buildLandscapeDigest([alpha], metricsById, {
       name: "Inspire",
@@ -406,7 +406,7 @@ const requireLocal = createRequire(import.meta.url);
     });
     assert.equal(
       buildSelfClause(noReviewCountDigest),
-      " You: 4.5★ vs pack avg 4.2★.",
+      " You: 4.5 stars vs pack avg 4.2 stars.",
       "a null self reviewCount is omitted, never shown as 0",
     );
 
@@ -417,7 +417,7 @@ const requireLocal = createRequire(import.meta.url);
     });
     assert.equal(
       buildSelfClause(noPackAvgDigest),
-      " You: 4.5★ (30 reviews).",
+      " You: 4.5 stars (30 reviews).",
       "no pack average available (no competitor ratings captured yet) -> the vs-pack part is omitted, not fabricated",
     );
   }
@@ -444,14 +444,14 @@ const requireLocal = createRequire(import.meta.url);
     );
     const twoRatedFallback = buildLandscapeFallback(twoRated);
     assert.ok(twoRatedFallback.startsWith("2 competitors tracked, ratings 4.2"), twoRatedFallback);
-    assert.ok(twoRatedFallback.includes("4.6★"), twoRatedFallback);
-    assert.ok(twoRatedFallback.includes("(avg 4.4★)"), twoRatedFallback);
+    assert.ok(twoRatedFallback.includes("4.6 stars"), twoRatedFallback);
+    assert.ok(twoRatedFallback.includes("(avg 4.4 stars)"), twoRatedFallback);
     assert.ok(twoRatedFallback.endsWith("connect AI for a fuller read."), twoRatedFallback);
 
     const sameRating = buildLandscapeDigest([alpha], new Map<number, Metric | null>([[1, metric(4500, 10)]]));
     assert.equal(
       buildLandscapeFallback(sameRating),
-      "1 competitor tracked, ratings 4.5★ (avg 4.5★) — connect AI for a fuller read.",
+      "1 competitor tracked, ratings 4.5 stars (avg 4.5 stars) — connect AI for a fuller read.",
       "a single rating shows once (no A–B range) when min === max",
     );
 
@@ -467,7 +467,7 @@ const requireLocal = createRequire(import.meta.url);
     );
     assert.equal(
       withSelfFallback,
-      "2 competitors tracked, ratings 4.2–4.6★ (avg 4.4★) — connect AI for a fuller read. You: 4.9★ (200 reviews) vs pack avg 4.4★.",
+      "2 competitors tracked, ratings 4.2–4.6 stars (avg 4.4 stars) — connect AI for a fuller read. You: 4.9 stars (200 reviews) vs pack avg 4.4 stars.",
     );
 
     // Self matched but no ratings captured for the COMPETITOR set yet — the
@@ -481,7 +481,7 @@ const requireLocal = createRequire(import.meta.url);
     );
     assert.equal(
       withSelfNoCompetitorRatings,
-      "1 competitor tracked, no ratings captured yet — connect AI for a fuller read. You: 4.9★ (200 reviews).",
+      "1 competitor tracked, no ratings captured yet — connect AI for a fuller read. You: 4.9 stars (200 reviews).",
     );
   }
 
@@ -557,7 +557,7 @@ const requireLocal = createRequire(import.meta.url);
       );
       const sample = runWithTenant(tid, () => getReviews(compId));
       const expectedFallback = buildThemesFallback(sample);
-      assert.equal(expectedFallback, "2 reviews, avg 4.0★ — connect AI for theme analysis.");
+      assert.equal(expectedFallback, "2 reviews, avg 4.0 stars — connect AI for theme analysis.");
 
       // NOT over cap yet -- this test environment deliberately has no
       // ANTHROPIC_API_KEY, so meteredCreate's real getAnthropic() throws
@@ -602,7 +602,7 @@ const requireLocal = createRequire(import.meta.url);
       runWithTenant(tid, () => appendMetric(compA, 4600, 80, "2026-08-01"));
       runWithTenant(tid, () => appendMetric(compB, 4000, 200, "2026-08-01"));
       const expectedFallback =
-        "2 competitors tracked, ratings 4.0–4.6★ (avg 4.3★) — connect AI for a fuller read.";
+        "2 competitors tracked, ratings 4.0–4.6 stars (avg 4.3 stars) — connect AI for a fuller read.";
 
       // NOT over cap -- same "AI unavailable" reality as 5a (no API key in
       // this test env) exercises the real error-catch branch for landscapeSummary.

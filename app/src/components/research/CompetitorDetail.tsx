@@ -1,6 +1,6 @@
 "use client";
 
-import { EyeOff, Key, Megaphone, Pin, Play, Unlink } from "lucide-react";
+import { EyeOff, Key, Megaphone, Pin, Play, Star, Unlink } from "lucide-react";
 
 import type { HydratedCompetitor, Metric, StoredAd } from "@/lib/research/store";
 import { parseStoredAdAngle } from "@/lib/research/adAngleJson";
@@ -299,7 +299,8 @@ export function CompetitorDetail({
               </span>
               {latest?.ratingMilli != null && (
                 <span style={{ fontSize: 13, color: "var(--text-primary)", fontWeight: 600 }}>
-                  {(latest.ratingMilli / 1000).toFixed(1)}★ now
+                  <Star size={12} fill="currentColor" style={{ display: "inline", verticalAlign: -1, marginRight: 3 }} />
+                  {(latest.ratingMilli / 1000).toFixed(1)} now
                 </span>
               )}
             </div>
@@ -333,7 +334,8 @@ export function CompetitorDetail({
                     </span>
                     {r.ratingMilli != null && (
                       <Badge tone="neutral" style={{ flexShrink: 0 }}>
-                        {`★ ${(r.ratingMilli / 1000).toFixed(1)}`}
+                        <Star size={10} fill="currentColor" />
+                        {(r.ratingMilli / 1000).toFixed(1)}
                       </Badge>
                     )}
                   </div>
@@ -386,7 +388,7 @@ export function CompetitorDetail({
                     fontFamily: "var(--font-mono), ui-monospace, monospace",
                   }}
                 >
-                  {`✓ Showing only ${competitor.facebookPageName}'s ads`}
+                  {`Showing only ${competitor.facebookPageName}'s ads`}
                 </span>
                 {isAdmin && (
                   <Button variant="ghost" size="sm" disabled={pending} onClick={() => onUnlinkPage?.(competitor.id)}>

@@ -93,7 +93,7 @@ export function SetupChecklist({ summary, isAdmin, venue, scheduling, businessDe
       {isAdmin && summary.allResolved && (
         <div style={{ display: "flex", justifyContent: "center", padding: "16px 0 4px" }}>
           <Button size="lg" onClick={dismiss} loading={dismissing}>
-            You&rsquo;re all set 🎉 — Dismiss this guide
+            You&rsquo;re all set — Dismiss this guide
           </Button>
         </div>
       )}

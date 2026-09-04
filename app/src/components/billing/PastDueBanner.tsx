@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AlertTriangle } from "lucide-react";
 
 export function PastDueBanner() {
   return (
@@ -11,13 +12,18 @@ export function PastDueBanner() {
         margin: "0 0 16px",
         fontSize: 13.5,
         color: "var(--text-primary)",
+        display: "flex",
+        gap: 8,
       }}
     >
-      ⚠ Your last subscription payment failed — we&apos;ll retry automatically.{" "}
-      <Link href="/settings/billing" style={{ textDecoration: "underline" }}>
-        Check your card
-      </Link>{" "}
-      to avoid interruption.
+      <AlertTriangle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+      <span>
+        Your last subscription payment failed — we&apos;ll retry automatically.{" "}
+        <Link href="/settings/billing" style={{ textDecoration: "underline" }}>
+          Check your card
+        </Link>{" "}
+        to avoid interruption.
+      </span>
     </div>
   );
 }

@@ -17,7 +17,7 @@ export function CopyButton({ code }: { code: string }) {
 
   return (
     <button type="button" onClick={onClick} className="btn-ghost">
-      {copied ? "Copied ✓" : "Copy code"}
+      {copied ? "Copied" : "Copy code"}
       <style jsx>{`
         .btn-ghost {
           padding: 16px 28px;

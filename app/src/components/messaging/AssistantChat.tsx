@@ -720,7 +720,7 @@ export function AssistantChat({
         }));
         return;
       }
-      const lines = data.results.map((r) => (r.ok ? `✓ ${r.text}` : `⚠️ ${r.text}`)).join("\n\n");
+      const lines = data.results.map((r) => (r.ok ? r.text : `Failed: ${r.text}`)).join("\n\n");
       const arts = data.results.flatMap((r) => (r.artifact ? [r.artifact] : []));
       // Campaign Engine Slice 1 (Task 6): fold any executed campaign write's
       // result into the progress-strip log — a no-op (returns null) for
@@ -974,7 +974,7 @@ export function AssistantChat({
                 >
                   {a.title}
                   <span style={{ marginLeft: 5 }} aria-hidden>
-                    {a.status === "done" ? "✓" : a.status === "current" ? "●" : "…"}
+                    {a.status === "done" ? <Check size={12} /> : a.status === "current" ? "●" : "…"}
                   </span>
                 </span>
               </span>

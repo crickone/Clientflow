@@ -38,8 +38,8 @@ function cfaBadge(m: Pick<CampaignMetrics, "roas" | "cfaCovered">): {
   label: string;
 } {
   if (m.roas === null) return { tone: "neutral", label: "— no ad spend" };
-  if (m.cfaCovered) return { tone: "green", label: "✓ Self-funded" };
-  return { tone: "red", label: "✗ short" };
+  if (m.cfaCovered) return { tone: "green", label: "Self-funded" };
+  return { tone: "red", label: "Short" };
 }
 
 const td: React.CSSProperties = {

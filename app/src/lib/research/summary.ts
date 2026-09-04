@@ -111,7 +111,7 @@ export function buildThemesFallback(reviews: StoredReview[]): string {
     return `${label}, rating unavailable — connect AI for theme analysis.`;
   }
   const avg = rated.reduce((sum, r) => sum + (r.ratingMilli as number), 0) / rated.length / 1000;
-  return `${label}, avg ${avg.toFixed(1)}★ — connect AI for theme analysis.`;
+  return `${label}, avg ${avg.toFixed(1)} stars — connect AI for theme analysis.`;
 }
 
 function buildThemesSystemPrompt(): string {
@@ -124,7 +124,7 @@ function buildThemesSystemPrompt(): string {
 
 function buildThemesUserPrompt(reviews: StoredReview[]): string {
   const lines = reviews.map((r, i) => {
-    const stars = r.ratingMilli != null ? `${(r.ratingMilli / 1000).toFixed(1)}★` : "unrated";
+    const stars = r.ratingMilli != null ? `${(r.ratingMilli / 1000).toFixed(1)} stars` : "unrated";
     return `${i + 1}. (${stars}) ${r.text}`;
   });
   return [
@@ -297,8 +297,8 @@ export function buildSelfClause(digest: LandscapeDigest): string {
   if (!self || self.ratingStars == null) return "";
   const reviewsPart =
     self.reviewCount != null ? ` (${self.reviewCount} review${self.reviewCount === 1 ? "" : "s"})` : "";
-  const vsPart = digest.avgRating != null ? ` vs pack avg ${digest.avgRating.toFixed(1)}★` : "";
-  return ` You: ${self.ratingStars.toFixed(1)}★${reviewsPart}${vsPart}.`;
+  const vsPart = digest.avgRating != null ? ` vs pack avg ${digest.avgRating.toFixed(1)} stars` : "";
+  return ` You: ${self.ratingStars.toFixed(1)} stars${reviewsPart}${vsPart}.`;
 }
 
 /**
@@ -317,9 +317,9 @@ export function buildLandscapeFallback(digest: LandscapeDigest): string {
   }
   const range =
     digest.minRating === digest.maxRating
-      ? `${digest.minRating.toFixed(1)}★`
-      : `${digest.minRating.toFixed(1)}–${digest.maxRating.toFixed(1)}★`;
-  return `${label}, ratings ${range} (avg ${digest.avgRating.toFixed(1)}★) — connect AI for a fuller read.${selfClause}`;
+      ? `${digest.minRating.toFixed(1)} stars`
+      : `${digest.minRating.toFixed(1)}–${digest.maxRating.toFixed(1)} stars`;
+  return `${label}, ratings ${range} (avg ${digest.avgRating.toFixed(1)} stars) — connect AI for a fuller read.${selfClause}`;
 }
 
 /**
@@ -350,7 +350,7 @@ function buildLandscapeSystemPrompt(digest: LandscapeDigest): string {
 
 function buildLandscapeUserPrompt(digest: LandscapeDigest): string {
   const lines = digest.rows.map((r) => {
-    const rating = r.ratingStars != null ? `${r.ratingStars.toFixed(1)}★` : "no rating yet";
+    const rating = r.ratingStars != null ? `${r.ratingStars.toFixed(1)} stars` : "no rating yet";
     const reviews = r.reviewCount != null ? `${r.reviewCount} reviews` : "review count unknown";
     return `- ${r.name}: ${rating}, ${reviews}`;
   });
@@ -359,7 +359,7 @@ function buildLandscapeUserPrompt(digest: LandscapeDigest): string {
     ? [
         "",
         `The operator's own business, ${digest.self!.name} (the operator's own business):`,
-        `- rating: ${digest.self!.ratingStars!.toFixed(1)}★`,
+        `- rating: ${digest.self!.ratingStars!.toFixed(1)} stars`,
         `- reviews: ${digest.self!.reviewCount != null ? digest.self!.reviewCount : "unknown"}`,
       ]
     : [];

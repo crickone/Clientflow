@@ -2,6 +2,7 @@ import { themeCss, type ThemeConfig } from "@/lib/theme";
 import { getFontOption, DEFAULT_HEADING_FONT_ID, DEFAULT_BODY_FONT_ID } from "@/lib/image/fonts";
 import type { ParsedLandingBody } from "@/lib/campaigns/assetBody";
 import type { BusinessProfile } from "@/lib/businessProfile";
+import { Check } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
 import { SignupForm } from "./SignupForm";
 
@@ -174,7 +175,7 @@ export function CampaignLanding({ body, theme, fonts, logoSrc, business, signupT
                           fontWeight: 700,
                         }}
                       >
-                        ✓
+                        <Check size={14} />
                       </span>
                       <span>{bullet}</span>
                     </li>

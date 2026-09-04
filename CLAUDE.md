@@ -123,6 +123,15 @@ Clonmel, Co. Tipperary — optimalhealthatinspire.ie · ☎ 083 867 2844).
 5. **Go live:** add the client's domain under the site's **Domains**, set
    `CMS_SITE_HOSTS="host=slug,…"` on deploy.
 
+## House rules
+
+- **NO EMOJIS.** Never use emojis in the app UI, in code (comments, labels,
+  copy, log lines), in commit messages, in docs, or in replies to the operator.
+  Use a `lucide-react` icon where a glyph is genuinely needed — the icon set is
+  already the app's visual language. The ONLY exception is **generated marketing
+  copy** (social captions, blog/email body text) where the client's audience
+  expects them, and even then only when the copy calls for it.
+
 ## Running
 
 - `cd app && npm run dev` → http://localhost:3000 (Node at `/usr/local/bin`).

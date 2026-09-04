@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronRight, Megaphone, Minus, TrendingDown, TrendingUp } from "lucide-react";
+import { ChevronDown, ChevronRight, Megaphone, Minus, Star, TrendingDown, TrendingUp } from "lucide-react";
 
 import type { CompetitorRow as CompetitorRowData, Metric } from "@/lib/research/store";
 import { Badge } from "@/components/ui/Badge";
@@ -171,7 +171,10 @@ export function CompetitorRow({
       </div>
 
       <div className="mres-row-rating">
-        <Badge tone="neutral">{`★ ${ratingLabel}`}</Badge>
+        <Badge tone="neutral">
+          <Star size={10} fill="currentColor" />
+          {ratingLabel}
+        </Badge>
         <TrendIcon size={14} color={trendColor} aria-hidden />
       </div>
 

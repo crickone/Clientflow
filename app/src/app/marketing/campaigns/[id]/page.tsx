@@ -175,7 +175,7 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
   // Gated on converts, not on roas/cfaCovered directly: gatherCampaignRevenue
   // always reports upfrontCashCents=0 when there are no converts yet, so if
   // ad spend is already set the plain roas/cfaCovered math below would render
-  // a misleading "✗ short of covering" for a campaign that simply hasn't had
+  // a misleading "short of covering" message for a campaign that simply hasn't had
   // time to convert anyone — the empty state (below, in the render) replaces
   // that with a neutral "no conversions yet" instead.
   const hasConverts = scoreboard.converts > 0;
@@ -185,8 +185,8 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
     scoreboard.roas === null
       ? "Add ad spend to see if this campaign paid for itself."
       : scoreboard.cfaCovered
-        ? `✓ Self-funded — front-end sales covered the ${formatCentsEur(scoreboard.adSpendCents)} ad spend (${scoreboard.roas.toFixed(1)}×)`
-        : `✗ ${formatCentsEur(scoreboard.adSpendCents - scoreboard.upfrontCashCents)} short of covering the ${formatCentsEur(scoreboard.adSpendCents)} ad spend`;
+        ? `Self-funded — front-end sales covered the ${formatCentsEur(scoreboard.adSpendCents)} ad spend (${scoreboard.roas.toFixed(1)}×)`
+        : `${formatCentsEur(scoreboard.adSpendCents - scoreboard.upfrontCashCents)} short of covering the ${formatCentsEur(scoreboard.adSpendCents)} ad spend`;
 
   // Landing page (Slice 2 Task 4): reuses the SAME gate the public
   // `/site/<slug>/c/<campaignSlug>` route checks (findApprovedLandingAsset —

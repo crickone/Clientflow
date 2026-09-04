@@ -49,7 +49,7 @@ const OPS_TOOLS = [
 ] as const;
 
 /**
- * ⚠ WHY `toolNames` IS A LAZY, MEMOIZED GETTER — not a plain array computed at
+ * IMPORTANT: WHY `toolNames` IS A LAZY, MEMOIZED GETTER — not a plain array computed at
  * this file's top level.
  *
  * `buildOrchestratorToolNames` calls `conciergeToolSlice`, imported from

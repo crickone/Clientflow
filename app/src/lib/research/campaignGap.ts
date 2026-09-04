@@ -47,10 +47,10 @@ export interface CompetitorGapSeed {
   angle: string;
 }
 
-/** "★4.3, 128 reviews" / "★4.3" / "128 reviews" / "" — only the facts actually on hand. */
+/** "4.3 stars, 128 reviews" / "4.3 stars" / "128 reviews" / "" — only the facts actually on hand. */
 function formatStatsLabel(ratingStars: number | null, reviewCount: number | null): string {
   const stats: string[] = [];
-  if (ratingStars != null) stats.push(`★${ratingStars.toFixed(1)}`);
+  if (ratingStars != null) stats.push(`${ratingStars.toFixed(1)} stars`);
   if (reviewCount != null) stats.push(`${reviewCount} review${reviewCount === 1 ? "" : "s"}`);
   return stats.length > 0 ? ` (${stats.join(", ")})` : "";
 }

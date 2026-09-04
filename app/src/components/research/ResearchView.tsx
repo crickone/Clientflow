@@ -345,12 +345,12 @@ export function ResearchView({
                   <StatTile
                     icon={<Star size={14} strokeWidth={1.8} />}
                     label="Avg rating"
-                    value={stats.avgRating != null ? `★ ${stats.avgRating.toFixed(1)}` : "—"}
+                    value={stats.avgRating != null ? stats.avgRating.toFixed(1) : "—"}
                   />
                   <StatTile
                     icon={<Crown size={14} strokeWidth={1.8} />}
                     label="Top rated"
-                    value={stats.topRated ? `★ ${stats.topRated.rating.toFixed(1)}` : "—"}
+                    value={stats.topRated ? stats.topRated.rating.toFixed(1) : "—"}
                     sub={stats.topRated?.competitor.name}
                   />
                   <StatTile
@@ -429,7 +429,10 @@ export function ResearchView({
                         {self.name}
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 14, flexShrink: 0 }}>
-                        <Badge tone="neutral">{`★ ${selfMetric?.ratingMilli != null ? (selfMetric.ratingMilli / 1000).toFixed(1) : "—"}`}</Badge>
+                        <Badge tone="neutral">
+                          <Star size={10} fill="currentColor" />
+                          {selfMetric?.ratingMilli != null ? (selfMetric.ratingMilli / 1000).toFixed(1) : "—"}
+                        </Badge>
                         <span style={{ fontSize: 13, color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums" }}>
                           {selfMetric?.reviewCount != null ? selfMetric.reviewCount.toLocaleString("en-IE") : "—"} reviews
                         </span>
@@ -442,7 +445,9 @@ export function ResearchView({
                     {stats.topRated && (
                       <Badge tone="neutral">
                         <Crown size={11} />
-                        {`Top rated · ${stats.topRated.competitor.name} · ★${stats.topRated.rating.toFixed(1)}`}
+                        {`Top rated · ${stats.topRated.competitor.name} ·`}
+                        <Star size={10} fill="currentColor" />
+                        {stats.topRated.rating.toFixed(1)}
                       </Badge>
                     )}
                     {stats.mostReviewed && (
