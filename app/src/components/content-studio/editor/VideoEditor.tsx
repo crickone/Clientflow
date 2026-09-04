@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Undo2, Download, AlertTriangle, Plus, RotateCw } from "lucide-react";
+import { Undo2, Download, AlertTriangle, Plus, RotateCw, Loader2 } from "lucide-react";
+import { GenerateBrollDialog } from "./GenerateBrollDialog";
 
 import { Button } from "@/components/ui/Button";
 import type { VideoAsset, VideoProject } from "@/lib/db/schema";
@@ -243,6 +244,25 @@ export function VideoEditor({
     },
     [projectId, mainAsset],
   );
+
+  /**
+   * Pull the project's assets again. AI b-roll clips are inserted as
+   * 'generating' rows and filled in by a detached job (~1 min each), so while
+   * any are still rendering we poll until they all settle.
+   */
+  const refreshAssets = useCallback(async () => {
+    const d = await fetch(API(projectId)).then((r) => r.json()).catch(() => null);
+    if (d?.ok) {
+      setAssets(d.assets.map((a: VideoAsset) => ({ ...a, createdAt: new Date(a.createdAt) })));
+    }
+  }, [projectId]);
+
+  const anyGenerating = assets.some((a) => a.genStatus === "generating");
+  useEffect(() => {
+    if (!anyGenerating) return;
+    const t = setInterval(refreshAssets, 5000);
+    return () => clearInterval(t);
+  }, [anyGenerating, refreshAssets]);
 
   const onRecaption = useCallback(async () => {
     setBusy(true);
@@ -487,34 +507,54 @@ export function VideoEditor({
           )}
           {brollAssets.map((b) => {
             const used = usedBrollIds.has(b.id);
+            // AI clips exist in the tray while fal renders them (~1 min), so
+            // they show their state instead of being addable.
+            const generating = b.genStatus === "generating";
+            const failed = b.genStatus === "failed";
             return (
               <button
                 key={b.id}
                 type="button"
+                disabled={generating || failed}
                 onClick={() => onAddBrollAtPlayhead(b.id)}
-                title={used ? `${b.originalName} (already placed — adds another)` : `Add ${b.originalName} at the playhead`}
+                title={
+                  generating
+                    ? "Generating this clip…"
+                    : failed
+                      ? b.genError ?? "Generation failed"
+                      : used
+                        ? `${b.originalName} (already placed — adds another)`
+                        : `Add ${b.originalName} at the playhead`
+                }
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 4,
-                  background: "#241c12",
-                  border: "1px solid #6b5226",
+                  background: failed ? "var(--danger-soft)" : "#241c12",
+                  border: `1px solid ${failed ? "var(--danger)" : "#6b5226"}`,
                   borderRadius: 4,
                   padding: "4px 8px",
                   fontSize: 10,
-                  color: "#e3c590",
+                  color: failed ? "var(--danger)" : "#e3c590",
                   maxWidth: 160,
-                  cursor: "pointer",
-                  opacity: used ? 0.55 : 1,
+                  cursor: generating || failed ? "default" : "pointer",
+                  opacity: generating ? 0.7 : used ? 0.55 : 1,
                 }}
               >
-                <Plus size={11} />
+                {generating ? (
+                  <Loader2 size={11} className="spin" />
+                ) : failed ? (
+                  <AlertTriangle size={11} />
+                ) : (
+                  <Plus size={11} />
+                )}
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {b.originalName}
+                  {generating ? "Generating…" : failed ? "Failed" : b.originalName}
                 </span>
               </button>
             );
           })}
+          <GenerateBrollDialog projectId={projectId} onQueued={refreshAssets} />
         </div>
       </div>
 

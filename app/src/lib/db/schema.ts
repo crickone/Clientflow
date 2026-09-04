@@ -825,6 +825,17 @@ export const videoAssets = sqliteTable("video_assets", {
    * choice writes to it. 0 = no suggestion.
    */
   suggestedRotation: integer("suggested_rotation").notNull().default(0),
+  /**
+   * AI b-roll generation state. Null for uploaded clips (the normal case).
+   * A generated clip is inserted as 'generating' with no file yet, so the
+   * editor can show it in the tray while fal renders it, then flips to
+   * 'ready' (filename populated) or 'failed' (genError set).
+   */
+  genStatus: text("gen_status", { enum: ["generating", "ready", "failed"] }),
+  /** The prompt used to animate the source photo (shown as the clip's label). */
+  genPrompt: text("gen_prompt"),
+  /** Why generation failed, for the retry affordance. */
+  genError: text("gen_error"),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),

@@ -212,7 +212,9 @@ export function runPlan(projectId: number): void {
       }
       const transcript = JSON.parse(project.transcriptJson) as Transcript;
       const assets = getAssets(projectId);
-      const brollAssets = assets.filter((a) => a.kind === "broll");
+      const brollAssets = assets.filter(
+        (a) => a.kind === "broll" && !!a.filename && a.genStatus !== "generating" && a.genStatus !== "failed",
+      );
 
       setStatus(projectId, "planning", { error: null });
       const plan = await planCut({
@@ -262,7 +264,9 @@ export function runTranscription(projectId: number): void {
       // from autoTrimSilence). GUARDED — if planning fails (e.g. the monthly AI
       // cap is hit) we still save the transcript with no plan; b-roll is then
       // empty but retriable via "Re-suggest b-roll".
-      const brollAssets = assets.filter((a) => a.kind === "broll");
+      const brollAssets = assets.filter(
+        (a) => a.kind === "broll" && !!a.filename && a.genStatus !== "generating" && a.genStatus !== "failed",
+      );
       let planJson: string | null = null;
       if (brollAssets.length > 0) {
         setStatus(projectId, "planning", { error: null });
@@ -320,7 +324,9 @@ export function runRender(
       const assets = getAssets(projectId);
       const main = assets.find((a) => a.kind === "main");
       if (!main) throw new Error("No main video uploaded.");
-      const brollAssets = assets.filter((a) => a.kind === "broll");
+      const brollAssets = assets.filter(
+        (a) => a.kind === "broll" && !!a.filename && a.genStatus !== "generating" && a.genStatus !== "failed",
+      );
       const projectDir = uploadDir(projectId);
 
       // The editor's timeline (when present) is the source of truth: it holds

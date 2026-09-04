@@ -1470,6 +1470,27 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     console.error("[db] video_assets suggested_rotation migration failed:", err);
   }
 
+  // AI-generated b-roll: a clip row exists while fal renders it, so the editor
+  // can show a "generating" placeholder and poll. Additive/idempotent.
+  try {
+    const genCols = sqlite
+      .prepare("PRAGMA table_info(video_assets)")
+      .all() as Array<{ name: string }>;
+    if (genCols.length > 0) {
+      if (!genCols.some((c) => c.name === "gen_status")) {
+        sqlite.exec("ALTER TABLE video_assets ADD COLUMN gen_status TEXT");
+      }
+      if (!genCols.some((c) => c.name === "gen_prompt")) {
+        sqlite.exec("ALTER TABLE video_assets ADD COLUMN gen_prompt TEXT");
+      }
+      if (!genCols.some((c) => c.name === "gen_error")) {
+        sqlite.exec("ALTER TABLE video_assets ADD COLUMN gen_error TEXT");
+      }
+    }
+  } catch (err) {
+    console.error("[db] video_assets gen_* migration failed:", err);
+  }
+
   // Agent tool-access toggles: a JSON array of tool names the agent may NOT use
   // (the disabled set). Null = nothing disabled = every tool on. Additive/
   // idempotent like every guard in this block. See agents.disabledTools

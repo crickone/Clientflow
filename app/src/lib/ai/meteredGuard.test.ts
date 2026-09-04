@@ -29,6 +29,7 @@ const SANCTIONED = new Set([
   "src/lib/ai/metered.ts", // meteredCreate(): the one-shot metered .messages.create() chokepoint
   "src/lib/ai/providers/anthropic.ts", // AnthropicProvider: the streaming .messages.stream() runAgentTurn meters
   "src/lib/ai/image/falClient.ts", // falGenerateImage(): the one fal.ai call site (flat-cost images; metered via generatePostImage)
+  "src/lib/ai/video/falVideoClient.ts", // falGenerateVideo(): the one fal.ai VIDEO call site (flat-cost clips; metered via generateBroll)
 ]);
 
 // Raw-SDK-access signatures that must not appear outside SANCTIONED files.
