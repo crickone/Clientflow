@@ -24,10 +24,15 @@ const VISION_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/gif
 /** What each preset should ask the model to do, in the written prompt. */
 const INTENT: Record<MotionPreset, string> = {
   action:
-    "The SUBJECTS should move: describe the exercise continuing naturally from this exact frame.",
+    "Identify the equipment, then describe the exercise that equipment is used for " +
+    "continuing naturally from this exact frame. If nobody is in shot, describe the " +
+    "equipment's own motion and a camera move over it.",
   camera:
-    "The SCENE stays still and only the CAMERA moves: describe a slow push-in over this exact frame.",
-  pan: "The CAMERA pans across the space while anyone in frame keeps moving naturally.",
+    "Identify the equipment, then describe a slow push-in over this exact frame. The " +
+    "scene stays still; only the camera moves.",
+  pan:
+    "Identify the equipment, then describe the camera panning across it, revealing more " +
+    "of the room. Anyone in frame keeps using the equipment naturally.",
 };
 
 export async function describeMotionPrompt(
@@ -50,17 +55,28 @@ export async function describeMotionPrompt(
       system:
         "You write motion prompts for an image-to-video model that animates a still photo " +
         "into a few seconds of realistic b-roll for a gym's social media.\n\n" +
-        "Look at the photo and write ONE paragraph, 40-70 words, describing what should " +
-        "happen in the next few seconds. Rules:\n" +
-        "- Name what is ACTUALLY in the frame: the person, their exercise, the equipment, the setting.\n" +
-        "- Describe motion that continues naturally from this exact moment — a rep being " +
-        "finished, weights lowering, a walk across the floor.\n" +
+        "START BY IDENTIFYING THE EQUIPMENT. The equipment in the frame is what the motion " +
+        "must be built on — the movement has to be what that specific kit is actually used " +
+        "for. Name it precisely (squat rack, leg press, cable crossover, lat pulldown, " +
+        "smith machine, dumbbell rack, kettlebells, treadmill, assault bike, rower, " +
+        "battle ropes, sled, bench) rather than saying 'gym equipment'.\n\n" +
+        "Then write ONE paragraph, 40-70 words, describing what happens over the next few " +
+        "seconds. Rules:\n" +
+        "- The motion must MATCH the equipment: a leg press is pressed and returned, a " +
+        "cable machine's stack rises and lowers on the cable, a barbell is racked, a rower's " +
+        "handle is drawn back, a treadmill belt runs. Get the mechanics right.\n" +
+        "- If a PERSON is in frame, describe them using that equipment correctly, continuing " +
+        "naturally from this exact moment — mid-rep finishing, weight lowering under control.\n" +
+        "- If there is NO person, this is equipment b-roll: describe camera movement over the " +
+        "kit (a slow push along a dumbbell rack, a drift across the rig) plus any honest " +
+        "detail like dust in a shaft of light. Do NOT invent a person.\n" +
+        "- Name the setting and surfaces you can actually see (rubber flooring, brick wall, " +
+        "mirrors, plate tree).\n" +
         "- Describe the camera too (subtle handheld drift, slow push-in).\n" +
         "- Say it is photorealistic documentary footage.\n" +
         "- End by forbidding the AI tells: no added or removed people, no changed faces or " +
-        "equipment, no morphing or distorted limbs.\n" +
-        "- If the photo has NO person in it, describe only camera movement over the space.\n" +
-        "- Never invent people, equipment or signage that isn't visible.\n\n" +
+        "equipment, no morphing or distorted limbs, no floating weights.\n" +
+        "- Never invent equipment, people or signage that isn't visible in the photo.\n\n" +
         "Reply with ONLY the prompt text — no preamble, no quotes.",
       messages: [
         {
