@@ -818,6 +818,13 @@ export const videoAssets = sqliteTable("video_assets", {
   height: integer("height"),
   /** Display rotation in degrees (0/90/180/270). Used to transpose at render. */
   rotation: integer("rotation").notNull().default(0),
+  /**
+   * AI-suggested clockwise rotation for footage shot with the camera turned on
+   * its side (no rotation metadata to read). Purely a SUGGESTION shown to the
+   * operator — `rotation` above is what the renderer uses, and only a confirmed
+   * choice writes to it. 0 = no suggestion.
+   */
+  suggestedRotation: integer("suggested_rotation").notNull().default(0),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),

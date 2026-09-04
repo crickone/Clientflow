@@ -1454,6 +1454,22 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     console.error("[db] campaigns landing_views migration failed:", err);
   }
 
+  // AI-suggested rotation for video clips shot with the camera physically
+  // turned (landscape file, no rotation metadata). A suggestion only — the
+  // operator confirms before it's applied to `rotation`. Additive/idempotent.
+  try {
+    const assetCols = sqlite
+      .prepare("PRAGMA table_info(video_assets)")
+      .all() as Array<{ name: string }>;
+    if (assetCols.length > 0 && !assetCols.some((c) => c.name === "suggested_rotation")) {
+      sqlite.exec(
+        "ALTER TABLE video_assets ADD COLUMN suggested_rotation INTEGER NOT NULL DEFAULT 0",
+      );
+    }
+  } catch (err) {
+    console.error("[db] video_assets suggested_rotation migration failed:", err);
+  }
+
   // Agent tool-access toggles: a JSON array of tool names the agent may NOT use
   // (the disabled set). Null = nothing disabled = every tool on. Additive/
   // idempotent like every guard in this block. See agents.disabledTools

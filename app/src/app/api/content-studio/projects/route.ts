@@ -12,6 +12,8 @@ import {
   runTranscription,
 } from "@/lib/video/projects";
 import { resolveLibraryPath } from "@/lib/video/brollLibrary";
+import { detectOrientation, mayBeShotSideways } from "@/lib/video/orientation";
+import { getCurrentTenant } from "@/lib/db/tenant";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -71,6 +73,7 @@ export async function POST(req: Request) {
   });
 
   const dir = ensureUploadDir(project.id);
+  const tenantId = getCurrentTenant().id;
 
   async function persist(file: File, kind: "main" | "broll") {
     const ext = path.extname(file.name) || ".mp4";
@@ -94,6 +97,15 @@ export async function POST(req: Request) {
     } catch (err) {
       console.warn(`[content-studio] probe failed for ${dest}:`, err);
     }
+    // Footage shot with the camera turned on its side (e.g. an A6400 rotated to
+    // film "portrait") is a genuinely landscape file with NO rotation flag, so
+    // probe() reports 0. Ask a vision model which way is up and store the
+    // SUGGESTION — the operator confirms/corrects it in the editor before it's
+    // used (never applied silently). Best-effort: resolves to 0 on any failure.
+    let suggestedRotation = 0;
+    if (kind === "main" && mayBeShotSideways(probed)) {
+      suggestedRotation = await detectOrientation(dest, tenantId);
+    }
     addAsset({
       projectId: project.id,
       kind,
@@ -105,6 +117,7 @@ export async function POST(req: Request) {
       width: probed.width,
       height: probed.height,
       rotation: probed.rotation,
+      suggestedRotation,
     });
   }
 

@@ -37,6 +37,19 @@ export async function PATCH(
     patch.rotation = r;
   }
 
+  // Clearing (or setting) the AI orientation suggestion. Confirming a rotation
+  // sends suggestedRotation: 0 to dismiss the prompt.
+  if (body?.suggestedRotation !== undefined) {
+    const s = Number(body.suggestedRotation);
+    if (![0, 90, 180, 270].includes(s)) {
+      return NextResponse.json(
+        { ok: false, error: "Suggested rotation must be 0, 90, 180, or 270." },
+        { status: 400 },
+      );
+    }
+    patch.suggestedRotation = s;
+  }
+
   if (Object.keys(patch).length === 0) {
     return NextResponse.json(
       { ok: false, error: "No supported fields to update." },

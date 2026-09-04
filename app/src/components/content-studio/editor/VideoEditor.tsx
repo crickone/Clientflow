@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Undo2, Download, AlertTriangle, Plus } from "lucide-react";
+import { Undo2, Download, AlertTriangle, Plus, RotateCw } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
 import type { VideoAsset, VideoProject } from "@/lib/db/schema";
@@ -210,6 +210,40 @@ export function VideoEditor({
     [projectId],
   );
 
+  /**
+   * Apply a confirmed orientation to the main clip. Footage shot with the
+   * camera turned on its side has no rotation metadata, so `suggestedRotation`
+   * is only ever a proposal — this is what commits the operator's choice to
+   * `rotation` (what the renderer and preview actually use). Clearing the
+   * suggestion dismisses the banner.
+   */
+  const onSetMainRotation = useCallback(
+    async (rotation: number) => {
+      if (!mainAsset) return;
+      setBusy(true);
+      setError(null);
+      try {
+        const d = await fetch(`${API(projectId)}/assets/${mainAsset.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rotation, suggestedRotation: 0 }),
+        }).then((r) => r.json());
+        if (!d.ok) {
+          setError(d.error ?? "Couldn't rotate the clip.");
+          return;
+        }
+        setAssets((prev) =>
+          prev.map((a) =>
+            a.id === mainAsset.id ? { ...a, rotation, suggestedRotation: 0 } : a,
+          ),
+        );
+      } finally {
+        setBusy(false);
+      }
+    },
+    [projectId, mainAsset],
+  );
+
   const onRecaption = useCallback(async () => {
     setBusy(true);
     setError(null);
@@ -302,6 +336,59 @@ export function VideoEditor({
           </Button>
         </div>
       </div>
+
+      {/* Orientation prompt — only for footage that looks shot sideways (a
+          landscape file with no rotation metadata, e.g. a camera turned on its
+          side). The AI's guess is pre-selected but nothing is applied until the
+          operator confirms, because no file data can settle it for certain. */}
+      {mainAsset && mainAsset.suggestedRotation > 0 && mainAsset.rotation === 0 && (
+        <div
+          style={{
+            display: "flex",
+            gap: 12,
+            alignItems: "center",
+            flexWrap: "wrap",
+            padding: "12px 14px",
+            borderRadius: "var(--radius)",
+            background: "var(--warning-soft)",
+            border: "1px solid var(--warning)",
+            fontSize: 13,
+          }}
+        >
+          <RotateCw size={16} style={{ color: "var(--warning)", flexShrink: 0 }} />
+          <span style={{ flex: 1, minWidth: 220 }}>
+            This looks like it was <strong>filmed sideways</strong>. Rotate it upright?
+          </span>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <Button
+              size="sm"
+              onClick={() => onSetMainRotation(mainAsset.suggestedRotation)}
+              disabled={busy}
+            >
+              <RotateCw size={13} />
+              Rotate {mainAsset.suggestedRotation === 270 ? "left" : "right"}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                onSetMainRotation(mainAsset.suggestedRotation === 270 ? 90 : 270)
+              }
+              disabled={busy}
+            >
+              Other way
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => onSetMainRotation(0)}
+              disabled={busy}
+            >
+              It&rsquo;s fine
+            </Button>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div

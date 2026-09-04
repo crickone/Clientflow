@@ -103,10 +103,16 @@ export function addAsset(input: {
   width: number | null;
   height: number | null;
   rotation?: number;
+  /** AI-suggested clockwise rotation (sideways-shot footage); 0 = none. */
+  suggestedRotation?: number;
 }) {
   const [row] = db
     .insert(schema.videoAssets)
-    .values({ ...input, rotation: input.rotation ?? 0 })
+    .values({
+      ...input,
+      rotation: input.rotation ?? 0,
+      suggestedRotation: input.suggestedRotation ?? 0,
+    })
     .returning()
     .all();
   return row;

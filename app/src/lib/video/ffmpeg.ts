@@ -98,6 +98,52 @@ export async function probe(filePath: string): Promise<ProbeResult> {
   });
 }
 
+/**
+ * Grab a single still frame as a JPEG. Used to show a clip's thumbnail and to
+ * let a vision model judge which way is up on footage shot with the camera
+ * physically turned (no rotation metadata to read — see detectOrientation).
+ *
+ * `atSec` is clamped into the clip; the seek happens before -i so it's fast
+ * even on long files. `-noautorotate` keeps the frame in its STORED
+ * orientation, which is what the detector must reason about (the same reason
+ * render.ts passes it — our transpose filter is the single source of truth).
+ */
+export async function extractFrame(
+  videoPath: string,
+  outPath: string,
+  atSec = 1,
+  maxWidth = 640,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const args = [
+      "-y",
+      "-noautorotate",
+      "-ss",
+      String(Math.max(0, atSec)),
+      "-i",
+      videoPath,
+      "-frames:v",
+      "1",
+      "-vf",
+      `scale=${maxWidth}:-2:force_original_aspect_ratio=decrease`,
+      "-q:v",
+      "4",
+      outPath,
+    ];
+    const child = spawn(ffmpegPath, args);
+    let stderr = "";
+    child.stderr.on("data", (d) => (stderr += d.toString()));
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code !== 0) {
+        reject(new Error(`ffmpeg exited ${code}: ${stderr.slice(-500)}`));
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
 export async function extractAudio(
   videoPath: string,
   outPath: string,
