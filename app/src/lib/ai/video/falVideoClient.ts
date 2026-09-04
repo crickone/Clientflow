@@ -43,6 +43,14 @@ export class VideoGenError extends Error {
 
 interface QueueSubmitResponse {
   request_id?: string;
+  /**
+   * fal returns the exact polling URLs. USE THESE rather than building them:
+   * this model's id has a path (…/v2.5-turbo/pro/image-to-video) and a
+   * hand-built `/{model}/requests/{id}/status` does not resolve for it, so
+   * every poll 404s and the job only "fails" when the deadline expires.
+   */
+  status_url?: string;
+  response_url?: string;
 }
 interface QueueStatusResponse {
   status?: "IN_QUEUE" | "IN_PROGRESS" | "COMPLETED";
@@ -101,17 +109,34 @@ export async function falGenerateVideo(
     const submitted = (await submitRes.json()) as QueueSubmitResponse;
     const requestId = submitted.request_id;
     if (!requestId) throw new VideoGenError("Video API returned no request id.");
+    // Prefer the URLs fal handed back; the constructed forms are only a fallback.
+    const statusUrl =
+      submitted.status_url ?? `${QUEUE_BASE}/${FAL_MODEL}/requests/${requestId}/status`;
+    const resultUrl =
+      submitted.response_url ?? `${QUEUE_BASE}/${FAL_MODEL}/requests/${requestId}`;
 
     // 2. Poll until COMPLETED (or we give up)
     const deadline = Date.now() + MAX_WAIT_MS;
     let completed = false;
+    let consecutiveErrors = 0;
+    let lastError = "";
     while (Date.now() < deadline) {
       await waiter(POLL_INTERVAL_MS);
-      const statusRes = await fetchImpl(
-        `${QUEUE_BASE}/${FAL_MODEL}/requests/${requestId}/status`,
-        { headers: auth, signal: AbortSignal.timeout(30_000) },
-      );
-      if (!statusRes.ok) continue; // transient — keep waiting until the deadline
+      const statusRes = await fetchImpl(statusUrl, {
+        headers: auth,
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (!statusRes.ok) {
+        // A blip is fine; a PERSISTENT error means we're polling the wrong
+        // place (or the job is gone), and silently spinning until the deadline
+        // just hides the real reason behind a timeout.
+        lastError = `${statusRes.status}: ${(await statusRes.text().catch(() => "")).slice(0, 160)}`;
+        if (++consecutiveErrors >= 3) {
+          throw new VideoGenError(`Video status check failed — ${lastError}`);
+        }
+        continue;
+      }
+      consecutiveErrors = 0;
       const status = (await statusRes.json()) as QueueStatusResponse;
       if (status.status === "COMPLETED") {
         completed = true;
@@ -123,7 +148,7 @@ export async function falGenerateVideo(
     }
 
     // 3. Fetch the result, then download the file
-    const resultRes = await fetchImpl(`${QUEUE_BASE}/${FAL_MODEL}/requests/${requestId}`, {
+    const resultRes = await fetchImpl(resultUrl, {
       headers: auth,
       signal: AbortSignal.timeout(60_000),
     });

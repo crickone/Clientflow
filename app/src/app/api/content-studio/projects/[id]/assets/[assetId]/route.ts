@@ -78,3 +78,35 @@ export async function PATCH(
 
   return NextResponse.json({ ok: true, asset: result[0] });
 }
+
+/**
+ * Remove an asset from a project. Used to clear a failed AI b-roll clip out of
+ * the tray — without this a failed generation sits there forever with no way to
+ * dismiss it. Scoped by projectId like the PATCH above, so an id from another
+ * project can't be deleted through this route.
+ */
+export async function DELETE(
+  _req: Request,
+  { params }: { params: { id: string; assetId: string } },
+) {
+  const __auth = await guard("user");
+  if (__auth) return __auth;
+  const projectId = Number(params.id);
+  const assetId = Number(params.assetId);
+
+  const removed = db
+    .delete(schema.videoAssets)
+    .where(
+      and(
+        eq(schema.videoAssets.id, assetId),
+        eq(schema.videoAssets.projectId, projectId),
+      ),
+    )
+    .returning()
+    .all();
+
+  if (removed.length === 0) {
+    return NextResponse.json({ ok: false, error: "Asset not found." }, { status: 404 });
+  }
+  return NextResponse.json({ ok: true });
+}

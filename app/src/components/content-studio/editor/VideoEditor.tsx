@@ -340,6 +340,21 @@ export function VideoEditor({
     [projectId, refreshAssets],
   );
 
+  /** Drop a clip from the tray — used to clear a failed AI generation. */
+  const removeAsset = useCallback(
+    async (assetId: number) => {
+      setAssets((prev) => prev.filter((a) => a.id !== assetId)); // optimistic
+      const d = await fetch(`${API(projectId)}/assets/${assetId}`, { method: "DELETE" })
+        .then((r) => r.json())
+        .catch(() => null);
+      if (!d?.ok) {
+        setError("Couldn't remove that clip.");
+        refreshAssets();
+      }
+    },
+    [projectId, refreshAssets],
+  );
+
   const onExport = useCallback(async () => {
     setBusy(true);
     setError(null);
@@ -639,13 +654,15 @@ export function VideoEditor({
               <button
                 key={b.id}
                 type="button"
-                disabled={generating || failed}
-                onClick={() => onAddBrollAtPlayhead(b.id)}
+                disabled={generating}
+                onClick={() =>
+                  failed ? removeAsset(b.id) : onAddBrollAtPlayhead(b.id)
+                }
                 title={
                   generating
                     ? "Generating this clip…"
                     : failed
-                      ? b.genError ?? "Generation failed"
+                      ? `${b.genError ?? "Generation failed"} — click to dismiss`
                       : used
                         ? `${b.originalName} (already placed — adds another)`
                         : `Add ${b.originalName} at the playhead`
@@ -661,7 +678,7 @@ export function VideoEditor({
                   fontSize: 10,
                   color: failed ? "var(--danger)" : "#e3c590",
                   maxWidth: 160,
-                  cursor: generating || failed ? "default" : "pointer",
+                  cursor: generating ? "default" : "pointer",
                   opacity: generating ? 0.7 : used ? 0.55 : 1,
                 }}
               >
@@ -673,7 +690,7 @@ export function VideoEditor({
                   <Plus size={11} />
                 )}
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {generating ? "Generating…" : failed ? "Failed" : b.originalName}
+                  {generating ? "Generating…" : failed ? "Failed — dismiss" : b.originalName}
                 </span>
               </button>
             );
