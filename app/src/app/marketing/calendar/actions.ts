@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireAdmin } from "@/lib/auth";
-import { setMonthNote, setYearPlan } from "@/lib/marketing/calendarNotes";
+import { setMonthNote } from "@/lib/marketing/calendarNotes";
 
 /**
  * Save the operator's marketing direction from the seasonal calendar. Guarded
@@ -11,17 +11,6 @@ import { setMonthNote, setYearPlan } from "@/lib/marketing/calendarNotes";
  * server action is its own entry point (the same reasoning as every other
  * actions.ts in this codebase).
  */
-
-export async function saveYearPlanAction(year: number, plan: string) {
-  await requireAdmin();
-  const y = Number(year);
-  if (!Number.isInteger(y) || y < 1900 || y > 2200) {
-    return { ok: false as const, error: "Invalid year." };
-  }
-  setYearPlan(y, String(plan ?? ""));
-  revalidatePath("/marketing/calendar");
-  return { ok: true as const };
-}
 
 export async function saveMonthNoteAction(year: number, month: number, note: string) {
   await requireAdmin();

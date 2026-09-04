@@ -3,9 +3,8 @@ import "server-only";
 import { readKey, setKey } from "@/lib/settings";
 
 /**
- * Operator-written direction attached to the seasonal calendar: the plan for
- * the year, plus per-month notes. This is what the operator already knows and
- * the AI can't infer — "September is the back-to-school push", "we're launching
+ * Operator-written direction attached to the seasonal calendar: a note per
+ * month. This is what the operator already knows and the AI can't infer — "September is the back-to-school push", "we're launching
  * the small-group programme in March, hold the discounting until then".
  *
  * Read back into the agent's business context (see @/lib/ai/businessContext) so
@@ -16,13 +15,9 @@ import { readKey, setKey } from "@/lib/settings";
  */
 
 export interface CalendarNotes {
-  /** The plan/direction for the whole year, free text. */
-  yearPlan: string;
   /** Month number (1-12) → note for that month. */
   months: Record<string, string>;
 }
-
-const EMPTY: CalendarNotes = { yearPlan: "", months: {} };
 
 function keyFor(year: number): string {
   return `marketing_calendar_notes_${year}`;
@@ -30,23 +25,14 @@ function keyFor(year: number): string {
 
 export function getCalendarNotes(year: number): CalendarNotes {
   const raw = readKey<Partial<CalendarNotes> | null>(keyFor(year), null);
-  if (!raw || typeof raw !== "object") return { ...EMPTY, months: {} };
+  if (!raw || typeof raw !== "object") return { months: {} };
   const months: Record<string, string> = {};
   if (raw.months && typeof raw.months === "object") {
     for (const [m, note] of Object.entries(raw.months)) {
       if (typeof note === "string" && note.trim()) months[m] = note;
     }
   }
-  return {
-    yearPlan: typeof raw.yearPlan === "string" ? raw.yearPlan : "",
-    months,
-  };
-}
-
-/** Replace the whole year plan. Blank clears it. */
-export function setYearPlan(year: number, plan: string): void {
-  const current = getCalendarNotes(year);
-  setKey(keyFor(year), { ...current, yearPlan: plan.trim().slice(0, 8000) });
+  return { months };
 }
 
 /** Set (or clear, when blank) one month's note. */
@@ -65,33 +51,64 @@ const MONTH_NAMES = [
   "July", "August", "September", "October", "November", "December",
 ];
 
+/** A note in the briefing is trimmed to keep the whole year affordable. */
+const BRIEF_NOTE_MAX = 400;
+
+function brief(note: string): string {
+  const t = note.trim();
+  return t.length > BRIEF_NOTE_MAX ? `${t.slice(0, BRIEF_NOTE_MAX - 1)}…` : t;
+}
+
 /**
- * The plan as a compact briefing for the agent: the year's direction plus the
- * note for THIS month and the next two. Deliberately not the whole year — the
- * agent is writing something for now, and twelve months of notes would crowd
- * out the rest of the business context.
+ * The plan as a briefing for the agent.
+ *
+ * The month notes are now the ONLY place this direction lives, so the whole
+ * year is included rather than a rolling window — that's what lets the agent
+ * see the shape of the year ("we launch in March, so hold the discounting in
+ * February") instead of just what's in front of it. Each note is trimmed, and
+ * they're short by nature, so twelve of them stay affordable.
+ *
+ * The months from `today` onward are marked as upcoming and listed first: they
+ * are what the agent is most likely writing for. Months already past stay in as
+ * context, and the first few months of NEXT year are included too so a December
+ * campaign can see January.
  */
 export function getPlanBriefing(today: Date = new Date()): string {
   const year = today.getUTCFullYear();
   const notes = getCalendarNotes(year);
-  const parts: string[] = [];
-
-  if (notes.yearPlan.trim()) {
-    parts.push(`Plan for ${year}:`, notes.yearPlan.trim());
-  }
+  const currentMonth = today.getUTCMonth() + 1;
 
   const upcoming: string[] = [];
-  for (let i = 0; i < 3; i++) {
-    const d = new Date(Date.UTC(year, today.getUTCMonth() + i, 1));
-    // Roll into next year's notes once we cross December.
-    const m = d.getUTCMonth() + 1;
-    const y = d.getUTCFullYear();
-    const source = y === year ? notes : getCalendarNotes(y);
-    const note = source.months[String(m)];
-    if (note) upcoming.push(`${MONTH_NAMES[m - 1]} ${y}: ${note}`);
+  const earlier: string[] = [];
+  for (let m = 1; m <= 12; m++) {
+    const note = notes.months[String(m)];
+    if (!note) continue;
+    const line = `${MONTH_NAMES[m - 1]}: ${brief(note)}`;
+    if (m >= currentMonth) upcoming.push(line);
+    else earlier.push(line);
   }
+
+  // Early next year, so a campaign written in December can see January.
+  const nextYear = getCalendarNotes(year + 1);
+  const nextLines: string[] = [];
+  for (let m = 1; m <= 3; m++) {
+    const note = nextYear.months[String(m)];
+    if (note) nextLines.push(`${MONTH_NAMES[m - 1]} ${year + 1}: ${brief(note)}`);
+  }
+
+  const parts: string[] = [];
   if (upcoming.length > 0) {
-    parts.push("", "What's planned for the months ahead:", ...upcoming);
+    parts.push(`The plan for the rest of ${year}, month by month:`, ...upcoming);
+  }
+  if (nextLines.length > 0) {
+    parts.push(...(parts.length ? [""] : []), `Early ${year + 1}:`, ...nextLines);
+  }
+  if (earlier.length > 0) {
+    parts.push(
+      ...(parts.length ? [""] : []),
+      `Earlier in ${year}, for context:`,
+      ...earlier,
+    );
   }
 
   return parts.join("\n");

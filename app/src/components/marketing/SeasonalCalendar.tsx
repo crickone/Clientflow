@@ -4,7 +4,7 @@ import { Radar } from "lucide-react";
 import { Card, CardLabel } from "@/components/ui/Card";
 import type { Campaign } from "@/lib/campaigns/store";
 import type { CalendarNotes } from "@/lib/marketing/calendarNotes";
-import { YearPlanPanel, MonthNote } from "@/components/marketing/PlanNotes";
+import { MonthNote } from "@/components/marketing/PlanNotes";
 import type { RadarSuggestion } from "@/lib/marketing/campaignRadar";
 import { seasonForMonth, type CalDate, type Season, type SeasonBand } from "@/lib/marketing/seasonalCalendar";
 import { BuildCampaignLink } from "./BuildCampaignLink";
@@ -153,8 +153,6 @@ export function SeasonalCalendar({ year, dates, seasons, campaigns, radar, notes
           ))}
         </div>
       </div>
-
-      <YearPlanPanel year={year} initialPlan={notes.yearPlan} />
 
       <div className="szncal-scroll">
         <div className="szncal-grid">

@@ -163,6 +163,11 @@ export function resolveThemeVars(cfg: ThemeConfig): Array<[string, string]> {
     ["--grid", rgba(fg, 0.05)],
     ["--hairline", rgba(fg, dark ? 0.09 : 0.12)],
     ["--hairline-strong", rgba(fg, dark ? 0.2 : 0.24)],
+    // Form fields are a filled, borderless surface, so they must step away from
+    // the canvas the same way the other surfaces do — otherwise a hardcoded
+    // value leaves dark charcoal inputs sitting on a light page.
+    ["--field-bg", toHex(step(bg, dark ? 0.09 : 0.05))],
+    ["--field-bg-focus", toHex(step(bg, dark ? 0.13 : 0.09))],
     ["--text-primary", rgba(fg, dark ? 0.96 : 0.92)],
     ["--text-secondary", rgba(fg, 0.64)],
     ["--text-tertiary", rgba(fg, 0.42)],
