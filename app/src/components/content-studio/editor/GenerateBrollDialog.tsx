@@ -172,7 +172,13 @@ export function GenerateBrollDialog({
                       title={p.originalName}
                       style={{
                         position: "relative",
-                        paddingBottom: "100%",
+                        // Square tiles via aspect-ratio, NOT the paddingBottom
+                        // trick — the `padding: 0` below (needed to strip the
+                        // button's default padding) reset it and collapsed
+                        // every tile to a thin bar.
+                        aspectRatio: "1 / 1",
+                        width: "100%",
+                        padding: 0,
                         borderRadius: "var(--radius)",
                         overflow: "hidden",
                         border: on
@@ -180,7 +186,6 @@ export function GenerateBrollDialog({
                           : "1px solid var(--hairline)",
                         background: "var(--surface-2)",
                         cursor: "pointer",
-                        padding: 0,
                       }}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}

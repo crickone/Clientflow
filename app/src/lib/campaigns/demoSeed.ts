@@ -84,6 +84,7 @@ export function seedTestCampaign(): void {
     startsOn,
     endsOn,
     offer: "8 weeks for the price of 6 — includes an InBody scan and a personalised plan.",
+    skipCalendarNote: true,
   });
   setCampaignStatus(campaign.id, "active");
   setCampaignAdSpend(campaign.id, 15000); // €150

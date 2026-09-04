@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Radar } from "lucide-react";
+import { Radar, Megaphone } from "lucide-react";
 
 import { Card, CardLabel } from "@/components/ui/Card";
 import type { Campaign } from "@/lib/campaigns/store";
@@ -202,6 +202,12 @@ export function SeasonalCalendar({ year, dates, seasons, campaigns, radar, notes
                     ))}
                   </div>
                 )}
+                {(notes.campaignNotes[String(month)] ?? []).map((line, i) => (
+                  <div key={i} className="szncal-auto-note" title="Recorded when this campaign was created">
+                    <Megaphone size={10} style={{ flexShrink: 0, marginTop: 2 }} />
+                    <span>{line}</span>
+                  </div>
+                ))}
                 <MonthNote
                   year={year}
                   month={month}
@@ -242,6 +248,21 @@ export function SeasonalCalendar({ year, dates, seasons, campaigns, radar, notes
               color: var(--text-primary);
             }
             .szncal-note-add { align-items: center; color: var(--text-tertiary); font-size: 11px; }
+            /* Campaign lines the app recorded — read-only, so they read as a
+               record rather than an editable note. */
+            .szncal-auto-note {
+              display: flex;
+              align-items: flex-start;
+              gap: 6px;
+              margin-top: 8px;
+              padding: 6px 9px;
+              border-radius: var(--radius-sm);
+              border: 1px solid var(--grid);
+              background: var(--surface-2);
+              color: var(--text-secondary);
+              font-size: 11px;
+              line-height: 1.4;
+            }
             .szncal-grid {
               display: grid;
               grid-template-columns: repeat(4, minmax(210px, 1fr));

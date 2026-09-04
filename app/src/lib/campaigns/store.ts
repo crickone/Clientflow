@@ -3,6 +3,7 @@ import "server-only";
 import { asc, desc, eq, sql } from "drizzle-orm";
 
 import { db, schema } from "@/lib/db";
+import { addCampaignNote } from "@/lib/marketing/calendarNotes";
 import type { Campaign, CampaignAsset } from "@/lib/db/schema";
 
 import { listSites } from "@/lib/cms/sites";
@@ -66,6 +67,12 @@ export interface CreateCampaignInput {
   startsOn?: string | null;
   endsOn?: string | null;
   offer?: string;
+  /**
+   * Skip writing the seasonal-calendar note. Only the demo seeder sets this —
+   * a throwaway "Test Campaign" shouldn't leave a note behind that the demo
+   * teardown can't remove.
+   */
+  skipCalendarNote?: boolean;
 }
 
 /**
@@ -74,7 +81,7 @@ export interface CreateCampaignInput {
  * a caller can build a custom asset plan instead of the default one).
  */
 export function createCampaign(input: CreateCampaignInput): Campaign {
-  return db
+  const campaign = db
     .insert(schema.campaigns)
     .values({
       name: input.name.trim(),
@@ -86,6 +93,38 @@ export function createCampaign(input: CreateCampaignInput): Campaign {
     })
     .returning()
     .get();
+
+  // Record it on the seasonal calendar, so the month shows what's actually
+  // running rather than only what the operator wrote down. Hooked HERE, at the
+  // single creation choke point, rather than in the agent tool — an agent can
+  // forget to call something, a choke point can't. Best-effort: a calendar
+  // write must never fail a campaign creation.
+  if (!input.skipCalendarNote) {
+    try {
+      logCampaignToCalendar(campaign);
+    } catch (err) {
+      console.error("[campaigns] calendar note failed:", err);
+    }
+  }
+  return campaign;
+}
+
+/**
+ * Write the "what's happening" line for a campaign onto the month it starts in
+ * (falling back to today when it has no start date). Deliberately factual —
+ * name, offer, dates — since the operator's own note is where opinion belongs.
+ */
+function logCampaignToCalendar(campaign: Campaign): void {
+  const iso = campaign.startsOn ?? new Date().toISOString().slice(0, 10);
+  const year = Number(iso.slice(0, 4));
+  const month = Number(iso.slice(5, 7));
+  if (!Number.isInteger(year) || !Number.isInteger(month)) return;
+  const when = campaign.startsOn
+    ? `from ${campaign.startsOn}${campaign.endsOn ? ` to ${campaign.endsOn}` : ""}`
+    : "no dates set";
+  const offer = campaign.offer?.trim();
+  const line = `${campaign.name} — ${when}${offer ? `. Offer: ${offer}` : ""}`;
+  addCampaignNote(year, month, line);
 }
 
 export function getCampaign(id: number): Campaign | null {

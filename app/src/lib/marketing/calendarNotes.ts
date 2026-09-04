@@ -15,9 +15,18 @@ import { readKey, setKey } from "@/lib/settings";
  */
 
 export interface CalendarNotes {
-  /** Month number (1-12) → note for that month. */
+  /** Month number (1-12) → the OPERATOR's note for that month. */
   months: Record<string, string>;
+  /**
+   * Month number (1-12) → lines written by the app when a campaign is created,
+   * so the calendar records what's actually running. Kept in their own track so
+   * they can never overwrite what the operator wrote.
+   */
+  campaignNotes: Record<string, string[]>;
 }
+
+/** How many auto lines to keep per month before dropping the oldest. */
+const MAX_CAMPAIGN_NOTES_PER_MONTH = 8;
 
 function keyFor(year: number): string {
   return `marketing_calendar_notes_${year}`;
@@ -25,14 +34,44 @@ function keyFor(year: number): string {
 
 export function getCalendarNotes(year: number): CalendarNotes {
   const raw = readKey<Partial<CalendarNotes> | null>(keyFor(year), null);
-  if (!raw || typeof raw !== "object") return { months: {} };
+  if (!raw || typeof raw !== "object") return { months: {}, campaignNotes: {} };
   const months: Record<string, string> = {};
   if (raw.months && typeof raw.months === "object") {
     for (const [m, note] of Object.entries(raw.months)) {
       if (typeof note === "string" && note.trim()) months[m] = note;
     }
   }
-  return { months };
+  const campaignNotes: Record<string, string[]> = {};
+  if (raw.campaignNotes && typeof raw.campaignNotes === "object") {
+    for (const [m, lines] of Object.entries(raw.campaignNotes)) {
+      if (!Array.isArray(lines)) continue;
+      const clean = lines.filter((l): l is string => typeof l === "string" && !!l.trim());
+      if (clean.length) campaignNotes[m] = clean;
+    }
+  }
+  return { months, campaignNotes };
+}
+
+/**
+ * Record what a campaign is doing, on the month it starts in. Written by the
+ * app when a campaign is created (see lib/campaigns/store.createCampaign), so
+ * the calendar reflects what's actually running rather than only what the
+ * operator remembered to write down. Never touches the operator's own note.
+ * De-duplicated, so re-running a create doesn't stack identical lines.
+ */
+export function addCampaignNote(year: number, month: number, line: string): void {
+  if (month < 1 || month > 12) return;
+  const text = line.trim().slice(0, 300);
+  if (!text) return;
+  const current = getCalendarNotes(year);
+  const key = String(month);
+  const existing = current.campaignNotes[key] ?? [];
+  if (existing.includes(text)) return;
+  const next = [...existing, text].slice(-MAX_CAMPAIGN_NOTES_PER_MONTH);
+  setKey(keyFor(year), {
+    ...current,
+    campaignNotes: { ...current.campaignNotes, [key]: next },
+  });
 }
 
 /** Set (or clear, when blank) one month's note. */
@@ -82,8 +121,15 @@ export function getPlanBriefing(today: Date = new Date()): string {
   const earlier: string[] = [];
   for (let m = 1; m <= 12; m++) {
     const note = notes.months[String(m)];
-    if (!note) continue;
-    const line = `${MONTH_NAMES[m - 1]}: ${brief(note)}`;
+    // Campaigns already recorded for the month, so the agent knows what's
+    // running and doesn't propose something that duplicates it.
+    const running = notes.campaignNotes[String(m)] ?? [];
+    if (!note && running.length === 0) continue;
+    const bits = [
+      note ? brief(note) : null,
+      running.length ? `Already scheduled: ${running.map(brief).join("; ")}` : null,
+    ].filter(Boolean);
+    const line = `${MONTH_NAMES[m - 1]}: ${bits.join(" ")}`;
     if (m >= currentMonth) upcoming.push(line);
     else earlier.push(line);
   }

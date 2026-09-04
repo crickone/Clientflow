@@ -39,7 +39,7 @@ function ok(name: string, cond: boolean) {
   passed++;
 }
 
-const { getCalendarNotes, setMonthNote, getPlanBriefing } =
+const { getCalendarNotes, setMonthNote, addCampaignNote, getPlanBriefing } =
   requireLocal("./calendarNotes") as typeof import("./calendarNotes");
 
 // Empty to start.
@@ -91,8 +91,45 @@ setMonthNote(2026, 0, "nope");
 ok("month 13 is rejected", getCalendarNotes(2026).months["13"] === undefined);
 ok("month 0 is rejected", getCalendarNotes(2026).months["0"] === undefined);
 
+// ── Campaign notes: written by the app when a campaign is created ─────────
+// They live in their OWN track so they can never clobber what the operator
+// wrote, and they feed back into the briefing so the agent knows what's
+// already scheduled and doesn't propose a duplicate.
+setMonthNote(2026, 10, "Autumn push, target lapsed members");
+addCampaignNote(2026, 10, "Autumn Reset Program — from 2026-10-26 to 2026-11-30");
+const notesOct = getCalendarNotes(2026);
+ok("operator note survives a campaign note", notesOct.months["10"] === "Autumn push, target lapsed members");
+ok("campaign note is stored separately", notesOct.campaignNotes["10"]?.[0]?.startsWith("Autumn Reset Program"));
+
+// And the reverse: writing the operator note again must not drop the campaign line.
+setMonthNote(2026, 10, "Autumn push, edited");
+ok(
+  "editing the operator note preserves campaign notes",
+  getCalendarNotes(2026).campaignNotes["10"]?.length === 1,
+);
+
+// De-duplicated, so re-running a create doesn't stack identical lines.
+addCampaignNote(2026, 10, "Autumn Reset Program — from 2026-10-26 to 2026-11-30");
+ok("identical campaign note is not duplicated", getCalendarNotes(2026).campaignNotes["10"]?.length === 1);
+
+const october = getPlanBriefing(new Date("2026-10-01T00:00:00Z"));
+ok("briefing carries the operator note", october.includes("Autumn push, edited"));
+ok("briefing flags what's already scheduled", october.includes("Already scheduled: Autumn Reset Program"));
+
+// A month with ONLY a campaign note still reaches the agent.
+addCampaignNote(2026, 11, "Black Friday offer — from 2026-11-27");
+ok(
+  "a campaign-only month appears in the briefing",
+  getPlanBriefing(new Date("2026-10-01T00:00:00Z")).includes("Black Friday offer"),
+);
+
+// Out-of-range months rejected here too.
+addCampaignNote(2026, 13, "nope");
+ok("campaign note month 13 is rejected", getCalendarNotes(2026).campaignNotes["13"] === undefined);
+
 // Malformed stored data must not throw — settings rows are hand-editable.
 store.set("marketing_calendar_notes_2030", "not an object");
 ok("malformed row degrades to empty", Object.keys(getCalendarNotes(2030).months).length === 0);
+ok("malformed row has no campaign notes", Object.keys(getCalendarNotes(2030).campaignNotes).length === 0);
 
 console.log(`calendarNotes.test.ts: all ${passed} assertions passed`);
