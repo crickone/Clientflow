@@ -284,6 +284,34 @@ export function NewProjectForm() {
   );
 }
 
+/**
+ * Does a dropped file match the picker's `accept`? Supports the wildcard form
+ * ("video/*") and an explicit mime list, falling back to the file extension —
+ * some browsers report an empty `type` for less common containers like .mkv.
+ */
+function matchesAccept(file: File, accept: string): boolean {
+  const rules = accept
+    .split(",")
+    .map((r) => r.trim().toLowerCase())
+    .filter(Boolean);
+  if (rules.length === 0) return true;
+  const type = (file.type || "").toLowerCase();
+  const name = file.name.toLowerCase();
+  return rules.some((rule) => {
+    if (rule.endsWith("/*")) {
+      const prefix = rule.slice(0, -1); // "video/"
+      if (type.startsWith(prefix)) return true;
+      // No mime from the browser — fall back to a sensible extension check.
+      if (!type && prefix === "video/") {
+        return /\.(mp4|mov|webm|mkv|m4v|avi)$/.test(name);
+      }
+      return false;
+    }
+    if (rule.startsWith(".")) return name.endsWith(rule);
+    return type === rule;
+  });
+}
+
 function FilePicker({
   label,
   helper,
@@ -299,17 +327,43 @@ function FilePicker({
   files: File[];
   onChange: (files: File[]) => void;
 }) {
+  const [dragging, setDragging] = useState(false);
+  const [rejected, setRejected] = useState(false);
+
+  function take(list: File[]) {
+    const ok = list.filter((f) => matchesAccept(f, accept));
+    setRejected(ok.length === 0 && list.length > 0);
+    if (ok.length === 0) return;
+    onChange(multiple ? ok : ok.slice(0, 1));
+  }
+
   return (
     <div>
       <Label>{label}</Label>
       <label
+        onDragOver={(e) => {
+          if (!e.dataTransfer.types.includes("Files")) return;
+          e.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={(e) => {
+          if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+          setDragging(false);
+        }}
+        onDrop={(e) => {
+          if (!e.dataTransfer.types.includes("Files")) return;
+          e.preventDefault();
+          setDragging(false);
+          take(Array.from(e.dataTransfer.files));
+        }}
         style={{
           display: "block",
-          border: "1px dashed var(--hairline-strong)",
+          border: `1px dashed ${dragging ? "var(--text-primary)" : "var(--hairline-strong)"}`,
           borderRadius: "var(--radius)",
           padding: 18,
-          background: "var(--surface-1)",
+          background: dragging ? "var(--surface-2)" : "var(--surface-1)",
           cursor: "pointer",
+          transition: "border-color 0.15s var(--ease), background 0.15s var(--ease)",
         }}
       >
         <input
@@ -319,30 +373,33 @@ function FilePicker({
           style={{ display: "none" }}
           onChange={(e) => {
             const list = Array.from(e.target.files ?? []);
-            onChange(list);
+            take(list);
+            e.target.value = "";
           }}
         />
         <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-          {files.length === 0
-            ? `Click to choose ${multiple ? "files" : "a file"}`
-            : files.map((f) => (
-                <div key={f.name} style={{ color: "var(--text-primary)" }}>
-                  {f.name}{" "}
-                  <span style={{ color: "var(--text-tertiary)" }}>
-                    · {(f.size / (1024 * 1024)).toFixed(1)} MB
-                  </span>
-                </div>
-              ))}
+          {dragging
+            ? `Drop to add ${multiple ? "these clips" : "this clip"}`
+            : files.length === 0
+              ? `Drag ${multiple ? "files" : "a file"} here, or click to choose`
+              : files.map((f) => (
+                  <div key={f.name} style={{ color: "var(--text-primary)" }}>
+                    {f.name}{" "}
+                    <span style={{ color: "var(--text-tertiary)" }}>
+                      · {(f.size / (1024 * 1024)).toFixed(1)} MB
+                    </span>
+                  </div>
+                ))}
         </div>
         <div
           style={{
             fontSize: 11,
-            color: "var(--text-tertiary)",
+            color: rejected ? "var(--danger)" : "var(--text-tertiary)",
             marginTop: 6,
             letterSpacing: "0.04em",
           }}
         >
-          {helper}
+          {rejected ? "That file isn't a video — try MP4, MOV, WebM or MKV." : helper}
         </div>
       </label>
     </div>
