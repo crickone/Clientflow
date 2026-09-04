@@ -356,6 +356,15 @@ export function Sidebar({
 
   /** Left indent scales with nesting depth (0 = top level, matches the old indent/no-indent split at depth 1). */
   const indentFor = (depth: number) => 13 + depth * 21;
+  /**
+   * On the collapsed rail rows stack icon-over-label and are centred, so the
+   * depth indent (and the right padding) would push the tile off-centre. Set
+   * here rather than in CSS because the indent itself is an inline style.
+   */
+  const rowPadding = (depth: number): CSSProperties =>
+    collapsed
+      ? { paddingLeft: 2, paddingRight: 2 }
+      : { paddingLeft: indentFor(depth) };
 
   function renderLink(item: NavLink, depth = 0) {
     const active = isActiveLink(item, pathname);
@@ -368,13 +377,14 @@ export function Sidebar({
         className={cn("nav-link", active && "nav-link--active")}
         style={{
           ...navRowStyle,
-          paddingLeft: indentFor(depth),
+          ...rowPadding(depth),
         }}
       >
         {active && (
           <motion.span
             layoutId="nav-active-bar"
             aria-hidden
+            className="nav-active-bar"
             style={{ position: "absolute", left: 0, top: 5, bottom: 5, width: 3, background: "var(--accent)" }}
             transition={{ duration: DUR.base, ease: [...EASE] }}
           />
@@ -453,6 +463,7 @@ export function Sidebar({
           <motion.span
             layoutId="nav-active-bar"
             aria-hidden
+            className="nav-active-bar"
             style={{ position: "absolute", left: 0, top: 5, bottom: 5, width: 3, background: "var(--accent)" }}
             transition={{ duration: DUR.base, ease: [...EASE] }}
           />
@@ -469,7 +480,9 @@ export function Sidebar({
 
     const Icon = entry.icon;
     const childActive = groupHasActiveDescendant(entry, pathname);
-    const expanded = openGroups[entry.label] ?? childActive;
+    // On the collapsed rail a group shows as a single icon+label tile; its
+    // children would have no room to read, so groups never expand there.
+    const expanded = collapsed ? false : (openGroups[entry.label] ?? childActive);
     return (
       <div key={entry.label}>
         <button
@@ -493,7 +506,7 @@ export function Sidebar({
             width: "100%",
             border: "none",
             cursor: "pointer",
-            paddingLeft: indentFor(depth),
+            ...rowPadding(depth),
             ...(childActive ? { color: "var(--text-primary)" } : {}),
           }}
         >
@@ -503,7 +516,7 @@ export function Sidebar({
           </span>
           <ChevronDown
             size={14}
-            className="nav-label"
+            className="nav-chevron"
             style={{
               transition: "transform 0.15s var(--ease)",
               transform: expanded ? "rotate(0deg)" : "rotate(-90deg)",
@@ -528,6 +541,7 @@ export function Sidebar({
         <X size={20} strokeWidth={2} />
       </button>
       <div
+        className="sidebar-header"
         style={{
           padding: "20px 12px 20px",
           display: "flex",
@@ -580,6 +594,7 @@ export function Sidebar({
       </nav>
 
       <div
+        className="sidebar-footer"
         style={{
           padding: "14px 16px",
           // Softer than a full hairline: on a floating (background-less) nav a

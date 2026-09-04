@@ -399,28 +399,55 @@ a {
 }
 .app-sidebar .nav-label,
 .app-sidebar .sidebar-fade {
-  transition: opacity 0.18s var(--ease);
+  transition:
+    opacity 0.18s var(--ease),
+    font-size 0.28s cubic-bezier(0.22, 1, 0.36, 1);
   white-space: nowrap;
 }
-.app-sidebar.is-collapsed .nav-label,
-.app-sidebar.is-collapsed .sidebar-fade {
-  opacity: 0;
-  pointer-events: none;
-}
-/* Rows centre their icon and lose the label gap while collapsed. */
+
+/* Collapsed rail: the icon stays and its label tucks UNDERNEATH at about half
+   size, so every destination is still readable — the row simply restacks from
+   a horizontal to a vertical arrangement. (Fading the label out instead would
+   leave it occupying its full width in layout, which pushed the icons out of
+   the 76px rail entirely.) */
 .app-sidebar.is-collapsed .nav-link {
-  padding-left: 0 !important;
-  padding-right: 0 !important;
+  flex-direction: column;
+  gap: 5px;
   justify-content: center;
+  text-align: center;
+}
+.app-sidebar.is-collapsed .nav-label {
+  font-size: 9.5px;
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: none !important;
+  text-align: center !important;
+}
+/* Chevrons and the account/user blocks have no room on the rail. */
+.app-sidebar.is-collapsed .nav-chevron,
+.app-sidebar.is-collapsed .sidebar-fade {
+  display: none;
 }
 .app-sidebar.is-collapsed .nav-badge {
   position: absolute;
-  top: 3px;
-  right: 12px;
+  top: 4px;
+  right: 10px;
   margin-left: 0 !important;
 }
-/* Group headers become a divider rule rather than a word. */
-.app-sidebar.is-collapsed .nav-group-label { opacity: 0; }
+.app-sidebar.is-collapsed .nav-active-bar { display: none; }
+/* Header + footer have no room for a row of controls on the rail — stack them. */
+.app-sidebar.is-collapsed .sidebar-header,
+.app-sidebar.is-collapsed .sidebar-footer {
+  flex-direction: column;
+  gap: 10px;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+  justify-content: center;
+}
 
 .app-sidebar-toggle {
   display: flex;
@@ -507,14 +534,28 @@ a {
     width: min(84vw, 300px);
     min-width: 0;
   }
-  .app-sidebar.is-collapsed .nav-label,
+  /* The drawer is always full width, so undo every rail rule it might inherit. */
+  .app-sidebar.is-collapsed .nav-label {
+    opacity: 1;
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: inherit;
+  }
   .app-sidebar.is-collapsed .sidebar-fade,
-  .app-sidebar.is-collapsed .nav-group-label {
+  .app-sidebar.is-collapsed .nav-chevron {
+    display: revert;
     opacity: 1;
   }
   .app-sidebar.is-collapsed .nav-link {
+    flex-direction: row;
     justify-content: flex-start;
+    text-align: left;
   }
+  .app-sidebar.is-collapsed .sidebar-header,
+  .app-sidebar.is-collapsed .sidebar-footer {
+    flex-direction: row;
+  }
+  .app-sidebar.is-collapsed .nav-active-bar { display: revert; }
   .app-sidebar-toggle { display: none; }
   .app-sidebar.is-open {
     transform: translateX(0);
