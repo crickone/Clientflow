@@ -46,6 +46,22 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const [navOpen, setNavOpen] = useState(false);
+  // Desktop nav collapse. Persisted per browser so it survives navigation and
+  // reloads; read after mount so the server render stays deterministic.
+  const [navCollapsed, setNavCollapsed] = useState(false);
+  useEffect(() => {
+    try {
+      setNavCollapsed(localStorage.getItem("nav-collapsed") === "1");
+    } catch {}
+  }, []);
+  const toggleNavCollapsed = () =>
+    setNavCollapsed((c) => {
+      const next = !c;
+      try {
+        localStorage.setItem("nav-collapsed", next ? "1" : "0");
+      } catch {}
+      return next;
+    });
 
   // Close the mobile drawer whenever the route changes (i.e. on nav).
   useEffect(() => {
@@ -76,6 +92,8 @@ export function AppShell({
           themeMode={themeMode}
           open={navOpen}
           onClose={() => setNavOpen(false)}
+          collapsed={navCollapsed}
+          onToggleCollapsed={toggleNavCollapsed}
         />
         {navOpen && <div className="app-backdrop" onClick={() => setNavOpen(false)} />}
         <main className="app-main">

@@ -51,6 +51,7 @@ import {
   Users,
   X,
   Zap,
+  PanelLeftClose,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -276,6 +277,8 @@ export function Sidebar({
   themeMode,
   open = false,
   onClose,
+  collapsed = false,
+  onToggleCollapsed,
 }: {
   user: SidebarUser;
   accounts: SidebarAccount[];
@@ -290,6 +293,9 @@ export function Sidebar({
   themeMode: ThemeMode;
   open?: boolean;
   onClose?: () => void;
+  /** Desktop: narrow icon-only rail. The mobile drawer ignores this. */
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
 }) {
   const vocab = useVocab();
   const router = useRouter();
@@ -374,7 +380,9 @@ export function Sidebar({
           />
         )}
         <Icon size={depth === 0 ? 16 : 15} strokeWidth={1.75} />
-        <span>{item.labelKey ? vocab[item.labelKey] : item.label}</span>
+        <span className="nav-label">
+          {item.labelKey ? vocab[item.labelKey] : item.label}
+        </span>
         {badge > 0 && (
           <span
             className="nav-badge"
@@ -450,7 +458,7 @@ export function Sidebar({
           />
         )}
         <Icon size={18} strokeWidth={2} />
-        <span>{item.label}</span>
+        <span className="nav-label">{item.label}</span>
       </Link>
     );
   }
@@ -490,9 +498,12 @@ export function Sidebar({
           }}
         >
           <Icon size={depth === 0 ? 16 : 15} strokeWidth={1.75} />
-          <span style={{ flex: 1, textAlign: "left" }}>{entry.label}</span>
+          <span className="nav-label" style={{ flex: 1, textAlign: "left" }}>
+            {entry.label}
+          </span>
           <ChevronDown
             size={14}
+            className="nav-label"
             style={{
               transition: "transform 0.15s var(--ease)",
               transform: expanded ? "rotate(0deg)" : "rotate(-90deg)",
@@ -506,7 +517,9 @@ export function Sidebar({
   }
 
   return (
-    <aside className={`app-sidebar${open ? " is-open" : ""}`}>
+    <aside
+      className={`app-sidebar${open ? " is-open" : ""}${collapsed ? " is-collapsed" : ""}`}
+    >
       <button
         className="app-sidebar-close"
         onClick={onClose}
@@ -516,21 +529,37 @@ export function Sidebar({
       </button>
       <div
         style={{
-          padding: "20px 16px 24px",
-          borderBottom: "1px solid var(--hairline)",
+          padding: "20px 12px 20px",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
         }}
       >
-        {accounts.length >= 2 ? (
-          <AccountSwitcher
-            accounts={accounts}
-            activeTenantId={activeTenantId}
-            logoSrc={logoSrc}
-            businessName={businessName}
-          />
-        ) : (
-          <div style={{ padding: "4px 4px 0" }}>
-            <Logo src={logoSrc} alt={businessName} height={24} />
-          </div>
+        <div className="sidebar-fade" style={{ flex: 1, minWidth: 0 }}>
+          {accounts.length >= 2 ? (
+            <AccountSwitcher
+              accounts={accounts}
+              activeTenantId={activeTenantId}
+              logoSrc={logoSrc}
+              businessName={businessName}
+            />
+          ) : (
+            <div style={{ padding: "4px 4px 0" }}>
+              <Logo src={logoSrc} alt={businessName} height={24} />
+            </div>
+          )}
+        </div>
+        {onToggleCollapsed && (
+          <button
+            type="button"
+            className="app-sidebar-toggle"
+            onClick={onToggleCollapsed}
+            aria-label={collapsed ? "Expand menu" : "Collapse menu"}
+            aria-expanded={!collapsed}
+            title={collapsed ? "Expand menu" : "Collapse menu"}
+          >
+            <PanelLeftClose size={15} strokeWidth={1.9} />
+          </button>
         )}
       </div>
 
@@ -553,7 +582,9 @@ export function Sidebar({
       <div
         style={{
           padding: "14px 16px",
-          borderTop: "1px solid var(--hairline)",
+          // Softer than a full hairline: on a floating (background-less) nav a
+          // hard rule reads as leftover panel chrome.
+          borderTop: "1px solid var(--grid)",
           display: "flex",
           alignItems: "center",
           gap: 10,
@@ -578,7 +609,7 @@ export function Sidebar({
         >
           {(user.name?.[0] ?? user.email[0] ?? "?").toUpperCase()}
         </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="sidebar-fade" style={{ flex: 1, minWidth: 0 }}>
           <div
             style={{
               color: "var(--text-primary)",
