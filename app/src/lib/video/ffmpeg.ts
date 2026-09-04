@@ -23,7 +23,12 @@ export interface ProbeResult {
   rotation: number;
 }
 
-function normaliseRotation(raw: number): number {
+/**
+ * Snap a rotation to 0/90/180/270 in a 0..359 range. Exported for the test that
+ * pins the sign convention — the branch feeding this used to skip a negation,
+ * which put every phone clip 180 degrees out with nothing to catch it.
+ */
+export function normaliseRotation(raw: number): number {
   if (!Number.isFinite(raw)) return 0;
   // side_data_list values can be negative for clockwise display rotation;
   // normalise to a 0..359 range and snap to the nearest 90.
@@ -69,16 +74,30 @@ export async function probe(filePath: string): Promise<ProbeResult> {
           : 0;
         const video = parsed.streams?.find((s) => s.codec_type === "video");
 
-        // Detect display rotation. Modern ffmpeg writes the rotation under
-        // side_data_list[].rotation (often negative for clockwise display);
-        // older containers put it in tags.rotate (positive degrees).
+        // Detect display rotation, normalised to ONE convention across the app:
+        // `rotation` is always the CLOCKWISE degrees needed to bring the stored
+        // raster upright (what transposeFor() in render.ts expects, and what the
+        // operator/AI rotation controls mean).
+        //
+        // The two metadata sources use OPPOSITE conventions, so they can't share
+        // a code path:
+        //   - side_data_list[].rotation is av_display_rotation_get(), documented
+        //     as the COUNTER-clockwise angle of the transform. ffmpeg's own
+        //     autorotate negates it (theta = -rotation) before choosing a
+        //     transpose, so we must negate it too. An iPhone portrait clip
+        //     reports -90 and needs transpose=1 (clockwise 90) => 90.
+        //   - tags.rotate (legacy containers) is ALREADY that negated value, so
+        //     it is used as-is.
+        // Without the negation a phone clip came out 180 degrees from correct;
+        // side_data wins whenever present, and modern ffprobe emits it for
+        // essentially all phone footage, so that was the branch actually firing.
         let rotation = 0;
         if (video?.side_data_list) {
           const entry = video.side_data_list.find(
             (d) => d.rotation !== undefined && d.rotation !== null,
           );
           if (entry?.rotation !== undefined) {
-            rotation = normaliseRotation(Number(entry.rotation));
+            rotation = normaliseRotation(-Number(entry.rotation));
           }
         }
         if (rotation === 0 && video?.tags?.rotate !== undefined) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Undo2, Download, AlertTriangle, Plus, RotateCw, Loader2 } from "lucide-react";
+import { Undo2, Download, AlertTriangle, Plus, RotateCw, RotateCcw, Loader2 } from "lucide-react";
 import { GenerateBrollDialog } from "./GenerateBrollDialog";
 
 import { Button } from "@/components/ui/Button";
@@ -453,54 +453,86 @@ export function VideoEditor({
           landscape file with no rotation metadata, e.g. a camera turned on its
           side). The AI's guess is pre-selected but nothing is applied until the
           operator confirms, because no file data can settle it for certain. */}
-      {mainAsset && mainAsset.suggestedRotation > 0 && mainAsset.rotation === 0 && (
-        <div
-          style={{
-            display: "flex",
-            gap: 12,
-            alignItems: "center",
-            flexWrap: "wrap",
-            padding: "12px 14px",
-            borderRadius: "var(--radius)",
-            background: "var(--warning-soft)",
-            border: "1px solid var(--warning)",
-            fontSize: 13,
-          }}
-        >
-          <RotateCw size={16} style={{ color: "var(--warning)", flexShrink: 0 }} />
-          <span style={{ flex: 1, minWidth: 220 }}>
-            This looks like it was <strong>filmed sideways</strong>. Rotate it upright?
-          </span>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Button
-              size="sm"
-              onClick={() => onSetMainRotation(mainAsset.suggestedRotation)}
-              disabled={busy}
-            >
-              <RotateCw size={13} />
-              Rotate {mainAsset.suggestedRotation === 270 ? "left" : "right"}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() =>
-                onSetMainRotation(mainAsset.suggestedRotation === 270 ? 90 : 270)
-              }
-              disabled={busy}
-            >
-              Other way
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => onSetMainRotation(0)}
-              disabled={busy}
-            >
-              It&rsquo;s fine
-            </Button>
+      {/* Orientation. The AI can only ever SUGGEST which way is up (a sideways
+          -shot file has no metadata saying so), and a suggestion can be wrong —
+          so the rotate controls are always available, not just while the clip is
+          unrotated. The prompt styling appears only when there's an unresolved
+          suggestion. */}
+      {mainAsset && (() => {
+        const pending = mainAsset.suggestedRotation > 0 && mainAsset.rotation === 0;
+        const turn = (delta: number) =>
+          onSetMainRotation((((mainAsset.rotation + delta) % 360) + 360) % 360);
+        return (
+          <div
+            style={{
+              display: "flex",
+              gap: 12,
+              alignItems: "center",
+              flexWrap: "wrap",
+              padding: pending ? "12px 14px" : "8px 12px",
+              borderRadius: "var(--radius)",
+              background: pending ? "var(--warning-soft)" : "transparent",
+              border: `1px solid ${pending ? "var(--warning)" : "var(--grid)"}`,
+              fontSize: 13,
+            }}
+          >
+            <RotateCw
+              size={pending ? 16 : 14}
+              style={{ color: pending ? "var(--warning)" : "var(--text-tertiary)", flexShrink: 0 }}
+            />
+            <span style={{ flex: 1, minWidth: 200, color: pending ? undefined : "var(--text-tertiary)" }}>
+              {pending ? (
+                <>
+                  This looks like it was <strong>filmed sideways</strong>. Rotate it upright?
+                </>
+              ) : (
+                `Orientation${mainAsset.rotation ? ` — rotated ${mainAsset.rotation}°` : ""}`
+              )}
+            </span>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {pending ? (
+                <>
+                  <Button
+                    size="sm"
+                    onClick={() => onSetMainRotation(mainAsset.suggestedRotation)}
+                    disabled={busy}
+                  >
+                    <RotateCw size={13} />
+                    Rotate {mainAsset.suggestedRotation === 270 ? "left" : "right"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onSetMainRotation(mainAsset.suggestedRotation === 270 ? 90 : 270)}
+                    disabled={busy}
+                  >
+                    Other way
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => onSetMainRotation(0)} disabled={busy}>
+                    It&rsquo;s fine
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button size="sm" variant="outline" onClick={() => turn(270)} disabled={busy} title="Rotate left">
+                    <RotateCcw size={13} />
+                    Left
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => turn(90)} disabled={busy} title="Rotate right">
+                    <RotateCw size={13} />
+                    Right
+                  </Button>
+                  {mainAsset.rotation !== 0 && (
+                    <Button size="sm" variant="ghost" onClick={() => onSetMainRotation(0)} disabled={busy}>
+                      Reset
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {error && (
         <div
