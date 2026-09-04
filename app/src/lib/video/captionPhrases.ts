@@ -43,6 +43,18 @@ export interface CaptionPhrase {
   start: number;
   end: number;
   text: string;
+  /**
+   * The individual words behind `text`, with their Whisper timings. Carried so
+   * both the renderer and the preview can highlight the word currently being
+   * spoken (the "karaoke"/word-pop style) instead of only showing the phrase.
+   */
+  words: CaptionWord[];
+}
+
+export interface CaptionWord {
+  text: string;
+  start: number;
+  end: number;
 }
 
 const SENTENCE_END_RE = /[.!?]$/;
@@ -101,6 +113,11 @@ export function groupIntoPhrases(words: TranscriptWord[]): CaptionPhrase[] {
           start: current.start,
           end: current.end,
           text: current.words.map((x) => x.word.trim()).join(" "),
+          words: current.words.map((x) => ({
+            text: x.word.trim(),
+            start: x.start,
+            end: x.end,
+          })),
         });
       }
       current = { words: [w], start: w.start, end: w.end };
@@ -114,6 +131,11 @@ export function groupIntoPhrases(words: TranscriptWord[]): CaptionPhrase[] {
       start: current.start,
       end: current.end,
       text: current.words.map((x) => x.word.trim()).join(" "),
+      words: current.words.map((x) => ({
+        text: x.word.trim(),
+        start: x.start,
+        end: x.end,
+      })),
     });
   }
   return phrases;
@@ -133,7 +155,14 @@ export function phrasesForDisplay(words: TranscriptWord[]): CaptionPhrase[] {
     const naturalEnd = next ? next.start : p.end + 0.25;
     const end = Math.max(naturalEnd, start + 0.2);
     const text = p.text.trim().toUpperCase();
-    if (text) out.push({ start, end, text });
+    if (text) {
+      out.push({
+        start,
+        end,
+        text,
+        words: p.words.map((w) => ({ ...w, text: w.text.toUpperCase() })),
+      });
+    }
   }
   return out;
 }

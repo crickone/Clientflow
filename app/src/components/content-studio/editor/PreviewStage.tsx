@@ -436,7 +436,27 @@ export const PreviewStage = forwardRef<PreviewHandle, Props>(function PreviewSta
               WebkitTextStroke: "1px #000",
             }}
           >
-            {caption.text}
+            {/* Word-pop: the word being spoken lights up in the accent colour,
+                matching the burned-in ASS captions (captions.ts). */}
+            {caption.words && caption.words.length > 0
+              ? caption.words.map((w, i) => {
+                  const live = playhead >= w.start && playhead < w.end;
+                  return (
+                    <span
+                      key={`${w.start}-${i}`}
+                      style={{
+                        color: live ? "#ff6a32" : "#fff",
+                        display: "inline-block",
+                        transform: live ? "scale(1.08)" : "none",
+                        transition: "color 0.06s linear, transform 0.06s linear",
+                      }}
+                    >
+                      {w.text}
+                      {i < caption.words.length - 1 ? " " : ""}
+                    </span>
+                  );
+                })
+              : caption.text}
           </div>
         )}
       </div>

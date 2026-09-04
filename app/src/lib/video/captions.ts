@@ -8,7 +8,15 @@ import {
   groupIntoPhrases,
   type AspectRatio,
   type CaptionConfig,
+  type CaptionPhrase,
 } from "@/lib/video/captionPhrases";
+
+/**
+ * Caption fill colours in ASS's &HBBGGRR order (NOT RGB).
+ * Base = white; highlight = the brand orange #ff6a32 → BB=32, GG=6a, RR=ff.
+ */
+const BASE_COLOUR = "&H00FFFFFF&";
+const HIGHLIGHT_COLOUR = "&H00326AFF&";
 
 // Re-exported so existing server importers (render.ts, cards.ts) are unchanged.
 export { configFor };
@@ -137,9 +145,40 @@ export function buildAssCaptions(
     const text = escapeAssText(p.text).toUpperCase();
     if (!text) continue;
     events.push(
-      `Dialogue: 0,${toAssTime(start)},${toAssTime(end)},Pop,,0,0,0,,${popTags}${text}`,
+      `Dialogue: 0,${toAssTime(start)},${toAssTime(end)},Pop,,0,0,0,,${popTags}${buildWordHighlightBody(p, start)}`,
     );
   }
 
   return [...header, ...events, ""].join("\n");
+}
+
+/**
+ * The phrase body with the word currently being spoken highlighted — the
+ * "word pop" look modern short-form captions use (CapCut/Submagic style).
+ *
+ * Each word is emitted with its own colour override, switched with `\t`
+ * transforms relative to the Dialogue's start: the word turns the accent colour
+ * (and scales up a touch) at its Whisper start time, then returns to white when
+ * it finishes. Because every word carries its own timing, the highlight tracks
+ * the speech exactly. Falls back to the plain uppercase phrase when a phrase has
+ * no word timings.
+ */
+function buildWordHighlightBody(phrase: CaptionPhrase, dialogueStart: number): string {
+  if (!phrase.words || phrase.words.length === 0) {
+    return escapeAssText(phrase.text).toUpperCase();
+  }
+  // ms offsets from the Dialogue start, which is what \t() is relative to.
+  const off = (t: number) => Math.max(0, Math.round((t - dialogueStart) * 1000));
+  const parts = phrase.words.map((w) => {
+    const word = escapeAssText(w.text).toUpperCase();
+    if (!word) return "";
+    const on = off(w.start);
+    const done = Math.max(on + 60, off(w.end));
+    // Highlight in, then back to the base fill. \1c = primary (fill) colour.
+    return (
+      `{\\t(${on},${on + 60},\\1c${HIGHLIGHT_COLOUR}\\fscx118\\fscy118)` +
+      `\\t(${done},${done + 80},\\1c${BASE_COLOUR}\\fscx100\\fscy100)}${word}`
+    );
+  });
+  return parts.filter(Boolean).join(" ");
 }
