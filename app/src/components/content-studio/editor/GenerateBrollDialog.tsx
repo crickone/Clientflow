@@ -236,11 +236,11 @@ export function GenerateBrollDialog({
           </div>
 
           <div>
-            <Label htmlFor="broll-prompt">Motion (optional)</Label>
+            <Label htmlFor="broll-prompt" srOnly>Motion (optional)</Label>
             <Textarea
               id="broll-prompt"
               value={prompt}
-              placeholder="Leave blank for a natural slow push-in. Or describe it: 'slow pan across the weights floor'."
+              placeholder="Motion (optional)"
               onChange={(e) => setPrompt(e.target.value)}
               style={{ minHeight: 56 }}
             />

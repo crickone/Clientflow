@@ -50,8 +50,8 @@ export function ClientLoginForm({ logoSrc, businessName }: { logoSrc: string | n
         ) : (
           <form onSubmit={submitForgot} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div>
-              <Label htmlFor="fp-email">Email</Label>
-              <Input id="fp-email" type="email" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} placeholder="you@email.com" autoComplete="email" autoFocus />
+              <Label htmlFor="fp-email" srOnly>Email</Label>
+              <Input id="fp-email" type="email" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} placeholder="Email" autoComplete="email" autoFocus />
             </div>
             <Button type="submit" disabled={forgotBusy} style={{ justifyContent: "center", height: 46, marginTop: 4 }}>
               {forgotBusy ? <Loader2 size={16} className="spin" /> : "Email me a reset link"}
@@ -101,12 +101,12 @@ export function ClientLoginForm({ logoSrc, businessName }: { logoSrc: string | n
 
       <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <div>
-          <Label htmlFor="cl-email">Email</Label>
-          <Input id="cl-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@email.com" autoComplete="email" autoFocus />
+          <Label htmlFor="cl-email" srOnly>Email</Label>
+          <Input id="cl-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" autoComplete="email" autoFocus />
         </div>
         <div>
-          <Label htmlFor="cl-pass">Password</Label>
-          <Input id="cl-pass" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password" />
+          <Label htmlFor="cl-pass" srOnly>Password</Label>
+          <Input id="cl-pass" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" autoComplete="current-password" />
         </div>
         {error && <div style={{ color: "#f87171", fontSize: 13 }}>{error}</div>}
         <Button type="submit" disabled={busy} style={{ justifyContent: "center", height: 46, marginTop: 4 }}>

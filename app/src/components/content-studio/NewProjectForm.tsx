@@ -90,12 +90,12 @@ export function NewProjectForm() {
       }}
     >
       <div>
-        <Label htmlFor="name">Project name</Label>
+        <Label htmlFor="name" srOnly>Project name</Label>
         <Input
           id="name"
           required
           value={name}
-          placeholder="e.g. Member testimonial — Maria"
+          placeholder="Project name"
           onChange={(e) => setName(e.target.value)}
         />
       </div>
@@ -144,11 +144,11 @@ export function NewProjectForm() {
       </div>
 
       <div>
-        <Label htmlFor="tone">Tone / hook notes (optional)</Label>
+        <Label htmlFor="tone" srOnly>Tone / hook notes (optional)</Label>
         <Textarea
           id="tone"
           value={toneNotes}
-          placeholder="e.g. testimonial-style, calm and grounded, lead with the result not the therapy name"
+          placeholder="Tone / hook notes (optional)"
           onChange={(e) => setToneNotes(e.target.value)}
         />
       </div>

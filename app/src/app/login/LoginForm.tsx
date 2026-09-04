@@ -118,24 +118,26 @@ export function LoginForm({
 
         <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email" srOnly>Email</Label>
             <Input
               id="email"
               type="email"
               autoComplete="email"
               required
+              placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={busy}
             />
           </div>
           <div>
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password" srOnly>Password</Label>
             <Input
               id="password"
               type="password"
               autoComplete="current-password"
               required
+              placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={busy}

@@ -44,8 +44,8 @@ export function ClientForm({ client }: Props) {
           <Field label="Date of birth" name="dateOfBirth" type="date" defaultValue={client?.dateOfBirth ?? ""} error={state?.errors?.dateOfBirth} />
         </div>
         <div style={{ marginTop: 16 }}>
-          <Label htmlFor="address">Address</Label>
-          <Textarea id="address" name="address" rows={3} defaultValue={client?.address ?? ""} />
+          <Label htmlFor="address" srOnly>Address</Label>
+          <Textarea id="address" name="address" rows={3} placeholder="Address" defaultValue={client?.address ?? ""} />
         </div>
       </Card>
 
@@ -61,13 +61,13 @@ export function ClientForm({ client }: Props) {
           Medical & emergency
         </CardLabel>
         <div style={{ marginBottom: 16 }}>
-          <Label htmlFor="medicalNotes">Medical notes</Label>
+          <Label htmlFor="medicalNotes" srOnly>Medical notes</Label>
           <Textarea
             id="medicalNotes"
             name="medicalNotes"
             rows={4}
             defaultValue={client?.medicalNotes ?? ""}
-            placeholder="Allergies, conditions, contraindications…"
+            placeholder="Medical notes"
           />
         </div>
         <div
@@ -141,9 +141,13 @@ function Field({
   error?: string;
   type?: string;
 }) {
+  // Date pickers paint their own dd/mm/yyyy hint and ignore `placeholder`, so
+  // a date field keeps its visible label — everything else carries its name in
+  // the placeholder instead (the house field style).
+  const namedByPlaceholder = type !== "date";
   return (
     <div>
-      <Label htmlFor={name}>
+      <Label htmlFor={name} srOnly={namedByPlaceholder}>
         {label}
         {required && <span style={{ color: "#dc2626", marginLeft: 4 }}>*</span>}
       </Label>
@@ -151,6 +155,9 @@ function Field({
         id={name}
         name={name}
         type={type}
+        placeholder={
+          namedByPlaceholder ? (required ? `${label} *` : label) : undefined
+        }
         defaultValue={defaultValue}
         required={required}
         error={error}

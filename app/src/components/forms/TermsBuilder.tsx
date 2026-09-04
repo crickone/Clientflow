@@ -39,12 +39,12 @@ export function TermsBuilder({ initial, meta }: { initial: FormInput; meta: Form
 
       <div style={{ display: "flex", flexDirection: "column", gap: 16, border: "1px solid var(--hairline)", borderRadius: "var(--radius)", background: "var(--surface-1)", padding: 24 }}>
         <div>
-          <Label htmlFor="tc-title">Title *</Label>
-          <Input id="tc-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Coaching Terms & Conditions" autoFocus />
+          <Label htmlFor="tc-title" srOnly>Title *</Label>
+          <Input id="tc-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title *" autoFocus />
         </div>
         <div>
-          <Label htmlFor="tc-content">Terms &amp; conditions</Label>
-          <Textarea id="tc-content" value={content} onChange={(e) => setContent(e.target.value)} rows={16} placeholder="Enter the terms your clients agree to when they join…" />
+          <Label htmlFor="tc-content" srOnly>Terms &amp; conditions</Label>
+          <Textarea id="tc-content" value={content} onChange={(e) => setContent(e.target.value)} rows={16} placeholder="Terms & conditions" />
         </div>
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
           <Button variant="ghost" onClick={() => router.push("/forms/terms")} disabled={saving}>Cancel</Button>

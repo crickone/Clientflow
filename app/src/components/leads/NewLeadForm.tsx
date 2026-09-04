@@ -36,32 +36,34 @@ export function NewLeadForm({
           }}
         >
           <div>
-            <Label htmlFor="firstName">First name *</Label>
+            <Label htmlFor="firstName" srOnly>First name *</Label>
             <Input
               id="firstName"
               name="firstName"
+              placeholder="First name *"
               required
               error={state?.errors?.firstName}
             />
             <FieldError message={state?.errors?.firstName} />
           </div>
           <div>
-            <Label htmlFor="lastName">Last name</Label>
-            <Input id="lastName" name="lastName" />
+            <Label htmlFor="lastName" srOnly>Last name</Label>
+            <Input id="lastName" name="lastName" placeholder="Last name" />
           </div>
           <div>
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email" srOnly>Email</Label>
             <Input
               id="email"
               name="email"
               type="email"
+              placeholder="Email"
               error={state?.errors?.email}
             />
             <FieldError message={state?.errors?.email} />
           </div>
           <div>
-            <Label htmlFor="phone">Phone</Label>
-            <Input id="phone" name="phone" />
+            <Label htmlFor="phone" srOnly>Phone</Label>
+            <Input id="phone" name="phone" placeholder="Phone" />
           </div>
         </div>
       </Card>
@@ -95,21 +97,21 @@ export function NewLeadForm({
             </select>
           </div>
           <div>
-            <Label htmlFor="campaign">Source / campaign</Label>
+            <Label htmlFor="campaign" srOnly>Source / campaign</Label>
             <Input
               id="campaign"
               name="campaign"
-              placeholder="e.g. HBOT - Apr 2026"
+              placeholder="Source / campaign"
             />
           </div>
         </div>
         <div style={{ marginTop: 16 }}>
-          <Label htmlFor="notes">Notes from them</Label>
+          <Label htmlFor="notes" srOnly>Notes from them</Label>
           <Textarea
             id="notes"
             name="notes"
             rows={3}
-            placeholder="Anything they mentioned — what they're looking for, conditions, schedule…"
+            placeholder="Notes from them"
           />
         </div>
       </Card>

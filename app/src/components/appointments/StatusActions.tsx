@@ -183,12 +183,12 @@ function CompleteForm({
   return (
     <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div>
-        <Label htmlFor="therapistNotes">Therapist notes</Label>
+        <Label htmlFor="therapistNotes" srOnly>Therapist notes</Label>
         <Textarea
           id="therapistNotes"
           name="therapistNotes"
           rows={4}
-          placeholder="Treatment summary, observations, follow-up actions…"
+          placeholder="Therapist notes"
         />
       </div>
       <div>

@@ -24,26 +24,26 @@ export function RequestSiteForm() {
     <form action={action}>
       <Card style={{ maxWidth: 560, display: "grid", gap: 16 }}>
         <div>
-          <Label htmlFor="businessName">Business name</Label>
-          <Input id="businessName" name="businessName" placeholder="Acme Wellness" required error={state.error} />
+          <Label htmlFor="businessName" srOnly>Business name</Label>
+          <Input id="businessName" name="businessName" placeholder="Business name" required error={state.error} />
         </div>
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 200 }}>
-            <Label htmlFor="contactName">Contact name</Label>
-            <Input id="contactName" name="contactName" placeholder="Jane Doe" />
+            <Label htmlFor="contactName" srOnly>Contact name</Label>
+            <Input id="contactName" name="contactName" placeholder="Contact name" />
           </div>
           <div style={{ flex: 1, minWidth: 200 }}>
-            <Label htmlFor="contactEmail">Contact email</Label>
-            <Input id="contactEmail" name="contactEmail" type="email" placeholder="jane@acme.com" />
+            <Label htmlFor="contactEmail" srOnly>Contact email</Label>
+            <Input id="contactEmail" name="contactEmail" type="email" placeholder="Contact email" />
           </div>
         </div>
         <div>
-          <Label htmlFor="notes">What do you need?</Label>
+          <Label htmlFor="notes" srOnly>What do you need?</Label>
           <Textarea
             id="notes"
             name="notes"
             rows={5}
-            placeholder="Goals, pages you want, style references, timeline…"
+            placeholder="What do you need?"
           />
         </div>
         <FieldError message={state.error} />

@@ -76,8 +76,8 @@ export function ContactFormBuilder({
 
       <div style={card}>
         <div>
-          <Label htmlFor="cf-title">Form title *</Label>
-          <Input id="cf-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. New client enquiry" autoFocus />
+          <Label htmlFor="cf-title" srOnly>Form title *</Label>
+          <Input id="cf-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Form title *" autoFocus />
         </div>
 
         <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>

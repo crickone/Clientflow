@@ -32,12 +32,12 @@ export function NewPageForm({
       <Card style={{ display: "grid", gap: 14, maxWidth: 640 }}>
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 200 }}>
-            <Label htmlFor="title">Page title</Label>
-            <Input id="title" name="title" placeholder="About us" required />
+            <Label htmlFor="title" srOnly>Page title</Label>
+            <Input id="title" name="title" placeholder="Page title" required />
           </div>
           <div style={{ flex: 1, minWidth: 200 }}>
-            <Label htmlFor="path">Path</Label>
-            <Input id="path" name="path" placeholder="/about" required error={state.error} />
+            <Label htmlFor="path" srOnly>Path</Label>
+            <Input id="path" name="path" placeholder="Path" required error={state.error} />
           </div>
         </div>
         <div>

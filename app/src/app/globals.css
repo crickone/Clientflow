@@ -41,6 +41,11 @@
   --radius-sm: 6px;
   --radius: 9px;
   --radius-lg: 14px;
+  /* Form fields: a softer, more rounded pill than the app's card radius, with a
+     filled surface and no resting border (the fill IS the affordance). */
+  --radius-field: 13px;
+  --field-bg: #22242b;
+  --field-bg-focus: #282b33;
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-2: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 24px 60px -24px rgba(0, 0, 0, 0.7);
   --glass: rgba(23, 24, 28, 0.72);
@@ -262,9 +267,30 @@ a {
 
 /* Inputs: keep inline border/bg (unchanged look); add a focus glow + disabled
    state that the inline styles don't set (so no !important needed). */
+.field::placeholder { color: var(--text-tertiary); }
+.field:hover:not(:disabled) { background: var(--field-bg-focus); }
 .field:focus,
-.field:focus-visible { box-shadow: 0 0 0 3px var(--accent-soft); }
+.field:focus-visible {
+  background: var(--field-bg-focus);
+  border-color: var(--hairline-strong) !important;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
 .field:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* Visually hidden but available to screen readers. Used for field labels that
+   are shown as placeholder text (Revolut-style) — the name still has to reach
+   assistive tech even when it isn't drawn on screen. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 /* Error state (Input/Textarea `error` prop). Resting border colour is set
    inline per-field (the base border is inline too, see components/ui/
@@ -347,14 +373,77 @@ a {
   width: 240px;
   min-width: 240px;
   flex-shrink: 0;
-  border-right: 1px solid var(--hairline);
-  background: var(--surface-1);
+  /* Floating: no panel fill and no divider — the nav sits on the page canvas
+     rather than in a chrome column. */
+  background: transparent;
   display: flex;
   flex-direction: column;
   position: sticky;
   top: 0;
   height: 100vh;
+  transition:
+    width 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+    min-width 0.34s cubic-bezier(0.22, 1, 0.36, 1);
 }
+@media (prefers-reduced-motion: reduce) {
+  .app-sidebar { transition: none; }
+}
+
+/* ── Collapsed (desktop) ───────────────────────────────────────────────────
+   Width animates; the labels fade and are clipped by the shrinking width, so
+   text never reflows mid-animation. Icons stay put because every nav row keeps
+   its icon as the first flex child. */
+.app-sidebar.is-collapsed {
+  width: 76px;
+  min-width: 76px;
+}
+.app-sidebar .nav-label,
+.app-sidebar .sidebar-fade {
+  transition: opacity 0.18s var(--ease);
+  white-space: nowrap;
+}
+.app-sidebar.is-collapsed .nav-label,
+.app-sidebar.is-collapsed .sidebar-fade {
+  opacity: 0;
+  pointer-events: none;
+}
+/* Rows centre their icon and lose the label gap while collapsed. */
+.app-sidebar.is-collapsed .nav-link {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  justify-content: center;
+}
+.app-sidebar.is-collapsed .nav-badge {
+  position: absolute;
+  top: 3px;
+  right: 12px;
+  margin-left: 0 !important;
+}
+/* Group headers become a divider rule rather than a word. */
+.app-sidebar.is-collapsed .nav-group-label { opacity: 0; }
+
+.app-sidebar-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid var(--hairline);
+  background: var(--surface-1);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background 0.15s var(--ease),
+    color 0.15s var(--ease),
+    transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.app-sidebar-toggle:hover {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+.app-sidebar.is-collapsed .app-sidebar-toggle { transform: rotate(180deg); }
 /* Mobile top bar (hamburger) — hidden on desktop. */
 .app-topbar {
   display: none;
@@ -403,12 +492,30 @@ a {
     left: 0;
     bottom: 0;
     height: 100dvh;
-    width: min(84vw, 300px);
+    /* The drawer floats OVER the page here, so it needs a real fill — the
+       desktop nav is transparent, which would be unreadable as an overlay. */
+    background: var(--surface-1);
+    border-right: 1px solid var(--hairline);
     z-index: 80;
     transform: translateX(-100%);
     transition: transform 0.25s var(--ease, ease);
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55);
   }
+  /* Desktop collapse never applies to the drawer — it's full width or closed. */
+  .app-sidebar,
+  .app-sidebar.is-collapsed {
+    width: min(84vw, 300px);
+    min-width: 0;
+  }
+  .app-sidebar.is-collapsed .nav-label,
+  .app-sidebar.is-collapsed .sidebar-fade,
+  .app-sidebar.is-collapsed .nav-group-label {
+    opacity: 1;
+  }
+  .app-sidebar.is-collapsed .nav-link {
+    justify-content: flex-start;
+  }
+  .app-sidebar-toggle { display: none; }
   .app-sidebar.is-open {
     transform: translateX(0);
   }

@@ -75,24 +75,25 @@ export function ClientResetForm({
 
       <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <div>
-          <Label htmlFor="rs-pass">New password</Label>
+          <Label htmlFor="rs-pass" srOnly>New password</Label>
           <Input
             id="rs-pass"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="At least 6 characters"
+            placeholder="New password"
             autoComplete="new-password"
             autoFocus
           />
         </div>
         <div>
-          <Label htmlFor="rs-confirm">Confirm password</Label>
+          <Label htmlFor="rs-confirm" srOnly>Confirm password</Label>
           <Input
             id="rs-confirm"
             type="password"
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
+            placeholder="Confirm password"
             autoComplete="new-password"
           />
         </div>

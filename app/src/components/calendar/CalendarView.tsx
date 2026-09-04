@@ -225,8 +225,8 @@ function EventDialog({ draft, onClose }: { draft: Draft; onClose: () => void }) 
       <DialogContent title={isEdit ? "Edit event" : "New event"} width={520}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
-            <Label htmlFor="ev-title">Title</Label>
-            <Input id="ev-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Meeting with supplier" autoFocus disabled={pending} />
+            <Label htmlFor="ev-title" srOnly>Title</Label>
+            <Input id="ev-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" autoFocus disabled={pending} />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: allDay ? "1fr" : "1fr 1fr 1fr", gap: 10 }}>
             <div>
@@ -251,12 +251,12 @@ function EventDialog({ draft, onClose }: { draft: Draft; onClose: () => void }) 
             All day
           </label>
           <div>
-            <Label htmlFor="ev-loc">Location (optional)</Label>
-            <Input id="ev-loc" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Office / Zoom" disabled={pending} />
+            <Label htmlFor="ev-loc" srOnly>Location (optional)</Label>
+            <Input id="ev-loc" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location (optional)" disabled={pending} />
           </div>
           <div>
-            <Label htmlFor="ev-desc">Notes (optional)</Label>
-            <textarea id="ev-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} disabled={pending} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }} />
+            <Label htmlFor="ev-desc" srOnly>Notes (optional)</Label>
+            <textarea id="ev-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Notes (optional)" disabled={pending} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }} />
           </div>
           <div>
             <Label>Colour</Label>

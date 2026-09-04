@@ -189,8 +189,8 @@ function TherapyForm({
   return (
     <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div>
-        <Label htmlFor="name">Name</Label>
-        <Input id="name" name="name" defaultValue={therapy?.name ?? ""} required />
+        <Label htmlFor="name" srOnly>Name</Label>
+        <Input id="name" name="name" placeholder="Name" defaultValue={therapy?.name ?? ""} required />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 110px", gap: 12 }}>
         <div>
@@ -250,11 +250,12 @@ function TherapyForm({
         </div>
       </div>
       <div>
-        <Label htmlFor="description">Description</Label>
+        <Label htmlFor="description" srOnly>Description</Label>
         <Textarea
           id="description"
           name="description"
           rows={3}
+          placeholder="Description"
           defaultValue={therapy?.description ?? ""}
         />
       </div>

@@ -79,17 +79,17 @@ export function WorkoutBuilder({ initial, exercises }: { initial: WorkoutInput; 
       <div style={card}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           <div>
-            <Label htmlFor="w-name">Day name *</Label>
+            <Label htmlFor="w-name" srOnly>Day name *</Label>
             <Input
               id="w-name"
               value={workout.name === "New Workout" ? "" : workout.name}
               onChange={(e) => setWorkout((w) => ({ ...w, name: e.target.value }))}
-              placeholder="Enter day name"
+              placeholder="Day name *"
             />
           </div>
           <div>
-            <Label htmlFor="w-tags">Tags</Label>
-            <Input id="w-tags" value={tagsText} onChange={(e) => setTagsText(e.target.value)} placeholder="Add tags (comma separated)" />
+            <Label htmlFor="w-tags" srOnly>Tags</Label>
+            <Input id="w-tags" value={tagsText} onChange={(e) => setTagsText(e.target.value)} placeholder="Tags (comma separated)" />
           </div>
         </div>
 
@@ -142,8 +142,8 @@ export function WorkoutBuilder({ initial, exercises }: { initial: WorkoutInput; 
 
       <div style={card}>
         <div>
-          <Label htmlFor="w-instr">Instructions</Label>
-          <Textarea id="w-instr" value={workout.instructions ?? ""} onChange={(e) => setWorkout((w) => ({ ...w, instructions: e.target.value }))} rows={3} placeholder="Enter workout instructions" />
+          <Label htmlFor="w-instr" srOnly>Instructions</Label>
+          <Textarea id="w-instr" value={workout.instructions ?? ""} onChange={(e) => setWorkout((w) => ({ ...w, instructions: e.target.value }))} rows={3} placeholder="Instructions" />
         </div>
       </div>
 

@@ -17,12 +17,12 @@ export const Input = React.forwardRef<
     aria-invalid={error ? true : ariaInvalid}
     style={{
       width: "100%",
-      background: "var(--surface-1)",
-      border: "1px solid var(--grid)",
-      borderRadius: "var(--radius)",
-      padding: "10px 14px",
+      background: "var(--field-bg)",
+      border: "1px solid transparent",
+      borderRadius: "var(--radius-field)",
+      padding: "13px 16px",
       color: "var(--text-primary)",
-      fontSize: 14,
+      fontSize: 14.5,
       outline: "none",
       fontFamily: "inherit",
       transition: "border-color 0.15s var(--ease), box-shadow 0.15s var(--ease)",
@@ -44,12 +44,12 @@ export const Textarea = React.forwardRef<
     aria-invalid={error ? true : ariaInvalid}
     style={{
       width: "100%",
-      background: "var(--surface-1)",
-      border: "1px solid var(--grid)",
-      borderRadius: "var(--radius)",
-      padding: "10px 14px",
+      background: "var(--field-bg)",
+      border: "1px solid transparent",
+      borderRadius: "var(--radius-field)",
+      padding: "13px 16px",
       color: "var(--text-primary)",
-      fontSize: 14,
+      fontSize: 14.5,
       outline: "none",
       fontFamily: "inherit",
       minHeight: 90,
@@ -66,10 +66,26 @@ Textarea.displayName = "Textarea";
 export function Label({
   children,
   htmlFor,
+  srOnly,
 }: {
   children: React.ReactNode;
   htmlFor?: string;
+  /**
+   * Hide the label visually but keep it for screen readers. Used where the
+   * field carries its name as placeholder text instead of a heading above it
+   * (the house field style) — the accessible name must survive even though
+   * nothing is drawn. Labels for NON-input controls (button groups, swatches,
+   * pickers) stay visible: their text can't live in a placeholder.
+   */
+  srOnly?: boolean;
 }) {
+  if (srOnly) {
+    return (
+      <label htmlFor={htmlFor} className="sr-only">
+        {children}
+      </label>
+    );
+  }
   return (
     <label
       htmlFor={htmlFor}

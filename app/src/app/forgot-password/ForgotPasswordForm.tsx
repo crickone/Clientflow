@@ -93,13 +93,14 @@ export function ForgotPasswordForm() {
         ) : (
           <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div>
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" srOnly>Email</Label>
               <Input
                 id="email"
                 type="email"
                 autoComplete="email"
                 required
                 autoFocus
+                placeholder="Email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={busy}

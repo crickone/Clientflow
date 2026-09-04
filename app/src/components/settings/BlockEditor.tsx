@@ -395,11 +395,11 @@ function BlockForm({
       </div>
 
       <div>
-        <Label htmlFor="reason">Name</Label>
+        <Label htmlFor="reason" srOnly>Name</Label>
         <Input
           id="reason"
           name="reason"
-          placeholder={type === "recurring" ? "Lunch break" : "Bank holiday"}
+          placeholder="Name"
           defaultValue={initial?.reason ?? ""}
           required
         />

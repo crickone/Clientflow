@@ -305,11 +305,11 @@ function TemplateForm({
   return (
     <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div>
-        <Label htmlFor="name">Name</Label>
+        <Label htmlFor="name" srOnly>Name</Label>
         <Input
           id="name"
           name="name"
-          placeholder="e.g. 10-session pack"
+          placeholder="Name"
           defaultValue={initial?.name ?? ""}
           required
         />
@@ -412,11 +412,12 @@ function TemplateForm({
       </div>
 
       <div>
-        <Label htmlFor="notes">Notes (optional)</Label>
+        <Label htmlFor="notes" srOnly>Notes (optional)</Label>
         <Textarea
           id="notes"
           name="notes"
           rows={2}
+          placeholder="Notes (optional)"
           defaultValue={initial?.notes ?? ""}
         />
       </div>

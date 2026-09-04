@@ -72,12 +72,12 @@ export function UploadProgramForm({ initial }: { initial: ProgramInput }) {
       <div style={card}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           <div>
-            <Label htmlFor="up-title">Program title *</Label>
-            <Input id="up-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Enter program title" autoFocus />
+            <Label htmlFor="up-title" srOnly>Program title *</Label>
+            <Input id="up-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Program title *" autoFocus />
           </div>
           <div>
-            <Label htmlFor="up-tags">Tags</Label>
-            <Input id="up-tags" value={tagsText} onChange={(e) => setTagsText(e.target.value)} placeholder="Add tags (comma separated)" />
+            <Label htmlFor="up-tags" srOnly>Tags</Label>
+            <Input id="up-tags" value={tagsText} onChange={(e) => setTagsText(e.target.value)} placeholder="Tags (comma separated)" />
           </div>
         </div>
 

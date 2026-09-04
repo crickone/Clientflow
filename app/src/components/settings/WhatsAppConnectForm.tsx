@@ -114,27 +114,27 @@ export function WhatsAppConnectForm({
         <CardLabel>Provider credentials</CardLabel>
         <div style={{ display: "grid", gap: 14 }}>
           <div>
-            <Label htmlFor="token">API token</Label>
+            <Label htmlFor="token" srOnly>API token</Label>
             <Input
               id="token"
               type="password"
               value={token}
               onChange={(e) => setToken(e.target.value)}
-              placeholder="Whapi channel token"
+              placeholder="API token"
             />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <div>
-              <Label htmlFor="channel">Channel ID (optional)</Label>
-              <Input id="channel" value={channel} onChange={(e) => setChannel(e.target.value)} />
+              <Label htmlFor="channel" srOnly>Channel ID (optional)</Label>
+              <Input id="channel" value={channel} onChange={(e) => setChannel(e.target.value)} placeholder="Channel ID (optional)" />
             </div>
             <div>
-              <Label htmlFor="baseUrl">API base URL (optional)</Label>
+              <Label htmlFor="baseUrl" srOnly>API base URL (optional)</Label>
               <Input
                 id="baseUrl"
                 value={baseUrl}
                 onChange={(e) => setBaseUrl(e.target.value)}
-                placeholder="https://gate.whapi.cloud"
+                placeholder="API base URL (optional)"
               />
             </div>
           </div>

@@ -188,53 +188,53 @@ export function CampaignEditor({
       <div style={{ display: "flex", flexDirection: "column", gap: 20, minWidth: 0 }}>
         <Card style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
-            <Label htmlFor="c-name">Campaign name</Label>
+            <Label htmlFor="c-name" srOnly>Campaign name</Label>
             <Input
               id="c-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Internal name, e.g. August newsletter"
+              placeholder="Campaign name"
               disabled={locked}
             />
           </div>
           <div>
-            <Label htmlFor="c-subject">Subject line</Label>
+            <Label htmlFor="c-subject" srOnly>Subject line</Label>
             <Input
               id="c-subject"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              placeholder="What recipients see in their inbox"
+              placeholder="Subject line"
               disabled={locked}
             />
           </div>
           <div>
-            <Label htmlFor="c-preheader">Preheader (optional)</Label>
+            <Label htmlFor="c-preheader" srOnly>Preheader (optional)</Label>
             <Input
               id="c-preheader"
               value={preheader}
               onChange={(e) => setPreheader(e.target.value)}
-              placeholder="Short preview text shown after the subject"
+              placeholder="Preheader (optional)"
               disabled={locked}
             />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <div>
-              <Label htmlFor="c-fromname">From name</Label>
+              <Label htmlFor="c-fromname" srOnly>From name</Label>
               <Input
                 id="c-fromname"
                 value={fromName}
                 onChange={(e) => setFromName(e.target.value)}
-                placeholder="Your business name"
+                placeholder="From name"
                 disabled={locked}
               />
             </div>
             <div>
-              <Label htmlFor="c-fromemail">From address</Label>
+              <Label htmlFor="c-fromemail" srOnly>From address</Label>
               <Input
                 id="c-fromemail"
                 value={fromEmail}
                 onChange={(e) => setFromEmail(e.target.value)}
-                placeholder="hello@yourbusiness.com"
+                placeholder="From address"
                 disabled={locked}
               />
             </div>
@@ -252,23 +252,23 @@ export function CampaignEditor({
             <strong style={{ fontSize: 14, color: "var(--text-primary)" }}>AI draft</strong>
           </div>
           <div>
-            <Label htmlFor="ai-topic">What&apos;s this email about?</Label>
+            <Label htmlFor="ai-topic" srOnly>What&apos;s this email about?</Label>
             <Input
               id="ai-topic"
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              placeholder="e.g. announcing our new evening opening hours"
+              placeholder="What's this email about?"
               disabled={locked}
             />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 140px", gap: 14 }}>
             <div>
-              <Label htmlFor="ai-tone">Tone (optional)</Label>
+              <Label htmlFor="ai-tone" srOnly>Tone (optional)</Label>
               <Input
                 id="ai-tone"
                 value={tone}
                 onChange={(e) => setTone(e.target.value)}
-                placeholder="e.g. warm and low-key"
+                placeholder="Tone (optional)"
                 disabled={locked}
               />
             </div>
@@ -286,12 +286,12 @@ export function CampaignEditor({
             </div>
           </div>
           <div>
-            <Label htmlFor="ai-audience">Who&apos;s this for? (optional)</Label>
+            <Label htmlFor="ai-audience" srOnly>Who&apos;s this for? (optional)</Label>
             <Input
               id="ai-audience"
               value={aiAudience}
               onChange={(e) => setAiAudience(e.target.value)}
-              placeholder="e.g. existing clients who haven't booked in a while"
+              placeholder="Who's this for? (optional)"
               disabled={locked}
             />
           </div>
@@ -302,13 +302,13 @@ export function CampaignEditor({
           </div>
 
           <div>
-            <Label htmlFor="c-body">Body</Label>
+            <Label htmlFor="c-body" srOnly>Body</Label>
             <Textarea
               id="c-body"
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={16}
-              placeholder="Plain text — short paragraphs separated by a blank line. Formatted into a branded email when this campaign sends."
+              placeholder="Body"
               disabled={locked}
             />
           </div>

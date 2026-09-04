@@ -118,12 +118,12 @@ export function PlanBuilder({ initial }: { initial: PlanInput }) {
       {/* title */}
       <div style={card}>
         <div>
-          <Label htmlFor="pl-title">Title</Label>
+          <Label htmlFor="pl-title" srOnly>Title</Label>
           <Input
             id="pl-title"
             value={plan.title === "New Nutrition Plan" ? "" : plan.title}
             onChange={(e) => setPlan((p) => ({ ...p, title: e.target.value }))}
-            placeholder="Enter nutrition plan title"
+            placeholder="Title"
           />
         </div>
 
@@ -172,8 +172,8 @@ export function PlanBuilder({ initial }: { initial: PlanInput }) {
 
         {/* day name */}
         <div style={{ maxWidth: 420 }}>
-          <Label htmlFor="day-name">Day name</Label>
-          <Input id="day-name" value={day.name} onChange={(e) => setDay({ name: e.target.value })} />
+          <Label htmlFor="day-name" srOnly>Day name</Label>
+          <Input id="day-name" value={day.name} onChange={(e) => setDay({ name: e.target.value })} placeholder="Day name" />
         </div>
 
         {/* day totals */}
@@ -197,8 +197,8 @@ export function PlanBuilder({ initial }: { initial: PlanInput }) {
             onChange={(patch) => setDay(patch)}
           />
           <div>
-            <Label htmlFor="day-notes">Notes</Label>
-            <Textarea id="day-notes" value={day.notes ?? ""} onChange={(e) => setDay({ notes: e.target.value })} rows={3} />
+            <Label htmlFor="day-notes" srOnly>Notes</Label>
+            <Textarea id="day-notes" value={day.notes ?? ""} onChange={(e) => setDay({ notes: e.target.value })} rows={3} placeholder="Notes" />
           </div>
         </div>
       ) : (
@@ -280,13 +280,13 @@ export function PlanBuilder({ initial }: { initial: PlanInput }) {
               )}
 
               <div>
-                <Label htmlFor={`meal-notes-${mi}`}>Notes</Label>
+                <Label htmlFor={`meal-notes-${mi}`} srOnly>Notes</Label>
                 <Textarea
                   id={`meal-notes-${mi}`}
                   value={meal.notes ?? ""}
                   onChange={(e) => setMeal(mi, { notes: e.target.value })}
                   rows={2}
-                  placeholder="Enter meal notes"
+                  placeholder="Notes"
                 />
               </div>
             </div>
@@ -303,12 +303,12 @@ export function PlanBuilder({ initial }: { initial: PlanInput }) {
       {/* plan notes + tags */}
       <div style={card}>
         <div>
-          <Label htmlFor="plan-notes">Plan notes</Label>
-          <Textarea id="plan-notes" value={plan.notes ?? ""} onChange={(e) => setPlan((p) => ({ ...p, notes: e.target.value }))} rows={3} />
+          <Label htmlFor="plan-notes" srOnly>Plan notes</Label>
+          <Textarea id="plan-notes" value={plan.notes ?? ""} onChange={(e) => setPlan((p) => ({ ...p, notes: e.target.value }))} rows={3} placeholder="Plan notes" />
         </div>
         <div>
-          <Label htmlFor="plan-tags">Tags</Label>
-          <Input id="plan-tags" value={tagsText} onChange={(e) => setTagsText(e.target.value)} placeholder="e.g. cutting, high protein (comma separated)" />
+          <Label htmlFor="plan-tags" srOnly>Tags</Label>
+          <Input id="plan-tags" value={tagsText} onChange={(e) => setTagsText(e.target.value)} placeholder="Tags (comma separated)" />
         </div>
       </div>
 

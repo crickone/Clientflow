@@ -88,36 +88,39 @@ export function ChangePasswordForm({ forced }: { forced: boolean }) {
 
         <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
-            <Label htmlFor="current">Current password</Label>
+            <Label htmlFor="current" srOnly>Current password</Label>
             <Input
               id="current"
               type="password"
               autoComplete="current-password"
               required
+              placeholder="Current password"
               value={current}
               onChange={(e) => setCurrent(e.target.value)}
               disabled={busy}
             />
           </div>
           <div>
-            <Label htmlFor="next">New password</Label>
+            <Label htmlFor="next" srOnly>New password</Label>
             <Input
               id="next"
               type="password"
               autoComplete="new-password"
               required
+              placeholder="New password"
               value={next}
               onChange={(e) => setNext(e.target.value)}
               disabled={busy}
             />
           </div>
           <div>
-            <Label htmlFor="confirm">Confirm new password</Label>
+            <Label htmlFor="confirm" srOnly>Confirm new password</Label>
             <Input
               id="confirm"
               type="password"
               autoComplete="new-password"
               required
+              placeholder="Confirm new password"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               disabled={busy}

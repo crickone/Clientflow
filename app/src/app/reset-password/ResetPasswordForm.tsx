@@ -79,26 +79,27 @@ export function ResetPasswordForm({ token, email }: { token: string; email: stri
 
         <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
-            <Label htmlFor="rp-pass">New password</Label>
+            <Label htmlFor="rp-pass" srOnly>New password</Label>
             <Input
               id="rp-pass"
               type="password"
               autoComplete="new-password"
               required
               autoFocus
-              placeholder="At least 8 characters"
+              placeholder="New password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={busy}
             />
           </div>
           <div>
-            <Label htmlFor="rp-confirm">Confirm password</Label>
+            <Label htmlFor="rp-confirm" srOnly>Confirm password</Label>
             <Input
               id="rp-confirm"
               type="password"
               autoComplete="new-password"
               required
+              placeholder="Confirm password"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               disabled={busy}

@@ -97,11 +97,12 @@ export function AcceptInviteForm({
 
         <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
-            <Label htmlFor="inv-name">Your name</Label>
+            <Label htmlFor="inv-name" srOnly>Your name</Label>
             <Input
               id="inv-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              placeholder="Your name"
               autoComplete="name"
               required
               disabled={pending}
@@ -109,25 +110,26 @@ export function AcceptInviteForm({
             />
           </div>
           <div>
-            <Label htmlFor="inv-pw">Password</Label>
+            <Label htmlFor="inv-pw" srOnly>Password</Label>
             <Input
               id="inv-pw"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="new-password"
-              placeholder="At least 8 characters"
+              placeholder="Password"
               required
               disabled={pending}
             />
           </div>
           <div>
-            <Label htmlFor="inv-confirm">Confirm password</Label>
+            <Label htmlFor="inv-confirm" srOnly>Confirm password</Label>
             <Input
               id="inv-confirm"
               type="password"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
+              placeholder="Confirm password"
               autoComplete="new-password"
               required
               disabled={pending}

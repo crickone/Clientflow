@@ -107,12 +107,12 @@ export function NewBlogForm({ therapies, videoProjects }: Props) {
       </div>
 
       <div>
-        <Label htmlFor="title">Title</Label>
+        <Label htmlFor="title" srOnly>Title</Label>
         <Input
           id="title"
           required
           value={title}
-          placeholder="e.g. What your first session actually feels like"
+          placeholder="Title"
           onChange={(e) => setTitle(e.target.value)}
         />
       </div>
@@ -217,29 +217,25 @@ export function NewBlogForm({ therapies, videoProjects }: Props) {
       )}
 
       <div>
-        <Label htmlFor="prompt">
+        <Label htmlFor="prompt" srOnly>
           {mode === "prompt" ? "Topic / brief" : "Angle (optional)"}
         </Label>
         <Textarea
           id="prompt"
           required={mode === "prompt"}
           value={prompt}
-          placeholder={
-            mode === "prompt"
-              ? "e.g. Cover what it is, how it works, who it suits, and what to expect."
-              : "e.g. Frame it for people who are nervous about their first session."
-          }
+          placeholder={mode === "prompt" ? "Topic / brief" : "Angle (optional)"}
           onChange={(e) => setPrompt(e.target.value)}
         />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         <div>
-          <Label htmlFor="tone">Tone (optional)</Label>
+          <Label htmlFor="tone" srOnly>Tone (optional)</Label>
           <Input
             id="tone"
             value={tone}
-            placeholder="e.g. calm, grounded, no hype"
+            placeholder="Tone (optional)"
             onChange={(e) => setTone(e.target.value)}
           />
         </div>

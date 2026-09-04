@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
@@ -92,7 +92,7 @@ export function BusinessProfileForm({ initial }: { initial: BusinessProfile }) {
         <CardLabel>Identity</CardLabel>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <Field label="Business name" value={profile.businessName} onChange={(v) => set("businessName", v)} />
-          <Field label="Tagline" value={profile.tagline} onChange={(v) => set("tagline", v)} placeholder="e.g. what your business is" />
+          <Field label="Tagline" value={profile.tagline} onChange={(v) => set("tagline", v)} />
           <div style={{ gridColumn: "1 / -1" }}>
             <Field label="Location" value={profile.location} onChange={(v) => set("location", v)} />
           </div>
@@ -104,22 +104,22 @@ export function BusinessProfileForm({ initial }: { initial: BusinessProfile }) {
 
       <Card>
         <CardLabel>Brief</CardLabel>
-        <Label htmlFor="brief">What the business does, who it serves, what makes it distinctive</Label>
+        <Label htmlFor="brief" srOnly>What the business does, who it serves, what makes it distinctive</Label>
         <Textarea
           id="brief"
           rows={5}
           value={profile.brief}
           onChange={(e) => set("brief", e.target.value)}
-          placeholder="Used to generate content (blogs, carousels) about your business. e.g. who you serve, what you offer, and what makes you different."
+          placeholder="What the business does, who it serves, what makes it distinctive"
         />
         <div style={{ marginTop: 16 }}>
-          <Label htmlFor="voiceNotes">Tone notes (optional)</Label>
+          <Label htmlFor="voiceNotes" srOnly>Tone notes (optional)</Label>
           <Textarea
             id="voiceNotes"
             rows={2}
             value={profile.voiceNotes}
             onChange={(e) => set("voiceNotes", e.target.value)}
-            placeholder="Any extra tone guidance layered on top of the venue voice. e.g. warm but professional; avoid jargon."
+            placeholder="Tone notes (optional)"
           />
         </div>
       </Card>
@@ -161,13 +161,13 @@ export function BusinessProfileForm({ initial }: { initial: BusinessProfile }) {
 
       <Card>
         <CardLabel>Policies &amp; FAQs</CardLabel>
-        <Label htmlFor="policies">Policies (cancellation, payment, etc.)</Label>
+        <Label htmlFor="policies" srOnly>Policies (cancellation, payment, etc.)</Label>
         <Textarea
           id="policies"
           rows={3}
           value={profile.policies}
           onChange={(e) => set("policies", e.target.value)}
-          placeholder="e.g. 24 hours' notice required to reschedule. Payment on the day by card or cash."
+          placeholder="Policies (cancellation, payment, etc.)"
         />
         <div style={{ marginTop: 20 }}>
           <Label>Key FAQs — the AI answers these directly</Label>
@@ -288,22 +288,26 @@ function Field({
   label,
   value,
   onChange,
-  placeholder,
   type = "text",
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
-  placeholder?: string;
   type?: string;
 }) {
+  // The field carries its own name as placeholder text, so the label is only
+  // there for screen readers — it still needs a real id to point at.
+  const id = useId();
   return (
     <div>
-      <Label>{label}</Label>
+      <Label htmlFor={id} srOnly>
+        {label}
+      </Label>
       <Input
+        id={id}
         type={type}
         value={value}
-        placeholder={placeholder}
+        placeholder={label}
         onChange={(e) => onChange(e.target.value)}
       />
     </div>

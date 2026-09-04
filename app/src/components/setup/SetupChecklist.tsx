@@ -261,9 +261,10 @@ function InlineBusinessAction({ defaults }: { defaults: BusinessEssentialsDefaul
       >
         <div style={{ display: "grid", gap: 14 }}>
           <div>
-            <Label htmlFor="setup-business-name">Business name</Label>
+            <Label htmlFor="setup-business-name" srOnly>Business name</Label>
             <Input
               id="setup-business-name"
+              placeholder="Business name"
               value={businessName}
               onChange={(e) => setBusinessName(e.target.value)}
               disabled={pending}
@@ -272,19 +273,20 @@ function InlineBusinessAction({ defaults }: { defaults: BusinessEssentialsDefaul
             />
           </div>
           <div>
-            <Label htmlFor="setup-business-tagline">Tagline</Label>
+            <Label htmlFor="setup-business-tagline" srOnly>Tagline</Label>
             <Input
               id="setup-business-tagline"
               value={tagline}
               onChange={(e) => setTagline(e.target.value)}
               disabled={pending}
-              placeholder="e.g. a recovery & wellness business"
+              placeholder="Tagline"
             />
           </div>
           <div>
-            <Label htmlFor="setup-business-location">Location</Label>
+            <Label htmlFor="setup-business-location" srOnly>Location</Label>
             <Input
               id="setup-business-location"
+              placeholder="Location"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               disabled={pending}
@@ -292,18 +294,20 @@ function InlineBusinessAction({ defaults }: { defaults: BusinessEssentialsDefaul
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <div>
-              <Label htmlFor="setup-business-phone">Phone</Label>
+              <Label htmlFor="setup-business-phone" srOnly>Phone</Label>
               <Input
                 id="setup-business-phone"
+                placeholder="Phone"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 disabled={pending}
               />
             </div>
             <div>
-              <Label htmlFor="setup-business-website">Website</Label>
+              <Label htmlFor="setup-business-website" srOnly>Website</Label>
               <Input
                 id="setup-business-website"
+                placeholder="Website"
                 value={website}
                 onChange={(e) => setWebsite(e.target.value)}
                 disabled={pending}

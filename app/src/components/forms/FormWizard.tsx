@@ -129,8 +129,8 @@ export function FormWizard({ initial, meta }: { initial: FormInput; meta: FormTy
               {meta.intro.map((line, i) => <li key={i}>{line}</li>)}
             </ul>
             <div>
-              <Label htmlFor="fw-title">Title</Label>
-              <Input id="fw-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={`Enter ${meta.label.toLowerCase()} title`} autoFocus />
+              <Label htmlFor="fw-title" srOnly>Title</Label>
+              <Input id="fw-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" autoFocus />
             </div>
             {meta.sections.map((sec) => {
               const secSug = bySection.get(sec.key) ?? [];
@@ -206,8 +206,8 @@ export function FormWizard({ initial, meta }: { initial: FormInput; meta: FormTy
                   <div key={idx} style={qCard}>
                     <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr auto auto", gap: 12, alignItems: "end" }}>
                       <div>
-                        <Label>What question would you like to ask?</Label>
-                        <Input value={q.label} onChange={(e) => patchQuestion(idx, { label: e.target.value })} />
+                        <Label htmlFor={`fw-q-${idx}`} srOnly>What question would you like to ask?</Label>
+                        <Input id={`fw-q-${idx}`} value={q.label} onChange={(e) => patchQuestion(idx, { label: e.target.value })} placeholder="What question would you like to ask?" />
                       </div>
                       <div>
                         <Label>What do you want to receive?</Label>

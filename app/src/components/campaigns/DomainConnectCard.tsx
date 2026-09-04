@@ -168,7 +168,7 @@ export function DomainConnectCard({ domain }: { domain: SendingDomainRecord | nu
           </div>
 
           <div>
-            <Label htmlFor="sending-domain">Domain</Label>
+            <Label htmlFor="sending-domain" srOnly>Domain</Label>
             <Input
               id="sending-domain"
               value={value}
@@ -176,7 +176,7 @@ export function DomainConnectCard({ domain }: { domain: SendingDomainRecord | nu
                 setError(null);
                 setValue(e.target.value);
               }}
-              placeholder="mg.yourbusiness.ie"
+              placeholder="Domain"
               disabled={busy}
             />
           </div>

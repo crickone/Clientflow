@@ -284,12 +284,12 @@ function MealSheet({
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 12 }}>
               <div>
-                <Label htmlFor="m-name">Name</Label>
-                <Input id="m-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Chicken & rice" autoFocus />
+                <Label htmlFor="m-name" srOnly>Name</Label>
+                <Input id="m-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" autoFocus />
               </div>
               <div>
-                <Label htmlFor="m-cat">Category</Label>
-                <Input id="m-cat" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. Lunch" />
+                <Label htmlFor="m-cat" srOnly>Category</Label>
+                <Input id="m-cat" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Category" />
               </div>
             </div>
 
@@ -303,11 +303,12 @@ function MealSheet({
 
             {/* food search */}
             <div style={{ position: "relative" }}>
-              <Label>Add food</Label>
+              <Label htmlFor="m-add-food" srOnly>Add food</Label>
               <Input
+                id="m-add-food"
                 value={foodQ}
                 onChange={(e) => setFoodQ(e.target.value)}
-                placeholder={foods.length ? "Search your foods…" : "No foods yet — add a custom item below"}
+                placeholder={foods.length ? "Add food" : "No foods yet — add a custom item below"}
               />
               {foodQ.trim() && (
                 <div style={dropdown}>
@@ -383,8 +384,8 @@ function MealSheet({
             </div>
 
             <div>
-              <Label htmlFor="m-notes">Notes</Label>
-              <Textarea id="m-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+              <Label htmlFor="m-notes" srOnly>Notes</Label>
+              <Textarea id="m-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Notes" />
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 4 }}>

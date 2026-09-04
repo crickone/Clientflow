@@ -25,22 +25,22 @@ export function NewPostForm({ siteSlug }: { siteSlug: string }) {
     <form action={formAction}>
       <Card style={{ maxWidth: 640, display: "grid", gap: 16 }}>
         <div>
-          <Label htmlFor="title">Title</Label>
-          <Input id="title" name="title" placeholder="Your blog post title" required error={state.error} />
+          <Label htmlFor="title" srOnly>Title</Label>
+          <Input id="title" name="title" placeholder="Title" required error={state.error} />
         </div>
         <div>
-          <Label htmlFor="prompt">Direction for the AI (optional)</Label>
+          <Label htmlFor="prompt" srOnly>Direction for the AI (optional)</Label>
           <Textarea
             id="prompt"
             name="prompt"
             rows={4}
-            placeholder="Angle, key points to cover, audience, calls to action…"
+            placeholder="Direction for the AI (optional)"
           />
         </div>
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 180 }}>
-            <Label htmlFor="tone">Tone (optional)</Label>
-            <Input id="tone" name="tone" placeholder="warm, expert, plain-English" />
+            <Label htmlFor="tone" srOnly>Tone (optional)</Label>
+            <Input id="tone" name="tone" placeholder="Tone (optional)" />
           </div>
           <div style={{ width: 160 }}>
             <Label htmlFor="targetWords">Target words</Label>

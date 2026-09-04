@@ -135,13 +135,13 @@ function LoginCard({ clientId, clientEmail, login }: { clientId: number; clientE
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
-              <Label htmlFor="cl-email">Login email</Label>
-              <Input id="cl-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="client@email.com" />
+              <Label htmlFor="cl-email" srOnly>Login email</Label>
+              <Input id="cl-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Login email" />
             </div>
             <div>
-              <Label htmlFor="cl-pass">Temporary password</Label>
+              <Label htmlFor="cl-pass" srOnly>Temporary password</Label>
               <div style={{ display: "flex", gap: 6 }}>
-                <Input id="cl-pass" value={password} onChange={(e) => setPassword(e.target.value)} />
+                <Input id="cl-pass" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Temporary password" />
                 <Button variant="outline" size="sm" onClick={() => setPassword(genPassword())} type="button">New</Button>
               </div>
             </div>
@@ -167,8 +167,8 @@ function LoginCard({ clientId, clientEmail, login }: { clientId: number; clientE
           {resetting ? (
             <div style={{ display: "flex", gap: 6, alignItems: "flex-end" }}>
               <div style={{ flex: 1 }}>
-                <Label htmlFor="cl-newpass">New password</Label>
-                <Input id="cl-newpass" value={newPass} onChange={(e) => setNewPass(e.target.value)} placeholder="At least 6 characters" />
+                <Label htmlFor="cl-newpass" srOnly>New password</Label>
+                <Input id="cl-newpass" value={newPass} onChange={(e) => setNewPass(e.target.value)} placeholder="New password" />
               </div>
               <Button size="sm" onClick={reset} disabled={pending}>Save</Button>
               <Button size="sm" variant="ghost" onClick={() => setResetting(false)}>Cancel</Button>

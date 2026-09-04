@@ -65,12 +65,12 @@ export function CircuitBuilder({ initial, exercises }: { initial: CircuitInput; 
       <div style={card}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           <div>
-            <Label htmlFor="c-title">Circuit title *</Label>
-            <Input id="c-title" value={circuit.name === "New Circuit" ? "" : circuit.name} onChange={(e) => setCircuit((c) => ({ ...c, name: e.target.value }))} placeholder="Enter circuit title" />
+            <Label htmlFor="c-title" srOnly>Circuit title *</Label>
+            <Input id="c-title" value={circuit.name === "New Circuit" ? "" : circuit.name} onChange={(e) => setCircuit((c) => ({ ...c, name: e.target.value }))} placeholder="Circuit title *" />
           </div>
           <div>
-            <Label htmlFor="c-tags">Tags</Label>
-            <Input id="c-tags" value={tagsText} onChange={(e) => setTagsText(e.target.value)} placeholder="Add tags (comma separated)" />
+            <Label htmlFor="c-tags" srOnly>Tags</Label>
+            <Input id="c-tags" value={tagsText} onChange={(e) => setTagsText(e.target.value)} placeholder="Tags (comma separated)" />
           </div>
         </div>
 
@@ -118,8 +118,8 @@ export function CircuitBuilder({ initial, exercises }: { initial: CircuitInput; 
 
       <div style={card}>
         <div>
-          <Label htmlFor="c-instr">Instructions</Label>
-          <Textarea id="c-instr" value={circuit.instructions ?? ""} onChange={(e) => setCircuit((c) => ({ ...c, instructions: e.target.value }))} rows={3} placeholder="Enter circuit instructions" />
+          <Label htmlFor="c-instr" srOnly>Instructions</Label>
+          <Textarea id="c-instr" value={circuit.instructions ?? ""} onChange={(e) => setCircuit((c) => ({ ...c, instructions: e.target.value }))} rows={3} placeholder="Instructions" />
         </div>
       </div>
 

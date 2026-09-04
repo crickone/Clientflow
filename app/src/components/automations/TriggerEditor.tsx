@@ -233,17 +233,17 @@ function MessageCard({
 
       {message.channel === "email" && (
         <div>
-          <Label htmlFor={`subj-${index}`}>Subject</Label>
-          <Input id={`subj-${index}`} value={message.subject ?? ""} onChange={(e) => onPatch({ subject: e.target.value })} placeholder="Email subject" />
+          <Label htmlFor={`subj-${index}`} srOnly>Subject</Label>
+          <Input id={`subj-${index}`} value={message.subject ?? ""} onChange={(e) => onPatch({ subject: e.target.value })} placeholder="Subject" />
         </div>
       )}
 
       <div>
-        <Label>Template</Label>
+        <Label htmlFor={`tpl-${index}`} srOnly>Template</Label>
         <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginBottom: 6 }}>
           Personalise with short-codes: {SHORTCODES.map((s) => <code key={s} style={codeTag}>{s}</code>)}
         </div>
-        <Textarea value={message.template} onChange={(e) => onPatch({ template: e.target.value })} rows={6} placeholder="Hi [FIRST_NAME], …" />
+        <Textarea id={`tpl-${index}`} value={message.template} onChange={(e) => onPatch({ template: e.target.value })} rows={6} placeholder="Template" />
         {message.template.trim() && (
           <div style={{ marginTop: 8, padding: "10px 12px", border: "1px dashed var(--hairline)", borderRadius: "var(--radius)", background: "var(--surface-2)" }}>
             <div style={{ fontSize: 10.5, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-tertiary)", marginBottom: 4 }}>

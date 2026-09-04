@@ -437,16 +437,16 @@ function PackageSheet({
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div>
-              <Label htmlFor="p-name">Name</Label>
-              <Input id="p-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. 8 Week Foundation" autoFocus />
+              <Label htmlFor="p-name" srOnly>Name</Label>
+              <Input id="p-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" autoFocus />
             </div>
             <div>
-              <Label htmlFor="p-cat">Category</Label>
-              <Input id="p-cat" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. Gym" />
+              <Label htmlFor="p-cat" srOnly>Category</Label>
+              <Input id="p-cat" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Category" />
             </div>
             <div>
-              <Label htmlFor="p-desc">Description</Label>
-              <Textarea id="p-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+              <Label htmlFor="p-desc" srOnly>Description</Label>
+              <Textarea id="p-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="Description" />
             </div>
 
             <div>
@@ -459,8 +459,8 @@ function PackageSheet({
             <Toggle on={restrictToMembers} onChange={setRestrictToMembers} label="Restrict to membership holders" hint="Only current members can buy" />
 
             <div>
-              <Label htmlFor="p-price">Price charged (€)</Label>
-              <Input id="p-price" type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} />
+              <Label htmlFor="p-price" srOnly>Price charged (€)</Label>
+              <Input id="p-price" type="number" min={0} step="0.01" placeholder="Price charged (€)" value={price} onChange={(e) => setPrice(e.target.value)} />
             </div>
 
             <Toggle on={unlimitedSessions} onChange={setUnlimitedSessions} label="Unlimited sessions" hint="No credit cap" />

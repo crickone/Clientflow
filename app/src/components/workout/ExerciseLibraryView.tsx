@@ -269,22 +269,22 @@ function ExerciseSheet({
       <SheetContent title={editing ? "Edit exercise" : "Add exercise"} width={460}>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div>
-            <Label htmlFor="ex-name">Name</Label>
-            <Input id="ex-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Dumbbell Bench Press" autoFocus />
+            <Label htmlFor="ex-name" srOnly>Name</Label>
+            <Input id="ex-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" autoFocus />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
-              <Label htmlFor="ex-cat">Category</Label>
-              <Input id="ex-cat" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. Chest" />
+              <Label htmlFor="ex-cat" srOnly>Category</Label>
+              <Input id="ex-cat" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Category" />
             </div>
             <div>
-              <Label htmlFor="ex-equip">Equipment</Label>
-              <Input id="ex-equip" value={equipment} onChange={(e) => setEquipment(e.target.value)} placeholder="e.g. Dumbbell" />
+              <Label htmlFor="ex-equip" srOnly>Equipment</Label>
+              <Input id="ex-equip" value={equipment} onChange={(e) => setEquipment(e.target.value)} placeholder="Equipment" />
             </div>
           </div>
           <div>
-            <Label htmlFor="ex-muscles">Muscle groups</Label>
-            <Input id="ex-muscles" value={muscles} onChange={(e) => setMuscles(e.target.value)} placeholder="Chest, Triceps, Front Delts (comma separated)" />
+            <Label htmlFor="ex-muscles" srOnly>Muscle groups</Label>
+            <Input id="ex-muscles" value={muscles} onChange={(e) => setMuscles(e.target.value)} placeholder="Muscle groups (comma separated)" />
             <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 4 }}>Used to compute total volume sets in programs.</div>
           </div>
           <div>
@@ -321,12 +321,12 @@ function ExerciseSheet({
             </div>
           </div>
           <div>
-            <Label htmlFor="ex-image">Image URL</Label>
-            <Input id="ex-image" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://…" />
+            <Label htmlFor="ex-image" srOnly>Image URL</Label>
+            <Input id="ex-image" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="Image URL" />
           </div>
           <div>
-            <Label htmlFor="ex-instr">Instructions</Label>
-            <Textarea id="ex-instr" value={instructions} onChange={(e) => setInstructions(e.target.value)} rows={3} />
+            <Label htmlFor="ex-instr" srOnly>Instructions</Label>
+            <Textarea id="ex-instr" value={instructions} onChange={(e) => setInstructions(e.target.value)} rows={3} placeholder="Instructions" />
           </div>
 
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 4 }}>

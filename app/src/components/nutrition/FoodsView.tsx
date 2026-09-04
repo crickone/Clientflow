@@ -189,18 +189,18 @@ function FoodSheet({
       <SheetContent title={editing ? "Edit food" : "Add food"} width={440}>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div>
-            <Label htmlFor="f-name">Name</Label>
-            <Input id="f-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Chicken breast" autoFocus />
+            <Label htmlFor="f-name" srOnly>Name</Label>
+            <Input id="f-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" autoFocus />
           </div>
           <div>
-            <Label htmlFor="f-cat">Category</Label>
-            <Input id="f-cat" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. Protein" />
+            <Label htmlFor="f-cat" srOnly>Category</Label>
+            <Input id="f-cat" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Category" />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <NumField label="Serving size" value={servingSize} onChange={setServingSize} />
             <div>
-              <Label htmlFor="f-unit">Unit</Label>
-              <Input id="f-unit" value={servingUnit} onChange={(e) => setServingUnit(e.target.value)} placeholder="g" />
+              <Label htmlFor="f-unit" srOnly>Unit</Label>
+              <Input id="f-unit" value={servingUnit} onChange={(e) => setServingUnit(e.target.value)} placeholder="Unit" />
             </div>
           </div>
           <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>Macros are per one serving above.</div>

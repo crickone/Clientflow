@@ -187,8 +187,8 @@ export function BlogPostEditor({
             <input type="hidden" name="coverPosition" value={coverPosition} />
           </div>
           <div>
-            <Label htmlFor="title">Title</Label>
-            <Input id="title" name="title" defaultValue={post.title} />
+            <Label htmlFor="title" srOnly>Title</Label>
+            <Input id="title" name="title" placeholder="Title" defaultValue={post.title} />
           </div>
           <div>
             <Label htmlFor="content">Content</Label>
@@ -206,22 +206,23 @@ export function BlogPostEditor({
                 url={`${siteBaseUrl}/blog/${slug || "post"}`}
               />
               <div>
-                <Label htmlFor="slug">Slug</Label>
-                <Input id="slug" name="slug" value={slug} onChange={(e) => setSlug(e.target.value)} />
+                <Label htmlFor="slug" srOnly>Slug</Label>
+                <Input id="slug" name="slug" placeholder="Slug" value={slug} onChange={(e) => setSlug(e.target.value)} />
               </div>
               <div>
-                <Label htmlFor="excerpt">Excerpt</Label>
-                <Textarea id="excerpt" name="excerpt" defaultValue={post.excerpt} rows={2} />
+                <Label htmlFor="excerpt" srOnly>Excerpt</Label>
+                <Textarea id="excerpt" name="excerpt" placeholder="Excerpt" defaultValue={post.excerpt} rows={2} />
               </div>
               <div>
-                <Label htmlFor="seoTitle">SEO title</Label>
-                <Input id="seoTitle" name="seoTitle" value={seoTitle} onChange={(e) => setSeoTitle(e.target.value)} />
+                <Label htmlFor="seoTitle" srOnly>SEO title</Label>
+                <Input id="seoTitle" name="seoTitle" placeholder="SEO title" value={seoTitle} onChange={(e) => setSeoTitle(e.target.value)} />
               </div>
               <div>
-                <Label htmlFor="seoDescription">Meta description</Label>
+                <Label htmlFor="seoDescription" srOnly>Meta description</Label>
                 <Textarea
                   id="seoDescription"
                   name="seoDescription"
+                  placeholder="Meta description"
                   value={seoDescription}
                   onChange={(e) => setSeoDescription(e.target.value)}
                   rows={2}

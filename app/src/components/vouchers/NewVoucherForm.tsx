@@ -95,12 +95,12 @@ export function NewVoucherForm({ clients: initialClients, therapies }: Props) {
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             <div>
-              <Label htmlFor="purchaserName">Name</Label>
-              <Input id="purchaserName" name="purchaserName" required />
+              <Label htmlFor="purchaserName" srOnly>Name</Label>
+              <Input id="purchaserName" name="purchaserName" placeholder="Name" required />
             </div>
             <div>
-              <Label htmlFor="purchaserEmail">Email</Label>
-              <Input id="purchaserEmail" name="purchaserEmail" type="email" />
+              <Label htmlFor="purchaserEmail" srOnly>Email</Label>
+              <Input id="purchaserEmail" name="purchaserEmail" type="email" placeholder="Email" />
             </div>
           </div>
         )}
@@ -135,8 +135,8 @@ export function NewVoucherForm({ clients: initialClients, therapies }: Props) {
           />
         ) : (
           <>
-            <Label htmlFor="recipientName">Recipient name (optional)</Label>
-            <Input id="recipientName" name="recipientName" />
+            <Label htmlFor="recipientName" srOnly>Recipient name (optional)</Label>
+            <Input id="recipientName" name="recipientName" placeholder="Recipient name (optional)" />
           </>
         )}
       </Card>

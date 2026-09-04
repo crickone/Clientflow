@@ -52,21 +52,21 @@ export function SimpleBuilder({ initial }: { initial: ProgramInput }) {
       <div style={card}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           <div>
-            <Label htmlFor="sp-title">Program title *</Label>
-            <Input id="sp-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Enter program title" autoFocus />
+            <Label htmlFor="sp-title" srOnly>Program title *</Label>
+            <Input id="sp-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Program title *" autoFocus />
           </div>
           <div>
-            <Label htmlFor="sp-tags">Tags</Label>
-            <Input id="sp-tags" value={tagsText} onChange={(e) => setTagsText(e.target.value)} placeholder="Add tags (comma separated)" />
+            <Label htmlFor="sp-tags" srOnly>Tags</Label>
+            <Input id="sp-tags" value={tagsText} onChange={(e) => setTagsText(e.target.value)} placeholder="Tags (comma separated)" />
           </div>
         </div>
         <div>
-          <Label htmlFor="sp-summary">Workout summary</Label>
-          <Textarea id="sp-summary" value={summary} onChange={(e) => setSummary(e.target.value)} rows={3} placeholder="Enter workout summary" />
+          <Label htmlFor="sp-summary" srOnly>Workout summary</Label>
+          <Textarea id="sp-summary" value={summary} onChange={(e) => setSummary(e.target.value)} rows={3} placeholder="Workout summary" />
         </div>
         <div>
-          <Label htmlFor="sp-content">Workout content *</Label>
-          <Textarea id="sp-content" value={content} onChange={(e) => setContent(e.target.value)} rows={12} placeholder="Type or paste the workout…" />
+          <Label htmlFor="sp-content" srOnly>Workout content *</Label>
+          <Textarea id="sp-content" value={content} onChange={(e) => setContent(e.target.value)} rows={12} placeholder="Workout content *" />
         </div>
       </div>
 

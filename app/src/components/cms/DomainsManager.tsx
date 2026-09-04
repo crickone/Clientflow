@@ -61,8 +61,8 @@ export function DomainsManager({
       >
         <Card style={{ display: "grid", gap: 14 }}>
           <div>
-            <Label htmlFor="host">Add a domain</Label>
-            <Input id="host" name="host" placeholder="renovacellular.ie" error={state.error} />
+            <Label htmlFor="host" srOnly>Add a domain</Label>
+            <Input id="host" name="host" placeholder="Add a domain" error={state.error} />
           </div>
           <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14 }}>
             <input type="checkbox" name="isPrimary" /> Set as primary (canonical) host

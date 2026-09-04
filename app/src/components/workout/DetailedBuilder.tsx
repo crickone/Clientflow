@@ -99,22 +99,22 @@ export function DetailedBuilder({ initial, exercises }: { initial: ProgramInput;
       <div style={card}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           <div>
-            <Label htmlFor="dp-title">Program title *</Label>
+            <Label htmlFor="dp-title" srOnly>Program title *</Label>
             <Input
               id="dp-title"
               value={program.title === "New Program" ? "" : program.title}
               onChange={(e) => setProgram((p) => ({ ...p, title: e.target.value }))}
-              placeholder="Enter program title"
+              placeholder="Program title *"
             />
           </div>
           <div>
-            <Label htmlFor="dp-tags">Tags</Label>
-            <Input id="dp-tags" value={tagsText} onChange={(e) => setTagsText(e.target.value)} placeholder="Add tags (comma separated)" />
+            <Label htmlFor="dp-tags" srOnly>Tags</Label>
+            <Input id="dp-tags" value={tagsText} onChange={(e) => setTagsText(e.target.value)} placeholder="Tags (comma separated)" />
           </div>
         </div>
         <div>
-          <Label htmlFor="dp-overview">Program overview</Label>
-          <Textarea id="dp-overview" value={program.summary ?? ""} onChange={(e) => setProgram((p) => ({ ...p, summary: e.target.value }))} rows={2} placeholder="Enter program overview" />
+          <Label htmlFor="dp-overview" srOnly>Program overview</Label>
+          <Textarea id="dp-overview" value={program.summary ?? ""} onChange={(e) => setProgram((p) => ({ ...p, summary: e.target.value }))} rows={2} placeholder="Program overview" />
         </div>
 
         {/* day tabs */}
@@ -154,8 +154,8 @@ export function DetailedBuilder({ initial, exercises }: { initial: ProgramInput;
         </div>
 
         <div style={{ maxWidth: 420 }}>
-          <Label htmlFor="day-name">Day name *</Label>
-          <Input id="day-name" value={day.name} onChange={(e) => setDay({ name: e.target.value })} placeholder="Enter day name" />
+          <Label htmlFor="day-name" srOnly>Day name *</Label>
+          <Input id="day-name" value={day.name} onChange={(e) => setDay({ name: e.target.value })} placeholder="Day name *" />
         </div>
 
         {volume.length > 0 && (
@@ -224,8 +224,8 @@ export function DetailedBuilder({ initial, exercises }: { initial: ProgramInput;
       {/* instructions */}
       <div style={card}>
         <div>
-          <Label htmlFor="day-instructions">Instructions</Label>
-          <Textarea id="day-instructions" value={day.instructions ?? ""} onChange={(e) => setDay({ instructions: e.target.value })} rows={3} placeholder="Enter workout instructions" />
+          <Label htmlFor="day-instructions" srOnly>Instructions</Label>
+          <Textarea id="day-instructions" value={day.instructions ?? ""} onChange={(e) => setDay({ instructions: e.target.value })} rows={3} placeholder="Instructions" />
         </div>
       </div>
 

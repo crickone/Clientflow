@@ -813,11 +813,11 @@ export function ImageDesigner({
         }}
       >
         <div style={{ flex: 1, minWidth: 280 }}>
-          <Label htmlFor="design-name">Design name</Label>
+          <Label htmlFor="design-name" srOnly>Design name</Label>
           <Input
             id="design-name"
             value={name}
-            placeholder="e.g. Welcome offer · IG square"
+            placeholder="Design name"
             onChange={(e) => setName(e.target.value)}
           />
         </div>
@@ -1392,11 +1392,11 @@ export function ImageDesigner({
           )}
 
           <div>
-            <Label htmlFor="heading">Heading</Label>
+            <Label htmlFor="heading" srOnly>Heading</Label>
             <Textarea
               id="heading"
               value={activeSlide.headingText}
-              placeholder="Big idea — 3-6 words is best."
+              placeholder="Heading"
               onChange={(e) =>
                 updateActiveSlide({ headingText: e.target.value })
               }
@@ -1405,11 +1405,11 @@ export function ImageDesigner({
           </div>
 
           <div>
-            <Label htmlFor="body">Body text</Label>
+            <Label htmlFor="body" srOnly>Body text</Label>
             <Textarea
               id="body"
               value={activeSlide.bodyText}
-              placeholder="One supporting line."
+              placeholder="Body text"
               onChange={(e) =>
                 updateActiveSlide({ bodyText: e.target.value })
               }
@@ -2100,12 +2100,12 @@ function GenerateCarouselButton({
       >
         <form onSubmit={submit} style={{ display: "grid", gap: 18 }}>
           <div>
-            <Label htmlFor="gen-topic">Topic</Label>
+            <Label htmlFor="gen-topic" srOnly>Topic</Label>
             <Textarea
               id="gen-topic"
               required
               value={topic}
-              placeholder="e.g. 5 quick tips to get started"
+              placeholder="Topic"
               onChange={(e) => setTopic(e.target.value)}
               style={{ minHeight: 70 }}
             />
@@ -2123,11 +2123,11 @@ function GenerateCarouselButton({
               />
             </div>
             <div>
-              <Label htmlFor="gen-tone">Tone (optional)</Label>
+              <Label htmlFor="gen-tone" srOnly>Tone (optional)</Label>
               <Input
                 id="gen-tone"
                 value={tone}
-                placeholder="calm, grounded, no hype"
+                placeholder="Tone (optional)"
                 onChange={(e) => setTone(e.target.value)}
               />
             </div>

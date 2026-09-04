@@ -79,8 +79,8 @@ export function PageEditor({
       <form action={onSave}>
         <Card style={{ display: "grid", gap: 16 }}>
           <div>
-            <Label htmlFor="title">Page title</Label>
-            <Input id="title" name="title" defaultValue={page.title} />
+            <Label htmlFor="title" srOnly>Page title</Label>
+            <Input id="title" name="title" placeholder="Page title" defaultValue={page.title} />
           </div>
 
           <CardLabel>Content blocks · {page.templateLabel}</CardLabel>
@@ -91,7 +91,7 @@ export function PageEditor({
           )}
           {blocks.map((b) => (
             <div key={b.name}>
-              <Label htmlFor={`block__${b.name}`}>
+              <Label htmlFor={`block__${b.name}`} srOnly>
                 {b.label}{" "}
                 <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>
                   ({b.kind})
@@ -103,7 +103,7 @@ export function PageEditor({
                     id={`block__${b.name}`}
                     name={`block__${b.name}`}
                     defaultValue={b.value}
-                    placeholder="Media ID (from Media library)"
+                    placeholder={`${b.label} (media ID)`}
                     style={{ maxWidth: 220 }}
                   />
                   {b.value && (
@@ -116,11 +116,17 @@ export function PageEditor({
                   )}
                 </div>
               ) : b.kind === "text" ? (
-                <Input id={`block__${b.name}`} name={`block__${b.name}`} defaultValue={b.value} />
+                <Input
+                  id={`block__${b.name}`}
+                  name={`block__${b.name}`}
+                  placeholder={`${b.label} (${b.kind})`}
+                  defaultValue={b.value}
+                />
               ) : (
                 <Textarea
                   id={`block__${b.name}`}
                   name={`block__${b.name}`}
+                  placeholder={`${b.label} (${b.kind})`}
                   defaultValue={b.value}
                   rows={b.kind === "html" ? 14 : 5}
                 />
@@ -135,19 +141,21 @@ export function PageEditor({
             url={previewUrl}
           />
           <div>
-            <Label htmlFor="seoTitle">SEO title</Label>
+            <Label htmlFor="seoTitle" srOnly>SEO title</Label>
             <Input
               id="seoTitle"
               name="seoTitle"
+              placeholder="SEO title"
               value={seoTitle}
               onChange={(e) => setSeoTitle(e.target.value)}
             />
           </div>
           <div>
-            <Label htmlFor="seoDescription">Meta description</Label>
+            <Label htmlFor="seoDescription" srOnly>Meta description</Label>
             <Textarea
               id="seoDescription"
               name="seoDescription"
+              placeholder="Meta description"
               value={seoDescription}
               onChange={(e) => setSeoDescription(e.target.value)}
               rows={2}
@@ -155,21 +163,21 @@ export function PageEditor({
           </div>
           <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
             <div style={{ flex: 1, minWidth: 200 }}>
-              <Label htmlFor="canonicalUrl">Canonical URL (optional)</Label>
-              <Input id="canonicalUrl" name="canonicalUrl" defaultValue={seo.canonicalUrl} />
+              <Label htmlFor="canonicalUrl" srOnly>Canonical URL (optional)</Label>
+              <Input id="canonicalUrl" name="canonicalUrl" placeholder="Canonical URL (optional)" defaultValue={seo.canonicalUrl} />
             </div>
             <div style={{ width: 200 }}>
-              <Label htmlFor="robots">Robots</Label>
-              <Input id="robots" name="robots" defaultValue={seo.robots || "index,follow"} />
+              <Label htmlFor="robots" srOnly>Robots</Label>
+              <Input id="robots" name="robots" placeholder="Robots" defaultValue={seo.robots || "index,follow"} />
             </div>
           </div>
           <div>
-            <Label htmlFor="ogImageAssetId">Social share image (media ID)</Label>
+            <Label htmlFor="ogImageAssetId" srOnly>Social share image (media ID)</Label>
             <Input
               id="ogImageAssetId"
               name="ogImageAssetId"
               defaultValue={seo.ogImageAssetId}
-              placeholder="Media ID for OG/Twitter image"
+              placeholder="Social share image (media ID)"
               style={{ maxWidth: 260 }}
             />
           </div>

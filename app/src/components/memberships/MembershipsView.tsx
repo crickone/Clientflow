@@ -628,16 +628,16 @@ function MembershipSheet({
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div>
-              <Label htmlFor="m-name">Name</Label>
-              <Input id="m-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Inspire 3x per Week" autoFocus />
+              <Label htmlFor="m-name" srOnly>Name</Label>
+              <Input id="m-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" autoFocus />
             </div>
             <div>
-              <Label htmlFor="m-cat">Category</Label>
-              <Input id="m-cat" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. Gym membership" />
+              <Label htmlFor="m-cat" srOnly>Category</Label>
+              <Input id="m-cat" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Category" />
             </div>
             <div>
-              <Label htmlFor="m-desc">Description</Label>
-              <Textarea id="m-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+              <Label htmlFor="m-desc" srOnly>Description</Label>
+              <Textarea id="m-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="Description" />
             </div>
 
             <div>
@@ -650,12 +650,12 @@ function MembershipSheet({
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div>
-                <Label htmlFor="m-price">Price charged (€)</Label>
-                <Input id="m-price" type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} />
+                <Label htmlFor="m-price" srOnly>Price charged (€)</Label>
+                <Input id="m-price" type="number" min={0} step="0.01" placeholder="Price charged (€)" value={price} onChange={(e) => setPrice(e.target.value)} />
               </div>
               <div>
-                <Label htmlFor="m-fee">Joining fee (€)</Label>
-                <Input id="m-fee" type="number" min={0} step="0.01" value={joiningFee} onChange={(e) => setJoiningFee(e.target.value)} />
+                <Label htmlFor="m-fee" srOnly>Joining fee (€)</Label>
+                <Input id="m-fee" type="number" min={0} step="0.01" placeholder="Joining fee (€)" value={joiningFee} onChange={(e) => setJoiningFee(e.target.value)} />
               </div>
             </div>
 

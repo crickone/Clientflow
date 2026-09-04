@@ -230,12 +230,12 @@ function CreateKeyButton() {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div>
-              <Label htmlFor="key-label">Label (optional)</Label>
+              <Label htmlFor="key-label" srOnly>Label (optional)</Label>
               <Input
                 id="key-label"
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
-                placeholder="e.g. Zapier — Facebook lead-gen"
+                placeholder="Label (optional)"
                 autoFocus
                 disabled={pending}
               />

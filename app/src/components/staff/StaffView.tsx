@@ -422,20 +422,20 @@ function StaffSheet({
       <SheetContent title={editing ? "Edit staff" : "New staff"} width={460}>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div>
-            <Label htmlFor="s-name">Name</Label>
-            <Input id="s-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Coach Mark" autoFocus />
+            <Label htmlFor="s-name" srOnly>Name</Label>
+            <Input id="s-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" autoFocus />
           </div>
           <div>
-            <Label htmlFor="s-title">Title</Label>
-            <Input id="s-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Head Coach" />
+            <Label htmlFor="s-title" srOnly>Title</Label>
+            <Input id="s-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" />
           </div>
           <div>
-            <Label htmlFor="s-email">Email</Label>
-            <Input id="s-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@studio.ie" />
+            <Label htmlFor="s-email" srOnly>Email</Label>
+            <Input id="s-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" />
           </div>
           <div>
-            <Label htmlFor="s-phone">Phone</Label>
-            <Input id="s-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="083…" />
+            <Label htmlFor="s-phone" srOnly>Phone</Label>
+            <Input id="s-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone" />
           </div>
 
           <div style={{ display: "flex", gap: 10 }}>
@@ -448,8 +448,8 @@ function StaffSheet({
               </select>
             </div>
             <div style={{ flex: 1 }}>
-              <Label htmlFor="s-rate">Rate (€)</Label>
-              <Input id="s-rate" type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} />
+              <Label htmlFor="s-rate" srOnly>Rate (€)</Label>
+              <Input id="s-rate" type="number" min={0} step="0.01" placeholder="Rate (€)" value={price} onChange={(e) => setPrice(e.target.value)} />
             </div>
           </div>
 
@@ -457,8 +457,8 @@ function StaffSheet({
           <Toggle on={isApproved} onChange={setIsApproved} label="Approved" hint="Cleared to run classes" />
 
           <div>
-            <Label htmlFor="s-notes">Notes</Label>
-            <Textarea id="s-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+            <Label htmlFor="s-notes" srOnly>Notes</Label>
+            <Textarea id="s-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Notes" />
           </div>
 
           <div style={{ display: "flex", gap: 10, justifyContent: "space-between", alignItems: "center", paddingTop: 4 }}>

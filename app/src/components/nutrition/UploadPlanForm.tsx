@@ -69,8 +69,8 @@ export function UploadPlanForm({ initial }: { initial: PlanInput }) {
 
       <div style={card}>
         <div>
-          <Label htmlFor="up-title">Title</Label>
-          <Input id="up-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Enter nutrition plan title" autoFocus />
+          <Label htmlFor="up-title" srOnly>Title</Label>
+          <Input id="up-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" autoFocus />
         </div>
 
         <div>

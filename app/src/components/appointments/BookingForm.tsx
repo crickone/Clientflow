@@ -403,39 +403,41 @@ export function BookingForm({
               }}
             >
               <div>
-                <Label htmlFor="walkInFirstName">First name *</Label>
+                <Label htmlFor="walkInFirstName" srOnly>First name *</Label>
                 <Input
                   id="walkInFirstName"
+                  placeholder="First name *"
                   value={walkInFirstName}
                   onChange={(e) => setWalkInFirstName(e.target.value)}
                   required={clientMode === "walk_in"}
                 />
               </div>
               <div>
-                <Label htmlFor="walkInLastName">Last name</Label>
+                <Label htmlFor="walkInLastName" srOnly>Last name</Label>
                 <Input
                   id="walkInLastName"
+                  placeholder="Last name"
                   value={walkInLastName}
                   onChange={(e) => setWalkInLastName(e.target.value)}
                 />
               </div>
               <div>
-                <Label htmlFor="walkInEmail">Email (optional)</Label>
+                <Label htmlFor="walkInEmail" srOnly>Email (optional)</Label>
                 <Input
                   id="walkInEmail"
                   type="email"
                   value={walkInEmail}
                   onChange={(e) => setWalkInEmail(e.target.value)}
-                  placeholder="name@example.com"
+                  placeholder="Email (optional)"
                 />
               </div>
               <div>
-                <Label htmlFor="walkInPhone">Phone (optional)</Label>
+                <Label htmlFor="walkInPhone" srOnly>Phone (optional)</Label>
                 <Input
                   id="walkInPhone"
                   value={walkInPhone}
                   onChange={(e) => setWalkInPhone(e.target.value)}
-                  placeholder="+353 87 …"
+                  placeholder="Phone (optional)"
                 />
               </div>
             </div>
@@ -724,11 +726,12 @@ export function BookingForm({
                 {newTemplateId === "" && (
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                     <div style={{ gridColumn: "1 / -1" }}>
-                      <Label>{vocab.plan} name</Label>
+                      <Label htmlFor="newPkgName" srOnly>{vocab.plan} name</Label>
                       <Input
+                        id="newPkgName"
                         value={newPkgName}
                         onChange={(e) => setNewPkgName(e.target.value)}
-                        placeholder="e.g. 10-session pack"
+                        placeholder={`${vocab.plan} name`}
                       />
                     </div>
                     <div>
@@ -799,11 +802,12 @@ export function BookingForm({
 
         {paymentMethod === "voucher" && (
           <div>
-            <Label>Voucher code</Label>
+            <Label htmlFor="voucherCode" srOnly>Voucher code</Label>
             <Input
+              id="voucherCode"
               value={voucherCode}
               onChange={(e) => setVoucherCode(e.target.value)}
-              placeholder="RCH-2026-XXXX"
+              placeholder="Voucher code"
             />
             {voucherCode && voucherInfo.state !== "idle" && (
               <div

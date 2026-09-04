@@ -44,32 +44,34 @@ export function QuickAddClientForm({
     <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <div>
-          <Label htmlFor="firstName">First name</Label>
+          <Label htmlFor="firstName" srOnly>First name</Label>
           <Input
             id="firstName"
             name="firstName"
+            placeholder="First name"
             defaultValue={seeded.firstName}
             required
             autoFocus
           />
         </div>
         <div>
-          <Label htmlFor="lastName">Last name</Label>
+          <Label htmlFor="lastName" srOnly>Last name</Label>
           <Input
             id="lastName"
             name="lastName"
+            placeholder="Last name"
             defaultValue={seeded.lastName}
             required
           />
         </div>
       </div>
       <div>
-        <Label htmlFor="phone">Phone</Label>
-        <Input id="phone" name="phone" type="tel" required />
+        <Label htmlFor="phone" srOnly>Phone</Label>
+        <Input id="phone" name="phone" type="tel" placeholder="Phone" required />
       </div>
       <div>
-        <Label htmlFor="email">Email (optional)</Label>
-        <Input id="email" name="email" type="email" />
+        <Label htmlFor="email" srOnly>Email (optional)</Label>
+        <Input id="email" name="email" type="email" placeholder="Email (optional)" />
       </div>
       <p
         style={{

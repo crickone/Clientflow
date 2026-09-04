@@ -214,27 +214,27 @@ export function ImapConnectCard({
           </div>
 
           <div>
-            <Label htmlFor="imap-email">Email</Label>
+            <Label htmlFor="imap-email" srOnly>Email</Label>
             <Input
               id="imap-email"
               type="email"
               value={form.email}
               onChange={(e) => set("email", e.target.value)}
               onBlur={handleEmailBlur}
-              placeholder="you@yourdomain.com"
+              placeholder="Email"
               autoComplete="username"
               disabled={busy}
             />
           </div>
 
           <div>
-            <Label htmlFor="imap-password">Password</Label>
+            <Label htmlFor="imap-password" srOnly>Password</Label>
             <Input
               id="imap-password"
               type="password"
               value={form.password}
               onChange={(e) => set("password", e.target.value)}
-              placeholder="Mailbox password"
+              placeholder="Password"
               autoComplete="current-password"
               disabled={busy}
             />
@@ -278,12 +278,12 @@ export function ImapConnectCard({
 
               <SectionLabel>Incoming (IMAP)</SectionLabel>
               <div>
-                <Label htmlFor="imap-host">Host</Label>
+                <Label htmlFor="imap-host" srOnly>Host</Label>
                 <Input
                   id="imap-host"
                   value={form.imapHost}
                   onChange={(e) => set("imapHost", e.target.value)}
-                  placeholder="mail.yourdomain.com"
+                  placeholder="Host"
                   disabled={busy}
                 />
               </div>
@@ -311,12 +311,12 @@ export function ImapConnectCard({
 
               <SectionLabel style={{ marginTop: 4 }}>Outgoing (SMTP)</SectionLabel>
               <div>
-                <Label htmlFor="smtp-host">Host</Label>
+                <Label htmlFor="smtp-host" srOnly>Host</Label>
                 <Input
                   id="smtp-host"
                   value={form.smtpHost}
                   onChange={(e) => set("smtpHost", e.target.value)}
-                  placeholder="mail.yourdomain.com"
+                  placeholder="Host"
                   disabled={busy}
                 />
               </div>

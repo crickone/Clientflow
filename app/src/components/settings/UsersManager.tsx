@@ -316,10 +316,11 @@ function NewUserButton() {
         ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
-            <Label htmlFor="new-email">Email</Label>
+            <Label htmlFor="new-email" srOnly>Email</Label>
             <Input
               id="new-email"
               type="email"
+              placeholder="Email"
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
@@ -345,12 +346,12 @@ function NewUserButton() {
           {isNew && (
             <>
               <div>
-                <Label htmlFor="new-name">Name {mode === "invite" ? "(optional)" : ""}</Label>
+                <Label htmlFor="new-name" srOnly>Name {mode === "invite" ? "(optional)" : ""}</Label>
                 <Input
                   id="new-name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder={mode === "invite" ? "They can set this themselves" : ""}
+                  placeholder={mode === "invite" ? "Name (optional)" : "Name"}
                   disabled={pending}
                 />
               </div>
@@ -375,13 +376,13 @@ function NewUserButton() {
 
               {mode === "password" && (
                 <div>
-                  <Label htmlFor="new-password">Temporary password</Label>
+                  <Label htmlFor="new-password" srOnly>Temporary password</Label>
                   <Input
                     id="new-password"
                     type="text"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="At least 8 characters"
+                    placeholder="Temporary password"
                     disabled={pending}
                   />
                   <div style={{ color: "var(--text-tertiary)", fontSize: 12, marginTop: 6 }}>
@@ -518,10 +519,11 @@ function EditUserDialog({ user, isMe }: { user: UserRow; isMe: boolean }) {
       <DialogContent title="Edit membership">
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
-            <Label htmlFor={`edit-email-${user.userId}`}>Login email</Label>
+            <Label htmlFor={`edit-email-${user.userId}`} srOnly>Login email</Label>
             <Input
               id={`edit-email-${user.userId}`}
               type="email"
+              placeholder="Login email"
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
@@ -537,10 +539,11 @@ function EditUserDialog({ user, isMe }: { user: UserRow; isMe: boolean }) {
             </div>
           </div>
           <div>
-            <Label htmlFor={`edit-name-${user.userId}`}>Name</Label>
+            <Label htmlFor={`edit-name-${user.userId}`} srOnly>Name</Label>
             <Input
               id={`edit-name-${user.userId}`}
               value={user.name ?? ""}
+              placeholder="Name"
               disabled
               readOnly
             />
@@ -632,13 +635,13 @@ function ResetPasswordDialog({ user }: { user: UserRow }) {
       <DialogContent title="Reset password" description={user.email}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
-            <Label htmlFor={`reset-${user.userId}`}>New password</Label>
+            <Label htmlFor={`reset-${user.userId}`} srOnly>New password</Label>
             <Input
               id={`reset-${user.userId}`}
               type="text"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="At least 8 characters"
+              placeholder="New password"
               disabled={pending}
               autoFocus
             />

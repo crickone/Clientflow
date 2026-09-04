@@ -81,23 +81,23 @@ export function ClientEmailPanel({
           </strong>
         </div>
         <div>
-          <Label htmlFor="ce-subject">Subject</Label>
+          <Label htmlFor="ce-subject" srOnly>Subject</Label>
           <Input
             id="ce-subject"
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             disabled={pending}
-            placeholder="e.g. Your session this week"
+            placeholder="Subject"
           />
         </div>
         <div>
-          <Label htmlFor="ce-body">Message</Label>
+          <Label htmlFor="ce-body" srOnly>Message</Label>
           <textarea
             id="ce-body"
             value={body}
             onChange={(e) => setBody(e.target.value)}
             rows={6}
-            placeholder="Write your message…"
+            placeholder="Message"
             disabled={pending}
             style={{
               width: "100%",

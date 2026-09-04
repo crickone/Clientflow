@@ -85,25 +85,25 @@ export function EmailSettingsForm({
 
       <Card style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
         <div>
-          <Label htmlFor="from-name">Sender name</Label>
+          <Label htmlFor="from-name" srOnly>Sender name</Label>
           <Input
             id="from-name"
             value={fromName}
             onChange={(e) => setFromName(e.target.value)}
-            placeholder={businessName}
+            placeholder="Sender name"
             disabled={saving}
           />
           <Hint>The name recipients see in their inbox.</Hint>
         </div>
 
         <div>
-          <Label htmlFor="from-email">From address</Label>
+          <Label htmlFor="from-email" srOnly>From address</Label>
           <Input
             id="from-email"
             type="email"
             value={fromEmail}
             onChange={(e) => setFromEmail(e.target.value.toLowerCase())}
-            placeholder="hello@yourdomain.ie"
+            placeholder="From address"
             disabled={saving}
           />
           <Hint>
@@ -121,13 +121,13 @@ export function EmailSettingsForm({
         </div>
 
         <div>
-          <Label htmlFor="reply-to">Reply-to address (optional)</Label>
+          <Label htmlFor="reply-to" srOnly>Reply-to address (optional)</Label>
           <Input
             id="reply-to"
             type="email"
             value={replyTo}
             onChange={(e) => setReplyTo(e.target.value.toLowerCase())}
-            placeholder={fromEmail || "replies@yourdomain.ie"}
+            placeholder="Reply-to address (optional)"
             disabled={saving}
           />
           <Hint>Where client replies land. Defaults to the from address.</Hint>

@@ -774,12 +774,12 @@ function CreateDialog({
       <DialogContent title="New session" width={620}>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div>
-            <Label htmlFor="ts-name">Session name</Label>
+            <Label htmlFor="ts-name" srOnly>Session name</Label>
             <Input
               id="ts-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Reformer Pilates"
+              placeholder="Session name"
               autoFocus
             />
           </div>
@@ -856,16 +856,16 @@ function CreateDialog({
               <Input id="ts-cap" type="number" min={1} value={capacity} onChange={(e) => setCapacity(Number(e.target.value))} />
             </div>
             <div>
-              <Label htmlFor="ts-cat">Category</Label>
-              <Input id="ts-cat" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. Pilates" />
+              <Label htmlFor="ts-cat" srOnly>Category</Label>
+              <Input id="ts-cat" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Category" />
             </div>
             <div>
-              <Label htmlFor="ts-loc">Location</Label>
-              <Input id="ts-loc" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Studio 1" />
+              <Label htmlFor="ts-loc" srOnly>Location</Label>
+              <Input id="ts-loc" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location" />
             </div>
             <div>
-              <Label htmlFor="ts-inst">Instructor</Label>
-              <Input id="ts-inst" value={instructor} onChange={(e) => setInstructor(e.target.value)} placeholder="e.g. Sarah" />
+              <Label htmlFor="ts-inst" srOnly>Instructor</Label>
+              <Input id="ts-inst" value={instructor} onChange={(e) => setInstructor(e.target.value)} placeholder="Instructor" />
             </div>
           </div>
 
@@ -902,13 +902,13 @@ function CreateDialog({
           </div>
 
           <div>
-            <Label htmlFor="ts-desc">Description</Label>
+            <Label htmlFor="ts-desc" srOnly>Description</Label>
             <Textarea
               id="ts-desc"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
-              placeholder="What should clients know about this session?"
+              placeholder="Description"
             />
           </div>
 
@@ -1314,8 +1314,8 @@ function EditSessionDialog({
       <DialogContent title="Edit session" width={560}>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div>
-            <Label htmlFor="es-name">Session name</Label>
-            <Input id="es-name" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+            <Label htmlFor="es-name" srOnly>Session name</Label>
+            <Input id="es-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Session name" autoFocus />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
             <div>
@@ -1344,16 +1344,16 @@ function EditSessionDialog({
               <Input id="es-cap" type="number" min={1} value={capacity} onChange={(e) => setCapacity(Number(e.target.value))} />
             </div>
             <div>
-              <Label htmlFor="es-cat">Category</Label>
-              <Input id="es-cat" value={category} onChange={(e) => setCategory(e.target.value)} />
+              <Label htmlFor="es-cat" srOnly>Category</Label>
+              <Input id="es-cat" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Category" />
             </div>
             <div>
-              <Label htmlFor="es-loc">Location</Label>
-              <Input id="es-loc" value={location} onChange={(e) => setLocation(e.target.value)} />
+              <Label htmlFor="es-loc" srOnly>Location</Label>
+              <Input id="es-loc" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Location" />
             </div>
             <div>
-              <Label htmlFor="es-inst">Instructor</Label>
-              <Input id="es-inst" value={instructor} onChange={(e) => setInstructor(e.target.value)} />
+              <Label htmlFor="es-inst" srOnly>Instructor</Label>
+              <Input id="es-inst" value={instructor} onChange={(e) => setInstructor(e.target.value)} placeholder="Instructor" />
             </div>
           </div>
           <div>
@@ -1387,8 +1387,8 @@ function EditSessionDialog({
             </select>
           </div>
           <div>
-            <Label htmlFor="es-desc">Description</Label>
-            <Textarea id="es-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
+            <Label htmlFor="es-desc" srOnly>Description</Label>
+            <Textarea id="es-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Description" />
           </div>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
             <Button variant="ghost" onClick={onClose} disabled={pending}>

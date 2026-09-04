@@ -24,20 +24,20 @@ export function AddSiteForm() {
     <form action={action}>
       <Card style={{ maxWidth: 540, display: "grid", gap: 16 }}>
         <div>
-          <Label htmlFor="name">Site name</Label>
-          <Input id="name" name="name" placeholder="Acme Wellness" required error={state.error} />
+          <Label htmlFor="name" srOnly>Site name</Label>
+          <Input id="name" name="name" placeholder="Site name" required error={state.error} />
         </div>
         <div>
-          <Label htmlFor="slug">Slug (optional)</Label>
-          <Input id="slug" name="slug" placeholder="acme" error={state.error} />
+          <Label htmlFor="slug" srOnly>Slug (optional)</Label>
+          <Input id="slug" name="slug" placeholder="Slug (optional)" error={state.error} />
           <p style={{ color: "var(--text-tertiary)", fontSize: 12, marginTop: 6 }}>
             Used internally and as the dev preview path. Auto-derived from the name
             if blank.
           </p>
         </div>
         <div>
-          <Label htmlFor="primaryHost">Primary domain (optional)</Label>
-          <Input id="primaryHost" name="primaryHost" placeholder="acmewellness.com" />
+          <Label htmlFor="primaryHost" srOnly>Primary domain (optional)</Label>
+          <Input id="primaryHost" name="primaryHost" placeholder="Primary domain (optional)" />
           <p style={{ color: "var(--text-tertiary)", fontSize: 12, marginTop: 6 }}>
             Canonical hostname for SEO/sitemap. You can add domains later under the
             site&apos;s Domains tab.
