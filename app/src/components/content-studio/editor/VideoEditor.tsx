@@ -51,6 +51,9 @@ export function VideoEditor({
   const [undoStack, setUndoStack] = useState<TimelineDoc[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const clipInputRef = useRef<HTMLInputElement | null>(null);
   const [musicTracks, setMusicTracks] = useState<Array<{ filename: string; label: string }>>([]);
 
   const previewRef = useRef<PreviewHandle>(null);
@@ -302,6 +305,41 @@ export function VideoEditor({
     }
   }, [projectId, pollUntilIdle, applyChange]);
 
+  /**
+   * Add clips to this project — from a drag-and-drop onto the editor or the
+   * tray's file picker. Until this existed a project's footage was fixed at
+   * creation time, so there was no way to add b-roll after the fact.
+   */
+  const uploadClips = useCallback(
+    async (files: File[]) => {
+      const videos = files.filter((f) => f.type.startsWith("video/") || /\.(mp4|mov|webm|mkv|m4v)$/i.test(f.name));
+      if (videos.length === 0) {
+        setError("Drop a video file (MP4, MOV, WebM or MKV).");
+        return;
+      }
+      setUploading(true);
+      setError(null);
+      try {
+        const fd = new FormData();
+        fd.append("kind", "broll");
+        for (const f of videos) fd.append("files", f);
+        const d = await fetch(`${API(projectId)}/assets`, { method: "POST", body: fd }).then((r) =>
+          r.json(),
+        );
+        if (!d.ok) {
+          setError(d.error ?? "Couldn't add that clip.");
+          return;
+        }
+        await refreshAssets();
+      } catch {
+        setError("Couldn't upload that clip.");
+      } finally {
+        setUploading(false);
+      }
+    },
+    [projectId, refreshAssets],
+  );
+
   const onExport = useCallback(async () => {
     setBusy(true);
     setError(null);
@@ -326,7 +364,61 @@ export function VideoEditor({
       : null;
 
   return (
-    <div style={{ display: "grid", gap: 14 }}>
+    <div
+      style={{ display: "grid", gap: 14, position: "relative" }}
+      onDragOver={(e) => {
+        // Only react to actual file drags, not text/element drags inside the
+        // timeline (which has its own drag interactions).
+        if (!e.dataTransfer.types.includes("Files")) return;
+        e.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+        setDragging(false);
+      }}
+      onDrop={(e) => {
+        if (!e.dataTransfer.types.includes("Files")) return;
+        e.preventDefault();
+        setDragging(false);
+        uploadClips(Array.from(e.dataTransfer.files));
+      }}
+    >
+      {(dragging || uploading) && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 20,
+            display: "grid",
+            placeItems: "center",
+            gap: 10,
+            borderRadius: "var(--radius)",
+            border: "2px dashed var(--text-primary)",
+            background: "rgba(12,13,16,0.82)",
+            backdropFilter: "blur(2px)",
+            pointerEvents: "none",
+            textAlign: "center",
+          }}
+        >
+          <div style={{ display: "grid", justifyItems: "center", gap: 8 }}>
+            {uploading ? (
+              <Loader2 size={22} className="spin" />
+            ) : (
+              <Plus size={22} />
+            )}
+            <div style={{ fontSize: 15, fontWeight: 600 }}>
+              {uploading ? "Adding your clip…" : "Drop to add as b-roll"}
+            </div>
+            {!uploading && (
+              <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+                MP4, MOV, WebM or MKV
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* top bar */}
       <div
         style={{
@@ -554,6 +646,40 @@ export function VideoEditor({
               </button>
             );
           })}
+          {/* Click-to-browse alongside drag-and-drop — dragging isn't
+              discoverable, and isn't available to every user. */}
+          <button
+            type="button"
+            onClick={() => clipInputRef.current?.click()}
+            disabled={uploading}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              background: "var(--surface-2)",
+              border: "1px dashed var(--hairline-strong)",
+              borderRadius: 4,
+              padding: "4px 9px",
+              fontSize: 10,
+              color: "var(--text-secondary)",
+              cursor: uploading ? "default" : "pointer",
+            }}
+          >
+            <Plus size={11} />
+            {uploading ? "Adding…" : "Add clips"}
+          </button>
+          <input
+            ref={clipInputRef}
+            type="file"
+            accept="video/mp4,video/quicktime,video/webm,video/x-matroska,video/x-m4v"
+            multiple
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const list = Array.from(e.target.files ?? []);
+              if (list.length > 0) uploadClips(list);
+              e.target.value = "";
+            }}
+          />
           <GenerateBrollDialog projectId={projectId} onQueued={refreshAssets} />
         </div>
       </div>
