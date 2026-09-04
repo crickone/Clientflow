@@ -59,10 +59,38 @@ function captionFontFamily(name: string | null | undefined): string {
  * with no metadata but an operator/AI rotation → the full rotation. An operator
  * override on a phone clip → just the difference.
  */
-function previewRotation(asset: VideoAsset | null | undefined): number {
+function previewRotation(
+  asset: VideoAsset | null | undefined,
+  browserRotated?: boolean,
+): number {
   const rotation = asset?.rotation ?? 0;
-  const metaRotation = asset?.metaRotation ?? 0;
+  // `metaRotation` is only recorded for clips uploaded after it was introduced.
+  // For older rows it's 0 even when the file DOES carry a matrix, which would
+  // double-rotate them forever. So trust what the browser actually did: if it
+  // reports the frame with width/height swapped relative to the stored
+  // dimensions, it has already applied a quarter turn — and since `rotation`
+  // was seeded from that same metadata, the remaining delta is zero.
+  const metaRotation =
+    asset?.metaRotation || (browserRotated ? rotation : 0);
   return (((rotation - metaRotation) % 360) + 360) % 360;
+}
+
+/**
+ * Did the browser auto-rotate this clip? True when the dimensions it reports
+ * are the transpose of the ones we probed on upload. `null` until the element
+ * has loaded metadata (or when we have nothing to compare against).
+ */
+function detectBrowserRotated(
+  el: HTMLVideoElement | null,
+  asset: VideoAsset | null | undefined,
+): boolean | null {
+  if (!el || !el.videoWidth || !el.videoHeight) return null;
+  const w = asset?.width ?? 0;
+  const h = asset?.height ?? 0;
+  if (!w || !h || w === h) return null;
+  const storedLandscape = w > h;
+  const shownLandscape = el.videoWidth > el.videoHeight;
+  return storedLandscape !== shownLandscape;
 }
 
 /** Imperative API so a parent timeline can scrub/play the preview. */
@@ -182,7 +210,12 @@ export const PreviewStage = forwardRef<PreviewHandle, Props>(function PreviewSta
     [onPlayheadChange],
   );
 
-  const mainRotation = previewRotation(mainAsset);
+  // Set once the <video> reports its dimensions — see detectBrowserRotated.
+  const [mainBrowserRotated, setMainBrowserRotated] = useState<boolean | null>(null);
+  useEffect(() => {
+    setMainBrowserRotated(null); // re-detect when the clip changes
+  }, [mainAsset?.id]);
+  const mainRotation = previewRotation(mainAsset, mainBrowserRotated ?? undefined);
 
   // ── active b-roll at the current playhead ────────────────────────────────
   const activeInsert = useMemo(() => {
@@ -401,7 +434,12 @@ export const PreviewStage = forwardRef<PreviewHandle, Props>(function PreviewSta
             src={mainSrc}
             playsInline
             preload="auto"
-            onLoadedMetadata={() => applySeek(playhead)}
+            onLoadedMetadata={(e) => {
+              setMainBrowserRotated(
+                detectBrowserRotated(e.currentTarget, mainAsset),
+              );
+              applySeek(playhead);
+            }}
             onEnded={() => stopLoopAndPause()}
             style={{ display: "block", ...coverFitStyle(mainRotation, wrapperSize) }}
           />
