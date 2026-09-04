@@ -5,6 +5,7 @@ import { therapies } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { getSettings, getVenueType } from "@/lib/settings";
 import { getBusinessProfile } from "@/lib/businessProfile";
+import { getPlanBriefing } from "@/lib/marketing/calendarNotes";
 import type { VenueType } from "@/lib/vocabulary";
 
 /**
@@ -114,6 +115,18 @@ export function getBusinessContext(): string {
 
   if (profile.voiceNotes.trim()) {
     parts.push("", `Additional tone notes: ${profile.voiceNotes.trim()}`);
+  }
+
+  // The operator's own plan for the year + the notes on the months coming up
+  // (from the seasonal calendar). This is direction the AI cannot infer from a
+  // date alone — what's being launched when, what to push, what to hold back.
+  const plan = getPlanBriefing();
+  if (plan) {
+    parts.push(
+      "",
+      "The operator's marketing plan — follow this direction when it applies to what you're writing:",
+      plan,
+    );
   }
 
   return parts.join("\n");

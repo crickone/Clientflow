@@ -3,6 +3,8 @@ import { Radar } from "lucide-react";
 
 import { Card, CardLabel } from "@/components/ui/Card";
 import type { Campaign } from "@/lib/campaigns/store";
+import type { CalendarNotes } from "@/lib/marketing/calendarNotes";
+import { YearPlanPanel, MonthNote } from "@/components/marketing/PlanNotes";
 import type { RadarSuggestion } from "@/lib/marketing/campaignRadar";
 import { seasonForMonth, type CalDate, type Season, type SeasonBand } from "@/lib/marketing/seasonalCalendar";
 import { BuildCampaignLink } from "./BuildCampaignLink";
@@ -13,6 +15,7 @@ interface Props {
   seasons: SeasonBand[];
   campaigns: Campaign[];
   radar: RadarSuggestion[];
+  notes: CalendarNotes;
 }
 
 const MONTH_NAMES = [
@@ -106,7 +109,7 @@ function daysAwayLabel(daysAway: number): string {
  * (/marketing/campaigns/[id]) or into the Marketing agent chat pre-seeded
  * via BuildCampaignLink.
  */
-export function SeasonalCalendar({ year, dates, seasons, campaigns, radar }: Props) {
+export function SeasonalCalendar({ year, dates, seasons, campaigns, radar, notes }: Props) {
   return (
     <div>
       <ComingUpRail radar={radar} />
@@ -150,6 +153,8 @@ export function SeasonalCalendar({ year, dates, seasons, campaigns, radar }: Pro
           ))}
         </div>
       </div>
+
+      <YearPlanPanel year={year} initialPlan={notes.yearPlan} />
 
       <div className="szncal-scroll">
         <div className="szncal-grid">
@@ -199,6 +204,11 @@ export function SeasonalCalendar({ year, dates, seasons, campaigns, radar }: Pro
                     ))}
                   </div>
                 )}
+                <MonthNote
+                  year={year}
+                  month={month}
+                  initialNote={notes.months[String(month)] ?? ""}
+                />
               </div>
             );
           })}
@@ -209,6 +219,31 @@ export function SeasonalCalendar({ year, dates, seasons, campaigns, radar }: Pro
         dangerouslySetInnerHTML={{
           __html: `
             .szncal-scroll { overflow-x: auto; padding-bottom: 6px; }
+            .szncal-note,
+            .szncal-note-add {
+              display: flex;
+              align-items: flex-start;
+              gap: 6px;
+              width: 100%;
+              margin-top: 8px;
+              padding: 7px 9px;
+              border-radius: var(--radius-sm);
+              border: 1px dashed var(--hairline);
+              background: rgba(255, 255, 255, 0.03);
+              color: var(--text-secondary);
+              font-family: inherit;
+              font-size: 11.5px;
+              line-height: 1.45;
+              text-align: left;
+              cursor: pointer;
+              transition: border-color 0.15s var(--ease), color 0.15s var(--ease);
+            }
+            .szncal-note:hover,
+            .szncal-note-add:hover {
+              border-color: var(--hairline-strong);
+              color: var(--text-primary);
+            }
+            .szncal-note-add { align-items: center; color: var(--text-tertiary); font-size: 11px; }
             .szncal-grid {
               display: grid;
               grid-template-columns: repeat(4, minmax(210px, 1fr));

@@ -2,6 +2,7 @@ import { requireAdminPage, getCurrentMembership } from "@/lib/auth";
 import { listCampaigns } from "@/lib/campaigns/store";
 import { getCampaignRadar } from "@/lib/marketing/campaignRadar";
 import { catalogForYear } from "@/lib/marketing/seasonalCalendar";
+import { getCalendarNotes } from "@/lib/marketing/calendarNotes";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SeasonalCalendar } from "@/components/marketing/SeasonalCalendar";
 
@@ -41,6 +42,7 @@ export default async function MarketingCalendarPage({
   const { dates, seasons } = catalogForYear(year);
   const campaigns = listCampaigns();
   const radar = await getCampaignRadar(tenantId);
+  const notes = getCalendarNotes(year);
 
   return (
     <div className="app-page">
@@ -49,7 +51,7 @@ export default async function MarketingCalendarPage({
         title="Seasonal calendar"
         subtitle="Irish holidays, awareness days and seasons for the year, overlaid with your campaigns — plus what's coming up next."
       />
-      <SeasonalCalendar year={year} dates={dates} seasons={seasons} campaigns={campaigns} radar={radar} />
+      <SeasonalCalendar year={year} dates={dates} seasons={seasons} campaigns={campaigns} radar={radar} notes={notes} />
     </div>
   );
 }
