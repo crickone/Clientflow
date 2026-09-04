@@ -486,7 +486,20 @@ export function Sidebar({
     return (
       <div key={entry.label}>
         <button
-          onClick={() =>
+          onClick={() => {
+            // On the collapsed rail a group can't show its children (no room),
+            // so clicking one did nothing at all — it looked unclickable, and
+            // groups are most of the nav. Expand the sidebar and open it.
+            if (collapsed) {
+              onToggleCollapsed?.();
+              setOpenGroups((s) => {
+                const next = { ...s };
+                for (const sib of GROUP_SIBLINGS[entry.label] ?? []) next[sib] = false;
+                next[entry.label] = true;
+                return next;
+              });
+              return;
+            }
             setOpenGroups((s) => {
               // Accordion: opening a group collapses its same-level siblings;
               // clicking an already-open group just collapses it. Setting a
@@ -498,8 +511,8 @@ export function Sidebar({
               for (const sib of GROUP_SIBLINGS[entry.label] ?? []) next[sib] = false;
               next[entry.label] = true;
               return next;
-            })
-          }
+            });
+          }}
           className="nav-link"
           style={{
             ...navRowStyle,

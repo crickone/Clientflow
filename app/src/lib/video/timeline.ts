@@ -230,6 +230,47 @@ export function trimSegment(
 }
 
 /** Append a b-roll insert, then clamp + sort by start. */
+/**
+ * Where to drop the NEXT cutaway of length `len`, starting from `desired`.
+ *
+ * Adding several cutaways without moving the playhead used to place every one
+ * at the same instant, stacked invisibly on top of each other — so the tray
+ * looked like it only accepted one clip. This walks forward past anything
+ * already occupying the spot, then falls back to the first gap big enough
+ * anywhere on the timeline. Returns null when the timeline is genuinely full,
+ * so the caller can say so instead of silently stacking.
+ */
+export function findFreeBrollStart(
+  doc: TimelineDoc,
+  desired: number,
+  len: number,
+  total: number,
+): number | null {
+  if (len <= 0 || total < len) return null;
+  const busy = [...doc.brollInserts].sort((a, b) => a.startSec - b.startSec);
+  const fits = (start: number) =>
+    start >= 0 &&
+    start + len <= total + 1e-6 &&
+    !busy.some((b) => start < b.endSec - 1e-6 && start + len > b.startSec + 1e-6);
+
+  // 1. From the playhead, skipping past anything in the way.
+  let cursor = Math.max(0, Math.min(desired, total - len));
+  for (let i = 0; i < busy.length + 1; i++) {
+    if (fits(cursor)) return cursor;
+    const blocking = busy.find((b) => cursor < b.endSec - 1e-6 && cursor + len > b.startSec + 1e-6);
+    if (!blocking) break;
+    cursor = blocking.endSec;
+    if (cursor + len > total + 1e-6) break;
+  }
+
+  // 2. Otherwise the first gap anywhere — before the first, between, after the last.
+  const edges = [0, ...busy.map((b) => b.endSec)];
+  for (const start of edges) {
+    if (fits(start)) return start;
+  }
+  return null;
+}
+
 export function addBroll(doc: TimelineDoc, insert: TimelineBrollInsert): TimelineDoc {
   const total = outputDuration(doc.mainSegments);
   const next = clampBroll([...doc.brollInserts, insert], total).sort(

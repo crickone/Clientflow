@@ -1,16 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Undo2, Download, AlertTriangle, Plus, RotateCw, RotateCcw, Loader2 } from "lucide-react";
+import { Undo2, Download, AlertTriangle, Plus, RotateCw, RotateCcw, Loader2, X } from "lucide-react";
 import { GenerateBrollDialog } from "./GenerateBrollDialog";
 
 import { Button } from "@/components/ui/Button";
+import { Tooltip } from "@/components/ui/Tooltip";
 import type { VideoAsset, VideoProject } from "@/lib/db/schema";
 import type { Transcript } from "@/lib/ai/transcribe";
 import type { TimelineDoc } from "@/lib/video/timeline";
 import {
   addBroll,
   deleteSegment,
+  findFreeBrollStart,
   outputDuration,
   remapBrollSourceToOutput,
   splitSegment,
@@ -157,7 +159,15 @@ export function VideoEditor({
       const doc = timelineSnapshotRef.current;
       const total = outputDuration(doc.mainSegments);
       const len = Math.min(3, Math.max(0.5, total));
-      const start = Math.max(0, Math.min(playhead, total - len));
+      // Drop it at the playhead, or the next free gap — adding several without
+      // moving the playhead used to stack them all on the same instant, which
+      // looked like only one could be added.
+      const start = findFreeBrollStart(doc, playhead, len, total);
+      if (start === null) {
+        setError("No room left on the timeline for another cutaway — shorten or remove one first.");
+        return;
+      }
+      setError(null);
       applyChange(
         addBroll(doc, { startSec: start, endSec: start + len, brollAssetId: assetId, brollStartSec: 0 }),
       );
@@ -651,8 +661,17 @@ export function VideoEditor({
             const generating = b.genStatus === "generating";
             const failed = b.genStatus === "failed";
             return (
-              <button
+              <span
                 key={b.id}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  background: failed ? "var(--danger-soft)" : "#241c12",
+                  border: `1px solid ${failed ? "var(--danger)" : "#6b5226"}`,
+                  borderRadius: 4,
+                }}
+              >
+              <button
                 type="button"
                 disabled={generating}
                 onClick={() =>
@@ -668,13 +687,15 @@ export function VideoEditor({
                         : `Add ${b.originalName} at the playhead`
                 }
                 style={{
+                  // The chip's fill/border live on the wrapper span so the
+                  // remove button sits inside the same pill.
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 4,
-                  background: failed ? "var(--danger-soft)" : "#241c12",
-                  border: `1px solid ${failed ? "var(--danger)" : "#6b5226"}`,
+                  background: "none",
+                  border: "none",
                   borderRadius: 4,
-                  padding: "4px 8px",
+                  padding: "4px 4px 4px 8px",
                   fontSize: 10,
                   color: failed ? "var(--danger)" : "#e3c590",
                   maxWidth: 160,
@@ -692,7 +713,28 @@ export function VideoEditor({
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {generating ? "Generating…" : failed ? "Failed — dismiss" : b.originalName}
                 </span>
-              </button>
+                </button>
+                {!generating && !failed && (
+                  <Tooltip label={`Remove ${b.originalName} from this project`}>
+                    <button
+                      type="button"
+                      onClick={() => removeAsset(b.id)}
+                      aria-label={`Remove ${b.originalName}`}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        background: "none",
+                        border: "none",
+                        padding: "0 6px 0 2px",
+                        color: "#8a7a55",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <X size={11} />
+                    </button>
+                  </Tooltip>
+                )}
+              </span>
             );
           })}
           {/* Click-to-browse alongside drag-and-drop — dragging isn't
