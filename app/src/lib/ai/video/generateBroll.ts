@@ -16,6 +16,13 @@ import {
   videoCostCents,
   VIDEO_MODEL_ID,
 } from "./falVideoClient";
+import {
+  isRunwayConfigured,
+  runwayCostCents,
+  runwayGenerateVideo,
+  RUNWAY_MODEL_ID,
+} from "./runwayClient";
+import { getProject } from "@/lib/video/projects";
 
 /**
  * The ONE metered path for AI b-roll — the video counterpart of
@@ -55,12 +62,25 @@ export function runBrollGeneration(input: {
       const srcPath = libraryFilePath(source.filename);
       const imageBytes = fs.readFileSync(srcPath);
 
-      const mp4 = await falGenerateVideo({
-        imageBytes,
-        imageMime: source.mimeType || "image/jpeg",
-        prompt: input.prompt,
-        durationSec: input.durationSec,
-      });
+      // Runway Gen-4 holds up better on human motion, which is what gym b-roll
+      // is — so it's preferred whenever its key is set, with fal/Kling as the
+      // fallback so the feature still works without a Runway account.
+      const useRunway = isRunwayConfigured();
+      const aspectRatio = getProject(input.projectId)?.aspectRatio ?? "9:16";
+      const mp4 = useRunway
+        ? await runwayGenerateVideo({
+            imageBytes,
+            imageMime: source.mimeType || "image/jpeg",
+            prompt: input.prompt,
+            durationSec: input.durationSec,
+            aspectRatio,
+          })
+        : await falGenerateVideo({
+            imageBytes,
+            imageMime: source.mimeType || "image/jpeg",
+            prompt: input.prompt,
+            durationSec: input.durationSec,
+          });
 
       const filename = `aibroll-${Date.now()}-${crypto.randomBytes(4).toString("hex")}.mp4`;
       const dest = path.join(uploadDir(input.projectId), filename);
@@ -92,12 +112,13 @@ export function runBrollGeneration(input: {
         .where(eq(schema.videoAssets.id, input.assetId))
         .run();
 
-      // Charge only once the clip actually landed.
+      // Charge only once the clip actually landed, against whichever provider
+      // actually produced it.
       meterAndChargeFlat(
         tenantId,
         "video",
-        VIDEO_MODEL_ID,
-        videoCostCents(input.durationSec),
+        useRunway ? RUNWAY_MODEL_ID : VIDEO_MODEL_ID,
+        useRunway ? runwayCostCents(input.durationSec) : videoCostCents(input.durationSec),
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
