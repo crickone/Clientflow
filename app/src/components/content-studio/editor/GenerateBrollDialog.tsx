@@ -39,6 +39,7 @@ export function GenerateBrollDialog({
   const [loading, setLoading] = useState(false);
   const [picked, setPicked] = useState<number[]>([]);
   const [duration, setDuration] = useState<5 | 10>(5);
+  const [motion, setMotion] = useState<"action" | "camera" | "pan">("action");
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -81,6 +82,7 @@ export function GenerateBrollDialog({
         body: JSON.stringify({
           libraryAssetIds: picked,
           durationSec: duration,
+          motion,
           prompt: prompt.trim() || undefined,
         }),
       }).then((r) => r.json());
@@ -126,9 +128,10 @@ export function GenerateBrollDialog({
               Generate b-roll from your photos
             </h2>
             <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--text-secondary)" }}>
-              Each photo becomes a short clip with natural camera motion — your real
-              space, not stock footage. Clips land in the b-roll tray when they&rsquo;re ready
-              (about a minute each).
+              Each photo becomes a short clip of your real space. The AI adds motion to
+              what&rsquo;s <strong>already in the photo</strong> — it can&rsquo;t put people into an
+              empty room, so pick shots that already show someone using the equipment.
+              Clips land in the b-roll tray when they&rsquo;re ready (about a minute each).
             </p>
           </div>
 
@@ -208,6 +211,44 @@ export function GenerateBrollDialog({
             )}
             <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 6 }}>
               Up to {MAX_PICKS} at a time.
+            </div>
+          </div>
+
+          <div>
+            <Label>Motion</Label>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {([
+                { key: "action", label: "People moving", hint: "Animates whoever is in the shot" },
+                { key: "camera", label: "Camera only", hint: "Scene held still, slow push-in" },
+                { key: "pan", label: "Pan across", hint: "Camera moves across the room" },
+              ] as const).map((m) => (
+                <button
+                  key={m.key}
+                  type="button"
+                  onClick={() => setMotion(m.key)}
+                  title={m.hint}
+                  style={{
+                    flex: "1 1 120px",
+                    padding: "8px 10px",
+                    borderRadius: "var(--radius)",
+                    border:
+                      motion === m.key
+                        ? "1px solid var(--text-primary)"
+                        : "1px solid var(--hairline)",
+                    background: motion === m.key ? "var(--surface-2)" : "var(--bg)",
+                    color: "var(--text-primary)",
+                    cursor: "pointer",
+                    fontSize: 12.5,
+                    fontFamily: "inherit",
+                    textAlign: "left",
+                  }}
+                >
+                  <span style={{ display: "block", fontWeight: 600 }}>{m.label}</span>
+                  <span style={{ display: "block", fontSize: 11, color: "var(--text-tertiary)" }}>
+                    {m.hint}
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
 

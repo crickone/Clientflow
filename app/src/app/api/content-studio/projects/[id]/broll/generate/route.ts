@@ -6,6 +6,7 @@ import { addAsset, ensureUploadDir, getProject } from "@/lib/video/projects";
 import { getLibraryAsset } from "@/lib/image/library";
 import { isVideoGenConfigured, videoCostCents } from "@/lib/ai/video/falVideoClient";
 import { runBrollGeneration } from "@/lib/ai/video/generateBroll";
+import { MOTION_PRESETS, type MotionPreset } from "@/lib/ai/video/motionPresets";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,7 @@ export async function POST(
     libraryAssetIds?: unknown;
     prompt?: unknown;
     durationSec?: unknown;
+    motion?: unknown;
   };
 
   const ids = Array.isArray(input.libraryAssetIds)
@@ -67,13 +69,13 @@ export async function POST(
   }
 
   const durationSec = Number(input.durationSec) === 10 ? 10 : 5;
+  // A typed preset unless the operator wrote their own words.
+  const preset: MotionPreset =
+    input.motion === "camera" || input.motion === "pan" ? input.motion : "action";
   const basePrompt =
     typeof input.prompt === "string" && input.prompt.trim()
       ? input.prompt.trim().slice(0, 400)
-      : // Default: gentle, real-looking camera motion. Deliberately conservative —
-        // b-roll should look like footage of their gym, not an AI fever dream.
-        "Subtle, natural camera movement: a slow cinematic push-in with gentle parallax. " +
-        "Keep the scene, people and equipment exactly as they are. Realistic, steady, documentary style.";
+      : MOTION_PRESETS[preset];
 
   const created: number[] = [];
   ensureUploadDir(projectId);
