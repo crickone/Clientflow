@@ -3574,7 +3574,11 @@ export function drawLogoOverlay(
   width: number,
   height: number,
   logo: HTMLImageElement,
-  placement: "top-left" | "top-center" | "bottom-right" = "bottom-right",
+  // Top-left is the house position. It used to default to bottom-right, which
+  // meant the 28 templates that don't declare a placement disagreed with the 6
+  // carousel ones (those go through paintSlideChrome, which measures a top
+  // corner) — so the same logo moved depending on which template you picked.
+  placement: "top-left" | "top-center" | "bottom-right" = "top-left",
 ) {
   const nw = logo.naturalWidth || logo.width;
   const nh = logo.naturalHeight || logo.height;
