@@ -7,8 +7,8 @@ import type { CSSProperties } from "react";
  * (9:16 or 1:1); `wrapperSize` is its measured px size, needed for the
  * quarter-turn cases where the video is pre-sized in pixels then rotated.
  *
- * Mirrors the b-roll preview math in PlanTimelineEditor, but cover (crop) to
- * match `scale=...:force_original_aspect_ratio=increase,crop=...` in render.ts.
+ * Covers (crops) rather than fits, to match
+ * `scale=...:force_original_aspect_ratio=increase,crop=...` in render.ts.
  */
 export function coverFitStyle(
   rotation: number,
