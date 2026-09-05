@@ -1,19 +1,24 @@
-import { redirect } from "next/navigation";
-import { addSlide, createCarousel } from "@/lib/image/carousels";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { StartDesign } from "@/components/content-studio/StartDesign";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Land on /new → spin up an empty design with one default slide and drop the
- * user straight into the editor. Keeps the original "open the editor, pick a
- * template, start designing" flow rather than gating it behind a setup form.
+ * Step 1 of the image flow. This page used to create a design silently and
+ * redirect straight into the editor, where the first thing you were shown was a
+ * 32-template grid — asking for a styling decision before you'd said what the
+ * post was about. Now it asks that first, and generating the copy IS the step
+ * rather than a button hidden in the editor's toolbar.
  */
 export default function NewImagePage() {
-  const design = createCarousel({ name: "Untitled design" });
-  addSlide({
-    carouselSetId: design.id,
-    templateId: "bold-headline",
-    aspectRatio: "1:1",
-  });
-  redirect(`/content-studio/images/${design.id}`);
+  return (
+    <>
+      <PageHeader
+        eyebrow="New design"
+        title="Start a post"
+        subtitle="Say what it's about and whether it's a carousel or a single image. You'll pick the look next."
+      />
+      <StartDesign />
+    </>
+  );
 }
