@@ -831,40 +831,6 @@ export function ImageDesigner({
           }}
         >
           <SaveStatus status={saveStatus} />
-          <GenerateCarouselButton
-            designId={designId}
-            slotKey={
-              activeSlot.startsWith("carousel-") || activeSlot === "question-hook"
-                ? activeSlot
-                : carouselSlotFor()
-            }
-            defaultTopic={
-              slidesInSlot[0]?.headingText?.trim() ||
-              slides[0]?.headingText?.trim() ||
-              name.trim() ||
-              ""
-            }
-            onGenerated={(newSlides, images) => {
-              lastSavedRef.current = {};
-              setSlides(newSlides);
-              // The carousel lives in its carousel slot — switch the view to the
-              // Carousels tab + that slot so we land on it (and never pollute the
-              // single-image "default" slot).
-              const cslot =
-                newSlides.find(
-                  (s) =>
-                    s.slotKey.startsWith("carousel-") ||
-                    s.slotKey === "question-hook",
-                )?.slotKey ?? "carousel-content";
-              setActiveSlot(cslot);
-              setActiveCategory("carousels");
-              setActiveIdx(0);
-              router.refresh();
-              if (images && images.queued > 0) {
-                toast.success(`Generating ${images.queued} AI backgrounds — they'll appear as they finish.`);
-              }
-            }}
-          />
           {slidesInSlot.length > 0 && (
             <Button
               variant="outline"
@@ -1257,6 +1223,51 @@ export function ImageDesigner({
             >
               {CATEGORIES.find((c) => c.id === activeCategory)?.blurb}
             </div>
+            {/* Generation belongs WITH the carousels. In the toolbar it showed on
+                every category, sitting above the template grid as "Generate
+                carousel" while a "Carousels" tab meant something else entirely —
+                two different jobs under near-identical names. */}
+            {activeCategory === "carousels" && (
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+            <GenerateCarouselButton
+              designId={designId}
+              slotKey={
+                activeSlot.startsWith("carousel-") || activeSlot === "question-hook"
+                  ? activeSlot
+                  : carouselSlotFor()
+              }
+              defaultTopic={
+                slidesInSlot[0]?.headingText?.trim() ||
+                slides[0]?.headingText?.trim() ||
+                name.trim() ||
+                ""
+              }
+              onGenerated={(newSlides, images) => {
+                lastSavedRef.current = {};
+                setSlides(newSlides);
+                // The carousel lives in its carousel slot — switch the view to the
+                // Carousels tab + that slot so we land on it (and never pollute the
+                // single-image "default" slot).
+                const cslot =
+                  newSlides.find(
+                    (s) =>
+                      s.slotKey.startsWith("carousel-") ||
+                      s.slotKey === "question-hook",
+                  )?.slotKey ?? "carousel-content";
+                setActiveSlot(cslot);
+                setActiveCategory("carousels");
+                setActiveIdx(0);
+                router.refresh();
+                if (images && images.queued > 0) {
+                  toast.success(`Generating ${images.queued} AI backgrounds — they'll appear as they finish.`);
+                }
+              }}
+            />
+                <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
+                  Writes a whole slide series on a topic
+                </span>
+              </div>
+            )}
             <div
               style={{
                 display: "grid",
