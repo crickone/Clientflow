@@ -57,6 +57,7 @@ import {
 } from "@/lib/image/paintSlide";
 import { SlideCanvas, useCanvasFonts, useLogoImage } from "./SlideCanvas";
 import { EditorSection } from "./EditorSection";
+import { PostIdeas } from "./PostIdeas";
 
 const ACCENT_SWATCHES = [
   "#2c6ce0",
@@ -2109,6 +2110,7 @@ function GenerateCarouselButton({
               onChange={(e) => setTopic(e.target.value)}
               style={{ minHeight: 70 }}
             />
+            <PostIdeas onPick={(hook) => setTopic(hook)} />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <div>
