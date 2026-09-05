@@ -1382,7 +1382,11 @@ export function ImageDesigner({
 
           {activeSlide && template && (
           <>
-          <EditorSection title="Content" defaultOpen>
+          <EditorSection
+            title="Content"
+            hint={total > 1 ? `Slide ${activeIdx + 1} of ${total}` : "This post"}
+            defaultOpen
+          >
           {template.usesTagline && (
             <div>
               <Label htmlFor="tagline">
@@ -1429,7 +1433,11 @@ export function ImageDesigner({
           </div>
           </EditorSection>
 
-          <EditorSection title="Style" defaultOpen>
+          <EditorSection
+            title="Style"
+            hint={total > 1 ? "This slide" : "This post"}
+            defaultOpen
+          >
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <div>
               <Label htmlFor="heading-font">Heading font</Label>
@@ -1634,7 +1642,11 @@ export function ImageDesigner({
           )}
           </EditorSection>
 
-          <EditorSection title="Layout & photo" defaultOpen>
+          <EditorSection
+            title="Layout & photo"
+            hint={total > 1 ? `Slide ${activeIdx + 1} of ${total}` : "This post"}
+            defaultOpen
+          >
           <div>
             <Label>Background photo</Label>
             <div
