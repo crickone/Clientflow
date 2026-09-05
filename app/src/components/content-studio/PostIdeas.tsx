@@ -42,7 +42,10 @@ export function PostIdeas({ onPick }: { onPick: (hook: string) => void }) {
         return;
       }
       if (!Array.isArray(d.ideas) || d.ideas.length === 0) {
-        setError("No ideas came back — check the AI cap, or write your own topic.");
+        // Deliberately does NOT guess at a cause. The first version blamed the
+        // AI cap and the real reason was a truncated reply, which sent me
+        // looking in the wrong place — the server log carries the actual error.
+        setError("No ideas came back. Try again, or write your own topic.");
         return;
       }
       setIdeas(d.ideas as PostIdea[]);

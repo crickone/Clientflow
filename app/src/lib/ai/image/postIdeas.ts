@@ -41,6 +41,61 @@ interface IdeasPayload {
   ideas?: Array<Record<string, unknown>>;
 }
 
+/**
+ * Pull idea objects out of the reply, tolerating a TRUNCATED response.
+ *
+ * Asking for several in-depth ideas produces a lot of text, and if the model
+ * runs out of tokens mid-array the whole JSON.parse fails — throwing away four
+ * perfectly good ideas because the fifth was cut in half. So: try the clean
+ * parse first, and on failure walk the string collecting balanced {...} blocks
+ * and parse them individually, keeping whatever survived.
+ */
+export function extractIdeaObjects(text: string): Array<Record<string, unknown>> {
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start !== -1 && end > start) {
+    try {
+      const parsed = JSON.parse(text.slice(start, end + 1)) as IdeasPayload;
+      if (Array.isArray(parsed.ideas)) return parsed.ideas;
+    } catch {
+      // fall through to the salvage pass
+    }
+  }
+
+  const out: Array<Record<string, unknown>> = [];
+  // Skip the outer wrapper so its opening brace isn't treated as an object.
+  const from = text.indexOf("[");
+  let depth = 0;
+  let objStart = -1;
+  let inString = false;
+  let escaped = false;
+  for (let i = from === -1 ? 0 : from; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === "{") {
+      if (depth === 0) objStart = i;
+      depth++;
+    } else if (ch === "}") {
+      depth--;
+      if (depth === 0 && objStart !== -1) {
+        try {
+          out.push(JSON.parse(text.slice(objStart, i + 1)) as Record<string, unknown>);
+        } catch {
+          // skip a malformed block rather than losing the rest
+        }
+        objStart = -1;
+      }
+    }
+  }
+  return out;
+}
+
 function coerce(raw: Record<string, unknown>): PostIdea | null {
   const str = (k: string) => (typeof raw[k] === "string" ? (raw[k] as string).trim() : "");
   const hook = str("hook");
@@ -65,7 +120,9 @@ export async function generatePostIdeas(
     { tenantId, agentKey: "content" },
     () => ({
       model: CONTENT_MODEL,
-      max_tokens: 2000,
+      // Several in-depth ideas is a lot of text; 2000 truncated the JSON
+      // mid-array and lost every idea. Room to finish, plus the salvage pass.
+      max_tokens: 6000,
       system:
         `${getBusinessContext()}\n\n` +
         "You are proposing social post ideas for this business.\n\n" +
@@ -103,17 +160,11 @@ export async function generatePostIdeas(
         },
       ],
     }),
-    (text) => {
-      const start = text.indexOf("{");
-      const end = text.lastIndexOf("}");
-      if (start === -1 || end <= start) return [];
-      const parsed = JSON.parse(text.slice(start, end + 1)) as IdeasPayload;
-      if (!Array.isArray(parsed.ideas)) return [];
-      return parsed.ideas
-        .map((r) => coerce(r as Record<string, unknown>))
+    (text) =>
+      extractIdeaObjects(text)
+        .map((r) => coerce(r))
         .filter((x): x is PostIdea => x !== null)
-        .slice(0, n);
-    },
+        .slice(0, n),
     [],
     "post-ideas",
   );
