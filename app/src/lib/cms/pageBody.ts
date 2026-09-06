@@ -24,9 +24,24 @@ export interface PageBodyZones {
   tail: string;
 }
 
-/** Matches one <style>...</style>, <script>...</script>, or <link ...> token. */
-const TOKEN =
-  /<style\b[^>]*>[\s\S]*?<\/style>|<script\b[^>]*>[\s\S]*?<\/script>|<link\b[^>]*>/gi;
+/**
+ * Matches one <style>...</style>, <script>...</script>, or <link ...> token.
+ * The opening-tag part skips over quoted attribute values so a ">" inside a
+ * quoted attribute (e.g. data-cfg="a>b") can't end the tag early.
+ */
+const OPEN_TAG_TAIL = `(?:"[^"]*"|'[^']*'|[^>])*`;
+const TOKEN = new RegExp(
+  `<style\\b${OPEN_TAG_TAIL}>[\\s\\S]*?<\\/style>|<script\\b${OPEN_TAG_TAIL}>[\\s\\S]*?<\\/script>|<link\\b${OPEN_TAG_TAIL}>`,
+  "gi",
+);
+
+/** An HTML comment. Comments count as blank when checking a zone-boundary gap. */
+const COMMENT = /<!--[\s\S]*?-->/g;
+
+/** True if `s` contains nothing but whitespace and/or HTML comments. */
+function isBlank(s: string): boolean {
+  return s.replace(COMMENT, "").trim() === "";
+}
 
 interface Token {
   start: number;
@@ -62,7 +77,7 @@ export function splitPageBody(
   let headEnd = 0;
   let i = 0;
   for (; i < tokens.length; i++) {
-    if (html.slice(headEnd, tokens[i].start).trim() !== "") break;
+    if (!isBlank(html.slice(headEnd, tokens[i].start))) break;
     headEnd = tokens[i].end;
   }
 
@@ -71,7 +86,7 @@ export function splitPageBody(
   let tailStart = html.length;
   for (let j = tokens.length - 1; j >= i; j--) {
     if (!tokens[j].isScript) break;
-    if (html.slice(tokens[j].end, tailStart).trim() !== "") break;
+    if (!isBlank(html.slice(tokens[j].end, tailStart))) break;
     tailStart = tokens[j].start;
   }
   if (tailStart < headEnd) tailStart = headEnd;

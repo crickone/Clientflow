@@ -110,4 +110,55 @@ check("whitespace-heavy body round-trips", joinPageBody(splitPageBody(SPACED)) =
 const ATTRS = '<link rel="stylesheet" href="/a.css" />\n<div data-x="<not a tag>">body</div>';
 check("self-closing link + attribute noise round-trips", joinPageBody(splitPageBody(ATTRS)) === ATTRS);
 
+// Finding 1: a leading HTML comment must not defeat head detection — the gap
+// check before each head candidate must treat a comment as blank, same as
+// whitespace, or the whole head leaks into content.
+const LEADING_COMMENT =
+  '<!-- Fonts -->\n<link rel="stylesheet" href="/a.css">\n<style>body{margin:0}</style>\n<div>hello</div>';
+const leadingComment = splitPageBody(LEADING_COMMENT);
+check("leading comment: head holds the comment", leadingComment.head.includes("<!-- Fonts -->"));
+check("leading comment: head holds the link", leadingComment.head.includes('<link rel="stylesheet"'));
+check("leading comment: head holds the style", leadingComment.head.includes("<style>body{margin:0}"));
+check("leading comment: style is NOT in content", !leadingComment.content.includes("<style"));
+check("leading comment: content is just the div", leadingComment.content === "\n<div>hello</div>");
+check("leading comment: round-trips", joinPageBody(leadingComment) === LEADING_COMMENT);
+
+// Finding 2: a trailing HTML comment must not defeat tail detection —
+// symmetric to Finding 1, on the walk-back-from-the-end side.
+const TRAILING_COMMENT =
+  '<div>hello</div>\n<script src="gsap.js"></script>\n<!-- end analytics -->';
+const trailingComment = splitPageBody(TRAILING_COMMENT);
+check("trailing comment: tail holds the script", trailingComment.tail.includes('<script src="gsap.js">'));
+check("trailing comment: tail holds the comment", trailingComment.tail.includes("<!-- end analytics -->"));
+check("trailing comment: script is NOT in content", !trailingComment.content.includes("<script"));
+check("trailing comment: content is just the div", trailingComment.content === "<div>hello</div>\n");
+check("trailing comment: round-trips", joinPageBody(trailingComment) === TRAILING_COMMENT);
+
+// A comment sitting in the middle of content (not adjacent to a head/tail
+// boundary) is ordinary markup and must stay in content.
+const MID_COMMENT =
+  "<style>a{}</style>\n<section>one</section>\n<!-- a note -->\n<section>two</section>";
+const midComment = splitPageBody(MID_COMMENT);
+check("mid-content comment stays in content", midComment.content.includes("<!-- a note -->"));
+check("mid-content comment is not in head", !midComment.head.includes("<!-- a note -->"));
+check("mid-content comment round-trips", joinPageBody(midComment) === MID_COMMENT);
+
+// Uppercase / mixed-case tags: the TOKEN regex already carries the `i` flag,
+// but that was never actually exercised by a test.
+const CASED =
+  "<STYLE>body{margin:0}</STYLE>\n<div>hello</div>\n<SCRIPT>x()</SCRIPT>";
+const cased = splitPageBody(CASED);
+check("uppercase STYLE lands in head", cased.head.includes("<STYLE>body{margin:0}</STYLE>"));
+check("uppercase SCRIPT lands in tail", cased.tail.includes("<SCRIPT>x()</SCRIPT>"));
+check("uppercase tags: content is just the div", cased.content === "\n<div>hello</div>\n");
+check("uppercase tags round-trips", joinPageBody(cased) === CASED);
+
+// Finding 3: a quoted attribute value containing ">" must not truncate the
+// token early — the whole <script>...</script> is ONE token.
+const QUOTED_GT = '<script data-cfg="a>b</script>c">real();</script>';
+const quotedGt = splitPageBody(QUOTED_GT);
+check("quoted '>' in attribute: whole script is one token in head", quotedGt.head === QUOTED_GT);
+check("quoted '>' in attribute: content is empty", quotedGt.content === "");
+check("quoted '>' in attribute: round-trips", joinPageBody(quotedGt) === QUOTED_GT);
+
 console.log(`pageBody: ${passed} checks passed.`);
