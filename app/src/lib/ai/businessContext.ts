@@ -36,6 +36,19 @@ const VENUE_VOICE: Record<VenueType, string> = {
   try it").`,
 };
 
+/**
+ * How social copy asks for the next step.
+ *
+ * Left to itself the model reaches for "register your interest" / "enquire
+ * about the next intake" — an enquiry-desk phrasing no gym or clinic here
+ * actually uses. The real next step is the link in the bio, so the sign-off is
+ * stated once, here, and shared by every social generator (carousel copy, its
+ * caption, and the refresh of either).
+ */
+export const SOCIAL_SIGNOFF_RULE = `Sign-off — how social copy asks for the next step:
+- The next step is ALWAYS the link in the bio. Close on it: "Click the link in bio to sign up." Small variations on that line are fine, as long as they still point at the link in bio and ask them to sign up.
+- NEVER ask people to "register your interest", "express your interest", "enquire", or "get in touch about the next intake". Those are not phrases this business uses.`;
+
 /** The business identity line, composed from the editable Business Profile. */
 export function getBusinessName(): string {
   const p = getBusinessProfile();

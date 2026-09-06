@@ -103,7 +103,7 @@ export function landingPagePrompt(campaign: Campaign, tweak?: string): string {
   const lines = campaignContextLines(campaign, tweak);
   lines.push("");
   lines.push(
-    "Write this campaign's landing page copy: a short, punchy headline, a one-sentence subhead, and 3-5 benefit bullets — all grounded in the offer above and written to make a visitor want to register their interest.",
+    "Write this campaign's landing page copy: a short, punchy headline, a one-sentence subhead, and 3-5 benefit bullets — all grounded in the offer above and written to make a visitor want to sign up.",
   );
   lines.push(
     'The call to action is always "Sign up" — never state a price, a booking action, or a guarantee; this page captures interest, it does not transact.',

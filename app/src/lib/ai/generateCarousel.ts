@@ -1,6 +1,9 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
-import { getBusinessContext } from "@/lib/ai/businessContext";
+import {
+  getBusinessContext,
+  SOCIAL_SIGNOFF_RULE,
+} from "@/lib/ai/businessContext";
 import { CONTENT_MODEL } from "@/lib/ai/client";
 import { meteredCreate, type MeterContext } from "@/lib/ai/metered";
 import { templatesByCategory } from "@/lib/image/templates";
@@ -12,7 +15,7 @@ const CAROUSEL_FORMAT_RULES = `You generate Instagram / Facebook carousel slide 
 Structure rules:
 - Slide 1 is the COVER — hook the reader with the main title.
 - Slides 2..N-1 are CONTENT slides — one clear idea per slide.
-- The final slide is the CTA — invite the reader to book or get in touch.
+- The final slide is the CTA — send the reader to the link in bio to sign up (see the sign-off rule below).
 
 Format constraints:
 - Plain text only. No markdown, no emojis, no hashtags in the slides.
@@ -35,7 +38,7 @@ Template options — pick what fits each slide:
 - "carousel-checklist" — heading + a ticked list. Body = 3-4 checklist lines separated by NEWLINES, each under 7 words.
 - "carousel-myth" — myth vs fact. Heading = the myth exactly as believers say it, body = the fact that debunks it.
 - "carousel-stat" — one giant number carries the slide. Tagline = the stat itself (short, e.g. "87%" or "3x"), heading = the sentence completing it (lowercase continuation), body = one supporting line. Only use stats grounded in the business context or common knowledge — never invent a figure.
-- "carousel-cta" — closing slide with a clear CTA. Use only on the last slide.
+- "carousel-cta" — closing slide, the link-in-bio sign-up. Use only on the last slide.
 - "carousel-save" — closing save-and-share prompt. Use as the last slide when the carousel is pure value with no booking angle.
 - "question-hook" — provocative question opener. Use only on slide 1 when the cover is question-led.
 
@@ -53,7 +56,7 @@ Some templates read a "tagline" field (the stat on "carousel-stat", the "TIP 02"
 You ALSO write the Instagram / Facebook caption that goes with this carousel when it's posted. The caption should:
 - Open with a hook (one short sentence that earns the second line).
 - Expand with 2–4 short paragraphs of real value tied to the slides.
-- End with a soft call to action mentioning the business by name.
+- End with the sign-off below, mentioning the business by name.
 - Be 80–200 words total. Plain text, no markdown. No emojis, no hashtag spam.
 - (Optional: 3–5 relevant hashtags at the very end, only if useful.)
 
@@ -69,7 +72,9 @@ Output format — return ONLY a JSON object inside <slides>...</slides> tags, no
 }
 </slides>
 
-The "slides" array must contain exactly the number of slides requested, in order. The "caption" string accompanies the whole carousel.`;
+The "slides" array must contain exactly the number of slides requested, in order. The "caption" string accompanies the whole carousel.
+
+${SOCIAL_SIGNOFF_RULE}`;
 
 export interface GeneratedSlide {
   template: string;
