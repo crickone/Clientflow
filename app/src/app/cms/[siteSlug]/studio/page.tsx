@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
 
-import { StudioShell } from "@/components/cms/StudioShell";
+import { StudioShell } from "@/components/cms/studio/StudioShell";
 import { requireAdminPage } from "@/lib/auth";
 import { getSiteBySlug } from "@/lib/cms/sites";
 import { listPages } from "@/lib/cms/pages";
+import { listPagePathsWithDrafts } from "@/lib/cms/pageDraft";
 
 export const dynamic = "force-dynamic";
 
@@ -23,8 +24,14 @@ export default async function StudioPage({
     .map((p) => ({ path: p.path, title: p.title || p.path }));
 
   const initialPath = searchParams.path || pages[0]?.path || "/";
+  const initialDraftPaths = listPagePathsWithDrafts(site.id);
 
   return (
-    <StudioShell siteSlug={site.slug} pages={pages} initialPath={initialPath} />
+    <StudioShell
+      siteSlug={site.slug}
+      pages={pages}
+      initialPath={initialPath}
+      initialDraftPaths={initialDraftPaths}
+    />
   );
 }
