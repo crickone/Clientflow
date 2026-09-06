@@ -7,6 +7,7 @@ import { Loader2, Sparkles, PenLine } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Label, Textarea } from "@/components/ui/Input";
 import { PostIdeas } from "./PostIdeas";
+import { DEFAULT_CAROUSEL_SLOT, DEFAULT_SLOT } from "@/lib/image/slots";
 
 /**
  * Step 1 of the image flow: say what you're making before anything else.
@@ -25,7 +26,7 @@ type Kind = "carousel" | "single";
  * The carousel slot generated slides land in. Matches the fallback the editor's
  * own generate flow uses, so both routes end up in the same place.
  */
-const CAROUSEL_SLOT = "carousel-content";
+const CAROUSEL_SLOT = DEFAULT_CAROUSEL_SLOT;
 
 export function StartDesign() {
   const router = useRouter();
@@ -36,20 +37,23 @@ export function StartDesign() {
   const [error, setError] = useState<string | null>(null);
 
   /**
-   * The editor only treats a slot as a carousel when its key starts with
-   * "carousel-", and generation writes into a slot. So a carousel must be
-   * seeded with a carousel template and generated into CAROUSEL_SLOT — seeding
-   * the single-image "default" slot would put the slides where the Carousels
-   * tab can't see them.
+   * The editor only treats a slot as a carousel when its key says so, and
+   * generation writes into a slot. So a carousel has to be seeded into
+   * CAROUSEL_SLOT — seeding the single-image "default" slot would put the
+   * slides where the Carousels tab can't see them, and the design would open
+   * on a Carousels tab reporting every slot empty.
    */
-  async function createDesign(): Promise<number | null> {
+  async function createDesign(seedSlideCount: number): Promise<number | null> {
     const name = topic.trim() ? topic.trim().slice(0, 80) : "Untitled design";
+    const carousel = kind === "carousel";
     const d = await fetch("/api/content-studio/carousels", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name,
-        seedTemplateId: kind === "carousel" ? CAROUSEL_SLOT : "bold-headline",
+        seedSlotKey: carousel ? CAROUSEL_SLOT : DEFAULT_SLOT,
+        seedTemplateId: carousel ? CAROUSEL_SLOT : "bold-headline",
+        seedSlideCount,
       }),
     })
       .then((r) => r.json())
@@ -64,7 +68,8 @@ export function StartDesign() {
   async function startManually() {
     setBusy("manual");
     setError(null);
-    const id = await createDesign();
+    // Writing it themselves means they get the slides they asked for, blank.
+    const id = await createDesign(kind === "carousel" ? slides : 1);
     if (id) router.push(`/content-studio/images/${id}`);
     else setBusy(null);
   }
@@ -76,7 +81,9 @@ export function StartDesign() {
     }
     setBusy("ai");
     setError(null);
-    const id = await createDesign();
+    // One seed slide only: generation replaces the whole slot, so seeding the
+    // full count here would just be deleted a second later.
+    const id = await createDesign(1);
     if (!id) {
       setBusy(null);
       return;

@@ -55,6 +55,12 @@ import {
   paintSlide,
   type BrandLabels,
 } from "@/lib/image/paintSlide";
+import {
+  DEFAULT_CAROUSEL_SLOT,
+  DEFAULT_SLOT,
+  isCarouselSlot,
+  templateForNewSlide,
+} from "@/lib/image/slots";
 import { SlideCanvas, useCanvasFonts, useLogoImage } from "./SlideCanvas";
 import { EditorSection } from "./EditorSection";
 import { PostIdeas } from "./PostIdeas";
@@ -248,9 +254,9 @@ export function ImageDesigner({
   // tip / quote / question-hook). Switching slots preserves whatever's in
   // the other slots.
   const initialSlot =
-    initialSlides.find((s) => s.slotKey !== "default")?.slotKey ??
+    initialSlides.find((s) => s.slotKey !== DEFAULT_SLOT)?.slotKey ??
     initialSlides[0]?.slotKey ??
-    "default";
+    DEFAULT_SLOT;
   const [activeSlot, setActiveSlot] = useState<string>(initialSlot);
 
   // Slides in the current slot only.
@@ -459,13 +465,11 @@ export function ImageDesigner({
       const lastInSlot = slidesInSlot[slidesInSlot.length - 1];
       // Pick a sensible template default. Within carousel slots, prefer the
       // matching content template; outside, mirror the slot's last slide.
-      let templateId = lastInSlot?.templateId ?? "carousel-content";
-      if (activeSlot.startsWith("carousel-") || activeSlot === "question-hook") {
-        templateId =
-          slidesInSlot.length === 0
-            ? activeSlot
-            : "carousel-content";
-      }
+      const templateId = templateForNewSlide(
+        activeSlot,
+        slidesInSlot.length,
+        lastInSlot?.templateId ?? DEFAULT_CAROUSEL_SLOT,
+      );
       const res = await fetch(
         `/api/content-studio/carousels/${designId}/slides`,
         {
@@ -773,9 +777,8 @@ export function ImageDesigner({
   // The first existing carousel slot, or the canonical one for a new carousel.
   const carouselSlotFor = useCallback(
     () =>
-      slides.find(
-        (s) => s.slotKey.startsWith("carousel-") || s.slotKey === "question-hook",
-      )?.slotKey ?? "carousel-content",
+      slides.find((s) => isCarouselSlot(s.slotKey))?.slotKey ??
+      DEFAULT_CAROUSEL_SLOT,
     [slides],
   );
 
@@ -788,7 +791,7 @@ export function ImageDesigner({
     (cat: TemplateCategory) => {
       setActiveCategory(cat);
       setActiveIdx(0);
-      setActiveSlot(cat === "carousels" ? carouselSlotFor() : "default");
+      setActiveSlot(cat === "carousels" ? carouselSlotFor() : DEFAULT_SLOT);
     },
     [carouselSlotFor],
   );
@@ -1231,11 +1234,7 @@ export function ImageDesigner({
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
             <GenerateCarouselButton
               designId={designId}
-              slotKey={
-                activeSlot.startsWith("carousel-") || activeSlot === "question-hook"
-                  ? activeSlot
-                  : carouselSlotFor()
-              }
+              slotKey={isCarouselSlot(activeSlot) ? activeSlot : carouselSlotFor()}
               defaultTopic={
                 slidesInSlot[0]?.headingText?.trim() ||
                 slides[0]?.headingText?.trim() ||
@@ -1249,11 +1248,8 @@ export function ImageDesigner({
                 // Carousels tab + that slot so we land on it (and never pollute the
                 // single-image "default" slot).
                 const cslot =
-                  newSlides.find(
-                    (s) =>
-                      s.slotKey.startsWith("carousel-") ||
-                      s.slotKey === "question-hook",
-                  )?.slotKey ?? "carousel-content";
+                  newSlides.find((s) => isCarouselSlot(s.slotKey))?.slotKey ??
+                  DEFAULT_CAROUSEL_SLOT;
                 setActiveSlot(cslot);
                 setActiveCategory("carousels");
                 setActiveIdx(0);
