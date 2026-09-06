@@ -11,7 +11,7 @@ import { getCurrentMembership } from "@/lib/auth";
 import { getBlockValue } from "@/lib/cms/blocks";
 import { sanitizeHtmlKeepStyles } from "@/lib/cms/html";
 import { splitPageBody, type PageBodyZones } from "@/lib/cms/pageBody";
-import { getDraftContent } from "@/lib/cms/pageDraft";
+import { getDraftContentFrom } from "@/lib/cms/pageDraft";
 import type { RenderCtx } from "@/components/cms/Block";
 import type { Page } from "@/lib/db/schema";
 // Side-effect import: registers site-specific templates (Renova etc.).
@@ -89,9 +89,15 @@ export function editBodyHtml(pc: PageContext): string {
 export function editBodyZones(
   pc: PageContext,
 ): PageBodyZones & { hasDraft: boolean } {
+  // Both reads MUST resolve through the same host-resolved db (pc.ctx.db,
+  // from resolvePublicSite) rather than mixing in the ambient session-tenant
+  // proxy: an agency staffer's active tenant (their session cookie) can
+  // differ from the tenant that owns the host/domain being viewed, and
+  // siteId/pageId are per-tenant numeric ids that collide across tenant
+  // databases. See getDraftContentFrom's doc comment in lib/cms/pageDraft.ts.
   const row = getBlockValue(pc.ctx.db, pc.ctx.siteId, pc.ctx.pageId, "body");
   const zones = splitPageBody(row?.value ?? "");
-  const draft = getDraftContent(pc.ctx.siteId, pc.ctx.pageId);
+  const draft = getDraftContentFrom(pc.ctx.db, pc.ctx.siteId, pc.ctx.pageId);
   return {
     ...zones,
     content: draft ?? zones.content,
