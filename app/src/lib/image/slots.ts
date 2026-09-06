@@ -37,6 +37,40 @@ export function isValidSlotKey(slotKey: string): boolean {
 }
 
 /**
+ * Apply a new within-slot order to the flat list of every slide in a design.
+ *
+ * Slide order is per-slot, so dragging a slide may only move slides in that
+ * slot. Everything in another slot has to come back in exactly the position it
+ * was in — the flat array's head feeds unrelated things like the default topic
+ * offered to the generator, so quietly rotating it would change behaviour
+ * nowhere near the drag.
+ *
+ * Returns null when `orderedIds` isn't a permutation of the slot's slides —
+ * a stale drag, or IDs from somewhere else — so the caller can leave the list
+ * alone rather than drop slides on the floor.
+ */
+export function applySlotOrder<T extends { id: number; slotKey: string }>(
+  slides: T[],
+  slotKey: string,
+  orderedIds: number[],
+): T[] | null {
+  const inSlot = slides.filter((s) => s.slotKey === slotKey);
+  if (orderedIds.length !== inSlot.length) return null;
+
+  const byId = new Map(inSlot.map((s) => [s.id, s]));
+  const reordered: T[] = [];
+  for (const id of orderedIds) {
+    const slide = byId.get(id);
+    if (!slide) return null; // not in this slot
+    byId.delete(id); // and never twice
+    reordered.push(slide);
+  }
+
+  let next = 0;
+  return slides.map((s) => (s.slotKey === slotKey ? reordered[next++] : s));
+}
+
+/**
  * The template a new slide in `slotKey` should use, given how many slides the
  * slot already holds.
  *

@@ -230,19 +230,32 @@ export function deleteSlot(carouselSetId: number, slotKey: string) {
 /**
  * Re-order slides within a slot by passing an array of slide IDs in their
  * new order.
+ *
+ * Every update is scoped to `carouselSetId`, so a slide ID belonging to a
+ * different design is a no-op rather than a write — the IDs arrive from the
+ * client and nothing else establishes that they belong to this design. The
+ * whole run is one transaction so a failure part-way can't leave a carousel
+ * half-reordered.
  */
 export function reorderSlides(
   carouselSetId: number,
   slideIds: number[],
 ) {
-  slideIds.forEach((slideId, idx) => {
-    db.update(schema.carouselSlides)
-      .set({ slideOrder: idx, updatedAt: new Date() })
-      .where(eq(schema.carouselSlides.id, slideId))
+  db.transaction((tx) => {
+    slideIds.forEach((slideId, idx) => {
+      tx.update(schema.carouselSlides)
+        .set({ slideOrder: idx, updatedAt: new Date() })
+        .where(
+          and(
+            eq(schema.carouselSlides.id, slideId),
+            eq(schema.carouselSlides.carouselSetId, carouselSetId),
+          ),
+        )
+        .run();
+    });
+    tx.update(schema.carouselSets)
+      .set({ updatedAt: new Date() })
+      .where(eq(schema.carouselSets.id, carouselSetId))
       .run();
   });
-  db.update(schema.carouselSets)
-    .set({ updatedAt: new Date() })
-    .where(eq(schema.carouselSets.id, carouselSetId))
-    .run();
 }

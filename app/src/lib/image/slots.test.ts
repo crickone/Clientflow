@@ -17,6 +17,7 @@ import assert from "node:assert/strict";
 import {
   DEFAULT_CAROUSEL_SLOT,
   DEFAULT_SLOT,
+  applySlotOrder,
   isCarouselSlot,
   isValidSlotKey,
   templateForNewSlide,
@@ -180,5 +181,88 @@ eq(
   roleLabels,
   ["Opening slide", "Middle slides", "Closing slide"],
 );
+
+// --- dragging a slide to reorder the series ---------------------------------
+//
+// The filmstrip lets you drag slides. Order is stored per-slot, so a drag may
+// only ever move slides within the slot on screen.
+
+const slide = (id: number, slotKey: string) => ({ id, slotKey });
+
+{
+  const one = [slide(1, "carousel-content"), slide(2, "carousel-content"), slide(3, "carousel-content")];
+  eq(
+    "a drag puts the slot's slides in the order asked for",
+    applySlotOrder(one, "carousel-content", [3, 1, 2])?.map((s) => s.id),
+    [3, 1, 2],
+  );
+  eq("the original list is not mutated", one.map((s) => s.id), [1, 2, 3]);
+}
+
+{
+  // A legacy design with two slots. Dragging inside one must not disturb the
+  // other — and must not disturb where the other sits in the flat list, which
+  // is what a naive [...others, ...reordered] rebuild would silently do. The
+  // head of this array feeds the topic offered to the generator, so a rotation
+  // here changes behaviour nowhere near the drag.
+  const mixed = [
+    slide(10, DEFAULT_SLOT),
+    slide(1, "carousel-content"),
+    slide(2, "carousel-content"),
+    slide(11, DEFAULT_SLOT),
+    slide(3, "carousel-content"),
+  ];
+  const out = applySlotOrder(mixed, "carousel-content", [3, 2, 1]);
+  eq(
+    "slides in other slots keep their exact positions",
+    out?.map((s) => s.id),
+    [10, 3, 2, 11, 1],
+  );
+  ok(
+    "the untouched slot's slides are the very same objects",
+    out?.[0] === mixed[0] && out?.[3] === mixed[3],
+  );
+  eq(
+    "the first slide of the design is unchanged by a drag in another slot",
+    out?.[0].id,
+    mixed[0].id,
+  );
+  eq(
+    "no slide is lost or duplicated",
+    out?.map((s) => s.id).sort((a, b) => a - b),
+    [1, 2, 3, 10, 11],
+  );
+}
+
+{
+  // Every rejection path returns null so the caller leaves the list alone
+  // rather than dropping slides.
+  const three = [slide(1, "carousel-content"), slide(2, "carousel-content"), slide(3, "carousel-content")];
+  eq(
+    "a short order (a slide arrived mid-drag) is rejected",
+    applySlotOrder(three, "carousel-content", [1, 2]),
+    null,
+  );
+  eq(
+    "a long order is rejected",
+    applySlotOrder(three, "carousel-content", [1, 2, 3, 4]),
+    null,
+  );
+  eq(
+    "an ID from another design is rejected",
+    applySlotOrder(three, "carousel-content", [1, 2, 99]),
+    null,
+  );
+  eq(
+    "a duplicated ID is rejected rather than cloning a slide",
+    applySlotOrder(three, "carousel-content", [1, 1, 2]),
+    null,
+  );
+  eq(
+    "reordering a slot that holds nothing is a no-op, not a crash",
+    applySlotOrder(three, "carousel-cover", []),
+    three,
+  );
+}
 
 console.log(`\nslots: ${passed} checks passed.`);

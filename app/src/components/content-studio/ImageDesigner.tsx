@@ -57,11 +57,13 @@ import {
 import {
   DEFAULT_CAROUSEL_SLOT,
   DEFAULT_SLOT,
+  applySlotOrder,
   isCarouselSlot,
   templateForNewSlide,
   type DesignKind,
 } from "@/lib/image/slots";
 import { SlideCanvas, useCanvasFonts, useLogoImage } from "./SlideCanvas";
+import { SlideFilmstrip } from "./SlideFilmstrip";
 import { EditorSection } from "./EditorSection";
 import { PostIdeas } from "./PostIdeas";
 
@@ -489,6 +491,42 @@ export function ImageDesigner({
       setActiveIdx(slidesInSlot.length);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Couldn't add slide.");
+    }
+  }
+
+  // Reorder within the active slot. slide_order is per-slot, so only this
+  // slot's IDs go to the server; the flat `slides` array keeps every other
+  // slot exactly where it was.
+  async function reorderSlidesInSlot(orderedIds: number[]) {
+    const next = applySlotOrder(slides, activeSlot, orderedIds);
+    if (!next) return; // stale drag — leave the list alone
+
+    const previous = slides;
+    const previousIdx = activeIdx;
+    const activeId = activeSlide?.id ?? null;
+
+    setSlides(next);
+    // Follow the slide you were editing rather than the position it vacated.
+    if (activeId != null) {
+      const movedTo = orderedIds.indexOf(activeId);
+      if (movedTo !== -1) setActiveIdx(movedTo);
+    }
+
+    try {
+      const res = await fetch(`/api/content-studio/carousels/${designId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slideOrder: orderedIds }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok)
+        throw new Error(json.error || "Couldn't reorder the slides.");
+    } catch (err) {
+      setSlides(previous);
+      setActiveIdx(previousIdx);
+      setActionError(
+        err instanceof Error ? err.message : "Couldn't reorder the slides.",
+      );
     }
   }
 
@@ -1013,37 +1051,6 @@ export function ImageDesigner({
                 )}
               </div>
             </div>
-          ) : isCarousel ? (
-            <div
-              style={{
-                background: "var(--surface-1)",
-                border: "1px solid var(--hairline)",
-                borderRadius: "var(--radius)",
-                padding: 14,
-                display: "grid",
-                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                gap: 10,
-                maxHeight: "calc(100vh - 120px)",
-                overflowY: "auto",
-              }}
-            >
-              {slidesInSlot.map((slide, idx) => (
-                <SlideThumb
-                  key={slide.id}
-                  slide={slide}
-                  slideIdx={idx}
-                  total={total}
-                  isActive={idx === activeIdx}
-                  fontsReady={fontsReady}
-                  library={library}
-                  onSelect={() => setActiveIdx(idx)}
-                  defaultHeadingFontId={defaultHeadingFontId}
-                  defaultBodyFontId={defaultBodyFontId}
-                  brand={brand}
-                  logo={showLogo ? logoImg : null}
-                />
-              ))}
-            </div>
           ) : (
             activeSlide && (
               <div
@@ -1113,6 +1120,27 @@ export function ImageDesigner({
             )
           )}
 
+          {/* The strip is what makes a carousel look like a carousel: the big
+              preview shows the slide you're editing, this shows the series it
+              sits in. It replaces a two-column thumbnail grid that had no
+              preview at all — so the ORDER, the one thing a carousel is, was
+              the one thing you couldn't see or change. */}
+          {!isEmptySlot && (isCarouselKind || isCarousel) && (
+            <SlideFilmstrip
+              slides={slidesInSlot}
+              activeIdx={activeIdx}
+              onSelect={setActiveIdx}
+              onReorder={reorderSlidesInSlot}
+              onAdd={() => addSlide()}
+              fontsReady={fontsReady}
+              library={library}
+              defaultHeadingFontId={defaultHeadingFontId}
+              defaultBodyFontId={defaultBodyFontId}
+              brand={brand}
+              logo={showLogo ? logoImg : null}
+            />
+          )}
+
           {/* Slide indicator */}
           <div
             style={{
@@ -1125,9 +1153,9 @@ export function ImageDesigner({
             }}
           >
             {isEmptySlot
-              ? "No slides in this slot"
+              ? "Nothing in this design yet"
               : isCarousel
-                ? `Editing slide ${padNumber(activeIdx + 1, 2)} of ${padNumber(total, 2)} — click a thumbnail to switch`
+                ? `Editing slide ${padNumber(activeIdx + 1, 2)} of ${padNumber(total, 2)}`
                 : "Single image"}
           </div>
 
@@ -2408,122 +2436,6 @@ function AiImagePanel({
         </div>
       )}
     </div>
-  );
-}
-
-function SlideThumb({
-  slide,
-  slideIdx,
-  total,
-  isActive,
-  fontsReady,
-  library,
-  onSelect,
-  defaultHeadingFontId,
-  defaultBodyFontId,
-  brand,
-  logo = null,
-}: {
-  slide: CarouselSlide;
-  slideIdx: number;
-  total: number;
-  isActive: boolean;
-  fontsReady: boolean;
-  library: ImageLibraryAsset[];
-  onSelect: () => void;
-  defaultHeadingFontId?: string;
-  defaultBodyFontId?: string;
-  brand?: BrandLabels;
-  logo?: HTMLImageElement | null;
-}) {
-  const template = getTemplate(slide.templateId);
-  const generating = slide.imageStatus === "generating";
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      style={{
-        position: "relative",
-        padding: 6,
-        borderRadius: "var(--radius)",
-        background: isActive ? "var(--surface-2)" : "var(--bg)",
-        border: isActive
-          ? "2px solid var(--text-primary)"
-          : "1px solid var(--hairline)",
-        cursor: "pointer",
-        display: "grid",
-        gap: 4,
-        fontFamily: "inherit",
-        textAlign: "left",
-      }}
-      aria-label={
-        generating
-          ? `Slide ${slideIdx + 1} — generating image`
-          : `Edit slide ${slideIdx + 1}`
-      }
-      aria-pressed={isActive}
-      aria-busy={generating}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          fontSize: 10,
-          fontWeight: 600,
-          color: isActive ? "var(--text-primary)" : "var(--text-secondary)",
-          letterSpacing: "0.08em",
-          textTransform: "uppercase",
-          padding: "0 2px",
-        }}
-      >
-        <span>Slide {padNumber(slideIdx + 1, 2)}</span>
-        <span style={{ color: "var(--text-tertiary)" }}>
-          {template?.aspectRatio ?? ""}
-        </span>
-      </div>
-      <div style={{ position: "relative" }}>
-        <SlideCanvas
-          slide={slide}
-          slideIdx={slideIdx}
-          total={total}
-          library={library}
-          fontsReady={fontsReady}
-          defaultHeadingFontId={defaultHeadingFontId}
-          defaultBodyFontId={defaultBodyFontId}
-          brand={brand}
-          logo={logo}
-        />
-        {generating && (
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 6,
-              borderRadius: "var(--radius)",
-              background: "rgba(10,10,10,0.6)",
-              color: "#fff",
-            }}
-          >
-            <Loader2 size={18} className="spin" />
-            <span
-              style={{
-                fontSize: 10,
-                fontWeight: 600,
-                letterSpacing: "0.05em",
-                textTransform: "uppercase",
-              }}
-            >
-              Generating…
-            </span>
-          </div>
-        )}
-      </div>
-    </button>
   );
 }
 
