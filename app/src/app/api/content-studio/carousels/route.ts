@@ -6,6 +6,7 @@ import {
   isValidSlotKey,
   templateForNewSlide,
 } from "@/lib/image/slots";
+import { getTemplate } from "@/lib/image/templates";
 
 export const dynamic = "force-dynamic";
 
@@ -41,8 +42,16 @@ export async function POST(req: Request) {
   // template: seeding a "carousel-content" TEMPLATE into the "default" SLOT
   // puts the slide where the editor's Carousels tab can't see it, so the
   // caller has to say the slot outright.
+  // A slot key must name a real carousel template (or be the single-image
+  // slot), because the first slide is created WITH that key as its template.
+  // Any other "carousel-*" string would pass the prefix test and then leave a
+  // slide no template can render — an editor stuck on "Nothing here yet" with
+  // a real row behind it.
   const seedSlot = String(body?.seedSlotKey ?? DEFAULT_SLOT);
-  if (!isValidSlotKey(seedSlot)) {
+  const seedSlotOk =
+    seedSlot === DEFAULT_SLOT ||
+    (isValidSlotKey(seedSlot) && getTemplate(seedSlot)?.category === "carousels");
+  if (!seedSlotOk) {
     return NextResponse.json(
       { ok: false, error: "Unknown slot." },
       { status: 400 },
@@ -52,12 +61,23 @@ export async function POST(req: Request) {
   // Optional: seed slides so the editor isn't empty. A carousel can ask for
   // the number of slides it was started with, so "I'll write it myself" gets
   // the slides the user chose rather than one.
-  const seedTemplate = String(body?.seedTemplateId ?? "carousel-cover");
+  const requestedTemplate = String(body?.seedTemplateId ?? "carousel-cover");
+  if (!getTemplate(requestedTemplate)) {
+    return NextResponse.json(
+      { ok: false, error: "Unknown template." },
+      { status: 400 },
+    );
+  }
+  const seedTemplate = requestedTemplate;
+
+  // Only a carousel is a series; a single image is one slide by definition.
   const requestedCount = Number(body?.seedSlideCount ?? 1);
   const seedCount =
-    Number.isFinite(requestedCount) && requestedCount >= 1
-      ? Math.min(Math.floor(requestedCount), 10)
-      : 1;
+    seedSlot === DEFAULT_SLOT
+      ? 1
+      : Number.isFinite(requestedCount) && requestedCount >= 1
+        ? Math.min(Math.floor(requestedCount), 10)
+        : 1;
   const seedAspect = String(body?.seedAspectRatio ?? "1:1");
   const aspectRatio = ["1:1", "9:16", "4:5"].includes(seedAspect)
     ? (seedAspect as "1:1" | "9:16" | "4:5")

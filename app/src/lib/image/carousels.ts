@@ -241,10 +241,40 @@ export function reorderSlides(
   carouselSetId: number,
   slideIds: number[],
 ) {
+  if (slideIds.length === 0) return;
+
   db.transaction((tx) => {
+    const rows = tx
+      .select()
+      .from(schema.carouselSlides)
+      .where(eq(schema.carouselSlides.carouselSetId, carouselSetId))
+      .all();
+
+    // Every ID has to name a slide of THIS design, and they all have to sit in
+    // one slot — order is per-slot, so a mixed list would renumber across two
+    // carousels at once. Anything else is a no-op rather than a partial write.
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    const target = slideIds.map((id) => byId.get(id));
+    if (target.some((s) => !s)) return;
+    const slotKey = target[0]!.slotKey;
+    if (target.some((s) => s!.slotKey !== slotKey)) return;
+    if (target.length !== rows.filter((r) => r.slotKey === slotKey).length)
+      return;
+
+    // The post caption is stored positionally, on the slot's first slide.
+    // Moving a different slide into that position without carrying the caption
+    // leaves it stranded where no UI can read it, and the next "Refresh
+    // caption" writes over it.
+    const caption =
+      target.find((s) => s!.caption && s!.caption.trim())?.caption ?? "";
+
     slideIds.forEach((slideId, idx) => {
       tx.update(schema.carouselSlides)
-        .set({ slideOrder: idx, updatedAt: new Date() })
+        .set({
+          slideOrder: idx,
+          caption: idx === 0 ? caption : "",
+          updatedAt: new Date(),
+        })
         .where(
           and(
             eq(schema.carouselSlides.id, slideId),

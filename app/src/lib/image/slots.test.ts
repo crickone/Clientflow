@@ -16,10 +16,12 @@ import assert from "node:assert/strict";
 
 import {
   DEFAULT_CAROUSEL_SLOT,
+  DEFAULT_SINGLE_TEMPLATE,
   DEFAULT_SLOT,
   applySlotOrder,
   isCarouselSlot,
   isValidSlotKey,
+  keepCaptionOnFirstSlide,
   templateForNewSlide,
 } from "./slots";
 import {
@@ -264,5 +266,121 @@ const slide = (id: number, slotKey: string) => ({ id, slotKey });
     three,
   );
 }
+
+// --- the caption has to survive a drag --------------------------------------
+//
+// The caption belongs to the carousel but is STORED positionally, on the
+// slot's first slide: the generator writes it to slide 0 and blanks the rest,
+// the editor reads slidesInSlot[0], and "Refresh caption" writes back to
+// slide 0. Reordering was unreachable until the filmstrip shipped, so nothing
+// ever moved a different slide into that position. Drag slide 3 to the front
+// without this and the caption is stranded on a slide no UI reads — then the
+// next refresh writes over it.
+
+const cap = (id: number, slotKey: string, caption: string) => ({
+  id,
+  slotKey,
+  caption,
+});
+
+{
+  const dragged = [
+    cap(3, "carousel-content", ""),
+    cap(1, "carousel-content", "Swipe for the 5 lifts >>"),
+    cap(2, "carousel-content", ""),
+  ];
+  const out = keepCaptionOnFirstSlide(dragged, "carousel-content");
+  eq(
+    "the caption follows the front of the series after a drag",
+    out.map((s) => s.caption),
+    ["Swipe for the 5 lifts >>", "", ""],
+  );
+  eq("and the slides themselves have not moved", out.map((s) => s.id), [3, 1, 2]);
+}
+
+{
+  // Already correct: return the very same objects, or React re-renders and the
+  // autosave fires a PATCH for a change nobody made.
+  const settled = [
+    cap(1, "carousel-content", "A caption"),
+    cap(2, "carousel-content", ""),
+  ];
+  const out = keepCaptionOnFirstSlide(settled, "carousel-content");
+  ok("an already-correct caption is left completely alone", out === settled);
+}
+
+{
+  const none = [cap(1, "carousel-content", ""), cap(2, "carousel-content", "")];
+  ok(
+    "no caption anywhere stays no caption",
+    keepCaptionOnFirstSlide(none, "carousel-content") === none,
+  );
+}
+
+{
+  // Only the slot being dragged in may be touched.
+  const mixed = [
+    cap(9, DEFAULT_SLOT, "the single post's own caption"),
+    cap(2, "carousel-content", ""),
+    cap(1, "carousel-content", "the carousel's caption"),
+  ];
+  const out = keepCaptionOnFirstSlide(mixed, "carousel-content");
+  eq(
+    "another slot's caption is untouched",
+    out[0].caption,
+    "the single post's own caption",
+  );
+  eq("the dragged slot's caption moves to its front", out[1].caption, "the carousel's caption");
+  eq("and is cleared from where it was", out[2].caption, "");
+}
+
+{
+  const empty = [cap(1, DEFAULT_SLOT, "x")];
+  ok(
+    "a slot with no slides is a no-op, not a crash",
+    keepCaptionOnFirstSlide(empty, "carousel-cover") === empty,
+  );
+}
+
+// A drag then a caption fix, composed the way the editor composes them.
+{
+  const before = [
+    cap(1, "carousel-content", "Five lifts, five slides"),
+    cap(2, "carousel-content", ""),
+    cap(3, "carousel-content", ""),
+  ];
+  const dragged = applySlotOrder(before, "carousel-content", [3, 1, 2]);
+  const out = keepCaptionOnFirstSlide(dragged!, "carousel-content");
+  eq(
+    "reorder then caption-fix leaves the caption readable at the front",
+    out.map((s) => [s.id, s.caption]),
+    [
+      [3, "Five lifts, five slides"],
+      [1, ""],
+      [2, ""],
+    ],
+  );
+}
+
+// --- a single post must not be given carousel chrome ------------------------
+//
+// carousel-content declares swipe chrome, so using it as the fallback for a
+// new slide in the single-image slot paints "SWIPE ->" onto a one-image post.
+
+ok(
+  `DEFAULT_SINGLE_TEMPLATE ("${DEFAULT_SINGLE_TEMPLATE}") is a real template`,
+  TEMPLATES.some((t) => t.id === DEFAULT_SINGLE_TEMPLATE),
+);
+ok(
+  "the single-image default is NOT a carousel template",
+  !isCarouselSlot(DEFAULT_SINGLE_TEMPLATE) &&
+    TEMPLATES.find((t) => t.id === DEFAULT_SINGLE_TEMPLATE)?.category !==
+      "carousels",
+);
+eq(
+  "an empty single-image slot falls back to a single-image template",
+  templateForNewSlide(DEFAULT_SLOT, 0, DEFAULT_SINGLE_TEMPLATE),
+  DEFAULT_SINGLE_TEMPLATE,
+);
 
 console.log(`\nslots: ${passed} checks passed.`);

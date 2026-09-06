@@ -24,6 +24,12 @@ export const DEFAULT_SLOT = "default";
 export const DEFAULT_CAROUSEL_SLOT = "carousel-content";
 
 /**
+ * The template a brand-new single image starts on. A carousel template would
+ * paint carousel chrome ("SWIPE ->", a slide number) onto a one-image post.
+ */
+export const DEFAULT_SINGLE_TEMPLATE = "bold-headline";
+
+/**
  * "question-hook" is a carousel template whose id predates the "carousel-"
  * prefix, so it has to be named explicitly.
  */
@@ -68,6 +74,40 @@ export function applySlotOrder<T extends { id: number; slotKey: string }>(
 
   let next = 0;
   return slides.map((s) => (s.slotKey === slotKey ? reordered[next++] : s));
+}
+
+/**
+ * Keep the post caption on the slot's first slide.
+ *
+ * The caption belongs to the carousel as a whole, but it's STORED positionally
+ * — the generator writes it to slide 0 and blanks the rest, the editor reads
+ * `slidesInSlot[0]`, and "Refresh caption" writes back to slide 0. Reordering
+ * moves a different slide into that position, so without this the caption
+ * becomes unreachable text on whatever slide used to be first, and the next
+ * refresh silently writes over it.
+ *
+ * Call this after any reorder. It's a no-op when the caption is already in the
+ * right place, and it returns the same objects so nothing re-renders or
+ * re-saves needlessly.
+ */
+export function keepCaptionOnFirstSlide<
+  T extends { slotKey: string; caption: string },
+>(slides: T[], slotKey: string): T[] {
+  const inSlot = slides.filter((s) => s.slotKey === slotKey);
+  if (inSlot.length === 0) return slides;
+
+  // Wherever it currently sits — after a drag that may not be position 0.
+  const caption = inSlot.find((s) => s.caption.trim())?.caption ?? "";
+  if (caption === inSlot[0].caption && inSlot.slice(1).every((s) => !s.caption))
+    return slides;
+
+  let seen = false;
+  return slides.map((s) => {
+    if (s.slotKey !== slotKey) return s;
+    const wanted = seen ? "" : caption;
+    seen = true;
+    return s.caption === wanted ? s : { ...s, caption: wanted };
+  });
 }
 
 /**

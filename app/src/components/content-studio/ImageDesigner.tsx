@@ -55,9 +55,11 @@ import {
 } from "@/lib/image/paintSlide";
 import {
   DEFAULT_CAROUSEL_SLOT,
+  DEFAULT_SINGLE_TEMPLATE,
   DEFAULT_SLOT,
   applySlotOrder,
   isCarouselSlot,
+  keepCaptionOnFirstSlide,
   templateForNewSlide,
   type DesignKind,
 } from "@/lib/image/slots";
@@ -316,6 +318,8 @@ export function ImageDesigner({
 
   // Auto-save active slide (debounced)
   const lastSavedRef = useRef<Record<number, string>>({});
+  // Drags can outpace their own PATCHes; only the newest one may roll back.
+  const reorderSeqRef = useRef(0);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!activeSlide) return;
@@ -459,14 +463,17 @@ export function ImageDesigner({
     try {
       const lastInSlot = slidesInSlot[slidesInSlot.length - 1];
       // Pick a sensible template default. Within carousel slots, prefer the
-      // matching content template; outside, mirror the slot's last slide.
+      // matching content template; outside, mirror the slot's last slide — and
+      // when the slot is empty there's nothing to mirror, so fall back by KIND.
+      // A carousel default here would paint "SWIPE ->" onto a single post.
+      const fallback =
+        lastInSlot?.templateId ??
+        (isCarouselSlot(activeSlot)
+          ? DEFAULT_CAROUSEL_SLOT
+          : DEFAULT_SINGLE_TEMPLATE);
       const templateId =
         template?.id ??
-        templateForNewSlide(
-          activeSlot,
-          slidesInSlot.length,
-          lastInSlot?.templateId ?? DEFAULT_CAROUSEL_SLOT,
-        );
+        templateForNewSlide(activeSlot, slidesInSlot.length, fallback);
       const res = await fetch(
         `/api/content-studio/carousels/${designId}/slides`,
         {
@@ -497,12 +504,21 @@ export function ImageDesigner({
   // slot's IDs go to the server; the flat `slides` array keeps every other
   // slot exactly where it was.
   async function reorderSlidesInSlot(orderedIds: number[]) {
-    const next = applySlotOrder(slides, activeSlot, orderedIds);
-    if (!next) return; // stale drag — leave the list alone
+    const reordered = applySlotOrder(slides, activeSlot, orderedIds);
+    if (!reordered) return; // stale drag — leave the list alone
 
-    const previous = slides;
+    // The caption is stored on the slot's first slide, so it has to travel
+    // with that position or it's stranded where nothing can read it. The
+    // server does the same inside the reorder; this keeps the panel from
+    // blanking in the meantime.
+    const next = keepCaptionOnFirstSlide(reordered, activeSlot);
+
+    // Revert by ORDER, not by snapshot: restoring a whole copy of `slides`
+    // would also throw away anything typed while the request was in flight.
+    const previousOrder = slidesInSlot.map((s) => s.id);
     const previousIdx = activeIdx;
     const activeId = activeSlide?.id ?? null;
+    const seq = ++reorderSeqRef.current;
 
     setSlides(next);
     // Follow the slide you were editing rather than the position it vacated.
@@ -521,7 +537,13 @@ export function ImageDesigner({
       if (!res.ok || !json.ok)
         throw new Error(json.error || "Couldn't reorder the slides.");
     } catch (err) {
-      setSlides(previous);
+      // A later drag has already superseded this one — rolling back now would
+      // undo an order the user has since changed again.
+      if (seq !== reorderSeqRef.current) return;
+      setSlides((cur) => {
+        const back = applySlotOrder(cur, activeSlot, previousOrder);
+        return back ? keepCaptionOnFirstSlide(back, activeSlot) : cur;
+      });
       setActiveIdx(previousIdx);
       setActionError(
         err instanceof Error ? err.message : "Couldn't reorder the slides.",
@@ -1155,7 +1177,11 @@ export function ImageDesigner({
               ? "Nothing in this design yet"
               : isCarousel
                 ? `Editing slide ${padNumber(activeIdx + 1, 2)} of ${padNumber(total, 2)}`
-                : "Single image"}
+                : isCarouselKind
+                  ? // A carousel that's one slide in — don't call it a single
+                    // image when the switch above says Carousel.
+                    "Editing slide 01 — add more to build the series"
+                  : "Single image"}
           </div>
 
           {/* Slide actions */}
