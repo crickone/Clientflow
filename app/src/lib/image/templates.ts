@@ -207,6 +207,13 @@ export interface Template {
    */
   acceptsPhoto?: boolean;
   /**
+   * Whether the render parses *asterisk* markup in the heading into accent
+   * highlights (tokenizeHighlight). Consumers strip the asterisks from
+   * headings bound for templates WITHOUT this flag, so stray markup never
+   * renders literally.
+   */
+  headingHighlight?: boolean;
+  /**
    * Where drawLogoOverlay stamps the tenant logo after render() runs.
    * Unset defaults to "bottom-right" — correct for most non-carousel
    * templates (full-bleed photo posts with nothing else claiming that
@@ -512,6 +519,103 @@ function drawBookmark(
   ctx.lineTo(x, top + h);
   ctx.closePath();
   ctx.fill();
+}
+
+/**
+ * Accent-highlight markup for headings: one or more phrases wrapped in
+ * *asterisks* render in the accent colour ("Massage beat the *cold plunge*").
+ * Parsing happens BEFORE auto-fit, so sizing sees only the clean text; the
+ * flags array marks which clean-text words are inside a highlight span.
+ */
+export function tokenizeHighlight(text: string): {
+  clean: string;
+  flags: boolean[];
+} {
+  const words = text.split(/\s+/).filter(Boolean);
+  const flags: boolean[] = [];
+  const cleanWords: string[] = [];
+  let inSpan = false;
+  for (const raw of words) {
+    let word = raw;
+    let flagged = inSpan;
+    // A span can open and close on the same word (*5x*), or open here and
+    // close several words later.
+    if (!inSpan && word.startsWith("*")) {
+      word = word.slice(1);
+      flagged = true;
+      inSpan = true;
+    }
+    if (inSpan && word.endsWith("*")) {
+      word = word.slice(0, -1);
+      inSpan = false;
+    }
+    word = word.replace(/\*/g, "");
+    if (!word) continue;
+    cleanWords.push(word);
+    flags.push(flagged);
+  }
+  return { clean: cleanWords.join(" "), flags };
+}
+
+/**
+ * Paint auto-fit heading lines word by word so highlighted words take the
+ * accent colour. Word order survives wrapping because wrapLines only ever
+ * splits on whitespace — the Nth word of the wrapped text is the Nth flag.
+ */
+function paintHighlightedLines(
+  ctx: CanvasRenderingContext2D,
+  measure: MeasureText,
+  lines: string[],
+  flags: boolean[],
+  font: string,
+  x: number,
+  firstBaseline: number,
+  lineHeight: number,
+  baseColor: string,
+  accentColor: string,
+  align: "left" | "right" = "left",
+) {
+  ctx.font = font;
+  ctx.textAlign = "left";
+  let wordIdx = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const lineWords = lines[i].split(" ");
+    const lineStart =
+      align === "right" ? x - measure(lines[i], font) : x;
+    const y = firstBaseline + i * lineHeight;
+    for (let w = 0; w < lineWords.length; w++) {
+      const prefix = lineWords.slice(0, w).join(" ");
+      const xOff = prefix ? measure(`${prefix} `, font) : 0;
+      ctx.fillStyle = flags[wordIdx] ? accentColor : baseColor;
+      ctx.fillText(lineWords[w], lineStart + xOff, y);
+      wordIdx++;
+    }
+  }
+}
+
+/**
+ * Parse "Label: 2.26" / "LABEL = -0.47" style data lines out of body text.
+ * Returns the parsed points plus whatever lines were plain prose, so the
+ * data templates degrade to ordinary body copy when nothing parses.
+ */
+function splitDataLines(text: string): {
+  points: Array<{ label: string; raw: string; value: number }>;
+  prose: string[];
+} {
+  const points: Array<{ label: string; raw: string; value: number }> = [];
+  const prose: string[] = [];
+  for (const line of text.split(/\n+/).map((s) => s.trim()).filter(Boolean)) {
+    const m = line.match(/^(.{1,40}?)\s*[:=]\s*(-?\d+(?:[.,]\d+)?\s*[a-zA-Z%×x]*)$/);
+    if (m) {
+      const value = Number.parseFloat(m[2].replace(",", "."));
+      if (Number.isFinite(value)) {
+        points.push({ label: m[1].trim(), raw: m[2].trim(), value });
+        continue;
+      }
+    }
+    prose.push(line);
+  }
+  return { points, prose };
 }
 
 /** What the heading-size control may ask for, either side of the template's own sizing. */
@@ -2823,6 +2927,584 @@ const CAROUSEL_SAVE: Template = {
 };
 
 // =========================================================================
+//  Templates — Carousels: the dark editorial family
+//
+//  A shared language: near-black grounds, photos as texture under heavy
+//  overlays, huge tight-leaded headlines with ONE phrase in accent (the
+//  *asterisk* markup — see tokenizeHighlight), small dot-eyebrows, and data
+//  drawn as graphics. Pairs best with a condensed heading face (Bebas), but
+//  honors whatever heading font the slide has selected.
+// =========================================================================
+
+const CAROUSEL_BOLD_COVER: Template = {
+  id: "carousel-bold-cover",
+  name: "Bold Cover",
+  headingHighlight: true,
+  blurb: "Opener — huge editorial headline on a dark photo, one phrase in accent.",
+  category: "carousels",
+  aspectRatio: "1:1",
+  width: 1080,
+  height: 1080,
+  requiresPhoto: true,
+  usesTagline: true,
+  taglineHint: "01 / 06",
+  chrome: {
+    brand: "name",
+    indicator: "01 / 06",
+    swipe: true,
+    ink: "light",
+    logo: "top-left",
+  },
+  render(ctx, design, bg, fonts) {
+    const W = this.width;
+    const H = this.height;
+    ctx.save();
+    const measure = canvasMeasure(ctx);
+    paintBackground(ctx, bg, { x: 0, y: 0, w: W, h: H }, design);
+    ctx.fillStyle = "rgba(8,8,8,0.5)";
+    ctx.fillRect(0, 0, W, H);
+    bottomGradient(ctx, W, H, Math.round(H * 0.4));
+
+    const padX = Math.round(W * 0.085);
+    const padBottom = Math.round(H * 0.085);
+    const innerW = W - padX * 2;
+
+    ctx.textBaseline = "alphabetic";
+
+    // The headline IS the slide. Very large, very tight.
+    const { clean, flags } = tokenizeHighlight(
+      design.headingText || "Massage beat the *cold plunge* by five times",
+    );
+    const fit = autoFitHeading(
+      measure,
+      clean.toUpperCase(),
+      "400",
+      fonts.heading,
+      Math.round(H * 0.096),
+      Math.round(H * 0.058),
+      innerW,
+      4,
+      design.headingScale,
+    );
+    const headingLine = Math.round(fit.size * 1.02);
+    const headingTop = Math.round(H * 0.16);
+    paintHighlightedLines(
+      ctx,
+      measure,
+      fit.lines,
+      flags,
+      `400 ${fit.size}px ${fonts.heading}`,
+      padX,
+      headingTop + fit.size,
+      headingLine,
+      "#ffffff",
+      design.accentColor,
+    );
+
+    // Proof line pinned to the bottom, under a short accent rule.
+    const bodySize = Math.round(H * 0.023);
+    const bodyLine = Math.round(bodySize * 1.5);
+    const bodyLines = wrapLines(
+      measure,
+      `400 ${bodySize}px ${fonts.body}`,
+      design.bodyText || "Add the numbers that back it up here.",
+      Math.round(innerW * 0.8),
+    ).slice(0, 3);
+    const bodyBlock = bodyLines.length * bodyLine;
+    const bodyTop = H - padBottom - Math.round(H * 0.045) - bodyBlock;
+    ctx.fillStyle = design.accentColor;
+    ctx.fillRect(padX, bodyTop - Math.round(H * 0.035), Math.round(W * 0.055), 4);
+    ctx.fillStyle = "rgba(255,255,255,0.92)";
+    ctx.font = `400 ${bodySize}px ${fonts.body}`;
+    ctx.textAlign = "left";
+    paintLines(ctx, bodyLines, padX, bodyTop + bodySize, bodyLine);
+    ctx.restore();
+  },
+};
+
+const CAROUSEL_VERSUS: Template = {
+  id: "carousel-versus",
+  name: "The Margin",
+  headingHighlight: true,
+  blurb: "Middle — a winner and a loser as bars, with one giant figure.",
+  category: "carousels",
+  aspectRatio: "1:1",
+  width: 1080,
+  height: 1080,
+  acceptsPhoto: true,
+  usesTagline: true,
+  taglineHint: "5x",
+  // The tagline is the BIG FIGURE (the margin). Body lines like
+  // "Massage: 2.26" become the bars; remaining lines stay prose. When the
+  // tagline is blank but both bars parse, the figure is computed from them.
+  chrome: {
+    brand: "name",
+    swipe: true,
+    ink: "light",
+    logo: "top-left",
+  },
+  render(ctx, design, bg, fonts) {
+    const W = this.width;
+    const H = this.height;
+    ctx.save();
+    const measure = canvasMeasure(ctx);
+    ctx.fillStyle = "#0b0b0b";
+    ctx.fillRect(0, 0, W, H);
+    if (bg) {
+      paintBackground(ctx, bg, { x: 0, y: 0, w: W, h: H }, design, { showPlaceholder: false });
+      ctx.fillStyle = "rgba(8,8,8,0.88)";
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    const padX = Math.round(W * 0.085);
+    const innerW = W - padX * 2;
+
+    ctx.textBaseline = "alphabetic";
+    ctx.textAlign = "left";
+
+    // Heading left, leaving the right third for the figure.
+    const { clean, flags } = tokenizeHighlight(
+      design.headingText || "Not a close race",
+    );
+    const fit = autoFitHeading(
+      measure,
+      clean.toUpperCase(),
+      "400",
+      fonts.heading,
+      Math.round(H * 0.075),
+      Math.round(H * 0.044),
+      Math.round(innerW * 0.55),
+      3,
+      design.headingScale,
+    );
+    const headingLine = Math.round(fit.size * 1.04);
+    const headingTop = Math.round(H * 0.17);
+    paintHighlightedLines(
+      ctx,
+      measure,
+      fit.lines,
+      flags,
+      `400 ${fit.size}px ${fonts.heading}`,
+      padX,
+      headingTop + fit.size,
+      headingLine,
+      "#ffffff",
+      design.accentColor,
+    );
+
+    const { points, prose } = splitDataLines(design.bodyText || "");
+    const bars = points.slice(0, 2);
+
+    // The giant figure: tagline, or computed from the two bars.
+    let figure = (design.tagline ?? "").trim();
+    if (!figure && bars.length === 2) {
+      const [a, b] = bars.map((p) => Math.abs(p.value));
+      const hi = Math.max(a, b);
+      const lo = Math.min(a, b);
+      if (lo > 0 && hi / lo >= 1.5) {
+        const ratio = hi / lo;
+        figure = `${ratio >= 10 ? Math.round(ratio) : Math.round(ratio * 10) / 10}x`;
+      }
+    }
+    if (!figure) figure = "5x";
+    let figSize = Math.round(H * 0.24);
+    const figMax = Math.round(innerW * 0.38);
+    while (figSize > Math.round(H * 0.1) && measure(figure, `400 ${figSize}px ${fonts.heading}`) > figMax) {
+      figSize -= 8;
+    }
+    ctx.fillStyle = design.accentColor;
+    ctx.font = `400 ${figSize}px ${fonts.heading}`;
+    ctx.textAlign = "right";
+    ctx.fillText(figure, W - padX, Math.round(H * 0.17) + figSize);
+    ctx.textAlign = "left";
+
+    // The two bars. Winner (larger magnitude) takes the accent.
+    if (bars.length === 2) {
+      const maxMag = Math.max(...bars.map((p) => Math.abs(p.value))) || 1;
+      const barAreaTop = Math.round(H * 0.5);
+      const rowGap = Math.round(H * 0.125);
+      const labelSize = Math.round(H * 0.02);
+      const barH = Math.round(H * 0.02);
+      bars.forEach((p, i) => {
+        const winner = Math.abs(p.value) === maxMag;
+        const rowY = barAreaTop + i * rowGap;
+        ctx.fillStyle = winner ? "#ffffff" : "rgba(255,255,255,0.6)";
+        ctx.font = `600 ${labelSize}px ${fonts.body}`;
+        ctx.fillText(p.label.toUpperCase(), padX, rowY);
+        ctx.fillStyle = winner ? design.accentColor : "rgba(255,255,255,0.45)";
+        ctx.font = `700 ${labelSize}px ${fonts.body}`;
+        ctx.textAlign = "right";
+        ctx.fillText(p.raw, W - padX, rowY);
+        ctx.textAlign = "left";
+        const w = Math.max(
+          Math.round(innerW * (Math.abs(p.value) / maxMag)),
+          Math.round(innerW * 0.05),
+        );
+        ctx.fillStyle = winner ? design.accentColor : "#3a3a3a";
+        roundedRect(ctx, padX, rowY + Math.round(H * 0.018), w, barH, barH / 2);
+        ctx.fill();
+      });
+    }
+
+    // Prose underneath.
+    const proseText = prose.join(" ");
+    if (proseText) {
+      const bodySize = Math.round(H * 0.021);
+      const bodyLine = Math.round(bodySize * 1.5);
+      const lines = wrapLines(
+        measure,
+        `400 ${bodySize}px ${fonts.body}`,
+        proseText,
+        innerW,
+      ).slice(0, 3);
+      ctx.fillStyle = "rgba(255,255,255,0.8)";
+      ctx.font = `400 ${bodySize}px ${fonts.body}`;
+      paintLines(ctx, lines, padX, Math.round(H * 0.78) + bodySize, bodyLine);
+    }
+    ctx.restore();
+  },
+};
+
+const CAROUSEL_TIMELINE: Template = {
+  id: "carousel-timeline",
+  name: "Timeline",
+  headingHighlight: true,
+  blurb: "Middle — checkpoints on a line, the peak in accent.",
+  category: "carousels",
+  aspectRatio: "1:1",
+  width: 1080,
+  height: 1080,
+  acceptsPhoto: true,
+  usesTagline: true,
+  taglineHint: "03 / 06",
+  // Body lines like "48h: 1.51" become the checkpoints (up to 4); the one
+  // with the largest magnitude gets the accent. Remaining lines stay prose.
+  chrome: {
+    brand: "name",
+    indicator: "03 / 06",
+    swipe: true,
+    ink: "light",
+    logo: "top-left",
+  },
+  render(ctx, design, bg, fonts) {
+    const W = this.width;
+    const H = this.height;
+    ctx.save();
+    const measure = canvasMeasure(ctx);
+    ctx.fillStyle = "#0b0b0b";
+    ctx.fillRect(0, 0, W, H);
+    if (bg) {
+      paintBackground(ctx, bg, { x: 0, y: 0, w: W, h: H }, design, { showPlaceholder: false });
+      ctx.fillStyle = "rgba(8,8,8,0.88)";
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    const padX = Math.round(W * 0.085);
+    const innerW = W - padX * 2;
+
+    ctx.textBaseline = "alphabetic";
+
+    // Right-aligned headline — the mirror of the cover's left block.
+    const { clean, flags } = tokenizeHighlight(
+      design.headingText || "It peaks at *48 hours*",
+    );
+    const fit = autoFitHeading(
+      measure,
+      clean.toUpperCase(),
+      "400",
+      fonts.heading,
+      Math.round(H * 0.078),
+      Math.round(H * 0.046),
+      Math.round(innerW * 0.85),
+      3,
+      design.headingScale,
+    );
+    const headingLine = Math.round(fit.size * 1.04);
+    const headingTop = Math.round(H * 0.16);
+    paintHighlightedLines(
+      ctx,
+      measure,
+      fit.lines,
+      flags,
+      `400 ${fit.size}px ${fonts.heading}`,
+      W - padX,
+      headingTop + fit.size,
+      headingLine,
+      "#ffffff",
+      design.accentColor,
+      "right",
+    );
+
+    const { points, prose } = splitDataLines(design.bodyText || "");
+    const marks = points.slice(0, 4);
+
+    if (marks.length >= 2) {
+      const maxMag = Math.max(...marks.map((p) => Math.abs(p.value)));
+      const lineY = Math.round(H * 0.52);
+      ctx.fillStyle = "#333333";
+      ctx.fillRect(padX, lineY - 1, innerW, 2);
+      marks.forEach((p, i) => {
+        const x = padX + Math.round((innerW * i) / (marks.length - 1));
+        const peak = Math.abs(p.value) === maxMag;
+        const r = peak ? Math.round(H * 0.011) : Math.round(H * 0.008);
+        ctx.fillStyle = peak ? design.accentColor : "#8a8a8a";
+        ctx.beginPath();
+        ctx.arc(x, lineY, r, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Labels hug their point but stay inside the frame.
+        ctx.textAlign = i === 0 ? "left" : i === marks.length - 1 ? "right" : "center";
+        const labelX = i === 0 ? padX : i === marks.length - 1 ? W - padX : x;
+        const labelSize = Math.round(H * 0.026);
+        ctx.fillStyle = peak ? "#ffffff" : "rgba(255,255,255,0.75)";
+        ctx.font = `700 ${labelSize}px ${fonts.body}`;
+        ctx.fillText(p.label.toUpperCase(), labelX, lineY + Math.round(H * 0.052));
+        ctx.fillStyle = peak ? design.accentColor : "rgba(255,255,255,0.5)";
+        ctx.font = `600 ${Math.round(H * 0.018)}px ${fonts.body}`;
+        ctx.fillText(p.raw, labelX, lineY + Math.round(H * 0.082));
+      });
+      ctx.textAlign = "left";
+    }
+
+    const proseText = prose.join(" ");
+    if (proseText) {
+      const bodySize = Math.round(H * 0.022);
+      const bodyLine = Math.round(bodySize * 1.55);
+      const lines = wrapLines(
+        measure,
+        `400 ${bodySize}px ${fonts.body}`,
+        proseText,
+        Math.round(innerW * 0.86),
+      ).slice(0, 4);
+      ctx.fillStyle = "rgba(255,255,255,0.82)";
+      ctx.font = `400 ${bodySize}px ${fonts.body}`;
+      paintLines(ctx, lines, padX, Math.round(H * 0.72) + bodySize, bodyLine);
+    }
+    ctx.restore();
+  },
+};
+
+const CAROUSEL_SPLIT: Template = {
+  id: "carousel-split",
+  name: "Split Photo",
+  headingHighlight: true,
+  blurb: "Middle — photo up the left, dark panel with eyebrow and heading right.",
+  category: "carousels",
+  aspectRatio: "1:1",
+  width: 1080,
+  height: 1080,
+  requiresPhoto: true,
+  usesTagline: true,
+  taglineHint: "THE MECHANISM",
+  // The tagline is the dot-eyebrow on the panel ("THE MECHANISM"), so no
+  // indicator — same repurposing as carousel-tip's label.
+  chrome: {
+    brand: "name",
+    swipe: true,
+    ink: "light",
+    logo: "top-left",
+  },
+  render(ctx, design, bg, fonts) {
+    const W = this.width;
+    const H = this.height;
+    ctx.save();
+    const measure = canvasMeasure(ctx);
+    ctx.fillStyle = "#0b0b0b";
+    ctx.fillRect(0, 0, W, H);
+
+    // Photo column + accent seam.
+    const photoW = Math.round(W * 0.42);
+    paintBackground(ctx, bg, { x: 0, y: 0, w: photoW, h: H }, design);
+    ctx.fillStyle = "rgba(8,8,8,0.18)";
+    ctx.fillRect(0, 0, photoW, H);
+    ctx.fillStyle = design.accentColor;
+    ctx.fillRect(photoW, 0, 3, H);
+
+    const panelX = photoW + Math.round(W * 0.06);
+    const panelW = W - panelX - Math.round(W * 0.085);
+
+    ctx.textBaseline = "alphabetic";
+    ctx.textAlign = "left";
+
+    // Dot eyebrow from the tagline.
+    const eyebrow = ((design.tagline ?? "").trim() || "THE MECHANISM").toUpperCase();
+    const eyebrowSize = Math.round(H * 0.017);
+    const eyebrowY = Math.round(H * 0.21);
+    ctx.fillStyle = design.accentColor;
+    ctx.beginPath();
+    ctx.arc(panelX + Math.round(H * 0.006), eyebrowY - Math.round(eyebrowSize * 0.32), Math.round(H * 0.006), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.font = `600 ${eyebrowSize}px ${fonts.body}`;
+    ctx.fillText(eyebrow, panelX + Math.round(H * 0.022), eyebrowY);
+
+    // Heading.
+    const { clean, flags } = tokenizeHighlight(
+      design.headingText || "It is not *loosening* the tissue",
+    );
+    const fit = autoFitHeading(
+      measure,
+      clean.toUpperCase(),
+      "400",
+      fonts.heading,
+      Math.round(H * 0.058),
+      Math.round(H * 0.038),
+      panelW,
+      4,
+      design.headingScale,
+    );
+    const headingLine = Math.round(fit.size * 1.05);
+    const headingTop = eyebrowY + Math.round(H * 0.03);
+    paintHighlightedLines(
+      ctx,
+      measure,
+      fit.lines,
+      flags,
+      `400 ${fit.size}px ${fonts.heading}`,
+      panelX,
+      headingTop + fit.size,
+      headingLine,
+      "#ffffff",
+      design.accentColor,
+    );
+
+    // Rule + body.
+    const ruleY = headingTop + fit.lines.length * headingLine + Math.round(H * 0.035);
+    ctx.fillStyle = design.accentColor;
+    ctx.fillRect(panelX, ruleY, Math.round(W * 0.05), 4);
+
+    const bodySize = Math.round(H * 0.022);
+    const bodyLine = Math.round(bodySize * 1.55);
+    const bodyLines = wrapLines(
+      measure,
+      `400 ${bodySize}px ${fonts.body}`,
+      design.bodyText || "Add the explanation here.",
+      panelW,
+    ).slice(0, 8);
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.font = `400 ${bodySize}px ${fonts.body}`;
+    paintLines(ctx, bodyLines, panelX, ruleY + Math.round(H * 0.05) + bodySize, bodyLine);
+    ctx.restore();
+  },
+};
+
+const CAROUSEL_STATEMENT: Template = {
+  id: "carousel-statement",
+  name: "Statement",
+  headingHighlight: true,
+  blurb: "Middle — big claim, thin ring, and a bold kicker line.",
+  category: "carousels",
+  aspectRatio: "1:1",
+  width: 1080,
+  height: 1080,
+  acceptsPhoto: true,
+  usesTagline: true,
+  taglineHint: "05 / 06",
+  // Body paragraphs split on a BLANK line: the first is the body, the second
+  // becomes the bold kicker under the rule ("The tissue did not change. The
+  // signal did.").
+  chrome: {
+    brand: "name",
+    indicator: "05 / 06",
+    swipe: true,
+    ink: "light",
+    logo: "top-left",
+  },
+  render(ctx, design, bg, fonts) {
+    const W = this.width;
+    const H = this.height;
+    ctx.save();
+    const measure = canvasMeasure(ctx);
+    ctx.fillStyle = "#0b0b0b";
+    ctx.fillRect(0, 0, W, H);
+    if (bg) {
+      paintBackground(ctx, bg, { x: 0, y: 0, w: W, h: H }, design, { showPlaceholder: false });
+      ctx.fillStyle = "rgba(8,8,8,0.88)";
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // The thin ring, off to the right, running off-canvas.
+    ctx.strokeStyle = design.accentColor;
+    ctx.globalAlpha = 0.5;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(Math.round(W * 0.78), Math.round(H * 0.56), Math.round(H * 0.3), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    const padX = Math.round(W * 0.085);
+    const innerW = W - padX * 2;
+
+    ctx.textBaseline = "alphabetic";
+    ctx.textAlign = "left";
+
+    const { clean, flags } = tokenizeHighlight(
+      design.headingText || "It is talking to your *nervous system*",
+    );
+    const fit = autoFitHeading(
+      measure,
+      clean.toUpperCase(),
+      "400",
+      fonts.heading,
+      Math.round(H * 0.08),
+      Math.round(H * 0.048),
+      Math.round(innerW * 0.8),
+      4,
+      design.headingScale,
+    );
+    const headingLine = Math.round(fit.size * 1.03);
+    const headingTop = Math.round(H * 0.16);
+    paintHighlightedLines(
+      ctx,
+      measure,
+      fit.lines,
+      flags,
+      `400 ${fit.size}px ${fonts.heading}`,
+      padX,
+      headingTop + fit.size,
+      headingLine,
+      "#ffffff",
+      design.accentColor,
+    );
+
+    // Body, then rule, then kicker.
+    const paragraphs = (design.bodyText || "").split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean);
+    const bodyPara = paragraphs[0] ?? "Add your supporting copy here.";
+    const kicker = paragraphs[1] ?? "";
+
+    const bodySize = Math.round(H * 0.022);
+    const bodyLine = Math.round(bodySize * 1.55);
+    const bodyLines = wrapLines(
+      measure,
+      `400 ${bodySize}px ${fonts.body}`,
+      bodyPara,
+      Math.round(innerW * 0.62),
+    ).slice(0, 5);
+    const bodyTop = Math.round(H * 0.56);
+    ctx.fillStyle = "rgba(255,255,255,0.82)";
+    ctx.font = `400 ${bodySize}px ${fonts.body}`;
+    const bodyEnd = paintLines(ctx, bodyLines, padX, bodyTop + bodySize, bodyLine);
+
+    if (kicker) {
+      const ruleY = bodyEnd + Math.round(H * 0.02);
+      ctx.fillStyle = design.accentColor;
+      ctx.fillRect(padX, ruleY, Math.round(W * 0.05), 4);
+      const kickerSize = Math.round(H * 0.024);
+      const kickerLine = Math.round(kickerSize * 1.4);
+      const kickerLines = wrapLines(
+        measure,
+        `700 ${kickerSize}px ${fonts.body}`,
+        kicker,
+        Math.round(innerW * 0.62),
+      ).slice(0, 2);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `700 ${kickerSize}px ${fonts.body}`;
+      paintLines(ctx, kickerLines, padX, ruleY + Math.round(H * 0.045) + kickerSize, kickerLine);
+    }
+    ctx.restore();
+  },
+};
+
+// =========================================================================
 //  Templates — Testimonials
 // =========================================================================
 
@@ -4149,6 +4831,12 @@ export const TEMPLATES: Template[] = [
   CAROUSEL_STAT,
   CAROUSEL_SAVE,
   QUESTION_HOOK,
+  // The dark editorial family
+  CAROUSEL_BOLD_COVER,
+  CAROUSEL_VERSUS,
+  CAROUSEL_TIMELINE,
+  CAROUSEL_SPLIT,
+  CAROUSEL_STATEMENT,
   // Testimonials
   QUOTE_PORTRAIT,
   PHOTO_QUOTE,
@@ -4205,6 +4893,11 @@ const CAROUSEL_ROLE_OF: Record<string, "opener" | "middle" | "closing"> = {
   "carousel-checklist": "middle",
   "carousel-myth": "middle",
   "carousel-stat": "middle",
+  "carousel-bold-cover": "opener",
+  "carousel-versus": "middle",
+  "carousel-timeline": "middle",
+  "carousel-split": "middle",
+  "carousel-statement": "middle",
   "carousel-cta": "closing",
   "carousel-save": "closing",
 };

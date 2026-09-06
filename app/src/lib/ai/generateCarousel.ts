@@ -39,7 +39,16 @@ Template options — pick what fits each slide:
 - "carousel-save" — closing save-and-share prompt. Use as the last slide when the carousel is pure value with no booking angle.
 - "question-hook" — provocative question opener. Use only on slide 1 when the cover is question-led.
 
-Some templates read a "tagline" field (the stat on "carousel-stat", the "TIP 02" label on "carousel-tip"). Include "tagline" on a slide when its template uses one; omit it elsewhere.
+The dark editorial family (near-black, documentary tone — use them together, never mixed with the light templates in one carousel):
+- "carousel-bold-cover" — opener: huge headline on a dark photo, proof line pinned at the bottom. Use only on slide 1.
+- "carousel-versus" — a winner and a loser as bars. Body starts with EXACTLY two lines "Label: number"; the rest of the body is prose. Tagline = the margin figure (e.g. "5x") or leave it blank to auto-compute from the two numbers.
+- "carousel-timeline" — 3-4 checkpoints on a line. Body starts with 3-4 lines "Label: number" (e.g. "48h: 1.51"); the rest is prose. The largest magnitude gets the accent.
+- "carousel-split" — photo up the left, panel right. Tagline = a short section label eyebrow (e.g. "THE MECHANISM"), body = 2-4 explanatory sentences.
+- "carousel-statement" — big claim with a thin ring. Body = one paragraph, then a BLANK line, then a 1-2 sentence bold kicker that lands the point.
+
+On every dark-editorial slide, wrap ONE key phrase of the heading in *asterisks* — it renders in the accent colour (e.g. "Massage beat the *cold plunge* by five times"). Any numbers on versus/timeline slides must come from the business context or common knowledge, with the source named in the prose — NEVER invent a figure.
+
+Some templates read a "tagline" field (the stat on "carousel-stat", the "TIP 02" label on "carousel-tip", the margin figure and section label above). Include "tagline" on a slide when its template uses one; omit it elsewhere.
 
 You ALSO write the Instagram / Facebook caption that goes with this carousel when it's posted. The caption should:
 - Open with a hook (one short sentence that earns the second line).
@@ -114,6 +123,13 @@ const SLOT_STYLES: Record<
     rule: string;
     coverTemplate: string;
     middleTemplate: string;
+    /**
+     * When set, the model may pick any of these for a middle slide and its
+     * choice survives post-processing; anything else falls back to
+     * middleTemplate. This is what lets one deck vary its layouts while
+     * staying inside a family.
+     */
+    middleTemplates?: string[];
     /** Template for the final slide. Defaults to "carousel-cta". */
     closingTemplate?: string;
     contentNotes: string;
@@ -199,6 +215,57 @@ const SLOT_STYLES: Record<
       "Slide 1 is 'carousel-cover'. EVERY middle slide is 'carousel-stat' — one number carries each slide. Final slide is 'carousel-cta'.",
     contentNotes:
       "Each middle slide: tagline = the stat itself (short — '87%', '3x', '12 weeks'), heading = the sentence completing it as a lowercase continuation, body = one supporting line. Only stats grounded in the business context or common knowledge — NEVER invent a figure.",
+  },
+  "carousel-bold-cover": {
+    label: "Editorial deck",
+    coverTemplate: "carousel-bold-cover",
+    middleTemplate: "carousel-split",
+    middleTemplates: [
+      "carousel-versus",
+      "carousel-timeline",
+      "carousel-split",
+      "carousel-statement",
+    ],
+    rule:
+      "Slide 1 is 'carousel-bold-cover'. Middle slides VARY across the dark editorial family — 'carousel-versus', 'carousel-timeline', 'carousel-split', 'carousel-statement' — picking whichever layout fits each slide's content, like a documentary breakdown. Final slide is 'carousel-cta'.",
+    contentNotes:
+      "This is a deep, evidence-led breakdown of ONE topic. Wrap one key phrase of every heading in *asterisks*. Data slides (versus/timeline) only where real numbers exist in the business context or common knowledge, with the source named in the prose.",
+  },
+  "carousel-versus": {
+    label: "Head-to-head",
+    coverTemplate: "carousel-bold-cover",
+    middleTemplate: "carousel-versus",
+    rule:
+      "Slide 1 is 'carousel-bold-cover'. EVERY middle slide is 'carousel-versus' — one comparison per slide. Final slide is 'carousel-cta'.",
+    contentNotes:
+      "Each middle slide compares two things with two 'Label: number' body lines plus prose naming the source. Wrap one key phrase of every heading in *asterisks*. Never invent a figure.",
+  },
+  "carousel-timeline": {
+    label: "Over-time story",
+    coverTemplate: "carousel-bold-cover",
+    middleTemplate: "carousel-timeline",
+    rule:
+      "Slide 1 is 'carousel-bold-cover'. EVERY middle slide is 'carousel-timeline' — one progression per slide. Final slide is 'carousel-cta'.",
+    contentNotes:
+      "Each middle slide shows 3-4 'Label: number' checkpoints plus prose naming the source. Wrap one key phrase of every heading in *asterisks*. Never invent a figure.",
+  },
+  "carousel-split": {
+    label: "Photo-led explainer",
+    coverTemplate: "carousel-bold-cover",
+    middleTemplate: "carousel-split",
+    rule:
+      "Slide 1 is 'carousel-bold-cover'. EVERY middle slide is 'carousel-split' — photo left, explanation right. Final slide is 'carousel-cta'.",
+    contentNotes:
+      "Each middle slide explains ONE idea: tagline = a short section label (e.g. 'THE MECHANISM'), heading with one phrase in *asterisks*, body = 2-4 clear sentences.",
+  },
+  "carousel-statement": {
+    label: "Claim series",
+    coverTemplate: "carousel-bold-cover",
+    middleTemplate: "carousel-statement",
+    rule:
+      "Slide 1 is 'carousel-bold-cover'. EVERY middle slide is 'carousel-statement' — one bold claim per slide. Final slide is 'carousel-cta'.",
+    contentNotes:
+      "Each middle slide: heading = the claim with one phrase in *asterisks*, body = one supporting paragraph, then a BLANK line, then a 1-2 sentence kicker that lands it.",
   },
   "carousel-save": {
     label: "Value series (save-led)",
@@ -340,7 +407,13 @@ export async function generateCarouselSlides(
     }
     const lastMiddleIdx = allHero ? slides.length - 1 : slides.length - 2;
     for (let i = 1; i <= lastMiddleIdx; i++) {
-      slides[i].template = middleTemplate;
+      // A slot with a middle FAMILY keeps the model's pick when it's in the
+      // family — that's what lets an editorial deck vary its layouts — and
+      // falls back to the slot's default otherwise.
+      slides[i].template =
+        style?.middleTemplates?.includes(slides[i].template)
+          ? slides[i].template
+          : middleTemplate;
     }
   }
 

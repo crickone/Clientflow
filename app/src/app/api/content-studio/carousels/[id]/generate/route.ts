@@ -122,6 +122,11 @@ export async function POST(
       // (quote, CTA, checklist, myth, stat, save) never paint one, and an
       // image generated for those is metered money buying nothing.
       const template = getTemplate(slide.template);
+      // *asterisk* highlight markup only means something to templates that
+      // parse it — anywhere else it would render literally.
+      const heading = template?.headingHighlight
+        ? slide.heading
+        : slide.heading.replace(/\*/g, "");
       const wantsImage = houseStyle && template && templateUsesPhoto(template);
       const prompt = wantsImage
         ? buildImagePrompt({
@@ -136,7 +141,7 @@ export async function POST(
         slotKey,
         templateId: slide.template,
         aspectRatio: "1:1",
-        headingText: slide.heading,
+        headingText: heading,
         bodyText: slide.body,
         // Some templates read the tagline as content (the stat, the tip
         // label) — carry it when the generator wrote one.

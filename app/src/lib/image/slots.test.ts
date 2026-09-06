@@ -192,12 +192,12 @@ eq(
     carouselTemplateGroups().map((g) => [g.label, g.templates.map((t) => t.id)]),
   );
   eq(
-    "opening slides are exactly the two openers",
+    "opening slides are exactly the three openers",
     byLabel.get("Opening slide"),
-    ["carousel-cover", "question-hook"],
+    ["carousel-cover", "question-hook", "carousel-bold-cover"],
   );
   eq(
-    "middle slides are exactly the six middles",
+    "middle slides are exactly the ten middles",
     byLabel.get("Middle slides"),
     [
       "carousel-content",
@@ -206,6 +206,10 @@ eq(
       "carousel-checklist",
       "carousel-myth",
       "carousel-stat",
+      "carousel-versus",
+      "carousel-timeline",
+      "carousel-split",
+      "carousel-statement",
     ],
   );
   eq(
