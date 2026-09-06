@@ -89,3 +89,8 @@ export function upsertBlock(input: UpsertBlockInput): void {
       .run();
   }
 }
+
+/** ADMIN: remove a block (used to discard/consume a page draft). No-op when absent. */
+export function deleteBlock(siteId: number, pageId: number | null, name: string): void {
+  db.delete(contentBlocks).where(whereBlock(siteId, pageId, name)).run();
+}

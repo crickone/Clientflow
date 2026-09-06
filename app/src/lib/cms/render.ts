@@ -10,6 +10,8 @@ import { getTemplate, type TemplateDef } from "@/lib/cms/templates";
 import { getCurrentMembership } from "@/lib/auth";
 import { getBlockValue } from "@/lib/cms/blocks";
 import { sanitizeHtmlKeepStyles } from "@/lib/cms/html";
+import { splitPageBody, type PageBodyZones } from "@/lib/cms/pageBody";
+import { getDraftContent } from "@/lib/cms/pageDraft";
 import type { RenderCtx } from "@/components/cms/Block";
 import type { Page } from "@/lib/db/schema";
 // Side-effect import: registers site-specific templates (Renova etc.).
@@ -58,10 +60,43 @@ export function canEditNow(): boolean {
   return getCurrentMembership()?.role === "admin";
 }
 
-/** Page body HTML with scripts stripped, for stable editing in the Studio. */
+/**
+ * Page body HTML with scripts stripped, for stable editing in the Studio.
+ *
+ * NOTE: kept alongside editBodyZones (below) rather than replaced. The two
+ * public site routes (src/app/site/[siteSlug]/page.tsx and
+ * src/app/site/[siteSlug]/[...slug]/page.tsx) still import this to feed
+ * RenovaEditCanvas; repointing them at editBodyZones/the new canvas belongs to
+ * a later task. Remove this once those routes no longer call it.
+ */
 export function editBodyHtml(pc: PageContext): string {
   const row = getBlockValue(pc.ctx.db, pc.ctx.siteId, pc.ctx.pageId, "body");
   return sanitizeHtmlKeepStyles(row?.value ?? "");
+}
+
+/**
+ * The Studio canvas's view of a page: its three zones (see lib/cms/pageBody),
+ * with the DRAFT content zone substituted when one exists.
+ *
+ * Deliberately NOT sanitised. The live clientflow-live template already renders
+ * this exact stored HTML verbatim, scripts included, on the same origin; the
+ * canvas is admin-only (canEditNow) and renders strictly less than the live
+ * page does (it never renders `tail`). Running it through
+ * sanitizeHtmlKeepStyles here was not a security boundary — that sanitiser
+ * drops <style> by design, which is what left the canvas unstyled and would
+ * have written a CSS-less body back over the live page on the first save.
+ */
+export function editBodyZones(
+  pc: PageContext,
+): PageBodyZones & { hasDraft: boolean } {
+  const row = getBlockValue(pc.ctx.db, pc.ctx.siteId, pc.ctx.pageId, "body");
+  const zones = splitPageBody(row?.value ?? "");
+  const draft = getDraftContent(pc.ctx.siteId, pc.ctx.pageId);
+  return {
+    ...zones,
+    content: draft ?? zones.content,
+    hasDraft: draft != null,
+  };
 }
 
 /** Per-site default OpenGraph image (a static asset shipped with the site),
