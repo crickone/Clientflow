@@ -1385,6 +1385,101 @@ export function ImageDesigner({
               uploading={uploading}
             />
           )}
+
+          {/* The caption, with the preview and the photos it belongs to. It
+              used to sit full-width UNDER the whole editor, so the words that
+              ship with the post were the one thing you had to scroll past
+              every control to reach. */}
+          {captionSlide && (
+            <div
+              style={{
+                border: "1px solid var(--hairline)",
+                borderRadius: "var(--radius)",
+                padding: 12,
+                background: "var(--surface-1)",
+                display: "grid",
+                gap: 10,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 8,
+                  flexWrap: "wrap",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    color: "var(--text-tertiary)",
+                  }}
+                >
+                  Post caption
+                </span>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={copyCaption}
+                    disabled={!caption.trim()}
+                  >
+                    <Copy size={14} />
+                    {captionCopied ? "Copied" : "Copy"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={refreshCaption}
+                    disabled={refreshing !== null}
+                    title="Rewrite the caption with Claude"
+                  >
+                    <RefreshCw
+                      size={14}
+                      style={{
+                        animation:
+                          refreshing === "caption"
+                            ? "spin 1s linear infinite"
+                            : undefined,
+                      }}
+                    />
+                    {refreshing === "caption" ? "Refreshing…" : "Refresh"}
+                  </Button>
+                </div>
+              </div>
+              <Textarea
+                value={caption}
+                onChange={(e) => updateCaption(e.target.value)}
+                placeholder={
+                  "Write the caption here, or click Refresh to generate one with Claude."
+                }
+                spellCheck
+                style={{
+                  minHeight: 140,
+                  fontSize: 13,
+                  lineHeight: 1.55,
+                  fontFamily: "inherit",
+                }}
+              />
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "var(--text-tertiary)",
+                  letterSpacing: "0.02em",
+                }}
+              >
+                {caption.trim()
+                  ? `${caption.split(/\s+/).filter(Boolean).length} words · ${caption.length} chars · auto-saves as you type`
+                  : "Empty — click Refresh to generate one."}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Controls column — grouped into collapsible Template / Content / Style / Layout sections */}
@@ -1900,110 +1995,6 @@ export function ImageDesigner({
           )}
         </div>
       </div>
-
-      {/* Caption section — full-width below the main grid */}
-      {captionSlide && (
-        <div
-          style={{
-            background: "var(--surface-1)",
-            border: "1px solid var(--hairline)",
-            borderRadius: "var(--radius)",
-            padding: 20,
-            display: "grid",
-            gap: 12,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 12,
-              flexWrap: "wrap",
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontFamily: "var(--font-heading), sans-serif",
-                  fontSize: 16,
-                  color: "var(--text-primary)",
-                  textTransform: "uppercase",
-                  letterSpacing: "-0.005em",
-                }}
-              >
-                Post caption
-              </div>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "var(--text-tertiary)",
-                  marginTop: 4,
-                }}
-              >
-                The Instagram / Facebook caption that goes with this{" "}
-                {isCarousel ? "carousel" : "post"}. Auto-saves as you type.
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={copyCaption}
-                disabled={!caption.trim()}
-              >
-                <Copy size={14} />
-                {captionCopied ? "Copied" : "Copy"}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={refreshCaption}
-                disabled={refreshing !== null}
-                title="Rewrite the caption with Claude"
-              >
-                <RefreshCw
-                  size={14}
-                  style={{
-                    animation:
-                      refreshing === "caption"
-                        ? "spin 1s linear infinite"
-                        : undefined,
-                  }}
-                />
-                {refreshing === "caption" ? "Refreshing…" : "Refresh caption"}
-              </Button>
-            </div>
-          </div>
-          <Textarea
-            value={caption}
-            onChange={(e) => updateCaption(e.target.value)}
-            placeholder={
-              "Write the caption here, or click Refresh caption to generate one with Claude."
-            }
-            spellCheck
-            style={{
-              minHeight: 200,
-              fontSize: 14,
-              lineHeight: 1.55,
-              fontFamily: "inherit",
-            }}
-          />
-          <div
-            style={{
-              fontSize: 11,
-              color: "var(--text-tertiary)",
-              letterSpacing: "0.02em",
-            }}
-          >
-            {caption.trim()
-              ? `${caption.split(/\s+/).filter(Boolean).length} words · ${caption.length} chars`
-              : "Empty — click Refresh caption to generate one."}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
