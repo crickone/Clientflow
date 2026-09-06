@@ -544,29 +544,11 @@ export async function discardDraftAction(
 }
 ```
 
-- [ ] **Step 6: Fix the two call sites of the old function**
-
-`editBodyHtml` was used by both public page routes. Update them to pass zones through (the canvas component signature lands in Task 3 — for now keep it compiling by passing the three zones):
-
-In `src/app/site/[siteSlug]/page.tsx` and `src/app/site/[siteSlug]/[...slug]/page.tsx`, change the import `editBodyHtml` to `editBodyZones` and the render line
-
-```tsx
-return <RenovaEditCanvas html={editBodyHtml(pc)} path={pc.path} />;
-```
-
-to
-
-```tsx
-return <StudioCanvas zones={editBodyZones(pc)} path={pc.path} />;
-```
-
-updating the component import to `import { StudioCanvas } from "@/components/cms/StudioCanvas";`. `StudioCanvas` does not exist yet — Task 3 creates it, so **typecheck will fail until Task 3 is done**. That is expected; do not stub it.
-
-- [ ] **Step 7: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 cd /Users/truep/Desktop/Clients/Renova
-git add app/src/lib/cms/pageDraft.ts app/src/lib/cms/blocks.ts app/src/lib/cms/render.ts app/src/app/cms/\[siteSlug\]/studio/actions.ts app/src/app/site
+git add app/src/lib/cms/pageDraft.ts app/src/lib/cms/blocks.ts app/src/lib/cms/render.ts app/src/app/cms/\[siteSlug\]/studio/actions.ts
 git commit -m "$(cat <<'EOF'
 feat(cms): page drafts, and the canvas stops being sanitised
 
@@ -593,6 +575,7 @@ EOF
 **Files:**
 - Create: `src/components/cms/StudioCanvas.tsx`
 - Delete: `src/components/cms/RenovaEditCanvas.tsx`
+- Modify: `src/app/site/[siteSlug]/page.tsx`, `src/app/site/[siteSlug]/[...slug]/page.tsx`
 
 **Interfaces:**
 - Consumes: `PageBodyZones` (Task 1); rendered by the two public site routes wired in Task 2 Step 6.
@@ -995,7 +978,25 @@ export function StudioCanvas({
 }
 ```
 
-- [ ] **Step 3: Delete the old canvas**
+- [ ] **Step 3: Repoint the two public site routes at the new canvas**
+
+`editBodyHtml` was used by both public page routes. Update them to pass zones through (the canvas component signature lands in Task 3 — for now keep it compiling by passing the three zones):
+
+In `src/app/site/[siteSlug]/page.tsx` and `src/app/site/[siteSlug]/[...slug]/page.tsx`, change the import `editBodyHtml` to `editBodyZones` and the render line
+
+```tsx
+return <RenovaEditCanvas html={editBodyHtml(pc)} path={pc.path} />;
+```
+
+to
+
+```tsx
+return <StudioCanvas zones={editBodyZones(pc)} path={pc.path} />;
+```
+
+updating the component import to `import { StudioCanvas } from "@/components/cms/StudioCanvas";`. Both routes previously rendered `RenovaEditCanvas` with `editBodyHtml(pc)`.
+
+- [ ] **Step 4: Delete the old canvas**
 
 ```bash
 cd app && rm src/components/cms/RenovaEditCanvas.tsx
@@ -1004,16 +1005,16 @@ grep -rn "RenovaEditCanvas" src/ || echo "no references left"
 
 Expected: `no references left` (Task 2 Step 6 already repointed both routes).
 
-- [ ] **Step 4: Typecheck**
+- [ ] **Step 5: Typecheck**
 
 Run: `cd app && npm run typecheck`
 Expected: PASS with no output. If `PageBodyZones` import errors, confirm Task 1 exported the type.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 cd /Users/truep/Desktop/Clients/Renova
-git add -A app/src/components/cms
+git add -A app/src/components/cms app/src/app/site
 git commit -m "$(cat <<'EOF'
 feat(cms): the studio canvas renders the real page, and everything is selectable
 
