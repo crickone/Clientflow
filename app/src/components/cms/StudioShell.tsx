@@ -164,8 +164,20 @@ export function StudioShell({
         clearTimeout(autosaveTimer.current);
         autosaveTimer.current = null;
       }
+      // Flush, do not drop: the sidebar's Manage-site links and the Sites
+      // back-link are plain next/link navigations that bypass the page
+      // switcher's unsaved-changes guard, so cancelling here would silently
+      // lose an edit the operator just made. saveDraftAction is a server
+      // action and completes regardless of this component being unmounted.
+      if (pendingDraft.current) {
+        void saveDraftAction(
+          siteSlug,
+          pendingDraft.current.path,
+          pendingDraft.current.content,
+        );
+      }
     };
-  }, []);
+  }, [siteSlug]);
 
   useEffect(() => {
     async function onMsg(ev: MessageEvent) {
