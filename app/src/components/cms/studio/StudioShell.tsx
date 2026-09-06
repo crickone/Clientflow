@@ -100,6 +100,13 @@ export function StudioShell({
     if (p) {
       pending.current = null;
       setSaving(true);
+      // This promise is stored on `inFlight` and re-awaited by later
+      // Publish/Discard calls (see below), so it must never reject: an
+      // unobserved rejection here would otherwise strand `inFlight` on a
+      // settled-but-rejected promise the moment the DB write throws, and
+      // every subsequent flush() would re-throw before Publish/Discard's
+      // own server action ever ran. Caught and surfaced as a toast instead,
+      // the same way every other failure in this file is reported.
       inFlight.current = (async () => {
         try {
           const r = await saveDraftAction(siteSlug, p.path, p.content);
@@ -107,6 +114,8 @@ export function StudioShell({
             setSavedAt(Date.now());
             setDraftPaths((prev) => (prev.includes(p.path) ? prev : [...prev, p.path]));
           } else toast.error(r.error ?? "Couldn't save the draft.");
+        } catch {
+          toast.error("Couldn't save the draft.");
         } finally {
           setSaving(false);
         }
@@ -114,9 +123,15 @@ export function StudioShell({
     }
     const current = inFlight.current;
     if (current) {
-      await current;
-      // Only clear if nothing newer replaced it while we were awaiting.
-      if (inFlight.current === current) inFlight.current = null;
+      try {
+        await current;
+      } finally {
+        // Always clear, even if `current` somehow still rejects — a `finally`
+        // here (rather than a line after the `await`) means a thrown error
+        // can never strand the ref on a settled promise and silently kill
+        // the next Publish or Discard.
+        if (inFlight.current === current) inFlight.current = null;
+      }
     }
   }, [siteSlug]);
 

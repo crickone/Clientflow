@@ -130,6 +130,20 @@ export function StudioCanvas({
     };
 
     const select = (el: HTMLElement | null) => {
+      // A picker token only means anything paired with the DOM attribute
+      // that carries it. The shell can't reliably tell two structurally
+      // identical siblings apart (it only sees derived breadcrumb labels),
+      // so it can't be trusted to invalidate a stale token by itself — the
+      // canvas can, by comparing actual node identity. Any genuine change
+      // of selection (a different element than the one already selected)
+      // clears the marker off whatever element still carries it, so a later
+      // cms:setImage naming a since-invalidated token finds nothing and
+      // does nothing, rather than landing on the wrong element. Reselecting
+      // the SAME element (el === selected) is not a change and must not
+      // clear a token minted for it moments earlier.
+      if (el !== selected) {
+        root.querySelectorAll("[data-cms-img]").forEach((e) => e.removeAttribute("data-cms-img"));
+      }
       if (selected) {
         selected.removeAttribute("data-cms-sel");
         if (selected.getAttribute("contenteditable") === "true") {
