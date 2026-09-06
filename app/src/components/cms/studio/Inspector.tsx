@@ -35,10 +35,33 @@ export function Inspector({
   // changes underneath (a different element, or the canvas echoing a change).
   const [href, setHref] = useState("");
   const [alt, setAlt] = useState("");
+  const hrefInputRef = useRef<HTMLInputElement>(null);
+  const altInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
-    setHref(selection?.props.href ?? "");
-    setAlt(selection?.props.alt ?? "");
+    // Skip resyncing a field that currently has focus; this prevents discarding
+    // in-progress edits if selection changes without stealing focus first.
+    if (document.activeElement !== hrefInputRef.current) {
+      setHref(selection?.props.href ?? "");
+    }
+    if (document.activeElement !== altInputRef.current) {
+      setAlt(selection?.props.alt ?? "");
+    }
   }, [selection]);
+
+  const handleHrefBlur = () => {
+    const currentValue = selection?.props.href ?? "";
+    if (href !== currentValue) {
+      onSetProp("href", href);
+    }
+  };
+
+  const handleAltBlur = () => {
+    const currentValue = selection?.props.alt ?? "";
+    if (alt !== currentValue) {
+      onSetProp("alt", alt);
+    }
+  };
 
   if (!selection || !selection.kind) {
     return (
@@ -74,6 +97,7 @@ export function Inspector({
                 {i > 0 && <span style={{ color: "var(--text-tertiary)", fontSize: 11 }}>/</span>}
                 <button
                   onClick={() => onSelectAncestor(b.depth)}
+                  aria-current={b.depth === 0 ? "location" : undefined}
                   style={{
                     border: "none",
                     background: b.depth === 0 ? "var(--surface-2)" : "transparent",
@@ -108,13 +132,15 @@ export function Inspector({
         <div style={{ display: "grid", gap: 8 }}>
           <div style={LABEL}>Link</div>
           <Input
+            ref={hrefInputRef}
             value={href}
             placeholder="/sign-up or https://…"
             onChange={(e) => setHref(e.target.value)}
-            onBlur={() => onSetProp("href", href)}
+            onBlur={handleHrefBlur}
             onKeyDown={(e) => {
               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
             }}
+            aria-label="Link URL"
           />
           <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--text-secondary)" }}>
             <input
@@ -151,13 +177,15 @@ export function Inspector({
           <div style={{ display: "grid", gap: 5 }}>
             <div style={LABEL}>Alt text</div>
             <Input
+              ref={altInputRef}
               value={alt}
               placeholder="Describe the image"
               onChange={(e) => setAlt(e.target.value)}
-              onBlur={() => onSetProp("alt", alt)}
+              onBlur={handleAltBlur}
               onKeyDown={(e) => {
                 if (e.key === "Enter") (e.target as HTMLInputElement).blur();
               }}
+              aria-label="Alt text"
             />
           </div>
         </div>
