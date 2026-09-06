@@ -13,6 +13,7 @@ import {
   Copy,
   Download,
   Image as ImageIcon,
+  Minus,
   Plus,
   RefreshCw,
   Sparkles,
@@ -33,7 +34,10 @@ import type {
   ImageLibraryAsset,
 } from "@/lib/db/schema";
 import {
+  HEADING_SCALE_MAX,
+  HEADING_SCALE_MIN,
   carouselTemplateGroups,
+  clampHeadingScale,
   getTemplate,
   singleTemplateGroups,
   type Template,
@@ -113,6 +117,96 @@ interface Props {
  * (x, y) over the canvas and drag anywhere on the preview repositions the
  * background photo. x/y are the slide's backgroundOffsetX/Y (0–1) unchanged.
  */
+/**
+ * Heading size, as a nudge either side of whatever the template does.
+ *
+ * Templates auto-fit a heading DOWNWARDS from a fixed start size, so a short
+ * heading — which is exactly what a carousel cover has — renders at that start
+ * size even when there's room for something much bigger. This raises or lowers
+ * that ceiling. It reads as a percentage because "the template's size, plus a
+ * bit" is the actual mental model; there's no absolute point size to show.
+ */
+function HeadingSizeControl({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (scale: number) => void;
+}) {
+  const STEP = 0.1;
+  const atMin = value <= HEADING_SCALE_MIN + 0.001;
+  const atMax = value >= HEADING_SCALE_MAX - 0.001;
+  const nudge = (delta: number) =>
+    onChange(clampHeadingScale(Math.round((value + delta) * 10) / 10));
+
+  const btn = (disabled: boolean): React.CSSProperties => ({
+    width: 24,
+    height: 24,
+    display: "grid",
+    placeItems: "center",
+    padding: 0,
+    border: "none",
+    borderRadius: "calc(var(--radius) - 2px)",
+    background: "transparent",
+    color: disabled ? "var(--text-tertiary)" : "var(--text-secondary)",
+    cursor: disabled ? "default" : "pointer",
+    fontFamily: "inherit",
+  });
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 1,
+        padding: 2,
+        borderRadius: "var(--radius)",
+        background: "var(--surface-2)",
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => nudge(-STEP)}
+        disabled={atMin}
+        aria-label="Smaller heading"
+        title="Smaller heading"
+        style={btn(atMin)}
+      >
+        <Minus size={13} />
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange(1)}
+        disabled={value === 1}
+        title="Back to the template's own size"
+        style={{
+          minWidth: 42,
+          padding: "0 4px",
+          border: "none",
+          background: "transparent",
+          color: value === 1 ? "var(--text-tertiary)" : "var(--text-primary)",
+          fontSize: 11,
+          fontVariantNumeric: "tabular-nums",
+          cursor: value === 1 ? "default" : "pointer",
+          fontFamily: "inherit",
+        }}
+      >
+        {Math.round(value * 100)}%
+      </button>
+      <button
+        type="button"
+        onClick={() => nudge(STEP)}
+        disabled={atMax}
+        aria-label="Bigger heading"
+        title="Bigger heading"
+        style={btn(atMax)}
+      >
+        <Plus size={13} />
+      </button>
+    </div>
+  );
+}
+
 function FocalOverlay({
   x,
   y,
@@ -327,6 +421,7 @@ export function ImageDesigner({
       templateId: activeSlide.templateId,
       aspectRatio: activeSlide.aspectRatio,
       headingText: activeSlide.headingText,
+      headingScale: activeSlide.headingScale,
       bodyText: activeSlide.bodyText,
       tagline: activeSlide.tagline,
       headingFont: activeSlide.headingFont,
@@ -1564,7 +1659,34 @@ export function ImageDesigner({
           )}
 
           <div>
-            <Label htmlFor="heading" srOnly>Heading</Label>
+            {/* The field itself keeps its name in the placeholder (house
+                style), but a stepper can't — so this one is labelled. */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                gap: 8,
+                marginBottom: 6,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 11,
+                  color: "var(--text-tertiary)",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                Heading size
+              </span>
+              <HeadingSizeControl
+                value={activeSlide.headingScale ?? 1}
+                onChange={(headingScale) => updateActiveSlide({ headingScale })}
+              />
+            </div>
+            <Label htmlFor="heading" srOnly>
+              Heading
+            </Label>
             <Textarea
               id="heading"
               value={activeSlide.headingText}

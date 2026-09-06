@@ -71,6 +71,9 @@ export function paintSlide(
     backgroundOffsetX: slide.backgroundOffsetX,
     backgroundOffsetY: slide.backgroundOffsetY,
     backgroundZoom: slide.backgroundZoom,
+    // Rows written before the column existed read back as null, not the
+    // default, so coalesce here rather than trusting the value.
+    headingScale: slide.headingScale ?? 1,
     businessName: brand?.businessName,
     website: brand?.website,
     location: brand?.location,

@@ -11,7 +11,15 @@
 // and passes it through. This is pure math — no DOM, no canvas, no jsdom.
 import assert from "node:assert/strict";
 
-import { autoFitHeading, canvasMeasure, wrapLines, type MeasureText } from "./templates";
+import {
+  HEADING_SCALE_MAX,
+  HEADING_SCALE_MIN,
+  autoFitHeading,
+  canvasMeasure,
+  clampHeadingScale,
+  wrapLines,
+  type MeasureText,
+} from "./templates";
 
 let passed = 0;
 function ok(name: string, cond: boolean) {
@@ -145,7 +153,7 @@ const sizedMeasure: MeasureText = (text, font) => {
   // and finally 2 lines at 10px (hand-verified against sizedMeasure's
   // length*size metric) — so with maxLines=2 the loop must walk all the way
   // down from 20 to 10 before it succeeds.
-  const fit = autoFitHeading(sizedMeasure, "ONE TWO THREE FOUR", "400", "TestFont", 20, 10, 100, 2);
+  const fit = autoFitHeading(sizedMeasure, "ONE TWO THREE FOUR", "400", "TestFont", 20, 10, 100, 2, 1);
   eq("autoFitHeading shrinks from startSize down to the size that first satisfies maxLines", fit.size, 10);
   eq("...and returns the lines wrapped at THAT size", fit.lines, ["ONE TWO", "THREE FOUR"]);
   ok("...which does satisfy the maxLines cap", fit.lines.length <= 2);
@@ -154,7 +162,7 @@ const sizedMeasure: MeasureText = (text, font) => {
 // ── autoFitHeading: when startSize already fits, it returns immediately
 //    without shrinking ──
 {
-  const fit = autoFitHeading(sizedMeasure, "SHORT", "400", "TestFont", 20, 10, 1000, 3);
+  const fit = autoFitHeading(sizedMeasure, "SHORT", "400", "TestFont", 20, 10, 1000, 3, 1);
   eq("autoFitHeading doesn't shrink when startSize already satisfies maxLines", fit.size, 20);
   eq("...lines wrapped at startSize", fit.lines, ["SHORT"]);
 }
@@ -166,7 +174,7 @@ const sizedMeasure: MeasureText = (text, font) => {
   // Same text as the shrink-succeeds case, but maxLines=1: even minSize=6
   // only gets it to 2 lines (verified: 18 chars * 6px/char = 108 > 100 for
   // all four words combined, so it can never reach exactly 1 line here).
-  const fit = autoFitHeading(sizedMeasure, "ONE TWO THREE FOUR", "400", "TestFont", 20, 6, 100, 1);
+  const fit = autoFitHeading(sizedMeasure, "ONE TWO THREE FOUR", "400", "TestFont", 20, 6, 100, 1, 1);
   eq("autoFitHeading falls back to minSize when maxLines is unreachable", fit.size, 6);
   eq("...returning minSize's wrap even though it still exceeds maxLines", fit.lines, ["ONE TWO THREE", "FOUR"]);
   ok("...(this is the honest-overflow case: more lines than maxLines asked for)", fit.lines.length > 1);
@@ -175,7 +183,7 @@ const sizedMeasure: MeasureText = (text, font) => {
 // ── autoFitHeading: empty/whitespace-only text returns startSize immediately
 //    with no lines (wrapLines short-circuits before ever calling measure) ──
 {
-  const fit = autoFitHeading(sizedMeasure, "   ", "400", "TestFont", 40, 10, 500, 3);
+  const fit = autoFitHeading(sizedMeasure, "   ", "400", "TestFont", 40, 10, 500, 3, 1);
   eq("autoFitHeading(whitespace-only) returns startSize (0 lines always satisfies maxLines)", fit.size, 40);
   eq("...with no lines", fit.lines, []);
 }
@@ -189,11 +197,91 @@ const sizedMeasure: MeasureText = (text, font) => {
     seenFonts.push(font);
     return sizedMeasure(text, font);
   };
-  autoFitHeading(spy, "HELLO WORLD", "600", "Georgia", 20, 10, 10000, 5);
+  autoFitHeading(spy, "HELLO WORLD", "600", "Georgia", 20, 10, 10000, 5, 1);
   ok(
     "autoFitHeading builds the font string as `${weight} ${size}px ${family}`",
     seenFonts.length > 0 && seenFonts.every((f) => f === "600 20px Georgia"),
   );
+}
+
+// ── autoFitHeading: the operator's heading-size override ───────────────────
+//
+// Templates auto-fit DOWNWARDS from a fixed start size, so a short heading —
+// a carousel cover, say — renders at exactly startSize even when there's room
+// for much more. The scale raises that ceiling. It's applied to the SEARCH
+// RANGE, not to the result: scaling the result would return a size whose line
+// count was measured for the smaller font, and the heading would overflow the
+// block the template laid out for it.
+{
+  // "SHORT" fits on one line at any size here, so it lands on the ceiling.
+  const plain = autoFitHeading(sizedMeasure, "SHORT", "400", "TestFont", 20, 10, 1000, 3, 1);
+  const bigger = autoFitHeading(sizedMeasure, "SHORT", "400", "TestFont", 20, 10, 1000, 3, 1.5);
+  eq("a short heading normally stops at startSize, however much room it has", plain.size, 20);
+  eq("...and scaling up lets it grow into that room", bigger.size, 30);
+  eq("...still on one line — the scale buys size, not extra lines", bigger.lines, ["SHORT"]);
+}
+{
+  const smaller = autoFitHeading(sizedMeasure, "SHORT", "400", "TestFont", 20, 10, 1000, 3, 0.8);
+  eq("scaling down lowers the ceiling too", smaller.size, 16);
+}
+{
+  // The maxLines contract has to survive scaling, or a bigger heading silently
+  // spills past the space the template reserved.
+  const fit = autoFitHeading(sizedMeasure, "ONE TWO THREE FOUR", "400", "TestFont", 20, 10, 100, 2, 1.5);
+  ok("a scaled-up heading still obeys maxLines", fit.lines.length <= 2);
+  ok("...by shrinking below its raised ceiling when it has to", fit.size < 30);
+}
+{
+  // The floor must NOT move when scaling up. It is the whole reason a long
+  // heading fits at all, so lifting it makes a heading that used to fit spill
+  // onto extra lines. This caught exactly that: scaling the floor too made
+  // this case overflow from 2 lines to 4.
+  const plain = autoFitHeading(sizedMeasure, "ONE TWO THREE FOUR", "400", "TestFont", 20, 6, 100, 1, 1);
+  const bigger = autoFitHeading(sizedMeasure, "ONE TWO THREE FOUR", "400", "TestFont", 20, 6, 100, 1, 1.5);
+  eq("an unreachable maxLines bottoms out at minSize", plain.size, 6);
+  eq("...and scaling up cannot lift that floor", bigger.size, 6);
+  eq("...so a bottomed-out heading wraps identically however big you ask for", bigger.lines, plain.lines);
+}
+{
+  // Scaling DOWN does lower the floor, or the request is silently ignored on
+  // templates whose minimum sits close to their start size.
+  const small = autoFitHeading(sizedMeasure, "SHORT", "400", "TestFont", 20, 18, 1000, 3, 0.7);
+  eq("scaling down can go below the template's own minimum", small.size, 14);
+}
+{
+  // Out-of-range values are clamped rather than trusted, so a bad stored value
+  // can't render a 400px heading or a zero-size one.
+  eq("a scale above the maximum clamps", clampHeadingScale(99), HEADING_SCALE_MAX);
+  eq("a scale below the minimum clamps", clampHeadingScale(0), HEADING_SCALE_MIN);
+  eq("a missing scale means the template's own size", clampHeadingScale(undefined), 1);
+  eq("a null scale means the template's own size", clampHeadingScale(null), 1);
+  eq("NaN means the template's own size", clampHeadingScale(Number.NaN), 1);
+  const wild = autoFitHeading(sizedMeasure, "SHORT", "400", "TestFont", 20, 10, 1000, 3, 999);
+  eq("...and the renderer clamps too, rather than trusting its caller", wild.size, Math.round(20 * HEADING_SCALE_MAX));
+}
+{
+  // Scale 1 must be byte-identical to the old behaviour, or every existing
+  // slide in the fleet re-renders slightly differently after this ships.
+  const cases: Array<[string, number, number, number, number]> = [
+    ["ONE TWO THREE FOUR", 20, 10, 100, 2],
+    ["SHORT", 20, 10, 1000, 3],
+    ["ONE TWO THREE FOUR", 20, 6, 100, 1],
+    ["   ", 40, 10, 500, 3],
+  ];
+  let drift = "";
+  for (const [text, start, min, width, maxLines] of cases) {
+    const fit = autoFitHeading(sizedMeasure, text, "400", "TestFont", start, min, width, maxLines, 1);
+    // Recompute what the pre-scale loop would have produced.
+    let size = start;
+    let lines = wrapLines(sizedMeasure, `400 ${size}px TestFont`, text, width);
+    while (size >= min && lines.length > maxLines) {
+      size -= 2;
+      lines = wrapLines(sizedMeasure, `400 ${size}px TestFont`, text, width);
+    }
+    const expected = size >= min ? size : min;
+    if (fit.size !== expected) drift = `${text} -> ${fit.size} vs ${expected}`;
+  }
+  eq("scale 1 reproduces the unscaled result exactly", drift, "");
 }
 
 // ── canvasMeasure: the production MeasureText adapter. Confirms it (a) sets

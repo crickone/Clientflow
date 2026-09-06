@@ -67,6 +67,13 @@ export interface DesignState {
   backgroundOffsetX: number;
   backgroundOffsetY: number;
   backgroundZoom: number;
+  /**
+   * Operator override on heading size, as a multiplier on the template's own
+   * auto-fit ceiling. 1 = the template's own sizing. Required rather than
+   * optional so every template has to decide what to do with it — which is how
+   * all 30 call sites were caught when it was introduced.
+   */
+  headingScale: number;
   /** Brand labels drawn on templates — from the account's Business Profile. */
   businessName?: string;
   website?: string;
@@ -435,6 +442,36 @@ function drawStar(
   ctx.fill();
 }
 
+/** What the heading-size control may ask for, either side of the template's own sizing. */
+export const HEADING_SCALE_MIN = 0.7;
+export const HEADING_SCALE_MAX = 1.6;
+
+export function clampHeadingScale(scale: number | null | undefined): number {
+  if (typeof scale !== "number" || !Number.isFinite(scale)) return 1;
+  return Math.min(HEADING_SCALE_MAX, Math.max(HEADING_SCALE_MIN, scale));
+}
+
+/**
+ * Fit a heading into `maxLines` at the largest size that works.
+ *
+ * `scale` is the operator's size override, applied to the search range rather
+ * than to the result. That matters: the search only ever walks DOWNWARDS from
+ * `startSize`, so a short heading renders at exactly `startSize` even when
+ * there's room for something far bigger. Scaling the ceiling lets it grow into
+ * that room; scaling the result instead would have overflowed the block,
+ * because the line count was chosen for the smaller size.
+ *
+ * `maxLines` is deliberately NOT scaled, so a bigger heading still has to fit
+ * the same number of lines the template laid out space for.
+ *
+ * Neither is the FLOOR raised when scaling up. The floor is the whole reason a
+ * long heading fits at all — it's how far the search may shrink before giving
+ * up and overflowing. Lifting it with the scale makes a heading that used to
+ * fit spill onto extra lines, so scaling up a heading that has already bottomed
+ * out does nothing, which is the honest answer: it is already as large as it
+ * can be. Scaling DOWN does lower the floor, or the request would be ignored
+ * for templates whose minimum sits close to their start size.
+ */
 export function autoFitHeading(
   measure: MeasureText,
   text: string,
@@ -444,9 +481,16 @@ export function autoFitHeading(
   minSize: number,
   maxWidth: number,
   maxLines: number,
+  scale: number,
 ): { size: number; lines: string[] } {
-  let size = startSize;
-  while (size >= minSize) {
+  const s = clampHeadingScale(scale);
+  const ceiling = Math.max(1, Math.round(startSize * s));
+  // min() so scaling down past the template's own minimum still lands there,
+  // rather than being held up by a floor meant for the unscaled range.
+  const floor = Math.max(1, Math.min(minSize, ceiling));
+
+  let size = ceiling;
+  while (size >= floor) {
     const font = `${weight} ${size}px ${family}`;
     const lines = wrapLines(measure, font, text, maxWidth);
     if (lines.length <= maxLines) {
@@ -454,8 +498,8 @@ export function autoFitHeading(
     }
     size -= 2;
   }
-  const font = `${weight} ${minSize}px ${family}`;
-  return { size: minSize, lines: wrapLines(measure, font, text, maxWidth) };
+  const font = `${weight} ${floor}px ${family}`;
+  return { size: floor, lines: wrapLines(measure, font, text, maxWidth) };
 }
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
@@ -549,6 +593,7 @@ const BOLD_HEADLINE: Template = {
       Math.round(H * 0.045),
       innerW,
       3,
+      design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.06);
     const headingBlock = fit.lines.length * headingLine;
@@ -638,6 +683,7 @@ const SIDE_CARD: Template = {
       Math.round(H * 0.034),
       innerW,
       4,
+      design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.08);
     const headingBlock = fit.lines.length * headingLine;
@@ -729,6 +775,7 @@ const CENTERED_STATEMENT: Template = {
       Math.round(H * 0.05),
       innerW,
       4,
+      design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.06);
     const headingBlock = fit.lines.length * headingLine;
@@ -824,6 +871,7 @@ const TOP_BANNER: Template = {
       Math.round(H * 0.035),
       innerW,
       3,
+      design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.08);
     const headingBlock = fit.lines.length * headingLine;
@@ -898,6 +946,7 @@ const STAT_BLOCK: Template = {
       Math.round(H * 0.06),
       innerW,
       2,
+      design.headingScale,
     );
     ctx.fillStyle = design.accentColor;
     ctx.font = `400 ${fit.size}px ${fonts.heading}`;
@@ -999,6 +1048,7 @@ const FRAME: Template = {
       Math.round(H * 0.028),
       innerW,
       2,
+      design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.1);
     const headingBlock = fit.lines.length * headingLine;
@@ -1142,6 +1192,7 @@ const MAGAZINE: Template = {
       Math.round(H * 0.042),
       innerW,
       3,
+      design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.06);
     const headingBlock = fit.lines.length * headingLine;
@@ -1234,6 +1285,7 @@ const QUESTION_HOOK: Template = {
       Math.round(H * 0.04),
       innerW,
       4,
+      design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.08);
     const headingBlock = fit.lines.length * headingLine;
@@ -1330,6 +1382,7 @@ const STORY_HERO: Template = {
       Math.round(H * 0.032),
       innerW,
       4,
+      design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.08);
     const headingBlock = fit.lines.length * headingLine;
@@ -1411,6 +1464,7 @@ const STORY_SPLIT: Template = {
       Math.round(H * 0.032),
       innerW,
       4,
+      design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.08);
     const headingBlock = fit.lines.length * headingLine;
@@ -1496,6 +1550,7 @@ const STORY_MINIMAL: Template = {
       Math.round(H * 0.04),
       innerW,
       5,
+      design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.06);
     const headingBlock = fit.lines.length * headingLine;
@@ -1586,6 +1641,7 @@ const STORY_QUOTE: Template = {
       Math.round(H * 0.035),
       innerW,
       6,
+      design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.08);
     const headingBlock = fit.lines.length * headingLine;
@@ -1673,6 +1729,7 @@ const STORY_STAT: Template = {
       Math.round(H * 0.05),
       innerW,
       2,
+      design.headingScale,
     );
     ctx.fillStyle = design.accentColor;
     ctx.font = `400 ${fit.size}px ${fonts.heading}`;
@@ -1773,6 +1830,7 @@ const CAROUSEL_COVER: Template = {
       Math.round(H * 0.05),
       innerW,
       4,
+      design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.06);
     const headingBlock = fit.lines.length * headingLine;
@@ -1897,6 +1955,7 @@ const CAROUSEL_CONTENT: Template = {
       Math.round(H * 0.038),
       innerW,
       3,
+      design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.08);
     const headingBlock = fit.lines.length * headingLine;
@@ -1996,6 +2055,7 @@ const CAROUSEL_CTA: Template = {
       Math.round(H * 0.05),
       innerW,
       3,
+      design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.06);
     const headingBlock = fit.lines.length * headingLine;
@@ -2102,6 +2162,7 @@ const CAROUSEL_TIP: Template = {
       Math.round(H * 0.038),
       innerW,
       3,
+      design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.08);
     const headingBlock = fit.lines.length * headingLine;
@@ -2194,6 +2255,7 @@ const CAROUSEL_QUOTE_SLIDE: Template = {
       Math.round(H * 0.04),
       innerW,
       5,
+      design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.08);
     const headingBlock = fit.lines.length * headingLine;
@@ -2283,6 +2345,7 @@ const QUOTE_PORTRAIT: Template = {
       Math.round(H * 0.03),
       innerW,
       4,
+      design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.1);
     const headingBlock = fit.lines.length * headingLine;
@@ -2353,6 +2416,7 @@ const PHOTO_QUOTE: Template = {
       Math.round(H * 0.038),
       innerW,
       5,
+      design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.1);
     const headingBlock = fit.lines.length * headingLine;
@@ -2450,6 +2514,7 @@ const STAR_RATING: Template = {
       Math.round(H * 0.034),
       innerW,
       5,
+      design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.08);
     const headingBlock = fit.lines.length * headingLine;
@@ -2569,6 +2634,7 @@ const RESULT_CARD: Template = {
       Math.round(H * 0.032),
       innerW,
       4,
+      design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.08);
     const headingBlock = fit.lines.length * headingLine;
@@ -2668,6 +2734,7 @@ const PRICE_TAG: Template = {
       Math.round(H * 0.07),
       innerW,
       3,
+      design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.02);
     const headingBlock = fit.lines.length * headingLine;
@@ -2781,6 +2848,7 @@ const VOUCHER_CARD: Template = {
       Math.round(H * 0.1),
       innerW,
       2,
+      design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.04);
     const headingBlock = fit.lines.length * headingLine;
@@ -2892,6 +2960,7 @@ const PACKAGE_DEAL: Template = {
       Math.round(H * 0.05),
       innerW,
       3,
+      design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.04);
     const headingBlock = fit.lines.length * headingLine;
@@ -3008,6 +3077,7 @@ const COUNTDOWN_STORY: Template = {
       Math.round(H * 0.038),
       innerW,
       5,
+      design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.06);
     const headingBlock = fit.lines.length * headingLine;
@@ -3121,6 +3191,7 @@ const FACT_STACK: Template = {
       Math.round(H * 0.032),
       innerW,
       3,
+      design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.08);
     const headingBlock = fit.lines.length * headingLine;
@@ -3232,6 +3303,7 @@ const DEFINITION_CARD: Template = {
       Math.round(H * 0.055),
       innerW,
       2,
+      design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.04);
     const headingBlock = fit.lines.length * headingLine;
@@ -3336,6 +3408,7 @@ const DID_YOU_KNOW: Template = {
       Math.round(H * 0.038),
       innerW,
       5,
+      design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.08);
     const headingBlock = fit.lines.length * headingLine;
@@ -3434,6 +3507,7 @@ const HOW_IT_WORKS: Template = {
       Math.round(H * 0.03),
       innerW,
       2,
+      design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.08);
     const headingTop = padTop + Math.round(H * 0.045);

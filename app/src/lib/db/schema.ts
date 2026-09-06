@@ -898,6 +898,14 @@ export const carouselSlides = sqliteTable("carousel_slides", {
     enum: ["1:1", "9:16", "4:5"],
   }).notNull(),
   headingText: text("heading_text").notNull().default(""),
+  /**
+   * Operator override on the heading's size, as a multiplier on the template's
+   * own auto-fit ceiling. 1 = the template's own sizing. Templates auto-fit a
+   * heading DOWNWARDS from a fixed start size, so a short heading renders at
+   * that start size even when there's room for far more — this raises the
+   * ceiling. It does not grant extra lines, so it can't overflow the block.
+   */
+  headingScale: real("heading_scale").notNull().default(1),
   bodyText: text("body_text").notNull().default(""),
   tagline: text("tagline"),
   /**

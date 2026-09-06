@@ -1,6 +1,7 @@
 import { guard } from "@/lib/api/guard";
 import { NextResponse } from "next/server";
 import { deleteSlide, updateSlide } from "@/lib/image/carousels";
+import { clampHeadingScale } from "@/lib/image/templates";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,11 @@ export async function PATCH(
     }
   }
   if (typeof body?.headingText === "string") patch.headingText = body.headingText;
+  if (typeof body?.headingScale === "number") {
+    // Clamped server-side too: the renderer would clamp it anyway, but storing
+    // an out-of-range value means the control and the canvas disagree.
+    patch.headingScale = clampHeadingScale(body.headingScale);
+  }
   if (typeof body?.bodyText === "string") patch.bodyText = body.bodyText;
   if (typeof body?.tagline === "string" || body?.tagline === null) {
     patch.tagline =

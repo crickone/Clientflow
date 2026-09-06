@@ -1454,6 +1454,22 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     console.error("[db] campaigns landing_views migration failed:", err);
   }
 
+  // Per-slide heading size override, as a multiplier on the template's own
+  // auto-fit ceiling. 1 = unchanged, which is what every existing slide gets.
+  // Additive/idempotent.
+  try {
+    const slideCols = sqlite
+      .prepare("PRAGMA table_info(carousel_slides)")
+      .all() as Array<{ name: string }>;
+    if (slideCols.length > 0 && !slideCols.some((c) => c.name === "heading_scale")) {
+      sqlite.exec(
+        "ALTER TABLE carousel_slides ADD COLUMN heading_scale REAL NOT NULL DEFAULT 1",
+      );
+    }
+  } catch (err) {
+    console.error("[db] carousel_slides heading_scale migration failed:", err);
+  }
+
   // AI-suggested rotation for video clips shot with the camera physically
   // turned (landscape file, no rotation metadata). A suggestion only — the
   // operator confirms before it's applied to `rotation`. Additive/idempotent.

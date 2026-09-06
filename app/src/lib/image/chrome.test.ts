@@ -98,6 +98,7 @@ function baseDesign(overrides: Partial<DesignState> = {}): DesignState {
     backgroundFit: "cover",
     backgroundOffsetX: 0.5,
     backgroundOffsetY: 0.5,
+    headingScale: 1,
     backgroundZoom: 1,
     businessName: "Renova",
     location: "Park, Clonmel, Co. Tipperary",
