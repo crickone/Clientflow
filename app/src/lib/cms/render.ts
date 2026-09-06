@@ -9,7 +9,6 @@ import { getSeoPublic } from "@/lib/cms/seo";
 import { getTemplate, type TemplateDef } from "@/lib/cms/templates";
 import { getCurrentMembership } from "@/lib/auth";
 import { getBlockValue } from "@/lib/cms/blocks";
-import { sanitizeHtmlKeepStyles } from "@/lib/cms/html";
 import { splitPageBody, type PageBodyZones } from "@/lib/cms/pageBody";
 import { getDraftContentFrom } from "@/lib/cms/pageDraft";
 import type { RenderCtx } from "@/components/cms/Block";
@@ -58,20 +57,6 @@ export function resolvePageContext(
 /** Admin-only: is the current request allowed to use the in-place editor? */
 export function canEditNow(): boolean {
   return getCurrentMembership()?.role === "admin";
-}
-
-/**
- * Page body HTML with scripts stripped, for stable editing in the Studio.
- *
- * NOTE: kept alongside editBodyZones (below) rather than replaced. The two
- * public site routes (src/app/site/[siteSlug]/page.tsx and
- * src/app/site/[siteSlug]/[...slug]/page.tsx) still import this to feed
- * RenovaEditCanvas; repointing them at editBodyZones/the new canvas belongs to
- * a later task. Remove this once those routes no longer call it.
- */
-export function editBodyHtml(pc: PageContext): string {
-  const row = getBlockValue(pc.ctx.db, pc.ctx.siteId, pc.ctx.pageId, "body");
-  return sanitizeHtmlKeepStyles(row?.value ?? "");
 }
 
 /**

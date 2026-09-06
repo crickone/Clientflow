@@ -7,9 +7,9 @@ import {
   resolvePageContext,
   buildPageMetadata,
   canEditNow,
-  editBodyHtml,
+  editBodyZones,
 } from "@/lib/cms/render";
-import { RenovaEditCanvas } from "@/components/cms/RenovaEditCanvas";
+import { StudioCanvas } from "@/components/cms/StudioCanvas";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +29,7 @@ export default function PublicSiteHome({ params, searchParams }: Props) {
   const pc = resolvePageContext(params, searchParams);
   if (pc?.template) {
     if (searchParams.cmsedit === "1" && canEditNow()) {
-      return <RenovaEditCanvas html={editBodyHtml(pc)} path={pc.path} />;
+      return <StudioCanvas zones={editBodyZones(pc)} path={pc.path} />;
     }
     const T = pc.template.Component;
     return <T ctx={pc.ctx} page={pc.page} />;
