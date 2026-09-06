@@ -2293,11 +2293,13 @@ const CAROUSEL_QUOTE_SLIDE: Template = {
   height: 1080,
   usesTagline: true,
   taglineHint: "03 / 05",
-  // Dark ground with a soft accent glow, a giant real quote glyph, and the
-  // quote itself set in the BODY font, mixed case — a spoken sentence in the
-  // display face's stylised caps reads like shouting robot text, and a
-  // testimonial has to feel like a person said it. Left-aligned, pairs with a
-  // top-left logo. Chrome (indicator/brand/swipe) via paintSlideChrome.
+  // Dark ground with a soft accent glow, a giant quote glyph, the quote in
+  // the operator's HEADING font (mixed case — caps-only faces self-cap, text
+  // faces read like a person speaking; picking a text face like Hanken as the
+  // slide's heading font gives the warm editorial look). Only the decorative
+  // quote glyph is fixed to the body face: the display face's quote glyph is
+  // a plain bar. Left-aligned, pairs with a top-left logo. Chrome
+  // (indicator/brand/swipe) via paintSlideChrome.
   chrome: {
     brand: "name",
     indicator: "03 / 05",
@@ -2330,13 +2332,16 @@ const CAROUSEL_QUOTE_SLIDE: Template = {
     ctx.textBaseline = "alphabetic";
     ctx.textAlign = "left";
 
-    // The quote, mixed case, warm weight.
+    // The quote is the slide's HEADING text, so it renders in the operator's
+    // chosen heading font — templates decide layout, never override the font
+    // selection. Left mixed-case: caps-only faces (Nebula) self-capitalise,
+    // text faces read as a person speaking.
     const quote = design.headingText || "Add a client quote here.";
     const fit = autoFitHeading(
       measure,
       quote,
       "600",
-      fonts.body,
+      fonts.heading,
       Math.round(H * 0.052),
       Math.round(H * 0.032),
       innerW,
@@ -2364,7 +2369,7 @@ const CAROUSEL_QUOTE_SLIDE: Template = {
 
     const quoteTop = groupTop + Math.round(markSize * 0.55) + markGap;
     ctx.fillStyle = "#ffffff";
-    ctx.font = `600 ${fit.size}px ${fonts.body}`;
+    ctx.font = `600 ${fit.size}px ${fonts.heading}`;
     paintLines(ctx, fit.lines, padX, quoteTop + fit.size, quoteLine);
 
     // Five accent stars.
@@ -2567,12 +2572,13 @@ const CAROUSEL_MYTH: Template = {
     ctx.font = `700 ${labelSize}px ${fonts.body}`;
     ctx.fillText("MYTH", cardX + cardPad + badgeR * 2 + Math.round(W * 0.018), cy + Math.round(labelSize * 0.35));
 
+    // The myth is the slide's HEADING text — operator's heading font, always.
     const mythText = design.headingText || "State the myth here";
     const mythFit = autoFitHeading(
       measure,
       mythText,
       "600",
-      fonts.body,
+      fonts.heading,
       Math.round(H * 0.034),
       Math.round(H * 0.024),
       cardW - cardPad * 2,
@@ -2580,7 +2586,7 @@ const CAROUSEL_MYTH: Template = {
       design.headingScale,
     );
     ctx.fillStyle = "rgba(10,10,10,0.78)";
-    ctx.font = `600 ${mythFit.size}px ${fonts.body}`;
+    ctx.font = `600 ${mythFit.size}px ${fonts.heading}`;
     paintLines(
       ctx,
       mythFit.lines,
@@ -2681,13 +2687,14 @@ const CAROUSEL_STAT: Template = {
     ctx.fillStyle = design.accentColor;
     ctx.fillRect(padX, ruleY, Math.round(W * 0.1), 4);
 
-    // The sentence completing the stat — mixed case, body font.
+    // The sentence completing the stat is the slide's HEADING text —
+    // operator's heading font, always.
     const line = design.headingText || "of people who start with a plan are still going a year later";
     const fit = autoFitHeading(
       measure,
       line,
       "600",
-      fonts.body,
+      fonts.heading,
       Math.round(H * 0.037),
       Math.round(H * 0.026),
       Math.round(innerW * 0.92),
@@ -2696,7 +2703,7 @@ const CAROUSEL_STAT: Template = {
     );
     const lineTop = ruleY + Math.round(H * 0.045);
     ctx.fillStyle = "#0a0a0a";
-    ctx.font = `600 ${fit.size}px ${fonts.body}`;
+    ctx.font = `600 ${fit.size}px ${fonts.heading}`;
     paintLines(ctx, fit.lines, padX, lineTop + fit.size, Math.round(fit.size * 1.3));
 
     // Supporting line.
