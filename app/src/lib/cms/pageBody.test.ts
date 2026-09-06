@@ -333,4 +333,130 @@ splitPageBody(REDOS_INPUT);
 const redosMs = Date.now() - redosStart;
 check(`defect 1 / ReDoS guard: n=2000 unterminated tag completes in under 100ms (took ${redosMs}ms)`, redosMs < 100);
 
+// THE REGRESSION (two-pass scanner): a "<!--" inside a live <script> body is
+// NOT a markup comment — script content is raw text, so a browser's
+// tokenizer never looks for comments inside it. The old two-pass scanner
+// computed comment ranges over the raw string first, saw this "<!--", found
+// no later "-->", and treated the rest of the document as commented out —
+// stranding BOTH trailing scripts in content and leaving tail empty. Exact
+// repro from the regression report.
+const SCRIPT_BODY_CONTAINS_COMMENT_OPENER = [
+  '<link rel="stylesheet" href="/a.css">',
+  "<style>a{}</style>",
+  "<div>hi</div>",
+  '<script>gsap.to(".hero",{opacity:1}); <!-- legacy marker</script>',
+  '<script src="lenis.min.js"></script>',
+].join("\n");
+const scriptBodyContainsCommentOpener = splitPageBody(SCRIPT_BODY_CONTAINS_COMMENT_OPENER);
+check(
+  "regression: head still holds the link",
+  scriptBodyContainsCommentOpener.head.includes('<link rel="stylesheet" href="/a.css">'),
+);
+check(
+  "regression: head still holds the style",
+  scriptBodyContainsCommentOpener.head.includes("<style>a{}</style>"),
+);
+check(
+  "regression: content has NO script tag",
+  !scriptBodyContainsCommentOpener.content.includes("<script"),
+);
+check(
+  "regression: tail holds the script with the embedded comment opener",
+  scriptBodyContainsCommentOpener.tail.includes("legacy marker"),
+);
+check(
+  "regression: tail holds the second trailing script",
+  scriptBodyContainsCommentOpener.tail.includes("lenis.min.js"),
+);
+check(
+  "regression: tail is NOT empty",
+  scriptBodyContainsCommentOpener.tail !== "",
+);
+check(
+  "regression: round-trips",
+  joinPageBody(scriptBodyContainsCommentOpener) === SCRIPT_BODY_CONTAINS_COMMENT_OPENER,
+);
+
+// A "<!--" inside a live <style> body, with real head tokens before it and
+// real scripts after: the style body's raw text is not scanned for
+// comments, so head and tail are still detected correctly around it.
+const STYLE_BODY_CONTAINS_COMMENT_OPENER = [
+  '<link rel="stylesheet" href="/a.css">',
+  '<style>.icon::before{content:"<!--"}</style>',
+  "<div>hi</div>",
+  '<script src="a.js"></script>',
+  "<script>init();</script>",
+].join("\n");
+const styleBodyContainsCommentOpener = splitPageBody(STYLE_BODY_CONTAINS_COMMENT_OPENER);
+check(
+  "style body has comment opener: head holds the link",
+  styleBodyContainsCommentOpener.head.includes('<link rel="stylesheet" href="/a.css">'),
+);
+check(
+  "style body has comment opener: head holds the whole style tag",
+  styleBodyContainsCommentOpener.head.includes('.icon::before{content:"<!--"}'),
+);
+check(
+  "style body has comment opener: content is just the div",
+  styleBodyContainsCommentOpener.content === "\n<div>hi</div>\n",
+);
+check(
+  "style body has comment opener: tail holds both scripts",
+  styleBodyContainsCommentOpener.tail.includes('src="a.js"') &&
+    styleBodyContainsCommentOpener.tail.includes("init();"),
+);
+check(
+  "style body has comment opener: round-trips",
+  joinPageBody(styleBodyContainsCommentOpener) === STYLE_BODY_CONTAINS_COMMENT_OPENER,
+);
+
+// A "-->" appearing inside a <style>'s CSS text must not truncate or shift
+// the zones — the style tag is consumed as one raw-text unit regardless of
+// what its body contains.
+const STYLE_BODY_CONTAINS_COMMENT_CLOSER = [
+  '<link rel="stylesheet" href="/a.css">',
+  '<style>.icon::after{content:"-->"}</style>',
+  "<div>hi</div>",
+  '<script src="a.js"></script>',
+].join("\n");
+const styleBodyContainsCommentCloser = splitPageBody(STYLE_BODY_CONTAINS_COMMENT_CLOSER);
+check(
+  "style body has comment closer: head holds the link and the whole style tag",
+  styleBodyContainsCommentCloser.head.includes('<link rel="stylesheet" href="/a.css">') &&
+    styleBodyContainsCommentCloser.head.includes('.icon::after{content:"-->"}'),
+);
+check(
+  "style body has comment closer: content is just the div",
+  styleBodyContainsCommentCloser.content === "\n<div>hi</div>\n",
+);
+check(
+  "style body has comment closer: tail holds the script",
+  styleBodyContainsCommentCloser.tail.includes('src="a.js"'),
+);
+check(
+  "style body has comment closer: round-trips",
+  joinPageBody(styleBodyContainsCommentCloser) === STYLE_BODY_CONTAINS_COMMENT_CLOSER,
+);
+
+// A comment immediately abutting a token with no whitespace between them:
+// the zero-length gap counts as blank, same as any whitespace-only gap.
+const COMMENT_ABUTTING_TOKEN = '<!--f--><link rel="stylesheet" href="/a.css"><div>hi</div>';
+const commentAbuttingToken = splitPageBody(COMMENT_ABUTTING_TOKEN);
+check(
+  "comment abutting token: head holds the comment",
+  commentAbuttingToken.head.includes("<!--f-->"),
+);
+check(
+  "comment abutting token: head holds the link",
+  commentAbuttingToken.head.includes('<link rel="stylesheet" href="/a.css">'),
+);
+check(
+  "comment abutting token: content is just the div",
+  commentAbuttingToken.content === "<div>hi</div>",
+);
+check(
+  "comment abutting token: round-trips",
+  joinPageBody(commentAbuttingToken) === COMMENT_ABUTTING_TOKEN,
+);
+
 console.log(`pageBody: ${passed} checks passed.`);
