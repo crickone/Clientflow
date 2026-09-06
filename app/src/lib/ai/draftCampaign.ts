@@ -1,6 +1,9 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
-import { getBusinessContext } from "@/lib/ai/businessContext";
+import {
+  getBusinessContext,
+  getSignoffRule,
+} from "@/lib/ai/businessContext";
 import { CONTENT_MODEL } from "@/lib/ai/client";
 import { meteredCreate, type MeterContext } from "@/lib/ai/metered";
 
@@ -33,8 +36,8 @@ Formatting:
   sentences).
 - No emojis. No clickbait. The subject line is decided separately — do not
   restate it as a heading at the top of the body.
-- End with one clear, understated call to action (book, reply, call, visit)
-  that names the business.
+- End with one clear, understated call to action that names the business —
+  see the sign-off rule below for how to ask.
 
 Output format:
 - Return ONLY the plain-text email body. Do not add a preamble, sign-off
@@ -100,7 +103,7 @@ export async function draftCampaignEmail(
     system: [
       {
         type: "text",
-        text: `${getBusinessContext()}\n\n${CAMPAIGN_FORMAT_RULES}`,
+        text: `${getBusinessContext()}\n\n${CAMPAIGN_FORMAT_RULES}\n\n${getSignoffRule("email")}`,
         cache_control: { type: "ephemeral" },
       },
     ],

@@ -6,11 +6,15 @@
  * blog/social/email reuse draftBlogPost/generateCarouselSlides/
  * draftCampaignEmail's own prompt building instead.
  *
- * Zero runtime imports (only a type-only import from @/lib/db/schema,
- * erased at compile time) — mirrors src/lib/campaigns/plan.ts and
- * src/lib/pipeline/roles.ts, so prompts.test.ts loads under the plain tsx
- * test runner with no DB/server-only module graph behind it.
+ * One runtime import — ./ai/signoff, itself a pure zero-import module holding
+ * the per-format CTA rules shared with the Content Studio generators — plus a
+ * type-only import from @/lib/db/schema, erased at compile time. Mirrors
+ * src/lib/campaigns/plan.ts and src/lib/pipeline/roles.ts: prompts.test.ts
+ * still loads under the plain tsx test runner with no DB/server-only module
+ * graph behind it.
  */
+import { signoffRule } from "@/lib/ai/signoff";
+
 import type { Campaign } from "@/lib/db/schema";
 
 /**
@@ -71,6 +75,8 @@ export function adCopyPrompt(campaign: Campaign, tweak?: string): string {
     "Write paid social ad copy (Facebook/Instagram) for this campaign: a short attention-grabbing headline, punchy primary text, and one clear call to action — all built around the offer above.",
   );
   lines.push("");
+  lines.push(signoffRule("ad"));
+  lines.push("");
   lines.push(HOUSE_RULES_CLAUSE);
   return lines.join("\n");
 }
@@ -82,6 +88,8 @@ export function videoScriptPrompt(campaign: Campaign, tweak?: string): string {
   lines.push(
     "Write a short (30-45 second) promotional video script for this campaign: an opening hook, 2-3 beats grounded in the offer above, and a closing call to action. Note brief on-screen action / voiceover direction for each beat.",
   );
+  lines.push("");
+  lines.push(signoffRule("ad"));
   lines.push("");
   lines.push(HOUSE_RULES_CLAUSE);
   return lines.join("\n");

@@ -1,7 +1,10 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Therapy } from "@/lib/db/schema";
-import { getBusinessContext } from "@/lib/ai/businessContext";
+import {
+  getBusinessContext,
+  getSignoffRule,
+} from "@/lib/ai/businessContext";
 import { CONTENT_MODEL } from "@/lib/ai/client";
 import { meteredCreate, type MeterContext } from "@/lib/ai/metered";
 
@@ -16,7 +19,7 @@ Formatting:
     - Use \`##\` for section headings. Keep them concrete and specific (e.g. "How a session feels" not "Benefits").
     - Use \`**bold**\` sparingly for the most important phrases.
     - Use short bullet lists only when listing concrete steps or items.
-- End with a short closing paragraph that invites the reader to book or get in touch, mentioning the business by name, but keep it understated — one sentence at most.
+- End with a short closing paragraph that asks the reader to sign up (see the sign-off rule below), mentioning the business by name, but keep it understated — a sentence or two at most.
 
 Output format:
 - Return ONLY the markdown body of the blog post. Begin with the \`# Title\` line.
@@ -119,7 +122,7 @@ export async function draftBlogPost(
     system: [
       {
         type: "text",
-        text: `${getBusinessContext()}\n\n${BLOG_FORMAT_RULES}`,
+        text: `${getBusinessContext()}\n\n${BLOG_FORMAT_RULES}\n\n${getSignoffRule("blog")}`,
         cache_control: { type: "ephemeral" },
       },
     ],

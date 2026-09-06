@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { getSettings, getVenueType } from "@/lib/settings";
 import { getBusinessProfile } from "@/lib/businessProfile";
 import { getPlanBriefing } from "@/lib/marketing/calendarNotes";
+import { signoffRule, type CopyFormat } from "@/lib/ai/signoff";
 import type { VenueType } from "@/lib/vocabulary";
 
 /**
@@ -37,17 +38,13 @@ const VENUE_VOICE: Record<VenueType, string> = {
 };
 
 /**
- * How social copy asks for the next step.
- *
- * Left to itself the model reaches for "register your interest" / "enquire
- * about the next intake" — an enquiry-desk phrasing no gym or clinic here
- * actually uses. The real next step is the link in the bio, so the sign-off is
- * stated once, here, and shared by every social generator (carousel copy, its
- * caption, and the refresh of either).
+ * The sign-off rule for one format, with the sign-up URL filled in from the
+ * Business Profile. The rules themselves live in the pure ./signoff module
+ * (also imported by the campaign prompt builders, which run without a DB).
  */
-export const SOCIAL_SIGNOFF_RULE = `Sign-off — how social copy asks for the next step:
-- The next step is ALWAYS the link in the bio. Close on it: "Click the link in bio to sign up." Small variations on that line are fine, as long as they still point at the link in bio and ask them to sign up.
-- NEVER ask people to "register your interest", "express your interest", "enquire", or "get in touch about the next intake". Those are not phrases this business uses.`;
+export function getSignoffRule(format: CopyFormat): string {
+  return signoffRule(format, getBusinessProfile().signupUrl);
+}
 
 /** The business identity line, composed from the editable Business Profile. */
 export function getBusinessName(): string {

@@ -98,6 +98,11 @@ export function BusinessProfileForm({ initial }: { initial: BusinessProfile }) {
           </div>
           <Field label="Phone" value={profile.phone} onChange={(v) => set("phone", v)} />
           <Field label="Website" value={profile.website} onChange={(v) => set("website", v)} />
+          <Field
+            label="Sign-up page URL"
+            value={profile.signupUrl}
+            onChange={(v) => set("signupUrl", v)}
+          />
           <Field label="Email" value={profile.email} onChange={(v) => set("email", v)} type="email" />
         </div>
       </Card>

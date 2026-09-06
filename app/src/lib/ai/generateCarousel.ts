@@ -2,7 +2,7 @@ import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import {
   getBusinessContext,
-  SOCIAL_SIGNOFF_RULE,
+  getSignoffRule,
 } from "@/lib/ai/businessContext";
 import { CONTENT_MODEL } from "@/lib/ai/client";
 import { meteredCreate, type MeterContext } from "@/lib/ai/metered";
@@ -72,9 +72,7 @@ Output format — return ONLY a JSON object inside <slides>...</slides> tags, no
 }
 </slides>
 
-The "slides" array must contain exactly the number of slides requested, in order. The "caption" string accompanies the whole carousel.
-
-${SOCIAL_SIGNOFF_RULE}`;
+The "slides" array must contain exactly the number of slides requested, in order. The "caption" string accompanies the whole carousel.`;
 
 export interface GeneratedSlide {
   template: string;
@@ -374,7 +372,7 @@ export async function generateCarouselSlides(
     system: [
       {
         type: "text",
-        text: `${getBusinessContext()}\n\n${CAROUSEL_FORMAT_RULES}`,
+        text: `${getBusinessContext()}\n\n${CAROUSEL_FORMAT_RULES}\n\n${getSignoffRule("social")}`,
         cache_control: { type: "ephemeral" },
       },
     ],

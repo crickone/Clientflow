@@ -2,7 +2,7 @@ import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import { getBusinessContext } from "@/lib/ai/businessContext";
 import { CONTENT_MODEL } from "@/lib/ai/client";
-import { SOCIAL_SIGNOFF_RULE } from "@/lib/ai/businessContext";
+import { getSignoffRule } from "@/lib/ai/businessContext";
 import { meteredCreate } from "@/lib/ai/metered";
 
 // Slide-refresh task + format rules. Business identity, services, and voice come
@@ -43,9 +43,7 @@ Output format — return ONLY a JSON object inside <slides>...</slides> tags:
 }
 </slides>
 
-The "slides" array must contain exactly the same number of entries as slides given, in order. The "caption" string is the new caption for the whole post.
-
-${SOCIAL_SIGNOFF_RULE}`;
+The "slides" array must contain exactly the same number of entries as slides given, in order. The "caption" string is the new caption for the whole post.`;
 
 export interface ExistingSlideInput {
   template: string;
@@ -167,7 +165,7 @@ export async function refreshCaptionOnly(
   });
   lines.push("");
   lines.push(
-    `Write a fresh Instagram / Facebook caption for this carousel, different from anything you might have written before. 80–200 words, hook + 2–4 short paragraphs of real value + a sign-off mentioning the business by name. Plain text, no emojis.\n\n${SOCIAL_SIGNOFF_RULE}\n\nReturn ONLY the caption text — no JSON, no markdown, no preamble.`,
+    `Write a fresh Instagram / Facebook caption for this carousel, different from anything you might have written before. 80–200 words, hook + 2–4 short paragraphs of real value + a sign-off mentioning the business by name. Plain text, no emojis.\n\n${getSignoffRule("social")}\n\nReturn ONLY the caption text — no JSON, no markdown, no preamble.`,
   );
 
   // meteredCreate enforces the monthly AI cap FIRST, then records the
@@ -180,7 +178,7 @@ export async function refreshCaptionOnly(
     system: [
       {
         type: "text",
-        text: `${getBusinessContext()}\n\n${REFRESH_FORMAT_RULES}`,
+        text: `${getBusinessContext()}\n\n${REFRESH_FORMAT_RULES}\n\n${getSignoffRule("social")}`,
         cache_control: { type: "ephemeral" },
       },
     ],
@@ -224,7 +222,7 @@ export async function refreshSlidesContent(
     system: [
       {
         type: "text",
-        text: `${getBusinessContext()}\n\n${REFRESH_FORMAT_RULES}`,
+        text: `${getBusinessContext()}\n\n${REFRESH_FORMAT_RULES}\n\n${getSignoffRule("social")}`,
         cache_control: { type: "ephemeral" },
       },
     ],

@@ -17,6 +17,7 @@ export async function updateBusinessProfile(profile: BusinessProfile) {
     phone: profile.phone.trim(),
     website: profile.website.trim(),
     email: profile.email.trim(),
+    signupUrl: (profile.signupUrl ?? "").trim(),
     brief: profile.brief.trim(),
     voiceNotes: profile.voiceNotes.trim(),
     marketingBrain: profile.marketingBrain.trim(),

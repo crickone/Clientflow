@@ -18,6 +18,13 @@ export interface BusinessProfile {
   phone: string;
   website: string;
   email: string;
+  /**
+   * The page people sign up on. AI copy that can carry a link (blog posts,
+   * emails) links THIS; social posts point at the link in bio instead, since a
+   * post can't carry one. Blank means the copy asks for the sign-up without a
+   * link rather than inventing a URL — see lib/ai/signoff.ts.
+   */
+  signupUrl: string;
   /** Free-text brief: what the business does, who it serves, what's distinctive. Feeds AI content. */
   brief: string;
   /** Optional extra tone notes, layered on top of the venue-type voice. */
@@ -51,6 +58,7 @@ const NEUTRAL_DEFAULT: BusinessProfile = {
   phone: "",
   website: "",
   email: "",
+  signupUrl: "",
   brief: "",
   voiceNotes: "",
   marketingBrain: "",
