@@ -23,7 +23,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Tooltip } from "@/components/ui/Tooltip";
-import { savePageHtmlAction } from "@/app/cms/[siteSlug]/studio/actions";
+import { saveDraftAction } from "@/app/cms/[siteSlug]/studio/actions";
 
 type PageRow = { path: string; title: string };
 type MediaRow = {
@@ -64,6 +64,10 @@ export function StudioShell({
   const pendingToken = useRef<string | null>(null);
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  // The cleaned draft content the canvas last posted via `cms:dirty`, paired
+  // with the page path it belongs to (so a save that fires after the
+  // operator has already switched screens can't land on the wrong page).
+  const pendingDraft = useRef<{ path: string; content: string } | null>(null);
 
   const src = (p: string) => `/site/${siteSlug}${p === "/" ? "" : p}?cmsedit=1`;
   const postToIframe = useCallback((msg: unknown) => {
@@ -119,19 +123,20 @@ export function StudioShell({
     postToIframe({ type: "cms:dragEnd" });
   }
 
+  // Saves the DRAFT using the content the canvas already sent us over
+  // `cms:dirty` — never re-reads the live iframe DOM. The canvas is the only
+  // thing that knows which of its own marker attributes/classes need
+  // stripping before content is safe to persist.
   const save = useCallback(async () => {
-    const doc = iframeRef.current?.contentDocument;
-    const root = doc?.getElementById("cms-edit-root");
-    if (!root) return;
-    const clone = root.cloneNode(true) as HTMLElement;
-    clone.querySelectorAll("[contenteditable]").forEach((e) => e.removeAttribute("contenteditable"));
-    clone.querySelectorAll("[data-cms-text]").forEach((e) => e.removeAttribute("data-cms-text"));
-    clone.querySelectorAll("[data-cms-img]").forEach((e) => e.removeAttribute("data-cms-img"));
-    clone.querySelectorAll(".cms-toolbar").forEach((e) => e.remove());
-    const html = clone.innerHTML;
+    const pending = pendingDraft.current;
+    if (!pending) return;
+    if (autosaveTimer.current) {
+      clearTimeout(autosaveTimer.current);
+      autosaveTimer.current = null;
+    }
     setSaving(true);
     try {
-      const r = await savePageHtmlAction(siteSlug, path, html);
+      const r = await saveDraftAction(siteSlug, pending.path, pending.content);
       if (r.ok) {
         setDirty(false);
         setSavedAt(Date.now());
@@ -143,7 +148,7 @@ export function StudioShell({
     } finally {
       setSaving(false);
     }
-  }, [siteSlug, path]);
+  }, [siteSlug]);
 
   const saveRef = useRef(save);
   saveRef.current = save;
@@ -156,6 +161,9 @@ export function StudioShell({
         setPath(d.path ?? path);
         setDirty(false);
       } else if (d.type === "cms:dirty") {
+        if (typeof d.content === "string") {
+          pendingDraft.current = { path, content: d.content };
+        }
         setDirty(true);
         if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
         autosaveTimer.current = setTimeout(() => saveRef.current(), 1500);
@@ -182,6 +190,11 @@ export function StudioShell({
     ) {
       return;
     }
+    if (autosaveTimer.current) {
+      clearTimeout(autosaveTimer.current);
+      autosaveTimer.current = null;
+    }
+    pendingDraft.current = null;
     setDirty(false);
     setPath(p);
     if (iframeRef.current) iframeRef.current.src = src(p);
@@ -201,11 +214,11 @@ export function StudioShell({
   }
 
   const status = saving
-    ? { icon: <Loader2 size={13} className="spin" />, text: "Saving…", color: "var(--text-tertiary)" }
+    ? { icon: <Loader2 size={13} className="spin" />, text: "Saving draft…", color: "var(--text-tertiary)" }
     : dirty
       ? { icon: <span style={{ color: "#d29922" }}>●</span>, text: "Unsaved", color: "#d29922" }
       : savedAt
-        ? { icon: <Check size={13} />, text: "Saved", color: "#3fb950" }
+        ? { icon: <Check size={13} />, text: "Draft saved", color: "#3fb950" }
         : { icon: null, text: "", color: "var(--text-tertiary)" };
 
   return (

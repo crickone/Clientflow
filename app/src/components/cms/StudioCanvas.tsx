@@ -56,10 +56,8 @@ export function StudioCanvas({
     style.textContent = `
       [data-cms-sel]{outline:2px solid #ef5a24 !important;outline-offset:2px}
       [data-cms-hover]:not([data-cms-sel]){outline:1px dashed rgba(239,90,36,.65) !important;outline-offset:2px}
-      [data-cms-text][contenteditable="true"]{background:rgba(239,90,36,.06)}
       [data-cms-hidden-preview]{opacity:.28}
       img.cms-drop-target{outline:3px solid #3fb950 !important;outline-offset:3px}
-      #cms-edit-root [data-cms-editable-text]{cursor:text}
     `;
     document.head.appendChild(style);
 
@@ -178,7 +176,8 @@ export function StudioCanvas({
       "position:absolute;z-index:99999;display:none;gap:2px;background:#16161a;border-radius:8px;padding:4px;box-shadow:0 8px 28px rgba(0,0,0,.35)";
     const btn = (cmd: string, label: string, italic = false, bold = false) =>
       `<button data-cmd="${cmd}" style="all:unset;cursor:pointer;color:#fff;font-size:12px;padding:5px 9px;border-radius:5px;${bold ? "font-weight:700;" : ""}${italic ? "font-style:italic;" : ""}">${label}</button>`;
-    tb.innerHTML = btn("bold", "B", false, true) + btn("italic", "I", true) + btn("clear", "Clear");
+    tb.innerHTML =
+      btn("bold", "B", false, true) + btn("italic", "I", true) + btn("link", "Link") + btn("clear", "Clear");
     document.body.appendChild(tb);
     tb.addEventListener("mousedown", (e) => e.preventDefault());
     tb.addEventListener("click", (e) => {
@@ -187,7 +186,11 @@ export function StudioCanvas({
       const cmd = (b as HTMLElement).dataset.cmd;
       if (cmd === "bold") document.execCommand("bold");
       else if (cmd === "italic") document.execCommand("italic");
-      else if (cmd === "clear") {
+      else if (cmd === "link") {
+        const url = window.prompt("Link URL");
+        if (!url) return;
+        document.execCommand("createLink", false, url);
+      } else if (cmd === "clear") {
         document.execCommand("removeFormat");
         document.execCommand("unlink");
       }
@@ -238,13 +241,16 @@ export function StudioCanvas({
       clone.querySelectorAll("[contenteditable]").forEach((e) => e.removeAttribute("contenteditable"));
       clone.querySelectorAll("[data-cms-sel]").forEach((e) => e.removeAttribute("data-cms-sel"));
       clone.querySelectorAll("[data-cms-hover]").forEach((e) => e.removeAttribute("data-cms-hover"));
-      clone.querySelectorAll("[data-cms-text]").forEach((e) => e.removeAttribute("data-cms-text"));
       clone.querySelectorAll("[data-cms-img]").forEach((e) => e.removeAttribute("data-cms-img"));
       clone.querySelectorAll("[data-cms-hidden-preview]").forEach((e) => {
         e.removeAttribute("data-cms-hidden-preview");
         (e as HTMLElement).style.display = "none";
       });
-      clone.querySelectorAll(".cms-toolbar").forEach((e) => e.remove());
+      // .cms-toolbar itself lives on document.body and never appears inside
+      // the cloned root, but if a customer's own markup ever used that class
+      // name, stripping the class (not removing the element) keeps this
+      // consistent and conservative with the .cms-drop-target handling below.
+      clone.querySelectorAll(".cms-toolbar").forEach((e) => e.classList.remove("cms-toolbar"));
       // onDrop calls dirty() (which calls clean()) before its own setTarget(null)
       // clears this class from the live element, so a drop-in-progress could
       // otherwise serialise the drag-hover marker into saved content.
@@ -317,11 +323,14 @@ export function StudioCanvas({
           if (selected === img) post({ type: "cms:selection", ...describe(img) });
         }
       } else if (d.type === "cms:selectAncestor") {
+        // Never walk as far as (or past) the edit root itself: stop the walk
+        // once `el` is already a direct child of root, since stepping up
+        // from there would land on root, and root is not a selectable node.
         let el: HTMLElement | null = selected;
-        for (let i = 0; i < Number(d.depth || 0) && el && el.parentElement !== root?.parentElement; i++) {
+        for (let i = 0; i < Number(d.depth || 0) && el && el !== root && el.parentElement !== root; i++) {
           el = el.parentElement;
         }
-        if (el && root.contains(el)) select(el);
+        if (el && el !== root && root.contains(el)) select(el);
       } else if (d.type === "cms:deselect") {
         select(null);
       } else if (d.type === "cms:dragStart") {
@@ -334,8 +343,12 @@ export function StudioCanvas({
     window.addEventListener("message", onMsg);
 
     // Sections already hidden in the stored HTML render at low opacity here so
-    // they can be found and switched back on.
+    // they can be found and switched back on. Scoped to plausible page
+    // sections only (matches SECTION_SEL, or a direct child of the edit
+    // root) — a bespoke page's hidden modal/nav/accordion pane elsewhere in
+    // the tree is left exactly as it is, not surfaced as an editable layer.
     root.querySelectorAll<HTMLElement>('[style*="display:none"],[style*="display: none"]').forEach((el) => {
+      if (!(el.matches(SECTION_SEL) || el.parentElement === root)) return;
       el.setAttribute("data-cms-hidden-preview", "1");
       el.style.removeProperty("display");
     });
@@ -349,6 +362,7 @@ export function StudioCanvas({
       document.removeEventListener("drop", onDrop);
       root.removeEventListener("mouseover", onOver);
       root.removeEventListener("mouseleave", onLeave);
+      root.removeEventListener("input", dirty, true);
       tb.remove();
       style.remove();
     };
