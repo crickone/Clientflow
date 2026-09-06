@@ -13,7 +13,6 @@ import {
   Copy,
   Download,
   Image as ImageIcon,
-  Loader2,
   Plus,
   RefreshCw,
   Sparkles,

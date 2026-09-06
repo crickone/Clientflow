@@ -3,7 +3,8 @@
 import {
   DndContext,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   closestCenter,
   useSensor,
   useSensors,
@@ -64,8 +65,16 @@ export function SlideFilmstrip({
   brand?: BrandLabels;
   logo?: HTMLImageElement | null;
 }) {
+  // Mouse and touch are split deliberately. One pointer sensor would need
+  // touch-action: none on every slide, and since the strip scrolls sideways
+  // that would leave a phone unable to reach slide 8 — the touch that would
+  // scroll starts on a slide. Touch therefore presses and holds to drag, so a
+  // swipe still scrolls.
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 220, tolerance: 8 },
+    }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
@@ -231,8 +240,9 @@ function FilmstripSlide({
         gap: 4,
         fontFamily: "inherit",
         textAlign: "left",
-        // Or the browser scrolls the strip instead of starting a drag.
-        touchAction: "none",
+        // Not "none": the strip has to stay swipe-scrollable on touch. The
+        // press-and-hold sensor is what separates a drag from a scroll.
+        touchAction: "manipulation",
       }}
     >
       <div

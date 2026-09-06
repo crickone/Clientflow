@@ -778,6 +778,18 @@ a {
   }
 }
 
+/* While it IS sticky, anything past the bottom of the viewport can't be
+   scrolled to — and the slide actions (add / delete / export) sit at the end
+   of this column. Cap it to the viewport and let it scroll internally. Only
+   bites when the content is genuinely taller: a carousel, which adds a
+   filmstrip under the preview. */
+@media (min-width: 861px) {
+  .cms-preview-col {
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+  }
+}
+
 /* Timetable "next class" pulse — ring colour comes from --tt-pulse on the element */
 @keyframes ttNextPulse {
   0% {
