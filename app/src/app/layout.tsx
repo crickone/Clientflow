@@ -99,7 +99,7 @@ export default async function RootLayout({
   // see above), but unlike /site and /f it's an authenticated, admin-only
   // internal tool (auth enforced in the page itself) that needs the themed
   // confirm dialog for its own destructive actions (e.g. discarding unsaved
-  // edits — see StudioShell's navigate()) plus toast feedback for its
+  // edits — see StudioShell's discard()) plus toast feedback for its
   // save/upload calls (StudioShell calls toast.success/toast.error directly).
   // ConfirmProvider and Toaster are both self-contained (no MotionRoot
   // dependency), so they're mounted here rather than pulling in the full

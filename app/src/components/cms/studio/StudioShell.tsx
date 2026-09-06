@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, Check, ExternalLink, Loader2, Monitor, Smartphone, Tablet, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, ExternalLink, Loader2, Monitor, Smartphone, Tablet, Trash2, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
@@ -52,9 +52,15 @@ export function StudioShell({
   const [libOpen, setLibOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
 
   const hasDraft = draftPaths.includes(path);
+  // Gates both destructive/terminal actions: while any one of save, publish
+  // or discard is running, neither Publish nor Discard can be started, so
+  // the three never overlap from the UI side (see flush()/publish()/discard()
+  // below for the matching server-side ordering guarantee).
+  const busy = saving || publishing || discarding;
   const src = (p: string) => `/site/${siteSlug}${p === "/" ? "" : p}?cmsedit=1`;
 
   const toCanvas = useCallback((msg: unknown) => {
@@ -72,26 +78,45 @@ export function StudioShell({
   const pathRef = useRef(path);
   pathRef.current = path;
 
-  // Sends whatever's pending right now and clears the timer, so the debounced
-  // save and a forced flush (screen switch, Publish, unmount) can never both
-  // fire for the same edit.
+  // `inFlight` holds the promise of whatever saveDraftAction call is
+  // currently on the wire (or null when none is). `pending`/`timer` only
+  // ever describe work that HASN'T been dispatched yet — the moment a save
+  // is sent, pending is cleared, so without this ref there is no record
+  // that a write is still outstanding. Publish and Discard both need that
+  // record: they must never run while a save the operator can't see the
+  // end of is still able to land afterwards.
+  const inFlight = useRef<Promise<void> | null>(null);
+
+  // Sends whatever's pending right now, then waits for whatever save is now
+  // in flight — the one just dispatched, or one a previous debounce fire is
+  // still waiting on — to finish. Callers can rely on "flush() resolved"
+  // meaning no save is outstanding.
   const flush = useCallback(async () => {
     if (timer.current) {
       clearTimeout(timer.current);
       timer.current = null;
     }
     const p = pending.current;
-    if (!p) return;
-    pending.current = null;
-    setSaving(true);
-    try {
-      const r = await saveDraftAction(siteSlug, p.path, p.content);
-      if (r.ok) {
-        setSavedAt(Date.now());
-        setDraftPaths((prev) => (prev.includes(p.path) ? prev : [...prev, p.path]));
-      } else toast.error(r.error ?? "Couldn't save the draft.");
-    } finally {
-      setSaving(false);
+    if (p) {
+      pending.current = null;
+      setSaving(true);
+      inFlight.current = (async () => {
+        try {
+          const r = await saveDraftAction(siteSlug, p.path, p.content);
+          if (r.ok) {
+            setSavedAt(Date.now());
+            setDraftPaths((prev) => (prev.includes(p.path) ? prev : [...prev, p.path]));
+          } else toast.error(r.error ?? "Couldn't save the draft.");
+        } finally {
+          setSaving(false);
+        }
+      })();
+    }
+    const current = inFlight.current;
+    if (current) {
+      await current;
+      // Only clear if nothing newer replaced it while we were awaiting.
+      if (inFlight.current === current) inFlight.current = null;
     }
   }, [siteSlug]);
 
@@ -108,17 +133,46 @@ export function StudioShell({
   );
 
   // --- canvas messages ---
+  // A picker token is only ever valid for the element it was minted against.
+  // The canvas re-posts cms:selection to refresh the Inspector after a prop
+  // edit on the SAME element (e.g. typing alt text while the picker is still
+  // open) — that must not clear the token. But a genuine selection change
+  // (the operator clicking a different element on the canvas) must, or a
+  // stale token can silently replace the wrong image later. selectionRef
+  // mirrors the last selection so incoming messages can tell the two apart
+  // without changing the postMessage payload shape.
   const pendingToken = useRef<string | null>(null);
+  const selectionRef = useRef<SelectionPayload | null>(null);
   useEffect(() => {
+    function isSameElement(a: SelectionPayload | null, b: SelectionPayload | null) {
+      if (!a || !b) return a === b;
+      if (a.kind !== b.kind || a.props.tag !== b.props.tag) return false;
+      if (a.breadcrumb.length !== b.breadcrumb.length) return false;
+      for (let i = 0; i < a.breadcrumb.length; i++) {
+        if (a.breadcrumb[i].label !== b.breadcrumb[i].label || a.breadcrumb[i].depth !== b.breadcrumb[i].depth) {
+          return false;
+        }
+      }
+      // src is never touched by cms:setProp, only by a successful pick, so
+      // for images it's the strongest available signal that this is still
+      // the same element rather than a sibling with an identical shape.
+      if (a.kind === "image" && a.props.src !== b.props.src) return false;
+      return true;
+    }
+
     function onMsg(ev: MessageEvent) {
       if (ev.source !== iframeRef.current?.contentWindow) return;
       const d = ev.data || {};
       if (d.type === "cms:ready") {
+        selectionRef.current = null;
         setSelection(null);
       } else if (d.type === "cms:dirty") {
         queueSave(String(d.content ?? ""));
       } else if (d.type === "cms:selection") {
-        setSelection(d.kind ? (d as SelectionPayload) : null);
+        const next = d.kind ? (d as SelectionPayload) : null;
+        if (!isSameElement(selectionRef.current, next)) pendingToken.current = null;
+        selectionRef.current = next;
+        setSelection(next);
       } else if (d.type === "cms:pickImage") {
         pendingToken.current = d.token;
         setLibOpen(true);
@@ -169,7 +223,10 @@ export function StudioShell({
 
   async function publish() {
     // Publishing reads whatever the draft currently holds in the database, so
-    // an edit still sitting in the debounce window has to land there first.
+    // an edit still sitting in the debounce window — or one a debounce timer
+    // just fired and is already waiting on a response for — has to land
+    // there first. flush() now awaits that in-flight request too, not just
+    // the queued-but-undispatched case.
     await flush();
     setPublishing(true);
     try {
@@ -194,28 +251,35 @@ export function StudioShell({
       }))
     )
       return;
-    // A debounced save still in flight would otherwise land after the discard
-    // and resurrect the draft we just asked to throw away.
-    if (timer.current) {
-      clearTimeout(timer.current);
-      timer.current = null;
+    setDiscarding(true);
+    try {
+      // A save still in flight (or one still sitting in the debounce window)
+      // must be resolved before the delete runs, or its write can land after
+      // the discard and resurrect the draft we just asked to throw away.
+      // Whatever it writes doesn't matter — the delete below always runs
+      // after it now, so the draft ends up gone either way.
+      await flush();
+      const r = await discardDraftAction(siteSlug, path);
+      if (r.ok) {
+        setDraftPaths((prev) => prev.filter((x) => x !== path));
+        setSavedAt(null);
+        reload(path);
+      } else toast.error(r.error ?? "Couldn't discard the draft.");
+    } finally {
+      setDiscarding(false);
     }
-    pending.current = null;
-    const r = await discardDraftAction(siteSlug, path);
-    if (r.ok) {
-      setDraftPaths((prev) => prev.filter((x) => x !== path));
-      setSavedAt(null);
-      reload(path);
-    } else toast.error(r.error ?? "Couldn't discard the draft.");
   }
 
+  // Note: a fourth "just-published/saved, no draft" branch (savedAt &&
+  // !hasDraft, shown with a success-colored check) doesn't exist here — every
+  // successful save also adds the path to draftPaths, so hasDraft is always
+  // true whenever savedAt is. That state is unreachable in practice, so
+  // there's nothing to render for it.
   const status = saving
     ? { icon: <Loader2 size={13} className="spin" />, text: "Saving draft…", color: "var(--text-tertiary)" }
     : hasDraft
       ? { icon: <span style={{ color: "var(--warning)" }}>●</span>, text: "Draft — not published", color: "var(--warning)" }
-      : savedAt
-        ? { icon: <Check size={13} />, text: "Published", color: "var(--success)" }
-        : { icon: null, text: "Published", color: "var(--text-tertiary)" };
+      : { icon: null, text: "Published", color: "var(--text-tertiary)" };
 
   return (
     <div style={{ display: "grid", gridTemplateRows: "52px 1fr", height: "100vh" }}>
@@ -273,11 +337,11 @@ export function StudioShell({
             View <ExternalLink size={13} />
           </a>
           {hasDraft && (
-            <Button size="sm" variant="ghost" onClick={discard}>
+            <Button size="sm" variant="ghost" onClick={discard} disabled={busy} loading={discarding}>
               <Trash2 size={14} /> Discard draft
             </Button>
           )}
-          <Button size="sm" onClick={publish} disabled={!hasDraft} loading={publishing}>
+          <Button size="sm" onClick={publish} disabled={!hasDraft || busy} loading={publishing}>
             <Upload size={14} /> Publish
           </Button>
         </div>
@@ -336,12 +400,16 @@ export function StudioShell({
           </div>
           <MediaDrawer
             open={libOpen}
-            onClose={() => setLibOpen(false)}
+            onClose={() => {
+              setLibOpen(false);
+              pendingToken.current = null;
+            }}
             onPick={(m: MediaRow) => {
               if (pendingToken.current) {
                 toCanvas({ type: "cms:setImage", token: pendingToken.current, src: m.url, alt: m.alt });
                 pendingToken.current = null;
               }
+              setLibOpen(false);
             }}
             onDragStart={(m) => toCanvas({ type: "cms:dragStart", asset: { id: m.id, url: m.url, alt: m.alt } })}
             onDragEnd={() => toCanvas({ type: "cms:dragEnd" })}
