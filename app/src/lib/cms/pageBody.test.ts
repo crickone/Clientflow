@@ -161,4 +161,176 @@ check("quoted '>' in attribute: whole script is one token in head", quotedGt.hea
 check("quoted '>' in attribute: content is empty", quotedGt.content === "");
 check("quoted '>' in attribute: round-trips", joinPageBody(quotedGt) === QUOTED_GT);
 
+// Defect 2 (comment-aware scan): a commented-out OLD <link> must not produce
+// a phantom head token that aborts head detection before the LIVE stylesheet
+// is ever reached. Exact repro from the audit.
+const COMMENTED_OLD_LINK = [
+  '<!-- <link rel="stylesheet" href="old.css"> -->',
+  '<link rel="stylesheet" href="live.css">',
+  "<style>body{margin:0}</style>",
+  '<div class="page">Real content</div>',
+  '<script src="gsap.js"></script>',
+].join("\n");
+const commentedOldLink = splitPageBody(COMMENTED_OLD_LINK);
+check(
+  "defect 2 / commented-out old link: head holds the LIVE stylesheet link",
+  commentedOldLink.head.includes('<link rel="stylesheet" href="live.css">'),
+);
+check(
+  "defect 2 / commented-out old link: head holds the live <style>",
+  commentedOldLink.head.includes("<style>body{margin:0}</style>"),
+);
+check(
+  "defect 2 / commented-out old link: content has NEITHER the live link NOR the style",
+  !commentedOldLink.content.includes("<link") && !commentedOldLink.content.includes("<style"),
+);
+check(
+  "defect 2 / commented-out old link: content is just the real div",
+  commentedOldLink.content === '\n<div class="page">Real content</div>\n',
+);
+check("defect 2 / commented-out old link: round-trips", joinPageBody(commentedOldLink) === COMMENTED_OLD_LINK);
+
+// Symmetric tail case: a real script, then a comment containing a
+// <script>-lookalike, then a real script. Both real scripts must land in
+// tail; the phantom inside the comment must not appear in content either.
+const COMMENTED_SCRIPT_IN_TAIL = [
+  "<div>hello</div>",
+  '<script src="real-1.js"></script>',
+  '<!-- <script src="dead.js"></script> -->',
+  '<script src="real-2.js"></script>',
+].join("\n");
+const commentedScriptInTail = splitPageBody(COMMENTED_SCRIPT_IN_TAIL);
+check(
+  "defect 2 / commented-out dead script in tail: tail holds real-1.js",
+  commentedScriptInTail.tail.includes("real-1.js"),
+);
+check(
+  "defect 2 / commented-out dead script in tail: tail holds real-2.js",
+  commentedScriptInTail.tail.includes("real-2.js"),
+);
+check(
+  "defect 2 / commented-out dead script in tail: content holds neither real script",
+  !commentedScriptInTail.content.includes("<script"),
+);
+check(
+  "defect 2 / commented-out dead script in tail: content is just the div",
+  commentedScriptInTail.content === "<div>hello</div>\n",
+);
+check(
+  "defect 2 / commented-out dead script in tail: round-trips",
+  joinPageBody(commentedScriptInTail) === COMMENTED_SCRIPT_IN_TAIL,
+);
+
+// Several consecutive comments before the real head tokens: head must still
+// be found (each comment's gap is blank, so head detection keeps walking).
+const MANY_LEADING_COMMENTS = [
+  "<!-- one -->",
+  "<!-- two -->",
+  "<!-- three -->",
+  '<link rel="stylesheet" href="/a.css">',
+  "<style>a{}</style>",
+  "<div>hi</div>",
+].join("\n");
+const manyLeadingComments = splitPageBody(MANY_LEADING_COMMENTS);
+check(
+  "several consecutive leading comments: head still holds the link",
+  manyLeadingComments.head.includes('<link rel="stylesheet" href="/a.css">'),
+);
+check(
+  "several consecutive leading comments: head still holds the style",
+  manyLeadingComments.head.includes("<style>a{}</style>"),
+);
+check(
+  "several consecutive leading comments: content has neither",
+  !manyLeadingComments.content.includes("<link") && !manyLeadingComments.content.includes("<style"),
+);
+check(
+  "several consecutive leading comments: round-trips",
+  joinPageBody(manyLeadingComments) === MANY_LEADING_COMMENTS,
+);
+
+// A comment sitting BETWEEN two head tokens: both tokens still land in head,
+// with the comment carried along in the gap.
+const COMMENT_BETWEEN_HEAD_TOKENS = [
+  '<link rel="stylesheet" href="/a.css">',
+  "<!-- second font, added later -->",
+  '<link rel="stylesheet" href="/b.css">',
+  "<div>hi</div>",
+].join("\n");
+const commentBetweenHeadTokens = splitPageBody(COMMENT_BETWEEN_HEAD_TOKENS);
+check(
+  "comment between two head links: head holds the first link",
+  commentBetweenHeadTokens.head.includes('<link rel="stylesheet" href="/a.css">'),
+);
+check(
+  "comment between two head links: head holds the second link",
+  commentBetweenHeadTokens.head.includes('<link rel="stylesheet" href="/b.css">'),
+);
+check(
+  "comment between two head links: content has neither link",
+  !commentBetweenHeadTokens.content.includes("<link"),
+);
+check(
+  "comment between two head links: round-trips",
+  joinPageBody(commentBetweenHeadTokens) === COMMENT_BETWEEN_HEAD_TOKENS,
+);
+
+// An unterminated "<!--" before what LOOKS like a <style> tag: everything
+// from the unterminated comment marker onward is comment text (browsers run
+// an unclosed comment to EOF), so the phantom "<style>" must NOT be treated
+// as a head token, and must not leak the rest of the document as content.
+const UNTERMINATED_COMMENT_BEFORE_STYLE =
+  '<link rel="stylesheet" href="/a.css">\n<!-- disabled: <style>a{color:red}</style>';
+const unterminatedCommentBeforeStyle = splitPageBody(UNTERMINATED_COMMENT_BEFORE_STYLE);
+check(
+  "unterminated <!-- before phantom <style>: head holds the real link",
+  unterminatedCommentBeforeStyle.head.includes('<link rel="stylesheet" href="/a.css">'),
+);
+check(
+  "unterminated <!-- before phantom <style>: head does NOT gain a <style> token (phantom is dead)",
+  !unterminatedCommentBeforeStyle.head.includes("<style"),
+);
+check(
+  "unterminated <!-- before phantom <style>: the dangling comment + phantom style live in content, not head",
+  unterminatedCommentBeforeStyle.content === "\n<!-- disabled: <style>a{color:red}</style>",
+);
+check(
+  "unterminated <!-- before phantom <style>: round-trips",
+  joinPageBody(unterminatedCommentBeforeStyle) === UNTERMINATED_COMMENT_BEFORE_STYLE,
+);
+
+// A comment that legitimately opens the CONTENT zone (head tokens end, then
+// a comment, then a <div>): the comment and the div both stay in content —
+// nothing gets pulled backward into head.
+const COMMENT_OPENING_CONTENT =
+  "<style>a{}</style>\n<!-- start of page markup -->\n<div>hi</div>";
+const commentOpeningContent = splitPageBody(COMMENT_OPENING_CONTENT);
+check(
+  "comment opening content: head is just the style",
+  commentOpeningContent.head === "<style>a{}</style>",
+);
+check(
+  "comment opening content: content holds the comment",
+  commentOpeningContent.content.includes("<!-- start of page markup -->"),
+);
+check(
+  "comment opening content: content holds the div",
+  commentOpeningContent.content.includes("<div>hi</div>"),
+);
+check(
+  "comment opening content: round-trips",
+  joinPageBody(commentOpeningContent) === COMMENT_OPENING_CONTENT,
+);
+
+// Defect 1 (ReDoS regression guard): an unterminated <script ...> opening tag
+// with a long run of quoted attributes used to explore exponentially many
+// quoted/unquoted splits before failing. This must stay fast at a size far
+// past where the old ambiguous regex was already unusable (n=18 took ~1.5s;
+// this uses n=2000).
+const REDOS_INPUT = "<script " + 'x="a"'.repeat(2000) + " no close here";
+const redosStart = Date.now();
+splitPageBody(REDOS_INPUT);
+const redosMs = Date.now() - redosStart;
+check(`defect 1 / ReDoS guard: n=2000 unterminated tag completes in under 100ms (took ${redosMs}ms)`, redosMs < 100);
+
 console.log(`pageBody: ${passed} checks passed.`);

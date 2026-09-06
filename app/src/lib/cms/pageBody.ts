@@ -28,8 +28,16 @@ export interface PageBodyZones {
  * Matches one <style>...</style>, <script>...</script>, or <link ...> token.
  * The opening-tag part skips over quoted attribute values so a ">" inside a
  * quoted attribute (e.g. data-cfg="a>b") can't end the tag early.
+ *
+ * The alternatives are mutually exclusive by construction: unquoted text is
+ * consumed only by the `[^"'>]*` class, which excludes quote characters, so
+ * no substring can be matched two different ways (once as loose characters,
+ * once as part of a quoted run). A version that allowed both readings of the
+ * same text (an ambiguous `(?:"[^"]*"|'[^']*'|[^>])*`) is catastrophically
+ * backtracking on an unterminated tag: the engine retries every split of an
+ * attribute run across quoted/unquoted alternatives before giving up.
  */
-const OPEN_TAG_TAIL = `(?:"[^"]*"|'[^']*'|[^>])*`;
+const OPEN_TAG_TAIL = `(?:[^"'>]*(?:"[^"]*"|'[^']*'))*[^"'>]*`;
 const TOKEN = new RegExp(
   `<style\\b${OPEN_TAG_TAIL}>[\\s\\S]*?<\\/style>|<script\\b${OPEN_TAG_TAIL}>[\\s\\S]*?<\\/script>|<link\\b${OPEN_TAG_TAIL}>`,
   "gi",
@@ -49,11 +57,53 @@ interface Token {
   isScript: boolean;
 }
 
+/** True if `index` falls inside one of `ranges` (each a [start, end) pair). */
+function isInRanges(index: number, ranges: Array<[number, number]>): boolean {
+  return ranges.some(([start, end]) => index >= start && index < end);
+}
+
+/**
+ * All comment spans in `html`, as [start, end) pairs, closed ones first (in
+ * document order, from COMMENT), then — if the document has an unterminated
+ * "<!--" left over — one final range from there to the end of the string.
+ * That mirrors what a browser does: an opening "<!--" with no matching "-->"
+ * comments out everything after it, including anything that looks like a
+ * tag. Any "<!--" that DOES have a later "-->" is already covered by a
+ * closed range, because the global exec below tries every position in turn,
+ * so the first "<!--" not covered by a closed range is guaranteed to have no
+ * closing "-->" anywhere after it.
+ */
+function commentRanges(html: string): Array<[number, number]> {
+  const ranges: Array<[number, number]> = [];
+  COMMENT.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = COMMENT.exec(html))) {
+    ranges.push([m.index, COMMENT.lastIndex]);
+  }
+
+  let openIdx = html.indexOf("<!--");
+  while (openIdx !== -1 && isInRanges(openIdx, ranges)) {
+    openIdx = html.indexOf("<!--", openIdx + 1);
+  }
+  if (openIdx !== -1) ranges.push([openIdx, html.length]);
+
+  return ranges;
+}
+
+/**
+ * Finds <style>/<script>/<link> tokens, but discards any whose start index
+ * falls inside a comment (closed or, per commentRanges, unterminated). A
+ * commented-out tag — a routine leftover in migrated bespoke HTML — would
+ * otherwise produce a phantom token that derails the head/tail boundary
+ * walk in splitPageBody.
+ */
 function scan(html: string): Token[] {
+  const comments = commentRanges(html);
   const out: Token[] = [];
   TOKEN.lastIndex = 0;
   let m: RegExpExecArray | null;
   while ((m = TOKEN.exec(html))) {
+    if (isInRanges(m.index, comments)) continue;
     out.push({
       start: m.index,
       end: TOKEN.lastIndex,
