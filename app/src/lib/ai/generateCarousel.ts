@@ -31,9 +31,15 @@ Template options — pick what fits each slide:
 - "carousel-cover" — series opener with title + slide indicator. Use only on slide 1.
 - "carousel-content" — middle slide with a big number and body. Default for content slides.
 - "carousel-tip" — photo top, white card with numbered tip — good for tip lists.
-- "carousel-quote-slide" — dark slide with a big accent quote. Use for testimonial-style content.
+- "carousel-quote-slide" — dark testimonial: warm quote, stars, attribution. Heading = the quote (first person, mixed case), body = who said it.
+- "carousel-checklist" — heading + a ticked list. Body = 3-4 checklist lines separated by NEWLINES, each under 7 words.
+- "carousel-myth" — myth vs fact. Heading = the myth exactly as believers say it, body = the fact that debunks it.
+- "carousel-stat" — one giant number carries the slide. Tagline = the stat itself (short, e.g. "87%" or "3x"), heading = the sentence completing it (lowercase continuation), body = one supporting line. Only use stats grounded in the business context or common knowledge — never invent a figure.
 - "carousel-cta" — closing slide with a clear CTA. Use only on the last slide.
+- "carousel-save" — closing save-and-share prompt. Use as the last slide when the carousel is pure value with no booking angle.
 - "question-hook" — provocative question opener. Use only on slide 1 when the cover is question-led.
+
+Some templates read a "tagline" field (the stat on "carousel-stat", the "TIP 02" label on "carousel-tip"). Include "tagline" on a slide when its template uses one; omit it elsewhere.
 
 You ALSO write the Instagram / Facebook caption that goes with this carousel when it's posted. The caption should:
 - Open with a hook (one short sentence that earns the second line).
@@ -61,6 +67,8 @@ export interface GeneratedSlide {
   heading: string;
   body: string;
   image: string;
+  /** Optional — read by templates that use one (the stat, the tip label). */
+  tagline?: string;
 }
 
 export interface GenerateInput {
@@ -106,6 +114,8 @@ const SLOT_STYLES: Record<
     rule: string;
     coverTemplate: string;
     middleTemplate: string;
+    /** Template for the final slide. Defaults to "carousel-cta". */
+    closingTemplate?: string;
     contentNotes: string;
   }
 > = {
@@ -163,6 +173,43 @@ const SLOT_STYLES: Record<
     contentNotes:
       "The cover heading MUST be phrased as a question (e.g. 'Why does this actually work?'). Each middle slide answers one facet of the question.",
   },
+  "carousel-checklist": {
+    label: "Checklist carousel",
+    coverTemplate: "carousel-cover",
+    middleTemplate: "carousel-checklist",
+    rule:
+      "Slide 1 is 'carousel-cover'. EVERY middle slide is 'carousel-checklist' — a heading plus a ticked list. Final slide is 'carousel-cta'.",
+    contentNotes:
+      "Each middle slide's BODY is 3-4 checklist lines separated by NEWLINES (\\n), each an imperative under 7 words. The heading names what the checklist is for.",
+  },
+  "carousel-myth": {
+    label: "Myth vs fact",
+    coverTemplate: "carousel-cover",
+    middleTemplate: "carousel-myth",
+    rule:
+      "Slide 1 is 'carousel-cover'. EVERY middle slide is 'carousel-myth' — one myth debunked per slide. Final slide is 'carousel-cta'.",
+    contentNotes:
+      "Each middle slide: heading = the myth stated exactly as believers say it (no 'Myth:' prefix), body = the fact that debunks it in 1-3 sentences. Pick myths people in this business's audience actually believe.",
+  },
+  "carousel-stat": {
+    label: "Stat-led carousel",
+    coverTemplate: "carousel-cover",
+    middleTemplate: "carousel-stat",
+    rule:
+      "Slide 1 is 'carousel-cover'. EVERY middle slide is 'carousel-stat' — one number carries each slide. Final slide is 'carousel-cta'.",
+    contentNotes:
+      "Each middle slide: tagline = the stat itself (short — '87%', '3x', '12 weeks'), heading = the sentence completing it as a lowercase continuation, body = one supporting line. Only stats grounded in the business context or common knowledge — NEVER invent a figure.",
+  },
+  "carousel-save": {
+    label: "Value series (save-led)",
+    coverTemplate: "carousel-cover",
+    middleTemplate: "carousel-content",
+    closingTemplate: "carousel-save",
+    rule:
+      "Slide 1 is 'carousel-cover'. Middle slides are 'carousel-content'. The FINAL slide is 'carousel-save' — a save-and-share prompt, not a booking pitch.",
+    contentNotes:
+      "Pure value throughout — no selling in the middle slides. The final slide invites the reader to save the post and share it with someone who needs it.",
+  },
 };
 
 function buildUserPrompt(input: GenerateInput): string {
@@ -219,7 +266,11 @@ export function extractPayload(text: string): {
     const heading = typeof obj.heading === "string" ? obj.heading.trim() : "";
     const body = typeof obj.body === "string" ? obj.body.trim() : "";
     const image = typeof obj.image === "string" ? obj.image.trim() : "";
-    return { template, heading, body, image };
+    const tagline =
+      typeof obj.tagline === "string" && obj.tagline.trim()
+        ? obj.tagline.trim()
+        : undefined;
+    return { template, heading, body, image, tagline };
   });
   return { slides, caption };
 }
@@ -278,12 +329,14 @@ export async function generateCarouselSlides(
     const middleTemplate = style?.middleTemplate ?? "carousel-content";
 
     // For the 'carousel-cover' slot, every slide is a hero — final stays as
-    // carousel-cover too. For every other slot, the final slide is a CTA.
+    // carousel-cover too. For every other slot, the final slide closes the
+    // series (a booking CTA unless the slot says otherwise, e.g. save).
     const allHero = input.styleSlot === "carousel-cover";
 
     slides[0].template = coverTemplate;
     if (slides.length > 2 && !allHero) {
-      slides[slides.length - 1].template = "carousel-cta";
+      slides[slides.length - 1].template =
+        style?.closingTemplate ?? "carousel-cta";
     }
     const lastMiddleIdx = allHero ? slides.length - 1 : slides.length - 2;
     for (let i = 1; i <= lastMiddleIdx; i++) {

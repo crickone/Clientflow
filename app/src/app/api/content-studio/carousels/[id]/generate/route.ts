@@ -10,6 +10,7 @@ import {
   updateSlide,
 } from "@/lib/image/carousels";
 import { generateCarouselSlides } from "@/lib/ai/generateCarousel";
+import { getTemplate, templateUsesPhoto } from "@/lib/image/templates";
 import { AiCapError } from "@/lib/ai/usage";
 import { isImageGenConfigured, IMAGE_COST_CENTS } from "@/lib/ai/image/falClient";
 import { buildImagePrompt, defaultImageStyle, fallbackScene } from "@/lib/ai/image/prompt";
@@ -117,7 +118,12 @@ export async function POST(
   try {
     for (let i = 0; i < result.slides.length; i++) {
       const slide = result.slides[i];
-      const prompt = houseStyle
+      // Only spend on a background the template can actually show — several
+      // (quote, CTA, checklist, myth, stat, save) never paint one, and an
+      // image generated for those is metered money buying nothing.
+      const template = getTemplate(slide.template);
+      const wantsImage = houseStyle && template && templateUsesPhoto(template);
+      const prompt = wantsImage
         ? buildImagePrompt({
             houseStyle,
             scene:
@@ -132,6 +138,9 @@ export async function POST(
         aspectRatio: "1:1",
         headingText: slide.heading,
         bodyText: slide.body,
+        // Some templates read the tagline as content (the stat, the tip
+        // label) — carry it when the generator wrote one.
+        tagline: slide.tagline ?? null,
         // Caption belongs to the carousel as a whole — store it on slide[0]
         caption: i === 0 ? result.caption : "",
         accentColor: previousAccent,

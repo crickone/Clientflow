@@ -184,6 +184,37 @@ eq(
   ["Opening slide", "Middle slides", "Closing slide"],
 );
 
+// Membership is pinned exactly: a new carousel template that's missing its
+// role entry silently lands in "Middle slides" — this makes that a failure
+// with a name instead of a quiet misplacement in the picker.
+{
+  const byLabel = new Map(
+    carouselTemplateGroups().map((g) => [g.label, g.templates.map((t) => t.id)]),
+  );
+  eq(
+    "opening slides are exactly the two openers",
+    byLabel.get("Opening slide"),
+    ["carousel-cover", "question-hook"],
+  );
+  eq(
+    "middle slides are exactly the six middles",
+    byLabel.get("Middle slides"),
+    [
+      "carousel-content",
+      "carousel-tip",
+      "carousel-quote-slide",
+      "carousel-checklist",
+      "carousel-myth",
+      "carousel-stat",
+    ],
+  );
+  eq(
+    "closing slides are exactly the two closers",
+    byLabel.get("Closing slide"),
+    ["carousel-cta", "carousel-save"],
+  );
+}
+
 // --- dragging a slide to reorder the series ---------------------------------
 //
 // The filmstrip lets you drag slides. Order is stored per-slot, so a drag may

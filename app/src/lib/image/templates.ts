@@ -200,6 +200,13 @@ export interface Template {
    */
   requiresPhoto?: boolean;
   /**
+   * Whether the template can DISPLAY a photo it doesn't require (e.g.
+   * carousel-content's optional top-right photo block). Together with
+   * `requiresPhoto` this answers "is generating a background for this slide
+   * money well spent?" — see templateUsesPhoto().
+   */
+  acceptsPhoto?: boolean;
+  /**
    * Where drawLogoOverlay stamps the tenant logo after render() runs.
    * Unset defaults to "bottom-right" — correct for most non-carousel
    * templates (full-bleed photo posts with nothing else claiming that
@@ -438,6 +445,71 @@ function drawStar(
     if (i === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
   }
+  ctx.closePath();
+  ctx.fill();
+}
+
+/** Check mark centred on (cx, cy) inside radius r — pairs with a filled circle. */
+function drawCheck(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  r: number,
+  color: string,
+) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(2, r * 0.28);
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.beginPath();
+  ctx.moveTo(cx - r * 0.5, cy + r * 0.05);
+  ctx.lineTo(cx - r * 0.12, cy + r * 0.42);
+  ctx.lineTo(cx + r * 0.55, cy - r * 0.38);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** X mark centred on (cx, cy) inside radius r — pairs with a filled circle. */
+function drawX(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  r: number,
+  color: string,
+) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(2, r * 0.28);
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(cx - r * 0.42, cy - r * 0.42);
+  ctx.lineTo(cx + r * 0.42, cy + r * 0.42);
+  ctx.moveTo(cx + r * 0.42, cy - r * 0.42);
+  ctx.lineTo(cx - r * 0.42, cy + r * 0.42);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** Filled bookmark ribbon: rounded top, notched tail. Anchored at top-centre. */
+function drawBookmark(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  top: number,
+  w: number,
+  h: number,
+) {
+  const x = cx - w / 2;
+  const r = w * 0.18;
+  const notch = h * 0.22;
+  ctx.beginPath();
+  ctx.moveTo(x, top + r);
+  ctx.quadraticCurveTo(x, top, x + r, top);
+  ctx.lineTo(x + w - r, top);
+  ctx.quadraticCurveTo(x + w, top, x + w, top + r);
+  ctx.lineTo(x + w, top + h);
+  ctx.lineTo(cx, top + h - notch);
+  ctx.lineTo(x, top + h);
   ctx.closePath();
   ctx.fill();
 }
@@ -1233,7 +1305,7 @@ const MAGAZINE: Template = {
 const QUESTION_HOOK: Template = {
   id: "question-hook",
   name: "Question Hook",
-  blurb: "Carousel opener — big question over a dimmed photo, scroll-stopper.",
+  blurb: "Opener — bold question anchored low on the photo, ghost question mark.",
   category: "carousels",
   aspectRatio: "1:1",
   width: 1080,
@@ -1241,9 +1313,11 @@ const QUESTION_HOOK: Template = {
   requiresPhoto: true,
   usesTagline: true,
   taglineHint: "01 / 05",
-  // Full-bleed dimmed photo, left-aligned heading/body/brand — logo pairs
-  // with that left edge up top (the big "?" glyph reads well below the
-  // logo's small footprint). Chrome (indicator/brand/swipe) is drawn by
+  // Full-bleed photo under layered gradients (never a flat wash — it murders
+  // the photo), heading anchored LOW like the cover's editorial siblings, and
+  // a huge ghost question mark up the right side. The ghost is drawn in the
+  // BODY font deliberately: the display face's stylised "?" renders as an
+  // unreadable bar-figure. Chrome (indicator/brand/swipe) is drawn by
   // paintSlideChrome — see ChromeIntent.
   chrome: {
     brand: "name",
@@ -1258,65 +1332,70 @@ const QUESTION_HOOK: Template = {
     ctx.save();
     const measure = canvasMeasure(ctx);
     paintBackground(ctx, bg, { x: 0, y: 0, w: W, h: H }, design);
-    ctx.fillStyle = "rgba(10,10,10,0.66)";
-    ctx.fillRect(0, 0, W, H);
+    topGradient(ctx, W, Math.round(H * 0.3));
+    bottomGradient(ctx, W, H, Math.round(H * 0.28));
 
     const padX = Math.round(W * 0.085);
-    const padTop = Math.round(H * 0.085);
+    const padBottom = Math.round(H * 0.085);
     const innerW = W - padX * 2;
 
     ctx.textBaseline = "alphabetic";
     ctx.textAlign = "left";
 
-    // Big accent question mark
-    const markSize = Math.round(H * 0.18);
-    ctx.fillStyle = design.accentColor;
-    ctx.font = `400 ${markSize}px ${fonts.heading}`;
-    ctx.fillText("?", padX, padTop + markSize);
+    // Ghost question mark, high on the right where the logo can't reach.
+    const ghostSize = Math.round(H * 0.52);
+    ctx.fillStyle = "rgba(255,255,255,0.16)";
+    ctx.font = `700 ${ghostSize}px ${fonts.body}`;
+    ctx.textAlign = "right";
+    ctx.fillText("?", W - padX + Math.round(W * 0.02), Math.round(H * 0.52));
+    ctx.textAlign = "left";
 
-    // Heading (the question)
+    // The stack builds UP from the bottom so the question always sits in the
+    // darkest part of the gradient, clear of the footer chrome.
     const heading = (design.headingText || "Ask your audience a question here.").toUpperCase();
     const fit = autoFitHeading(
       measure,
       heading,
       "400",
       fonts.heading,
-      Math.round(H * 0.062),
-      Math.round(H * 0.04),
+      Math.round(H * 0.072),
+      Math.round(H * 0.044),
       innerW,
       4,
       design.headingScale,
     );
-    const headingLine = Math.round(fit.size * 1.08);
+    const headingLine = Math.round(fit.size * 1.05);
     const headingBlock = fit.lines.length * headingLine;
-    const headingTop = padTop + markSize + Math.round(H * 0.03);
 
-    ctx.fillStyle = "#ffffff";
-    ctx.font = `400 ${fit.size}px ${fonts.heading}`;
-    ctx.textAlign = "left";
-    paintLines(ctx, fit.lines, padX, headingTop + fit.size, headingLine);
-
-    // Accent rule
-    const ruleY = headingTop + headingBlock + Math.round(H * 0.03);
-    ctx.fillStyle = design.accentColor;
-    ctx.fillRect(padX, ruleY, Math.round(W * 0.08), 3);
-
-    // Body (the hook continuation)
-    const bodySize = Math.round(H * 0.024);
+    const bodySize = Math.round(H * 0.023);
     const bodyLine = Math.round(bodySize * 1.5);
-    ctx.font = `400 ${bodySize}px ${fonts.body}`;
     const bodyLines = wrapLines(
       measure,
       `400 ${bodySize}px ${fonts.body}`,
-      design.bodyText ||
-        "Add your supporting copy here.",
-      innerW,
-    ).slice(0, 3);
+      design.bodyText || "Add your supporting copy here.",
+      Math.round(innerW * 0.86),
+    ).slice(0, 2);
+    const bodyBlock = bodyLines.length ? bodyLines.length * bodyLine : 0;
+
+    const ruleGap = Math.round(H * 0.032);
+    const bodyGap = bodyLines.length ? Math.round(H * 0.03) : 0;
+    const stackBottom = H - padBottom - Math.round(H * 0.045);
+    const ruleH = 5;
+    const headingTop =
+      stackBottom - bodyBlock - bodyGap - ruleH - ruleGap - headingBlock;
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `400 ${fit.size}px ${fonts.heading}`;
+    paintLines(ctx, fit.lines, padX, headingTop + fit.size, headingLine);
+
+    const ruleY = headingTop + headingBlock + ruleGap;
+    ctx.fillStyle = design.accentColor;
+    ctx.fillRect(padX, ruleY, Math.round(W * 0.1), ruleH);
 
     if (bodyLines.length) {
       ctx.fillStyle = "rgba(255,255,255,0.88)";
-      const bodyTop = ruleY + Math.round(H * 0.035);
-      paintLines(ctx, bodyLines, padX, bodyTop + bodySize, bodyLine);
+      ctx.font = `400 ${bodySize}px ${fonts.body}`;
+      paintLines(ctx, bodyLines, padX, ruleY + ruleH + bodyGap + bodySize, bodyLine);
     }
     ctx.restore();
   },
@@ -1873,6 +1952,7 @@ const CAROUSEL_CONTENT: Template = {
   aspectRatio: "1:1",
   width: 1080,
   height: 1080,
+  acceptsPhoto: true,
   usesTagline: true,
   taglineHint: "02",
   // Light card, left-aligned content block — pairs with a top-left logo. The
@@ -1990,25 +2070,23 @@ const CAROUSEL_CONTENT: Template = {
 const CAROUSEL_CTA: Template = {
   id: "carousel-cta",
   name: "Carousel CTA",
-  blurb: "Closing slide — big call to action with contact details.",
+  blurb: "Closing slide — dark ground, big heading, accent booking button.",
   category: "carousels",
   aspectRatio: "1:1",
   width: 1080,
   height: 1080,
   usesTagline: true,
   taglineHint: "05 / 05",
-  // Everything on this slide (eyebrow, heading, body, CTA pill) is drawn
-  // centred at W/2 — the logo matches that with top-center instead of
-  // top-left. No swipe hint here: it's the closing slide, nothing to swipe
-  // to next. No brand credit either: the CTA pill below is BODY content and
-  // already carries the business's contact details. Chrome (indicator) is
-  // drawn by paintSlideChrome — see ChromeIntent. ink:"auto" because this
-  // slide's own ground IS the tenant's accent colour (a fixed ink could
-  // vanish against it) — same readableTextOn() this render used to call
-  // directly for its own text.
+  // Dark ground bookending the dark-photo cover, with the accent saved for
+  // the one thing that matters here: the button. (The old solid-accent flood
+  // also washed out light tenant logos — on dark, every logo pops.)
+  // Everything is centred at W/2, logo top-center to match. No swipe hint:
+  // closing slide. No brand credit: the button + website line below carry
+  // the business's contact details as BODY content. ink:"light" — the
+  // ground is always dark now.
   chrome: {
     indicator: "05 / 05",
-    ink: "auto",
+    ink: "light",
     logo: "top-center",
     align: "center",
   },
@@ -2018,40 +2096,38 @@ const CAROUSEL_CTA: Template = {
     ctx.save();
     const measure = canvasMeasure(ctx);
 
-    // Solid accent background
-    ctx.fillStyle = design.accentColor;
+    // Dark base with an accent glow rising from behind the button.
+    ctx.fillStyle = "#0d0d0d";
     ctx.fillRect(0, 0, W, H);
-
-    // Subtle vignette
-    const grad = ctx.createRadialGradient(W / 2, H / 2, W * 0.2, W / 2, H / 2, W * 0.7);
-    grad.addColorStop(0, "rgba(0,0,0,0)");
-    grad.addColorStop(1, "rgba(0,0,0,0.25)");
-    ctx.fillStyle = grad;
+    const { r, g, b } = hexToRgb(design.accentColor);
+    const glow = ctx.createRadialGradient(
+      W / 2, H * 0.92, 0,
+      W / 2, H * 0.92, W * 0.85,
+    );
+    glow.addColorStop(0, `rgba(${r},${g},${b},0.22)`);
+    glow.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = glow;
     ctx.fillRect(0, 0, W, H);
-
-    const textColor = readableTextOn(design.accentColor);
-    const subtle = textColor === "#ffffff" ? "rgba(255,255,255,0.85)" : "rgba(10,10,10,0.72)";
 
     const padX = Math.round(W * 0.085);
-    const padBottom = Math.round(H * 0.085);
     const innerW = W - padX * 2;
 
     ctx.textBaseline = "alphabetic";
+    ctx.textAlign = "center";
 
     // Eyebrow
-    ctx.fillStyle = textColor;
-    ctx.font = `600 ${Math.round(H * 0.02)}px ${fonts.body}`;
-    ctx.textAlign = "center";
-    ctx.fillText("BOOK YOUR FIRST SESSION", W / 2, H * 0.32);
+    ctx.fillStyle = design.accentColor;
+    ctx.font = `600 ${Math.round(H * 0.019)}px ${fonts.body}`;
+    ctx.fillText("THE NEXT STEP", W / 2, Math.round(H * 0.315));
 
     // Big heading
-    const heading = (design.headingText || "We're 30 minutes\nfrom you.").toUpperCase();
+    const heading = (design.headingText || "Your first session is on us").toUpperCase();
     const fit = autoFitHeading(
       measure,
       heading,
       "400",
       fonts.heading,
-      Math.round(H * 0.085),
+      Math.round(H * 0.082),
       Math.round(H * 0.05),
       innerW,
       3,
@@ -2059,9 +2135,9 @@ const CAROUSEL_CTA: Template = {
     );
     const headingLine = Math.round(fit.size * 1.06);
     const headingBlock = fit.lines.length * headingLine;
-    const headingTop = H / 2 - headingBlock / 2 + Math.round(H * 0.02);
+    const headingTop = Math.round(H * 0.375);
 
-    ctx.fillStyle = textColor;
+    ctx.fillStyle = "#ffffff";
     ctx.font = `400 ${fit.size}px ${fonts.heading}`;
     paintLines(ctx, fit.lines, W / 2, headingTop + fit.size, headingLine);
 
@@ -2069,34 +2145,49 @@ const CAROUSEL_CTA: Template = {
     if (design.bodyText.trim()) {
       const bodySize = Math.round(H * 0.022);
       const bodyLine = Math.round(bodySize * 1.5);
+      const bodyLines = wrapLines(
+        measure,
+        `400 ${bodySize}px ${fonts.body}`,
+        design.bodyText,
+        Math.round(innerW * 0.82),
+      ).slice(0, 2);
+      ctx.fillStyle = "rgba(255,255,255,0.78)";
       ctx.font = `400 ${bodySize}px ${fonts.body}`;
-      const bodyLines = wrapLines(measure, `400 ${bodySize}px ${fonts.body}`, design.bodyText, innerW).slice(0, 3);
-      ctx.fillStyle = subtle;
       paintLines(
         ctx,
         bodyLines,
         W / 2,
-        headingTop + headingBlock + Math.round(H * 0.04) + bodySize,
+        headingTop + headingBlock + Math.round(H * 0.038) + bodySize,
         bodyLine,
       );
     }
 
-    // CTA pill at bottom
-    const ctaText = `${brandWeb(design).toUpperCase()}  ·  ${brandPhone(design)}`;
-    ctx.font = `600 ${Math.round(H * 0.017)}px ${fonts.body}`;
-    const ctaTextW = ctx.measureText(ctaText).width;
-    const ctaPadH = Math.round(H * 0.025);
-    const ctaPadV = Math.round(H * 0.013);
-    const ctaH = Math.round(H * 0.017) + ctaPadV * 2;
-    const ctaW = ctaTextW + ctaPadH * 2;
-    const ctaX = (W - ctaW) / 2;
-    const ctaY = H - padBottom - ctaH;
-    ctx.fillStyle = textColor;
-    roundedRect(ctx, ctaX, ctaY, ctaW, ctaH, ctaH / 2);
-    ctx.fill();
+    // The button: a real accent button with the phone number — the actual
+    // call to action — and the website quietly underneath.
+    const phone = brandPhone(design);
+    const web = brandWeb(design).toUpperCase();
+    const btnText = phone ? `CALL  ${phone}` : web || "GET IN TOUCH";
+    const btnSize = Math.round(H * 0.026);
+    ctx.font = `700 ${btnSize}px ${fonts.body}`;
+    const btnTextW = ctx.measureText(btnText).width;
+    const btnH = Math.round(H * 0.078);
+    const btnW = Math.min(innerW, Math.round(btnTextW + H * 0.09));
+    const btnX = Math.round((W - btnW) / 2);
+    const btnY = Math.round(H * 0.72);
     ctx.fillStyle = design.accentColor;
+    roundedRect(ctx, btnX, btnY, btnW, btnH, btnH / 2);
+    ctx.fill();
+    ctx.fillStyle = readableTextOn(design.accentColor);
     ctx.textBaseline = "middle";
-    ctx.fillText(ctaText, W / 2, ctaY + ctaH / 2 + 1);
+    ctx.fillText(btnText, W / 2, btnY + Math.round(btnH / 2) + 1);
+
+    // Website line under the button (skip when the button already shows it).
+    if (phone && web) {
+      ctx.textBaseline = "alphabetic";
+      ctx.fillStyle = "rgba(255,255,255,0.6)";
+      ctx.font = `600 ${Math.round(H * 0.017)}px ${fonts.body}`;
+      ctx.fillText(web, W / 2, btnY + btnH + Math.round(H * 0.045));
+    }
     ctx.restore();
   },
 };
@@ -2195,26 +2286,24 @@ const CAROUSEL_TIP: Template = {
 const CAROUSEL_QUOTE_SLIDE: Template = {
   id: "carousel-quote-slide",
   name: "Carousel Quote",
-  blurb: "Dark slide with a big accent quote — testimonial inside a series.",
+  blurb: "Dark testimonial — big warm quote, stars, attribution.",
   category: "carousels",
   aspectRatio: "1:1",
   width: 1080,
   height: 1080,
   usesTagline: true,
   taglineHint: "03 / 05",
-  // Dark card, left-aligned quote mark/heading/body/brand — pairs with a
-  // top-left logo (the small quote-mark block sits lower and clear of it).
-  // Chrome (indicator/brand/swipe) is drawn by paintSlideChrome — see
-  // ChromeIntent. inset 0.1 (wider than the 0.085 default) matches this
-  // template's own body inset, both driven by clearing the accent frame
-  // below.
+  // Dark ground with a soft accent glow, a giant real quote glyph, and the
+  // quote itself set in the BODY font, mixed case — a spoken sentence in the
+  // display face's stylised caps reads like shouting robot text, and a
+  // testimonial has to feel like a person said it. Left-aligned, pairs with a
+  // top-left logo. Chrome (indicator/brand/swipe) via paintSlideChrome.
   chrome: {
     brand: "name",
     indicator: "03 / 05",
     swipe: true,
     ink: "light",
     logo: "top-left",
-    inset: 0.1,
   },
   render(ctx, design, bg, fonts) {
     const W = this.width;
@@ -2222,66 +2311,506 @@ const CAROUSEL_QUOTE_SLIDE: Template = {
     ctx.save();
     const measure = canvasMeasure(ctx);
 
-    // Dark base
-    ctx.fillStyle = "#0a0a0a";
+    // Dark base with a soft accent glow up in the corner opposite the logo.
+    ctx.fillStyle = "#0d0d0d";
+    ctx.fillRect(0, 0, W, H);
+    const { r, g, b } = hexToRgb(design.accentColor);
+    const glow = ctx.createRadialGradient(
+      W * 0.92, H * 0.06, 0,
+      W * 0.92, H * 0.06, W * 0.75,
+    );
+    glow.addColorStop(0, `rgba(${r},${g},${b},0.16)`);
+    glow.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = glow;
     ctx.fillRect(0, 0, W, H);
 
-    // Accent inset frame
-    const frame = Math.round(W * 0.04);
-    ctx.strokeStyle = design.accentColor;
-    ctx.lineWidth = 3;
-    ctx.strokeRect(frame, frame, W - frame * 2, H - frame * 2);
-
-    const padX = Math.round(W * 0.1);
+    const padX = Math.round(W * 0.085);
     const innerW = W - padX * 2;
-    const padTop = Math.round(H * 0.1);
 
     ctx.textBaseline = "alphabetic";
+    ctx.textAlign = "left";
 
-    // Big accent quote mark
-    const markH = Math.round(H * 0.05);
-    const markW = Math.round(H * 0.09);
+    // The quote, mixed case, warm weight.
+    const quote = design.headingText || "Add a client quote here.";
+    const fit = autoFitHeading(
+      measure,
+      quote,
+      "600",
+      fonts.body,
+      Math.round(H * 0.052),
+      Math.round(H * 0.032),
+      innerW,
+      5,
+      design.headingScale,
+    );
+    const quoteLine = Math.round(fit.size * 1.28);
+    const quoteBlock = fit.lines.length * quoteLine;
+
+    // Group metrics, centred vertically as one composition.
+    const markSize = Math.round(H * 0.15);
+    const markGap = Math.round(H * 0.005);
+    const starR = Math.round(H * 0.012);
+    const starsGap = Math.round(H * 0.05);
+    const attrGap = Math.round(H * 0.045);
+    const attrSize = Math.round(H * 0.021);
+    const groupH =
+      Math.round(markSize * 0.55) + markGap + quoteBlock + starsGap + starR * 2 + attrGap + attrSize;
+    const groupTop = Math.round((H - groupH) / 2) + Math.round(H * 0.045);
+
+    // Giant real quote glyph in the body font (the display face's is a bar).
     ctx.fillStyle = design.accentColor;
-    ctx.fillRect(padX, padTop + Math.round(H * 0.06), markW, markH);
+    ctx.font = `700 ${markSize}px ${fonts.body}`;
+    ctx.fillText("“", padX - Math.round(W * 0.008), groupTop + Math.round(markSize * 0.55));
 
-    // Quote heading
-    const heading = (design.headingText || "Add a client quote here.").toUpperCase();
+    const quoteTop = groupTop + Math.round(markSize * 0.55) + markGap;
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `600 ${fit.size}px ${fonts.body}`;
+    paintLines(ctx, fit.lines, padX, quoteTop + fit.size, quoteLine);
+
+    // Five accent stars.
+    const starsY = quoteTop + quoteBlock + starsGap;
+    ctx.fillStyle = design.accentColor;
+    for (let i = 0; i < 5; i++) {
+      drawStar(ctx, padX + starR + i * (starR * 2 + Math.round(starR * 1.1)), starsY, starR);
+    }
+
+    // Attribution.
+    const attribution = (design.bodyText || "Your client").replace(/^[—-]\s*/, "");
+    ctx.fillStyle = "rgba(255,255,255,0.62)";
+    ctx.font = `500 ${attrSize}px ${fonts.body}`;
+    ctx.fillText(attribution, padX, starsY + starR + attrGap + Math.round(attrSize * 0.35));
+    ctx.restore();
+  },
+};
+
+const CAROUSEL_CHECKLIST: Template = {
+  id: "carousel-checklist",
+  name: "Carousel Checklist",
+  blurb: "Middle slide — heading plus a ticked list, one line per item.",
+  category: "carousels",
+  aspectRatio: "1:1",
+  width: 1080,
+  height: 1080,
+  usesTagline: true,
+  taglineHint: "03",
+  // Light card, left-aligned — same family as carousel-content, so a series
+  // can mix the two without changing mood. Body text is split on NEWLINES:
+  // each line becomes one ticked row. Chrome via paintSlideChrome.
+  chrome: {
+    brand: "name-locality",
+    swipe: true,
+    ink: "dark",
+    logo: "top-left",
+  },
+  render(ctx, design, bg, fonts) {
+    const W = this.width;
+    const H = this.height;
+    ctx.save();
+    const measure = canvasMeasure(ctx);
+
+    ctx.fillStyle = "#fafafa";
+    ctx.fillRect(0, 0, W, H);
+
+    const padX = Math.round(W * 0.085);
+    const padTop = Math.round(H * 0.08);
+    const innerW = W - padX * 2;
+
+    ctx.textBaseline = "alphabetic";
+    ctx.textAlign = "left";
+
+    // Numeral eyebrow + rule, matching carousel-content's furniture.
+    const contentTop = padTop + Math.round(H * 0.06);
+    const tagline = (design.tagline ?? "").trim() || "03";
+    const numberSize = Math.round(H * 0.05);
+    ctx.font = `400 ${numberSize}px ${fonts.heading}`;
+    ctx.fillStyle = design.accentColor;
+    ctx.fillText(tagline, padX, contentTop + numberSize);
+    const ruleY = contentTop + numberSize + Math.round(H * 0.018);
+    ctx.fillRect(padX, ruleY, Math.round(W * 0.08), 3);
+
+    // Heading
+    const heading = (design.headingText || "Your checklist").toUpperCase();
     const fit = autoFitHeading(
       measure,
       heading,
       "400",
       fonts.heading,
-      Math.round(H * 0.062),
-      Math.round(H * 0.04),
+      Math.round(H * 0.056),
+      Math.round(H * 0.038),
       innerW,
-      5,
+      2,
       design.headingScale,
     );
     const headingLine = Math.round(fit.size * 1.08);
-    const headingBlock = fit.lines.length * headingLine;
-    const headingTop = H / 2 - headingBlock / 2 + Math.round(H * 0.02);
-
-    ctx.fillStyle = "#ffffff";
+    const headingTop = ruleY + Math.round(H * 0.03);
+    ctx.fillStyle = "#0a0a0a";
     ctx.font = `400 ${fit.size}px ${fonts.heading}`;
-    ctx.textAlign = "left";
     paintLines(ctx, fit.lines, padX, headingTop + fit.size, headingLine);
 
-    // Body / attribution
-    const bodySize = Math.round(H * 0.022);
-    const bodyLine = Math.round(bodySize * 1.5);
-    ctx.font = `400 ${bodySize}px ${fonts.body}`;
-    const bodyLines = wrapLines(
-      measure,
-      `400 ${bodySize}px ${fonts.body}`,
-      design.bodyText || "— Your client",
-      innerW,
-    ).slice(0, 2);
+    // Rows: one per body-text line, ticked. Wrapped rows keep their text
+    // clear of the check column.
+    const items = (design.bodyText || "First step\nSecond step\nThird step")
+      .split(/\n+/)
+      .map((s) => s.trim().replace(/^[-*•]\s*/, ""))
+      .filter(Boolean)
+      .slice(0, 4);
 
-    if (bodyLines.length) {
+    const rowsTop =
+      headingTop + fit.lines.length * headingLine + Math.round(H * 0.045);
+    const rowsBottom = H - Math.round(H * 0.085) - Math.round(H * 0.045);
+    const rowH = Math.min(
+      Math.round(H * 0.105),
+      Math.floor((rowsBottom - rowsTop) / Math.max(1, items.length)),
+    );
+    const checkR = Math.round(H * 0.021);
+    const textX = padX + checkR * 2 + Math.round(W * 0.03);
+    const textW = innerW - (textX - padX);
+    const itemSize = Math.round(H * 0.025);
+    const itemLine = Math.round(itemSize * 1.35);
+
+    items.forEach((item, i) => {
+      const rowMid = rowsTop + i * rowH + Math.round(rowH / 2);
       ctx.fillStyle = design.accentColor;
-      const bodyTop = headingTop + headingBlock + Math.round(H * 0.04);
-      paintLines(ctx, bodyLines, padX, bodyTop + bodySize, bodyLine);
+      ctx.beginPath();
+      ctx.arc(padX + checkR, rowMid, checkR, 0, Math.PI * 2);
+      ctx.fill();
+      drawCheck(ctx, padX + checkR, rowMid, checkR, "#ffffff");
+
+      const lines = wrapLines(
+        measure,
+        `500 ${itemSize}px ${fonts.body}`,
+        item,
+        textW,
+      ).slice(0, 2);
+      ctx.fillStyle = "rgba(10,10,10,0.82)";
+      ctx.font = `500 ${itemSize}px ${fonts.body}`;
+      const blockH = lines.length * itemLine;
+      paintLines(
+        ctx,
+        lines,
+        textX,
+        rowMid - Math.round(blockH / 2) + itemSize - Math.round(itemSize * 0.16),
+        itemLine,
+      );
+
+      if (i < items.length - 1) {
+        ctx.fillStyle = "rgba(10,10,10,0.07)";
+        ctx.fillRect(padX, rowsTop + (i + 1) * rowH - 1, innerW, 2);
+      }
+    });
+    ctx.restore();
+  },
+};
+
+const CAROUSEL_MYTH: Template = {
+  id: "carousel-myth",
+  name: "Myth vs Fact",
+  blurb: "Middle slide — the myth struck through, the fact in an accent card.",
+  category: "carousels",
+  aspectRatio: "1:1",
+  width: 1080,
+  height: 1080,
+  usesTagline: true,
+  taglineHint: "02",
+  // Light ground, two stacked cards: heading = the myth, body = the fact.
+  // Chrome via paintSlideChrome.
+  chrome: {
+    brand: "name-locality",
+    swipe: true,
+    ink: "dark",
+    logo: "top-left",
+  },
+  render(ctx, design, bg, fonts) {
+    const W = this.width;
+    const H = this.height;
+    ctx.save();
+    const measure = canvasMeasure(ctx);
+
+    ctx.fillStyle = "#fafafa";
+    ctx.fillRect(0, 0, W, H);
+
+    const padX = Math.round(W * 0.085);
+    const innerW = W - padX * 2;
+    const { r, g, b } = hexToRgb(design.accentColor);
+
+    ctx.textBaseline = "alphabetic";
+    ctx.textAlign = "left";
+
+    const cardX = padX;
+    const cardW = innerW;
+    const cardPad = Math.round(W * 0.045);
+    const cardR = Math.round(H * 0.022);
+    const badgeR = Math.round(H * 0.019);
+    const labelSize = Math.round(H * 0.018);
+    const topArea = Math.round(H * 0.155);
+    const bottomLimit = H - Math.round(H * 0.145);
+    const gap = Math.round(H * 0.03);
+    // The myth is one stated line; the fact is the debunking — give the fact
+    // the bigger card rather than leaving the myth's half empty.
+    const available = bottomLimit - topArea - gap;
+    const cardH = Math.round(available * 0.42);
+    const factH = available - cardH;
+
+    // MYTH card — neutral, struck through by its own badge.
+    const mythY = topArea;
+    ctx.fillStyle = "#efefef";
+    roundedRect(ctx, cardX, mythY, cardW, cardH, cardR);
+    ctx.fill();
+
+    let cy = mythY + cardPad + badgeR;
+    ctx.fillStyle = "#3a3a3a";
+    ctx.beginPath();
+    ctx.arc(cardX + cardPad + badgeR, cy, badgeR, 0, Math.PI * 2);
+    ctx.fill();
+    drawX(ctx, cardX + cardPad + badgeR, cy, badgeR, "#ffffff");
+    ctx.fillStyle = "rgba(10,10,10,0.55)";
+    ctx.font = `700 ${labelSize}px ${fonts.body}`;
+    ctx.fillText("MYTH", cardX + cardPad + badgeR * 2 + Math.round(W * 0.018), cy + Math.round(labelSize * 0.35));
+
+    const mythText = design.headingText || "State the myth here";
+    const mythFit = autoFitHeading(
+      measure,
+      mythText,
+      "600",
+      fonts.body,
+      Math.round(H * 0.034),
+      Math.round(H * 0.024),
+      cardW - cardPad * 2,
+      3,
+      design.headingScale,
+    );
+    ctx.fillStyle = "rgba(10,10,10,0.78)";
+    ctx.font = `600 ${mythFit.size}px ${fonts.body}`;
+    paintLines(
+      ctx,
+      mythFit.lines,
+      cardX + cardPad,
+      cy + badgeR + Math.round(H * 0.035) + mythFit.size,
+      Math.round(mythFit.size * 1.3),
+    );
+
+    // FACT card — accent-tinted, accent-edged.
+    const factY = mythY + cardH + gap;
+    ctx.fillStyle = `rgba(${r},${g},${b},0.1)`;
+    roundedRect(ctx, cardX, factY, cardW, factH, cardR);
+    ctx.fill();
+    ctx.strokeStyle = design.accentColor;
+    ctx.lineWidth = 2.5;
+    roundedRect(ctx, cardX + 1, factY + 1, cardW - 2, factH - 2, cardR);
+    ctx.stroke();
+
+    cy = factY + cardPad + badgeR;
+    ctx.fillStyle = design.accentColor;
+    ctx.beginPath();
+    ctx.arc(cardX + cardPad + badgeR, cy, badgeR, 0, Math.PI * 2);
+    ctx.fill();
+    drawCheck(ctx, cardX + cardPad + badgeR, cy, badgeR, readableTextOn(design.accentColor));
+    ctx.fillStyle = design.accentColor;
+    ctx.font = `700 ${labelSize}px ${fonts.body}`;
+    ctx.fillText("FACT", cardX + cardPad + badgeR * 2 + Math.round(W * 0.018), cy + Math.round(labelSize * 0.35));
+
+    const factText = design.bodyText || "State the fact that debunks it here.";
+    const factLines = wrapLines(
+      measure,
+      `500 ${Math.round(H * 0.027)}px ${fonts.body}`,
+      factText,
+      cardW - cardPad * 2,
+    ).slice(0, 5);
+    ctx.fillStyle = "#0a0a0a";
+    ctx.font = `500 ${Math.round(H * 0.027)}px ${fonts.body}`;
+    paintLines(
+      ctx,
+      factLines,
+      cardX + cardPad,
+      cy + badgeR + Math.round(H * 0.035) + Math.round(H * 0.027),
+      Math.round(H * 0.027 * 1.35),
+    );
+    ctx.restore();
+  },
+};
+
+const CAROUSEL_STAT: Template = {
+  id: "carousel-stat",
+  name: "Carousel Stat",
+  blurb: "Middle slide — one giant number carries the slide.",
+  category: "carousels",
+  aspectRatio: "1:1",
+  width: 1080,
+  height: 1080,
+  usesTagline: true,
+  taglineHint: "87%",
+  // Light card. The tagline IS the stat — a giant accent numeral — and the
+  // heading is the sentence that completes it. Chrome via paintSlideChrome.
+  chrome: {
+    brand: "name-locality",
+    swipe: true,
+    ink: "dark",
+    logo: "top-left",
+  },
+  render(ctx, design, bg, fonts) {
+    const W = this.width;
+    const H = this.height;
+    ctx.save();
+    const measure = canvasMeasure(ctx);
+
+    ctx.fillStyle = "#fafafa";
+    ctx.fillRect(0, 0, W, H);
+
+    const padX = Math.round(W * 0.085);
+    const innerW = W - padX * 2;
+
+    ctx.textBaseline = "alphabetic";
+    ctx.textAlign = "left";
+
+    // The stat, as big as it can be while fitting the width.
+    const stat = (design.tagline ?? "").trim() || "87%";
+    let statSize = Math.round(H * 0.21);
+    while (
+      statSize > Math.round(H * 0.1) &&
+      measure(stat, `400 ${statSize}px ${fonts.heading}`) > innerW * 0.9
+    ) {
+      statSize -= 8;
     }
+    const statTop = Math.round(H * 0.22);
+    ctx.fillStyle = design.accentColor;
+    ctx.font = `400 ${statSize}px ${fonts.heading}`;
+    ctx.fillText(stat, padX, statTop + statSize);
+
+    // Rule under the stat.
+    const ruleY = statTop + statSize + Math.round(H * 0.035);
+    ctx.fillStyle = design.accentColor;
+    ctx.fillRect(padX, ruleY, Math.round(W * 0.1), 4);
+
+    // The sentence completing the stat — mixed case, body font.
+    const line = design.headingText || "of people who start with a plan are still going a year later";
+    const fit = autoFitHeading(
+      measure,
+      line,
+      "600",
+      fonts.body,
+      Math.round(H * 0.037),
+      Math.round(H * 0.026),
+      Math.round(innerW * 0.92),
+      3,
+      design.headingScale,
+    );
+    const lineTop = ruleY + Math.round(H * 0.045);
+    ctx.fillStyle = "#0a0a0a";
+    ctx.font = `600 ${fit.size}px ${fonts.body}`;
+    paintLines(ctx, fit.lines, padX, lineTop + fit.size, Math.round(fit.size * 1.3));
+
+    // Supporting line.
+    if (design.bodyText.trim()) {
+      const bodySize = Math.round(H * 0.022);
+      const bodyLines = wrapLines(
+        measure,
+        `400 ${bodySize}px ${fonts.body}`,
+        design.bodyText,
+        Math.round(innerW * 0.86),
+      ).slice(0, 2);
+      ctx.fillStyle = "rgba(10,10,10,0.6)";
+      ctx.font = `400 ${bodySize}px ${fonts.body}`;
+      paintLines(
+        ctx,
+        bodyLines,
+        padX,
+        lineTop + fit.lines.length * Math.round(fit.size * 1.3) + Math.round(H * 0.035) + bodySize,
+        Math.round(bodySize * 1.5),
+      );
+    }
+    ctx.restore();
+  },
+};
+
+const CAROUSEL_SAVE: Template = {
+  id: "carousel-save",
+  name: "Save This",
+  blurb: "Closing slide — save-and-share prompt instead of a booking pitch.",
+  category: "carousels",
+  aspectRatio: "1:1",
+  width: 1080,
+  height: 1080,
+  usesTagline: true,
+  taglineHint: "05 / 05",
+  // Dark closer for carousels whose ask is engagement, not booking — the
+  // bookmark ribbon is the hero. Centred; logo top-center to match. No swipe:
+  // closing slide. Chrome via paintSlideChrome.
+  chrome: {
+    brand: "name",
+    indicator: "05 / 05",
+    ink: "light",
+    logo: "top-center",
+    align: "center",
+  },
+  render(ctx, design, bg, fonts) {
+    const W = this.width;
+    const H = this.height;
+    ctx.save();
+    const measure = canvasMeasure(ctx);
+
+    ctx.fillStyle = "#0d0d0d";
+    ctx.fillRect(0, 0, W, H);
+    const { r, g, b } = hexToRgb(design.accentColor);
+    const glow = ctx.createRadialGradient(
+      W / 2, H * 0.3, 0,
+      W / 2, H * 0.3, W * 0.7,
+    );
+    glow.addColorStop(0, `rgba(${r},${g},${b},0.14)`);
+    glow.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, W, H);
+
+    const padX = Math.round(W * 0.085);
+    const innerW = W - padX * 2;
+
+    ctx.textBaseline = "alphabetic";
+    ctx.textAlign = "center";
+
+    // The bookmark ribbon.
+    ctx.fillStyle = design.accentColor;
+    drawBookmark(ctx, W / 2, Math.round(H * 0.24), Math.round(W * 0.075), Math.round(H * 0.115));
+
+    // Heading
+    const heading = (design.headingText || "Save this for later").toUpperCase();
+    const fit = autoFitHeading(
+      measure,
+      heading,
+      "400",
+      fonts.heading,
+      Math.round(H * 0.075),
+      Math.round(H * 0.046),
+      innerW,
+      3,
+      design.headingScale,
+    );
+    const headingLine = Math.round(fit.size * 1.06);
+    const headingBlock = fit.lines.length * headingLine;
+    const headingTop = Math.round(H * 0.43);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `400 ${fit.size}px ${fonts.heading}`;
+    paintLines(ctx, fit.lines, W / 2, headingTop + fit.size, headingLine);
+
+    // Body
+    if (design.bodyText.trim()) {
+      const bodySize = Math.round(H * 0.023);
+      const bodyLine = Math.round(bodySize * 1.55);
+      const bodyLines = wrapLines(
+        measure,
+        `400 ${bodySize}px ${fonts.body}`,
+        design.bodyText,
+        Math.round(innerW * 0.78),
+      ).slice(0, 3);
+      ctx.fillStyle = "rgba(255,255,255,0.75)";
+      ctx.font = `400 ${bodySize}px ${fonts.body}`;
+      paintLines(
+        ctx,
+        bodyLines,
+        W / 2,
+        headingTop + headingBlock + Math.round(H * 0.04) + bodySize,
+        bodyLine,
+      );
+    }
+
     ctx.restore();
   },
 };
@@ -3608,6 +4137,10 @@ export const TEMPLATES: Template[] = [
   CAROUSEL_CTA,
   CAROUSEL_TIP,
   CAROUSEL_QUOTE_SLIDE,
+  CAROUSEL_CHECKLIST,
+  CAROUSEL_MYTH,
+  CAROUSEL_STAT,
+  CAROUSEL_SAVE,
   QUESTION_HOOK,
   // Testimonials
   QUOTE_PORTRAIT,
@@ -3636,6 +4169,15 @@ export function templatesByCategory(
   return TEMPLATES.filter((t) => t.category === category);
 }
 
+/**
+ * Whether a slide on this template can show a background photo at all.
+ * The AI-background queue checks this before spending money: generating an
+ * image for a slide whose template never paints one buys nothing.
+ */
+export function templateUsesPhoto(t: Template): boolean {
+  return !!(t.requiresPhoto || t.acceptsPhoto);
+}
+
 /** A labelled run of templates in the picker. */
 export interface TemplateGroup {
   label: string;
@@ -3653,7 +4195,11 @@ const CAROUSEL_ROLE_OF: Record<string, "opener" | "middle" | "closing"> = {
   "carousel-content": "middle",
   "carousel-tip": "middle",
   "carousel-quote-slide": "middle",
+  "carousel-checklist": "middle",
+  "carousel-myth": "middle",
+  "carousel-stat": "middle",
   "carousel-cta": "closing",
+  "carousel-save": "closing",
 };
 
 const CAROUSEL_ROLES = [
