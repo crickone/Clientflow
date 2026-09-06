@@ -14,6 +14,9 @@
  * tab, which then reported every slot EMPTY and the slide looked lost.
  */
 
+/** What a design is: a series of slides, or one image. */
+export type DesignKind = "carousel" | "single";
+
 /** The slot every single image shares. */
 export const DEFAULT_SLOT = "default";
 

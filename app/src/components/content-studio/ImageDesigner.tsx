@@ -36,11 +36,10 @@ import type {
   ImageLibraryAsset,
 } from "@/lib/db/schema";
 import {
-  CATEGORIES,
+  carouselTemplateGroups,
   getTemplate,
-  templatesByCategory,
+  singleTemplateGroups,
   type Template,
-  type TemplateCategory,
 } from "@/lib/image/templates";
 import {
   DEFAULT_BODY_FONT_ID,
@@ -60,6 +59,7 @@ import {
   DEFAULT_SLOT,
   isCarouselSlot,
   templateForNewSlide,
+  type DesignKind,
 } from "@/lib/image/slots";
 import { SlideCanvas, useCanvasFonts, useLogoImage } from "./SlideCanvas";
 import { EditorSection } from "./EditorSection";
@@ -268,15 +268,6 @@ export function ImageDesigner({
   const isCarousel = total > 1;
   const activeSlide = slidesInSlot[activeIdx] ?? null;
 
-  // Slide counts per slot (used for badges on the Carousels template cards).
-  const slotCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const s of slides) {
-      counts[s.slotKey] = (counts[s.slotKey] ?? 0) + 1;
-    }
-    return counts;
-  }, [slides]);
-
   // Clamp activeIdx when the slot or slide count changes.
   useEffect(() => {
     if (activeIdx >= slidesInSlot.length) {
@@ -459,17 +450,22 @@ export function ImageDesigner({
     };
   }, [anyGenerating, designId]);
 
-  async function addSlide() {
+  // `template` is only passed when the user picked one from the picker on an
+  // empty slot. NOTE the callers: `onClick={addSlide}` would hand the click
+  // event in as the template.
+  async function addSlide(template?: Template) {
     setActionError(null);
     try {
       const lastInSlot = slidesInSlot[slidesInSlot.length - 1];
       // Pick a sensible template default. Within carousel slots, prefer the
       // matching content template; outside, mirror the slot's last slide.
-      const templateId = templateForNewSlide(
-        activeSlot,
-        slidesInSlot.length,
-        lastInSlot?.templateId ?? DEFAULT_CAROUSEL_SLOT,
-      );
+      const templateId =
+        template?.id ??
+        templateForNewSlide(
+          activeSlot,
+          slidesInSlot.length,
+          lastInSlot?.templateId ?? DEFAULT_CAROUSEL_SLOT,
+        );
       const res = await fetch(
         `/api/content-studio/carousels/${designId}/slides`,
         {
@@ -478,7 +474,10 @@ export function ImageDesigner({
           body: JSON.stringify({
             slotKey: activeSlot,
             templateId,
-            aspectRatio: lastInSlot?.aspectRatio ?? "1:1",
+            // A picked template brings its own shape; otherwise follow the
+            // slot so a slide doesn't change aspect mid-carousel.
+            aspectRatio:
+              template?.aspectRatio ?? lastInSlot?.aspectRatio ?? "1:1",
           }),
         },
       );
@@ -490,6 +489,17 @@ export function ImageDesigner({
       setActiveIdx(slidesInSlot.length);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Couldn't add slide.");
+    }
+  }
+
+  // Clicking a template restyles the slide in front of you. On an empty slot
+  // there's nothing to restyle, so the click starts the slot with that
+  // template — otherwise the whole picker would sit there looking inert.
+  function applyTemplate(t: Template) {
+    if (activeSlide) {
+      updateActiveSlide({ templateId: t.id, aspectRatio: t.aspectRatio });
+    } else {
+      void addSlide(t);
     }
   }
 
@@ -770,9 +780,11 @@ export function ImageDesigner({
     [activeSlide],
   );
 
-  const [activeCategory, setActiveCategory] = useState<TemplateCategory>(
-    (template?.category as TemplateCategory) ?? "social",
-  );
+  // What you're making isn't stored anywhere — it IS which slot you're in.
+  // Deriving it means the switch can't drift out of step with the slides on
+  // screen, which is the whole class of bug that made a carousel look lost.
+  const isCarouselKind = isCarouselSlot(activeSlot);
+  const designKind: DesignKind = isCarouselKind ? "carousel" : "single";
 
   // The first existing carousel slot, or the canonical one for a new carousel.
   const carouselSlotFor = useCallback(
@@ -782,19 +794,39 @@ export function ImageDesigner({
     [slides],
   );
 
-  // Switching a format tab maps to a slot: single-image formats (Social Posts,
-  // Stories, Testimonials, Promos, Educational) all live in the "default" slot;
-  // carousels live in a carousel slot. This keeps a generated carousel in the
-  // Carousels tab and stops a single-image format from being applied to — and
-  // getting stuck on — the carousel.
-  const selectCategory = useCallback(
-    (cat: TemplateCategory) => {
-      setActiveCategory(cat);
+  // Switching kind maps to a slot: single images all live in the "default"
+  // slot, a carousel in a carousel slot. This keeps a generated carousel where
+  // the carousel view can see it and stops a single-image format being applied
+  // to — and getting stuck on — the carousel.
+  const selectKind = useCallback(
+    (kind: DesignKind) => {
       setActiveIdx(0);
-      setActiveSlot(cat === "carousels" ? carouselSlotFor() : DEFAULT_SLOT);
+      setActiveSlot(kind === "carousel" ? carouselSlotFor() : DEFAULT_SLOT);
     },
     [carouselSlotFor],
   );
+
+  const templateGroups = useMemo(
+    () => (isCarouselKind ? carouselTemplateGroups() : singleTemplateGroups()),
+    [isCarouselKind],
+  );
+
+  // Slots other than the one on screen. Only legacy designs have any: the old
+  // picker made a parallel carousel every time you clicked a carousel card.
+  const otherSlots = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const s of slides) {
+      if (s.slotKey === activeSlot) continue;
+      counts.set(s.slotKey, (counts.get(s.slotKey) ?? 0) + 1);
+    }
+    return [...counts.entries()].map(([key, count]) => ({
+      key,
+      count,
+      label:
+        getTemplate(key)?.name ??
+        (key === DEFAULT_SLOT ? "Single post" : key),
+    }));
+  }, [slides, activeSlot]);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -960,7 +992,7 @@ export function ImageDesigner({
                   textTransform: "uppercase",
                 }}
               >
-                Empty slot
+                Nothing here yet
               </div>
               <div
                 style={{
@@ -970,9 +1002,15 @@ export function ImageDesigner({
                   margin: "0 auto",
                 }}
               >
-                Click <strong>Generate carousel</strong> in the toolbar to
-                fill this slot, or click <strong>Add slide</strong> to start
-                manually.
+                {isCarouselKind ? (
+                  <>
+                    Hit <strong>Generate carousel</strong> to have Adonis write
+                    the series, or pick a template to start the first slide
+                    yourself.
+                  </>
+                ) : (
+                  <>Pick a template to start this post.</>
+                )}
               </div>
             </div>
           ) : isCarousel ? (
@@ -1106,7 +1144,7 @@ export function ImageDesigner({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={addSlide}
+                onClick={() => addSlide()}
                 title="Add another slide to make this a carousel"
               >
                 <Plus size={14} />
@@ -1176,31 +1214,43 @@ export function ImageDesigner({
         <div style={{ display: "grid", gap: 12 }}>
           <EditorSection title="Template" defaultOpen>
           <div>
-            <Label>Template</Label>
+            {/* The six-tab row that used to sit here asked the wrong question.
+                Social vs Stories vs Promos was never a mode to BE in — just a
+                way to find a card — while the one real decision (a series of
+                slides, or one image?) was buried as the third tab along, under
+                a name that collided with the Generate button. Now the kind is
+                the switch, and the categories are labels you scroll past. */}
+            <Label>What you&rsquo;re making</Label>
             <div
+              role="group"
               style={{
-                display: "flex",
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
                 gap: 2,
-                borderBottom: "1px solid var(--hairline)",
-                marginBottom: 12,
-                overflowX: "auto",
+                padding: 2,
+                background: "var(--surface-2)",
+                borderRadius: "var(--radius)",
+                marginBottom: 10,
               }}
             >
-              {CATEGORIES.map((cat) => {
-                const active = activeCategory === cat.id;
+              {(
+                [
+                  { kind: "single" as const, label: "Single post" },
+                  { kind: "carousel" as const, label: "Carousel" },
+                ]
+              ).map((o) => {
+                const active = designKind === o.kind;
                 return (
                   <button
-                    key={cat.id}
+                    key={o.kind}
                     type="button"
-                    onClick={() => selectCategory(cat.id)}
+                    onClick={() => selectKind(o.kind)}
+                    aria-pressed={active}
                     style={{
-                      padding: "10px 14px",
-                      background: "transparent",
+                      padding: "9px 12px",
+                      borderRadius: "calc(var(--radius) - 2px)",
                       border: "none",
-                      borderBottom: `2px solid ${
-                        active ? "var(--text-primary)" : "transparent"
-                      }`,
-                      marginBottom: -1,
+                      background: active ? "var(--bg)" : "transparent",
                       color: active
                         ? "var(--text-primary)"
                         : "var(--text-secondary)",
@@ -1208,10 +1258,9 @@ export function ImageDesigner({
                       fontWeight: 500,
                       cursor: "pointer",
                       fontFamily: "inherit",
-                      whiteSpace: "nowrap",
                     }}
                   >
-                    {cat.label}
+                    {o.label}
                   </button>
                 );
               })}
@@ -1224,13 +1273,15 @@ export function ImageDesigner({
                 letterSpacing: "0.02em",
               }}
             >
-              {CATEGORIES.find((c) => c.id === activeCategory)?.blurb}
+              {isCarouselKind
+                ? "Square slides designed to be posted as a 3-7 slide series."
+                : "One image. Pick the look that fits what you're saying."}
             </div>
             {/* Generation belongs WITH the carousels. In the toolbar it showed on
                 every category, sitting above the template grid as "Generate
                 carousel" while a "Carousels" tab meant something else entirely —
                 two different jobs under near-identical names. */}
-            {activeCategory === "carousels" && (
+            {isCarouselKind && (
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
             <GenerateCarouselButton
               designId={designId}
@@ -1244,14 +1295,13 @@ export function ImageDesigner({
               onGenerated={(newSlides, images) => {
                 lastSavedRef.current = {};
                 setSlides(newSlides);
-                // The carousel lives in its carousel slot — switch the view to the
-                // Carousels tab + that slot so we land on it (and never pollute the
-                // single-image "default" slot).
+                // The carousel lives in its carousel slot — switch to that slot
+                // so we land on it (and never pollute the single-image
+                // "default" slot). The kind follows the slot on its own.
                 const cslot =
                   newSlides.find((s) => isCarouselSlot(s.slotKey))?.slotKey ??
                   DEFAULT_CAROUSEL_SLOT;
                 setActiveSlot(cslot);
-                setActiveCategory("carousels");
                 setActiveIdx(0);
                 router.refresh();
                 if (images && images.queued > 0) {
@@ -1264,115 +1314,143 @@ export function ImageDesigner({
                 </span>
               </div>
             )}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                gap: 10,
-              }}
-            >
-              {templatesByCategory(activeCategory).map((t) => {
-                // In Carousels category, each template card represents an
-                // INDEPENDENT slot — clicking switches which carousel you're
-                // viewing rather than re-skinning the current slide.
-                const isSlotMode = activeCategory === "carousels";
-                const active = isSlotMode
-                  ? activeSlot === t.id
-                  : activeSlide.templateId === t.id;
-                const count = isSlotMode ? slotCounts[t.id] ?? 0 : 0;
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => {
-                      if (isSlotMode) {
-                        setActiveSlot(t.id);
-                        setActiveIdx(0);
-                      } else {
-                        updateActiveSlide({
-                          templateId: t.id,
-                          aspectRatio: t.aspectRatio,
-                        });
-                      }
-                    }}
-                    style={{
-                      textAlign: "left",
-                      padding: "12px 14px",
-                      borderRadius: "var(--radius)",
-                      border: active
-                        ? "1px solid var(--text-primary)"
-                        : "1px solid var(--hairline)",
-                      background: active ? "var(--surface-2)" : "var(--bg)",
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                      display: "grid",
-                      gap: 4,
-                      position: "relative",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        gap: 8,
-                      }}
-                    >
-                      <span
+            {/* One scroll, labelled. A carousel template card used to switch
+                you to a different, parallel carousel rather than restyle the
+                slide in front of you — the templates read as slide ROLES
+                ("Series opener", "Closing slide"), so that was backwards.
+                Cards now restyle the current slide in both kinds. */}
+            {templateGroups.map((group) => (
+              <div key={group.label} style={{ marginBottom: 14 }}>
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    color: "var(--text-tertiary)",
+                    marginBottom: 7,
+                  }}
+                >
+                  {group.label}
+                </div>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                    gap: 10,
+                  }}
+                >
+                  {group.templates.map((t) => {
+                    const active = activeSlide?.templateId === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => applyTemplate(t)}
+                        aria-pressed={active}
                         style={{
-                          fontSize: 13,
-                          fontWeight: 500,
-                          color: "var(--text-primary)",
+                          textAlign: "left",
+                          padding: "12px 14px",
+                          borderRadius: "var(--radius)",
+                          border: active
+                            ? "1px solid var(--text-primary)"
+                            : "1px solid var(--hairline)",
+                          background: active ? "var(--surface-2)" : "var(--bg)",
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                          display: "grid",
+                          gap: 4,
+                          position: "relative",
                         }}
                       >
-                        {t.name}
-                      </span>
-                      {isSlotMode ? (
-                        <span
+                        <div
                           style={{
-                            fontSize: 10,
-                            fontWeight: 600,
-                            letterSpacing: "0.06em",
-                            padding: "3px 8px",
-                            borderRadius: "var(--radius)",
-                            background:
-                              count > 0
-                                ? "var(--text-primary)"
-                                : "var(--surface-3)",
-                            color:
-                              count > 0
-                                ? "var(--bg)"
-                                : "var(--text-tertiary)",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            gap: 8,
                           }}
                         >
-                          {count > 0
-                            ? `${count} SLIDE${count === 1 ? "" : "S"}`
-                            : "EMPTY"}
-                        </span>
-                      ) : (
-                        <span
+                          <span
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 500,
+                              color: "var(--text-primary)",
+                            }}
+                          >
+                            {t.name}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 11,
+                              color: "var(--text-tertiary)",
+                            }}
+                          >
+                            {t.aspectRatio}
+                          </span>
+                        </div>
+                        <div
                           style={{
                             fontSize: 11,
                             color: "var(--text-tertiary)",
+                            letterSpacing: "0.02em",
                           }}
                         >
-                          {t.aspectRatio}
-                        </span>
-                      )}
-                    </div>
-                    <div
+                          {t.blurb}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+            {/* Designs made before the kind was a single choice could hold
+                several parallel carousels. Nothing creates them any more, so
+                this only appears for the handful that already exist. */}
+            {otherSlots.length > 0 && (
+              <div style={{ marginTop: 4 }}>
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    color: "var(--text-tertiary)",
+                    marginBottom: 7,
+                  }}
+                >
+                  Also in this design
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {otherSlots.map((slot) => (
+                    <button
+                      key={slot.key}
+                      type="button"
+                      onClick={() => {
+                        setActiveSlot(slot.key);
+                        setActiveIdx(0);
+                      }}
                       style={{
-                        fontSize: 11,
-                        color: "var(--text-tertiary)",
-                        letterSpacing: "0.02em",
+                        padding: "7px 11px",
+                        borderRadius: "var(--radius)",
+                        border: "1px solid var(--hairline)",
+                        background: "var(--bg)",
+                        color: "var(--text-secondary)",
+                        fontSize: 12,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
                       }}
                     >
-                      {t.blurb}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+                      {slot.label}
+                      <span style={{ color: "var(--text-tertiary)" }}>
+                        {" "}
+                        · {slot.count} slide{slot.count === 1 ? "" : "s"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           </EditorSection>
 

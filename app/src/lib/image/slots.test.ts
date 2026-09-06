@@ -21,7 +21,11 @@ import {
   isValidSlotKey,
   templateForNewSlide,
 } from "./slots";
-import { TEMPLATES } from "./templates";
+import {
+  TEMPLATES,
+  carouselTemplateGroups,
+  singleTemplateGroups,
+} from "./templates";
 
 let passed = 0;
 function ok(name: string, cond: boolean) {
@@ -115,5 +119,66 @@ for (const t of TEMPLATES.filter((x) => x.category !== "carousels")) {
     !isCarouselSlot(t.id),
   );
 }
+
+// --- the picker's two lists --------------------------------------------------
+//
+// The six-tab row was replaced by a single Single-post / Carousel switch, so
+// each kind now shows one scrolling, labelled list. The point of the change is
+// that you only ever see templates for the kind you chose — if the two lists
+// started overlapping, the naming collision the redesign removed would be back.
+
+const carouselIds = carouselTemplateGroups().flatMap((g) =>
+  g.templates.map((t) => t.id),
+);
+const singleIds = singleTemplateGroups().flatMap((g) =>
+  g.templates.map((t) => t.id),
+);
+
+eq(
+  "every carousel template is offered exactly once",
+  carouselIds.length,
+  new Set(carouselIds).size,
+);
+eq(
+  "every single-post template is offered exactly once",
+  singleIds.length,
+  new Set(singleIds).size,
+);
+ok(
+  "the carousel list is exactly the carousels category",
+  carouselIds.length === TEMPLATES.filter((t) => t.category === "carousels").length,
+);
+ok(
+  "no carousel template leaks into the single-post list",
+  singleIds.every((id) => !isCarouselSlot(id)),
+);
+ok(
+  "no single-post template leaks into the carousel list",
+  carouselIds.every((id) => isCarouselSlot(id)),
+);
+eq(
+  "between them the two lists offer every template — none is unreachable",
+  [...carouselIds, ...singleIds].sort(),
+  TEMPLATES.map((t) => t.id).sort(),
+);
+ok("every group is labelled", [
+  ...carouselTemplateGroups(),
+  ...singleTemplateGroups(),
+].every((g) => g.label.trim().length > 0));
+ok(
+  "no group renders empty",
+  [...carouselTemplateGroups(), ...singleTemplateGroups()].every(
+    (g) => g.templates.length > 0,
+  ),
+);
+
+// A carousel's groups are slide ROLES, so the opener has to come before the
+// closer — the list doubles as the shape of the series.
+const roleLabels = carouselTemplateGroups().map((g) => g.label);
+eq(
+  "carousel groups read in series order",
+  roleLabels,
+  ["Opening slide", "Middle slides", "Closing slide"],
+);
 
 console.log(`\nslots: ${passed} checks passed.`);

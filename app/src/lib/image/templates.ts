@@ -3562,6 +3562,54 @@ export function templatesByCategory(
   return TEMPLATES.filter((t) => t.category === category);
 }
 
+/** A labelled run of templates in the picker. */
+export interface TemplateGroup {
+  label: string;
+  templates: Template[];
+}
+
+/**
+ * Carousel templates are slide ROLES, not alternative looks — "Series opener",
+ * "Middle slide", "Closing slide", all 1:1, all part of one series. Anything
+ * new defaults to a middle slide so it can't vanish from the picker.
+ */
+const CAROUSEL_ROLE_OF: Record<string, "opener" | "middle" | "closing"> = {
+  "carousel-cover": "opener",
+  "question-hook": "opener",
+  "carousel-content": "middle",
+  "carousel-tip": "middle",
+  "carousel-quote-slide": "middle",
+  "carousel-cta": "closing",
+};
+
+const CAROUSEL_ROLES = [
+  { role: "opener", label: "Opening slide" },
+  { role: "middle", label: "Middle slides" },
+  { role: "closing", label: "Closing slide" },
+] as const;
+
+/** Carousel templates, grouped by where the slide sits in the series. */
+export function carouselTemplateGroups(): TemplateGroup[] {
+  const carousels = templatesByCategory("carousels");
+  return CAROUSEL_ROLES.map(({ role, label }) => ({
+    label,
+    templates: carousels.filter(
+      (t) => (CAROUSEL_ROLE_OF[t.id] ?? "middle") === role,
+    ),
+  })).filter((g) => g.templates.length > 0);
+}
+
+/**
+ * Single-image templates, grouped by category. This replaces the six-tab row:
+ * a carousel and a single post are two different things, but Social vs Stories
+ * vs Promos was never a mode to be in — just a way to find the right card.
+ */
+export function singleTemplateGroups(): TemplateGroup[] {
+  return CATEGORIES.filter((c) => c.id !== "carousels")
+    .map((c) => ({ label: c.label, templates: templatesByCategory(c.id) }))
+    .filter((g) => g.templates.length > 0);
+}
+
 /**
  * Draw the tenant's uploaded logo on a rendered slide, positioned per the
  * active template's `logoPlacement` (default "bottom-right"). Called by the
