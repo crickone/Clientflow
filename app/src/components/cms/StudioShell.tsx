@@ -153,6 +153,20 @@ export function StudioShell({
   const saveRef = useRef(save);
   saveRef.current = save;
 
+  // The sidebar's "Manage site" links and the "Sites" back-link are plain
+  // next/link Links (not the internal navigate() below), so they can unmount
+  // this shell while an autosave timer is still pending. Without this, that
+  // timer fires after unmount and calls a server action / sets state on a
+  // component that's gone.
+  useEffect(() => {
+    return () => {
+      if (autosaveTimer.current) {
+        clearTimeout(autosaveTimer.current);
+        autosaveTimer.current = null;
+      }
+    };
+  }, []);
+
   useEffect(() => {
     async function onMsg(ev: MessageEvent) {
       if (ev.source !== iframeRef.current?.contentWindow) return;

@@ -123,7 +123,7 @@ export function StudioCanvas({
           alt: kind === "image" ? img.getAttribute("alt") ?? "" : undefined,
           hidden:
             kind === "section"
-              ? el.style.display === "none" || el.hasAttribute("data-cms-hidden-preview")
+              ? el.hasAttribute("data-cms-hidden") || el.hasAttribute("data-cms-hidden-preview")
               : undefined,
         },
       };
@@ -242,8 +242,15 @@ export function StudioCanvas({
       clone.querySelectorAll("[data-cms-sel]").forEach((e) => e.removeAttribute("data-cms-sel"));
       clone.querySelectorAll("[data-cms-hover]").forEach((e) => e.removeAttribute("data-cms-hover"));
       clone.querySelectorAll("[data-cms-img]").forEach((e) => e.removeAttribute("data-cms-img"));
+      // data-cms-hidden is the durable, saved-HTML record that the CMS (not
+      // the page's own CSS/JS) hid this element; data-cms-hidden-preview is
+      // the editor-only marker that fades it in the canvas instead of
+      // actually hiding it, so it can still be found and switched back on.
+      // Serialising must drop the preview marker but keep (or add) the
+      // durable one, and re-apply the real display:none the live page needs.
       clone.querySelectorAll("[data-cms-hidden-preview]").forEach((e) => {
         e.removeAttribute("data-cms-hidden-preview");
+        e.setAttribute("data-cms-hidden", "1");
         (e as HTMLElement).style.display = "none";
       });
       // .cms-toolbar itself lives on document.body and never appears inside
@@ -303,8 +310,16 @@ export function StudioCanvas({
           else el.removeAttribute("target");
         } else if (d.prop === "alt") el.setAttribute("alt", String(d.value));
         else if (d.prop === "hidden") {
-          if (d.value) el.setAttribute("data-cms-hidden-preview", "1");
-          else {
+          if (d.value) {
+            // data-cms-hidden is the durable marker that survives clean() into
+            // the saved HTML (paired there with inline display:none); the
+            // preview attribute is editor-only and only fades the element
+            // here so it stays visible enough to find and switch back on.
+            el.setAttribute("data-cms-hidden", "1");
+            el.setAttribute("data-cms-hidden-preview", "1");
+            el.style.removeProperty("display");
+          } else {
+            el.removeAttribute("data-cms-hidden");
             el.removeAttribute("data-cms-hidden-preview");
             if (el.style.display === "none") el.style.removeProperty("display");
           }
@@ -342,13 +357,17 @@ export function StudioCanvas({
     };
     window.addEventListener("message", onMsg);
 
-    // Sections already hidden in the stored HTML render at low opacity here so
-    // they can be found and switched back on. Scoped to plausible page
-    // sections only (matches SECTION_SEL, or a direct child of the edit
-    // root) — a bespoke page's hidden modal/nav/accordion pane elsewhere in
-    // the tree is left exactly as it is, not surfaced as an editable layer.
-    root.querySelectorAll<HTMLElement>('[style*="display:none"],[style*="display: none"]').forEach((el) => {
-      if (!(el.matches(SECTION_SEL) || el.parentElement === root)) return;
+    // Reveal only what the CMS itself hid — never infer it from a bare
+    // inline display:none. A bespoke page very commonly authors its own
+    // full-screen modal or mobile-nav overlay (position:fixed;inset:0;
+    // display:none) as a top-level sibling of header/main/footer, precisely
+    // because it doesn't need to sit in the document flow; a heuristic that
+    // matched "hidden + top-level (or section-like)" would surface that
+    // overlay as a fake faded section and its full-viewport hit area would
+    // swallow every click to the real content underneath. data-cms-hidden is
+    // the explicit, durable marker `clean()` writes when the operator hides a
+    // section, so only elements carrying it are ever candidates here.
+    root.querySelectorAll<HTMLElement>("[data-cms-hidden]").forEach((el) => {
       el.setAttribute("data-cms-hidden-preview", "1");
       el.style.removeProperty("display");
     });
