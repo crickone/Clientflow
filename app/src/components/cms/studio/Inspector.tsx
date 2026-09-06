@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Eye, EyeOff, Image as ImageIcon, Link2, Type } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";

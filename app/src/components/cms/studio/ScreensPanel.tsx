@@ -64,6 +64,7 @@ export function ScreensPanel({
             <button
               key={p.path}
               onClick={() => onNavigate(p.path)}
+              aria-label={`${p.title || p.path}${drafts.has(p.path) ? " — unpublished draft" : ""}`}
               style={{
                 textAlign: "left",
                 padding: "8px 10px",
@@ -80,7 +81,7 @@ export function ScreensPanel({
                 {drafts.has(p.path) && (
                   <span
                     title="Unpublished draft"
-                    style={{ width: 6, height: 6, borderRadius: "50%", background: "#d29922", flex: "none" }}
+                    style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--warning)", flex: "none" }}
                   />
                 )}
               </span>

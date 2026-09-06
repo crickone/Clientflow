@@ -36,20 +36,48 @@ export function MediaDrawer({
   const fileInput = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(async () => {
-    const res = await fetch("/api/cms/library").then((r) => r.json());
-    setRows(
-      (res.assets || []).map((a: { id: number; originalName: string; alt: string | null }) => ({
-        id: a.id,
-        originalName: a.originalName,
-        alt: a.alt,
-        url: `/library-media/${a.id}`,
-      })),
-    );
+    try {
+      const res = await fetch("/api/cms/library").then((r) => r.json());
+      setRows(
+        (res.assets || []).map((a: { id: number; originalName: string; alt: string | null }) => ({
+          id: a.id,
+          originalName: a.originalName,
+          alt: a.alt,
+          url: `/library-media/${a.id}`,
+        })),
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to load media library");
+    }
   }, []);
 
   useEffect(() => {
-    if (open) void refresh();
-  }, [open, refresh]);
+    if (!open) return;
+
+    const abortController = new AbortController();
+
+    (async () => {
+      try {
+        const res = await fetch("/api/cms/library", { signal: abortController.signal }).then((r) => r.json());
+        if (!abortController.signal.aborted) {
+          setRows(
+            (res.assets || []).map((a: { id: number; originalName: string; alt: string | null }) => ({
+              id: a.id,
+              originalName: a.originalName,
+              alt: a.alt,
+              url: `/library-media/${a.id}`,
+            })),
+          );
+        }
+      } catch (err) {
+        if (!abortController.signal.aborted) {
+          toast.error(err instanceof Error ? err.message : "Failed to load media library");
+        }
+      }
+    })();
+
+    return () => abortController.abort();
+  }, [open]);
 
   const upload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -124,6 +152,7 @@ export function MediaDrawer({
                 onDragEnd={onDragEnd}
                 onClick={() => onPick(m)}
                 title={m.alt || m.originalName}
+                aria-label={m.alt || m.originalName}
                 style={{
                   border: "1px solid var(--hairline)",
                   borderRadius: 8,
