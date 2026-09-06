@@ -17,7 +17,6 @@ import {
   RefreshCw,
   Sparkles,
   Trash2,
-  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
@@ -29,7 +28,6 @@ import {
   DialogClose,
 } from "@/components/ui/Dialog";
 import { Input, Label, Textarea } from "@/components/ui/Input";
-import { Tooltip } from "@/components/ui/Tooltip";
 import type {
   CarouselSlide,
   ImageLibraryAsset,
@@ -65,6 +63,8 @@ import {
 } from "@/lib/image/slots";
 import { SlideCanvas, useCanvasFonts, useLogoImage } from "./SlideCanvas";
 import { SlideFilmstrip } from "./SlideFilmstrip";
+import { SlideColorPicker } from "./SlideColorPicker";
+import { SlidePhotoLibrary } from "./SlidePhotoLibrary";
 import { EditorSection } from "./EditorSection";
 import { PostIdeas } from "./PostIdeas";
 
@@ -887,7 +887,6 @@ export function ImageDesigner({
     }));
   }, [slides, activeSlot]);
 
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // We DON'T early-return when activeSlide is null — the slot may simply be
   // empty (e.g. the user clicked a Carousels template card for the first
@@ -1215,6 +1214,22 @@ export function ImageDesigner({
                 </Button>
               )}
             </div>
+            {/* Both slide colours, next to the thing they change. They used to
+                sit in the Style section down the controls column, so picking
+                one meant scrolling away from the preview you were picking it
+                for. */}
+            {activeSlide && (
+              <SlideColorPicker
+                accent={activeSlide.accentColor}
+                background={activeSlide.backgroundColor}
+                onAccent={(accentColor) => updateActiveSlide({ accentColor })}
+                onBackground={(backgroundColor) =>
+                  updateActiveSlide({ backgroundColor })
+                }
+                accentSwatches={ACCENT_SWATCHES}
+                backgroundSwatches={BACKGROUND_SWATCHES}
+              />
+            )}
             {!isEmptySlot && (
               <div style={{ display: "flex", gap: 8 }}>
                 <Button
@@ -1260,6 +1275,20 @@ export function ImageDesigner({
               {template.aspectRatio} · {template.width}×{template.height} ·{" "}
               {template.name}
             </div>
+          )}
+
+          {/* The photo library, next to the preview it changes. It used to be
+              at the bottom of the Layout section, so picking a background meant
+              scrolling away from the slide you were picking it for. */}
+          {activeSlide && (
+            <SlidePhotoLibrary
+              assets={imageLibrary}
+              activeAssetId={activeSlide.backgroundAssetId}
+              onPick={setSlideBackgroundManually}
+              onUpload={uploadFiles}
+              onDelete={deleteAsset}
+              uploading={uploading}
+            />
           )}
         </div>
 
@@ -1636,121 +1665,6 @@ export function ImageDesigner({
             </div>
           </div>
 
-          <div>
-            <Label>Accent colour</Label>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {ACCENT_SWATCHES.map((c) => {
-                const active =
-                  activeSlide.accentColor.toLowerCase() === c.toLowerCase();
-                return (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => updateActiveSlide({ accentColor: c })}
-                    aria-label={c}
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: "var(--radius)",
-                      background: c,
-                      border: active
-                        ? "2px solid var(--text-primary)"
-                        : "1px solid var(--hairline-strong)",
-                      cursor: "pointer",
-                      padding: 0,
-                    }}
-                  />
-                );
-              })}
-              <input
-                type="color"
-                value={activeSlide.accentColor}
-                onChange={(e) =>
-                  updateActiveSlide({ accentColor: e.target.value })
-                }
-                style={{
-                  width: 36,
-                  height: 36,
-                  border: "1px solid var(--hairline)",
-                  borderRadius: "var(--radius)",
-                  padding: 0,
-                  background: "transparent",
-                  cursor: "pointer",
-                }}
-                title="Custom colour"
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label>Background colour</Label>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-              <Tooltip label="No colour">
-                <button
-                  type="button"
-                  onClick={() => updateActiveSlide({ backgroundColor: null })}
-                  aria-label="No colour"
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: "var(--radius)",
-                    background:
-                      "repeating-conic-gradient(#888 0% 25%, #ccc 0% 50%) 50% / 12px 12px",
-                    border: !activeSlide.backgroundColor
-                      ? "2px solid var(--text-primary)"
-                      : "1px solid var(--hairline-strong)",
-                    cursor: "pointer",
-                    padding: 0,
-                  }}
-                />
-              </Tooltip>
-              {BACKGROUND_SWATCHES.map((c) => {
-                const active =
-                  (activeSlide.backgroundColor ?? "").toLowerCase() ===
-                  c.toLowerCase();
-                return (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => updateActiveSlide({ backgroundColor: c })}
-                    aria-label={c}
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: "var(--radius)",
-                      background: c,
-                      border: active
-                        ? "2px solid var(--text-primary)"
-                        : "1px solid var(--hairline-strong)",
-                      cursor: "pointer",
-                      padding: 0,
-                    }}
-                  />
-                );
-              })}
-              <input
-                type="color"
-                value={activeSlide.backgroundColor ?? "#0a0a0a"}
-                onChange={(e) =>
-                  updateActiveSlide({ backgroundColor: e.target.value })
-                }
-                style={{
-                  width: 36,
-                  height: 36,
-                  border: "1px solid var(--hairline)",
-                  borderRadius: "var(--radius)",
-                  padding: 0,
-                  background: "transparent",
-                  cursor: "pointer",
-                }}
-                title="Custom background colour"
-              />
-            </div>
-            <p style={{ color: "var(--text-tertiary)", fontSize: 12, marginTop: 6 }}>
-              Used when no background photo is set. A photo always takes priority.
-            </p>
-          </div>
-
           {imageGenEnabled && activeSlide && (
             <div>
               <Label>AI background</Label>
@@ -1774,158 +1688,6 @@ export function ImageDesigner({
             hint={total > 1 ? `Slide ${activeIdx + 1} of ${total}` : "This post"}
             defaultOpen
           >
-          <div>
-            <Label>Background photo</Label>
-            <div
-              style={{
-                border: "1px solid var(--hairline)",
-                borderRadius: "var(--radius)",
-                padding: 14,
-                background: "var(--surface-1)",
-                display: "grid",
-                gap: 12,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                  {imageLibrary.length} photo{imageLibrary.length === 1 ? "" : "s"} in
-                  library
-                </span>
-                <div style={{ display: "flex", gap: 8 }}>
-                  {activeSlide.backgroundAssetId != null && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setSlideBackgroundManually(null)}
-                    >
-                      Clear
-                    </Button>
-                  )}
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                  >
-                    <Upload size={14} />
-                    {uploading ? "Uploading…" : "Upload photos"}
-                  </Button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    multiple
-                    style={{ display: "none" }}
-                    onChange={(e) => {
-                      const list = Array.from(e.target.files ?? []);
-                      if (list.length > 0) uploadFiles(list);
-                      e.target.value = "";
-                    }}
-                  />
-                </div>
-              </div>
-              {imageLibrary.length === 0 ? (
-                <div
-                  style={{
-                    border: "1px dashed var(--hairline)",
-                    borderRadius: "var(--radius)",
-                    padding: 24,
-                    textAlign: "center",
-                    color: "var(--text-tertiary)",
-                    fontSize: 13,
-                  }}
-                >
-                  <ImageIcon
-                    size={24}
-                    strokeWidth={1.5}
-                    style={{ marginBottom: 6, opacity: 0.5 }}
-                  />
-                  <div>Upload clinic photos to use as backgrounds.</div>
-                </div>
-              ) : (
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))",
-                    gap: 8,
-                    maxHeight: 320,
-                    overflowY: "auto",
-                  }}
-                >
-                  {imageLibrary.map((asset) => {
-                    const active = asset.id === activeSlide.backgroundAssetId;
-                    return (
-                      <div
-                        key={asset.id}
-                        style={{
-                          position: "relative",
-                          width: "100%",
-                          paddingBottom: "100%",
-                          borderRadius: "var(--radius)",
-                          overflow: "hidden",
-                          border: active
-                            ? "2px solid var(--text-primary)"
-                            : "1px solid var(--hairline)",
-                          cursor: "pointer",
-                          background: "var(--surface-2)",
-                        }}
-                        onClick={() => setSlideBackgroundManually(asset.id)}
-                      >
-                        <img
-                          src={libraryFileUrl(asset.filename)}
-                          alt={asset.originalName}
-                          style={{
-                            position: "absolute",
-                            inset: 0,
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "cover",
-                            display: "block",
-                          }}
-                        />
-                        <Tooltip label="Remove from library">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteAsset(asset.id);
-                            }}
-                            aria-label="Remove from library"
-                            style={{
-                              position: "absolute",
-                              top: 4,
-                              right: 4,
-                              background: "rgba(0,0,0,0.6)",
-                              color: "#fff",
-                              borderRadius: "var(--radius)",
-                              border: "none",
-                              width: 22,
-                              height: 22,
-                              cursor: "pointer",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                          >
-                            <Trash2 size={11} />
-                          </button>
-                        </Tooltip>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-
           {activeSlide.backgroundAssetId != null && (
             <div
               style={{
