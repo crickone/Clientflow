@@ -8,7 +8,7 @@
 // saving a page silently rewrites markup nobody edited.
 import assert from "node:assert/strict";
 
-import { splitPageBody, joinPageBody, rebuildBodyWithContent, studioEditability } from "./pageBody";
+import { splitPageBody, joinPageBody, rebuildBodyWithContent, headForCanvas, studioEditability } from "./pageBody";
 import type { PageBodyZones } from "./pageBody";
 
 let passed = 0;
@@ -545,5 +545,42 @@ check(
   "defect 1: <header> is not mistaken for <head>",
   studioEditability(STARTS_WITH_HEADER_TAG).ok === true,
 );
+
+// headForCanvas: the Studio canvas must get the page's styles and NONE of its
+// scripts. The canvas is server-rendered, so a script left here is executed by
+// the browser's parser (client-side innerHTML inertness does not apply), and
+// the bespoke sites' one head script sets a `js` flag whose CSS hides every
+// scroll-reveal section -- revealed only by GSAP in the tail zone, which the
+// canvas never renders. That combination left whole sections invisible.
+{
+  const head = [
+    '<link rel="preconnect" href="https://fonts.googleapis.com">',
+    "<style>body{margin:0}.js [data-rise]{opacity:0}</style>",
+    "<script>document.documentElement.className+=' js';</script>",
+  ].join("\n");
+  const out = headForCanvas(head);
+  check("headForCanvas: keeps the stylesheet", out.includes("<style>body{margin:0}"));
+  check("headForCanvas: keeps the font link", out.includes("fonts.googleapis.com"));
+  check("headForCanvas: drops the script that sets the js flag", !out.includes("<script"));
+  check("headForCanvas: drops the flag itself", !out.includes("className+="));
+
+  check("headForCanvas: a head with no scripts is unchanged", headForCanvas('<style>a{}</style>') === '<style>a{}</style>');
+  check("headForCanvas: empty head stays empty", headForCanvas("") === "");
+  check(
+    "headForCanvas: several scripts all go, styles between them stay",
+    headForCanvas('<script>a()</script><style>x{}</style><script src="b.js"></script>') === '<style>x{}</style>',
+  );
+  check(
+    "headForCanvas: a script-lookalike inside a comment is not treated as a script",
+    headForCanvas('<!-- <script>old</script> --><style>y{}</style>').includes("<!-- <script>old</script> -->"),
+  );
+  // Display only: publishing rebuilds from the STORED body, so a page's real
+  // scripts can never be lost by rendering it in the canvas.
+  const stored = `${head}\n<div>hi</div>\n<script src="gsap.js"></script>`;
+  check(
+    "headForCanvas: does not affect what a publish writes back",
+    rebuildBodyWithContent(stored, "<div>edited</div>").includes("className+="),
+  );
+}
 
 console.log(`pageBody: ${passed} checks passed.`);

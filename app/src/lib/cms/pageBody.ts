@@ -204,6 +204,36 @@ export function joinPageBody(zones: PageBodyZones): string {
 }
 
 /**
+ * The head zone with its `<script>` tags removed, for RENDERING in the Studio
+ * canvas. Styles and font links are kept; nothing executable survives.
+ *
+ * This is not cosmetic. The canvas is server-rendered, so a `<script>` inside
+ * `dangerouslySetInnerHTML` is emitted into the HTML response and RUN by the
+ * browser's parser during initial parse — the "scripts inserted via innerHTML
+ * are inert" rule only holds for client-side innerHTML. The bespoke sites'
+ * head zone carries a progressive-enhancement flag
+ * (`document.documentElement.className += ' js'`), and their CSS hides
+ * scroll-reveal content behind it (`.js [data-rise]{opacity:0}`). The reveal
+ * itself is done by GSAP from the TAIL zone, which the canvas never renders —
+ * so letting that one flag run left whole sections permanently invisible in
+ * the editor while looking perfect on the live site.
+ *
+ * Display only: the stored body is rebuilt from its own head by
+ * rebuildBodyWithContent, so nothing here can strip a script from a saved page.
+ */
+export function headForCanvas(head: string): string {
+  let out = "";
+  let pos = 0;
+  for (const item of scan(head)) {
+    if (item.type === "script") {
+      out += head.slice(pos, item.start);
+      pos = item.end;
+    }
+  }
+  return out + head.slice(pos);
+}
+
+/**
  * Publishing, as a pure function: keep the stored body's head and tail, swap in
  * the new content. Called with the body as it stands AT PUBLISH TIME, so a page
  * re-imported with new CSS under an open draft picks up the new CSS rather than

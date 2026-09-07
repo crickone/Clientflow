@@ -11,7 +11,11 @@ import { getCurrentMembership } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getSiteBySlug } from "@/lib/cms/sites";
 import { getBlockValue, getBlock } from "@/lib/cms/blocks";
-import { splitPageBody, type PageBodyZones } from "@/lib/cms/pageBody";
+import {
+  splitPageBody,
+  headForCanvas,
+  type PageBodyZones,
+} from "@/lib/cms/pageBody";
 import { getDraftContentFrom, getDraftContent } from "@/lib/cms/pageDraft";
 import type { RenderCtx } from "@/components/cms/Block";
 import type { Page } from "@/lib/db/schema";
@@ -129,7 +133,17 @@ export async function studioEditZones(
 
   const zones = splitPageBody(getBlock(site.id, page.id, "body")?.value ?? "");
   const draft = getDraftContent(site.id, page.id);
-  return { ...zones, content: draft ?? zones.content, hasDraft: draft != null };
+  return {
+    ...zones,
+    // Styles and fonts, never scripts: the canvas is server-rendered, so a
+    // script here would be executed by the browser's parser (see
+    // headForCanvas). The page's own progressive-enhancement flag would
+    // otherwise switch on CSS that hides every scroll-reveal section, which
+    // only the tail zone's GSAP -- never rendered here -- would undo.
+    head: headForCanvas(zones.head),
+    content: draft ?? zones.content,
+    hasDraft: draft != null,
+  };
 }
 
 /** Per-site default OpenGraph image (a static asset shipped with the site),
