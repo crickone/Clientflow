@@ -58,11 +58,30 @@ export function StudioCanvas({
       [data-cms-hover]:not([data-cms-sel]){outline:1px dashed rgba(239,90,36,.65) !important;outline-offset:2px}
       [data-cms-hidden-preview]{opacity:.28}
       img.cms-drop-target{outline:3px solid #3fb950 !important;outline-offset:3px}
+      /* Bespoke pages routinely open with a full-viewport intro/preloader
+         overlay (".pt"/".intro") that their OWN CSS shows by default —
+         position:fixed;inset:0;z-index:10000 — and only their GSAP init
+         script ever lifts. The canvas deliberately never runs tail scripts
+         (see the file header), so on a page shaped like that the overlay
+         would sit up forever and the editor would look like a black
+         rectangle. This is editor chrome, injected outside #cms-edit-root,
+         so it never reaches clean()'s output or the saved draft — do not
+         remove it on the reasoning that "scripts hide it": it's the exact
+         opposite, the page's CSS SHOWS it and a script we never run is the
+         only thing that hides it. */
+      .pt,.intro{display:none!important}
+      .lenis,.lenis body{overflow:auto!important}
     `;
     document.head.appendChild(style);
 
     const SECTION_SEL = "section,header,footer,article,aside";
     const TEXT_SEL = "h1,h2,h3,h4,h5,h6,p,li,blockquote,figcaption,dt,dd,th,td";
+    // Never page copy: raw CSS/JS or invisible document metadata. Even
+    // though (a) below narrows "text" to elements with no element children,
+    // a <style> or <script> tag itself has no element children and DOES
+    // carry text (its raw source) — without this explicit exclusion the
+    // narrowing alone would treat that raw source as editable page copy.
+    const UNSELECTABLE_SEL = "style,script,template,link,meta,title,noscript";
     const hasText = (el: Element) => (el.textContent || "").trim().length > 0;
 
     const labelFor = (el: HTMLElement): string => {
@@ -82,7 +101,13 @@ export function StudioCanvas({
       if (tag === "img") return "image";
       if (tag === "a") return "link";
       if (el.matches(SECTION_SEL) || el.parentElement === root) return "section";
-      if (el.matches(TEXT_SEL) || hasText(el)) return "text";
+      // A genuine text leaf is either one of the known copy tags, or an
+      // element with NO element children that still holds text — a wrapper
+      // <div> around a heading + paragraph has text via descendants but is
+      // NOT itself a text leaf, so it must fall through to "section" rather
+      // than becoming contenteditable (clicking its padding used to select
+      // — and make editable — the whole subtree beneath it).
+      if (el.matches(TEXT_SEL) || (el.children.length === 0 && hasText(el))) return "text";
       return "section";
     };
 
@@ -230,7 +255,25 @@ export function StudioCanvas({
       }
       e.preventDefault();
       e.stopPropagation();
-      select(t === root ? null : t);
+      if (t === root) {
+        select(null);
+        return;
+      }
+      // style/script/template/link/meta/title/noscript never hold page
+      // copy — raw CSS/JS or document metadata — so they (or anything the
+      // browser resolves the click target to inside one) must never become
+      // selectable or contenteditable. Walk up to the nearest ancestor that
+      // isn't one of these; if the walk reaches the root with nothing
+      // acceptable in between, there is nothing legitimate to select.
+      let el: HTMLElement | null = t;
+      while (el && el !== root && el.matches(UNSELECTABLE_SEL)) {
+        el = el.parentElement;
+      }
+      if (!el || el === root) {
+        select(null);
+        return;
+      }
+      select(el);
     };
     document.addEventListener("click", onClick, true);
     root.addEventListener("mouseover", onOver);

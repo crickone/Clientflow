@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm";
 
 import { db, schema } from "@/lib/db";
 import { getBlock, upsertBlock, deleteBlock } from "@/lib/cms/blocks";
-import { rebuildBodyWithContent } from "@/lib/cms/pageBody";
+import { rebuildBodyWithContent, splitPageBody } from "@/lib/cms/pageBody";
 import type { TenantDb } from "@/lib/db/tenant";
 
 const { contentBlocks, pages } = schema;
@@ -82,8 +82,62 @@ export function clearDraft(siteId: number, pageId: number): void {
 }
 
 /**
+ * A draft is allowed to publish only if it keeps at least this fraction of
+ * the current content zone's length. Guards against publishing an empty or
+ * near-empty draft over a full page — either a parse failure in clean()
+ * (StudioCanvas) or a subtree wiped out by the wrapper-div-becomes-editable
+ * bug (see StudioCanvas's kindFor). 20% is deliberately generous: a
+ * legitimate edit that trims a lot of copy still clears it comfortably,
+ * while an accidentally-wiped subtree (near-zero length) or an empty parse
+ * result does not.
+ */
+export const MIN_DRAFT_RETENTION = 0.2;
+
+/**
+ * The outcome of the publish-size guard, as a discriminated union so a
+ * caller can tell "refused" apart from "nothing to publish" and report the
+ * specific reason (see publishDraft/PublishOutcome below, which layer the
+ * "no draft at all" case on top of this).
+ */
+export type PublishGate =
+  | { allowed: true }
+  | { allowed: false; reason: "empty"; currentLength: number; draftLength: number }
+  | { allowed: false; reason: "too-small"; currentLength: number; draftLength: number };
+
+/**
+ * Pure decision: is `draftContent` an acceptable replacement for
+ * `currentContent`? Takes plain strings (the page's current content zone and
+ * the candidate draft content) and returns a verdict — no DB, no I/O, so it
+ * can be unit tested directly. publishDraft (below) is the only caller that
+ * matters in production; it feeds this the real current content zone and
+ * the real draft before ever writing anything.
+ */
+export function canPublishDraft(currentContent: string, draftContent: string): PublishGate {
+  const draftLength = draftContent.length;
+  if (draftContent.trim() === "") {
+    return { allowed: false, reason: "empty", currentLength: currentContent.length, draftLength };
+  }
+  const currentLength = currentContent.trim().length;
+  // Only guard against shrinkage when there's something to shrink from — a
+  // page whose content zone is already empty (a brand-new page, say) has no
+  // "current size" to be drastically smaller than.
+  if (currentLength > 0 && draftLength < currentLength * MIN_DRAFT_RETENTION) {
+    return { allowed: false, reason: "too-small", currentLength, draftLength };
+  }
+  return { allowed: true };
+}
+
+export type PublishOutcome =
+  | { ok: true }
+  | { ok: false; reason: "no-draft" }
+  | { ok: false; reason: "empty" | "too-small"; currentLength: number; draftLength: number };
+
+/**
  * Publish: rebuild the body as head + draft content + tail, then consume the
- * draft. Returns false when there was nothing to publish.
+ * draft. Returns a PublishOutcome rather than a bare boolean so the caller
+ * (publishDraftAction) can tell "there was no draft to publish" apart from
+ * "there WAS a draft, but publishing it was refused" and surface the
+ * specific reason to the operator instead of silently doing nothing.
  *
  * The upsert-body and clear-draft writes run inside one
  * `db.transaction(...)` (the codebase's standard drizzle/better-sqlite3
@@ -93,10 +147,17 @@ export function clearDraft(siteId: number, pageId: number): void {
  * here because they operate on the ambient `db`, not the transaction's `tx`;
  * the write shape below mirrors them exactly, applied through `tx`.
  */
-export function publishDraft(siteId: number, pageId: number): boolean {
+export function publishDraft(siteId: number, pageId: number): PublishOutcome {
   const draft = getDraftContent(siteId, pageId);
-  if (draft == null) return false;
+  if (draft == null) return { ok: false, reason: "no-draft" };
   const body = getBlock(siteId, pageId, "body")?.value ?? "";
+  const currentContent = splitPageBody(body).content;
+
+  const gate = canPublishDraft(currentContent, draft);
+  if (!gate.allowed) {
+    return { ok: false, reason: gate.reason, currentLength: gate.currentLength, draftLength: gate.draftLength };
+  }
+
   const nextBody = rebuildBodyWithContent(body, draft);
 
   db.transaction((tx) => {
@@ -131,7 +192,7 @@ export function publishDraft(siteId: number, pageId: number): boolean {
       )
       .run();
   });
-  return true;
+  return { ok: true };
 }
 
 /** Paths of every page in the site that currently has an unpublished draft. */

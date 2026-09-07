@@ -41,8 +41,24 @@ export async function publishDraftAction(
 ): Promise<Result> {
   const r = await resolve(siteSlug, path);
   if ("error" in r) return { ok: false, error: r.error };
-  if (!publishDraft(r.site.id, r.page.id)) {
-    return { ok: false, error: "Nothing to publish." };
+  const outcome = publishDraft(r.site.id, r.page.id);
+  if (!outcome.ok) {
+    if (outcome.reason === "no-draft") return { ok: false, error: "Nothing to publish." };
+    // "empty"/"too-small": publishDraft refused because the draft would
+    // remove all (or most) of the page's content — a parse failure or an
+    // accidentally-wiped subtree, not a real edit. Surface the specific
+    // reason rather than the generic "Nothing to publish." so the operator
+    // understands this is a REFUSAL, not a no-op, and knows to discard the
+    // draft and re-edit rather than trying Publish again.
+    const kept = outcome.currentLength > 0 ? Math.round((outcome.draftLength / outcome.currentLength) * 100) : 0;
+    const detail =
+      outcome.reason === "empty"
+        ? "The draft is empty."
+        : `The draft keeps only about ${kept}% of the page's current content.`;
+    return {
+      ok: false,
+      error: `Publish refused — this would remove most of the page. ${detail} Discard the draft and try editing again.`,
+    };
   }
   revalidatePath(`/site/${siteSlug}${path === "/" ? "" : path}`);
   return { ok: true };

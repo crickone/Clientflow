@@ -251,6 +251,13 @@ export function StudioShell({
         setDraftPaths((prev) => prev.filter((x) => x !== path));
         setSavedAt(null);
       } else toast.error(r.error ?? "Publish failed");
+    } catch {
+      // publishDraftAction can throw rather than resolve with `ok: false` —
+      // a DB error inside the server action, or requireAdminPage() throwing
+      // a redirect. Uncaught, that left the spinner just stopping with no
+      // toast, so the operator believed the page had published when it had
+      // not. Same failure-is-visible contract as flush() above.
+      toast.error("Publish failed");
     } finally {
       setPublishing(false);
     }
@@ -280,6 +287,12 @@ export function StudioShell({
         setSavedAt(null);
         reload(path);
       } else toast.error(r.error ?? "Couldn't discard the draft.");
+    } catch {
+      // Same rationale as publish()'s catch: discardDraftAction can throw
+      // (DB error, or requireAdminPage() throwing a redirect) rather than
+      // resolve with `ok: false`. Left unhandled, the draft stays live but
+      // the operator sees no error — surface one instead.
+      toast.error("Couldn't discard the draft.");
     } finally {
       setDiscarding(false);
     }
