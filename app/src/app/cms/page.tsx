@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { DeleteSiteDialog } from "@/components/cms/DeleteSiteDialog";
 import { requireAdminPage } from "@/lib/auth";
 import { listSites } from "@/lib/cms/sites";
 import { listRequests } from "@/lib/cms/requests";
@@ -115,6 +116,7 @@ export default async function CmsSitesPage({
                   display: "flex",
                   gap: 14,
                   flexWrap: "wrap",
+                  alignItems: "center",
                 }}
               >
                 <Link href={`/cms/${s.slug}/studio`} style={{ fontSize: 13, color: "var(--accent)" }}>
@@ -134,6 +136,9 @@ export default async function CmsSitesPage({
                 >
                   Preview <ExternalLink size={12} />
                 </a>
+                <div style={{ marginLeft: "auto" }}>
+                  <DeleteSiteDialog site={{ slug: s.slug, name: s.name }} />
+                </div>
               </div>
             </Card>
           ))}
