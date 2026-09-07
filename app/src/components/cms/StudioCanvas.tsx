@@ -318,6 +318,11 @@ export function StudioCanvas({
       // actually hiding it, so it can still be found and switched back on.
       // Serialising must drop the preview marker but keep (or add) the
       // durable one, and re-apply the real display:none the live page needs.
+      // Accordions we forced open for editing ship collapsed again.
+      clone.querySelectorAll("[data-cms-forced-open]").forEach((e) => {
+        e.removeAttribute("open");
+        e.removeAttribute("data-cms-forced-open");
+      });
       clone.querySelectorAll("[data-cms-hidden-preview]").forEach((e) => {
         e.removeAttribute("data-cms-hidden-preview");
         e.setAttribute("data-cms-hidden", "1");
@@ -437,6 +442,15 @@ export function StudioCanvas({
     // swallow every click to the real content underneath. data-cms-hidden is
     // the explicit, durable marker `clean()` writes when the operator hides a
     // section, so only elements carrying it are ever candidates here.
+    // A closed <details> hides its own answer copy, and the canvas blocks the
+    // native summary toggle (clicks select rather than activate). Open every
+    // collapsed one so its content is visible and editable; clean() puts each
+    // back exactly as it was, so a page's accordions still ship collapsed.
+    root.querySelectorAll<HTMLElement>("details:not([open])").forEach((el) => {
+      el.setAttribute("open", "");
+      el.setAttribute("data-cms-forced-open", "1");
+    });
+
     root.querySelectorAll<HTMLElement>("[data-cms-hidden]").forEach((el) => {
       el.setAttribute("data-cms-hidden-preview", "1");
       el.style.removeProperty("display");
