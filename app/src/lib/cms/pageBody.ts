@@ -215,3 +215,61 @@ export function rebuildBodyWithContent(
 ): string {
   return joinPageBody({ ...splitPageBody(storedBody), content });
 }
+
+export type StudioEditability = { ok: true } | { ok: false; reason: string };
+
+/**
+ * Not every stored page body fits the three-zone model above. Three shapes
+ * are known to break it, all refused rather than guessed at — the Studio
+ * must never mangle a page it can't actually model:
+ *
+ *  - A COMPLETE HTML DOCUMENT stored as the "body" block (an import that kept
+ *    its own doctype/html/head wrapper rather than being split into
+ *    head/content/tail at import time — e.g. clientflow's adonisagent home
+ *    page). The content zone would then hold the doctype, <html>, <head>,
+ *    <title>, the stylesheet and every script; a browser's fragment parser
+ *    silently drops the doctype and the html/head/body wrappers when that's
+ *    set as innerHTML, and the first save would write that flattened result
+ *    back over the page permanently.
+ *  - A content zone that still carries a <style> token, whatever head looks
+ *    like. Head/tail are carried around content untouched, but content
+ *    itself is exactly what the Studio's edit surface treats as user-editable
+ *    markup — a raw <style> element sitting inside that surface is not
+ *    something the visual editor round-trips safely, unlike an inert
+ *    mid-content <script> (see the "mid-content script stays in content"
+ *    case in pageBody.test.ts, which IS safe: a script tag set via innerHTML
+ *    never executes and isn't rewritten by editing). This is the real shape
+ *    of every clientflow page: head captures a first run of style/link
+ *    tokens, but a later <style> block sits deeper in content, after markup
+ *    breaks the head walk.
+ *  - head came back completely empty AND content contains a <script> token.
+ *    An inert mid-content script is only accepted when there's a genuine
+ *    head/tail around it (the ordinary bespoke shape); a page with NO head
+ *    at all is one the split plainly never applied to.
+ */
+export function studioEditability(zones: PageBodyZones): StudioEditability {
+  const trimmedContent = zones.content.replace(/^\s+/, "");
+  const lower = trimmedContent.slice(0, 15).toLowerCase();
+  if (lower.startsWith("<!doctype") || lower.startsWith("<html")) {
+    return {
+      ok: false,
+      reason:
+        "This page is stored as a complete HTML document, not a page fragment, so the Studio cannot edit it safely.",
+    };
+  }
+  if (/<style\b/i.test(zones.content)) {
+    return {
+      ok: false,
+      reason:
+        "This page's styles are embedded in its content rather than separated out, so the Studio cannot edit it safely.",
+    };
+  }
+  if (zones.head === "" && /<script\b/i.test(zones.content)) {
+    return {
+      ok: false,
+      reason:
+        "This page's scripts are embedded in its content rather than separated out, so the Studio cannot edit it safely.",
+    };
+  }
+  return { ok: true };
+}

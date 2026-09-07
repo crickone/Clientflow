@@ -54,9 +54,22 @@ export function resolvePageContext(
   return { resolved, page, ctx, template: getTemplate(page.templateId), host, path };
 }
 
-/** Admin-only: is the current request allowed to use the in-place editor? */
-export function canEditNow(): boolean {
-  return getCurrentMembership()?.role === "admin";
+/**
+ * Admin-only, AND tenant-aware: is the current request allowed to use the
+ * in-place editor on THIS resolved page?
+ *
+ * `/site/*` is unauthenticated at the middleware, and the page itself may be
+ * resolved by a slug search across every tenant (see resolveHost.ts step
+ * 2 — "a site can live in any tenant"), while the caller's admin role is
+ * scoped to their OWN active session tenant. Checking the role alone would
+ * let an admin of tenant A open tenant B's page — and its unpublished
+ * draft — with `?cmsedit=1`. Requiring the resolved site's tenant to match
+ * the caller's active tenant closes that: an admin can only ever open the
+ * canvas for a page their own tenant owns.
+ */
+export function canEditNow(pc: PageContext): boolean {
+  const m = getCurrentMembership();
+  return m?.role === "admin" && m.tenant.id === pc.resolved.tenantId;
 }
 
 /**

@@ -8,7 +8,8 @@
 // saving a page silently rewrites markup nobody edited.
 import assert from "node:assert/strict";
 
-import { splitPageBody, joinPageBody, rebuildBodyWithContent } from "./pageBody";
+import { splitPageBody, joinPageBody, rebuildBodyWithContent, studioEditability } from "./pageBody";
+import type { PageBodyZones } from "./pageBody";
 
 let passed = 0;
 function check(name: string, cond: boolean) {
@@ -458,5 +459,40 @@ check(
   "comment abutting token: round-trips",
   joinPageBody(commentAbuttingToken) === COMMENT_ABUTTING_TOKEN,
 );
+
+// studioEditability: refuses a body the three-zone model doesn't fit, rather
+// than silently mangling it on the first save.
+
+// A complete HTML document stored as the body block (e.g. clientflow's
+// adonisagent home page) must be refused, even with leading whitespace.
+const DOCUMENT_BODY = "  \n<!doctype html><html lang=\"en\"><head><title>x</title></head><body><p>hi</p></body></html>";
+const documentEditability = studioEditability(splitPageBody(DOCUMENT_BODY));
+check("document-shaped body: refused", documentEditability.ok === false);
+check(
+  "document-shaped body: reason is operator-facing text",
+  !documentEditability.ok && typeof documentEditability.reason === "string" && documentEditability.reason.length > 0,
+);
+
+// A bare <html ...> start (no doctype) is refused the same way.
+const HTML_TAG_BODY = "<html><body><p>hi</p></body></html>";
+check("<html>-shaped body: refused", studioEditability(splitPageBody(HTML_TAG_BODY)).ok === false);
+
+// A normal bespoke body (head carries the <style>, content is markup, tail
+// carries scripts) is allowed.
+check("bespoke body: allowed", studioEditability(bespoke).ok === true);
+
+// A plain HTML fragment with no head and no style/script in content is
+// allowed — this is the ordinary case for most CMS pages.
+check("plain fragment, no head/style/script: allowed", studioEditability(plain).ok === true);
+
+// Empty head but a <style> living inside content: the three-zone split
+// plainly didn't apply (e.g. every clientflow page stores <style> inside
+// content) — refused.
+const STYLE_IN_CONTENT = splitPageBody("<div><style>a{color:red}</style><p>hi</p></div>");
+check("empty head, <style> inside content: refused", studioEditability(STYLE_IN_CONTENT).ok === false);
+
+// Symmetric case: empty head, <script> inside content.
+const SCRIPT_IN_CONTENT: PageBodyZones = { head: "", content: "<div><script>x()</script></div>", tail: "" };
+check("empty head, <script> inside content: refused", studioEditability(SCRIPT_IN_CONTENT).ok === false);
 
 console.log(`pageBody: ${passed} checks passed.`);
