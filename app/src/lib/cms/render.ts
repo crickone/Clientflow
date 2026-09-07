@@ -8,9 +8,11 @@ import { getPublishedPageByPath } from "@/lib/cms/pages";
 import { getSeoPublic } from "@/lib/cms/seo";
 import { getTemplate, type TemplateDef } from "@/lib/cms/templates";
 import { getCurrentMembership } from "@/lib/auth";
-import { getBlockValue } from "@/lib/cms/blocks";
+import { db } from "@/lib/db";
+import { getSiteBySlug } from "@/lib/cms/sites";
+import { getBlockValue, getBlock } from "@/lib/cms/blocks";
 import { splitPageBody, type PageBodyZones } from "@/lib/cms/pageBody";
-import { getDraftContentFrom } from "@/lib/cms/pageDraft";
+import { getDraftContentFrom, getDraftContent } from "@/lib/cms/pageDraft";
 import type { RenderCtx } from "@/components/cms/Block";
 import type { Page } from "@/lib/db/schema";
 // Side-effect import: registers site-specific templates (Renova etc.).
@@ -23,6 +25,11 @@ export interface PageContext {
   template: TemplateDef | null;
   host: string | null;
   path: string;
+}
+
+/** The catch-all route's slug segments as a page path ("/a/b"); "/" when empty. */
+export function pathFromSlugParam(slug?: string[]): string {
+  return pathFromSlug(slug);
 }
 
 function pathFromSlug(slug?: string[]): string {
@@ -54,23 +61,6 @@ export function resolvePageContext(
   return { resolved, page, ctx, template: getTemplate(page.templateId), host, path };
 }
 
-/**
- * Admin-only, AND tenant-aware: is the current request allowed to use the
- * in-place editor on THIS resolved page?
- *
- * `/site/*` is unauthenticated at the middleware, and the page itself may be
- * resolved by a slug search across every tenant (see resolveHost.ts step
- * 2 — "a site can live in any tenant"), while the caller's admin role is
- * scoped to their OWN active session tenant. Checking the role alone would
- * let an admin of tenant A open tenant B's page — and its unpublished
- * draft — with `?cmsedit=1`. Requiring the resolved site's tenant to match
- * the caller's active tenant closes that: an admin can only ever open the
- * canvas for a page their own tenant owns.
- */
-export function canEditNow(pc: PageContext): boolean {
-  const m = getCurrentMembership();
-  return m?.role === "admin" && m.tenant.id === pc.resolved.tenantId;
-}
 
 /**
  * The Studio canvas's view of a page: its three zones (see lib/cms/pageBody),
@@ -78,7 +68,7 @@ export function canEditNow(pc: PageContext): boolean {
  *
  * Deliberately NOT sanitised. The live clientflow-live template already renders
  * this exact stored HTML verbatim, scripts included, on the same origin; the
- * canvas is admin-only (canEditNow) and renders strictly less than the live
+ * canvas is admin-only (see studioEditZones) and renders strictly less than the live
  * page does (it never renders `tail`). Running it through
  * sanitizeHtmlKeepStyles here was not a security boundary — that sanitiser
  * drops <style> by design, which is what left the canvas unstyled and would
@@ -101,6 +91,45 @@ export function editBodyZones(
     content: draft ?? zones.content,
     hasDraft: draft != null,
   };
+}
+
+/**
+ * The Studio's OWN resolution of a page to edit: the caller's SESSION tenant
+ * plus the route's site slug — deliberately NOT the host.
+ *
+ * The public render resolves a site by hostname (or, on an unmapped host, by
+ * searching every tenant for the slug). The Studio's save/publish actions
+ * resolve it by slug against the session tenant. When the edit canvas used the
+ * host-resolved context, those two halves could disagree — and on the admin
+ * host, where no domain is mapped, the cross-tenant slug search could land on a
+ * different tenant than the operator's own, so the canvas silently refused to
+ * render and the operator got the ordinary public page inside the editor.
+ *
+ * Resolving here exactly as the actions do fixes both: the canvas and the save
+ * path are the same page by construction, and because only the session tenant's
+ * database is ever opened, an operator cannot read another tenant's page or its
+ * unpublished draft even if a site slug collides across tenants.
+ *
+ * Returns null when the caller is not an admin, the site or published page does
+ * not exist in their tenant, or the page has no body — callers fall through to
+ * the ordinary public render, which reveals nothing.
+ */
+export async function studioEditZones(
+  siteSlug: string,
+  path: string,
+): Promise<(PageBodyZones & { hasDraft: boolean }) | null> {
+  const m = getCurrentMembership();
+  if (m?.role !== "admin") return null;
+
+  const site = await getSiteBySlug(siteSlug);
+  if (!site) return null;
+
+  const page = getPublishedPageByPath(db, site.id, path);
+  if (!page) return null;
+
+  const zones = splitPageBody(getBlock(site.id, page.id, "body")?.value ?? "");
+  const draft = getDraftContent(site.id, page.id);
+  return { ...zones, content: draft ?? zones.content, hasDraft: draft != null };
 }
 
 /** Per-site default OpenGraph image (a static asset shipped with the site),

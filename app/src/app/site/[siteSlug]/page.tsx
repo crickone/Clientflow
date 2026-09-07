@@ -6,8 +6,7 @@ import { resolvePublicSite } from "@/lib/cms/resolveHost";
 import {
   resolvePageContext,
   buildPageMetadata,
-  canEditNow,
-  editBodyZones,
+  studioEditZones,
 } from "@/lib/cms/render";
 import { studioEditability } from "@/lib/cms/pageBody";
 import { StudioCanvas } from "@/components/cms/StudioCanvas";
@@ -26,29 +25,26 @@ export function generateMetadata({ params, searchParams }: Props): Metadata {
   return { title: "Site" };
 }
 
-export default function PublicSiteHome({ params, searchParams }: Props) {
-  // A published home page ('/') renders via its template.
-  const pc = resolvePageContext(params, searchParams);
-  if (pc?.template) {
-    // Only offer the canvas when this admin's own active tenant owns the
-    // resolved site (canEditNow) AND the resolved site is genuinely the one
-    // the route param asked for (site slugs are unique only WITHIN a
-    // tenant, so a host/fallback resolution could otherwise land on a
-    // same-slug site in a different tenant than the caller expects). Any
-    // failure falls through to the ORDINARY public render below — never an
-    // error that would reveal the page exists in another tenant.
-    if (
-      searchParams.cmsedit === "1" &&
-      canEditNow(pc) &&
-      pc.resolved.site.slug === params.siteSlug
-    ) {
-      const zones = editBodyZones(pc);
+export default async function PublicSiteHome({ params, searchParams }: Props) {
+  // The edit canvas resolves through the operator's OWN tenant (see
+  // studioEditZones), never the host — the admin host maps to no site, and a
+  // cross-tenant slug search could otherwise land on a different tenant's
+  // page than the one the operator opened. Anything unresolvable falls
+  // through to the ordinary public render below, revealing nothing.
+  if (searchParams.cmsedit === "1") {
+    const zones = await studioEditZones(params.siteSlug, "/");
+    if (zones) {
       const editability = studioEditability(zones);
       if (!editability.ok) {
         return <StudioUneditablePanel reason={editability.reason} />;
       }
-      return <StudioCanvas zones={zones} path={pc.path} />;
+      return <StudioCanvas zones={zones} path={"/"} />;
     }
+  }
+
+  // A published home page ('/') renders via its template.
+  const pc = resolvePageContext(params, searchParams);
+  if (pc?.template) {
     const T = pc.template.Component;
     return <T ctx={pc.ctx} page={pc.page} />;
   }
