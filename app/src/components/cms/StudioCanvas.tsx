@@ -83,6 +83,13 @@ export function StudioCanvas({
     // narrowing alone would treat that raw source as editable page copy.
     const UNSELECTABLE_SEL = "style,script,template,link,meta,title,noscript";
     const hasText = (el: Element) => (el.textContent || "").trim().length > 0;
+    // The inline-formatting allow-list for a text leaf: a heading legitimately
+    // wraps a <span>, a paragraph legitimately wraps an <a>/<strong>, and none
+    // of that turns the heading/paragraph into something that WRAPS other
+    // content the way a card-shaped <li>/<td>/<figcaption> does.
+    const INLINE_SEL = "a,b,i,em,strong,span,br,small,sup,sub,code,u,mark";
+    const isInlineOnly = (el: Element): boolean =>
+      Array.from(el.children).every((child) => child.matches(INLINE_SEL) && isInlineOnly(child));
 
     const labelFor = (el: HTMLElement): string => {
       const tag = el.tagName.toLowerCase();
@@ -101,13 +108,19 @@ export function StudioCanvas({
       if (tag === "img") return "image";
       if (tag === "a") return "link";
       if (el.matches(SECTION_SEL) || el.parentElement === root) return "section";
-      // A genuine text leaf is either one of the known copy tags, or an
-      // element with NO element children that still holds text — a wrapper
-      // <div> around a heading + paragraph has text via descendants but is
-      // NOT itself a text leaf, so it must fall through to "section" rather
-      // than becoming contenteditable (clicking its padding used to select
-      // — and make editable — the whole subtree beneath it).
-      if (el.matches(TEXT_SEL) || (el.children.length === 0 && hasText(el))) return "text";
+      // A genuine text leaf is either one of the known copy tags with nothing
+      // but inline formatting inside it (a heading with a <span>, a
+      // paragraph with an <a>/<strong>), or an element with NO element
+      // children at all that still holds text — a wrapper <div> around a
+      // heading + paragraph has text via descendants but is NOT itself a
+      // text leaf, so it must fall through to "section" rather than becoming
+      // contenteditable (clicking its padding used to select — and make
+      // editable — the whole subtree beneath it). The same applies to a
+      // TEXT_SEL element that itself WRAPS block content — an <li>/<td>/
+      // <figcaption> holding an image, a heading and a paragraph — which
+      // must also fall through to "section": otherwise a select-all plus a
+      // keystroke inside it wipes the whole card.
+      if ((el.matches(TEXT_SEL) && isInlineOnly(el)) || (el.children.length === 0 && hasText(el))) return "text";
       return "section";
     };
 

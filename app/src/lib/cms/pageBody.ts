@@ -219,6 +219,36 @@ export function rebuildBodyWithContent(
 export type StudioEditability = { ok: true } | { ok: false; reason: string };
 
 /**
+ * Skips leading whitespace and any run of leading HTML comments (possibly
+ * several, possibly separated by whitespace), so something like
+ * `<!-- saved from url --><!doctype html>...` can't hide the document marker
+ * that follows from the check below. Mirrors scan()'s indexOf-based comment
+ * detection above (terminated vs. unterminated) rather than inventing a
+ * second comment-scanning approach — an unterminated "<!--" here just means
+ * there is no markup left to find, so the loop stops and returns what's left
+ * (which then simply fails the marker test).
+ */
+function skipLeadingCommentsAndWhitespace(s: string): string {
+  let rest = s;
+  for (;;) {
+    rest = rest.replace(/^\s+/, "");
+    if (!rest.startsWith("<!--")) return rest;
+    const closeIdx = rest.indexOf("-->", 4);
+    if (closeIdx === -1) return rest;
+    rest = rest.slice(closeIdx + 3);
+  }
+}
+
+/**
+ * Matches a document-shape marker at the very start of a string: `<!doctype`,
+ * `<html`, `<head`, or `<body`, each required to be followed by whitespace,
+ * "/", ">", or end-of-string — NOT just any character — so an ordinary tag
+ * that happens to share the prefix (`<header>`, `<bodytext>`) is never
+ * mistaken for one.
+ */
+const DOCUMENT_MARKER = /^<(!doctype|html|head|body)(?=[\s/>]|$)/i;
+
+/**
  * Not every stored page body fits the three-zone model above. Three shapes
  * are known to break it, all refused rather than guessed at — the Studio
  * must never mangle a page it can't actually model:
@@ -226,11 +256,15 @@ export type StudioEditability = { ok: true } | { ok: false; reason: string };
  *  - A COMPLETE HTML DOCUMENT stored as the "body" block (an import that kept
  *    its own doctype/html/head wrapper rather than being split into
  *    head/content/tail at import time — e.g. clientflow's adonisagent home
- *    page). The content zone would then hold the doctype, <html>, <head>,
+ *    page), OR a document fragment that starts mid-way through one (a
+ *    hand-pasted `<head>...</head><body>...` or bare `<body>...</body>`).
+ *    The content zone would then hold the doctype, <html>, <head>,
  *    <title>, the stylesheet and every script; a browser's fragment parser
  *    silently drops the doctype and the html/head/body wrappers when that's
  *    set as innerHTML, and the first save would write that flattened result
- *    back over the page permanently.
+ *    back over the page permanently. A leading HTML comment (or several) in
+ *    front of any of these markers doesn't change that — it's skipped before
+ *    the check runs, not treated as ordinary content.
  *  - A content zone that still carries a <style> token, whatever head looks
  *    like. Head/tail are carried around content untouched, but content
  *    itself is exactly what the Studio's edit surface treats as user-editable
@@ -248,9 +282,8 @@ export type StudioEditability = { ok: true } | { ok: false; reason: string };
  *    at all is one the split plainly never applied to.
  */
 export function studioEditability(zones: PageBodyZones): StudioEditability {
-  const trimmedContent = zones.content.replace(/^\s+/, "");
-  const lower = trimmedContent.slice(0, 15).toLowerCase();
-  if (lower.startsWith("<!doctype") || lower.startsWith("<html")) {
+  const trimmedContent = skipLeadingCommentsAndWhitespace(zones.content);
+  if (DOCUMENT_MARKER.test(trimmedContent)) {
     return {
       ok: false,
       reason:

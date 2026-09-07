@@ -495,4 +495,55 @@ check("empty head, <style> inside content: refused", studioEditability(STYLE_IN_
 const SCRIPT_IN_CONTENT: PageBodyZones = { head: "", content: "<div><script>x()</script></div>", tail: "" };
 check("empty head, <script> inside content: refused", studioEditability(SCRIPT_IN_CONTENT).ok === false);
 
+// Defect 1: the document-shape check is a prefix test, so a leading HTML
+// comment (or starting mid-document at <head> or <body>) must not be able to
+// slip a document-shaped body past it — these are exactly the shapes a
+// hand-pasted document ends up in.
+const LEADING_COMMENT_BEFORE_DOCTYPE: PageBodyZones = {
+  head: "",
+  content:
+    '<!-- saved from url --><!doctype html><html><head><link rel=stylesheet href="/a.css"></head><body><p>hi</p></body></html>',
+  tail: "",
+};
+check(
+  "defect 1: leading HTML comment before <!doctype> is still refused",
+  studioEditability(LEADING_COMMENT_BEFORE_DOCTYPE).ok === false,
+);
+
+const STARTS_AT_HEAD: PageBodyZones = {
+  head: "",
+  content: '<head><link rel="stylesheet" href="/a.css"></head><body><p>hi</p></body>',
+  tail: "",
+};
+check("defect 1: content starting at <head> is refused", studioEditability(STARTS_AT_HEAD).ok === false);
+
+const STARTS_AT_BODY: PageBodyZones = { head: "", content: "<body><p>hi</p></body>", tail: "" };
+check("defect 1: content starting at <body> is refused", studioEditability(STARTS_AT_BODY).ok === false);
+
+// A leading comment followed by ORDINARY content must still be allowed — the
+// comment-skip is only there to see past it to a document marker, not to
+// refuse every commented-out body.
+const LEADING_COMMENT_THEN_ORDINARY: PageBodyZones = {
+  head: "",
+  content: "<!-- hero --><section><h1>Hi</h1></section>",
+  tail: "",
+};
+check(
+  "defect 1: leading comment then ordinary content is still allowed",
+  studioEditability(LEADING_COMMENT_THEN_ORDINARY).ok === true,
+);
+
+// A tag that merely SHARES a document-marker prefix (<header>, not <head>)
+// must not be mistaken for one — this is exactly the bespoke shape (content
+// starts with a <header> nav) and must keep passing.
+const STARTS_WITH_HEADER_TAG: PageBodyZones = {
+  head: "",
+  content: '<header class="nav"><a href="/">Home</a></header>',
+  tail: "",
+};
+check(
+  "defect 1: <header> is not mistaken for <head>",
+  studioEditability(STARTS_WITH_HEADER_TAG).ok === true,
+);
+
 console.log(`pageBody: ${passed} checks passed.`);
