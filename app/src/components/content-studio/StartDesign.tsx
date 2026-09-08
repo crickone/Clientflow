@@ -120,21 +120,39 @@ export function StartDesign() {
       router.push(`/content-studio/images/${id}`);
       return;
     }
-    const gen = await fetch(`/api/content-studio/carousels/${id}/generate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        topic: topic.trim(),
-        slideCount: slides,
-        slotKey: CAROUSEL_SLOT,
-      }),
-    })
-      .then((r) => r.json())
-      .catch(() => null);
+    let gen: { ok?: boolean; error?: string } | null = null;
+    try {
+      const res = await fetch(`/api/content-studio/carousels/${id}/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: topic.trim(),
+          slideCount: slides,
+          slotKey: CAROUSEL_SLOT,
+        }),
+      });
+      gen = await res.json();
+      if (!gen?.ok && !gen?.error) {
+        gen = { ok: false, error: `The generator failed (HTTP ${res.status}).` };
+      }
+    } catch {
+      gen = {
+        ok: false,
+        error: "Lost contact with the server while writing the slides.",
+      };
+    }
     if (!gen?.ok) {
-      // The design exists, so send them into the editor rather than losing the
-      // work — they can generate again from the Carousels tab.
-      setError(gen?.error ?? "Couldn't write the slides — opening the editor.");
+      // STAY PUT on failure. This used to set the error and navigate in the
+      // same breath, so the message was destroyed by the route change and the
+      // operator landed in an editor holding one seed slide with no idea why —
+      // which is exactly how a truncated generation looked in production.
+      // The reason is usually something they can act on here ("try fewer
+      // slides"), so it belongs on the screen with the controls that change it.
+      setError(
+        `${gen?.error ?? "Couldn't write the slides."} Your draft was saved — you can open it and generate again from there.`,
+      );
+      setBusy(null);
+      return;
     }
     router.push(`/content-studio/images/${id}`);
   }

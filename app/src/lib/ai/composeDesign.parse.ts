@@ -182,8 +182,17 @@ export function extractComposedPayload(text: string): {
   slides: RawSlide[];
   caption: string;
 } {
-  const match = text.match(/<slides>([\s\S]*?)<\/slides>/i);
-  const jsonText = (match ? match[1] : text).trim();
+  // A complete reply has both tags. A TRUNCATED one has the opening tag and no
+  // closing tag, and the old code then fell back to parsing the whole string --
+  // which begins "<slides>" and produced `SyntaxError: Unexpected token '<'`,
+  // a message that says nothing about what actually went wrong. Name it.
+  const closed = text.match(/<slides>([\s\S]*?)<\/slides>/i);
+  if (!closed && /<slides>/i.test(text)) {
+    throw new Error(
+      "The design was cut off before it finished. Try fewer slides, or a shorter topic.",
+    );
+  }
+  const jsonText = (closed ? closed[1] : text).trim();
   const cleaned = jsonText
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/\s*```$/i, "")

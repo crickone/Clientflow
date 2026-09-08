@@ -95,7 +95,25 @@ export async function composeCarousel(
     getSignoffRule("social"),
   ].join("\n\n");
 
-  const usage = {
+  /**
+ * Output ceiling for the composed pass.
+ *
+ * NOT the 4096 the copy-only generator uses. A composed reply carries a full
+ * layout spec per slide -- archetype, ground, photo treatment, and every text
+ * slot with its level and span -- on top of the copy and the caption, and
+ * adaptive thinking spends from the same output budget. At 4096 a five-slide
+ * carousel truncates mid-JSON: the closing </slides> never arrives, the payload
+ * will not parse, and the operator gets a generation that produced nothing.
+ * That happened in production on the second real run.
+ *
+ * 16000 is the documented default for a non-streaming request -- high enough
+ * that the model is not the binding constraint, low enough to stay under the
+ * SDK's HTTP timeout. Output tokens are billed as used, so the headroom is
+ * free unless it is needed.
+ */
+const COMPOSE_MAX_TOKENS = 16000;
+
+const usage = {
     inputTokens: 0,
     outputTokens: 0,
     cacheCreationInputTokens: 0,
@@ -122,7 +140,7 @@ export async function composeCarousel(
 
   const first = await meteredCreate(meter, () => ({
     model,
-    max_tokens: 4096,
+    max_tokens: COMPOSE_MAX_TOKENS,
     thinking: { type: "adaptive" as const },
     system: [
       {
@@ -136,6 +154,11 @@ export async function composeCarousel(
   addUsage(first);
 
   const firstText = textOf(first);
+  if (first.stop_reason === "max_tokens") {
+    throw new Error(
+      `The design ran out of room before it finished (${input.slideCount} slides). Try fewer slides, or a shorter topic.`,
+    );
+  }
   const payload = extractComposedPayload(firstText);
   let checked = checkSlides(payload.slides, system, accentColor);
   let caption = payload.caption;
@@ -148,7 +171,7 @@ export async function composeCarousel(
     repaired = true;
     const repair = await meteredCreate(meter, () => ({
       model,
-      max_tokens: 4096,
+      max_tokens: COMPOSE_MAX_TOKENS,
       thinking: { type: "adaptive" as const },
       system: [
         {

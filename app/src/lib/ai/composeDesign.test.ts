@@ -82,6 +82,36 @@ try {
 }
 check("a reply with no slides array is an error", threw);
 
+// TRUNCATION. This is the production failure: a composed reply is far bigger
+// than the copy-only format, so at too low a max_tokens the model stops before
+// the closing tag. The old code then parsed the WHOLE string -- which starts
+// "<slides>" -- and surfaced `SyntaxError: Unexpected token '<'`, telling the
+// operator nothing. It has to name itself.
+function errorFor(text: string): string {
+  try {
+    extractComposedPayload(text);
+    return "";
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
+}
+const truncated = errorFor(
+  '<slides>\n{"caption":"A caption.","slides":[{"image":"a room","layout":{"archetype":"stat',
+);
+check("a truncated reply is an error", truncated !== "");
+check(
+  "and it says it was cut off, not that JSON is malformed",
+  truncated.toLowerCase().includes("cut off"),
+);
+check(
+  "and it tells the operator what to change",
+  truncated.toLowerCase().includes("fewer slides"),
+);
+check(
+  "it does NOT leak a raw parser message",
+  !truncated.includes("Unexpected token"),
+);
+
 // -------------------------------------------------------------------------
 //  Checking what came back
 // -------------------------------------------------------------------------
