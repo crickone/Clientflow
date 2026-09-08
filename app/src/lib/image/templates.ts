@@ -244,7 +244,7 @@ export interface Template {
 //  Painters
 // -------------------------------------------------------------------------
 
-function paintBackground(
+export function paintBackground(
   ctx: CanvasRenderingContext2D,
   img: HTMLImageElement | null,
   rect: { x: number; y: number; w: number; h: number },
@@ -375,7 +375,7 @@ export function wrapLines(
   return out;
 }
 
-function paintLines(
+export function paintLines(
   ctx: CanvasRenderingContext2D,
   lines: string[],
   x: number,
@@ -388,7 +388,7 @@ function paintLines(
   return y + lines.length * lineHeight;
 }
 
-function bottomGradient(
+export function bottomGradient(
   ctx: CanvasRenderingContext2D,
   w: number,
   h: number,
@@ -562,7 +562,7 @@ export function tokenizeHighlight(text: string): {
  * accent colour. Word order survives wrapping because wrapLines only ever
  * splits on whitespace — the Nth word of the wrapped text is the Nth flag.
  */
-function paintHighlightedLines(
+export function paintHighlightedLines(
   ctx: CanvasRenderingContext2D,
   measure: MeasureText,
   lines: string[],

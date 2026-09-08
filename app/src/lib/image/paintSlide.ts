@@ -6,6 +6,17 @@ import {
   paintSlideChrome,
   type DesignState,
 } from "@/lib/image/templates";
+import type { DesignSystem } from "@/lib/design/parse";
+import { deserializeLayoutSpec, isSpecError } from "@/lib/design/grammar";
+import { paintLayout } from "@/lib/image/paintLayout";
+
+/**
+ * `carousel_slides.template_id` is notNull, so a slide whose layout the AI
+ * composed stores this sentinel there and puts the real spec in `layout_json`.
+ * Nothing in TEMPLATES uses the id, so getTemplate() returns null for it and
+ * the pre-existing path cannot be entered by accident.
+ */
+export const COMPOSED_TEMPLATE_ID = "composed";
 
 export type BrandLabels = {
   businessName?: string;
@@ -58,9 +69,18 @@ export function paintSlide(
   fontFamilies: { heading: string; body: string },
   bg: HTMLImageElement | null,
   logo: HTMLImageElement | null,
+  /**
+   * The tenant's design system, for AI-composed slides. Optional and
+   * defaulting to null so every existing caller is unchanged and a tenant
+   * without a system behaves exactly as before: a composed slide simply has
+   * no layout to draw, which is the same nothing an unknown template id has
+   * always produced.
+   */
+  system: DesignSystem | null = null,
 ): void {
   const template = getTemplate(slide.templateId);
-  if (!template) return;
+  const composed = slide.templateId === COMPOSED_TEMPLATE_ID;
+  if (!template && !composed) return;
   const design: DesignState = {
     headingText: slide.headingText,
     bodyText: slide.bodyText,
@@ -79,19 +99,48 @@ export function paintSlide(
     location: brand?.location,
     phone: brand?.phone,
   };
-  template.render(ctx, design, bg, fontFamilies);
-  if (template.chrome) {
+  // THE FORK. It lives here, inside the one function both the live preview
+  // and the PNG export call, so exactly one branch runs and the same one runs
+  // on both sides — which is the whole reason preview equals export. A
+  // composed slide with no system, or with a spec that no longer parses, is
+  // drawn as nothing rather than silently swapped for a fixed template: the
+  // editor surfaces the violation instead (see lib/design/validate.ts).
+  const chrome = template?.chrome;
+  if (composed) {
+    if (!system) return;
+    const spec = deserializeLayoutSpec(slide.layoutJson, system);
+    if (isSpecError(spec)) return;
+    paintLayout(ctx, canvasW, canvasH, spec, system, design, bg, fontFamilies);
+    if (spec.chrome) {
+      paintSlideChrome(
+        ctx,
+        canvasW,
+        canvasH,
+        spec.chrome,
+        canvasMeasure(ctx),
+        fontFamilies,
+        design,
+        logo,
+      );
+    } else if (logo) {
+      drawLogoOverlay(ctx, canvasW, canvasH, logo);
+    }
+    return;
+  }
+
+  template!.render(ctx, design, bg, fontFamilies);
+  if (chrome) {
     paintSlideChrome(
       ctx,
       canvasW,
       canvasH,
-      template.chrome,
+      chrome,
       canvasMeasure(ctx),
       fontFamilies,
       design,
       logo,
     );
   } else if (logo) {
-    drawLogoOverlay(ctx, canvasW, canvasH, logo, template.logoPlacement);
+    drawLogoOverlay(ctx, canvasW, canvasH, logo, template!.logoPlacement);
   }
 }

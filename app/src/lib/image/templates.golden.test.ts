@@ -8,23 +8,9 @@
 // forks inside paintSlide. This test is the regression that proves the
 // existing templates came through that fork byte-for-byte unchanged.
 //
-// HOW IT CAPTURES A RENDER, and why not pixels: there is no server-side canvas
-// in this app. paintSlide takes a CanvasRenderingContext2D and
-// HTMLImageElements, and the only rasterising caller lives in the browser
-// (ImageDesigner's renderSlideToBlob -> canvas.toBlob). Rather than invent a
-// second render path — a native canvas dep whose antialiasing would differ
-// between a Mac dev box and Linux CI, making a committed pixel hash unstable —
-// this instruments the EXISTING path: a recording 2D context that captures the
-// exact ordered sequence of drawing operations each template issues. That
-// trace IS what our code does; rasterising it afterwards adds no information
-// our code controls. It is exactly reproducible on any platform, needs no
-// dependency, and on a mismatch gives a real line-by-line diff instead of two
-// different hashes.
-//
-// Text measurement goes through the same MeasureText port templates.test.ts
-// uses (see its header): canvasMeasure(ctx) calls ctx.measureText, and this
-// context answers with a deterministic synthetic metric, so wrapLines and
-// autoFitHeading run their real logic against stable widths.
+// HOW IT CAPTURES A RENDER, and why not pixels: see ./recordingContext.ts —
+// it instruments the EXISTING render path rather than inventing a second one,
+// capturing the ordered sequence of draw calls instead of rasterising.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -33,6 +19,7 @@ import { join } from "node:path";
 
 import type { CarouselSlide } from "@/lib/db/schema";
 import { paintSlide } from "@/lib/image/paintSlide";
+import { fakeImage, makeContext, type FakeImage } from "@/lib/image/recordingContext";
 import { TEMPLATES } from "@/lib/image/templates";
 
 let passed = 0;
@@ -43,245 +30,11 @@ function check(name: string, cond: boolean) {
 }
 
 // -------------------------------------------------------------------------
-//  The recording context
-// -------------------------------------------------------------------------
-
-/** Every 2D-context member templates.ts touches. Kept exhaustive on purpose:
- *  an unrecognised call throws rather than silently vanishing from the trace,
- *  so a template reaching for a new primitive can't slip past unrecorded. */
-const TRACKED_PROPS = [
-  "fillStyle",
-  "strokeStyle",
-  "font",
-  "textAlign",
-  "textBaseline",
-  "lineWidth",
-  "lineCap",
-  "lineJoin",
-  "globalAlpha",
-  "shadowColor",
-  "shadowBlur",
-  "shadowOffsetX",
-  "shadowOffsetY",
-] as const;
-
-/** Stable rendering of a call argument. Numbers print at full precision —
- *  IEEE-754 arithmetic is exact and identical everywhere, so any difference in
- *  the printed value is a real difference in the layout maths, never noise. */
-function arg(v: unknown): string {
-  if (v === null) return "null";
-  if (v === undefined) return "undefined";
-  if (typeof v === "number") return Number.isFinite(v) ? String(v) : `!${v}`;
-  if (typeof v === "string") return JSON.stringify(v);
-  if (typeof v === "object" && v !== null && "__id" in v) {
-    return String((v as { __id: unknown }).__id);
-  }
-  return JSON.stringify(v);
-}
-
-interface FakeImage {
-  __id: string;
-  width: number;
-  height: number;
-  naturalWidth: number;
-  naturalHeight: number;
-}
-
-class RecordingContext {
-  readonly ops: string[] = [];
-  private gradients = 0;
-  private state: Record<string, unknown> = {
-    fillStyle: "#000000",
-    strokeStyle: "#000000",
-    font: "10px sans-serif",
-    textAlign: "start",
-    textBaseline: "alphabetic",
-    lineWidth: 1,
-    lineCap: "butt",
-    lineJoin: "miter",
-    globalAlpha: 1,
-    shadowColor: "rgba(0, 0, 0, 0)",
-    shadowBlur: 0,
-    shadowOffsetX: 0,
-    shadowOffsetY: 0,
-  };
-  private stack: Record<string, unknown>[] = [];
-
-  private record(line: string) {
-    this.ops.push(line);
-  }
-
-  private call(name: string, ...args: unknown[]) {
-    this.record(`${name}(${args.map(arg).join(", ")})`);
-  }
-
-  // Property access is proxied in makeContext() below; these back it.
-  getProp(name: string): unknown {
-    return this.state[name];
-  }
-  setProp(name: string, value: unknown) {
-    // canvasMeasure() sets ctx.font on every single measurement, so recording
-    // every assignment would bury the trace in repeats of one value. Only
-    // CHANGES are recorded, which loses nothing: re-assigning the value a
-    // property already holds cannot affect a single pixel. save()/restore()
-    // move the current value too, which is why this.state is stacked.
-    if (this.state[name] === value) return;
-    this.state[name] = value;
-    this.record(`${name} = ${arg(value)}`);
-  }
-
-  save() {
-    this.stack.push({ ...this.state });
-    this.call("save");
-  }
-  restore() {
-    const prev = this.stack.pop();
-    if (prev) this.state = prev;
-    this.call("restore");
-  }
-  beginPath() {
-    this.call("beginPath");
-  }
-  closePath() {
-    this.call("closePath");
-  }
-  moveTo(x: number, y: number) {
-    this.call("moveTo", x, y);
-  }
-  lineTo(x: number, y: number) {
-    this.call("lineTo", x, y);
-  }
-  quadraticCurveTo(cx: number, cy: number, x: number, y: number) {
-    this.call("quadraticCurveTo", cx, cy, x, y);
-  }
-  arc(x: number, y: number, r: number, a0: number, a1: number, ccw?: boolean) {
-    this.call("arc", x, y, r, a0, a1, ccw);
-  }
-  rect(x: number, y: number, w: number, h: number) {
-    this.call("rect", x, y, w, h);
-  }
-  clip() {
-    this.call("clip");
-  }
-  fill() {
-    this.call("fill");
-  }
-  stroke() {
-    this.call("stroke");
-  }
-  fillRect(x: number, y: number, w: number, h: number) {
-    this.call("fillRect", x, y, w, h);
-  }
-  strokeRect(x: number, y: number, w: number, h: number) {
-    this.call("strokeRect", x, y, w, h);
-  }
-  fillText(text: string, x: number, y: number, maxWidth?: number) {
-    this.call("fillText", text, x, y, maxWidth);
-  }
-  strokeText(text: string, x: number, y: number, maxWidth?: number) {
-    this.call("strokeText", text, x, y, maxWidth);
-  }
-  drawImage(img: unknown, ...rest: number[]) {
-    this.call("drawImage", img, ...rest);
-  }
-  measureText(text: string): { width: number } {
-    const width = syntheticWidth(text, String(this.state.font));
-    this.call("measureText", text, `-> ${width}`);
-    return { width };
-  }
-  createLinearGradient(x0: number, y0: number, x1: number, y1: number) {
-    const id = `linearGradient#${++this.gradients}`;
-    this.call("createLinearGradient", x0, y0, x1, y1, `-> ${id}`);
-    return this.gradient(id);
-  }
-  createRadialGradient(
-    x0: number,
-    y0: number,
-    r0: number,
-    x1: number,
-    y1: number,
-    r1: number,
-  ) {
-    const id = `radialGradient#${++this.gradients}`;
-    this.call("createRadialGradient", x0, y0, r0, x1, y1, r1, `-> ${id}`);
-    return this.gradient(id);
-  }
-  private gradient(id: string) {
-    const self = this;
-    return {
-      __id: id,
-      addColorStop(offset: number, color: string) {
-        self.call(`${id}.addColorStop`, offset, color);
-      },
-    };
-  }
-}
-
-/**
- * Synthetic text metric: proportional to the font's px size and the string
- * length. Deterministic, and varies with size — which is what autoFitHeading
- * needs to actually shrink (a flat per-char width would measure a 20px and a
- * 10px heading identically). Same trick as templates.test.ts's fake measurer.
- */
-function syntheticWidth(text: string, font: string): number {
-  const m = /(\d+(?:\.\d+)?)px/.exec(font);
-  const size = m ? Number(m[1]) : 16;
-  return text.length * size * 0.52;
-}
-
-/**
- * Wraps a RecordingContext so the TRACKED_PROPS behave as real context
- * properties (get returns the current value, set records the change) while
- * every method call passes straight through. Unknown members throw, so a
- * template reaching for something this recorder doesn't model fails loudly
- * instead of producing a quietly incomplete trace.
- */
-function makeContext(): {
-  ctx: CanvasRenderingContext2D;
-  rec: RecordingContext;
-} {
-  const rec = new RecordingContext();
-  const props = new Set<string>(TRACKED_PROPS);
-  const proxy = new Proxy(rec, {
-    get(target, key) {
-      if (typeof key !== "string") return undefined;
-      if (props.has(key)) return target.getProp(key);
-      const value = (target as unknown as Record<string, unknown>)[key];
-      if (typeof value === "function") return value.bind(target);
-      if (value !== undefined) return value;
-      throw new Error(`RecordingContext: unmodelled context member "${key}"`);
-    },
-    set(target, key, value) {
-      if (typeof key === "string" && props.has(key)) {
-        target.setProp(key, value);
-        return true;
-      }
-      throw new Error(
-        `RecordingContext: unmodelled context property "${String(key)}"`,
-      );
-    },
-  });
-  return { ctx: proxy as unknown as CanvasRenderingContext2D, rec };
-}
-
-// -------------------------------------------------------------------------
 //  Fixtures
 // -------------------------------------------------------------------------
 
-const PHOTO: FakeImage = {
-  __id: "photo",
-  width: 1600,
-  height: 1200,
-  naturalWidth: 1600,
-  naturalHeight: 1200,
-};
-const LOGO: FakeImage = {
-  __id: "logo",
-  width: 512,
-  height: 128,
-  naturalWidth: 512,
-  naturalHeight: 128,
-};
+const PHOTO: FakeImage = fakeImage("photo", 1600, 1200);
+const LOGO: FakeImage = fakeImage("logo", 512, 128);
 
 const FONTS = { heading: "Nebula", body: "Hanken Grotesk" };
 

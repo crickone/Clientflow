@@ -1470,6 +1470,21 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     console.error("[db] carousel_slides heading_scale migration failed:", err);
   }
 
+  // An AI-composed layout spec (lib/design/grammar.ts), stored as JSON beside
+  // the content columns it does NOT duplicate — structure here, content and
+  // colour on the row. Null for every slide on a fixed template, which is all
+  // of them until a tenant has a design system. Additive/idempotent.
+  try {
+    const layoutCols = sqlite
+      .prepare("PRAGMA table_info(carousel_slides)")
+      .all() as Array<{ name: string }>;
+    if (layoutCols.length > 0 && !layoutCols.some((c) => c.name === "layout_json")) {
+      sqlite.exec("ALTER TABLE carousel_slides ADD COLUMN layout_json TEXT");
+    }
+  } catch (err) {
+    console.error("[db] carousel_slides layout_json migration failed:", err);
+  }
+
   // AI-suggested rotation for video clips shot with the camera physically
   // turned (landscape file, no rotation metadata). A suggestion only — the
   // operator confirms before it's applied to `rotation`. Additive/idempotent.

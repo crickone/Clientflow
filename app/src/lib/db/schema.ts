@@ -938,6 +938,19 @@ export const carouselSlides = sqliteTable("carousel_slides", {
   imagePrompt: text("image_prompt"),
   /** Operator-visible message when image_status = 'failed'. */
   imageError: text("image_error"),
+  /**
+   * An AI-composed layout, as a serialized LayoutSpec (see
+   * lib/design/grammar.ts). Null for every slide on one of the fixed
+   * templates, which is all of them until a tenant has a design system.
+   *
+   * It holds STRUCTURE only — archetype, ground, photo treatment, which type
+   * level each slot uses, spans, rule placement. CONTENT and COLOUR stay in
+   * the columns above, so a composed slide is edited with exactly the
+   * controls a template slide has and retyping a heading invalidates nothing.
+   * `template_id` is notNull, so a composed slide stores the sentinel
+   * 'composed' there.
+   */
+  layoutJson: text("layout_json"),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),
