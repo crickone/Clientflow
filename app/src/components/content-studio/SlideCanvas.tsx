@@ -15,7 +15,6 @@ import {
   FONT_OPTIONS,
   resolveCanvasFont,
 } from "@/lib/image/fonts";
-import { getTemplate } from "@/lib/image/templates";
 
 /**
  * Pre-load every registered Content Studio font so canvas renders use them

@@ -20,6 +20,7 @@ import type {
 } from "@/lib/content-studio/recentWork";
 import { SlideCanvas, useCanvasFonts, useLogoImage } from "./SlideCanvas";
 import type { DesignSystem } from "@/lib/design/parse";
+import { LazyMount } from "./LazyMount";
 
 interface Props {
   items: ContentItem[];
@@ -83,28 +84,6 @@ function StatusChip({ item }: { item: ContentItem }) {
       {label}
     </span>
   );
-}
-
-/** Only mount the (full-resolution) carousel canvas once the card scrolls near view. */
-function LazyMount({ children, placeholder }: { children: React.ReactNode; placeholder: React.ReactNode }) {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const [show, setShow] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || show) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          setShow(true);
-          io.disconnect();
-        }
-      },
-      { rootMargin: "300px" },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [show]);
-  return <div ref={ref} style={{ width: "100%", height: "100%" }}>{show ? children : placeholder}</div>;
 }
 
 function Thumb({
