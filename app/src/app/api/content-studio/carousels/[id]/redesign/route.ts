@@ -7,7 +7,6 @@ import { getCurrentMembership } from "@/lib/auth";
 import { getCarousel, updateSlide } from "@/lib/image/carousels";
 import { libraryFilePath, listLibraryAssets } from "@/lib/image/library";
 import { DESIGNED_TEMPLATE_ID } from "@/lib/image/paintSlide";
-import { deleteRender } from "@/lib/image/renderStore";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -89,16 +88,16 @@ export async function POST(
     );
   }
 
-  const previousRender = slide.renderFilename;
   updateSlide(slide.id, {
     designHtml: result.slide.html,
     renderFilename: result.slide.renderFilename,
   });
-  // Only after the row points at the new file, so a failure mid-way never
-  // leaves a slide referencing a render that has been deleted.
-  if (result.slide.renderFilename && previousRender !== result.slide.renderFilename) {
-    deleteRender(previousRender);
-  }
+  // The superseded render is deliberately NOT deleted. The editor offers a
+  // one-step undo, and undo restoring a row that points at a file we just
+  // removed would be worse than the disk it costs -- a render is around 60KB
+  // and the filename is a content hash, so identical output dedupes. A sweep
+  // for renders no row references belongs with the other housekeeping jobs,
+  // not in the request path.
 
   return NextResponse.json({
     ok: true,

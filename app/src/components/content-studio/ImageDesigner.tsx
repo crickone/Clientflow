@@ -19,6 +19,7 @@ import {
   Plus,
   RefreshCw,
   Sparkles,
+  Undo2,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -400,6 +401,35 @@ export function ImageDesigner({
     }
   }, [activeSlot, slidesInSlot.length, activeIdx]);
 
+  /**
+   * One-step undo for STRUCTURAL slide changes -- switching template, and
+   * redesigning.
+   *
+   * Deliberately not an undo of every keystroke: the autosave effect fires on
+   * each character, so snapshotting there would make "undo" mean "delete one
+   * letter". What an operator actually loses by accident is the whole slide --
+   * they click a template to see what it looks like and the AI design appears
+   * to be gone. It is not: designHtml and renderFilename stay on the row
+   * through a template switch, so restoring is just putting templateId back.
+   */
+  const [undoable, setUndoable] = useState<Record<number, CarouselSlide>>({});
+
+  const snapshotForUndo = useCallback((slide: CarouselSlide) => {
+    setUndoable((prev) => ({ ...prev, [slide.id]: slide }));
+  }, []);
+
+  const undoSlide = useCallback(() => {
+    if (!activeSlide) return;
+    const previous = undoable[activeSlide.id];
+    if (!previous) return;
+    setSlides((cur) => cur.map((s) => (s.id === previous.id ? previous : s)));
+    setUndoable((prev) => {
+      const next = { ...prev };
+      delete next[previous.id];
+      return next;
+    });
+  }, [activeSlide, undoable]);
+
   const updateActiveSlide = useCallback(
     (patch: Partial<CarouselSlide>) => {
       if (!activeSlide) return;
@@ -679,9 +709,15 @@ export function ImageDesigner({
   // template — otherwise the whole picker would sit there looking inert.
   function applyTemplate(t: Template) {
     if (activeSlide) {
+      // Snapshot first: trying a template on an AI-designed slide is the
+      // change most likely to be regretted, and it looks destructive even
+      // though it is not.
+      snapshotForUndo(activeSlide);
       // Dropping layoutJson matters: paintSlide forks on templateId, so a
       // stale spec left behind a real template id would be invisible until
       // someone switched back and got a layout they thought they had replaced.
+      // designHtml and renderFilename are deliberately KEPT, so undo can put
+      // the design back without asking the model for it again.
       updateActiveSlide({
         templateId: t.id,
         aspectRatio: t.aspectRatio,
@@ -1350,6 +1386,17 @@ export function ImageDesigner({
                 <Plus size={14} />
                 Add slide
               </Button>
+              {activeSlide && undoable[activeSlide.id] && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={undoSlide}
+                  title="Put this slide back the way it was"
+                >
+                  <Undo2 size={14} />
+                  Undo
+                </Button>
+              )}
               {isCarousel && (
                 <Button
                   variant="ghost"
@@ -1688,6 +1735,7 @@ export function ImageDesigner({
             <DesignedSlidePanel
               designId={designId}
               slide={activeSlide}
+              onBeforeRedesign={() => snapshotForUndo(activeSlide)}
               onUpdated={(next) => {
                 setSlides((cur) => cur.map((s) => (s.id === next.id ? next : s)));
               }}
@@ -2497,16 +2545,19 @@ function DesignedSlidePanel({
   designId,
   slide,
   onUpdated,
+  onBeforeRedesign,
 }: {
   designId: number;
   slide: CarouselSlide;
   onUpdated: (slide: CarouselSlide) => void;
+  onBeforeRedesign: () => void;
 }) {
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function redesign() {
+    onBeforeRedesign();
     setBusy(true);
     setError(null);
     try {
