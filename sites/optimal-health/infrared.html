@@ -214,15 +214,23 @@ h1,h2,h3,p,figure,blockquote{margin:0}
 /* ---- big-name list with small meta beside it ---- */
 .roll{border-top:1px dotted rgba(36,35,31,.42);padding-top:clamp(18px,2.4vw,26px)}
 .band--ink .roll{border-top-color:rgba(242,243,237,.42)}
+/* The row IS the line of type on every ordinary list. On the therapies
+   accordion it becomes a container instead and the head below carries the
+   line -- so the layout lives on both, and only the container resets it.
+   Putting it solely on .roll__head is what flattened the massage, pricing and
+   about lists: those rows have no head. */
+.roll__row,.roll__head{
+  display:flex;align-items:baseline;gap:clamp(10px,1.4vw,18px);flex-wrap:wrap;
+  padding:clamp(14px,1.9vw,22px) 0;
+}
 .roll__row{border-bottom:1px dotted rgba(36,35,31,.28)}
 .band--ink .roll__row{border-bottom-color:rgba(242,243,237,.28)}
 
 /* The head is a button, not a link: it opens the explainer. The link to the
    full page lives inside the panel, so a press never navigates by surprise. */
+.roll--therapies .roll__row{display:block;padding:0}
 .roll__head{
-  display:flex;align-items:baseline;gap:clamp(10px,1.4vw,18px);flex-wrap:wrap;
-  width:100%;padding:clamp(12px,1.6vw,18px) 0;
-  background:none;border:0;text-align:left;color:inherit;font:inherit;cursor:pointer;
+  width:100%;background:none;border:0;text-align:left;color:inherit;font:inherit;cursor:pointer;
 }
 .roll__n{
   font-size:clamp(21px,2.9vw,40px);line-height:1;letter-spacing:-.02em;font-weight:500;
