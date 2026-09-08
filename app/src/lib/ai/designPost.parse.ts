@@ -98,7 +98,9 @@ USE THE WHOLE CANVAS. A slide with a line of type at the top and empty space bel
 
 Where a slide uses a photograph, write the src EXACTLY as ${PHOTO_TOKEN} -- that placeholder is replaced with the real image. Use it at most once per slide, and give that slide a "photo" field describing the scene: subject, setting, mood, composition. Never describe text, signage or lettering in shot. A slide with no photograph has "photo": "".
 
-Copy: plain text, no markdown, no emojis, no hashtags. Headings short and concrete. Never invent a statistic.
+Copy: plain text, no markdown, no emojis, no hashtags. Headings short and concrete.
+
+NEVER INVENT A FACT. That covers prices, session lengths, opening times, offers, phone numbers, addresses and statistics alike. If a number is not in the business context above, it does not go on the slide -- write the sentence without it. A plausible-looking price on a health clinic's post is worse than no price, because someone will turn up expecting it.
 
 Output format -- return ONLY this JSON inside <design>...</design> tags, no other text:
 <design>

@@ -113,6 +113,16 @@ check(
 check("the text-wrap rule is in the prompt", DESIGN_RULES.includes("must NOT set"));
 check("and the no-br rule", DESIGN_RULES.includes("NEVER write <br>"));
 check("and the fill-the-canvas rule", DESIGN_RULES.includes("USE THE WHOLE CANVAS"));
+// A real generation put "HBOT - 60 minutes - EUR 95" on a closing slide for a
+// tenant with no services, no pricing and no business profile. "Never invent a
+// statistic" did not cover a price, and a plausible-looking one on a health
+// clinic's post brings someone through the door expecting it.
+check(
+  "inventing a fact is forbidden in the terms that actually get broken",
+  DESIGN_RULES.includes("NEVER INVENT A FACT") &&
+    DESIGN_RULES.includes("prices") &&
+    DESIGN_RULES.includes("session lengths"),
+);
 
 const empty = checkDesigns([{ html: "   ", photo: "" }], SYSTEM);
 check("an empty design is a problem", empty.problems.some((p) => p.includes("no markup")));
