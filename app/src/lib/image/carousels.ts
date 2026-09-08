@@ -98,6 +98,9 @@ export interface AddSlideInput {
   backgroundZoom?: number;
   imageStatus?: "generating" | "ready" | "failed" | null;
   imagePrompt?: string | null;
+  /** Serialized LayoutSpec for an AI-composed slide (lib/design/grammar.ts).
+   *  Null on every slide that uses one of the fixed templates. */
+  layoutJson?: string | null;
 }
 
 export function addSlide(input: AddSlideInput): CarouselSlide {
@@ -140,6 +143,7 @@ export function addSlide(input: AddSlideInput): CarouselSlide {
       backgroundZoom: input.backgroundZoom ?? 1,
       imageStatus: input.imageStatus ?? null,
       imagePrompt: input.imagePrompt ?? null,
+      layoutJson: input.layoutJson ?? null,
     })
     .returning()
     .all();

@@ -270,6 +270,29 @@ fails(
   "3.62:1",
 );
 
+// An accent that only fills a rule is exempt from the type rules -- that is
+// what an accent is for. Checking it unconditionally would flag every composed
+// slide in a palette whose accent is forbidden as type, which is most of them.
+check(
+  "an accent that carries no text is not held to the type rules",
+  validateSlide(spec({ ground: "sage" }), SYSTEM, {
+    accent: TIMBER,
+    accentCarriesText: false,
+  }).ok,
+);
+fails(
+  "but the same accent set in type is caught",
+  validateSlide(spec({ ground: "sage" }), SYSTEM, {
+    accent: TIMBER,
+    accentCarriesText: true,
+  }),
+  "never sets type in timber",
+);
+check(
+  "and a caller that says nothing gets the strict answer",
+  !validateSlide(spec({ ground: "sage" }), SYSTEM, { accent: TIMBER }).ok,
+);
+
 // -------------------------------------------------------------------------
 //  4. The rotation rule
 // -------------------------------------------------------------------------

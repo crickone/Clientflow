@@ -142,6 +142,17 @@ export interface SlideColours {
   background?: string | null;
   /** The row's accentColor — highlighted words and the accent rule. */
   accent?: string | null;
+  /**
+   * Whether the accent is actually SET IN TYPE on this slide, rather than only
+   * filling a rule. An accent used to divide and fill is exempt from the type
+   * rules — that is what an accent is for — so checking it unconditionally
+   * would flag every composed slide whose palette has a forbidden-as-type
+   * accent, which is most of them. Callers derive it from the content: the
+   * accent carries text only where the heading has *asterisk* highlight
+   * markup. Defaults to true, so a caller that has not thought about it gets
+   * the strict answer rather than a silent pass.
+   */
+  accentCarriesText?: boolean;
   /** Whether a background photograph is actually present. Type over a
    *  photograph cannot be checked against a flat hex, so contrast is not
    *  measured there; the ban on non-type values still applies. */
@@ -222,11 +233,12 @@ export function validateSlide(
   // highlighted words; otherwise the system chooses, and its choice is safe
   // by construction.
   const accent = colours.accent?.trim() || null;
+  const carriesText = colours.accentCarriesText !== false;
   const fallback = defaultTypeValue(system, groundHex);
 
   const textColours: { hex: string; why: string }[] = [];
   if (fallback) textColours.push({ hex: fallback.hex, why: "" });
-  if (accent && (!fallback || accent.toLowerCase() !== fallback.hex)) {
+  if (carriesText && accent && (!fallback || accent.toLowerCase() !== fallback.hex)) {
     textColours.push({ hex: accent, why: " highlight" });
   }
 

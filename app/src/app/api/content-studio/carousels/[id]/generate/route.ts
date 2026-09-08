@@ -10,6 +10,8 @@ import {
   updateSlide,
 } from "@/lib/image/carousels";
 import { generateCarouselSlides } from "@/lib/ai/generateCarousel";
+import { composeCarousel } from "@/lib/ai/composeDesign";
+import { COMPOSED_TEMPLATE_ID } from "@/lib/image/paintSlide";
 import { getTemplate, templateUsesPhoto } from "@/lib/image/templates";
 import { AiCapError } from "@/lib/ai/usage";
 import { isImageGenConfigured, IMAGE_COST_CENTS } from "@/lib/ai/image/falClient";
@@ -76,9 +78,14 @@ export async function POST(
     );
   }
 
+  // composeCarousel is the entry point for BOTH paths: with a tenant design
+  // system it composes layouts within the grammar; without one it delegates to
+  // generateCarouselSlides unchanged and returns composed:false. That is why
+  // this route has one call rather than a branch — a tenant with no system
+  // takes exactly the code path it took before.
   let result;
   try {
-    result = await generateCarouselSlides(
+    result = await composeCarousel(
       {
         topic,
         slideCount,
@@ -116,6 +123,58 @@ export async function POST(
   const jobs: SlideImageJob[] = [];
 
   try {
+    if (result.composed) {
+      // A composed slide stores the sentinel template id plus its spec; its
+      // content and colour go in the ordinary columns, so it is edited with
+      // the controls a template slide already has.
+      for (let i = 0; i < result.slides.length; i++) {
+        const slide = result.slides[i];
+        // Imagery only where the layout uses one — composeCarousel already
+        // blanked the scene for flat slides, so this spends nothing on them.
+        const prompt =
+          houseStyle && slide.image
+            ? buildImagePrompt({ houseStyle, scene: slide.image })
+            : null;
+        const row = addSlide({
+          carouselSetId: carouselId,
+          slotKey,
+          templateId: COMPOSED_TEMPLATE_ID,
+          aspectRatio: "1:1",
+          headingText: slide.headingText,
+          bodyText: slide.bodyText,
+          tagline: slide.tagline,
+          caption: i === 0 ? result.caption : "",
+          accentColor: slide.accentColor,
+          backgroundColor: slide.backgroundColor,
+          layoutJson: slide.layoutJson,
+          imagePrompt: prompt,
+          imageStatus: prompt ? "generating" : null,
+        });
+        if (prompt) jobs.push({ slideId: row.id, prompt, aspectRatio: "1:1" });
+      }
+      if (jobs.length > 0) queueSlideImages(tenantId, jobs);
+
+      db.update(schema.carouselSets)
+        .set({ updatedAt: new Date() })
+        .where(eq(schema.carouselSets.id, carouselId))
+        .run();
+
+      return NextResponse.json({
+        ok: true,
+        carousel: getCarousel(carouselId),
+        usage: result.usage,
+        images: { queued: jobs.length, estCents: jobs.length * IMAGE_COST_CENTS },
+        // Rules the composed set still breaks. Surfaced, never hidden — the
+        // editor shows them beside the slide they belong to.
+        design: {
+          composed: true,
+          repaired: result.repaired,
+          setViolations: result.setViolations,
+          slideViolations: result.slides.map((s: { violations: string[] }) => s.violations),
+        },
+      });
+    }
+
     for (let i = 0; i < result.slides.length; i++) {
       const slide = result.slides[i];
       // Only spend on a background the template can actually show — several

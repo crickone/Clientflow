@@ -168,6 +168,28 @@ export function bindSlots(spec: LayoutSpec, design: DesignState): BoundSlot[] {
   });
 }
 
+/**
+ * The inverse of bindSlots: the row columns a freshly-composed spec should be
+ * persisted into. The model writes its copy INTO the slots, and this pulls it
+ * back out into the columns the editor edits — so what is saved round-trips
+ * through bindSlots exactly, and slot text and row text can never disagree at
+ * the moment a slide is created.
+ */
+export function rowFromSpec(spec: LayoutSpec): {
+  headingText: string;
+  bodyText: string;
+  tagline: string | null;
+} {
+  const at = (pred: (level: TypeLevel) => boolean) =>
+    spec.slots.filter((s) => pred(s.level)).map((s) => s.text.trim());
+  const label = at((l) => l === "label");
+  return {
+    headingText: at((l) => HEADING_LEVELS.has(l)).join(" ").trim(),
+    bodyText: at((l) => BODY_LEVELS.has(l)).filter(Boolean).join("\n"),
+    tagline: label.find(Boolean) ?? null,
+  };
+}
+
 // -------------------------------------------------------------------------
 //  Painting a block of slots
 // -------------------------------------------------------------------------
