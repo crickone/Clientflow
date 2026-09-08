@@ -402,33 +402,51 @@ export function ImageDesigner({
   }, [activeSlot, slidesInSlot.length, activeIdx]);
 
   /**
-   * One-step undo for STRUCTURAL slide changes -- switching template, and
-   * redesigning.
+   * Undo for STRUCTURAL slide changes -- switching template, and redesigning.
+   * A STACK per slide, not a single step: the way templates are actually used
+   * is to click through several to see what they look like, and a one-deep
+   * undo cannot get back to what you started from. Each press walks back one
+   * change, so N clicks then N undos returns the original AI design.
    *
    * Deliberately not an undo of every keystroke: the autosave effect fires on
    * each character, so snapshotting there would make "undo" mean "delete one
-   * letter". What an operator actually loses by accident is the whole slide --
-   * they click a template to see what it looks like and the AI design appears
-   * to be gone. It is not: designHtml and renderFilename stay on the row
-   * through a template switch, so restoring is just putting templateId back.
+   * letter". What gets lost by accident is the whole slide -- someone tries a
+   * template and the AI design appears to be gone. It is not: designHtml and
+   * renderFilename stay on the row through a switch, so restoring is just
+   * putting templateId back, with no model call.
    */
-  const [undoable, setUndoable] = useState<Record<number, CarouselSlide>>({});
+  const UNDO_LIMIT = 25;
+  const [undoStacks, setUndoStacks] = useState<Record<number, CarouselSlide[]>>({});
 
   const snapshotForUndo = useCallback((slide: CarouselSlide) => {
-    setUndoable((prev) => ({ ...prev, [slide.id]: slide }));
+    setUndoStacks((prev) => {
+      const stack = [...(prev[slide.id] ?? []), slide];
+      // Oldest first, so the cap drops the most distant history rather than
+      // the step about to be undone.
+      return { ...prev, [slide.id]: stack.slice(-UNDO_LIMIT) };
+    });
   }, []);
 
   const undoSlide = useCallback(() => {
     if (!activeSlide) return;
-    const previous = undoable[activeSlide.id];
+    const slideId = activeSlide.id;
+    const stack = undoStacks[slideId] ?? [];
+    const previous = stack[stack.length - 1];
     if (!previous) return;
-    setSlides((cur) => cur.map((s) => (s.id === previous.id ? previous : s)));
-    setUndoable((prev) => {
+    // Both writes happen OUTSIDE the updaters. Restoring the slide from inside
+    // setUndoStacks would be a side effect in a state updater, which React may
+    // run twice in development -- and that would pop two steps for one press.
+    setSlides((cur) => cur.map((s) => (s.id === slideId ? previous : s)));
+    setUndoStacks((prev) => {
+      const rest = (prev[slideId] ?? []).slice(0, -1);
       const next = { ...prev };
-      delete next[previous.id];
+      if (rest.length) next[slideId] = rest;
+      else delete next[slideId];
       return next;
     });
-  }, [activeSlide, undoable]);
+  }, [activeSlide, undoStacks]);
+
+  const undoDepth = activeSlide ? (undoStacks[activeSlide.id]?.length ?? 0) : 0;
 
   const updateActiveSlide = useCallback(
     (patch: Partial<CarouselSlide>) => {
@@ -1386,15 +1404,19 @@ export function ImageDesigner({
                 <Plus size={14} />
                 Add slide
               </Button>
-              {activeSlide && undoable[activeSlide.id] && (
+              {undoDepth > 0 && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={undoSlide}
-                  title="Put this slide back the way it was"
+                  title={
+                    undoDepth === 1
+                      ? "Put this slide back the way it was"
+                      : `Step back through ${undoDepth} changes to this slide`
+                  }
                 >
                   <Undo2 size={14} />
-                  Undo
+                  {undoDepth > 1 ? `Undo (${undoDepth})` : "Undo"}
                 </Button>
               )}
               {isCarousel && (
