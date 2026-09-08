@@ -1485,6 +1485,23 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     console.error("[db] carousel_slides layout_json migration failed:", err);
   }
 
+  // AI-designed slides: the authored HTML and the PNG rendered from it. The
+  // HTML is the source of truth; the render is derived and can be rebuilt.
+  // Additive/idempotent, like every guard in this block.
+  try {
+    const designCols = sqlite
+      .prepare("PRAGMA table_info(carousel_slides)")
+      .all() as Array<{ name: string }>;
+    if (designCols.length > 0 && !designCols.some((c) => c.name === "design_html")) {
+      sqlite.exec("ALTER TABLE carousel_slides ADD COLUMN design_html TEXT");
+    }
+    if (designCols.length > 0 && !designCols.some((c) => c.name === "render_filename")) {
+      sqlite.exec("ALTER TABLE carousel_slides ADD COLUMN render_filename TEXT");
+    }
+  } catch (err) {
+    console.error("[db] carousel_slides design columns migration failed:", err);
+  }
+
   // AI-suggested rotation for video clips shot with the camera physically
   // turned (landscape file, no rotation metadata). A suggestion only — the
   // operator confirms before it's applied to `rotation`. Additive/idempotent.

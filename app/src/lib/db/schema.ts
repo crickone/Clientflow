@@ -951,6 +951,18 @@ export const carouselSlides = sqliteTable("carousel_slides", {
    * 'composed' there.
    */
   layoutJson: text("layout_json"),
+  /**
+   * The AI-authored HTML for a designed slide, and the SOURCE OF TRUTH for it:
+   * the PNG is derived, so a slide can be re-rendered later -- a font change, a
+   * new aspect ratio, a fix to the renderer -- without paying the model again.
+   */
+  designHtml: text("design_html"),
+  /**
+   * Filename of the PNG rendered from `design_html`, in data/renders. This is
+   * what the editor shows AND what the operator exports: the same bytes, which
+   * is how preview equals export for a designed slide.
+   */
+  renderFilename: text("render_filename"),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),

@@ -101,6 +101,10 @@ export interface AddSlideInput {
   /** Serialized LayoutSpec for an AI-composed slide (lib/design/grammar.ts).
    *  Null on every slide that uses one of the fixed templates. */
   layoutJson?: string | null;
+  /** AI-authored HTML for a designed slide (lib/design/renderDesign.ts). */
+  designHtml?: string | null;
+  /** Filename of the PNG rendered from it (lib/image/renderStore.ts). */
+  renderFilename?: string | null;
 }
 
 export function addSlide(input: AddSlideInput): CarouselSlide {
@@ -144,6 +148,8 @@ export function addSlide(input: AddSlideInput): CarouselSlide {
       imageStatus: input.imageStatus ?? null,
       imagePrompt: input.imagePrompt ?? null,
       layoutJson: input.layoutJson ?? null,
+      designHtml: input.designHtml ?? null,
+      renderFilename: input.renderFilename ?? null,
     })
     .returning()
     .all();
