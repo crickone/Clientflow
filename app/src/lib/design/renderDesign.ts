@@ -163,3 +163,81 @@ export async function gradedPhotoDataUri(
   const buf = await img.jpeg({ quality: 88 }).toBuffer();
   return `data:image/jpeg;base64,${buf.toString("base64")}`;
 }
+
+/**
+ * Stamp the tenant's logo onto a rendered slide.
+ *
+ * Composited AFTER the design rather than asked for in the markup, for the same
+ * reason the photograph is substituted rather than described: placement and
+ * size are brand rules, and a model that can put the logo anywhere will
+ * eventually put it somewhere wrong. The prompt's job is only to keep the
+ * corner clear.
+ *
+ * THE COLOUR IS CHOSEN FROM THE SLIDE. Optimal Health's supplied mark is solid
+ * ink, which the brand document pairs with sage and plaster grounds and
+ * replaces with a plaster version on ink -- black on near-black is nothing at
+ * all. Rather than require both files, this measures the actual brightness
+ * under the logo's box and, on a dark ground, pushes the SAME artwork through
+ * in plaster. The geometry is untouched, which is what "use the supplied file"
+ * protects; only the ink is swapped, exactly as the document's second file
+ * does. A photograph underneath is handled by the same measurement.
+ */
+export async function stampLogo(
+  slidePng: Buffer,
+  logoPath: string,
+  width: number,
+  height: number,
+): Promise<Buffer> {
+  // The document sets clear space at the height of the dot cluster and a
+  // minimum width; on a 1080 field this reads as roughly a fifth of the width,
+  // inset by the grid margin.
+  const margin = Math.round(width * 0.07);
+  const logoW = Math.round(width * 0.19);
+
+  const logo = sharp(logoPath).resize({ width: logoW });
+  const { data: logoData, info } = await logo
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const left = width - margin - info.width;
+  const top = margin;
+
+  // Mean brightness of the pixels the logo will actually cover.
+  const patch = await sharp(slidePng)
+    .extract({ left, top, width: info.width, height: info.height })
+    .greyscale()
+    .raw()
+    .toBuffer();
+  let sum = 0;
+  for (let i = 0; i < patch.length; i++) sum += patch[i];
+  const ground = sum / patch.length;
+
+  // Below this the ground is dark enough that an ink mark disappears.
+  const onDark = ground < 128;
+  let mark = sharp(logoData, {
+    raw: { width: info.width, height: info.height, channels: 4 },
+  });
+  if (onDark) {
+    // Push plaster through the mark's own alpha: same shape, brand's light ink.
+    const alpha = await sharp(logoData, {
+      raw: { width: info.width, height: info.height, channels: 4 },
+    })
+      .extractChannel(3)
+      .toBuffer();
+    mark = sharp({
+      create: {
+        width: info.width,
+        height: info.height,
+        channels: 3,
+        background: "#f2f3ed",
+      },
+    })
+      .joinChannel(alpha, { raw: { width: info.width, height: info.height, channels: 1 } });
+  }
+
+  return sharp(slidePng)
+    .composite([{ input: await mark.png().toBuffer(), left, top }])
+    .png()
+    .toBuffer();
+}

@@ -6,6 +6,7 @@ import { AiCapError } from "@/lib/ai/usage";
 import { getCurrentMembership } from "@/lib/auth";
 import { getCarousel, updateSlide } from "@/lib/image/carousels";
 import { libraryFilePath, listLibraryAssets } from "@/lib/image/library";
+import { resolveLogoPath } from "@/lib/branding";
 import { DESIGNED_TEMPLATE_ID } from "@/lib/image/paintSlide";
 
 export const dynamic = "force-dynamic";
@@ -69,6 +70,7 @@ export async function POST(
         note: note || null,
         aspectRatio: slide.aspectRatio,
         photoSource: firstPhoto ? libraryFilePath(firstPhoto.filename) : null,
+        logoPath: carousel.showLogo ? resolveLogoPath() : null,
       },
       { tenantId, agentKey: "carousel" },
     );

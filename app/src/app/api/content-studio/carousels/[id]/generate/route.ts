@@ -13,6 +13,7 @@ import { generateCarouselSlides } from "@/lib/ai/generateCarousel";
 import { designPost } from "@/lib/ai/designPost";
 import { DESIGNED_TEMPLATE_ID } from "@/lib/image/paintSlide";
 import { libraryFilePath, listLibraryAssets } from "@/lib/image/library";
+import { resolveLogoPath } from "@/lib/branding";
 import { getTemplate, templateUsesPhoto } from "@/lib/image/templates";
 import { AiCapError } from "@/lib/ai/usage";
 import { isImageGenConfigured, IMAGE_COST_CENTS } from "@/lib/ai/image/falClient";
@@ -104,6 +105,9 @@ export async function POST(
       {
         aspectRatio: "1:1",
         photoSource: firstPhoto ? libraryFilePath(firstPhoto.filename) : null,
+        // The design carries the logo the same way a template slide does, and
+        // obeys the same per-design switch.
+        logoPath: carousel.showLogo ? resolveLogoPath() : null,
       },
     );
   } catch (err) {

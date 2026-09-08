@@ -1753,101 +1753,16 @@ export function ImageDesigner({
           </div>
           </EditorSection>
 
-          {activeSlide && surface?.designed && (
-            <DesignedSlidePanel
-              designId={designId}
-              slide={activeSlide}
-              onBeforeRedesign={() => snapshotForUndo(activeSlide)}
-              onUpdated={(next) => {
-                setSlides((cur) => cur.map((s) => (s.id === next.id ? next : s)));
-              }}
-            />
-          )}
-
-          {activeSlide && surface && !surface.designed && (
-          <>
+          {/* The caption belongs to the POST, not to a slide -- it is stored
+              on slide[0] and goes out with the whole carousel. It used to sit
+              inside the Content section, which meant AI-designed slides lost
+              it entirely when that section became template-only: the caption
+              was being written and saved, and simply had nowhere to appear. */}
           <EditorSection
-            title="Content"
-            hint={total > 1 ? `Slide ${activeIdx + 1} of ${total}` : "This post"}
+            title="Caption"
+            hint={isCarousel ? "The whole carousel" : "Goes out with the post"}
             defaultOpen
           >
-          {surface.usesTagline && (
-            <div>
-              <Label htmlFor="tagline">
-                {surface.category === "carousels"
-                  ? "Slide indicator (auto-numbered if blank)"
-                  : "Tagline"}
-              </Label>
-              <Input
-                id="tagline"
-                value={activeSlide.tagline ?? ""}
-                placeholder={
-                  surface.taglineHint ?? autoTagline(activeIdx, total) ?? ""
-                }
-                onChange={(e) =>
-                  updateActiveSlide({ tagline: e.target.value || null })
-                }
-              />
-            </div>
-          )}
-
-          <div>
-            {/* The field itself keeps its name in the placeholder (house
-                style), but a stepper can't — so this one is labelled. */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "flex-end",
-                gap: 8,
-                marginBottom: 6,
-              }}
-            >
-              <span
-                style={{
-                  fontSize: 11,
-                  color: "var(--text-tertiary)",
-                  letterSpacing: "0.04em",
-                }}
-              >
-                Heading size
-              </span>
-              <HeadingSizeControl
-                value={activeSlide.headingScale ?? 1}
-                onChange={(headingScale) => updateActiveSlide({ headingScale })}
-              />
-            </div>
-            <Label htmlFor="heading" srOnly>
-              Heading
-            </Label>
-            <Textarea
-              id="heading"
-              value={activeSlide.headingText}
-              placeholder="Heading"
-              onChange={(e) =>
-                updateActiveSlide({ headingText: e.target.value })
-              }
-              style={{ minHeight: 70 }}
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="body" srOnly>Body text</Label>
-            <Textarea
-              id="body"
-              value={activeSlide.bodyText}
-              placeholder="Body text"
-              onChange={(e) =>
-                updateActiveSlide({ bodyText: e.target.value })
-              }
-            />
-          </div>
-
-          {/* The caption belongs with the words, not under the whole editor —
-              it used to be a full-width block below the grid, so the copy that
-              actually ships with the post was the one thing you had to scroll
-              past every control to reach. It is per-POST, not per-slide, hence
-              the rule above it and the note. */}
           {captionSlide && (
             <div
               style={{
@@ -1949,6 +1864,103 @@ export function ImageDesigner({
               </div>
             </div>
           )}
+          </EditorSection>
+
+          {activeSlide && surface?.designed && (
+            <DesignedSlidePanel
+              designId={designId}
+              slide={activeSlide}
+              onBeforeRedesign={() => snapshotForUndo(activeSlide)}
+              onUpdated={(next) => {
+                setSlides((cur) => cur.map((s) => (s.id === next.id ? next : s)));
+              }}
+            />
+          )}
+
+          {activeSlide && surface && !surface.designed && (
+          <>
+          <EditorSection
+            title="Content"
+            hint={total > 1 ? `Slide ${activeIdx + 1} of ${total}` : "This post"}
+            defaultOpen
+          >
+          {surface.usesTagline && (
+            <div>
+              <Label htmlFor="tagline">
+                {surface.category === "carousels"
+                  ? "Slide indicator (auto-numbered if blank)"
+                  : "Tagline"}
+              </Label>
+              <Input
+                id="tagline"
+                value={activeSlide.tagline ?? ""}
+                placeholder={
+                  surface.taglineHint ?? autoTagline(activeIdx, total) ?? ""
+                }
+                onChange={(e) =>
+                  updateActiveSlide({ tagline: e.target.value || null })
+                }
+              />
+            </div>
+          )}
+
+          <div>
+            {/* The field itself keeps its name in the placeholder (house
+                style), but a stepper can't — so this one is labelled. */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                gap: 8,
+                marginBottom: 6,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 11,
+                  color: "var(--text-tertiary)",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                Heading size
+              </span>
+              <HeadingSizeControl
+                value={activeSlide.headingScale ?? 1}
+                onChange={(headingScale) => updateActiveSlide({ headingScale })}
+              />
+            </div>
+            <Label htmlFor="heading" srOnly>
+              Heading
+            </Label>
+            <Textarea
+              id="heading"
+              value={activeSlide.headingText}
+              placeholder="Heading"
+              onChange={(e) =>
+                updateActiveSlide({ headingText: e.target.value })
+              }
+              style={{ minHeight: 70 }}
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="body" srOnly>Body text</Label>
+            <Textarea
+              id="body"
+              value={activeSlide.bodyText}
+              placeholder="Body text"
+              onChange={(e) =>
+                updateActiveSlide({ bodyText: e.target.value })
+              }
+            />
+          </div>
+
+          {/* The caption belongs with the words, not under the whole editor —
+              it used to be a full-width block below the grid, so the copy that
+              actually ships with the post was the one thing you had to scroll
+              past every control to reach. It is per-POST, not per-slide, hence
+              the rule above it and the note. */}
           </EditorSection>
 
           <EditorSection

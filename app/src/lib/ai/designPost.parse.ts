@@ -90,6 +90,8 @@ Write ONE HTML element per slide. It is rendered by satori, which supports a SUB
 
 The canvas is EXACTLY the size you are told. The outermost element sets that width and height in px, "display:flex", and "position:relative".
 
+KEEP THE TOP-RIGHT CORNER CLEAR -- roughly a quarter of the width and a tenth of the height. The business's logo is stamped there afterwards, in the right colour for the ground you chose. Do not draw a logo, a wordmark or the business name yourself.
+
 Moves worth making, because a fixed template cannot: a figure or word oversized and cropped by the canvas edge; a panel of type overlapping a full-bleed photograph; an asymmetric split where a band of a second ground cuts the first; a rule that crosses the whole composition; a list as cards on the signature ground. Vary them across a set -- five slides of the same shape read as a template, which is the thing this exists to avoid.
 
 Keep every element inside the canvas and clear of the others. Nothing may overlap text, and nothing may run off an edge unless you meant it to. Give every text element an explicit "width" so it wraps where you intend rather than where it runs out of canvas.

@@ -20,7 +20,7 @@ import {
 } from "@/lib/ai/generateCarousel";
 import { meteredCreateStreamed, type MeterContext } from "@/lib/ai/metered";
 import { loadDesignFonts } from "@/lib/design/fonts";
-import { gradedPhotoDataUri, renderDesignToPng } from "@/lib/design/renderDesign";
+import { gradedPhotoDataUri, renderDesignToPng, stampLogo } from "@/lib/design/renderDesign";
 import { getDesignSystem } from "@/lib/design/system";
 import type { DesignSystem } from "@/lib/design/parse";
 import { saveRender } from "@/lib/image/renderStore";
@@ -84,6 +84,7 @@ async function renderOne(
   width: number,
   height: number,
   photoSource: Buffer | string | null,
+  logoPath: string | null,
 ): Promise<{ renderFilename: string | null; violation: string | null }> {
   let html = design.html;
   if (html.includes(PHOTO_TOKEN)) {
@@ -104,7 +105,12 @@ async function renderOne(
 
   try {
     const fonts = await loadDesignFonts("Inter");
-    const png = await renderDesignToPng(html, width, height, fonts);
+    let png = await renderDesignToPng(html, width, height, fonts);
+    if (logoPath) {
+      // Stamped after the design, never asked for in the markup -- placement
+      // and size are brand rules, not something to leave to a model.
+      png = await stampLogo(png, logoPath, width, height);
+    }
     return { renderFilename: saveRender(png), violation: null };
   } catch (err) {
     // A design that will not render must not take the whole set down with it.
@@ -126,6 +132,8 @@ export async function designPost(
     aspectRatio?: "1:1" | "4:5" | "9:16";
     /** Source image for slides that ask for a photograph. */
     photoSource?: Buffer | string | null;
+    /** The tenant's logo file, stamped onto every slide. Null to omit it. */
+    logoPath?: string | null;
   } = {},
 ): Promise<DesignPostOutcome> {
   const system = getDesignSystem();
@@ -236,6 +244,7 @@ export async function designPost(
         width,
         height,
         options.photoSource ?? null,
+        options.logoPath ?? null,
       );
       if (violation) problems.push(`Slide ${i + 1}: ${violation}`);
       rendered.push({
@@ -316,6 +325,7 @@ export async function redesignSlide(
     note: string | null;
     aspectRatio?: "1:1" | "4:5" | "9:16";
     photoSource?: Buffer | string | null;
+    logoPath?: string | null;
   },
   meter: MeterContext,
   model: string = CONTENT_MODEL,
@@ -384,6 +394,7 @@ export async function redesignSlide(
     width,
     height,
     input.photoSource ?? null,
+    input.logoPath ?? null,
   );
 
   return {
