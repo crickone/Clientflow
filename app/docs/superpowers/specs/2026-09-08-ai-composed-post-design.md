@@ -134,7 +134,20 @@ Content Studio gains two tabs:
 - **Golden master**: render all 48 templates before and after the `paintSlide` fork and assert byte-identical PNGs. This is the regression that matters.
 - Composed output is judged by eye, against the real Optimal Health system, before it ships.
 
-## Open questions for review
+## Resolved in review (2026-09-08)
 
-1. Should a composed slide be **editable** afterwards in the Studio's normal controls, or locked to its spec? Editable is friendlier; it means the spec and the edited slide can diverge, and the validator no longer holds.
-2. When validation fails twice, is falling back to a fixed template the right behaviour, or should the slide be shown with the violation surfaced to the operator?
+**1. A composed slide stays editable.** This resolves more cleanly than expected, because it forces a separation the design wanted anyway:
+
+- **`layout_json` holds STRUCTURE only** — archetype, ground, photo treatment, which type level each slot uses, spans, rule placement.
+- **The existing slide columns stay the source of truth for CONTENT and COLOUR** — `headingText`, `bodyText`, `tagline`, `accentColor`, `backgroundColor`, `backgroundAssetId`, `headingScale`.
+
+So the operator edits a composed slide with exactly the controls they already have, and nothing about the layout is invalidated by retyping a heading or nudging a colour. `paintLayout` reads structure from the spec and content from the row — the same split `paintSlide` already makes between `template` and `DesignState`.
+
+**2. A slide that fails validation is shown, with the violation surfaced.** Never silently swapped for a fixed template, and never hidden.
+
+This pairs with decision 1 to give one warning surface serving two sources: a spec the model composed badly, and an operator edit that breaks a rule (picking a timber heading on sage takes it to 2.14:1). Validation therefore runs **on render, not only on generation**:
+
+- `validateSlide(slide, spec, system)` runs whenever a composed slide is drawn in the editor.
+- Violations appear in the Inspector as a non-blocking notice naming the actual measurement — "Heading is timber on sage: 2.14:1, below the 4.5:1 this system requires for body text" — not a generic warning.
+- Generation still gets its single repair call first; what survives that is shown flagged rather than discarded.
+- The notice is editor-only. It never renders into the exported PNG.
