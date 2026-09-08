@@ -61,6 +61,7 @@ const footer = () => `<footer class="foot on-ink">
 // the visual editor (which strips head scripts) shows every section.
 const scripts = () => `<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/CustomEase.min.js"></script>
 <script>
 (function () {
   var root = document.documentElement;
@@ -69,13 +70,33 @@ const scripts = () => `<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dis
     root.className = root.className.replace(/\\bjs\\b/, ''); return;
   }
   gsap.registerPlugin(ScrollTrigger);
-  var EASE = 'power3.out';
+  if (window.CustomEase) gsap.registerPlugin(CustomEase);
+
+  /* ---- one easing vocabulary, used by everything ----------------------
+     "Smooth but with a snap" is a curve that leaves fast and lands slow:
+     most of the distance is covered in the first third, then it settles
+     without bouncing. cubic-bezier(.16,1,.3,1) is that curve. Built-in
+     power/expo eases are close but symmetrical-feeling by comparison --
+     they ramp rather than launch.
+
+     SNAP   the house ease. Entrances, panels, anything that arrives.
+     GLIDE  softer, for things already on screen that shift position.
+     PRESS  short and tight, for hover and other direct responses.
+
+     Durations matter as much as the curve: a snappy ease over 1.4s still
+     reads as slow, and over 0.2s reads as a jump. These are tuned to the
+     distances actually travelled on this site.
+  --------------------------------------------------------------------- */
+  var SNAP = window.CustomEase ? CustomEase.create('snap', '.16,1,.3,1') : 'expo.out';
+  var GLIDE = window.CustomEase ? CustomEase.create('glide', '.22,.78,.24,1') : 'power3.out';
+  var PRESS = window.CustomEase ? CustomEase.create('press', '.3,.9,.2,1') : 'power2.out';
+  var EASE = SNAP;
 
   if (document.querySelector('.hero')) {
     var tl = gsap.timeline();
-    tl.to('.hero__media img', { scale: 1, duration: 2.2, ease: 'power2.out' }, 0)
-      .to('.hero__mark > span', { y: '0%', duration: 1.15, ease: 'power4.out' }, 0.12)
-      .to('.hero [data-rise]', { opacity: 1, y: 0, duration: .9, ease: EASE, stagger: 0.1 }, 0.3);
+    tl.to('.hero__media img', { scale: 1, duration: 2.4, ease: GLIDE }, 0)
+      .to('.hero__mark > span', { y: '0%', duration: 1.05, ease: SNAP }, 0.1)
+      .to('.hero [data-rise]', { opacity: 1, y: 0, duration: .85, ease: SNAP, stagger: 0.08 }, 0.28);
     gsap.to('.hero__media img', {
       yPercent: 10, ease: 'none',
       scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: true }
@@ -86,7 +107,7 @@ const scripts = () => `<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dis
   // while they are on screen.
   gsap.utils.toArray('.duo__img img, .tile__img img').forEach(function (img) {
     gsap.to(img, {
-      clipPath: 'inset(0% 0 0 0)', scale: 1, duration: 1.3, ease: 'power3.out',
+      clipPath: 'inset(0% 0 0 0)', scale: 1, duration: 1.15, ease: SNAP,
       scrollTrigger: { trigger: img, start: 'top 88%' }
     });
   });
@@ -99,12 +120,12 @@ const scripts = () => `<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dis
 
   // Section titles and list rows arrive in sequence.
   gsap.utils.toArray('.band__head .title').forEach(function (t) {
-    gsap.to(t, { opacity: 1, y: 0, duration: .7, ease: EASE,
+    gsap.to(t, { opacity: 1, y: 0, duration: .8, ease: SNAP,
       scrollTrigger: { trigger: t, start: 'top 92%' } });
   });
   gsap.utils.toArray('.roll').forEach(function (roll) {
     gsap.to(roll.querySelectorAll('.roll__row'), {
-      opacity: 1, y: 0, duration: .8, ease: EASE, stagger: 0.09,
+      opacity: 1, y: 0, duration: .85, ease: SNAP, stagger: 0.07,
       scrollTrigger: { trigger: roll, start: 'top 84%' }
     });
   });
@@ -112,14 +133,96 @@ const scripts = () => `<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dis
   // The closing wordmark lifts into place like the one at the top.
   if (document.querySelector('.foot__mark > span')) {
     gsap.to('.foot__mark > span', {
-      y: '0%', duration: 1.15, ease: 'power4.out',
+      y: '0%', duration: 1.05, ease: SNAP,
       scrollTrigger: { trigger: '.foot__mark', start: 'top 95%' }
     });
   }
 
+  /* ---- the therapies: hover to reveal, tap to open --------------------
+     One panel open at a time. On a fine pointer the row opens on hover and
+     the whole list closes when the pointer leaves it, so browsing the four
+     is a single continuous movement rather than four clicks. On touch --
+     where there is no hover -- the head toggles, which is also what a
+     keyboard gets, and the link to the full page sits inside the panel so a
+     press never navigates by surprise.
+
+     Height is animated to a measured pixel value rather than 'auto': auto
+     forces a layout read mid-tween and the first frame stutters, which is
+     exactly the jolt this is meant to avoid.
+  --------------------------------------------------------------------- */
+  var rolls = gsap.utils.toArray('.roll--therapies');
+  rolls.forEach(function (roll) {
+    var rows = gsap.utils.toArray('[data-therapy]', roll);
+    var open = null;
+
+    rows.forEach(function (row) {
+      var head = row.querySelector('.roll__head');
+      var panel = row.querySelector('.roll__panel');
+      var img = row.querySelector('.roll__media img');
+      var copy = row.querySelectorAll('.roll__body, .roll__go');
+      if (!head || !panel) return;
+
+      row._close = function (now) {
+        if (!row.classList.contains('is-open')) return;
+        row.classList.remove('is-open');
+        head.setAttribute('aria-expanded', 'false');
+        gsap.killTweensOf([panel, img, copy]);
+        gsap.to(panel, {
+          height: 0, duration: now ? 0 : 0.42, ease: GLIDE,
+          onComplete: function () { panel.hidden = true; }
+        });
+        gsap.to(copy, { opacity: 0, y: 8, duration: now ? 0 : 0.2, ease: PRESS });
+      };
+
+      row._open = function () {
+        if (row.classList.contains('is-open')) return;
+        if (open && open !== row) open._close();
+        open = row;
+        row.classList.add('is-open');
+        head.setAttribute('aria-expanded', 'true');
+        panel.hidden = false;
+        gsap.killTweensOf([panel, img, copy]);
+
+        // Measure the natural height with the panel laid out but not painted
+        // at that size yet, then animate to the number.
+        gsap.set(panel, { height: 'auto' });
+        var target = panel.offsetHeight;
+        gsap.fromTo(panel, { height: 0 }, { height: target, duration: 0.62, ease: SNAP });
+
+        // The photograph wipes up and settles out of a slight overscale --
+        // the same move the section images make when they scroll in, so the
+        // panel feels like part of the page rather than a widget.
+        gsap.fromTo(img,
+          { clipPath: 'inset(0 0 100% 0)', scale: 1.06 },
+          { clipPath: 'inset(0 0 0% 0)', scale: 1, duration: 0.85, ease: SNAP, delay: 0.05 });
+        gsap.fromTo(copy,
+          { opacity: 0, y: 14 },
+          { opacity: 1, y: 0, duration: 0.6, ease: SNAP, stagger: 0.07, delay: 0.12 });
+      };
+
+      head.addEventListener('click', function () {
+        if (row.classList.contains('is-open')) row._close();
+        else row._open();
+      });
+      head.addEventListener('focus', function () { row._open(); });
+    });
+
+    // Hover only where hovering is real. A coarse pointer that reports hover
+    // (some hybrids) would otherwise open a panel on the tap that was meant
+    // to close it.
+    if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+      rows.forEach(function (row) {
+        row.addEventListener('mouseenter', function () { row._open(); });
+      });
+      roll.addEventListener('mouseleave', function () {
+        if (open) { open._close(); open = null; }
+      });
+    }
+  });
+
   gsap.utils.toArray('[data-stagger]').forEach(function (group) {
     gsap.to(group.children, {
-      opacity: 1, y: 0, duration: 0.85, ease: EASE, stagger: 0.09,
+      opacity: 1, y: 0, duration: 0.85, ease: SNAP, stagger: 0.07,
       scrollTrigger: { trigger: group, start: 'top 85%' }
     });
   });

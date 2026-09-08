@@ -202,18 +202,60 @@ h1,h2,h3,p,figure,blockquote{margin:0}
 /* ---- big-name list with small meta beside it ---- */
 .roll{border-top:1px dotted rgba(36,35,31,.42);padding-top:clamp(18px,2.4vw,26px)}
 .band--ink .roll{border-top-color:rgba(242,243,237,.42)}
-.roll__row{
-  display:flex;align-items:baseline;gap:clamp(10px,1.4vw,18px);flex-wrap:wrap;
-  padding:clamp(12px,1.6vw,18px) 0;
-  border-bottom:1px dotted rgba(36,35,31,.28);
-  text-decoration:none;color:inherit;
-}
+.roll__row{border-bottom:1px dotted rgba(36,35,31,.28)}
 .band--ink .roll__row{border-bottom-color:rgba(242,243,237,.28)}
-.roll__n{font-size:clamp(21px,2.9vw,40px);line-height:1;letter-spacing:-.02em;font-weight:500}
+
+/* The head is a button, not a link: it opens the explainer. The link to the
+   full page lives inside the panel, so a press never navigates by surprise. */
+.roll__head{
+  display:flex;align-items:baseline;gap:clamp(10px,1.4vw,18px);flex-wrap:wrap;
+  width:100%;padding:clamp(12px,1.6vw,18px) 0;
+  background:none;border:0;text-align:left;color:inherit;font:inherit;cursor:pointer;
+}
+.roll__n{
+  font-size:clamp(21px,2.9vw,40px);line-height:1;letter-spacing:-.02em;font-weight:500;
+  transition:color .32s cubic-bezier(.3,.9,.2,1),transform .32s cubic-bezier(.3,.9,.2,1);
+}
 .roll__m{font-size:clamp(10px,.86vw,12px);color:var(--deep);max-width:34ch}
 .band--ink .roll__m{color:var(--sage)}
 .roll__x{margin-left:auto;font-size:clamp(10px,.82vw,12px);letter-spacing:.14em;text-transform:uppercase}
-.roll__row:hover .roll__n,.roll__row:focus-visible .roll__n{color:var(--timber)}
+.roll__head:hover .roll__n,.roll__head:focus-visible .roll__n,
+.roll__row.is-open .roll__n{color:var(--timber);transform:translateX(6px)}
+.roll__head:focus-visible{outline:2px solid var(--timber);outline-offset:4px}
+
+/* ---- the explainer -------------------------------------------------- */
+.roll__panel{overflow:hidden}
+.roll__inner{
+  display:grid;grid-template-columns:minmax(0,32%) minmax(0,1fr);
+  gap:clamp(20px,3vw,44px);align-items:start;
+  padding:0 0 clamp(22px,3vw,34px);
+}
+@media (max-width:760px){.roll__inner{grid-template-columns:1fr;gap:18px}}
+.roll__media{overflow:hidden;background:rgba(36,35,31,.06)}
+.roll__media img{
+  /* 3:2 and a capped height keep the panel around a third of the viewport.
+     A taller crop pushed the rest of the list down far enough that browsing
+     the four therapies felt like the page jumping, which is the opposite of
+     what a hover reveal is for. */
+  display:block;width:100%;aspect-ratio:3/2;max-height:38vh;object-fit:cover;
+  /* Pre-state for the wipe. GSAP clears both on open. */
+  clip-path:inset(0 0 100% 0);transform:scale(1.06);
+}
+.roll__body{font-size:clamp(14px,1.05vw,17px);line-height:1.55;max-width:52ch;color:var(--ink)}
+.band--sage .roll__body{color:var(--ink)}
+.band--ink .roll__body{color:var(--plaster)}
+.roll__go{
+  display:inline-block;margin-top:clamp(14px,1.6vw,20px);
+  font-size:clamp(10px,.82vw,12px);letter-spacing:.14em;text-transform:uppercase;
+  color:var(--timber);text-decoration:none;border-bottom:1px solid currentColor;padding-bottom:3px;
+  transition:opacity .3s cubic-bezier(.3,.9,.2,1);
+}
+.roll__go:hover{opacity:.62}
+
+/* Without JavaScript the panels simply stand open -- the explainer is content,
+   and the site's rule is that no flag means no hiding. */
+html:not(.js) .roll__panel[hidden]{display:block}
+html:not(.js) .roll__media img{clip-path:none;transform:none}
 
 /* ---- quotes ---- */
 .says{display:grid;grid-template-columns:1fr 1fr;gap:clamp(24px,4vw,64px)}

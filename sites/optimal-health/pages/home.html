@@ -83,27 +83,71 @@
     <h2 class="title" data-rise>The therapies</h2>
     <a class="explore" href="therapies.html" data-rise>See all four</a>
   </div>
-  <div class="roll" data-stagger>
-    <a class="roll__row" href="hbot.html">
-      <span class="roll__n">Hyperbaric oxygen</span>
-      <span class="roll__m">Recovery, clarity, steady energy</span>
-      <span class="roll__x">50 min</span>
-    </a>
-    <a class="roll__row" href="infrared.html">
-      <span class="roll__n">Infrared</span>
-      <span class="roll__m">Muscle release, joint comfort, rest</span>
-      <span class="roll__x">30 min</span>
-    </a>
-    <a class="roll__row" href="pemf.html">
-      <span class="roll__n">PEMF</span>
-      <span class="roll__m">Cellular energy, circulation, pelvic floor</span>
-      <span class="roll__x">12 min</span>
-    </a>
-    <a class="roll__row" href="massage.html">
-      <span class="roll__n">Massage</span>
-      <span class="roll__m">Massage, reflexology and lymphatic drainage</span>
-      <span class="roll__x">45&ndash;60 min</span>
-    </a>
+  <div class="roll roll--therapies" data-stagger>
+    <div class="roll__row" data-therapy>
+      <button class="roll__head" type="button" aria-expanded="false" aria-controls="t-hbot">
+        <span class="roll__n">Hyperbaric oxygen</span>
+        <span class="roll__m">Recovery, clarity, steady energy</span>
+        <span class="roll__x">50 min</span>
+      </button>
+      <div class="roll__panel" id="t-hbot" hidden>
+        <div class="roll__inner">
+          <div class="roll__media"><img src="assets/hbot.jpg" alt="The hyperbaric chamber at the clinic" loading="lazy" /></div>
+          <div class="roll__copy">
+            <p class="roll__body">You sit in a pressurised chamber and breathe air with a higher concentration of oxygen than the room has. It is the pressure that does the work, not the percentage on the tank &mdash; under it, oxygen dissolves further into the blood than it can at room pressure. Most people read, listen to something, or doze.</p>
+            <a class="roll__go" href="hbot.html">See hyperbaric oxygen</a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="roll__row" data-therapy>
+      <button class="roll__head" type="button" aria-expanded="false" aria-controls="t-infrared">
+        <span class="roll__n">Infrared</span>
+        <span class="roll__m">Muscle release, joint comfort, rest</span>
+        <span class="roll__x">30 min</span>
+      </button>
+      <div class="roll__panel" id="t-infrared" hidden>
+        <div class="roll__inner">
+          <div class="roll__media"><img src="assets/infrared.jpg" alt="The infrared therapy bed at the clinic" loading="lazy" /></div>
+          <div class="roll__copy">
+            <p class="roll__body">Deep, gentle warmth from an infrared bed, reaching muscle and joint rather than only warming the skin. You lie down fully clothed and the bed does the rest. Most people find it the easiest thirty minutes of their week.</p>
+            <a class="roll__go" href="infrared.html">See infrared</a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="roll__row" data-therapy>
+      <button class="roll__head" type="button" aria-expanded="false" aria-controls="t-pemf">
+        <span class="roll__n">PEMF</span>
+        <span class="roll__m">Cellular energy, circulation, pelvic floor</span>
+        <span class="roll__x">12 min</span>
+      </button>
+      <div class="roll__panel" id="t-pemf" hidden>
+        <div class="roll__inner">
+          <div class="roll__media"><img src="assets/pemf.jpg" alt="PEMF therapy equipment at the clinic" loading="lazy" /></div>
+          <div class="roll__copy">
+            <p class="roll__body">Pulsed electromagnetic fields, applied while you sit or lie fully clothed. Sessions are short and most people feel nothing more than a faint pulsing. It supports circulation and eases tension, which is why it sits well alongside the other therapies rather than replacing them.</p>
+            <a class="roll__go" href="pemf.html">See pemf</a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="roll__row" data-therapy>
+      <button class="roll__head" type="button" aria-expanded="false" aria-controls="t-massage">
+        <span class="roll__n">Massage</span>
+        <span class="roll__m">Massage, reflexology and lymphatic drainage</span>
+        <span class="roll__x">45&ndash;60 min</span>
+      </button>
+      <div class="roll__panel" id="t-massage" hidden>
+        <div class="roll__inner">
+          <div class="roll__media"><img src="assets/massage.jpg" alt="A therapist working during a massage treatment" loading="lazy" /></div>
+          <div class="roll__copy">
+            <p class="roll__body">Hands-on bodywork from clinical therapists: therapeutic massage, reflexology and lymphatic drainage. Taken on their own, or alongside the other therapies when you want the room to do more than one thing.</p>
+            <a class="roll__go" href="massage.html">See massage</a>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
