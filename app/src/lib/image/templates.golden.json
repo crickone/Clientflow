@@ -1,0 +1,161 @@
+{
+  "note": "Golden master over every template's draw-call trace through paintSlide. Regenerate deliberately with UPDATE_GOLDEN=1 npm test -- src/lib/image/templates.golden.test.ts, and only when the render change is intended.",
+  "templates": {
+    "bold-headline": {
+      "ops": 348,
+      "sha256": "c916b0350c2d0223d96d5f7f46d34511bb7bec5786f6408702f86e5441d71aab"
+    },
+    "side-card": {
+      "ops": 396,
+      "sha256": "62d8d2127e5ce04ed3f3d6d8d188a36964d2dd2ef45d53ceefe30158a8ff23a3"
+    },
+    "centered-statement": {
+      "ops": 262,
+      "sha256": "1cf3c0733060a63379b610f3b8c170bd73b222ca79dea7421ea86b22ec84a6b5"
+    },
+    "top-banner": {
+      "ops": 262,
+      "sha256": "790b618827bd07bc6f874b833b24ba3ff5d17294d7f8ea7ad06748b486bf74b4"
+    },
+    "stat-block": {
+      "ops": 5233,
+      "sha256": "69ff42abb7a671fe2e1d23eb4cf3290f88bfcd26a9e9578a6e65cb2af829ac14"
+    },
+    "frame": {
+      "ops": 263,
+      "sha256": "103e64dbb9cd84639b96da5fb093bbafb0aeaea027209e2afa787595a91e872f"
+    },
+    "magazine": {
+      "ops": 322,
+      "sha256": "944e43c5891140099a47583aab64767a5f4bcc56cf2b2d48deb46b30030cd936"
+    },
+    "story-hero": {
+      "ops": 306,
+      "sha256": "96143f941372264ddccc7b78cc9edf106d8c0bed383c9da2000ea326d905bb29"
+    },
+    "story-split": {
+      "ops": 262,
+      "sha256": "005ccfbb93407996ff4a60c81344330e873b936a08399162fd15abfc5c0d5ea2"
+    },
+    "story-minimal": {
+      "ops": 243,
+      "sha256": "7fa4c327179032eed6329b564bf2274f6af57b3fcac2124e9e7c68a2815c4cc3"
+    },
+    "story-quote": {
+      "ops": 275,
+      "sha256": "243e8889d0c31ab0430bb5308fd882309fbb4c57d712d565ff6513e8d535ecca"
+    },
+    "story-stat": {
+      "ops": 8330,
+      "sha256": "f2b518ad84ff9a9bdcca2452ccc5f487ccf156f3420deda5f94a754befe67441"
+    },
+    "carousel-cover": {
+      "ops": 306,
+      "sha256": "75c54334e7b0d0cf82a62fc6fecee544360816f7641fdfe29bffe0fc81daa18c"
+    },
+    "carousel-content": {
+      "ops": 280,
+      "sha256": "6d39248e981e43259cf93a915debb356682083992ab8bd06888a8ecb1fdd481e"
+    },
+    "carousel-cta": {
+      "ops": 364,
+      "sha256": "ae208b2b670adfe41b546b59330cedc5a3bda0bd2804202e61afa0fceabb88d2"
+    },
+    "carousel-tip": {
+      "ops": 294,
+      "sha256": "9b0b40609daa28b593b9f6b6a676f40774c7988ed95f38b728b43a5a3df8b529"
+    },
+    "carousel-quote-slide": {
+      "ops": 470,
+      "sha256": "0d0f46f6118f6e473e3a113ae686cc77c5f0d3245457593c72791edee05beb13"
+    },
+    "carousel-checklist": {
+      "ops": 429,
+      "sha256": "5c6df5091b335fa3164dc411afac6566d289ad5144be1f396ccbb016dc2aed40"
+    },
+    "carousel-myth": {
+      "ops": 540,
+      "sha256": "ef157225038c1d8cae745ef45fe1486544655d23693354c03e336af62f7048d5"
+    },
+    "carousel-stat": {
+      "ops": 343,
+      "sha256": "357b0ae472c35d755ffa0f35197563d9aea70f164efc2233e18cbef3c862b0c3"
+    },
+    "carousel-save": {
+      "ops": 308,
+      "sha256": "923fc3ce7b11acb642bfcf6ad42881b6f9e4f0f3b0deff4668a528a845656eed"
+    },
+    "question-hook": {
+      "ops": 368,
+      "sha256": "48cbaf0830af4ac11bdd356cd0ce6af99608775760d6b4cbcd013b1da7d4bbdd"
+    },
+    "carousel-bold-cover": {
+      "ops": 372,
+      "sha256": "3456fc3f03f056aacdbfb7f4a43c1bd489f15b95d73b6cf9588fe94425361e25"
+    },
+    "carousel-versus": {
+      "ops": 770,
+      "sha256": "5672299c859528d6b51436e9024285b3b2d64a9dcce830eb4c9a207c2e31daf3"
+    },
+    "carousel-timeline": {
+      "ops": 395,
+      "sha256": "118e8ba4d958a54fad12a355785cf04452e1a0faf56df4c39620a31d6b7518e8"
+    },
+    "carousel-split": {
+      "ops": 406,
+      "sha256": "aa630275463c027e265e35265321e8ff19f080b1acd311a7ca7650de74ca055d"
+    },
+    "carousel-statement": {
+      "ops": 358,
+      "sha256": "9bd6298954d508c802454fd8cd149e7e2f02411caf95b9c31fa94f32518971ad"
+    },
+    "quote": {
+      "ops": 258,
+      "sha256": "47924ddd4990fdb85d57612fe779f5ab894e81b20be8d47ca43904c3164830f3"
+    },
+    "photo-quote": {
+      "ops": 258,
+      "sha256": "6429b8d50d8aa4e916d9a8b345688b92b05b2ad558a3ff276e68471294fd09ce"
+    },
+    "star-rating": {
+      "ops": 510,
+      "sha256": "bff75b1eea6da604c8257c7dbb93c4228b057c97ace8067a0d7ee8daf1f9bd54"
+    },
+    "result-card": {
+      "ops": 366,
+      "sha256": "6b691ec0f3f458886579f8cbfdd2287033ef5fbc65e2053b9e93f44b41690e3f"
+    },
+    "price-tag": {
+      "ops": 1431,
+      "sha256": "222fa13973b8f9c68ba24ea63d69c589999e6bb2a7e79c42c385c2ada102ee66"
+    },
+    "voucher-card": {
+      "ops": 2554,
+      "sha256": "b4eca13c2ab7b25a84b78a49fb311f75e3f44cfa44b4ac13fe722ccb1aa5e230"
+    },
+    "package-deal": {
+      "ops": 459,
+      "sha256": "ec133981568891c50f033f661ad27edc9ce6652dc30ff78a478827105fd451cc"
+    },
+    "countdown-story": {
+      "ops": 327,
+      "sha256": "a081261625b2336fd0811d0afb634640fd98c9b673c4f9edec57ae74fa3f7534"
+    },
+    "fact-stack": {
+      "ops": 280,
+      "sha256": "e321dde0b840713d5d676e83936f2d9293ca682d2608ffcc91c4efb82edc8b20"
+    },
+    "definition-card": {
+      "ops": 845,
+      "sha256": "d9d8f4c66561700dbd5ed05f175553ce0a03c23b3ebad5e53c1a5126d9435b94"
+    },
+    "did-you-know": {
+      "ops": 320,
+      "sha256": "175b31e8f404b9e51b0adaa1a17710526bb89bd17dfaf9ca4b9979df3850575d"
+    },
+    "how-it-works": {
+      "ops": 411,
+      "sha256": "c6c2811c0c5c6a902b0a9474eb5e7a6912ce60ebf14e55512cd688ef1e8978b8"
+    }
+  }
+}
