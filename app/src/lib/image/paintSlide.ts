@@ -19,6 +19,15 @@ import { paintLayout } from "@/lib/image/paintLayout";
  */
 export const COMPOSED_TEMPLATE_ID = "composed";
 
+/**
+ * A slide the AI DESIGNED as HTML. Its markup is in `design_html` and the PNG
+ * rendered from it in `render_filename`; nothing in TEMPLATES uses this id, so
+ * getTemplate() returns null for it and no template path can be entered by
+ * accident. Unlike a template slide there is nothing to paint on a canvas --
+ * the stored render is the slide.
+ */
+export const DESIGNED_TEMPLATE_ID = "designed";
+
 export type BrandLabels = {
   businessName?: string;
   website?: string;
@@ -112,6 +121,20 @@ export function slideSurface(
       usesTagline: !!template.usesTagline,
       taglineHint: template.taglineHint,
       composed: false,
+    };
+  }
+  if (slide.templateId === DESIGNED_TEMPLATE_ID) {
+    const dims = slideDimensions(slide);
+    return {
+      id: DESIGNED_TEMPLATE_ID,
+      name: "AI design",
+      aspectRatio: dims.aspectRatio,
+      width: dims.width,
+      height: dims.height,
+      category: "carousels",
+      // A designed slide has no slots, so no tagline field to offer.
+      usesTagline: false,
+      composed: true,
     };
   }
   if (slide.templateId !== COMPOSED_TEMPLATE_ID) return null;

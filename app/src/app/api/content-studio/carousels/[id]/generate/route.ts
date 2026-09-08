@@ -10,8 +10,9 @@ import {
   updateSlide,
 } from "@/lib/image/carousels";
 import { generateCarouselSlides } from "@/lib/ai/generateCarousel";
-import { composeCarousel } from "@/lib/ai/composeDesign";
-import { COMPOSED_TEMPLATE_ID } from "@/lib/image/paintSlide";
+import { designPost } from "@/lib/ai/designPost";
+import { DESIGNED_TEMPLATE_ID } from "@/lib/image/paintSlide";
+import { libraryFilePath, listLibraryAssets } from "@/lib/image/library";
 import { getTemplate, templateUsesPhoto } from "@/lib/image/templates";
 import { AiCapError } from "@/lib/ai/usage";
 import { isImageGenConfigured, IMAGE_COST_CENTS } from "@/lib/ai/image/falClient";
@@ -78,14 +79,20 @@ export async function POST(
     );
   }
 
-  // composeCarousel is the entry point for BOTH paths: with a tenant design
-  // system it composes layouts within the grammar; without one it delegates to
-  // generateCarouselSlides unchanged and returns composed:false. That is why
-  // this route has one call rather than a branch — a tenant with no system
-  // takes exactly the code path it took before.
+  // designPost is the entry point for BOTH paths: with a tenant design system
+  // the AI designs each slide as HTML and this renders it; without one it
+  // delegates to generateCarouselSlides unchanged and returns designed:false.
+  // That is why this route has one call rather than a branch — a tenant with
+  // no system takes exactly the code path it took before.
+  //
+  // The photo source is the tenant's own library, so a design asking for a
+  // photograph gets a real one, graded to the brand's numbers at render time.
+  const firstPhoto = listLibraryAssets().find(
+    (a: { kind?: string | null }) => a.kind !== "video",
+  );
   let result;
   try {
-    result = await composeCarousel(
+    result = await designPost(
       {
         topic,
         slideCount,
@@ -93,6 +100,11 @@ export async function POST(
         styleSlot: slotKey,
       },
       { tenantId, agentKey: "carousel" },
+      undefined,
+      {
+        aspectRatio: "1:1",
+        photoSource: firstPhoto ? libraryFilePath(firstPhoto.filename) : null,
+      },
     );
   } catch (err) {
     // AiCapError (tenant over its monthly AI spend cap) surfaces as a clean
@@ -123,36 +135,25 @@ export async function POST(
   const jobs: SlideImageJob[] = [];
 
   try {
-    if (result.composed) {
-      // A composed slide stores the sentinel template id plus its spec; its
-      // content and colour go in the ordinary columns, so it is edited with
-      // the controls a template slide already has.
+    if (result.designed) {
+      // A designed slide stores its markup and its render. There is no
+      // imagePrompt and no queueSlideImages: the photograph is embedded in the
+      // markup at render time, so the AI-background queue plays no part.
       for (let i = 0; i < result.slides.length; i++) {
         const slide = result.slides[i];
-        // Imagery only where the layout uses one — composeCarousel already
-        // blanked the scene for flat slides, so this spends nothing on them.
-        const prompt =
-          houseStyle && slide.image
-            ? buildImagePrompt({ houseStyle, scene: slide.image })
-            : null;
-        const row = addSlide({
+        addSlide({
           carouselSetId: carouselId,
           slotKey,
-          templateId: COMPOSED_TEMPLATE_ID,
+          templateId: DESIGNED_TEMPLATE_ID,
           aspectRatio: "1:1",
-          headingText: slide.headingText,
-          bodyText: slide.bodyText,
-          tagline: slide.tagline,
+          // A designed slide has no slots; its copy lives inside the markup.
+          headingText: "",
+          bodyText: "",
           caption: i === 0 ? result.caption : "",
-          accentColor: slide.accentColor,
-          backgroundColor: slide.backgroundColor,
-          layoutJson: slide.layoutJson,
-          imagePrompt: prompt,
-          imageStatus: prompt ? "generating" : null,
+          designHtml: slide.html,
+          renderFilename: slide.renderFilename,
         });
-        if (prompt) jobs.push({ slideId: row.id, prompt, aspectRatio: "1:1" });
       }
-      if (jobs.length > 0) queueSlideImages(tenantId, jobs);
 
       db.update(schema.carouselSets)
         .set({ updatedAt: new Date() })
@@ -163,14 +164,11 @@ export async function POST(
         ok: true,
         carousel: getCarousel(carouselId),
         usage: result.usage,
-        images: { queued: jobs.length, estCents: jobs.length * IMAGE_COST_CENTS },
-        // Rules the composed set still breaks. Surfaced, never hidden — the
-        // editor shows them beside the slide they belong to.
+        images: { queued: 0, estCents: 0 },
         design: {
-          composed: true,
+          designed: true,
           repaired: result.repaired,
-          setViolations: result.setViolations,
-          slideViolations: result.slides.map((s: { violations: string[] }) => s.violations),
+          slideViolations: result.slides.map((s) => s.violations),
         },
       });
     }
