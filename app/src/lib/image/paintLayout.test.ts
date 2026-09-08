@@ -288,13 +288,32 @@ for (const s of ARCHETYPE_SPECS) {
   );
 }
 
-// A statement anchors low, a stack anchors high — the archetypes differ.
+// Vertical anchoring asks what else is on the slide. Type over a full-bleed
+// photograph anchors low against it; on a flat ground, with nothing to balance
+// against, the block is centred. This is the rule that replaced a
+// per-archetype switch which left most of a flat slide empty.
 const firstBaseline = (ops: string[]) =>
   Number(ops.find((o) => o.startsWith("fillText("))!.split(", ")[2]);
+const oneSlot = spec({
+  archetype: "statement",
+  slots: [{ level: "display", text: "Short", span: 5 }],
+});
+const overPhoto = firstBaseline(
+  trace({ ...oneSlot, photo: "full" }, design(), PHOTO),
+);
+const onFlat = firstBaseline(trace(oneSlot));
+check("type over a full-bleed photograph anchors low", overPhoto > 1080 * 0.6);
+check("on a flat ground the same slide is centred", onFlat < overPhoto);
 check(
-  "a statement sits lower on the slide than a stack",
-  firstBaseline(trace(spec({ archetype: "statement", slots: [{ level: "display", text: "S", span: 5 }] }))) >
-    firstBaseline(trace(spec({ archetype: "stack" }))),
+  "and centred means centred — not pinned near the top",
+  onFlat > 1080 * 0.3 && onFlat < 1080 * 0.7,
+);
+check(
+  "a tall 9:16 slide on a flat ground centres too, rather than leaving a void",
+  (() => {
+    const y = firstBaseline(trace(oneSlot, design(), null, 1080, 1920));
+    return y > 1920 * 0.3 && y < 1920 * 0.7;
+  })(),
 );
 
 // -------------------------------------------------------------------------

@@ -448,25 +448,22 @@ export function paintLayout(
     () => headingLines(spec),
   );
 
-  // Vertical anchoring is the archetype's own decision.
+  // Vertical anchoring asks what ELSE is on the slide, not which archetype
+  // this is. A photograph filling the frame is the composition, so type
+  // anchors low against it; a flat ground has nothing to balance against, so
+  // the block is optically centred, a touch above true centre.
+  //
+  // This replaced a per-archetype switch that top-anchored stack and list.
+  // Rendered and looked at, that left roughly sixty per cent of a square slide
+  // empty below the text, and a 9:16 story on a flat ground was three-quarters
+  // void — the type scale is authored against WIDTH, correctly, so a taller
+  // canvas gains height the composition was not using.
   const rule = ruleSpace(spec, frame);
   const above = spec.accentRule?.place === "above";
   const contentHeight = block.height + rule;
-  let top: number;
-  switch (spec.archetype) {
-    case "statement":
-      // Anchored to the bottom, the way a full-bleed statement reads.
-      top = H - frame.margin - contentHeight;
-      break;
-    case "stack":
-    case "list":
-      top = frame.margin * 1.6;
-      break;
-    default:
-      // quote, stat, split — optically centred, a touch above true centre.
-      top = (H - contentHeight) / 2 - frame.margin * 0.2;
-      break;
-  }
+  let top = overPhoto
+    ? H - frame.margin - contentHeight
+    : (H - contentHeight) / 2 - frame.margin * 0.2;
   top = Math.max(frame.margin, top);
 
   if (above) {
