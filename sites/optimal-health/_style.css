@@ -231,6 +231,31 @@ h1,h2,h3,p,figure,blockquote{margin:0}
 .roll__row.is-open .roll__n{color:var(--timber);transform:translateX(6px)}
 .roll__head:focus-visible{outline:2px solid var(--timber);outline-offset:4px}
 
+/* ---- a priced menu -------------------------------------------------
+   The right-hand cell carries the price rather than a duration, and some
+   treatments have two lengths -- so it stacks, with the second sitting
+   quieter than the first. */
+.roll--menu .roll__x{display:flex;flex-direction:column;align-items:flex-end;gap:3px;text-align:right}
+.roll__p{font-size:clamp(12px,1vw,15px);letter-spacing:.06em;white-space:nowrap;text-transform:none}
+.roll__p--alt{opacity:.6;font-size:clamp(10px,.84vw,12px)}
+.roll--menu .roll__n{font-size:clamp(19px,2.1vw,30px)}
+.roll--menu .roll__m{max-width:40ch}
+
+/* ---- the rates table ------------------------------------------------
+   Three therapies, three block sizes, and the sizes are NOT the same for
+   each -- the chair sells in 6 and 12 where the others sell in 5 and 10.
+   So each price carries its own count instead of the table carrying one
+   header row that would be true for two rows out of three. */
+.roll--rates .roll__x{display:flex;gap:clamp(16px,3vw,44px);align-items:flex-start;text-transform:none;letter-spacing:0}
+.rate{display:flex;flex-direction:column;gap:2px;text-align:right;min-width:clamp(56px,6vw,84px)}
+.rate__v{font-size:clamp(14px,1.3vw,19px);letter-spacing:-.01em}
+.rate__k{font-size:clamp(9px,.72vw,11px);letter-spacing:.14em;text-transform:uppercase;color:var(--deep)}
+.band--sage .rate__k{color:var(--deep)}
+@media (max-width:640px){
+  .roll--rates .roll__x{width:100%;margin-left:0;justify-content:space-between;gap:12px}
+  .rate{min-width:0}
+}
+
 /* ---- the explainer -------------------------------------------------- */
 .roll__panel{overflow:hidden}
 .roll__inner{

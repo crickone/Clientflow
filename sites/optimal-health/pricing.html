@@ -243,6 +243,31 @@ h1,h2,h3,p,figure,blockquote{margin:0}
 .roll__row.is-open .roll__n{color:var(--timber);transform:translateX(6px)}
 .roll__head:focus-visible{outline:2px solid var(--timber);outline-offset:4px}
 
+/* ---- a priced menu -------------------------------------------------
+   The right-hand cell carries the price rather than a duration, and some
+   treatments have two lengths -- so it stacks, with the second sitting
+   quieter than the first. */
+.roll--menu .roll__x{display:flex;flex-direction:column;align-items:flex-end;gap:3px;text-align:right}
+.roll__p{font-size:clamp(12px,1vw,15px);letter-spacing:.06em;white-space:nowrap;text-transform:none}
+.roll__p--alt{opacity:.6;font-size:clamp(10px,.84vw,12px)}
+.roll--menu .roll__n{font-size:clamp(19px,2.1vw,30px)}
+.roll--menu .roll__m{max-width:40ch}
+
+/* ---- the rates table ------------------------------------------------
+   Three therapies, three block sizes, and the sizes are NOT the same for
+   each -- the chair sells in 6 and 12 where the others sell in 5 and 10.
+   So each price carries its own count instead of the table carrying one
+   header row that would be true for two rows out of three. */
+.roll--rates .roll__x{display:flex;gap:clamp(16px,3vw,44px);align-items:flex-start;text-transform:none;letter-spacing:0}
+.rate{display:flex;flex-direction:column;gap:2px;text-align:right;min-width:clamp(56px,6vw,84px)}
+.rate__v{font-size:clamp(14px,1.3vw,19px);letter-spacing:-.01em}
+.rate__k{font-size:clamp(9px,.72vw,11px);letter-spacing:.14em;text-transform:uppercase;color:var(--deep)}
+.band--sage .rate__k{color:var(--deep)}
+@media (max-width:640px){
+  .roll--rates .roll__x{width:100%;margin-left:0;justify-content:space-between;gap:12px}
+  .rate{min-width:0}
+}
+
 /* ---- the explainer -------------------------------------------------- */
 .roll__panel{overflow:hidden}
 .roll__inner{
@@ -391,9 +416,8 @@ textarea.field__i{resize:vertical;min-height:120px}
   <div class="says">
     <div class="band__head__l">
       <p class="title">Pricing</p>
-      
       <h1 class="wordmark hero__mark"><span>What it costs.</span></h1>
-      <p style="margin-top:22px">Start with a single session. Blocks of ten work out cheaper if you decide to keep going, and combined blocks let you use more than one therapy.</p>
+      <p style="margin-top:22px">Start with a single session. Blocks bring the per-session price down if you decide to keep going.</p>
     </div>
   </div>
 </section>
@@ -403,26 +427,25 @@ textarea.field__i{resize:vertical;min-height:120px}
   <div>
     <div class="band__head">
       <div class="band__head__l">
-        <p class="title">Single therapy</p>
-        
-        <h2 class="lede">Ten-session blocks.</h2>
+        <p class="title" data-rise>Sessions</p>
+        <h2 class="lede">Single, or in a block.</h2>
       </div>
     </div>
-    <div class="grid3" data-stagger>
-      <div class="tile">
-        <p class="roll__n">&euro;225</p>
-        <p class="tile__m">was &euro;250</p>
-        <p class="tile__m">Ten sessions, one therapy.</p>
+    <div class="roll roll--rates" data-stagger>
+      <div class="roll__row">
+        <span class="roll__n">Infrared therapy</span>
+        <span class="roll__m">Deep, gentle warmth. You lie down and the bed does the rest.</span>
+        <span class="roll__x"><span class="rate"><span class="rate__v">&euro;50</span><span class="rate__k">1 session</span></span><span class="rate"><span class="rate__v">&euro;225</span><span class="rate__k">5 sessions</span></span><span class="rate"><span class="rate__v">&euro;400</span><span class="rate__k">10 sessions</span></span></span>
       </div>
-      <div class="tile">
-        <p class="roll__n">&euro;315</p>
-        <p class="tile__m">was &euro;325</p>
-        <p class="tile__m">Ten sessions, longer format.</p>
+      <div class="roll__row">
+        <span class="roll__n">Hyperbaric oxygen</span>
+        <span class="roll__m">A pressurised chamber, and the pressure is what does the work.</span>
+        <span class="roll__x"><span class="rate"><span class="rate__v">&euro;100</span><span class="rate__k">1 session</span></span><span class="rate"><span class="rate__v">&euro;450</span><span class="rate__k">5 sessions</span></span><span class="rate"><span class="rate__v">&euro;800</span><span class="rate__k">10 sessions</span></span></span>
       </div>
-      <div class="tile">
-        <p class="roll__n">&euro;400</p>
-        <p class="tile__m">was &euro;450</p>
-        <p class="tile__m">Ten sessions, extended.</p>
+      <div class="roll__row">
+        <span class="roll__n">HIFEM chair</span>
+        <span class="roll__m">Short sessions, fully clothed and seated.</span>
+        <span class="roll__x"><span class="rate"><span class="rate__v">&euro;70</span><span class="rate__k">1 session</span></span><span class="rate"><span class="rate__v">&euro;375</span><span class="rate__k">6 sessions</span></span><span class="rate"><span class="rate__v">&euro;670</span><span class="rate__k">12 sessions</span></span></span>
       </div>
     </div>
   </div>
@@ -433,27 +456,50 @@ textarea.field__i{resize:vertical;min-height:120px}
   <div>
     <div class="band__head">
       <div class="band__head__l">
-        <p class="title">Combined</p>
-        
-        <h2 class="lede">More than one therapy.</h2>
-        <p style="margin-top:22px">If you want to use two or three of them across a block, these are the combined rates.</p>
+        <p class="title" data-rise>Massage therapy</p>
+        <h2 class="lede">Hands-on, by the hour.</h2>
       </div>
     </div>
-    <div class="grid3" data-stagger>
-      <div class="tile" style="background:var(--plaster)">
-        <p class="roll__n">&euro;450</p>
-        <p class="tile__m">was &euro;600</p>
-        <p class="tile__m">Combined therapies, ten sessions.</p>
+    <div class="roll roll--menu" data-stagger>
+      <div class="roll__row">
+        <span class="roll__n">Swedish massage</span>
+        <span class="roll__x"><span class="roll__p">1 hr &euro;80</span><span class="roll__p roll__p--alt">30 min &euro;50</span></span>
       </div>
-      <div class="tile" style="background:var(--plaster)">
-        <p class="roll__n">&euro;560</p>
-        <p class="tile__m">was &euro;700</p>
-        <p class="tile__m">Combined therapies, extended block.</p>
+      <div class="roll__row">
+        <span class="roll__n">Deep tissue</span>
+        <span class="roll__x"><span class="roll__p">1 hr &euro;80</span><span class="roll__p roll__p--alt">30 min &euro;50</span></span>
       </div>
-      <div class="tile" style="background:var(--plaster)">
-        <p class="roll__n">&euro;800</p>
-        <p class="tile__m">was &euro;1200</p>
-        <p class="tile__m">The full block, all three therapies.</p>
+      <div class="roll__row">
+        <span class="roll__n">Sports massage</span>
+        <span class="roll__x"><span class="roll__p">1 hr &euro;80</span><span class="roll__p roll__p--alt">30 min &euro;50</span></span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Hot lava shells</span>
+        <span class="roll__x"><span class="roll__p">1 hr &euro;100</span></span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Reflexology</span>
+        <span class="roll__x"><span class="roll__p">1 hr &euro;80</span></span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Sculpting lifting facial</span>
+        <span class="roll__x"><span class="roll__p">1 hr &euro;80</span></span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Indian head massage</span>
+        <span class="roll__x"><span class="roll__p">40 min &euro;60</span></span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Oncology cancer care massage</span>
+        <span class="roll__x"><span class="roll__p">1 hr &euro;80</span></span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Cupping massage</span>
+        <span class="roll__x"><span class="roll__p">1 hr &euro;80</span></span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Lymphatic drainage</span>
+        <span class="roll__x"><span class="roll__p">1 hr &euro;80</span></span>
       </div>
     </div>
   </div>
