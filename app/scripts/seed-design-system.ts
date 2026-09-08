@@ -5,10 +5,24 @@
 //   npx tsx scripts/seed-design-system.ts --slug=optimal-health --clear
 //   npx tsx scripts/seed-design-system.ts --list
 //
-// Writes straight to the tenant's own settings table -- no HTTP, no running
-// app -- which is what lets it run against the deployed volume:
+// Writes straight to the tenant's own settings table -- no HTTP, no running app.
 //
-//   railway run npx tsx scripts/seed-design-system.ts --slug=<slug>
+// LOCAL DEV ONLY. It reads ./data/control.db, so it cannot reach production:
+// `railway run` injects env vars into a LOCAL process rather than executing on
+// the container, and the deployed standalone image carries neither /app/scripts
+// nor tsx. To seed a PRODUCTION tenant, generate the payload here and write it
+// over `railway ssh` using the container's own better-sqlite3:
+//
+//   npx tsx -e 'import {DESIGN_SYSTEM_PRESETS as P} from "./src/lib/design/presets";
+//     import {parseDesignSystem} from "./src/lib/design/parse";
+//     console.log(JSON.stringify(parseDesignSystem(P["optimal-health"])))' > ds.json
+//   B64=$(base64 < ds.json | tr -d "\n")
+//   railway ssh "cd /app && node -e \"...INSERT INTO settings ... ON CONFLICT(key) DO UPDATE...\""
+//
+// Note also that a tenant's column migrations run when the APP opens that
+// tenant's DB. /api/health only touches the control DB, so seeding alone does
+// not create carousel_slides.layout_json -- load a page for the tenant, or
+// apply the additive ALTER by hand (the app's PRAGMA guard then skips it).
 //
 // A tenant WITHOUT a design system keeps today's Content Studio behaviour
 // exactly: fixed templates only, no composed layouts, no validation notices.
