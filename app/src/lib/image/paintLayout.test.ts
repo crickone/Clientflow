@@ -16,7 +16,7 @@ import type { CarouselSlide } from "@/lib/db/schema";
 import { OPTIMAL_HEALTH_DESIGN_SYSTEM as SYSTEM } from "@/lib/design/presets";
 import { validateSlide } from "@/lib/design/validate";
 import { serializeLayoutSpec, type LayoutSpec } from "@/lib/design/grammar";
-import { COMPOSED_TEMPLATE_ID, paintSlide } from "@/lib/image/paintSlide";
+import { COMPOSED_TEMPLATE_ID, paintSlide, slideSurface } from "@/lib/image/paintSlide";
 import { bindSlots, paintLayout } from "@/lib/image/paintLayout";
 import { fakeImage, makeContext } from "@/lib/image/recordingContext";
 import type { DesignState } from "@/lib/image/templates";
@@ -431,6 +431,60 @@ check(
   "and none of the violation strings themselves are drawn",
   !violationCheck.ok &&
     violationCheck.violations.every((v) => !painted.includes(v.slice(0, 20))),
+);
+
+// -------------------------------------------------------------------------
+//  9. slideSurface — what the EDITOR reads
+// -------------------------------------------------------------------------
+//
+// This exists because of a real bug: the editor asked getTemplate() and
+// treated null as "this slot is empty". For a composed slide the id IS the
+// sentinel, so five real generated slides rendered as "NOTHING IN THIS DESIGN
+// YET" — the slides were in the database, the editor just could not describe
+// them. Every question the inspector asks is answered here for both kinds.
+
+const templateSurface = slideSurface(slide({ templateId: "bold-headline" }));
+check("a template slide is described", templateSurface !== null);
+check("by its template's name", templateSurface!.name === "Bold Headline");
+check("and is not marked composed", templateSurface!.composed === false);
+
+const composedSurface = slideSurface(slide());
+check("a COMPOSED slide is described, not treated as empty", composedSurface !== null);
+check("it is marked composed", composedSurface!.composed === true);
+check("it names its archetype", composedSurface!.name === "Composed · Stack");
+check("it reports a real pixel size", composedSurface!.width === 1080 && composedSurface!.height === 1080);
+check(
+  "it takes its aspect ratio from the row, not a template",
+  slideSurface(slide({ aspectRatio: "9:16" } as Partial<CarouselSlide>))!.height === 1920,
+);
+check(
+  "it uses a tagline only when its layout has a label slot",
+  composedSurface!.usesTagline === true &&
+    slideSurface(
+      slide({
+        layoutJson: serializeLayoutSpec(
+          spec({ archetype: "statement", slots: [{ level: "display", text: "x", span: 5 }] }),
+        ),
+      }),
+    )!.usesTagline === false,
+);
+
+// A composed slide whose spec is unreadable must still describe ITSELF —
+// otherwise a corrupt layout collapses back into "empty slot" and the operator
+// loses the slide rather than seeing the violation.
+check(
+  "a corrupt layout still describes a composed slide",
+  slideSurface(slide({ layoutJson: "{not json" }))?.composed === true,
+);
+check(
+  "as does a missing one",
+  slideSurface(slide({ layoutJson: null }))?.composed === true,
+);
+
+// The original meaning of null survives: a genuinely unknown template.
+check(
+  "an unknown template id is still nothing",
+  slideSurface(slide({ templateId: "no-such-template" })) === null,
 );
 
 console.log(`\npaintLayout: ${passed} checks passed`);

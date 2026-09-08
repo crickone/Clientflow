@@ -7,6 +7,7 @@ import {
   type DesignState,
 } from "@/lib/image/templates";
 import type { DesignSystem } from "@/lib/design/parse";
+import type { TemplateCategory } from "@/lib/image/templates";
 import { deserializeLayoutSpec, isSpecError } from "@/lib/design/grammar";
 import { paintLayout } from "@/lib/image/paintLayout";
 
@@ -51,6 +52,102 @@ export function slideDimensions(slide: CarouselSlide): {
   const height =
     aspect === "9:16" ? 1920 : aspect === "4:5" ? 1350 : 1080;
   return { width: 1080, height, aspectRatio: aspect };
+}
+
+/**
+ * What the EDITOR needs to know about a slide to lay its controls out: the
+ * things a Template carries, answered for a composed slide too.
+ *
+ * The editor used to ask `getTemplate(slide.templateId)` and treat null as
+ * "this slot is empty". That is right for an unknown template id and wrong for
+ * a composed slide, whose id is the sentinel on purpose — five real slides
+ * read back as "NOTHING IN THIS DESIGN YET". Everything the inspector shows
+ * now comes from here instead, so both kinds of slide answer the same
+ * questions.
+ */
+export interface SlideSurface {
+  id: string;
+  name: string;
+  aspectRatio: "1:1" | "9:16" | "4:5";
+  width: number;
+  height: number;
+  category: TemplateCategory;
+  usesTagline: boolean;
+  taglineHint?: string;
+  /** True when this slide's layout was composed rather than picked. */
+  composed: boolean;
+}
+
+const ARCHETYPE_NAMES: Record<string, string> = {
+  statement: "Statement",
+  split: "Split",
+  stack: "Stack",
+  list: "List",
+  quote: "Quote",
+  stat: "Stat",
+};
+
+/**
+ * Describe a slide for the editor. Returns null only when there is genuinely
+ * nothing to show — no template AND not a composed slide — which is the
+ * original "empty slot" meaning.
+ *
+ * `system` is optional: without one a composed slide can still be described
+ * from its own row (its aspect ratio, its stored archetype), because the
+ * editor has to be able to say what a slide IS even when it cannot draw it.
+ */
+export function slideSurface(
+  slide: CarouselSlide,
+  system?: DesignSystem | null,
+): SlideSurface | null {
+  const template = getTemplate(slide.templateId);
+  if (template) {
+    return {
+      id: template.id,
+      name: template.name,
+      aspectRatio: template.aspectRatio,
+      width: template.width,
+      height: template.height,
+      category: template.category,
+      usesTagline: !!template.usesTagline,
+      taglineHint: template.taglineHint,
+      composed: false,
+    };
+  }
+  if (slide.templateId !== COMPOSED_TEMPLATE_ID) return null;
+
+  const dims = slideDimensions(slide);
+  // The archetype is read straight off the stored JSON rather than through the
+  // grammar, so a spec that no longer validates against the tenant's system
+  // still names itself instead of collapsing to "empty".
+  let archetype = "";
+  let hasLabel = false;
+  try {
+    const raw = JSON.parse(slide.layoutJson ?? "null") as {
+      archetype?: unknown;
+      slots?: { level?: unknown }[];
+    } | null;
+    if (raw && typeof raw.archetype === "string") archetype = raw.archetype;
+    if (Array.isArray(raw?.slots)) {
+      hasLabel = raw.slots.some((s) => s?.level === "label");
+    }
+  } catch {
+    // A corrupt layout still describes a composed slide; the editor shows the
+    // violation separately.
+  }
+  void system;
+  return {
+    id: COMPOSED_TEMPLATE_ID,
+    name: archetype
+      ? `Composed · ${ARCHETYPE_NAMES[archetype] ?? archetype}`
+      : "Composed",
+    aspectRatio: dims.aspectRatio,
+    width: dims.width,
+    height: dims.height,
+    category: "carousels",
+    usesTagline: hasLabel,
+    composed: true,
+  };
 }
 
 export function libraryFileUrl(filename: string) {

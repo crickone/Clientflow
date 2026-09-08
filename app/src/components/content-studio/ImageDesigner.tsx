@@ -68,7 +68,7 @@ import {
 } from "@/lib/image/slots";
 import { SlideCanvas, useCanvasFonts, useLogoImage } from "./SlideCanvas";
 import type { DesignSystem } from "@/lib/design/parse";
-import { COMPOSED_TEMPLATE_ID, slideDimensions } from "@/lib/image/paintSlide";
+import { COMPOSED_TEMPLATE_ID, slideDimensions, slideSurface } from "@/lib/image/paintSlide";
 import { deserializeLayoutSpec, isSpecError } from "@/lib/design/grammar";
 import { validateSlide } from "@/lib/design/validate";
 import { SlideFilmstrip } from "./SlideFilmstrip";
@@ -620,7 +620,7 @@ export function ImageDesigner({
             // A picked template brings its own shape; otherwise follow the
             // slot so a slide doesn't change aspect mid-carousel.
             aspectRatio:
-              template?.aspectRatio ?? lastInSlot?.aspectRatio ?? "1:1",
+              surface?.aspectRatio ?? lastInSlot?.aspectRatio ?? "1:1",
           }),
         },
       );
@@ -691,7 +691,14 @@ export function ImageDesigner({
   // template — otherwise the whole picker would sit there looking inert.
   function applyTemplate(t: Template) {
     if (activeSlide) {
-      updateActiveSlide({ templateId: t.id, aspectRatio: t.aspectRatio });
+      // Dropping layoutJson matters: paintSlide forks on templateId, so a
+      // stale spec left behind a real template id would be invisible until
+      // someone switched back and got a layout they thought they had replaced.
+      updateActiveSlide({
+        templateId: t.id,
+        aspectRatio: t.aspectRatio,
+        layoutJson: null,
+      });
     } else {
       void addSlide(t);
     }
@@ -920,7 +927,7 @@ export function ImageDesigner({
     const a = document.createElement("a");
     a.href = url;
     const slug =
-      (name || `renova-${template?.id ?? "design"}`)
+      (name || `renova-${surface?.id ?? "design"}`)
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-+|-+$/g, "") || "renova";
@@ -976,6 +983,18 @@ export function ImageDesigner({
     [activeSlide],
   );
 
+  /**
+   * What the inspector reads. A composed slide has no Template — its id is the
+   * sentinel — so asking getTemplate and treating null as "empty" reported
+   * five real slides as an empty slot. Everything the editor DISPLAYS comes
+   * from here; `template` above is kept only for the places that need a real
+   * Template object.
+   */
+  const surface = useMemo(
+    () => (activeSlide ? slideSurface(activeSlide, designSystem) : null),
+    [activeSlide, designSystem],
+  );
+
   // What you're making isn't stored anywhere — it IS which slot you're in.
   // Deriving it means the switch can't drift out of step with the slides on
   // screen, which is the whole class of bug that made a carousel look lost.
@@ -1029,8 +1048,8 @@ export function ImageDesigner({
   // empty (e.g. the user clicked a Carousels template card for the first
   // time). The toolbar + template picker stay visible so the user can switch
   // slots or hit Generate.
-  const previewMaxWidth = template?.aspectRatio === "9:16" ? 320 : 460;
-  const isEmptySlot = !activeSlide || !template;
+  const previewMaxWidth = surface?.aspectRatio === "9:16" ? 320 : 460;
+  const isEmptySlot = !activeSlide || !surface;
 
   return (
     <div style={{ display: "grid", gap: 18 }}>
@@ -1404,7 +1423,7 @@ export function ImageDesigner({
             )}
           </div>
 
-          {template && (
+          {surface && (
             <div
               style={{
                 fontSize: 11,
@@ -1413,8 +1432,8 @@ export function ImageDesigner({
                 letterSpacing: "0.04em",
               }}
             >
-              {template.aspectRatio} · {template.width}×{template.height} ·{" "}
-              {template.name}
+              {surface.aspectRatio} · {surface.width}×{surface.height} ·{" "}
+              {surface.name}
             </div>
           )}
 
@@ -1677,17 +1696,17 @@ export function ImageDesigner({
           </div>
           </EditorSection>
 
-          {activeSlide && template && (
+          {activeSlide && surface && (
           <>
           <EditorSection
             title="Content"
             hint={total > 1 ? `Slide ${activeIdx + 1} of ${total}` : "This post"}
             defaultOpen
           >
-          {template.usesTagline && (
+          {surface.usesTagline && (
             <div>
               <Label htmlFor="tagline">
-                {template.category === "carousels"
+                {surface.category === "carousels"
                   ? "Slide indicator (auto-numbered if blank)"
                   : "Tagline"}
               </Label>
@@ -1695,7 +1714,7 @@ export function ImageDesigner({
                 id="tagline"
                 value={activeSlide.tagline ?? ""}
                 placeholder={
-                  template.taglineHint ?? autoTagline(activeIdx, total) ?? ""
+                  surface.taglineHint ?? autoTagline(activeIdx, total) ?? ""
                 }
                 onChange={(e) =>
                   updateActiveSlide({ tagline: e.target.value || null })
