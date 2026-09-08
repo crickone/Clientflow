@@ -5,8 +5,10 @@ import type { CarouselSlide, ImageLibraryAsset } from "@/lib/db/schema";
 import {
   libraryFileUrl,
   paintSlide,
+  slideDimensions,
   type BrandLabels,
 } from "@/lib/image/paintSlide";
+import type { DesignSystem } from "@/lib/design/parse";
 import {
   DEFAULT_BODY_FONT_ID,
   DEFAULT_HEADING_FONT_ID,
@@ -83,6 +85,7 @@ export function SlideCanvas({
   defaultBodyFontId = DEFAULT_BODY_FONT_ID,
   brand,
   logo = null,
+  system = null,
 }: {
   slide: CarouselSlide;
   slideIdx: number;
@@ -93,6 +96,10 @@ export function SlideCanvas({
   defaultBodyFontId?: string;
   brand?: BrandLabels;
   logo?: HTMLImageElement | null;
+  /** The tenant's design system, needed to draw an AI-composed slide. Null
+   *  for a tenant that has none, which is every tenant until one is authored
+   *  — and template slides never look at it. */
+  system?: DesignSystem | null;
 }) {
   const fontFamilies = useMemo(
     () => ({
@@ -140,12 +147,13 @@ export function SlideCanvas({
     if (!fontsReady) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const template = getTemplate(slide.templateId);
-    if (!template) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    canvas.width = template.width;
-    canvas.height = template.height;
+    // Sized through slideDimensions, not getTemplate, so a composed slide
+    // (which has no template) still gets a canvas of its own aspect ratio.
+    const dims = slideDimensions(slide);
+    canvas.width = dims.width;
+    canvas.height = dims.height;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     paintSlide(
       ctx,
@@ -158,11 +166,11 @@ export function SlideCanvas({
       fontFamilies,
       bgRef.current,
       logo,
+      system,
     );
-  }, [slide, slideIdx, total, fontsReady, fontFamilies, tick, brand, logo]);
+  }, [slide, slideIdx, total, fontsReady, fontFamilies, tick, brand, logo, system]);
 
-  const template = getTemplate(slide.templateId);
-  const aspect = template?.aspectRatio ?? "1:1";
+  const aspect = slideDimensions(slide).aspectRatio;
 
   return (
     <canvas

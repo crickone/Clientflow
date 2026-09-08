@@ -25,6 +25,34 @@ export type BrandLabels = {
   phone?: string;
 };
 
+/**
+ * A slide's natural pixel size. A template slide takes its template's; a
+ * composed slide has no template to ask, so its own aspectRatio answers —
+ * which is why the design system's numbers scale off the real width rather
+ * than assuming 1080.
+ *
+ * Both the preview and the export size their canvas through this, for the
+ * same reason they both paint through paintSlide.
+ */
+export function slideDimensions(slide: CarouselSlide): {
+  width: number;
+  height: number;
+  aspectRatio: "1:1" | "9:16" | "4:5";
+} {
+  const template = getTemplate(slide.templateId);
+  if (template) {
+    return {
+      width: template.width,
+      height: template.height,
+      aspectRatio: template.aspectRatio,
+    };
+  }
+  const aspect = slide.aspectRatio ?? "1:1";
+  const height =
+    aspect === "9:16" ? 1920 : aspect === "4:5" ? 1350 : 1080;
+  return { width: 1080, height, aspectRatio: aspect };
+}
+
 export function libraryFileUrl(filename: string) {
   return `/api/content-studio/image-library/file/${encodeURIComponent(filename)}`;
 }

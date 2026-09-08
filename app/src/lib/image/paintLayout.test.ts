@@ -14,6 +14,7 @@ import assert from "node:assert/strict";
 
 import type { CarouselSlide } from "@/lib/db/schema";
 import { OPTIMAL_HEALTH_DESIGN_SYSTEM as SYSTEM } from "@/lib/design/presets";
+import { validateSlide } from "@/lib/design/validate";
 import { serializeLayoutSpec, type LayoutSpec } from "@/lib/design/grammar";
 import { COMPOSED_TEMPLATE_ID, paintSlide } from "@/lib/image/paintSlide";
 import { bindSlots, paintLayout } from "@/lib/image/paintLayout";
@@ -364,6 +365,53 @@ check(
 check(
   "a real template still renders when a system is present",
   paint(slide({ templateId: "bold-headline" })).length > 8,
+);
+
+// -------------------------------------------------------------------------
+//  8. A violation is never drawn
+// -------------------------------------------------------------------------
+//
+// The editor shows brand-rule violations beside the canvas (DesignNotice, in
+// ImageDesigner). They are DOM, never a draw call — but "never" is worth
+// asserting rather than assuming, because the export path shares every line of
+// render code with the preview and the only thing keeping a notice out of a
+// customer's PNG is that it was never painted in the first place.
+//
+// A slide deliberately in violation: deep green body copy on sage, 3.62:1
+// against a 4.5:1 floor. The spec itself is well-formed -- the point is a
+// slide that PARSES and still breaks a brand rule, which is exactly the case
+// the notice exists for.
+const VIOLATING_SPEC: LayoutSpec = spec({
+  archetype: "statement",
+  ground: "sage",
+  slots: [{ level: "body", text: "Too small for this ground", span: 4 }],
+});
+const violating = slide({
+  accentColor: "#5e6b4e",
+  backgroundColor: SAGE,
+  headingText: "A *highlighted* heading",
+  layoutJson: serializeLayoutSpec(VIOLATING_SPEC),
+});
+const violationCheck = validateSlide(VIOLATING_SPEC, SYSTEM, {
+  background: SAGE,
+  accent: "#5e6b4e",
+  accentCarriesText: true,
+});
+check("the fixture really does violate a rule", !violationCheck.ok);
+
+const violatingOps = paint(violating);
+const painted = drawn(violatingOps);
+check("the slide still renders — a violation never hides it", violatingOps.length > 8);
+for (const fragment of ["below the", "requires", ":1", "brand rule", "contrast"]) {
+  check(
+    `no drawn text contains "${fragment}"`,
+    !painted.toLowerCase().includes(fragment.toLowerCase()),
+  );
+}
+check(
+  "and none of the violation strings themselves are drawn",
+  !violationCheck.ok &&
+    violationCheck.violations.every((v) => !painted.includes(v.slice(0, 20))),
 );
 
 console.log(`\npaintLayout: ${passed} checks passed`);

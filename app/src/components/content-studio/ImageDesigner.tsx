@@ -10,6 +10,7 @@ import {
 } from "react";
 import JSZip from "jszip";
 import {
+  AlertTriangle,
   Copy,
   Download,
   Image as ImageIcon,
@@ -66,6 +67,10 @@ import {
   type DesignKind,
 } from "@/lib/image/slots";
 import { SlideCanvas, useCanvasFonts, useLogoImage } from "./SlideCanvas";
+import type { DesignSystem } from "@/lib/design/parse";
+import { COMPOSED_TEMPLATE_ID, slideDimensions } from "@/lib/image/paintSlide";
+import { deserializeLayoutSpec, isSpecError } from "@/lib/design/grammar";
+import { validateSlide } from "@/lib/design/validate";
 import { SlideFilmstrip } from "./SlideFilmstrip";
 import { SlideColorPicker } from "./SlideColorPicker";
 import { SlidePhotoLibrary } from "./SlidePhotoLibrary";
@@ -109,6 +114,13 @@ interface Props {
   logoUrl?: string | null;
   /** Whether this design currently draws the logo on its slides (persisted per-design). */
   initialShowLogo?: boolean;
+  /**
+   * The tenant's design system, or null when they have none — which is every
+   * tenant until one is authored. It is what draws an AI-composed slide, and
+   * what its layout is re-checked against on every render, so an operator edit
+   * that breaks a brand rule is caught as well as a badly-composed layout.
+   */
+  designSystem?: DesignSystem | null;
 }
 
 /**
@@ -302,6 +314,7 @@ export function ImageDesigner({
   imageGenEnabled = false,
   logoUrl = null,
   initialShowLogo = true,
+  designSystem = null,
 }: Props) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -364,6 +377,33 @@ export function ImageDesigner({
   const total = slidesInSlot.length;
   const isCarousel = total > 1;
   const activeSlide = slidesInSlot[activeIdx] ?? null;
+
+  /**
+   * Brand-rule violations for the slide being edited.
+   *
+   * Validation runs HERE, on every render, not only at generation — because
+   * there are two sources of a bad slide and only one of them is the model.
+   * An operator who retypes a heading or nudges a colour can break the same
+   * rule, and picking a timber heading on sage takes it to 2.14:1 whoever
+   * did it.
+   *
+   * accentCarriesText is derived from the content: the accent is only set in
+   * type where the heading carries *asterisk* highlight markup. Everywhere
+   * else it fills a rule, which is what an accent is for and is exempt.
+   */
+  const designViolations = useMemo<string[]>(() => {
+    if (!designSystem || !activeSlide) return [];
+    if (activeSlide.templateId !== COMPOSED_TEMPLATE_ID) return [];
+    const spec = deserializeLayoutSpec(activeSlide.layoutJson, designSystem);
+    if (isSpecError(spec)) return [spec.error];
+    const check = validateSlide(spec, designSystem, {
+      background: activeSlide.backgroundColor,
+      accent: activeSlide.accentColor,
+      accentCarriesText: activeSlide.headingText.includes("*"),
+      hasPhoto: activeSlide.backgroundAssetId != null,
+    });
+    return check.ok ? [] : check.violations;
+  }, [designSystem, activeSlide]);
 
   // Clamp activeIdx when the slot or slide count changes.
   useEffect(() => {
@@ -873,6 +913,7 @@ export function ImageDesigner({
       slideFonts(activeSlide),
       brand,
       showLogo ? logoImg : null,
+      designSystem,
     );
     if (!blob) return;
     const url = URL.createObjectURL(blob);
@@ -910,6 +951,7 @@ export function ImageDesigner({
           slideFonts(slidesInSlot[i]),
           brand,
           showLogo ? logoImg : null,
+          designSystem,
         );
         if (blob) {
           zip.file(`${padNumber(i + 1, 2)}-${slug}.png`, blob);
@@ -1195,6 +1237,7 @@ export function ImageDesigner({
                     defaultBodyFontId={defaultBodyFontId}
                     brand={brand}
                     logo={showLogo ? logoImg : null}
+                    system={designSystem}
                   />
                   {activeSlide.backgroundAssetId != null && (
                     <FocalOverlay
@@ -1235,6 +1278,8 @@ export function ImageDesigner({
             )
           )}
 
+          <DesignNotice violations={designViolations} />
+
           {/* The strip is what makes a carousel look like a carousel: the big
               preview shows the slide you're editing, this shows the series it
               sits in. It replaces a two-column thumbnail grid that had no
@@ -1253,6 +1298,7 @@ export function ImageDesigner({
               defaultBodyFontId={defaultBodyFontId}
               brand={brand}
               logo={showLogo ? logoImg : null}
+              system={designSystem}
             />
           )}
 
@@ -2369,6 +2415,58 @@ async function readImageDimensions(
   });
 }
 
+/**
+ * The brand-rule notice for an AI-composed slide.
+ *
+ * It is EDITOR-ONLY: this is DOM, drawn beside the canvas and never into it,
+ * so nothing here can reach an exported PNG. That is deliberate — a violation
+ * is information for the operator, not a watermark on their work.
+ *
+ * It is also non-blocking. A slide that breaks a rule is still shown, still
+ * editable and still exportable; what it is not is silently swapped for a
+ * fixed template or quietly hidden. The text quotes the actual measurement
+ * ("Body is deep-green on sage: 3.62:1, below the 4.5:1 this system requires
+ * for body text") because a generic warning tells an operator nothing about
+ * what to change.
+ */
+function DesignNotice({ violations }: { violations: string[] }) {
+  if (violations.length === 0) return null;
+  return (
+    <div
+      role="status"
+      style={{
+        display: "flex",
+        gap: 10,
+        alignItems: "flex-start",
+        padding: "12px 14px",
+        borderRadius: "var(--radius)",
+        border: "1px solid var(--hairline)",
+        background: "var(--surface-1)",
+        color: "var(--text-secondary)",
+        fontSize: 13,
+        lineHeight: 1.5,
+      }}
+    >
+      <AlertTriangle
+        size={15}
+        style={{ flexShrink: 0, marginTop: 2, color: "var(--accent)" }}
+      />
+      <div>
+        <div style={{ fontWeight: 600, color: "var(--text-primary)", marginBottom: 4 }}>
+          {violations.length === 1
+            ? "This slide breaks a brand rule"
+            : `This slide breaks ${violations.length} brand rules`}
+        </div>
+        <ul style={{ margin: 0, paddingLeft: 16 }}>
+          {violations.map((v, i) => (
+            <li key={i}>{v}</li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 async function renderSlideToBlob(
   slide: CarouselSlide,
   slideIdx: number,
@@ -2377,9 +2475,13 @@ async function renderSlideToBlob(
   fontFamilies: { heading: string; body: string },
   brand?: BrandLabels,
   logo: HTMLImageElement | null = null,
+  system: DesignSystem | null = null,
 ): Promise<Blob | null> {
-  const template = getTemplate(slide.templateId);
-  if (!template) return null;
+  // A composed slide has no template, so its size comes from its own aspect
+  // ratio — the same slideDimensions the live preview uses, because the two
+  // must agree on the canvas as much as on what is drawn into it.
+  const composed = slide.templateId === COMPOSED_TEMPLATE_ID;
+  if (!getTemplate(slide.templateId) && !composed) return null;
 
   let bg: HTMLImageElement | null = null;
   if (slide.backgroundAssetId != null) {
@@ -2395,12 +2497,13 @@ async function renderSlideToBlob(
     }
   }
 
+  const dims = slideDimensions(slide);
   const canvas = document.createElement("canvas");
-  canvas.width = template.width;
-  canvas.height = template.height;
+  canvas.width = dims.width;
+  canvas.height = dims.height;
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
-  paintSlide(ctx, canvas.width, canvas.height, slide, slideIdx, total, brand, fontFamilies, bg, logo);
+  paintSlide(ctx, canvas.width, canvas.height, slide, slideIdx, total, brand, fontFamilies, bg, logo, system);
 
   return new Promise<Blob | null>((resolve) => {
     canvas.toBlob((b) => resolve(b), "image/png");

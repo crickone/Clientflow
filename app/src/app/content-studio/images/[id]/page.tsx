@@ -10,6 +10,7 @@ import { getBusinessProfile } from "@/lib/businessProfile";
 import { getChromeLogoSrc } from "@/lib/branding";
 import { isImageGenConfigured } from "@/lib/ai/image/falClient";
 import { ImageDesigner } from "@/components/content-studio/ImageDesigner";
+import { getDesignSystem } from "@/lib/design/system";
 
 export const dynamic = "force-dynamic";
 
@@ -65,6 +66,7 @@ export default function ImageDesignPage({
         imageGenEnabled={isImageGenConfigured()}
         logoUrl={getChromeLogoSrc()}
         initialShowLogo={design.showLogo}
+        designSystem={getDesignSystem()}
       />
     </>
   );

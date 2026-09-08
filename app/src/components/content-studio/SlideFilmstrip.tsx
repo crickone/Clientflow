@@ -23,6 +23,7 @@ import type { CarouselSlide, ImageLibraryAsset } from "@/lib/db/schema";
 import { getTemplate } from "@/lib/image/templates";
 import { padNumber, type BrandLabels } from "@/lib/image/paintSlide";
 import { SlideCanvas } from "./SlideCanvas";
+import type { DesignSystem } from "@/lib/design/parse";
 
 /**
  * The strip of slides under the preview.
@@ -51,6 +52,7 @@ export function SlideFilmstrip({
   defaultBodyFontId,
   brand,
   logo = null,
+  system = null,
 }: {
   slides: CarouselSlide[];
   activeIdx: number;
@@ -64,6 +66,9 @@ export function SlideFilmstrip({
   defaultBodyFontId?: string;
   brand?: BrandLabels;
   logo?: HTMLImageElement | null;
+  /** The tenant's design system, for AI-composed slides. Null for a tenant
+   *  with none; template slides never look at it. */
+  system?: DesignSystem | null;
 }) {
   // Mouse and touch are split deliberately. One pointer sensor would need
   // touch-action: none on every slide, and since the strip scrolls sideways
@@ -121,6 +126,7 @@ export function SlideFilmstrip({
                 defaultBodyFontId={defaultBodyFontId}
                 brand={brand}
                 logo={logo}
+                system={system}
               />
             ))}
             <button
@@ -178,6 +184,7 @@ function FilmstripSlide({
   defaultBodyFontId,
   brand,
   logo,
+  system,
 }: {
   slide: CarouselSlide;
   slideIdx: number;
@@ -190,6 +197,7 @@ function FilmstripSlide({
   defaultBodyFontId?: string;
   brand?: BrandLabels;
   logo?: HTMLImageElement | null;
+  system?: DesignSystem | null;
 }) {
   const {
     attributes,
@@ -267,6 +275,7 @@ function FilmstripSlide({
           defaultBodyFontId={defaultBodyFontId}
           brand={brand}
           logo={logo}
+          system={system}
         />
         {generating && (
           <div

@@ -4,6 +4,7 @@ import { getBrandFontIds } from "@/lib/settings";
 import { getBusinessProfile } from "@/lib/businessProfile";
 import { getChromeLogoSrc } from "@/lib/branding";
 import { ContentStudioHome } from "@/components/content-studio/ContentStudioHome";
+import { getDesignSystem } from "@/lib/design/system";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,7 @@ export default function ContentStudioIndex() {
       defaultHeadingFontId={brandFonts.heading}
       defaultBodyFontId={brandFonts.body}
       logoUrl={getChromeLogoSrc()}
+      designSystem={getDesignSystem()}
     />
   );
 }

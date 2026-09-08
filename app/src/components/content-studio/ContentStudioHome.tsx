@@ -19,6 +19,7 @@ import type {
   ContentTone,
 } from "@/lib/content-studio/recentWork";
 import { SlideCanvas, useCanvasFonts, useLogoImage } from "./SlideCanvas";
+import type { DesignSystem } from "@/lib/design/parse";
 
 interface Props {
   items: ContentItem[];
@@ -29,6 +30,9 @@ interface Props {
   defaultHeadingFontId: string;
   defaultBodyFontId: string;
   logoUrl: string | null;
+  /** The tenant's design system, so AI-composed slides render in the grid
+   *  too. Null for a tenant with none. */
+  designSystem?: DesignSystem | null;
 }
 
 type Filter = "all" | ContentKind;
@@ -111,6 +115,7 @@ function Thumb({
   defaultBodyFontId,
   fontsReady,
   logo,
+  system,
 }: {
   item: ContentItem;
   library: ImageLibraryAsset[];
@@ -119,6 +124,8 @@ function Thumb({
   defaultBodyFontId: string;
   fontsReady: boolean;
   logo: HTMLImageElement | null;
+  /** The tenant's design system, for AI-composed slides. */
+  system: DesignSystem | null;
 }) {
   if (item.kind === "image" && item.firstSlide) {
     const slide = item.firstSlide;
@@ -134,6 +141,7 @@ function Thumb({
           defaultBodyFontId={defaultBodyFontId}
           brand={brand}
           logo={logo}
+          system={system}
         />
       </LazyMount>
     );
@@ -174,6 +182,7 @@ export function ContentStudioHome({
   defaultHeadingFontId,
   defaultBodyFontId,
   logoUrl,
+  designSystem = null,
 }: Props) {
   const [filter, setFilter] = useState<Filter>("all");
   const fontsReady = useCanvasFonts();
@@ -245,6 +254,7 @@ export function ContentStudioHome({
                   defaultBodyFontId={defaultBodyFontId}
                   fontsReady={fontsReady}
                   logo={logo}
+                  system={designSystem}
                 />
                 <div className="cs-thumb-ov">
                   <div className="cs-thumb-top"><StatusChip item={item} /></div>
