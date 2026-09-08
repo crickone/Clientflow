@@ -85,6 +85,10 @@ export interface SlideSurface {
   taglineHint?: string;
   /** True when this slide's layout was composed rather than picked. */
   composed: boolean;
+  /** True when the AI DESIGNED this slide as HTML. Distinct from `composed`:
+   *  a composed slide still had a fixed set of slots the inspector could edit,
+   *  a designed one has none, so the editor offers regenerate instead. */
+  designed: boolean;
 }
 
 const ARCHETYPE_NAMES: Record<string, string> = {
@@ -121,6 +125,7 @@ export function slideSurface(
       usesTagline: !!template.usesTagline,
       taglineHint: template.taglineHint,
       composed: false,
+      designed: false,
     };
   }
   if (slide.templateId === DESIGNED_TEMPLATE_ID) {
@@ -135,6 +140,7 @@ export function slideSurface(
       // A designed slide has no slots, so no tagline field to offer.
       usesTagline: false,
       composed: true,
+      designed: true,
     };
   }
   if (slide.templateId !== COMPOSED_TEMPLATE_ID) return null;
@@ -170,6 +176,7 @@ export function slideSurface(
     category: "carousels",
     usesTagline: hasLabel,
     composed: true,
+    designed: false,
   };
 }
 

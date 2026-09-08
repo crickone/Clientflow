@@ -12,6 +12,7 @@ import JSZip from "jszip";
 import {
   AlertTriangle,
   Copy,
+  Loader2,
   Download,
   Image as ImageIcon,
   Minus,
@@ -1696,7 +1697,17 @@ export function ImageDesigner({
           </div>
           </EditorSection>
 
-          {activeSlide && surface && (
+          {activeSlide && surface?.designed && (
+            <DesignedSlidePanel
+              designId={designId}
+              slide={activeSlide}
+              onUpdated={(next) => {
+                setSlides((cur) => cur.map((s) => (s.id === next.id ? next : s)));
+              }}
+            />
+          )}
+
+          {activeSlide && surface && !surface.designed && (
           <>
           <EditorSection
             title="Content"
@@ -2483,6 +2494,97 @@ function DesignNotice({ violations }: { violations: string[] }) {
         </ul>
       </div>
     </div>
+  );
+}
+
+/**
+ * The inspector for an AI-designed slide: accept, regenerate, or nudge.
+ *
+ * There are deliberately no heading, body or colour controls. The AI decided
+ * where the heading goes, so there is no fixed slot for a control to point at
+ * -- a "Heading" box would have nothing to edit. What an operator can do is
+ * judge the result and ask for a different one, which is how design tools with
+ * AI in them actually work.
+ */
+function DesignedSlidePanel({
+  designId,
+  slide,
+  onUpdated,
+}: {
+  designId: number;
+  slide: CarouselSlide;
+  onUpdated: (slide: CarouselSlide) => void;
+}) {
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function redesign() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/content-studio/carousels/${designId}/redesign`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ slideId: slide.id, note: note.trim() || null }),
+        },
+      );
+      const data = await res.json().catch(() => null);
+      if (!data?.ok) {
+        setError(data?.error ?? `Redesign failed (HTTP ${res.status}).`);
+        return;
+      }
+      const next = (data.carousel?.slides as CarouselSlide[] | undefined)?.find(
+        (s) => s.id === slide.id,
+      );
+      if (next) onUpdated(next);
+      setNote("");
+    } catch {
+      setError("Couldn't reach the server. Try again in a moment.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <EditorSection title="This slide" hint="Designed by Adonis" defaultOpen>
+      <p
+        style={{
+          margin: "0 0 14px",
+          fontSize: 13,
+          color: "var(--text-secondary)",
+          lineHeight: 1.5,
+        }}
+      >
+        Adonis chose this layout from your design system. Keep it, or ask for a
+        different one.
+      </p>
+      <div>
+        <Label htmlFor="redesign-note">What would you change? (optional)</Label>
+        <Input
+          id="redesign-note"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="e.g. make the headline bigger, try it on the dark ground"
+          disabled={busy}
+        />
+      </div>
+      <Button onClick={redesign} disabled={busy} style={{ marginTop: 12 }}>
+        {busy ? <Loader2 size={15} className="spin" /> : <RefreshCw size={15} />}
+        {busy
+          ? "Designing…"
+          : note.trim()
+            ? "Redesign with that"
+            : "Try a different design"}
+      </Button>
+      {error && (
+        <div style={{ marginTop: 10, fontSize: 13, color: "var(--danger)" }}>
+          {error}
+        </div>
+      )}
+    </EditorSection>
   );
 }
 

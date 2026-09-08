@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CarouselSlide, ImageLibraryAsset } from "@/lib/db/schema";
 import {
+  DESIGNED_TEMPLATE_ID,
   libraryFileUrl,
   paintSlide,
   slideDimensions,
   type BrandLabels,
 } from "@/lib/image/paintSlide";
+import { renderFileUrl } from "@/lib/image/renderStore.client";
 import type { DesignSystem } from "@/lib/design/parse";
 import {
   DEFAULT_BODY_FONT_ID,
@@ -142,7 +144,15 @@ export function SlideCanvas({
     };
   }, [slide.backgroundAssetId, library]);
 
+  // An AI-designed slide is not painted here. Its PNG was rendered server-side
+  // and stored, and that same file is what the operator exports -- so showing
+  // it is not a preview OF the export, it IS the export. Painting it a second
+  // way on a canvas is the one thing that could make the two disagree.
+  const designed =
+    slide.templateId === DESIGNED_TEMPLATE_ID && !!slide.renderFilename;
+
   useEffect(() => {
+    if (designed) return;
     if (!fontsReady) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -167,9 +177,28 @@ export function SlideCanvas({
       logo,
       system,
     );
-  }, [slide, slideIdx, total, fontsReady, fontFamilies, tick, brand, logo, system]);
+  }, [designed, slide, slideIdx, total, fontsReady, fontFamilies, tick, brand, logo, system]);
 
   const aspect = slideDimensions(slide).aspectRatio;
+
+  if (designed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={renderFileUrl(slide.renderFilename!)}
+        alt=""
+        style={{
+          width: "100%",
+          height: "auto",
+          aspectRatio: aspect.replace(":", " / "),
+          borderRadius: "var(--radius)",
+          boxShadow: "var(--shadow-1)",
+          background: "#0a0a0a",
+          display: "block",
+        }}
+      />
+    );
+  }
 
   return (
     <canvas

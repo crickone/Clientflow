@@ -31,9 +31,10 @@ export function renderFilePath(filename: string): string {
   return path.join(renderDir(), path.basename(filename));
 }
 
-export function renderFileUrl(filename: string): string {
-  return `/api/content-studio/renders/${encodeURIComponent(filename)}`;
-}
+// Re-exported from the client-safe module so there is ONE definition of this
+// URL. renderStore is server-only (it touches the filesystem); the editor
+// needs the same string, so the helper itself lives next door.
+export { renderFileUrl } from "./renderStore.client";
 
 export function saveRender(png: Buffer): string {
   const hash = crypto.createHash("sha256").update(png).digest("hex").slice(0, 16);

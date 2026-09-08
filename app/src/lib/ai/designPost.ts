@@ -293,3 +293,113 @@ export async function designPost(
 
   return { designed: true, slides: checked.slides, caption, repaired, usage };
 }
+
+/**
+ * Redesign ONE slide.
+ *
+ * This is the whole editing model for a designed slide. There are no inspector
+ * controls because there is no fixed slot for them to point at -- the AI
+ * decided where the heading goes -- so an operator accepts what they see,
+ * regenerates it, or nudges it with a sentence ("make the headline bigger",
+ * "try it on the dark ground").
+ *
+ * The previous markup goes back in as the assistant's turn, so a nudge is a
+ * revision of THIS design rather than a fresh attempt at the topic: "bigger"
+ * has no meaning without the thing it is bigger than.
+ */
+export async function redesignSlide(
+  input: {
+    topic: string;
+    /** The markup being revised. */
+    previousHtml: string;
+    /** The operator's instruction, or null for a plain regenerate. */
+    note: string | null;
+    aspectRatio?: "1:1" | "4:5" | "9:16";
+    photoSource?: Buffer | string | null;
+  },
+  meter: MeterContext,
+  model: string = CONTENT_MODEL,
+): Promise<{ slide: DesignedSlide; usage: GenerateResult["usage"] } | null> {
+  const system = getDesignSystem();
+  if (!system) return null;
+
+  const { width, height } = CANVAS[input.aspectRatio ?? "1:1"] ?? CANVAS["1:1"];
+  const hasPhotography = !!input.photoSource;
+
+  const systemPrompt = [
+    getBusinessContext(),
+    describeSystemForDesign(system),
+    DESIGN_RULES,
+    hasPhotography ? null : NO_PHOTOGRAPHY_RULE,
+    getSignoffRule("social"),
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  const askFor = `Topic: ${input.topic}\n\nDesign ONE slide on a ${width}x${height} canvas. Return ONLY the JSON in <design>...</design>, with exactly one entry in "slides".`;
+
+  const message = await meteredCreateStreamed(meter, () => ({
+    model,
+    max_tokens: DESIGN_MAX_TOKENS,
+    thinking: { type: "adaptive" as const },
+    system: [
+      {
+        type: "text" as const,
+        text: systemPrompt,
+        cache_control: { type: "ephemeral" as const },
+      },
+    ],
+    messages: [
+      { role: "user" as const, content: askFor },
+      {
+        role: "assistant" as const,
+        content: `<design>\n${JSON.stringify({ caption: "", slides: [{ photo: "", html: input.previousHtml }] })}\n</design>`,
+      },
+      {
+        role: "user" as const,
+        content: input.note?.trim()
+          ? `${input.note.trim()}\n\nRedesign that slide accordingly. Keep everything the instruction does not touch. Same format.`
+          : "Design that slide again, differently. Same content, a different composition. Same format.",
+      },
+    ],
+  }));
+
+  if (message.stop_reason === "max_tokens") {
+    throw new Error("The design ran out of room before it finished. Try a shorter note.");
+  }
+
+  const text = message.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("\n");
+  const payload = extractDesignPayload(text);
+  const first = payload.slides[0];
+  if (!first) throw new Error("The designer returned no slide.");
+
+  const checked = checkDesigns([first], system);
+  const design = checked.designs[0];
+  const { renderFilename, violation } = await renderOne(
+    design,
+    system,
+    width,
+    height,
+    input.photoSource ?? null,
+  );
+
+  return {
+    slide: {
+      html: design.html,
+      renderFilename,
+      photo: design.photo,
+      violations: violation
+        ? [...design.violations, violation]
+        : design.violations,
+    },
+    usage: {
+      inputTokens: message.usage.input_tokens,
+      outputTokens: message.usage.output_tokens,
+      cacheCreationInputTokens: message.usage.cache_creation_input_tokens ?? 0,
+      cacheReadInputTokens: message.usage.cache_read_input_tokens ?? 0,
+    },
+  };
+}
