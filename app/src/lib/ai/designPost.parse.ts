@@ -94,7 +94,11 @@ Moves worth making, because a fixed template cannot: a figure or word oversized 
 
 Keep every element inside the canvas and clear of the others. Nothing may overlap text, and nothing may run off an edge unless you meant it to. Give every text element an explicit "width" so it wraps where you intend rather than where it runs out of canvas.
 
-USE THE WHOLE CANVAS. A slide with a line of type at the top and empty space below it is unfinished, not restrained. Decide what fills the frame -- a photograph, a ground that changes partway down, a figure at display size, a stack of cards -- and let the composition reach the edges it is meant to reach. Empty COLUMNS beside a text block are the calm the system asks for; an empty lower half is not.
+Open space is fine. A composition anchored high or low with quiet space across the rest of the frame is the house look, not an unfinished slide.
+
+SET HEADINGS LARGE. A carousel is read at thumbnail size in a feed, so a heading that looks generous on screen is merely legible in the app. A slide's MAIN heading -- the line the slide is about -- is DISPLAY size. The headline level is for a secondary heading inside a slide, never for the thing the slide is about, and when a heading sits between two levels take the larger one.
+
+Never place two items SIDE BY SIDE to compare them -- at feed size a pair of columns becomes two narrow strips nobody reads. Stack them down the page instead, each with its own heading at subhead size or larger, separated by a rule or a change of ground rather than shut inside cards.
 
 Where a slide uses a photograph, write the src EXACTLY as ${PHOTO_TOKEN} -- that placeholder is replaced with the real image. Use it at most once per slide, and give that slide a "photo" field describing the scene: subject, setting, mood, composition. Never describe text, signage or lettering in shot. A slide with no photograph has "photo": "".
 
@@ -112,6 +116,17 @@ Output format -- return ONLY this JSON inside <design>...</design> tags, no othe
 }
 </design>
 The "slides" array must hold exactly the number of slides requested, in order.`;
+
+/**
+ * Told to the model when the tenant has no photography.
+ *
+ * Necessary because stripping a photo AFTER the fact does not undo the design
+ * built around it: a real generation asked for a full-bleed image, the <img>
+ * was removed, and the scrim gradient meant to sit over it was left lying on a
+ * flat ground as a muddy wash. A design that never expected a photograph is
+ * coherent; one with the photograph cut out of it is not.
+ */
+export const NO_PHOTOGRAPHY_RULE = `NO PHOTOGRAPHY IS AVAILABLE for this post. Every slide must work on a flat ground. Do not write ${PHOTO_TOKEN}, do not write an <img>, and do not build a scrim or gradient of the kind that only makes sense over an image. Set "photo" to "" on every slide.`;
 
 export function extractDesignPayload(text: string): {
   slides: RawDesign[];

@@ -46,9 +46,20 @@ export const OPTIMAL_HEALTH_DESIGN_SYSTEM: DesignSystem = {
   ],
 
   // Section 5 — the type scale, authored for a 1080px field.
+  //
+  // ONE DELIBERATE DEPARTURE from the document, at the client's request
+  // (2026-09-08): headline is 64px here, not the document's 50. Social posts
+  // are read at thumbnail size in a feed, where 50px on a 1080 field is merely
+  // legible rather than the emphasis a headline is for — the operator looked at
+  // real generated carousels and asked for bigger headings twice. Changing the
+  // SCALE rather than the prompt is what makes it hold: the size a heading
+  // takes is brand-system data, and asking a model to override its own type
+  // scale is a rule that quietly stops being followed. The website build made
+  // two similar departures for the same reason. Every other level is the
+  // document's.
   type: {
     display: { size: 84, leading: 0.96, tracking: -0.035, weight: 600 },
-    headline: { size: 50, leading: 1.02, tracking: -0.03, weight: 600 },
+    headline: { size: 64, leading: 1.02, tracking: -0.03, weight: 600 },
     subhead: { size: 30, leading: 1.26, tracking: -0.01, weight: 500 },
     body: { size: 21, leading: 1.52, tracking: 0, weight: 400 },
     label: { size: 15, leading: 1, tracking: 0.2, weight: 600, upper: true },

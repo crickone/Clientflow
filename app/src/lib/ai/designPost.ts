@@ -5,6 +5,7 @@ import { getBusinessContext, getSignoffRule } from "@/lib/ai/businessContext";
 import { CONTENT_MODEL } from "@/lib/ai/client";
 import {
   DESIGN_RULES,
+  NO_PHOTOGRAPHY_RULE,
   PHOTO_TOKEN,
   checkDesigns,
   describeSystemForDesign,
@@ -139,12 +140,20 @@ export async function designPost(
 
   const { width, height } = CANVAS[options.aspectRatio ?? "1:1"] ?? CANVAS["1:1"];
 
+  // Whether photography exists changes what the model should design, not just
+  // what it gets. Offering a photograph that will then be stripped leaves the
+  // scrim built for it lying on a flat ground.
+  const hasPhotography = !!options.photoSource;
+
   const systemPrompt = [
     getBusinessContext(),
     describeSystemForDesign(system),
     DESIGN_RULES,
+    hasPhotography ? null : NO_PHOTOGRAPHY_RULE,
     getSignoffRule("social"),
-  ].join("\n\n");
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
   const userPrompt = [
     `Topic: ${input.topic}`,

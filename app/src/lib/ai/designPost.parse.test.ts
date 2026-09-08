@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 
 import {
   DESIGN_RULES,
+  NO_PHOTOGRAPHY_RULE,
   checkDesigns,
   describeSystemForDesign,
   extractDesignPayload,
@@ -112,7 +113,31 @@ check(
 );
 check("the text-wrap rule is in the prompt", DESIGN_RULES.includes("must NOT set"));
 check("and the no-br rule", DESIGN_RULES.includes("NEVER write <br>"));
-check("and the fill-the-canvas rule", DESIGN_RULES.includes("USE THE WHOLE CANVAS"));
+// Operator feedback on the first real carousel: the open compositions are the
+// house look and headings want to be larger, and a comparison reads better
+// stacked than as two columns at feed size.
+check("headings are pushed to the top of the scale", DESIGN_RULES.includes("SET HEADINGS LARGE"));
+check("and ties are broken upwards", DESIGN_RULES.includes("take the larger one"));
+check("comparisons stack rather than sitting side by side", DESIGN_RULES.includes("SIDE BY SIDE"));
+check("and are not boxed into cards", DESIGN_RULES.includes("shut inside cards"));
+check(
+  "the main heading is display size, not headline",
+  DESIGN_RULES.includes("is DISPLAY size") &&
+    DESIGN_RULES.includes("never for the thing the slide is about"),
+);
+// A real generation asked for a full-bleed photo the tenant does not have; the
+// <img> was stripped and the scrim built for it was left as a muddy wash on a
+// flat ground. A design that never expected a photograph is coherent.
+check(
+  "a tenant with no photography is told so, not left to have it stripped",
+  NO_PHOTOGRAPHY_RULE.includes("NO PHOTOGRAPHY IS AVAILABLE") &&
+    NO_PHOTOGRAPHY_RULE.includes("scrim"),
+);
+check(
+  "open space is allowed, not called unfinished",
+  DESIGN_RULES.includes("Open space is fine") &&
+    !DESIGN_RULES.includes("USE THE WHOLE CANVAS"),
+);
 // A real generation put "HBOT - 60 minutes - EUR 95" on a closing slide for a
 // tenant with no services, no pricing and no business profile. "Never invent a
 // statistic" did not cover a price, and a plausible-looking one on a health
