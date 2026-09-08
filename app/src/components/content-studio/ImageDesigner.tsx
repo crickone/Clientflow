@@ -69,9 +69,8 @@ import {
 } from "@/lib/image/slots";
 import { SlideCanvas, useCanvasFonts, useLogoImage } from "./SlideCanvas";
 import type { DesignSystem } from "@/lib/design/parse";
-import { COMPOSED_TEMPLATE_ID, slideDimensions, slideSurface } from "@/lib/image/paintSlide";
-import { deserializeLayoutSpec, isSpecError } from "@/lib/design/grammar";
-import { validateSlide } from "@/lib/design/validate";
+import { slideDimensions, slideSurface } from "@/lib/image/paintSlide";
+import { renderFileUrl } from "@/lib/image/renderStore.client";
 import { SlideFilmstrip } from "./SlideFilmstrip";
 import { SlideColorPicker } from "./SlideColorPicker";
 import { SlidePhotoLibrary } from "./SlidePhotoLibrary";
@@ -380,30 +379,18 @@ export function ImageDesigner({
   const activeSlide = slidesInSlot[activeIdx] ?? null;
 
   /**
-   * Brand-rule violations for the slide being edited.
-   *
-   * Validation runs HERE, on every render, not only at generation — because
-   * there are two sources of a bad slide and only one of them is the model.
-   * An operator who retypes a heading or nudges a colour can break the same
-   * rule, and picking a timber heading on sage takes it to 2.14:1 whoever
-   * did it.
-   *
-   * accentCarriesText is derived from the content: the accent is only set in
-   * type where the heading carries *asterisk* highlight markup. Everywhere
-   * else it fills a rule, which is what an accent is for and is exempt.
+   * A designed slide whose markup the renderer rejected has no PNG, so there is
+   * nothing to show and nothing to export. That is the one problem an operator
+   * can still be looking at after generation, so it is the one the editor
+   * surfaces; everything else is reported when the design is made.
    */
   const designViolations = useMemo<string[]>(() => {
-    if (!designSystem || !activeSlide) return [];
-    if (activeSlide.templateId !== COMPOSED_TEMPLATE_ID) return [];
-    const spec = deserializeLayoutSpec(activeSlide.layoutJson, designSystem);
-    if (isSpecError(spec)) return [spec.error];
-    const check = validateSlide(spec, designSystem, {
-      background: activeSlide.backgroundColor,
-      accent: activeSlide.accentColor,
-      accentCarriesText: activeSlide.headingText.includes("*"),
-      hasPhoto: activeSlide.backgroundAssetId != null,
-    });
-    return check.ok ? [] : check.violations;
+    if (!activeSlide) return [];
+    if (!slideSurface(activeSlide, designSystem)?.designed) return [];
+    if (activeSlide.renderFilename) return [];
+    return [
+      "This design could not be rendered, so there is nothing to show or export. Try a different one.",
+    ];
   }, [designSystem, activeSlide]);
 
   // Clamp activeIdx when the slot or slide count changes.
@@ -913,7 +900,7 @@ export function ImageDesigner({
   async function exportCurrentSlide() {
     if (!activeSlide || !fontsReady) return;
     const template = getTemplate(activeSlide.templateId);
-    const blob = await renderSlideToBlob(
+    const blob = await slideToBlob(
       activeSlide,
       activeIdx,
       total,
@@ -951,7 +938,7 @@ export function ImageDesigner({
           .replace(/[^a-z0-9]+/g, "-")
           .replace(/^-+|-+$/g, "") || `design-${designId}`;
       for (let i = 0; i < slidesInSlot.length; i++) {
-        const blob = await renderSlideToBlob(
+        const blob = await slideToBlob(
           slidesInSlot[i],
           i,
           slidesInSlot.length,
@@ -2588,6 +2575,46 @@ function DesignedSlidePanel({
   );
 }
 
+/**
+ * The PNG bytes for any slide.
+ *
+ * A DESIGNED slide is already a PNG: it was rendered server-side and stored,
+ * and that file is the export. Fetching it is not a shortcut -- re-drawing it
+ * here would mean a second renderer, and the whole point of storing the render
+ * is that preview and export are the same bytes. Only a template slide is
+ * painted on a canvas.
+ */
+async function slideToBlob(
+  slide: CarouselSlide,
+  slideIdx: number,
+  total: number,
+  library: ImageLibraryAsset[],
+  fontFamilies: { heading: string; body: string },
+  brand?: BrandLabels,
+  logo: HTMLImageElement | null = null,
+  system: DesignSystem | null = null,
+): Promise<Blob | null> {
+  if (slide.renderFilename) {
+    try {
+      const res = await fetch(renderFileUrl(slide.renderFilename));
+      if (!res.ok) return null;
+      return await res.blob();
+    } catch {
+      return null;
+    }
+  }
+  return renderSlideToBlob(
+    slide,
+    slideIdx,
+    total,
+    library,
+    fontFamilies,
+    brand,
+    logo,
+    system,
+  );
+}
+
 async function renderSlideToBlob(
   slide: CarouselSlide,
   slideIdx: number,
@@ -2598,11 +2625,7 @@ async function renderSlideToBlob(
   logo: HTMLImageElement | null = null,
   system: DesignSystem | null = null,
 ): Promise<Blob | null> {
-  // A composed slide has no template, so its size comes from its own aspect
-  // ratio — the same slideDimensions the live preview uses, because the two
-  // must agree on the canvas as much as on what is drawn into it.
-  const composed = slide.templateId === COMPOSED_TEMPLATE_ID;
-  if (!getTemplate(slide.templateId) && !composed) return null;
+  if (!getTemplate(slide.templateId)) return null;
 
   let bg: HTMLImageElement | null = null;
   if (slide.backgroundAssetId != null) {

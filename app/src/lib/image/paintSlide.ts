@@ -8,16 +8,6 @@ import {
 } from "@/lib/image/templates";
 import type { DesignSystem } from "@/lib/design/parse";
 import type { TemplateCategory } from "@/lib/image/templates";
-import { deserializeLayoutSpec, isSpecError } from "@/lib/design/grammar";
-import { paintLayout } from "@/lib/image/paintLayout";
-
-/**
- * `carousel_slides.template_id` is notNull, so a slide whose layout the AI
- * composed stores this sentinel there and puts the real spec in `layout_json`.
- * Nothing in TEMPLATES uses the id, so getTemplate() returns null for it and
- * the pre-existing path cannot be entered by accident.
- */
-export const COMPOSED_TEMPLATE_ID = "composed";
 
 /**
  * A slide the AI DESIGNED as HTML. Its markup is in `design_html` and the PNG
@@ -83,22 +73,11 @@ export interface SlideSurface {
   category: TemplateCategory;
   usesTagline: boolean;
   taglineHint?: string;
-  /** True when this slide's layout was composed rather than picked. */
-  composed: boolean;
-  /** True when the AI DESIGNED this slide as HTML. Distinct from `composed`:
-   *  a composed slide still had a fixed set of slots the inspector could edit,
-   *  a designed one has none, so the editor offers regenerate instead. */
+  /** True when the AI designed this slide as HTML rather than the operator
+   *  picking a template. A designed slide has no slots, so the editor offers
+   *  regenerate rather than field-by-field controls. */
   designed: boolean;
 }
-
-const ARCHETYPE_NAMES: Record<string, string> = {
-  statement: "Statement",
-  split: "Split",
-  stack: "Stack",
-  list: "List",
-  quote: "Quote",
-  stat: "Stat",
-};
 
 /**
  * Describe a slide for the editor. Returns null only when there is genuinely
@@ -124,7 +103,6 @@ export function slideSurface(
       category: template.category,
       usesTagline: !!template.usesTagline,
       taglineHint: template.taglineHint,
-      composed: false,
       designed: false,
     };
   }
@@ -139,45 +117,13 @@ export function slideSurface(
       category: "carousels",
       // A designed slide has no slots, so no tagline field to offer.
       usesTagline: false,
-      composed: true,
       designed: true,
     };
   }
-  if (slide.templateId !== COMPOSED_TEMPLATE_ID) return null;
-
-  const dims = slideDimensions(slide);
-  // The archetype is read straight off the stored JSON rather than through the
-  // grammar, so a spec that no longer validates against the tenant's system
-  // still names itself instead of collapsing to "empty".
-  let archetype = "";
-  let hasLabel = false;
-  try {
-    const raw = JSON.parse(slide.layoutJson ?? "null") as {
-      archetype?: unknown;
-      slots?: { level?: unknown }[];
-    } | null;
-    if (raw && typeof raw.archetype === "string") archetype = raw.archetype;
-    if (Array.isArray(raw?.slots)) {
-      hasLabel = raw.slots.some((s) => s?.level === "label");
-    }
-  } catch {
-    // A corrupt layout still describes a composed slide; the editor shows the
-    // violation separately.
-  }
+  // Anything else is genuinely nothing to show, which is what null has always
+  // meant here: an unknown template id.
   void system;
-  return {
-    id: COMPOSED_TEMPLATE_ID,
-    name: archetype
-      ? `Composed · ${ARCHETYPE_NAMES[archetype] ?? archetype}`
-      : "Composed",
-    aspectRatio: dims.aspectRatio,
-    width: dims.width,
-    height: dims.height,
-    category: "carousels",
-    usesTagline: hasLabel,
-    composed: true,
-    designed: false,
-  };
+  return null;
 }
 
 export function libraryFileUrl(filename: string) {
@@ -234,8 +180,10 @@ export function paintSlide(
   system: DesignSystem | null = null,
 ): void {
   const template = getTemplate(slide.templateId);
-  const composed = slide.templateId === COMPOSED_TEMPLATE_ID;
-  if (!template && !composed) return;
+  // A DESIGNED slide is not painted here at all: it was rendered to a PNG
+  // server-side and that file is what both the editor and the export use. Only
+  // the fixed templates reach a canvas.
+  if (!template) return;
   const design: DesignState = {
     headingText: slide.headingText,
     bodyText: slide.bodyText,
@@ -254,36 +202,8 @@ export function paintSlide(
     location: brand?.location,
     phone: brand?.phone,
   };
-  // THE FORK. It lives here, inside the one function both the live preview
-  // and the PNG export call, so exactly one branch runs and the same one runs
-  // on both sides — which is the whole reason preview equals export. A
-  // composed slide with no system, or with a spec that no longer parses, is
-  // drawn as nothing rather than silently swapped for a fixed template: the
-  // editor surfaces the violation instead (see lib/design/validate.ts).
-  const chrome = template?.chrome;
-  if (composed) {
-    if (!system) return;
-    const spec = deserializeLayoutSpec(slide.layoutJson, system);
-    if (isSpecError(spec)) return;
-    paintLayout(ctx, canvasW, canvasH, spec, system, design, bg, fontFamilies);
-    if (spec.chrome) {
-      paintSlideChrome(
-        ctx,
-        canvasW,
-        canvasH,
-        spec.chrome,
-        canvasMeasure(ctx),
-        fontFamilies,
-        design,
-        logo,
-      );
-    } else if (logo) {
-      drawLogoOverlay(ctx, canvasW, canvasH, logo);
-    }
-    return;
-  }
-
-  template!.render(ctx, design, bg, fontFamilies);
+  const chrome = template.chrome;
+  template.render(ctx, design, bg, fontFamilies);
   if (chrome) {
     paintSlideChrome(
       ctx,
@@ -296,6 +216,6 @@ export function paintSlide(
       logo,
     );
   } else if (logo) {
-    drawLogoOverlay(ctx, canvasW, canvasH, logo, template!.logoPlacement);
+    drawLogoOverlay(ctx, canvasW, canvasH, logo, template.logoPlacement);
   }
 }
