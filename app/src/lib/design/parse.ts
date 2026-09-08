@@ -1,0 +1,263 @@
+/**
+ * The tenant design system, as data.
+ *
+ * ZERO RUNTIME IMPORTS, deliberately — this file has to load under the plain
+ * tsx test runner (scripts/test.mjs) and inside the pure grammar/validator
+ * modules, neither of which can pull in `server-only` or the database. The
+ * store accessors that read and write it live in ./system.ts, which can.
+ *
+ * A design system is the machine-readable form of what a brand document
+ * already says in prose: which values exist and what each is for, which of
+ * them may carry a ground and how often, the type scale, the grid, the photo
+ * grade, and the contrast floors. Optimal Health's "Sage Field" document is
+ * the model (see ./presets.ts) — it states its rules as measured numbers,
+ * which is exactly what makes AI-composed layout checkable rather than a
+ * lottery.
+ */
+
+/** What a value is FOR. Note this is the value's primary role, not a
+ *  permission list: ink's role is "type" and it is also the anchor ground.
+ *  Ground eligibility is answered by the `grounds` array below, which is the
+ *  authoritative list, because only that carries the share and run budgets. */
+export type ValueRole = "ground" | "type" | "accent" | "reserved";
+
+/** The type scale's levels, coarsest first. Fixed set: a system that needs a
+ *  sixth level is a system that has stopped being a system. */
+export const TYPE_LEVELS = [
+  "display",
+  "headline",
+  "subhead",
+  "body",
+  "label",
+] as const;
+export type TypeLevel = (typeof TYPE_LEVELS)[number];
+
+/** Levels large enough to be held to the LARGE-text contrast floor rather
+ *  than the body floor — WCAG's own distinction, and the reason a system can
+ *  allow deep green on sage (3.62:1) for a headline but not for body copy. */
+export const LARGE_TYPE_LEVELS: ReadonlySet<TypeLevel> = new Set([
+  "display",
+  "headline",
+]);
+
+export interface TypeStep {
+  /** px, authored against `grid.field` and scaled proportionally to the real
+   *  slide width, so one system serves 1:1, 4:5 and 9:16. */
+  size: number;
+  /** Line height as a multiple of `size`. */
+  leading: number;
+  /** Letter spacing in em. Negative tightens. */
+  tracking: number;
+  weight: number;
+  upper?: boolean;
+}
+
+export interface DesignSystem {
+  version: 1;
+  values: { key: string; hex: string; role: ValueRole }[];
+  /** Which values may be a ground, and the budget for each across a set.
+   *  `share` is a ceiling as a fraction of the slides (0..1); `maxRun` is how
+   *  many consecutive slides may carry it. Sage's maxRun of 1 is the
+   *  document's "never on two consecutive slides", stated as a number. */
+  grounds: { value: string; share: number; maxRun: number }[];
+  type: Record<TypeLevel, TypeStep>;
+  grid: { columns: number; margin: number; gutter: number; field: number };
+  /** Photo grade. Multipliers on the source (1 = unchanged). null = this
+   *  system does not grade photography. */
+  photo: {
+    saturate: number;
+    contrast: number;
+    brightness: number;
+    wash?: { hex: string; alpha: number };
+  } | null;
+  rules: {
+    minContrastBody: number;
+    minContrastLarge: number;
+    /** Value keys that must never carry text, whatever the contrast maths
+     *  says. Optimal Health's timber is the case this exists for: it is the
+     *  prettiest value in the palette, it will be reached for constantly, and
+     *  it fails as type on every ground. */
+    neverType: string[];
+  };
+}
+
+// -------------------------------------------------------------------------
+//  Parsing
+// -------------------------------------------------------------------------
+
+const HEX = /^#[0-9a-fA-F]{6}$/;
+const ROLES: ReadonlySet<string> = new Set([
+  "ground",
+  "type",
+  "accent",
+  "reserved",
+]);
+
+function isObj(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+function num(v: unknown, min: number, max: number): number | null {
+  return typeof v === "number" && Number.isFinite(v) && v >= min && v <= max
+    ? v
+    : null;
+}
+
+function parseTypeStep(v: unknown): TypeStep | null {
+  if (!isObj(v)) return null;
+  const size = num(v.size, 1, 1000);
+  const leading = num(v.leading, 0.5, 4);
+  const tracking = num(v.tracking, -0.5, 1);
+  const weight = num(v.weight, 1, 1000);
+  if (size === null || leading === null || tracking === null || weight === null) {
+    return null;
+  }
+  const step: TypeStep = { size, leading, tracking, weight };
+  if (v.upper === true) step.upper = true;
+  return step;
+}
+
+/**
+ * Tolerant parse of a stored design system. Returns null rather than throwing
+ * on ANY malformed input — a tenant whose stored blob is junk, half-migrated
+ * or from a future version must fall through to today's behaviour, not break
+ * their Content Studio. Null is a first-class state throughout this feature.
+ */
+export function parseDesignSystem(input: unknown): DesignSystem | null {
+  if (!isObj(input)) return null;
+  if (input.version !== 1) return null;
+
+  // Values
+  if (!Array.isArray(input.values) || input.values.length === 0) return null;
+  const values: DesignSystem["values"] = [];
+  const seen = new Set<string>();
+  for (const raw of input.values) {
+    if (!isObj(raw)) return null;
+    const key = typeof raw.key === "string" ? raw.key.trim() : "";
+    const hex = typeof raw.hex === "string" ? raw.hex.trim() : "";
+    const role = typeof raw.role === "string" ? raw.role : "";
+    if (!key || seen.has(key)) return null;
+    if (!HEX.test(hex)) return null;
+    if (!ROLES.has(role)) return null;
+    seen.add(key);
+    values.push({ key, hex: hex.toLowerCase(), role: role as ValueRole });
+  }
+
+  // Grounds — every one must name a value that exists.
+  if (!Array.isArray(input.grounds) || input.grounds.length === 0) return null;
+  const grounds: DesignSystem["grounds"] = [];
+  const groundKeys = new Set<string>();
+  for (const raw of input.grounds) {
+    if (!isObj(raw)) return null;
+    const value = typeof raw.value === "string" ? raw.value.trim() : "";
+    const share = num(raw.share, 0, 1);
+    const maxRun = num(raw.maxRun, 1, 999);
+    if (!value || !seen.has(value) || groundKeys.has(value)) return null;
+    if (share === null || maxRun === null || !Number.isInteger(maxRun)) {
+      return null;
+    }
+    groundKeys.add(value);
+    grounds.push({ value, share, maxRun });
+  }
+
+  // Type scale — every level required, so no render can hit a missing step.
+  if (!isObj(input.type)) return null;
+  const type = {} as DesignSystem["type"];
+  for (const level of TYPE_LEVELS) {
+    const step = parseTypeStep(input.type[level]);
+    if (!step) return null;
+    type[level] = step;
+  }
+
+  // Grid
+  if (!isObj(input.grid)) return null;
+  const columns = num(input.grid.columns, 1, 24);
+  const margin = num(input.grid.margin, 0, 1000);
+  const gutter = num(input.grid.gutter, 0, 1000);
+  const field = num(input.grid.field, 1, 10000);
+  if (
+    columns === null ||
+    !Number.isInteger(columns) ||
+    margin === null ||
+    gutter === null ||
+    field === null
+  ) {
+    return null;
+  }
+  // The columns have to actually fit the field, or every span computed from
+  // this grid is nonsense.
+  if (margin * 2 + gutter * (columns - 1) >= field) return null;
+
+  // Photo grade — explicitly nullable.
+  let photo: DesignSystem["photo"] = null;
+  if (input.photo !== null && input.photo !== undefined) {
+    if (!isObj(input.photo)) return null;
+    const saturate = num(input.photo.saturate, 0, 4);
+    const contrast = num(input.photo.contrast, 0, 4);
+    const brightness = num(input.photo.brightness, 0, 4);
+    if (saturate === null || contrast === null || brightness === null) {
+      return null;
+    }
+    photo = { saturate, contrast, brightness };
+    if (input.photo.wash !== null && input.photo.wash !== undefined) {
+      if (!isObj(input.photo.wash)) return null;
+      const hex =
+        typeof input.photo.wash.hex === "string"
+          ? input.photo.wash.hex.trim()
+          : "";
+      const alpha = num(input.photo.wash.alpha, 0, 1);
+      if (!HEX.test(hex) || alpha === null) return null;
+      photo.wash = { hex: hex.toLowerCase(), alpha };
+    }
+  }
+
+  // Rules
+  if (!isObj(input.rules)) return null;
+  const minContrastBody = num(input.rules.minContrastBody, 1, 21);
+  const minContrastLarge = num(input.rules.minContrastLarge, 1, 21);
+  if (minContrastBody === null || minContrastLarge === null) return null;
+  const neverTypeRaw = input.rules.neverType ?? [];
+  if (!Array.isArray(neverTypeRaw)) return null;
+  const neverType: string[] = [];
+  for (const key of neverTypeRaw) {
+    if (typeof key !== "string" || !seen.has(key)) return null;
+    neverType.push(key);
+  }
+
+  return {
+    version: 1,
+    values,
+    grounds,
+    type,
+    grid: { columns, margin, gutter, field },
+    photo,
+    rules: { minContrastBody, minContrastLarge, neverType },
+  };
+}
+
+// -------------------------------------------------------------------------
+//  Lookups
+// -------------------------------------------------------------------------
+
+/** Hex for a value key, or null if the system has no such value. */
+export function valueHex(system: DesignSystem, key: string): string | null {
+  return system.values.find((v) => v.key === key)?.hex ?? null;
+}
+
+/** Whether a value may be used as a ground in this system. Answered by the
+ *  `grounds` budget list, not by `role` — see the note on ValueRole. */
+export function isGround(system: DesignSystem, key: string): boolean {
+  return system.grounds.some((g) => g.value === key);
+}
+
+/** Column width in the system's own authored units. */
+export function columnWidth(system: DesignSystem): number {
+  const { field, margin, gutter, columns } = system.grid;
+  return (field - margin * 2 - gutter * (columns - 1)) / columns;
+}
+
+/** Scale factor from the system's authored field to a real slide width, so
+ *  one system serves every aspect ratio. */
+export function fieldScale(system: DesignSystem, width: number): number {
+  return width / system.grid.field;
+}
