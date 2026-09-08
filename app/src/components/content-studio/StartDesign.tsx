@@ -46,20 +46,45 @@ export function StartDesign() {
   async function createDesign(seedSlideCount: number): Promise<number | null> {
     const name = topic.trim() ? topic.trim().slice(0, 80) : "Untitled design";
     const carousel = kind === "carousel";
-    const d = await fetch("/api/content-studio/carousels", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name,
-        seedSlotKey: carousel ? CAROUSEL_SLOT : DEFAULT_SLOT,
-        seedTemplateId: carousel ? CAROUSEL_SLOT : "bold-headline",
-        seedSlideCount,
-      }),
-    })
-      .then((r) => r.json())
-      .catch(() => null);
+    // Every failure used to collapse into one message, because a .catch()
+    // around .json() swallows the cause: a 500, a redirect to /login, and the
+    // browser failing to connect at all read identically. That cost a whole
+    // debugging round when a deploy's container swap produced "Couldn't start
+    // a new design" and there was nothing to go on. Each case now says what
+    // actually happened.
+    let res: Response;
+    try {
+      res = await fetch("/api/content-studio/carousels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          seedSlotKey: carousel ? CAROUSEL_SLOT : DEFAULT_SLOT,
+          seedTemplateId: carousel ? CAROUSEL_SLOT : "bold-headline",
+          seedSlideCount,
+        }),
+      });
+    } catch {
+      setError(
+        "Couldn't reach the server. If the app was just updated, give it a few seconds and try again.",
+      );
+      return null;
+    }
+    if (res.status === 401 || res.redirected) {
+      setError("Your session expired. Reload the page and sign in again.");
+      return null;
+    }
+    let d: { ok?: boolean; error?: string; carouselId?: number } | null = null;
+    try {
+      d = await res.json();
+    } catch {
+      setError(
+        `The server returned an unexpected response (HTTP ${res.status}). Try again in a moment.`,
+      );
+      return null;
+    }
     if (!d?.ok) {
-      setError(d?.error ?? "Couldn't start a new design.");
+      setError(d?.error ?? `Couldn't start a new design (HTTP ${res.status}).`);
       return null;
     }
     return d.carouselId as number;
