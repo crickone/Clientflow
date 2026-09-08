@@ -4,6 +4,9 @@
 // spend cap (@/lib/ai/usage) is only UNSKIPPABLE if every paid model call goes
 // through a chokepoint that gates + meters it. The RAW-SDK ones are two:
 //   - meteredCreate (@/lib/ai/metered)         — one-shot, non-streaming calls
+//   - meteredCreateStreamed (@/lib/ai/metered) — the same, streamed, for calls
+//     whose max_tokens is high enough that the SDK refuses to run them
+//     unstreamed (Content Studio's design pass)
 //   - runAgentTurn  (@/lib/agents/runAgentTurn) — the agent tool-use loop,
 //     which streams via AnthropicProvider and meters once per turn
 // Both reach the SDK only through the shared getAnthropic() client.
@@ -26,7 +29,7 @@ import { join, relative, sep } from "node:path";
 // tiny — every entry is a deliberate, reviewed chokepoint.
 const SANCTIONED = new Set([
   "src/lib/ai/client.ts", // getAnthropic(): the one cached Anthropic client (the sole `new Anthropic()`)
-  "src/lib/ai/metered.ts", // meteredCreate(): the one-shot metered .messages.create() chokepoint
+  "src/lib/ai/metered.ts", // meteredCreate() + meteredCreateStreamed(): the one-shot metered .messages.create()/.stream() chokepoint
   "src/lib/ai/providers/anthropic.ts", // AnthropicProvider: the streaming .messages.stream() runAgentTurn meters
   "src/lib/ai/image/falClient.ts", // falGenerateImage(): the one fal.ai call site (flat-cost images; metered via generatePostImage)
   "src/lib/ai/video/falVideoClient.ts", // falGenerateVideo(): the one fal.ai VIDEO call site (flat-cost clips; metered via generateBroll)

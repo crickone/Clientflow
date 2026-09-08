@@ -10,13 +10,14 @@ import {
   describeSystemForDesign,
   extractDesignPayload,
   type CheckedDesign,
+  type RawDesign,
 } from "@/lib/ai/designPost.parse";
 import {
   generateCarouselSlides,
   type GenerateInput,
   type GenerateResult,
 } from "@/lib/ai/generateCarousel";
-import { meteredCreate, type MeterContext } from "@/lib/ai/metered";
+import { meteredCreateStreamed, type MeterContext } from "@/lib/ai/metered";
 import { loadDesignFonts } from "@/lib/design/fonts";
 import { gradedPhotoDataUri, renderDesignToPng } from "@/lib/design/renderDesign";
 import { getDesignSystem } from "@/lib/design/system";
@@ -175,8 +176,12 @@ export async function designPost(
       .map((b) => b.text)
       .join("\n");
 
+  // Streamed, not because the output is shown live but because the SDK refuses
+  // a non-streaming request at this max_tokens: it could outrun the 10-minute
+  // HTTP limit. finalMessage() hands back one finished Message, so everything
+  // downstream is unchanged.
   const ask = (messages: Anthropic.MessageParam[]) =>
-    meteredCreate(meter, () => ({
+    meteredCreateStreamed(meter, () => ({
       model,
       max_tokens: DESIGN_MAX_TOKENS,
       thinking: { type: "adaptive" as const },
@@ -198,9 +203,47 @@ export async function designPost(
     );
   }
 
+  /**
+   * Audit AND RENDER a set, so `problems` carries everything the repair call
+   * could fix.
+   *
+   * Rendering before the repair decision is the whole point. The audit reads
+   * markup and cannot know that satori will reject a container missing
+   * display:flex -- only the renderer knows that, and on the first real
+   * generation three of four slides failed exactly that way with no chance to
+   * be repaired, because rendering happened after the repair opportunity had
+   * passed. Rendering is local and fast; a wasted render costs far less than a
+   * slide the operator has to regenerate by hand.
+   */
+  async function attempt(slides: RawDesign[]) {
+    const checked = checkDesigns(slides, system!);
+    const problems = [...checked.problems];
+    const rendered: DesignedSlide[] = [];
+    for (let i = 0; i < checked.designs.length; i++) {
+      const design = checked.designs[i];
+      const { renderFilename, violation } = await renderOne(
+        design,
+        system!,
+        width,
+        height,
+        options.photoSource ?? null,
+      );
+      if (violation) problems.push(`Slide ${i + 1}: ${violation}`);
+      rendered.push({
+        html: design.html,
+        renderFilename,
+        photo: design.photo,
+        violations: violation
+          ? [...design.violations, violation]
+          : design.violations,
+      });
+    }
+    return { slides: rendered, problems };
+  }
+
   const firstText = textOf(first);
   const payload = extractDesignPayload(firstText);
-  let checked = checkDesigns(payload.slides, system);
+  let checked = await attempt(payload.slides);
   let caption = payload.caption;
   let repaired = false;
 
@@ -224,11 +267,11 @@ export async function designPost(
     addUsage(repair);
     try {
       const second = extractDesignPayload(textOf(repair));
-      const recheck = checkDesigns(second.slides, system);
+      const recheck = await attempt(second.slides);
       // Take the repair only if it is actually better. One that returns fewer
       // slides, or more problems, is a regression -- keep the first.
       if (
-        recheck.designs.length >= checked.designs.length &&
+        recheck.slides.length >= checked.slides.length &&
         recheck.problems.length < checked.problems.length
       ) {
         checked = recheck;
@@ -239,24 +282,5 @@ export async function designPost(
     }
   }
 
-  const slides: DesignedSlide[] = [];
-  for (const design of checked.designs) {
-    const { renderFilename, violation } = await renderOne(
-      design,
-      system,
-      width,
-      height,
-      options.photoSource ?? null,
-    );
-    slides.push({
-      html: design.html,
-      renderFilename,
-      photo: design.photo,
-      violations: violation
-        ? [...design.violations, violation]
-        : design.violations,
-    });
-  }
-
-  return { designed: true, slides, caption, repaired, usage };
+  return { designed: true, slides: checked.slides, caption, repaired, usage };
 }

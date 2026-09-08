@@ -75,8 +75,11 @@ export function describeSystemForDesign(system: DesignSystem): string {
 export const DESIGN_RULES = `YOU ARE DESIGNING THE POST, not filling in a template. Compose each slide yourself: decide the structure, the scale, what dominates and what stays quiet. Every colour and type size comes from the system above; the composition is yours.
 
 Write ONE HTML element per slide. It is rendered by satori, which supports a SUBSET of CSS. Stay inside it:
-- FLEXBOX ONLY. No grid, no float, no table. EVERY element that has children must set "display:flex". This is the single most common mistake and the slide will not render without it.
-- Set "flex-direction:column" explicitly whenever children stack vertically. The default is row.
+- FLEXBOX ONLY. No grid, no float, no table.
+- ANY element with MORE THAN ONE child must set "display:flex", and must set "flex-direction:column" whenever those children stack vertically (the default is row). Without it the render fails outright with "Expected <div> to have explicit display: flex".
+- An element containing ONLY TEXT must NOT set "display:flex". Give it a "width" in px and let the text wrap inside that width. display:flex on a text element makes each run of text a side-by-side item, so a heading comes out on one line and runs off the canvas.
+- Those two rules are not in conflict: containers get display:flex, the leaf elements that hold words do not.
+- NEVER write <br>. It is not a line break here -- it splits the text into separate flex items on the same line, and the words collide. To break a line, either let the text wrap inside its width, or make each line its own child of a "flex-direction:column" parent.
 - Absolute positioning IS supported ("position:absolute" inside a "position:relative" parent). It is how you overlap, bleed a figure off the edge, or pin a footer.
 - NO CSS filter, backdrop-filter, mix-blend-mode or mask. A photograph arrives already graded.
 - An <img> takes its size in "style" -- style="width:1080px;height:1080px;object-fit:cover". NEVER as width/height attributes: as attributes it silently renders nothing.
@@ -89,7 +92,9 @@ The canvas is EXACTLY the size you are told. The outermost element sets that wid
 
 Moves worth making, because a fixed template cannot: a figure or word oversized and cropped by the canvas edge; a panel of type overlapping a full-bleed photograph; an asymmetric split where a band of a second ground cuts the first; a rule that crosses the whole composition; a list as cards on the signature ground. Vary them across a set -- five slides of the same shape read as a template, which is the thing this exists to avoid.
 
-Keep every element inside the canvas and clear of the others. Nothing may overlap text, and nothing may run off an edge unless you meant it to.
+Keep every element inside the canvas and clear of the others. Nothing may overlap text, and nothing may run off an edge unless you meant it to. Give every text element an explicit "width" so it wraps where you intend rather than where it runs out of canvas.
+
+USE THE WHOLE CANVAS. A slide with a line of type at the top and empty space below it is unfinished, not restrained. Decide what fills the frame -- a photograph, a ground that changes partway down, a figure at display size, a stack of cards -- and let the composition reach the edges it is meant to reach. Empty COLUMNS beside a text block are the calm the system asks for; an empty lower half is not.
 
 Where a slide uses a photograph, write the src EXACTLY as ${PHOTO_TOKEN} -- that placeholder is replaced with the real image. Use it at most once per slide, and give that slide a "photo" field describing the scene: subject, setting, mood, composition. Never describe text, signage or lettering in shot. A slide with no photograph has "photo": "".
 
@@ -166,6 +171,14 @@ export function checkDesigns(
       if (!/display\s*:\s*flex/i.test(r.html)) {
         violations.push(
           "The outermost element does not set display:flex, so this will not render.",
+        );
+      }
+      // A <br> is not a line break in satori: it splits the text into separate
+      // flex items on the same line, so the words collide and the heading runs
+      // off the canvas. Caught by rendering a real generation and looking at it.
+      if (/<br\b/i.test(r.html)) {
+        violations.push(
+          "This uses <br>, which is not a line break here -- it puts the text side by side on one line. Let the text wrap inside an explicit width instead.",
         );
       }
     }

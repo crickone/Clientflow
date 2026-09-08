@@ -78,6 +78,32 @@ export async function meteredCreate(
 }
 
 /**
+ * The same gate-then-meter wrapper as `meteredCreate`, but STREAMED.
+ *
+ * Not an optimisation -- a requirement. The SDK refuses a non-streaming request
+ * whose `max_tokens` is high enough that it could exceed the 10-minute HTTP
+ * limit, and rejects it outright rather than timing out. Anything asking for a
+ * large output (Content Studio's design pass writes a full HTML design per
+ * slide) has to stream.
+ *
+ * The caller still gets one finished `Anthropic.Message` -- `finalMessage()`
+ * accumulates the stream -- so metering, usage and every call site's parsing
+ * stay identical to the non-streaming path. It lives here, beside
+ * `meteredCreate`, because this file is the reviewed raw-SDK chokepoint: a
+ * streamed call outside it would dodge the cap exactly as a created one would.
+ */
+export async function meteredCreateStreamed(
+  meter: MeterContext,
+  buildParams: () => Anthropic.MessageCreateParamsNonStreaming,
+): Promise<Anthropic.Message> {
+  assertAiAllowed(meter.tenantId);
+  const params = buildParams();
+  const message = await getAnthropic().messages.stream(params).finalMessage();
+  meterAndCharge(meter.tenantId, meter.agentKey, params.model, usageFromMessage(message.usage));
+  return message;
+}
+
+/**
  * Provider-NEUTRAL one-shot metered completion — the same gate-then-meter
  * wrapper as `meteredCreate`, but routed through `getProvider(model).streamTurn`
  * (@/lib/ai/providers) so it can run an OpenRouter model too, not only native

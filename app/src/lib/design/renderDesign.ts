@@ -57,37 +57,75 @@ export async function renderDesignToPng(
   const { satori, toNodes } = await loadSatori();
   // The cast is the honest shape of this seam: satori-html returns its own
   // node tree, satori types its input as ReactNode, and the two are structurally
-  // the same object. decodeTextNodes preserves that structure exactly.
-  const nodes = decodeTextNodes(toNodes(html)) as Parameters<SatoriFn>[0];
+  // the same object. `prepare` preserves that structure exactly.
+  const nodes = prepare(toNodes(html)) as Parameters<SatoriFn>[0];
   const svg = await satori(nodes, { width, height, fonts });
   return sharp(Buffer.from(svg)).png().toBuffer();
 }
 
 /**
- * Decode HTML entities in TEXT ONLY, after parsing.
+ * Make a parsed HTML tree renderable: decode entities in text, and give
+ * multi-child elements the explicit display satori demands.
  *
- * satori-html's parser leaves entities alone, so "&middot;" reaches the canvas
- * as the six literal characters -- caught by rendering a slide and looking at
- * it. A model writes entities freely ("&amp;", "&rsquo;", "&mdash;"), so this
- * cannot be left to the prompt.
+ * ENTITIES. satori-html's parser leaves them alone, so "&middot;" reaches the
  *
- * It runs AFTER parsing, and only on text nodes, which is the whole point:
- * decoding the raw string first would turn an escaped "&lt;div&gt;" into a real
- * element and let content become markup.
+ * canvas as the six literal characters -- caught by rendering a slide and
+ * looking at it. A model writes entities freely, so this cannot be left to the
+ * prompt. It runs AFTER parsing, and only on text nodes, which is the whole
+ * point: decoding the raw string first would turn an escaped "&lt;div&gt;" into
+ * a real element and let content become markup.
  */
-function decodeTextNodes(node: unknown): unknown {
+function prepare(node: unknown): unknown {
   if (typeof node === "string") return decodeHTML(node);
-  if (Array.isArray(node)) return node.map(decodeTextNodes);
-  if (node && typeof node === "object") {
-    const el = node as { props?: { children?: unknown } };
-    if (el.props && "children" in el.props) {
-      return {
-        ...node,
-        props: { ...el.props, children: decodeTextNodes(el.props.children) },
-      };
+  if (Array.isArray(node)) return node.map(prepare);
+  if (!node || typeof node !== "object") return node;
+
+  const el = node as {
+    props?: { style?: Record<string, unknown>; children?: unknown };
+  };
+  if (!el.props) return node;
+
+  const children = el.props.children;
+  const kids =
+    children === undefined || children === null
+      ? []
+      : Array.isArray(children)
+        ? children
+        : [children];
+
+  const style = { ...(el.props.style ?? {}) };
+
+  // satori REQUIRES an explicit display on any element that is not simply
+  // holding text, and throws outright without it. Its error says "more than one
+  // child node", but that undersells it -- an EMPTY div throws too, which is
+  // how a plain accent bar (a positioned 10x220 block of colour) took down
+  // three of four slides in a real generation. What renders without a display
+  // is only the text-holding case.
+  //
+  // HTML has no such requirement: a div with several children stacks them, and
+  // an empty one is just a box. A model writes ordinary HTML, so this
+  // TRANSLATES rather than corrects, and "flex-direction: column" is what
+  // preserves the author's meaning -- vertical stacking is what the block
+  // layout they wrote would have done. An element that already declares a
+  // display is left alone; that was a deliberate choice.
+  //
+  // Doing this in the renderer rather than the prompt is the point. The
+  // requirement is mechanical, and a constraint the machine can enforce should
+  // never be left to wording -- stating it in the prompt did not stop the model
+  // breaking it on the very next generation.
+  const holdsOnlyText =
+    kids.length > 0 && kids.every((k) => typeof k === "string");
+  if (!style.display && !holdsOnlyText) {
+    style.display = "flex";
+    if (kids.length > 1 && !style.flexDirection) {
+      style.flexDirection = "column";
     }
   }
-  return node;
+
+  return {
+    ...node,
+    props: { ...el.props, style, children: prepare(children) },
+  };
 }
 
 /** A design system's photo grade, as multipliers on the source (1 = unchanged). */

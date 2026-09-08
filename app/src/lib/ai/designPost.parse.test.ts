@@ -98,6 +98,22 @@ check(
   noFlex.problems.some((p) => p.includes("display:flex")),
 );
 
+// The failure a real generation produced: <br> inside a display:flex text
+// element put "It's not the oxygen." and "It's the pressure." side by side on
+// one line, which then ran off the canvas.
+const withBr = checkDesigns(
+  [{ html: `<div style="display:flex"><span style="width:786px">a<br/>b</span></div>`, photo: "" }],
+  SYSTEM,
+);
+check("a <br> is caught", withBr.problems.some((p) => p.includes("<br>")));
+check(
+  "and the message explains what it actually does",
+  withBr.problems.some((p) => p.includes("side by side")),
+);
+check("the text-wrap rule is in the prompt", DESIGN_RULES.includes("must NOT set"));
+check("and the no-br rule", DESIGN_RULES.includes("NEVER write <br>"));
+check("and the fill-the-canvas rule", DESIGN_RULES.includes("USE THE WHOLE CANVAS"));
+
 const empty = checkDesigns([{ html: "   ", photo: "" }], SYSTEM);
 check("an empty design is a problem", empty.problems.some((p) => p.includes("no markup")));
 
