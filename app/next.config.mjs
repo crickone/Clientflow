@@ -68,6 +68,11 @@ const nextConfig = {
     // dynamic require()s that webpack can bundle at build time yet break at
     // runtime — keep them external so output-file-tracing copies the real
     // packages into .next/standalone/node_modules (see src/lib/imapEmail.ts).
+    // satori/satori-html (Content Studio: renders AI-authored HTML designs to
+    // PNG). Same reason as imapflow above, one step worse: satori's layout and
+    // text-shaping engines are WASM loaded through dynamic requires, so webpack
+    // bundles the JS and leaves the .wasm behind. External keeps
+    // output-file-tracing copying the real packages.
     serverComponentsExternalPackages: [
       "better-sqlite3",
       "ffmpeg-static",
@@ -76,7 +81,20 @@ const nextConfig = {
       "imapflow",
       "nodemailer",
       "mailparser",
+      "satori",
+      "satori-html",
     ],
+    // Tracing follows `import` statements and does not see a .wasm binary
+    // referenced by a runtime path join, so harfbuzzjs's shaping engine has to
+    // be named explicitly or a designed slide throws on first render in
+    // production -- the one failure that cannot be reproduced locally, because
+    // dev serves straight out of node_modules.
+    outputFileTracingIncludes: {
+      "/api/content-studio/**": [
+        "./node_modules/harfbuzzjs/*.wasm",
+        "./node_modules/yoga-layout/**",
+      ],
+    },
   },
 };
 
