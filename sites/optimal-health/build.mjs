@@ -45,7 +45,7 @@ const footer = () => `<footer class="foot on-ink">
     </div>
     <div>
       <p class="foot__k">Therapies</p>
-      <p class="foot__v"><a href="hbot.html">Hyperbaric oxygen</a><a href="infrared.html">Infrared</a><a href="pemf.html">PEMF</a><a href="massage.html">Massage</a></p>
+      <p class="foot__v"><a href="hbot.html">Hyperbaric oxygen</a><a href="infrared.html">Infrared</a><a href="hifem.html">HIFEM</a><a href="massage.html">Massage</a></p>
     </div>
   </div>
   <div class="foot__bar">
@@ -260,15 +260,15 @@ ${scripts()}
 const META = {
   home: {
     file: "index.html",
-    title: "Optimal Health & Recovery at Inspire | Infrared, HBOT & PEMF, Clonmel",
+    title: "Optimal Health & Recovery at Inspire | Infrared, HBOT & HIFEM, Clonmel",
     description:
-      "A recovery clinic in Clonmel. Infrared, hyperbaric oxygen and PEMF sessions, guided from start to finish, in a room built to be calm.",
+      "A recovery clinic in Clonmel. Infrared, hyperbaric oxygen and HIFEM sessions, guided from start to finish, in a room built to be calm.",
   },
   therapies: {
     file: "therapies.html",
     title: "The three therapies | Optimal Health & Recovery at Inspire",
     description:
-      "Hyperbaric oxygen, infrared and PEMF at our Clonmel clinic. What each one is, what it supports, and how long a session takes.",
+      "Hyperbaric oxygen, infrared and HIFEM at our Clonmel clinic. What each one is, what it supports, and how long a session takes.",
   },
   hbot: {
     file: "hbot.html",
@@ -282,17 +282,17 @@ const META = {
     description:
       "Infrared sessions in Clonmel. Deep, gentle warmth to support muscle release, joint comfort, circulation and rest.",
   },
-  pemf: {
-    file: "pemf.html",
-    title: "PEMF therapy | Optimal Health & Recovery at Inspire",
+  hifem: {
+    file: "hifem.html",
+    title: "HIFEM therapy | Optimal Health & Recovery at Inspire",
     description:
-      "PEMF sessions in Clonmel, including pelvic floor support. Supports cellular energy, circulation and everyday movement.",
+      "HIFEM sessions in Clonmel, including pelvic floor support. Supports cellular energy, circulation and everyday movement.",
   },
   pricing: {
     file: "pricing.html",
     title: "Pricing | Optimal Health & Recovery at Inspire",
     description:
-      "Session and block pricing for infrared, hyperbaric oxygen and PEMF at our Clonmel clinic.",
+      "Session and block pricing for infrared, hyperbaric oxygen and HIFEM at our Clonmel clinic.",
   },
   about: {
     file: "about.html",
