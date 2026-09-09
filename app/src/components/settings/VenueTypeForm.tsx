@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { useState } from "react";
 
-import { Button } from "@/components/ui/Button";
 import { updateVenueType } from "@/app/settings/venue/actions";
 import type { VenueType } from "@/lib/vocabulary";
+import { SaveStatus } from "./SaveStatus";
+import { useAutosave } from "./useAutosave";
 
 const OPTIONS: { value: VenueType; label: string; blurb: string }[] = [
   {
@@ -23,25 +22,16 @@ const OPTIONS: { value: VenueType; label: string; blurb: string }[] = [
 
 export function VenueTypeForm({ current }: { current: VenueType }) {
   const [selected, setSelected] = useState<VenueType>(current);
-  const [isPending, startTransition] = useTransition();
-  const router = useRouter();
-  const dirty = selected !== current;
 
-  function save() {
-    startTransition(async () => {
-      try {
-        const res = await updateVenueType(selected);
-        if (res.ok) {
-          toast.success(`Venue type set to ${res.venueType}.`);
-          router.refresh();
-        } else {
-          toast.error("Couldn't save — please try again.");
-        }
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Couldn't save — please try again.");
-      }
-    });
-  }
+  const autosave = useAutosave({
+    values: selected,
+    save: async (value) => {
+      const res = await updateVenueType(value);
+      if (!res.ok) throw new Error("Couldn't save — please try again.");
+      // The action revalidates the root layout, which is what re-reads the
+      // vocabulary for the sidebar and the rest of the app.
+    },
+  });
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -94,11 +84,7 @@ export function VenueTypeForm({ current }: { current: VenueType }) {
           );
         })}
       </div>
-      <div>
-        <Button onClick={save} disabled={!dirty || isPending}>
-          {isPending ? "Saving…" : "Save venue type"}
-        </Button>
-      </div>
+      <SaveStatus autosave={autosave} sticky={false} />
     </div>
   );
 }

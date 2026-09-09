@@ -159,7 +159,7 @@ export function dayWindow(dateIso: string): {
  * Calendar grid bounds = the union of every weekday's open/close pair, so all
  * days fit in the same vertical range.
  */
-export function weekWindow(): { open: string; close: string; slot: number } {
+export function weekWindow(): { open: string; close: string } {
   const settings = getSettings();
   let min = 24 * 60;
   let max = 0;
@@ -172,9 +172,5 @@ export function weekWindow(): { open: string; close: string; slot: number } {
     min = 8 * 60;
     max = 20 * 60;
   }
-  return {
-    open: minToHm(min),
-    close: minToHm(max),
-    slot: settings.slotLengthMinutes,
-  };
+  return { open: minToHm(min), close: minToHm(max) };
 }

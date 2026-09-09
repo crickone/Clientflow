@@ -22,7 +22,6 @@ interface Props {
   blockOuts: BlockOut[];
   windowOpen: string;
   windowClose: string;
-  slotMinutes: number;
 }
 
 const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Check, Loader2, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
@@ -14,6 +14,8 @@ import {
   type ThemeConfig,
 } from "@/lib/theme";
 import { resetThemeAction, saveThemeAction } from "@/app/settings/appearance/actions";
+import { SaveStatus } from "./SaveStatus";
+import { useAutosave } from "./useAutosave";
 
 /** Live-preview just the heading font on the document root (inline → wins over
  *  the injected <style>). Colours are the app light/dark mode now — toggled from
@@ -49,26 +51,21 @@ export function AppearanceView({
     return () => applyLiveFont(savedRef.current.headingFont);
   }, []);
 
-  const dirty = draft.headingFont !== saved.headingFont;
-
-  const save = () => {
-    start(async () => {
+  const autosave = useAutosave({
+    values: draft.headingFont,
+    save: async (headingFont) => {
       // bg/accent are carried through unchanged — the colour picker was retired
       // (light/dark is the sidebar toggle); only the heading font is editable here.
       const res = await saveThemeAction({
         bg: saved.bg,
         accent: saved.accent,
-        headingFont: draft.headingFont,
+        headingFont,
       });
-      if (res.ok) {
-        setSaved(draft);
-        toast.success("Heading font saved.");
-        router.refresh();
-      } else {
-        toast.error(res.error);
-      }
-    });
-  };
+      if (!res.ok) throw new Error(res.error);
+      // Keeps the revert-on-unmount above honest: what is on screen IS saved now.
+      setSaved((prev) => ({ ...prev, headingFont }));
+    },
+  });
 
   const reset = () => {
     start(async () => {
@@ -152,14 +149,13 @@ export function AppearanceView({
           <ThemePreview businessName={businessName} />
 
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <Button onClick={save} disabled={!dirty || pending}>
-              {pending ? <Loader2 size={14} className="spin" /> : <Check size={14} />}
-              {pending ? "Saving…" : "Save font"}
-            </Button>
             <Button variant="outline" onClick={reset} disabled={pending}>
               <RotateCcw size={14} />
               Reset font
             </Button>
+            <div style={{ marginLeft: "auto" }}>
+              <SaveStatus autosave={autosave} sticky={false} />
+            </div>
           </div>
         </div>
       </Section>

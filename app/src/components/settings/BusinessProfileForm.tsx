@@ -1,10 +1,8 @@
 "use client";
 
-import { useId, useState, useTransition } from "react";
+import { useId, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
-import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
@@ -12,6 +10,8 @@ import { Card, CardLabel } from "@/components/ui/Card";
 import { Input, Label, Textarea } from "@/components/ui/Input";
 import { updateBusinessProfile } from "@/app/settings/business/actions";
 import type { BusinessProfile } from "@/lib/businessProfile";
+import { SaveStatus } from "./SaveStatus";
+import { useAutosave } from "./useAutosave";
 
 const MARKETING_BRAIN_PLACEHOLDER = `Industry: e.g. Strength & conditioning gym
 Audience: who you serve and their goals
@@ -49,9 +49,15 @@ Never:
 
 export function BusinessProfileForm({ initial }: { initial: BusinessProfile }) {
   const [profile, setProfile] = useState<BusinessProfile>(initial);
-  const [isPending, startTransition] = useTransition();
   const confirm = useConfirm();
-  const router = useRouter();
+
+  const autosave = useAutosave({
+    values: profile,
+    save: async (next) => {
+      const res = await updateBusinessProfile(next);
+      if (!res.ok) throw new Error("Couldn't save — please try again.");
+    },
+  });
 
   function set<K extends keyof BusinessProfile>(key: K, value: string) {
     setProfile((p) => ({ ...p, [key]: value }));
@@ -68,22 +74,6 @@ export function BusinessProfileForm({ initial }: { initial: BusinessProfile }) {
   }
   function removeFaq(i: number) {
     setProfile((p) => ({ ...p, faqs: p.faqs.filter((_, idx) => idx !== i) }));
-  }
-
-  function save() {
-    startTransition(async () => {
-      try {
-        const res = await updateBusinessProfile(profile);
-        if (res.ok) {
-          toast.success("Business profile saved.");
-          router.refresh();
-        } else {
-          toast.error("Couldn't save — please try again.");
-        }
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Couldn't save — please try again.");
-      }
-    });
   }
 
   return (
@@ -257,34 +247,7 @@ export function BusinessProfileForm({ initial }: { initial: BusinessProfile }) {
         </div>
       </Card>
 
-      <div
-        style={{
-          position: "sticky",
-          bottom: 12,
-          zIndex: 5,
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          padding: "12px 16px",
-          background: "var(--surface-1)",
-          border: "1px solid var(--hairline)",
-          borderRadius: "var(--radius)",
-          boxShadow: "var(--shadow-1)",
-        }}
-      >
-        <span
-          style={{
-            marginRight: "auto",
-            color: "var(--text-tertiary)",
-            fontSize: 13,
-          }}
-        >
-          Changes aren&apos;t saved until you click Save.
-        </span>
-        <Button onClick={save} disabled={isPending}>
-          {isPending ? "Saving…" : "Save profile"}
-        </Button>
-      </div>
+      <SaveStatus autosave={autosave} />
     </div>
   );
 }

@@ -22,6 +22,8 @@ import {
   toggleTherapyAction,
   updateTherapyAction,
 } from "@/app/settings/therapies/actions";
+import { SaveStatus } from "./SaveStatus";
+import { useAutosave } from "./useAutosave";
 
 export function TherapyList({ items }: { items: Therapy[] }) {
   return (
@@ -162,6 +164,47 @@ function NewTherapyButton() {
   );
 }
 
+interface TherapyValues {
+  name: string;
+  colourHex: string;
+  defaultDurationMinutes: string;
+  defaultPriceEur: string;
+  description: string;
+  isActive: boolean;
+}
+
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+
+/** Mirrors `readForm` in the server action — the shape it expects, exactly. */
+function toFormData(v: TherapyValues): FormData {
+  const fd = new FormData();
+  fd.set("name", v.name);
+  fd.set("colourHex", v.colourHex);
+  fd.set("defaultDurationMinutes", v.defaultDurationMinutes);
+  fd.set("defaultPriceEur", v.defaultPriceEur);
+  fd.set("description", v.description);
+  if (v.isActive) fd.set("isActive", "on");
+  return fd;
+}
+
+/**
+ * The action parses with zod and THROWS on anything malformed, so autosave is
+ * held until every field would survive that parse. Otherwise a half-typed
+ * colour would put a raw ZodError in the status line.
+ */
+function isSavable(v: TherapyValues): boolean {
+  const duration = Number(v.defaultDurationMinutes);
+  const price = Number(v.defaultPriceEur);
+  return (
+    v.name.trim() !== "" &&
+    HEX_RE.test(v.colourHex.trim()) &&
+    Number.isInteger(duration) &&
+    duration > 0 &&
+    Number.isFinite(price) &&
+    price >= 0
+  );
+}
+
 function TherapyForm({
   therapy,
   onDone,
@@ -171,14 +214,42 @@ function TherapyForm({
 }) {
   const [pending, start] = useTransition();
   const vocab = useVocab();
+  const isEdit = Boolean(therapy);
 
-  function submit(e: React.FormEvent<HTMLFormElement>) {
+  // The values as the dialog was opened — what "Undo changes" restores to.
+  const [opened] = useState<TherapyValues>(() => ({
+    name: therapy?.name ?? "",
+    colourHex: therapy?.colourHex ?? "#58a6ff",
+    defaultDurationMinutes: String(therapy?.defaultDurationMinutes ?? 60),
+    defaultPriceEur: String(therapy?.defaultPriceEur ?? 0),
+    description: therapy?.description ?? "",
+    isActive: therapy?.isActive ?? true,
+  }));
+  const [v, setV] = useState<TherapyValues>(opened);
+
+  function set<K extends keyof TherapyValues>(key: K, value: TherapyValues[K]) {
+    setV((prev) => ({ ...prev, [key]: value }));
+  }
+
+  // Editing an existing row autosaves. Creating one cannot — there is no row to
+  // save into until it is added, and a half-typed name is not a therapy.
+  const autosave = useAutosave({
+    values: v,
+    enabled: isEdit && isSavable(v),
+    blockedReason: "Needs a name, a #rrggbb colour, a duration and a price",
+    save: async (next) => {
+      if (!therapy) return;
+      await updateTherapyAction(therapy.id, toFormData(next));
+    },
+  });
+
+  const changedSinceOpen = JSON.stringify(v) !== JSON.stringify(opened);
+
+  function create(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const fd = new FormData(e.currentTarget);
     start(async () => {
       try {
-        if (therapy) await updateTherapyAction(therapy.id, fd);
-        else await createTherapyAction(fd);
+        await createTherapyAction(toFormData(v));
         onDone();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Save failed.");
@@ -187,18 +258,27 @@ function TherapyForm({
   }
 
   return (
-    <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+    <form
+      onSubmit={isEdit ? (e) => e.preventDefault() : create}
+      style={{ display: "flex", flexDirection: "column", gap: 14 }}
+    >
       <div>
         <Label htmlFor="name" srOnly>Name</Label>
-        <Input id="name" name="name" placeholder="Name" defaultValue={therapy?.name ?? ""} required />
+        <Input
+          id="name"
+          placeholder="Name"
+          value={v.name}
+          onChange={(e) => set("name", e.target.value)}
+          required
+        />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 110px", gap: 12 }}>
         <div>
           <Label htmlFor="colourHex">Colour</Label>
           <Input
             id="colourHex"
-            name="colourHex"
-            defaultValue={therapy?.colourHex ?? "#58a6ff"}
+            value={v.colourHex}
+            onChange={(e) => set("colourHex", e.target.value)}
             placeholder="#58a6ff"
             required
           />
@@ -207,12 +287,9 @@ function TherapyForm({
           <Label>&nbsp;</Label>
           <input
             type="color"
-            defaultValue={therapy?.colourHex ?? "#58a6ff"}
-            onChange={(e) => {
-              const input = (e.currentTarget.parentElement?.parentElement
-                ?.querySelector("#colourHex") as HTMLInputElement) ?? null;
-              if (input) input.value = e.currentTarget.value;
-            }}
+            aria-label="Pick colour"
+            value={HEX_RE.test(v.colourHex) ? v.colourHex : "#58a6ff"}
+            onChange={(e) => set("colourHex", e.target.value)}
             style={{
               width: "100%",
               height: 38,
@@ -229,9 +306,9 @@ function TherapyForm({
           <Label htmlFor="defaultDurationMinutes">Duration (minutes)</Label>
           <Input
             id="defaultDurationMinutes"
-            name="defaultDurationMinutes"
             type="number"
-            defaultValue={therapy?.defaultDurationMinutes ?? 60}
+            value={v.defaultDurationMinutes}
+            onChange={(e) => set("defaultDurationMinutes", e.target.value)}
             min={1}
             required
           />
@@ -240,10 +317,10 @@ function TherapyForm({
           <Label htmlFor="defaultPriceEur">Price (€)</Label>
           <Input
             id="defaultPriceEur"
-            name="defaultPriceEur"
             type="number"
             step="0.01"
-            defaultValue={therapy?.defaultPriceEur ?? 0}
+            value={v.defaultPriceEur}
+            onChange={(e) => set("defaultPriceEur", e.target.value)}
             min={0}
             required
           />
@@ -253,36 +330,56 @@ function TherapyForm({
         <Label htmlFor="description" srOnly>Description</Label>
         <Textarea
           id="description"
-          name="description"
           rows={3}
           placeholder="Description"
-          defaultValue={therapy?.description ?? ""}
+          value={v.description}
+          onChange={(e) => set("description", e.target.value)}
         />
       </div>
       <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
         <input
           type="checkbox"
-          name="isActive"
-          defaultChecked={therapy?.isActive ?? true}
+          checked={v.isActive}
+          onChange={(e) => set("isActive", e.target.checked)}
         />
         <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
           Active (available for booking)
         </span>
       </label>
-      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-        <DialogClose asChild>
-          <Button type="button" variant="ghost">
-            Cancel
+
+      {isEdit ? (
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {/* Autosave means there is nothing to cancel — so the escape hatch is
+              a real undo back to how the dialog opened, which then saves. */}
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={!changedSinceOpen}
+            onClick={() => setV(opened)}
+          >
+            Undo changes
           </Button>
-        </DialogClose>
-        <Button type="submit" disabled={pending}>
-          {pending
-            ? "Saving…"
-            : therapy
-              ? "Save changes"
-              : `Add ${vocab.service.toLowerCase()}`}
-        </Button>
-      </div>
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+            <SaveStatus autosave={autosave} sticky={false} />
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Done
+              </Button>
+            </DialogClose>
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <DialogClose asChild>
+            <Button type="button" variant="ghost">
+              Cancel
+            </Button>
+          </DialogClose>
+          <Button type="submit" disabled={pending || !isSavable(v)}>
+            {pending ? "Saving…" : `Add ${vocab.service.toLowerCase()}`}
+          </Button>
+        </div>
+      )}
     </form>
   );
 }

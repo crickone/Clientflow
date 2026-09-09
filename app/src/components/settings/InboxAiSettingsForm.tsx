@@ -18,6 +18,8 @@ import {
   addCoreTagAction,
 } from "@/app/settings/inbox-ai/actions";
 import type { InboxAiSettings } from "@/lib/inbox/settings";
+import { SaveStatus } from "./SaveStatus";
+import { useAutosave } from "./useAutosave";
 import type { Tag } from "@/lib/db/schema";
 
 const AUTO_CATEGORIES = [
@@ -35,7 +37,6 @@ export function InboxAiSettingsForm({
   briefComplete: boolean;
 }) {
   const [s, setS] = useState<InboxAiSettings>(initial);
-  const [saving, startSave] = useTransition();
   const [tagBusy, startTag] = useTransition();
   const [newTag, setNewTag] = useState("");
   const router = useRouter();
@@ -52,21 +53,13 @@ export function InboxAiSettingsForm({
     });
   }
 
-  function save() {
-    startSave(async () => {
-      try {
-        const res = await updateInboxAiSettings(s);
-        if (res.ok) {
-          toast.success("Inbox AI settings saved.");
-          router.refresh();
-        } else {
-          toast.error("Couldn't save — please try again.");
-        }
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Couldn't save — please try again.");
-      }
-    });
-  }
+  const autosave = useAutosave({
+    values: s,
+    save: async (next) => {
+      const res = await updateInboxAiSettings(next);
+      if (!res.ok) throw new Error("Couldn't save — please try again.");
+    },
+  });
 
   function promote(id: number) {
     startTag(async () => {
@@ -243,9 +236,7 @@ export function InboxAiSettingsForm({
         </div>
 
         <div style={{ marginTop: 20 }}>
-          <Button onClick={save} disabled={saving}>
-            {saving ? "Saving…" : "Save settings"}
-          </Button>
+          <SaveStatus autosave={autosave} sticky={false} />
         </div>
       </Card>
 

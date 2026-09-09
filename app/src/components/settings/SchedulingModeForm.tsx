@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { CalendarDays, CalendarRange } from "lucide-react";
-import { toast } from "sonner";
 
-import { Button } from "@/components/ui/Button";
 import { updateSchedulingMode } from "@/app/settings/venue/actions";
 import type { SchedulingMode } from "@/lib/settings";
+import { SaveStatus } from "./SaveStatus";
+import { useAutosave } from "./useAutosave";
 
 const OPTIONS: { value: SchedulingMode; title: string; desc: string; icon: typeof CalendarDays }[] = [
   {
@@ -25,22 +25,15 @@ const OPTIONS: { value: SchedulingMode; title: string; desc: string; icon: typeo
 
 export function SchedulingModeForm({ current }: { current: SchedulingMode }) {
   const [value, setValue] = useState<SchedulingMode>(current);
-  const [pending, start] = useTransition();
 
-  function save() {
-    start(async () => {
-      try {
-        const res = await updateSchedulingMode(value);
-        if (!res.ok) {
-          toast.error("Couldn't save — please try again.");
-          return;
-        }
-        toast.success("Scheduling updated");
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Couldn't save — please try again.");
-      }
-    });
-  }
+  const autosave = useAutosave({
+    values: value,
+    save: async (mode) => {
+      const res = await updateSchedulingMode(mode);
+      if (!res.ok) throw new Error("Couldn't save — please try again.");
+      // The action revalidates the root layout, which rebuilds the sidebar nav.
+    },
+  });
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -52,7 +45,6 @@ export function SchedulingModeForm({ current }: { current: SchedulingMode }) {
             <button
               key={o.value}
               onClick={() => setValue(o.value)}
-              disabled={pending}
               style={{
                 textAlign: "left",
                 padding: 16,
@@ -75,11 +67,7 @@ export function SchedulingModeForm({ current }: { current: SchedulingMode }) {
       <div style={{ color: "var(--text-tertiary)", fontSize: 12, lineHeight: 1.5 }}>
         This only controls which one shows in your sidebar — your existing data in the other is kept, and you can switch back anytime.
       </div>
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <Button onClick={save} disabled={pending || value === current}>
-          {pending ? "Saving…" : "Save"}
-        </Button>
-      </div>
+      <SaveStatus autosave={autosave} sticky={false} />
     </div>
   );
 }

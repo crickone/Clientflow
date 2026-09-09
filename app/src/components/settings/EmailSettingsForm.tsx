@@ -12,6 +12,12 @@ import {
   sendTestEmailAction,
 } from "@/app/settings/email/actions";
 import type { EmailSender } from "@/lib/email";
+import { SaveStatus } from "./SaveStatus";
+import { useAutosave } from "./useAutosave";
+
+/** Deliberately loose — the server's zod schema is the real check; this only
+ *  decides when the address is complete enough to be worth sending. */
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 export function EmailSettingsForm({
   initial,
@@ -28,18 +34,27 @@ export function EmailSettingsForm({
   const [fromEmail, setFromEmail] = useState(initial.fromEmail);
   const [replyTo, setReplyTo] = useState(initial.replyTo);
   const [testTo, setTestTo] = useState("");
-  const [saving, startSave] = useTransition();
   const [testing, startTest] = useTransition();
 
   const domain = fromEmail.includes("@") ? fromEmail.split("@")[1] : "";
 
-  function save() {
-    startSave(async () => {
-      const res = await saveEmailSenderAction({ fromName, fromEmail, replyTo });
-      if (!res.ok) { toast.error(res.error); return; }
-      toast.success("Email sender saved");
-    });
-  }
+  // The action validates with zod and rejects a partial address. Without this
+  // gate, autosave would put "Enter a valid email address" on screen after
+  // every keystroke of typing one.
+  const complete =
+    fromName.trim() !== "" &&
+    EMAIL_RE.test(fromEmail.trim()) &&
+    (replyTo.trim() === "" || EMAIL_RE.test(replyTo.trim()));
+
+  const autosave = useAutosave({
+    values: { fromName, fromEmail, replyTo },
+    enabled: complete,
+    blockedReason: "Needs a sender name and a valid address",
+    save: async (v) => {
+      const res = await saveEmailSenderAction(v);
+      if (!res.ok) throw new Error(res.error);
+    },
+  });
 
   function sendTest() {
     startTest(async () => {
@@ -91,7 +106,6 @@ export function EmailSettingsForm({
             value={fromName}
             onChange={(e) => setFromName(e.target.value)}
             placeholder="Sender name"
-            disabled={saving}
           />
           <Hint>The name recipients see in their inbox.</Hint>
         </div>
@@ -104,7 +118,6 @@ export function EmailSettingsForm({
             value={fromEmail}
             onChange={(e) => setFromEmail(e.target.value.toLowerCase())}
             placeholder="From address"
-            disabled={saving}
           />
           <Hint>
             Must be on a domain you&apos;ve <strong>verified in Resend</strong>
@@ -128,16 +141,11 @@ export function EmailSettingsForm({
             value={replyTo}
             onChange={(e) => setReplyTo(e.target.value.toLowerCase())}
             placeholder="Reply-to address (optional)"
-            disabled={saving}
           />
           <Hint>Where client replies land. Defaults to the from address.</Hint>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <Button onClick={save} disabled={saving}>
-            {saving ? "Saving…" : "Save sender"}
-          </Button>
-        </div>
+        <SaveStatus autosave={autosave} sticky={false} />
       </Card>
 
       {/* Test send */}

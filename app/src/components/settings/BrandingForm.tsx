@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, Trash2, ImagePlus, Check, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { Upload, Trash2, ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Input";
 import { FONT_OPTIONS } from "@/lib/image/fonts";
 import { saveBrandFontsAction, saveBrandImageStyleAction } from "@/app/settings/branding/actions";
+import { SaveStatus } from "./SaveStatus";
+import { useAutosave } from "./useAutosave";
 
 export function BrandingForm({
   hasLogo,
@@ -30,42 +31,25 @@ export function BrandingForm({
   const [error, setError] = useState<string | null>(null);
   const [heading, setHeading] = useState(headingFontId);
   const [body, setBody] = useState(bodyFontId);
-  const [savingFonts, setSavingFonts] = useState(false);
-  const fontsDirty = heading !== headingFontId || body !== bodyFontId;
-
-  async function saveFonts() {
-    setSavingFonts(true);
-    try {
-      const res = await saveBrandFontsAction({ heading, body });
-      if (res.ok) {
-        toast.success("Content fonts saved");
-        router.refresh();
-      } else {
-        toast.error(res.error);
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Save failed");
-    } finally {
-      setSavingFonts(false);
-    }
-  }
-
   const [style, setStyle] = useState(imageStyle);
-  const [savingStyle, setSavingStyle] = useState(false);
 
-  async function saveStyle() {
-    setSavingStyle(true);
-    try {
-      const res = await saveBrandImageStyleAction({ style });
+  // Fonts and the image-style prompt save independently — they are separate
+  // settings with separate failure modes, so they get their own status.
+  const fontsAutosave = useAutosave({
+    values: { heading, body },
+    save: async (v) => {
+      const res = await saveBrandFontsAction(v);
+      if (!res.ok) throw new Error(res.error);
+    },
+  });
+
+  const styleAutosave = useAutosave({
+    values: style,
+    save: async (v) => {
+      const res = await saveBrandImageStyleAction({ style: v });
       if (!res.ok) throw new Error(("error" in res && res.error) || "Couldn't save.");
-      toast.success("Image style saved");
-      router.refresh();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Couldn't save.");
-    } finally {
-      setSavingStyle(false);
-    }
-  }
+    },
+  });
   // Bust the <img> cache when a new file is uploaded — the URL stays the
   // same so we tack a query string on.
   const [cacheKey, setCacheKey] = useState<string>(() =>
@@ -250,20 +234,7 @@ export function BrandingForm({
               />
             </div>
           </div>
-          <div>
-            <Button
-              type="button"
-              onClick={saveFonts}
-              disabled={!fontsDirty || savingFonts}
-            >
-              {savingFonts ? (
-                <Loader2 size={14} className="spin" />
-              ) : (
-                <Check size={14} />
-              )}
-              {savingFonts ? "Saving…" : "Save fonts"}
-            </Button>
-          </div>
+          <SaveStatus autosave={fontsAutosave} sticky={false} />
         </div>
       </Section>
 
@@ -289,14 +260,11 @@ export function BrandingForm({
             }}
           />
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Button type="button" size="sm" onClick={saveStyle} disabled={savingStyle}>
-              {savingStyle ? <Loader2 size={14} className="spin" /> : <Check size={14} />}
-              Save style
-            </Button>
-            <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
+            <span style={{ fontSize: 12, color: "var(--text-tertiary)", marginRight: "auto" }}>
               The look-and-feel half of every AI post image prompt. Leave blank
               to use the default shown above.
             </span>
+            <SaveStatus autosave={styleAutosave} sticky={false} />
           </div>
         </div>
       </Section>

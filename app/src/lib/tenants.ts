@@ -87,8 +87,6 @@ export function seedTenant(
       { dow: 6, closed: false, open: "09:00", close: "16:00" },
     ]),
   );
-  setIf.run("slot_length_minutes", "15");
-  setIf.run("multi_therapy_concurrent", "true");
   setIf.run("buffer_minutes", "0");
   setIf.run("venue_type", JSON.stringify(venueType));
 

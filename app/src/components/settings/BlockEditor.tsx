@@ -20,6 +20,8 @@ import {
   deleteBlockAction,
   updateBlockAction,
 } from "@/app/settings/blocks/actions";
+import { SaveStatus } from "./SaveStatus";
+import { useAutosave } from "./useAutosave";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DAY_FULL = [
@@ -261,9 +263,23 @@ function BlockForm({
 }) {
   const [pending, start] = useTransition();
   const isEdit = !!initial;
+  const todayIso = new Date().toISOString().slice(0, 10);
 
-  const initialDays = initial ? daysForBlock(initial) : [1];
-  const [selectedDays, setSelectedDays] = useState<number[]>(initialDays);
+  // Everything the dialog opened with — what "Undo changes" restores to.
+  const [opened] = useState(() => ({
+    days: initial ? daysForBlock(initial) : [1],
+    date: initial?.date ?? todayIso,
+    endDate: initial?.endDate && initial.endDate !== initial.date ? initial.endDate : "",
+    startTime: initial?.startTime ?? "13:00",
+    endTime: initial?.endTime ?? "14:00",
+    reason: initial?.reason ?? "",
+  }));
+  const [selectedDays, setSelectedDays] = useState<number[]>(opened.days);
+  const [date, setDate] = useState(opened.date);
+  const [endDate, setEndDate] = useState(opened.endDate);
+  const [startTime, setStartTime] = useState(opened.startTime);
+  const [endTime, setEndTime] = useState(opened.endTime);
+  const [reason, setReason] = useState(opened.reason);
 
   function toggleDay(d: number) {
     setSelectedDays((prev) =>
@@ -271,27 +287,66 @@ function BlockForm({
     );
   }
 
-  function submit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
+  const values = { days: selectedDays, date, endDate, startTime, endTime, reason };
+
+  // A recurring block needs at least one day; a one-off needs a start date.
+  // Both need a name and a time range that runs forwards.
+  const savable =
+    reason.trim() !== "" &&
+    startTime !== "" &&
+    endTime !== "" &&
+    startTime < endTime &&
+    (type === "recurring" ? selectedDays.length > 0 : date !== "");
+
+  function toFormData(v: typeof values): FormData {
+    const fd = new FormData();
     fd.set("type", type);
+    fd.set("startTime", v.startTime);
+    fd.set("endTime", v.endTime);
+    fd.set("reason", v.reason);
     if (type === "recurring") {
-      fd.delete("daysOfWeek");
-      if (selectedDays.length === 0) {
-        toast.error("Pick at least one day.");
-        return;
-      }
-      for (const d of selectedDays) fd.append("daysOfWeek", String(d));
+      for (const d of v.days) fd.append("daysOfWeek", String(d));
+    } else {
+      fd.set("date", v.date);
+      fd.set("endDate", v.endDate);
+    }
+    return fd;
+  }
+
+  const autosave = useAutosave({
+    values,
+    enabled: isEdit && savable,
+    blockedReason:
+      type === "recurring"
+        ? "Needs a name, at least one day, and an end time after the start"
+        : "Needs a name, a date, and an end time after the start",
+    save: async (v) => {
+      if (!initial) return;
+      await updateBlockAction(initial.id, toFormData(v));
+    },
+  });
+
+  const changedSinceOpen = JSON.stringify(values) !== JSON.stringify(opened);
+
+  function undo() {
+    setSelectedDays(opened.days);
+    setDate(opened.date);
+    setEndDate(opened.endDate);
+    setStartTime(opened.startTime);
+    setEndTime(opened.endTime);
+    setReason(opened.reason);
+  }
+
+  function create(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (type === "recurring" && selectedDays.length === 0) {
+      toast.error("Pick at least one day.");
+      return;
     }
     start(async () => {
       try {
-        if (isEdit && initial) {
-          await updateBlockAction(initial.id, fd);
-          toast.success("Block updated.");
-        } else {
-          await createBlockAction(fd);
-          toast.success("Block-out added.");
-        }
+        await createBlockAction(toFormData(values));
+        toast.success("Block-out added.");
         onDone();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Save failed.");
@@ -299,10 +354,11 @@ function BlockForm({
     });
   }
 
-  const todayIso = new Date().toISOString().slice(0, 10);
-
   return (
-    <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+    <form
+      onSubmit={isEdit ? (e) => e.preventDefault() : create}
+      style={{ display: "flex", flexDirection: "column", gap: 14 }}
+    >
       {type === "recurring" ? (
         <div>
           <Label>Days of week</Label>
@@ -349,9 +405,9 @@ function BlockForm({
             <Label htmlFor="date">Start date</Label>
             <Input
               id="date"
-              name="date"
               type="date"
-              defaultValue={initial?.date ?? todayIso}
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
               required
             />
           </div>
@@ -359,13 +415,9 @@ function BlockForm({
             <Label htmlFor="endDate">End date (optional)</Label>
             <Input
               id="endDate"
-              name="endDate"
               type="date"
-              defaultValue={
-                initial?.endDate && initial.endDate !== initial.date
-                  ? initial.endDate
-                  : ""
-              }
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
             />
           </div>
         </div>
@@ -376,9 +428,9 @@ function BlockForm({
           <Label htmlFor="startTime">Start time</Label>
           <Input
             id="startTime"
-            name="startTime"
             type="time"
-            defaultValue={initial?.startTime ?? "13:00"}
+            value={startTime}
+            onChange={(e) => setStartTime(e.target.value)}
             required
           />
         </div>
@@ -386,9 +438,9 @@ function BlockForm({
           <Label htmlFor="endTime">End time</Label>
           <Input
             id="endTime"
-            name="endTime"
             type="time"
-            defaultValue={initial?.endTime ?? "14:00"}
+            value={endTime}
+            onChange={(e) => setEndTime(e.target.value)}
             required
           />
         </div>
@@ -398,23 +450,39 @@ function BlockForm({
         <Label htmlFor="reason" srOnly>Name</Label>
         <Input
           id="reason"
-          name="reason"
           placeholder="Name"
-          defaultValue={initial?.reason ?? ""}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
           required
         />
       </div>
 
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-        <DialogClose asChild>
-          <Button type="button" variant="ghost">
-            Cancel
+      {isEdit ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Button type="button" variant="ghost" disabled={!changedSinceOpen} onClick={undo}>
+            Undo changes
           </Button>
-        </DialogClose>
-        <Button type="submit" disabled={pending}>
-          {pending ? (isEdit ? "Saving…" : "Adding…") : isEdit ? "Save changes" : "Add block-out"}
-        </Button>
-      </div>
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+            <SaveStatus autosave={autosave} sticky={false} />
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Done
+              </Button>
+            </DialogClose>
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <DialogClose asChild>
+            <Button type="button" variant="ghost">
+              Cancel
+            </Button>
+          </DialogClose>
+          <Button type="submit" disabled={pending || !savable}>
+            {pending ? "Adding…" : "Add block-out"}
+          </Button>
+        </div>
+      )}
     </form>
   );
 }

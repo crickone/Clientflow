@@ -21,6 +21,8 @@ import {
   deletePackageTemplateAction,
   updatePackageTemplateAction,
 } from "@/app/settings/packages/actions";
+import { SaveStatus } from "./SaveStatus";
+import { useAutosave } from "./useAutosave";
 
 interface Props {
   items: PackageTemplate[];
@@ -263,38 +265,75 @@ function TemplateForm({
   const vocab = useVocab();
   const isEdit = !!initial;
 
-  const [therapyId, setTherapyId] = useState<number>(
-    initial?.therapyId ?? therapies[0]?.id ?? 0,
-  );
-  const [sessions, setSessions] = useState<number>(initial?.totalSessions ?? 10);
-  const [price, setPrice] = useState<number>(initial?.priceEur ?? 0);
-  const [validity, setValidity] = useState<number>(initial?.validityMonths ?? 12);
-  const [isActive, setIsActive] = useState<boolean>(initial?.isActive ?? true);
+  // Everything the dialog opened with — what "Undo changes" restores to.
+  const [opened] = useState(() => ({
+    name: initial?.name ?? "",
+    therapyId: initial?.therapyId ?? therapies[0]?.id ?? 0,
+    sessions: initial?.totalSessions ?? 10,
+    price: initial?.priceEur ?? 0,
+    validity: initial?.validityMonths ?? 12,
+    notes: initial?.notes ?? "",
+    isActive: initial?.isActive ?? true,
+  }));
+  const [name, setName] = useState(opened.name);
+  const [therapyId, setTherapyId] = useState<number>(opened.therapyId);
+  const [sessions, setSessions] = useState<number>(opened.sessions);
+  const [price, setPrice] = useState<number>(opened.price);
+  const [validity, setValidity] = useState<number>(opened.validity);
+  const [notes, setNotes] = useState(opened.notes);
+  const [isActive, setIsActive] = useState<boolean>(opened.isActive);
 
   const therapy = therapies.find((t) => t.id === therapyId);
+  const values = { name, therapyId, sessions, price, validity, notes, isActive };
+  const savable = name.trim() !== "" && therapyId > 0 && sessions >= 1 && price >= 0 && validity >= 1;
+
+  function toFormData(v: typeof values): FormData {
+    const fd = new FormData();
+    fd.set("name", v.name);
+    fd.set("therapyId", String(v.therapyId));
+    fd.set("totalSessions", String(v.sessions));
+    fd.set("priceEur", String(v.price));
+    fd.set("validityMonths", String(v.validity));
+    fd.set("notes", v.notes);
+    fd.set("isActive", v.isActive ? "true" : "false");
+    return fd;
+  }
 
   function autoPrice() {
     if (!therapy) return;
     setPrice(Math.round(therapy.defaultPriceEur * sessions));
   }
 
-  function submit(e: React.FormEvent<HTMLFormElement>) {
+  // Editing autosaves; creating still needs the explicit Add — there is no row
+  // to write into until it exists.
+  const autosave = useAutosave({
+    values,
+    enabled: isEdit && savable,
+    blockedReason: "Needs a name and a chosen " + vocab.service.toLowerCase(),
+    save: async (v) => {
+      if (!initial) return;
+      await updatePackageTemplateAction(initial.id, toFormData(v));
+    },
+  });
+
+  const changedSinceOpen = JSON.stringify(values) !== JSON.stringify(opened);
+
+  function undo() {
+    setName(opened.name);
+    setTherapyId(opened.therapyId);
+    setSessions(opened.sessions);
+    setPrice(opened.price);
+    setValidity(opened.validity);
+    setNotes(opened.notes);
+    setIsActive(opened.isActive);
+  }
+
+  function create(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    fd.set("therapyId", String(therapyId));
-    fd.set("totalSessions", String(sessions));
-    fd.set("priceEur", String(price));
-    fd.set("validityMonths", String(validity));
-    fd.set("isActive", isActive ? "true" : "false");
     start(async () => {
       try {
-        if (isEdit && initial) {
-          await updatePackageTemplateAction(initial.id, fd);
-          toast.success("Template updated.");
-        } else {
-          await createPackageTemplateAction(fd);
-          toast.success("Template added.");
-        }
+        await createPackageTemplateAction(toFormData(values));
+        toast.success("Template added.");
         onDone();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Save failed.");
@@ -303,14 +342,17 @@ function TemplateForm({
   }
 
   return (
-    <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+    <form
+      onSubmit={isEdit ? (e) => e.preventDefault() : create}
+      style={{ display: "flex", flexDirection: "column", gap: 14 }}
+    >
       <div>
         <Label htmlFor="name" srOnly>Name</Label>
         <Input
           id="name"
-          name="name"
           placeholder="Name"
-          defaultValue={initial?.name ?? ""}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
           required
         />
       </div>
@@ -415,10 +457,10 @@ function TemplateForm({
         <Label htmlFor="notes" srOnly>Notes (optional)</Label>
         <Textarea
           id="notes"
-          name="notes"
           rows={2}
           placeholder="Notes (optional)"
-          defaultValue={initial?.notes ?? ""}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
         />
       </div>
 
@@ -440,22 +482,32 @@ function TemplateForm({
         Active (visible on Sell-package page)
       </label>
 
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-        <DialogClose asChild>
-          <Button type="button" variant="ghost">
-            Cancel
+      {isEdit ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Button type="button" variant="ghost" disabled={!changedSinceOpen} onClick={undo}>
+            Undo changes
           </Button>
-        </DialogClose>
-        <Button type="submit" disabled={pending}>
-          {pending
-            ? isEdit
-              ? "Saving…"
-              : "Adding…"
-            : isEdit
-              ? "Save changes"
-              : "Add template"}
-        </Button>
-      </div>
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+            <SaveStatus autosave={autosave} sticky={false} />
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Done
+              </Button>
+            </DialogClose>
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <DialogClose asChild>
+            <Button type="button" variant="ghost">
+              Cancel
+            </Button>
+          </DialogClose>
+          <Button type="submit" disabled={pending || !savable}>
+            {pending ? "Adding…" : "Add template"}
+          </Button>
+        </div>
+      )}
     </form>
   );
 }

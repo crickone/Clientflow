@@ -21,8 +21,6 @@ export interface OpeningHour {
 
 export interface ClinicSettings {
   openingHours: OpeningHour[];
-  slotLengthMinutes: number;
-  multiTherapyConcurrent: boolean;
   bufferMinutes: number;
 }
 
@@ -36,8 +34,6 @@ const DEFAULTS: ClinicSettings = {
     { dow: 5, closed: false, open: "08:00", close: "20:00" },
     { dow: 6, closed: false, open: "09:00", close: "16:00" },
   ],
-  slotLengthMinutes: 30,
-  multiTherapyConcurrent: true,
   bufferMinutes: 0,
 };
 
@@ -69,12 +65,6 @@ export function readKeyForTenant<T>(tenantId: number, key: string, fallback: T):
 export function getSettings(): ClinicSettings {
   return {
     openingHours: readKey("opening_hours", DEFAULTS.openingHours),
-    slotLengthMinutes: Number(
-      readKey("slot_length_minutes", DEFAULTS.slotLengthMinutes),
-    ),
-    multiTherapyConcurrent: Boolean(
-      readKey("multi_therapy_concurrent", DEFAULTS.multiTherapyConcurrent),
-    ),
     bufferMinutes: Number(readKey("buffer_minutes", DEFAULTS.bufferMinutes)),
   };
 }

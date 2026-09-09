@@ -102,7 +102,6 @@ export default async function AppointmentsPage({ searchParams }: Props) {
               blockOuts={blocks}
               windowOpen={window.open}
               windowClose={window.close}
-              slotMinutes={window.slot}
             />
           );
         })()
