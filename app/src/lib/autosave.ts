@@ -67,7 +67,14 @@ export interface AutosaveState {
   blocked?: string | null;
 }
 
-export type AutosaveStatusKind = "idle" | "dirty" | "saving" | "saved" | "error";
+/**
+ * "blocked" is split out from "dirty" because the UI treats them completely
+ * differently: ordinary unsaved changes are silent (the save is coming), while
+ * a form that CANNOT save has to say so or the operator walks away from work
+ * that was never kept. See SaveStatus, which renders nothing for the quiet
+ * states.
+ */
+export type AutosaveStatusKind = "idle" | "dirty" | "saving" | "saved" | "error" | "blocked";
 
 export interface AutosaveStatus {
   kind: AutosaveStatusKind;
@@ -91,7 +98,8 @@ export function formatSavedAt(epochMs: number): string {
 export function describeAutosave(state: AutosaveState): AutosaveStatus {
   if (state.error) return { kind: "error", text: state.error };
   if (state.saving) return { kind: "saving", text: "Saving…" };
-  if (state.dirty) return { kind: "dirty", text: state.blocked || "Unsaved changes" };
+  if (state.dirty && state.blocked) return { kind: "blocked", text: state.blocked };
+  if (state.dirty) return { kind: "dirty", text: "Unsaved changes" };
   if (state.savedAt !== null) {
     return { kind: "saved", text: `Saved ${formatSavedAt(state.savedAt)}` };
   }

@@ -2163,25 +2163,24 @@ export function ImageDesigner({
   );
 }
 
+/**
+ * The designer's autosave indicator — silent unless the save FAILED.
+ *
+ * Same rule as the settings forms' SaveStatus (components/settings/
+ * SaveStatus.tsx): autosave that works needs no announcement, and a "Saved"
+ * flashing on every edit reads as activity rather than reassurance. A failure
+ * still shouts, because that is the case where the work exists only on screen.
+ *
+ * The empty spacer is kept so the toolbar doesn't shift when a failure appears
+ * and clears.
+ */
 function SaveStatus({
   status,
 }: {
   status: "idle" | "saving" | "saved" | "error";
 }) {
-  const text =
-    status === "saving"
-      ? "Saving…"
-      : status === "saved"
-        ? "Saved"
-        : status === "error"
-          ? "Save failed"
-          : "";
-  const color =
-    status === "error"
-      ? "#dc2626"
-      : status === "saved"
-        ? "#15803d"
-        : "var(--text-tertiary)";
+  const text = status === "error" ? "Save failed" : "";
+  const color = "#dc2626";
   if (!text) return <span style={{ width: 60 }} />;
   return (
     <span

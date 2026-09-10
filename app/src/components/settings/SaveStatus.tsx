@@ -21,20 +21,37 @@ const TONE: Record<string, { colour: string; icon: React.ReactNode }> = {
   saving: { colour: "var(--text-tertiary)", icon: <Loader2 size={13} className="spin" /> },
   saved: { colour: "var(--success)", icon: <Check size={13} /> },
   error: { colour: "var(--danger)", icon: <AlertTriangle size={13} /> },
+  // A form that cannot save yet is a warning, not a failure — nothing is
+  // broken, there is just something to finish before it can go.
+  blocked: { colour: "var(--warning)", icon: <PencilLine size={13} /> },
 };
 
 /**
- * The visible counterpart to `useAutosave` — this is what replaces the Save
- * button on an autosaving settings form.
+ * The visible counterpart to `useAutosave` — and, in the states that matter,
+ * deliberately INVISIBLE.
  *
- * It is deliberately never silent. An autosaving form with no indicator leaves
- * the operator unsure whether anything was kept, which is exactly the anxiety a
- * Save button removes; so the bar holds its ground and reports the last save
- * time even when nothing is happening.
+ * Autosave that works needs no announcement. A pill reading "Saved 19:41" on
+ * every settings page is a running commentary on something the operator
+ * already assumes is happening, and the flash of it on each keystroke reads as
+ * activity rather than reassurance. So idle, dirty, saving and saved all render
+ * NOTHING.
+ *
+ * What is never silent is autosave that ISN'T working:
+ *   - `error`   — the save failed, and the work is still only on screen;
+ *   - `blocked` — the form can't be saved yet (a half-typed email the server
+ *                 would reject), so nothing is being sent at all.
+ * Both are cases where staying quiet would let someone navigate away from work
+ * that was never kept, which is the one failure an autosaving form must not
+ * have. That is the line: silent when it works, loud when it doesn't.
+ *
+ * (`useAutosave` still flushes pending edits on unmount and warns on tab close,
+ * so the quiet states are genuinely safe rather than merely undisplayed.)
  */
 export function SaveStatus({ autosave, sticky = true }: Props) {
   const { status, saveNow } = autosave;
   const tone = TONE[status.kind] ?? TONE.idle;
+
+  if (status.kind !== "error" && status.kind !== "blocked") return null;
 
   return (
     <div

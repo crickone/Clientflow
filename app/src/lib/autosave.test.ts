@@ -96,8 +96,19 @@ const clean = { dirty: false, saving: false, error: null, savedAt: null };
       "Needs a valid email address",
   );
   check(
-    "describeAutosave: blocked is still the dirty state, not an error",
-    describeAutosave({ ...clean, dirty: true, blocked: "Needs a valid email address" }).kind === "dirty",
+    "describeAutosave: blocked is its OWN state, not an error",
+    describeAutosave({ ...clean, dirty: true, blocked: "Needs a valid email address" }).kind === "blocked",
+  );
+  // The split exists so the UI can be silent about ordinary unsaved changes
+  // while still speaking up when nothing is being saved at all — see
+  // SaveStatus, which renders only for `error` and `blocked`.
+  check(
+    "describeAutosave: ordinary pending edits stay plain 'dirty'",
+    describeAutosave({ ...clean, dirty: true }).kind === "dirty",
+  );
+  check(
+    "describeAutosave: dirty carries no blocked text of its own",
+    describeAutosave({ ...clean, dirty: true }).text === "Unsaved changes",
   );
   check(
     "describeAutosave: blocked on a clean form is ignored (nothing to save)",
