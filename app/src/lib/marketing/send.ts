@@ -15,6 +15,7 @@ import {
   isMarketingSuspended,
   recordCreditSpend,
 } from "@/lib/email/credits";
+import { recordSent, splitBillable } from "@/lib/email/included";
 import { escapeHtml, renderEmailShell, textToParagraphs } from "@/lib/email";
 import { getBusinessProfileForTenant } from "@/lib/businessProfile";
 import { getThemeForTenant } from "@/lib/settings";
@@ -264,7 +265,10 @@ export async function precheckCampaign(
       return { ok: false, error: "There are no eligible recipients (check the audience, contacts, and suppressions)." };
     }
 
-    const costCents = costForRecipients(recipients.length);
+    // Only the slice BEYOND this month's included-sends allowance costs
+    // credits (@/lib/email/included) — a tenant inside their allowance sends
+    // with a zero balance, which is the whole point of the tranche.
+    const costCents = costForRecipients(splitBillable(tenantId, recipients.length).billable);
     const balance = getEmailBalanceCents(tenantId);
     if (balance < costCents) {
       return { ok: false, error: `Insufficient email credits: balance is ${balance}c, need ${costCents}c.` };
@@ -454,7 +458,7 @@ export async function runCampaignSend(
       // just once up-front) so a campaign that runs the balance dry mid-send
       // stops cleanly instead of sending on credit.
       try {
-        assertCreditsAvailable(tenantId, costForRecipients(batch.length));
+        assertCreditsAvailable(tenantId, costForRecipients(splitBillable(tenantId, batch.length).billable));
       } catch {
         pauseCampaign(tdb, campaignId, "Paused: ran out of email credits mid-send. Top up credits to resume.");
         return;
@@ -554,7 +558,13 @@ export async function runCampaignSend(
       // N× versus costForRecipients(N) charged once. Guard cost > 0: a €0
       // price (or an all-failed batch) must never call recordCreditSpend,
       // which rejects cents <= 0.
-      const cost = costForRecipients(sentInBatch);
+      // Split BEFORE recording, so this batch is measured against the
+      // allowance as it stood when the batch went out; `recordSent` then
+      // consumes it for the next batch. Every send counts against the
+      // allowance — free ones included — or the tranche would never run out.
+      const { billable } = splitBillable(tenantId, sentInBatch);
+      recordSent(tenantId, sentInBatch);
+      const cost = costForRecipients(billable);
       if (cost > 0) {
         try {
           recordCreditSpend(tenantId, cost, campaignId, "system");

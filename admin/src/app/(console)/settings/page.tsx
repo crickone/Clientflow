@@ -5,7 +5,11 @@ interface Settings {
   monthlyPriceCents: number;
   vatRateBp: number;
   emailCreditPricePer1000Cents: number;
+  emailIncludedPerMonth: number;
   aiCreditMarginBp: number;
+  voicePricePerMinuteCents: number;
+  voiceIncludedMinutes: number;
+  voiceTrialMinutes: number;
   provider: string;
 }
 
@@ -67,6 +71,22 @@ export default async function SettingsPage({
         </label>
 
         <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Emails included per month</span>
+          <input
+            className="input"
+            type="number"
+            step="1"
+            min="0"
+            name="emailIncluded"
+            defaultValue={String(s.emailIncludedPerMonth)}
+            required
+          />
+          <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>
+            Recipients each business can email every month on the base plan before credits are charged.
+          </p>
+        </label>
+
+        <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>AI credit margin (%)</span>
           <input
             className="input"
@@ -82,6 +102,56 @@ export default async function SettingsPage({
             Markup over raw model cost, charged on AI usage beyond each business&apos;s free monthly allowance.
           </p>
         </label>
+
+        <div style={{ borderTop: "1px solid var(--hairline)", paddingTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>Voice Agent add-on</div>
+
+          <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Price per minute (EUR)</span>
+            <input
+              className="input"
+              type="number"
+              step="0.01"
+              min="0"
+              max="20"
+              name="voicePrice"
+              defaultValue={(s.voicePricePerMinuteCents / 100).toFixed(2)}
+              required
+            />
+            <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>
+              Charged on minutes beyond the included allowance. Calls under 20 seconds are never billed.
+            </p>
+          </label>
+
+          <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Minutes included per month</span>
+            <input
+              className="input"
+              type="number"
+              step="1"
+              min="0"
+              name="voiceIncluded"
+              defaultValue={String(s.voiceIncludedMinutes)}
+              required
+            />
+          </label>
+
+          <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Free trial minutes</span>
+            <input
+              className="input"
+              type="number"
+              step="1"
+              min="0"
+              name="voiceTrial"
+              defaultValue={String(s.voiceTrialMinutes)}
+              required
+            />
+            <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>
+              One-off evaluation minutes while a business&apos;s add-on is on trial. They do not reset monthly.
+            </p>
+          </label>
+        </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Payment provider</span>

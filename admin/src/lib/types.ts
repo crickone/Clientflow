@@ -116,6 +116,47 @@ export interface AiCreditState {
   ledger: AiLedgerRow[];
 }
 
+/** One paid add-on on a tenant — mirrors `TenantAddon` in
+ *  app/src/lib/billing/addons.ts EXACTLY. 'trial' is entitled but NOT
+ *  invoiced; only 'active' appears on an invoice. */
+export interface TenantAddon {
+  tenantId: number;
+  key: string;
+  name: string;
+  status: "trial" | "active" | "cancelled";
+  priceCents: number;
+  activatedAt: number;
+  cancelledAt: number | null;
+}
+
+/** This month's voice usage — mirrors `VoiceMonthUsage` in app/src/lib/voice/usage.ts. */
+export interface VoiceMonthUsage {
+  seconds: number;
+  billedMinutes: number;
+  costCents: number;
+  calls: number;
+}
+
+/** A tenant's Voice Agent state — mirrors the `voice` block returned by
+ *  `/tenants/:id`. Minutes come out of trial, then the monthly included
+ *  allowance, then prepaid credits. */
+export interface VoiceState {
+  balanceCents: number;
+  capCents: number;
+  pricePerMinuteCents: number;
+  includedMinutesRemaining: number;
+  trialMinutesRemaining: number;
+  month: VoiceMonthUsage;
+  suspended: boolean;
+  ledger: AiLedgerRow[];
+}
+
+/** The tenant's monthly email allowance and what it has used of it. */
+export interface EmailAllowanceState {
+  includedPerMonth: number;
+  sentThisMonth: number;
+}
+
 export interface TenantDetail {
   tenant: TenantSummary;
   usage: { clients: number; staff: number };
@@ -128,6 +169,12 @@ export interface TenantDetail {
   autoTopup: AutoTopup;
   /** AI-credit add-on state — free-tranche usage + prepaid overflow balance. */
   ai: AiCreditState;
+  /** The base plan's monthly included sends, and this month's usage of them. */
+  email: EmailAllowanceState;
+  /** Every paid add-on this tenant has ever had, cancelled ones included. */
+  addons: TenantAddon[];
+  /** Voice Agent add-on state — allowances, cap, prepaid balance, ledger. */
+  voice: VoiceState;
 }
 
 /**

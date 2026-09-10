@@ -9,7 +9,14 @@ import { GrantCreditsForm } from "@/components/GrantCreditsForm";
 import { OpenBusinessButton } from "@/components/OpenBusinessButton";
 import { Card } from "@/components/ui/Card";
 import type { InvoiceRow, TenantDetail } from "@/lib/types";
-import { tenantAction, openTenant, grantCreditsAction, grantAiCreditsAction } from "./actions";
+import {
+  tenantAction,
+  openTenant,
+  grantCreditsAction,
+  grantAiCreditsAction,
+  grantVoiceCreditsAction,
+  setVoiceCapAction,
+} from "./actions";
 
 /** Invoice statuses are a different vocabulary from billing statuses, so they
  *  don't reuse the `.chip.<status>` CSS — colour them inline instead. */
@@ -35,7 +42,15 @@ export default async function GymDetailPage({
   searchParams,
 }: {
   params: { id: string };
-  searchParams: { error?: string; granted?: string; aiError?: string; aiGranted?: string };
+  searchParams: {
+    error?: string;
+    granted?: string;
+    aiError?: string;
+    aiGranted?: string;
+    voiceError?: string;
+    voiceGranted?: string;
+    voiceSaved?: string;
+  };
 }) {
   const id = Number(params.id);
   let data: TenantDetail;
@@ -47,6 +62,9 @@ export default async function GymDetailPage({
   }
 
   const { tenant, usage, invoices, events } = data;
+  // `undefined` = never enabled; a 'cancelled' row is a different thing (it
+  // was on once, and its negotiated price is still frozen on the row).
+  const voiceAddon = data.addons.find((a) => a.key === "voice");
   const billing = tenant.billing;
   const status = billing?.status ?? null;
   const canAct = billing !== null && !billing.billingExempt;
@@ -202,6 +220,14 @@ export default async function GymDetailPage({
         <div style={{ display: "flex", gap: 40, flexWrap: "wrap" }}>
           <div>
             <div className="mono-label" style={{ marginBottom: 6 }}>
+              Included this month
+            </div>
+            <div style={{ fontSize: 14 }}>
+              {data.email.sentThisMonth.toLocaleString("en-IE")} / {data.email.includedPerMonth.toLocaleString("en-IE")} used
+            </div>
+          </div>
+          <div>
+            <div className="mono-label" style={{ marginBottom: 6 }}>
               Credit balance
             </div>
             <div style={{ fontSize: 14 }}>{fmtCents(data.emailBalanceCents)}</div>
@@ -339,6 +365,179 @@ export default async function GymDetailPage({
             </thead>
             <tbody>
               {data.ai.ledger.map((r) => (
+                <tr key={r.id}>
+                  <td>
+                    {r.reason}
+                    {r.note ? <span style={{ color: "var(--muted-2)" }}> · {r.note}</span> : null}
+                  </td>
+                  <td style={{ color: r.deltaCents >= 0 ? "var(--green)" : "var(--red)" }}>
+                    {r.deltaCents >= 0 ? "+" : "−"}
+                    {fmtCents(Math.abs(r.deltaCents))}
+                  </td>
+                  <td>{fmtCents(r.balanceAfterCents)}</td>
+                  <td>{fmtDate(r.createdAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
+
+      {/* Voice Agent add-on */}
+      <Card style={{ padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+            Voice Agent
+          </h2>
+          <span className={`chip ${voiceAddon?.status === "active" ? "active" : voiceAddon?.status === "trial" ? "past_due" : "suspended"}`}>
+            {voiceAddon?.status ?? "not enabled"}
+          </span>
+          {voiceAddon?.status === "active" && (
+            <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+              {fmtCents(voiceAddon.priceCents)}/mo on the invoice
+            </span>
+          )}
+        </div>
+
+        <div style={{ display: "flex", gap: 40, flexWrap: "wrap" }}>
+          <div>
+            <div className="mono-label" style={{ marginBottom: 6 }}>
+              This month
+            </div>
+            <div style={{ fontSize: 14 }}>
+              {data.voice.month.billedMinutes} min billed · {data.voice.month.calls} call
+              {data.voice.month.calls === 1 ? "" : "s"} · {fmtCents(data.voice.month.costCents)}
+            </div>
+          </div>
+          <div>
+            <div className="mono-label" style={{ marginBottom: 6 }}>
+              {voiceAddon?.status === "trial" ? "Trial minutes left" : "Included minutes left"}
+            </div>
+            <div style={{ fontSize: 14 }}>
+              {voiceAddon?.status === "trial"
+                ? data.voice.trialMinutesRemaining
+                : data.voice.includedMinutesRemaining}{" "}
+              min
+            </div>
+          </div>
+          <div>
+            <div className="mono-label" style={{ marginBottom: 6 }}>
+              Credit balance
+            </div>
+            <div style={{ fontSize: 14, color: data.voice.balanceCents < 0 ? "var(--red)" : undefined }}>
+              {fmtCents(data.voice.balanceCents)}
+            </div>
+          </div>
+          <div>
+            <div className="mono-label" style={{ marginBottom: 6 }}>
+              Monthly cap
+            </div>
+            <div style={{ fontSize: 14 }}>{fmtCents(data.voice.capCents)}</div>
+          </div>
+          <div>
+            <div className="mono-label" style={{ marginBottom: 6 }}>
+              Status
+            </div>
+            <span className={`chip ${data.voice.suspended ? "suspended" : "active"}`}>
+              {data.voice.suspended ? "suspended" : "active"}
+            </span>
+          </div>
+        </div>
+
+        <p style={{ margin: 0, fontSize: 12, color: "var(--text-tertiary)" }}>
+          Trial minutes are free and never reset. On the paid add-on, the monthly included minutes come first, then prepaid
+          credits at {fmtCents(data.voice.pricePerMinuteCents)}/minute. Calls under 20 seconds are never billed, and the cap
+          stops calling for the rest of the month.
+        </p>
+
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {voiceAddon?.status !== "trial" && (
+            <ConfirmButton
+              label="Start trial"
+              confirm="Give this business the free voice trial? They can call until the trial minutes run out, and nothing is invoiced."
+              action={tenantAction.bind(null, tenant.id, "addon", { key: "voice", status: "trial" })}
+            />
+          )}
+          {voiceAddon?.status !== "active" && (
+            <ConfirmButton
+              label="Activate add-on"
+              confirm="Activate the Voice Agent add-on? It is added to every invoice from the next renewal."
+              action={tenantAction.bind(null, tenant.id, "addon", { key: "voice", status: "active" })}
+            />
+          )}
+          {voiceAddon && voiceAddon.status !== "cancelled" && (
+            <ConfirmButton
+              label="Cancel add-on"
+              danger
+              confirm="Cancel the Voice Agent add-on? Calling stops immediately and it drops off the next invoice."
+              action={tenantAction.bind(null, tenant.id, "addon", { key: "voice", status: "cancelled" })}
+            />
+          )}
+          {data.voice.suspended ? (
+            <ConfirmButton
+              label="Resume voice"
+              confirm="Resume voice for this business? Its agent can place calls again."
+              action={tenantAction.bind(null, tenant.id, "resume-voice", {})}
+            />
+          ) : (
+            <ConfirmButton
+              label="Suspend voice"
+              danger
+              confirm="Suspend voice for this business? No calls are placed until resumed."
+              action={tenantAction.bind(null, tenant.id, "suspend-voice", {})}
+            />
+          )}
+        </div>
+
+        <GrantCreditsForm action={grantVoiceCreditsAction.bind(null, tenant.id)} noun="voice credits" />
+
+        <form
+          action={setVoiceCapAction.bind(null, tenant.id)}
+          style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}
+        >
+          <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Monthly voice cap (EUR)</span>
+            <input
+              className="input"
+              type="number"
+              step="1"
+              min="0"
+              max="5000"
+              name="euros"
+              defaultValue={(data.voice.capCents / 100).toFixed(0)}
+              required
+              style={{ width: 140 }}
+            />
+          </label>
+          <button className="btn btn--sm" type="submit">
+            Set cap
+          </button>
+        </form>
+
+        {searchParams.voiceError && (
+          <p role="alert" style={{ margin: 0, color: "var(--red)", fontSize: 13 }}>
+            {searchParams.voiceError}
+          </p>
+        )}
+        {searchParams.voiceGranted && !searchParams.voiceError && (
+          <p style={{ margin: 0, color: "var(--green)", fontSize: 13 }}>Voice credits granted.</p>
+        )}
+        {searchParams.voiceSaved && !searchParams.voiceError && (
+          <p style={{ margin: 0, color: "var(--green)", fontSize: 13 }}>Voice cap saved.</p>
+        )}
+
+        {data.voice.ledger.length > 0 && (
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Movement</th>
+                <th>Amount</th>
+                <th>Balance</th>
+                <th>When</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.voice.ledger.map((r) => (
                 <tr key={r.id}>
                   <td>
                     {r.reason}

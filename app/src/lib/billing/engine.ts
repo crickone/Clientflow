@@ -8,7 +8,8 @@ import { closeTenantConn, openTenantDb } from "@/lib/db/tenant";
 import { getPaymentProvider, type PaymentProvider, type ChargeResult } from "@/lib/payments/provider";
 import { computeVat } from "./money";
 import { addMonthClamped, addDays, cmpDate, dublinDayOfMonth, dublinToday } from "./dates";
-import { getMonthlyPriceCents, getVatRateBp } from "./settings";
+import { getVatRateBp } from "./settings";
+import { monthlyLines, monthlySubtotalCents, type MonthlyLine } from "./addons";
 import { sendBillingEmail } from "./emails";
 
 /** Retry offsets (days after the due date). 4 attempts total incl. the due-day one. */
@@ -100,21 +101,84 @@ export function saveCard(tenantId: number, card: { token: string; last4: string;
 const touch = (tenantId: number, sets: string, ...args: unknown[]) =>
   controlSqlite.prepare(`UPDATE tenant_billing SET ${sets}, updated_at = ${Date.now()} WHERE tenant_id = ?`).run(...args, tenantId);
 
-/** Create (idempotently) the invoice for the period starting `periodStart`. */
+/**
+ * Create (idempotently) the invoice for the period starting `periodStart`.
+ *
+ * The amount is the tenant's whole recurring charge — base plan + every active
+ * add-on (`monthlyLines`) — and the breakdown is persisted as invoice lines so
+ * the receipt can say WHAT was charged, not just how much.
+ *
+ * Lines are written only when this call actually inserted the invoice
+ * (`changes > 0`). An invoice is a historical record: if voice is activated
+ * halfway through an already-raised period, that period keeps the total it was
+ * raised with and the new line first appears on the NEXT invoice — the same
+ * reason the row freezes its own vat_rate_bp instead of re-reading the setting.
+ */
 function ensureInvoice(tenantId: number, periodStart: string, anchorDay: number): InvoiceRow {
   const periodEnd = addMonthClamped(periodStart, anchorDay);
-  const { netCents, vatCents, grossCents } = computeVat(getMonthlyPriceCents(), getVatRateBp());
-  controlSqlite
+  const lines = monthlyLines(tenantId);
+  const subtotal = lines.reduce((sum, l) => sum + l.netCents, 0);
+  const { netCents, vatCents, grossCents } = computeVat(subtotal, getVatRateBp());
+  const res = controlSqlite
     .prepare(
       `INSERT INTO billing_invoices (tenant_id, period_start, period_end, net_cents, vat_cents, gross_cents, vat_rate_bp, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(tenant_id, period_start) DO NOTHING`,
     )
     .run(tenantId, periodStart, periodEnd, netCents, vatCents, grossCents, getVatRateBp(), Date.now());
-  return rowToInvoice(
+  const inv = rowToInvoice(
     controlSqlite
       .prepare("SELECT * FROM billing_invoices WHERE tenant_id = ? AND period_start = ?")
       .get(tenantId, periodStart) as Record<string, unknown>,
   );
+  if (res.changes > 0) writeInvoiceLines(inv.id, lines);
+  return inv;
+}
+
+function writeInvoiceLines(invoiceId: number, lines: MonthlyLine[]): void {
+  const stmt = controlSqlite.prepare(
+    `INSERT INTO billing_invoice_lines (invoice_id, kind, addon_key, description, net_cents)
+     VALUES (?, ?, ?, ?, ?) ON CONFLICT(invoice_id, kind, addon_key) DO NOTHING`,
+  );
+  const run = controlSqlite.transaction(() => {
+    for (const l of lines) stmt.run(invoiceId, l.kind, l.addonKey, l.description, l.netCents);
+  });
+  run();
+}
+
+export interface InvoiceLine {
+  kind: "base" | "addon";
+  addonKey: string;
+  description: string;
+  netCents: number;
+}
+
+/**
+ * One invoice's breakdown. Invoices raised BEFORE add-ons existed have no line
+ * rows at all — rather than showing an empty breakdown, they read back as a
+ * single implicit base line for the invoice's own net, which is exactly what
+ * they were.
+ */
+export function listInvoiceLines(invoiceId: number): InvoiceLine[] {
+  const rows = controlSqlite
+    .prepare(
+      `SELECT kind, addon_key, description, net_cents FROM billing_invoice_lines
+       WHERE invoice_id = ? ORDER BY (kind = 'base') DESC, id`,
+    )
+    .all(invoiceId) as Array<{ kind: string; addon_key: string; description: string; net_cents: number }>;
+  if (rows.length > 0) {
+    return rows.map((r) => ({
+      kind: r.kind as "base" | "addon",
+      addonKey: r.addon_key,
+      description: r.description,
+      netCents: r.net_cents,
+    }));
+  }
+  const inv = controlSqlite
+    .prepare("SELECT net_cents FROM billing_invoices WHERE id = ?")
+    .get(invoiceId) as { net_cents: number } | undefined;
+  return inv
+    ? [{ kind: "base", addonKey: "", description: "AdonisAgent subscription", netCents: inv.net_cents }]
+    : [];
 }
 
 /** Shared success path: invoice paid → active, failures cleared, renewal advanced. */

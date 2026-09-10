@@ -114,6 +114,8 @@ function makeFakeSender(opts: { failTo?: Set<string> } = {}): { sender: Campaign
     listLedger,
     setEmailPricePer1000Cents,
   } = requireLocal("../email/credits") as typeof import("../email/credits");
+  const { getSentThisMonth, setTenantIncludedSends } =
+    requireLocal("../email/included") as typeof import("../email/included");
   const { precheckCampaign, markCampaignSending, runCampaignSend, normalizeMessageId, sanitizeHeader } =
     requireLocal("./send") as typeof import("./send");
 
@@ -140,6 +142,8 @@ function makeFakeSender(opts: { failTo?: Set<string> } = {}): { sender: Campaign
   const cleanup = () => {
     controlSqlite.prepare("DELETE FROM email_credit_ledger WHERE tenant_id = ?").run(tid);
     controlSqlite.prepare("DELETE FROM email_credits WHERE tenant_id = ?").run(tid);
+    controlSqlite.prepare("DELETE FROM email_usage WHERE tenant_id = ?").run(tid);
+    controlSqlite.prepare("DELETE FROM tenant_email_included WHERE tenant_id = ?").run(tid);
     controlSqlite.prepare("DELETE FROM tenants WHERE id = ?").run(tid);
     if (priceBefore) {
       controlSqlite.prepare("UPDATE platform_settings SET value = ? WHERE key = ?").run(priceBefore.value, EMAIL_PRICE_KEY);
@@ -227,8 +231,20 @@ function makeFakeSender(opts: { failTo?: Set<string> } = {}): { sender: Campaign
     assert.equal(wrongDomain.ok, false);
     assert.match((wrongDomain as { error: string }).error, /verified sending domain/i);
 
-    // ── 4. precheckCampaign: insufficient credits (balance is still 0) ──
+    // ── 4a. the monthly INCLUDED-SENDS tranche: a send inside the base
+    // plan's allowance costs no credits, so a zero balance is fine. This is
+    // the behaviour that makes email usable for a small client who never
+    // tops up at all. ──
     assert.equal(getEmailBalanceCents(tid), 0, "no credits granted yet");
+    const insideTranche = await precheckCampaign(tid, c1.id, fakeBaseUrl);
+    assert.equal(insideTranche.ok, true, "inside the included allowance, a zero balance still sends");
+    assert.equal((insideTranche as { costCents: number }).costCents, 0, "nothing billable inside the tranche");
+
+    // ── 4b. precheckCampaign: insufficient credits, once the allowance is
+    // spent. Zeroing this tenant's allowance is the deterministic way to put
+    // every later assertion in this suite on the BILLABLE side of the
+    // tranche, so the per-batch charge maths below is unchanged. ──
+    setTenantIncludedSends(tid, 0);
     const noCredits = await precheckCampaign(tid, c1.id, fakeBaseUrl);
     assert.equal(noCredits.ok, false);
     assert.match((noCredits as { error: string }).error, /credit/i);
@@ -370,6 +386,10 @@ function makeFakeSender(opts: { failTo?: Set<string> } = {}): { sender: Campaign
       "sanity check: batching must actually be cheaper than per-email charging at this price for the scenario to be meaningful",
     );
     assert.equal(getEmailBalanceCents(tid), balanceBeforeSend - costForRecipients(3));
+
+    // Every send counts against the monthly allowance, billable or not —
+    // otherwise a tranche would never actually run out.
+    assert.equal(getSentThisMonth(tid), 3, "the 3 sends were counted against the monthly allowance");
 
     // ── 11. Re-invoking after the campaign is already 'sent' is a pure
     // no-op (the status guard) — never double-sends, never double-charges. ──

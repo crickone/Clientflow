@@ -18,6 +18,10 @@ import {
 } from "@/lib/billing/engine";
 import { grantCredits, setMarketingSuspended } from "@/lib/email/credits";
 import { grantAiCredits, setAiSuspended } from "@/lib/ai/creditsLedger";
+import { clearTenantIncludedSends, setTenantIncludedSends } from "@/lib/email/included";
+import { ADDON_KEYS, isAddonKey, setAddonStatus, type AddonKey } from "@/lib/billing/addons";
+import { grantVoiceCredits, setVoiceSuspended } from "@/lib/voice/credits";
+import { setVoiceCapCents } from "@/lib/voice/usage";
 
 export const dynamic = "force-dynamic";
 
@@ -96,6 +100,59 @@ export async function POST(
           .parse(await req.json());
         grantAiCredits(id, b.cents, actor);
         logEvent(id, "ai_credits_granted", { cents: b.cents }, actor);
+        break;
+      }
+      case "addon": {
+        // The add-on state machine, straight through: 'trial' (entitled, not
+        // invoiced), 'active' (entitled + invoiced) or 'cancelled'. An
+        // explicit priceCents is a negotiated deal; omitted, the tenant keeps
+        // whatever price they already had, else the catalog default.
+        const b = z
+          .object({
+            key: z.string().refine(isAddonKey, { message: `Unknown add-on (expected one of: ${ADDON_KEYS.join(", ")})` }),
+            status: z.enum(["trial", "active", "cancelled"]),
+            priceCents: z.number().int().min(0).max(100_000).optional(),
+          })
+          .parse(await req.json());
+        const saved = setAddonStatus(id, b.key as AddonKey, b.status, { priceCents: b.priceCents });
+        logEvent(id, "addon_changed", { key: b.key, status: b.status, priceCents: saved.priceCents }, actor);
+        break;
+      }
+      case "grant-voice-credits": {
+        // Same shape/guard as the other two grants: positive + capped at
+        // €10,000 in one go, so a fat-fingered amount can't hand out an
+        // unbounded balance.
+        const b = z
+          .object({ cents: z.number().int().positive().max(1_000_000) })
+          .parse(await req.json());
+        grantVoiceCredits(id, b.cents, actor);
+        logEvent(id, "voice_credits_granted", { cents: b.cents }, actor);
+        break;
+      }
+      case "voice-cap": {
+        const b = z.object({ capCents: z.number().int().min(0).max(500_000) }).parse(await req.json());
+        setVoiceCapCents(id, b.capCents);
+        logEvent(id, "voice_cap_changed", { capCents: b.capCents }, actor);
+        break;
+      }
+      case "suspend-voice":
+        setVoiceSuspended(id, true, actor);
+        logEvent(id, "voice_suspended", null, actor);
+        break;
+      case "resume-voice":
+        setVoiceSuspended(id, false, actor);
+        logEvent(id, "voice_resumed", null, actor);
+        break;
+      case "email-included": {
+        // `null` clears the per-tenant override, returning them to the global
+        // allowance — distinct from setting it to 0, which is a deliberate
+        // "this tenant gets nothing included".
+        const b = z
+          .object({ includedSends: z.number().int().min(0).max(1_000_000).nullable() })
+          .parse(await req.json());
+        if (b.includedSends === null) clearTenantIncludedSends(id);
+        else setTenantIncludedSends(id, b.includedSends);
+        logEvent(id, "email_included_changed", { includedSends: b.includedSends }, actor);
         break;
       }
       case "suspend-ai":

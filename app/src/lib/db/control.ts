@@ -610,6 +610,136 @@ export function ensureControlTables() {
       created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
     CREATE INDEX IF NOT EXISTS idx_email_credit_ledger_tenant ON email_credit_ledger(tenant_id, created_at);
+
+    -- ── Paid add-ons (Voice Agent and whatever follows) ───────────────────────
+    -- The platform sells ONE base plan (billing/settings.ts monthly_price_cents)
+    -- plus zero or more per-tenant add-ons. Deliberately NOT a "plan"/"tier"
+    -- column: tiers are a packaging decision that can be expressed later as a
+    -- named bundle of these rows, whereas an entitlement (does THIS tenant have
+    -- voice?) is what the runtime actually has to answer on every call.
+    --
+    -- status is the whole state machine:
+    --   'trial'     — entitled, NOT invoiced (the free-minutes evaluation)
+    --   'active'    — entitled AND invoiced at price_cents every renewal
+    --   'cancelled' — not entitled, not invoiced (row kept for history)
+    -- See @/lib/billing/addons: isAddonEnabled() = trial|active (the runtime
+    -- gate), billableAddons() = active only (what ensureInvoice charges for).
+    --
+    -- price_cents is FROZEN per tenant at activation time (copied from
+    -- ADDON_CATALOG's default, admin-overridable) rather than read live from a
+    -- global setting: a price change must never silently re-price the tenants
+    -- already on the add-on, the same reason billing_invoices stores its own
+    -- vat_rate_bp instead of re-reading it.
+    CREATE TABLE IF NOT EXISTS tenant_addons (
+      tenant_id    INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      addon_key    TEXT NOT NULL,           -- 'voice' (see ADDON_CATALOG)
+      status       TEXT NOT NULL DEFAULT 'active',  -- 'trial'|'active'|'cancelled'
+      price_cents  INTEGER NOT NULL,
+      activated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+      cancelled_at INTEGER,
+      updated_at   INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+      PRIMARY KEY (tenant_id, addon_key)
+    );
+
+    -- Per-invoice breakdown: one row per charged component (base plan + each
+    -- active add-on). Written ONCE, by ensureInvoice, and only when it actually
+    -- inserted the invoice — an invoice's composition is a historical record and
+    -- must not shift because an add-on was activated later in the period.
+    -- Invoices raised BEFORE this table existed have no lines at all; readers
+    -- (the console, the invoice email) fall back to the invoice's own net_cents
+    -- as a single implicit base line — see listInvoiceLines in billing/engine.
+    -- addon_key is '' (not NULL) for the base line purely so the UNIQUE index
+    -- below works without a COALESCE expression index.
+    CREATE TABLE IF NOT EXISTS billing_invoice_lines (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      invoice_id  INTEGER NOT NULL,
+      kind        TEXT NOT NULL,           -- 'base' | 'addon'
+      addon_key   TEXT NOT NULL DEFAULT '',
+      description TEXT NOT NULL,
+      net_cents   INTEGER NOT NULL,
+      created_at  INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_invoice_lines_unique
+      ON billing_invoice_lines(invoice_id, kind, addon_key);
+    CREATE INDEX IF NOT EXISTS idx_invoice_lines_invoice ON billing_invoice_lines(invoice_id);
+
+    -- ── Email: monthly included sends (the free tranche) ──────────────────────
+    -- The base plan includes N recipient-sends per month (EMAIL_INCLUDED_KEY,
+    -- default 5000) absorbed by the operator; only sends BEYOND that hit the
+    -- prepaid email_credits balance. Structurally research_usage's shape (ONE
+    -- accumulator row per tenant+month, upserted) rather than ai_usage's
+    -- row-per-call + SUM-on-read: a campaign send has no per-call breakdown
+    -- requirement, and "the allowance resets every month" falls out of a new
+    -- yyyymm simply having no row yet.
+    CREATE TABLE IF NOT EXISTS email_usage (
+      tenant_id  INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      yyyymm     TEXT NOT NULL,            -- billing bucket, e.g. '2026-09'
+      sent_count INTEGER NOT NULL DEFAULT 0,
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+      PRIMARY KEY (tenant_id, yyyymm)
+    );
+
+    -- Sparse per-tenant override of the monthly included-sends allowance —
+    -- same shape and reasoning as tenant_ai_cap: no row = the global default.
+    CREATE TABLE IF NOT EXISTS tenant_email_included (
+      tenant_id      INTEGER PRIMARY KEY REFERENCES tenants(id) ON DELETE CASCADE,
+      included_sends INTEGER NOT NULL,
+      updated_at     INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+
+    -- ── Voice agent: usage, cap, prepaid credits ──────────────────────────────
+    -- Billed per MINUTE (billed_minutes, each call rounded up — see
+    -- @/lib/voice/pricing), so the monthly included-minutes tranche and the
+    -- credit debit both work off billed_minutes; seconds is carried purely for
+    -- honest reporting ("you talked for 4m12s" vs "you were billed 5 minutes").
+    CREATE TABLE IF NOT EXISTS voice_usage (
+      tenant_id     INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      yyyymm        TEXT NOT NULL,
+      seconds       INTEGER NOT NULL DEFAULT 0,
+      billed_minutes INTEGER NOT NULL DEFAULT 0,
+      cost_cents    INTEGER NOT NULL DEFAULT 0,
+      calls         INTEGER NOT NULL DEFAULT 0,
+      updated_at    INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+      PRIMARY KEY (tenant_id, yyyymm)
+    );
+
+    -- Sparse per-tenant override of the monthly voice SPEND cap (default
+    -- DEFAULT_VOICE_CAP_CENTS, €150) — the runaway-dialler backstop, same
+    -- sparse shape as tenant_ai_cap / tenant_research_cap.
+    CREATE TABLE IF NOT EXISTS tenant_voice_cap (
+      tenant_id  INTEGER PRIMARY KEY REFERENCES tenants(id) ON DELETE CASCADE,
+      cap_cents  INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+
+    -- Prepaid voice credits — the third instance of the email_credits /
+    -- ai_credits shape, and the reason the read-compute-write-in-one-
+    -- transaction invariant now lives in ONE place (@/lib/billing/prepaidLedger)
+    -- that all three delegate to instead of a third hand-rolled copy.
+    -- trial_seconds_used tracks the one-off free evaluation minutes (they do
+    -- NOT reset monthly, unlike the included-minutes tranche) and is the only
+    -- column here with no counterpart in the other two tables.
+    CREATE TABLE IF NOT EXISTS voice_credits (
+      tenant_id INTEGER PRIMARY KEY REFERENCES tenants(id) ON DELETE CASCADE,
+      balance_cents INTEGER NOT NULL DEFAULT 0,
+      auto_topup_enabled INTEGER NOT NULL DEFAULT 0,
+      auto_topup_threshold_cents INTEGER NOT NULL DEFAULT 0,
+      auto_topup_amount_cents INTEGER NOT NULL DEFAULT 0,
+      voice_suspended INTEGER NOT NULL DEFAULT 0,
+      trial_seconds_used INTEGER NOT NULL DEFAULT 0,
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+
+    CREATE TABLE IF NOT EXISTS voice_credit_ledger (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id INTEGER NOT NULL,
+      delta_cents INTEGER NOT NULL,
+      reason TEXT NOT NULL,          -- 'topup'|'usage'|'adjustment'|'refund'|'auto_topup'
+      balance_after_cents INTEGER NOT NULL,
+      note TEXT,                     -- actor (grants) or context (usage: call ref)
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_voice_credit_ledger_tenant ON voice_credit_ledger(tenant_id, created_at);
   `);
 
   // Existing control DBs predate site_domains.verify_token/verified_at. The

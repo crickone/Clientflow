@@ -34,8 +34,10 @@ const requireLocal = createRequire(import.meta.url);
   const {
     activateTenant, createBillingRow, getBilling, listInvoices, listEvents,
     runBillingForDate, saveCard, suspendTenant, reactivateTenant, markPaid,
-    chargeOutstanding, setBillingExempt,
+    chargeOutstanding, setBillingExempt, listInvoiceLines,
   } = requireLocal("./engine") as typeof import("./engine");
+  const { ADDON_CATALOG, setAddonStatus } = requireLocal("./addons") as typeof import("./addons");
+  const { getMonthlyPriceCents } = requireLocal("./settings") as typeof import("./settings");
 
   controlSqlite.prepare("DELETE FROM tenants WHERE slug = 'billing-test'").run();
   const t = controlSqlite
@@ -43,7 +45,10 @@ const requireLocal = createRequire(import.meta.url);
     .get() as { id: number };
   const tid = t.id;
   const cleanup = () => {
-    for (const tbl of ["billing_invoices", "billing_events", "tenant_billing", "capture_sessions"])
+    controlSqlite
+      .prepare("DELETE FROM billing_invoice_lines WHERE invoice_id IN (SELECT id FROM billing_invoices WHERE tenant_id = ?)")
+      .run(tid);
+    for (const tbl of ["billing_invoices", "billing_events", "tenant_billing", "capture_sessions", "tenant_addons"])
       controlSqlite.prepare(`DELETE FROM ${tbl} WHERE tenant_id = ?`).run(tid);
     controlSqlite.prepare("DELETE FROM tenants WHERE id = ?").run(tid);
   };
@@ -65,11 +70,44 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(inv[0].status, "paid");
     assert.deepEqual([inv[0].periodStart, inv[0].periodEnd], ["2026-01-31", "2026-02-28"]);
 
+    // An invoice with no add-ons is the base plan alone, and it carries a
+    // breakdown line saying so.
+    assert.equal(inv[0].netCents, getMonthlyPriceCents());
+    assert.deepEqual(
+      listInvoiceLines(inv[0].id).map((l) => [l.kind, l.netCents]),
+      [["base", getMonthlyPriceCents()]],
+    );
+
+    // Switch the Voice Agent add-on on BEFORE the next renewal: the next
+    // invoice is base + add-on, itemised. (An add-on activated mid-period
+    // never re-prices an invoice that was already raised — an invoice is a
+    // historical record; it lands on the NEXT one, which is exactly what
+    // this ordering exercises.)
+    setAddonStatus(tid, "voice", "active");
+
     // Renewal on Feb 28 succeeds → anchor restored to Mar 31
     await runBillingForDate("2026-02-28", { provider: devProvider });
     b = getBilling(tid)!;
     assert.equal(b.status, "active");
     assert.equal(b.nextRenewalAt, "2026-03-31");
+
+    const febInv = listInvoices(tid).find((i) => i.periodStart === "2026-02-28")!;
+    assert.equal(
+      febInv.netCents,
+      getMonthlyPriceCents() + ADDON_CATALOG.voice.defaultPriceCents,
+      "the invoice charges base plan + active add-on",
+    );
+    assert.deepEqual(
+      listInvoiceLines(febInv.id).map((l) => [l.kind, l.addonKey, l.netCents]),
+      [
+        ["base", "", getMonthlyPriceCents()],
+        ["addon", "voice", ADDON_CATALOG.voice.defaultPriceCents],
+      ],
+      "and says what it charged for",
+    );
+    // The already-paid January invoice is untouched by a later activation.
+    assert.equal(listInvoices(tid).find((i) => i.periodStart === "2026-01-31")!.netCents, getMonthlyPriceCents());
+    setAddonStatus(tid, "voice", "cancelled");
     assert.equal(listInvoices(tid).length, 2);
 
     // Idempotency: same day again → no new invoice, no double charge

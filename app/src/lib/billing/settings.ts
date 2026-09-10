@@ -3,7 +3,7 @@ import "server-only";
 import { controlSqlite } from "@/lib/db/control";
 
 const DEFAULTS: Record<string, string> = {
-  monthly_price_cents: "9900",
+  monthly_price_cents: "24900", // €249/mo ex-VAT; see migration 0003-base-price-249 for control DBs that stored the old €99
   vat_rate_bp: "2300",
   billing_from_email: "billing@adonisagent.ie",
   billing_from_name: "AdonisAgent Billing",

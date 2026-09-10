@@ -6,6 +6,9 @@ import { requireAdminPage, getCurrentMembership } from "@/lib/auth";
 import { getBilling, listInvoices, type BillingStatus, type InvoiceRow } from "@/lib/billing/engine";
 import { formatCents } from "@/lib/billing/money";
 import { startCapture } from "@/lib/billing/capture";
+import { monthlyLines } from "@/lib/billing/addons";
+import { getVatRateBp } from "@/lib/billing/settings";
+import { computeVat } from "@/lib/billing/money";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardLabel } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -33,6 +36,13 @@ export default async function BillingSettingsPage() {
   const tenantId = getCurrentMembership()!.tenant.id;
   const b = getBilling(tenantId);
   const invoices = b ? listInvoices(tenantId) : [];
+  // What this account pays every month — base plan + active add-ons, from the
+  // same composition the invoice itself is built from.
+  const planLines = monthlyLines(tenantId);
+  const planTotal = computeVat(
+    planLines.reduce((sum, l) => sum + l.netCents, 0),
+    getVatRateBp(),
+  );
 
   async function updateCard() {
     "use server";
@@ -107,6 +117,33 @@ export default async function BillingSettingsPage() {
                     }}
                   />
                   {STATUS_LABEL[b.status]}
+                </div>
+                <div style={{ marginTop: 14 }}>
+                  <CardLabel>Your plan</CardLabel>
+                  <div style={{ fontSize: 14, color: "var(--text-secondary)" }}>
+                    {planLines.map((l) => (
+                      <div key={l.kind + l.addonKey} style={{ display: "flex", gap: 10, justifyContent: "space-between", maxWidth: 380 }}>
+                        <span>{l.description}</span>
+                        <span>{formatCents(l.netCents)}</span>
+                      </div>
+                    ))}
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 10,
+                        justifyContent: "space-between",
+                        maxWidth: 380,
+                        marginTop: 6,
+                        paddingTop: 6,
+                        borderTop: "1px solid var(--hairline)",
+                        color: "var(--text-primary)",
+                        fontWeight: 600,
+                      }}
+                    >
+                      <span>Monthly total, incl. VAT</span>
+                      <span>{formatCents(planTotal.grossCents)}</span>
+                    </div>
+                  </div>
                 </div>
                 <div style={{ marginTop: 14 }}>
                   <CardLabel>Card on file</CardLabel>

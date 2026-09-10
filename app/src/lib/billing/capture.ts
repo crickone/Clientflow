@@ -5,7 +5,8 @@ import { controlSqlite } from "@/lib/db/control";
 import { getPaymentProvider } from "@/lib/payments/provider";
 import { DEV_TOKENS } from "@/lib/payments/devProvider";
 import { computeVat } from "./money";
-import { getMonthlyPriceCents, getVatRateBp } from "./settings";
+import { getVatRateBp } from "./settings";
+import { monthlySubtotalCents } from "./addons";
 import { activateTenant, chargeOutstanding, getBilling, logEvent, saveCard } from "./engine";
 
 export type CapturePurpose = "activate" | "update_card" | "reactivate";
@@ -16,8 +17,14 @@ export async function startCapture(
   purpose: CapturePurpose,
 ): Promise<{ redirectUrl: string }> {
   const ref = `cs_${crypto.randomBytes(12).toString("hex")}`;
+  // The activation charge is the tenant's WHOLE monthly total — base plan plus
+  // any add-on already switched on for them — read through the same
+  // `monthlySubtotalCents` the invoice uses, so the amount we authorise can
+  // never drift from the amount we then bill.
   const amountCents =
-    purpose === "activate" ? computeVat(getMonthlyPriceCents(), getVatRateBp()).grossCents : null;
+    purpose === "activate"
+      ? computeVat(monthlySubtotalCents(tenantId), getVatRateBp()).grossCents
+      : null;
   controlSqlite
     .prepare("INSERT INTO capture_sessions (ref, tenant_id, purpose, amount_cents, created_at) VALUES (?, ?, ?, ?, ?)")
     .run(ref, tenantId, purpose, amountCents, Date.now());

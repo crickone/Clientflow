@@ -2,6 +2,7 @@ import "server-only";
 
 import { controlSqlite } from "@/lib/db/control";
 import { getPlatformSetting, setPlatformSetting } from "@/lib/billing/settings";
+import { createPrepaidLedger } from "@/lib/billing/prepaidLedger";
 
 /**
  * Prepaid AI-credit ledger + margin (control plane) — the money layer for AI
@@ -9,16 +10,19 @@ import { getPlatformSetting, setPlatformSetting } from "@/lib/billing/settings";
  * default €25, absorbed by the operator). Overflow is billed to this prepaid
  * balance at raw provider cost + a small margin (`getAiMarginBp`, default 5%).
  *
- * Deliberately a near-clone of `@/lib/email/credits`: an `assert`/`record`
- * bracket around the metered action, a sparse per-tenant balance row, the
- * GLOBAL margin in `platform_settings`, and the same money-safety invariant —
- * every balance mutation (grant or spend) is ONE `controlSqlite.transaction()`
- * that reads the balance, computes the new one, writes it, and inserts exactly
- * one ledger row carrying that same `balance_after_cents`. SQLite serialises
- * writers, so concurrent AI calls can't interleave a read-compute-write.
+ * Shaped like `@/lib/email/credits`: an `assert`/`record` bracket around the
+ * metered action, a sparse per-tenant balance row, and the GLOBAL margin in
+ * `platform_settings`. The money-safety invariant the two used to duplicate —
+ * every balance mutation is ONE `controlSqlite.transaction()` that reads the
+ * balance, computes the new one, writes it, and inserts exactly one ledger row
+ * carrying that same `balance_after_cents` — now lives once in
+ * `createPrepaidLedger` (@/lib/billing/prepaidLedger), which this file binds to
+ * its own two tables (see `ledger` below). SQLite still serialises writers, so
+ * concurrent AI calls can't interleave a read-compute-write.
  *
- * ONE deliberate divergence from the email ledger: a `usage` debit is allowed
- * to drive the balance NEGATIVE (`allowNegative`). Email knows a send's cost
+ * ONE deliberate divergence from the email ledger, and the reason the shared
+ * module takes it as a parameter: a `usage` debit is allowed to drive the
+ * balance NEGATIVE (`allowNegative`). Email knows a send's cost
  * up front and refuses before sending; an AI call's cost is only known AFTER
  * the tokens are burned, so the pre-check (`assertAiAllowed` in `./usage`) lets
  * a call through while there's ANY headroom, and this records the true cost
@@ -74,12 +78,26 @@ export function withMargin(rawCents: number): number {
   return Math.ceil((rawCents * (10_000 + getAiMarginBp())) / 10_000);
 }
 
+/**
+ * The shared prepaid-credit mechanism (@/lib/billing/prepaidLedger), bound to
+ * this product's two tables. `allowNegative` is ON here and nowhere else — an
+ * AI call's cost is only known once the tokens are burned, so the last call
+ * through the gate may overshoot into a small debt that blocks the next one
+ * (see the file header).
+ */
+const ledger = createPrepaidLedger({
+  balanceTable: "ai_credits",
+  ledgerTable: "ai_credit_ledger",
+  allowNegative: true,
+  insufficient: (balance, wouldBe) =>
+    new AiCreditsError(
+      `Insufficient AI credits: balance is ${balance}c, this spend would take it to ${wouldBe}c.`,
+    ),
+});
+
 /** A tenant's current AI-credit balance (cents). Sparse row: never-granted reads as 0. */
 export function getAiBalanceCents(tenantId: number): number {
-  const row = controlSqlite
-    .prepare("SELECT balance_cents FROM ai_credits WHERE tenant_id = ?")
-    .get(tenantId) as { balance_cents: number } | undefined;
-  return row?.balance_cents ?? 0;
+  return ledger.getBalanceCents(tenantId);
 }
 
 export interface AiAutoTopupConfig {
@@ -162,44 +180,19 @@ export interface AiLedgerRow {
 type AiLedgerReason = "topup" | "usage" | "adjustment" | "refund" | "auto_topup";
 
 /**
- * The ONE place ai_credits.balance_cents is ever written — read → compute →
- * (guard) → write balance + insert one ledger row, all in a single
- * transaction. `allowNegative` skips the negative-balance guard for `usage`
- * debits (see the file header for why AI usage is allowed to overshoot).
+ * The ONE place ai_credits.balance_cents is ever written — a thin adapter over
+ * the shared `ledger` above (read → compute → guard → write + one ledger row,
+ * in a single transaction). Kept as a named local function so this file still
+ * has one chokepoint, and so the `allowNegative` decision stays a property of
+ * the ledger rather than something each caller passes.
  */
 function mutateBalance(
   tenantId: number,
   deltaCents: number,
   reason: AiLedgerReason,
-  opts: { note?: string | null; allowNegative?: boolean } = {},
+  opts: { note?: string | null } = {},
 ): number {
-  const run = controlSqlite.transaction(() => {
-    const row = controlSqlite
-      .prepare("SELECT balance_cents FROM ai_credits WHERE tenant_id = ?")
-      .get(tenantId) as { balance_cents: number } | undefined;
-    const currentBalance = row?.balance_cents ?? 0;
-    const newBalance = currentBalance + deltaCents;
-    if (newBalance < 0 && !opts.allowNegative) {
-      throw new AiCreditsError(
-        `Insufficient AI credits: balance is ${currentBalance}c, this spend would take it to ${newBalance}c.`,
-      );
-    }
-    controlSqlite
-      .prepare(
-        `INSERT INTO ai_credits (tenant_id, balance_cents, updated_at)
-         VALUES (?, ?, unixepoch() * 1000)
-         ON CONFLICT(tenant_id) DO UPDATE SET balance_cents = excluded.balance_cents, updated_at = excluded.updated_at`,
-      )
-      .run(tenantId, newBalance);
-    controlSqlite
-      .prepare(
-        `INSERT INTO ai_credit_ledger (tenant_id, delta_cents, reason, balance_after_cents, note)
-         VALUES (?, ?, ?, ?, ?)`,
-      )
-      .run(tenantId, deltaCents, reason, newBalance, opts.note ?? null);
-    return newBalance;
-  });
-  return run();
+  return ledger.mutate(tenantId, deltaCents, reason, { note: opts.note ?? null });
 }
 
 /** Grant credits to a tenant (+balance, one ledger row). Admin allocation + (later) auto-topup execution call this. */
@@ -225,7 +218,7 @@ export function recordAiSpend(tenantId: number, cents: number, note?: string | n
   if (!Number.isInteger(cents) || cents <= 0) {
     throw new Error("Spend amount must be a positive whole number of cents.");
   }
-  return mutateBalance(tenantId, -cents, "usage", { note: note ?? null, allowNegative: true });
+  return mutateBalance(tenantId, -cents, "usage", { note: note ?? null });
 }
 
 /** A tenant's AI-credit ledger, newest first. */

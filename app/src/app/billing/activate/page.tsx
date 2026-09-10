@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { requireUserPage, getCurrentMembership } from "@/lib/auth";
 import { getBilling } from "@/lib/billing/engine";
 import { computeVat, formatCents } from "@/lib/billing/money";
-import { getMonthlyPriceCents, getVatRateBp } from "@/lib/billing/settings";
+import { getVatRateBp } from "@/lib/billing/settings";
+import { monthlyLines } from "@/lib/billing/addons";
 import { startCapture } from "@/lib/billing/capture";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/Card";
@@ -19,7 +20,13 @@ export default async function ActivatePage() {
   const b = getBilling(m.tenant.id);
   if (!b || b.status !== "pending_payment") redirect("/dashboard");
 
-  const { netCents, vatCents, grossCents } = computeVat(getMonthlyPriceCents(), getVatRateBp());
+  // Base plan + any add-on already switched on — the same composition
+  // startCapture authorises and ensureInvoice bills, so all three agree.
+  const lines = monthlyLines(m.tenant.id);
+  const { netCents, vatCents, grossCents } = computeVat(
+    lines.reduce((sum, l) => sum + l.netCents, 0),
+    getVatRateBp(),
+  );
 
   async function pay() {
     "use server";
@@ -44,7 +51,9 @@ export default async function ActivatePage() {
             border: "1px solid var(--hairline)",
           }}
         >
-          <Row label="AdonisAgent monthly subscription" value={formatCents(netCents)} />
+          {lines.map((l) => (
+            <Row key={l.kind + l.addonKey} label={l.description} value={formatCents(l.netCents)} />
+          ))}
           <Row label="VAT" value={formatCents(vatCents)} />
           <Row label="Due today" value={formatCents(grossCents)} strong />
         </div>

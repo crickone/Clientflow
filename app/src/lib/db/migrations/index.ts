@@ -266,4 +266,14 @@ export const CONTROL_MIGRATIONS: Migration[] = [
       "Global Exercise Library bootstrap: import the Inspire tenant's curated exercise_library rows as GLOBAL control rows (tenant_id NULL) and every other active tenant's existing rows as their own customs. See docs/superpowers/specs/2026-08-24-global-exercise-library-design.md and ./exerciseLibraryBootstrap.ts.",
     up: runExerciseLibraryBootstrap,
   },
+  {
+    id: "0003-base-price-249",
+    description:
+      "Base subscription price €99 -> €249/mo. The DEFAULT in billing/settings.ts covers a control DB that never stored the setting; this covers one that DID (the admin console writes platform_settings on every save). Deliberately conditional on the value still being exactly the old 9900 default, so a price an operator has since set by hand is left alone — a migration must never silently overwrite a deliberate money decision.",
+    up: (sqlite) => {
+      sqlite
+        .prepare("UPDATE platform_settings SET value = '24900' WHERE key = 'monthly_price_cents' AND value = '9900'")
+        .run();
+    },
+  },
 ];

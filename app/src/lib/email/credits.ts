@@ -2,6 +2,7 @@ import "server-only";
 
 import { controlSqlite } from "@/lib/db/control";
 import { getPlatformSetting, setPlatformSetting } from "@/lib/billing/settings";
+import { createPrepaidLedger } from "@/lib/billing/prepaidLedger";
 
 /**
  * Prepaid email-credit ledger + pricing (control plane) — the money
@@ -24,10 +25,18 @@ import { getPlatformSetting, setPlatformSetting } from "@/lib/billing/settings";
  * `controlSqlite.transaction()` — read balance, compute the new balance,
  * guard against going negative, write balance + insert exactly one ledger row
  * carrying that same `balance_after_cents`, all inside one SQLite transaction.
- * SQLite serializes writers (busy_timeout=15000, see ./control.ts), so two
- * concurrent sends can't interleave their read-compute-write and corrupt the
- * balance or record a wrong `balance_after_cents`; a throw anywhere inside the
- * transaction rolls back everything it did (no partial write).
+ * That invariant NO LONGER LIVES HERE: it moved to the shared
+ * `createPrepaidLedger` (@/lib/billing/prepaidLedger) when voice credits became
+ * its third instance, and this file now binds it to its own two tables (see
+ * `ledger` below). The behaviour, the public API and the guarantees are
+ * unchanged — SQLite still serializes writers, so two concurrent sends can't
+ * interleave their read-compute-write, and a throw anywhere inside still rolls
+ * back everything (no partial write, no orphan ledger row).
+ *
+ * Also unchanged, and deliberately NOT pushed into the shared module: the
+ * monthly INCLUDED-SENDS tranche. Which recipients are free is email's own
+ * pricing rule and lives in ./included.ts; this file only ever sees the
+ * billable remainder.
  */
 
 /** platform_settings key for the global (not per-tenant) email credit price. */
@@ -87,13 +96,26 @@ export class EmailCreditsError extends Error {
   }
 }
 
+/**
+ * The shared prepaid-credit mechanism (@/lib/billing/prepaidLedger), bound to
+ * this product's two tables. Email refuses a spend it can't cover — the cost
+ * of a send is known BEFORE it goes out — so `allowNegative` stays off, the
+ * one behavioural difference from the AI ledger.
+ */
+const ledger = createPrepaidLedger({
+  balanceTable: "email_credits",
+  ledgerTable: "email_credit_ledger",
+  ledgerExtras: ["campaign_id"],
+  insufficient: (balance, wouldBe) =>
+    new EmailCreditsError(
+      `Insufficient email credits: balance is ${balance}c, this spend would take it to ${wouldBe}c.`,
+    ),
+});
+
 /** A tenant's current email-credit balance (cents). Sparse row: a tenant that
  *  has never been granted credits has no row and reads as 0. */
 export function getEmailBalanceCents(tenantId: number): number {
-  const row = controlSqlite
-    .prepare("SELECT balance_cents FROM email_credits WHERE tenant_id = ?")
-    .get(tenantId) as { balance_cents: number } | undefined;
-  return row?.balance_cents ?? 0;
+  return ledger.getBalanceCents(tenantId);
 }
 
 export interface AutoTopupConfig {
@@ -216,13 +238,14 @@ export interface LedgerRow {
 type LedgerReason = "topup" | "send" | "adjustment" | "refund" | "auto_topup";
 
 /**
- * The ONE place balance_cents is ever written. Reads the current balance,
- * computes the new one, guards against going negative, then writes the new
- * balance + inserts exactly one ledger row carrying it — all inside a single
- * `controlSqlite.transaction()` so the pair can never drift apart, and a
- * thrown guard leaves NO trace (SQLite rolls back everything the wrapped
- * function did). `note` carries `actor`: the ledger schema has no dedicated
- * actor column, and every caller here has exactly one free-text slot to fill.
+ * The ONE place balance_cents is ever written — now a thin adapter over the
+ * shared `ledger` above, which owns the read → compute → guard → write balance
+ * + insert one ledger row, all in a single transaction. Kept as a named local
+ * function (rather than inlining `ledger.mutate` at the two call sites) so
+ * this file still has one chokepoint, and so `campaignId` keeps a named home
+ * instead of every caller having to know it is the first positional extra.
+ * `note` carries `actor`: the ledger schema has no dedicated actor column, and
+ * every caller here has exactly one free-text slot to fill.
  */
 function mutateBalance(
   tenantId: number,
@@ -230,35 +253,10 @@ function mutateBalance(
   reason: LedgerReason,
   opts: { campaignId?: number | null; note?: string | null } = {},
 ): number {
-  const run = controlSqlite.transaction(() => {
-    const row = controlSqlite
-      .prepare("SELECT balance_cents FROM email_credits WHERE tenant_id = ?")
-      .get(tenantId) as { balance_cents: number } | undefined;
-    const currentBalance = row?.balance_cents ?? 0;
-    const newBalance = currentBalance + deltaCents;
-    if (newBalance < 0) {
-      throw new EmailCreditsError(
-        `Insufficient email credits: balance is ${currentBalance}c, this spend would take it to ${newBalance}c.`,
-      );
-    }
-    controlSqlite
-      .prepare(
-        `INSERT INTO email_credits (tenant_id, balance_cents, updated_at)
-         VALUES (?, ?, unixepoch() * 1000)
-         ON CONFLICT(tenant_id) DO UPDATE SET
-           balance_cents = excluded.balance_cents,
-           updated_at = excluded.updated_at`,
-      )
-      .run(tenantId, newBalance);
-    controlSqlite
-      .prepare(
-        `INSERT INTO email_credit_ledger (tenant_id, delta_cents, reason, campaign_id, balance_after_cents, note)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-      )
-      .run(tenantId, deltaCents, reason, opts.campaignId ?? null, newBalance, opts.note ?? null);
-    return newBalance;
+  return ledger.mutate(tenantId, deltaCents, reason, {
+    note: opts.note ?? null,
+    extras: [opts.campaignId ?? null],
   });
-  return run();
 }
 
 /** Throws `EmailCreditsError` when `tenantId`'s balance is below `cents`

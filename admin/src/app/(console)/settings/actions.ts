@@ -15,11 +15,19 @@ export async function saveSettings(formData: FormData): Promise<void> {
   const vatRaw = String(formData.get("vatRate") ?? "");
   const emailPriceRaw = String(formData.get("emailPrice") ?? "");
   const aiMarginRaw = String(formData.get("aiMargin") ?? "");
+  const emailIncludedRaw = String(formData.get("emailIncluded") ?? "");
+  const voicePriceRaw = String(formData.get("voicePrice") ?? "");
+  const voiceIncludedRaw = String(formData.get("voiceIncluded") ?? "");
+  const voiceTrialRaw = String(formData.get("voiceTrial") ?? "");
 
   const priceEur = parseFloat(priceRaw);
   const vatPct = parseFloat(vatRaw);
   const emailPriceEur = parseFloat(emailPriceRaw);
   const aiMarginPct = parseFloat(aiMarginRaw);
+  const emailIncluded = parseInt(emailIncludedRaw, 10);
+  const voicePriceEur = parseFloat(voicePriceRaw);
+  const voiceIncluded = parseInt(voiceIncludedRaw, 10);
+  const voiceTrial = parseInt(voiceTrialRaw, 10);
 
   if (!Number.isFinite(priceEur) || priceEur < 0) {
     redirect(`/settings?error=${encodeURIComponent("Enter a valid, non-negative monthly price.")}`);
@@ -33,6 +41,18 @@ export async function saveSettings(formData: FormData): Promise<void> {
   if (!Number.isFinite(aiMarginPct) || aiMarginPct < 0) {
     redirect(`/settings?error=${encodeURIComponent("Enter a valid, non-negative AI credit margin.")}`);
   }
+  if (!Number.isInteger(emailIncluded) || emailIncluded < 0) {
+    redirect(`/settings?error=${encodeURIComponent("Enter a valid, non-negative number of included emails.")}`);
+  }
+  if (!Number.isFinite(voicePriceEur) || voicePriceEur < 0) {
+    redirect(`/settings?error=${encodeURIComponent("Enter a valid, non-negative voice price per minute.")}`);
+  }
+  if (!Number.isInteger(voiceIncluded) || voiceIncluded < 0) {
+    redirect(`/settings?error=${encodeURIComponent("Enter a valid, non-negative number of included voice minutes.")}`);
+  }
+  if (!Number.isInteger(voiceTrial) || voiceTrial < 0) {
+    redirect(`/settings?error=${encodeURIComponent("Enter a valid, non-negative number of trial voice minutes.")}`);
+  }
 
   const monthlyPriceCents = Math.round(priceEur * 100);
   const vatRateBp = Math.round(vatPct * 100);
@@ -43,7 +63,16 @@ export async function saveSettings(formData: FormData): Promise<void> {
   try {
     await api("/settings", {
       method: "PUT",
-      body: { monthlyPriceCents, vatRateBp, emailCreditPricePer1000Cents, aiCreditMarginBp },
+      body: {
+        monthlyPriceCents,
+        vatRateBp,
+        emailCreditPricePer1000Cents,
+        aiCreditMarginBp,
+        emailIncludedPerMonth: emailIncluded,
+        voicePricePerMinuteCents: Math.round(voicePriceEur * 100),
+        voiceIncludedMinutes: voiceIncluded,
+        voiceTrialMinutes: voiceTrial,
+      },
     });
   } catch (err) {
     errorMsg = err instanceof ApiError ? err.message : "Failed to save settings.";

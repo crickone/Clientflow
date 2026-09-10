@@ -21,6 +21,12 @@ export type TenantActionName =
   | "grant-ai-credits"
   | "suspend-ai"
   | "resume-ai"
+  | "addon"
+  | "grant-voice-credits"
+  | "voice-cap"
+  | "suspend-voice"
+  | "resume-voice"
+  | "email-included"
   | "offboard";
 
 /**
@@ -118,4 +124,46 @@ export async function grantAiCreditsAction(id: number, formData: FormData): Prom
   }
 
   redirect(`/gyms/${id}?aiGranted=1`);
+}
+
+/**
+ * Grant prepaid VOICE credits — same shape as the email/AI grant actions,
+ * against the voice ledger. Its own `?voiceError=` / `?voiceGranted=1`
+ * searchParams so feedback lands under the Voice card.
+ */
+export async function grantVoiceCreditsAction(id: number, formData: FormData): Promise<void> {
+  const eurosRaw = String(formData.get("euros") ?? "");
+  const euros = parseFloat(eurosRaw);
+
+  if (!Number.isFinite(euros) || euros <= 0) {
+    redirect(`/gyms/${id}?voiceError=${encodeURIComponent("Enter a valid, positive credit amount.")}`);
+  }
+
+  const cents = Math.round(euros * 100);
+  const r = await tenantAction(id, "grant-voice-credits", { cents });
+  if (!r.ok) {
+    redirect(`/gyms/${id}?voiceError=${encodeURIComponent(r.error ?? "Failed to grant voice credits.")}`);
+  }
+
+  redirect(`/gyms/${id}?voiceGranted=1`);
+}
+
+/**
+ * Set this tenant's monthly voice SPEND cap (euros in the form, cents on the
+ * wire) — the runaway-dialler backstop, not an allowance.
+ */
+export async function setVoiceCapAction(id: number, formData: FormData): Promise<void> {
+  const eurosRaw = String(formData.get("euros") ?? "");
+  const euros = parseFloat(eurosRaw);
+
+  if (!Number.isFinite(euros) || euros < 0) {
+    redirect(`/gyms/${id}?voiceError=${encodeURIComponent("Enter a valid, non-negative cap.")}`);
+  }
+
+  const r = await tenantAction(id, "voice-cap", { capCents: Math.round(euros * 100) });
+  if (!r.ok) {
+    redirect(`/gyms/${id}?voiceError=${encodeURIComponent(r.error ?? "Failed to set the voice cap.")}`);
+  }
+
+  redirect(`/gyms/${id}?voiceSaved=1`);
 }
