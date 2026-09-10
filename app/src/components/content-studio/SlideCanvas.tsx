@@ -10,6 +10,7 @@ import {
   type BrandLabels,
 } from "@/lib/image/paintSlide";
 import { renderFileUrl } from "@/lib/image/renderStore.client";
+import { SlideTextEditor } from "./SlideTextEditor";
 import type { DesignSystem } from "@/lib/design/parse";
 import {
   DEFAULT_BODY_FONT_ID,
@@ -87,6 +88,7 @@ export function SlideCanvas({
   brand,
   logo = null,
   system = null,
+  textEdit = null,
 }: {
   slide: CarouselSlide;
   slideIdx: number;
@@ -101,6 +103,13 @@ export function SlideCanvas({
    *  for a tenant that has none, which is every tenant until one is authored
    *  — and template slides never look at it. */
   system?: DesignSystem | null;
+  /**
+   * Makes the text on an AI-designed slide clickable and editable in place.
+   * Only the main editor passes it: a filmstrip thumbnail or a gallery tile is
+   * too small to aim at a word in, and each one would fetch a hit map of its
+   * own for no reason.
+   */
+  textEdit?: { carouselId: number; onEdited: (renderFilename: string) => void } | null;
 }) {
   const fontFamilies = useMemo(
     () => ({
@@ -182,6 +191,17 @@ export function SlideCanvas({
   const aspect = slideDimensions(slide).aspectRatio;
 
   if (designed) {
+    if (textEdit) {
+      return (
+        <SlideTextEditor
+          carouselId={textEdit.carouselId}
+          slideId={slide.id}
+          renderFilename={slide.renderFilename!}
+          aspectRatio={aspect}
+          onEdited={textEdit.onEdited}
+        />
+      );
+    }
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img

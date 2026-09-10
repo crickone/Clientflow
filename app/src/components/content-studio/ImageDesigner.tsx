@@ -1299,6 +1299,13 @@ export function ImageDesigner({
                     brand={brand}
                     logo={showLogo ? logoImg : null}
                     system={designSystem}
+                    textEdit={{
+                      carouselId: designId,
+                      // The server has already written the new markup and
+                      // render; this just points the row at the new file so the
+                      // preview and the filmstrip both pick it up.
+                      onEdited: (renderFilename) => updateActiveSlide({ renderFilename }),
+                    }}
                   />
                   {activeSlide.backgroundAssetId != null && (
                     <FocalOverlay

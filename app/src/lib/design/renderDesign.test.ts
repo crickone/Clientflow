@@ -8,9 +8,11 @@
 //
 // Every case here is markup a real generation produced.
 import assert from "node:assert/strict";
+import sharp from "sharp";
 
 import { loadDesignFonts } from "./fonts";
 import { measureOverflowPx, renderDesignToPng } from "./renderDesign";
+import { buildHitMapHtml, indexFromColour, pickBand } from "./hitMap";
 
 let passed = 0;
 function check(name: string, cond: boolean) {
@@ -107,6 +109,60 @@ async function main() {
   // spilling out of the canvas.
   const flat = `<div style="display:flex;width:600px;height:400px;background:#24231f;font-family:Inter;"></div>`;
   check("a full-bleed background alone reports no overflow", (await measureOverflowPx(flat, 600, 400, fonts)) === 0);
+
+  // ── the hit map lands ON the words ──
+  //
+  // Click-to-edit rests entirely on "the hit map changes style, never
+  // structure, therefore satori lays it out identically". That is a claim
+  // about the renderer, so it is checked against the renderer: colour every
+  // text element, render both, and ask what the hit map says is underneath
+  // each ink pixel of the real render. Anything unattributed is text the
+  // operator could click and miss.
+  //
+  // If someone later makes buildHitMapHtml wrap elements instead of styling
+  // them, this is what fails.
+  const HIT_SLIDE =
+    `<div style="display:flex;flex-direction:column;justify-content:space-between;width:600px;height:600px;background:#f2f3ed;padding:50px 40px;font-family:Inter;">` +
+    `<span style="font-size:52px;line-height:0.98;font-weight:600;color:#24231f;">It's not the oxygen.<br/>It's the pressure.</span>` +
+    `<span style="font-size:18px;line-height:1.4;color:#6b6a63;">How hyperbaric therapy actually works.</span>` +
+    `</div>`;
+
+  const band = pickBand(HIT_SLIDE);
+  const { runs: hitRuns, html: hitHtml } = buildHitMapHtml(HIT_SLIDE, band);
+  const realRaw = await sharp(await renderDesignToPng(HIT_SLIDE, 600, 600, fonts))
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const mapRaw = await sharp(await renderDesignToPng(hitHtml, 600, 600, fonts))
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const bg = [realRaw.data[0], realRaw.data[1], realRaw.data[2]];
+  const seen = new Set<number>();
+  let ink = 0;
+  let attributed = 0;
+  for (let i = 0; i < realRaw.info.width * realRaw.info.height; i++) {
+    const o = i * realRaw.info.channels;
+    const isInk =
+      Math.abs(realRaw.data[o] - bg[0]) > 60 ||
+      Math.abs(realRaw.data[o + 1] - bg[1]) > 60 ||
+      Math.abs(realRaw.data[o + 2] - bg[2]) > 60;
+    if (!isInk) continue;
+    ink++;
+    const idx = indexFromColour(mapRaw.data[o], mapRaw.data[o + 1], mapRaw.data[o + 2], band);
+    if (idx !== null) {
+      attributed++;
+      seen.add(idx);
+    }
+  }
+
+  check("the probe slide actually has text to hit", ink > 1000);
+  check(
+    "virtually every rendered ink pixel falls inside a hit region",
+    attributed / ink > 0.95,
+  );
+  check("and every run is reachable", seen.size === hitRuns.length);
 
   console.log(`\nrenderDesign: ${passed} checks passed`);
 }

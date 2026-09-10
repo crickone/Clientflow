@@ -43,7 +43,8 @@ import { saveRender } from "@/lib/image/renderStore";
 const DESIGN_MAX_TOKENS = 32000;
 
 /** Slide dimensions by aspect ratio. The canvas the model is told to fill. */
-const CANVAS: Record<string, { width: number; height: number }> = {
+/** Exported so every path that renders a designed slide sizes it identically — the generator, the redesign, and the text editor. */
+export const CANVAS: Record<string, { width: number; height: number }> = {
   "1:1": { width: 1080, height: 1080 },
   "4:5": { width: 1080, height: 1350 },
   "9:16": { width: 1080, height: 1920 },
