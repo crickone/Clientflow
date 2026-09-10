@@ -89,11 +89,34 @@ export function PostIdeas({ onPick }: { onPick: (hook: string) => void }) {
     setError(null);
     setPicked(null);
     try {
-      const d = await fetch("/api/content-studio/post-ideas", {
+      const res = await fetch("/api/content-studio/post-ideas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ count: 6 }),
-      }).then((r) => r.json());
+      });
+
+      // Separate a TRANSPORT failure from an API one. A deploy swapping the
+      // container returns a 502 HTML page, and parsing that as JSON throws —
+      // which the old catch-all reported as "Couldn't get ideas", sending
+      // everyone to look at the generator when the app had simply restarted.
+      // Naming what actually happened is not the same as guessing a cause.
+      if (!res.ok) {
+        setError(
+          res.status >= 502 && res.status <= 504
+            ? "The app was restarting. Give it a few seconds and try again."
+            : `Couldn't get ideas — the server returned ${res.status}.`,
+        );
+        return;
+      }
+
+      let d: { ok?: boolean; error?: string; ideas?: unknown };
+      try {
+        d = await res.json();
+      } catch {
+        setError("The reply from Adonis wasn't readable. Try again.");
+        return;
+      }
+
       if (!d.ok) {
         setError(d.error ?? "Couldn't get ideas.");
         return;
@@ -108,7 +131,8 @@ export function PostIdeas({ onPick }: { onPick: (hook: string) => void }) {
       setIdeas(d.ideas as PostIdea[]);
       setShowLibrary(false);
     } catch {
-      setError("Couldn't get ideas.");
+      // Genuinely no reply: offline, or the request was cut off.
+      setError("Couldn't reach Adonis. Check your connection and try again.");
     } finally {
       setBusy(false);
     }
