@@ -57,6 +57,7 @@ export function describeSystemForDesign(system: DesignSystem): string {
 
   lines.push(
     "",
+    `Typeface: ${system.font}. Every text element sets font-family:"${system.font}" -- it is the only face the renderer has, and any other name renders in a fallback.`,
     `Grid: ${system.grid.columns} columns of ${Math.round(columnWidth(system))}px, margins ${system.grid.margin}px, gutters ${system.grid.gutter}px. Text sits in three or four columns. The empty columns are the calm and are not there to be filled.`,
     `Contrast: body text needs ${system.rules.minContrastBody}:1 against its ground, large text ${system.rules.minContrastLarge}:1.`,
     "Setting: flush left, ragged right. No centred type, no justification, no italics.",
@@ -86,7 +87,7 @@ Write ONE HTML element per slide. It is rendered by satori, which supports a SUB
 - Gradients work, and rgba() is how you build a scrim so type stays readable over a photograph.
 - No external CSS, no <style> block, no classes, no CSS variables. Inline "style" only.
 - Write characters directly, NEVER HTML entities. Type the actual character.
-- font-family is exactly "Inter".
+- font-family is exactly the typeface named in the design system above. No other face exists in the renderer.
 
 The canvas is EXACTLY the size you are told. The outermost element sets that width and height in px, "display:flex", and "position:relative".
 

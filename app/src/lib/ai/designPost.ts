@@ -110,7 +110,7 @@ async function renderOne(
   }
 
   try {
-    const fonts = await loadDesignFonts("Inter");
+    const fonts = await loadDesignFonts(system.font);
     let png = await renderDesignToPng(html, width, height, fonts);
     if (logoPath) {
       // Stamped after the design, never asked for in the markup -- placement
