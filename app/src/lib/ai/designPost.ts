@@ -22,6 +22,8 @@ import { meteredCreateStreamed, type MeterContext } from "@/lib/ai/metered";
 import { loadDesignFonts } from "@/lib/design/fonts";
 import { gradedPhotoDataUri, measureOverflowPx, renderDesignToPng, stampLogo } from "@/lib/design/renderDesign";
 import { getDesignSystem } from "@/lib/design/system";
+import { pickOpeningMove } from "@/lib/ai/openingMoves";
+import { readKey, setKey } from "@/lib/settings";
 import type { DesignSystem } from "@/lib/design/parse";
 import { saveRender } from "@/lib/image/renderStore";
 
@@ -41,6 +43,9 @@ import { saveRender } from "@/lib/image/renderStore";
  * frugal. Output tokens bill as used, so the headroom is free unless taken.
  */
 const DESIGN_MAX_TOKENS = 32000;
+
+/** Settings key holding the opening move the LAST post used, so the next one can't repeat it. */
+const LAST_OPENING_MOVE_KEY = "last_opening_move";
 
 /** Slide dimensions by aspect ratio. The canvas the model is told to fill. */
 /** Exported so every path that renders a designed slide sizes it identically — the generator, the redesign, and the text editor. */
@@ -182,6 +187,15 @@ export async function designPost(
     .filter(Boolean)
     .join("\n\n");
 
+  // A direction for slide one, rotated between generations. Without it the
+  // model opens every post the same way -- the prompt is identical each time,
+  // so it settles on its favourite composition and posts start to resemble
+  // each other even though each SET is varied internally. See ./openingMoves
+  // for why this is a direction rather than a layout to fill in.
+  const lastMove = readKey<string | null>(LAST_OPENING_MOVE_KEY, null);
+  const move = pickOpeningMove(lastMove, hasPhotography);
+  setKey(LAST_OPENING_MOVE_KEY, move.key);
+
   const userPrompt = [
     `Topic: ${input.topic}`,
     `Slides: ${input.slideCount}`,
@@ -189,6 +203,9 @@ export async function designPost(
     "",
     `The canvas for every slide is EXACTLY ${width}x${height} pixels.`,
     `Design ${input.slideCount} slide${input.slideCount === 1 ? "" : "s"} as ONE set: different compositions, one visual world. Rotate the grounds within the budgets above.`,
+    "",
+    `THE OPENING SLIDE: open on ${move.directive}. That is a starting point, not a template -- compose it yourself, and let the slides after it move away from that shape.`,
+    "",
     "Return ONLY the JSON in <design>...</design>.",
   ]
     .filter(Boolean)
@@ -367,6 +384,11 @@ export async function redesignSlide(
 
   const askFor = `Topic: ${input.topic}\n\nDesign ONE slide on a ${width}x${height} canvas. Return ONLY the JSON in <design>...</design>, with exactly one entry in "slides".`;
 
+  const redesignMove = pickOpeningMove(
+    readKey<string | null>(LAST_OPENING_MOVE_KEY, null),
+    hasPhotography,
+  );
+
   const message = await meteredCreateStreamed(meter, () => ({
     model,
     max_tokens: DESIGN_MAX_TOKENS,
@@ -388,7 +410,13 @@ export async function redesignSlide(
         role: "user" as const,
         content: input.note?.trim()
           ? `${input.note.trim()}\n\nRedesign that slide accordingly. Keep everything the instruction does not touch. Same format.`
-          : "Design that slide again, differently. Same content, a different composition. Same format.",
+          : // A plain regenerate with no steer lands on a near-identical
+            // composition surprisingly often — the model has just written this
+            // slide, and it is the strongest thing in its context. Naming a
+            // different direction is what makes "again, differently" actually
+            // different. Only when the operator gave no instruction of their
+            // own: a note is a steer, and this would fight it.
+            `Design that slide again, differently. Same content, a different composition -- take it toward ${redesignMove.directive}. Same format.`,
       },
     ],
   }));
