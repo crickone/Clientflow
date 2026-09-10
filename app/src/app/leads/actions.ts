@@ -7,7 +7,7 @@ import { z } from "zod";
 
 import { db } from "@/lib/db";
 import { leadMessages, leads } from "@/lib/db/schema";
-import { requireUser } from "@/lib/auth";
+import { requireAdmin, requireUser } from "@/lib/auth";
 import {
   addMessage,
   setLeadStatus,
@@ -17,6 +17,7 @@ import {
 import { logActivity } from "@/lib/queries";
 import { sendWhatsApp } from "@/lib/whatsapp/send";
 import { setStageToId } from "@/lib/pipeline/stage";
+import { dialLead } from "@/lib/voice/dial";
 
 /** Operator override of a lead's pipeline stage (e.g. mark Lost, or correct). */
 export async function setLeadStageAction(leadId: number, stageId: number) {
@@ -190,4 +191,57 @@ export async function deleteLeadAction(id: number) {
   db.delete(leads).where(eq(leads.id, leadId)).run();
   revalidatePath("/leads");
   redirect("/leads");
+}
+
+/**
+ * Place a voice-agent call to this lead. Every gate — provider configured,
+ * account entitled, under its spend cap, lead reachable and not opted out —
+ * lives in `dialLead` (lib/voice/dial.ts), the single place that can make a
+ * phone ring; this action only supplies who is asking.
+ *
+ * Admin-only: a phone call to a real person is not something a staff login
+ * should be able to trigger, and it spends the account's money.
+ */
+export async function callLeadAction(
+  leadId: number,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireAdmin();
+  const res = await dialLead({ leadId, startedBy: `user:${user.id}` });
+  revalidatePath(`/leads/${leadId}`);
+  if (!res.ok) return { ok: false, error: res.error };
+  return { ok: true };
+}
+
+/**
+ * Mark a lead as do-not-call, or clear it. A hard block on every future dial
+ * (see dialLead) — an opt-out on a sales call is a legal obligation, so it
+ * lives on the lead itself rather than as a tag an automation could move off.
+ * The change is logged to the lead's own timeline so there is a record of when
+ * it was set and by whom.
+ */
+export async function setLeadDoNotCallAction(
+  leadId: number,
+  doNotCall: boolean,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await requireAdmin();
+  try {
+    db.update(leads).set({ doNotCall }).where(eq(leads.id, leadId)).run();
+    addMessage({
+      leadId,
+      direction: "note",
+      channel: "system",
+      content: doNotCall
+        ? "Marked do-not-call — the voice agent will not phone this lead."
+        : "Do-not-call cleared.",
+    });
+    await logActivity(
+      "lead.do_not_call",
+      `Lead #${leadId} do-not-call ${doNotCall ? "set" : "cleared"}`,
+      { leadId, userId: user.id },
+    );
+    revalidatePath(`/leads/${leadId}`);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Couldn't update this lead." };
+  }
 }

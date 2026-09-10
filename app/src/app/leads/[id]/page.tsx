@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { LeadDetail } from "@/components/leads/LeadDetail";
 import { getLead, getLeadMessages } from "@/lib/leads";
 import { listStages } from "@/lib/pipeline/stageRepo";
+import { voiceAvailability } from "@/lib/voice/dial";
 
 export const dynamic = "force-dynamic";
 
@@ -15,10 +16,11 @@ export default async function LeadDetailPage({
   if (!lead) notFound();
   const messages = getLeadMessages(id);
   const stages = listStages();
+  const voice = voiceAvailability();
 
   return (
     <div className="app-page">
-      <LeadDetail lead={lead} messages={messages} stages={stages} />
+      <LeadDetail lead={lead} messages={messages} stages={stages} voice={voice} />
     </div>
   );
 }

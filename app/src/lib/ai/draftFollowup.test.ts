@@ -86,6 +86,7 @@ const requireLocal = createRequire(import.meta.url);
     therapyInterest: "HBOT",
     notes: null,
     rawPayload: null,
+    doNotCall: false,
     status: "new",
     pipelineStage: "new_lead",
     stageId: null,

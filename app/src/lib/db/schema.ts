@@ -291,6 +291,13 @@ export const leads = sqliteTable("leads", {
   therapyInterest: text("therapy_interest"),
   notes: text("notes"),
   rawPayload: text("raw_payload"),
+  // Do-not-call: set when someone asks not to be phoned again. Checked by
+  // lib/voice/dial.ts before every dial, and it is a HARD refusal — an opt-out
+  // on a sales call is a legal obligation, not a preference, so it is a column
+  // on the lead rather than a stage or a tag that a later automation could
+  // move off. Separate from the email `suppressions` table on purpose: an
+  // email unsubscribe is not a phone opt-out, and vice versa.
+  doNotCall: integer("do_not_call", { mode: "boolean" }).notNull().default(false),
   status: text("status", {
     enum: ["new", "contacted", "replied", "booked", "lost"],
   })

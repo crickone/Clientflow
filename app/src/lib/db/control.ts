@@ -740,6 +740,21 @@ export function ensureControlTables() {
       created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
     CREATE INDEX IF NOT EXISTS idx_voice_credit_ledger_tenant ON voice_credit_ledger(tenant_id, created_at);
+
+    -- Maps a provider conversation id -> the tenant (and call row) that owns
+    -- it. The post-call webhook is a server-to-server callback with NO session
+    -- cookie, so the tenant CANNOT be resolved from the request; without this
+    -- index the only alternative is opening every tenant DB and guessing,
+    -- which is exactly the fail-open tenant resolution the 2026-08 hardening
+    -- pass removed. Written at dial time, inside the same request that creates
+    -- the call row. An unknown conversation id is ignored (never a default
+    -- tenant), which is what makes the webhook fail CLOSED.
+    CREATE TABLE IF NOT EXISTS voice_call_index (
+      provider_call_id TEXT PRIMARY KEY,
+      tenant_id  INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      call_id    INTEGER NOT NULL,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
   `);
 
   // Existing control DBs predate site_domains.verify_token/verified_at. The

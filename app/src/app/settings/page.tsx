@@ -15,6 +15,7 @@ import {
   Bot,
   KeyRound,
   Megaphone,
+  PhoneOutgoing,
   Rocket,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -98,6 +99,12 @@ function buildSections(vocab: ReturnType<typeof getVocab>) {
     icon: Mail,
     title: "Email",
     desc: "Send staff invites and email clients from your own verified domain (Resend).",
+  },
+  {
+    href: "/settings/voice",
+    icon: PhoneOutgoing,
+    title: "Voice agent",
+    desc: "The AI that phones your leads — what it says, the number it calls from, and what it has cost.",
   },
   {
     href: "/settings/integrations/whatsapp",

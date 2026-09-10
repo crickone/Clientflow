@@ -6,6 +6,8 @@ import {
   ArrowLeft,
   Bot,
   Check,
+  PhoneOff,
+  PhoneOutgoing,
   Mail,
   MessageSquare,
   Phone,
@@ -23,10 +25,12 @@ import { Textarea } from "@/components/ui/Input";
 import { StageChip } from "@/components/pipeline/StageChip";
 import type { StageRecord } from "@/lib/pipeline/roles";
 import {
+  callLeadAction,
   deleteLeadAction,
   logInboundReplyAction,
   markMessageSentAction,
   sendLeadWhatsAppAction,
+  setLeadDoNotCallAction,
   setLeadStageAction,
 } from "@/app/leads/actions";
 import { formatDate, formatDateTime, relativeTime } from "@/lib/utils";
@@ -35,9 +39,14 @@ interface Props {
   lead: Lead;
   messages: LeadMessage[];
   stages: StageRecord[];
+  /** Whether this ACCOUNT can place calls at all (add-on on, provisioned, in
+   *  credit) plus why not — computed server-side by `voiceAvailability` so the
+   *  button explains itself instead of failing on click. Per-LEAD reasons (no
+   *  number, do-not-call) are decided here from the lead itself. */
+  voice: { available: boolean; reason: string | null };
 }
 
-export function LeadDetail({ lead: initialLead, messages: initialMessages, stages }: Props) {
+export function LeadDetail({ lead: initialLead, messages: initialMessages, stages, voice }: Props) {
   const [lead, setLead] = useState(initialLead);
   const [messages, setMessages] = useState(initialMessages);
   const [drafting, setDrafting] = useState(false);
@@ -50,6 +59,63 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
   const [replyChannel, setReplyChannel] = useState<
     "email" | "sms" | "whatsapp" | "call" | "manual"
   >("email");
+  const [calling, setCalling] = useState(false);
+
+  // Why the Call button can't be pressed, in the order an operator would want
+  // to hear it: the lead's own blockers first (they're specific and fixable
+  // here), then the account-wide one.
+  const callBlockedReason = lead.doNotCall
+    ? "This lead is marked do-not-call."
+    : !lead.phone
+      ? "This lead has no phone number."
+      : voice.available
+        ? null
+        : voice.reason;
+
+  async function placeCall() {
+    if (callBlockedReason) return;
+    const name = [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "this lead";
+    const ok = await confirm({
+      title: `Call ${name}?`,
+      body:
+        "The voice agent will phone them now, say it is an AI, and that the call is recorded. " +
+        "The call is charged to this account's voice minutes.",
+      confirmLabel: "Call now",
+    });
+    if (!ok) return;
+    setCalling(true);
+    try {
+      const res = await callLeadAction(lead.id);
+      if (res.ok) {
+        toast.success("Calling now — the transcript lands here when the call ends.");
+      } else {
+        toast.error(res.error);
+      }
+    } finally {
+      setCalling(false);
+    }
+  }
+
+  async function toggleDoNotCall() {
+    const next = !lead.doNotCall;
+    if (next) {
+      const ok = await confirm({
+        title: "Mark do-not-call?",
+        body: "The voice agent will never phone this lead again. You can undo this here.",
+        confirmLabel: "Mark do-not-call",
+      });
+      if (!ok) return;
+    }
+    start(async () => {
+      const res = await setLeadDoNotCallAction(lead.id, next);
+      if (res.ok) {
+        setLead({ ...lead, doNotCall: next });
+        toast.success(next ? "Marked do-not-call." : "Do-not-call cleared.");
+      } else {
+        toast.error(res.error);
+      }
+    });
+  }
 
   const stage = stages.find((s) => s.id === lead.stageId) ?? null;
 
@@ -272,6 +338,7 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
                 <Phone size={14} /> {lead.phone}
               </span>
             )}
+            {lead.doNotCall && <Badge>Do not call</Badge>}
             <StageChip stage={stage} />
             {lead.therapyInterest && <Badge>{lead.therapyInterest}</Badge>}
             {lead.campaign && <Badge>{lead.campaign}</Badge>}
@@ -284,11 +351,29 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
           </Button>
           <Button
             variant="outline"
+            onClick={placeCall}
+            disabled={calling || pending || !!callBlockedReason}
+            title={callBlockedReason ?? "Have the voice agent phone this lead now"}
+          >
+            <PhoneOutgoing size={14} />
+            {calling ? "Calling…" : "Call"}
+          </Button>
+          <Button
+            variant="outline"
             onClick={() => setReplyOpen(true)}
             disabled={pending}
           >
             <MessageSquare size={14} />
             Log reply
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={toggleDoNotCall}
+            disabled={pending}
+            title={lead.doNotCall ? "Allow calls to this lead again" : "Never phone this lead"}
+          >
+            <PhoneOff size={14} />
+            {lead.doNotCall ? "Allow calls" : "Do not call"}
           </Button>
         </div>
       </div>

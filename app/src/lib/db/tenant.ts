@@ -1058,6 +1058,7 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       therapy_interest TEXT,
       notes TEXT,
       raw_payload TEXT,
+      do_not_call INTEGER NOT NULL DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'new',
       client_id INTEGER REFERENCES clients(id),
       created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
@@ -1089,6 +1090,42 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_lead_messages_lead ON lead_messages(lead_id);
+
+    -- Voice agent calls (Phase 1). One row per call the AI voice agent places
+    -- or answers, from the moment it is dialled: the call record is written
+    -- BEFORE the provider is asked to dial, so a call that never connects (or
+    -- whose webhook never arrives) is still visible as 'dialling' rather than
+    -- vanishing. provider_call_id is the ElevenLabs conversation id, and the
+    -- control-plane voice_call_index maps it back to (tenant, call) when the
+    -- post-call webhook arrives with no session to resolve a tenant from.
+    --
+    -- duration_seconds/billed_minutes/cost_cents are what the tenant was
+    -- actually charged (see lib/voice/usage.ts) — stored per call so a
+    -- disputed line on a statement can be traced to one conversation, rather
+    -- than recomputed later from a price that may since have changed.
+    CREATE TABLE IF NOT EXISTS voice_calls (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      lead_id INTEGER REFERENCES leads(id) ON DELETE SET NULL,
+      direction TEXT NOT NULL DEFAULT 'outbound',   -- 'outbound' | 'inbound'
+      status TEXT NOT NULL DEFAULT 'dialling',      -- 'dialling'|'completed'|'failed'|'no_answer'
+      to_number TEXT,
+      provider_call_id TEXT,
+      agent_id TEXT,
+      duration_seconds INTEGER NOT NULL DEFAULT 0,
+      billed_minutes INTEGER NOT NULL DEFAULT 0,
+      cost_cents INTEGER NOT NULL DEFAULT 0,
+      outcome TEXT,                                 -- the agent's own summary of how it went
+      transcript TEXT,
+      recording_url TEXT,
+      error TEXT,
+      started_by TEXT,                              -- 'user:<id>' | 'system'
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+      ended_at INTEGER
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_voice_calls_lead ON voice_calls(lead_id, created_at);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_voice_calls_provider ON voice_calls(provider_call_id)
+      WHERE provider_call_id IS NOT NULL;
 
     CREATE TABLE IF NOT EXISTS video_projects (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1422,6 +1459,12 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     const cols = sqlite.prepare("PRAGMA table_info(leads)").all() as Array<{ name: string }>;
     if (!cols.some((c) => c.name === "stage_id")) {
       sqlite.exec("ALTER TABLE leads ADD COLUMN stage_id INTEGER REFERENCES pipeline_stages(id)");
+    }
+    // Voice do-not-call (Phase 1). Existing tenant DBs predate it; the CREATE
+    // above only applies to fresh installs, so add it once here (PRAGMA-
+    // guarded, mirroring every other column-add in this function).
+    if (!cols.some((c) => c.name === "do_not_call")) {
+      sqlite.exec("ALTER TABLE leads ADD COLUMN do_not_call INTEGER NOT NULL DEFAULT 0");
     }
   } catch (err) {
     console.error("[db] leads stage_id migration failed:", err);

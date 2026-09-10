@@ -28,7 +28,7 @@ Clonmel, Co. Tipperary — optimalhealthatinspire.ie · ☎ 083 867 2844).
                                data/clinic.db — see src/lib/db/tenant.ts.
     public/sites/<slug>/    ← per-site static assets (namespaced)
   admin/                    ← separate Next.js app: the platform console (subscriptions/
-                               billing, admin.clientflow.ie) — its own package.json, deployed
+                               billing, admin.adonisagent.ie) — its own package.json, deployed
                                as its own Railway service. Not part of the app/ CRM+CMS.
   sites/
     renova/, inspire/, clientflow/, clientflow-web/  ← bespoke website SOURCE per client
