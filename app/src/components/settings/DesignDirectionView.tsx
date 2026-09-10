@@ -1,0 +1,302 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Check, Eye, Loader2, RotateCcw } from "lucide-react";
+import { toast } from "sonner";
+
+import { Button } from "@/components/ui/Button";
+import { Card, CardLabel } from "@/components/ui/Card";
+import { Input, Label } from "@/components/ui/Input";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { applyDesignDirectionAction, clearDesignDirectionAction } from "@/app/settings/design/actions";
+
+/**
+ * Pick a direction, put your colours into its slots, look at three real
+ * slides, then apply. Applying is a button with a confirm and NOT autosave:
+ * it reshapes every post from now on.
+ *
+ * The preview is the whole point of the page. A direction is a set of
+ * decisions about type and grounds that only mean anything rendered, and
+ * rendered in the tenant's own colours -- a picker showing stock swatches has
+ * them choosing something they will never see.
+ */
+
+interface DirectionSummary {
+  id: string;
+  name: string;
+  blurb: string;
+  font: string;
+  slots: { key: string; label: string; defaultHex: string }[];
+}
+
+type Status =
+  | { kind: "none" }
+  | { kind: "custom" }
+  | { kind: "direction"; directionId: string; palette: Record<string, string> };
+
+const HEX = /^#[0-9a-fA-F]{6}$/;
+
+export function DesignDirectionView({
+  directions,
+  status,
+}: {
+  directions: DirectionSummary[];
+  status: Status;
+}) {
+  const router = useRouter();
+  const confirm = useConfirm();
+  const [pending, start] = useTransition();
+
+  const current = status.kind === "direction" ? status.directionId : null;
+  const [selectedId, setSelectedId] = useState<string | null>(current);
+  const selected = directions.find((d) => d.id === selectedId) ?? null;
+
+  // Palette state per direction, seeded from the stored choice for the current
+  // one and from defaults for the rest, so switching back and forth never loses
+  // colours already typed.
+  const [palettes, setPalettes] = useState<Record<string, Record<string, string>>>(() => {
+    const init: Record<string, Record<string, string>> = {};
+    for (const d of directions) {
+      const base: Record<string, string> = {};
+      for (const s of d.slots) base[s.key] = s.defaultHex;
+      if (status.kind === "direction" && status.directionId === d.id) Object.assign(base, status.palette);
+      init[d.id] = base;
+    }
+    return init;
+  });
+  const palette = selected ? palettes[selected.id] : {};
+  const paletteValid = selected ? selected.slots.every((s) => HEX.test(palette[s.key] ?? "")) : false;
+
+  const [preview, setPreview] = useState<string[] | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+
+  function setSlot(key: string, hex: string) {
+    if (!selected) return;
+    setPalettes((p) => ({ ...p, [selected.id]: { ...p[selected.id], [key]: hex } }));
+    setPreview(null);
+  }
+
+  async function runPreview() {
+    if (!selected || !paletteValid) return;
+    setPreviewing(true);
+    try {
+      const res = await fetch("/api/content-studio/design-direction/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ directionId: selected.id, palette }),
+      });
+      if (!res.ok) {
+        toast.error(res.status >= 502 && res.status <= 504 ? "The app was restarting. Try again in a moment." : `Preview failed (${res.status}).`);
+        return;
+      }
+      const d = await res.json();
+      if (!d.ok) {
+        toast.error(d.error ?? "Preview failed.");
+        return;
+      }
+      setPreview(d.slides as string[]);
+    } catch {
+      toast.error("Couldn't reach the app.");
+    } finally {
+      setPreviewing(false);
+    }
+  }
+
+  async function apply() {
+    if (!selected || !paletteValid) return;
+    const ok = await confirm({
+      title: `Use ${selected.name} for every post?`,
+      body: "Adonis will compose every new post in this direction, in these colours. Existing posts are untouched. You can change it again here at any time.",
+      confirmLabel: "Apply",
+    });
+    if (!ok) return;
+    start(async () => {
+      const r = await applyDesignDirectionAction({ directionId: selected.id, palette });
+      if (r.ok) {
+        toast.success(`${selected.name} is now your design direction.`);
+        router.refresh();
+      } else {
+        toast.error(r.error);
+      }
+    });
+  }
+
+  async function clear() {
+    const ok = await confirm({
+      title: "Go back to templates?",
+      body: "Adonis will stop composing layouts and use the fixed templates instead. Your colours here are kept until you leave the page.",
+      confirmLabel: "Use templates",
+      destructive: true,
+    });
+    if (!ok) return;
+    start(async () => {
+      const r = await clearDesignDirectionAction();
+      if (r.ok) {
+        toast.success("Back to templates.");
+        setSelectedId(null);
+        setPreview(null);
+        router.refresh();
+      } else {
+        toast.error(r.error);
+      }
+    });
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* Current state, plainly */}
+      <Card style={{ padding: 20 }}>
+        <CardLabel>In use</CardLabel>
+        <p style={{ fontSize: 14, color: "var(--text-secondary)", margin: "6px 0 0", lineHeight: 1.55 }}>
+          {status.kind === "none" && "No direction. Adonis uses the fixed templates."}
+          {status.kind === "custom" &&
+            "A hand-authored design system. Applying a direction below replaces it; nothing changes until you do."}
+          {status.kind === "direction" &&
+            `${directions.find((d) => d.id === status.directionId)?.name ?? status.directionId}, in your colours.`}
+        </p>
+      </Card>
+
+      {/* The six */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
+        {directions.map((d) => {
+          const isSelected = d.id === selectedId;
+          const isCurrent = d.id === current;
+          return (
+            <Card
+              key={d.id}
+              style={{
+                padding: 16,
+                cursor: "pointer",
+                border: isSelected ? "1px solid var(--accent)" : "1px solid var(--hairline)",
+                background: isSelected ? "var(--accent-soft)" : undefined,
+              }}
+              onClick={() => {
+                setSelectedId(d.id);
+                setPreview(null);
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 15, fontWeight: 600 }}>{d.name}</span>
+                {isCurrent && (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, color: "var(--accent)" }}>
+                    <Check size={12} />
+                    in use
+                  </span>
+                )}
+              </div>
+              <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: "6px 0 10px", lineHeight: 1.5 }}>{d.blurb}</p>
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                {d.slots.map((s) => (
+                  <span
+                    key={s.key}
+                    title={s.label}
+                    style={{ width: 18, height: 18, borderRadius: 4, background: palettes[d.id]?.[s.key] ?? s.defaultHex, border: "1px solid var(--hairline)" }}
+                  />
+                ))}
+                <span style={{ fontSize: 12, color: "var(--text-tertiary)", marginLeft: "auto" }}>{d.font}</span>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* Palette + preview + apply, for the selected direction */}
+      {selected && (
+        <Card style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+          <div>
+            <CardLabel>Your colours in {selected.name}</CardLabel>
+            <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "4px 0 0", lineHeight: 1.5 }}>
+              Each slot has a job. Put your brand colour in the slot that does that job, and the structure -- which
+              grounds, how often, what may carry text -- stays the direction&apos;s. Colours that can&apos;t be read on
+              any ground are kept off text automatically.
+            </p>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
+            {selected.slots.map((s) => {
+              const value = palette[s.key] ?? s.defaultHex;
+              const valid = HEX.test(value);
+              return (
+                <div key={s.key}>
+                  <Label htmlFor={`slot-${s.key}`}>{s.label}</Label>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <input
+                      type="color"
+                      aria-label={`${s.label} colour`}
+                      value={valid ? value : s.defaultHex}
+                      onChange={(e) => setSlot(s.key, e.target.value)}
+                      style={{ width: 40, height: 36, padding: 0, border: "1px solid var(--hairline)", borderRadius: "var(--radius-sm)", background: "transparent", cursor: "pointer" }}
+                    />
+                    <Input
+                      id={`slot-${s.key}`}
+                      value={value}
+                      onChange={(e) => setSlot(s.key, e.target.value)}
+                      placeholder={s.defaultHex}
+                      style={{ fontFamily: "var(--font-mono), ui-monospace, monospace" }}
+                    />
+                  </div>
+                  {!valid && (
+                    <p style={{ fontSize: 12, color: "var(--danger)", margin: "4px 0 0" }}>Six-digit hex, like #1a1a1a.</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <Button variant="outline" onClick={runPreview} disabled={previewing || !paletteValid}>
+              {previewing ? <Loader2 size={14} className="spin" /> : <Eye size={14} />}
+              {previewing ? "Rendering…" : "Preview three slides"}
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                const base: Record<string, string> = {};
+                for (const s of selected.slots) base[s.key] = s.defaultHex;
+                setPalettes((p) => ({ ...p, [selected.id]: base }));
+                setPreview(null);
+              }}
+            >
+              <RotateCcw size={14} />
+              Direction&apos;s own colours
+            </Button>
+            <span style={{ flex: 1 }} />
+            <Button variant="primary" onClick={apply} disabled={pending || !paletteValid || !preview}>
+              {pending ? <Loader2 size={14} className="spin" /> : <Check size={14} />}
+              {current === selected.id ? "Apply changes" : `Use ${selected.name}`}
+            </Button>
+          </div>
+          {!preview && (
+            <p style={{ fontSize: 12.5, color: "var(--text-tertiary)", margin: 0 }}>
+              Preview first. You apply what you have seen, not what you hope it looks like.
+            </p>
+          )}
+
+          {preview && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+              {preview.map((src, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={i} src={src} alt={`${selected.name} sample slide ${i + 1}`} style={{ width: "100%", height: "auto", borderRadius: "var(--radius)", border: "1px solid var(--hairline)" }} />
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {status.kind !== "none" && (
+        <Card style={{ padding: 20, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontSize: 14.5, fontWeight: 600 }}>Back to templates</div>
+            <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: "4px 0 0" }}>
+              Stop composing layouts and use the fixed templates only.
+            </p>
+          </div>
+          <Button variant="outline" onClick={clear} disabled={pending}>
+            Use templates only
+          </Button>
+        </Card>
+      )}
+    </div>
+  );
+}

@@ -10,6 +10,7 @@ import {
   UserCog,
   Image as ImageIcon,
   Palette,
+  LayoutTemplate,
   MessageCircle,
   Mail,
   Bot,
@@ -93,6 +94,12 @@ function buildSections(vocab: ReturnType<typeof getVocab>) {
     icon: ImageIcon,
     title: "Branding",
     desc: "Content Studio fonts, and the same business logo used on intro/outro cards.",
+  },
+  {
+    href: "/settings/design",
+    icon: LayoutTemplate,
+    title: "Design direction",
+    desc: "The look Adonis composes your posts in: a typeface, a grid and a rotation of grounds, in your own colours.",
   },
   {
     href: "/settings/email",
