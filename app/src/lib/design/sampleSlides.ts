@@ -16,6 +16,14 @@ import { defaultTypeValue } from "./validate";
 const W = 1080;
 const H = 1080;
 
+/** The top-right corner the logo is stamped into after rendering -- the
+ *  prompt's own rule for real slides is "roughly a quarter of the width and a
+ *  tenth of the height" (see DESIGN_RULES). Keeping every text block out of
+ *  that x-range entirely means no sample can collide with it whatever the
+ *  direction's margin, which is what the old `- 200` guess got wrong for every
+ *  direction in the catalogue. */
+const LOGO_CORNER_W = Math.round(W / 4);
+
 function css(system: DesignSystem, level: TypeLevel, colour: string): string {
   const t = system.type[level];
   return (
@@ -44,7 +52,7 @@ function accentHex(system: DesignSystem): string {
 
 export function sampleSlides(system: DesignSystem): string[] {
   const m = system.grid.margin;
-  const textWidth = W - m * 2 - 200; // keeps the top-right corner clear
+  const textWidth = W - m - LOGO_CORNER_W;
   const g0 = groundHex(system, 0);
   const g1 = groundHex(system, 1);
   const g2 = groundHex(system, 2);

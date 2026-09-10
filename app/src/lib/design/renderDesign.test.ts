@@ -10,6 +10,8 @@
 import assert from "node:assert/strict";
 import sharp from "sharp";
 
+import { composeDesignSystem, defaultPalette } from "./direction";
+import { getDirection } from "./directions";
 import { loadDesignFonts } from "./fonts";
 import { measureOverflowPx, renderDesignToPng } from "./renderDesign";
 import { buildHitMapHtml, indexFromColour, pickBand } from "./hitMap";
@@ -180,6 +182,62 @@ async function main() {
     const png = await renderDesignToPng(html, 1080, 1080, fonts);
     check(`sample ${i + 1} renders`, png.length > 0);
     check(`sample ${i + 1} fits the canvas`, (await measureOverflowPx(html, 1080, 1080, fonts)) === 0);
+
+    // The top-right corner is where the logo is stamped afterwards. It must
+    // hold nothing but ground: sample the region the prompt reserves (a quarter
+    // of the width, a tenth of the height) and require it to be one flat colour.
+    const raw = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const cornerX = raw.info.width - Math.round(raw.info.width / 4);
+    const cornerH = Math.round(raw.info.height / 10);
+    const first = (raw.info.width - 1) * raw.info.channels; // top-right pixel
+    let flat = true;
+    for (let y = 0; y < cornerH && flat; y++) {
+      for (let x = cornerX; x < raw.info.width; x++) {
+        const o = (y * raw.info.width + x) * raw.info.channels;
+        if (
+          Math.abs(raw.data[o] - raw.data[first]) > 8 ||
+          Math.abs(raw.data[o + 1] - raw.data[first + 1]) > 8 ||
+          Math.abs(raw.data[o + 2] - raw.data[first + 2]) > 8
+        ) {
+          flat = false;
+          break;
+        }
+      }
+    }
+    check(`sample ${i + 1} keeps the logo corner clear`, flat);
+  }
+
+  // The corner rule has to hold for every direction's grid, not just Optimal
+  // Health's hand-authored one -- rerun the same three assertions against
+  // "bold", which has the smallest margin (64) of any direction in the
+  // catalogue and is therefore the tightest case for the reserved corner.
+  const bold = getDirection("bold")!;
+  const boldFonts = await loadDesignFonts(bold.font);
+  const boldSamples = sampleSlides(composeDesignSystem(bold, defaultPalette(bold)));
+  for (const [i, html] of boldSamples.entries()) {
+    const png = await renderDesignToPng(html, 1080, 1080, boldFonts);
+    check(`bold sample ${i + 1} renders`, png.length > 0);
+    check(`bold sample ${i + 1} fits the canvas`, (await measureOverflowPx(html, 1080, 1080, boldFonts)) === 0);
+
+    const raw = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const cornerX = raw.info.width - Math.round(raw.info.width / 4);
+    const cornerH = Math.round(raw.info.height / 10);
+    const first = (raw.info.width - 1) * raw.info.channels;
+    let flat = true;
+    for (let y = 0; y < cornerH && flat; y++) {
+      for (let x = cornerX; x < raw.info.width; x++) {
+        const o = (y * raw.info.width + x) * raw.info.channels;
+        if (
+          Math.abs(raw.data[o] - raw.data[first]) > 8 ||
+          Math.abs(raw.data[o + 1] - raw.data[first + 1]) > 8 ||
+          Math.abs(raw.data[o + 2] - raw.data[first + 2]) > 8
+        ) {
+          flat = false;
+          break;
+        }
+      }
+    }
+    check(`bold sample ${i + 1} keeps the logo corner clear`, flat);
   }
 
   console.log(`\nrenderDesign: ${passed} checks passed`);

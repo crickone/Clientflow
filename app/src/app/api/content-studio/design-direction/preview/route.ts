@@ -31,13 +31,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Invalid JSON body." }, { status: 400 });
   }
 
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ ok: false, error: "Invalid JSON body." }, { status: 400 });
+  }
+
   const direction = typeof body.directionId === "string" ? getDirection(body.directionId) : null;
   if (!direction) return NextResponse.json({ ok: false, error: "Unknown design direction." }, { status: 400 });
 
   const palette: BrandPalette = {};
-  if (body.palette && typeof body.palette === "object") {
+  if (body.palette && typeof body.palette === "object" && !Array.isArray(body.palette)) {
     for (const [k, v] of Object.entries(body.palette as Record<string, unknown>)) {
-      if (typeof v === "string" && HEX.test(v.trim())) palette[k] = v.trim().toLowerCase();
+      const trimmed = typeof v === "string" ? v.trim() : "";
+      if (HEX.test(trimmed)) palette[k] = trimmed.toLowerCase();
     }
   }
 
