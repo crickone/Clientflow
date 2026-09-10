@@ -119,7 +119,7 @@ export function DesignDirectionView({
     } catch {
       toast.error("Couldn't reach the app.");
     } finally {
-      setPreviewing(false);
+      if (token === previewToken.current) setPreviewing(false);
     }
   }
 
@@ -145,7 +145,10 @@ export function DesignDirectionView({
   async function clear() {
     const ok = await confirm({
       title: "Go back to templates?",
-      body: "Adonis will stop composing layouts and use the fixed templates instead. Your colours here are kept until you leave the page.",
+      body:
+        status.kind === "custom"
+          ? "This removes the hand-authored design system on this account. Adonis will use the fixed templates until a direction is applied. This cannot be undone from here."
+          : "Adonis will stop composing layouts and use the fixed templates instead. Your colours here are kept until you leave the page.",
       confirmLabel: "Use templates",
       destructive: true,
     });

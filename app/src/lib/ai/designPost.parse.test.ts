@@ -34,10 +34,8 @@ check("the grid is given in real numbers", d.includes("76px") && d.includes("131
 check("the contrast floor is stated", d.includes("4.5:1"));
 check("the setting rule is stated", d.toLowerCase().includes("flush left"));
 check("the description names the typeface", d.includes("Typeface: Inter"));
-check(
-  "and tells the model to set it on every text element",
-  d.includes('font-family:"Inter"'),
-);
+check("and tells the model to set it on every text element, unquoted", d.includes("font-family:Inter"));
+check("and never shows the model a quoted font-family", !d.includes('font-family:"'));
 check(
   "the rules no longer hardcode Inter",
   !DESIGN_RULES.includes('font-family is exactly "Inter"'),

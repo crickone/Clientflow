@@ -57,7 +57,7 @@ export function describeSystemForDesign(system: DesignSystem): string {
 
   lines.push(
     "",
-    `Typeface: ${system.font}. Every text element sets font-family:"${system.font}" -- it is the only face the renderer has, and any other name renders in a fallback.`,
+    `Typeface: ${system.font}. Every text element sets font-family:${system.font} -- written exactly like that, with NO quotation marks around the name (a quote inside a style attribute ends the attribute). It is the only face the renderer has; any other name renders in a fallback.`,
     `Grid: ${system.grid.columns} columns of ${Math.round(columnWidth(system))}px, margins ${system.grid.margin}px, gutters ${system.grid.gutter}px. Text sits in three or four columns. The empty columns are the calm and are not there to be filled.`,
     `Contrast: body text needs ${system.rules.minContrastBody}:1 against its ground, large text ${system.rules.minContrastLarge}:1.`,
     "Setting: flush left, ragged right. No centred type, no justification, no italics.",

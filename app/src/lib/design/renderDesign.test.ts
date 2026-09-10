@@ -184,10 +184,11 @@ async function main() {
     check(`sample ${i + 1} fits the canvas`, (await measureOverflowPx(html, 1080, 1080, fonts)) === 0);
 
     // The top-right corner is where the logo is stamped afterwards. It must
-    // hold nothing but ground: sample the region the prompt reserves (a quarter
-    // of the width, a tenth of the height) and require it to be one flat colour.
+    // hold nothing but ground: sample stampLogo's actual box (a 7% margin plus
+    // a 19% logo width, a tenth of the height) and require it to be one flat
+    // colour.
     const raw = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-    const cornerX = raw.info.width - Math.round(raw.info.width / 4);
+    const cornerX = raw.info.width - Math.round(raw.info.width * 0.07) - Math.round(raw.info.width * 0.19);
     const cornerH = Math.round(raw.info.height / 10);
     const first = (raw.info.width - 1) * raw.info.channels; // top-right pixel
     let flat = true;
@@ -220,7 +221,7 @@ async function main() {
     check(`bold sample ${i + 1} fits the canvas`, (await measureOverflowPx(html, 1080, 1080, boldFonts)) === 0);
 
     const raw = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-    const cornerX = raw.info.width - Math.round(raw.info.width / 4);
+    const cornerX = raw.info.width - Math.round(raw.info.width * 0.07) - Math.round(raw.info.width * 0.19);
     const cornerH = Math.round(raw.info.height / 10);
     const first = (raw.info.width - 1) * raw.info.channels;
     let flat = true;

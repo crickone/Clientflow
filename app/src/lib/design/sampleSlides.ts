@@ -16,13 +16,12 @@ import { defaultTypeValue } from "./validate";
 const W = 1080;
 const H = 1080;
 
-/** The top-right corner the logo is stamped into after rendering -- the
- *  prompt's own rule for real slides is "roughly a quarter of the width and a
- *  tenth of the height" (see DESIGN_RULES). Keeping every text block out of
- *  that x-range entirely means no sample can collide with it whatever the
- *  direction's margin, which is what the old `- 200` guess got wrong for every
- *  direction in the catalogue. */
-const LOGO_CORNER_W = Math.round(W / 4);
+/** The top-right corner the logo is stamped into after rendering. Sized from
+ *  stampLogo's own geometry (a 7% margin and a 19% logo width, see
+ *  renderDesign.ts) plus a small gap, so no text block can touch the logo's
+ *  real box whatever the direction's margin -- the prompt's rough "a quarter
+ *  of the width" rule for real slides is narrower than the box actually is. */
+const LOGO_CORNER_W = Math.round(W * 0.19) + Math.round(W * 0.07) + 12;
 
 function css(system: DesignSystem, level: TypeLevel, colour: string): string {
   const t = system.type[level];
