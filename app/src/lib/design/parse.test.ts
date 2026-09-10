@@ -217,4 +217,27 @@ for (const input of [
 }
 check("parsing never throws, whatever it is handed", !threw);
 
+// -- font ------------------------------------------------------------------
+//
+// The stored Optimal Health blob in production predates `font`. It MUST keep
+// parsing, defaulting to Inter, or the tenant loses composed posts on deploy.
+{
+  const noFont = valid();
+  delete noFont.font;
+  const p = parseDesignSystem(noFont);
+  check("a system with no font field still parses", p !== null);
+  check("and defaults to Inter", p?.font === "Inter");
+
+  const withFont = valid();
+  withFont.font = "Playfair Display";
+  check("an explicit font is kept", parseDesignSystem(withFont)?.font === "Playfair Display");
+
+  rejects("font that is not a string", (s) => {
+    s.font = 42;
+  });
+  rejects("font that is blank", (s) => {
+    s.font = "   ";
+  });
+}
+
 console.log(`\nparse: ${passed} checks passed`);

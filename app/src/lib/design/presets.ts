@@ -22,6 +22,7 @@ import type { DesignSystem } from "./parse";
  */
 export const OPTIMAL_HEALTH_DESIGN_SYSTEM: DesignSystem = {
   version: 1,
+  font: "Inter",
 
   // Section 2 — five values, no more (navy is the reserved sixth, for
   // wayfinding and signage only, and is carried so a composed layout can be

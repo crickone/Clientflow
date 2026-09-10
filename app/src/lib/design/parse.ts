@@ -52,8 +52,17 @@ export interface TypeStep {
   upper?: boolean;
 }
 
+/** The face a system renders in when it names none. Inter is what every
+ *  system authored before `font` existed rendered in, so defaulting to it is
+ *  what keeps those stored blobs meaning what they meant. */
+export const DEFAULT_DESIGN_FONT = "Inter";
+
 export interface DesignSystem {
   version: 1;
+  /** satori font family. Must be one the renderer has bytes for
+   *  (lib/design/fonts.ts AVAILABLE_FAMILIES); an unknown name falls back to
+   *  Inter at load time rather than rendering in a silent default. */
+  font: string;
   values: { key: string; hex: string; role: ValueRole }[];
   /** Which values may be a ground, and the budget for each across a set.
    *  `share` is a ceiling as a fraction of the slides (0..1); `maxRun` is how
@@ -224,8 +233,20 @@ export function parseDesignSystem(input: unknown): DesignSystem | null {
     neverType.push(key);
   }
 
+  // Font — absent means "authored before fonts existed", which is Inter.
+  // Present but not a usable string is malformed, same as any other field.
+  let font: string;
+  if (input.font === undefined) {
+    font = DEFAULT_DESIGN_FONT;
+  } else if (typeof input.font === "string" && input.font.trim()) {
+    font = input.font.trim();
+  } else {
+    return null;
+  }
+
   return {
     version: 1,
+    font,
     values,
     grounds,
     type,
