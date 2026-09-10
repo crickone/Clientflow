@@ -2,7 +2,7 @@ import "server-only";
 
 import { getCurrentTenant, getCurrentTenantDb } from "@/lib/db/tenant";
 import { getLead } from "@/lib/leads";
-import { normalizePhone } from "@/lib/whatsapp/phone";
+import { toE164 } from "@/lib/whatsapp/phone";
 import { getVoiceAgentConfig, isVoiceProvisioned } from "./config";
 import { createCall, linkProviderCall, markCallFailed, type VoiceCallRow } from "./calls";
 import { outboundCall, voiceConfigured } from "./elevenlabs";
@@ -19,7 +19,7 @@ import { getCallFlow, isWithinWindow } from "./flow";
  *   2. THIS tenant has an agent and a number   (isVoiceProvisioned)
  *   3. the tenant is entitled, not suspended, under its spend cap, and has
  *      an allowance or credits left            (assertVoiceAllowed)
- *   4. we hold a phone number we can dial      (normalizePhone)
+ *   4. we hold a dialable E.164 number           (toE164)
  *   5. the person has not opted out            (see the note below)
  *
  * Concentrating them here is the point: a future autonomous dialler, a batch
@@ -99,7 +99,9 @@ export async function dialLead(input: DialLeadInput): Promise<DialResult> {
   const lead = getLead(input.leadId);
   if (!lead) return refuse("That lead no longer exists.");
 
-  const toNumber = normalizePhone(lead.phone ?? "");
+  // E.164 WITH the '+' — what Twilio and the provider require. The bare-digit
+  // `normalizePhone` used everywhere else in the app is rejected by them.
+  const toNumber = toE164(lead.phone);
   if (!toNumber) {
     return refuse("This lead has no usable phone number.");
   }

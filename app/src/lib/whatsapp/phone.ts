@@ -20,6 +20,26 @@ export function normalizePhone(raw: string | null | undefined): string {
   return s.replace(/\D/g, "");
 }
 
+/**
+ * E.164 WITH the leading '+' (e.g. "+353871234567") — the form telephony APIs
+ * require (Twilio, and ElevenLabs' outbound-call endpoint through it).
+ *
+ * Deliberately a separate function from `normalizePhone` rather than a change
+ * to it: the WhatsApp bridge and every inbound-number match in the app expect
+ * the bare-digits form, and quietly adding a '+' there would break matching
+ * everywhere. The two forms have genuinely different consumers, so they get
+ * two names.
+ *
+ * Returns "" for anything that isn't a plausible international number — under
+ * 8 digits or over E.164's 15-digit maximum. A caller that dials "" is refused
+ * by its own guard rather than asking a telephony provider to ring nonsense.
+ */
+export function toE164(raw: string | null | undefined): string {
+  const digits = normalizePhone(raw);
+  if (digits.length < 8 || digits.length > 15) return "";
+  return `+${digits}`;
+}
+
 /** True when two numbers refer to the same line after normalization. */
 export function phonesMatch(a: string | null | undefined, b: string | null | undefined): boolean {
   const na = normalizePhone(a);

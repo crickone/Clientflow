@@ -4,7 +4,7 @@
  */
 import assert from "node:assert/strict";
 
-import { normalizePhone, phonesMatch } from "./phone";
+import { normalizePhone, phonesMatch, toE164 } from "./phone";
 
 let passed = 0;
 function check(name: string, actual: unknown, expected: unknown) {
@@ -37,3 +37,23 @@ check("null never matches", phonesMatch(null, null), false);
 check("empty never matches", phonesMatch("", ""), false);
 
 console.log(`\nphone: ${passed} checks passed.`);
+
+// ── toE164: the telephony form, with the '+' ────────────────────────────────
+// A separate function from normalizePhone on purpose — Twilio and the voice
+// provider reject the bare-digit form the WhatsApp bridge wants, and this is
+// the exact mismatch that would have failed the first real outbound call.
+{
+  assert.equal(toE164("083 867 2844"), "+353838672844", "Irish national form gets the country code AND the plus");
+  assert.equal(toE164("+353 87 123 4567"), "+353871234567");
+  assert.equal(toE164("00353871234567"), "+353871234567");
+  assert.equal(toE164(null), "", "no number is not a number");
+  assert.equal(toE164(""), "");
+  assert.equal(toE164("12345"), "", "too short to be an international number — refused, not dialled");
+  assert.equal(toE164("1234567890123456"), "", "past E.164's 15-digit maximum");
+  assert.notEqual(
+    toE164("+353871234567"),
+    normalizePhone("+353871234567"),
+    "the two forms are deliberately different — that difference is the point",
+  );
+  console.log("phone.test.ts: toE164 assertions passed");
+}
