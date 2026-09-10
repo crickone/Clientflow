@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Eye, Loader2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
@@ -68,17 +68,29 @@ export function DesignDirectionView({
   const palette = selected ? palettes[selected.id] : {};
   const paletteValid = selected ? selected.slots.every((s) => HEX.test(palette[s.key] ?? "")) : false;
 
+  function select(id: string) {
+    setSelectedId(id);
+    setPreview(null);
+    previewToken.current++;
+  }
+
   const [preview, setPreview] = useState<string[] | null>(null);
   const [previewing, setPreviewing] = useState(false);
+  // Bumped whenever the palette or selected direction changes, so a preview
+  // response that lands after the operator has already moved on gets
+  // orphaned instead of re-enabling Apply with stale slides.
+  const previewToken = useRef(0);
 
   function setSlot(key: string, hex: string) {
     if (!selected) return;
     setPalettes((p) => ({ ...p, [selected.id]: { ...p[selected.id], [key]: hex } }));
     setPreview(null);
+    previewToken.current++;
   }
 
   async function runPreview() {
     if (!selected || !paletteValid) return;
+    const token = ++previewToken.current;
     setPreviewing(true);
     try {
       const res = await fetch("/api/content-studio/design-direction/preview", {
@@ -86,12 +98,20 @@ export function DesignDirectionView({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ directionId: selected.id, palette }),
       });
+      if (token !== previewToken.current) return;
       if (!res.ok) {
         toast.error(res.status >= 502 && res.status <= 504 ? "The app was restarting. Try again in a moment." : `Preview failed (${res.status}).`);
         return;
       }
-      const d = await res.json();
-      if (!d.ok) {
+      let d: { ok?: boolean; slides?: unknown; error?: string };
+      try {
+        d = await res.json();
+      } catch {
+        toast.error("The preview reply wasn't readable.");
+        return;
+      }
+      if (token !== previewToken.current) return;
+      if (!d.ok || !Array.isArray(d.slides)) {
         toast.error(d.error ?? "Preview failed.");
         return;
       }
@@ -165,15 +185,21 @@ export function DesignDirectionView({
           return (
             <Card
               key={d.id}
+              role="button"
+              tabIndex={0}
+              aria-pressed={isSelected}
               style={{
                 padding: 16,
                 cursor: "pointer",
                 border: isSelected ? "1px solid var(--accent)" : "1px solid var(--hairline)",
                 background: isSelected ? "var(--accent-soft)" : undefined,
               }}
-              onClick={() => {
-                setSelectedId(d.id);
-                setPreview(null);
+              onClick={() => select(d.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  select(d.id);
+                }
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -256,6 +282,7 @@ export function DesignDirectionView({
                 for (const s of selected.slots) base[s.key] = s.defaultHex;
                 setPalettes((p) => ({ ...p, [selected.id]: base }));
                 setPreview(null);
+                previewToken.current++;
               }}
             >
               <RotateCcw size={14} />
