@@ -24,20 +24,42 @@ const WEIGHTS = [400, 500, 600, 700] as const;
 const cache = new Map<string, DesignFont[]>();
 
 /**
- * Families with real per-weight bytes on disk. Nebula and ClashDisplay also sit
- * in public/fonts but ship as a single file each (a variable axis and two
- * styles), which satori cannot weight-match -- adding either means splitting it
- * into static instances first. A design system naming anything not listed here
- * falls back to Inter rather than rendering in a silent default.
+ * Families with real per-weight bytes on disk. Inter ships as the four TTFs
+ * it always did; the rest are fontsource WOFFs fetched by
+ * scripts/fetch-design-fonts.mjs (satori reads TTF/OTF/WOFF, not WOFF2).
+ * Nebula and ClashDisplay also sit in public/fonts but ship as a single file
+ * each (a variable axis and two styles), which satori cannot weight-match --
+ * adding either means splitting it into static instances first. A design
+ * system naming anything not listed here falls back to Inter rather than
+ * rendering in a silent default.
  */
-export const AVAILABLE_FAMILIES = ["Inter"] as const;
+export const AVAILABLE_FAMILIES = [
+  "Inter",
+  "Playfair Display",
+  "Space Grotesk",
+  "Manrope",
+  "Archivo",
+  "Fraunces",
+] as const;
+export type DesignFamily = (typeof AVAILABLE_FAMILIES)[number];
 
-export const DEFAULT_FAMILY = "Inter";
+export const DEFAULT_FAMILY: DesignFamily = "Inter";
 
-export function resolveFamily(family: string | null | undefined): string {
+/** File on disk for a family at a weight. Inter predates the fontsource
+ *  naming; everything after it follows fontsource's exactly. */
+const FILE: Record<DesignFamily, (weight: number) => string> = {
+  Inter: (w) => `Inter-${w}.ttf`,
+  "Playfair Display": (w) => `playfair-display-latin-${w}-normal.woff`,
+  "Space Grotesk": (w) => `space-grotesk-latin-${w}-normal.woff`,
+  Manrope: (w) => `manrope-latin-${w}-normal.woff`,
+  Archivo: (w) => `archivo-latin-${w}-normal.woff`,
+  Fraunces: (w) => `fraunces-latin-${w}-normal.woff`,
+};
+
+export function resolveFamily(family: string | null | undefined): DesignFamily {
   const name = (family ?? "").trim();
   return (AVAILABLE_FAMILIES as readonly string[]).includes(name)
-    ? name
+    ? (name as DesignFamily)
     : DEFAULT_FAMILY;
 }
 
@@ -51,7 +73,7 @@ export async function loadDesignFonts(
   const fonts = await Promise.all(
     WEIGHTS.map(async (weight) => ({
       name,
-      data: await readFile(path.join(dir, `${name}-${weight}.ttf`)),
+      data: await readFile(path.join(dir, FILE[name](weight))),
       weight,
       style: "normal" as const,
     })),
