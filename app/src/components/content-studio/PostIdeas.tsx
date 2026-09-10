@@ -1,9 +1,20 @@
 "use client";
 
-import { useState } from "react";
-import { Lightbulb, Loader2, RefreshCw, AlertTriangle } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import {
+  AlertTriangle,
+  Bookmark,
+  BookmarkCheck,
+  ChevronDown,
+  Lightbulb,
+  Loader2,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
+import { DUR, EASE } from "@/lib/motion";
 
 export interface PostIdea {
   pillar: string;
@@ -11,6 +22,11 @@ export interface PostIdea {
   teaches: string;
   basis: string;
   needsSource?: string;
+}
+
+interface SavedIdea extends PostIdea {
+  id: number;
+  status: "saved" | "used";
 }
 
 /**
@@ -22,15 +38,56 @@ export interface PostIdea {
  * inventing citations or statistics, so where a hard number would strengthen
  * the post it says what to look up instead. That turns a fabrication risk into
  * a visible task.
+ *
+ * TWO behaviours worth knowing about:
+ *
+ * 1. PICKING FOLDS THE LIST. Choosing an idea collapses the others away and
+ *    leaves the chosen one as a single summary bar. The list is a decision
+ *    surface, and once the decision is made it is noise sitting between the
+ *    operator and the topic box they're about to write in. The bar stays
+ *    clickable, so changing your mind costs one click — it's a fold, not a
+ *    commitment.
+ *
+ * 2. IDEAS CAN BE KEPT. A generation is ephemeral: pressing "New ideas"
+ *    replaces it, and the good idea you didn't want today is gone. The
+ *    bookmark saves a snapshot to the library (../../lib/content-studio/
+ *    ideaLibrary), which is browsable from the same control — so ideas
+ *    accumulate instead of evaporating.
+ *
+ * Both animations respect prefers-reduced-motion: with it on, the fold is
+ * instant rather than absent, because the LAYOUT change is the information —
+ * only the movement is decoration.
  */
 export function PostIdeas({ onPick }: { onPick: (hook: string) => void }) {
   const [ideas, setIdeas] = useState<PostIdea[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [picked, setPicked] = useState<PostIdea | null>(null);
+  const [saved, setSaved] = useState<SavedIdea[]>([]);
+  const [showLibrary, setShowLibrary] = useState(false);
+  const reduce = useReducedMotion();
+
+  const savedHooks = new Set(saved.map((s) => s.hook));
+  const dur = reduce ? 0 : DUR.base;
+
+  const loadLibrary = useCallback(async () => {
+    try {
+      const d = await fetch("/api/content-studio/ideas").then((r) => r.json());
+      if (d.ok && Array.isArray(d.ideas)) setSaved(d.ideas as SavedIdea[]);
+    } catch {
+      // The library is an enhancement, not the feature — a failure here must
+      // never stop someone generating or picking an idea.
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadLibrary();
+  }, [loadLibrary]);
 
   async function load() {
     setBusy(true);
     setError(null);
+    setPicked(null);
     try {
       const d = await fetch("/api/content-studio/post-ideas", {
         method: "POST",
@@ -49,12 +106,45 @@ export function PostIdeas({ onPick }: { onPick: (hook: string) => void }) {
         return;
       }
       setIdeas(d.ideas as PostIdea[]);
+      setShowLibrary(false);
     } catch {
       setError("Couldn't get ideas.");
     } finally {
       setBusy(false);
     }
   }
+
+  function pick(idea: PostIdea) {
+    setPicked(idea);
+    onPick(idea.hook);
+    // Bookkeeping only — the operator doesn't wait on it, and a failure here
+    // must not interrupt the pick.
+    void fetch("/api/content-studio/ideas", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hook: idea.hook }),
+    }).catch(() => {});
+  }
+
+  async function toggleSave(idea: PostIdea) {
+    const already = saved.find((s) => s.hook === idea.hook);
+    if (already) {
+      setSaved((s) => s.filter((x) => x.hook !== idea.hook)); // optimistic
+      await fetch(`/api/content-studio/ideas?id=${already.id}`, { method: "DELETE" }).catch(() => {});
+      void loadLibrary();
+      return;
+    }
+    const d = await fetch("/api/content-studio/ideas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(idea),
+    })
+      .then((r) => r.json())
+      .catch(() => null);
+    if (d?.ok && d.idea) setSaved((s) => [d.idea as SavedIdea, ...s]);
+  }
+
+  const list = showLibrary ? saved : (ideas ?? []);
 
   return (
     <div style={{ marginTop: 10 }}>
@@ -63,84 +153,216 @@ export function PostIdeas({ onPick }: { onPick: (hook: string) => void }) {
           {busy ? <Loader2 size={14} className="spin" /> : <Lightbulb size={14} />}
           {busy ? "Thinking…" : ideas ? "New ideas" : "Suggest ideas"}
         </Button>
+
+        {saved.length > 0 && (
+          <Button
+            variant={showLibrary ? "primary" : "ghost"}
+            size="sm"
+            onClick={() => {
+              setShowLibrary((v) => !v);
+              setPicked(null);
+            }}
+          >
+            <Bookmark size={14} />
+            Saved ({saved.length})
+          </Button>
+        )}
+
         <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-          In-depth, across your content pillars
+          {showLibrary ? "Ideas you kept" : "In-depth, across your content pillars"}
         </span>
       </div>
 
-      {error && (
-        <div style={{ marginTop: 8, fontSize: 12.5, color: "var(--danger)" }}>{error}</div>
-      )}
+      {error && <div style={{ marginTop: 8, fontSize: 12.5, color: "var(--danger)" }}>{error}</div>}
 
-      {ideas && ideas.length > 0 && (
-        <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
-          {ideas.map((idea, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => onPick(idea.hook)}
+      <AnimatePresence initial={false} mode="wait">
+        {picked ? (
+          // ── folded: the chosen idea, as one bar ──
+          <motion.button
+            key="picked"
+            type="button"
+            layout
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: dur, ease: EASE }}
+            onClick={() => setPicked(null)}
+            style={{
+              width: "100%",
+              textAlign: "left",
+              marginTop: 12,
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              background: "var(--accent-soft)",
+              border: "1px solid var(--accent)",
+              borderRadius: "var(--radius)",
+              padding: "12px 14px",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              color: "inherit",
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ ...pillarStyle, color: "var(--accent)" }}>{picked.pillar}</div>
+              <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.35, marginTop: 4 }}>
+                {picked.hook}
+              </div>
+            </div>
+            <span
               style={{
-                textAlign: "left",
-                background: "var(--surface-1)",
-                border: "1px solid var(--hairline)",
-                borderRadius: "var(--radius)",
-                padding: "12px 14px",
-                cursor: "pointer",
-                fontFamily: "inherit",
-                color: "inherit",
-                display: "grid",
+                display: "inline-flex",
+                alignItems: "center",
                 gap: 6,
+                fontSize: 12,
+                color: "var(--text-tertiary)",
+                flexShrink: 0,
               }}
             >
-              <span
-                style={{
-                  fontFamily: "var(--font-mono), ui-monospace, monospace",
-                  fontSize: 10,
-                  letterSpacing: "0.08em",
-                  textTransform: "uppercase",
-                  color: "var(--text-tertiary)",
-                }}
-              >
-                {idea.pillar}
-              </span>
-              <span style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.35 }}>
-                {idea.hook}
-              </span>
-              <span style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
-                {idea.teaches}
-              </span>
-              {idea.basis && (
-                <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-                  Rests on: {idea.basis}
-                </span>
-              )}
-              {idea.needsSource && (
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "flex-start",
-                    gap: 6,
-                    fontSize: 12,
-                    color: "var(--warning)",
-                    background: "var(--warning-soft)",
-                    borderRadius: "var(--radius-sm)",
-                    padding: "6px 9px",
-                    lineHeight: 1.45,
-                  }}
+              Change
+              <ChevronDown size={14} />
+            </span>
+          </motion.button>
+        ) : list.length > 0 ? (
+          // ── open: the full list ──
+          <motion.div
+            key={showLibrary ? "library" : "generated"}
+            layout
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: dur, ease: EASE }}
+            style={{ display: "grid", gap: 8, marginTop: 12 }}
+          >
+            {list.map((idea, i) => {
+              const isSaved = savedHooks.has(idea.hook);
+              const used = (idea as SavedIdea).status === "used";
+              return (
+                <motion.div
+                  key={idea.hook || i}
+                  layout
+                  initial={reduce ? false : { opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: dur, ease: EASE, delay: reduce ? 0 : Math.min(i, 6) * 0.03 }}
+                  style={{ position: "relative" }}
                 >
-                  <AlertTriangle size={12} style={{ flexShrink: 0, marginTop: 2 }} />
-                  Find a real source before publishing: {idea.needsSource}
-                </span>
-              )}
-            </button>
-          ))}
-          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--text-tertiary)" }}>
-            <RefreshCw size={11} />
-            Ideas are grounded in established principles. No study, journal or statistic
-            is cited — anything needing a hard number says so.
-          </div>
-        </div>
-      )}
+                  <button
+                    type="button"
+                    onClick={() => pick(idea)}
+                    style={{
+                      width: "100%",
+                      textAlign: "left",
+                      background: "var(--surface-1)",
+                      border: "1px solid var(--hairline)",
+                      borderRadius: "var(--radius)",
+                      padding: "12px 44px 12px 14px",
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      color: "inherit",
+                      display: "grid",
+                      gap: 6,
+                      opacity: used ? 0.65 : 1,
+                    }}
+                  >
+                    <span style={pillarStyle}>
+                      {idea.pillar}
+                      {used && " · already used"}
+                    </span>
+                    <span style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.35 }}>{idea.hook}</span>
+                    <span style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                      {idea.teaches}
+                    </span>
+                    {idea.basis && (
+                      <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Rests on: {idea.basis}</span>
+                    )}
+                    {idea.needsSource && (
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "flex-start",
+                          gap: 6,
+                          fontSize: 12,
+                          color: "var(--warning)",
+                          background: "var(--warning-soft)",
+                          borderRadius: "var(--radius-sm)",
+                          padding: "6px 9px",
+                          lineHeight: 1.45,
+                        }}
+                      >
+                        <AlertTriangle size={12} style={{ flexShrink: 0, marginTop: 2 }} />
+                        Find a real source before publishing: {idea.needsSource}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Keep/remove sits OUTSIDE the pick button — nesting buttons
+                      is invalid HTML, and one click must never mean both. */}
+                  <button
+                    type="button"
+                    aria-label={
+                      showLibrary ? "Remove from saved ideas" : isSaved ? "Remove from saved ideas" : "Save this idea"
+                    }
+                    title={showLibrary ? "Remove from the library" : isSaved ? "Saved — click to remove" : "Save for later"}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void toggleSave(idea);
+                    }}
+                    style={{
+                      position: "absolute",
+                      top: 10,
+                      right: 10,
+                      display: "grid",
+                      placeItems: "center",
+                      width: 28,
+                      height: 28,
+                      borderRadius: 6,
+                      border: "1px solid transparent",
+                      background: "transparent",
+                      cursor: "pointer",
+                      color: isSaved ? "var(--accent)" : "var(--text-tertiary)",
+                    }}
+                  >
+                    {showLibrary ? (
+                      <Trash2 size={14} />
+                    ) : isSaved ? (
+                      <BookmarkCheck size={14} />
+                    ) : (
+                      <Bookmark size={14} />
+                    )}
+                  </button>
+                </motion.div>
+              );
+            })}
+
+            {!showLibrary && (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--text-tertiary)" }}>
+                <RefreshCw size={11} />
+                Ideas are grounded in established principles. No study, journal or statistic is cited — anything
+                needing a hard number says so.
+              </div>
+            )}
+          </motion.div>
+        ) : showLibrary ? (
+          <motion.p
+            key="empty-library"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: dur, ease: EASE }}
+            style={{ fontSize: 12.5, color: "var(--text-tertiary)", marginTop: 12 }}
+          >
+            Nothing saved yet. Generate some ideas and press the bookmark on any you want to keep.
+          </motion.p>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }
+
+const pillarStyle: React.CSSProperties = {
+  fontFamily: "var(--font-mono), ui-monospace, monospace",
+  fontSize: 10,
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+  color: "var(--text-tertiary)",
+};

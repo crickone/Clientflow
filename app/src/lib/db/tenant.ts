@@ -1147,6 +1147,34 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_voice_queue_due ON voice_call_queue(status, due_at);
+
+    -- Saved post ideas (the ideas library). Generated ideas are ephemeral by
+    -- nature -- a new Suggest ideas run replaces them -- so a good one that
+    -- isn't wanted TODAY is lost. Saving copies the idea's fields as a
+    -- snapshot rather than referencing the generation: the whole point is that
+    -- it survives, and re-running the generator must never rewrite what an
+    -- operator deliberately kept.
+    --
+    -- hook is UNIQUE per tenant so saving the same idea twice is a no-op
+    -- rather than a growing pile of duplicates (the generator does repeat
+    -- itself across runs).
+    -- status: 'saved' (in the library) | 'used' (turned into a post) --
+    -- used ideas are kept, not deleted, so an operator can see what has
+    -- already been covered.
+    CREATE TABLE IF NOT EXISTS post_ideas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pillar TEXT NOT NULL DEFAULT '',
+      hook TEXT NOT NULL,
+      teaches TEXT NOT NULL DEFAULT '',
+      basis TEXT NOT NULL DEFAULT '',
+      needs_source TEXT,
+      status TEXT NOT NULL DEFAULT 'saved',
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+      used_at INTEGER
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_post_ideas_hook ON post_ideas(hook);
+    CREATE INDEX IF NOT EXISTS idx_post_ideas_status ON post_ideas(status, id);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_voice_queue_one_pending ON voice_call_queue(lead_id)
       WHERE status = 'pending';
     CREATE UNIQUE INDEX IF NOT EXISTS idx_voice_calls_provider ON voice_calls(provider_call_id)
