@@ -13,6 +13,8 @@ import sharp from "sharp";
 import { loadDesignFonts } from "./fonts";
 import { measureOverflowPx, renderDesignToPng } from "./renderDesign";
 import { buildHitMapHtml, indexFromColour, pickBand } from "./hitMap";
+import { OPTIMAL_HEALTH_DESIGN_SYSTEM } from "./presets";
+import { sampleSlides } from "./sampleSlides";
 
 let passed = 0;
 function check(name: string, cond: boolean) {
@@ -163,6 +165,22 @@ async function main() {
     attributed / ink > 0.95,
   );
   check("and every run is reachable", seen.size === hitRuns.length);
+
+  // ── sample slides: the preview a tenant judges a direction by ──
+  //
+  // Three fixed compositions, no model call, rendered with the system's own
+  // font, grounds and type. They must render for the hand-authored system
+  // (fonts and rules known-good) so that a direction that fails to preview is
+  // the direction's fault, not the sample's.
+  const samples = sampleSlides(OPTIMAL_HEALTH_DESIGN_SYSTEM);
+  check("three sample slides", samples.length === 3);
+  check("every sample names the system's font", samples.every((s) => s.includes(`font-family:${OPTIMAL_HEALTH_DESIGN_SYSTEM.font}`)));
+  check("the samples use the system's grounds", samples.some((s) => s.includes("#c7d2bb")) && samples.some((s) => s.includes("#f2f3ed")));
+  for (const [i, html] of samples.entries()) {
+    const png = await renderDesignToPng(html, 1080, 1080, fonts);
+    check(`sample ${i + 1} renders`, png.length > 0);
+    check(`sample ${i + 1} fits the canvas`, (await measureOverflowPx(html, 1080, 1080, fonts)) === 0);
+  }
 
   console.log(`\nrenderDesign: ${passed} checks passed`);
 }
