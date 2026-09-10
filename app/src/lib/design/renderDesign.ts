@@ -64,6 +64,71 @@ export async function renderDesignToPng(
 }
 
 /**
+ * How far a design's content runs PAST the bottom of its canvas, in pixels.
+ * 0 means it fits.
+ *
+ * Why this is needed at all: satori has no auto-fit. The fixed templates shrink
+ * a heading until it fits (autoFitHeading in lib/image/templates), but a
+ * designed slide is authored HTML with hard pixel font-sizes, so a model that
+ * writes one sentence too many simply gets it cut off at the canvas edge —
+ * which is exactly what an operator sees as "the last sentence doesn't finish".
+ *
+ * How it works, and why this shape: satori does NOT clip at the root. Rendered
+ * into a TALLER canvas at the SAME width, overflowing content paints below
+ * where the canvas would have ended, and the area past the root stays
+ * transparent otherwise. So the test is simply "is anything painted below the
+ * canvas line", read off the alpha channel — no background-colour heuristics,
+ * which would misfire on a full-bleed photograph. (Established by probe, not
+ * assumption: a 40px block reports 0 pixels below the line, the same block at
+ * 64px reports 1874.)
+ *
+ * The width is deliberately left EXACT. Widening the measurement canvas would
+ * re-wrap the text and measure a layout that is not the one being rendered.
+ * The cost is that horizontal overflow — a long unbroken word pushing past the
+ * right edge — is not detected here; vertical is what actually bites, because
+ * that is the direction copy grows.
+ *
+ * This is a SECOND satori pass per slide. That is a real cost, accepted
+ * deliberately: it runs inside a generation that already spent seconds on a
+ * model call, and it feeds the existing repair loop, so the alternative is
+ * shipping the operator a slide with its last line sliced off.
+ */
+export async function measureOverflowPx(
+  html: string,
+  width: number,
+  height: number,
+  fonts: DesignFont[],
+  slack = 500,
+): Promise<number> {
+  const { satori, toNodes } = await loadSatori();
+  const nodes = prepare(toNodes(html)) as Parameters<SatoriFn>[0];
+  const svg = await satori(nodes, { width, height: height + slack, fonts });
+  const { data, info } = await sharp(Buffer.from(svg))
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  let painted = 0;
+  let lowest = -1;
+  for (let y = height; y < info.height; y++) {
+    for (let x = 0; x < info.width; x++) {
+      // Alpha only. Anything painted below the canvas line is, by definition,
+      // content that did not fit.
+      if (data[(y * info.width + x) * info.channels + 3] > 8) {
+        painted++;
+        lowest = y;
+      }
+    }
+  }
+
+  // A handful of pixels is antialiasing on a shape that ends exactly at the
+  // edge, not a cut-off sentence. Requiring a real cluster keeps the repair
+  // loop from being triggered by a rounding artefact.
+  if (painted < 32 || lowest < 0) return 0;
+  return lowest - height + 1;
+}
+
+/**
  * Make a parsed HTML tree renderable: decode entities in text, and give
  * multi-child elements the explicit display satori demands.
  *

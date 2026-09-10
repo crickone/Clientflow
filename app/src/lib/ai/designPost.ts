@@ -20,7 +20,7 @@ import {
 } from "@/lib/ai/generateCarousel";
 import { meteredCreateStreamed, type MeterContext } from "@/lib/ai/metered";
 import { loadDesignFonts } from "@/lib/design/fonts";
-import { gradedPhotoDataUri, renderDesignToPng, stampLogo } from "@/lib/design/renderDesign";
+import { gradedPhotoDataUri, measureOverflowPx, renderDesignToPng, stampLogo } from "@/lib/design/renderDesign";
 import { getDesignSystem } from "@/lib/design/system";
 import type { DesignSystem } from "@/lib/design/parse";
 import { saveRender } from "@/lib/image/renderStore";
@@ -111,6 +111,24 @@ async function renderOne(
       // and size are brand rules, not something to leave to a model.
       png = await stampLogo(png, logoPath, width, height);
     }
+
+    // Does the design actually FIT? satori has no auto-fit, so a slide with one
+    // sentence too many renders with its last line sliced off at the canvas
+    // edge -- and it renders "successfully", which is why this cannot be left
+    // to the catch below. The render is still kept: a clipped slide the
+    // operator can see beats no slide at all, and the violation puts it in
+    // front of the repair call, which is the thing that can actually fix it.
+    const overflowPx = await measureOverflowPx(html, width, height, fonts);
+    if (overflowPx > 0) {
+      return {
+        renderFilename: saveRender(png),
+        violation:
+          `The content runs about ${overflowPx}px past the bottom of the ${width}x${height} canvas, ` +
+          `so the last lines are cut off. Cut copy or reduce the font-size until everything fits ` +
+          `inside the canvas with the margins intact -- do not just shrink the padding.`,
+      };
+    }
+
     return { renderFilename: saveRender(png), violation: null };
   } catch (err) {
     // A design that will not render must not take the whole set down with it.

@@ -10,7 +10,7 @@
 import assert from "node:assert/strict";
 
 import { loadDesignFonts } from "./fonts";
-import { renderDesignToPng } from "./renderDesign";
+import { measureOverflowPx, renderDesignToPng } from "./renderDesign";
 
 let passed = 0;
 function check(name: string, cond: boolean) {
@@ -79,6 +79,34 @@ async function main() {
     fonts,
   );
   check("an escaped tag stays text rather than becoming an element", escaped.length > 0);
+
+  // ── measureOverflowPx: does the design actually FIT the canvas? ──
+  //
+  // satori has no auto-fit, so a slide with one sentence too many renders
+  // "successfully" with its last lines sliced off at the canvas edge. That is
+  // the "the last sentence doesn't finish" an operator reports. Detection
+  // works because satori does NOT clip at the root: rendered into a taller
+  // canvas at the SAME width, the overflow paints below the canvas line, and
+  // everything past the root is otherwise transparent.
+  const LONG =
+    "Hyperbaric oxygen therapy works by increasing the pressure around you, which dissolves far " +
+    "more oxygen into the plasma than breathing at sea level ever could, reaching tissue that red " +
+    "blood cells struggle to serve when circulation is the limiting factor rather than the oxygen.";
+  const block = (px: number) =>
+    `<div style="display:flex;flex-direction:column;position:relative;width:600px;height:400px;background:#f2f3ed;font-family:Inter;padding:40px;">` +
+    `<span style="font-size:${px}px;line-height:1.15;color:#24231f;">${LONG}</span></div>`;
+
+  check("text that fits reports no overflow", (await measureOverflowPx(block(14), 600, 400, fonts)) === 0);
+
+  const past = await measureOverflowPx(block(40), 600, 400, fonts);
+  check("text that does not fit reports overflow", past > 0);
+  check("and reports roughly how far past it runs", past > 10);
+
+  // An empty-ish canvas must never report overflow — the predicate reads the
+  // alpha channel, so a full-bleed background must not be mistaken for content
+  // spilling out of the canvas.
+  const flat = `<div style="display:flex;width:600px;height:400px;background:#24231f;font-family:Inter;"></div>`;
+  check("a full-bleed background alone reports no overflow", (await measureOverflowPx(flat, 600, 400, fonts)) === 0);
 
   console.log(`\nrenderDesign: ${passed} checks passed`);
 }
