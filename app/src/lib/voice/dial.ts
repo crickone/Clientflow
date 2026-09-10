@@ -7,6 +7,7 @@ import { getVoiceAgentConfig, isVoiceProvisioned } from "./config";
 import { createCall, linkProviderCall, markCallFailed, type VoiceCallRow } from "./calls";
 import { outboundCall, voiceConfigured } from "./elevenlabs";
 import { assertVoiceAllowed, MAX_CALL_MINUTES } from "./usage";
+import { getCallFlow, isWithinWindow } from "./flow";
 
 /**
  * The ONE place in this application that can cause a phone to ring.
@@ -28,12 +29,17 @@ import { assertVoiceAllowed, MAX_CALL_MINUTES } from "./usage";
  * Returns a typed result and NEVER throws — a dialler loop that throws is a
  * retry storm aimed at a real person's phone.
  *
- * NOT yet enforced here, and deliberately named so it can't be forgotten:
- * calling windows (no evenings, no Sundays), the National Directory Database
- * opt-out screening, and a retry cap per lead. Those belong to the autonomous
- * dialler (Phase 3) rather than to an operator pressing a button in front of a
- * lead's record, and they must land in THIS function when that arrives, not
- * alongside it.
+ * The calling WINDOW applies to automated calls only (`startedBy === 'system'`)
+ * and is checked here as well as in the dialler loop — belt and braces, since
+ * this is the function that can actually make the phone ring. An operator
+ * pressing Call at 20:30 to return a missed call is exercising judgement about
+ * one person in front of them, which is a different thing from a machine
+ * working a list unattended; blocking that would just push them to their own
+ * mobile, where nothing is recorded.
+ *
+ * Still NOT enforced here, and named so it can't be forgotten: National
+ * Directory Database opt-out screening for numbers not sourced from an inbound
+ * enquiry. When that arrives it belongs in THIS function, not beside it.
  */
 
 export type DialResult =
@@ -99,6 +105,11 @@ export async function dialLead(input: DialLeadInput): Promise<DialResult> {
   }
   if (lead.doNotCall) {
     return refuse("This lead has asked not to be contacted.");
+  }
+
+  const automated = input.startedBy === "system";
+  if (automated && !isWithinWindow(new Date(), getCallFlow())) {
+    return refuse("Outside the calling hours set for this account.");
   }
 
   const tdb = getCurrentTenantDb();

@@ -18,6 +18,8 @@ import { logActivity } from "@/lib/queries";
 import { sendWhatsApp } from "@/lib/whatsapp/send";
 import { setStageToId } from "@/lib/pipeline/stage";
 import { dialLead } from "@/lib/voice/dial";
+import { cancelForLead } from "@/lib/voice/queue";
+import { getCurrentTenantDb } from "@/lib/db/tenant";
 
 /** Operator override of a lead's pipeline stage (e.g. mark Lost, or correct). */
 export async function setLeadStageAction(leadId: number, stageId: number) {
@@ -226,6 +228,10 @@ export async function setLeadDoNotCallAction(
   const user = await requireAdmin();
   try {
     db.update(leads).set({ doNotCall }).where(eq(leads.id, leadId)).run();
+    // Setting the flag is not enough on its own: a call already queued by the
+    // flow would still go out. Cancel it in the same action, so "do not call"
+    // takes effect immediately rather than at the next dial's gate.
+    if (doNotCall) cancelForLead(getCurrentTenantDb(), leadId, "Lead marked do-not-call");
     addMessage({
       leadId,
       direction: "note",

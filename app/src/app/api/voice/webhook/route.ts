@@ -6,6 +6,10 @@ import { completeCall, getCall, resolveProviderCall } from "@/lib/voice/calls";
 import { meterVoiceCall } from "@/lib/voice/usage";
 import { billedMinutesFor } from "@/lib/voice/pricing";
 import { transcriptToText, type ConversationDetail } from "@/lib/voice/elevenlabs";
+import { completeForLead } from "@/lib/voice/queue";
+import { getCallFlowForTenant } from "@/lib/voice/flow";
+import { setStageToId } from "@/lib/pipeline/stage";
+import { listStagesOnConn } from "@/lib/pipeline/stageRepo";
 
 export const dynamic = "force-dynamic";
 
@@ -133,6 +137,25 @@ export async function POST(req: Request) {
       (tdb as unknown as { $client: import("better-sqlite3").Database }).$client
         .prepare("UPDATE voice_calls SET cost_cents = ?, billed_minutes = ? WHERE id = ?")
         .run(charge.chargedCents, charge.billedMinutes, resolved.callId);
+
+      // A lead who actually answered is finished with the flow: take them off
+      // the queue so the retry ladder can't phone someone who has already had
+      // the conversation. A no-answer deliberately stays queued — the dialler
+      // owns the retry decision, not this route.
+      if (call.leadId && status === "completed") {
+        completeForLead(tdb, call.leadId);
+        const flow = getCallFlowForTenant(resolved.tenantId);
+        if (flow.onAnsweredStageRole) {
+          try {
+            const stage = listStagesOnConn(tdb).find((st) => st.role === flow.onAnsweredStageRole);
+            if (stage) setStageToId(call.leadId, stage.id);
+          } catch (err) {
+            // A stage that has since been renamed or deleted must not cost us
+            // the transcript below.
+            console.error("[voice webhook] could not advance the lead's stage:", err);
+          }
+        }
+      }
 
       if (call.leadId) {
         const mins = Math.floor(seconds / 60);

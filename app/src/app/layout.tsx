@@ -36,6 +36,10 @@ import { PastDueBanner } from "@/components/billing/PastDueBanner";
 // the server. This is a nodejs-only server component, so better-sqlite3 stays
 // out of the edge bundle. Guarded internally against duplicate timers.
 import "@/lib/automations/scheduler";
+// The voice dialler's own minute-granularity loop (self-starting, like the
+// scheduler above). Separate timer on purpose: speed-to-lead is the point of
+// automatic calling, and a daily tick would make it a different product.
+import "@/lib/voice/runner";
 import {
   bebasNeue,
   body,

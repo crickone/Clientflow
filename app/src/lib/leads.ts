@@ -5,6 +5,9 @@ import { leadMessages, leads, pipelineStages, type Lead, type LeadMessage } from
 import { normalizePhone } from "./whatsapp/phone";
 import { splitFullName } from "./humanName";
 import { resolveEntryStageId } from "./pipeline/stageRepo";
+import { getCurrentTenantDb } from "./db/tenant";
+import { getCallFlow } from "./voice/flow";
+import { enqueueCall } from "./voice/queue";
 import type { StageRole } from "./pipeline/roles";
 
 export type LeadStatus = "new" | "contacted" | "replied" | "booked" | "lost";
@@ -73,7 +76,36 @@ export function upsertLead(input: NormalizedLeadInput): {
     })
     .returning()
     .all();
-  return { lead: inserted[0], created: true };
+  const lead = inserted[0];
+  enrolInCallFlow(lead);
+  return { lead, created: true };
+}
+
+/**
+ * Hand a brand-new lead to the voice call flow, if this tenant has armed one.
+ *
+ * Here rather than at each caller because EVERY source of a new lead — the
+ * inbound API, Facebook lead ads, the manual form — funnels through
+ * `upsertLead`, and a source that quietly skipped enrolment would look like the
+ * dialler was broken. Only ever called on the CREATE path: re-posting an
+ * existing lead returns early above and must not re-queue a call.
+ *
+ * Fail-soft on purpose. Lead capture is the money path; a voice-queue problem
+ * (a locked DB, a bad config) must never cost the tenant the lead itself.
+ */
+function enrolInCallFlow(lead: Lead): void {
+  try {
+    const flow = getCallFlow();
+    if (!flow.enabled) return;
+    if (!lead.phone || lead.doNotCall) return;
+    enqueueCall(
+      getCurrentTenantDb(),
+      lead.id,
+      Date.now() + flow.triggerDelayMinutes * 60_000,
+    );
+  } catch (err) {
+    console.error("[voice] could not enrol a new lead in the call flow:", err);
+  }
 }
 
 function nz(v: string | null | undefined) {

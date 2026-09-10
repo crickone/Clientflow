@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { PhoneCall, RefreshCw } from "lucide-react";
+import { GitBranch, PhoneCall, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
@@ -109,6 +109,23 @@ export function VoiceSettingsView({
           </p>
         </Card>
       )}
+
+      {/* The call flow lives on its own page — it is the thing an operator
+          actually tunes, so it gets a prominent entry rather than a nav link. */}
+      <Card style={{ padding: 20, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20, flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 600 }}>Call flow</div>
+          <p style={{ fontSize: 13.5, color: "var(--text-secondary)", margin: "4px 0 0", lineHeight: 1.5, maxWidth: 520 }}>
+            When the agent calls a new lead, the hours it may call, and what happens if nobody answers.
+          </p>
+        </div>
+        <Link href="/settings/voice/flow">
+          <Button variant="outline">
+            <GitBranch size={14} />
+            Open the flow
+          </Button>
+        </Link>
+      </Card>
 
       {/* Allowances and spend */}
       <Card style={{ padding: 20 }}>

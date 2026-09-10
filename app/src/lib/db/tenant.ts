@@ -1124,6 +1124,31 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_voice_calls_lead ON voice_calls(lead_id, created_at);
+
+    -- The dialler's work list: one pending row per lead the call flow has
+    -- enrolled, with the instant it becomes due. A table rather than an
+    -- in-memory timer because the process restarts on every deploy and a
+    -- queued call must survive that — and because "who are we about to phone,
+    -- and when" is a question an operator is entitled to be able to answer.
+    --
+    -- attempt counts calls ALREADY made (0 on enrolment), so the flow's
+    -- maxAttempts is simply attempt >= maxAttempts -> stop.
+    -- status: 'pending' (due at due_at) | 'done' | 'cancelled' | 'exhausted'.
+    -- One pending row per lead at a time, enforced by the partial unique index.
+    CREATE TABLE IF NOT EXISTS voice_call_queue (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      lead_id INTEGER NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+      due_at INTEGER NOT NULL,
+      attempt INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'pending',
+      last_error TEXT,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_voice_queue_due ON voice_call_queue(status, due_at);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_voice_queue_one_pending ON voice_call_queue(lead_id)
+      WHERE status = 'pending';
     CREATE UNIQUE INDEX IF NOT EXISTS idx_voice_calls_provider ON voice_calls(provider_call_id)
       WHERE provider_call_id IS NOT NULL;
 
