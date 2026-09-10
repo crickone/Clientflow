@@ -179,7 +179,7 @@ export function StartDesign() {
           placeholder="e.g. why over-35s should lift weights, for people who think it's too late to start"
           style={{ minHeight: 84 }}
         />
-        <PostIdeas onPick={(hook) => setTopic(hook)} />
+        <PostIdeas onPick={(topic) => setTopic(topic)} />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>

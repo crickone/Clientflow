@@ -15,6 +15,7 @@ import {
 
 import { Button } from "@/components/ui/Button";
 import { DUR, EASE } from "@/lib/motion";
+import { ideaToTopic } from "@/lib/content-studio/ideaTopic";
 
 export interface PostIdea {
   pillar: string;
@@ -58,7 +59,7 @@ interface SavedIdea extends PostIdea {
  * instant rather than absent, because the LAYOUT change is the information —
  * only the movement is decoration.
  */
-export function PostIdeas({ onPick }: { onPick: (hook: string) => void }) {
+export function PostIdeas({ onPick }: { onPick: (topic: string) => void }) {
   const [ideas, setIdeas] = useState<PostIdea[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -140,7 +141,10 @@ export function PostIdeas({ onPick }: { onPick: (hook: string) => void }) {
 
   function pick(idea: PostIdea) {
     setPicked(idea);
-    onPick(idea.hook);
+    // The whole idea, not just its headline — see ideaToTopic for why handing
+    // the generator the hook alone threw away the substance that made the idea
+    // worth picking.
+    onPick(ideaToTopic(idea));
     // Bookkeeping only — the operator doesn't wait on it, and a failure here
     // must not interrupt the pick.
     void fetch("/api/content-studio/ideas", {
