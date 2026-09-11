@@ -100,6 +100,17 @@ export function describeSystemForDesign(system: DesignSystem): string {
     );
   }
 
+  if (system.templates.length > 0) {
+    lines.push(
+      "",
+      "THE SLIDE TYPES THIS STYLE IS BUILT FROM. A set moves between them -- a DIFFERENT one for each slide, chosen for what that slide has to do:",
+    );
+    for (const t of system.templates) lines.push(`- ${t.name}: ${t.structure}`);
+    lines.push(
+      "These describe a structure, not a stencil. You decide the proportions, the crop, the emphasis and what goes where inside one. Never use the same slide type twice in a row, and do not use them in the order listed.",
+    );
+  }
+
   return lines.join("\n");
 }
 

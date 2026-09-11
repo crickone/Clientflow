@@ -200,124 +200,99 @@ export const WARM: DesignDirection = {
 
 
 /**
- * Evidence File -- the dossier. A paper ground with a running head and a page
- * counter, a serif headline with a marker highlight through the key phrase,
- * numbers set as a ledger, and photography cropped to a band rather than bled.
+ * Evidence -- one style, built from a real account's whole feed rather than
+ * from one post.
  *
- * The marker is explicitly never type: it is a highlighter, it sits BEHIND
- * words, and lime letters on paper are 1.15:1 -- unreadable. The derived check
- * would not catch it, because the colour passes on the ink ground.
+ * It was first modelled as three directions (a paper dossier, a black poster,
+ * a data slide) because that is how the references LOOK at a glance. They are
+ * one brand: the same lime, the same condensed cut, the same evidence-led
+ * voice, using different slide types for different jobs. Splitting them made
+ * three directions that shared a family resemblance and none of which was the
+ * real thing. They are templates within a style, and that is how they are
+ * modelled here.
+ *
+ * TWO GROUNDS AND TWO DISPLAY FACES, both deliberate: the dossier pages are
+ * serif on paper, the posters and data slides are condensed caps on black, and
+ * a carousel moves between them. That is the style, not an inconsistency.
+ *
+ * The lime is usable as type on black (15:1) and unusable on paper (1.15:1).
+ * It is NOT in neverType, because forbidding it everywhere would lose the
+ * accent headlines the style is known for -- the per-ground contrast floor is
+ * what keeps it off paper.
  */
-export const EVIDENCE_FILE: DesignDirection = {
-  id: "evidence-file",
-  name: "Evidence File",
-  blurb: "A dossier. Paper, a serif headline with a marker highlight, numbers as a ledger, photography in a band.",
+export const EVIDENCE: DesignDirection = {
+  id: "evidence",
+  name: "Evidence",
+  blurb:
+    "Evidence-led and high contrast. Serif dossier pages on paper, condensed caps on black, a marker highlight and one hot accent.",
   font: "Playfair Display",
+  altFont: "Anton",
   bodyFont: "Inter",
   slots: [
-    { key: "paper", label: "Main ground", role: "ground", defaultHex: "#f7f7f4", ground: { share: 0.7, maxRun: 4 } },
-    { key: "ink", label: "Type, and the dark ground", role: "type", defaultHex: "#111111", ground: { share: 0.3, maxRun: 1 } },
-    { key: "marker", label: "Highlighter (behind words, never text)", role: "accent", defaultHex: "#d4f000" },
+    { key: "paper", label: "Light ground", role: "ground", defaultHex: "#f7f7f4", ground: { share: 0.5, maxRun: 2 } },
+    { key: "black", label: "Dark ground", role: "ground", defaultHex: "#0b0b0b", ground: { share: 0.5, maxRun: 3 } },
+    { key: "ink", label: "Type on light", role: "type", defaultHex: "#111111" },
+    { key: "chalk", label: "Type on dark", role: "type", defaultHex: "#ffffff" },
+    { key: "volt", label: "Accent and highlighter", role: "accent", defaultHex: "#d4f000" },
+    { key: "azure", label: "Second accent", role: "accent", defaultHex: "#4a9eff" },
     { key: "graphite", label: "Secondary type", role: "type", defaultHex: "#6b6b66" },
   ],
   type: {
     display: { size: 88, leading: 1.0, tracking: -0.02, weight: 600 },
     headline: { size: 62, leading: 1.04, tracking: -0.015, weight: 500 },
     subhead: { size: 28, leading: 1.3, tracking: 0, weight: 500 },
-    body: { size: 22, leading: 1.5, tracking: 0, weight: 400 },
+    body: { size: 21, leading: 1.5, tracking: 0, weight: 400 },
     label: { size: 13, leading: 1.2, tracking: 0.16, weight: 600, upper: true },
   },
   grid: { columns: 6, margin: 72, gutter: 24, field: 1080 },
-  photo: { saturate: 0.75, contrast: 1.05, brightness: 1.0 },
-  rules: { minContrastBody: 4.5, minContrastLarge: 3, neverType: ["marker"] },
+  photo: { saturate: 0.6, contrast: 1.15, brightness: 0.95 },
+  rules: { minContrastBody: 4.5, minContrastLarge: 3, neverType: [] },
   motifs: [
     "A running head across the top: the business name at label size on the left, a slide counter like 02 / 08 on the right, with a hard rule directly beneath spanning the full width.",
     "A kicker above the heading at label size -- a short section name such as THE MECHANISM -- preceded by a small ring or dot in the accent.",
-    "A marker highlight: a block of the highlighter colour sitting behind ONE line or phrase of the serif heading, with ink type on top. Use it once per slide at most.",
-    "A short accent rule, roughly the width of a word, directly under the heading.",
-    "A stat block: a numeral set very large inside a filled highlighter square, with a two-line caps label beside it.",
-    "A ledger: a narrow left column of figures with a tiny caps label beside each, rows separated by hairlines.",
-    "A photograph cropped to a wide letterbox band across the lower third, or to a tall column down the right-hand side. Never full bleed.",
-    "A footer line at label size: the source or a note on the left, and SWIPE on the right.",
-  ],
-};
-
-/**
- * Poster -- one photograph, one enormous condensed headline, nothing else.
- *
- * The references this came from get part of their force from grain and from
- * type passing behind the subject. satori has no filters and no masks, so
- * neither is available: what carries here is scale, crop and stacking.
- */
-export const POSTER: DesignDirection = {
-  id: "poster",
-  name: "Poster",
-  blurb: "One photograph, one enormous condensed headline, nothing else. Loudest of the set at thumbnail size.",
-  font: "Anton",
-  bodyFont: "Inter",
-  slots: [
-    { key: "black", label: "Main ground, and type on light", role: "ground", defaultHex: "#0b0b0b", ground: { share: 0.75, maxRun: 4 } },
-    { key: "chalk", label: "Type on dark, and the light ground", role: "type", defaultHex: "#ffffff", ground: { share: 0.25, maxRun: 1 } },
-    { key: "signal", label: "Signal colour, used once at most", role: "accent", defaultHex: "#d4f000" },
-  ],
-  type: {
-    display: { size: 150, leading: 0.92, tracking: -0.01, weight: 400, upper: true },
-    headline: { size: 104, leading: 0.94, tracking: -0.005, weight: 400, upper: true },
-    subhead: { size: 30, leading: 1.24, tracking: 0, weight: 500 },
-    body: { size: 22, leading: 1.45, tracking: 0, weight: 400 },
-    label: { size: 14, leading: 1.2, tracking: 0.18, weight: 600, upper: true },
-  },
-  grid: { columns: 4, margin: 56, gutter: 20, field: 1080 },
-  photo: { saturate: 0, contrast: 1.25, brightness: 0.85 },
-  rules: { minContrastBody: 4.5, minContrastLarge: 3, neverType: [] },
-  motifs: [
-    "A full-bleed photograph as the ground, with the headline laid straight over it in chalk -- no panel, no card, no box behind the type.",
-    "The headline stacked in three to five short lines, each line its own child, line height under 0.9, every line hard against the left margin.",
-    "The headline large enough that the canvas crops a letter at the left or the right edge.",
-    "A scrim: a vertical rgba gradient from the black ground at the bottom to transparent at the top, sitting over the photograph and under the type, so the words stay readable.",
-    "One short sentence-case line beneath the headline at subhead size, and nothing else on the slide.",
-    "A single word of the headline in the signal colour while the rest is chalk. Once in a set, not on every slide.",
-  ],
-};
-
-/**
- * Signal -- near-black, clinical, data-shaped. Accent words inside a white
- * headline, numbered section markers, and the furniture of a diagram:
- * annotation boxes with hairline borders, connector lines, method cards.
- */
-export const SIGNAL: DesignDirection = {
-  id: "signal",
-  name: "Signal",
-  blurb: "Near-black and clinical. A condensed headline with one word in the accent, numbered sections, diagram furniture.",
-  font: "Anton",
-  bodyFont: "Inter",
-  slots: [
-    { key: "void", label: "Main ground", role: "ground", defaultHex: "#08090b", ground: { share: 0.65, maxRun: 3 } },
-    { key: "deep", label: "Second ground", role: "ground", defaultHex: "#101826", ground: { share: 0.35, maxRun: 2 } },
-    { key: "chalk", label: "Type", role: "type", defaultHex: "#ffffff" },
-    { key: "volt", label: "Accent", role: "accent", defaultHex: "#c8f000" },
-    { key: "azure", label: "Second accent", role: "accent", defaultHex: "#4a9eff" },
-    { key: "slate", label: "Secondary type", role: "type", defaultHex: "#8b93a1" },
-  ],
-  type: {
-    display: { size: 96, leading: 0.92, tracking: -0.01, weight: 400, upper: true },
-    headline: { size: 70, leading: 0.96, tracking: -0.005, weight: 400, upper: true },
-    subhead: { size: 26, leading: 1.3, tracking: 0.01, weight: 600 },
-    body: { size: 19, leading: 1.55, tracking: 0.02, weight: 500 },
-    label: { size: 13, leading: 1.2, tracking: 0.2, weight: 600, upper: true },
-  },
-  grid: { columns: 8, margin: 64, gutter: 20, field: 1080 },
-  photo: { saturate: 0.85, contrast: 1.2, brightness: 0.8, wash: { slot: "deep", alpha: 0.18 } },
-  rules: { minContrastBody: 4.5, minContrastLarge: 3, neverType: [] },
-  motifs: [
-    "A numbered section marker above the heading at label size, in the accent: a figure, a slash, then the section name -- 03 / THE BELIEF SHIFT.",
-    "One or two words of the headline set in the accent while the rest is chalk, the accent words carrying the point of the sentence.",
-    "A block of body copy set in capitals and centred -- for a definition or a caption, not for every paragraph on every slide.",
-    "A figure set enormous with its unit or percent sign in the accent beside it, and a sentence beneath explaining what it measures.",
-    "A method card: a rounded rectangle with a hairline border in the accent, a caps label inside it, and two or three short lines of detail.",
+    "A marker highlight: a block of the accent sitting behind ONE line or phrase of a serif heading, with ink type on top. Once per slide at most, and only on the light ground.",
+    "One or two words of a condensed headline set in the accent while the rest is chalk, the accent words carrying the point of the sentence.",
+    "A figure set very large with its unit or percent sign in the accent beside it.",
     "A thin accent line running from a label to the thing it marks, ending in a small filled square.",
-    "A footer: the source at label size in slate, and SWIPE centred in the accent beneath it.",
-    "A disclaimer strip along the very bottom inside a thin bordered box, tiny, in slate.",
+    "A footer at label size: the source on the left in the secondary type, and SWIPE on the right.",
+    "A hairline-bordered box in the accent holding a short caps label and two lines of detail.",
+  ],
+  templates: [
+    {
+      name: "Dossier page",
+      structure:
+        "Light ground. Running head and slide counter with a hard rule beneath, a kicker, a SERIF heading of one or two lines with a marker highlight behind one of them, a short accent rule, a paragraph of body copy with key terms in bold, and a footer. The workhorse for explaining a mechanism.",
+    },
+    {
+      name: "Poster",
+      structure:
+        "A photograph filling the whole canvas with a dark scrim over it, and a CONDENSED CAPS headline in chalk laid straight on top, stacked in three to five short lines, large enough that a letter is cropped by an edge. One sentence-case line beneath it. Nothing else.",
+    },
+    {
+      name: "Data point",
+      structure:
+        "Dark ground. A numbered section marker in the accent, one figure set enormous in the condensed face with its unit in the accent, and two or three lines of body copy explaining what it measures. Optionally a hairline-bordered method box beneath.",
+    },
+    {
+      name: "Ledger",
+      structure:
+        "Light ground. A narrow left column of figures in the serif face with a tiny caps label beside each, rows separated by hairlines, under a short heading. For three to five related numbers that belong together.",
+    },
+    {
+      name: "Definition list",
+      structure:
+        "Either ground. A short kicker, then three or four rows stacked down the page, each a term in the accent followed by its explanation in the body face. Separated by space or hairlines, never shut in cards and never side by side.",
+    },
+    {
+      name: "Annotated figure",
+      structure:
+        "Dark ground. A photograph or figure with small caps labels placed around it, each joined to what it marks by a thin accent line ending in a filled square. A heading above or below, kept clear of the labels.",
+    },
+    {
+      name: "Closing card",
+      structure:
+        "Dark ground. A condensed caps closing line with one phrase in the accent, a short prompt to save or share it in a hairline-bordered box, and a disclaimer strip in the secondary type along the very bottom.",
+    },
   ],
 };
 
@@ -328,9 +303,7 @@ export const DESIGN_DIRECTIONS: DesignDirection[] = [
   CLINICAL,
   SWISS,
   WARM,
-  EVIDENCE_FILE,
-  POSTER,
-  SIGNAL,
+  EVIDENCE,
 ];
 
 export function getDirection(id: string): DesignDirection | null {

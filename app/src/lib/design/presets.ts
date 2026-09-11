@@ -23,6 +23,7 @@ import type { DesignSystem } from "./parse";
 export const OPTIMAL_HEALTH_DESIGN_SYSTEM: DesignSystem = {
   version: 1,
   font: "Inter",
+  templates: [],
 
   // Sage Field's compositional moves -- the same list the direction of that
   // name carries, and directions.test.ts pins that the two cannot drift apart.

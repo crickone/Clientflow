@@ -53,7 +53,7 @@ export async function POST(req: Request) {
   if (!system) return NextResponse.json({ ok: false, error: "That combination doesn't compose." }, { status: 400 });
 
   try {
-    const fonts = await loadDesignFonts(system.font, system.bodyFont);
+    const fonts = await loadDesignFonts(system.font, system.bodyFont, system.altFont);
     const slides = await Promise.all(
       sampleSlides(system, base.id).map(async (html) => {
         const png = await renderDesignToPng(html, 1080, 1080, fonts);

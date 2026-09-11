@@ -70,7 +70,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   }
 
   try {
-    const fonts = await loadDesignFonts(getDesignSystem()?.font, getDesignSystem()?.bodyFont);
+    const fonts = await loadDesignFonts(getDesignSystem()?.font, getDesignSystem()?.bodyFont, getDesignSystem()?.altFont);
     const { width, height } = CANVAS[found.slide.aspectRatio] ?? CANVAS["1:1"];
 
     // No logo stamp on the hit map: the logo is painted OVER the design after
@@ -151,7 +151,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         rendered = rendered.replace(/<img[^>]*\{\{PHOTO\}\}[^>]*>/gi, "");
       }
     }
-    const fonts = await loadDesignFonts(system.font, system.bodyFont);
+    const fonts = await loadDesignFonts(system.font, system.bodyFont, system.altFont);
     let png = await renderDesignToPng(rendered, width, height, fonts);
     if (logoPath) png = await stampLogo(png, logoPath, width, height);
 

@@ -21,7 +21,7 @@ function check(name: string, cond: boolean) {
   console.log("  ✓", name);
 }
 
-check("there are nine directions", DESIGN_DIRECTIONS.length === 9);
+check("there are seven directions", DESIGN_DIRECTIONS.length === 7);
 check("ids are unique", new Set(DESIGN_DIRECTIONS.map((d) => d.id)).size === DESIGN_DIRECTIONS.length);
 check("names are unique", new Set(DESIGN_DIRECTIONS.map((d) => d.name)).size === DESIGN_DIRECTIONS.length);
 // Anton is deliberately shared by Poster and Signal: both are built on the
@@ -38,6 +38,29 @@ check(
 check(
   "every motif is a real instruction, not a label",
   DESIGN_DIRECTIONS.every((d) => d.motifs.every((m) => m.trim().length > 30)),
+);
+
+// A style built from named slide types must describe each one well enough that
+// a designer could build it without seeing the reference. A name with a
+// one-liner beside it is a label, not a template.
+for (const d of DESIGN_DIRECTIONS.filter((x) => x.templates?.length)) {
+  check(`${d.name}: template names are unique`, new Set(d.templates!.map((t) => t.name)).size === d.templates!.length);
+  check(
+    `${d.name}: every template describes a real structure`,
+    d.templates!.every((t) => t.name.trim().length > 2 && t.structure.trim().length > 80),
+  );
+  check(`${d.name}: enough slide types to fill a carousel without repeating`, d.templates!.length >= 5);
+}
+
+// A second display face has to be a face the renderer actually has, or every
+// element naming it renders in a silent fallback.
+check(
+  "a second display face is one the renderer has",
+  DESIGN_DIRECTIONS.every((d) => !d.altFont || (AVAILABLE_FAMILIES as readonly string[]).includes(d.altFont)),
+);
+check(
+  "and so is every body face",
+  DESIGN_DIRECTIONS.every((d) => !d.bodyFont || (AVAILABLE_FAMILIES as readonly string[]).includes(d.bodyFont)),
 );
 check("getDirection finds by id", getDirection("sage-field") === SAGE_FIELD);
 check("getDirection is null for an unknown id", getDirection("nope") === null);

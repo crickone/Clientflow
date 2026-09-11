@@ -63,6 +63,12 @@ export interface DesignSystem {
    *  (lib/design/fonts.ts AVAILABLE_FAMILIES); an unknown name falls back to
    *  Inter at load time rather than rendering in a silent default. */
   font: string;
+  /**
+   * A SECOND display face, where a style genuinely has two -- a serif for
+   * editorial pages and a condensed grotesk for posters, say. Absent means the
+   * style has one display face, which is the common case.
+   */
+  altFont?: string;
   /** The face for body and small copy. Absent means "the same as `font`" --
    *  which is what every system authored before the pair existed meant. A
    *  serif display over a sans body is the move that makes an editorial system
@@ -78,6 +84,8 @@ export interface DesignSystem {
    * what every system authored before this existed gets.
    */
   motifs: string[];
+  /** The named slide types this style is built from. See DesignDirection.templates. */
+  templates: { name: string; structure: string }[];
   values: { key: string; hex: string; role: ValueRole }[];
   /** Which values may be a ground, and the budget for each across a set.
    *  `share` is a ceiling as a fraction of the slides (0..1); `maxRun` is how
@@ -248,16 +256,19 @@ export function parseDesignSystem(input: unknown): DesignSystem | null {
     neverType.push(key);
   }
 
-  // Body font — absent means "the same face as the display", which is what a
-  // system authored before the pair existed meant.
-  let bodyFont: string | undefined;
-  if (input.bodyFont !== undefined) {
-    if (typeof input.bodyFont === "string" && input.bodyFont.trim()) {
-      bodyFont = input.bodyFont.trim();
-    } else {
-      return null;
-    }
-  }
+  // Optional faces -- absent means the system does not have that role, which
+  // for bodyFont means "the same face as the display".
+  const optionalFace = (v: unknown): { ok: true; value?: string } | { ok: false } => {
+    if (v === undefined) return { ok: true };
+    if (typeof v === "string" && v.trim()) return { ok: true, value: v.trim() };
+    return { ok: false };
+  };
+  const bodyParsed = optionalFace(input.bodyFont);
+  if (!bodyParsed.ok) return null;
+  const bodyFont = bodyParsed.value;
+  const altParsed = optionalFace(input.altFont);
+  if (!altParsed.ok) return null;
+  const altFont = altParsed.value;
 
   // Motifs — absent is an empty list, i.e. "use the generic moves". Each entry
   // must be a non-empty string; anything else is malformed, same as any field.
@@ -267,6 +278,21 @@ export function parseDesignSystem(input: unknown): DesignSystem | null {
     for (const m of input.motifs) {
       if (typeof m !== "string" || !m.trim()) return null;
       motifs.push(m.trim());
+    }
+  }
+
+  // Templates — absent is an empty list. Each needs both halves: a name with
+  // no structure tells the designer nothing, and a structure with no name
+  // cannot be referred to when asking for a different one next slide.
+  const templates: { name: string; structure: string }[] = [];
+  if (input.templates !== undefined) {
+    if (!Array.isArray(input.templates)) return null;
+    for (const t of input.templates) {
+      if (!isObj(t)) return null;
+      const name = typeof t.name === "string" ? t.name.trim() : "";
+      const structure = typeof t.structure === "string" ? t.structure.trim() : "";
+      if (!name || !structure) return null;
+      templates.push({ name, structure });
     }
   }
 
@@ -285,7 +311,9 @@ export function parseDesignSystem(input: unknown): DesignSystem | null {
     version: 1,
     font,
     ...(bodyFont ? { bodyFont } : {}),
+    ...(altFont ? { altFont } : {}),
     motifs,
+    templates,
     values,
     grounds,
     type,

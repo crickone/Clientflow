@@ -43,9 +43,18 @@ function rejects(name: string, mutate: (s: Record<string, any>) => void) {
 
 const parsed = parseDesignSystem(valid());
 check("the authored Optimal Health system parses", parsed !== null);
+// Compared key-insensitively: the preset is authored in the order the brand
+// document states things, the parser emits its own order, and neither order
+// means anything. What must hold is that every value survives unchanged.
+const canonical = (v: unknown) =>
+  JSON.stringify(v, (_k, val) =>
+    val && typeof val === "object" && !Array.isArray(val)
+      ? Object.fromEntries(Object.entries(val as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)))
+      : val,
+  );
 check(
   "it round-trips value-for-value",
-  JSON.stringify(parsed) === JSON.stringify(OPTIMAL_HEALTH_DESIGN_SYSTEM),
+  canonical(parsed) === canonical(OPTIMAL_HEALTH_DESIGN_SYSTEM),
 );
 check("all five type levels survive", TYPE_LEVELS.every((l) => !!parsed?.type[l]));
 

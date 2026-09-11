@@ -34,12 +34,23 @@ function faceFor(system: DesignSystem, level: TypeLevel): string {
   return isDisplay ? system.font : (system.bodyFont ?? system.font);
 }
 
-function css(system: DesignSystem, level: TypeLevel, colour: string): string {
+/**
+ * `alt` asks for the system's SECOND display face where it has one -- the
+ * condensed cut a style uses for posters and figures while its editorial pages
+ * stay serif. A system with one display face is unaffected.
+ */
+function css(
+  system: DesignSystem,
+  level: TypeLevel,
+  colour: string,
+  opts: { alt?: boolean; upper?: boolean } = {},
+): string {
   const t = system.type[level];
+  const face = opts.alt ? (system.altFont ?? faceFor(system, level)) : faceFor(system, level);
   return (
-    `font-family:${faceFor(system, level)};font-size:${t.size}px;line-height:${t.leading};` +
+    `font-family:${face};font-size:${t.size}px;line-height:${t.leading};` +
     `letter-spacing:${t.tracking}em;font-weight:${t.weight};color:${colour};` +
-    (t.upper ? "text-transform:uppercase;" : "")
+    (t.upper || opts.upper ? "text-transform:uppercase;" : "")
   );
 }
 
@@ -177,7 +188,7 @@ const posterType: Builder = ({ system, m, ground, ink }) => {
     `<div style="display:flex;flex-direction:column;justify-content:flex-end;position:relative;width:${W}px;height:${H}px;background:${ground};padding:${m}px;">` +
     `<div style="display:flex;flex-direction:column;width:${width}px;">` +
     lines
-      .map((l) => `<span style="width:${width}px;${css(system, "display", ink)}">${l}</span>`)
+      .map((l) => `<span style="width:${width}px;${css(system, "display", ink, { alt: true, upper: true })}">${l}</span>`)
       .join("") +
     `</div>` +
     `<span style="width:${width}px;margin-top:28px;${css(system, "subhead", ink)}">You stop seeing blocks and start seeing splits.</span>` +
@@ -218,8 +229,8 @@ const bigNumber: Builder = ({ system, m, textWidth, ground, ink, accent }) =>
   `<div style="display:flex;flex-direction:column;justify-content:center;position:relative;width:${W}px;height:${H}px;background:${ground};padding:${m}px;">` +
   `<span style="width:${textWidth}px;${css(system, "label", accent)}">01 / The number</span>` +
   `<div style="display:flex;flex-direction:row;align-items:flex-start;margin-top:14px;">` +
-  `<span style="${css(system, "display", ink)}">54</span>` +
-  `<span style="${css(system, "display", accent)}">%</span>` +
+  `<span style="${css(system, "display", ink, { alt: true })}">54</span>` +
+  `<span style="${css(system, "display", accent, { alt: true })}">%</span>` +
   `</div>` +
   `<span style="width:${textWidth}px;margin-top:26px;${css(system, "body", ink)}">More than half of the people who book a first session never book a second one. The gap is almost always the week after, not the session itself.</span>` +
   `</div>`;
@@ -246,9 +257,10 @@ const PER_DIRECTION: Record<string, [string, string, string]> = {
   clinical: ["ruleAndBody", "listRows", "bigNumber"],
   swiss: ["ruleAndBody", "bigNumber", "listRows"],
   warm: ["anchoredLow", "listRows", "ruleAndBody"],
-  "evidence-file": ["dossier", "ruleAndBody", "bigNumber"],
-  poster: ["posterType", "anchoredLow", "bigNumber"],
-  signal: ["signalCard", "bigNumber", "listRows"],
+  // One style, three of its slide types -- which is the point of the preview:
+  // an operator judging Evidence needs to see that it MOVES between a paper
+  // dossier page and a black poster, not three variations of one shape.
+  evidence: ["dossier", "posterType", "bigNumber"],
 };
 
 const FALLBACK: [string, string, string] = ["anchoredLow", "ruleAndBody", "listRows"];

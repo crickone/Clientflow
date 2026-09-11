@@ -110,7 +110,7 @@ async function renderOne(
   }
 
   try {
-    const fonts = await loadDesignFonts(system.font, system.bodyFont);
+    const fonts = await loadDesignFonts(system.font, system.bodyFont, system.altFont);
     let png = await renderDesignToPng(html, width, height, fonts);
     if (logoPath) {
       // Stamped after the design, never asked for in the markup -- placement

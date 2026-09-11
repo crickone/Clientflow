@@ -41,12 +41,27 @@ export interface DesignDirection {
   font: string;
   /** The face for body and small copy. Omitted means the same as `font`. */
   bodyFont?: string;
+  /** A second display face, where the style genuinely has two. */
+  altFont?: string;
   /**
    * This direction's own compositional moves -- what makes its posts look like
    * ITS posts rather than another direction's palette. Empty means the
    * designer gets the generic list instead.
    */
   motifs: string[];
+  /**
+   * The named slide types this style is built from. A carousel in this style is
+   * a sequence of these, a different one per slide, rather than one shape five
+   * times.
+   *
+   * These are DESCRIBED, not filled in. An earlier version of this codebase
+   * shipped an archetype grammar that handed the model a layout to populate,
+   * and it produced exactly the templated look composed design exists to
+   * escape. A template here names a structure and its parts; the model still
+   * decides the proportions, the crop and the emphasis. The difference is the
+   * difference between a stencil and a brief.
+   */
+  templates?: { name: string; structure: string }[];
   slots: PaletteSlot[];
   type: Record<TypeLevel, TypeStep>;
   grid: DesignSystem["grid"];
@@ -143,7 +158,9 @@ export function composeDesignSystem(
     version: 1,
     font: direction.font,
     ...(direction.bodyFont ? { bodyFont: direction.bodyFont } : {}),
+    ...(direction.altFont ? { altFont: direction.altFont } : {}),
     motifs: [...direction.motifs],
+    templates: (direction.templates ?? []).map((t) => ({ ...t })),
     values,
     grounds,
     type: direction.type,
@@ -261,6 +278,7 @@ export function withOverrides(direction: DesignDirection, overrides: DirectionOv
     ...direction,
     font: overrides.font ?? direction.font,
     bodyFont: overrides.bodyFont ?? direction.bodyFont,
+    altFont: direction.altFont,
     type,
     photo,
   };

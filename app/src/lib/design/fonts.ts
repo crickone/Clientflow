@@ -104,10 +104,16 @@ async function loadFamily(name: DesignFamily): Promise<DesignFont[]> {
 export async function loadDesignFonts(
   family: string = DEFAULT_FAMILY,
   bodyFamily?: string | null,
+  altFamily?: string | null,
 ): Promise<DesignFont[]> {
-  const display = resolveFamily(family);
-  const body = bodyFamily ? resolveFamily(bodyFamily) : display;
-  if (body === display) return loadFamily(display);
-  const [a, b] = await Promise.all([loadFamily(display), loadFamily(body)]);
-  return [...a, ...b];
+  const wanted = [
+    resolveFamily(family),
+    ...(bodyFamily ? [resolveFamily(bodyFamily)] : []),
+    ...(altFamily ? [resolveFamily(altFamily)] : []),
+  ];
+  // Distinct families only: a system naming the same face twice must not pay
+  // for it twice, and satori does not want a family registered more than once.
+  const unique = [...new Set(wanted)];
+  const loaded = await Promise.all(unique.map(loadFamily));
+  return loaded.flat();
 }
