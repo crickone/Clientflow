@@ -39,6 +39,14 @@ export interface DesignDirection {
   blurb: string;
   /** Must be a family in lib/design/fonts.ts AVAILABLE_FAMILIES. */
   font: string;
+  /** The face for body and small copy. Omitted means the same as `font`. */
+  bodyFont?: string;
+  /**
+   * This direction's own compositional moves -- what makes its posts look like
+   * ITS posts rather than another direction's palette. Empty means the
+   * designer gets the generic list instead.
+   */
+  motifs: string[];
   slots: PaletteSlot[];
   type: Record<TypeLevel, TypeStep>;
   grid: DesignSystem["grid"];
@@ -134,6 +142,8 @@ export function composeDesignSystem(
   return {
     version: 1,
     font: direction.font,
+    ...(direction.bodyFont ? { bodyFont: direction.bodyFont } : {}),
+    motifs: [...direction.motifs],
     values,
     grounds,
     type: direction.type,
@@ -162,6 +172,8 @@ export function composeDesignSystem(
 export interface DirectionOverrides {
   /** Must be a family the renderer has; validated against the list the caller passes. */
   font?: string;
+  /** The body face, same validation as `font`. */
+  bodyFont?: string;
   /** Per level, any subset of the step's fields. */
   type?: Partial<Record<TypeLevel, Partial<TypeStep>>>;
   /** A whole grade, or null for "no photo grade". The direction's wash (a slot
@@ -185,6 +197,7 @@ export function normalizeOverrides(raw: unknown, fonts: readonly string[]): Dire
   const o = raw as Record<string, unknown>;
 
   if (typeof o.font === "string" && fonts.includes(o.font.trim())) out.font = o.font.trim();
+  if (typeof o.bodyFont === "string" && fonts.includes(o.bodyFont.trim())) out.bodyFont = o.bodyFont.trim();
 
   if (o.type && typeof o.type === "object" && !Array.isArray(o.type)) {
     const type: DirectionOverrides["type"] = {};
@@ -247,6 +260,7 @@ export function withOverrides(direction: DesignDirection, overrides: DirectionOv
   return {
     ...direction,
     font: overrides.font ?? direction.font,
+    bodyFont: overrides.bodyFont ?? direction.bodyFont,
     type,
     photo,
   };

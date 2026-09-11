@@ -15,6 +15,12 @@ import os from "node:os";
 import path from "node:path";
 
 const FAMILIES = [
+  // Anton ships ONE weight. It is a display face with no weight axis -- the
+  // whole point of it is that there is only the one, very condensed, very
+  // heavy cut -- so `weights` records what actually exists on disk and
+  // lib/design/fonts.ts registers that single file at every weight satori may
+  // ask for. Without that, a heading asking for 700 silently falls back.
+  { pkg: "anton", version: "5.3.0", weights: [400] },
   { pkg: "playfair-display", version: "5.3.0" },
   { pkg: "space-grotesk", version: "5.3.0" },
   { pkg: "manrope", version: "5.3.0" },
@@ -26,13 +32,13 @@ const WEIGHTS = [400, 500, 600, 700];
 const dest = path.join(process.cwd(), "public", "fonts");
 const tmp = mkdtempSync(path.join(os.tmpdir(), "design-fonts-"));
 
-for (const { pkg, version } of FAMILIES) {
+for (const { pkg, version, weights } of FAMILIES) {
   const url = `https://registry.npmjs.org/@fontsource/${pkg}/-/${pkg}-${version}.tgz`;
   const tgz = path.join(tmp, `${pkg}.tgz`);
   execFileSync("curl", ["-sSL", "--fail", "-o", tgz, url]);
   execFileSync("tar", ["-xzf", tgz, "-C", tmp]);
   const files = path.join(tmp, "package", "files");
-  for (const weight of WEIGHTS) {
+  for (const weight of weights ?? WEIGHTS) {
     const name = `${pkg}-latin-${weight}-normal.woff`;
     const src = path.join(files, name);
     if (!existsSync(src)) throw new Error(`${pkg}@${version} has no ${name}`);

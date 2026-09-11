@@ -63,6 +63,21 @@ export interface DesignSystem {
    *  (lib/design/fonts.ts AVAILABLE_FAMILIES); an unknown name falls back to
    *  Inter at load time rather than rendering in a silent default. */
   font: string;
+  /** The face for body and small copy. Absent means "the same as `font`" --
+   *  which is what every system authored before the pair existed meant. A
+   *  serif display over a sans body is the move that makes an editorial system
+   *  read as editorial rather than as one face at two sizes. */
+  bodyFont?: string;
+  /**
+   * This system's own compositional vocabulary: the moves that make its posts
+   * look like ITS posts. Fed to the designer in place of the generic list.
+   *
+   * This is the field that stops two systems with different palettes producing
+   * the same layouts -- everything else here is colour, size and spacing, none
+   * of which is a composition. Empty means "use the generic moves", which is
+   * what every system authored before this existed gets.
+   */
+  motifs: string[];
   values: { key: string; hex: string; role: ValueRole }[];
   /** Which values may be a ground, and the budget for each across a set.
    *  `share` is a ceiling as a fraction of the slides (0..1); `maxRun` is how
@@ -233,6 +248,28 @@ export function parseDesignSystem(input: unknown): DesignSystem | null {
     neverType.push(key);
   }
 
+  // Body font — absent means "the same face as the display", which is what a
+  // system authored before the pair existed meant.
+  let bodyFont: string | undefined;
+  if (input.bodyFont !== undefined) {
+    if (typeof input.bodyFont === "string" && input.bodyFont.trim()) {
+      bodyFont = input.bodyFont.trim();
+    } else {
+      return null;
+    }
+  }
+
+  // Motifs — absent is an empty list, i.e. "use the generic moves". Each entry
+  // must be a non-empty string; anything else is malformed, same as any field.
+  let motifs: string[] = [];
+  if (input.motifs !== undefined) {
+    if (!Array.isArray(input.motifs)) return null;
+    for (const m of input.motifs) {
+      if (typeof m !== "string" || !m.trim()) return null;
+      motifs.push(m.trim());
+    }
+  }
+
   // Font — absent means "authored before fonts existed", which is Inter.
   // Present but not a usable string is malformed, same as any other field.
   let font: string;
@@ -247,6 +284,8 @@ export function parseDesignSystem(input: unknown): DesignSystem | null {
   return {
     version: 1,
     font,
+    ...(bodyFont ? { bodyFont } : {}),
+    motifs,
     values,
     grounds,
     type,

@@ -24,6 +24,19 @@ export const OPTIMAL_HEALTH_DESIGN_SYSTEM: DesignSystem = {
   version: 1,
   font: "Inter",
 
+  // Sage Field's compositional moves -- the same list the direction of that
+  // name carries, and directions.test.ts pins that the two cannot drift apart.
+  // Note this does NOT reach the live tenant on its own: the stored blob in
+  // production has no motifs and keeps falling back to the generic moves until
+  // someone deliberately re-applies the direction.
+  motifs: [
+    "A composition anchored hard to the top or the bottom, with a large quiet field across the rest of the frame. The empty part is the design, not an unfinished slide.",
+    "A single timber hairline rule under a heading, or crossing the full width. Never a box, never a card with a border.",
+    "A full-bleed photograph with a panel of plaster or sage overlapping its lower third, type set inside that panel.",
+    "A list as generously spaced rows stacked down the page, each separated by a hairline rather than shut inside a card.",
+    "One word of the heading set in deep green while the rest is ink -- used once in a set, never on every slide.",
+  ],
+
   // Section 2 — five values, no more (navy is the reserved sixth, for
   // wayfinding and signage only, and is carried so a composed layout can be
   // told it exists and may not have it).

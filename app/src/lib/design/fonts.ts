@@ -40,6 +40,7 @@ export const AVAILABLE_FAMILIES = [
   "Manrope",
   "Archivo",
   "Fraunces",
+  "Anton",
 ] as const;
 export type DesignFamily = (typeof AVAILABLE_FAMILIES)[number];
 
@@ -54,6 +55,10 @@ const FILE: Record<DesignFamily, (weight: number) => string> = {
   Manrope: (w) => `manrope-latin-${w}-normal.woff`,
   Archivo: (w) => `archivo-latin-${w}-normal.woff`,
   Fraunces: (w) => `fraunces-latin-${w}-normal.woff`,
+  // Anton has no weight axis at all -- one very condensed, very heavy cut is
+  // the whole typeface. Every weight maps to that one file, so a heading
+  // asking for 700 gets Anton rather than silently falling back to a default.
+  Anton: () => "anton-latin-400-normal.woff",
 };
 
 export function resolveFamily(family: string | null | undefined): DesignFamily {
@@ -63,21 +68,46 @@ export function resolveFamily(family: string | null | undefined): DesignFamily {
     : DEFAULT_FAMILY;
 }
 
-export async function loadDesignFonts(
-  family: string = DEFAULT_FAMILY,
-): Promise<DesignFont[]> {
-  const name = resolveFamily(family);
+async function loadFamily(name: DesignFamily): Promise<DesignFont[]> {
   const hit = cache.get(name);
   if (hit) return hit;
   const dir = path.join(process.cwd(), "public", "fonts");
+  // Read each distinct file once: a single-cut face like Anton maps every
+  // weight to the same path, and reading it four times would be four times the
+  // I/O for identical bytes.
+  const bytes = new Map<string, Promise<Buffer>>();
   const fonts = await Promise.all(
-    WEIGHTS.map(async (weight) => ({
-      name,
-      data: await readFile(path.join(dir, FILE[name](weight))),
-      weight,
-      style: "normal" as const,
-    })),
+    WEIGHTS.map(async (weight) => {
+      const file = FILE[name](weight);
+      if (!bytes.has(file)) bytes.set(file, readFile(path.join(dir, file)));
+      return {
+        name,
+        data: await bytes.get(file)!,
+        weight,
+        style: "normal" as const,
+      };
+    }),
   );
   cache.set(name, fonts);
   return fonts;
+}
+
+/**
+ * Font bytes for a render. Pass a second family to load a DISPLAY/BODY PAIR --
+ * satori takes several families in one array and matches on the font-family
+ * each element names, which is what lets a design system set a serif headline
+ * over a sans body (the move that makes an editorial direction read as
+ * editorial rather than as one face at two sizes).
+ *
+ * Passing the same family twice, or omitting the second, loads it once.
+ */
+export async function loadDesignFonts(
+  family: string = DEFAULT_FAMILY,
+  bodyFamily?: string | null,
+): Promise<DesignFont[]> {
+  const display = resolveFamily(family);
+  const body = bodyFamily ? resolveFamily(bodyFamily) : display;
+  if (body === display) return loadFamily(display);
+  const [a, b] = await Promise.all([loadFamily(display), loadFamily(body)]);
+  return [...a, ...b];
 }

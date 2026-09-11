@@ -46,6 +46,7 @@ const FIXTURE: DesignDirection = {
   grid: { columns: 6, margin: 76, gutter: 28, field: 1080 },
   photo: { saturate: 0.6, contrast: 1, brightness: 1, wash: { slot: "accent", alpha: 0.07 } },
   rules: { minContrastBody: 4.5, minContrastLarge: 3, neverType: ["accent"] },
+  motifs: ["A fixture motif, so the field is exercised."],
 };
 
 // -- defaultPalette --
@@ -57,6 +58,7 @@ check("and carries the slot's default hex, lower-cased", defaults.paper === "#f4
 const composed = composeDesignSystem(FIXTURE, defaults);
 check("a composed system parses", parseDesignSystem(composed) !== null);
 check("it carries the direction's font", composed.font === "Inter");
+check("and the direction's motifs", composed.motifs.length === 1);
 check("values follow slot order", composed.values.map((v) => v.key).join() === "paper,ink,accent,ghost,reserved");
 check("a slot's role becomes the value's role", composed.values.find((v) => v.key === "ink")?.role === "type");
 check("only slots with a budget become grounds", composed.grounds.map((g) => g.value).join() === "paper,ink");

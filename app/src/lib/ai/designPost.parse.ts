@@ -55,13 +55,50 @@ export function describeSystemForDesign(system: DesignSystem): string {
     );
   }
 
+  const body = system.bodyFont ?? system.font;
+  lines.push("", "Typefaces -- these are the ONLY faces the renderer has:");
+  if (body === system.font) {
+    lines.push(
+      `- ${system.font}, for everything. Every text element sets font-family:${system.font}`,
+    );
+  } else {
+    lines.push(
+      `- ${system.font} for display and headline levels: font-family:${system.font}`,
+      `- ${body} for subhead, body and label levels: font-family:${body}`,
+    );
+  }
+  lines.push(
+    "Write the family name with NO quotation marks around it -- a quote inside a style attribute ends the attribute, and every declaration after it is silently thrown away. Any name not listed above renders in a fallback face.",
+  );
+
   lines.push(
     "",
-    `Typeface: ${system.font}. Every text element sets font-family:${system.font} -- written exactly like that, with NO quotation marks around the name (a quote inside a style attribute ends the attribute). It is the only face the renderer has; any other name renders in a fallback.`,
     `Grid: ${system.grid.columns} columns of ${Math.round(columnWidth(system))}px, margins ${system.grid.margin}px, gutters ${system.grid.gutter}px. Text sits in three or four columns. The empty columns are the calm and are not there to be filled.`,
     `Contrast: body text needs ${system.rules.minContrastBody}:1 against its ground, large text ${system.rules.minContrastLarge}:1.`,
-    "Setting: flush left, ragged right. No centred type, no justification, no italics.",
   );
+
+  // The compositional vocabulary. A system's own motifs are what make ITS
+  // posts recognisable; without them every system produces the same shapes in
+  // different colours, which is precisely the complaint that put this field
+  // here. The generic list is the fallback for a system that has none.
+  lines.push("", "THE MOVES THIS BRAND MAKES -- these are its signature, not suggestions:");
+  if (system.motifs.length > 0) {
+    for (const m of system.motifs) lines.push(`- ${m}`);
+    lines.push(
+      "Build each slide out of these. Use two or three per slide, not all of them, and a DIFFERENT combination on each slide of a set -- the moves are the brand, the repetition is not.",
+      "Setting: flush left, ragged right unless a move above says otherwise. No justification, no italics.",
+    );
+  } else {
+    lines.push(
+      "- A figure or word oversized and cropped by the canvas edge.",
+      "- A panel of type overlapping a full-bleed photograph.",
+      "- An asymmetric split where a band of a second ground cuts the first.",
+      "- A rule that crosses the whole composition.",
+      "- A list as cards on the signature ground.",
+      "Vary them across a set -- five slides of the same shape read as a template, which is the thing this exists to avoid.",
+      "Setting: flush left, ragged right. No centred type, no justification, no italics.",
+    );
+  }
 
   return lines.join("\n");
 }
@@ -92,8 +129,6 @@ Write ONE HTML element per slide. It is rendered by satori, which supports a SUB
 The canvas is EXACTLY the size you are told. The outermost element sets that width and height in px, "display:flex", and "position:relative".
 
 KEEP THE TOP-RIGHT CORNER CLEAR -- roughly a quarter of the width and a tenth of the height. The business's logo is stamped there afterwards, in the right colour for the ground you chose. Do not draw a logo, a wordmark or the business name yourself.
-
-Moves worth making, because a fixed template cannot: a figure or word oversized and cropped by the canvas edge; a panel of type overlapping a full-bleed photograph; an asymmetric split where a band of a second ground cuts the first; a rule that crosses the whole composition; a list as cards on the signature ground. Vary them across a set -- five slides of the same shape read as a template, which is the thing this exists to avoid.
 
 Keep every element inside the canvas and clear of the others. Nothing may overlap text, and nothing may run off an edge unless you meant it to. Give every text element an explicit "width" so it wraps where you intend rather than where it runs out of canvas.
 

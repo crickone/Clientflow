@@ -33,16 +33,46 @@ check("the type scale is given in real numbers", d.includes("84px"));
 check("the grid is given in real numbers", d.includes("76px") && d.includes("131px"));
 check("the contrast floor is stated", d.includes("4.5:1"));
 check("the setting rule is stated", d.toLowerCase().includes("flush left"));
-check("the description names the typeface", d.includes("Typeface: Inter"));
+check("the description names the typeface", d.includes("- Inter, for everything"));
 check("and tells the model to set it on every text element, unquoted", d.includes("font-family:Inter"));
 check("and never shows the model a quoted font-family", !d.includes('font-family:"'));
+// A display/body PAIR must be named separately, and by LEVEL -- a model told
+// only "here are two faces" has no way to know which is which.
+{
+  const paired = describeSystemForDesign({ ...SYSTEM, font: "Playfair Display", bodyFont: "Inter" });
+  check("a pair names the display face for display and headline", paired.includes("- Playfair Display for display and headline levels: font-family:Playfair Display"));
+  check("and the body face for the smaller levels", paired.includes("- Inter for subhead, body and label levels: font-family:Inter"));
+  check("a pair never shows a quoted family either", !paired.includes('font-family:"'));
+}
+
+// The motifs are what stop two systems with different palettes producing the
+// same shapes. A system that has them gets ITS moves; one that does not gets
+// the generic list, which is exactly today's behaviour for a stored blob.
+{
+  const withMotifs = describeSystemForDesign({
+    ...SYSTEM,
+    motifs: ["A running head with a slide counter and a hard rule beneath it."],
+  });
+  check("a system's own motifs reach the designer", withMotifs.includes("A running head with a slide counter"));
+  check("and are framed as the brand's signature", withMotifs.includes("THE MOVES THIS BRAND MAKES"));
+  check("the generic list is not also sent", !withMotifs.includes("A list as cards on the signature ground"));
+  check(
+    "a motif may override the flush-left default",
+    withMotifs.includes("unless a move above says otherwise"),
+  );
+
+  const noMotifs = describeSystemForDesign({ ...SYSTEM, motifs: [] });
+  check("a system with no motifs falls back to the generic moves", noMotifs.includes("A list as cards on the signature ground"));
+  check("and keeps the strict setting rule", noMotifs.includes("No centred type"));
+}
+
 check(
   "the rules no longer hardcode Inter",
   !DESIGN_RULES.includes('font-family is exactly "Inter"'),
 );
 check(
   "a system in another face is described in that face",
-  describeSystemForDesign({ ...SYSTEM, font: "Fraunces" }).includes("Typeface: Fraunces"),
+  describeSystemForDesign({ ...SYSTEM, font: "Fraunces" }).includes("- Fraunces, for everything"),
 );
 
 // -- What the model is told about the RENDERER ----------------------------
@@ -54,7 +84,14 @@ check("no CSS filter is stated", DESIGN_RULES.includes("filter"));
 check("img sizing in style is stated", DESIGN_RULES.includes("object-fit"));
 check("the entity trap is stated", DESIGN_RULES.toLowerCase().includes("entit"));
 check("the photo placeholder is specified", DESIGN_RULES.includes("{{PHOTO}}"));
-check("moves a template cannot make are suggested", DESIGN_RULES.includes("cropped by the canvas edge"));
+// The compositional vocabulary MOVED: it belongs with the system description
+// (where a brand's own motifs can replace it), not with the renderer's rules.
+// DESIGN_RULES is now purely what satori can and cannot draw.
+check("the rules no longer carry a compositional vocabulary", !DESIGN_RULES.includes("cropped by the canvas edge"));
+check(
+  "the vocabulary lives with the system description instead",
+  describeSystemForDesign({ ...SYSTEM, motifs: [] }).includes("cropped by the canvas edge"),
+);
 
 // -- Reading the reply ----------------------------------------------------
 const reply = `Here you go.

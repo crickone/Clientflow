@@ -21,10 +21,24 @@ function check(name: string, cond: boolean) {
   console.log("  ✓", name);
 }
 
-check("there are six directions", DESIGN_DIRECTIONS.length === 6);
-check("ids are unique", new Set(DESIGN_DIRECTIONS.map((d) => d.id)).size === 6);
-check("names are unique", new Set(DESIGN_DIRECTIONS.map((d) => d.name)).size === 6);
-check("no two directions share a typeface", new Set(DESIGN_DIRECTIONS.map((d) => d.font)).size === 6);
+check("there are nine directions", DESIGN_DIRECTIONS.length === 9);
+check("ids are unique", new Set(DESIGN_DIRECTIONS.map((d) => d.id)).size === DESIGN_DIRECTIONS.length);
+check("names are unique", new Set(DESIGN_DIRECTIONS.map((d) => d.name)).size === DESIGN_DIRECTIONS.length);
+// Anton is deliberately shared by Poster and Signal: both are built on the
+// same ultra-condensed cut and differ in ground, colour and motif instead. What
+// must stay true is that a direction is not just another palette, so the check
+// is on the MOTIFS being its own -- that is the field that carries the
+// difference the typeface used to be asked to carry alone.
+check("at least five distinct typefaces across the set", new Set(DESIGN_DIRECTIONS.map((d) => d.font)).size >= 5);
+check("every direction has its own motifs", DESIGN_DIRECTIONS.every((d) => d.motifs.length >= 4));
+check(
+  "no two directions share a motif list",
+  new Set(DESIGN_DIRECTIONS.map((d) => d.motifs.join("|"))).size === DESIGN_DIRECTIONS.length,
+);
+check(
+  "every motif is a real instruction, not a label",
+  DESIGN_DIRECTIONS.every((d) => d.motifs.every((m) => m.trim().length > 30)),
+);
 check("getDirection finds by id", getDirection("sage-field") === SAGE_FIELD);
 check("getDirection is null for an unknown id", getDirection("nope") === null);
 
