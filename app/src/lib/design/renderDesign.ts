@@ -284,11 +284,62 @@ export async function logoBox(logoPath: string, width: number): Promise<LogoBox>
   return { left: width - margin - w, top: margin, width: w, height: h };
 }
 
+/**
+ * The two inks the mark is pushed through, by what it lands on.
+ *
+ * Both are flattenings of the SAME artwork -- the geometry is untouched, which
+ * is what "use the supplied file" protects; only the colour is swapped, exactly
+ * as a brand document's second file does. A tenant whose mark is gold and teal
+ * gets a solid white version on a dark ground and a solid black one on a light
+ * ground, which is what an operator asked for after watching a two-colour
+ * wordmark fight a cream dossier page for attention.
+ */
+export interface LogoMarks {
+  /** Pushed through the mark's alpha on a DARK ground. */
+  onDark: string;
+  /** Pushed through on a LIGHT ground. null keeps the supplied artwork as-is. */
+  onLight: string | null;
+}
+
+export const DEFAULT_LOGO_MARKS: LogoMarks = {
+  onDark: "#f2f3ed",
+  onLight: "#0b0b0b",
+};
+
+/** Same shape, same alpha, one flat colour. */
+function flattened(
+  logoData: Buffer,
+  info: { width: number; height: number },
+  hex: string,
+): Promise<Buffer> {
+  return sharp(logoData, {
+    raw: { width: info.width, height: info.height, channels: 4 },
+  })
+    .extractChannel(3)
+    .toBuffer()
+    .then((alpha) =>
+      sharp({
+        create: {
+          width: info.width,
+          height: info.height,
+          channels: 3,
+          background: hex,
+        },
+      })
+        .joinChannel(alpha, {
+          raw: { width: info.width, height: info.height, channels: 1 },
+        })
+        .png()
+        .toBuffer(),
+    );
+}
+
 export async function stampLogo(
   slidePng: Buffer,
   logoPath: string,
   width: number,
   height: number,
+  marks: LogoMarks = DEFAULT_LOGO_MARKS,
 ): Promise<Buffer> {
   const margin = Math.round(width * LOGO_MARGIN_FRACTION);
   const logoW = Math.round(width * LOGO_WIDTH_FRACTION);
@@ -314,29 +365,17 @@ export async function stampLogo(
 
   // Below this the ground is dark enough that an ink mark disappears.
   const onDark = ground < 128;
-  let mark = sharp(logoData, {
-    raw: { width: info.width, height: info.height, channels: 4 },
-  });
-  if (onDark) {
-    // Push plaster through the mark's own alpha: same shape, brand's light ink.
-    const alpha = await sharp(logoData, {
-      raw: { width: info.width, height: info.height, channels: 4 },
-    })
-      .extractChannel(3)
-      .toBuffer();
-    mark = sharp({
-      create: {
-        width: info.width,
-        height: info.height,
-        channels: 3,
-        background: "#f2f3ed",
-      },
-    })
-      .joinChannel(alpha, { raw: { width: info.width, height: info.height, channels: 1 } });
-  }
+  const ink = onDark ? marks.onDark : marks.onLight;
+  const mark = ink
+    ? await flattened(logoData, info, ink)
+    : await sharp(logoData, {
+        raw: { width: info.width, height: info.height, channels: 4 },
+      })
+        .png()
+        .toBuffer();
 
   return sharp(slidePng)
-    .composite([{ input: await mark.png().toBuffer(), left, top }])
+    .composite([{ input: mark, left, top }])
     .png()
     .toBuffer();
 }

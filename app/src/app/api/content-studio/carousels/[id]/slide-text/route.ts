@@ -10,7 +10,7 @@ import { gradedPhotoDataUri, renderDesignToPng, stampLogo } from "@/lib/design/r
 import { getDesignSystem } from "@/lib/design/system";
 import { CANVAS } from "@/lib/ai/designPost";
 import { saveRender } from "@/lib/image/renderStore";
-import { libraryFilePath, listLibraryAssets } from "@/lib/image/library";
+import { photoChoiceFor } from "@/lib/image/library";
 import { resolveLogoPath } from "@/lib/branding";
 
 export const dynamic = "force-dynamic";
@@ -43,11 +43,15 @@ function slideOf(carouselId: number, slideId: number) {
   return { carousel, slide } as const;
 }
 
-/** The photo and logo the REAL render used — the hit map has to be laid out identically. */
-function renderInputs(showLogo: boolean) {
-  const firstPhoto = listLibraryAssets().find((a: { kind?: string | null }) => a.kind !== "video");
+/**
+ * The photo and logo the REAL render used — the hit map has to be laid out
+ * identically, and an edited slide has to come back with the same picture it
+ * had. THIS SLIDE's photograph, not the library's first: they were the same
+ * thing until a set stopped putting one picture on every slide.
+ */
+function renderInputs(showLogo: boolean, backgroundAssetId: number | null) {
   return {
-    photoSource: firstPhoto ? libraryFilePath(firstPhoto.filename) : null,
+    photo: photoChoiceFor(backgroundAssetId),
     logoPath: showLogo ? resolveLogoPath() : null,
   };
 }
@@ -139,13 +143,13 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
   const { width, height } = CANVAS[slide.aspectRatio] ?? CANVAS["1:1"];
 
-  const { photoSource, logoPath } = renderInputs(carousel.showLogo);
+  const { photo, logoPath } = renderInputs(carousel.showLogo, slide.backgroundAssetId);
 
   let rendered = nextHtml;
   try {
     if (rendered.includes("{{PHOTO}}")) {
-      if (photoSource) {
-        const uri = await gradedPhotoDataUri(photoSource, width, height, system.photo);
+      if (photo) {
+        const uri = await gradedPhotoDataUri(photo.path, width, height, system.photo);
         rendered = rendered.split("{{PHOTO}}").join(uri);
       } else {
         rendered = rendered.replace(/<img[^>]*\{\{PHOTO\}\}[^>]*>/gi, "");

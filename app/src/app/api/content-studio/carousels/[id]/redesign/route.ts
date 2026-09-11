@@ -5,7 +5,7 @@ import { redesignSlide } from "@/lib/ai/designPost";
 import { AiCapError } from "@/lib/ai/usage";
 import { getCurrentMembership } from "@/lib/auth";
 import { getCarousel, updateSlide } from "@/lib/image/carousels";
-import { libraryFilePath, listLibraryAssets } from "@/lib/image/library";
+import { photoChoiceFor } from "@/lib/image/library";
 import { resolveLogoPath } from "@/lib/branding";
 import { DESIGNED_TEMPLATE_ID } from "@/lib/image/paintSlide";
 
@@ -56,9 +56,9 @@ export async function POST(
   }
 
   const note = typeof body?.note === "string" ? body.note.trim().slice(0, 400) : "";
-  const firstPhoto = listLibraryAssets().find(
-    (a: { kind?: string | null }) => a.kind !== "video",
-  );
+  // The photograph this slide already used, so a redesign keeps its picture
+  // rather than silently reverting to the library's first.
+  const photo = photoChoiceFor(slide.backgroundAssetId);
 
   let result;
   try {
@@ -69,7 +69,7 @@ export async function POST(
         previousHtml: slide.designHtml,
         note: note || null,
         aspectRatio: slide.aspectRatio,
-        photoSource: firstPhoto ? libraryFilePath(firstPhoto.filename) : null,
+        photo,
         logoPath: carousel.showLogo ? resolveLogoPath() : null,
       },
       { tenantId, agentKey: "carousel" },
@@ -93,6 +93,8 @@ export async function POST(
   updateSlide(slide.id, {
     designHtml: result.slide.html,
     renderFilename: result.slide.renderFilename,
+    backgroundAssetId: result.slide.photoAssetId ?? undefined,
+    imagePrompt: result.slide.photo || null,
   });
   // The superseded render is deliberately NOT deleted. The editor offers a
   // one-step undo, and undo restoring a row that points at a file we just

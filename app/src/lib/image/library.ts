@@ -38,6 +38,36 @@ export function getLibraryAsset(id: number) {
   );
 }
 
+/**
+ * The tenant's photographs, as the renderer wants them: an id and a path.
+ *
+ * Videos are excluded -- a designed slide embeds a still. The id travels with
+ * the path so a slide can RECORD which photograph it used, which is what makes
+ * re-rendering one stable and re-photographing it possible. Every caller goes
+ * through here so they cannot drift apart: they did, and the result was a
+ * seven-slide set with `listLibraryAssets()[0]` on every photo slide.
+ */
+export function photoChoices(): { id: number; path: string }[] {
+  return listLibraryAssets()
+    .filter((a: { kind?: string | null }) => a.kind !== "video")
+    .map((a: { id: number; filename: string }) => ({
+      id: a.id,
+      path: libraryFilePath(a.filename),
+    }));
+}
+
+/** One photograph by asset id, or the first available when there is no id. */
+export function photoChoiceFor(
+  assetId: number | null | undefined,
+): { id: number; path: string } | null {
+  const all = photoChoices();
+  if (assetId != null) {
+    const found = all.find((p) => p.id === assetId);
+    if (found) return found;
+  }
+  return all[0] ?? null;
+}
+
 export function addLibraryAsset(input: {
   filename: string;
   originalName: string;

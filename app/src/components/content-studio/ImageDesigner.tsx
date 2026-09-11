@@ -70,7 +70,7 @@ import {
 } from "@/lib/image/slots";
 import { SlideCanvas, useCanvasFonts, useLogoImage } from "./SlideCanvas";
 import type { DesignSystem } from "@/lib/design/parse";
-import { slideDimensions, slideSurface } from "@/lib/image/paintSlide";
+import { DESIGNED_TEMPLATE_ID, slideDimensions, slideSurface } from "@/lib/image/paintSlide";
 import { renderFileUrl } from "@/lib/image/renderStore.client";
 import { SlideFilmstrip } from "./SlideFilmstrip";
 import { SlideColorPicker } from "./SlideColorPicker";
@@ -347,6 +347,8 @@ export function ImageDesigner({
     "slot" | "slide" | "caption" | null
   >(null);
   const [captionCopied, setCaptionCopied] = useState(false);
+  /** Slide id whose photograph is being changed and re-rendered, or null. */
+  const [rephotographing, setRephotographing] = useState<number | null>(null);
   const [generationStatus, setGenerationStatus] = useState<string | null>(
     initialGenerationStatus,
   );
@@ -484,6 +486,45 @@ export function ImageDesigner({
   const setSlideBackgroundManually = useCallback(
     (backgroundAssetId: number | null) => {
       if (!activeSlide) return;
+      // A DESIGNED slide has no background to set: its photograph is embedded
+      // in the markup and baked into a stored PNG, so the picture only changes
+      // when the slide is re-rendered. Same strip, same click, different
+      // mechanism -- which is why this branches here rather than offering the
+      // operator a second, differently-worded photo control.
+      if (activeSlide.templateId === DESIGNED_TEMPLATE_ID) {
+        if (backgroundAssetId == null) return;
+        const slideId = activeSlide.id;
+        setRephotographing(slideId);
+        setActionError(null);
+        void (async () => {
+          try {
+            const res = await fetch(
+              `/api/content-studio/carousels/${designId}/slides/${slideId}/photo`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ assetId: backgroundAssetId }),
+              },
+            );
+            const json = await res.json();
+            if (!res.ok || !json.ok) {
+              throw new Error(json.error || "Couldn't put that photo on the slide.");
+            }
+            if (json.slide) {
+              setSlides((cur) =>
+                cur.map((s) => (s.id === slideId ? (json.slide as CarouselSlide) : s)),
+              );
+            }
+          } catch (err) {
+            setActionError(
+              err instanceof Error ? err.message : "Couldn't change the photo.",
+            );
+          } finally {
+            setRephotographing((cur) => (cur === slideId ? null : cur));
+          }
+        })();
+        return;
+      }
       const wasGenerating = activeSlide.imageStatus === "generating";
       updateActiveSlide(
         wasGenerating
@@ -1591,7 +1632,7 @@ export function ImageDesigner({
               onPick={setSlideBackgroundManually}
               onUpload={uploadFiles}
               onDelete={deleteAsset}
-              uploading={uploading}
+              uploading={uploading || rephotographing === activeSlide.id}
             />
           )}
         </div>
@@ -1955,6 +1996,7 @@ export function ImageDesigner({
             <DesignedSlidePanel
               designId={designId}
               slide={activeSlide}
+              imageGenEnabled={imageGenEnabled}
               onBeforeRedesign={() => snapshotForUndo(activeSlide)}
               onUpdated={(next) => {
                 setSlides((cur) => cur.map((s) => (s.id === next.id ? next : s)));
@@ -2734,15 +2776,49 @@ function DesignedSlidePanel({
   slide,
   onUpdated,
   onBeforeRedesign,
+  imageGenEnabled = false,
 }: {
   designId: number;
   slide: CarouselSlide;
   onUpdated: (slide: CarouselSlide) => void;
   onBeforeRedesign: () => void;
+  imageGenEnabled?: boolean;
 }) {
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [rephoto, setRephoto] = useState(false);
+
+  // The scene the DESIGN asked for, recorded when the slide was written. A
+  // slide with none either predates the field or was designed without a
+  // photograph, and there is nothing to generate against in either case.
+  const scene = slide.imagePrompt?.trim() ?? "";
+
+  async function newPhoto() {
+    setRephoto(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/content-studio/carousels/${designId}/slides/${slide.id}/photo`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ generate: true }),
+          signal: AbortSignal.timeout(120_000),
+        },
+      );
+      const json = await res.json().catch(() => null);
+      if (!json?.ok) {
+        setError(json?.error ?? `Couldn't make a new photo (HTTP ${res.status}).`);
+        return;
+      }
+      if (json.slide) onUpdated(json.slide as CarouselSlide);
+    } catch {
+      setError("Couldn't reach the server. Try again in a moment.");
+    } finally {
+      setRephoto(false);
+    }
+  }
 
   async function redesign() {
     onBeforeRedesign();
@@ -2806,7 +2882,7 @@ function DesignedSlidePanel({
           disabled={busy}
         />
       </div>
-      <Button onClick={redesign} disabled={busy} style={{ marginTop: 12 }}>
+      <Button onClick={redesign} disabled={busy || rephoto} style={{ marginTop: 12 }}>
         {busy ? <Loader2 size={15} className="spin" /> : <RefreshCw size={15} />}
         {busy
           ? "Designing…"
@@ -2814,6 +2890,31 @@ function DesignedSlidePanel({
             ? "Redesign with that"
             : "Try a different design"}
       </Button>
+
+      {scene && (
+        <div style={{ marginTop: 16, borderTop: "1px solid var(--hairline)", paddingTop: 14 }}>
+          <div
+            style={{
+              fontSize: 12.5,
+              color: "var(--text-tertiary)",
+              lineHeight: 1.5,
+              marginBottom: 10,
+            }}
+          >
+            This slide asked for: {scene}
+          </div>
+          {imageGenEnabled ? (
+            <Button variant="outline" onClick={newPhoto} disabled={busy || rephoto}>
+              {rephoto ? <Loader2 size={15} className="spin" /> : <ImageIcon size={15} />}
+              {rephoto ? "Making a photo…" : "Make a photo for this slide"}
+            </Button>
+          ) : (
+            <div style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>
+              Pick a different photo from the strip under the preview.
+            </div>
+          )}
+        </div>
+      )}
       {error && (
         <div style={{ marginTop: 10, fontSize: 13, color: "var(--danger)" }}>
           {error}

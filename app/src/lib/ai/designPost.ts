@@ -56,13 +56,32 @@ export const CANVAS: Record<string, { width: number; height: number }> = {
   "9:16": { width: 1080, height: 1920 },
 };
 
+/**
+ * One photograph the renderer may use, and the library row it came from.
+ *
+ * The id is carried so a finished slide can RECORD which photo it used. Without
+ * it a re-render has to guess, and every designed slide in a set was in fact
+ * handed the same guess -- `listLibraryAssets()[0]` -- which is why a set of
+ * seven slides came back with one picture on all of them regardless of what
+ * each slide had asked for.
+ */
+export interface PhotoChoice {
+  /** The image-library asset, or null for a path with no row behind it. */
+  id: number | null;
+  path: string;
+}
+
 export interface DesignedSlide {
   /** The authored markup, with the photo placeholder still in it. Source of
    *  truth: the render is derived and can be rebuilt from this. */
   html: string;
   /** The stored PNG, or null when the markup would not render. */
   renderFilename: string | null;
+  /** The scene the design asked for, in the designer's words. Kept so a slide
+   *  can be re-photographed later against what it actually wanted. */
   photo: string;
+  /** The library asset this slide's photograph came from, if it used one. */
+  photoAssetId: number | null;
   violations: string[];
 }
 
@@ -90,14 +109,14 @@ async function renderOne(
   system: DesignSystem,
   width: number,
   height: number,
-  photoSource: Buffer | string | null,
+  photo: PhotoChoice | null,
   logoPath: string | null,
 ): Promise<{ renderFilename: string | null; violation: string | null }> {
   let html = design.html;
   if (html.includes(PHOTO_TOKEN)) {
-    if (photoSource) {
+    if (photo) {
       const uri = await gradedPhotoDataUri(
-        photoSource,
+        photo.path,
         width,
         height,
         system.photo,
@@ -155,8 +174,13 @@ export async function designPost(
   model: string = CONTENT_MODEL,
   options: {
     aspectRatio?: "1:1" | "4:5" | "9:16";
-    /** Source image for slides that ask for a photograph. */
-    photoSource?: Buffer | string | null;
+    /**
+     * Photographs available to slides that ask for one. Each slide that uses
+     * the placeholder takes the NEXT entry, so a set moves through the library
+     * instead of repeating one picture; the list cycles when there are more
+     * photo slides than photos.
+     */
+    photos?: PhotoChoice[];
     /** The tenant's logo file, stamped onto every slide. Null to omit it. */
     logoPath?: string | null;
   } = {},
@@ -176,7 +200,8 @@ export async function designPost(
   // Whether photography exists changes what the model should design, not just
   // what it gets. Offering a photograph that will then be stripped leaves the
   // scrim built for it lying on a flat ground.
-  const hasPhotography = !!options.photoSource;
+  const photos = options.photos ?? [];
+  const hasPhotography = photos.length > 0;
 
   // Computed from the real logo file, not stated as a fraction: its height is
   // its own aspect ratio at the stamped width, which no fixed phrasing can
@@ -279,14 +304,23 @@ export async function designPost(
     const checked = checkDesigns(slides, system!);
     const problems = [...checked.problems];
     const rendered: DesignedSlide[] = [];
+    // Advanced only by slides that actually take a photograph, so two photo
+    // slides never land on the same picture just because a flat slide sat
+    // between them.
+    let nextPhoto = 0;
     for (let i = 0; i < checked.designs.length; i++) {
       const design = checked.designs[i];
+      const wantsPhoto = design.html.includes(PHOTO_TOKEN);
+      const photo =
+        wantsPhoto && photos.length > 0
+          ? photos[nextPhoto++ % photos.length]
+          : null;
       const { renderFilename, violation } = await renderOne(
         design,
         system!,
         width,
         height,
-        options.photoSource ?? null,
+        photo,
         options.logoPath ?? null,
       );
       if (violation) problems.push(`Slide ${i + 1}: ${violation}`);
@@ -294,6 +328,7 @@ export async function designPost(
         html: design.html,
         renderFilename,
         photo: design.photo,
+        photoAssetId: photo?.id ?? null,
         violations: violation
           ? [...design.violations, violation]
           : design.violations,
@@ -367,7 +402,8 @@ export async function redesignSlide(
     /** The operator's instruction, or null for a plain regenerate. */
     note: string | null;
     aspectRatio?: "1:1" | "4:5" | "9:16";
-    photoSource?: Buffer | string | null;
+    /** The photograph this slide may use, when it asks for one. */
+    photo?: PhotoChoice | null;
     logoPath?: string | null;
   },
   meter: MeterContext,
@@ -377,7 +413,7 @@ export async function redesignSlide(
   if (!system) return null;
 
   const { width, height } = CANVAS[input.aspectRatio ?? "1:1"] ?? CANVAS["1:1"];
-  const hasPhotography = !!input.photoSource;
+  const hasPhotography = !!input.photo;
 
   // Computed from the real logo file, not stated as a fraction: its height is
   // its own aspect ratio at the stamped width, which no fixed phrasing can
@@ -453,7 +489,7 @@ export async function redesignSlide(
     system,
     width,
     height,
-    input.photoSource ?? null,
+    input.photo ?? null,
     input.logoPath ?? null,
   );
 
@@ -462,6 +498,7 @@ export async function redesignSlide(
       html: design.html,
       renderFilename,
       photo: design.photo,
+      photoAssetId: design.html.includes(PHOTO_TOKEN) ? (input.photo?.id ?? null) : null,
       violations: violation
         ? [...design.violations, violation]
         : design.violations,

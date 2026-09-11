@@ -13,7 +13,7 @@ import { buildImagePrompt, defaultImageStyle, fallbackScene } from "@/lib/ai/ima
 import { isImageGenConfigured } from "@/lib/ai/image/falClient";
 import { getTemplate, templateUsesPhoto } from "@/lib/image/templates";
 import { DESIGNED_TEMPLATE_ID } from "@/lib/image/paintSlide";
-import { libraryFilePath, listLibraryAssets } from "@/lib/image/library";
+import { photoChoices } from "@/lib/image/library";
 import {
   addSlide,
   deleteSlot,
@@ -90,11 +90,11 @@ export async function runCarouselGeneration(
   const carousel = getCarousel(carouselId);
   if (!carousel) throw new Error("The design was deleted while it was being written.");
 
-  // The photo source is the tenant's own library, so a design asking for a
-  // photograph gets a real one, graded to the brand's numbers at render time.
-  const firstPhoto = listLibraryAssets().find(
-    (a: { kind?: string | null }) => a.kind !== "video",
-  );
+  // The tenant's own library, so a design asking for a photograph gets a real
+  // one, graded to the brand's numbers at render time. The whole list, not the
+  // first of it: each photo slide takes the next, so a set moves through the
+  // library instead of putting one picture on every slide.
+  const photos = photoChoices();
 
   // designPost is the entry point for BOTH paths: with a tenant design system
   // the AI designs each slide as HTML and this renders it; without one it
@@ -105,7 +105,7 @@ export async function runCarouselGeneration(
     undefined,
     {
       aspectRatio: "1:1",
-      photoSource: firstPhoto ? libraryFilePath(firstPhoto.filename) : null,
+      photos,
       // The design carries the logo the same way a template slide does, and
       // obeys the same per-design switch.
       logoPath: carousel.showLogo ? resolveLogoPath() : null,
@@ -144,6 +144,11 @@ export async function runCarouselGeneration(
           caption: i === 0 ? result.caption : "",
           designHtml: slide.html,
           renderFilename: slide.renderFilename,
+          // Recorded so the slide can be re-rendered, or re-photographed,
+          // against what it actually asked for. Inert for painting -- a
+          // designed slide is its stored PNG (see paintSlide).
+          backgroundAssetId: slide.photoAssetId ?? undefined,
+          imagePrompt: slide.photo || null,
         });
       }
     } else {
