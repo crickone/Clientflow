@@ -247,17 +247,51 @@ export async function gradedPhotoDataUri(
  * protects; only the ink is swapped, exactly as the document's second file
  * does. A photograph underneath is handled by the same measurement.
  */
+// The brand document sets clear space at the height of the dot cluster and a
+// minimum width; on a 1080 field this reads as roughly a fifth of the width,
+// inset by the grid margin.
+const LOGO_MARGIN_FRACTION = 0.07;
+const LOGO_WIDTH_FRACTION = 0.19;
+
+/** Where the logo lands on a slide, in canvas pixels. */
+export interface LogoBox {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * THE single statement of the logo's geometry: stampLogo composites into it,
+ * and the design prompt reserves it.
+ *
+ * They used to be two separate statements of the same rule, and they
+ * disagreed. The prompt asked for "roughly a quarter of the width and a tenth
+ * of the height" kept clear -- but the HEIGHT is the logo's own aspect ratio at
+ * a 19% width, which for a squarish mark is more than a quarter of the canvas,
+ * not a tenth. Anything the model put in the top band (Evidence's running head
+ * and its slide counter, in the carousel that exposed this) was told it had
+ * room and then had the logo composited straight over it.
+ */
+export async function logoBox(logoPath: string, width: number): Promise<LogoBox> {
+  const margin = Math.round(width * LOGO_MARGIN_FRACTION);
+  const w = Math.round(width * LOGO_WIDTH_FRACTION);
+  const meta = await sharp(logoPath).metadata();
+  // A logo with no readable dimensions is reserved as a square: too much space
+  // held back is a composition constraint, too little is a logo on top of type.
+  const h =
+    meta.width && meta.height ? Math.round((meta.height * w) / meta.width) : w;
+  return { left: width - margin - w, top: margin, width: w, height: h };
+}
+
 export async function stampLogo(
   slidePng: Buffer,
   logoPath: string,
   width: number,
   height: number,
 ): Promise<Buffer> {
-  // The document sets clear space at the height of the dot cluster and a
-  // minimum width; on a 1080 field this reads as roughly a fifth of the width,
-  // inset by the grid margin.
-  const margin = Math.round(width * 0.07);
-  const logoW = Math.round(width * 0.19);
+  const margin = Math.round(width * LOGO_MARGIN_FRACTION);
+  const logoW = Math.round(width * LOGO_WIDTH_FRACTION);
 
   const logo = sharp(logoPath).resize({ width: logoW });
   const { data: logoData, info } = await logo

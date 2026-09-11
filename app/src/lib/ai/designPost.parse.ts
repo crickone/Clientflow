@@ -151,8 +151,6 @@ Write ONE HTML element per slide. It is rendered by satori, which supports a SUB
 
 The canvas is EXACTLY the size you are told. The outermost element sets that width and height in px, "display:flex", and "position:relative".
 
-KEEP THE TOP-RIGHT CORNER CLEAR -- roughly a quarter of the width and a tenth of the height. The business's logo is stamped there afterwards, in the right colour for the ground you chose. Do not draw a logo, a wordmark or the business name yourself.
-
 Keep every element inside the canvas and clear of the others. Nothing may overlap text, and nothing may run off an edge unless you meant it to. Give every text element an explicit "width" so it wraps where you intend rather than where it runs out of canvas.
 
 ANCHOR THE COMPOSITION, and do not leave a hole in it. Quiet space is a BAND at one edge, never a gap in the middle: either the content runs down to the bottom margin, or it starts below the midline and the space sits above it. A slide that fills the top two thirds and then stops -- a band of nothing between the last paragraph and the footer -- reads as unfinished, not composed. If the copy does not reach the bottom on its own, set it larger, move the whole block down, or close the slide with something that belongs there: a figure, a rule, a caption, a band of a second ground, a photograph.
@@ -177,6 +175,46 @@ Output format -- return ONLY this JSON inside <design>...</design> tags, no othe
 }
 </design>
 The "slides" array must hold exactly the number of slides requested, in order.`;
+
+/** The logo's region on the canvas, as the renderer computes it. Mirrors
+ *  LogoBox in @/lib/design/renderDesign, redeclared here so this file keeps its
+ *  no-runtime-import property and stays loadable under the plain test runner. */
+export interface LogoReserve {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * The space the logo needs, in exact pixels on THIS canvas.
+ *
+ * Exact, because the previous phrasing ("roughly a quarter of the width and a
+ * tenth of the height") was wrong in the direction that hurts: the height a
+ * logo actually occupies is its own aspect ratio at a 19% width, which for a
+ * squarish mark is over a quarter of the canvas. A model that believed the
+ * tenth put its running head and slide counter inside the box, and the logo
+ * was composited on top of both.
+ */
+export function logoReserveRule(
+  box: LogoReserve | null,
+  width: number,
+  height: number,
+): string {
+  if (!box) {
+    return "NO LOGO IS STAMPED on these slides, so the top-right corner is yours to compose into. Do not draw a logo, a wordmark or the business name yourself -- this post simply carries none.";
+  }
+  const fromRight = width - box.left;
+  const bottom = box.top + box.height;
+  const gap = Math.round(width * 0.02);
+  return `KEEP THE LOGO'S BOX CLEAR. After you design a slide, the business's logo is composited into a box ${box.width}px wide and ${box.height}px tall, its top-left corner at x=${box.left}, y=${box.top} on the ${width}x${height} canvas -- ${fromRight}px in from the right edge, and reaching ${bottom}px down from the top.
+
+Nothing you draw may enter that box: no text, no rule, no figure, no block of colour. A running head, a slide counter, a kicker or anything else along the top must sit either entirely LEFT of x=${box.left - gap}, or entirely BELOW y=${bottom + gap}. A rule that spans the full width belongs below y=${bottom + gap}, otherwise it cuts straight through the mark.
+
+A full-bleed photograph MAY pass under the box -- the logo is recoloured for whatever it lands on -- but keep the busiest part of the picture out of it.
+
+Do not draw a logo, a wordmark or the business name yourself.`;
+}
 
 /**
  * Told to the model when the tenant has no photography.

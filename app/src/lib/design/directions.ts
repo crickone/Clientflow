@@ -248,7 +248,7 @@ export const EVIDENCE: DesignDirection = {
   photo: { saturate: 0.6, contrast: 1.15, brightness: 0.95 },
   rules: { minContrastBody: 4.5, minContrastLarge: 3, neverType: [] },
   motifs: [
-    "A running head across the top: the business name at label size on the left, a slide counter like 02 / 08 on the right, with a hard rule directly beneath spanning the full width.",
+    "A running head along the TOP LEFT: a short section label at label size with a slide counter like 02 / 08 beside it, and a hard rule directly beneath it spanning the full width. It never reaches the top-right corner -- the logo is stamped there, and the rule sits below the logo's box rather than across it.",
     "A kicker above the heading at label size -- a short section name such as THE MECHANISM -- preceded by a small ring or dot in the accent.",
     "A marker highlight: a block of the accent sitting behind ONE line or phrase of a serif heading, with ink type on top. Once per slide at most, and only on the light ground.",
     "One or two words of a condensed headline set in the accent while the rest is chalk, the accent words carrying the point of the sentence.",

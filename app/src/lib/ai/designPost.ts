@@ -5,6 +5,7 @@ import { getBusinessContext, getSignoffRule } from "@/lib/ai/businessContext";
 import { CONTENT_MODEL } from "@/lib/ai/client";
 import {
   DESIGN_RULES,
+  logoReserveRule,
   NO_PHOTOGRAPHY_RULE,
   PHOTO_TOKEN,
   checkDesigns,
@@ -20,7 +21,7 @@ import {
 } from "@/lib/ai/generateCarousel";
 import { meteredCreateStreamed, type MeterContext } from "@/lib/ai/metered";
 import { loadDesignFonts } from "@/lib/design/fonts";
-import { gradedPhotoDataUri, measureOverflowPx, renderDesignToPng, stampLogo } from "@/lib/design/renderDesign";
+import { gradedPhotoDataUri, logoBox, measureOverflowPx, renderDesignToPng, stampLogo } from "@/lib/design/renderDesign";
 import { getDesignSystem } from "@/lib/design/system";
 import { pickOpeningMove } from "@/lib/ai/openingMoves";
 import { readKey, setKey } from "@/lib/settings";
@@ -177,10 +178,16 @@ export async function designPost(
   // scrim built for it lying on a flat ground.
   const hasPhotography = !!options.photoSource;
 
+  // Computed from the real logo file, not stated as a fraction: its height is
+  // its own aspect ratio at the stamped width, which no fixed phrasing can
+  // stand in for. See logoReserveRule.
+  const reserve = options.logoPath ? await logoBox(options.logoPath, width) : null;
+
   const systemPrompt = [
     getBusinessContext(),
     describeSystemForDesign(system),
     DESIGN_RULES,
+    logoReserveRule(reserve, width, height),
     hasPhotography ? null : NO_PHOTOGRAPHY_RULE,
     getSignoffRule("social"),
   ]
@@ -372,10 +379,16 @@ export async function redesignSlide(
   const { width, height } = CANVAS[input.aspectRatio ?? "1:1"] ?? CANVAS["1:1"];
   const hasPhotography = !!input.photoSource;
 
+  // Computed from the real logo file, not stated as a fraction: its height is
+  // its own aspect ratio at the stamped width, which no fixed phrasing can
+  // stand in for. See logoReserveRule.
+  const reserve = input.logoPath ? await logoBox(input.logoPath, width) : null;
+
   const systemPrompt = [
     getBusinessContext(),
     describeSystemForDesign(system),
     DESIGN_RULES,
+    logoReserveRule(reserve, width, height),
     hasPhotography ? null : NO_PHOTOGRAPHY_RULE,
     getSignoffRule("social"),
   ]
