@@ -1603,7 +1603,19 @@ export function ImageDesigner({
               />
             )}
             {!isEmptySlot && (
-              <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {activeSlide && surface?.designed && (
+                  <RedesignSlideButton
+                    designId={designId}
+                    slide={activeSlide}
+                    imageGenEnabled={imageGenEnabled}
+                    onBeforeRedesign={() => snapshotForUndo(activeSlide)}
+                    onUpdated={(next) =>
+                      setSlides((cur) => cur.map((sl) => (sl.id === next.id ? next : sl)))
+                    }
+                  />
+                )}
+                {!surface?.designed && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -1622,6 +1634,7 @@ export function ImageDesigner({
                   />
                   {refreshing === "slide" ? "Refreshing…" : "Refresh slide"}
                 </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
@@ -2038,18 +2051,6 @@ export function ImageDesigner({
             </div>
           )}
           </EditorSection>
-
-          {activeSlide && surface?.designed && (
-            <DesignedSlidePanel
-              designId={designId}
-              slide={activeSlide}
-              imageGenEnabled={imageGenEnabled}
-              onBeforeRedesign={() => snapshotForUndo(activeSlide)}
-              onUpdated={(next) => {
-                setSlides((cur) => cur.map((s) => (s.id === next.id ? next : s)));
-              }}
-            />
-          )}
 
           {activeSlide && surface && !surface.designed && (
           <>
@@ -2808,15 +2809,6 @@ function DesignNotice({ violations }: { violations: string[] }) {
 }
 
 /**
- * The inspector for an AI-designed slide: accept, regenerate, or nudge.
- *
- * There are deliberately no heading, body or colour controls. The AI decided
- * where the heading goes, so there is no fixed slot for a control to point at
- * -- a "Heading" box would have nothing to edit. What an operator can do is
- * judge the result and ask for a different one, which is how design tools with
- * AI in them actually work.
- */
-/**
  * The design direction's own slide types, as cards.
  *
  * An operator asked for "those templates" in the template panel, and the honest
@@ -2857,6 +2849,10 @@ function DirectionTemplates({
         }),
         signal: AbortSignal.timeout(180_000),
       });
+      if (res.status === 502 || res.status === 503 || res.status === 504) {
+        setError("The app was restarting. Give it a few seconds and try again.");
+        return;
+      }
       const json = await res.json().catch(() => null);
       if (!json?.ok) {
         setError(json?.error ?? `Couldn't redesign that slide (HTTP ${res.status}).`);
@@ -2954,7 +2950,21 @@ function DirectionTemplates({
   );
 }
 
-function DesignedSlidePanel({
+/**
+ * Redesigning an AI-designed slide: one button beside the picture, and a
+ * dialog that asks what to change.
+ *
+ * It was a permanent inspector section -- a paragraph, a labelled field and two
+ * buttons -- sitting far below the slide it acted on. An operator's verdict:
+ * "there's no need for a big section like that". The action is occasional and
+ * the question it asks is one line, so it belongs behind a button, next to the
+ * thing it changes.
+ *
+ * There are still no heading, body or colour controls. The AI decided where the
+ * heading goes, so there is no fixed slot for a control to point at; what an
+ * operator can do is judge the result and ask for a different one.
+ */
+function RedesignSlideButton({
   designId,
   slide,
   onUpdated,
@@ -2967,143 +2977,152 @@ function DesignedSlidePanel({
   onBeforeRedesign: () => void;
   imageGenEnabled?: boolean;
 }) {
+  const [open, setOpen] = useState(false);
   const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<null | "design" | "photo">(null);
   const [error, setError] = useState<string | null>(null);
-  const [rephoto, setRephoto] = useState(false);
 
   // The scene the DESIGN asked for, recorded when the slide was written. A
-  // slide with none either predates the field or was designed without a
+  // slide with none either predates the field or was composed without a
   // photograph, and there is nothing to generate against in either case.
   const scene = slide.imagePrompt?.trim() ?? "";
 
-  async function newPhoto() {
-    setRephoto(true);
+  function reset() {
+    setNote("");
+    setError(null);
+  }
+
+  async function post(url: string, body: unknown, pick: (json: any) => CarouselSlide | undefined) {
     setError(null);
     try {
-      const res = await fetch(
-        `/api/content-studio/carousels/${designId}/slides/${slide.id}/photo`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ generate: true }),
-          signal: AbortSignal.timeout(120_000),
-        },
-      );
-      const json = await res.json().catch(() => null);
-      if (!json?.ok) {
-        setError(json?.error ?? `Couldn't make a new photo (HTTP ${res.status}).`);
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(180_000),
+      });
+      if (res.status === 502 || res.status === 503 || res.status === 504) {
+        setError("The app was restarting. Give it a few seconds and try again.");
         return;
       }
-      if (json.slide) onUpdated(json.slide as CarouselSlide);
-    } catch {
-      setError("Couldn't reach the server. Try again in a moment.");
-    } finally {
-      setRephoto(false);
+      const json = await res.json().catch(() => null);
+      if (!json?.ok) {
+        setError(json?.error ?? `That didn't work (HTTP ${res.status}).`);
+        return;
+      }
+      const next = pick(json);
+      if (next) onUpdated(next);
+      setOpen(false);
+      reset();
+    } catch (err) {
+      setError(
+        err instanceof DOMException && err.name === "TimeoutError"
+          ? "That took too long and was stopped. Try again in a moment."
+          : "Couldn't reach the server. Try again in a moment.",
+      );
     }
   }
 
   async function redesign() {
     onBeforeRedesign();
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch(
-        `/api/content-studio/carousels/${designId}/redesign`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ slideId: slide.id, note: note.trim() || null }),
-          // Same deadline as the starter's generate: the route gives up at
-          // 120s, and without a client floor a connection whose server went
-          // away (a deploy swapping the container mid-request) never rejects
-          // and the button spins forever.
-          signal: AbortSignal.timeout(180_000),
-        },
-      );
-      const data = await res.json().catch(() => null);
-      if (!data?.ok) {
-        setError(data?.error ?? `Redesign failed (HTTP ${res.status}).`);
-        return;
-      }
-      const next = (data.carousel?.slides as CarouselSlide[] | undefined)?.find(
-        (s) => s.id === slide.id,
-      );
-      if (next) onUpdated(next);
-      setNote("");
-    } catch (err) {
-      setError(
-        err instanceof DOMException && err.name === "TimeoutError"
-          ? "The redesign took too long and was stopped. This usually means the app restarted mid-request."
-          : "Couldn't reach the server. Try again in a moment.",
-      );
-    } finally {
-      setBusy(false);
-    }
+    setBusy("design");
+    await post(
+      `/api/content-studio/carousels/${designId}/redesign`,
+      { slideId: slide.id, note: note.trim() || null },
+      (json) =>
+        (json.carousel?.slides as CarouselSlide[] | undefined)?.find(
+          (sl) => sl.id === slide.id,
+        ),
+    );
+    setBusy(null);
+  }
+
+  async function newPhoto() {
+    setBusy("photo");
+    await post(
+      `/api/content-studio/carousels/${designId}/slides/${slide.id}/photo`,
+      { generate: true },
+      (json) => json.slide as CarouselSlide | undefined,
+    );
+    setBusy(null);
   }
 
   return (
-    <EditorSection title="This slide" hint="Designed by Adonis" defaultOpen>
-      <p
-        style={{
-          margin: "0 0 14px",
-          fontSize: 13,
-          color: "var(--text-secondary)",
-          lineHeight: 1.5,
-        }}
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) reset();
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          title="Ask Adonis for a different design for this slide"
+        >
+          <RefreshCw size={14} />
+          Redesign slide
+        </Button>
+      </DialogTrigger>
+      <DialogContent
+        title="Redesign this slide"
+        description="Say what you'd change, or leave it blank for a different take on the same content."
       >
-        Adonis chose this layout from your design system. Keep it, or ask for a
-        different one.
-      </p>
-      <div>
-        <Label htmlFor="redesign-note">What would you change? (optional)</Label>
-        <Input
-          id="redesign-note"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="e.g. make the headline bigger, try it on the dark ground"
-          disabled={busy}
-        />
-      </div>
-      <Button onClick={redesign} disabled={busy || rephoto} style={{ marginTop: 12 }}>
-        {busy ? <Loader2 size={15} className="spin" /> : <RefreshCw size={15} />}
-        {busy
-          ? "Designing…"
-          : note.trim()
-            ? "Redesign with that"
-            : "Try a different design"}
-      </Button>
-
-      {scene && (
-        <div style={{ marginTop: 16, borderTop: "1px solid var(--hairline)", paddingTop: 14 }}>
-          <div
-            style={{
-              fontSize: 12.5,
-              color: "var(--text-tertiary)",
-              lineHeight: 1.5,
-              marginBottom: 10,
-            }}
-          >
-            This slide asked for: {scene}
+        <div style={{ display: "grid", gap: 14 }}>
+          <div>
+            <Label htmlFor="redesign-note" srOnly>
+              What would you change?
+            </Label>
+            <Input
+              id="redesign-note"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="e.g. make the headline bigger, try it on the dark ground"
+              disabled={busy !== null}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && busy === null) void redesign();
+              }}
+            />
           </div>
-          {imageGenEnabled ? (
-            <Button variant="outline" onClick={newPhoto} disabled={busy || rephoto}>
-              {rephoto ? <Loader2 size={15} className="spin" /> : <ImageIcon size={15} />}
-              {rephoto ? "Making a photo…" : "Make a photo for this slide"}
-            </Button>
-          ) : (
-            <div style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>
-              Pick a different photo from the strip under the preview.
+
+          {scene && (
+            <div style={{ fontSize: 12.5, color: "var(--text-tertiary)", lineHeight: 1.5 }}>
+              This slide asked for: {scene}
             </div>
           )}
+
+          {error && (
+            <div style={{ fontSize: 13, color: "var(--danger)" }}>{error}</div>
+          )}
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <Button onClick={redesign} disabled={busy !== null}>
+              {busy === "design" ? (
+                <Loader2 size={15} className="spin" />
+              ) : (
+                <RefreshCw size={15} />
+              )}
+              {busy === "design"
+                ? "Designing…"
+                : note.trim()
+                  ? "Redesign with that"
+                  : "Try a different design"}
+            </Button>
+            {imageGenEnabled && scene && (
+              <Button variant="outline" onClick={newPhoto} disabled={busy !== null}>
+                {busy === "photo" ? (
+                  <Loader2 size={15} className="spin" />
+                ) : (
+                  <ImageIcon size={15} />
+                )}
+                {busy === "photo" ? "Making a photo…" : "Make a new photo"}
+              </Button>
+            )}
+          </div>
         </div>
-      )}
-      {error && (
-        <div style={{ marginTop: 10, fontSize: 13, color: "var(--danger)" }}>
-          {error}
-        </div>
-      )}
-    </EditorSection>
+      </DialogContent>
+    </Dialog>
   );
 }
 
