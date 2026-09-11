@@ -69,6 +69,7 @@ export default function ImageDesignPage({
         designSystem={getDesignSystem()}
         initialGenerationStatus={design.generationStatus}
         initialGenerationError={design.generationError}
+        initialGenerationStage={design.generationStage}
       />
     </>
   );

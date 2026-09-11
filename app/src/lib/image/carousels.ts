@@ -26,9 +26,27 @@ export function setGenerationStatus(
       generationStatus: status,
       generationError: error,
       generationStartedAt: status === "writing" ? new Date() : null,
+      // A stage belongs to a run. Starting one clears the last run's, and
+      // ending one leaves nothing behind to be shown next to a finished design.
+      generationStage: null,
     })
     .where(eq(schema.carouselSets.id, carouselId))
     .run();
+}
+
+/**
+ * Say what the run is doing. Best-effort and deliberately unguarded: a stage
+ * that fails to write must never take a generation down with it.
+ */
+export function setGenerationStage(carouselId: number, stage: string): void {
+  try {
+    db.update(schema.carouselSets)
+      .set({ generationStage: stage })
+      .where(eq(schema.carouselSets.id, carouselId))
+      .run();
+  } catch {
+    // Nothing to do: the stage is a courtesy, the run is the work.
+  }
 }
 
 /** Apply the staleness rule (see ./generationState) to a row on its way out. */

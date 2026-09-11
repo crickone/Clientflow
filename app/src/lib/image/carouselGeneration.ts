@@ -18,6 +18,7 @@ import {
   addSlide,
   deleteSlot,
   getCarousel,
+  setGenerationStage,
   setGenerationStatus,
   updateSlide,
 } from "@/lib/image/carousels";
@@ -109,8 +110,11 @@ export async function runCarouselGeneration(
       // The design carries the logo the same way a template slide does, and
       // obeys the same per-design switch.
       logoPath: carousel.showLogo ? resolveLogoPath() : null,
+      onProgress: (stage) => setGenerationStage(carouselId, stage),
     },
   );
+
+  setGenerationStage(carouselId, "Saving the slides");
 
   // Inherit accent from the previous first slide in this slot (or the
   // design's first slide overall) for visual continuity.

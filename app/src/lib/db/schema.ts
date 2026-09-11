@@ -895,6 +895,10 @@ export const carouselSets = sqliteTable("carousel_sets", {
   /** When the current run started, so a 'writing' left behind by a restarted
    *  process can be recognised as dead rather than spun on forever. */
   generationStartedAt: integer("generation_started_at", { mode: "timestamp_ms" }),
+  /** What the current run is doing right now, in the operator's words. A
+   *  two-to-four-minute wait with no account of itself reads as a hang -- it
+   *  was reported as one. Cleared when the run ends. */
+  generationStage: text("generation_stage"),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),

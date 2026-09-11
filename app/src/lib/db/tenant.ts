@@ -1268,6 +1268,7 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       generation_status TEXT,
       generation_error TEXT,
       generation_started_at INTEGER,
+      generation_stage TEXT,
       created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
       updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
@@ -1797,6 +1798,9 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     }
     if (!setCols.find((c) => c.name === "generation_started_at")) {
       sqlite.exec("ALTER TABLE carousel_sets ADD COLUMN generation_started_at INTEGER");
+    }
+    if (!setCols.find((c) => c.name === "generation_stage")) {
+      sqlite.exec("ALTER TABLE carousel_sets ADD COLUMN generation_stage TEXT");
     }
   } catch (err) {
     console.error("[db] carousel imagery migration failed:", err);

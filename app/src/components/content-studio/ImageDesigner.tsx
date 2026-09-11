@@ -131,6 +131,7 @@ interface Props {
    */
   initialGenerationStatus?: string | null;
   initialGenerationError?: string | null;
+  initialGenerationStage?: string | null;
 }
 
 /**
@@ -327,6 +328,7 @@ export function ImageDesigner({
   designSystem = null,
   initialGenerationStatus = null,
   initialGenerationError = null,
+  initialGenerationStage = null,
 }: Props) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -354,6 +356,9 @@ export function ImageDesigner({
   );
   const [generationError, setGenerationError] = useState<string | null>(
     initialGenerationError,
+  );
+  const [generationStage, setGenerationStage] = useState<string | null>(
+    initialGenerationStage,
   );
   const writing = generationStatus === "writing";
 
@@ -648,6 +653,7 @@ export function ImageDesigner({
         const status: string | null = json.carousel?.generationStatus ?? null;
         setGenerationStatus(status);
         setGenerationError(json.carousel?.generationError ?? null);
+        setGenerationStage(json.carousel?.generationStage ?? null);
         const server: CarouselSlide[] = json.carousel?.slides ?? [];
         // A finished generation REPLACED the slot: the rows are new, with new
         // ids, so the patch-by-id path below would match none of them and the
@@ -1325,7 +1331,7 @@ export function ImageDesigner({
           the SEED slide underneath -- a blank template with placeholder copy --
           which reads as "it opened a different design" at precisely the moment
           the real one is being written. Show the work instead. */}
-      {writing && <WritingDesign />}
+      {writing && <WritingDesign stage={generationStage} />}
 
       {!writing && (
       <div
@@ -1732,6 +1738,7 @@ export function ImageDesigner({
                 // waiting for the first tick to confirm what we already know.
                 setGenerationStatus("writing");
                 setGenerationError(null);
+                setGenerationStage(null);
               }}
             />
                 <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
@@ -2293,16 +2300,14 @@ export function ImageDesigner({
  * survives leaving, because that is the thing an operator cannot see and would
  * otherwise assume the opposite of.
  */
-function WritingDesign() {
-  // Proportioned like a 1:1 slide's contents: a kicker, a heading of two lines,
-  // a gap, three lines of body. Widths vary so it reads as type, not as bars.
-  const lines = [
-    { w: "22%", h: 12, top: 0 },
-    { w: "86%", h: 34, top: 22 },
-    { w: "64%", h: 34, top: 8 },
-    { w: "78%", h: 12, top: 30 },
-    { w: "92%", h: 12, top: 8 },
-    { w: "48%", h: 12, top: 8 },
+function WritingDesign({ stage }: { stage?: string | null }) {
+  // Three blobs, each on its own path and its own clock, so the field never
+  // repeats a frame an operator could catch. Sized well over the frame: a blob
+  // whose edge is visible reads as a circle, and the point is a field of light.
+  const blobs = [
+    { anim: "designDriftA", dur: "13s", size: "88%", left: "-18%", top: "-14%", colour: "color-mix(in srgb, var(--accent) 70%, transparent)" },
+    { anim: "designDriftB", dur: "17s", size: "76%", left: "26%", top: "8%", colour: "color-mix(in srgb, var(--accent) 38%, #4a9eff)" },
+    { anim: "designDriftC", dur: "21s", size: "94%", left: "-6%", top: "22%", colour: "color-mix(in srgb, var(--accent) 22%, transparent)" },
   ];
   return (
     <div
@@ -2320,25 +2325,25 @@ function WritingDesign() {
           aspectRatio: "1 / 1",
           border: "1px solid var(--hairline)",
           borderRadius: "var(--radius)",
-          background: "var(--surface-1)",
-          padding: "13%",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
         }}
       >
-        {lines.map((l, i) => (
+        {blobs.map((b) => (
           <div
-            key={i}
-            className="design-writing-line"
+            key={b.anim}
+            className="design-writing-blob"
             style={{
-              width: l.w,
-              height: l.h,
-              marginTop: l.top,
-              animationDelay: `${i * 0.14}s`,
+              width: b.size,
+              height: b.size,
+              left: b.left,
+              top: b.top,
+              background: b.colour,
+              opacity: 0.5,
+              animation: `${b.anim} ${b.dur} ease-in-out infinite`,
             }}
           />
         ))}
+        <div className="design-writing-grid" />
+        <div className="design-writing-sweep" />
       </div>
       <div
         style={{
@@ -2350,7 +2355,7 @@ function WritingDesign() {
         }}
       >
         <Loader2 size={14} className="spin" />
-        Writing the slides. This takes a minute or two.
+        {stage?.trim() || "Writing the slides."}
       </div>
     </div>
   );

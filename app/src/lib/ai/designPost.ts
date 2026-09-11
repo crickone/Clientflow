@@ -183,6 +183,12 @@ export async function designPost(
     photos?: PhotoChoice[];
     /** The tenant's logo file, stamped onto every slide. Null to omit it. */
     logoPath?: string | null;
+    /**
+     * Called as the run moves through its stages, for a caller that has
+     * somewhere to show them. A generation is two to four minutes and was
+     * reported as a hang when it accounted for none of that.
+     */
+    onProgress?: (stage: string) => void;
   } = {},
 ): Promise<DesignPostOutcome> {
   const system = getDesignSystem();
@@ -202,6 +208,7 @@ export async function designPost(
   // scrim built for it lying on a flat ground.
   const photos = options.photos ?? [];
   const hasPhotography = photos.length > 0;
+  const onProgress = options.onProgress;
 
   // Computed from the real logo file, not stated as a fraction: its height is
   // its own aspect ratio at the stamped width, which no fixed phrasing can
@@ -280,6 +287,7 @@ export async function designPost(
       messages,
     }));
 
+  onProgress?.(`Designing ${input.slideCount} slides`);
   const first = await ask([{ role: "user", content: userPrompt }]);
   addUsage(first);
   if (first.stop_reason === "max_tokens") {
@@ -300,10 +308,25 @@ export async function designPost(
    * passed. Rendering is local and fast; a wasted render costs far less than a
    * slide the operator has to regenerate by hand.
    */
-  async function attempt(slides: RawDesign[]) {
+  /**
+   * `previous` is the attempt this one supersedes, when there is one. A repair
+   * is asked to return the WHOLE post with only the named slides fixed, so most
+   * of what comes back is byte-identical to what was already rendered -- and
+   * rendering a slide is TWO satori passes (the render, then the overflow
+   * measurement). Reusing the render for markup that did not change is the
+   * difference between a repair costing one slide's work and costing the set's,
+   * which an operator felt directly: "it got there in the end, just really
+   * slow".
+   */
+  async function attempt(slides: RawDesign[], previous?: DesignedSlide[]) {
     const checked = checkDesigns(slides, system!);
     const problems = [...checked.problems];
     const rendered: DesignedSlide[] = [];
+    const unchanged = new Map(
+      (previous ?? [])
+        .filter((p) => p.renderFilename)
+        .map((p) => [p.html, p] as const),
+    );
     // Advanced only by slides that actually take a photograph, so two photo
     // slides never land on the same picture just because a flat slide sat
     // between them.
@@ -315,6 +338,16 @@ export async function designPost(
         wantsPhoto && photos.length > 0
           ? photos[nextPhoto++ % photos.length]
           : null;
+
+      // Identical markup on the identical photograph paints identical pixels.
+      const already = unchanged.get(design.html);
+      if (already && already.photoAssetId === (photo?.id ?? null)) {
+        already.violations.forEach((v) => problems.push(`Slide ${i + 1}: ${v}`));
+        rendered.push({ ...already, violations: [...already.violations] });
+        continue;
+      }
+
+      onProgress?.(`Drawing slide ${i + 1} of ${checked.designs.length}`);
       const { renderFilename, violation } = await renderOne(
         design,
         system!,
@@ -348,6 +381,7 @@ export async function designPost(
   // for every attempt. What survives is shown flagged.
   if (checked.problems.length > 0) {
     repaired = true;
+    onProgress?.("Correcting what didn't fit the brand's rules");
     const repair = await ask([
       { role: "user", content: userPrompt },
       { role: "assistant", content: firstText },
@@ -363,7 +397,7 @@ export async function designPost(
     addUsage(repair);
     try {
       const second = extractDesignPayload(textOf(repair));
-      const recheck = await attempt(second.slides);
+      const recheck = await attempt(second.slides, checked.slides);
       // Take the repair only if it is actually better. One that returns fewer
       // slides, or more problems, is a regression -- keep the first.
       if (

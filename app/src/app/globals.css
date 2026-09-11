@@ -723,41 +723,83 @@ a {
 }
 
 /* Content Studio: a design being WRITTEN (ImageDesigner's WritingDesign).
-   A slow sweep across the slide frame, and the lines inside breathing in
-   sequence, so the wait reads as work in progress rather than a stalled page.
-   Deliberately slower than .ai-shimmer: this runs for a minute or more, and a
-   fast loop at that length is agitating rather than reassuring. */
-@keyframes designSweep {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+
+   Abstract rather than a skeleton of the slide: a skeleton promises a shape the
+   design has not chosen yet, and every one of these posts is composed from
+   scratch. Large blurred blobs in the tenant's own accent drift across a dark
+   field, with a slow light sweep over them -- movement that says "working"
+   without claiming to know what is being made.
+
+   Deliberately unhurried. This runs for two to four minutes; a fast loop at
+   that length is agitating rather than reassuring. */
+.design-writing {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(255, 255, 255, 0.04), transparent 60%),
+    var(--surface-2);
 }
-@keyframes designLine {
-  0%, 100% { opacity: 0.28; }
-  50% { opacity: 0.8; }
-}
-.design-writing { position: relative; overflow: hidden; }
-.design-writing::after {
-  content: "";
+.design-writing-blob {
   position: absolute;
-  inset: 0;
+  border-radius: 50%;
+  filter: blur(58px);
+  will-change: transform;
   pointer-events: none;
+}
+@keyframes designDriftA {
+  0%, 100% { transform: translate(-12%, -8%) scale(1); }
+  33%      { transform: translate(28%, 18%) scale(1.25); }
+  66%      { transform: translate(6%, 34%) scale(0.9); }
+}
+@keyframes designDriftB {
+  0%, 100% { transform: translate(34%, 28%) scale(1.1); }
+  40%      { transform: translate(-8%, 6%) scale(0.85); }
+  70%      { transform: translate(22%, -10%) scale(1.3); }
+}
+@keyframes designDriftC {
+  0%, 100% { transform: translate(10%, 44%) scale(0.95); }
+  50%      { transform: translate(-16%, 12%) scale(1.35); }
+}
+/* A single bar of light crossing the frame, tilted so it reads as a sweep
+   rather than a loading bar. */
+@keyframes designSweep {
+  0%   { transform: translateX(-140%) rotate(12deg); opacity: 0; }
+  12%  { opacity: 1; }
+  88%  { opacity: 1; }
+  100% { transform: translateX(140%) rotate(12deg); opacity: 0; }
+}
+.design-writing-sweep {
+  position: absolute;
+  top: -25%;
+  bottom: -25%;
+  width: 22%;
   background: linear-gradient(
     90deg,
     transparent,
-    color-mix(in srgb, var(--accent) 14%, transparent) 50%,
+    rgba(255, 255, 255, 0.1),
     transparent
   );
-  animation: designSweep 2.6s ease-in-out infinite;
+  animation: designSweep 4.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  pointer-events: none;
 }
-.design-writing-line {
-  border-radius: 4px;
-  background: var(--text-primary);
-  opacity: 0.28;
-  animation: designLine 2s ease-in-out infinite;
+/* A fine grid over the whole thing, low enough to register as texture rather
+   than as a chart. */
+.design-writing-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(75% 75% at 50% 50%, #000 35%, transparent 100%);
+  -webkit-mask-image: radial-gradient(75% 75% at 50% 50%, #000 35%, transparent 100%);
+  pointer-events: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  .design-writing::after,
-  .design-writing-line { animation: none; }
+  .design-writing-blob,
+  .design-writing-sweep { animation: none; }
+  .design-writing-sweep { opacity: 0.5; }
 }
 
 /* Voice T2: the mic button's "live" recording indicator — a small pulsing
