@@ -1746,6 +1746,25 @@ export function ImageDesigner({
                 </span>
               </div>
             )}
+            {/* The brand's OWN slide types, when the account has a design
+                direction and this slide was designed by Adonis. They are not
+                painters like the cards below -- there is no canvas code behind
+                a "Dossier page" -- they are the structures the direction is
+                built from, which the designer already has in its prompt. So
+                picking one asks for this slide again AS that type, which is the
+                closest thing to a template a composed slide can have. */}
+            {activeSlide && surface?.designed && (designSystem?.templates?.length ?? 0) > 0 && (
+              <DirectionTemplates
+                designId={designId}
+                slideId={activeSlide.id}
+                templates={designSystem!.templates}
+                onBeforeRedesign={() => snapshotForUndo(activeSlide)}
+                onUpdated={(next) =>
+                  setSlides((cur) => cur.map((sl) => (sl.id === next.id ? next : sl)))
+                }
+              />
+            )}
+
             {/* One scroll, labelled. A carousel template card used to switch
                 you to a different, parallel carousel rather than restyle the
                 slide in front of you — the templates read as slide ROLES
@@ -2776,6 +2795,144 @@ function DesignNotice({ violations }: { violations: string[] }) {
  * judge the result and ask for a different one, which is how design tools with
  * AI in them actually work.
  */
+/**
+ * The design direction's own slide types, as cards.
+ *
+ * An operator asked for "those templates" in the template panel, and the honest
+ * answer is that they are not templates in the sense the cards below are: a
+ * direction's slide types are STRUCTURES described to the designer, with no
+ * canvas painter behind them. What they can be is a steer. The full structure
+ * text is already in the model's system prompt (describeSystemForDesign), so
+ * naming the type is enough -- which also keeps the note well under the
+ * redesign route's 400-character cap.
+ */
+function DirectionTemplates({
+  designId,
+  slideId,
+  templates,
+  onUpdated,
+  onBeforeRedesign,
+}: {
+  designId: number;
+  slideId: number;
+  templates: { name: string; structure: string }[];
+  onUpdated: (slide: CarouselSlide) => void;
+  onBeforeRedesign: () => void;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function pick(name: string) {
+    onBeforeRedesign();
+    setBusy(name);
+    setError(null);
+    try {
+      const res = await fetch(`/api/content-studio/carousels/${designId}/redesign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slideId,
+          note: `Redesign this slide as the "${name}" slide type from this brand's own set, following that structure exactly. Keep the words; change the composition.`,
+        }),
+        signal: AbortSignal.timeout(180_000),
+      });
+      const json = await res.json().catch(() => null);
+      if (!json?.ok) {
+        setError(json?.error ?? `Couldn't redesign that slide (HTTP ${res.status}).`);
+        return;
+      }
+      const next = (json.carousel?.slides as CarouselSlide[] | undefined)?.find(
+        (sl) => sl.id === slideId,
+      );
+      if (next) onUpdated(next);
+    } catch (err) {
+      setError(
+        err instanceof DOMException && err.name === "TimeoutError"
+          ? "That took too long and was stopped. Try again in a moment."
+          : "Couldn't reach the server. Try again in a moment.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div
+        style={{
+          fontSize: 10,
+          fontWeight: 600,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          color: "var(--text-tertiary)",
+          marginBottom: 7,
+        }}
+      >
+        This slide, as
+      </div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+          gap: 10,
+        }}
+      >
+        {templates.map((t) => (
+          <button
+            key={t.name}
+            type="button"
+            onClick={() => pick(t.name)}
+            disabled={busy !== null}
+            title={t.structure}
+            style={{
+              textAlign: "left",
+              padding: "12px 14px",
+              borderRadius: "var(--radius)",
+              border: "1px solid var(--hairline)",
+              background: "var(--bg)",
+              cursor: busy ? "default" : "pointer",
+              fontFamily: "inherit",
+              display: "grid",
+              gap: 4,
+              opacity: busy && busy !== t.name ? 0.5 : 1,
+            }}
+          >
+            <span
+              style={{
+                fontSize: 13,
+                fontWeight: 500,
+                color: "var(--text-primary)",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              {busy === t.name && <Loader2 size={13} className="spin" />}
+              {t.name}
+            </span>
+            <span
+              style={{
+                fontSize: 11,
+                color: "var(--text-tertiary)",
+                letterSpacing: "0.02em",
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
+            >
+              {t.structure}
+            </span>
+          </button>
+        ))}
+      </div>
+      {error && (
+        <div style={{ marginTop: 8, fontSize: 12.5, color: "var(--danger)" }}>{error}</div>
+      )}
+    </div>
+  );
+}
+
 function DesignedSlidePanel({
   designId,
   slide,
