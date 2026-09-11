@@ -77,6 +77,85 @@ export function useLogoImage(
  * whenever the slide / library / fonts change. Used both for the big single
  * preview and for each thumbnail in the carousel grid.
  */
+/**
+ * A designed slide's stored PNG.
+ *
+ * Two states this used to get wrong, both seen in production. A slide whose
+ * render FAILED has no filename, and the old `renderFilename!` handed the
+ * browser a URL for nothing -- a black square with a broken-image glyph and no
+ * account of itself. And a render request that fails in flight (the app
+ * restarting under the operator is the one that happens) left that same black
+ * square permanently, even though the file was there all along.
+ *
+ * So: say so when there is nothing to show, and retry twice when there should
+ * have been. The retry carries a changing query so the browser re-requests
+ * rather than serving its own cached failure.
+ */
+function RenderImage({
+  filename,
+  aspect,
+}: {
+  filename: string | null;
+  aspect: string;
+}) {
+  const [attempt, setAttempt] = useState(0);
+  const [dead, setDead] = useState(false);
+  const box = {
+    width: "100%",
+    height: "auto",
+    aspectRatio: aspect.replace(":", " / "),
+    borderRadius: "var(--radius)",
+    boxShadow: "var(--shadow-1)",
+    background: "#0a0a0a",
+    display: "block",
+  } as const;
+
+  useEffect(() => {
+    setAttempt(0);
+    setDead(false);
+  }, [filename]);
+
+  if (!filename || dead) {
+    return (
+      <div
+        style={{
+          ...box,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 24,
+          textAlign: "center",
+          fontSize: 13,
+          lineHeight: 1.5,
+          color: "var(--text-tertiary)",
+          border: "1px solid var(--hairline)",
+        }}
+      >
+        {filename
+          ? "This slide's picture didn't load. Reload the page; if it stays, ask for a different design."
+          : "This slide didn't render. Ask for a different design for it."}
+      </div>
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={attempt === 0 ? renderFileUrl(filename) : `${renderFileUrl(filename)}?r=${attempt}`}
+      alt=""
+      onError={() => {
+        if (attempt < 2) {
+          // A restarting container answers nothing for a second or two.
+          setTimeout(() => setAttempt((a) => a + 1), 900);
+        } else {
+          setDead(true);
+        }
+      }}
+      style={box}
+    />
+  );
+}
+
 export function SlideCanvas({
   slide,
   slideIdx,
@@ -202,22 +281,7 @@ export function SlideCanvas({
         />
       );
     }
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={renderFileUrl(slide.renderFilename!)}
-        alt=""
-        style={{
-          width: "100%",
-          height: "auto",
-          aspectRatio: aspect.replace(":", " / "),
-          borderRadius: "var(--radius)",
-          boxShadow: "var(--shadow-1)",
-          background: "#0a0a0a",
-          display: "block",
-        }}
-      />
-    );
+    return <RenderImage filename={slide.renderFilename} aspect={aspect} />;
   }
 
   return (

@@ -511,9 +511,25 @@ export function ImageDesigner({
                 body: JSON.stringify({ assetId: backgroundAssetId }),
               },
             );
-            const json = await res.json();
+            // A gateway status is the app restarting under you, not a refusal
+            // the operator can do anything about -- and the two used to arrive
+            // as the same sentence, which sent someone looking for a fault in
+            // their own photo.
+            if (res.status === 502 || res.status === 503 || res.status === 504) {
+              throw new Error(
+                "The app was restarting. Give it a few seconds and pick the photo again.",
+              );
+            }
+            const json = await res.json().catch(() => null);
+            if (!json) {
+              throw new Error(
+                `The server answered with something unexpected (HTTP ${res.status}). Try again in a moment.`,
+              );
+            }
             if (!res.ok || !json.ok) {
-              throw new Error(json.error || "Couldn't put that photo on the slide.");
+              throw new Error(
+                json.error || `Couldn't put that photo on the slide (HTTP ${res.status}).`,
+              );
             }
             if (json.slide) {
               setSlides((cur) =>
@@ -594,8 +610,13 @@ export function ImageDesigner({
             body: snapshot,
           },
         );
-        const json = await res.json();
-        if (!res.ok || !json.ok) throw new Error(json.error || "Save failed.");
+        if (res.status === 502 || res.status === 503 || res.status === 504) {
+          throw new Error("The app was restarting — your change hasn't saved yet.");
+        }
+        const json = await res.json().catch(() => null);
+        if (!res.ok || !json?.ok) {
+          throw new Error(json?.error || `Save failed (HTTP ${res.status}).`);
+        }
         lastSavedRef.current[activeSlide.id] = snapshot;
         setSaveStatus("saved");
         setTimeout(() => setSaveStatus((s) => (s === "saved" ? "idle" : s)), 1500);
