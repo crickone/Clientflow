@@ -1798,10 +1798,11 @@ export function ImageDesigner({
                 built from, which the designer already has in its prompt. So
                 picking one asks for this slide again AS that type, which is the
                 closest thing to a template a composed slide can have. */}
-            {activeSlide && surface?.designed && (designSystem?.templates?.length ?? 0) > 0 && (
+            {activeSlide && (designSystem?.templates?.length ?? 0) > 0 && (
               <DirectionTemplates
                 designId={designId}
                 slideId={activeSlide.id}
+                designed={!!surface?.designed}
                 templates={designSystem!.templates}
                 onBeforeRedesign={() => snapshotForUndo(activeSlide)}
                 onUpdated={(next) =>
@@ -2841,12 +2842,15 @@ function DesignNotice({ violations }: { violations: string[] }) {
 function DirectionTemplates({
   designId,
   slideId,
+  designed,
   templates,
   onUpdated,
   onBeforeRedesign,
 }: {
   designId: number;
   slideId: number;
+  /** Whether this slide is already an Adonis design, or a fixed template being converted. */
+  designed: boolean;
   templates: { name: string; structure: string }[];
   onUpdated: (slide: CarouselSlide) => void;
   onBeforeRedesign: () => void;
@@ -2904,8 +2908,21 @@ function DirectionTemplates({
           marginBottom: 7,
         }}
       >
-        This slide, as
+        {designed ? "This slide, as" : "Redesign this slide as"}
       </div>
+      {!designed && (
+        <div
+          style={{
+            fontSize: 11.5,
+            color: "var(--text-tertiary)",
+            lineHeight: 1.5,
+            marginBottom: 9,
+          }}
+        >
+          Adonis will compose this slide from scratch in one of your brand&rsquo;s own
+          structures, keeping the words. It stops being a fixed template.
+        </div>
+      )}
       <div
         style={{
           display: "grid",

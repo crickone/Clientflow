@@ -10,6 +10,12 @@ import { resolveLogoPath } from "@/lib/branding";
 import { DESIGNED_TEMPLATE_ID } from "@/lib/image/paintSlide";
 
 export const dynamic = "force-dynamic";
+
+/** Operator copy going into markup the model reads. Angle brackets would make
+ *  it look like structure; the renderer never sees this string. */
+function escapeText(text: string | null | undefined): string {
+  return (text ?? "").replace(/[<>]/g, " ").trim();
+}
 export const maxDuration = 120;
 
 /**
@@ -48,17 +54,30 @@ export async function POST(
   if (!slide) {
     return NextResponse.json({ ok: false, error: "Slide not found." }, { status: 404 });
   }
-  if (slide.templateId !== DESIGNED_TEMPLATE_ID || !slide.designHtml) {
-    return NextResponse.json(
-      { ok: false, error: "That slide was not designed by Adonis, so there is nothing to redesign." },
-      { status: 400 },
-    );
-  }
+  const wasDesigned = slide.templateId === DESIGNED_TEMPLATE_ID && !!slide.designHtml;
 
   const note = typeof body?.note === "string" ? body.note.trim().slice(0, 400) : "";
   // The photograph this slide already used, so a redesign keeps its picture
   // rather than silently reverting to the library's first.
   const photo = photoChoiceFor(slide.backgroundAssetId);
+
+  /**
+   * What the model is shown as "the design so far".
+   *
+   * A slide Adonis designed has its own markup. A FIXED-template slide has
+   * none -- it is slots and a painter -- so this stands one up from its copy:
+   * structure and words, and deliberately no colours, since the palette the
+   * model should use is already in its system prompt and a hex here would
+   * invite it to copy the wrong one. That is what lets "this slide, as a
+   * Ledger" work on a template slide, which is where an operator reached for
+   * it and found nothing.
+   */
+  const previousHtml =
+    slide.designHtml ??
+    `<div style="display:flex;flex-direction:column;justify-content:center;width:1080px;height:1080px;padding:76px">` +
+      `<span style="font-size:84px;width:928px">${escapeText(slide.headingText)}</span>` +
+      `<span style="font-size:28px;width:928px">${escapeText(slide.bodyText)}</span>` +
+      `</div>`;
 
   let result;
   try {
@@ -66,7 +85,7 @@ export async function POST(
       {
         // The design's name is the topic it was generated from.
         topic: carousel.name,
-        previousHtml: slide.designHtml,
+        previousHtml,
         note: note || null,
         aspectRatio: slide.aspectRatio,
         photo,
@@ -91,6 +110,9 @@ export async function POST(
   }
 
   updateSlide(slide.id, {
+    // A template slide that has just been designed BECOMES a designed slide --
+    // its painter and its slots no longer describe what is on screen.
+    templateId: DESIGNED_TEMPLATE_ID,
     designHtml: result.slide.html,
     renderFilename: result.slide.renderFilename,
     backgroundAssetId: result.slide.photoAssetId ?? undefined,
