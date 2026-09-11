@@ -722,6 +722,44 @@ a {
   border-radius: 2px;
 }
 
+/* Content Studio: a design being WRITTEN (ImageDesigner's WritingDesign).
+   A slow sweep across the slide frame, and the lines inside breathing in
+   sequence, so the wait reads as work in progress rather than a stalled page.
+   Deliberately slower than .ai-shimmer: this runs for a minute or more, and a
+   fast loop at that length is agitating rather than reassuring. */
+@keyframes designSweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+@keyframes designLine {
+  0%, 100% { opacity: 0.28; }
+  50% { opacity: 0.8; }
+}
+.design-writing { position: relative; overflow: hidden; }
+.design-writing::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--accent) 14%, transparent) 50%,
+    transparent
+  );
+  animation: designSweep 2.6s ease-in-out infinite;
+}
+.design-writing-line {
+  border-radius: 4px;
+  background: var(--text-primary);
+  opacity: 0.28;
+  animation: designLine 2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .design-writing::after,
+  .design-writing-line { animation: none; }
+}
+
 /* Voice T2: the mic button's "live" recording indicator — a small pulsing
    dot pinned to the button's corner (the button itself gets `position:
    relative` inline, only while recording — see AssistantChat.tsx). Same

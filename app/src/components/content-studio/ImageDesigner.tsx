@@ -1159,7 +1159,7 @@ export function ImageDesigner({
           }}
         >
           <SaveStatus status={saveStatus} />
-          {slidesInSlot.length > 0 && (
+          {slidesInSlot.length > 0 && !writing && (
             <Button
               variant="outline"
               size="sm"
@@ -1280,6 +1280,13 @@ export function ImageDesigner({
       )}
 
       {/* Main layout */}
+      {/* A design being WRITTEN has nothing to edit yet. The editor used to show
+          the SEED slide underneath -- a blank template with placeholder copy --
+          which reads as "it opened a different design" at precisely the moment
+          the real one is being written. Show the work instead. */}
+      {writing && <WritingDesign />}
+
+      {!writing && (
       <div
         className="cms-editor-grid"
         style={{
@@ -2229,6 +2236,79 @@ export function ImageDesigner({
           </>
           )}
         </div>
+      </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * What the editor shows while a detached generation is running.
+ *
+ * A slide-shaped frame with its lines filling in, on the square the real slides
+ * will occupy -- so the page does not reflow when they arrive, and so nothing
+ * on screen claims to be a design that is not one. The copy says the run
+ * survives leaving, because that is the thing an operator cannot see and would
+ * otherwise assume the opposite of.
+ */
+function WritingDesign() {
+  // Proportioned like a 1:1 slide's contents: a kicker, a heading of two lines,
+  // a gap, three lines of body. Widths vary so it reads as type, not as bars.
+  const lines = [
+    { w: "22%", h: 12, top: 0 },
+    { w: "86%", h: 34, top: 22 },
+    { w: "64%", h: 34, top: 8 },
+    { w: "78%", h: 12, top: 30 },
+    { w: "92%", h: 12, top: 8 },
+    { w: "48%", h: 12, top: 8 },
+  ];
+  return (
+    <div
+      style={{
+        display: "grid",
+        gap: 14,
+        justifyItems: "center",
+        padding: "8px 0 24px",
+      }}
+    >
+      <div
+        className="design-writing"
+        style={{
+          width: "min(520px, 100%)",
+          aspectRatio: "1 / 1",
+          border: "1px solid var(--hairline)",
+          borderRadius: "var(--radius)",
+          background: "var(--surface-1)",
+          padding: "13%",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+        }}
+      >
+        {lines.map((l, i) => (
+          <div
+            key={i}
+            className="design-writing-line"
+            style={{
+              width: l.w,
+              height: l.h,
+              marginTop: l.top,
+              animationDelay: `${i * 0.14}s`,
+            }}
+          />
+        ))}
+      </div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 9,
+          fontSize: 13,
+          color: "var(--text-secondary)",
+        }}
+      >
+        <Loader2 size={14} className="spin" />
+        Writing the slides. This takes a minute or two.
       </div>
     </div>
   );

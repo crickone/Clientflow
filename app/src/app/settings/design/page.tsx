@@ -7,6 +7,7 @@ import { requireAdminPage } from "@/lib/auth";
 import { DESIGN_DIRECTIONS } from "@/lib/design/directions";
 import { AVAILABLE_FAMILIES } from "@/lib/design/fonts";
 import { designStatus } from "@/lib/design/directionStore";
+import { getTheme } from "@/lib/settings";
 import { DesignDirectionView } from "@/components/settings/DesignDirectionView";
 
 export const dynamic = "force-dynamic";
@@ -35,12 +36,18 @@ export default async function DesignDirectionPage() {
           name: d.name,
           blurb: d.blurb,
           font: d.font,
-          slots: d.slots.map((s) => ({ key: s.key, label: s.label, defaultHex: s.defaultHex.toLowerCase() })),
+          slots: d.slots.map((s) => ({
+            key: s.key,
+            label: s.label,
+            role: s.role,
+            defaultHex: s.defaultHex.toLowerCase(),
+          })),
           type: d.type,
           photo: d.photo ? { saturate: d.photo.saturate, contrast: d.photo.contrast, brightness: d.photo.brightness } : null,
         }))}
         fonts={[...AVAILABLE_FAMILIES]}
         status={designStatus()}
+        brandAccent={getTheme().accent.toLowerCase()}
       />
     </div>
   );

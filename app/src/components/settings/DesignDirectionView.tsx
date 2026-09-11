@@ -54,7 +54,7 @@ interface DirectionSummary {
   name: string;
   blurb: string;
   font: string;
-  slots: { key: string; label: string; defaultHex: string }[];
+  slots: { key: string; label: string; role: string; defaultHex: string }[];
   type: Record<TypeLevel, TypeStep>;
   photo: PhotoGrade | null;
 }
@@ -87,15 +87,43 @@ function hasOverrides(o: Overrides): boolean {
   return o.font !== undefined || (o.type !== undefined && Object.keys(o.type).length > 0) || o.photo !== undefined;
 }
 
+/**
+ * What a direction's slots start on for a tenant who has not chosen yet.
+ *
+ * Grounds and type keep the direction's own hexes -- a brand's paper and ink
+ * are the direction's paper and ink. The ACCENTS start on the tenant's brand
+ * colour, because the alternative is what an operator actually hit: a set
+ * generated in Evidence's stock blue on a business whose colour is gold, with
+ * nothing on the page saying the blue was a default rather than a choice.
+ *
+ * Every accent slot gets it, not just the first. A direction with two accents
+ * lets the designer pick one per post, and a slot left on the stock colour is
+ * exactly the one it would eventually pick.
+ */
+function seededPalette(
+  d: DirectionSummary,
+  brandAccent: string | null,
+): Record<string, string> {
+  const base: Record<string, string> = {};
+  for (const s of d.slots) {
+    base[s.key] =
+      s.role === "accent" && brandAccent ? brandAccent : s.defaultHex;
+  }
+  return base;
+}
+
 export function DesignDirectionView({
   directions,
   fonts,
   status,
+  brandAccent = null,
 }: {
   directions: DirectionSummary[];
   /** The families the renderer can actually load. */
   fonts: string[];
   status: Status;
+  /** The tenant's own accent (Settings -> Appearance), seeded into accent slots. */
+  brandAccent?: string | null;
 }) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -110,10 +138,10 @@ export function DesignDirectionView({
   const [palettes, setPalettes] = useState<Record<string, Record<string, string>>>(() => {
     const init: Record<string, Record<string, string>> = {};
     for (const d of directions) {
-      const base: Record<string, string> = {};
-      for (const s of d.slots) base[s.key] = s.defaultHex;
-      if (status.kind === "direction" && status.directionId === d.id) Object.assign(base, status.palette);
-      init[d.id] = base;
+      init[d.id] = seededPalette(d, brandAccent);
+      if (status.kind === "direction" && status.directionId === d.id) {
+        Object.assign(init[d.id], status.palette);
+      }
     }
     return init;
   });
@@ -337,9 +365,10 @@ export function DesignDirectionView({
           <div>
             <CardLabel>Your colours in {selected.name}</CardLabel>
             <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "4px 0 0", lineHeight: 1.5 }}>
-              Each slot has a job. Put your brand colour in the slot that does that job, and the structure -- which
-              grounds, how often, what may carry text -- stays the direction&apos;s. Colours that can&apos;t be read on
-              any ground are kept off text automatically.
+              Each slot has a job, and the structure -- which grounds, how often, what may carry text -- stays the
+              direction&apos;s whatever you put in them. The accent slots start on your own brand colour; the grounds
+              and the ink start on the direction&apos;s. Colours that can&apos;t be read on any ground are kept off
+              text automatically.
             </p>
           </div>
 
@@ -563,6 +592,21 @@ export function DesignDirectionView({
               <RotateCcw size={14} />
               Direction&apos;s own colours
             </Button>
+            {brandAccent && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setPalettes((p) => ({
+                    ...p,
+                    [selected.id]: seededPalette(selected, brandAccent),
+                  }));
+                  invalidate();
+                }}
+              >
+                <RotateCcw size={14} />
+                Your brand colour
+              </Button>
+            )}
             <span style={{ flex: 1 }} />
             <Button variant="primary" onClick={apply} disabled={pending || !paletteValid || !preview}>
               {pending ? <Loader2 size={14} className="spin" /> : <Check size={14} />}
