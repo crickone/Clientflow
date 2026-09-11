@@ -349,8 +349,15 @@ export function ImageDesigner({
     "slot" | "slide" | "caption" | null
   >(null);
   const [captionCopied, setCaptionCopied] = useState(false);
-  /** Slide id whose photograph is being changed and re-rendered, or null. */
-  const [rephotographing, setRephotographing] = useState<number | null>(null);
+  /**
+   * The photo swap in flight on a designed slide: which slide, and which
+   * photo. Held so the strip can show the work AND refuse a second pick --
+   * two re-renders racing for one slide let the slower one win, which reads
+   * as the second pick having done nothing.
+   */
+  const [rephotographing, setRephotographing] = useState<
+    { slideId: number; assetId: number } | null
+  >(null);
   const [generationStatus, setGenerationStatus] = useState<string | null>(
     initialGenerationStatus,
   );
@@ -497,9 +504,14 @@ export function ImageDesigner({
       // mechanism -- which is why this branches here rather than offering the
       // operator a second, differently-worded photo control.
       if (activeSlide.templateId === DESIGNED_TEMPLATE_ID) {
+        // A designed slide's photograph is embedded in its markup, so there is
+        // nothing to clear -- only something to swap.
         if (backgroundAssetId == null) return;
+        // One at a time. The guard is here rather than on the strip alone so a
+        // keyboard or a double click cannot get past it either.
+        if (rephotographing) return;
         const slideId = activeSlide.id;
-        setRephotographing(slideId);
+        setRephotographing({ slideId, assetId: backgroundAssetId });
         setActionError(null);
         void (async () => {
           try {
@@ -541,7 +553,7 @@ export function ImageDesigner({
               err instanceof Error ? err.message : "Couldn't change the photo.",
             );
           } finally {
-            setRephotographing((cur) => (cur === slideId ? null : cur));
+            setRephotographing((cur) => (cur?.slideId === slideId ? null : cur));
           }
         })();
         return;
@@ -563,7 +575,7 @@ export function ImageDesigner({
         ).catch(() => {});
       }
     },
-    [activeSlide, designId, updateActiveSlide],
+    [activeSlide, designId, rephotographing, updateActiveSlide],
   );
 
   // Auto-save active slide (debounced)
@@ -1464,7 +1476,12 @@ export function ImageDesigner({
                       onEdited: (renderFilename) => updateActiveSlide({ renderFilename }),
                     }}
                   />
-                  {activeSlide.backgroundAssetId != null && (
+                  {/* Only where it does something. A DESIGNED slide records
+                      which photograph it used, but that photograph is embedded
+                      in its markup and cropped at render time -- dragging a
+                      focal point over it would move nothing and save a value
+                      no renderer reads. */}
+                  {activeSlide.backgroundAssetId != null && !surface?.designed && (
                     <FocalOverlay
                       x={activeSlide.backgroundOffsetX}
                       y={activeSlide.backgroundOffsetY}
@@ -1472,6 +1489,30 @@ export function ImageDesigner({
                         updateActiveSlide({ backgroundOffsetX, backgroundOffsetY })
                       }
                     />
+                  )}
+
+                  {/* The slide is being drawn again on the server. Over the
+                      picture, because that is where the operator is looking --
+                      a spinner in the strip below answers "did my click land",
+                      this answers "is this still the old one". */}
+                  {rephotographing?.slideId === activeSlide.id && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 9,
+                        borderRadius: "var(--radius)",
+                        background: "rgba(0,0,0,0.55)",
+                        color: "#fff",
+                        fontSize: 13,
+                      }}
+                    >
+                      <Loader2 size={16} className="spin" />
+                      Redrawing this slide…
+                    </div>
                   )}
                   {activeSlide?.imageStatus === "generating" && (
                     <div
@@ -1681,7 +1722,13 @@ export function ImageDesigner({
               onPick={setSlideBackgroundManually}
               onUpload={uploadFiles}
               onDelete={deleteAsset}
-              uploading={uploading || rephotographing === activeSlide.id}
+              uploading={uploading}
+              applyingAssetId={
+                rephotographing?.slideId === activeSlide.id
+                  ? rephotographing.assetId
+                  : null
+              }
+              canClear={activeSlide.templateId !== DESIGNED_TEMPLATE_ID}
             />
           )}
           </>

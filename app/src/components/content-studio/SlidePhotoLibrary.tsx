@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { Image as ImageIcon, Trash2, Upload } from "lucide-react";
+import { Image as ImageIcon, Loader2, Trash2, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -23,6 +23,8 @@ export function SlidePhotoLibrary({
   onUpload,
   onDelete,
   uploading,
+  applyingAssetId = null,
+  canClear = true,
 }: {
   assets: ImageLibraryAsset[];
   activeAssetId: number | null;
@@ -31,7 +33,18 @@ export function SlidePhotoLibrary({
   onUpload: (files: File[]) => void;
   onDelete: (assetId: number) => void;
   uploading: boolean;
+  /**
+   * The photo currently being put on the slide, when that takes real work --
+   * an AI-designed slide is RE-RENDERED server-side, which is a second or two
+   * of nothing if the strip says nothing. It also locks the strip, because two
+   * picks in flight race for the same slide and the slower one wins, which an
+   * operator reads as the second pick doing nothing at all.
+   */
+  applyingAssetId?: number | null;
+  /** False where the slide's photograph cannot be removed, only swapped. */
+  canClear?: boolean;
 }) {
+  const applying = applyingAssetId != null;
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   return (
@@ -68,7 +81,24 @@ export function SlidePhotoLibrary({
           </span>
         </span>
         <div style={{ display: "flex", gap: 8 }}>
-          {activeAssetId != null && (
+          {applying && (
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 11.5,
+                fontWeight: 400,
+                color: "var(--text-secondary)",
+                textTransform: "none",
+                letterSpacing: 0,
+              }}
+            >
+              <Loader2 size={13} className="spin" />
+              Putting it on the slide…
+            </span>
+          )}
+          {canClear && activeAssetId != null && !applying && (
             <Button type="button" size="sm" variant="ghost" onClick={() => onPick(null)}>
               Clear
             </Button>
@@ -129,6 +159,7 @@ export function SlidePhotoLibrary({
         >
           {assets.map((asset) => {
             const active = asset.id === activeAssetId;
+            const thisOne = asset.id === applyingAssetId;
             return (
               <div
                 key={asset.id}
@@ -138,13 +169,19 @@ export function SlidePhotoLibrary({
                   paddingBottom: "100%",
                   borderRadius: "var(--radius)",
                   overflow: "hidden",
-                  border: active
-                    ? "2px solid var(--text-primary)"
-                    : "1px solid var(--hairline)",
-                  cursor: "pointer",
+                  border:
+                    active || thisOne
+                      ? "2px solid var(--text-primary)"
+                      : "1px solid var(--hairline)",
+                  cursor: applying ? "default" : "pointer",
                   background: "var(--surface-2)",
+                  opacity: applying && !thisOne ? 0.4 : 1,
+                  transition: "opacity 120ms ease",
                 }}
-                onClick={() => onPick(asset.id)}
+                onClick={() => {
+                  if (applying) return;
+                  onPick(asset.id);
+                }}
               >
                 <img
                   src={libraryFileUrl(asset.filename)}
@@ -158,11 +195,27 @@ export function SlidePhotoLibrary({
                     display: "block",
                   }}
                 />
+                {thisOne && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "rgba(0,0,0,0.45)",
+                      color: "#fff",
+                    }}
+                  >
+                    <Loader2 size={18} className="spin" />
+                  </div>
+                )}
                 <Tooltip label="Remove from library">
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (applying) return;
                       onDelete(asset.id);
                     }}
                     aria-label="Remove from library"
