@@ -304,36 +304,56 @@ export function SlidePhotoLibraryPopout(
   }, [open]);
 
   return (
-    <div style={{ position: "absolute", top: 10, left: 10, zIndex: 6 }}>
+    // OUTSIDE the slide, hung off its left edge: the pill used to sit on the
+    // picture, which an operator read as part of the design rather than a
+    // control of it. translateX(-100%) puts the tab in the preview card's own
+    // padding, and the panel opens further left again, so nothing this owns
+    // ever covers the slide.
+    <div
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        transform: "translateX(-100%)",
+        paddingRight: 8,
+        zIndex: 6,
+      }}
+    >
       <button
         type="button"
         onClick={toggle}
         aria-expanded={open}
+        aria-label={open ? "Hide photos" : "Show photos"}
+        title={open ? "Hide photos" : "Show photos"}
         style={{
           display: "inline-flex",
+          flexDirection: "column",
           alignItems: "center",
-          gap: 6,
-          fontSize: 11.5,
-          fontWeight: 500,
-          padding: "5px 9px",
-          borderRadius: 999,
-          border: "none",
-          background: "rgba(10,10,10,0.72)",
-          color: "#fff",
+          gap: 5,
+          padding: "10px 6px",
+          borderRadius: "var(--radius) 0 0 var(--radius)",
+          border: "1px solid var(--hairline)",
+          borderRight: "none",
+          background: "var(--surface-2)",
+          color: "var(--text-secondary)",
           cursor: "pointer",
           fontFamily: "inherit",
-          backdropFilter: "blur(4px)",
+          fontSize: 10,
+          fontWeight: 600,
+          letterSpacing: "0.08em",
         }}
       >
-        <ImageIcon size={12} />
-        Photos
+        <ImageIcon size={13} />
+        <span style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}>
+          PHOTOS
+        </span>
         {photoCount > 0 && (
-          <span style={{ opacity: 0.65, fontWeight: 400 }}>{photoCount}</span>
+          <span style={{ fontWeight: 400, opacity: 0.7 }}>{photoCount}</span>
         )}
         <ChevronDown
           size={12}
           style={{
-            transform: open ? "rotate(180deg)" : "none",
+            transform: open ? "rotate(90deg)" : "rotate(-90deg)",
             transition: `transform ${DUR.base}s`,
           }}
         />
@@ -342,18 +362,21 @@ export function SlidePhotoLibraryPopout(
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
+            initial={{ opacity: 0, x: 8 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 8 }}
             transition={{ duration: DUR.base, ease: EASE }}
             style={{
               position: "absolute",
-              top: 34,
-              left: 0,
-              width: 316,
-              maxWidth: "80vw",
+              top: 0,
+              right: "100%",
+              marginRight: 8,
+              // Narrow viewports have less room to the left of the preview, so
+              // the panel gives way rather than running off the screen.
+              width: "min(292px, 30vw)",
               boxShadow: "var(--shadow-2, 0 18px 40px rgba(0,0,0,0.45))",
               borderRadius: "var(--radius)",
+              background: "var(--bg)",
             }}
           >
             <SlidePhotoLibrary {...libraryProps} />
