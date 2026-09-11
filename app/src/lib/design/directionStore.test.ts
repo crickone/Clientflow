@@ -67,6 +67,20 @@ const requireLocal = createRequire(import.meta.url);
       assert.equal(system!.values.find((v) => v.key === "red")?.hex, "#b00020", "the tenant's hex is in the system");
       assert.equal(system!.values.find((v) => v.key === "white")?.hex, "#ffffff", "unnamed slots took the default");
 
+      // Overrides ride along with the choice and reach the composed system.
+      const withType = applyDesignDirection("swiss", { red: "#B00020" }, { font: "Fraunces", type: { display: { size: 140 } }, photo: null });
+      assert.deepEqual(withType, { ok: true });
+      const st = designStatus();
+      assert.equal(st.kind, "direction");
+      assert.equal((st as { overrides: { font?: string } }).overrides.font, "Fraunces", "the override is stored");
+      assert.equal(getDesignSystem()!.font, "Fraunces", "and reaches the composed system");
+      assert.equal(getDesignSystem()!.type.display.size, 140);
+      assert.equal(getDesignSystem()!.photo, null, "photo null means no grade");
+      assert.equal(getDesignSystem()!.values.find((v) => v.key === "red")?.hex, "#b00020", "the palette is unaffected");
+      // Unknown font is dropped, not refused: the rest of the edit still applies.
+      assert.deepEqual(applyDesignDirection("swiss", { red: "#B00020" }, { font: "Comic Sans" }), { ok: true });
+      assert.equal(getDesignSystem()!.font, "Space Grotesk", "an unknown font falls back to the direction's own");
+
       // Bad input is refused, and nothing changes.
       assert.deepEqual(applyDesignDirection("nope", {}), { ok: false, error: "Unknown design direction." });
       assert.equal(applyDesignDirection("swiss", { red: "not a colour" }).ok, false, "a bad hex is refused");

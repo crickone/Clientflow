@@ -16,9 +16,11 @@ export type DesignActionResult = { ok: true } | { ok: false; error: string };
 export async function applyDesignDirectionAction(input: {
   directionId: string;
   palette: Record<string, string>;
+  /** Typeface / type scale / photo grade edits; clamped server-side by normalizeOverrides. */
+  overrides?: unknown;
 }): Promise<DesignActionResult> {
   await requireAdmin();
-  const r = applyDesignDirection(input.directionId, input.palette);
+  const r = applyDesignDirection(input.directionId, input.palette, input.overrides ?? {});
   if (r.ok) {
     revalidatePath("/settings/design");
     revalidatePath("/content-studio", "layout");

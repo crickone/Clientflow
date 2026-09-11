@@ -1,7 +1,8 @@
 import "server-only";
 
 import { deleteKey, readKey, setKey } from "@/lib/settings";
-import { composeDesignSystem, type BrandPalette } from "./direction";
+import { composeDesignSystem, normalizeOverrides, withOverrides, type BrandPalette, type DirectionOverrides } from "./direction";
+import { AVAILABLE_FAMILIES } from "./fonts";
 import { getDirection } from "./directions";
 import { parseDesignSystem } from "./parse";
 import { getDesignSystem, setDesignSystem } from "./system";
@@ -27,19 +28,21 @@ export const DESIGN_DIRECTION_KEY = "design_direction";
 export interface StoredDirection {
   directionId: string;
   palette: BrandPalette;
+  /** The operator's edits to typeface, type scale and photo grade -- see DirectionOverrides. */
+  overrides: DirectionOverrides;
 }
 
 export type DesignStatus =
   | { kind: "none" }
   | { kind: "custom" }
-  | { kind: "direction"; directionId: string; palette: BrandPalette };
+  | { kind: "direction"; directionId: string; palette: BrandPalette; overrides: DirectionOverrides };
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
 export function getStoredDirection(): StoredDirection | null {
   const raw = readKey<unknown>(DESIGN_DIRECTION_KEY, null);
   if (!raw || typeof raw !== "object") return null;
-  const o = raw as { directionId?: unknown; palette?: unknown };
+  const o = raw as { directionId?: unknown; palette?: unknown; overrides?: unknown };
   if (typeof o.directionId !== "string" || !getDirection(o.directionId)) return null;
   const palette: BrandPalette = {};
   if (o.palette && typeof o.palette === "object") {
@@ -47,7 +50,11 @@ export function getStoredDirection(): StoredDirection | null {
       if (typeof v === "string" && HEX.test(v)) palette[k] = v.toLowerCase();
     }
   }
-  return { directionId: o.directionId, palette };
+  return {
+    directionId: o.directionId,
+    palette,
+    overrides: normalizeOverrides(o.overrides, AVAILABLE_FAMILIES),
+  };
 }
 
 export function designStatus(): DesignStatus {
@@ -64,9 +71,12 @@ export function designStatus(): DesignStatus {
 export function applyDesignDirection(
   directionId: string,
   palette: BrandPalette,
+  overridesRaw: unknown = {},
 ): { ok: true } | { ok: false; error: string } {
-  const direction = getDirection(directionId);
-  if (!direction) return { ok: false, error: "Unknown design direction." };
+  const base = getDirection(directionId);
+  if (!base) return { ok: false, error: "Unknown design direction." };
+  const overrides = normalizeOverrides(overridesRaw, AVAILABLE_FAMILIES);
+  const direction = withOverrides(base, overrides);
 
   const clean: BrandPalette = {};
   for (const slot of direction.slots) {
@@ -81,7 +91,7 @@ export function applyDesignDirection(
   const system = parseDesignSystem(composeDesignSystem(direction, clean));
   if (!system) return { ok: false, error: "That combination doesn't compose to a valid design system." };
 
-  setKey(DESIGN_DIRECTION_KEY, { directionId, palette: clean });
+  setKey(DESIGN_DIRECTION_KEY, { directionId, palette: clean, overrides });
   setDesignSystem(system);
   return { ok: true };
 }

@@ -17,7 +17,7 @@
  * ZERO RUNTIME IMPORTS beyond the sibling pure modules (see ./parse.ts): this
  * runs in the pure test runner and in the browser.
  */
-import type { DesignSystem, TypeLevel, TypeStep, ValueRole } from "./parse";
+import { TYPE_LEVELS, type DesignSystem, type TypeLevel, type TypeStep, type ValueRole } from "./parse";
 import { contrastRatio } from "./validate";
 
 export interface PaletteSlot {
@@ -144,5 +144,110 @@ export function composeDesignSystem(
       minContrastLarge: direction.rules.minContrastLarge,
       neverType,
     },
+  };
+}
+
+// ─── Overrides: the operator's edits on top of a direction ───────────────────
+
+/**
+ * What an operator may change about a direction without leaving it: the
+ * typeface, the type scale, and the photo grade. NOT the grid and NOT the
+ * ground rotation budgets -- those are the questions nobody can answer in a
+ * settings form ("how many consecutive slides may carry sage?"), and they are
+ * what makes a direction a direction rather than a blank form.
+ *
+ * Stored beside the choice, applied at compose time, so the direction itself
+ * is never mutated and "Direction's own type" is always one reset away.
+ */
+export interface DirectionOverrides {
+  /** Must be a family the renderer has; validated against the list the caller passes. */
+  font?: string;
+  /** Per level, any subset of the step's fields. */
+  type?: Partial<Record<TypeLevel, Partial<TypeStep>>>;
+  /** A whole grade, or null for "no photo grade". The direction's wash (a slot
+   *  reference) is kept when a grade is given -- it is structural, not a number. */
+  photo?: { saturate: number; contrast: number; brightness: number } | null;
+}
+
+function inRange(v: unknown, min: number, max: number): number | null {
+  return typeof v === "number" && Number.isFinite(v) && v >= min && v <= max ? v : null;
+}
+
+/**
+ * Clamp untrusted overrides to what the parser will accept, dropping anything
+ * unusable rather than refusing the lot -- a stored blob with one bad field
+ * still yields the good ones. Bounds mirror parseDesignSystem exactly, so an
+ * override that survives here composes to a system that parses.
+ */
+export function normalizeOverrides(raw: unknown, fonts: readonly string[]): DirectionOverrides {
+  const out: DirectionOverrides = {};
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
+  const o = raw as Record<string, unknown>;
+
+  if (typeof o.font === "string" && fonts.includes(o.font.trim())) out.font = o.font.trim();
+
+  if (o.type && typeof o.type === "object" && !Array.isArray(o.type)) {
+    const type: DirectionOverrides["type"] = {};
+    for (const level of TYPE_LEVELS) {
+      const step = (o.type as Record<string, unknown>)[level];
+      if (!step || typeof step !== "object" || Array.isArray(step)) continue;
+      const st = step as Record<string, unknown>;
+      const partial: Partial<TypeStep> = {};
+      const size = inRange(st.size, 1, 1000);
+      const leading = inRange(st.leading, 0.5, 4);
+      const tracking = inRange(st.tracking, -0.5, 1);
+      const weight = inRange(st.weight, 1, 1000);
+      if (size !== null) partial.size = size;
+      if (leading !== null) partial.leading = leading;
+      if (tracking !== null) partial.tracking = tracking;
+      if (weight !== null) partial.weight = weight;
+      if (typeof st.upper === "boolean") partial.upper = st.upper;
+      if (Object.keys(partial).length > 0) type[level] = partial;
+    }
+    if (Object.keys(type).length > 0) out.type = type;
+  }
+
+  if (o.photo === null) {
+    out.photo = null;
+  } else if (o.photo && typeof o.photo === "object" && !Array.isArray(o.photo)) {
+    const ph = o.photo as Record<string, unknown>;
+    const saturate = inRange(ph.saturate, 0, 4);
+    const contrast = inRange(ph.contrast, 0, 4);
+    const brightness = inRange(ph.brightness, 0, 4);
+    if (saturate !== null && contrast !== null && brightness !== null) {
+      out.photo = { saturate, contrast, brightness };
+    }
+  }
+
+  return out;
+}
+
+/**
+ * A direction with an operator's overrides applied. Returns a NEW direction;
+ * the authored one is never touched. `upper: false` removes the flag rather
+ * than storing a false, so the composed step matches what the parser emits.
+ */
+export function withOverrides(direction: DesignDirection, overrides: DirectionOverrides): DesignDirection {
+  const type = { ...direction.type };
+  for (const level of TYPE_LEVELS) {
+    const patch = overrides.type?.[level];
+    if (!patch) continue;
+    const merged: TypeStep = { ...direction.type[level], ...patch };
+    if (merged.upper !== true) delete merged.upper;
+    type[level] = merged;
+  }
+
+  let photo = direction.photo;
+  if (overrides.photo === null) {
+    photo = null;
+  } else if (overrides.photo) {
+    photo = { ...overrides.photo, ...(direction.photo?.wash ? { wash: direction.photo.wash } : {}) };
+  }
+
+  return {
+    ...direction,
+    font: overrides.font ?? direction.font,
+    type,
+    photo,
   };
 }

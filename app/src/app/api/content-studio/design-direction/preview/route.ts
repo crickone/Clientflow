@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import sharp from "sharp";
 
 import { guard } from "@/lib/api/guard";
-import { composeDesignSystem, type BrandPalette } from "@/lib/design/direction";
+import { composeDesignSystem, normalizeOverrides, withOverrides, type BrandPalette } from "@/lib/design/direction";
+import { AVAILABLE_FAMILIES } from "@/lib/design/fonts";
 import { getDirection } from "@/lib/design/directions";
 import { loadDesignFonts } from "@/lib/design/fonts";
 import { parseDesignSystem } from "@/lib/design/parse";
@@ -24,7 +25,7 @@ export async function POST(req: Request) {
   const denied = await guard("admin");
   if (denied) return denied;
 
-  let body: { directionId?: unknown; palette?: unknown };
+  let body: { directionId?: unknown; palette?: unknown; overrides?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -35,8 +36,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const direction = typeof body.directionId === "string" ? getDirection(body.directionId) : null;
-  if (!direction) return NextResponse.json({ ok: false, error: "Unknown design direction." }, { status: 400 });
+  const base = typeof body.directionId === "string" ? getDirection(body.directionId) : null;
+  if (!base) return NextResponse.json({ ok: false, error: "Unknown design direction." }, { status: 400 });
+  // The same clamp Apply uses, so what is previewed is exactly what would be stored.
+  const direction = withOverrides(base, normalizeOverrides(body.overrides, AVAILABLE_FAMILIES));
 
   const palette: BrandPalette = {};
   if (body.palette && typeof body.palette === "object" && !Array.isArray(body.palette)) {

@@ -11,6 +11,8 @@ import {
   composeDesignSystem,
   defaultPalette,
   deriveNeverType,
+  normalizeOverrides,
+  withOverrides,
   type DesignDirection,
 } from "./direction";
 
@@ -101,5 +103,44 @@ check(
 
 // -- a direction with no photo grade composes to photo: null --
 check("no photo grade stays null", composeDesignSystem({ ...FIXTURE, photo: null }, defaults).photo === null);
+
+// -- overrides: the operator's edits on top of a direction --
+//
+// Clamped to the parser's bounds and applied at compose time; the authored
+// direction is never mutated, so "Direction's own" is always one reset away.
+const FONTS = ["Inter", "Fraunces"];
+
+check("empty overrides change nothing", JSON.stringify(withOverrides(FIXTURE, {})) === JSON.stringify(FIXTURE));
+check("a known font applies", withOverrides(FIXTURE, { font: "Fraunces" }).font === "Fraunces");
+check("an unknown font is dropped at normalisation", normalizeOverrides({ font: "Comic Sans" }, FONTS).font === undefined);
+check("a known font survives normalisation", normalizeOverrides({ font: " Fraunces " }, FONTS).font === "Fraunces");
+
+const typed = normalizeOverrides(
+  { type: { display: { size: 120, weight: 700, upper: true }, body: { size: 5000, leading: 9 }, nope: { size: 10 } } },
+  FONTS,
+);
+check("in-range type fields are kept", typed.type?.display?.size === 120 && typed.type?.display?.weight === 700);
+check("upper is kept as a boolean", typed.type?.display?.upper === true);
+check("an out-of-range size is dropped, not clamped to a guess", typed.type?.body === undefined);
+check("an unknown level is ignored", !("nope" in (typed.type ?? {})));
+
+const applied = withOverrides(FIXTURE, typed);
+check("the override merges over the direction's step", applied.type.display.size === 120 && applied.type.display.leading === FIXTURE.type.display.leading);
+check("untouched levels are the direction's", applied.type.body.size === FIXTURE.type.body.size);
+check("the direction itself is not mutated", FIXTURE.type.display.size === 84);
+check("upper:false removes the flag rather than storing false", !("upper" in withOverrides(FIXTURE, { type: { label: { upper: false } } }).type.label));
+
+check("photo null means no grade", withOverrides(FIXTURE, { photo: null }).photo === null);
+const graded = withOverrides(FIXTURE, { photo: { saturate: 0.3, contrast: 1.2, brightness: 1 } });
+check("a photo override replaces the numbers", graded.photo?.saturate === 0.3);
+check("but keeps the direction's wash -- it is a slot, not a number", graded.photo?.wash?.slot === "accent");
+check("a half-specified photo grade is dropped", normalizeOverrides({ photo: { saturate: 0.5 } }, FONTS).photo === undefined);
+check("photo null survives normalisation", normalizeOverrides({ photo: null }, FONTS).photo === null);
+check("junk normalises to nothing", Object.keys(normalizeOverrides("junk", FONTS)).length === 0);
+
+check(
+  "an overridden direction still composes to a system the parser accepts",
+  parseDesignSystem(composeDesignSystem(withOverrides(FIXTURE, typed), defaults)) !== null,
+);
 
 console.log(`\ndirection: ${passed} checks passed`);
