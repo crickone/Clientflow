@@ -1352,9 +1352,9 @@ export function ImageDesigner({
           the SEED slide underneath -- a blank template with placeholder copy --
           which reads as "it opened a different design" at precisely the moment
           the real one is being written. Show the work instead. */}
-      {writing && <WritingDesign stage={generationStage} />}
 
-      {!writing && (
+
+
       <div
         className="cms-editor-grid"
         style={{
@@ -1366,6 +1366,15 @@ export function ImageDesigner({
       >
         {/* Preview */}
         <div className="cms-preview-col" style={{ display: "grid", gap: 14, position: "sticky", top: 24 }}>
+          {/* While a design is being WRITTEN there is no slide to show -- the
+              seed slide underneath is a blank template, and showing it reads as
+              "it opened a different design". Only THIS column is replaced: the
+              template panel beside it is how an operator starts and steers a
+              design, and hiding the whole editor took that with it. */}
+          {writing ? (
+            <WritingDesign stage={generationStage} />
+          ) : (
+          <>
           {isEmptySlot ? (
             <div
               style={{
@@ -1675,6 +1684,8 @@ export function ImageDesigner({
               uploading={uploading || rephotographing === activeSlide.id}
             />
           )}
+          </>
+          )}
         </div>
 
         {/* Controls column — grouped into collapsible Template / Content / Style / Layout sections */}
@@ -1938,6 +1949,13 @@ export function ImageDesigner({
             )}
           </div>
           </EditorSection>
+
+          {/* Everything below acts on a SLIDE, and while a design is being
+              written the slide on screen is the seed one about to be deleted.
+              The Template section above stays: it is how the design was started
+              and how it is steered. */}
+          {!writing && (
+          <>
 
           {/* The caption belongs to the POST, not to a slide -- it is stored
               on slide[0] and goes out with the whole carousel. It used to sit
@@ -2325,9 +2343,10 @@ export function ImageDesigner({
           </EditorSection>
           </>
           )}
+          </>
+          )}
         </div>
       </div>
-      )}
     </div>
   );
 }
