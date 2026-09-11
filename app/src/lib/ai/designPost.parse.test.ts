@@ -10,6 +10,7 @@ import {
   DESIGN_RULES,
   NO_PHOTOGRAPHY_RULE,
   checkDesigns,
+  checkSet,
   describeSystemForDesign,
   extractDesignPayload,
 } from "./designPost.parse";
@@ -181,10 +182,24 @@ check(
   NO_PHOTOGRAPHY_RULE.includes("NO PHOTOGRAPHY IS AVAILABLE") &&
     NO_PHOTOGRAPHY_RULE.includes("scrim"),
 );
+// The seven-slide carousel that prompted this: every light slide filled its
+// top two thirds and then stopped, leaving a dead band above the footer. The
+// old rule ("Open space is fine") read as a licence for exactly that.
 check(
-  "open space is allowed, not called unfinished",
-  DESIGN_RULES.includes("Open space is fine") &&
-    !DESIGN_RULES.includes("USE THE WHOLE CANVAS"),
+  "quiet space is a band at an edge, not a hole in the middle",
+  DESIGN_RULES.includes("ANCHOR THE COMPOSITION") &&
+    DESIGN_RULES.includes("band of nothing between the last paragraph and the footer"),
+);
+check(
+  "and the slide is told how to close itself instead",
+  DESIGN_RULES.includes("close the slide with something that belongs there"),
+);
+check(
+  "a slide type is used at most once in a set, not merely never twice in a row",
+  describeSystemForDesign({
+    ...SYSTEM,
+    templates: [{ name: "Dossier page", structure: "Light ground." }],
+  }).includes("AT MOST ONCE in a set"),
 );
 // A real generation put "HBOT - 60 minutes - EUR 95" on a closing slide for a
 // tenant with no services, no pricing and no business profile. "Never invent a
@@ -199,5 +214,83 @@ check(
 
 const empty = checkDesigns([{ html: "   ", photo: "" }], SYSTEM);
 check("an empty design is a problem", empty.problems.some((p) => p.includes("no markup")));
+
+// -- Set-level problems ---------------------------------------------------
+// A palette with two accents, to exercise both halves.
+const TWO_ACCENTS = {
+  ...SYSTEM,
+  values: [
+    ...SYSTEM.values,
+    { key: "volt", hex: "#d4f000", role: "accent" as const },
+    { key: "azure", hex: "#4a9eff", role: "accent" as const },
+  ],
+};
+{
+  const d = describeSystemForDesign(TWO_ACCENTS);
+  check("a multi-accent palette is told to commit to one", d.includes("A SET COMMITS TO ONE"));
+  check("and names the accents it is choosing between", d.includes("volt, azure"));
+  check(
+    "a single-accent palette is not told to choose",
+    !describeSystemForDesign(SYSTEM).includes("A SET COMMITS TO ONE"),
+  );
+}
+
+// The same shape twice in one set. Same ground, same sizes, same block count --
+// slides 2 and 6 of the real carousel, down to the same kicker.
+{
+  const shape = (words: string) =>
+    `<div style="display:flex;background:#f2f3ed"><span style="font-size:84px;color:#24231f">${words}</span><span style="font-size:28px;color:#24231f">${words} again</span></div>`;
+  const repeated = checkSet(
+    [
+      { html: shape("One"), photo: "" },
+      { html: `<div style="display:flex;background:#24231f"><span style="font-size:180px;color:#f2f3ed">2</span></div>`, photo: "" },
+      { html: shape("Two"), photo: "" },
+    ],
+    SYSTEM,
+  );
+  check("the same composition twice is a set-level problem", repeated.length === 1);
+  check("named by slide, so the repair call knows which", repeated[0].includes("Slides 1 and 3"));
+  check("and told which one to rebuild", repeated[0].includes("Rebuild slide 3"));
+
+  const varied = checkSet(
+    [
+      { html: shape("One"), photo: "" },
+      { html: `<div style="display:flex;background:#24231f"><span style="font-size:180px;color:#f2f3ed">2</span></div>`, photo: "" },
+    ],
+    SYSTEM,
+  );
+  check("a set that moves between types has no such problem", varied.length === 0);
+}
+
+// Two accents on the same set.
+{
+  const both = checkSet(
+    [
+      { html: `<div style="display:flex;background:#f2f3ed"><span style="font-size:84px;color:#d4f000">a</span></div>`, photo: "" },
+      { html: `<div style="display:flex;background:#24231f"><span style="font-size:40px;color:#4a9eff">b</span></div>`, photo: "" },
+    ],
+    TWO_ACCENTS,
+  );
+  check("two accents in one set is a problem", both.some((p) => p.includes("two accents")));
+  check("and both are named with the slides they are on", both.some((p) => p.includes("volt #d4f000") && p.includes("azure #4a9eff")));
+
+  const one = checkSet(
+    [
+      { html: `<div style="display:flex;background:#f2f3ed"><span style="font-size:84px;color:#d4f000">a</span></div>`, photo: "" },
+      { html: `<div style="display:flex;background:#24231f"><span style="font-size:40px;color:#d4f000">b</span></div>`, photo: "" },
+    ],
+    TWO_ACCENTS,
+  );
+  check("one accent used throughout is not", one.length === 0);
+}
+
+// Set problems reach the repair call WITHOUT badging an individual slide --
+// neither slide is wrong on its own terms, and a warning on one would be a lie.
+{
+  const same = `<div style="display:flex;background:#f2f3ed"><span style="font-size:84px;color:#24231f">x</span></div>`;
+  const r = checkDesigns([{ html: same, photo: "" }, { html: same, photo: "" }], SYSTEM);
+  check("a set problem is in problems", r.problems.some((p) => p.includes("same composition")));
+  check("and on no slide's violations", r.designs.every((d) => d.violations.length === 0));
+}
 
 console.log(`\ndesignPost.parse: ${passed} checks passed`);

@@ -261,7 +261,7 @@ export const EVIDENCE: DesignDirection = {
     {
       name: "Dossier page",
       structure:
-        "Light ground. Running head and slide counter with a hard rule beneath, a kicker, a SERIF heading of one or two lines with a marker highlight behind one of them, a short accent rule, a paragraph of body copy with key terms in bold, and a footer. The workhorse for explaining a mechanism.",
+        "Light ground. Running head and slide counter with a hard rule beneath, a kicker, a SERIF heading of one or two lines with a marker highlight behind one of them, a short accent rule, a paragraph of body copy with key terms in bold, and a footer on the very bottom edge. The column of copy runs DOWN TO the bottom margin -- this page is dense. If the copy is short, close it with a hairline-bordered detail box or a figure rather than leaving a band of nothing above the footer. The workhorse for explaining a mechanism.",
     },
     {
       name: "Poster",
@@ -276,12 +276,12 @@ export const EVIDENCE: DesignDirection = {
     {
       name: "Ledger",
       structure:
-        "Light ground. A narrow left column of figures in the serif face with a tiny caps label beside each, rows separated by hairlines, under a short heading. For three to five related numbers that belong together.",
+        "Light ground. A narrow left column of figures in the serif face with a tiny caps label beside each, rows separated by hairlines, under a short heading. The rows run down to the bottom margin. For three to five related numbers that belong together.",
     },
     {
       name: "Definition list",
       structure:
-        "Either ground. A short kicker, then three or four rows stacked down the page, each a term in the accent followed by its explanation in the body face. Separated by space or hairlines, never shut in cards and never side by side.",
+        "Either ground. A short kicker, then three or four rows stacked down the page, each a term in the accent followed by its explanation in the body face. Separated by space or hairlines, never shut in cards and never side by side. The rows are spaced to fill the height between the kicker and the bottom margin, so the last one ends where the page does.",
     },
     {
       name: "Annotated figure",

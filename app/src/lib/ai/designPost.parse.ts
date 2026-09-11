@@ -7,8 +7,9 @@
  * transitively and will not load under the plain tsx runner, so everything that
  * can be tested without a network call lives here.
  */
-import { auditDesignHtml } from "@/lib/design/htmlAudit";
+import { auditDesignHtml, extractColours } from "@/lib/design/htmlAudit";
 import { TYPE_LEVELS, columnWidth, type DesignSystem } from "@/lib/design/parse";
+import { findTextRuns } from "@/lib/design/textRuns";
 
 export interface RawDesign {
   html: string;
@@ -35,6 +36,17 @@ export function describeSystemForDesign(system: DesignSystem): string {
       notes.push("NEVER set type in this - rules, blocks and fills only");
     }
     lines.push(`- ${v.key} ${v.hex} -- ${notes.join(", ")}`);
+  }
+
+  // A palette may carry several accents; a POST commits to one. Two accents
+  // across a set reads as two brands, which is what a real carousel did when
+  // it put the lime and the blue on the same slides.
+  const accentKeys = system.values.filter((v) => v.role === "accent").map((v) => v.key);
+  if (accentKeys.length > 1) {
+    lines.push(
+      "",
+      `This palette carries more than one accent (${accentKeys.join(", ")}). A SET COMMITS TO ONE. Choose the accent before you design slide 1, use only that one across every slide, and do not use the others anywhere in this post.`,
+    );
   }
 
   lines.push("", "Grounds -- a slide's background is one of these:");
@@ -107,7 +119,7 @@ export function describeSystemForDesign(system: DesignSystem): string {
     );
     for (const t of system.templates) lines.push(`- ${t.name}: ${t.structure}`);
     lines.push(
-      "These describe a structure, not a stencil. You decide the proportions, the crop, the emphasis and what goes where inside one. Never use the same slide type twice in a row, and do not use them in the order listed.",
+      "These describe a structure, not a stencil. You decide the proportions, the crop, the emphasis and what goes where inside one. Use each slide type AT MOST ONCE in a set, and not in the order listed. If the set has more slides than there are slide types, the one you repeat must be visibly a different slide -- another ground, another scale, another crop -- and never with the same kicker or running head as the first.",
     );
   }
 
@@ -143,7 +155,7 @@ KEEP THE TOP-RIGHT CORNER CLEAR -- roughly a quarter of the width and a tenth of
 
 Keep every element inside the canvas and clear of the others. Nothing may overlap text, and nothing may run off an edge unless you meant it to. Give every text element an explicit "width" so it wraps where you intend rather than where it runs out of canvas.
 
-Open space is fine. A composition anchored high or low with quiet space across the rest of the frame is the house look, not an unfinished slide.
+ANCHOR THE COMPOSITION, and do not leave a hole in it. Quiet space is a BAND at one edge, never a gap in the middle: either the content runs down to the bottom margin, or it starts below the midline and the space sits above it. A slide that fills the top two thirds and then stops -- a band of nothing between the last paragraph and the footer -- reads as unfinished, not composed. If the copy does not reach the bottom on its own, set it larger, move the whole block down, or close the slide with something that belongs there: a figure, a rule, a caption, a band of a second ground, a photograph.
 
 SET HEADINGS LARGE. A carousel is read at thumbnail size in a feed, so a heading that looks generous on screen is merely legible in the app. A slide's MAIN heading -- the line the slide is about -- is DISPLAY size. The headline level is for a secondary heading inside a slide, never for the thing the slide is about, and when a heading sits between two levels take the larger one.
 
@@ -215,6 +227,79 @@ export function extractDesignPayload(text: string): {
 }
 
 /**
+ * A slide's composition, reduced to the things that make two slides read as
+ * the same slide: the ground it sits on, the set of type sizes it uses, how
+ * many text elements it has, and whether it carries a photograph.
+ *
+ * Deliberately coarse on content and exact on structure. Two slides saying
+ * different words in the same shape ARE the same slide at feed size, which is
+ * the complaint; two slides sharing a heading size but differing in ground or
+ * in how many blocks they hold are not.
+ */
+function compositionSignature(html: string): string {
+  const sizes = [
+    ...new Set(
+      [...html.matchAll(/font-size\s*:\s*(\d+)px/gi)].map((m) => Number(m[1])),
+    ),
+  ]
+    .sort((a, b) => a - b)
+    .join(",");
+  // The outermost background is the ground. Later ones are bands and blocks.
+  const ground = html.match(/background(?:-color)?\s*:\s*(#[0-9a-fA-F]{6})/i)?.[1].toLowerCase() ?? "none";
+  const photo = /<img\b/i.test(html) ? "photo" : "flat";
+  return `${ground}|${sizes}|${findTextRuns(html).length}|${photo}`;
+}
+
+/**
+ * The problems no single slide can see, phrased for the repair call.
+ *
+ * Both came off a real seven-slide carousel: two of its slides were the same
+ * composition down to the same kicker, and the set used two different accents
+ * on the same slides, which reads as two brands rather than one.
+ */
+export function checkSet(raw: RawDesign[], system: DesignSystem): string[] {
+  const problems: string[] = [];
+
+  const bySignature = new Map<string, number[]>();
+  raw.forEach((r, i) => {
+    if (!r.html.trim()) return;
+    const sig = compositionSignature(r.html);
+    bySignature.set(sig, [...(bySignature.get(sig) ?? []), i + 1]);
+  });
+  for (const slides of bySignature.values()) {
+    if (slides.length < 2) continue;
+    const [, ...rest] = slides;
+    problems.push(
+      `Slides ${slides.join(" and ")} are the same composition -- the same ground, the same type sizes and the same number of text blocks. A set moves between slide types. Rebuild slide${rest.length === 1 ? "" : "s"} ${rest.join(" and ")} as a different slide type.`,
+    );
+  }
+
+  // One accent per set. A palette may offer several; a post commits to one.
+  const accents = new Map<string, string>();
+  for (const v of system.values) {
+    if (v.role === "accent") accents.set(v.hex, v.key);
+  }
+  if (accents.size > 1) {
+    const used = new Map<string, number[]>();
+    raw.forEach((r, i) => {
+      for (const c of extractColours(r.html)) {
+        if (accents.has(c)) used.set(c, [...(used.get(c) ?? []), i + 1]);
+      }
+    });
+    if (used.size > 1) {
+      const named = [...used.entries()]
+        .map(([hex, slides]) => `${accents.get(hex)} ${hex} (slide${slides.length === 1 ? "" : "s"} ${slides.join(", ")})`)
+        .join(" and ");
+      problems.push(
+        `This set uses two accents: ${named}. A post commits to ONE accent throughout -- two of them read as two brands. Pick one and restate the other slides in it.`,
+      );
+    }
+  }
+
+  return problems;
+}
+
+/**
  * Audit every design. `problems` is phrased for the repair call; the designs
  * come back regardless, because a flagged slide is SHOWN, never discarded.
  */
@@ -251,6 +336,11 @@ export function checkDesigns(
     violations.forEach((v) => problems.push(`Slide ${i + 1}: ${v}`));
     designs.push({ ...r, violations });
   });
+
+  // Set-level problems are NOT slide violations: they belong to no one slide,
+  // so they go to the repair call without putting a warning badge on a slide
+  // that is fine on its own terms.
+  problems.push(...checkSet(raw, system));
 
   return { designs, problems };
 }
