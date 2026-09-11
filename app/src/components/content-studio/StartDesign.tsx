@@ -23,6 +23,14 @@ import { DEFAULT_CAROUSEL_SLOT, DEFAULT_SLOT } from "@/lib/image/slots";
 type Kind = "carousel" | "single";
 
 /**
+ * How long the client waits for a generation before giving up. Comfortably
+ * past the route's own 120s limit, so a slow-but-working generation is never
+ * killed by this -- it exists only to catch a connection that will never
+ * answer at all.
+ */
+const GENERATE_TIMEOUT_MS = 180_000;
+
+/**
  * The carousel slot generated slides land in. Matches the fallback the editor's
  * own generate flow uses, so both routes end up in the same place.
  */
@@ -130,15 +138,25 @@ export function StartDesign() {
           slideCount: slides,
           slotKey: CAROUSEL_SLOT,
         }),
+        // The route gives up at 120s; this is the client's own floor under it.
+        // Without a deadline a connection whose server went away -- a deploy
+        // swapping the container mid-request is the common one -- never
+        // rejects, and the button sits on "Writing..." forever with no way
+        // out and no idea why. Generous, because a seven-slide design with
+        // thinking genuinely takes a minute or more.
+        signal: AbortSignal.timeout(GENERATE_TIMEOUT_MS),
       });
       gen = await res.json();
       if (!gen?.ok && !gen?.error) {
         gen = { ok: false, error: `The generator failed (HTTP ${res.status}).` };
       }
-    } catch {
+    } catch (err) {
+      const timedOut = err instanceof DOMException && err.name === "TimeoutError";
       gen = {
         ok: false,
-        error: "Lost contact with the server while writing the slides.",
+        error: timedOut
+          ? "Writing the slides took too long and was stopped. This usually means the app restarted mid-request."
+          : "Lost contact with the server while writing the slides.",
       };
     }
     if (!gen?.ok) {

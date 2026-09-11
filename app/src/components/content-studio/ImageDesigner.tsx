@@ -2607,6 +2607,11 @@ function DesignedSlidePanel({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ slideId: slide.id, note: note.trim() || null }),
+          // Same deadline as the starter's generate: the route gives up at
+          // 120s, and without a client floor a connection whose server went
+          // away (a deploy swapping the container mid-request) never rejects
+          // and the button spins forever.
+          signal: AbortSignal.timeout(180_000),
         },
       );
       const data = await res.json().catch(() => null);
@@ -2619,8 +2624,12 @@ function DesignedSlidePanel({
       );
       if (next) onUpdated(next);
       setNote("");
-    } catch {
-      setError("Couldn't reach the server. Try again in a moment.");
+    } catch (err) {
+      setError(
+        err instanceof DOMException && err.name === "TimeoutError"
+          ? "The redesign took too long and was stopped. This usually means the app restarted mid-request."
+          : "Couldn't reach the server. Try again in a moment.",
+      );
     } finally {
       setBusy(false);
     }
