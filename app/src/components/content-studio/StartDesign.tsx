@@ -23,12 +23,13 @@ import { DEFAULT_CAROUSEL_SLOT, DEFAULT_SLOT } from "@/lib/image/slots";
 type Kind = "carousel" | "single";
 
 /**
- * How long the client waits for a generation before giving up. Comfortably
- * past the route's own 120s limit, so a slow-but-working generation is never
- * killed by this -- it exists only to catch a connection that will never
- * answer at all.
+ * How long the client waits for the generation to be ACCEPTED. The route no
+ * longer writes the slides inside the request -- it queues a detached run and
+ * returns -- so this covers a handshake, not a minute of AI work. It exists
+ * only to catch a connection that will never answer at all (a deploy swapping
+ * the container mid-request is the usual one).
  */
-const GENERATE_TIMEOUT_MS = 180_000;
+const GENERATE_TIMEOUT_MS = 30_000;
 
 /**
  * The carousel slot generated slides land in. Matches the fallback the editor's
@@ -128,6 +129,10 @@ export function StartDesign() {
       router.push(`/content-studio/images/${id}`);
       return;
     }
+    // Only STARTS the run. The slides are written by a detached continuation on
+    // the server, and the editor shows them arriving -- so the operator is free
+    // to navigate anywhere from here, which is the whole point: this used to be
+    // a minute-long request that clicking away from destroyed.
     let gen: { ok?: boolean; error?: string } | null = null;
     try {
       const res = await fetch(`/api/content-studio/carousels/${id}/generate`, {
@@ -138,12 +143,6 @@ export function StartDesign() {
           slideCount: slides,
           slotKey: CAROUSEL_SLOT,
         }),
-        // The route gives up at 120s; this is the client's own floor under it.
-        // Without a deadline a connection whose server went away -- a deploy
-        // swapping the container mid-request is the common one -- never
-        // rejects, and the button sits on "Writing..." forever with no way
-        // out and no idea why. Generous, because a seven-slide design with
-        // thinking genuinely takes a minute or more.
         signal: AbortSignal.timeout(GENERATE_TIMEOUT_MS),
       });
       gen = await res.json();
@@ -155,19 +154,18 @@ export function StartDesign() {
       gen = {
         ok: false,
         error: timedOut
-          ? "Writing the slides took too long and was stopped. This usually means the app restarted mid-request."
-          : "Lost contact with the server while writing the slides.",
+          ? "The server didn't answer in time. This usually means the app restarted mid-request."
+          : "Lost contact with the server while starting the generation.",
       };
     }
     if (!gen?.ok) {
       // STAY PUT on failure. This used to set the error and navigate in the
       // same breath, so the message was destroyed by the route change and the
-      // operator landed in an editor holding one seed slide with no idea why —
-      // which is exactly how a truncated generation looked in production.
+      // operator landed in an editor holding one seed slide with no idea why.
       // The reason is usually something they can act on here ("try fewer
       // slides"), so it belongs on the screen with the controls that change it.
       setError(
-        `${gen?.error ?? "Couldn't write the slides."} Your draft was saved — you can open it and generate again from there.`,
+        `${gen?.error ?? "Couldn't start writing the slides."} Your draft was saved — you can open it and generate again from there.`,
       );
       setBusy(null);
       return;
@@ -278,7 +276,7 @@ export function StartDesign() {
         )}
         <Button onClick={startWithAi} disabled={working}>
           {busy === "ai" ? <Loader2 size={15} className="spin" /> : <Sparkles size={15} />}
-          {busy === "ai" ? "Writing…" : "Write it with Adonis"}
+          {busy === "ai" ? "Starting…" : "Write it with Adonis"}
         </Button>
         <Button variant="ghost" onClick={startManually} disabled={working}>
           <PenLine size={15} />
@@ -291,7 +289,8 @@ export function StartDesign() {
       )}
       {busy === "ai" && kind === "carousel" && (
         <div style={{ marginTop: 12, fontSize: 12.5, color: "var(--text-tertiary)" }}>
-          Writing {slides} slides — this takes a few seconds.
+          Opening the design — Adonis writes the {slides} slides there, and keeps
+          going if you go elsewhere in the app.
         </div>
       )}
     </div>

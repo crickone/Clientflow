@@ -67,6 +67,8 @@ export default function ImageDesignPage({
         logoUrl={getChromeLogoSrc()}
         initialShowLogo={design.showLogo}
         designSystem={getDesignSystem()}
+        initialGenerationStatus={design.generationStatus}
+        initialGenerationError={design.generationError}
       />
     </>
   );

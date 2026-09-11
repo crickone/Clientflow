@@ -879,6 +879,22 @@ export const carouselSets = sqliteTable("carousel_sets", {
   name: text("name").notNull(),
   /** Draw the tenant's uploaded logo on every slide of this design (preview + export). */
   showLogo: integer("show_logo", { mode: "boolean" }).notNull().default(true),
+  /**
+   * Where a DETACHED generation has got to: 'writing' while the AI run is in
+   * flight, 'failed' when it gave up, null when there is nothing running (the
+   * ordinary state, and what a finished run clears itself back to).
+   *
+   * Persisted rather than held in the request because the run outlives the
+   * request that started it -- an operator who navigates away mid-generation
+   * must be able to come back and find it, which is exactly what used to be
+   * lost.
+   */
+  generationStatus: text("generation_status"),
+  /** Why the last detached generation failed. Shown in the editor, cleared on the next run. */
+  generationError: text("generation_error"),
+  /** When the current run started, so a 'writing' left behind by a restarted
+   *  process can be recognised as dead rather than spun on forever. */
+  generationStartedAt: integer("generation_started_at", { mode: "timestamp_ms" }),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),

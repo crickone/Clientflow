@@ -3,9 +3,44 @@ import "server-only";
 import { db, schema } from "@/lib/db";
 import type { CarouselSet, CarouselSlide } from "@/lib/db/schema";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
+import {
+  honestGenerationState,
+  type GenerationStatus,
+} from "@/lib/image/generationState";
 
 export interface CarouselWithSlides extends CarouselSet {
   slides: CarouselSlide[];
+}
+
+/**
+ * Record where a detached generation has got to. Starting a run stamps the
+ * time, so staleness can be judged later; finishing or failing clears it.
+ */
+export function setGenerationStatus(
+  carouselId: number,
+  status: GenerationStatus,
+  error: string | null = null,
+): void {
+  db.update(schema.carouselSets)
+    .set({
+      generationStatus: status,
+      generationError: error,
+      generationStartedAt: status === "writing" ? new Date() : null,
+    })
+    .where(eq(schema.carouselSets.id, carouselId))
+    .run();
+}
+
+/** Apply the staleness rule (see ./generationState) to a row on its way out. */
+function withHonestGenerationState<T extends CarouselSet>(set: T): T {
+  return {
+    ...set,
+    ...honestGenerationState({
+      generationStatus: set.generationStatus as GenerationStatus,
+      generationError: set.generationError,
+      generationStartedAt: set.generationStartedAt,
+    }),
+  };
 }
 
 export function createCarousel(input: { name: string }): CarouselSet {
@@ -37,7 +72,7 @@ export function getCarousel(id: number): CarouselWithSlides | null {
       asc(schema.carouselSlides.slideOrder),
     )
     .all();
-  return { ...set, slides };
+  return { ...withHonestGenerationState(set), slides };
 }
 
 export interface CarouselSummary extends CarouselSet {
@@ -58,7 +93,11 @@ export function listCarousels(): CarouselSummary[] {
       .where(eq(schema.carouselSlides.carouselSetId, s.id))
       .orderBy(asc(schema.carouselSlides.slideOrder))
       .all();
-    return { ...s, slideCount: slides.length, firstSlide: slides[0] ?? null };
+    return {
+      ...withHonestGenerationState(s),
+      slideCount: slides.length,
+      firstSlide: slides[0] ?? null,
+    };
   });
 }
 

@@ -1265,6 +1265,9 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       show_logo INTEGER NOT NULL DEFAULT 1,
+      generation_status TEXT,
+      generation_error TEXT,
+      generation_started_at INTEGER,
       created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
       updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
@@ -1782,6 +1785,18 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       sqlite.exec(
         "ALTER TABLE carousel_sets ADD COLUMN show_logo INTEGER NOT NULL DEFAULT 1",
       );
+    }
+    // Generation runs DETACHED from the request that started it, so its state
+    // has to live somewhere the next page load can find it -- navigating away
+    // mid-generation used to lose the whole thing.
+    if (!setCols.find((c) => c.name === "generation_status")) {
+      sqlite.exec("ALTER TABLE carousel_sets ADD COLUMN generation_status TEXT");
+    }
+    if (!setCols.find((c) => c.name === "generation_error")) {
+      sqlite.exec("ALTER TABLE carousel_sets ADD COLUMN generation_error TEXT");
+    }
+    if (!setCols.find((c) => c.name === "generation_started_at")) {
+      sqlite.exec("ALTER TABLE carousel_sets ADD COLUMN generation_started_at INTEGER");
     }
   } catch (err) {
     console.error("[db] carousel imagery migration failed:", err);

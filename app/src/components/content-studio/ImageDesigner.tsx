@@ -122,6 +122,15 @@ interface Props {
    * that breaks a brand rule is caught as well as a badly-composed layout.
    */
   designSystem?: DesignSystem | null;
+  /**
+   * Whether a DETACHED generation is running on this design ("writing"), gave
+   * up ("failed"), or neither (null). The run outlives the request that started
+   * it, so this is how the editor learns there is work in flight -- including
+   * on a page load that happens long after the operator navigated away from the
+   * screen that kicked it off.
+   */
+  initialGenerationStatus?: string | null;
+  initialGenerationError?: string | null;
 }
 
 /**
@@ -316,6 +325,8 @@ export function ImageDesigner({
   logoUrl = null,
   initialShowLogo = true,
   designSystem = null,
+  initialGenerationStatus = null,
+  initialGenerationError = null,
 }: Props) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -336,6 +347,13 @@ export function ImageDesigner({
     "slot" | "slide" | "caption" | null
   >(null);
   const [captionCopied, setCaptionCopied] = useState(false);
+  const [generationStatus, setGenerationStatus] = useState<string | null>(
+    initialGenerationStatus,
+  );
+  const [generationError, setGenerationError] = useState<string | null>(
+    initialGenerationError,
+  );
+  const writing = generationStatus === "writing";
 
   const fontsReady = useCanvasFonts();
 
@@ -493,6 +511,10 @@ export function ImageDesigner({
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!activeSlide) return;
+    // A run in flight is about to delete and replace this slot. Saving the
+    // slide it is replacing writes nothing worth keeping, and a PATCH racing
+    // the delete is noise in the log for no gain.
+    if (writing) return;
     const snapshot = JSON.stringify({
       templateId: activeSlide.templateId,
       aspectRatio: activeSlide.aspectRatio,
@@ -536,7 +558,7 @@ export function ImageDesigner({
         setActionError(err instanceof Error ? err.message : "Save failed.");
       }
     }, 600);
-  }, [activeSlide, designId]);
+  }, [activeSlide, designId, writing]);
 
   // Auto-save design name (debounced)
   const nameTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -570,15 +592,30 @@ export function ImageDesigner({
     libraryRef.current = library;
   }, [library]);
   const anyGenerating = slides.some((s) => s.imageStatus === "generating");
+  // `writing` is the whole-design run; `anyGenerating` is per-slide background
+  // imagery. Both are resolved by the same poll, because both are written by a
+  // detached continuation and the editor has no other way to hear about them.
+  const pollWanted = anyGenerating || writing;
   useEffect(() => {
-    if (!anyGenerating) return;
+    if (!pollWanted) return;
     let stopped = false;
     const tick = async () => {
       try {
         const res = await fetch(`/api/content-studio/carousels/${designId}`);
         const json = await res.json();
         if (stopped || !res.ok || !json.ok) return;
+        const status: string | null = json.carousel?.generationStatus ?? null;
+        setGenerationStatus(status);
+        setGenerationError(json.carousel?.generationError ?? null);
         const server: CarouselSlide[] = json.carousel?.slides ?? [];
+        // A finished generation REPLACED the slot: the rows are new, with new
+        // ids, so the patch-by-id path below would match none of them and the
+        // editor would sit on the seed slide forever. Take the server's set
+        // whole, once, at the moment the run stops.
+        if (writing && status !== "writing") {
+          setSlides(server);
+          setActiveIdx(0);
+        }
         const byId = new Map(server.map((s) => [s.id, s]));
         // Hydrate newly-generated assets we don't have locally yet.
         const known = new Set(libraryRef.current.map((a) => a.id));
@@ -624,7 +661,7 @@ export function ImageDesigner({
       stopped = true;
       clearInterval(iv);
     };
-  }, [anyGenerating, designId]);
+  }, [pollWanted, writing, designId]);
 
   // `template` is only passed when the user picked one from the picker on an
   // empty slot. NOTE the callers: `onClick={addSlide}` would hand the click
@@ -1191,6 +1228,42 @@ export function ImageDesigner({
         </div>
       </div>
 
+      {writing && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            fontSize: 13,
+            padding: "10px 12px",
+            border: "1px solid var(--hairline)",
+            background: "var(--surface-2)",
+            borderRadius: "var(--radius)",
+          }}
+        >
+          <Loader2 size={15} className="spin" />
+          <span>
+            Adonis is writing this design. It keeps going if you leave this page
+            — come back any time and the slides will be here.
+          </span>
+        </div>
+      )}
+
+      {generationError && !writing && (
+        <div
+          style={{
+            color: "#dc2626",
+            fontSize: 13,
+            padding: "8px 12px",
+            border: "1px solid #dc2626",
+            background: "rgba(220,38,38,0.06)",
+            borderRadius: "var(--radius)",
+          }}
+        >
+          Writing the slides failed: {generationError}
+        </div>
+      )}
+
       {actionError && (
         <div
           style={{
@@ -1598,21 +1671,19 @@ export function ImageDesigner({
                 name.trim() ||
                 ""
               }
-              onGenerated={(newSlides, images) => {
+              onStarted={(startedSlot) => {
                 lastSavedRef.current = {};
-                setSlides(newSlides);
-                // The carousel lives in its carousel slot — switch to that slot
-                // so we land on it (and never pollute the single-image
-                // "default" slot). The kind follows the slot on its own.
-                const cslot =
-                  newSlides.find((s) => isCarouselSlot(s.slotKey))?.slotKey ??
-                  DEFAULT_CAROUSEL_SLOT;
-                setActiveSlot(cslot);
+                // Switch to the slot the run writes into, so the slides land in
+                // front of the operator rather than in a tab they have to find.
+                // The kind follows the slot on its own.
+                setActiveSlot(
+                  isCarouselSlot(startedSlot) ? startedSlot : DEFAULT_CAROUSEL_SLOT,
+                );
                 setActiveIdx(0);
-                router.refresh();
-                if (images && images.queued > 0) {
-                  toast.success(`Generating ${images.queued} AI backgrounds — they'll appear as they finish.`);
-                }
+                // Turns the poll on immediately, so the banner shows without
+                // waiting for the first tick to confirm what we already know.
+                setGenerationStatus("writing");
+                setGenerationError(null);
               }}
             />
                 <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
@@ -2205,15 +2276,13 @@ function GenerateCarouselButton({
   designId,
   slotKey,
   defaultTopic,
-  onGenerated,
+  onStarted,
 }: {
   designId: number;
   slotKey: string;
   defaultTopic: string;
-  onGenerated: (
-    newSlides: CarouselSlide[],
-    images?: { queued: number; estCents: number },
-  ) => void;
+  /** The run is QUEUED, not finished -- the editor polls for the slides. */
+  onStarted: (slotKey: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [topic, setTopic] = useState(defaultTopic);
@@ -2256,12 +2325,11 @@ function GenerateCarouselButton({
       if (!res.ok || !json.ok) {
         throw new Error(json.error || "Couldn't generate the carousel.");
       }
-      const newSlides = json?.carousel?.slides;
-      if (!Array.isArray(newSlides) || newSlides.length === 0) {
-        throw new Error("Generator returned no slides.");
-      }
+      // The response says the run STARTED. The slides are written by a detached
+      // continuation and arrive through the editor's poll, which is what lets
+      // the operator navigate away without killing the generation.
       setOpen(false);
-      onGenerated(newSlides as CarouselSlide[], json.images);
+      onStarted(slotKey);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Couldn't generate the carousel.",
