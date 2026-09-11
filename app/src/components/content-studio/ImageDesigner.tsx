@@ -1440,11 +1440,33 @@ export function ImageDesigner({
             </div>
           ) : (
             activeSlide && (
+              /* The photo library is a tab on the OUTSIDE of the preview card,
+                 laid out beside it. It was a strip under the slide (a scroll
+                 away from what it changed) and then a pill on the slide itself
+                 (read as part of the design). Here it is neither. */
+              <div style={{ display: "flex", alignItems: "stretch" }}>
+                <SlidePhotoLibraryPopout
+                  photoCount={imageLibrary.length}
+                  assets={imageLibrary}
+                  activeAssetId={activeSlide.backgroundAssetId}
+                  onPick={setSlideBackgroundManually}
+                  onUpload={uploadFiles}
+                  onDelete={deleteAsset}
+                  uploading={uploading}
+                  applyingAssetId={
+                    rephotographing?.slideId === activeSlide.id
+                      ? rephotographing.assetId
+                      : null
+                  }
+                  canClear={activeSlide.templateId !== DESIGNED_TEMPLATE_ID}
+                />
               <div
                 style={{
+                  flex: 1,
+                  minWidth: 0,
                   background: "var(--surface-1)",
                   border: "1px solid var(--hairline)",
-                  borderRadius: "var(--radius)",
+                  borderRadius: "0 var(--radius) var(--radius) 0",
                   padding: 18,
                   display: "flex",
                   justifyContent: "center",
@@ -1490,25 +1512,6 @@ export function ImageDesigner({
                       }
                     />
                   )}
-
-                  {/* The library, on the corner of the thing it changes. It
-                      was a strip below the preview, which meant scrolling away
-                      from the slide to pick a picture for it. */}
-                  <SlidePhotoLibraryPopout
-                    photoCount={imageLibrary.length}
-                    assets={imageLibrary}
-                    activeAssetId={activeSlide.backgroundAssetId}
-                    onPick={setSlideBackgroundManually}
-                    onUpload={uploadFiles}
-                    onDelete={deleteAsset}
-                    uploading={uploading}
-                    applyingAssetId={
-                      rephotographing?.slideId === activeSlide.id
-                        ? rephotographing.assetId
-                        : null
-                    }
-                    canClear={activeSlide.templateId !== DESIGNED_TEMPLATE_ID}
-                  />
 
                   {/* The slide is being drawn again on the server. Over the
                       picture, because that is where the operator is looking --
@@ -1559,6 +1562,7 @@ export function ImageDesigner({
                     </div>
                   )}
                 </div>
+              </div>
               </div>
             )
           )}

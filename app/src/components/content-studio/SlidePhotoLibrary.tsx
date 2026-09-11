@@ -304,21 +304,12 @@ export function SlidePhotoLibraryPopout(
   }, [open]);
 
   return (
-    // OUTSIDE the slide, hung off its left edge: the pill used to sit on the
-    // picture, which an operator read as part of the design rather than a
-    // control of it. translateX(-100%) puts the tab in the preview card's own
-    // padding, and the panel opens further left again, so nothing this owns
-    // ever covers the slide.
-    <div
-      style={{
-        position: "absolute",
-        top: 0,
-        left: 0,
-        transform: "translateX(-100%)",
-        paddingRight: 8,
-        zIndex: 6,
-      }}
-    >
+    // A real element BESIDE the preview card, not an absolute overhang off the
+    // slide. The overhang was the first attempt and it lost: the card clipped
+    // it and var(--surface-2) on var(--surface-1) made what survived almost
+    // invisible. Laid out in the flow, it cannot be clipped and it cannot be
+    // mistaken for part of the design.
+    <div style={{ position: "relative", display: "flex", alignItems: "stretch" }}>
       <button
         type="button"
         onClick={toggle}
@@ -326,29 +317,34 @@ export function SlidePhotoLibraryPopout(
         aria-label={open ? "Hide photos" : "Show photos"}
         title={open ? "Hide photos" : "Show photos"}
         style={{
-          display: "inline-flex",
+          display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          gap: 5,
-          padding: "10px 6px",
+          justifyContent: "center",
+          gap: 7,
+          width: 34,
+          padding: "14px 0",
           borderRadius: "var(--radius) 0 0 var(--radius)",
           border: "1px solid var(--hairline)",
           borderRight: "none",
-          background: "var(--surface-2)",
-          color: "var(--text-secondary)",
+          background: open ? "var(--surface-2)" : "var(--bg)",
+          color: open ? "var(--text-primary)" : "var(--text-secondary)",
           cursor: "pointer",
           fontFamily: "inherit",
-          fontSize: 10,
+          fontSize: 9.5,
           fontWeight: 600,
-          letterSpacing: "0.08em",
+          letterSpacing: "0.1em",
+          transition: `background ${DUR.base}s, color ${DUR.base}s`,
         }}
       >
-        <ImageIcon size={13} />
+        <ImageIcon size={14} />
         <span style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}>
           PHOTOS
         </span>
         {photoCount > 0 && (
-          <span style={{ fontWeight: 400, opacity: 0.7 }}>{photoCount}</span>
+          <span style={{ fontWeight: 400, opacity: 0.65, letterSpacing: 0 }}>
+            {photoCount}
+          </span>
         )}
         <ChevronDown
           size={12}
@@ -377,6 +373,7 @@ export function SlidePhotoLibraryPopout(
               boxShadow: "var(--shadow-2, 0 18px 40px rgba(0,0,0,0.45))",
               borderRadius: "var(--radius)",
               background: "var(--bg)",
+              zIndex: 6,
             }}
           >
             <SlidePhotoLibrary {...libraryProps} />
