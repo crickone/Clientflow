@@ -1,7 +1,10 @@
 "use client";
 
-import { useRef } from "react";
-import { Image as ImageIcon, Loader2, Trash2, Upload } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronDown, Image as ImageIcon, Loader2, Trash2, Upload } from "lucide-react";
+
+import { DUR, EASE } from "@/lib/motion";
 
 import { Button } from "@/components/ui/Button";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -243,6 +246,120 @@ export function SlidePhotoLibrary({
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+
+const OPEN_KEY = "cs.photoLibraryOpen";
+
+/**
+ * The photo library as a panel that pops out of the preview's top-left corner.
+ *
+ * It was a strip under the slide, which cost the operator a scroll every time
+ * they wanted a different picture and pushed the slide actions down the page.
+ * As a popout it sits ON the preview, next to the thing it changes, and folds
+ * away when it is not wanted -- which is most of the time, because a slide's
+ * photograph is chosen once.
+ *
+ * Open/closed persists per browser: an operator who works with it open should
+ * not have to open it on every slide, and one who never uses it should not keep
+ * dismissing it. Storage can throw (private windows, blocked site data), so
+ * every access is guarded and the default simply wins.
+ */
+export function SlidePhotoLibraryPopout(
+  props: Parameters<typeof SlidePhotoLibrary>[0] & { photoCount: number },
+) {
+  const [open, setOpen] = useState(false);
+  const { photoCount, ...libraryProps } = props;
+
+  useEffect(() => {
+    try {
+      setOpen(window.localStorage.getItem(OPEN_KEY) === "1");
+    } catch {
+      // Closed is the safe default: it never covers the slide unasked.
+    }
+  }, []);
+
+  function toggle() {
+    setOpen((was) => {
+      const next = !was;
+      try {
+        window.localStorage.setItem(OPEN_KEY, next ? "1" : "0");
+      } catch {
+        // The preference is a convenience, not state the editor depends on.
+      }
+      return next;
+    });
+  }
+
+  // Escape closes it, the way every other transient panel in the app behaves.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  return (
+    <div style={{ position: "absolute", top: 10, left: 10, zIndex: 6 }}>
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          fontSize: 11.5,
+          fontWeight: 500,
+          padding: "5px 9px",
+          borderRadius: 999,
+          border: "none",
+          background: "rgba(10,10,10,0.72)",
+          color: "#fff",
+          cursor: "pointer",
+          fontFamily: "inherit",
+          backdropFilter: "blur(4px)",
+        }}
+      >
+        <ImageIcon size={12} />
+        Photos
+        {photoCount > 0 && (
+          <span style={{ opacity: 0.65, fontWeight: 400 }}>{photoCount}</span>
+        )}
+        <ChevronDown
+          size={12}
+          style={{
+            transform: open ? "rotate(180deg)" : "none",
+            transition: `transform ${DUR.base}s`,
+          }}
+        />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: DUR.base, ease: EASE }}
+            style={{
+              position: "absolute",
+              top: 34,
+              left: 0,
+              width: 316,
+              maxWidth: "80vw",
+              boxShadow: "var(--shadow-2, 0 18px 40px rgba(0,0,0,0.45))",
+              borderRadius: "var(--radius)",
+            }}
+          >
+            <SlidePhotoLibrary {...libraryProps} />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -74,7 +74,7 @@ import { DESIGNED_TEMPLATE_ID, slideDimensions, slideSurface } from "@/lib/image
 import { renderFileUrl } from "@/lib/image/renderStore.client";
 import { SlideFilmstrip } from "./SlideFilmstrip";
 import { SlideColorPicker } from "./SlideColorPicker";
-import { SlidePhotoLibrary } from "./SlidePhotoLibrary";
+import { SlidePhotoLibraryPopout } from "./SlidePhotoLibrary";
 import { EditorSection } from "./EditorSection";
 import { PostIdeas } from "./PostIdeas";
 
@@ -1491,6 +1491,25 @@ export function ImageDesigner({
                     />
                   )}
 
+                  {/* The library, on the corner of the thing it changes. It
+                      was a strip below the preview, which meant scrolling away
+                      from the slide to pick a picture for it. */}
+                  <SlidePhotoLibraryPopout
+                    photoCount={imageLibrary.length}
+                    assets={imageLibrary}
+                    activeAssetId={activeSlide.backgroundAssetId}
+                    onPick={setSlideBackgroundManually}
+                    onUpload={uploadFiles}
+                    onDelete={deleteAsset}
+                    uploading={uploading}
+                    applyingAssetId={
+                      rephotographing?.slideId === activeSlide.id
+                        ? rephotographing.assetId
+                        : null
+                    }
+                    canClear={activeSlide.templateId !== DESIGNED_TEMPLATE_ID}
+                  />
+
                   {/* The slide is being drawn again on the server. Over the
                       picture, because that is where the operator is looking --
                       a spinner in the strip below answers "did my click land",
@@ -1712,25 +1731,6 @@ export function ImageDesigner({
             </div>
           )}
 
-          {/* The photo library, next to the preview it changes. It used to be
-              at the bottom of the Layout section, so picking a background meant
-              scrolling away from the slide you were picking it for. */}
-          {activeSlide && (
-            <SlidePhotoLibrary
-              assets={imageLibrary}
-              activeAssetId={activeSlide.backgroundAssetId}
-              onPick={setSlideBackgroundManually}
-              onUpload={uploadFiles}
-              onDelete={deleteAsset}
-              uploading={uploading}
-              applyingAssetId={
-                rephotographing?.slideId === activeSlide.id
-                  ? rephotographing.assetId
-                  : null
-              }
-              canClear={activeSlide.templateId !== DESIGNED_TEMPLATE_ID}
-            />
-          )}
           </>
           )}
         </div>

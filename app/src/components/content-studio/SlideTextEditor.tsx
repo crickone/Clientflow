@@ -188,8 +188,10 @@ export function SlideTextEditor({
       {clickable && (
         <div
           style={{
+            // Bottom-left: the top-left corner now carries the photo library's
+            // popout, and two pills stacked in one corner read as clutter.
             position: "absolute",
-            top: 10,
+            bottom: 10,
             left: 10,
             display: "inline-flex",
             alignItems: "center",
