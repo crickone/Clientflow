@@ -358,18 +358,25 @@ export function SlidePhotoLibraryPopout(
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, x: 8 }}
+            initial={{ opacity: 0, x: -8 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 8 }}
+            exit={{ opacity: 0, x: -8 }}
             transition={{ duration: DUR.base, ease: EASE }}
             style={{
               position: "absolute",
               top: 0,
-              right: "100%",
-              marginRight: 8,
-              // Narrow viewports have less room to the left of the preview, so
-              // the panel gives way rather than running off the screen.
-              width: "min(292px, 30vw)",
+              // Opens INWARD, over the preview, and there is no choice about
+              // it: .app-main carries overflow-x:hidden as a page-level safety
+              // net, and this tab sits at that container's left edge -- a panel
+              // opening outward was clipped away entirely, which is why
+              // clicking it showed nothing at all.
+              //
+              // The tab is what had to stay off the slide. A panel that covers
+              // it for as long as you are choosing a photo, and folds away
+              // after, is the popout that was asked for.
+              left: "100%",
+              marginLeft: 8,
+              width: "min(292px, 76%)",
               boxShadow: "var(--shadow-2, 0 18px 40px rgba(0,0,0,0.45))",
               borderRadius: "var(--radius)",
               background: "var(--bg)",
