@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { DEFAULT_TENANT_SLUG, getTenantBySlug, runWithTenant } from "@/lib/db/tenant";
+import { runWithTenant } from "@/lib/db/tenant";
+import { listTenants } from "@/lib/tenants";
+import { readKeyForTenant } from "@/lib/settings";
 import { getWhatsAppBridge, isWhatsAppConfigured } from "@/lib/whatsapp";
 import {
   addMessage,
@@ -50,17 +52,28 @@ export const dynamic = "force-dynamic";
  * credentials live in one tenant's settings (see lib/whatsapp/config.ts —
  * "single instance for now; per-tenant in the tenancy phase"), the provider
  * calls ONE webhook URL with ONE shared secret, and the inbound payload carries
- * no tenant identifier to route on. So we bind the whole handler to the default/
- * agency tenant EXPLICITLY via runWithTenant, rather than leaning on the proxy's
- * default-tenant fallback. Every `db` access below — and the fire-and-forget
- * triage it spawns — then resolves to that one tenant deterministically.
+ * no tenant identifier to route on. So we bind the whole handler EXPLICITLY via
+ * runWithTenant to the one active tenant that holds a WhatsApp token — the
+ * tenant that connected the bridge is the tenant its messages belong to. This
+ * used to be hardcoded to the original tenant's slug, which kept routing the
+ * clinic's WhatsApp into a retired account after the business moved tenants.
+ * Every `db` access below — and the fire-and-forget triage it spawns — then
+ * resolves to that one tenant deterministically.
  *
  * TODO(per-tenant WhatsApp): when the bridge becomes per-tenant, resolve the
  * owning tenant from the inbound channel/number → tenant mapping here (e.g. a
- * control-plane whatsapp_channels table) instead of the default tenant.
+ * control-plane whatsapp_channels table) instead of the single configured one.
  */
+function whatsAppTenant() {
+  return listTenants().find((t) => {
+    if (t.isActive === false) return false;
+    const cfg = readKeyForTenant<{ token?: string }>(t.id, "whatsapp_config", {});
+    return typeof cfg.token === "string" && cfg.token.trim().length > 0;
+  });
+}
+
 export async function POST(req: NextRequest) {
-  const tenant = getTenantBySlug(DEFAULT_TENANT_SLUG);
+  const tenant = whatsAppTenant();
   if (!tenant) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }

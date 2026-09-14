@@ -233,7 +233,8 @@ const NAV_GROUPS: NavGroup[] = [
     icon: SettingsIcon,
     children: [
       { href: "/my-app", label: "My App", icon: Smartphone },
-      { href: "/training", label: "Training", icon: GraduationCap, tenants: ["renova"] },
+      // Staff training content written for the Clonmel clinic (see app/training/layout.tsx).
+      { href: "/training", label: "Training", icon: GraduationCap, tenants: ["optimal-health"] },
       { href: "/settings", label: "Settings", icon: SettingsIcon, adminOnly: true },
       // Dismissible self-onboarding checklist — admin-only, hidden once complete (showSetup).
       { href: "/setup", label: "Set up", icon: Rocket, adminOnly: true, dot: true },

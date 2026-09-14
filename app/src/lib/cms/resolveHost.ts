@@ -22,7 +22,6 @@ import { listTenants } from "@/lib/tenants";
  * against the default tenant so the public site is viewable without DNS.
  */
 
-const DEFAULT_TENANT_SLUG = process.env.DEFAULT_TENANT_SLUG || "renova";
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1"]);
 
 export interface PublicSite {
@@ -90,17 +89,12 @@ export function resolvePublicSite(opts: {
     }
   }
 
-  // 2) Dev fallback: ?site=<slug> / /site/<slug>. A site can live in ANY tenant
-  //    (not just the default), so search across tenants — default tenant first
-  //    for the common case. Connections are cached, so this stays cheap.
+  // 2) Dev fallback: ?site=<slug> / /site/<slug>. A site can live in ANY tenant,
+  //    so search the active tenants in registry order — there is no "default"
+  //    tenant to try first any more. Connections are cached, so this stays cheap.
   const slug = opts.siteParam?.trim().toLowerCase();
   if (slug) {
-    const all = listTenants();
-    const ordered = [
-      ...all.filter((t) => t.slug === DEFAULT_TENANT_SLUG),
-      ...all.filter((t) => t.slug !== DEFAULT_TENANT_SLUG),
-    ];
-    for (const tenant of ordered) {
+    for (const tenant of listTenants()) {
       if (tenant.isActive === false) continue;
       const conn = openTenantDb(tenant.dbFile);
       const site = conn.db

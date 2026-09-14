@@ -11,14 +11,14 @@ const ALLOWED_EXT = new Set([".png", ".jpg", ".jpeg", ".webp", ".svg"]);
 export const LOGO_BASENAME = "logo";
 
 /**
- * Branding files live per tenant. Renova keeps the legacy `data/branding/` path
- * (so its live logo file never moves); provisioned tenants use
- * `data/tenants/<slug>/branding/`. The logo *filename* is already per-tenant
- * (stored in that tenant's settings).
+ * Branding files live per tenant at `data/tenants/<slug>/branding/`, every
+ * tenant alike. The logo *filename* is already per-tenant (stored in that
+ * tenant's settings). The original tenant used to keep a legacy `data/branding/`
+ * path here; it was retired on 2026-09-14 (merged into Optimal Health) and the
+ * slug special case went with it.
  */
 export function brandingDir(): string {
   const tenant = getCurrentTenant();
-  if (tenant.slug === "renova") return path.join(DATA_DIR, "branding");
   return path.join(DATA_DIR, "tenants", tenant.slug, "branding");
 }
 

@@ -67,36 +67,19 @@ const NEUTRAL_DEFAULT: BusinessProfile = {
 };
 
 /**
- * Renova is the original tenant; its real details historically lived in the
- * profile default (it never explicitly saved a business_profile). Preserve them
- * as a slug-scoped base so the live clinic's identity is unchanged WITHOUT
- * writing to its DB. Anything Renova later saves in Settings → Business still
- * wins (stored is spread over this).
- */
-const RENOVA_DEFAULTS: Partial<BusinessProfile> = {
-  businessName: "Renova Cellular Health",
-  tagline: "a recovery & wellness business",
-  location: "Ard Gaoithe Business Park, Clonmel, Co. Tipperary",
-  phone: "083 867 2844",
-  website: "renovacellularhealth.ie",
-};
-
-/** Baseline profile for a tenant, before its stored overrides are applied. */
-function baseProfile(slug: string | undefined): BusinessProfile {
-  return slug === "renova" ? { ...NEUTRAL_DEFAULT, ...RENOVA_DEFAULTS } : NEUTRAL_DEFAULT;
-}
-
-/**
- * Merge stored overrides onto the baseline, then fall an unset businessName back
- * to the tenant's OWN registry name (`name`) — never a hardcoded or other
- * tenant's name. `slug`/`name` come from the control-plane tenant row.
+ * Merge stored overrides onto the neutral baseline, then fall an unset
+ * businessName back to the tenant's OWN registry name (`name`) — never a
+ * hardcoded or other tenant's name. `name` comes from the control-plane tenant
+ * row. There is deliberately no per-slug baseline: the original tenant used to
+ * get a hardcoded Renova identity here, and that was one of the special cases
+ * that made "which account am I in" impossible to answer (see
+ * scripts/merge-renova-into-optimal-health.cjs).
  */
 function resolveProfile(
-  slug: string | undefined,
   name: string | undefined,
   stored: Partial<BusinessProfile>,
 ): BusinessProfile {
-  const merged = { ...baseProfile(slug), ...stored };
+  const merged = { ...NEUTRAL_DEFAULT, ...stored };
   if (!merged.businessName) merged.businessName = name ?? "";
   return merged;
 }
@@ -104,14 +87,14 @@ function resolveProfile(
 export function getBusinessProfile(): BusinessProfile {
   const tenant = getCurrentTenant();
   const stored = readKey<Partial<BusinessProfile>>("business_profile", {});
-  return resolveProfile(tenant.slug, tenant.name, stored);
+  return resolveProfile(tenant.name, stored);
 }
 
 /** Business profile for an explicit tenant (background jobs). */
 export function getBusinessProfileForTenant(tenantId: number): BusinessProfile {
   const tenant = getTenantById(tenantId);
   const stored = readKeyForTenant<Partial<BusinessProfile>>(tenantId, "business_profile", {});
-  return resolveProfile(tenant?.slug, tenant?.name, stored);
+  return resolveProfile(tenant?.name, stored);
 }
 
 export function setBusinessProfile(profile: BusinessProfile): void {

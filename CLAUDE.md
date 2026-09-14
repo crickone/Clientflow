@@ -24,8 +24,12 @@ Clonmel, Co. Tipperary — optimalhealthatinspire.ie · ☎ 083 867 2844).
     data/                   ← SQLite DBs: control.db (control plane: users, sessions, tenant
                                registry, domain routing, AI usage) + tenants/<slug>/<slug>.db,
                                one file per business (e.g. tenants/inspire/inspire.db). The
-                               original tenant (Renova) is still special-cased to legacy
-                               data/clinic.db — see src/lib/db/tenant.ts.
+                               original tenant `renova` (legacy data/clinic.db) was RETIRED
+                               on 2026-09-14 — its content was merged into tenant 1028
+                               `optimal-health` (scripts/merge-renova-into-optimal-health.cjs)
+                               and every `slug === "renova"` special case was removed. Never
+                               diagnose tenant state from these local files: they are stale
+                               dev copies, production lives on the Railway volume.
     public/sites/<slug>/    ← per-site static assets (namespaced)
   admin/                    ← separate Next.js app: the platform console (subscriptions/
                                billing, admin.adonisagent.ie) — its own package.json, deployed

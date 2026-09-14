@@ -32,7 +32,6 @@ interface TenantConn {
 }
 
 const DATA_DIR = path.join(process.cwd(), "data");
-export const DEFAULT_TENANT_SLUG = process.env.DEFAULT_TENANT_SLUG || "renova";
 
 // Process-level connection cache, keyed by db_file. better-sqlite3 connections
 // are long-lived; one per tenant file for the life of the server. Iteration
@@ -382,7 +381,7 @@ export const getCurrentTenant = cache(() => {
   if (process.env.NEXT_PHASE === "phase-production-build") {
     return {
       id: 0,
-      slug: DEFAULT_TENANT_SLUG,
+      slug: "build-stub",
       name: "Default",
       dbFile: "clinic.db",
       isActive: true,
