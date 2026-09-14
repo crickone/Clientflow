@@ -46,18 +46,67 @@ const count = (src: string, re: RegExp) => (src.match(re) ?? []).length;
 // variant can be looked for across a multi-line prop list, not just on the
 // line `<Button` itself appears on.
 //
-// The naive "match up to the next '>'" reads wrong on a JSX arrow-function
-// prop: `onClick={() => foo()}` contains a `>` (inside `=>`) long before the
-// tag's real close. A lookbehind that refuses to stop at a `>` immediately
-// preceded by `=` skips every `=>` and lands on the tag's actual close --
-// which is always preceded by whitespace, a quote, `}`, or `/`, never `=`.
+// A regex can't reliably find a JSX tag's real close: any "stop at the next
+// '>'" rule -- even one that skips `=>` -- can still be fooled by a bare `>`
+// that occurs earlier in an ordinary prop expression, e.g.
+// `disabled={count > 5}`. So this walks the characters after `<Button`
+// instead: it tracks `{}` nesting depth and skips over quoted strings
+// (`"`, `'`, and backtick template literals), and the tag ends at the first
+// `>` seen at brace depth zero, outside any string. That is the actual JSX
+// rule -- a `>` only closes the tag when it isn't nested inside `{...}` or a
+// string -- so it isn't fooled by a bare `>` comparison, a `>` inside a
+// string prop like `title="a > b"`, or an arrow function's `=>`. A trailing
+// `/` (self-closing tags) is stripped from the captured attrs.
 // Verified against every `<Button` in ImageDesigner.tsx (18 usages): this
 // extracts exactly 18 tags, matching a plain `/<Button\b/g` count.
 function buttonTags(src: string): string[] {
-  const re = /<Button\b([\s\S]*?)(?<!=)>/g;
   const tags: string[] = [];
+  const openRe = /<Button\b/g;
   let m: RegExpExecArray | null;
-  while ((m = re.exec(src))) tags.push(m[1]);
+  while ((m = openRe.exec(src))) {
+    const start = m.index + m[0].length;
+    let i = start;
+    let depth = 0;
+    let quote: string | null = null;
+    let end = -1;
+    while (i < src.length) {
+      const c = src[i];
+      if (quote) {
+        if (c === "\\") {
+          i += 2;
+          continue;
+        }
+        if (c === quote) quote = null;
+        i++;
+        continue;
+      }
+      if (c === '"' || c === "'" || c === "`") {
+        quote = c;
+        i++;
+        continue;
+      }
+      if (c === "{") {
+        depth++;
+        i++;
+        continue;
+      }
+      if (c === "}") {
+        depth--;
+        i++;
+        continue;
+      }
+      if (c === ">" && depth === 0) {
+        end = i;
+        break;
+      }
+      i++;
+    }
+    if (end === -1) continue; // unterminated tag -- nothing sane to capture
+    let attrs = src.slice(start, end);
+    if (attrs.endsWith("/")) attrs = attrs.slice(0, -1); // self-closing `/>`
+    tags.push(attrs);
+    openRe.lastIndex = end + 1;
+  }
   return tags;
 }
 
@@ -92,6 +141,46 @@ check(
 check(
   "the studio home has no primary-weight button and no destructive button -- its tiles are links, not actions competing for emphasis",
   countPrimaryWeight(home) === 0 && count(home, /variant="destructive"/g) === 0,
+);
+
+// buttonTags() itself, exercised against inline sample strings rather than a
+// real component -- this is what makes the extractor's tag-close logic
+// verifiable on its own, without waiting for a component to trip it.
+check(
+  "buttonTags sees the real close of a tag with an earlier bare '>' comparison " +
+    "(the exact counter-example that broke the old regex: it used to truncate " +
+    "at the '>' inside `count > 5` and never see `variant=\"primary\"`)",
+  (() => {
+    const sample =
+      '<Button disabled={count > 5} variant="primary" onClick={() => go()}>Go</Button>';
+    const tags = buttonTags(sample);
+    return tags.length === 1 && isExplicitPrimary(tags[0]);
+  })(),
+);
+check(
+  "buttonTags handles a self-closing tag",
+  (() => {
+    const tags = buttonTags('<Button variant="ghost" />');
+    return tags.length === 1 && /variant\s*=\s*"ghost"/.test(tags[0]);
+  })(),
+);
+check(
+  "buttonTags does not let a '>' inside a string prop end the tag early",
+  (() => {
+    const tags = buttonTags('<Button title="a > b" variant="secondary">x</Button>');
+    return (
+      tags.length === 1 &&
+      /title="a > b"/.test(tags[0]) &&
+      /variant\s*=\s*"secondary"/.test(tags[0])
+    );
+  })(),
+);
+check(
+  "buttonTags handles an arrow-function prop ('=>') without stopping early",
+  (() => {
+    const tags = buttonTags('<Button onClick={() => go()}>Go</Button>');
+    return tags.length === 1 && /onClick=\{\(\) => go\(\)\}/.test(tags[0]);
+  })(),
 );
 
 console.log(`\nemphasisBudget: ${passed} checks passed`);
