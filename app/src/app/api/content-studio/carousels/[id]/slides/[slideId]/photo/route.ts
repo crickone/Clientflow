@@ -13,9 +13,10 @@ import {
   renderDesignToPng,
   stampLogo,
 } from "@/lib/design/renderDesign";
-import { CANVAS } from "@/lib/ai/designPost";
+import { CANVAS, redesignSlide } from "@/lib/ai/designPost";
 import { resolveLogoPath } from "@/lib/branding";
 import { PHOTO_TOKEN } from "@/lib/ai/designPost.parse";
+import { findTextRuns } from "@/lib/design/textRuns";
 import { AiCapError } from "@/lib/ai/usage";
 import { generatePostImage } from "@/lib/ai/image/generatePostImage";
 import { isImageGenConfigured } from "@/lib/ai/image/falClient";
@@ -24,7 +25,23 @@ import { getBusinessProfile } from "@/lib/businessProfile";
 import { buildImagePrompt, defaultImageStyle } from "@/lib/ai/image/prompt";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 120;
+
+/**
+ * A photographic brief from the slide's own words, for a slide that never
+ * recorded one. Designed slides keep their copy inside the markup rather than
+ * in headingText/bodyText, so the text runs ARE the copy — the first two carry
+ * the heading and its supporting line, which is as much of a brief as the
+ * words can give. Deliberately no house style here: the caller wraps it.
+ */
+function sceneFromSlideCopy(slide: { designHtml: string | null }): string {
+  const words = findTextRuns(slide.designHtml ?? "")
+    .map((r) => r.text.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .slice(0, 2)
+    .join(" — ");
+  return words || "an atmospheric scene that fits the brand";
+}
 
 /**
  * Change the photograph on an AI-DESIGNED slide, and re-render it.
@@ -41,6 +58,12 @@ export const maxDuration = 60;
  *   { generate }  -- make one from the scene the design asked for, metered
  *
  * NOT metered in the pick case: choosing a file is not an AI call.
+ *
+ * Either mode needs somewhere to put the picture. A slide the designer built
+ * on a flat ground has no {{PHOTO}} placeholder, so PICKING is refused there
+ * (there is nothing to swap) while GENERATING redesigns the slide around the
+ * new photograph -- two metered calls, and the only way that slide can gain
+ * one. Hence the 120s ceiling: an image plus a design.
  */
 export async function POST(
   req: Request,
@@ -68,17 +91,6 @@ export async function POST(
       { status: 400 },
     );
   }
-  if (!slide.designHtml.includes(PHOTO_TOKEN)) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error:
-          "This slide was designed without a photograph. Ask for a different design if you want one on it.",
-      },
-      { status: 400 },
-    );
-  }
-
   const system = getDesignSystem();
   if (!system) {
     return NextResponse.json(
@@ -96,6 +108,7 @@ export async function POST(
   const o = (body ?? {}) as { assetId?: unknown; generate?: unknown };
 
   let photo: { id: number; path: string } | null = null;
+  let scene = "";
 
   if (o.generate === true) {
     if (!isImageGenConfigured()) {
@@ -104,20 +117,13 @@ export async function POST(
         { status: 400 },
       );
     }
-    // The scene the DESIGN asked for -- stored on the slide when it was
-    // written. Without it there is nothing to generate against that would be
-    // any more accurate than what is already there.
-    const scene = slide.imagePrompt?.trim();
-    if (!scene) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error:
-            "This slide has no recorded scene, so there's nothing to generate from. Pick a photo from your library instead.",
-        },
-        { status: 400 },
-      );
-    }
+    // The scene the DESIGN asked for, stored on the slide when it was written.
+    // Every designed slide records one now (designPost.parse.ts), but slides
+    // designed before that, and the odd slide where the model left the field
+    // empty, have none — and refusing there made Generate dead on most of a
+    // set. The slide's own words are a worse brief than the designer's, and a
+    // far better one than nothing.
+    scene = slide.imagePrompt?.trim() || sceneFromSlideCopy(slide);
     try {
       const asset = await generatePostImage(
         {
@@ -140,6 +146,16 @@ export async function POST(
       return NextResponse.json({ ok: false, error: message }, { status: 500 });
     }
   } else {
+    if (!slide.designHtml.includes(PHOTO_TOKEN)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "This slide was designed without a photograph, so there's nowhere to put one. Use “Make a new photo” and Adonis will redesign it around the picture.",
+        },
+        { status: 400 },
+      );
+    }
     const assetId = Number(o.assetId);
     if (!Number.isFinite(assetId)) {
       return NextResponse.json({ ok: false, error: "Pick a photo." }, { status: 400 });
@@ -160,6 +176,52 @@ export async function POST(
     );
   }
 
+  // A slide designed on a flat ground has no {{PHOTO}} to swap into, so the
+  // new picture can only reach it through a redesign: the model rebuilds the
+  // slide WITH photography available. Refusing here (which is what used to
+  // happen) left "Make a new photo" dead on most of a set, since the designer
+  // typically photographs one slide in five.
+  if (!slide.designHtml.includes(PHOTO_TOKEN)) {
+    try {
+      const result = await redesignSlide(
+        {
+          topic: carousel.name,
+          previousHtml: slide.designHtml,
+          note: "Use the photograph on this slide.",
+          aspectRatio: slide.aspectRatio,
+          photo,
+          logoPath: carousel.showLogo ? resolveLogoPath() : null,
+        },
+        { tenantId, agentKey: "carousel" },
+      );
+      if (!result) {
+        return NextResponse.json(
+          { ok: false, error: "This account has no design system." },
+          { status: 400 },
+        );
+      }
+      updateSlide(slide.id, {
+        designHtml: result.slide.html,
+        renderFilename: result.slide.renderFilename,
+        backgroundAssetId: result.slide.photoAssetId ?? undefined,
+        imagePrompt: result.slide.photo || scene,
+      });
+      const after = getCarousel(carousel.id);
+      return NextResponse.json({
+        ok: true,
+        slide: after?.slides.find((s) => s.id === slide.id) ?? null,
+      });
+    } catch (err) {
+      if (err instanceof AiCapError) {
+        return NextResponse.json({ ok: false, error: err.message }, { status: 429 });
+      }
+      const message =
+        err instanceof Error ? err.message : "Couldn't redesign the slide around the photo.";
+      console.error("[slide-photo] redesign-with-photo failed:", err);
+      return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    }
+  }
+
   const { width, height } = CANVAS[slide.aspectRatio] ?? CANVAS["1:1"];
   try {
     const uri = await gradedPhotoDataUri(photo.path, width, height, system.photo);
@@ -173,7 +235,13 @@ export async function POST(
     // designHtml is untouched: the placeholder is the source of truth, and the
     // photograph is what it resolves to. Storing the resolved markup would bake
     // a data URI into the row and make the next change impossible.
-    updateSlide(slide.id, { renderFilename, backgroundAssetId: photo.id });
+    updateSlide(slide.id, {
+      renderFilename,
+      backgroundAssetId: photo.id,
+      // A slide that had no recorded scene gets the one this generation used,
+      // so the next "make a new photo" starts from the same brief.
+      ...(scene && !slide.imagePrompt ? { imagePrompt: scene } : {}),
+    });
 
     const after = getCarousel(carousel.id);
     return NextResponse.json({

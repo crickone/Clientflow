@@ -159,7 +159,9 @@ SET HEADINGS LARGE. A carousel is read at thumbnail size in a feed, so a heading
 
 Never place two items SIDE BY SIDE to compare them -- at feed size a pair of columns becomes two narrow strips nobody reads. Stack them down the page instead, each with its own heading at subhead size or larger, separated by a rule or a change of ground rather than shut inside cards.
 
-Where a slide uses a photograph, write the src EXACTLY as ${PHOTO_TOKEN} -- that placeholder is replaced with the real image. Use it at most once per slide, and give that slide a "photo" field describing the scene: subject, setting, mood, composition. Never describe text, signage or lettering in shot. A slide with no photograph has "photo": "".
+Where a slide uses a photograph, write the src EXACTLY as ${PHOTO_TOKEN} -- that placeholder is replaced with the real image. Use it at most once per slide.
+
+EVERY slide gets a "photo" field, whether or not its design uses one. It names the photograph that would suit THIS slide -- subject, setting, mood, composition -- so the operator can have that picture taken or generated later and drop it in. A slide you designed on a flat ground still says what it would want; describe the scene that belongs with its words, not a generic room. Never describe text, signage or lettering in shot. Never leave it empty.
 
 Copy: plain text, no markdown, no emojis, no hashtags. Headings short and concrete.
 
@@ -225,7 +227,7 @@ Do not draw a logo, a wordmark or the business name yourself.`;
  * flat ground as a muddy wash. A design that never expected a photograph is
  * coherent; one with the photograph cut out of it is not.
  */
-export const NO_PHOTOGRAPHY_RULE = `NO PHOTOGRAPHY IS AVAILABLE for this post. Every slide must work on a flat ground. Do not write ${PHOTO_TOKEN}, do not write an <img>, and do not build a scrim or gradient of the kind that only makes sense over an image. Set "photo" to "" on every slide.`;
+export const NO_PHOTOGRAPHY_RULE = `NO PHOTOGRAPHY IS AVAILABLE for this post. Every slide must work on a flat ground. Do not write ${PHOTO_TOKEN}, do not write an <img>, and do not build a scrim or gradient of the kind that only makes sense over an image. Still fill in "photo" on every slide with the scene that would suit it -- that is how the operator gets the picture that is missing -- but design as though it will never arrive.`;
 
 export function extractDesignPayload(text: string): {
   slides: RawDesign[];

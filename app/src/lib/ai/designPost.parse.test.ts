@@ -325,4 +325,25 @@ check(
   !DESIGN_RULES.includes("KEEP THE TOP-RIGHT CORNER CLEAR"),
 );
 
+// Every slide records the photograph it would want, whether or not its own
+// design uses one. The bug this pins: the scene was only written for slides
+// that actually placed a photo, so "Make a new photo" was dead on four
+// slides in five — there was no brief to generate against.
+check(
+  "every slide is asked for a scene, not just the photographed ones",
+  DESIGN_RULES.includes('EVERY slide gets a "photo" field'),
+);
+check(
+  "and is told never to leave it empty",
+  DESIGN_RULES.includes("Never leave it empty."),
+);
+check(
+  "a post with no photography still names the scene it wants",
+  NO_PHOTOGRAPHY_RULE.includes('Still fill in "photo" on every slide'),
+);
+check(
+  "but still designs as though none is coming",
+  NO_PHOTOGRAPHY_RULE.includes("design as though it will never arrive"),
+);
+
 console.log(`\ndesignPost.parse: ${passed} checks passed`);

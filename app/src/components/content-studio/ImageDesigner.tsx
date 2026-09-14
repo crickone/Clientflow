@@ -3073,6 +3073,9 @@ function RedesignSlideButton({
   // slide with none either predates the field or was composed without a
   // photograph, and there is nothing to generate against in either case.
   const scene = slide.imagePrompt?.trim() ?? "";
+  // A slide designed on a flat ground has nowhere to put a picture, so making
+  // one redesigns the slide around it — slower, and worth saying so.
+  const hasPhotoSlot = (slide.designHtml ?? "").includes("{{PHOTO}}");
 
   function reset() {
     setNote("");
@@ -3196,14 +3199,21 @@ function RedesignSlideButton({
                   ? "Redesign with that"
                   : "Try a different design"}
             </Button>
-            {imageGenEnabled && scene && (
+            {/* No `scene` condition: a slide that never recorded one used to
+                hide this button entirely, which is most of a set — the server
+                now falls back to the slide's own words. */}
+            {imageGenEnabled && (
               <Button variant="outline" onClick={newPhoto} disabled={busy !== null}>
                 {busy === "photo" ? (
                   <Loader2 size={15} className="spin" />
                 ) : (
                   <ImageIcon size={15} />
                 )}
-                {busy === "photo" ? "Making a photo…" : "Make a new photo"}
+                {busy === "photo"
+                ? hasPhotoSlot
+                  ? "Making a photo…"
+                  : "Making a photo, then redesigning…"
+                : "Make a new photo"}
               </Button>
             )}
           </div>
