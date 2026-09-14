@@ -248,6 +248,7 @@ export function SlidePhotoLibrary({
             return (
               <div
                 key={asset.id}
+                className="photo-tile"
                 style={{
                   position: "relative",
                   width: "100%",
@@ -295,30 +296,23 @@ export function SlidePhotoLibrary({
                     <Loader2 size={18} className="spin" />
                   </div>
                 )}
+                {/* Hidden until the tile is hovered or holds focus (rules in
+                    globals.css -- inline style cannot express :hover). The
+                    pick target is the whole tile; the destructive one is a
+                    small corner that only exists once you are already on
+                    the tile, so a stray click on a photograph cannot land on
+                    Remove (Fitts's law: make the dangerous target the small,
+                    deliberate one). */}
                 <Tooltip label="Remove from library">
                   <button
                     type="button"
+                    className="photo-tile-delete"
                     onClick={(e) => {
                       e.stopPropagation();
                       if (applying) return;
                       onDelete(asset.id);
                     }}
                     aria-label="Remove from library"
-                    style={{
-                      position: "absolute",
-                      top: 3,
-                      right: 3,
-                      background: "rgba(0,0,0,0.6)",
-                      color: "#fff",
-                      borderRadius: "var(--radius)",
-                      border: "none",
-                      width: 20,
-                      height: 20,
-                      cursor: "pointer",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
                   >
                     <Trash2 size={11} />
                   </button>

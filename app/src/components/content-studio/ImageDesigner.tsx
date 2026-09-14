@@ -1749,7 +1749,6 @@ export function ImageDesigner({
             <div style={{ display: "flex", gap: 8 }}>
               <Button
                 variant="outline"
-                size="sm"
                 onClick={() => addSlide()}
                 title="Add another slide to make this a carousel"
               >
@@ -2707,7 +2706,6 @@ function GenerateCarouselButton({
       <DialogTrigger asChild>
         <Button
           variant="outline"
-          size="sm"
           title="Generate a full carousel on a topic with Claude"
         >
           <Sparkles size={14} />
@@ -3281,7 +3279,6 @@ function RedesignSlideButton({
       <DialogTrigger asChild>
         <Button
           variant="outline"
-          size="sm"
           title="Ask Adonis for a different design for this slide"
         >
           <RefreshCw size={14} />

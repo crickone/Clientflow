@@ -360,6 +360,33 @@ a {
 
 @media (max-width: 720px) { .cs-create { grid-template-columns: 1fr; } }
 
+/* Photo library tiles (content-studio/SlidePhotoLibrary). The delete control
+   is invisible until the tile is hovered or focused, and sits in the bottom
+   corner away from where a pick lands. Always visible when hover is not a
+   thing (touch), because there is no hover to reveal it with. */
+.photo-tile-delete {
+  position: absolute;
+  bottom: 3px;
+  right: 3px;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: var(--radius);
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.12s var(--ease);
+}
+.photo-tile:hover .photo-tile-delete,
+.photo-tile:focus-within .photo-tile-delete,
+.photo-tile-delete:focus-visible { opacity: 1; }
+.photo-tile-delete:hover { background: rgba(220, 38, 38, 0.85); }
+@media (hover: none) { .photo-tile-delete { opacity: 1; } }
+
 /* Radix dropdown items highlight on hover AND keyboard nav (data-highlighted). */
 .dropdown-item[data-highlighted] { background: var(--surface-2); }
 
