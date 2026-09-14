@@ -75,6 +75,7 @@ import { renderFileUrl } from "@/lib/image/renderStore.client";
 import { SlideFilmstrip } from "./SlideFilmstrip";
 import { SlideColorPicker } from "./SlideColorPicker";
 import { PHOTO_PANEL_WIDTH, SlidePhotoLibraryPopout } from "./SlidePhotoLibrary";
+import { isMacPlatform, resolveShortcut, shortcutLabel } from "@/lib/content-studio/shortcuts";
 import { EditorSection } from "./EditorSection";
 import { PostIdeas } from "./PostIdeas";
 
@@ -479,6 +480,53 @@ export function ImageDesigner({
   }, [activeSlide, undoStacks]);
 
   const undoDepth = activeSlide ? (undoStacks[activeSlide.id]?.length ?? 0) : 0;
+
+  /**
+   * The designer's keyboard. One listener on the window, resolved through the
+   * pure keymap, so what a key means is tested and what it does is here.
+   *
+   * Arrows are clamped, not wrapped: reaching the last slide and pressing
+   * right doing nothing is what every filmstrip does. Undo only fires when
+   * there is something to undo, so the browser keeps Cmd+Z everywhere else.
+   * Nothing fires while a whole-design run is writing -- the slides are about
+   * to be replaced and stepping through them would be stepping through ghosts.
+   */
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (writing) return;
+      const action = resolveShortcut({
+        key: e.key,
+        metaKey: e.metaKey,
+        ctrlKey: e.ctrlKey,
+        shiftKey: e.shiftKey,
+        altKey: e.altKey,
+        target: e.target instanceof HTMLElement
+          ? { tagName: e.target.tagName, isContentEditable: e.target.isContentEditable }
+          : null,
+      });
+      if (action === "undo") {
+        if (undoDepth === 0) return;
+        e.preventDefault();
+        undoSlide();
+      } else if (action === "nextSlide") {
+        if (activeIdx >= slidesInSlot.length - 1) return;
+        e.preventDefault();
+        setActiveIdx(activeIdx + 1);
+      } else if (action === "prevSlide") {
+        if (activeIdx <= 0) return;
+        e.preventDefault();
+        setActiveIdx(activeIdx - 1);
+      }
+      // "submit" is handled by the dialogs themselves: it means nothing at
+      // the window level, where there is no form to submit.
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [writing, undoDepth, undoSlide, activeIdx, slidesInSlot.length]);
+
+  const shortcutPlatform = isMacPlatform(typeof navigator === "undefined" ? undefined : navigator)
+    ? "mac"
+    : "other";
 
   const updateActiveSlide = useCallback(
     (patch: Partial<CarouselSlide>) => {
@@ -1707,8 +1755,8 @@ export function ImageDesigner({
                   onClick={undoSlide}
                   title={
                     undoDepth === 1
-                      ? "Put this slide back the way it was"
-                      : `Step back through ${undoDepth} changes to this slide`
+                      ? `Put this slide back the way it was (${shortcutLabel("Z", { platform: shortcutPlatform })})`
+                      : `Step back through ${undoDepth} changes to this slide (${shortcutLabel("Z", { platform: shortcutPlatform })})`
                   }
                 >
                   <Undo2 size={14} />
@@ -2671,6 +2719,15 @@ function GenerateCarouselButton({
               value={topic}
               placeholder="Topic"
               onChange={(e) => setTopic(e.target.value)}
+              onKeyDown={(e) => {
+                // Cmd/Ctrl+Enter submits from inside the box, where you are
+                // when you have finished typing. Plain Enter stays a newline:
+                // a topic is often more than one line.
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  e.currentTarget.form?.requestSubmit();
+                }
+              }}
               style={{ minHeight: 70 }}
             />
             <PostIdeas onPick={(topic) => setTopic(topic)} />
@@ -3239,7 +3296,12 @@ function RedesignSlideButton({
               placeholder="e.g. make the headline bigger, try it on the dark ground"
               disabled={busy !== null}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && busy === null) void redesign();
+                // A single-line field submits on Enter by convention; Cmd/Ctrl+Enter
+                // is honoured too so the habit from the topic box carries over.
+                if (e.key === "Enter" && busy === null) {
+                  e.preventDefault();
+                  void redesign();
+                }
               }}
             />
           </div>
