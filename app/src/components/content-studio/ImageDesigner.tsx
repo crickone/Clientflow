@@ -1390,7 +1390,11 @@ export function ImageDesigner({
             <Button
               type="button"
               size="sm"
-              variant={showLogo ? "primary" : "outline"}
+              // A toggle's ON state must not look like the page's primary
+              // action -- it sat in the top bar at the same weight as the one
+              // button that should own it. Secondary reads as "on" without
+              // competing (Von Restorff: emphasis works only when scarce).
+              variant={showLogo ? "secondary" : "outline"}
               title="Draw your logo on every slide (preview + export)"
               onClick={async () => {
                 const next = !showLogo;
