@@ -2,6 +2,7 @@ import type { CarouselSlide, VideoProject } from "@/lib/db/schema";
 import { listProjects } from "@/lib/video/projects";
 import { listCarousels, type CarouselSummary } from "@/lib/image/carousels";
 import { listBlogPosts } from "@/lib/blog/posts";
+import { titleFrom } from "./title";
 
 /**
  * The Content Studio home shows every video, carousel and blog in ONE grid,
@@ -20,6 +21,7 @@ export interface ContentStatus {
 export interface ContentItem {
   kind: ContentKind;
   id: number;
+  /** Card title: the stored name reduced to one line (see lib/content-studio/title.ts). */
   title: string;
   /** Link to the item's editor. */
   href: string;
@@ -54,7 +56,7 @@ function videoToItem(p: VideoProject): ContentItem {
   return {
     kind: "video",
     id: p.id,
-    title: p.name,
+    title: titleFrom(p.name),
     href: `/content-studio/videos/${p.id}`,
     updatedAt: p.updatedAt,
     status: VIDEO_STATUS[p.status] ?? { label: p.status, tone: "neutral" },
@@ -75,7 +77,7 @@ function carouselToItem(c: CarouselSummary): ContentItem {
   return {
     kind: "image",
     id: c.id,
-    title: c.name,
+    title: titleFrom(c.name),
     href: `/content-studio/images/${c.id}`,
     updatedAt: c.updatedAt,
     status,
@@ -100,7 +102,7 @@ function blogToItem(b: BlogRow): ContentItem {
   return {
     kind: "blog",
     id: b.id,
-    title: b.title,
+    title: titleFrom(b.title),
     href: `/content-studio/blogs/${b.id}`,
     updatedAt: b.updatedAt,
     status,

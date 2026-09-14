@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Label, Textarea } from "@/components/ui/Input";
 import { PostIdeas } from "./PostIdeas";
 import { DEFAULT_CAROUSEL_SLOT, DEFAULT_SLOT } from "@/lib/image/slots";
+import { titleFrom } from "@/lib/content-studio/title";
 
 /**
  * Step 1 of the image flow: say what you're making before anything else.
@@ -53,7 +54,10 @@ export function StartDesign() {
    * on a Carousels tab reporting every slot empty.
    */
   async function createDesign(seedSlideCount: number): Promise<number | null> {
-    const name = topic.trim() ? topic.trim().slice(0, 80) : "Untitled design";
+    // The topic box holds a BRIEF (the idea picker composes hook + what it
+    // should teach + what it rests on), so a hard slice of it stored a
+    // sentence cut mid-word as the design's name. The name is the hook.
+    const name = titleFrom(topic, 80) || "Untitled design";
     const carousel = kind === "carousel";
     // Every failure used to collapse into one message, because a .catch()
     // around .json() swallows the cause: a 500, a redirect to /login, and the

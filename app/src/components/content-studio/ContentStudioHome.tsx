@@ -5,10 +5,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   FileText,
   Image as ImageIcon,
+  Layers,
   Play,
   Plus,
   Video,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import type { ImageLibraryAsset } from "@/lib/db/schema";
@@ -38,11 +40,22 @@ interface Props {
 
 type Filter = "all" | ContentKind;
 
-const KIND_LABEL: Record<ContentKind, string> = {
-  video: "Reel",
-  image: "Carousel",
-  blog: "Blog",
+/**
+ * The kind reads as an ICON in the meta row, not a word. In a grid that is
+ * mostly one kind, "Carousel · " on every card is noise that pushed the rest
+ * of the meta onto a second line; the glyph carries the same information in a
+ * fraction of the width, and the accessible name keeps it readable.
+ */
+const KIND_ICON: Record<ContentKind, { Icon: LucideIcon; label: string }> = {
+  video: { Icon: Video, label: "Reel" },
+  image: { Icon: Layers, label: "Carousel" },
+  blog: { Icon: FileText, label: "Blog" },
 };
+
+function KindIcon({ kind }: { kind: ContentKind }) {
+  const { Icon, label } = KIND_ICON[kind];
+  return <Icon size={13} strokeWidth={1.8} aria-label={label} />;
+}
 
 const CREATE = [
   { href: "/content-studio/videos/new", Icon: Video, title: "New video", sub: "Upload a clip → auto-captioned reel" },
@@ -242,11 +255,9 @@ export function ContentStudioHome({
               <div className="cs-card-body">
                 <h3 className="cs-card-title">{item.title}</h3>
                 <div className="cs-card-meta">
-                  <span>{KIND_LABEL[item.kind]}</span>
-                  <span className="cs-sep">·</span>
-                  <span>{item.meta}</span>
-                  <span className="cs-sep">·</span>
-                  <span>{relTime(item.updatedAt)}</span>
+                  <KindIcon kind={item.kind} />
+                  <span className="cs-card-meta-t">{item.meta}</span>
+                  <span className="cs-card-time">{relTime(item.updatedAt)}</span>
                 </div>
               </div>
             </Link>
