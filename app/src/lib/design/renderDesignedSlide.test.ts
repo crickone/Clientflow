@@ -4,7 +4,9 @@
 // existed before -- the generator, the photo swap and the text editor -- and
 // they had drifted. These checks pin the behaviour the single copy owes all
 // three: the photo branch both ways, the overflow measurement that used to run
-// only during generation, and the content-addressed filename.
+// only during generation, the content-addressed filename, the flat stand-in's
+// equivalence to a real graded photograph, a non-square canvas actually going
+// through the recipe end to end, and the no-token early return.
 //
 // Deliberately real: real satori, real sharp, real font bytes, a real write
 // into the render store. The recipe IS the composition of those, so stubbing
@@ -17,7 +19,9 @@ import sharp from "sharp";
 
 import { PHOTO_TOKEN } from "../ai/designPost.parse";
 import { renderFilePath } from "../image/renderStore";
+import { loadDesignFonts } from "./fonts";
 import type { DesignSystem } from "./parse";
+import { gradedPhotoDataUri, measureOverflowPx } from "./renderDesign";
 import { CANVAS, canvasFor, renderDesignedSlide } from "./renderDesignedSlide";
 
 let passed = 0;
@@ -190,6 +194,89 @@ async function main() {
   check(
     "an overflowing design is still stored -- a clipped slide the operator can see beats no slide",
     existsSync(renderFilePath(overflowing.filename)),
+  );
+
+  // ── stand-in equivalence ─────────────────────────────────────────────────
+  //
+  // The property the flat stand-in exists for, and until now it had zero
+  // tests: measuring overflow against the REAL graded photograph must report
+  // the same number the module reports internally against its stand-in. That
+  // equivalence is what makes trading a 135-second pass for a 32ms one safe
+  // rather than merely fast.
+  //
+  // The <img> here pins only WIDTH, not height -- the one fork where this can
+  // actually go wrong. With both axes pinned, satori uses the style verbatim
+  // and never looks at either image's intrinsic size, so the real photo and
+  // the stand-in could never disagree regardless of the stand-in's shape.
+  // Leaving height unpinned forces satori to fall back to intrinsic size, and
+  // the graded photo and the stand-in only measure the same because both are
+  // produced at the CANVAS's dimensions -- never the <img>'s own style box.
+  const equivFonts = await loadDesignFonts("Inter");
+  const equivHtml =
+    `<div style="display:flex;flex-direction:column;width:1080px;height:1080px;background:#f2f3ed;font-family:Inter">` +
+    `<img src="${PHOTO_TOKEN}" style="width:1080px" />` +
+    `<div style="display:flex;width:1080px;font-size:60px;color:#24231f;line-height:1.3">` +
+    `Copy underneath a photograph whose height satori has to infer from the image itself.` +
+    `</div>` +
+    `</div>`;
+  const realPhotoUri = await gradedPhotoDataUri(photoPath, 1080, 1080, SYSTEM.photo);
+  const realOverflow = await measureOverflowPx(
+    equivHtml.split(PHOTO_TOKEN).join(realPhotoUri),
+    1080,
+    1080,
+    equivFonts,
+  );
+  const equivRender = await renderDesignedSlide({
+    html: equivHtml,
+    aspectRatio: "1:1",
+    photo: { path: photoPath },
+    logoPath: null,
+    system: SYSTEM,
+  });
+  check(
+    "the flat stand-in measures the same overflow a real graded photograph would",
+    equivRender.overflowPx === realOverflow,
+  );
+
+  // ── a real 4:5 render, not just canvasFor's table ───────────────────────
+  //
+  // canvasFor itself is already unit-tested above; this is the render path
+  // actually going through it end to end at a non-square ratio, which no
+  // other check here exercises.
+  const portrait = await renderDesignedSlide({
+    html: slideHtml(40),
+    aspectRatio: "4:5",
+    photo: { path: photoPath },
+    logoPath,
+    system: SYSTEM,
+  });
+  check(
+    "a 4:5 render actually sizes the canvas to 1080x1350",
+    portrait.width === 1080 && portrait.height === 1350,
+  );
+
+  // ── the no-token early return ───────────────────────────────────────────
+  //
+  // withPhoto's first line is `if (!html.includes(PHOTO_TOKEN)) return html`
+  // -- markup with nothing to substitute must come back unchanged and must
+  // never even look at `photo`. Pinned by handing it a photo path that does
+  // not exist: if the early return were ever removed, gradedPhotoDataUri
+  // would try to read that path and this render would throw instead of
+  // succeeding.
+  const noTokenHtml =
+    `<div style="display:flex;flex-direction:column;width:1080px;height:1080px;background:#f2f3ed;font-family:Inter">` +
+    `<div style="display:flex;width:1080px;font-size:40px;color:#24231f">No photo placeholder anywhere in this markup.</div>` +
+    `</div>`;
+  const noTokenRender = await renderDesignedSlide({
+    html: noTokenHtml,
+    aspectRatio: "1:1",
+    photo: { path: path.join(tmp, "does-not-exist.png") },
+    logoPath,
+    system: SYSTEM,
+  });
+  check(
+    "markup with no {{PHOTO}} token renders even with a bogus photo path -- the early return never touches it",
+    existsSync(renderFilePath(noTokenRender.filename)),
   );
 
   // ── failure ─────────────────────────────────────────────────────────────

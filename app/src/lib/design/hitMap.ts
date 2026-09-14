@@ -1,5 +1,4 @@
 import { extractColours } from "./htmlAudit";
-import { findTextRuns, type TextRun } from "./textRuns";
 
 /**
  * The hit map: the same design, rendered with every editable text element
@@ -13,18 +12,13 @@ import { findTextRuns, type TextRun } from "./textRuns";
  * the operator clicks a word and edits a different one. Here the click regions
  * ARE the rendered boxes, because the renderer drew them.
  *
- * The design is left structurally untouched. Only two things change per
- * element: a background colour and transparent text, both appended to the
- * existing inline style so they win as later declarations. No wrapper, no new
- * child, no display change — so the layout being hit-tested is exactly the
- * layout on screen. (This is also why ./textRuns refuses mixed content: making
- * that editable would require a wrapper element, and a wrapper can change what
- * satori's `prepare` does to the parent.)
- *
- * Photographs are blanked to a transparent pixel, keeping their box (an <img>
- * in these designs takes its size from `style`, never from attributes) but
- * removing every colour they contribute. A photo contains every colour there
- * is, including whichever ones we chose to encode indices with.
+ * This file holds the PURE half: the colour encoding and the pixel-to-run
+ * lookup, with no dependency on satori, sharp or the render module. A CLIENT
+ * component (SlideTextEditor.tsx) imports pickBand and hitIndexAt directly, to
+ * resolve a click without a round trip. Building the hit-map MARKUP itself
+ * (./buildHitMap) needs the render module's photo stand-in, which pulls in
+ * `server-only` transitively -- that lives in its own file so this one stays
+ * safe to reach from a client bundle.
  */
 
 /**
@@ -63,53 +57,6 @@ export function pickBand(html: string): number {
       .map((h) => parseInt(h.slice(0, 2), 16)),
   );
   return BANDS.find((b) => !used.has(b)) ?? BANDS[0];
-}
-
-/** A 1x1 fully transparent PNG — keeps an <img>'s box while contributing no colour. */
-const BLANK_PIXEL =
-  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
-
-function injectStyle(openTag: string, declarations: string): string {
-  const styleMatch = /\sstyle\s*=\s*("([^"]*)"|'([^']*)')/i.exec(openTag);
-  if (styleMatch) {
-    const quote = styleMatch[1][0];
-    const existing = styleMatch[2] ?? styleMatch[3] ?? "";
-    const sep = existing.trim().endsWith(";") || existing.trim() === "" ? "" : ";";
-    const replaced = ` style=${quote}${existing}${sep}${declarations}${quote}`;
-    return openTag.slice(0, styleMatch.index) + replaced + openTag.slice(styleMatch.index + styleMatch[0].length);
-  }
-  // No style attribute at all — add one just before the tag closes.
-  return `${openTag.slice(0, -1)} style="${declarations}">`;
-}
-
-/**
- * Build the markup for the hit map. Returns the HTML plus the runs it encoded,
- * so a caller never has to re-scan and risk a different numbering.
- */
-export function buildHitMapHtml(
-  html: string,
-  band: number,
-): { html: string; runs: TextRun[] } {
-  const runs = findTextRuns(html);
-
-  // Rewrite from the END so earlier offsets stay valid.
-  let out = html;
-  for (let i = runs.length - 1; i >= 0; i--) {
-    const run = runs[i];
-    const openTag = out.slice(run.tagStart, run.tagEnd + 1);
-    const painted = injectStyle(
-      openTag,
-      `background-color:${hitColour(run.index, band)};color:transparent;`,
-    );
-    out = out.slice(0, run.tagStart) + painted + out.slice(run.tagEnd + 1);
-  }
-
-  // Blank every image: same box, no colour. Covers both a substituted photo
-  // and the {{PHOTO}} token that is still in the stored markup.
-  out = out.replace(/(<img[^>]*\ssrc\s*=\s*)("[^"]*"|'[^']*')/gi, `$1"${BLANK_PIXEL}"`);
-  out = out.split("{{PHOTO}}").join(BLANK_PIXEL);
-
-  return { html: out, runs };
 }
 
 /**

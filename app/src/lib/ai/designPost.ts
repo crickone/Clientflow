@@ -22,7 +22,6 @@ import {
 import { meteredCreateStreamed, type MeterContext } from "@/lib/ai/metered";
 import { logoBox } from "@/lib/design/renderDesign";
 import {
-  CANVAS,
   canvasFor,
   overflowViolation,
   renderDesignedSlide,
@@ -51,14 +50,6 @@ const DESIGN_MAX_TOKENS = 32000;
 
 /** Settings key holding the opening move the LAST post used, so the next one can't repeat it. */
 const LAST_OPENING_MOVE_KEY = "last_opening_move";
-
-/**
- * Re-exported, not defined here. The canvas table belongs to the render recipe
- * (lib/design/renderDesignedSlide), which is what sizes to it; this file only
- * needs the numbers to tell the model how big its canvas is. Kept exported so
- * importers that already reach it through the generator are unaffected.
- */
-export { CANVAS };
 
 /**
  * One photograph the renderer may use, and the library row it came from.

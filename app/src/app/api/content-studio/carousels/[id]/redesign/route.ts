@@ -123,6 +123,24 @@ export async function POST(
     );
   }
 
+  // A redesign can come back with markup and a null render -- the model wrote
+  // something satori refuses, or a library photo went missing under it -- and
+  // renderOne returns that as a violation rather than throwing. Writing the
+  // null onto the row would REPLACE the slide's existing good render with
+  // nothing, and the operator would see it silently fall back to the template
+  // painter instead of an error. The slide keeps what it had.
+  if (!result.slide.renderFilename) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          result.slide.violations[result.slide.violations.length - 1] ??
+          "Couldn't render the redesigned slide.",
+      },
+      { status: 500 },
+    );
+  }
+
   updateSlide(slide.id, {
     // A template slide that has just been designed BECOMES a designed slide --
     // its painter and its slots no longer describe what is on screen.

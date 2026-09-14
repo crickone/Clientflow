@@ -223,6 +223,23 @@ export async function POST(
           { status: 400 },
         );
       }
+      // A redesign can come back with markup and no render -- the model wrote
+      // something satori refuses, or the render otherwise failed -- and
+      // renderFilename is null rather than the redesign throwing. Writing that
+      // null onto the row would REPLACE the slide's existing good render with
+      // nothing, and the operator would see it silently fall back to the
+      // template painter instead of an error. The slide keeps what it had.
+      if (!result.slide.renderFilename) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              result.slide.violations[result.slide.violations.length - 1] ??
+              "Couldn't render the slide with that photograph.",
+          },
+          { status: 500 },
+        );
+      }
       updateSlide(slide.id, {
         designHtml: result.slide.html,
         renderFilename: result.slide.renderFilename,

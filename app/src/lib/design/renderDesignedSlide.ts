@@ -123,13 +123,35 @@ async function withPhoto(
 }
 
 /**
+ * A flat WxH image, as a data URI.
+ *
+ * Same dimensions as the photograph it stands in for, never a 1x1 stretched
+ * by CSS: satori falls back to an image's intrinsic size when a style does
+ * not pin both axes, and a stand-in of the wrong size measures -- or, for
+ * this function's second caller, hit-tests -- a layout that never actually
+ * rendered. One colour, so the only thing that differs from a real
+ * photograph is how long it takes to decode.
+ *
+ * Exported because it now has two callers with the identical requirement:
+ * this module's own overflow measurement (standInForPhoto, below) and the
+ * hit map (lib/design/hitMap), which lays out click regions by rendering
+ * this same markup and needs the click boxes to land where the real render
+ * would put them. Two adapters are what make this a seam rather than an
+ * implementation detail.
+ */
+export async function standInPhoto(width: number, height: number): Promise<string> {
+  const sharp = (await import("sharp")).default;
+  const flat = await sharp({
+    create: { width, height, channels: 3, background: { r: 200, g: 200, b: 190 } },
+  })
+    .jpeg({ quality: 50 })
+    .toBuffer();
+  return `data:image/jpeg;base64,${flat.toString("base64")}`;
+}
+
+/**
  * The markup with its photograph swapped for a flat image of the same pixel
  * size, for measuring only.
- *
- * Same dimensions rather than a 1x1 stretched by CSS: satori falls back to an
- * image's intrinsic size when a style does not pin both axes, and a stand-in
- * that changed the box would measure a layout that never rendered. Same size,
- * one colour, and the only thing that differs is how long it takes to decode.
  */
 async function standInForPhoto(
   html: string,
@@ -138,17 +160,22 @@ async function standInForPhoto(
 ): Promise<string> {
   const start = html.indexOf("data:image/");
   if (start === -1) return html;
-  const sharp = (await import("sharp")).default;
-  const flat = await sharp({
-    create: { width, height, channels: 3, background: { r: 200, g: 200, b: 190 } },
-  })
-    .jpeg({ quality: 50 })
-    .toBuffer();
-  const uri = `data:image/jpeg;base64,${flat.toString("base64")}`;
+  const uri = await standInPhoto(width, height);
   // Every embedded image, not just the first: a design may carry the graded
   // photograph and nothing else today, but the substitution must not start
-  // depending on that.
-  return html.replace(/data:image\/[a-z+]+;base64,[A-Za-z0-9+/=]+/g, uri);
+  // depending on that. The character class covers every image subtype satori
+  // could plausibly be handed (jpeg, svg+xml, x-icon, vnd.microsoft.icon),
+  // and the whole match is case-insensitive -- a data URI spelled
+  // "DATA:IMAGE/JPEG;BASE64," is valid and was silently skipped before.
+  //
+  // The one real divergence this leaves: a SECOND embedded image at a
+  // different intrinsic size would be measured at THIS canvas's size instead
+  // of its own, since every match is replaced with the same WxH stand-in.
+  // Unreachable today -- the design prompt allows exactly one photograph and
+  // a model cannot author base64 of its own -- but worth writing down, since
+  // the day a design legitimately carries a second image this stops being
+  // exact.
+  return html.replace(/data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+/gi, uri);
 }
 
 /**

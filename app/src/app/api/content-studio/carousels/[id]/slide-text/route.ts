@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { guard } from "@/lib/api/guard";
 import { getCarousel, updateSlide } from "@/lib/image/carousels";
 import { DESIGNED_TEMPLATE_ID } from "@/lib/image/paintSlide";
-import { buildHitMapHtml, pickBand } from "@/lib/design/hitMap";
+import { buildHitMapHtml } from "@/lib/design/buildHitMap";
+import { pickBand } from "@/lib/design/hitMap";
 import { findTextRuns, runAt, replaceRunText } from "@/lib/design/textRuns";
 import { loadDesignFonts } from "@/lib/design/fonts";
 import { renderDesignToPng } from "@/lib/design/renderDesign";
@@ -65,16 +66,20 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     return NextResponse.json({ ok: false, error: found.error }, { status: found.status });
   }
   const html = found.slide.designHtml!;
-
   const band = pickBand(html);
-  const { html: hitHtml, runs } = buildHitMapHtml(html, band);
-  if (runs.length === 0) {
-    return NextResponse.json({ ok: true, runs: [], band, hitMap: null });
-  }
+  const { width, height } = canvasFor(found.slide.aspectRatio);
 
   try {
+    // The stand-in the hit map paints into the photo's box now has to be
+    // built at the slide's own canvas size, so buildHitMapHtml needs it
+    // before it can run -- which is why this, and not just the PNG render
+    // below, is inside the try.
+    const { html: hitHtml, runs } = await buildHitMapHtml(html, band, width, height);
+    if (runs.length === 0) {
+      return NextResponse.json({ ok: true, runs: [], band, hitMap: null });
+    }
+
     const fonts = await loadDesignFonts(getDesignSystem()?.font, getDesignSystem()?.bodyFont, getDesignSystem()?.altFont);
-    const { width, height } = canvasFor(found.slide.aspectRatio);
 
     // No logo stamp on the hit map: the logo is painted OVER the design after
     // rendering, so stamping it here would punch an opaque hole through a

@@ -14,7 +14,8 @@ import { composeDesignSystem, defaultPalette } from "./direction";
 import { getDirection } from "./directions";
 import { loadDesignFonts } from "./fonts";
 import { measureOverflowPx, renderDesignToPng } from "./renderDesign";
-import { buildHitMapHtml, indexFromColour, pickBand } from "./hitMap";
+import { buildHitMapHtml } from "./buildHitMap";
+import { indexFromColour, pickBand } from "./hitMap";
 import { OPTIMAL_HEALTH_DESIGN_SYSTEM } from "./presets";
 import { sampleSlides } from "./sampleSlides";
 
@@ -132,7 +133,7 @@ async function main() {
     `</div>`;
 
   const band = pickBand(HIT_SLIDE);
-  const { runs: hitRuns, html: hitHtml } = buildHitMapHtml(HIT_SLIDE, band);
+  const { runs: hitRuns, html: hitHtml } = await buildHitMapHtml(HIT_SLIDE, band, 600, 600);
   const realRaw = await sharp(await renderDesignToPng(HIT_SLIDE, 600, 600, fonts))
     .ensureAlpha()
     .raw()
