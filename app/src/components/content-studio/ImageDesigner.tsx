@@ -1021,33 +1021,71 @@ export function ImageDesigner({
     }
   }
 
+  /**
+   * Upload photographs ONE PER REQUEST, reporting how far through it is.
+   *
+   * Every file used to go up in a single multipart request: nothing could be
+   * reported until the whole batch landed, the server resized all of them
+   * inside one 60-second route, and a single unsupported file failed the lot.
+   * Twenty photographs off a phone was indistinguishable from stuck, which is
+   * exactly what it was.
+   *
+   * One file per request means the count is real, each request is small
+   * enough to finish, a bad file fails alone, and the photographs appear in
+   * the panel as they arrive rather than all at the end.
+   */
   async function uploadFiles(files: File[]) {
     if (files.length === 0) return;
     setUploading(true);
     setActionError(null);
+    setUploadProgress({ done: 0, total: files.length });
+    const failed: string[] = [];
+    let firstUploadedId: number | null = null;
     try {
-      const fd = new FormData();
-      for (const file of files) {
-        fd.append("file", file);
-        const dims = await readImageDimensions(file);
-        fd.append("width", String(dims?.width ?? 0));
-        fd.append("height", String(dims?.height ?? 0));
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        try {
+          const fd = new FormData();
+          fd.append("file", file);
+          const dims = await readImageDimensions(file);
+          fd.append("width", String(dims?.width ?? 0));
+          fd.append("height", String(dims?.height ?? 0));
+          const res = await fetch("/api/content-studio/image-library", {
+            method: "POST",
+            body: fd,
+          });
+          const json = await res.json();
+          if (!res.ok || !json.ok) throw new Error(json.error || "Upload failed.");
+          const created = (json.assets as ImageLibraryAsset[]) ?? [];
+          if (created.length > 0) {
+            setLibrary((prev) => [...created, ...prev]);
+            if (firstUploadedId == null) firstUploadedId = created[0].id;
+          }
+        } catch (err) {
+          failed.push(
+            `${file.name}${err instanceof Error && err.message ? ` (${err.message})` : ""}`,
+          );
+        } finally {
+          setUploadProgress({ done: i + 1, total: files.length });
+        }
       }
-      const res = await fetch("/api/content-studio/image-library", {
-        method: "POST",
-        body: fd,
-      });
-      const json = await res.json();
-      if (!res.ok || !json.ok) throw new Error(json.error || "Upload failed.");
-      const newAssets = json.assets as ImageLibraryAsset[];
-      setLibrary((prev) => [...newAssets, ...prev]);
-      if (newAssets.length > 0) {
-        setSlideBackgroundManually(newAssets[0].id);
+      if (failed.length > 0) {
+        setActionError(
+          failed.length === files.length
+            ? `Upload failed: ${failed[0]}`
+            : `${failed.length} of ${files.length} didn't upload: ${failed.slice(0, 3).join(", ")}${failed.length > 3 ? "…" : ""}`,
+        );
       }
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Upload failed.");
+      // Only a SINGLE upload puts the photograph on the slide. Dropping a
+      // folder of the client's photography into the library is stocking it,
+      // not choosing a background — and on a designed slide each apply costs
+      // a server-side re-render, so doing it mid-batch fought the upload.
+      if (files.length === 1 && firstUploadedId != null) {
+        setSlideBackgroundManually(firstUploadedId);
+      }
     } finally {
       setUploading(false);
+      setUploadProgress(null);
     }
   }
 
@@ -1215,6 +1253,11 @@ export function ImageDesigner({
    * The room comes from the controls column, which has it to give.
    */
   const [photosOpen, setPhotosOpen] = useState(false);
+  /** How far through a multi-file upload we are; null when none is running. */
+  const [uploadProgress, setUploadProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
   const previewColMax = 480 + (photosOpen ? PHOTO_PANEL_WIDTH + 8 : 0);
   const isEmptySlot = !activeSlide || !surface;
 
@@ -1472,6 +1515,7 @@ export function ImageDesigner({
                   onUpload={uploadFiles}
                   onDelete={deleteAsset}
                   uploading={uploading}
+                  uploadProgress={uploadProgress}
                   applyingAssetId={
                     rephotographing?.slideId === activeSlide.id
                       ? rephotographing.assetId

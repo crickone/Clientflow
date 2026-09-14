@@ -2,7 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, Image as ImageIcon, Loader2, Trash2, Upload } from "lucide-react";
+import {
+  ChevronDown,
+  Image as ImageIcon,
+  Loader2,
+  Trash2,
+  Upload,
+} from "lucide-react";
 
 import { DUR, EASE } from "@/lib/motion";
 
@@ -26,6 +32,7 @@ export function SlidePhotoLibrary({
   onUpload,
   onDelete,
   uploading,
+  uploadProgress = null,
   applyingAssetId = null,
   canClear = true,
 }: {
@@ -36,6 +43,14 @@ export function SlidePhotoLibrary({
   onUpload: (files: File[]) => void;
   onDelete: (assetId: number) => void;
   uploading: boolean;
+  /**
+   * How far through a multi-file upload we are, or null when none is running.
+   * Files go up ONE PER REQUEST, so this is a real count rather than a
+   * spinner: a batch of twenty used to be a single request that reported
+   * nothing until it finished (or timed out), which is indistinguishable
+   * from stuck.
+   */
+  uploadProgress?: { done: number; total: number } | null;
   /**
    * The photo currently being put on the slide, when that takes real work --
    * an AI-designed slide is RE-RENDERED server-side, which is a second or two
@@ -58,77 +73,140 @@ export function SlidePhotoLibrary({
         padding: 12,
         background: "var(--surface-1)",
         display: "grid",
+        // Header, then the sheet taking whatever is left. The panel fills the
+        // height the preview sets and scrolls inside itself -- it must never
+        // be what makes the row taller, because everything below (Add slide,
+        // Undo, Delete slide) gets pushed down the sticky column with it.
+        gridTemplateRows: "auto 1fr",
+        height: "100%",
+        minHeight: 0,
         gap: 10,
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 8,
-        }}
-      >
-        <span
+      {/* Header and progress are ONE grid cell, so the sheet below always
+          gets the 1fr row whether or not an upload is running. */}
+      <div style={{ display: "grid", gap: 8, minWidth: 0 }}>
+        <div
           style={{
-            fontSize: 10,
-            fontWeight: 600,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            color: "var(--text-tertiary)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 8,
+            // 252px is narrow: let the actions drop to their own line rather
+            // than push the Upload button out past the panel's edge.
+            flexWrap: "wrap",
           }}
         >
-          Photos
-          <span style={{ fontWeight: 400 }}>
-            {assets.length > 0 ? ` · ${assets.length}` : ""}
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: "var(--text-tertiary)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              minWidth: 0,
+            }}
+          >
+            Photos
+            <span style={{ fontWeight: 400 }}>
+              {assets.length > 0 ? ` · ${assets.length}` : ""}
+            </span>
           </span>
-        </span>
-        <div style={{ display: "flex", gap: 8 }}>
-          {applying && (
-            <span
+          <div style={{ display: "flex", gap: 8 }}>
+            {applying && (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: 11.5,
+                  fontWeight: 400,
+                  color: "var(--text-secondary)",
+                  textTransform: "none",
+                  letterSpacing: 0,
+                }}
+              >
+                <Loader2 size={13} className="spin" />
+                Putting it on the slide…
+              </span>
+            )}
+            {canClear && activeAssetId != null && !applying && (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => onPick(null)}
+              >
+                Clear
+              </Button>
+            )}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+            >
+              {uploading ? (
+                <Loader2 size={14} className="spin" />
+              ) : (
+                <Upload size={14} />
+              )}
+              Upload
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const list = Array.from(e.target.files ?? []);
+                if (list.length > 0) onUpload(list);
+                e.target.value = "";
+              }}
+            />
+          </div>
+        </div>
+        {uploadProgress && uploadProgress.total > 1 && (
+          <div style={{ display: "grid", gap: 5 }}>
+            <div
+              aria-live="polite"
               style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
+                display: "flex",
+                justifyContent: "space-between",
                 fontSize: 11.5,
-                fontWeight: 400,
                 color: "var(--text-secondary)",
-                textTransform: "none",
-                letterSpacing: 0,
               }}
             >
-              <Loader2 size={13} className="spin" />
-              Putting it on the slide…
-            </span>
-          )}
-          {canClear && activeAssetId != null && !applying && (
-            <Button type="button" size="sm" variant="ghost" onClick={() => onPick(null)}>
-              Clear
-            </Button>
-          )}
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-          >
-            <Upload size={14} />
-            {uploading ? "Uploading…" : "Upload"}
-          </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            multiple
-            style={{ display: "none" }}
-            onChange={(e) => {
-              const list = Array.from(e.target.files ?? []);
-              if (list.length > 0) onUpload(list);
-              e.target.value = "";
-            }}
-          />
-        </div>
+              <span>Uploading photos</span>
+              <span style={{ fontVariantNumeric: "tabular-nums" }}>
+                {uploadProgress.done} of {uploadProgress.total}
+              </span>
+            </div>
+            <div
+              aria-hidden="true"
+              style={{
+                height: 3,
+                borderRadius: 2,
+                background: "var(--surface-3)",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  height: "100%",
+                  width: `${Math.round((uploadProgress.done / uploadProgress.total) * 100)}%`,
+                  background: "var(--text-primary)",
+                  transition: "width 160ms linear",
+                }}
+              />
+            </div>
+          </div>
+        )}
       </div>
       {assets.length === 0 ? (
         <div
@@ -136,6 +214,7 @@ export function SlidePhotoLibrary({
             border: "1px dashed var(--hairline)",
             borderRadius: "var(--radius)",
             padding: 20,
+            alignSelf: "start",
             textAlign: "center",
             color: "var(--text-tertiary)",
             fontSize: 13,
@@ -158,9 +237,8 @@ export function SlidePhotoLibrary({
             // rather than a one-file-wide list you scroll.
             gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
             gap: 7,
-            // Beside the preview, so it may run as tall as the slide it sits
-            // next to before it starts scrolling inside itself.
-            maxHeight: 420,
+            alignContent: "start",
+            minHeight: 0,
             overflowY: "auto",
           }}
         >
@@ -253,7 +331,6 @@ export function SlidePhotoLibrary({
     </div>
   );
 }
-
 
 const OPEN_KEY = "cs.photoLibraryOpen";
 
@@ -393,12 +470,25 @@ export function SlidePhotoLibraryPopout(
             animate={{ width: PHOTO_PANEL_WIDTH, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ duration: DUR.base, ease: EASE }}
-            style={{ overflow: "hidden", flexShrink: 0 }}
+            // position:relative + an absolutely-positioned child is what keeps
+            // the panel from DRIVING the row's height: with no in-flow content
+            // this box contributes no height of its own, so the row stays as
+            // tall as the preview and align-items:stretch hands that height
+            // back to the panel. Without it, a full library made the column
+            // taller and pushed the slide actions (Add slide, Undo, Delete)
+            // down out of the sticky column.
+            style={{ overflow: "hidden", flexShrink: 0, position: "relative" }}
           >
             {/* Fixed width inside the animating box, so the tiles are laid out
                 at their final size throughout rather than reflowing 3-across
                 on every frame. */}
-            <div style={{ width: PHOTO_PANEL_WIDTH }}>
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: PHOTO_PANEL_WIDTH,
+              }}
+            >
               <SlidePhotoLibrary {...libraryProps} />
             </div>
           </motion.div>
