@@ -7,7 +7,6 @@ import { mediaSecurityHeaders } from "@/lib/api/mediaSecurityHeaders";
 import { processImageUpload } from "@/lib/image/processUpload";
 
 import {
-  brandingDir,
   ensureBrandingDir,
   isAllowedLogoExt,
   LOGO_BASENAME,
