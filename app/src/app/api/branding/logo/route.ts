@@ -147,9 +147,10 @@ export async function DELETE() {
   if (__auth) return __auth;
   const filename = getBrandingLogoFilename();
   if (filename) {
-    const full = path.join(brandingDir(), filename);
+    // resolveLogoPath() knows both the per-tenant dir and the legacy one.
+    const full = resolveLogoPath();
     try {
-      if (fs.existsSync(full)) fs.unlinkSync(full);
+      if (full && fs.existsSync(full)) fs.unlinkSync(full);
     } catch {
       // best effort
     }

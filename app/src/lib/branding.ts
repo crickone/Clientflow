@@ -12,15 +12,22 @@ export const LOGO_BASENAME = "logo";
 
 /**
  * Branding files live per tenant at `data/tenants/<slug>/branding/`, every
- * tenant alike. The logo *filename* is already per-tenant (stored in that
- * tenant's settings). The original tenant used to keep a legacy `data/branding/`
- * path here; it was retired on 2026-09-14 (merged into Optimal Health) and the
- * slug special case went with it.
+ * tenant alike — uploads always land here. The logo *filename* is already
+ * per-tenant (stored in that tenant's settings).
  */
 export function brandingDir(): string {
   const tenant = getCurrentTenant();
   return path.join(DATA_DIR, "tenants", tenant.slug, "branding");
 }
+
+/**
+ * Where the original tenant's logo was written before branding went
+ * per-tenant. resolveLogoPath() falls back to it by FILE PRESENCE — the
+ * per-tenant dir is checked first — so that logo keeps working without a
+ * slug special case and without moving a file on the production volume. The
+ * moment a logo is re-uploaded it lands in the per-tenant dir and wins.
+ */
+const LEGACY_BRANDING_DIR = path.join(DATA_DIR, "branding");
 
 export function ensureBrandingDir(): string {
   const dir = brandingDir();
@@ -43,9 +50,11 @@ export function resolveLogoPath(): string | null {
   const safe = path.basename(filename);
   if (safe !== filename) return null;
   if (!isAllowedLogoExt(path.extname(safe))) return null;
-  const full = path.join(brandingDir(), safe);
-  if (!fs.existsSync(full)) return null;
-  return full;
+  for (const dir of [brandingDir(), LEGACY_BRANDING_DIR]) {
+    const full = path.join(dir, safe);
+    if (fs.existsSync(full)) return full;
+  }
+  return null;
 }
 
 /**

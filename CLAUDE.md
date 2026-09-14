@@ -9,8 +9,13 @@ It combines a CRM (clients, appointments, leads, packages, content studio) with 
 and an **AI agent layer** (an Orchestrator + domain specialists that work a
 tenant's own data, gated by an operator-approval step — see "Agents & AI" below).
 
-The first managed website is **Renova Cellular Health** (a wellness clinic in
-Clonmel, Co. Tipperary — optimalhealthatinspire.ie · ☎ 083 867 2844).
+Two SEPARATE clinic businesses live on the platform and must never be conflated:
+- **Optimal Health at Inspire** — tenant 1028 `optimal-health`, LIVE
+  (optimalhealthatinspire.ie · ☎ 083 867 2844; HBOT, infrared, PEMF, massage).
+  This is where the client works day to day.
+- **Renova Cellular Health** — tenant 1 `renova`, the ORIGINAL tenant (legacy
+  data/clinic.db), a business that has NOT started yet and will launch later.
+  Its tenant, CMS site and data stay put; do not merge or retire it.
 
 > Note: the root folder may be named `clientflow` (renamed from `Renova`). Nothing
 > in the code depends on the folder name — all paths are relative.
@@ -24,12 +29,12 @@ Clonmel, Co. Tipperary — optimalhealthatinspire.ie · ☎ 083 867 2844).
     data/                   ← SQLite DBs: control.db (control plane: users, sessions, tenant
                                registry, domain routing, AI usage) + tenants/<slug>/<slug>.db,
                                one file per business (e.g. tenants/inspire/inspire.db). The
-                               original tenant `renova` (legacy data/clinic.db) was RETIRED
-                               on 2026-09-14 — its content was merged into tenant 1028
-                               `optimal-health` (scripts/merge-renova-into-optimal-health.cjs)
-                               and every `slug === "renova"` special case was removed. Never
-                               diagnose tenant state from these local files: they are stale
-                               dev copies, production lives on the Railway volume.
+                               original tenant `renova` still points at legacy data/clinic.db
+                               (registered by the boot migration, src/lib/db/migrate.ts) but
+                               is otherwise an ORDINARY tenant since 2026-09-14 — there are no
+                               `slug === "renova"` special cases left in src/. NEVER diagnose
+                               tenant state from these local files: they are stale dev copies;
+                               production lives on the Railway volume (`railway ssh`).
     public/sites/<slug>/    ← per-site static assets (namespaced)
   admin/                    ← separate Next.js app: the platform console (subscriptions/
                                billing, admin.adonisagent.ie) — its own package.json, deployed
