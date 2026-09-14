@@ -118,7 +118,7 @@ export const POLL_MERGE_FIELDS = [
   "imageStatus",
   "imageError",
   "imagePrompt",
-] as const;
+] as const satisfies readonly (keyof DesignSlideLike)[];
 
 /** Build the autosave snapshot: the PATCH body AND the dirty-check string. */
 export function autosaveSnapshot(
@@ -210,7 +210,18 @@ export type DesignAction<S extends DesignSlideLike> =
   | { type: "slidesReplaced"; slides: S[]; activeIdx?: number }
   | { type: "slideAdded"; slide: S }
   | { type: "slideDeleted"; slideId: number }
-  | { type: "reorderRolledBack"; previousOrder: number[]; previousIdx: number }
+  | {
+      type: "reorderRolledBack";
+      /**
+       * The slot that was DRAGGED, not the one on screen when the PATCH came
+       * back failing: a request can outlive the operator's stay in a slot, and
+       * an order made of one slot's ids restores nothing in another -- leaving
+       * the failed order on screen next to an error saying it failed.
+       */
+      slotKey: string;
+      previousOrder: number[];
+      previousIdx: number;
+    }
   | { type: "snapshotForUndo"; slide: S }
   | { type: "undoSlide"; slideId: number }
   | { type: "photoSwapStarted"; slideId: number; assetId: number }
@@ -221,6 +232,16 @@ export type DesignAction<S extends DesignSlideLike> =
       error: string | null;
       stage: string | null;
       serverSlides: S[];
+      /**
+       * Whether a whole-design run was in flight when THIS tick went out --
+       * not when its answer came back. The handover below is an edge, and an
+       * edge belongs to the run the tick actually observed: a response whose
+       * DB snapshot predates a run the operator has started since would
+       * otherwise be read as that run finishing, and its stale slide set taken
+       * over the top of live edits. The component sources it from a ref
+       * written at tick-issue time.
+       */
+      wasWriting: boolean;
     }
   | { type: "pollMerge"; serverSlides: S[] };
 
@@ -283,6 +304,15 @@ export function designReducer<S extends DesignSlideLike>(
     case "slideAdded": {
       // The new slide lands last in its slot, so the index to land on is the
       // count BEFORE the append.
+      //
+      // ACCEPTED DIVERGENCE from the pre-lift component: it counted the slot
+      // from the render closure, i.e. as it was when the POST went out, while
+      // this counts it when the response lands. They differ only if the slot
+      // gained or lost a slide during the request, and this reading is the
+      // better one -- the cursor follows the slide that was just added rather
+      // than a position computed against a list that has since moved. Left as
+      // it is deliberately, and noted here so the difference is not mistaken
+      // for an oversight.
       const idx = selectSlidesInSlot(state).length;
       return { ...state, slides: [...state.slides, action.slide], activeIdx: idx };
     }
@@ -299,12 +329,12 @@ export function designReducer<S extends DesignSlideLike>(
       // Read from the CURRENT slides for the same reason.
       const back = applySlotOrder(
         state.slides,
-        state.activeSlot,
+        action.slotKey,
         action.previousOrder,
       );
       return {
         ...state,
-        slides: back ? keepCaptionOnFirstSlide(back, state.activeSlot) : state.slides,
+        slides: back ? keepCaptionOnFirstSlide(back, action.slotKey) : state.slides,
         activeIdx: action.previousIdx,
       };
     }
@@ -356,7 +386,6 @@ export function designReducer<S extends DesignSlideLike>(
         : state;
 
     case "pollStatus": {
-      const wasWriting = selectWriting(state);
       const next: DesignState<S> = {
         ...state,
         generationStatus: action.status,
@@ -366,10 +395,10 @@ export function designReducer<S extends DesignSlideLike>(
       // A finished generation REPLACED the slot: the rows are new, with new
       // ids, so the patch-by-id path ("pollMerge") would match none of them
       // and the editor would sit on the seed slide forever. Take the server's
-      // set whole, ONCE, at the moment the run stops -- the edge is read off
-      // the status this tick is replacing, so a second tick cannot take it
-      // again.
-      if (wasWriting && action.status !== "writing") {
+      // set whole at the moment the run stops -- the edge is read off the
+      // action's `wasWriting`, the status as the TICK saw it, so only a tick
+      // that watched the run stop can hand its slide set over.
+      if (action.wasWriting && action.status !== "writing") {
         next.slides = action.serverSlides;
         next.activeIdx = 0;
       }
@@ -383,14 +412,15 @@ export function designReducer<S extends DesignSlideLike>(
         slides: state.slides.map((s) => {
           const sv = byId.get(s.id);
           if (!sv) return s;
-          // Generation-owned fields only. Everything else on the row belongs
-          // to the autosave snapshot, and merging it here would overwrite
-          // what the operator is typing with what the server last stored.
-          const patch: Record<string, unknown> = {
-            imageStatus: sv.imageStatus,
-            imageError: sv.imageError,
-            imagePrompt: sv.imagePrompt,
-          };
+          // Generation-owned fields only, taken FROM the manifest rather
+          // than retyped beside it: a second copy of the list is a second
+          // thing to keep in step, and the one that drifts is the one the
+          // disjoint-from-autosave test is not looking at. Everything else on
+          // the row belongs to the autosave snapshot, and merging it here
+          // would overwrite what the operator is typing with what the server
+          // last stored.
+          const patch: Record<string, unknown> = {};
+          for (const field of POLL_MERGE_FIELDS) patch[field] = sv[field];
           // backgroundAssetId only while the LOCAL slide is still generating:
           // a manual pick mid-flight has already cleared imageStatus, and it
           // wins.
@@ -488,6 +518,7 @@ export interface ReorderPlan<S extends DesignSlideLike> {
   slides: S[];
   activeIdx: number;
   /** For the rollback, if the PATCH fails and nothing newer has superseded it. */
+  slotKey: string;
   previousOrder: number[];
   previousIdx: number;
 }
@@ -515,7 +546,7 @@ export function planReorder<S extends DesignSlideLike>(
     if (movedTo !== -1) activeIdx = movedTo;
   }
 
-  return { slides, activeIdx, previousOrder, previousIdx };
+  return { slides, activeIdx, slotKey: state.activeSlot, previousOrder, previousIdx };
 }
 
 /**

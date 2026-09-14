@@ -5,9 +5,10 @@
 // poll's once-only handover, the fields the poll must never touch -- was only
 // ever verified by clicking around the editor.
 //
-// Two of these pin a KNOWN DEFECT rather than a guarantee. They are named so,
-// and they exist so the fix has something to flip rather than something to
-// write from scratch.
+// Three of these pin a KNOWN DEFECT rather than a guarantee -- the
+// redesign-versus-photo-swap race. They are named FLIP 1..3, one per shape the
+// fix could take, so that whichever way it lands the pin fails instead of
+// passing quietly. See the block they live in for what to do when one fails.
 import assert from "node:assert/strict";
 
 import {
@@ -164,13 +165,15 @@ check(
   let s = stateWith(seed, { activeSlot: "carousel-content", generationStatus: "writing" });
   check("a design with a run in flight reports as writing", selectWriting(s));
 
-  // Tick 1: still writing. Nothing is handed over.
+  // Tick 1: still writing. Nothing is handed over. `wasWriting` is what the
+  // poll saw when it issued the tick, which is what the component passes.
   s = reduce(s, {
     type: "pollStatus",
     status: "writing",
     error: null,
     stage: "composing",
     serverSlides: written,
+    wasWriting: true,
   });
   check(
     "a tick while the run is still writing does NOT take the server's slide set",
@@ -185,6 +188,7 @@ check(
     error: null,
     stage: null,
     serverSlides: written,
+    wasWriting: true,
   });
   check(
     "at the writing->null edge the server's slide set is taken WHOLE",
@@ -205,12 +209,38 @@ check(
     error: null,
     stage: null,
     serverSlides: laterServerSet,
+    // Issued after the run stopped, so this tick never saw it writing.
+    wasWriting: false,
   });
   check(
-    "a second tick after the edge does NOT take the set again",
+    "a tick issued after the run stopped does NOT take the set again",
     s.slides === written,
   );
   check("...so it cannot yank the cursor back to slide one", s.activeIdx === 1);
+}
+
+{
+  // Two ticks can be in flight at once, and BOTH of them watched the run stop.
+  // Both therefore hand over -- the flag is per-tick, not a latch on the
+  // machine, because a latch would also swallow the stale-tick case above.
+  // Taking the same finished set twice is idempotent bar the cursor reset.
+  const written = [slide(90), slide(91)];
+  let s = stateWith([slide(1)], { generationStatus: "writing" });
+  const tick = {
+    type: "pollStatus" as const,
+    status: null,
+    error: null,
+    stage: null,
+    serverSlides: written,
+    wasWriting: true,
+  };
+  s = reduce(s, tick);
+  s = reduce(s, { type: "setActiveIndex", index: 1 });
+  s = reduce(s, tick);
+  check(
+    "a second tick that also watched the run stop hands over too, cursor and all",
+    s.slides === written && s.activeIdx === 0,
+  );
 }
 
 {
@@ -224,9 +254,45 @@ check(
     error: "the model gave up",
     stage: null,
     serverSlides: written,
+    wasWriting: true,
   });
   check("giving up is also an edge -- the set is taken", s.slides === written);
   check("the failure reaches the operator", s.generationError === "the model gave up");
+}
+
+{
+  // A tick that went out BEFORE the run started must not be mistaken for that
+  // run finishing. The poll is already running for a per-slide background, so
+  // a GET goes out with nothing writing; its DB snapshot predates the run the
+  // operator then starts, so it comes back saying `null`. The edge belongs to
+  // the run the TICK observed, not to whatever the editor has learned since.
+  const local = [
+    slide(1, { headingText: "typed, not yet autosaved", imageStatus: "generating" }),
+    slide(2),
+  ];
+  const stale = [slide(1, { headingText: "what the server last stored" })];
+  let s = stateWith(local);
+  s = reduce(s, { type: "setActiveIndex", index: 1 });
+  // The tick goes out here, with no whole-design run in flight.
+  const wasWriting = selectWriting(s);
+  // The operator starts one before the GET comes back.
+  s = reduce(s, { type: "generationStarted", slotKey: "default" });
+  s = reduce(s, { type: "setActiveIndex", index: 1 });
+  // ...and now the stale answer lands.
+  s = reduce(s, {
+    type: "pollStatus",
+    status: null,
+    error: null,
+    stage: null,
+    serverSlides: stale,
+    wasWriting,
+  });
+  check(
+    "a tick issued before the run started cannot hand over its stale slide set",
+    s.slides === local,
+  );
+  check("...so the operator's unsaved edits are still on screen", s.slides.length === 2);
+  check("...and the cursor is left where the operator put it", s.activeIdx === 1);
 }
 
 {
@@ -241,6 +307,7 @@ check(
     error: null,
     stage: null,
     serverSlides: server,
+    wasWriting: false,
   });
   check(
     "with no run in flight, a tick never takes the server's slide set",
@@ -253,16 +320,45 @@ check(
 // ---------------------------------------------------------------------------
 
 {
-  const autosaved = new Set<string>(AUTOSAVE_FIELDS);
-  const overlap = POLL_MERGE_FIELDS.filter((f) => autosaved.has(f));
+  // The manifest is only worth asserting about because the reducer BUILDS its
+  // merge patch from it. So check the reducer's actual output first: hand it a
+  // server slide where every field differs and see exactly which ones move.
+  const local = [
+    slide(1, {
+      headingText: "local heading",
+      imageStatus: null,
+      imageError: null,
+      imagePrompt: null,
+      backgroundAssetId: 5,
+    }),
+  ];
+  const server = [
+    slide(1, {
+      headingText: "server heading",
+      imageStatus: "ready",
+      imageError: "server error",
+      imagePrompt: "server prompt",
+      backgroundAssetId: 42,
+      designHtml: "<section>server</section>",
+    }),
+  ];
+  const merged = reduce(stateWith(local), { type: "pollMerge", serverSlides: server }).slides[0];
+  const moved = (Object.keys(merged) as (keyof typeof merged)[])
+    .filter((k) => merged[k] !== local[0][k])
+    .sort();
   check(
-    "no field the poll merges unconditionally is a field the autosave saves",
-    overlap.length === 0,
+    "the fields a tick moves onto a settled slide are exactly the manifest, no more and no fewer",
+    moved.join() === [...POLL_MERGE_FIELDS].sort().join(),
+  );
+
+  const autosaved = new Set<string>(AUTOSAVE_FIELDS);
+  check(
+    "...and none of them is a field the autosave saves, so a tick cannot fight the debounce",
+    moved.every((f) => !autosaved.has(f)),
   );
   check(
-    "backgroundAssetId is the deliberate exception: the autosave owns it, and the poll writes it ONLY while generating",
-    autosaved.has("backgroundAssetId") &&
-      !(POLL_MERGE_FIELDS as readonly string[]).includes("backgroundAssetId"),
+    "backgroundAssetId is the deliberate exception: the autosave owns it, so a settled slide keeps the operator's pick",
+    autosaved.has("backgroundAssetId") && merged.backgroundAssetId === 5,
   );
 }
 
@@ -419,48 +515,72 @@ check(
 
 // ---------------------------------------------------------------------------
 //  KNOWN DEFECT -- pinned as it behaves TODAY, not as it should behave
+//
+//  A photo swap and a redesign of the same slide both end in the same
+//  server-side updateSlide and both hand a whole slide row back to the editor.
+//  The photo swap is the only one of the two this machine can see; the
+//  redesign's in-flight flag lives inside the redesign button. So nothing
+//  refuses the overlap, and whichever response lands LAST is the slide the
+//  operator is left with.
+//
+//  Two shapes of fix are open, and the checks below are written so that EITHER
+//  of them makes one fail loudly rather than passing quietly:
+//
+//    FLIP 1 -- the fix at the GATE. Hoist the redesign's in-flight flag into
+//      this machine and have planManualBackground refuse a pick while one is
+//      running (the fix the comment on planManualBackground predicts). That
+//      puts a new field on DesignState, and FLIP 1 reads the field list.
+//
+//    FLIP 2 / FLIP 3 -- the fix at the WRITE. Make a response that was built
+//      from a superseded version of the slide lose to the newer one instead of
+//      overwriting it. These two assert the losing outcome in both orders.
+//
+//  A failure here is the fix ARRIVING, not a regression: rewrite the named
+//  check to assert the new behaviour. Do not delete it.
 // ---------------------------------------------------------------------------
 
 {
-  // A photo swap and a redesign both end in the same server-side updateSlide
-  // and both hand a whole slide row back to the editor. The photo swap is the
-  // only one of the two this machine can see; the redesign's in-flight flag
-  // lives inside the redesign button. So nothing refuses the overlap, and
-  // whichever response lands LAST is the slide the operator ends up with.
+  // FLIP 1 -- the gate. Everything this machine knows it is holding, and the
+  // planner's one and only refusal. A photo pick on a designed slide is
+  // accepted whenever no other PHOTO SWAP is in flight; a redesign of that
+  // same slide cannot make it say no, because there is no field here in which
+  // a redesign could be recorded.
+  const machine = stateWith([slide(1, { designHtml: "<section>original</section>" })]);
+  check(
+    "DEFECT PINNED / FLIP 1: the only work in flight this machine can record is a photo swap, so a redesign never reaches the gate",
+    Object.keys(machine).sort().join() ===
+      "activeIdx,activeSlot,generationError,generationStage,generationStatus,rephotographing,slides,undoStacks" &&
+      planManualBackground(machine, 7, { designed: true }).kind === "rephotograph",
+  );
+}
+
+{
+  // FLIP 2 -- the write, redesign first. The operator picks a photo (setup,
+  // not a pin: it is the accepted pick that sets the race up), then hits
+  // Redesign on the same slide. The redesign answers first, and the photo
+  // swap's response -- built from the slide as it was BEFORE the redesign --
+  // lands on top of it.
   let s = stateWith([slide(1, { designHtml: "<section>original</section>" })]);
-
-  // The operator picks a photo. Accepted, and recorded.
-  const pick = planManualBackground(s, 7, { designed: true });
-  check(
-    "DEFECT PINNED: a photo swap starts and is the only mutation on record",
-    pick.kind === "rephotograph",
-  );
+  assert.equal(planManualBackground(s, 7, { designed: true }).kind, "rephotograph");
   s = reduce(s, { type: "photoSwapStarted", slideId: 1, assetId: 7 });
-
-  // They then hit Redesign on the same slide. NOTHING in this machine refuses
-  // it -- there is no state for it to consult and no flag for it to set.
-  check(
-    "DEFECT PINNED: a photo swap in flight does not stop a redesign of the same slide",
-    s.rephotographing !== null,
-  );
-
-  // The redesign answers first.
   s = reduce(s, {
     type: "slideUpdated",
-    slide: slide(1, { designHtml: "<section>redesigned</section>", backgroundAssetId: null }),
+    slide: slide(1, { designHtml: "<section>redesigned</section>", backgroundAssetId: 7 }),
   });
-  // Then the photo swap answers, built from the slide as it was BEFORE the
-  // redesign, and overwrites it.
   s = reduce(s, {
     type: "slideUpdated",
     slide: slide(1, { designHtml: "<section>original</section>", backgroundAssetId: 7 }),
   });
+  s = reduce(s, { type: "photoSwapFinished", slideId: 1 });
   check(
-    "DEFECT PINNED: the later response wins outright -- the redesign is silently thrown away",
-    s.slides[0].designHtml === "<section>original</section>",
+    "DEFECT PINNED / FLIP 2: the redesign is silently thrown away by the slower photo swap, and the editor then reports itself idle",
+    s.slides[0].designHtml === "<section>original</section>" && s.rephotographing === null,
   );
+}
 
-  // And the other way round: the redesign lands last and the photo is lost.
+{
+  // FLIP 3 -- the write, the other way round. Same overlap, reversed replies,
+  // and this time it is the operator's chosen photograph that disappears.
   let t = stateWith([slide(1, { designHtml: "<section>original</section>" })]);
   t = reduce(t, { type: "photoSwapStarted", slideId: 1, assetId: 7 });
   t = reduce(t, {
@@ -471,17 +591,10 @@ check(
     type: "slideUpdated",
     slide: slide(1, { designHtml: "<section>redesigned</section>", backgroundAssetId: null }),
   });
-  check(
-    "DEFECT PINNED: in the other order the operator's chosen photograph is the thing that disappears",
-    t.slides[0].backgroundAssetId === null,
-  );
-
-  // Finishing the swap clears the flag either way, so the editor looks idle
-  // while holding whichever of the two results happened to be slower.
   t = reduce(t, { type: "photoSwapFinished", slideId: 1 });
   check(
-    "DEFECT PINNED: the editor then reports itself idle, with no sign either result was dropped",
-    t.rephotographing === null,
+    "DEFECT PINNED / FLIP 3: in the other order the chosen photograph is the thing that disappears, with no sign a result was dropped",
+    t.slides[0].backgroundAssetId === null && t.rephotographing === null,
   );
 }
 
@@ -571,6 +684,7 @@ check(
   s = reduce(s, { type: "patchSlide", slideId: 2, patch: { headingText: "typed during the request" } });
   s = reduce(s, {
     type: "reorderRolledBack",
+    slotKey: plan.slotKey,
     previousOrder: plan.previousOrder,
     previousIdx: plan.previousIdx,
   });
@@ -580,6 +694,35 @@ check(
     s.slides[1].headingText === "typed during the request",
   );
   check("...and puts the cursor back too", s.activeIdx === 0);
+}
+
+{
+  // The rollback belongs to the slot that was DRAGGED. A PATCH can take long
+  // enough for the operator to switch slots, and rolling the slot on screen
+  // back to an order made of another slot's ids restores nothing at all --
+  // leaving the failed order on screen while the database holds the old one.
+  let s = stateWith(
+    [slide(1), slide(2), slide(3), slide(9, { slotKey: "carousel-content" })],
+    { activeSlot: "default" },
+  );
+  const plan = planReorder(s, [3, 1, 2])!;
+  s = reduce(s, { type: "slidesReplaced", slides: plan.slides, activeIdx: plan.activeIdx });
+  // The operator moves to the carousel while the PATCH is still in flight.
+  s = reduce(s, { type: "selectSlot", slotKey: "carousel-content" });
+  s = reduce(s, {
+    type: "reorderRolledBack",
+    slotKey: plan.slotKey,
+    previousOrder: plan.previousOrder,
+    previousIdx: plan.previousIdx,
+  });
+  check(
+    "a failed reorder rolls back the slot that was dragged, not the slot now on screen",
+    s.slides.slice(0, 3).map((x) => x.id).join() === "1,2,3",
+  );
+  check(
+    "...and the slot the operator switched to is untouched",
+    s.slides[3].id === 9,
+  );
 }
 
 // ---------------------------------------------------------------------------

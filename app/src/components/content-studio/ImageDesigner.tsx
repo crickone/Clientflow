@@ -666,10 +666,10 @@ export function ImageDesigner({
   }, [name, designId, router]);
 
   // Poll while any slide's AI background is generating — the detached server
-  // queue flips image_status/backgroundAssetId as each image completes. Merge
-  // ONLY the generation-owned fields; backgroundAssetId only while the local
-  // slide is still 'generating' (a manual pick mid-flight wins). These fields
-  // are NOT in the auto-save snapshot, so polling never fights the debounce.
+  // queue flips image_status/backgroundAssetId as each image completes. Which
+  // fields a tick is allowed to merge, and why backgroundAssetId is the one
+  // deliberate overlap with the auto-save snapshot, is stated once on
+  // POLL_MERGE_FIELDS in designState.ts.
   const libraryRef = useRef(library);
   useEffect(() => {
     libraryRef.current = library;
@@ -679,24 +679,33 @@ export function ImageDesigner({
   // imagery. Both are resolved by the same poll, because both are written by a
   // detached continuation and the editor has no other way to hear about them.
   const pollWanted = anyGenerating || writing;
+  // Whether a whole-design run was in flight is read when a tick GOES OUT, not
+  // when its answer comes back: the handover at the writing -> null edge
+  // belongs to the run that tick observed. A response whose DB snapshot
+  // predates a run started since would otherwise read as that run finishing,
+  // and take its stale slide set over the top of live edits.
+  const writingRef = useRef(writing);
+  writingRef.current = writing;
   useEffect(() => {
     if (!pollWanted) return;
     let stopped = false;
     const tick = async () => {
+      const wasWriting = writingRef.current;
       try {
         const res = await fetch(`/api/content-studio/carousels/${designId}`);
         const json = await res.json();
         if (stopped || !res.ok || !json.ok) return;
         const status: string | null = json.carousel?.generationStatus ?? null;
         const server: CarouselSlide[] = json.carousel?.slides ?? [];
-        // Status first, and with it the once-only handover of the server's
-        // slide set at the writing -> null edge (see designState.ts).
+        // Status first, and with it the handover of the server's slide set at
+        // the writing -> null edge this tick watched (see designState.ts).
         dispatch({
           type: "pollStatus",
           status,
           error: json.carousel?.generationError ?? null,
           stage: json.carousel?.generationStage ?? null,
           serverSlides: server,
+          wasWriting,
         });
         // Hydrate newly-generated assets we don't have locally yet.
         const missing = missingAssetIds(
@@ -724,10 +733,11 @@ export function ImageDesigner({
       stopped = true;
       clearInterval(iv);
     };
-    // `writing` is no longer read inside the tick -- the reducer reads the
-    // edge off its own state -- but it stays a dependency so the poll is still
-    // torn down and restarted when a run stops while per-slide backgrounds are
-    // still generating, exactly as before.
+    // `writing` reaches the tick through a ref rather than this closure, so
+    // that a tick fired between a run starting and this effect restarting
+    // still reports what was true when it went out. It stays a dependency so
+    // the poll is torn down and restarted when a run stops while per-slide
+    // backgrounds are still generating, exactly as before.
   }, [pollWanted, writing, designId]);
 
   // `template` is only passed when the user picked one from the picker on an
@@ -802,6 +812,9 @@ export function ImageDesigner({
       if (seq !== reorderSeqRef.current) return;
       dispatch({
         type: "reorderRolledBack",
+        // The slot the drag happened in, not whichever is on screen now: the
+        // PATCH can outlive the operator's stay in it.
+        slotKey: plan.slotKey,
         previousOrder: plan.previousOrder,
         previousIdx: plan.previousIdx,
       });
