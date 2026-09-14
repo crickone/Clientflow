@@ -20,5 +20,6 @@ check("a photo on its own", progressLabel("photo", 12) === "Making the photo… 
 check("the two-step path says which step it is on", progressLabel("photoThenDesign", 3) === "Making the photo (1 of 2)… 3s");
 check("no seconds under three -- a flicker of '1s' reads as a glitch", progressLabel("photo", 2) === "Making the photo…");
 check("seconds are whole", progressLabel("designing", 9.8) === "Designing… 9s");
+check("applying an already-made photo is named for what it is, not still 'making' it", progressLabel("applyingPhoto", 5) === "Adding the photo to the slide… 5s");
 
 console.log(`\nprogressLabel: ${passed} checks passed`);

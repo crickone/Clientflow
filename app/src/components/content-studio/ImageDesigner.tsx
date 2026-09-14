@@ -502,7 +502,15 @@ export function ImageDesigner({
       // operator's attention is on the dialog. Checked live, not captured at
       // effect-registration time, since dialogs mount and unmount on top of
       // this listener's lifetime.
-      if (document.querySelector('[role="dialog"][data-state="open"]')) return;
+      //
+      // `:not([data-state="closed"])`, not `[data-state="open"]`: the
+      // hand-rolled panels in this subtree (SlideColorPicker, ImagePicker)
+      // are `role="dialog"` with no `data-state` attribute at all, so a
+      // check for the literal value "open" never matches them -- only the
+      // Radix dialogs set that attribute. The negated form matches both:
+      // Radix while open, and a hand-rolled panel that has no such
+      // attribute to be "closed" with.
+      if (document.querySelector('[role="dialog"]:not([data-state="closed"])')) return;
       const action = resolveShortcut({
         key: e.key,
         metaKey: e.metaKey,
@@ -2667,6 +2675,11 @@ function GenerateCarouselButton({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    // requestSubmit() with no submitter ignores the button's disabled state
+    // (per spec), and the textarea's Cmd+Enter handler calls it directly --
+    // so a second press inside the request window has to be stopped here,
+    // not by disabling a control the second press never looks at.
+    if (submitting) return;
     if (!topic.trim()) {
       setError("Topic is required.");
       return;
@@ -3334,7 +3347,16 @@ function RedesignSlideButton({
           : "The photograph was saved to the library.",
       );
 
+    // Step 2 mutates the slide on BOTH branches -- a swap here, a redesign
+    // below -- so the undo snapshot is taken once, right before it, either
+    // way. Not before step 1: a step-1 failure would otherwise leave an
+    // undo step on the stack that undoes nothing.
+    onBeforeRedesign();
+
     if (hasPhotoSlot) {
+      // Named for what this step actually is -- the slide being re-rendered
+      // with the new photograph -- not still "making" it, which was step 1.
+      setBusy("applyingPhoto");
       await post(
         `/api/content-studio/carousels/${designId}/slides/${slide.id}/photo`,
         { assetId: asset.id },
@@ -3345,7 +3367,6 @@ function RedesignSlideButton({
       );
     } else {
       setBusy("designing");
-      onBeforeRedesign();
       await post(
         `/api/content-studio/carousels/${designId}/redesign`,
         { slideId: slide.id, note: "Use the photograph on this slide.", photoAssetId: asset.id },
@@ -3365,6 +3386,11 @@ function RedesignSlideButton({
     <Dialog
       open={open}
       onOpenChange={(o) => {
+        // Step 2 is already paid for and runs invisibly once step 1 lands --
+        // closing mid-flight would strand its error and the "saved to the
+        // library" note inside a dialog nobody can see again. Dismissible
+        // again the moment busy clears.
+        if (busy !== null) return;
         setOpen(o);
         if (!o) reset();
       }}
@@ -3381,6 +3407,12 @@ function RedesignSlideButton({
       <DialogContent
         title="Redesign this slide"
         description="Say what you'd change, or leave it blank for a different take on the same content."
+        onEscapeKeyDown={(e) => {
+          if (busy !== null) e.preventDefault();
+        }}
+        onPointerDownOutside={(e) => {
+          if (busy !== null) e.preventDefault();
+        }}
       >
         <div style={{ display: "grid", gap: 14 }}>
           <div>
@@ -3432,12 +3464,12 @@ function RedesignSlideButton({
                 now falls back to the slide's own words. */}
             {imageGenEnabled && (
               <Button variant="outline" onClick={newPhoto} disabled={busy !== null}>
-                {busy === "photo" || busy === "photoThenDesign" ? (
+                {busy === "photo" || busy === "photoThenDesign" || busy === "applyingPhoto" ? (
                   <Loader2 size={15} className="spin" />
                 ) : (
                   <ImageIcon size={15} />
                 )}
-                {busy === "photo" || busy === "photoThenDesign"
+                {busy === "photo" || busy === "photoThenDesign" || busy === "applyingPhoto"
                   ? progressLabel(busy, elapsed)
                   : "Make a new photo"}
               </Button>

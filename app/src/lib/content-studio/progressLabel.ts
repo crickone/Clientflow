@@ -8,12 +8,13 @@
  * copy is pinned by a test rather than left to drift.
  */
 
-export type DialogPhase = "designing" | "photo" | "photoThenDesign";
+export type DialogPhase = "designing" | "photo" | "photoThenDesign" | "applyingPhoto";
 
 const WORDING: Record<DialogPhase, string> = {
   designing: "Designing…",
   photo: "Making the photo…",
   photoThenDesign: "Making the photo (1 of 2)…",
+  applyingPhoto: "Adding the photo to the slide…",
 };
 
 /** Seconds are shown once a few have passed: "1s" flickering on is a glitch, not information. */

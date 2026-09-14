@@ -470,6 +470,11 @@ function DragSurface({
         else if (e.key === "ArrowDown") onPick(handleX, clamp01(handleY + step));
         else return;
         e.preventDefault();
+        // The window keymap listens on the bubble phase and would otherwise
+        // see this same ArrowLeft/Right as a slide-navigation shortcut,
+        // stepping the preview behind this panel while the panel itself
+        // moves the colour handle.
+        e.stopPropagation();
       }}
       style={{
         position: "relative",
