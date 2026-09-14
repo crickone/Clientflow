@@ -53,17 +53,38 @@ function sceneFromSlideCopy(slide: { designHtml: string | null }): string {
  * alone would record a new picture and show the old one. The re-render is the
  * point, and it is what this route adds.
  *
- * Two modes, one body:
- *   { assetId }   -- use a photograph already in the library
- *   { generate }  -- make one from the scene the design asked for, metered
+ * Three shapes of body, not two -- the dialog (ImageDesigner.tsx) used to
+ * drive this route's one-shot generate mode, but now runs "make a new
+ * photo" as two requests of its own so it can name which one is in flight:
  *
- * NOT metered in the pick case: choosing a file is not an AI call.
+ *   { assetId }                     -- swap in a photo already in the
+ *                                       library, and re-render. Not an AI
+ *                                       call, so not metered.
+ *   { generate, onlyGenerate: true } -- the dialog's step 1: make a photo
+ *                                       from the scene the design asked for,
+ *                                       save it to the library, and hand it
+ *                                       straight back. Metered; touches
+ *                                       nothing else on the slide. The
+ *                                       dialog does step 2 itself: another
+ *                                       call here with { assetId } when the
+ *                                       slide has a {{PHOTO}} slot, or a
+ *                                       call to .../redesign with
+ *                                       { photoAssetId } when it does not.
+ *   { generate }  (no onlyGenerate)  -- the older one-shot mode: generate,
+ *                                       then either swap the result in or
+ *                                       redesign the slide around it, all in
+ *                                       this one request -- up to two
+ *                                       metered calls. Still supported for
+ *                                       any caller besides the dialog, but
+ *                                       no longer exercised by the app's own
+ *                                       client. This is why the route still
+ *                                       carries the 120s ceiling below: an
+ *                                       image plus a design, in one request.
  *
- * Either mode needs somewhere to put the picture. A slide the designer built
- * on a flat ground has no {{PHOTO}} placeholder, so PICKING is refused there
- * (there is nothing to swap) while GENERATING redesigns the slide around the
- * new photograph -- two metered calls, and the only way that slide can gain
- * one. Hence the 120s ceiling: an image plus a design.
+ * A slide the designer built on a flat ground has no {{PHOTO}} placeholder,
+ * so PICKING is refused there (there is nothing to swap) while GENERATING
+ * (the one-shot mode above) redesigns the slide around the new photograph
+ * instead.
  */
 export async function POST(
   req: Request,
@@ -246,8 +267,10 @@ export async function POST(
     updateSlide(slide.id, {
       renderFilename,
       backgroundAssetId: photo.id,
-      // A slide that had no recorded scene gets the one this generation used,
-      // so the next "make a new photo" starts from the same brief.
+      // scene is only ever set on the one-shot { generate } path above; a
+      // plain { assetId } swap -- what the dialog's own step 2 now sends --
+      // reaches here with scene still "", so this is a no-op for it and
+      // imagePrompt is left as the slide already had it.
       ...(scene && !slide.imagePrompt ? { imagePrompt: scene } : {}),
     });
 

@@ -3208,10 +3208,11 @@ function RedesignSlideButton({
   // busy. Reset with busy so a second action never inherits the first's clock.
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
-    if (busy === null) {
-      setElapsed(0);
-      return;
-    }
+    // Reset unconditionally, before the interval starts: a phase change
+    // still renders once with the OLD elapsed value, and without this reset
+    // that stale number briefly shows against the new phase's label.
+    setElapsed(0);
+    if (busy === null) return;
     const started = Date.now();
     const id = window.setInterval(() => setElapsed((Date.now() - started) / 1000), 1000);
     return () => window.clearInterval(id);
@@ -3293,9 +3294,17 @@ function RedesignSlideButton({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ generate: true, onlyGenerate: true }),
-          signal: AbortSignal.timeout(90_000),
+          // Above the route's own 120s maxDuration -- mirrors post() below, so
+          // a slow generation can't abort client-side after the server has
+          // already finished (and charged) but before the response lands.
+          signal: AbortSignal.timeout(180_000),
         },
       );
+      if (res.status === 502 || res.status === 503 || res.status === 504) {
+        setError("The app was restarting. Give it a few seconds and try again.");
+        setBusy(null);
+        return;
+      }
       const json = await res.json().catch(() => null);
       if (!json?.ok || !json.asset) {
         setError(json?.error ?? `Couldn't make the photo (HTTP ${res.status}).`);
@@ -3303,17 +3312,36 @@ function RedesignSlideButton({
         return;
       }
       asset = json.asset as ImageLibraryAsset;
-    } catch {
-      setError("Couldn't reach the server. Try again in a moment.");
+    } catch (err) {
+      setError(
+        err instanceof DOMException && err.name === "TimeoutError"
+          ? "That took too long and was stopped. Try again in a moment."
+          : "Couldn't reach the server. Try again in a moment.",
+      );
       setBusy(null);
       return;
     }
+
+    // From here, the photograph is already made and saved -- it was paid
+    // for in step 1. If step 2 fails, `applied` stays false and the
+    // operator has to be told the picture still exists, or a retry (the
+    // only visible way forward on a slot-less slide) pays for a second one.
+    let applied = false;
+    const notePhotoSaved = () =>
+      setError((prev) =>
+        prev
+          ? `${prev} The photograph was saved to the library.`
+          : "The photograph was saved to the library.",
+      );
 
     if (hasPhotoSlot) {
       await post(
         `/api/content-studio/carousels/${designId}/slides/${slide.id}/photo`,
         { assetId: asset.id },
-        (json) => json.slide as CarouselSlide | undefined,
+        (json) => {
+          applied = true;
+          return json.slide as CarouselSlide | undefined;
+        },
       );
     } else {
       setBusy("designing");
@@ -3321,12 +3349,15 @@ function RedesignSlideButton({
       await post(
         `/api/content-studio/carousels/${designId}/redesign`,
         { slideId: slide.id, note: "Use the photograph on this slide.", photoAssetId: asset.id },
-        (json) =>
-          (json.carousel?.slides as CarouselSlide[] | undefined)?.find(
+        (json) => {
+          applied = true;
+          return (json.carousel?.slides as CarouselSlide[] | undefined)?.find(
             (sl) => sl.id === slide.id,
-          ),
+          );
+        },
       );
     }
+    if (!applied) notePhotoSaved();
     setBusy(null);
   }
 

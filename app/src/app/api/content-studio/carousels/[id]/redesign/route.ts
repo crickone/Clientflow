@@ -5,7 +5,7 @@ import { redesignSlide } from "@/lib/ai/designPost";
 import { AiCapError } from "@/lib/ai/usage";
 import { getCurrentMembership } from "@/lib/auth";
 import { getCarousel, updateSlide } from "@/lib/image/carousels";
-import { photoChoiceFor } from "@/lib/image/library";
+import { photoChoiceFor, photoChoices } from "@/lib/image/library";
 import { resolveLogoPath } from "@/lib/branding";
 import { DESIGNED_TEMPLATE_ID } from "@/lib/image/paintSlide";
 
@@ -61,11 +61,18 @@ export async function POST(
   // two-step "make a new photo" path) or, failing that, the one this slide
   // already had -- so a plain redesign keeps its picture rather than
   // silently reverting to the library's first.
+  // photoChoiceFor falls back to the library's FIRST photo when the id it is
+  // given doesn't resolve -- it has no notion of "the other candidate" -- so
+  // a shape-valid but nonexistent id (deleted asset, typo, stale client
+  // state) has to be caught here, or it would silently redesign around an
+  // arbitrary library photograph instead of the slide's own.
   const requestedPhotoId = Number(body?.photoAssetId);
+  const requestedPhotoExists =
+    Number.isFinite(requestedPhotoId) &&
+    requestedPhotoId > 0 &&
+    photoChoices().some((p) => p.id === requestedPhotoId);
   const photo = photoChoiceFor(
-    Number.isFinite(requestedPhotoId) && requestedPhotoId > 0
-      ? requestedPhotoId
-      : slide.backgroundAssetId,
+    requestedPhotoExists ? requestedPhotoId : slide.backgroundAssetId,
   );
 
   /**
