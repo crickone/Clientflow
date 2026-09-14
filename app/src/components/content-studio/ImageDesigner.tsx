@@ -74,7 +74,7 @@ import { DESIGNED_TEMPLATE_ID, slideDimensions, slideSurface } from "@/lib/image
 import { renderFileUrl } from "@/lib/image/renderStore.client";
 import { SlideFilmstrip } from "./SlideFilmstrip";
 import { SlideColorPicker } from "./SlideColorPicker";
-import { SlidePhotoLibraryPopout } from "./SlidePhotoLibrary";
+import { PHOTO_PANEL_WIDTH, SlidePhotoLibraryPopout } from "./SlidePhotoLibrary";
 import { EditorSection } from "./EditorSection";
 import { PostIdeas } from "./PostIdeas";
 
@@ -1208,6 +1208,14 @@ export function ImageDesigner({
   // time). The toolbar + template picker stay visible so the user can switch
   // slots or hit Generate.
   const previewMaxWidth = surface?.aspectRatio === "9:16" ? 320 : 460;
+  /**
+   * The photo library takes its width in the flow beside the preview, so the
+   * column has to grow by the same amount while it is open -- otherwise the
+   * panel would come out of the slide, which is the thing it used to cover.
+   * The room comes from the controls column, which has it to give.
+   */
+  const [photosOpen, setPhotosOpen] = useState(false);
+  const previewColMax = 480 + (photosOpen ? PHOTO_PANEL_WIDTH + 8 : 0);
   const isEmptySlot = !activeSlide || !surface;
 
   return (
@@ -1371,9 +1379,19 @@ export function ImageDesigner({
         className="cms-editor-grid"
         style={{
           display: "grid",
-          gridTemplateColumns: "minmax(320px, 480px) 1fr",
+          // The second track keeps a floor so a narrow laptop doesn't crush the
+          // controls to make room: past that, grid gives the preview column
+          // less than its max and the panel takes its width off the slide
+          // instead -- smaller, but never covered, which was the point.
+          gridTemplateColumns: photosOpen
+            ? `minmax(320px, ${previewColMax}px) minmax(360px, 1fr)`
+            : `minmax(320px, ${previewColMax}px) 1fr`,
           gap: 28,
           alignItems: "start",
+          // The column resizes rather than jumping, in step with the panel
+          // opening inside it. Below 860px the stylesheet collapses this to a
+          // single column with !important, so none of this applies there.
+          transition: "grid-template-columns 0.2s var(--ease)",
         }}
       >
         {/* Preview */}
@@ -1446,6 +1464,7 @@ export function ImageDesigner({
                  (read as part of the design). Here it is neither. */
               <div style={{ display: "flex", alignItems: "stretch" }}>
                 <SlidePhotoLibraryPopout
+                  onOpenChange={setPhotosOpen}
                   photoCount={imageLibrary.length}
                   assets={imageLibrary}
                   activeAssetId={activeSlide.backgroundAssetId}
@@ -1466,7 +1485,12 @@ export function ImageDesigner({
                   minWidth: 0,
                   background: "var(--surface-1)",
                   border: "1px solid var(--hairline)",
-                  borderRadius: "0 var(--radius) var(--radius) 0",
+                  // Flush against the tab when the panel is folded away; its
+                  // own card, with a gap, once the panel sits between them.
+                  borderRadius: photosOpen
+                    ? "var(--radius)"
+                    : "0 var(--radius) var(--radius) 0",
+                  marginLeft: photosOpen ? 8 : 0,
                   padding: 18,
                   display: "flex",
                   justifyContent: "center",

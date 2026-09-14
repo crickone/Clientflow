@@ -152,11 +152,15 @@ export function SlidePhotoLibrary({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(78px, 1fr))",
+            // Exactly three across, at whatever size that makes them. A
+            // photograph is recognisable small, and three columns is what
+            // turns a panel this narrow into a contact sheet you can scan
+            // rather than a one-file-wide list you scroll.
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
             gap: 7,
-            // Sits under the preview now, so it stays a strip rather than
-            // pushing the slide actions off the screen.
-            maxHeight: 188,
+            // Beside the preview, so it may run as tall as the slide it sits
+            // next to before it starts scrolling inside itself.
+            maxHeight: 420,
             overflowY: "auto",
           }}
         >
@@ -254,13 +258,29 @@ export function SlidePhotoLibrary({
 const OPEN_KEY = "cs.photoLibraryOpen";
 
 /**
- * The photo library as a panel that pops out of the preview's top-left corner.
+ * The panel's width, and the space the preview column has to gain for it.
  *
- * It was a strip under the slide, which cost the operator a scroll every time
- * they wanted a different picture and pushed the slide actions down the page.
- * As a popout it sits ON the preview, next to the thing it changes, and folds
- * away when it is not wanted -- which is most of the time, because a slide's
- * photograph is chosen once.
+ * Exported because the two have to agree: the panel takes this in the flow
+ * beside the preview, and ImageDesigner widens the column by exactly this
+ * much (plus the gap) so the slide keeps its size instead of being squeezed
+ * or covered. Sized to three tiles: 12px padding either side, two 7px gaps,
+ * and three ~71px squares.
+ */
+export const PHOTO_PANEL_WIDTH = 252;
+
+/**
+ * The photo library as a panel that expands out BESIDE the preview.
+ *
+ * Three attempts got here. A strip under the slide cost a scroll every time
+ * you wanted a different picture; a pill on the slide read as part of the
+ * design; an absolutely-positioned popout opened over the preview, so
+ * choosing a photograph hid the thing the photograph was for.
+ *
+ * This one is laid out in the flow: the panel takes real width next to the
+ * tab, and ImageDesigner widens the preview column by exactly PHOTO_PANEL_WIDTH
+ * while it is open, so the room comes out of the page's margin rather than off
+ * the slide. Nothing overlaps, nothing is clipped, and the slide never changes
+ * size as you browse.
  *
  * Open/closed persists per browser: an operator who works with it open should
  * not have to open it on every slide, and one who never uses it should not keep
@@ -268,17 +288,27 @@ const OPEN_KEY = "cs.photoLibraryOpen";
  * every access is guarded and the default simply wins.
  */
 export function SlidePhotoLibraryPopout(
-  props: Parameters<typeof SlidePhotoLibrary>[0] & { photoCount: number },
+  props: Parameters<typeof SlidePhotoLibrary>[0] & {
+    photoCount: number;
+    /** Told to the parent so the column can make room. Fires on mount with
+     *  the persisted value, which is why the parent starts closed too. */
+    onOpenChange?: (open: boolean) => void;
+  },
 ) {
   const [open, setOpen] = useState(false);
-  const { photoCount, ...libraryProps } = props;
+  const { photoCount, onOpenChange, ...libraryProps } = props;
 
   useEffect(() => {
+    let restored = false;
     try {
-      setOpen(window.localStorage.getItem(OPEN_KEY) === "1");
+      restored = window.localStorage.getItem(OPEN_KEY) === "1";
     } catch {
-      // Closed is the safe default: it never covers the slide unasked.
+      // Closed is the safe default: it never takes the room unasked.
     }
+    setOpen(restored);
+    onOpenChange?.(restored);
+    // Mount only: this restores a preference, it does not track the callback.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function toggle() {
@@ -289,6 +319,7 @@ export function SlidePhotoLibraryPopout(
       } catch {
         // The preference is a convenience, not state the editor depends on.
       }
+      onOpenChange?.(next);
       return next;
     });
   }
@@ -304,12 +335,7 @@ export function SlidePhotoLibraryPopout(
   }, [open]);
 
   return (
-    // A real element BESIDE the preview card, not an absolute overhang off the
-    // slide. The overhang was the first attempt and it lost: the card clipped
-    // it and var(--surface-2) on var(--surface-1) made what survived almost
-    // invisible. Laid out in the flow, it cannot be clipped and it cannot be
-    // mistaken for part of the design.
-    <div style={{ position: "relative", display: "flex", alignItems: "stretch" }}>
+    <div style={{ display: "flex", alignItems: "stretch", minWidth: 0 }}>
       <button
         type="button"
         onClick={toggle}
@@ -323,6 +349,7 @@ export function SlidePhotoLibraryPopout(
           justifyContent: "center",
           gap: 7,
           width: 34,
+          flexShrink: 0,
           padding: "14px 0",
           borderRadius: "var(--radius) 0 0 var(--radius)",
           border: "1px solid var(--hairline)",
@@ -355,35 +382,25 @@ export function SlidePhotoLibraryPopout(
         />
       </button>
 
-      <AnimatePresence>
+      <AnimatePresence initial={false}>
         {open && (
+          // Width is what animates, because width is what the panel is taking:
+          // it grows into the room the column just made rather than appearing
+          // on top of something. overflow:hidden keeps the contents from
+          // spilling while that width is still opening.
           <motion.div
-            initial={{ opacity: 0, x: -8 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -8 }}
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: PHOTO_PANEL_WIDTH, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
             transition={{ duration: DUR.base, ease: EASE }}
-            style={{
-              position: "absolute",
-              top: 0,
-              // Opens INWARD, over the preview, and there is no choice about
-              // it: .app-main carries overflow-x:hidden as a page-level safety
-              // net, and this tab sits at that container's left edge -- a panel
-              // opening outward was clipped away entirely, which is why
-              // clicking it showed nothing at all.
-              //
-              // The tab is what had to stay off the slide. A panel that covers
-              // it for as long as you are choosing a photo, and folds away
-              // after, is the popout that was asked for.
-              left: "100%",
-              marginLeft: 8,
-              width: "min(292px, 76%)",
-              boxShadow: "var(--shadow-2, 0 18px 40px rgba(0,0,0,0.45))",
-              borderRadius: "var(--radius)",
-              background: "var(--bg)",
-              zIndex: 6,
-            }}
+            style={{ overflow: "hidden", flexShrink: 0 }}
           >
-            <SlidePhotoLibrary {...libraryProps} />
+            {/* Fixed width inside the animating box, so the tiles are laid out
+                at their final size throughout rather than reflowing 3-across
+                on every frame. */}
+            <div style={{ width: PHOTO_PANEL_WIDTH }}>
+              <SlidePhotoLibrary {...libraryProps} />
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
