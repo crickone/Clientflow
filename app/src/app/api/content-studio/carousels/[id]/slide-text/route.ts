@@ -6,10 +6,9 @@ import { DESIGNED_TEMPLATE_ID } from "@/lib/image/paintSlide";
 import { buildHitMapHtml, pickBand } from "@/lib/design/hitMap";
 import { findTextRuns, runAt, replaceRunText } from "@/lib/design/textRuns";
 import { loadDesignFonts } from "@/lib/design/fonts";
-import { gradedPhotoDataUri, renderDesignToPng, stampLogo } from "@/lib/design/renderDesign";
+import { renderDesignToPng } from "@/lib/design/renderDesign";
+import { canvasFor, renderDesignedSlide } from "@/lib/design/renderDesignedSlide";
 import { getDesignSystem } from "@/lib/design/system";
-import { CANVAS } from "@/lib/ai/designPost";
-import { saveRender } from "@/lib/image/renderStore";
 import { photoChoiceFor } from "@/lib/image/library";
 import { resolveLogoPath } from "@/lib/branding";
 
@@ -75,7 +74,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 
   try {
     const fonts = await loadDesignFonts(getDesignSystem()?.font, getDesignSystem()?.bodyFont, getDesignSystem()?.altFont);
-    const { width, height } = CANVAS[found.slide.aspectRatio] ?? CANVAS["1:1"];
+    const { width, height } = canvasFor(found.slide.aspectRatio);
 
     // No logo stamp on the hit map: the logo is painted OVER the design after
     // rendering, so stamping it here would punch an opaque hole through a
@@ -141,25 +140,21 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ ok: false, error: "This account has no design system." }, { status: 400 });
   }
 
-  const { width, height } = CANVAS[slide.aspectRatio] ?? CANVAS["1:1"];
-
   const { photo, logoPath } = renderInputs(carousel.showLogo, slide.backgroundAssetId);
 
-  let rendered = nextHtml;
   try {
-    if (rendered.includes("{{PHOTO}}")) {
-      if (photo) {
-        const uri = await gradedPhotoDataUri(photo.path, width, height, system.photo);
-        rendered = rendered.split("{{PHOTO}}").join(uri);
-      } else {
-        rendered = rendered.replace(/<img[^>]*\{\{PHOTO\}\}[^>]*>/gi, "");
-      }
-    }
-    const fonts = await loadDesignFonts(system.font, system.bodyFont, system.altFont);
-    let png = await renderDesignToPng(rendered, width, height, fonts);
-    if (logoPath) png = await stampLogo(png, logoPath, width, height);
-
-    const renderFilename = saveRender(png);
+    // One call for the whole recipe. Editing a word is exactly the change that
+    // can push a slide past the bottom of its canvas, so the overflow is
+    // measured here too -- this route has nowhere to report it yet, but the
+    // render path no longer differs from the generator's by which steps it
+    // happens to run.
+    const { filename: renderFilename } = await renderDesignedSlide({
+      html: nextHtml,
+      aspectRatio: slide.aspectRatio,
+      photo,
+      logoPath,
+      system,
+    });
     updateSlide(slide.id, { designHtml: nextHtml, renderFilename });
 
     return NextResponse.json({

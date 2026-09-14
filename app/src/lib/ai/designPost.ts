@@ -20,13 +20,17 @@ import {
   type GenerateResult,
 } from "@/lib/ai/generateCarousel";
 import { meteredCreateStreamed, type MeterContext } from "@/lib/ai/metered";
-import { loadDesignFonts } from "@/lib/design/fonts";
-import { gradedPhotoDataUri, logoBox, measureOverflowPx, renderDesignToPng, stampLogo } from "@/lib/design/renderDesign";
+import { logoBox } from "@/lib/design/renderDesign";
+import {
+  CANVAS,
+  canvasFor,
+  overflowViolation,
+  renderDesignedSlide,
+} from "@/lib/design/renderDesignedSlide";
 import { getDesignSystem } from "@/lib/design/system";
 import { pickOpeningMove } from "@/lib/ai/openingMoves";
 import { readKey, setKey } from "@/lib/settings";
 import type { DesignSystem } from "@/lib/design/parse";
-import { saveRender } from "@/lib/image/renderStore";
 
 /**
  * The design pass: the model authors the post, this renders it.
@@ -48,13 +52,13 @@ const DESIGN_MAX_TOKENS = 32000;
 /** Settings key holding the opening move the LAST post used, so the next one can't repeat it. */
 const LAST_OPENING_MOVE_KEY = "last_opening_move";
 
-/** Slide dimensions by aspect ratio. The canvas the model is told to fill. */
-/** Exported so every path that renders a designed slide sizes it identically — the generator, the redesign, and the text editor. */
-export const CANVAS: Record<string, { width: number; height: number }> = {
-  "1:1": { width: 1080, height: 1080 },
-  "4:5": { width: 1080, height: 1350 },
-  "9:16": { width: 1080, height: 1920 },
-};
+/**
+ * Re-exported, not defined here. The canvas table belongs to the render recipe
+ * (lib/design/renderDesignedSlide), which is what sizes to it; this file only
+ * needs the numbers to tell the model how big its canvas is. Kept exported so
+ * importers that already reach it through the generator are unaffected.
+ */
+export { CANVAS };
 
 /**
  * One photograph the renderer may use, and the library row it came from.
@@ -100,43 +104,29 @@ export interface FellThroughResult extends GenerateResult {
 export type DesignPostOutcome = DesignPostResult | FellThroughResult;
 
 /**
- * Render one design. Photo substitution happens here rather than in the model's
- * markup because satori cannot fetch a URL and has no CSS filter: the image has
- * to arrive already graded, and inline.
+ * Render one design, in the generator's terms: a filename, or a violation the
+ * repair call can act on.
+ *
+ * The recipe itself lives in lib/design/renderDesignedSlide -- three copies of
+ * it had drifted apart. What is left here is the translation from "it
+ * overflowed" / "it would not render" into the sentences this file feeds back
+ * to the model, which is a generation concern and not a rendering one.
  */
 async function renderOne(
   design: CheckedDesign,
   system: DesignSystem,
-  width: number,
-  height: number,
+  aspectRatio: string,
   photo: PhotoChoice | null,
   logoPath: string | null,
 ): Promise<{ renderFilename: string | null; violation: string | null }> {
-  let html = design.html;
-  if (html.includes(PHOTO_TOKEN)) {
-    if (photo) {
-      const uri = await gradedPhotoDataUri(
-        photo.path,
-        width,
-        height,
-        system.photo,
-      );
-      html = html.split(PHOTO_TOKEN).join(uri);
-    } else {
-      // No photograph available. Strip the whole <img> rather than leave a
-      // broken src, which satori would draw as an empty box.
-      html = html.replace(/<img[^>]*\{\{PHOTO\}\}[^>]*>/gi, "");
-    }
-  }
-
   try {
-    const fonts = await loadDesignFonts(system.font, system.bodyFont, system.altFont);
-    let png = await renderDesignToPng(html, width, height, fonts);
-    if (logoPath) {
-      // Stamped after the design, never asked for in the markup -- placement
-      // and size are brand rules, not something to leave to a model.
-      png = await stampLogo(png, logoPath, width, height);
-    }
+    const render = await renderDesignedSlide({
+      html: design.html,
+      aspectRatio,
+      photo,
+      logoPath,
+      system,
+    });
 
     // Does the design actually FIT? satori has no auto-fit, so a slide with one
     // sentence too many renders with its last line sliced off at the canvas
@@ -144,18 +134,13 @@ async function renderOne(
     // to the catch below. The render is still kept: a clipped slide the
     // operator can see beats no slide at all, and the violation puts it in
     // front of the repair call, which is the thing that can actually fix it.
-    const overflowPx = await measureOverflowPx(html, width, height, fonts);
-    if (overflowPx > 0) {
-      return {
-        renderFilename: saveRender(png),
-        violation:
-          `The content runs about ${overflowPx}px past the bottom of the ${width}x${height} canvas, ` +
-          `so the last lines are cut off. Cut copy or reduce the font-size until everything fits ` +
-          `inside the canvas with the margins intact -- do not just shrink the padding.`,
-      };
-    }
-
-    return { renderFilename: saveRender(png), violation: null };
+    return {
+      renderFilename: render.filename,
+      violation:
+        render.overflowPx > 0
+          ? overflowViolation(render.overflowPx, render.width, render.height)
+          : null,
+    };
   } catch (err) {
     // A design that will not render must not take the whole set down with it.
     // The slide is kept, flagged with the renderer's own words, and the
@@ -201,7 +186,8 @@ export async function designPost(
     throw new Error("Slide count must be between 1 and 10.");
   }
 
-  const { width, height } = CANVAS[options.aspectRatio ?? "1:1"] ?? CANVAS["1:1"];
+  const aspectRatio = options.aspectRatio ?? "1:1";
+  const { width, height } = canvasFor(aspectRatio);
 
   // Whether photography exists changes what the model should design, not just
   // what it gets. Offering a photograph that will then be stripped leaves the
@@ -351,8 +337,7 @@ export async function designPost(
       const { renderFilename, violation } = await renderOne(
         design,
         system!,
-        width,
-        height,
+        aspectRatio,
         photo,
         options.logoPath ?? null,
       );
@@ -446,7 +431,8 @@ export async function redesignSlide(
   const system = getDesignSystem();
   if (!system) return null;
 
-  const { width, height } = CANVAS[input.aspectRatio ?? "1:1"] ?? CANVAS["1:1"];
+  const aspectRatio = input.aspectRatio ?? "1:1";
+  const { width, height } = canvasFor(aspectRatio);
   const hasPhotography = !!input.photo;
 
   // Computed from the real logo file, not stated as a fraction: its height is
@@ -521,8 +507,7 @@ export async function redesignSlide(
   const { renderFilename, violation } = await renderOne(
     design,
     system,
-    width,
-    height,
+    aspectRatio,
     input.photo ?? null,
     input.logoPath ?? null,
   );

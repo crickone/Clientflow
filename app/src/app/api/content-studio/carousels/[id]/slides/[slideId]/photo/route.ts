@@ -4,16 +4,10 @@ import { NextResponse } from "next/server";
 import { getCurrentMembership } from "@/lib/auth";
 import { getCarousel, updateSlide } from "@/lib/image/carousels";
 import { photoChoiceFor, photoChoices } from "@/lib/image/library";
-import { saveRender } from "@/lib/image/renderStore";
 import { DESIGNED_TEMPLATE_ID } from "@/lib/image/paintSlide";
 import { getDesignSystem } from "@/lib/design/system";
-import { loadDesignFonts } from "@/lib/design/fonts";
-import {
-  gradedPhotoDataUri,
-  renderDesignToPng,
-  stampLogo,
-} from "@/lib/design/renderDesign";
-import { CANVAS, redesignSlide } from "@/lib/ai/designPost";
+import { renderDesignedSlide } from "@/lib/design/renderDesignedSlide";
+import { redesignSlide } from "@/lib/ai/designPost";
 import { resolveLogoPath } from "@/lib/branding";
 import { PHOTO_TOKEN } from "@/lib/ai/designPost.parse";
 import { findTextRuns } from "@/lib/design/textRuns";
@@ -251,16 +245,19 @@ export async function POST(
     }
   }
 
-  const { width, height } = CANVAS[slide.aspectRatio] ?? CANVAS["1:1"];
   try {
-    const uri = await gradedPhotoDataUri(photo.path, width, height, system.photo);
-    const rendered = slide.designHtml.split(PHOTO_TOKEN).join(uri);
-    const fonts = await loadDesignFonts(system.font, system.bodyFont, system.altFont);
-    let png = await renderDesignToPng(rendered, width, height, fonts);
-    const logoPath = carousel.showLogo ? resolveLogoPath() : null;
-    if (logoPath) png = await stampLogo(png, logoPath, width, height);
-
-    const renderFilename = saveRender(png);
+    // The whole recipe -- grade, substitute, render, stamp, measure, store --
+    // behind one call. The overflow it measures has nowhere to go in this
+    // route's response shape yet; it is computed all the same, because the
+    // alternative is a render path that cannot tell a clipped slide from a
+    // clean one.
+    const { filename: renderFilename } = await renderDesignedSlide({
+      html: slide.designHtml,
+      aspectRatio: slide.aspectRatio,
+      photo,
+      logoPath: carousel.showLogo ? resolveLogoPath() : null,
+      system,
+    });
     // designHtml is untouched: the placeholder is the source of truth, and the
     // photograph is what it resolves to. Storing the resolved markup would bake
     // a data URI into the row and make the next change impossible.
