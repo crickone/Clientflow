@@ -42,7 +42,7 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Design not found." }, { status: 404 });
   }
 
-  let body: { slideId?: unknown; note?: unknown };
+  let body: { slideId?: unknown; note?: unknown; photoAssetId?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -57,9 +57,16 @@ export async function POST(
   const wasDesigned = slide.templateId === DESIGNED_TEMPLATE_ID && !!slide.designHtml;
 
   const note = typeof body?.note === "string" ? body.note.trim().slice(0, 400) : "";
-  // The photograph this slide already used, so a redesign keeps its picture
-  // rather than silently reverting to the library's first.
-  const photo = photoChoiceFor(slide.backgroundAssetId);
+  // The photograph the redesign may use: one the caller just made (the
+  // two-step "make a new photo" path) or, failing that, the one this slide
+  // already had -- so a plain redesign keeps its picture rather than
+  // silently reverting to the library's first.
+  const requestedPhotoId = Number(body?.photoAssetId);
+  const photo = photoChoiceFor(
+    Number.isFinite(requestedPhotoId) && requestedPhotoId > 0
+      ? requestedPhotoId
+      : slide.backgroundAssetId,
+  );
 
   /**
    * What the model is shown as "the design so far".

@@ -105,7 +105,7 @@ export async function POST(
   } catch {
     body = {};
   }
-  const o = (body ?? {}) as { assetId?: unknown; generate?: unknown };
+  const o = (body ?? {}) as { assetId?: unknown; generate?: unknown; onlyGenerate?: unknown };
 
   let photo: { id: number; path: string } | null = null;
   let scene = "";
@@ -137,6 +137,14 @@ export async function POST(
       );
       photo = { id: asset.id, path: photoChoiceFor(asset.id)?.path ?? "" };
       if (!photo.path) photo = null;
+
+      // The client's two-step path: make the photograph, put it in the
+      // library, hand it back, and touch nothing else. The client then
+      // decides -- swap it in, or redesign around it -- and can say which
+      // step it is on while it does, which one long request never could.
+      if (o.onlyGenerate === true) {
+        return NextResponse.json({ ok: true, asset });
+      }
     } catch (err) {
       if (err instanceof AiCapError) {
         return NextResponse.json({ ok: false, error: err.message }, { status: 429 });

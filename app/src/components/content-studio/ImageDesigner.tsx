@@ -76,6 +76,7 @@ import { SlideFilmstrip } from "./SlideFilmstrip";
 import { SlideColorPicker } from "./SlideColorPicker";
 import { PHOTO_PANEL_WIDTH, SlidePhotoLibraryPopout } from "./SlidePhotoLibrary";
 import { isMacPlatform, resolveShortcut, shortcutLabel } from "@/lib/content-studio/shortcuts";
+import { progressLabel, type DialogPhase } from "@/lib/content-studio/progressLabel";
 import { EditorSection } from "./EditorSection";
 import { PostIdeas } from "./PostIdeas";
 
@@ -3201,8 +3202,20 @@ function RedesignSlideButton({
 }) {
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState("");
-  const [busy, setBusy] = useState<null | "design" | "photo">(null);
+  const [busy, setBusy] = useState<null | DialogPhase>(null);
   const [error, setError] = useState<string | null>(null);
+  // Seconds since the current action started, ticking once a second while
+  // busy. Reset with busy so a second action never inherits the first's clock.
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (busy === null) {
+      setElapsed(0);
+      return;
+    }
+    const started = Date.now();
+    const id = window.setInterval(() => setElapsed((Date.now() - started) / 1000), 1000);
+    return () => window.clearInterval(id);
+  }, [busy]);
 
   // The scene the DESIGN asked for, recorded when the slide was written. A
   // slide with none either predates the field or was composed without a
@@ -3250,7 +3263,7 @@ function RedesignSlideButton({
 
   async function redesign() {
     onBeforeRedesign();
-    setBusy("design");
+    setBusy("designing");
     await post(
       `/api/content-studio/carousels/${designId}/redesign`,
       { slideId: slide.id, note: note.trim() || null },
@@ -3262,13 +3275,58 @@ function RedesignSlideButton({
     setBusy(null);
   }
 
+  /**
+   * Two requests, so the button can say which one is running. Step 1 makes
+   * the photograph and returns it. Step 2 is whichever this slide needs: a
+   * swap when its markup has a photo slot, a redesign around the picture
+   * when it does not. Everything the server does in one call it can do in
+   * two; what it cannot do in one is tell the operator it is halfway.
+   */
   async function newPhoto() {
-    setBusy("photo");
-    await post(
-      `/api/content-studio/carousels/${designId}/slides/${slide.id}/photo`,
-      { generate: true },
-      (json) => json.slide as CarouselSlide | undefined,
-    );
+    setBusy(hasPhotoSlot ? "photo" : "photoThenDesign");
+    setError(null);
+    let asset: ImageLibraryAsset | null = null;
+    try {
+      const res = await fetch(
+        `/api/content-studio/carousels/${designId}/slides/${slide.id}/photo`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ generate: true, onlyGenerate: true }),
+          signal: AbortSignal.timeout(90_000),
+        },
+      );
+      const json = await res.json().catch(() => null);
+      if (!json?.ok || !json.asset) {
+        setError(json?.error ?? `Couldn't make the photo (HTTP ${res.status}).`);
+        setBusy(null);
+        return;
+      }
+      asset = json.asset as ImageLibraryAsset;
+    } catch {
+      setError("Couldn't reach the server. Try again in a moment.");
+      setBusy(null);
+      return;
+    }
+
+    if (hasPhotoSlot) {
+      await post(
+        `/api/content-studio/carousels/${designId}/slides/${slide.id}/photo`,
+        { assetId: asset.id },
+        (json) => json.slide as CarouselSlide | undefined,
+      );
+    } else {
+      setBusy("designing");
+      onBeforeRedesign();
+      await post(
+        `/api/content-studio/carousels/${designId}/redesign`,
+        { slideId: slide.id, note: "Use the photograph on this slide.", photoAssetId: asset.id },
+        (json) =>
+          (json.carousel?.slides as CarouselSlide[] | undefined)?.find(
+            (sl) => sl.id === slide.id,
+          ),
+      );
+    }
     setBusy(null);
   }
 
@@ -3327,13 +3385,13 @@ function RedesignSlideButton({
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <Button onClick={redesign} disabled={busy !== null}>
-              {busy === "design" ? (
+              {busy === "designing" ? (
                 <Loader2 size={15} className="spin" />
               ) : (
                 <RefreshCw size={15} />
               )}
-              {busy === "design"
-                ? "Designing…"
+              {busy === "designing"
+                ? progressLabel("designing", elapsed)
                 : note.trim()
                   ? "Redesign with that"
                   : "Try a different design"}
@@ -3343,16 +3401,14 @@ function RedesignSlideButton({
                 now falls back to the slide's own words. */}
             {imageGenEnabled && (
               <Button variant="outline" onClick={newPhoto} disabled={busy !== null}>
-                {busy === "photo" ? (
+                {busy === "photo" || busy === "photoThenDesign" ? (
                   <Loader2 size={15} className="spin" />
                 ) : (
                   <ImageIcon size={15} />
                 )}
-                {busy === "photo"
-                ? hasPhotoSlot
-                  ? "Making a photo…"
-                  : "Making a photo, then redesigning…"
-                : "Make a new photo"}
+                {busy === "photo" || busy === "photoThenDesign"
+                  ? progressLabel(busy, elapsed)
+                  : "Make a new photo"}
               </Button>
             )}
           </div>
