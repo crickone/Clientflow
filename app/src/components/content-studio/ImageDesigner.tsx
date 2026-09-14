@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
 } from "react";
@@ -62,9 +63,7 @@ import {
   DEFAULT_CAROUSEL_SLOT,
   DEFAULT_SINGLE_TEMPLATE,
   DEFAULT_SLOT,
-  applySlotOrder,
   isCarouselSlot,
-  keepCaptionOnFirstSlide,
   templateForNewSlide,
   type DesignKind,
 } from "@/lib/image/slots";
@@ -76,9 +75,35 @@ import { SlideFilmstrip } from "./SlideFilmstrip";
 import { SlideColorPicker } from "./SlideColorPicker";
 import { PHOTO_PANEL_WIDTH, SlidePhotoLibraryPopout } from "./SlidePhotoLibrary";
 import { isMacPlatform, resolveShortcut, shortcutLabel } from "@/lib/content-studio/shortcuts";
+import {
+  autosaveSnapshot,
+  designReducer,
+  initialDesignState,
+  missingAssetIds,
+  planManualBackground,
+  planReorder,
+  selectActiveSlide,
+  selectSlidesInSlot,
+  selectUndoDepth,
+  selectWriting,
+  type DesignAction,
+  type DesignState,
+} from "@/lib/content-studio/designState";
 import { progressLabel, type DialogPhase } from "@/lib/content-studio/progressLabel";
 import { EditorSection } from "./EditorSection";
 import { PostIdeas } from "./PostIdeas";
+
+/**
+ * The design-under-edit state machine, typed to the real row. Everything it
+ * decides lives in lib/content-studio/designState.ts, where it can be tested
+ * without mounting this editor.
+ */
+function slideReducer(
+  state: DesignState<CarouselSlide>,
+  action: DesignAction<CarouselSlide>,
+): DesignState<CarouselSlide> {
+  return designReducer(state, action);
+}
 
 const ACCENT_SWATCHES = [
   "#2c6ce0",
@@ -335,8 +360,18 @@ export function ImageDesigner({
   const router = useRouter();
   const confirm = useConfirm();
   const [name, setName] = useState(initialName);
-  const [slides, setSlides] = useState<CarouselSlide[]>(initialSlides);
-  const [activeIdx, setActiveIdx] = useState(0);
+  // The slide set, the cursor, the active slot, the per-slide undo stacks, the
+  // photo swap in flight and the detached run's status are ONE machine -- they
+  // are read and written together, and as eight separate useStates the rules
+  // that hold between them had nowhere to live and no way to be tested.
+  const [design, dispatch] = useReducer(slideReducer, undefined, () =>
+    initialDesignState<CarouselSlide>(initialSlides, {
+      status: initialGenerationStatus,
+      error: initialGenerationError,
+      stage: initialGenerationStage,
+    }),
+  );
+  const { slides, activeIdx, activeSlot, rephotographing } = design;
   const [library, setLibrary] = useState<ImageLibraryAsset[]>(initialLibrary);
   // Backgrounds can only be images — videos in the shared library are excluded
   // from the picker (they live in the Library tab and the video editor).
@@ -351,25 +386,8 @@ export function ImageDesigner({
     "slot" | "slide" | "caption" | null
   >(null);
   const [captionCopied, setCaptionCopied] = useState(false);
-  /**
-   * The photo swap in flight on a designed slide: which slide, and which
-   * photo. Held so the strip can show the work AND refuse a second pick --
-   * two re-renders racing for one slide let the slower one win, which reads
-   * as the second pick having done nothing.
-   */
-  const [rephotographing, setRephotographing] = useState<
-    { slideId: number; assetId: number } | null
-  >(null);
-  const [generationStatus, setGenerationStatus] = useState<string | null>(
-    initialGenerationStatus,
-  );
-  const [generationError, setGenerationError] = useState<string | null>(
-    initialGenerationError,
-  );
-  const [generationStage, setGenerationStage] = useState<string | null>(
-    initialGenerationStage,
-  );
-  const writing = generationStatus === "writing";
+  const { generationError, generationStage } = design;
+  const writing = selectWriting(design);
 
   const fontsReady = useCanvasFonts();
 
@@ -394,21 +412,11 @@ export function ImageDesigner({
     [defaultHeadingFontId, defaultBodyFontId],
   );
 
-  // Active slot. A "slot" lets a single design hold multiple independent
-  // carousels — each keyed by a carousel template (cover / content / cta /
-  // tip / quote / question-hook). Switching slots preserves whatever's in
-  // the other slots.
-  const initialSlot =
-    initialSlides.find((s) => s.slotKey !== DEFAULT_SLOT)?.slotKey ??
-    initialSlides[0]?.slotKey ??
-    DEFAULT_SLOT;
-  const [activeSlot, setActiveSlot] = useState<string>(initialSlot);
-
-  // Slides in the current slot only.
-  const slidesInSlot = useMemo(
-    () => slides.filter((s) => s.slotKey === activeSlot),
-    [slides, activeSlot],
-  );
+  // Slides in the current slot only. A "slot" lets a single design hold
+  // multiple independent carousels — each keyed by a carousel template
+  // (cover / content / cta / tip / quote / question-hook). Switching slots
+  // preserves whatever's in the other slots.
+  const slidesInSlot = useMemo(() => selectSlidesInSlot(design), [design]);
   const total = slidesInSlot.length;
   const isCarousel = total > 1;
   const activeSlide = slidesInSlot[activeIdx] ?? null;
@@ -430,57 +438,22 @@ export function ImageDesigner({
 
   // Clamp activeIdx when the slot or slide count changes.
   useEffect(() => {
-    if (activeIdx >= slidesInSlot.length) {
-      setActiveIdx(Math.max(0, slidesInSlot.length - 1));
-    }
+    dispatch({ type: "clampActiveIndex" });
   }, [activeSlot, slidesInSlot.length, activeIdx]);
 
-  /**
-   * Undo for STRUCTURAL slide changes -- switching template, and redesigning.
-   * A STACK per slide, not a single step: the way templates are actually used
-   * is to click through several to see what they look like, and a one-deep
-   * undo cannot get back to what you started from. Each press walks back one
-   * change, so N clicks then N undos returns the original AI design.
-   *
-   * Deliberately not an undo of every keystroke: the autosave effect fires on
-   * each character, so snapshotting there would make "undo" mean "delete one
-   * letter". What gets lost by accident is the whole slide -- someone tries a
-   * template and the AI design appears to be gone. It is not: designHtml and
-   * renderFilename stay on the row through a switch, so restoring is just
-   * putting templateId back, with no model call.
-   */
-  const UNDO_LIMIT = 25;
-  const [undoStacks, setUndoStacks] = useState<Record<number, CarouselSlide[]>>({});
-
+  // Undo for STRUCTURAL slide changes -- a STACK per slide. The rules, and
+  // why it is not an undo of every keystroke, live with the stacks in
+  // lib/content-studio/designState.ts.
   const snapshotForUndo = useCallback((slide: CarouselSlide) => {
-    setUndoStacks((prev) => {
-      const stack = [...(prev[slide.id] ?? []), slide];
-      // Oldest first, so the cap drops the most distant history rather than
-      // the step about to be undone.
-      return { ...prev, [slide.id]: stack.slice(-UNDO_LIMIT) };
-    });
+    dispatch({ type: "snapshotForUndo", slide });
   }, []);
 
   const undoSlide = useCallback(() => {
     if (!activeSlide) return;
-    const slideId = activeSlide.id;
-    const stack = undoStacks[slideId] ?? [];
-    const previous = stack[stack.length - 1];
-    if (!previous) return;
-    // Both writes happen OUTSIDE the updaters. Restoring the slide from inside
-    // setUndoStacks would be a side effect in a state updater, which React may
-    // run twice in development -- and that would pop two steps for one press.
-    setSlides((cur) => cur.map((s) => (s.id === slideId ? previous : s)));
-    setUndoStacks((prev) => {
-      const rest = (prev[slideId] ?? []).slice(0, -1);
-      const next = { ...prev };
-      if (rest.length) next[slideId] = rest;
-      else delete next[slideId];
-      return next;
-    });
-  }, [activeSlide, undoStacks]);
+    dispatch({ type: "undoSlide", slideId: activeSlide.id });
+  }, [activeSlide]);
 
-  const undoDepth = activeSlide ? (undoStacks[activeSlide.id]?.length ?? 0) : 0;
+  const undoDepth = selectUndoDepth(design);
 
   /**
    * The designer's keyboard. One listener on the window, resolved through the
@@ -528,11 +501,11 @@ export function ImageDesigner({
       } else if (action === "nextSlide") {
         if (activeIdx >= slidesInSlot.length - 1) return;
         e.preventDefault();
-        setActiveIdx(activeIdx + 1);
+        dispatch({ type: "setActiveIndex", index: activeIdx + 1 });
       } else if (action === "prevSlide") {
         if (activeIdx <= 0) return;
         e.preventDefault();
-        setActiveIdx(activeIdx - 1);
+        dispatch({ type: "setActiveIndex", index: activeIdx - 1 });
       }
       // "submit" is handled by the dialogs themselves: it means nothing at
       // the window level, where there is no form to submit.
@@ -548,35 +521,23 @@ export function ImageDesigner({
   const updateActiveSlide = useCallback(
     (patch: Partial<CarouselSlide>) => {
       if (!activeSlide) return;
-      const slideId = activeSlide.id;
-      setSlides((prev) =>
-        prev.map((s) => (s.id === slideId ? { ...s, ...patch } : s)),
-      );
+      dispatch({ type: "patchSlide", slideId: activeSlide.id, patch });
     },
     [activeSlide],
   );
 
-  // A MANUAL background change resolves any pending AI generation for the
-  // active slide: clear image_status locally (kills the poll's merge guard +
-  // the chip) and persist that resolution immediately — the detached queue
-  // checks it before writing, so the user's pick wins over a late AI result.
+  // What a manual background pick DOES -- the designed/template branch, the
+  // one-swap-at-a-time guard and the resolution of a pending AI generation --
+  // is decided by planManualBackground; this runs the plan.
   const setSlideBackgroundManually = useCallback(
     (backgroundAssetId: number | null) => {
-      if (!activeSlide) return;
-      // A DESIGNED slide has no background to set: its photograph is embedded
-      // in the markup and baked into a stored PNG, so the picture only changes
-      // when the slide is re-rendered. Same strip, same click, different
-      // mechanism -- which is why this branches here rather than offering the
-      // operator a second, differently-worded photo control.
-      if (activeSlide.templateId === DESIGNED_TEMPLATE_ID) {
-        // A designed slide's photograph is embedded in its markup, so there is
-        // nothing to clear -- only something to swap.
-        if (backgroundAssetId == null) return;
-        // One at a time. The guard is here rather than on the strip alone so a
-        // keyboard or a double click cannot get past it either.
-        if (rephotographing) return;
-        const slideId = activeSlide.id;
-        setRephotographing({ slideId, assetId: backgroundAssetId });
+      const plan = planManualBackground(design, backgroundAssetId, {
+        designed: selectActiveSlide(design)?.templateId === DESIGNED_TEMPLATE_ID,
+      });
+      if (plan.kind === "none") return;
+      if (plan.kind === "rephotograph") {
+        const { slideId, assetId } = plan;
+        dispatch({ type: "photoSwapStarted", slideId, assetId });
         setActionError(null);
         void (async () => {
           try {
@@ -585,7 +546,7 @@ export function ImageDesigner({
               {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ assetId: backgroundAssetId }),
+                body: JSON.stringify({ assetId }),
               },
             );
             // A gateway status is the app restarting under you, not a refusal
@@ -609,29 +570,22 @@ export function ImageDesigner({
               );
             }
             if (json.slide) {
-              setSlides((cur) =>
-                cur.map((s) => (s.id === slideId ? (json.slide as CarouselSlide) : s)),
-              );
+              dispatch({ type: "slideUpdated", slide: json.slide as CarouselSlide });
             }
           } catch (err) {
             setActionError(
               err instanceof Error ? err.message : "Couldn't change the photo.",
             );
           } finally {
-            setRephotographing((cur) => (cur?.slideId === slideId ? null : cur));
+            dispatch({ type: "photoSwapFinished", slideId });
           }
         })();
         return;
       }
-      const wasGenerating = activeSlide.imageStatus === "generating";
-      updateActiveSlide(
-        wasGenerating
-          ? { backgroundAssetId, imageStatus: null, imageError: null }
-          : { backgroundAssetId },
-      );
-      if (wasGenerating) {
+      dispatch({ type: "patchSlide", slideId: plan.slideId, patch: plan.patch });
+      if (plan.persistClearedGeneration) {
         void fetch(
-          `/api/content-studio/carousels/${designId}/slides/${activeSlide.id}`,
+          `/api/content-studio/carousels/${designId}/slides/${plan.slideId}`,
           {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
@@ -640,7 +594,7 @@ export function ImageDesigner({
         ).catch(() => {});
       }
     },
-    [activeSlide, designId, rephotographing, updateActiveSlide],
+    [design, designId],
   );
 
   // Auto-save active slide (debounced)
@@ -654,25 +608,10 @@ export function ImageDesigner({
     // slide it is replacing writes nothing worth keeping, and a PATCH racing
     // the delete is noise in the log for no gain.
     if (writing) return;
-    const snapshot = JSON.stringify({
-      templateId: activeSlide.templateId,
-      aspectRatio: activeSlide.aspectRatio,
-      headingText: activeSlide.headingText,
-      headingScale: activeSlide.headingScale,
-      bodyText: activeSlide.bodyText,
-      tagline: activeSlide.tagline,
-      headingFont: activeSlide.headingFont,
-      bodyFont: activeSlide.bodyFont,
-      accentColor: activeSlide.accentColor,
-      backgroundColor: activeSlide.backgroundColor,
-      // backgroundAssetId's inclusion here is load-bearing for the
-      // manual-pick-wins convergence — see setSlideBackgroundManually.
-      backgroundAssetId: activeSlide.backgroundAssetId,
-      backgroundFit: activeSlide.backgroundFit,
-      backgroundOffsetX: activeSlide.backgroundOffsetX,
-      backgroundOffsetY: activeSlide.backgroundOffsetY,
-      backgroundZoom: activeSlide.backgroundZoom,
-    });
+    // The snapshot IS the PATCH body, and the string the dirty-check diffs
+    // against. Which fields it carries (and why backgroundAssetId is one of
+    // them) is AUTOSAVE_FIELDS in designState.ts.
+    const snapshot = autosaveSnapshot(activeSlide);
     if (lastSavedRef.current[activeSlide.id] === snapshot) return;
     setSaveStatus("idle");
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -749,27 +688,20 @@ export function ImageDesigner({
         const json = await res.json();
         if (stopped || !res.ok || !json.ok) return;
         const status: string | null = json.carousel?.generationStatus ?? null;
-        setGenerationStatus(status);
-        setGenerationError(json.carousel?.generationError ?? null);
-        setGenerationStage(json.carousel?.generationStage ?? null);
         const server: CarouselSlide[] = json.carousel?.slides ?? [];
-        // A finished generation REPLACED the slot: the rows are new, with new
-        // ids, so the patch-by-id path below would match none of them and the
-        // editor would sit on the seed slide forever. Take the server's set
-        // whole, once, at the moment the run stops.
-        if (writing && status !== "writing") {
-          setSlides(server);
-          setActiveIdx(0);
-        }
-        const byId = new Map(server.map((s) => [s.id, s]));
+        // Status first, and with it the once-only handover of the server's
+        // slide set at the writing -> null edge (see designState.ts).
+        dispatch({
+          type: "pollStatus",
+          status,
+          error: json.carousel?.generationError ?? null,
+          stage: json.carousel?.generationStage ?? null,
+          serverSlides: server,
+        });
         // Hydrate newly-generated assets we don't have locally yet.
-        const known = new Set(libraryRef.current.map((a) => a.id));
-        const missing = Array.from(
-          new Set(
-            server
-              .map((s) => s.backgroundAssetId)
-              .filter((id): id is number => id != null && !known.has(id)),
-          ),
+        const missing = missingAssetIds(
+          server,
+          new Set(libraryRef.current.map((a) => a.id)),
         );
         for (const id of missing) {
           try {
@@ -783,21 +715,7 @@ export function ImageDesigner({
           } catch {}
         }
         if (stopped) return;
-        setSlides((prev) =>
-          prev.map((s) => {
-            const sv = byId.get(s.id);
-            if (!sv) return s;
-            const patch: Partial<CarouselSlide> = {
-              imageStatus: sv.imageStatus,
-              imageError: sv.imageError,
-              imagePrompt: sv.imagePrompt,
-            };
-            if (s.imageStatus === "generating" && sv.backgroundAssetId != null) {
-              patch.backgroundAssetId = sv.backgroundAssetId;
-            }
-            return { ...s, ...patch };
-          }),
-        );
+        dispatch({ type: "pollMerge", serverSlides: server });
       } catch {}
     };
     const iv = setInterval(tick, 2500);
@@ -806,6 +724,10 @@ export function ImageDesigner({
       stopped = true;
       clearInterval(iv);
     };
+    // `writing` is no longer read inside the tick -- the reducer reads the
+    // edge off its own state -- but it stays a dependency so the poll is still
+    // torn down and restarted when a run stops while per-slide backgrounds are
+    // still generating, exactly as before.
   }, [pollWanted, writing, designId]);
 
   // `template` is only passed when the user picked one from the picker on an
@@ -845,9 +767,7 @@ export function ImageDesigner({
       const json = await res.json();
       if (!res.ok || !json.ok)
         throw new Error(json.error || "Couldn't add slide.");
-      const newSlide = json.slide as CarouselSlide;
-      setSlides((prev) => [...prev, newSlide]);
-      setActiveIdx(slidesInSlot.length);
+      dispatch({ type: "slideAdded", slide: json.slide as CarouselSlide });
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Couldn't add slide.");
     }
@@ -857,28 +777,15 @@ export function ImageDesigner({
   // slot's IDs go to the server; the flat `slides` array keeps every other
   // slot exactly where it was.
   async function reorderSlidesInSlot(orderedIds: number[]) {
-    const reordered = applySlotOrder(slides, activeSlot, orderedIds);
-    if (!reordered) return; // stale drag — leave the list alone
+    const plan = planReorder(design, orderedIds);
+    if (!plan) return; // stale drag — leave the list alone
 
-    // The caption is stored on the slot's first slide, so it has to travel
-    // with that position or it's stranded where nothing can read it. The
-    // server does the same inside the reorder; this keeps the panel from
-    // blanking in the meantime.
-    const next = keepCaptionOnFirstSlide(reordered, activeSlot);
-
-    // Revert by ORDER, not by snapshot: restoring a whole copy of `slides`
-    // would also throw away anything typed while the request was in flight.
-    const previousOrder = slidesInSlot.map((s) => s.id);
-    const previousIdx = activeIdx;
-    const activeId = activeSlide?.id ?? null;
     const seq = ++reorderSeqRef.current;
-
-    setSlides(next);
-    // Follow the slide you were editing rather than the position it vacated.
-    if (activeId != null) {
-      const movedTo = orderedIds.indexOf(activeId);
-      if (movedTo !== -1) setActiveIdx(movedTo);
-    }
+    dispatch({
+      type: "slidesReplaced",
+      slides: plan.slides,
+      activeIdx: plan.activeIdx,
+    });
 
     try {
       const res = await fetch(`/api/content-studio/carousels/${designId}`, {
@@ -893,11 +800,11 @@ export function ImageDesigner({
       // A later drag has already superseded this one — rolling back now would
       // undo an order the user has since changed again.
       if (seq !== reorderSeqRef.current) return;
-      setSlides((cur) => {
-        const back = applySlotOrder(cur, activeSlot, previousOrder);
-        return back ? keepCaptionOnFirstSlide(back, activeSlot) : cur;
+      dispatch({
+        type: "reorderRolledBack",
+        previousOrder: plan.previousOrder,
+        previousIdx: plan.previousIdx,
       });
-      setActiveIdx(previousIdx);
       setActionError(
         err instanceof Error ? err.message : "Couldn't reorder the slides.",
       );
@@ -944,7 +851,7 @@ export function ImageDesigner({
       );
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error || "Couldn't delete.");
-      setSlides((prev) => prev.filter((s) => s.id !== activeSlide.id));
+      dispatch({ type: "slideDeleted", slideId: activeSlide.id });
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Couldn't delete.");
     }
@@ -959,10 +866,11 @@ export function ImageDesigner({
 
   function updateCaption(next: string) {
     if (!captionSlide) return;
-    const id = captionSlide.id;
-    setSlides((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, caption: next } : s)),
-    );
+    dispatch({
+      type: "patchSlide",
+      slideId: captionSlide.id,
+      patch: { caption: next },
+    });
   }
 
   // Caption auto-save (independent of active slide editing).
@@ -1024,7 +932,7 @@ export function ImageDesigner({
       const newSlides = json?.carousel?.slides;
       if (Array.isArray(newSlides)) {
         lastSavedCaptionRef.current = {};
-        setSlides(newSlides as CarouselSlide[]);
+        dispatch({ type: "slidesReplaced", slides: newSlides as CarouselSlide[] });
       }
     } catch (err) {
       setActionError(
@@ -1061,7 +969,7 @@ export function ImageDesigner({
       // Clear save snapshots — server changed heading/body so local PATCH
       // diffing should pick up the new state as 'clean'.
       lastSavedRef.current = {};
-      setSlides(newSlides as CarouselSlide[]);
+      dispatch({ type: "slidesReplaced", slides: newSlides as CarouselSlide[] });
     } catch (err) {
       setActionError(
         err instanceof Error ? err.message : "Couldn't refresh content.",
@@ -1277,8 +1185,10 @@ export function ImageDesigner({
   // to — and getting stuck on — the carousel.
   const selectKind = useCallback(
     (kind: DesignKind) => {
-      setActiveIdx(0);
-      setActiveSlot(kind === "carousel" ? carouselSlotFor() : DEFAULT_SLOT);
+      dispatch({
+        type: "selectSlot",
+        slotKey: kind === "carousel" ? carouselSlotFor() : DEFAULT_SLOT,
+      });
     },
     [carouselSlotFor],
   );
@@ -1715,7 +1625,7 @@ export function ImageDesigner({
             <SlideFilmstrip
               slides={slidesInSlot}
               activeIdx={activeIdx}
-              onSelect={setActiveIdx}
+              onSelect={(index) => dispatch({ type: "setActiveIndex", index })}
               onReorder={reorderSlidesInSlot}
               onAdd={() => addSlide()}
               fontsReady={fontsReady}
@@ -1819,9 +1729,7 @@ export function ImageDesigner({
                     slide={activeSlide}
                     imageGenEnabled={imageGenEnabled}
                     onBeforeRedesign={() => snapshotForUndo(activeSlide)}
-                    onUpdated={(next) =>
-                      setSlides((cur) => cur.map((sl) => (sl.id === next.id ? next : sl)))
-                    }
+                    onUpdated={(next) => dispatch({ type: "slideUpdated", slide: next })}
                   />
                 )}
                 {!surface?.designed && (
@@ -1962,15 +1870,15 @@ export function ImageDesigner({
                 // Switch to the slot the run writes into, so the slides land in
                 // front of the operator rather than in a tab they have to find.
                 // The kind follows the slot on its own.
-                setActiveSlot(
-                  isCarouselSlot(startedSlot) ? startedSlot : DEFAULT_CAROUSEL_SLOT,
-                );
-                setActiveIdx(0);
-                // Turns the poll on immediately, so the banner shows without
-                // waiting for the first tick to confirm what we already know.
-                setGenerationStatus("writing");
-                setGenerationError(null);
-                setGenerationStage(null);
+                // Turns the poll on immediately too, so the banner shows
+                // without waiting for the first tick to confirm what we
+                // already know.
+                dispatch({
+                  type: "generationStarted",
+                  slotKey: isCarouselSlot(startedSlot)
+                    ? startedSlot
+                    : DEFAULT_CAROUSEL_SLOT,
+                });
               }}
             />
                 <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
@@ -1992,9 +1900,7 @@ export function ImageDesigner({
                 designed={!!surface?.designed}
                 templates={designSystem!.templates}
                 onBeforeRedesign={() => snapshotForUndo(activeSlide)}
-                onUpdated={(next) =>
-                  setSlides((cur) => cur.map((sl) => (sl.id === next.id ? next : sl)))
-                }
+                onUpdated={(next) => dispatch({ type: "slideUpdated", slide: next })}
               />
             )}
 
@@ -2111,8 +2017,7 @@ export function ImageDesigner({
                       key={slot.key}
                       type="button"
                       onClick={() => {
-                        setActiveSlot(slot.key);
-                        setActiveIdx(0);
+                        dispatch({ type: "selectSlot", slotKey: slot.key });
                       }}
                       style={{
                         padding: "7px 11px",
