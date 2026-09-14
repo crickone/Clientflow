@@ -494,6 +494,14 @@ export function ImageDesigner({
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (writing) return;
+      // A modal (the carousel/redesign dialogs) can be open with focus on a
+      // non-field control inside it -- a pill, a stepper, a button. Radix
+      // traps Tab but lets other keys bubble to window, so without this the
+      // design behind the modal would silently step or undo while the
+      // operator's attention is on the dialog. Checked live, not captured at
+      // effect-registration time, since dialogs mount and unmount on top of
+      // this listener's lifetime.
+      if (document.querySelector('[role="dialog"][data-state="open"]')) return;
       const action = resolveShortcut({
         key: e.key,
         metaKey: e.metaKey,
