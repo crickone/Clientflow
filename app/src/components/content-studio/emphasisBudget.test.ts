@@ -51,12 +51,15 @@ const count = (src: string, re: RegExp) => (src.match(re) ?? []).length;
 // that occurs earlier in an ordinary prop expression, e.g.
 // `disabled={count > 5}`. So this walks the characters after `<Button`
 // instead: it tracks `{}` nesting depth and skips over quoted strings
-// (`"`, `'`, and backtick template literals), and the tag ends at the first
-// `>` seen at brace depth zero, outside any string. That is the actual JSX
-// rule -- a `>` only closes the tag when it isn't nested inside `{...}` or a
-// string -- so it isn't fooled by a bare `>` comparison, a `>` inside a
-// string prop like `title="a > b"`, or an arrow function's `=>`. A trailing
-// `/` (self-closing tags) is stripped from the captured attrs.
+// (`"`, `'`, and backtick template literals) AND comments (`// ...` to end
+// of line, `/* ... */` to the matching close), and the tag ends at the
+// first `>` seen at brace depth zero, outside any string or comment. That
+// is the actual JSX rule -- a `>` only closes the tag when it isn't nested
+// inside `{...}`, a string, or a comment -- so it isn't fooled by a bare
+// `>` comparison, a `>` inside a string prop like `title="a > b"`, a `>`
+// inside a comment like `// arrow points a -> b, but also plain a > b`, or
+// an arrow function's `=>`. A trailing `/` (self-closing tags) is stripped
+// from the captured attrs.
 // Verified against every `<Button` in ImageDesigner.tsx (18 usages): this
 // extracts exactly 18 tags, matching a plain `/<Button\b/g` count.
 function buttonTags(src: string): string[] {
@@ -83,6 +86,16 @@ function buttonTags(src: string): string[] {
       if (c === '"' || c === "'" || c === "`") {
         quote = c;
         i++;
+        continue;
+      }
+      if (c === "/" && src[i + 1] === "/") {
+        i = src.indexOf("\n", i + 2);
+        if (i === -1) i = src.length;
+        continue;
+      }
+      if (c === "/" && src[i + 1] === "*") {
+        const closeAt = src.indexOf("*/", i + 2);
+        i = closeAt === -1 ? src.length : closeAt + 2;
         continue;
       }
       if (c === "{") {
@@ -180,6 +193,33 @@ check(
   (() => {
     const tags = buttonTags('<Button onClick={() => go()}>Go</Button>');
     return tags.length === 1 && /onClick=\{\(\) => go\(\)\}/.test(tags[0]);
+  })(),
+);
+check(
+  "buttonTags does not let a '//' line comment's bare '>' end the tag early " +
+    "(the reviewer's exact counter-example: a line comment mentioning an " +
+    "arrow '->' and a bare '>' sits between props, and used to truncate the " +
+    "tag before `variant=\"primary\"` was ever seen)",
+  (() => {
+    const sample = [
+      "<Button",
+      '  type="button"',
+      "  // migrated from <OldButton> usage, arrow points a -> b, but also plain a > b here",
+      '  variant="primary"',
+      "  onClick={() => go()}",
+      ">",
+    ].join("\n");
+    const tags = buttonTags(sample);
+    return tags.length === 1 && isExplicitPrimary(tags[0]);
+  })(),
+);
+check(
+  "buttonTags does not let a '/* */' block comment's bare '>' end the tag early",
+  (() => {
+    const sample =
+      '<Button /* old: <OldButton> was used here, a > b */ variant="primary">Go</Button>';
+    const tags = buttonTags(sample);
+    return tags.length === 1 && isExplicitPrimary(tags[0]);
   })(),
 );
 
