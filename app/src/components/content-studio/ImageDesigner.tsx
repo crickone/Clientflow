@@ -3500,7 +3500,13 @@ async function slideToBlob(
   logo: HTMLImageElement | null = null,
   system: DesignSystem | null = null,
 ): Promise<Blob | null> {
-  if (slide.renderFilename) {
+  // The SAME predicate SlideCanvas paints by (SlideCanvas.tsx: designed AND a
+  // stored render). Guarding on renderFilename alone meant a designed slide
+  // switched to a fixed template kept exporting its old designed PNG forever:
+  // applyTemplate deliberately KEEPS designHtml/renderFilename so undo needs no
+  // model call, so the stored render outlives the slide that earned it. The
+  // preview repainted as the template; the export did not.
+  if (slide.templateId === DESIGNED_TEMPLATE_ID && slide.renderFilename) {
     try {
       const res = await fetch(renderFileUrl(slide.renderFilename));
       if (!res.ok) return null;

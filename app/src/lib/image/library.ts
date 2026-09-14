@@ -56,15 +56,24 @@ export function photoChoices(): { id: number; path: string }[] {
     }));
 }
 
-/** One photograph by asset id, or the first available when there is no id. */
+/**
+ * One photograph by asset id, or the first available when NO id was asked for.
+ *
+ * An id that does not resolve returns null rather than the library's first
+ * photograph. It used to fall through to `all[0]`, which answered a different
+ * question than the caller asked: a slide whose background_asset_id pointed at
+ * a deleted asset re-rendered with an arbitrary picture after a one-word text
+ * edit. The redesign route carries a hand-written pre-check that exists solely
+ * to defend against that fallback; slide-text did not, and paid for it.
+ *
+ * Asking with no id is still a real question ("any photograph") and still
+ * answers `all[0]`.
+ */
 export function photoChoiceFor(
   assetId: number | null | undefined,
 ): { id: number; path: string } | null {
   const all = photoChoices();
-  if (assetId != null) {
-    const found = all.find((p) => p.id === assetId);
-    if (found) return found;
-  }
+  if (assetId != null) return all.find((p) => p.id === assetId) ?? null;
   return all[0] ?? null;
 }
 

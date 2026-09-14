@@ -2,6 +2,7 @@ import { guard } from "@/lib/api/guard";
 import { NextResponse } from "next/server";
 import { getCurrentMembership } from "@/lib/auth";
 import { getCarousel, updateSlide } from "@/lib/image/carousels";
+import { DESIGNED_TEMPLATE_ID } from "@/lib/image/paintSlide";
 import {
   refreshCaptionOnly,
   refreshSlidesContent,
@@ -48,8 +49,13 @@ export async function POST(
   const tone = body?.tone ? String(body.tone).trim() : null;
   const captionOnly = body?.captionOnly === true;
 
+  // A DESIGNED slide's copy lives inside design_html, not in heading/body --
+  // it is created with both empty. Refreshing one sent "" and "" to the model
+  // and wrote the reply into fields no renderer reads: a metered call that
+  // changed nothing on screen. The per-slide Refresh button already hides for
+  // designed slides; this is the toolbar's "Refresh all copy" catching up.
   const slotSlides = carousel.slides
-    .filter((s) => s.slotKey === slotKey)
+    .filter((s) => s.slotKey === slotKey && s.templateId !== DESIGNED_TEMPLATE_ID)
     .sort((a, b) => a.slideOrder - b.slideOrder);
   const target = requestedIds
     ? slotSlides.filter((s) => requestedIds.includes(s.id))
