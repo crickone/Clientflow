@@ -72,9 +72,16 @@ export async function POST(
     Number.isFinite(requestedPhotoId) &&
     requestedPhotoId > 0 &&
     photoChoices().some((p) => p.id === requestedPhotoId);
-  const photo = photoChoiceFor(
-    requestedPhotoExists ? requestedPhotoId : slide.backgroundAssetId,
-  );
+  // photoChoiceFor(null) is not "this slide has none" -- it is the library's
+  // FIRST photo, its documented answer for "any photograph" when no id is
+  // asked for. A slide with no recorded photograph (background_asset_id
+  // cleared, e.g. by a flat redesign) must ask for NONE, not "any": passing
+  // its null straight through would have the very next plain redesign of that
+  // slide handed an arbitrary library picture, which is exactly what the
+  // pre-check above exists to stop for a stale id. Resolve only when there is
+  // a real id to resolve.
+  const targetPhotoId = requestedPhotoExists ? requestedPhotoId : slide.backgroundAssetId;
+  const photo = targetPhotoId != null ? photoChoiceFor(targetPhotoId) : null;
 
   /**
    * What the model is shown as "the design so far".

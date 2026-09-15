@@ -454,7 +454,12 @@ export function ImageDesigner({
   // has. Every pick then POSTed slot 2 and was refused, with no tile
   // highlighted and no way back but selecting another slide. Clamping at the
   // point of use cannot race the render the way a corrective effect can.
-  const effectivePhotoSlot = photoSlots.includes(photoSlot) ? photoSlot : 1;
+  // Falling back to the constant 1 assumed every slide has a slot 1, which a
+  // {{PHOTO:2}}-only slide does not: the fallback itself was then refused,
+  // and with the chooser hidden (one slot means no UI to pick another) the
+  // operator had no way to point at the slot the slide actually has. Fall
+  // back to the slide's first ACTUAL slot instead.
+  const effectivePhotoSlot = photoSlots.includes(photoSlot) ? photoSlot : (photoSlots[0] ?? 1);
   // The photograph the chosen slot currently holds, so the strip highlights
   // the picture the operator is about to replace rather than always slot 1's.
   // A slide with no slots is painted from background_asset_id, so that column

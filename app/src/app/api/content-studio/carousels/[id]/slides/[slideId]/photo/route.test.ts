@@ -170,6 +170,43 @@ function check(fn: () => void) {
     );
   }
 
+  // 1b. A slot-2 pick on a slide whose slot 1 has never held a photograph
+  //     (background_asset_id AND the list both null) still writes
+  //     background_asset_id as an explicit null, not an absent key. Case 1
+  //     above only ever exercises a POPULATED slot 1, so `nextIds[0]` and
+  //     `nextIds[0] ?? null` are indistinguishable there; this pins the
+  //     never-photographed shape too, so a future change to how nextIds is
+  //     built (the padding, the truncation, parsePhotoAssetIds' fallback)
+  //     that stops leaving index 0 densely populated is caught here instead
+  //     of surfacing as a stale column in production.
+  const neverPhotographed = makeSlide({
+    id: 5,
+    designHtml: '<img src="{{PHOTO}}" /><img src="{{PHOTO:2}}" />',
+    backgroundAssetId: null,
+    photoAssetIds: null,
+  });
+  {
+    const { status } = await post(neverPhotographed.id, { assetId: 9, slot: 2 });
+    check(() =>
+      assert.equal(status, 200, "a slot-2 pick on a never-photographed slide is accepted"),
+    );
+    const patch = writes.at(-1)?.patch ?? {};
+    check(() =>
+      assert.equal(
+        patch.backgroundAssetId,
+        null,
+        "slot 1 stays null -- the pick was for slot 2 alone",
+      ),
+    );
+    check(() =>
+      assert.equal(
+        patch.photoAssetIds,
+        "[null,9]",
+        "the list records null for the empty slot 1 and the pick at slot 2",
+      ),
+    );
+  }
+
   // 2. A redesign persists the slot list it came back with, and writes slot 1's
   //    column EXPLICITLY -- `undefined` there means "leave the column" and left
   //    a stale photograph beside a list that says slot 1 is empty.
@@ -201,9 +238,14 @@ function check(fn: () => void) {
       ),
     );
     check(() =>
-      assert.ok(
-        "backgroundAssetId" in patch,
-        "slot 1's column is written, not skipped -- an absent key leaves the stale id",
+      // `?? undefined` would also leave the key present -- with an undefined
+      // value, which drizzle reads as "leave the column" -- so `"key" in
+      // patch` alone passes under that bug too. The value has to be checked,
+      // not just the key's presence.
+      assert.notEqual(
+        patch.backgroundAssetId,
+        undefined,
+        "slot 1's column is written, not skipped -- undefined leaves the stale id",
       ),
     );
     check(() =>
