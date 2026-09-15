@@ -5,7 +5,7 @@
 // they had drifted. These checks pin the behaviour the single copy owes all
 // three: the photo branch both ways, the overflow measurement that used to run
 // only during generation, the content-addressed filename, the flat stand-in's
-// equivalence to a real graded photograph, a non-square canvas actually going
+// equivalence to a real graded photograph and its cover of every slot, a non-square canvas actually going
 // through the recipe end to end, and the no-token early return.
 //
 // Deliberately real: real satori, real sharp, real font bytes, a real write
@@ -22,7 +22,8 @@ import { renderFilePath } from "../image/renderStore";
 import { loadDesignFonts } from "./fonts";
 import type { DesignSystem } from "./parse";
 import { gradedPhotoDataUri, measureOverflowPx } from "./renderDesign";
-import { CANVAS, canvasFor, renderDesignedSlide } from "./renderDesignedSlide";
+import { fillPhotoSlots } from "./photoSlots";
+import { CANVAS, canvasFor, measurementHtmlFor, renderDesignedSlide } from "./renderDesignedSlide";
 
 let passed = 0;
 function check(name: string, cond: boolean) {
@@ -357,16 +358,67 @@ async function main() {
       missingSecond.filename !== both.filename,
     );
 
-    // The stand-in must cover BOTH slots, or overflow is measured against a
-    // layout with one image missing.
-    const overflowTwo = await renderDesignedSlide({
-      html: twoSlot,
-      aspectRatio: "1:1",
-      photos: [{ path: photoA }, { path: photoB }],
-      logoPath: null,
-      system: SYSTEM,
+    // The stand-in must cover BOTH slots, or the overflow pass carries a
+    // graded photograph -- roughly 111x the stand-in's payload -- back through
+    // satori, which is the entire cost the stand-in exists to avoid.
+    //
+    // Asserted on the measurement STRING, not on a render. Both <img> tags
+    // here pin width AND height, and a graded photograph and the stand-in are
+    // both 1080x1080, so the measured LAYOUT is identical whichever one slot 2
+    // holds: a render check would pass even with the graded photo left in
+    // place, which is exactly the hole this is closing.
+    const gradedA = await gradedPhotoDataUri(photoA, 1080, 1080, SYSTEM.photo);
+    const gradedB = await gradedPhotoDataUri(photoB, 1080, 1080, SYSTEM.photo);
+    const measured = await measurementHtmlFor(
+      fillPhotoSlots(twoSlot, (slot) => (slot === 1 ? gradedA : gradedB)),
+      1080,
+      1080,
+    );
+    const embedded: string[] = measured.match(/data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+/gi) ?? [];
+    check(
+      "the measurement markup still carries an image in each of the two slots",
+      embedded.length === 2,
+    );
+    check(
+      "and both are the one flat stand-in -- no graded photograph survives into the measurement",
+      new Set(embedded).size === 1 &&
+        !embedded.includes(gradedA) &&
+        !embedded.includes(gradedB),
+    );
+  }
+
+  // ── indexed by SLOT, not by order of appearance ─────────────────────────
+  //
+  // A design may write {{PHOTO:2}} and no {{PHOTO}} at all -- nothing requires
+  // a model that has been taught both to use slot 1 first. renderDesignedSlide
+  // reads photos[slot - 1], so that slide's photograph is the list's SECOND
+  // entry. Indexing by order of appearance instead would take the first, and
+  // every other check in this file would still pass.
+  {
+    const secondOnly =
+      '<div style="display:flex;width:1080px;height:1080px;background-color:#f2f3ed;">' +
+      '<img src="{{PHOTO:2}}" style="width:1080px;height:1080px;object-fit:cover"/>' +
+      "</div>";
+    const atSlotTwo = await renderDesignedSlide({
+      html: secondOnly, aspectRatio: "1:1", photos: [null, { path: photoA }], logoPath: null, system: SYSTEM,
     });
-    check("a two-photograph slide that fits reports no overflow", overflowTwo.overflowPx === 0);
+    // The same markup with slot 1's spelling: the token is substituted away,
+    // so identical pixels are what "the photograph landed in that <img>" means.
+    const asSlotOne = await renderDesignedSlide({
+      html: secondOnly.replace("{{PHOTO:2}}", PHOTO_TOKEN),
+      aspectRatio: "1:1", photo: { path: photoA }, logoPath: null, system: SYSTEM,
+    });
+    check(
+      "a lone {{PHOTO:2}} is filled from the list's second entry",
+      atSlotTwo.filename === asSlotOne.filename,
+    );
+    const firstEntry = await renderDesignedSlide({
+      html: secondOnly, aspectRatio: "1:1", photos: [{ path: photoA }], logoPath: null, system: SYSTEM,
+    });
+    check(
+      "and the list's FIRST entry does not fill it -- slot 2 with nothing for it loses its <img>",
+      firstEntry.filename !== atSlotTwo.filename,
+    );
   }
 
   // The single-photograph shorthand still works and is identical to the list form.

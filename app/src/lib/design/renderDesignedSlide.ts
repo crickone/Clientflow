@@ -119,17 +119,36 @@ async function withPhotos(
   const slots = photoSlotsUsed(html);
   if (slots.length === 0) return html;
 
-  // Grade each slot's photograph ONCE, before substitution: fillPhotoSlots is
-  // synchronous, and grading is the expensive step -- a slot that appears twice
-  // in the markup must not pay for it twice.
-  const uriBySlot = new Map<number, string | null>();
-  for (const slot of slots) {
-    const photo = photos[slot - 1] ?? null;
-    uriBySlot.set(
-      slot,
-      photo ? await gradedPhotoDataUri(photo.path, width, height, system.photo) : null,
-    );
-  }
+  // Grade each PHOTOGRAPH once, before substitution: fillPhotoSlots is
+  // synchronous, and grading is the expensive step (~30ms of sharp work) -- a
+  // slot that appears twice in the markup must not pay for it twice.
+  //
+  // Keyed by the photograph's PATH, not by the slot: two slots can hold the
+  // same picture, and they do whenever the tenant library has only one, since
+  // the generator's rotation then hands the same choice to both. Keying by
+  // slot graded the identical file twice. The PROMISE is memoised, not the
+  // result, so the second slot waits on the first slot's grade rather than
+  // starting a duplicate of it.
+  const gradeByPath = new Map<string, Promise<string>>();
+  const gradeOf = (photo: SlidePhoto): Promise<string> => {
+    const started = gradeByPath.get(photo.path);
+    if (started) return started;
+    const grading = gradedPhotoDataUri(photo.path, width, height, system.photo);
+    gradeByPath.set(photo.path, grading);
+    return grading;
+  };
+
+  // Concurrent, not a serial await per slot: the grades are independent, so a
+  // two-photograph slide pays one grade's latency instead of two.
+  const uris = await Promise.all(
+    slots.map((slot) => {
+      const photo = photos[slot - 1] ?? null;
+      return photo ? gradeOf(photo) : Promise.resolve(null);
+    }),
+  );
+  const uriBySlot = new Map<number, string | null>(
+    slots.map((slot, i) => [slot, uris[i]]),
+  );
   return fillPhotoSlots(html, (slot) => uriBySlot.get(slot) ?? null);
 }
 
@@ -144,7 +163,7 @@ async function withPhotos(
  * photograph is how long it takes to decode.
  *
  * Exported because it now has two callers with the identical requirement:
- * this module's own overflow measurement (standInForPhoto, below) and the
+ * this module's own overflow measurement (measurementHtmlFor, below) and the
  * hit map (lib/design/hitMap), which lays out click regions by rendering
  * this same markup and needs the click boxes to land where the real render
  * would put them. Two adapters are what make this a seam rather than an
@@ -162,9 +181,16 @@ export async function standInPhoto(width: number, height: number): Promise<strin
 
 /**
  * The markup with EVERY slot's photograph swapped for a flat image of the same
- * pixel size, for measuring only.
+ * pixel size -- the markup the overflow measurement actually runs on.
+ *
+ * Exported as a seam because the property it exists for is not observable from
+ * a render: both <img> tags in a real design pin width AND height, so a slide
+ * measures the same whether slot 2 holds the stand-in or a live graded
+ * photograph, and a graded photograph surviving into the measurement would
+ * silently restore the ~111x payload the stand-in exists to avoid. The STRING
+ * is where that is provable -- see renderDesignedSlide.test.ts.
  */
-async function standInForPhoto(
+export async function measurementHtmlFor(
   html: string,
   width: number,
   height: number,
@@ -239,7 +265,7 @@ export async function renderDesignedSlide(
   // number is not a trade worth making, and it would have blown through the
   // editor's own 180s client timeout on a slide with a large photograph.
   const overflowPx = await measureOverflowPx(
-    await standInForPhoto(html, width, height),
+    await measurementHtmlFor(html, width, height),
     width,
     height,
     fonts,

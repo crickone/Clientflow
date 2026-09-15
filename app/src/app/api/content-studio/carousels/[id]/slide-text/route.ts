@@ -11,6 +11,7 @@ import { renderDesignToPng } from "@/lib/design/renderDesign";
 import { canvasFor, renderDesignedSlide } from "@/lib/design/renderDesignedSlide";
 import { getDesignSystem } from "@/lib/design/system";
 import { photoChoiceFor } from "@/lib/image/library";
+import { parsePhotoAssetIds } from "@/lib/image/photoAssetIds";
 import { resolveLogoPath } from "@/lib/branding";
 
 export const dynamic = "force-dynamic";
@@ -44,14 +45,31 @@ function slideOf(carouselId: number, slideId: number) {
 }
 
 /**
- * The photo and logo the REAL render used — the hit map has to be laid out
- * identically, and an edited slide has to come back with the same picture it
- * had. THIS SLIDE's photograph, not the library's first: they were the same
- * thing until a set stopped putting one picture on every slide.
+ * The photographs and logo the REAL render used — an edited slide has to come
+ * back with the same pictures it had. THIS SLIDE's photographs, not the
+ * library's first: they were the same thing until a set stopped putting one
+ * picture on every slide.
+ *
+ * EVERY slot, not just slot 1. This resolved one photograph from
+ * background_asset_id and handed it over as the `photo` shorthand, which left
+ * a two-photograph slide's second entry undefined — so re-rendering after a
+ * one-word edit dropped that <img> and then wrote the new filename onto the
+ * row. Silent, permanent, and no error: the operator changed a word and lost a
+ * photograph.
+ *
+ * A null id in the stored list means that slot has no photograph, so it stays
+ * null rather than going through photoChoiceFor — which answers a NO id at all
+ * with the library's first photograph ("any photograph"), and would drop an
+ * arbitrary picture into a slot the slide deliberately left empty.
  */
-function renderInputs(showLogo: boolean, backgroundAssetId: number | null) {
+function renderInputs(
+  showLogo: boolean,
+  slide: { backgroundAssetId: number | null; photoAssetIds: string | null },
+) {
   return {
-    photo: photoChoiceFor(backgroundAssetId),
+    photos: parsePhotoAssetIds(slide.photoAssetIds, slide.backgroundAssetId).map((id) =>
+      id == null ? null : photoChoiceFor(id),
+    ),
     logoPath: showLogo ? resolveLogoPath() : null,
   };
 }
@@ -145,7 +163,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ ok: false, error: "This account has no design system." }, { status: 400 });
   }
 
-  const { photo, logoPath } = renderInputs(carousel.showLogo, slide.backgroundAssetId);
+  const { photos, logoPath } = renderInputs(carousel.showLogo, slide);
 
   try {
     // One call for the whole recipe. Editing a word is exactly the change that
@@ -156,7 +174,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const { filename: renderFilename } = await renderDesignedSlide({
       html: nextHtml,
       aspectRatio: slide.aspectRatio,
-      photo,
+      photos,
       logoPath,
       system,
     });

@@ -20,7 +20,7 @@ import {
 } from "@/lib/ai/generateCarousel";
 import { meteredCreateStreamed, type MeterContext } from "@/lib/ai/metered";
 import { logoBox } from "@/lib/design/renderDesign";
-import { MAX_PHOTO_SLOTS, photoSlotsUsed, usesPhoto } from "@/lib/design/photoSlots";
+import { MAX_PHOTO_SLOTS, photoSlotsUsed } from "@/lib/design/photoSlots";
 import {
   canvasFor,
   overflowViolation,
@@ -526,14 +526,38 @@ export async function redesignSlide(
 
   const checked = checkDesigns([first], system);
   const design = checked.designs[0];
-  // One photograph: redesigning a slide swaps the composition, not the
-  // library. A two-slot design redesigned here fills slot 1 and drops slot 2's
-  // <img> rather than refusing to render.
+
+  // The same slot-indexed assignment `attempt` makes, for the same reason:
+  // renderDesignedSlide reads photos[slot - 1], so a redesign that comes back
+  // using only {{PHOTO:2}} -- which the system prompt this very call sent
+  // teaches it -- must not have its one photograph land at index 0, where the
+  // markup has no <img> to fill. A one-entry list did exactly that, and the
+  // slide came back with no photograph at all while renderFilename was
+  // non-null, so the route's null-render guard showed the operator a broken
+  // slide as a success. Slots past the cap stay unassigned: the audit has
+  // already flagged them as unfillable, and handing one a photograph would
+  // contradict that.
+  //
+  // One photograph goes in, so a two-slot redesign shows it in both slots:
+  // redesigning a slide swaps the composition, not the library. That is what
+  // `attempt`'s rotation does too whenever the library holds one photograph.
+  const slots = photoSlotsUsed(design.html).filter((s) => s <= MAX_PHOTO_SLOTS);
+  const forThisSlide: (PhotoChoice | null)[] = Array.from(
+    { length: slots.length > 0 ? Math.max(...slots) : 0 },
+    () => null,
+  );
+  for (const slot of slots) forThisSlide[slot - 1] = input.photo ?? null;
+  // Derived from the list that was RENDERED, never from "does this markup use
+  // a photograph": recording [input.photo.id] for markup using only slot 2
+  // claimed slot 1 held that asset while the render carried no photograph --
+  // and that id goes on to become the row's background_asset_id.
+  const assetIds = forThisSlide.map((p) => p?.id ?? null);
+
   const { renderFilename, violation } = await renderOne(
     design,
     system,
     aspectRatio,
-    [input.photo ?? null],
+    forThisSlide,
     input.logoPath ?? null,
   );
 
@@ -542,8 +566,8 @@ export async function redesignSlide(
       html: design.html,
       renderFilename,
       photo: design.photo,
-      photoAssetId: usesPhoto(design.html) ? (input.photo?.id ?? null) : null,
-      photoAssetIds: usesPhoto(design.html) ? [input.photo?.id ?? null] : [],
+      photoAssetId: assetIds[0] ?? null,
+      photoAssetIds: assetIds,
       violations: violation
         ? [...design.violations, violation]
         : design.violations,

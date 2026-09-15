@@ -6,6 +6,7 @@ import { AiCapError } from "@/lib/ai/usage";
 import { getCurrentMembership } from "@/lib/auth";
 import { getCarousel, updateSlide } from "@/lib/image/carousels";
 import { photoChoiceFor, photoChoices } from "@/lib/image/library";
+import { serialisePhotoAssetIds } from "@/lib/image/photoAssetIds";
 import { resolveLogoPath } from "@/lib/branding";
 import { DESIGNED_TEMPLATE_ID } from "@/lib/image/paintSlide";
 
@@ -148,6 +149,13 @@ export async function POST(
     designHtml: result.slide.html,
     renderFilename: result.slide.renderFilename,
     backgroundAssetId: result.slide.photoAssetId ?? undefined,
+    // Slot 2's id has nowhere else to live -- background_asset_id is slot 1's
+    // column alone -- and the text editor resolves a slide's photographs from
+    // exactly this list. Without it a redesigned comparison lost its second
+    // photograph the next time anything re-rendered from the row. Null for a
+    // one-photograph slide, which also clears a stale list left by the markup
+    // this redesign just replaced.
+    photoAssetIds: serialisePhotoAssetIds(result.slide.photoAssetIds),
     imagePrompt: result.slide.photo || null,
   });
   // The superseded render is deliberately NOT deleted. The editor offers a
