@@ -34,6 +34,7 @@ interface SlideRow {
   backgroundAssetId: number | null;
   photoAssetIds: string | null;
   imagePrompt: string | null;
+  photoScenes: string | null;
 }
 
 const CAROUSEL_ID = 1;
@@ -44,6 +45,8 @@ let writes: { id: number; patch: Record<string, unknown> }[] = [];
 let renderedPhotos: (string | null)[] = [];
 /** What the stubbed model hands back, set per case. */
 let redesignResult: unknown = null;
+/** The scene the route briefed the image model with, per generate call. */
+let briefedScene = "";
 
 function makeSlide(row: Partial<SlideRow> & { id: number }): SlideRow {
   const slide: SlideRow = {
@@ -53,6 +56,7 @@ function makeSlide(row: Partial<SlideRow> & { id: number }): SlideRow {
     backgroundAssetId: null,
     photoAssetIds: null,
     imagePrompt: null,
+    photoScenes: null,
     ...row,
   };
   slides.set(slide.id, slide);
@@ -110,7 +114,10 @@ const stubs: Record<string, unknown> = {
   "@/lib/settings": { getBrandImageStyle: () => null },
   "@/lib/businessProfile": { getBusinessProfile: () => ({ name: "Test" }) },
   "@/lib/ai/image/prompt": {
-    buildImagePrompt: () => "a prompt",
+    buildImagePrompt: (input: { scene: string }) => {
+      briefedScene = input.scene;
+      return "a prompt";
+    },
     defaultImageStyle: () => "a style",
   },
 };
@@ -133,6 +140,7 @@ function check(fn: () => void) {
   const post = async (slideId: number, body: unknown) => {
     writes = [];
     renderedPhotos = [];
+    briefedScene = "";
     const res = await POST({ json: async () => body } as unknown as Request, {
       params: { id: String(CAROUSEL_ID), slideId: String(slideId) },
     });
@@ -221,6 +229,7 @@ function check(fn: () => void) {
         html: '<img src="{{PHOTO:2}}" />',
         renderFilename: "redesigned.png",
         photo: "a scene",
+        photoScenes: ["a scene"],
         photoAssetId: null,
         photoAssetIds: [null, 5],
         violations: [],
@@ -323,6 +332,117 @@ function check(fn: () => void) {
       assert.equal(status, 400, `slot ${JSON.stringify(bad)} is refused rather than coerced`),
     );
     check(() => assert.equal(writes.length, 0, `slot ${JSON.stringify(bad)} writes nothing`));
+  }
+
+  // 7. "Make a new photo" is briefed with the TARGETED slot's scene.
+  //
+  //    The design named a scene per slot and only slot 1's was ever read, so
+  //    on this feature's own example -- infrared above, HBOT below -- pressing
+  //    Make a new photo with Second selected generated a second infrared bed
+  //    and reported nothing wrong.
+  const compared = makeSlide({
+    id: 6,
+    designHtml: '<img src="{{PHOTO}}" /><img src="{{PHOTO:2}}" />',
+    imagePrompt: "an infrared bed in a treatment room",
+    photoScenes: '["an infrared bed in a treatment room","a hyperbaric chamber, daylight"]',
+  });
+  {
+    await post(compared.id, { generate: true, onlyGenerate: true, slot: 2 });
+    check(() =>
+      assert.equal(
+        briefedScene,
+        "a hyperbaric chamber, daylight",
+        "slot 2 is briefed with slot 2's scene, not slot 1's",
+      ),
+    );
+    await post(compared.id, { generate: true, onlyGenerate: true, slot: 1 });
+    check(() =>
+      assert.equal(
+        briefedScene,
+        "an infrared bed in a treatment room",
+        "slot 1 is still briefed with slot 1's scene",
+      ),
+    );
+  }
+
+  // 8. A slide with one scene briefs BOTH slots with it -- the fallback that
+  //    keeps every slide designed before the column existed working exactly as
+  //    it did, since image_prompt is all such a row has.
+  const oneScene = makeSlide({
+    id: 7,
+    designHtml: '<img src="{{PHOTO}}" /><img src="{{PHOTO:2}}" />',
+    imagePrompt: "a quiet treatment room",
+  });
+  {
+    await post(oneScene.id, { generate: true, onlyGenerate: true, slot: 2 });
+    check(() =>
+      assert.equal(
+        briefedScene,
+        "a quiet treatment room",
+        "a slide with only slot 1's scene falls back to it for slot 2",
+      ),
+    );
+  }
+
+  // 9. The redesign persists the scene list, so the NEXT generation on either
+  //    slot is briefed against the markup the slide actually has.
+  //
+  //    Its own flat slide, not the one case 2 used: the stub writes patches
+  //    back onto the row, so that slide now HAS a photo slot and would take
+  //    the swap path instead of the redesign one.
+  const flatAgain = makeSlide({ id: 8, designHtml: "<div>no photograph here</div>" });
+  {
+    redesignResult = {
+      slide: {
+        html: '<img src="{{PHOTO}}" /><img src="{{PHOTO:2}}" />',
+        renderFilename: "redesigned.png",
+        photo: "an infrared bed",
+        photoScenes: ["an infrared bed", "a hyperbaric chamber"],
+        photoAssetId: 5,
+        photoAssetIds: [5, 5],
+        violations: [],
+      },
+      usage: {},
+    };
+    await post(flatAgain.id, { generate: true });
+    const patch = writes.at(-1)?.patch ?? {};
+    check(() =>
+      assert.equal(
+        patch.photoScenes,
+        '["an infrared bed","a hyperbaric chamber"]',
+        "a two-scene redesign persists both scenes",
+      ),
+    );
+    check(() =>
+      assert.equal(
+        patch.imagePrompt,
+        "an infrared bed",
+        "and image_prompt still holds slot 1's scene alone -- never the list",
+      ),
+    );
+  }
+
+  // 10. A one-scene result stores null, the same as a one-photograph slide
+  //     stores no id list -- that is what keeps an old row byte-identical.
+  const flatOnce = makeSlide({ id: 9, designHtml: "<div>no photograph here</div>" });
+  {
+    redesignResult = {
+      slide: {
+        html: '<img src="{{PHOTO}}" />',
+        renderFilename: "redesigned.png",
+        photo: "a quiet treatment room",
+        photoScenes: ["a quiet treatment room"],
+        photoAssetId: 5,
+        photoAssetIds: [5],
+        violations: [],
+      },
+      usage: {},
+    };
+    await post(flatOnce.id, { generate: true });
+    const patch = writes.at(-1)?.patch ?? {};
+    check(() =>
+      assert.equal(patch.photoScenes, null, "a one-scene redesign stores no list"),
+    );
   }
 
   console.log(`photo/route.test.ts: all ${checks} assertions passed`);

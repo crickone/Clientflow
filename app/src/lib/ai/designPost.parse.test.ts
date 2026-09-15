@@ -9,6 +9,8 @@ import assert from "node:assert/strict";
 import {
   DESIGN_RULES,
   NO_PHOTOGRAPHY_RULE,
+  ONE_PHOTOGRAPH_RULE,
+  photographyRuleFor,
   checkDesigns,
   checkSet,
   describeSystemForDesign,
@@ -529,6 +531,47 @@ const cleanTwoPhoto = checkDesigns(
 check(
   "two photographs in two separate <img>s is not a violation",
   !cleanTwoPhoto.designs[0].violations.some((v) => /two photographs|single src/i.test(v)),
+);
+
+// -- ...but only when there IS a second photograph -------------------------
+//
+// The rules teach {{PHOTO:2}} and name a comparison as the reason to reach for
+// it, which makes "redesign this as a before-and-after" the likeliest way an
+// operator meets the second slot. A redesign holds ONE photograph, and a new
+// tenant's library can hold one -- and in both cases the filler hands the same
+// choice to both slots, so the slide came back showing one picture twice under
+// two headings with nothing reporting an error.
+check(
+  "a call with one photograph is told so, and told not to write the second token",
+  ONE_PHOTOGRAPH_RULE.includes("ONLY ONE PHOTOGRAPH IS AVAILABLE") &&
+    ONE_PHOTOGRAPH_RULE.includes("do NOT write {{PHOTO:2}}"),
+);
+check(
+  "and is told what to do instead, rather than only what not to do",
+  ONE_PHOTOGRAPH_RULE.includes("carry it with type, ground and rule"),
+);
+check(
+  "and still names the scene, the same as every other photography rule",
+  ONE_PHOTOGRAPH_RULE.includes('Still fill in "photos" on every slide'),
+);
+check(
+  "the one-photograph rule never forbids the photograph the call actually has",
+  !ONE_PHOTOGRAPH_RULE.includes("Do not write {{PHOTO}}"),
+);
+// The two rules contradict each other -- one forbids the <img> the other asks
+// for -- so which is sent has to be decided in one place.
+check("no photographs gets the no-photography rule", photographyRuleFor(0) === NO_PHOTOGRAPHY_RULE);
+check("one photograph gets the one-photograph rule", photographyRuleFor(1) === ONE_PHOTOGRAPH_RULE);
+check(
+  "two or more gets neither -- DESIGN_RULES already caps the slots at two",
+  photographyRuleFor(2) === null && photographyRuleFor(9) === null,
+);
+check(
+  "the two rules are never both sent",
+  [0, 1, 2, 3].every((n) => {
+    const rule = photographyRuleFor(n);
+    return rule === null || rule === NO_PHOTOGRAPHY_RULE || rule === ONE_PHOTOGRAPH_RULE;
+  }),
 );
 
 console.log(`\ndesignPost.parse: ${passed} checks passed`);

@@ -22,7 +22,7 @@ import { renderFilePath } from "../image/renderStore";
 import { loadDesignFonts } from "./fonts";
 import type { DesignSystem } from "./parse";
 import { gradedPhotoDataUri, measureOverflowPx } from "./renderDesign";
-import { fillPhotoSlots } from "./photoSlots";
+import { fillPhotoSlots, photoSlotBoxes, photoSlotsUsed } from "./photoSlots";
 import { CANVAS, canvasFor, measurementHtmlFor, renderDesignedSlide } from "./renderDesignedSlide";
 
 let passed = 0;
@@ -96,6 +96,43 @@ function slideHtml(bodyPx: number): string {
     `A designed slide rendered by the one recipe that every path now shares.` +
     `</div>` +
     `</div>`
+  );
+}
+
+/**
+ * The pixel size of every stand-in the overflow measurement would use for
+ * `html`, by running the real grading path and decoding what came back.
+ *
+ * Goes through gradedPhotoDataUri + measurementHtmlFor rather than reaching
+ * into renderDesignedSlide, because the property under test is the agreement
+ * BETWEEN those two: the stand-in must be the same pixel size as the graded
+ * photograph it replaces.
+ */
+async function standInSizes(
+  html: string,
+  photos: { path: string }[],
+): Promise<{ width: number; height: number }[]> {
+  const { width, height } = canvasFor("1:1");
+  const boxes = photoSlotBoxes(html);
+  const slots = photoSlotsUsed(html);
+  const uriBySlot = new Map<number, string>();
+  const gradedAt = new Map<string, { width: number; height: number }>();
+  for (const slot of slots) {
+    const photo = photos[slot - 1];
+    if (!photo) continue;
+    const box = boxes.get(slot) ?? { width, height };
+    const uri = await gradedPhotoDataUri(photo.path, box.width, box.height, SYSTEM.photo);
+    uriBySlot.set(slot, uri);
+    gradedAt.set(uri, box);
+  }
+  const filled = fillPhotoSlots(html, (slot) => uriBySlot.get(slot) ?? null);
+  const measured = await measurementHtmlFor(filled, width, height, gradedAt);
+  const embedded = measured.match(/data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+/gi) ?? [];
+  return Promise.all(
+    embedded.map(async (uri) => {
+      const meta = await sharp(Buffer.from(uri.split(",")[1], "base64")).metadata();
+      return { width: meta.width ?? 0, height: meta.height ?? 0 };
+    }),
   );
 }
 
@@ -384,6 +421,51 @@ async function main() {
       new Set(embedded).size === 1 &&
         !embedded.includes(gradedA) &&
         !embedded.includes(gradedB),
+    );
+  }
+
+  // ── each slot is graded at ITS OWN box ──────────────────────────────────
+  //
+  // Every slot used to be graded at the whole canvas, so a stacked comparison
+  // embedded two full-canvas JPEGs and pushed both through satori twice:
+  // measured on these library-sized photographs, 14.2s against 3.2s at 1:1 and
+  // 46.8s against 9.8s at 9:16 -- and three of the editor's client paths abort
+  // at 180s while the server keeps writing, so the operator saw an error on a
+  // change that had landed.
+  //
+  // Asserted on the measurement markup's stand-ins rather than on elapsed
+  // time, which is not a property. The stand-in is built at the size the
+  // photograph it replaces was graded at -- that is the whole contract between
+  // withPhotos and measurementHtmlFor -- so decoding it reads the grade's size
+  // back out. It also pins the invariant directly: a stand-in of the wrong
+  // size measures a layout that never rendered, because satori falls back to
+  // an image's intrinsic size wherever a style does not pin both axes.
+  {
+    const halves =
+      '<div style="display:flex;flex-direction:column;width:1080px;height:1080px;background:#f2f3ed;font-family:Inter">' +
+      '<img src="{{PHOTO}}" style="width:1080px;height:540px" />' +
+      '<img src="{{PHOTO:2}}" style="width:540px;height:270px" />' +
+      "</div>";
+    const seen = await standInSizes(halves, [{ path: photoA }, { path: photoB }]);
+    check(
+      "each slot's stand-in is the size that slot's <img> declares, not the canvas",
+      seen.length === 2 &&
+        seen.some((d) => d.width === 1080 && d.height === 540) &&
+        seen.some((d) => d.width === 540 && d.height === 270),
+    );
+
+    // The fallback is what keeps a full-bleed slide -- the common
+    // one-photograph slide -- rendering exactly as it did before per-slot
+    // sizing existed. A percentage cannot be resolved without laying the
+    // design out, so the canvas stands.
+    const bleed =
+      '<div style="display:flex;width:1080px;height:1080px;background:#f2f3ed;font-family:Inter">' +
+      '<img src="{{PHOTO}}" style="width:100%;height:100%" />' +
+      "</div>";
+    const bled = await standInSizes(bleed, [{ path: photoA }]);
+    check(
+      "a slot with no px box falls back to the canvas, as every slot did before",
+      bled.length === 1 && bled[0].width === 1080 && bled[0].height === 1080,
     );
   }
 

@@ -4,7 +4,7 @@ import { saveRender } from "@/lib/image/renderStore";
 
 import { loadDesignFonts } from "./fonts";
 import type { DesignSystem } from "./parse";
-import { fillPhotoSlots, photoSlotsUsed } from "./photoSlots";
+import { fillPhotoSlots, photoSlotBoxes, photoSlotsUsed } from "./photoSlots";
 import {
   gradedPhotoDataUri,
   measureOverflowPx,
@@ -108,6 +108,10 @@ export interface DesignedSlideRender {
  *
  * This was `html.split(PHOTO_TOKEN).join(uri)` -- the same picture everywhere
  * the token appeared -- so a slide asking for two showed one of them twice.
+ *
+ * Returns the BOX each resulting data URI was made at, because the overflow
+ * measurement stands each one in with a flat image and that stand-in has to be
+ * the same pixel size as the picture it replaces (see measurementHtmlFor).
  */
 async function withPhotos(
   html: string,
@@ -115,41 +119,73 @@ async function withPhotos(
   width: number,
   height: number,
   system: DesignSystem,
-): Promise<string> {
+): Promise<{ html: string; boxes: Map<string, { width: number; height: number }> }> {
   const slots = photoSlotsUsed(html);
-  if (slots.length === 0) return html;
+  if (slots.length === 0) return { html, boxes: new Map() };
+
+  // Each slot is graded at ITS OWN box, not at the whole canvas. A stacked
+  // comparison gives each <img> half the canvas, and grading both at the full
+  // canvas embedded two full-size JPEGs in one slide: measured on real library
+  // photographs, a two-slot 1:1 slide took 51.6s that way against 10.4s
+  // grading each slot at 1080x540 -- satori and sharp are paid by the byte,
+  // and three of the editor's client paths abort at 180s while the server
+  // keeps writing, so the operator sees an error on a change that landed.
+  //
+  // Only a box declared in px on both axes is used; anything else (a
+  // percentage, a flex-grown box) falls back to the canvas exactly as before,
+  // which is what keeps a full-bleed one-photograph slide byte-identical.
+  // Clamped to the canvas so this can never make a grade LARGER than today's.
+  const declared = photoSlotBoxes(html);
+  const boxFor = (slot: number): { width: number; height: number } => {
+    const box = declared.get(slot);
+    if (!box) return { width, height };
+    return {
+      width: Math.min(box.width, width),
+      height: Math.min(box.height, height),
+    };
+  };
 
   // Grade each PHOTOGRAPH once, before substitution: fillPhotoSlots is
   // synchronous, and grading is the expensive step (~30ms of sharp work) -- a
   // slot that appears twice in the markup must not pay for it twice.
   //
-  // Keyed by the photograph's PATH, not by the slot: two slots can hold the
-  // same picture, and they do whenever the tenant library has only one, since
-  // the generator's rotation then hands the same choice to both. Keying by
-  // slot graded the identical file twice. The PROMISE is memoised, not the
-  // result, so the second slot waits on the first slot's grade rather than
-  // starting a duplicate of it.
-  const gradeByPath = new Map<string, Promise<string>>();
-  const gradeOf = (photo: SlidePhoto): Promise<string> => {
-    const started = gradeByPath.get(photo.path);
+  // Keyed by the photograph's PATH AND BOX, not by the slot: two slots can
+  // hold the same picture, and they do whenever the tenant library has only
+  // one, since the generator's rotation then hands the same choice to both.
+  // Keying by slot graded the identical file twice. The box is part of the key
+  // because the same photograph in two differently sized slots is genuinely
+  // two different grades. The PROMISE is memoised, not the result, so the
+  // second slot waits on the first slot's grade rather than starting a
+  // duplicate of it.
+  const gradeByKey = new Map<string, Promise<string>>();
+  const gradeOf = (photo: SlidePhoto, box: { width: number; height: number }): Promise<string> => {
+    const key = `${box.width}x${box.height}|${photo.path}`;
+    const started = gradeByKey.get(key);
     if (started) return started;
-    const grading = gradedPhotoDataUri(photo.path, width, height, system.photo);
-    gradeByPath.set(photo.path, grading);
+    const grading = gradedPhotoDataUri(photo.path, box.width, box.height, system.photo);
+    gradeByKey.set(key, grading);
     return grading;
   };
 
   // Concurrent, not a serial await per slot: the grades are independent, so a
   // two-photograph slide pays one grade's latency instead of two.
+  const boxes = slots.map(boxFor);
   const uris = await Promise.all(
-    slots.map((slot) => {
+    slots.map((slot, i) => {
       const photo = photos[slot - 1] ?? null;
-      return photo ? gradeOf(photo) : Promise.resolve(null);
+      return photo ? gradeOf(photo, boxes[i]) : Promise.resolve(null);
     }),
   );
   const uriBySlot = new Map<number, string | null>(
     slots.map((slot, i) => [slot, uris[i]]),
   );
-  return fillPhotoSlots(html, (slot) => uriBySlot.get(slot) ?? null);
+  // Keyed by the URI itself, since that is all the measurement can see of a
+  // slot once the markup has been filled in.
+  const boxByUri = new Map<string, { width: number; height: number }>();
+  uris.forEach((uri, i) => {
+    if (uri) boxByUri.set(uri, boxes[i]);
+  });
+  return { html: fillPhotoSlots(html, (slot) => uriBySlot.get(slot) ?? null), boxes: boxByUri };
 }
 
 /**
@@ -189,15 +225,35 @@ export async function standInPhoto(width: number, height: number): Promise<strin
  * photograph, and a graded photograph surviving into the measurement would
  * silently restore the ~111x payload the stand-in exists to avoid. The STRING
  * is where that is provable -- see renderDesignedSlide.test.ts.
+ *
+ * `boxes` is the size each data URI was graded at, from withPhotos. Slots are
+ * no longer all graded at the canvas -- a stacked comparison grades each at
+ * its own half -- so a single canvas-sized stand-in would no longer be exact,
+ * and satori falls back to an image's INTRINSIC size whenever a style does not
+ * pin both axes. Anything not in the map (a caller with no grades to hand, an
+ * embedded image a design carried itself) keeps the canvas, which is what this
+ * did for every image before.
  */
 export async function measurementHtmlFor(
   html: string,
   width: number,
   height: number,
+  boxes?: Map<string, { width: number; height: number }>,
 ): Promise<string> {
   const start = html.indexOf("data:image/");
   if (start === -1) return html;
-  const uri = await standInPhoto(width, height);
+  // One stand-in per distinct SIZE, built once and reused: a two-slot slide
+  // whose halves match pays for one flat image, not two.
+  const standIns = new Map<string, string>();
+  const standInFor = async (box: { width: number; height: number }): Promise<string> => {
+    const key = `${box.width}x${box.height}`;
+    const made = standIns.get(key);
+    if (made) return made;
+    const uri = await standInPhoto(box.width, box.height);
+    standIns.set(key, uri);
+    return uri;
+  };
+
   // Every embedded image, not just the first: a design may carry the graded
   // photograph and nothing else today, but the substitution must not start
   // depending on that. The character class covers every image subtype satori
@@ -207,16 +263,20 @@ export async function measurementHtmlFor(
   //
   // A slide may now carry TWO photographs, and both are covered here: this
   // runs AFTER withPhotos, so each slot is already a data URI and each match
-  // is replaced. Both stay exact, because withPhotos grades every slot's
-  // photograph at the CANVAS's dimensions -- the same size this stand-in is
-  // made at -- so satori infers the same intrinsic size either way.
+  // is replaced, each with a stand-in at ITS OWN graded size.
   //
-  // The divergence that would remain: an embedded image at some OTHER
-  // intrinsic size would be measured at this canvas's size instead of its own,
-  // since every match is replaced with the same WxH stand-in. Nothing produces
-  // one today -- every image in a design is a graded photograph, and a model
-  // cannot author base64 of its own -- but worth writing down.
-  return html.replace(/data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+/gi, uri);
+  // Two passes rather than String.replace with a callback, because building a
+  // stand-in is async and a replacer cannot await. The first pass collects the
+  // matches, the second substitutes what was made for them.
+  const uris = [...new Set(html.match(/data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+/gi) ?? [])];
+  const replacement = new Map<string, string>();
+  for (const uri of uris) {
+    replacement.set(uri, await standInFor(boxes?.get(uri) ?? { width, height }));
+  }
+  return html.replace(
+    /data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+/gi,
+    (m) => replacement.get(m) ?? m,
+  );
 }
 
 /**
@@ -235,7 +295,7 @@ export async function renderDesignedSlide(
   const { width, height } = canvasFor(input.aspectRatio);
   // `photos` wins over `photo`; `photo` is the one-slot shorthand.
   const photos = input.photos ?? (input.photo ? [input.photo] : []);
-  const html = await withPhotos(input.html, photos, width, height, input.system);
+  const { html, boxes } = await withPhotos(input.html, photos, width, height, input.system);
 
   const fonts = await loadDesignFonts(
     input.system.font,
@@ -265,7 +325,7 @@ export async function renderDesignedSlide(
   // number is not a trade worth making, and it would have blown through the
   // editor's own 180s client timeout on a slide with a large photograph.
   const overflowPx = await measureOverflowPx(
-    await measurementHtmlFor(html, width, height),
+    await measurementHtmlFor(html, width, height, boxes),
     width,
     height,
     fonts,

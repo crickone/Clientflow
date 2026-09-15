@@ -969,8 +969,18 @@ export const carouselSlides = sqliteTable("carousel_slides", {
   backgroundZoom: real("background_zoom").notNull().default(1),
   /** AI background generation state: null = never generated, else 'generating' | 'ready' | 'failed'. */
   imageStatus: text("image_status", { enum: ["generating", "ready", "failed"] }),
-  /** The prompt last used for this slide's AI background (Regenerate reuses it; Edit-prompt overwrites it). */
+  /** The prompt last used for this slide's AI background (Regenerate reuses it; Edit-prompt overwrites it).
+   *  On a designed slide this is SLOT 1's scene; the generate path sends this
+   *  string straight to an image model, so it never holds a list. */
   imagePrompt: text("image_prompt"),
+  /**
+   * The scene the design asked for per photo slot, as a JSON array of strings,
+   * index 0 being slot 1. Null when the slide has at most one scene --
+   * image_prompt above already holds it, and leaving this null keeps every row
+   * written before two-photograph slides indistinguishable from one written
+   * after. See lib/image/photoScenes.ts.
+   */
+  photoScenes: text("photo_scenes"),
   /** Operator-visible message when image_status = 'failed'. */
   imageError: text("image_error"),
   /**

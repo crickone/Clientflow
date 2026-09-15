@@ -187,6 +187,77 @@ export function multiSlotImgTags(html: string): { start: number; end: number; te
   return findImgTags(html).filter((tag) => photoSlotsUsed(tag.text).length > 1);
 }
 
+/** The box an <img> declares for itself, in CSS pixels. */
+export interface PhotoSlotBox {
+  width: number;
+  height: number;
+}
+
+/** A `width`/`height` declaration in px, as a whole declaration rather than a
+ *  substring -- `max-width:100%` and `background-size` both contain "width",
+ *  and matching them would size a grade off a number that is not the box. */
+const PX_DECL = {
+  width: /^\s*width\s*:\s*(\d+(?:\.\d+)?)\s*px\s*$/i,
+  height: /^\s*height\s*:\s*(\d+(?:\.\d+)?)\s*px\s*$/i,
+} as const;
+
+function pxDeclaration(style: string, property: "width" | "height"): number | null {
+  for (const decl of style.split(";")) {
+    const m = PX_DECL[property].exec(decl);
+    if (m) {
+      const n = Math.round(Number(m[1]));
+      if (Number.isFinite(n) && n >= 1) return n;
+    }
+  }
+  return null;
+}
+
+/** The `style` attribute's value, quote-aware for both quote characters. */
+function styleOf(tag: string): string {
+  const m = /\sstyle\s*=\s*("([^"]*)"|'([^']*)')/i.exec(tag);
+  return m ? (m[2] ?? m[3] ?? "") : "";
+}
+
+/**
+ * The pixel box each slot's <img> declares, for the slots that declare one in
+ * px on BOTH axes.
+ *
+ * Why it exists: the renderer used to grade every slot at the whole canvas, so
+ * a stacked comparison embedded two full-canvas JPEGs in one slide and pushed
+ * both through satori. Grading each slot at its own box is the same picture at
+ * a quarter of the bytes -- and a better one, since sharp's cover-crop then
+ * matches the box's aspect instead of being stretched into it by satori.
+ *
+ * ONLY px on both axes. A percentage, a flex-grown box or a missing axis
+ * cannot be resolved without laying the design out, which is satori's job and
+ * not this module's -- those slots are simply absent from the map, and the
+ * caller falls back to the canvas exactly as before. That fallback is what
+ * keeps a full-bleed slide (the common one-photograph slide, written as
+ * `width:100%;height:100%` or as the canvas's own pixel size) rendering
+ * byte-for-byte as it did.
+ *
+ * A slot appearing in more than one <img> is malformed in the same family as
+ * multiSlotImgTags, and the FIRST tag wins rather than the last: a caller
+ * grading one box while satori lays out another is the failure to avoid, and
+ * either choice risks it, so the deterministic one is the useful one.
+ */
+export function photoSlotBoxes(html: string): Map<number, PhotoSlotBox> {
+  const boxes = new Map<number, PhotoSlotBox>();
+  for (const tag of findImgTags(html)) {
+    const slots = photoSlotsUsed(tag.text);
+    // Exactly one: a tag carrying two DISTINCT slots is malformed markup the
+    // audit rejects, and sizing either slot off it would be a guess.
+    if (slots.length !== 1) continue;
+    const slot = slots[0];
+    if (boxes.has(slot)) continue;
+    const style = styleOf(tag.text);
+    const width = pxDeclaration(style, "width");
+    const height = pxDeclaration(style, "height");
+    if (width != null && height != null) boxes.set(slot, { width, height });
+  }
+  return boxes;
+}
+
 /** Replaces every token in `remaining` within one text segment, in a single pass. */
 function substituteTokens(
   text: string,

@@ -6,7 +6,7 @@ import { CONTENT_MODEL } from "@/lib/ai/client";
 import {
   DESIGN_RULES,
   logoReserveRule,
-  NO_PHOTOGRAPHY_RULE,
+  photographyRuleFor,
   checkDesigns,
   describeSystemForDesign,
   extractDesignPayload,
@@ -73,8 +73,14 @@ export interface DesignedSlide {
   /** The stored PNG, or null when the markup would not render. */
   renderFilename: string | null;
   /** The scene the design asked for, in the designer's words. Kept so a slide
-   *  can be re-photographed later against what it actually wanted. */
+   *  can be re-photographed later against what it actually wanted. SLOT 1's
+   *  scene, and photoScenes[0]. */
   photo: string;
+  /** The scene per slot, index 0 being slot 1. Carried through because a
+   *  two-photograph slide asks for two DIFFERENT pictures -- infrared above,
+   *  HBOT below -- and briefing slot 2's regeneration with slot 1's scene is
+   *  how the operator got a second infrared bed. */
+  photoScenes: string[];
   /** The library asset slot 1's photograph came from, if it used one. Kept as
    *  the shorthand every reader that only cares about one photograph already
    *  uses (the routes, background_asset_id), and it is photoAssetIds[0]. */
@@ -213,7 +219,11 @@ export async function designPost(
     describeSystemForDesign(system),
     DESIGN_RULES,
     logoReserveRule(reserve, width, height),
-    hasPhotography ? null : NO_PHOTOGRAPHY_RULE,
+    // From the COUNT, not just "any at all": the rotation below hands the same
+    // choice to both slots of a two-slot slide whenever the library holds one
+    // photograph, so a library of one that was invited to design a comparison
+    // produced the same picture twice. See photographyRuleFor.
+    photographyRuleFor(photos.length),
     getSignoffRule("social"),
   ]
     .filter(Boolean)
@@ -367,6 +377,7 @@ export async function designPost(
         html: design.html,
         renderFilename,
         photo: design.photo,
+        photoScenes: design.photos,
         photoAssetId: assetIds[0] ?? null,
         photoAssetIds: assetIds,
         violations: violation
@@ -467,7 +478,13 @@ export async function redesignSlide(
     describeSystemForDesign(system),
     DESIGN_RULES,
     logoReserveRule(reserve, width, height),
-    hasPhotography ? null : NO_PHOTOGRAPHY_RULE,
+    // A redesign holds ONE photograph at most -- input.photo, the picture the
+    // slide already had -- so the count here is never more than 1 and the
+    // second slot is never fillable. Without this the prompt taught
+    // {{PHOTO:2}} and the filler below put input.photo in both slots, so
+    // "redesign this as a before-and-after" came back showing one picture
+    // twice under two headings and reported no error.
+    photographyRuleFor(input.photo ? 1 : 0),
     getSignoffRule("social"),
   ]
     .filter(Boolean)
@@ -566,6 +583,7 @@ export async function redesignSlide(
       html: design.html,
       renderFilename,
       photo: design.photo,
+      photoScenes: design.photos,
       photoAssetId: assetIds[0] ?? null,
       photoAssetIds: assetIds,
       violations: violation

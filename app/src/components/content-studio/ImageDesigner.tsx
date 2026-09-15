@@ -71,6 +71,7 @@ import { SlideCanvas, useCanvasFonts, useLogoImage } from "./SlideCanvas";
 import type { DesignSystem } from "@/lib/design/parse";
 import { photoSlotsUsed, usesPhoto } from "@/lib/design/photoSlots";
 import { parsePhotoAssetIds } from "@/lib/image/photoAssetIds";
+import { sceneForSlot } from "@/lib/image/photoScenes";
 import { DESIGNED_TEMPLATE_ID, slideDimensions, slideSurface } from "@/lib/image/paintSlide";
 import { renderFileUrl } from "@/lib/image/renderStore.client";
 import { SlideFilmstrip } from "./SlideFilmstrip";
@@ -3222,10 +3223,14 @@ function RedesignSlideButton({
     return () => window.clearInterval(id);
   }, [busy]);
 
-  // The scene the DESIGN asked for, recorded when the slide was written. A
-  // slide with none either predates the field or was composed without a
+  // The scene the DESIGN asked for FOR THE TARGETED SLOT, recorded when the
+  // slide was written. Per slot, and the same resolution the generate route
+  // makes, because a comparison asks for two different pictures -- infrared
+  // above, HBOT below -- and showing slot 1's scene whichever slot the
+  // operator had selected described a photograph they were not about to get.
+  // A slide with none either predates the field or was composed without a
   // photograph, and there is nothing to generate against in either case.
-  const scene = slide.imagePrompt?.trim() ?? "";
+  const scene = sceneForSlot(slide.photoScenes, slide.imagePrompt, photoSlot);
   // A slide designed on a flat ground has nowhere to put a picture, so making
   // one redesigns the slide around it — slower, and worth saying so.
   // Asks the module that owns the placeholder rather than matching a literal:

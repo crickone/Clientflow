@@ -15,6 +15,7 @@ import { getTemplate, templateUsesPhoto } from "@/lib/image/templates";
 import { DESIGNED_TEMPLATE_ID } from "@/lib/image/paintSlide";
 import { photoChoices } from "@/lib/image/library";
 import { serialisePhotoAssetIds } from "@/lib/image/photoAssetIds";
+import { serialisePhotoScenes } from "@/lib/image/photoScenes";
 import {
   addSlide,
   deleteSlot,
@@ -158,6 +159,11 @@ export async function runCarouselGeneration(
           // this column is written only when there is a second one to record.
           photoAssetIds: serialisePhotoAssetIds(slide.photoAssetIds),
           imagePrompt: slide.photo || null,
+          // Slot 1's scene stays in image_prompt (above), the same as before;
+          // this column is written only when the design named a second one, so
+          // "Make a new photo" on slot 2 is briefed with slot 2's scene rather
+          // than slot 1's.
+          photoScenes: serialisePhotoScenes(slide.photoScenes),
         });
       }
     } else {

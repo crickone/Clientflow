@@ -252,6 +252,37 @@ Do not draw a logo, a wordmark or the business name yourself.`;
 export const NO_PHOTOGRAPHY_RULE = `NO PHOTOGRAPHY IS AVAILABLE for this post. Every slide must work on a flat ground. Do not write ${PHOTO_TOKEN}, do not write an <img>, and do not build a scrim or gradient of the kind that only makes sense over an image. Still fill in "photos" on every slide with a one-entry list holding the scene that would suit it -- that is how the operator gets the picture that is missing -- but design as though it will never arrive.`;
 
 /**
+ * Told to the model when exactly ONE photograph can be had.
+ *
+ * DESIGN_RULES teaches {{PHOTO:2}} and names a comparison as the reason to
+ * reach for it, so "redesign this as a before-and-after" is the likeliest way
+ * an operator meets the second slot at all. But a redesign only ever holds the
+ * one photograph the slide already had, and a tenant library can hold one
+ * picture and no more -- and in both cases the filler hands the SAME choice to
+ * both slots. The result is one photograph shown twice under two different
+ * headings, with nothing anywhere reporting an error. The rule is what keeps
+ * the invitation honest: the cap the call can actually meet, stated before the
+ * design is made rather than repaired afterwards.
+ */
+export const ONE_PHOTOGRAPH_RULE = `ONLY ONE PHOTOGRAPH IS AVAILABLE. Write ${PHOTO_TOKEN} where a slide takes a picture, and do NOT write {{PHOTO:2}} anywhere -- there is no second photograph to put in it, so a slide asking for two would show the SAME picture twice under two different headings. Where the point is a comparison, carry it with type, ground and rule -- two stacked blocks, each with its own heading -- and at most the one photograph. Still fill in "photos" on every slide, one entry naming the scene that slide's photograph should show.`;
+
+/**
+ * Which photography rule a call gets, from the number of photographs it can
+ * actually put on a slide.
+ *
+ * One function rather than a condition at each call site because the two rules
+ * CONTRADICT each other -- NO_PHOTOGRAPHY_RULE forbids the <img> that
+ * ONE_PHOTOGRAPH_RULE tells the model to write -- so "none" and "one" have to
+ * be decided in one place or they will eventually both be sent. Two or more
+ * needs no rule: DESIGN_RULES already caps the slots at two.
+ */
+export function photographyRuleFor(available: number): string | null {
+  if (available < 1) return NO_PHOTOGRAPHY_RULE;
+  if (available < 2) return ONE_PHOTOGRAPH_RULE;
+  return null;
+}
+
+/**
  * The scenes a reply carries, from either shape, trimmed and capped at the
  * slot limit so a model that ignored the cap cannot make the renderer look
  * for photographs that the audit is about to reject anyway.

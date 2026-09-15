@@ -7,6 +7,7 @@ import { getCurrentMembership } from "@/lib/auth";
 import { getCarousel, updateSlide } from "@/lib/image/carousels";
 import { photoChoiceFor, photoChoices } from "@/lib/image/library";
 import { serialisePhotoAssetIds } from "@/lib/image/photoAssetIds";
+import { serialisePhotoScenes } from "@/lib/image/photoScenes";
 import { resolveLogoPath } from "@/lib/branding";
 import { DESIGNED_TEMPLATE_ID } from "@/lib/image/paintSlide";
 
@@ -171,6 +172,11 @@ export async function POST(
     // this redesign just replaced.
     photoAssetIds: serialisePhotoAssetIds(result.slide.photoAssetIds),
     imagePrompt: result.slide.photo || null,
+    // Written every time for the same reason the list of ids is: a redesign
+    // replaces the markup wholesale, so a stale second scene left behind would
+    // brief slot 2's next generation against a slide that no longer exists.
+    // Null for a one-scene redesign, which is also how that stale list clears.
+    photoScenes: serialisePhotoScenes(result.slide.photoScenes),
   });
   // The superseded render is deliberately NOT deleted. The editor offers a
   // one-step undo, and undo restoring a row that points at a file we just

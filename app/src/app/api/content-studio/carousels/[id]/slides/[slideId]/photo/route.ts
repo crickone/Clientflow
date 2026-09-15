@@ -11,6 +11,7 @@ import { redesignSlide } from "@/lib/ai/designPost";
 import { resolveLogoPath } from "@/lib/branding";
 import { MAX_PHOTO_SLOTS, photoSlotsUsed, usesPhoto } from "@/lib/design/photoSlots";
 import { parsePhotoAssetIds, serialisePhotoAssetIds } from "@/lib/image/photoAssetIds";
+import { sceneForSlot, serialisePhotoScenes } from "@/lib/image/photoScenes";
 import { findTextRuns } from "@/lib/design/textRuns";
 import { AiCapError } from "@/lib/ai/usage";
 import { generatePostImage } from "@/lib/ai/image/generatePostImage";
@@ -182,13 +183,21 @@ export async function POST(
         { status: 400 },
       );
     }
-    // The scene the DESIGN asked for, stored on the slide when it was written.
+    // The scene the DESIGN asked for FOR THIS SLOT, stored on the slide when
+    // it was written. Per slot, because a two-photograph slide asks for two
+    // different pictures -- infrared above, HBOT below -- and briefing slot 2
+    // with slot 1's scene generated a second infrared bed. sceneForSlot falls
+    // back to slot 1's scene, which is all a one-photograph slide has and what
+    // this always used.
+    //
     // Every designed slide records one now (designPost.parse.ts), but slides
     // designed before that, and the odd slide where the model left the field
     // empty, have none — and refusing there made Generate dead on most of a
     // set. The slide's own words are a worse brief than the designer's, and a
     // far better one than nothing.
-    scene = slide.imagePrompt?.trim() || sceneFromSlideCopy(slide);
+    scene =
+      sceneForSlot(slide.photoScenes, slide.imagePrompt, slot) ||
+      sceneFromSlideCopy(slide);
     try {
       const asset = await generatePostImage(
         {
@@ -311,6 +320,11 @@ export async function POST(
         // list left by the markup this redesign just replaced.
         photoAssetIds: serialisePhotoAssetIds(result.slide.photoAssetIds),
         imagePrompt: result.slide.photo || scene,
+        // Written alongside the ids for the same reason: this redesign
+        // replaced the markup, so a second scene from the markup it replaced
+        // would brief a slot that no longer exists. Null for a one-scene
+        // result, which is also how a stale list clears.
+        photoScenes: serialisePhotoScenes(result.slide.photoScenes),
       });
       const after = getCarousel(carousel.id);
       return NextResponse.json({
@@ -382,7 +396,11 @@ export async function POST(
       // plain { assetId } swap -- what the dialog's own step 2 now sends --
       // reaches here with scene still "", so this is a no-op for it and
       // imagePrompt is left as the slide already had it.
-      ...(scene && !slide.imagePrompt ? { imagePrompt: scene } : {}),
+      //
+      // Slot 1 only: image_prompt is SLOT 1's scene (lib/image/photoScenes),
+      // so recording a brief generated for slot 2 there would hand slot 2's
+      // scene to slot 1 the next time anything read it.
+      ...(scene && slot === 1 && !slide.imagePrompt ? { imagePrompt: scene } : {}),
     });
 
     const after = getCarousel(carousel.id);

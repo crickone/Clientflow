@@ -12,6 +12,7 @@ import {
   PHOTO_TOKEN,
   fillPhotoSlots,
   multiSlotImgTags,
+  photoSlotBoxes,
   photoSlotsUsed,
   slotsOverCap,
   tokenForSlot,
@@ -251,6 +252,81 @@ check(
     const result = fillPhotoSlots(html, (slot) => `SRC${slot}`);
     return result.includes("SRC1") && result.includes("SRC2") && !result.includes("{{PHOTO");
   })(),
+);
+
+// ── photoSlotBoxes: what each slot's <img> declares for itself ───────────
+//
+// The renderer grades each slot at its own box rather than at the whole
+// canvas, which is a ~5x saving on a two-slot slide (measured: 14.2s -> 3.2s
+// at 1:1, 46.8s -> 9.8s at 9:16). Everything here is about the boundary
+// between "this box is known in px" and "fall back to the canvas" -- getting
+// that wrong grades a photograph at a size satori never lays out, and the
+// overflow measurement then measures a layout that never rendered.
+check(
+  "a slot's px box is read off its own <img>",
+  (() => {
+    const boxes = photoSlotBoxes(img(PHOTO_TOKEN) + img("{{PHOTO:2}}"));
+    const one = boxes.get(1);
+    const two = boxes.get(2);
+    return one?.width === 1080 && one.height === 540 && two?.width === 1080 && two.height === 540;
+  })(),
+);
+check(
+  "two slots with DIFFERENT boxes each get their own, not the first one's",
+  (() => {
+    const html =
+      '<img src="{{PHOTO}}" style="width:1080px;height:720px"/>' +
+      '<img src="{{PHOTO:2}}" style="width:540px;height:360px"/>';
+    const boxes = photoSlotBoxes(html);
+    return boxes.get(1)?.height === 720 && boxes.get(2)?.width === 540;
+  })(),
+);
+check(
+  "a percentage box is NOT a box -- the caller falls back to the canvas, as before",
+  photoSlotBoxes('<img src="{{PHOTO}}" style="width:100%;height:100%"/>').size === 0,
+);
+check(
+  "one axis in px and one missing is not a box either -- satori would infer the other",
+  photoSlotBoxes('<img src="{{PHOTO}}" style="width:1080px"/>').size === 0,
+);
+check(
+  "max-width does not masquerade as width -- a declaration is matched whole",
+  photoSlotBoxes('<img src="{{PHOTO}}" style="max-width:600px;height:540px"/>').size === 0,
+);
+check(
+  "a quoted > in an earlier attribute cannot hide the style -- the scan is quote-aware",
+  photoSlotBoxes(
+    '<img alt="Before > After" src="{{PHOTO}}" style="width:1080px;height:540px"/>',
+  ).get(1)?.height === 540,
+);
+check(
+  "single-quoted styles are read too",
+  photoSlotBoxes("<img src='{{PHOTO}}' style='width:1080px;height:540px'/>").get(1)?.width === 1080,
+);
+check(
+  "an <img> carrying two DISTINCT slots sizes neither -- that markup is the audit's to reject",
+  photoSlotBoxes('<img src="{{PHOTO}}{{PHOTO:2}}" style="width:1080px;height:540px"/>').size === 0,
+);
+check(
+  "both spellings of slot 1 report the one slot's box",
+  photoSlotBoxes('<img src="{{PHOTO:1}}" style="width:1080px;height:540px"/>').get(1)?.height ===
+    540,
+);
+check(
+  "a fractional px box rounds to a whole pixel -- sharp cannot resize to half of one",
+  photoSlotBoxes('<img src="{{PHOTO}}" style="width:1080px;height:539.6px"/>').get(1)?.height ===
+    540,
+);
+check(
+  "a slot in two <img> tags takes the FIRST deterministically, rather than whichever came last",
+  photoSlotBoxes(
+    '<img src="{{PHOTO}}" style="width:1080px;height:540px"/>' +
+      '<img src="{{PHOTO}}" style="width:300px;height:200px"/>',
+  ).get(1)?.height === 540,
+);
+check(
+  "markup with no photo slot declares no boxes",
+  photoSlotBoxes('<img src="logo.png" style="width:200px;height:100px"/>').size === 0,
 );
 
 console.log(`\nphotoSlots: ${passed} checks passed`);

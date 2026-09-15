@@ -158,6 +158,9 @@ export interface AddSlideInput {
   backgroundZoom?: number;
   imageStatus?: "generating" | "ready" | "failed" | null;
   imagePrompt?: string | null;
+  /** The design's scene per photo slot, as JSON (lib/image/photoScenes.ts).
+   *  Null unless the slide carries more than one scene. */
+  photoScenes?: string | null;
   /** Serialized LayoutSpec for an AI-composed slide (lib/design/grammar.ts).
    *  Null on every slide that uses one of the fixed templates. */
   layoutJson?: string | null;
@@ -208,6 +211,7 @@ export function addSlide(input: AddSlideInput): CarouselSlide {
       backgroundZoom: input.backgroundZoom ?? 1,
       imageStatus: input.imageStatus ?? null,
       imagePrompt: input.imagePrompt ?? null,
+      photoScenes: input.photoScenes ?? null,
       layoutJson: input.layoutJson ?? null,
       designHtml: input.designHtml ?? null,
       renderFilename: input.renderFilename ?? null,
