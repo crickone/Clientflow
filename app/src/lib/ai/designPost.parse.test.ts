@@ -131,11 +131,11 @@ check("a reply with no slides array is an error", errorFor('{"caption":"c"}') !=
 
 // -- Checking what came back ----------------------------------------------
 const clean = `<div style="display:flex;background:#f2f3ed"><span style="color:#24231f">x</span></div>`;
-const good = checkDesigns([{ html: clean, photo: "" }], SYSTEM);
+const good = checkDesigns([{ html: clean, photo: "", photos: [] }], SYSTEM);
 check("a clean design has no problems", good.problems.length === 0);
 check("and is returned", good.designs.length === 1);
 
-const bad = checkDesigns([{ html: `<div style="display:flex;background:#ff00ff"></div>`, photo: "" }], SYSTEM);
+const bad = checkDesigns([{ html: `<div style="display:flex;background:#ff00ff"></div>`, photo: "", photos: [] }], SYSTEM);
 check("an off-palette design is a problem", bad.problems.length > 0);
 check("numbered by slide, so the repair call can name it", bad.problems[0].startsWith("Slide 1:"));
 check(
@@ -143,7 +143,7 @@ check(
   bad.designs.length === 1 && bad.designs[0].violations.length > 0,
 );
 
-const noFlex = checkDesigns([{ html: `<div style="background:#f2f3ed">x</div>`, photo: "" }], SYSTEM);
+const noFlex = checkDesigns([{ html: `<div style="background:#f2f3ed">x</div>`, photo: "", photos: [] }], SYSTEM);
 check(
   "markup that will not render is caught before it is rendered",
   noFlex.problems.some((p) => p.includes("display:flex")),
@@ -153,7 +153,7 @@ check(
 // element put "It's not the oxygen." and "It's the pressure." side by side on
 // one line, which then ran off the canvas.
 const withBr = checkDesigns(
-  [{ html: `<div style="display:flex"><span style="width:786px">a<br/>b</span></div>`, photo: "" }],
+  [{ html: `<div style="display:flex"><span style="width:786px">a<br/>b</span></div>`, photo: "", photos: [] }],
   SYSTEM,
 );
 check("a <br> is caught", withBr.problems.some((p) => p.includes("<br>")));
@@ -213,7 +213,7 @@ check(
     DESIGN_RULES.includes("session lengths"),
 );
 
-const empty = checkDesigns([{ html: "   ", photo: "" }], SYSTEM);
+const empty = checkDesigns([{ html: "   ", photo: "", photos: [] }], SYSTEM);
 check("an empty design is a problem", empty.problems.some((p) => p.includes("no markup")));
 
 // -- Set-level problems ---------------------------------------------------
@@ -243,9 +243,9 @@ const TWO_ACCENTS = {
     `<div style="display:flex;background:#f2f3ed"><span style="font-size:84px;color:#24231f">${words}</span><span style="font-size:28px;color:#24231f">${words} again</span></div>`;
   const repeated = checkSet(
     [
-      { html: shape("One"), photo: "" },
-      { html: `<div style="display:flex;background:#24231f"><span style="font-size:180px;color:#f2f3ed">2</span></div>`, photo: "" },
-      { html: shape("Two"), photo: "" },
+      { html: shape("One"), photo: "", photos: [] },
+      { html: `<div style="display:flex;background:#24231f"><span style="font-size:180px;color:#f2f3ed">2</span></div>`, photo: "", photos: [] },
+      { html: shape("Two"), photo: "", photos: [] },
     ],
     SYSTEM,
   );
@@ -255,8 +255,8 @@ const TWO_ACCENTS = {
 
   const varied = checkSet(
     [
-      { html: shape("One"), photo: "" },
-      { html: `<div style="display:flex;background:#24231f"><span style="font-size:180px;color:#f2f3ed">2</span></div>`, photo: "" },
+      { html: shape("One"), photo: "", photos: [] },
+      { html: `<div style="display:flex;background:#24231f"><span style="font-size:180px;color:#f2f3ed">2</span></div>`, photo: "", photos: [] },
     ],
     SYSTEM,
   );
@@ -267,8 +267,8 @@ const TWO_ACCENTS = {
 {
   const both = checkSet(
     [
-      { html: `<div style="display:flex;background:#f2f3ed"><span style="font-size:84px;color:#d4f000">a</span></div>`, photo: "" },
-      { html: `<div style="display:flex;background:#24231f"><span style="font-size:40px;color:#4a9eff">b</span></div>`, photo: "" },
+      { html: `<div style="display:flex;background:#f2f3ed"><span style="font-size:84px;color:#d4f000">a</span></div>`, photo: "", photos: [] },
+      { html: `<div style="display:flex;background:#24231f"><span style="font-size:40px;color:#4a9eff">b</span></div>`, photo: "", photos: [] },
     ],
     TWO_ACCENTS,
   );
@@ -277,8 +277,8 @@ const TWO_ACCENTS = {
 
   const one = checkSet(
     [
-      { html: `<div style="display:flex;background:#f2f3ed"><span style="font-size:84px;color:#d4f000">a</span></div>`, photo: "" },
-      { html: `<div style="display:flex;background:#24231f"><span style="font-size:40px;color:#d4f000">b</span></div>`, photo: "" },
+      { html: `<div style="display:flex;background:#f2f3ed"><span style="font-size:84px;color:#d4f000">a</span></div>`, photo: "", photos: [] },
+      { html: `<div style="display:flex;background:#24231f"><span style="font-size:40px;color:#d4f000">b</span></div>`, photo: "", photos: [] },
     ],
     TWO_ACCENTS,
   );
@@ -289,7 +289,7 @@ const TWO_ACCENTS = {
 // neither slide is wrong on its own terms, and a warning on one would be a lie.
 {
   const same = `<div style="display:flex;background:#f2f3ed"><span style="font-size:84px;color:#24231f">x</span></div>`;
-  const r = checkDesigns([{ html: same, photo: "" }, { html: same, photo: "" }], SYSTEM);
+  const r = checkDesigns([{ html: same, photo: "", photos: [] }, { html: same, photo: "", photos: [] }], SYSTEM);
   check("a set problem is in problems", r.problems.some((p) => p.includes("same composition")));
   check("and on no slide's violations", r.designs.every((d) => d.violations.length === 0));
 }
@@ -331,19 +331,120 @@ check(
 // slides in five — there was no brief to generate against.
 check(
   "every slide is asked for a scene, not just the photographed ones",
-  DESIGN_RULES.includes('EVERY slide gets a "photo" field'),
+  DESIGN_RULES.includes('EVERY slide gets a "photos" field'),
 );
 check(
   "and is told never to leave it empty",
-  DESIGN_RULES.includes("Never leave it empty."),
+  DESIGN_RULES.includes("Never leave the list empty."),
 );
 check(
   "a post with no photography still names the scene it wants",
-  NO_PHOTOGRAPHY_RULE.includes('Still fill in "photo" on every slide'),
+  NO_PHOTOGRAPHY_RULE.includes('Still fill in "photos" on every slide'),
 );
 check(
   "but still designs as though none is coming",
   NO_PHOTOGRAPHY_RULE.includes("design as though it will never arrive"),
+);
+
+// -- A slide may carry a second photograph ---------------------------------
+
+// Two photographs on one slide. The model could not ask for this before: the
+// prompt said "at most once per slide" and substitution put the SAME picture
+// everywhere the token appeared, so a comparison slide was impossible to
+// express -- which is what an operator hit asking for "infrared on top".
+check(
+  "the rules teach the indexed form",
+  DESIGN_RULES.includes("{{PHOTO:2}}"),
+);
+check(
+  "the rules cap it at two",
+  DESIGN_RULES.includes("at most TWO photographs"),
+);
+check(
+  "the rules ask for a scene per photograph",
+  DESIGN_RULES.includes('"photos"'),
+);
+
+const twoPhotoPayload = `<design>${JSON.stringify({
+  caption: "c",
+  slides: [
+    {
+      photos: ["an infrared bed, warm light", "a hyperbaric chamber, cool light"],
+      html: '<div style="display:flex"><img src="{{PHOTO}}"/><img src="{{PHOTO:2}}"/></div>',
+    },
+  ],
+})}</design>`;
+const twoRead = extractDesignPayload(twoPhotoPayload);
+check(
+  "both scenes survive the parse",
+  twoRead.slides[0].photos.length === 2 &&
+    twoRead.slides[0].photos[1] === "a hyperbaric chamber, cool light",
+);
+check(
+  "the slot-1 scene is still on `photo` for readers that never learned about slots",
+  twoRead.slides[0].photo === "an infrared bed, warm light",
+);
+
+const onePhotoPayload = `<design>${JSON.stringify({
+  caption: "c",
+  slides: [{ photo: "a quiet room", html: '<div style="display:flex"><img src="{{PHOTO}}"/></div>' }],
+})}</design>`;
+const oneRead = extractDesignPayload(onePhotoPayload);
+check(
+  "a single-scene reply still parses, and becomes a one-entry list",
+  oneRead.slides[0].photos.length === 1 && oneRead.slides[0].photos[0] === "a quiet room",
+);
+
+const threeSlots = checkDesigns(
+  [
+    {
+      html: '<div style="display:flex"><img src="{{PHOTO}}"/><img src="{{PHOTO:2}}"/><img src="{{PHOTO:3}}"/></div>',
+      photo: "a",
+      photos: ["a", "b", "c"],
+    },
+  ],
+  SYSTEM,
+);
+check(
+  "a third slot is a violation the repair call can act on",
+  threeSlots.designs[0].violations.some((v) => /two photographs/i.test(v)),
+);
+
+// A single <img> has one "src" attribute. Two slot tokens inside it is
+// malformed markup -- fillPhotoSlots (lib/design/photoSlots.ts) deliberately
+// leaves such a tag untouched rather than guess which token wins, on the
+// stated grounds that the audit rejects it. This is that rejection.
+const twoTokensOneImg = checkDesigns(
+  [
+    {
+      html: '<div style="display:flex"><img src="{{PHOTO}}{{PHOTO:2}}"/></div>',
+      photo: "a",
+      photos: ["a", "b"],
+    },
+  ],
+  SYSTEM,
+);
+check(
+  "two tokens in one <img> is a violation, not a silently broken image",
+  twoTokensOneImg.designs[0].violations.some((v) => /single src/i.test(v)),
+);
+
+// A clean two-<img> slide, one token each, is NOT a violation of either new
+// rule -- the cap check and the single-<img> check must not fire on the
+// shape they exist to allow.
+const cleanTwoPhoto = checkDesigns(
+  [
+    {
+      html: '<div style="display:flex"><img src="{{PHOTO}}"/><img src="{{PHOTO:2}}"/></div>',
+      photo: "a",
+      photos: ["a", "b"],
+    },
+  ],
+  SYSTEM,
+);
+check(
+  "two photographs in two separate <img>s is not a violation",
+  !cleanTwoPhoto.designs[0].violations.some((v) => /two photographs|single src/i.test(v)),
 );
 
 console.log(`\ndesignPost.parse: ${passed} checks passed`);

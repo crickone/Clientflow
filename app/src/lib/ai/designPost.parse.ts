@@ -9,13 +9,22 @@
  */
 import { auditDesignHtml, extractColours } from "@/lib/design/htmlAudit";
 import { TYPE_LEVELS, columnWidth, type DesignSystem } from "@/lib/design/parse";
-import { PHOTO_TOKEN } from "@/lib/design/photoSlots";
+import { MAX_PHOTO_SLOTS, PHOTO_TOKEN, photoSlotsUsed, slotsOverCap } from "@/lib/design/photoSlots";
 import { findTextRuns } from "@/lib/design/textRuns";
 
 export interface RawDesign {
   html: string;
-  /** A photographic scene for this slide, or "" when the design uses none. */
+  /**
+   * The scene for SLOT 1, or "" when the design uses none.
+   *
+   * Kept alongside `photos` because several readers only ever want the one
+   * scene -- the editor's "This slide asked for:" hint, and the photo route's
+   * fallback brief -- and making them all index into a list would be churn for
+   * nothing.
+   */
   photo: string;
+  /** A scene per slot, index 0 being slot 1. One entry for a one-photograph slide. */
+  photos: string[];
 }
 
 export interface CheckedDesign extends RawDesign {
@@ -164,9 +173,11 @@ SET HEADINGS LARGE. A carousel is read at thumbnail size in a feed, so a heading
 
 Never place two items SIDE BY SIDE to compare them -- at feed size a pair of columns becomes two narrow strips nobody reads. Stack them down the page instead, each with its own heading at subhead size or larger, separated by a rule or a change of ground rather than shut inside cards.
 
-Where a slide uses a photograph, write the src EXACTLY as ${PHOTO_TOKEN} -- that placeholder is replaced with the real image. Use it at most once per slide.
+Where a slide uses a photograph, write the src EXACTLY as ${PHOTO_TOKEN} -- that placeholder is replaced with the real image.
 
-EVERY slide gets a "photo" field, whether or not its design uses one. It names the photograph that would suit THIS slide -- subject, setting, mood, composition -- so the operator can have that picture taken or generated later and drop it in. A slide you designed on a flat ground still says what it would want; describe the scene that belongs with its words, not a generic room. Never describe text, signage or lettering in shot. Never leave it empty.
+A slide may carry at most TWO photographs. For a SECOND one, write its src as {{PHOTO:2}}. Two is for a genuine comparison -- two therapies, before and after, two ways of doing a thing -- where the pictures carry the point between them. It is not for decoration: one photograph well placed beats two fighting each other. Never write {{PHOTO:3}} or higher.
+
+EVERY slide gets a "photos" field: a LIST of scenes, one per photograph the design uses, in slot order. A slide with one photograph has one entry; a slide with two has two, the first describing {{PHOTO}} and the second describing {{PHOTO:2}}. A slide you designed on a flat ground still gives one entry, naming the photograph that WOULD suit it -- that is how the operator gets the picture that is missing. Each entry names subject, setting, mood, composition. Never describe text, signage or lettering in shot. Never leave the list empty.
 
 Copy: plain text, no markdown, no emojis, no hashtags. Headings short and concrete.
 
@@ -177,7 +188,7 @@ Output format -- return ONLY this JSON inside <design>...</design> tags, no othe
 {
   "caption": "the Instagram caption for the whole post",
   "slides": [
-    { "photo": "a quiet treatment room, daylight", "html": "<div style=\\"display:flex;position:relative;width:1080px;height:1080px;...\\">...</div>" }
+    { "photos": ["a quiet treatment room, daylight"], "html": "<div style=\\"display:flex;position:relative;width:1080px;height:1080px;...\\">...</div>" }
   ]
 }
 </design>
@@ -232,7 +243,24 @@ Do not draw a logo, a wordmark or the business name yourself.`;
  * flat ground as a muddy wash. A design that never expected a photograph is
  * coherent; one with the photograph cut out of it is not.
  */
-export const NO_PHOTOGRAPHY_RULE = `NO PHOTOGRAPHY IS AVAILABLE for this post. Every slide must work on a flat ground. Do not write ${PHOTO_TOKEN}, do not write an <img>, and do not build a scrim or gradient of the kind that only makes sense over an image. Still fill in "photo" on every slide with the scene that would suit it -- that is how the operator gets the picture that is missing -- but design as though it will never arrive.`;
+export const NO_PHOTOGRAPHY_RULE = `NO PHOTOGRAPHY IS AVAILABLE for this post. Every slide must work on a flat ground. Do not write ${PHOTO_TOKEN}, do not write an <img>, and do not build a scrim or gradient of the kind that only makes sense over an image. Still fill in "photos" on every slide with a one-entry list holding the scene that would suit it -- that is how the operator gets the picture that is missing -- but design as though it will never arrive.`;
+
+/**
+ * The scenes a reply carries, from either shape. Trimmed, empties dropped, and
+ * capped at the slot limit so a model that ignored the cap cannot make the
+ * renderer look for photographs that the audit is about to reject anyway.
+ */
+function readScenes(o: Record<string, unknown>): string[] {
+  const list = Array.isArray(o.photos)
+    ? o.photos
+    : typeof o.photo === "string"
+      ? [o.photo]
+      : [];
+  return list
+    .map((s) => (typeof s === "string" ? s.trim() : ""))
+    .filter(Boolean)
+    .slice(0, MAX_PHOTO_SLOTS);
+}
 
 export function extractDesignPayload(text: string): {
   slides: RawDesign[];
@@ -265,7 +293,11 @@ export function extractDesignPayload(text: string): {
       const o = s as Record<string, unknown>;
       return {
         html: typeof o.html === "string" ? o.html : "",
-        photo: typeof o.photo === "string" ? o.photo.trim() : "",
+        // Both shapes: `photos` is what the rules now ask for, `photo` is what
+        // a model that ignored them (or an older stored reply) sends. Neither
+        // is an error -- one photograph is the common slide.
+        photos: readScenes(o),
+        photo: readScenes(o)[0] ?? "",
       };
     }),
   };
@@ -375,6 +407,31 @@ export function checkDesigns(
       if (/<br\b/i.test(r.html)) {
         violations.push(
           "This uses <br>, which is not a line break here -- it puts the text side by side on one line. Let the text wrap inside an explicit width instead.",
+        );
+      }
+      // A slot past the cap would render as a broken box: nothing ever assigns
+      // a photograph to it. Cheaper to let the repair call redesign the slide
+      // than to drop the extra image and leave a composition built around a
+      // picture that is gone.
+      const slots = photoSlotsUsed(r.html);
+      if (slotsOverCap(r.html).length > 0) {
+        violations.push(
+          `A slide may carry at most two photographs; this one asks for ${slots.length}.`,
+        );
+      }
+      // An <img> has exactly one "src". Two slot tokens in the same element is
+      // malformed markup, and fillPhotoSlots (lib/design/photoSlots.ts)
+      // deliberately leaves such a tag untouched rather than guess which token
+      // wins -- both raw "{{PHOTO}}"-style tokens would then reach the
+      // renderer and satori draws them as empty boxes. Catch it here instead,
+      // where the repair call can redesign the slide with two separate <img>s.
+      const imgTags = r.html.match(/<img\b[^>]*>/gi) ?? [];
+      const multiTokenImg = imgTags.some(
+        (tag) => (tag.match(/\{\{PHOTO(?::\d+)?\}\}/g) ?? []).length > 1,
+      );
+      if (multiTokenImg) {
+        violations.push(
+          "One <img> element carries two photo tokens; an <img> has a single src -- give each photograph its own <img>.",
         );
       }
     }
