@@ -12,6 +12,7 @@ import {
   PHOTO_TOKEN,
   fillPhotoSlots,
   photoSlotsUsed,
+  slotsOverCap,
   tokenForSlot,
   usesPhoto,
 } from "./photoSlots";
@@ -69,6 +70,88 @@ check("the surviving slot is untouched", oneMissing.includes("SRC1"));
 check(
   "markup with no slots comes back identical",
   fillPhotoSlots("<div>plain</div>", () => "X") === "<div>plain</div>",
+);
+
+// slotsOverCap: reporting is unfiltered (photoSlotsUsed), only this predicate
+// (used by the audit) draws the line.
+check("nothing over cap when within range", slotsOverCap(img(PHOTO_TOKEN) + img("{{PHOTO:2}}")).length === 0);
+check(
+  "a third slot is reported as over cap, not silently dropped",
+  JSON.stringify(slotsOverCap(img("{{PHOTO:3}}"))) === "[3]",
+);
+check(
+  "photoSlotsUsed itself still surfaces the out-of-range slot -- the audit needs to SEE it to reject it",
+  JSON.stringify(photoSlotsUsed(img("{{PHOTO:99}}"))) === "[99]",
+);
+
+// A zero-padded index is a mistyped slot, not "slot 7" -- see the doc comment
+// on photoSlotsUsed for why aliasing it would be worse than rejecting it.
+check(
+  "a leading-zero index ({{PHOTO:007}}) is not a slot at all",
+  photoSlotsUsed(img("{{PHOTO:007}}")).length === 0 && usesPhoto(img("{{PHOTO:007}}")) === false,
+);
+
+// Finding 1: a quoted '>' before the token must not stop the tag scan early.
+// The counter-example a reviewer proved against the old [^>]*-based regex:
+// it truncated at the '>' inside the alt text and never reached the token,
+// so the "remove this slot" path was a silent no-op and the raw placeholder
+// reached the renderer.
+check(
+  "a '>' inside a DOUBLE-quoted attribute before the token does not defeat removal",
+  (() => {
+    const html = `<img alt="Before > After" src="${PHOTO_TOKEN}">`;
+    const result = fillPhotoSlots(html, () => null);
+    return !result.includes(PHOTO_TOKEN) && !result.includes("<img");
+  })(),
+);
+check(
+  "a '>' inside a SINGLE-quoted value before the token does not defeat removal",
+  (() => {
+    const html = `<img alt='Before > After' src="${PHOTO_TOKEN}">`;
+    const result = fillPhotoSlots(html, () => null);
+    return !result.includes(PHOTO_TOKEN) && !result.includes("<img");
+  })(),
+);
+check(
+  "an unquoted attribute value ahead of the token does not defeat removal",
+  (() => {
+    const html = `<img data-x=before src="${PHOTO_TOKEN}">`;
+    const result = fillPhotoSlots(html, () => null);
+    return !result.includes(PHOTO_TOKEN) && !result.includes("<img");
+  })(),
+);
+check(
+  "a self-closing <img ... /> is removed like any other",
+  (() => {
+    const html = `<img alt="Before > After" src="${PHOTO_TOKEN}" />`;
+    const result = fillPhotoSlots(html, () => null);
+    return !result.includes(PHOTO_TOKEN) && !result.includes("<img");
+  })(),
+);
+
+// Finding 3: two tokens sharing one <img> is malformed (one element, one
+// src). Chosen behaviour: leave that element completely untouched -- both
+// raw tokens survive -- rather than remove it and silently discard whichever
+// slot's value the caller believed was placed.
+check(
+  "nulling one slot in a two-token <img> leaves the whole element untouched, rather than silently discarding the other slot's filled value",
+  (() => {
+    const html = `<img src="${PHOTO_TOKEN}" data-x="{{PHOTO:2}}">`;
+    const result = fillPhotoSlots(html, (slot) => (slot === 1 ? null : "SRC2"));
+    return result === html;
+  })(),
+);
+
+// Finding 4: each slot's own value is substituted exactly once. A value that
+// happens to contain another slot's token text verbatim must not be rewritten
+// by that slot's later pass -- otherwise the fill function would not be safe
+// for the general `(slot) => string | null` contract it advertises.
+check(
+  "a slot's own substituted value is never re-scanned by a later slot's pass",
+  (() => {
+    const result = fillPhotoSlots(two, (slot) => (slot === 1 ? "xxx{{PHOTO:2}}yyy" : "SRC2"));
+    return result.includes("xxx{{PHOTO:2}}yyy") && !result.includes("xxxSRC2yyy");
+  })(),
 );
 
 console.log(`\nphotoSlots: ${passed} checks passed`);
