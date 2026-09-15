@@ -12,7 +12,7 @@
 // into the render store. The recipe IS the composition of those, so stubbing
 // any of them would test the arrangement of mocks rather than the thing.
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import sharp from "sharp";
@@ -21,7 +21,7 @@ import { PHOTO_TOKEN } from "../ai/designPost.parse";
 import { renderFilePath } from "../image/renderStore";
 import { loadDesignFonts } from "./fonts";
 import type { DesignSystem } from "./parse";
-import { gradedPhotoDataUri, measureOverflowPx } from "./renderDesign";
+import { gradedPhotoDataUri, measureOverflowPx, renderDesignToPng } from "./renderDesign";
 import { fillPhotoSlots, photoSlotBoxes, photoSlotsUsed } from "./photoSlots";
 import { CANVAS, canvasFor, measurementHtmlFor, renderDesignedSlide } from "./renderDesignedSlide";
 
@@ -55,6 +55,44 @@ async function samplePhoto(
     .toBuffer();
   const file = path.join(dir, name);
   writeFileSync(file, png);
+  return file;
+}
+
+/**
+ * A photograph with a distinct top band and bottom band -- unlike samplePhoto,
+ * which is deliberately a single flat colour and so crops identically no
+ * matter what box it is graded at. The gate check needs a fixture where
+ * cropping to a DIFFERENT aspect actually changes what is visible: a 320x240
+ * source (4:3) cropped to a 1080x1080 square keeps its full height (cover
+ * crops the sides), while cropped to a 1080x540 box (2:1, wider than the
+ * source) it loses part of a band (cover crops top/bottom) -- so a
+ * canvas-graded and a box-graded copy of the same file are visibly, and
+ * therefore byte-wise, different.
+ */
+async function bandedPhoto(dir: string, name: string): Promise<string> {
+  const width = 320;
+  const height = 240;
+  const top = await sharp({
+    create: { width, height: height / 2, channels: 3, background: { r: 30, g: 60, b: 160 } },
+  })
+    .png()
+    .toBuffer();
+  const bottom = await sharp({
+    create: { width, height: height / 2, channels: 3, background: { r: 220, g: 140, b: 40 } },
+  })
+    .png()
+    .toBuffer();
+  const composed = await sharp({
+    create: { width, height, channels: 3, background: { r: 0, g: 0, b: 0 } },
+  })
+    .composite([
+      { input: top, left: 0, top: 0 },
+      { input: bottom, left: 0, top: height / 2 },
+    ])
+    .png()
+    .toBuffer();
+  const file = path.join(dir, name);
+  writeFileSync(file, composed);
   return file;
 }
 
@@ -144,6 +182,11 @@ async function main() {
   // same one twice" would hold no matter what the renderer did with the slots.
   const photoA = photoPath;
   const photoB = await samplePhoto(tmp, "photo-b.png", { r: 40, g: 70, b: 160 });
+  // Banded (top/bottom colour split), for the grading-gate checks below --
+  // samplePhoto's flat colour crops identically to any box, which would make
+  // the gate untestable by pixel comparison.
+  const bandedA = await bandedPhoto(tmp, "banded-a.png");
+  const bandedB = await bandedPhoto(tmp, "banded-b.png");
   const logoPath = await writeLogo(tmp);
 
   // ── the canvas table ────────────────────────────────────────────────────
@@ -466,6 +509,91 @@ async function main() {
     check(
       "a slot with no px box falls back to the canvas, as every slot did before",
       bled.length === 1 && bled[0].width === 1080 && bled[0].height === 1080,
+    );
+
+    // ── the gate: per-box grading only once a slide has MORE THAN ONE slot ──
+    //
+    // Pinned by reconstructing what each grading policy would have produced
+    // and comparing PNG bytes -- not standInSizes, which only proves the
+    // stand-in agrees with whatever box photoSlotBoxes hands it, not which
+    // box the real recipe chose. Both <img>s below pin width AND height in
+    // their style, so satori lays each one out identically regardless of
+    // which crop is embedded in it (see the module doc comment on
+    // measurementHtmlFor) -- only the EMBEDDED PIXELS differ between a
+    // canvas-graded and a box-graded photograph, which is exactly the signal
+    // the gate needs to be judged on.
+    const bandFonts = await loadDesignFonts(SYSTEM.font, SYSTEM.bodyFont, SYSTEM.altFont);
+
+    // A single slot pinning a sub-canvas box (a half-height band is the
+    // common shape of a slide already published) must still grade at the
+    // canvas, exactly as every slot did before per-slot sizing existed --
+    // otherwise a published one-photograph slide would silently re-frame the
+    // next time anything re-renders it. See the comment above `declared` in
+    // renderDesignedSlide.ts.
+    const oneSlotBand =
+      '<div style="display:flex;flex-direction:column;width:1080px;height:1080px;background:#f2f3ed;font-family:Inter">' +
+      '<img src="{{PHOTO}}" style="width:1080px;height:540px" />' +
+      "</div>";
+    const bandRender = await renderDesignedSlide({
+      html: oneSlotBand,
+      aspectRatio: "1:1",
+      photo: { path: bandedA },
+      logoPath: null,
+      system: SYSTEM,
+    });
+    const actualBandPng = readFileSync(renderFilePath(bandRender.filename));
+
+    const canvasGraded = await gradedPhotoDataUri(bandedA, 1080, 1080, SYSTEM.photo);
+    const expectedCanvasGradePng = await renderDesignToPng(
+      fillPhotoSlots(oneSlotBand, () => canvasGraded),
+      1080,
+      1080,
+      bandFonts,
+    );
+    check(
+      "a single-slot slide with a sub-canvas box grades at the canvas, byte-identical to canvas grading",
+      Buffer.compare(actualBandPng, expectedCanvasGradePng) === 0,
+    );
+
+    const boxGraded = await gradedPhotoDataUri(bandedA, 1080, 540, SYSTEM.photo);
+    const wouldBeBoxGradePng = await renderDesignToPng(
+      fillPhotoSlots(oneSlotBand, () => boxGraded),
+      1080,
+      1080,
+      bandFonts,
+    );
+    check(
+      "and differs from what grading at its own 1080x540 box would have produced",
+      Buffer.compare(actualBandPng, wouldBeBoxGradePng) !== 0,
+    );
+
+    // The identical box, on a SECOND slot, flips the gate: now the slide has
+    // more than one slot, so both grade at their own box.
+    const twoSlotBands =
+      '<div style="display:flex;flex-direction:column;width:1080px;height:1080px;background:#f2f3ed;font-family:Inter">' +
+      '<img src="{{PHOTO}}" style="width:1080px;height:540px" />' +
+      '<img src="{{PHOTO:2}}" style="width:1080px;height:540px" />' +
+      "</div>";
+    const twoBandRender = await renderDesignedSlide({
+      html: twoSlotBands,
+      aspectRatio: "1:1",
+      photos: [{ path: photoA }, { path: photoB }],
+      logoPath: null,
+      system: SYSTEM,
+    });
+    const actualTwoBandPng = readFileSync(renderFilePath(twoBandRender.filename));
+
+    const boxGradedA = await gradedPhotoDataUri(photoA, 1080, 540, SYSTEM.photo);
+    const boxGradedB = await gradedPhotoDataUri(photoB, 1080, 540, SYSTEM.photo);
+    const expectedBoxGradePng = await renderDesignToPng(
+      fillPhotoSlots(twoSlotBands, (slot) => (slot === 1 ? boxGradedA : boxGradedB)),
+      1080,
+      1080,
+      bandFonts,
+    );
+    check(
+      "a two-slot slide with the same box grades at its own boxes, byte-identical to box grading",
+      Buffer.compare(actualTwoBandPng, expectedBoxGradePng) === 0,
     );
   }
 

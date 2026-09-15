@@ -15,9 +15,11 @@
  * taught that "{{PHOTO:2}}" exists reaches for "{{PHOTO:1}}" by the same
  * symmetry, and REPORTING that as slot 1 while FILLING recognised only the
  * bare spelling used to be exactly the gap -- the raw indexed token survived
- * to satori and drew an empty box. Both spellings resolve to the one slot,
- * so a design that mixes them (rather than always writing the bare form) is
- * not an error: it gets the one photograph, wherever either spelling sits.
+ * to satori, which throws ("Image source must be an absolute URL:
+ * {{PHOTO:2}}") rather than rendering anything. Both spellings resolve to
+ * the one slot, so a design that mixes them (rather than always writing the
+ * bare form) is not an error: it gets the one photograph, wherever either
+ * spelling sits.
  * See spellingsForSlot, below tokenForSlot.
  *
  * Pure and dependency-free: it runs in the browser (the editor asks whether a
@@ -225,8 +227,11 @@ function styleOf(tag: string): string {
  * Why it exists: the renderer used to grade every slot at the whole canvas, so
  * a stacked comparison embedded two full-canvas JPEGs in one slide and pushed
  * both through satori. Grading each slot at its own box is the same picture at
- * a quarter of the bytes -- and a better one, since sharp's cover-crop then
- * matches the box's aspect instead of being stretched into it by satori.
+ * a quarter of the bytes -- and a better one: satori itself honours
+ * `object-fit: cover` and crops (top-anchored), so the old path was a crop
+ * of a crop -- sharp cropping to the canvas's aspect, then satori cropping a
+ * band out of that -- while grading at the slot's own box is one
+ * subject-aware crop, made at the shape that will actually be seen.
  *
  * ONLY px on both axes. A percentage, a flex-grown box or a missing axis
  * cannot be resolved without laying the design out, which is satori's job and

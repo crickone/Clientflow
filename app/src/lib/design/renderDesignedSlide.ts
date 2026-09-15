@@ -123,19 +123,39 @@ async function withPhotos(
   const slots = photoSlotsUsed(html);
   if (slots.length === 0) return { html, boxes: new Map() };
 
-  // Each slot is graded at ITS OWN box, not at the whole canvas. A stacked
-  // comparison gives each <img> half the canvas, and grading both at the full
-  // canvas embedded two full-size JPEGs in one slide: measured on real library
+  // Each slot is graded at ITS OWN box, not at the whole canvas -- but only
+  // once the slide actually HAS more than one slot. A stacked comparison
+  // gives each <img> half the canvas, and grading both at the full canvas
+  // embedded two full-size JPEGs in one slide: measured on real library
   // photographs, a two-slot 1:1 slide took 51.6s that way against 10.4s
   // grading each slot at 1080x540 -- satori and sharp are paid by the byte,
   // and three of the editor's client paths abort at 180s while the server
   // keeps writing, so the operator sees an error on a change that landed.
   //
+  // The gate is deliberate, not an oversight. A one-photograph slide can
+  // ALSO pin a sub-canvas box (a half-height band is a common design), and
+  // grading it at that box rather than the canvas is genuinely a better
+  // photograph -- the whole scene sharp hands satori, instead of a crop of a
+  // crop. But it is a visible re-frame of a slide that may already be
+  // published, and it would land the first time anything re-renders that
+  // slide at all -- a one-word text edit, a photo swap, a redesign -- with
+  // no operator having asked for new framing. This fix's job is the cost win
+  // for slides a two-photograph comparison creates; it is not licence to
+  // silently re-frame slides that predate it. So: only a slide using MORE
+  // THAN ONE slot is graded per-box. A single-slot slide is graded at the
+  // canvas exactly as it always has been, and renders byte-identically
+  // forever. Extending the better framing to single-slot slides is one
+  // condition away -- drop the `slots.length > 1` check below -- whenever
+  // someone decides re-framing existing work is an acceptable trade.
+  //
   // Only a box declared in px on both axes is used; anything else (a
   // percentage, a flex-grown box) falls back to the canvas exactly as before,
   // which is what keeps a full-bleed one-photograph slide byte-identical.
   // Clamped to the canvas so this can never make a grade LARGER than today's.
-  const declared = photoSlotBoxes(html);
+  const declared =
+    slots.length > 1
+      ? photoSlotBoxes(html)
+      : new Map<number, { width: number; height: number }>();
   const boxFor = (slot: number): { width: number; height: number } => {
     const box = declared.get(slot);
     if (!box) return { width, height };
