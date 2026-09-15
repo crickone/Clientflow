@@ -11,6 +11,7 @@ import {
 } from "@/components/layout/Sidebar";
 import { Logo } from "@/components/ui/Logo";
 import { VocabProvider } from "@/components/providers/VocabProvider";
+import { GenerationWatcher } from "@/components/content-studio/GenerationWatcher";
 import type { Vocab } from "@/lib/vocabulary";
 import type { ThemeMode } from "@/lib/theme";
 
@@ -105,6 +106,12 @@ export function AppShell({
           </div>
           {children}
         </main>
+        {/* Renders nothing. It watches detached carousel generations started in
+            this browser and notifies when they finish -- which has to happen
+            ABOVE the page, because the operator is invited to navigate away
+            from the editor while the run continues on the server. Idle (the
+            usual case) it holds no timer and makes no requests. */}
+        <GenerationWatcher />
       </div>
     </VocabProvider>
   );

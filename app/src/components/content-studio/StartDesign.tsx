@@ -9,6 +9,7 @@ import { Label, Textarea } from "@/components/ui/Input";
 import { PostIdeas } from "./PostIdeas";
 import { DEFAULT_CAROUSEL_SLOT, DEFAULT_SLOT } from "@/lib/image/slots";
 import { titleFrom } from "@/lib/content-studio/title";
+import { watchGeneration } from "./GenerationWatcher";
 
 /**
  * Step 1 of the image flow: say what you're making before anything else.
@@ -174,6 +175,11 @@ export function StartDesign() {
       setBusy(null);
       return;
     }
+    // The run is detached and the operator is free to leave the editor it is
+    // about to land in -- so register the watch that notifies them when the
+    // slides are done, wherever they have got to by then. Same click that
+    // justifies asking for notification permission.
+    watchGeneration(id, titleFrom(topic, 80) || "Untitled design");
     router.push(`/content-studio/images/${id}`);
   }
 

@@ -90,6 +90,7 @@ import {
   type DesignState,
 } from "@/lib/content-studio/designState";
 import { progressLabel, type DialogPhase } from "@/lib/content-studio/progressLabel";
+import { watchGeneration } from "./GenerationWatcher";
 import { EditorSection } from "./EditorSection";
 import { PostIdeas } from "./PostIdeas";
 
@@ -1871,6 +1872,7 @@ export function ImageDesigner({
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
             <GenerateCarouselButton
               designId={designId}
+              designName={name}
               slotKey={isCarouselSlot(activeSlot) ? activeSlot : carouselSlotFor()}
               defaultTopic={
                 slidesInSlot[0]?.headingText?.trim() ||
@@ -2567,11 +2569,14 @@ function SaveStatus({
  */
 function GenerateCarouselButton({
   designId,
+  designName,
   slotKey,
   defaultTopic,
   onStarted,
 }: {
   designId: number;
+  /** Used only to name the design in the completion notification. */
+  designName: string;
   slotKey: string;
   defaultTopic: string;
   /** The run is QUEUED, not finished -- the editor polls for the slides. */
@@ -2626,6 +2631,13 @@ function GenerateCarouselButton({
       // The response says the run STARTED. The slides are written by a detached
       // continuation and arrive through the editor's poll, which is what lets
       // the operator navigate away without killing the generation.
+      //
+      // Which is exactly why the watch is registered HERE: the editor's poll
+      // dies with this page, so the shell's watcher is what tells them it
+      // finished once they have gone elsewhere. This click is also the gesture
+      // that makes the notification-permission prompt expected -- watchGeneration
+      // asks for it, and only ever from here.
+      watchGeneration(designId, designName);
       setOpen(false);
       onStarted(slotKey);
     } catch (err) {
