@@ -9,6 +9,7 @@
  */
 import { auditDesignHtml, extractColours } from "@/lib/design/htmlAudit";
 import { TYPE_LEVELS, columnWidth, type DesignSystem } from "@/lib/design/parse";
+import { PHOTO_TOKEN } from "@/lib/design/photoSlots";
 import { findTextRuns } from "@/lib/design/textRuns";
 
 export interface RawDesign {
@@ -23,7 +24,11 @@ export interface CheckedDesign extends RawDesign {
 
 /** The placeholder the model writes where a photograph goes. Substituted with a
  *  graded data URI at render time, because satori cannot fetch a URL. */
-export const PHOTO_TOKEN = "{{PHOTO}}";
+// The placeholder now lives in lib/design/photoSlots, which also knows the
+// indexed form and how to fill each slot. Re-exported here because the prompt
+// text below interpolates it and several modules already import it from this
+// file; the constant itself must have exactly one definition.
+export { PHOTO_TOKEN };
 
 /** The tenant's system, as instructions a designer can act on. */
 export function describeSystemForDesign(system: DesignSystem): string {
