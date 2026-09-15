@@ -175,4 +175,82 @@ check(
   multiSlotImgTags(img(PHOTO_TOKEN + PHOTO_TOKEN)).length === 0,
 );
 
+// {{PHOTO:1}} is slot 1's indexed spelling, not a distinct slot and not an
+// unfilled token: a model that has just learned "{{PHOTO:2}}" reaches for
+// "{{PHOTO:1}}" by the same symmetry (see the module doc comment and
+// spellingsForSlot). photoSlotsUsed already read it as slot 1 before this
+// fix -- the gap was that fillPhotoSlots only recognised the bare spelling
+// when substituting, so "{{PHOTO:1}}" reached the renderer untouched.
+check(
+  "{{PHOTO:1}} alone reads as slot 1, same as the bare form",
+  JSON.stringify(photoSlotsUsed(img("{{PHOTO:1}}"))) === "[1]",
+);
+check(
+  "{{PHOTO:1}} alone is filled -- no raw token survives",
+  (() => {
+    const result = fillPhotoSlots(img("{{PHOTO:1}}"), () => "SRC1");
+    return result.includes("SRC1") && !result.includes("{{PHOTO");
+  })(),
+);
+check(
+  "usesPhoto is true for the indexed spelling of slot 1",
+  usesPhoto(img("{{PHOTO:1}}")) === true,
+);
+
+// {{PHOTO:1}} and {{PHOTO}} together, in the SAME <img>: both spellings
+// resolve to slot 1, so this is the same case as one spelling repeated
+// twice -- not two distinct slots sharing an element -- and both instances
+// get slot 1's one value. That is the right call: nulling one occurrence
+// but not the other would mean guessing which spelling the caller "meant",
+// and leaving the tag untouched (the two-DISTINCT-slots behaviour) would
+// let a raw token reach the renderer for no reason, since there is only
+// one photograph in play either way.
+check(
+  "{{PHOTO:1}} and {{PHOTO}} in the SAME <img> collide onto slot 1, not two slots",
+  photoSlotsUsed(`<img src="${PHOTO_TOKEN}" data-x="{{PHOTO:1}}">`).length === 1,
+);
+check(
+  "{{PHOTO:1}} and {{PHOTO}} in the SAME <img> both get slot 1's value filled in",
+  (() => {
+    const html = `<img src="${PHOTO_TOKEN}" data-x="{{PHOTO:1}}">`;
+    const result = fillPhotoSlots(html, () => "SRC1");
+    return (result.match(/SRC1/g) ?? []).length === 2 && !result.includes("{{PHOTO");
+  })(),
+);
+
+// {{PHOTO:1}} and {{PHOTO}} together, in DIFFERENT <img> elements of the same
+// design: they are still the same slot (there is only one bare token), so the
+// design is reported as using ONE slot, not two -- and both elements get
+// filled with that slot's single value, i.e. the same photograph twice. That
+// mirrors two separate <img>s each carrying the literal bare token, which
+// already filled identically before this fix.
+check(
+  "{{PHOTO:1}} and {{PHOTO}} in DIFFERENT <img>s in one design still read as ONE slot",
+  JSON.stringify(photoSlotsUsed(img(PHOTO_TOKEN) + img("{{PHOTO:1}}"))) === "[1]",
+);
+check(
+  "{{PHOTO:1}} and {{PHOTO}} in DIFFERENT <img>s both fill with slot 1's value, and no raw token survives",
+  (() => {
+    const html = img(PHOTO_TOKEN) + img("{{PHOTO:1}}");
+    const result = fillPhotoSlots(html, () => "SRC1");
+    return (result.match(/SRC1/g) ?? []).length === 2 && !result.includes("{{PHOTO");
+  })(),
+);
+
+// {{PHOTO:1}} and {{PHOTO:2}} together: two DISTINCT slots, so this is the
+// ordinary two-photograph case (same shape as the bare form + {{PHOTO:2}}
+// already covered above) -- each slot keeps its own value.
+check(
+  "{{PHOTO:1}} and {{PHOTO:2}} together read as two distinct slots, ascending",
+  JSON.stringify(photoSlotsUsed(img("{{PHOTO:1}}") + img("{{PHOTO:2}}"))) === "[1,2]",
+);
+check(
+  "{{PHOTO:1}} and {{PHOTO:2}} each fill with their OWN value, and no raw token survives",
+  (() => {
+    const html = img("{{PHOTO:1}}") + img("{{PHOTO:2}}");
+    const result = fillPhotoSlots(html, (slot) => `SRC${slot}`);
+    return result.includes("SRC1") && result.includes("SRC2") && !result.includes("{{PHOTO");
+  })(),
+);
+
 console.log(`\nphotoSlots: ${passed} checks passed`);

@@ -11,6 +11,15 @@
  * contains it, and this is not a deprecated form: a one-photograph slide is
  * still the common case and should not have to say "1".
  *
+ * Slot 1 is also reachable by its indexed spelling, "{{PHOTO:1}}": a model
+ * taught that "{{PHOTO:2}}" exists reaches for "{{PHOTO:1}}" by the same
+ * symmetry, and REPORTING that as slot 1 while FILLING recognised only the
+ * bare spelling used to be exactly the gap -- the raw indexed token survived
+ * to satori and drew an empty box. Both spellings resolve to the one slot,
+ * so a design that mixes them (rather than always writing the bare form) is
+ * not an error: it gets the one photograph, wherever either spelling sits.
+ * See spellingsForSlot, below tokenForSlot.
+ *
  * Pure and dependency-free: it runs in the browser (the editor asks whether a
  * slide has a photo slot) and on the server (the renderer fills them).
  *
@@ -49,6 +58,23 @@ const SLOT_RE = /\{\{PHOTO(?::(\d+))?\}\}/g;
 /** The token text for a slot. Slot 1 is bare so existing markup keeps parsing. */
 export function tokenForSlot(slot: number): string {
   return slot <= 1 ? PHOTO_TOKEN : `{{PHOTO:${slot}}}`;
+}
+
+/**
+ * Every literal spelling that FILLS a given slot -- as opposed to tokenForSlot,
+ * which is the one spelling this module HANDS OUT when generating a new token.
+ * Slot 1 has two: the bare form (tokenForSlot's answer, and what every stored
+ * slide already contains) and its indexed twin "{{PHOTO:1}}". photoSlotsUsed
+ * already reads "{{PHOTO:1}}" as slot 1 -- SLOT_RE treats "1" as a canonical
+ * index, same as "2" -- so a model that has just been taught "{{PHOTO:2}}"
+ * exists reaches for "{{PHOTO:1}}" by the same symmetry, and REPORTING it as
+ * slot 1 while FILLING only recognised the bare spelling was exactly the gap:
+ * fillPhotoSlots would search the tag for "{{PHOTO}}", find nothing, and leave
+ * "{{PHOTO:1}}" to reach satori as an unfilled empty box. Every other slot has
+ * exactly one spelling, since only slot 1 is bare.
+ */
+function spellingsForSlot(slot: number): string[] {
+  return slot === 1 ? [PHOTO_TOKEN, "{{PHOTO:1}}"] : [tokenForSlot(slot)];
 }
 
 /**
@@ -168,9 +194,15 @@ function substituteTokens(
   values: Map<number, string | null>,
 ): string {
   if (remaining.length === 0) return text;
-  const tokenRe = new RegExp(remaining.map((s) => escapeRegExp(tokenForSlot(s))).join("|"), "g");
+  // Every spelling of every remaining slot goes into one map, so "{{PHOTO}}"
+  // and "{{PHOTO:1}}" both resolve to slot 1's value -- see spellingsForSlot.
+  const spellingToSlot = new Map<string, number>();
+  for (const s of remaining) {
+    for (const spelling of spellingsForSlot(s)) spellingToSlot.set(spelling, s);
+  }
+  const tokenRe = new RegExp([...spellingToSlot.keys()].map(escapeRegExp).join("|"), "g");
   return text.replace(tokenRe, (matched) => {
-    const slot = remaining.find((s) => tokenForSlot(s) === matched);
+    const slot = spellingToSlot.get(matched);
     return slot != null ? (values.get(slot) as string) : matched;
   });
 }
@@ -208,13 +240,32 @@ export function fillPhotoSlots(
   for (const tag of tags) {
     out += substituteTokens(html.slice(cursor, tag.start), remaining, values);
 
-    const tokensInTag = slots.filter((s) => tag.text.includes(tokenForSlot(s)));
+    // photoSlotsUsed, not a tokenForSlot-only check: it already folds every
+    // spelling of a slot (bare "{{PHOTO}}" and indexed "{{PHOTO:1}}" both) into
+    // that slot's number, so a tag holding both spellings of slot 1 reads as
+    // ONE slot here -- the same as a tag holding the same literal token twice
+    // already did -- rather than being mistaken for two DISTINCT slots sharing
+    // one <img>.
+    const tokensInTag = photoSlotsUsed(tag.text);
     if (tokensInTag.length > 1) {
-      out += tag.text; // malformed (two slots, one element) -- leave for the audit
+      out += tag.text; // malformed (two DISTINCT slots, one element) -- leave for the audit
     } else if (tokensInTag.length === 1) {
       const slot = tokensInTag[0];
       const value = values.get(slot);
-      out += value == null ? "" : tag.text.split(tokenForSlot(slot)).join(value);
+      if (value == null) {
+        out += "";
+      } else {
+        // split/join per spelling, not a regex-with-string replace: a string
+        // replacement interprets "$&"/"$1"/"$$" specially, and a value is
+        // arbitrary caller-provided text (e.g. a data URI) that must land
+        // byte-for-byte. Looping spellings handles slot 1's two spellings
+        // (and any duplicate occurrences of either) in one pass each.
+        let replaced = tag.text;
+        for (const spelling of spellingsForSlot(slot)) {
+          replaced = replaced.split(spelling).join(value);
+        }
+        out += replaced;
+      }
     } else {
       out += tag.text; // no photo token in this tag -- nothing to do
     }
