@@ -9,7 +9,7 @@ import { getDesignSystem } from "@/lib/design/system";
 import { renderDesignedSlide } from "@/lib/design/renderDesignedSlide";
 import { redesignSlide } from "@/lib/ai/designPost";
 import { resolveLogoPath } from "@/lib/branding";
-import { photoSlotsUsed, usesPhoto } from "@/lib/design/photoSlots";
+import { MAX_PHOTO_SLOTS, photoSlotsUsed, usesPhoto } from "@/lib/design/photoSlots";
 import { parsePhotoAssetIds, serialisePhotoAssetIds } from "@/lib/image/photoAssetIds";
 import { findTextRuns } from "@/lib/design/textRuns";
 import { AiCapError } from "@/lib/ai/usage";
@@ -141,10 +141,31 @@ export async function POST(
   // columns and the pixels drift apart. A slide with NO slots at all is not
   // refused -- it falls through to the redesign branch below, which gives it
   // one.
-  const slots = photoSlotsUsed(slide.designHtml);
-  const requestedSlot = Number(o.slot);
-  const slot = Number.isFinite(requestedSlot) && requestedSlot >= 1 ? requestedSlot : 1;
-  if (slots.length > 0 && !slots.includes(slot)) {
+  const slotsInMarkup = photoSlotsUsed(slide.designHtml);
+  // photoSlotsUsed REPORTS slots past MAX_PHOTO_SLOTS on purpose -- the slide
+  // audit is what rejects that markup, not this module -- so an over-cap slot
+  // reaches here as a usable one unless it is filtered out. Left in, it
+  // validated, rendered, and was then sliced away by serialisePhotoAssetIds:
+  // the photograph baked into the PNG and absent from the row, gone at the
+  // next text edit. Filtering keeps the gate below unchanged for markup that
+  // uses NO slot at all (still the redesign branch's job).
+  const slots = slotsInMarkup.filter((s) => s <= MAX_PHOTO_SLOTS);
+  // An absent slot means slot 1, so every caller written before two-photograph
+  // slides keeps working unchanged. A slot that IS sent but is not a whole
+  // number of 1 or more is a caller bug: coercing it (0, -1, true, {}, "2")
+  // silently wrote the photograph to slot 1, which is a surprise write rather
+  // than an answer. Refuse it instead.
+  let slot = 1;
+  if (o.slot != null) {
+    if (typeof o.slot !== "number" || !Number.isInteger(o.slot) || o.slot < 1) {
+      return NextResponse.json(
+        { ok: false, error: "Photo slot must be a whole number, 1 or more." },
+        { status: 400 },
+      );
+    }
+    slot = o.slot;
+  }
+  if (slotsInMarkup.length > 0 && !slots.includes(slot)) {
     return NextResponse.json(
       { ok: false, error: `This slide has no photo slot ${slot}.` },
       { status: 400 },
@@ -272,7 +293,15 @@ export async function POST(
       updateSlide(slide.id, {
         designHtml: result.slide.html,
         renderFilename: result.slide.renderFilename,
-        backgroundAssetId: result.slide.photoAssetId ?? undefined,
+        // Written explicitly, never skipped: `undefined` means "leave the
+        // column" to drizzle, so a redesign that came back using only
+        // {{PHOTO:2}} stored the list [null, id] beside a STALE
+        // background_asset_id. The renderers read the list and looked right
+        // while every direct reader of the column -- applyTemplate, the delete
+        // path's "is this photo on the slide" check, slideToBlob -- acted on a
+        // photograph the slide no longer has. photoAssetId IS photoAssetIds[0]
+        // (see designPost.ts), so null is the honest answer for slot 1 empty.
+        backgroundAssetId: result.slide.photoAssetId ?? null,
         // The redesign is free to come back with TWO photographs -- the model
         // is taught {{PHOTO:2}} and a comparison is the obvious thing to reach
         // for -- and slot 2's id has nowhere but this column to live. Writing
@@ -306,8 +335,18 @@ export async function POST(
   // The list is padded to reach the slot when the slide has never had one
   // there (a second slot in the markup that no photograph has filled yet), so
   // slot 1 keeps index 0 whatever order the operator works in.
+  //
+  // It is then cut to the slots the markup ACTUALLY has, because the stored
+  // list can outlive the markup: a redesign that comes back with one
+  // photograph leaves the old "[7,9]" behind, and writing it forward kept a
+  // photograph for a slot nothing renders -- and made a one-photograph slide
+  // store a list at all, which is the case serialisePhotoAssetIds exists to
+  // keep as null. slots is non-empty here: markup with no slot at all
+  // returned from the redesign branch above.
+  const slotCount = slots[slots.length - 1];
   const nextIds = parsePhotoAssetIds(slide.photoAssetIds, slide.backgroundAssetId);
-  while (nextIds.length < slot) nextIds.push(null);
+  while (nextIds.length < slotCount) nextIds.push(null);
+  nextIds.length = slotCount;
   nextIds[slot - 1] = photo.id;
   // A slot whose id is missing from the library (deleted under the slide)
   // resolves to null and loses its <img>, rather than photoChoiceFor's

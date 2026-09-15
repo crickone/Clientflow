@@ -427,9 +427,18 @@ export function ImageDesigner({
   // Which of the slide's photographs a pick replaces. A designed slide can
   // carry two, and picking a library photo had nowhere to say WHICH -- it
   // always meant the first.
+  // Markup alone does not mean the slide still renders from it: applyTemplate
+  // deliberately KEEPS designHtml so undo needs no model call, so a
+  // template-restyled slide still carries two {{PHOTO}} slots while the
+  // painter it now uses reads background_asset_id and nothing else. Gate on
+  // the surface, so a restyled slide offers no target to choose between --
+  // the control did nothing there.
   const photoSlots = useMemo(
-    () => photoSlotsUsed(activeSlide?.designHtml ?? ""),
-    [activeSlide?.designHtml],
+    () =>
+      activeSlide && slideSurface(activeSlide, designSystem)?.designed
+        ? photoSlotsUsed(activeSlide.designHtml ?? "")
+        : [],
+    [activeSlide, designSystem],
   );
   const [photoSlot, setPhotoSlot] = useState(1);
   useEffect(() => {
@@ -438,13 +447,25 @@ export function ImageDesigner({
     // at all. Back to the first on every move.
     setPhotoSlot(1);
   }, [activeSlide?.id]);
+  // The slot every request actually carries. The held one is only ever a
+  // preference: a redesign replaces designHtml under the SAME slide id -- so
+  // the reset effect above never fires -- and a two-photograph slide that
+  // comes back with one leaves the panel holding a slot the slide no longer
+  // has. Every pick then POSTed slot 2 and was refused, with no tile
+  // highlighted and no way back but selecting another slide. Clamping at the
+  // point of use cannot race the render the way a corrective effect can.
+  const effectivePhotoSlot = photoSlots.includes(photoSlot) ? photoSlot : 1;
   // The photograph the chosen slot currently holds, so the strip highlights
   // the picture the operator is about to replace rather than always slot 1's.
-  const activeSlotAssetId = activeSlide
-    ? (parsePhotoAssetIds(activeSlide.photoAssetIds, activeSlide.backgroundAssetId)[
-        photoSlot - 1
-      ] ?? null)
-    : null;
+  // A slide with no slots is painted from background_asset_id, so that column
+  // -- not the list -- is the picture on screen there.
+  const activeSlotAssetId = !activeSlide
+    ? null
+    : photoSlots.length === 0
+      ? activeSlide.backgroundAssetId
+      : (parsePhotoAssetIds(activeSlide.photoAssetIds, activeSlide.backgroundAssetId)[
+          effectivePhotoSlot - 1
+        ] ?? null);
 
   /**
    * A designed slide whose markup the renderer rejected has no PNG, so there is
@@ -573,7 +594,7 @@ export function ImageDesigner({
                 headers: { "Content-Type": "application/json" },
                 // The slot the panel is pointing at. The route reads an absent
                 // one as slot 1, so a one-photograph slide is unaffected.
-                body: JSON.stringify({ assetId, slot: photoSlot }),
+                body: JSON.stringify({ assetId, slot: effectivePhotoSlot }),
               },
             );
             // A gateway status is the app restarting under you, not a refusal
@@ -621,7 +642,7 @@ export function ImageDesigner({
         ).catch(() => {});
       }
     },
-    [design, designId, photoSlot],
+    [design, designId, effectivePhotoSlot],
   );
 
   // Auto-save active slide (debounced)
@@ -1531,7 +1552,7 @@ export function ImageDesigner({
                   assets={imageLibrary}
                   activeAssetId={activeSlotAssetId}
                   slots={photoSlots}
-                  activeSlot={photoSlot}
+                  activeSlot={effectivePhotoSlot}
                   onSlotChange={setPhotoSlot}
                   onPick={setSlideBackgroundManually}
                   onUpload={uploadFiles}
@@ -1773,7 +1794,7 @@ export function ImageDesigner({
                     imageGenEnabled={imageGenEnabled}
                     // "Make a new photo" replaces the picture the photo panel
                     // is pointing at, not always the first one.
-                    photoSlot={photoSlot}
+                    photoSlot={effectivePhotoSlot}
                     onBeforeRedesign={() => snapshotForUndo(activeSlide)}
                     onUpdated={(next) => dispatch({ type: "slideUpdated", slide: next })}
                   />

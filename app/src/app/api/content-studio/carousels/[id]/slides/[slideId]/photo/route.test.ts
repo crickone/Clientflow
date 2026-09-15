@@ -1,0 +1,287 @@
+// Run: npm test -- "src/app/api/content-studio/carousels/[id]/slides/[slideId]/photo/route.test.ts"
+//
+// The photo route's PERSISTENCE contract -- which columns a pick or a redesign
+// writes, and which slots it refuses. Every defect this guards has already
+// shipped at least once, in three separate routes, and each was a one-line
+// regression away from coming back:
+//
+//   1. a slot-2 pick writing the list and leaving background_asset_id stale
+//      (the two columns must always agree: background_asset_id IS slot 1);
+//   2. a redesign persisting only background_asset_id, so a two-photograph
+//      result lost slot 2 at the next re-render -- and writing that column as
+//      `undefined`, which drizzle reads as "leave it", so a result with no
+//      slot 1 kept the OLD photograph in the column while the list said null;
+//   3. a one-slot slide carrying a stale list forward instead of storing null;
+//   4. a slot the markup does not use being written anyway;
+//   5. an over-cap slot (photoSlotsUsed REPORTS those on purpose, for the
+//      audit) being accepted, rendered, then sliced away by
+//      serialisePhotoAssetIds -- on screen and not in the row.
+//
+// The route is exercised for real; only its ambient dependencies are stubbed,
+// because the defects live in the WIRING (which column gets which value) and
+// not in the helpers it composes. Same Module._load shim as
+// src/lib/exerciseLibrary.test.ts, for the same reason: this plain tsx runner
+// has no Next request context, no database and no design system.
+import assert from "node:assert/strict";
+import Module from "node:module";
+import { createRequire } from "node:module";
+
+interface SlideRow {
+  id: number;
+  templateId: string;
+  designHtml: string | null;
+  aspectRatio: string;
+  backgroundAssetId: number | null;
+  photoAssetIds: string | null;
+  imagePrompt: string | null;
+}
+
+const CAROUSEL_ID = 1;
+const slides = new Map<number, SlideRow>();
+/** Every updateSlide(id, patch) the route made, newest last. */
+let writes: { id: number; patch: Record<string, unknown> }[] = [];
+/** The photographs the renderer was handed, per slot. */
+let renderedPhotos: (string | null)[] = [];
+/** What the stubbed model hands back, set per case. */
+let redesignResult: unknown = null;
+
+function makeSlide(row: Partial<SlideRow> & { id: number }): SlideRow {
+  const slide: SlideRow = {
+    templateId: "designed",
+    designHtml: null,
+    aspectRatio: "1:1",
+    backgroundAssetId: null,
+    photoAssetIds: null,
+    imagePrompt: null,
+    ...row,
+  };
+  slides.set(slide.id, slide);
+  return slide;
+}
+
+type Loader = (request: string, ...rest: unknown[]) => unknown;
+const mod = Module as unknown as { _load: Loader };
+const realLoad = mod._load;
+const stubs: Record<string, unknown> = {
+  "next/server": {
+    NextResponse: {
+      json: (body: unknown, init?: { status?: number }) => ({
+        status: init?.status ?? 200,
+        json: async () => body,
+      }),
+    },
+  },
+  "@/lib/api/guard": { guard: async () => null },
+  "@/lib/auth": { getCurrentMembership: () => ({ tenant: { id: 1 } }) },
+  "@/lib/image/carousels": {
+    getCarousel: (id: number) =>
+      id === CAROUSEL_ID
+        ? { id, name: "Test design", showLogo: false, slides: [...slides.values()] }
+        : null,
+    updateSlide: (id: number, patch: Record<string, unknown>) => {
+      writes.push({ id, patch });
+      const row = slides.get(id);
+      if (row) Object.assign(row, patch);
+    },
+  },
+  // The library holds ids 5..11; photoChoiceFor is deliberately exact here, so
+  // a test can tell "slot 2's photograph" from "slot 1's" in what the renderer
+  // was given.
+  "@/lib/image/library": {
+    photoChoices: () => [5, 7, 8, 9, 11].map((id) => ({ id, path: `/photos/${id}.jpg` })),
+    photoChoiceFor: (id: number | null) =>
+      id == null ? null : { id, path: `/photos/${id}.jpg` },
+  },
+  "@/lib/image/paintSlide": { DESIGNED_TEMPLATE_ID: "designed" },
+  "@/lib/design/system": { getDesignSystem: () => ({ name: "test system" }) },
+  "@/lib/design/renderDesignedSlide": {
+    renderDesignedSlide: async (input: { photos?: ({ path: string } | null)[] }) => {
+      renderedPhotos = (input.photos ?? []).map((p) => p?.path ?? null);
+      return { filename: "render.png", width: 1080, height: 1080, overflowPx: 0 };
+    },
+  },
+  "@/lib/ai/designPost": { redesignSlide: async () => redesignResult },
+  "@/lib/branding": { resolveLogoPath: () => null },
+  "@/lib/ai/usage": { AiCapError: class AiCapError extends Error {} },
+  "@/lib/ai/image/generatePostImage": {
+    generatePostImage: async () => ({ id: 5, path: "/photos/5.jpg" }),
+  },
+  "@/lib/ai/image/falClient": { isImageGenConfigured: () => true },
+  "@/lib/settings": { getBrandImageStyle: () => null },
+  "@/lib/businessProfile": { getBusinessProfile: () => ({ name: "Test" }) },
+  "@/lib/ai/image/prompt": {
+    buildImagePrompt: () => "a prompt",
+    defaultImageStyle: () => "a style",
+  },
+};
+mod._load = function (this: unknown, request: string, ...rest: unknown[]) {
+  if (request in stubs) return stubs[request];
+  return realLoad.call(this, request, ...rest);
+};
+
+const requireLocal = createRequire(import.meta.url);
+
+let checks = 0;
+function check(fn: () => void) {
+  fn();
+  checks++;
+}
+
+(async () => {
+  const { POST } = requireLocal("./route") as typeof import("./route");
+
+  const post = async (slideId: number, body: unknown) => {
+    writes = [];
+    renderedPhotos = [];
+    const res = await POST({ json: async () => body } as unknown as Request, {
+      params: { id: String(CAROUSEL_ID), slideId: String(slideId) },
+    });
+    return { status: res.status, body: (await res.json()) as Record<string, unknown> };
+  };
+
+  // 1. A slot-2 pick writes BOTH columns, in agreement: the list gains the new
+  //    photograph at index 1 and background_asset_id still carries slot 1's.
+  const two = makeSlide({
+    id: 1,
+    designHtml: '<img src="{{PHOTO}}" /><img src="{{PHOTO:2}}" />',
+    backgroundAssetId: 7,
+    photoAssetIds: "[7,8]",
+  });
+  {
+    const { status } = await post(two.id, { assetId: 9, slot: 2 });
+    check(() => assert.equal(status, 200, "a slot-2 pick on a two-slot slide is accepted"));
+    check(() =>
+      assert.deepEqual(
+        renderedPhotos,
+        ["/photos/7.jpg", "/photos/9.jpg"],
+        "the re-render keeps slot 1's photograph and takes the new one for slot 2",
+      ),
+    );
+    const patch = writes.at(-1)?.patch ?? {};
+    check(() =>
+      assert.equal(patch.photoAssetIds, "[7,9]", "the list records the pick at slot 2"),
+    );
+    check(() =>
+      assert.equal(
+        patch.backgroundAssetId,
+        7,
+        "background_asset_id still equals slot 1's id -- the columns agree",
+      ),
+    );
+  }
+
+  // 2. A redesign persists the slot list it came back with, and writes slot 1's
+  //    column EXPLICITLY -- `undefined` there means "leave the column" and left
+  //    a stale photograph beside a list that says slot 1 is empty.
+  const flat = makeSlide({
+    id: 2,
+    designHtml: "<div>no photograph here</div>",
+    backgroundAssetId: 7,
+  });
+  {
+    redesignResult = {
+      slide: {
+        html: '<img src="{{PHOTO:2}}" />',
+        renderFilename: "redesigned.png",
+        photo: "a scene",
+        photoAssetId: null,
+        photoAssetIds: [null, 5],
+        violations: [],
+      },
+      usage: {},
+    };
+    const { status } = await post(flat.id, { generate: true });
+    check(() => assert.equal(status, 200, "a redesign around a new photograph is accepted"));
+    const patch = writes.at(-1)?.patch ?? {};
+    check(() =>
+      assert.equal(
+        patch.photoAssetIds,
+        "[null,5]",
+        "the redesign's slot list is persisted, slot 2 included",
+      ),
+    );
+    check(() =>
+      assert.ok(
+        "backgroundAssetId" in patch,
+        "slot 1's column is written, not skipped -- an absent key leaves the stale id",
+      ),
+    );
+    check(() =>
+      assert.equal(
+        patch.backgroundAssetId,
+        null,
+        "a redesign with no slot 1 clears background_asset_id rather than keeping the old photograph",
+      ),
+    );
+  }
+
+  // 3. A one-slot slide stores null, even when it is carrying a stale list from
+  //    the markup a redesign replaced.
+  const one = makeSlide({
+    id: 3,
+    designHtml: '<img src="{{PHOTO}}" />',
+    backgroundAssetId: 7,
+    photoAssetIds: "[7,9]",
+  });
+  {
+    const { status } = await post(one.id, { assetId: 11 });
+    check(() => assert.equal(status, 200, "a pick with no slot means slot 1"));
+    check(() =>
+      assert.deepEqual(
+        renderedPhotos,
+        ["/photos/11.jpg"],
+        "a one-slot slide renders exactly one photograph",
+      ),
+    );
+    const patch = writes.at(-1)?.patch ?? {};
+    check(() =>
+      assert.equal(
+        patch.photoAssetIds,
+        null,
+        "a one-photograph slide stores no list -- the stale second entry is dropped",
+      ),
+    );
+    check(() =>
+      assert.equal(patch.backgroundAssetId, 11, "background_asset_id carries the new photograph"),
+    );
+  }
+
+  // 4. A slot the markup does not use is refused rather than stored -- this is
+  //    also what a panel holding a slot a redesign removed would send.
+  {
+    const { status, body } = await post(one.id, { assetId: 11, slot: 2 });
+    check(() => assert.equal(status, 400, "slot 2 on a one-slot slide is refused"));
+    check(() =>
+      assert.match(String(body.error), /no photo slot 2/, "the refusal names the missing slot"),
+    );
+    check(() => assert.equal(writes.length, 0, "a refused slot writes nothing"));
+  }
+
+  // 5. An over-cap slot is refused. photoSlotsUsed REPORTS slot 3 so the audit
+  //    can see it; accepting it here rendered the photograph and then stored a
+  //    list sliced back to two -- on screen, and not in the row.
+  const overCap = makeSlide({
+    id: 4,
+    designHtml: '<img src="{{PHOTO}}" /><img src="{{PHOTO:3}}" />',
+    backgroundAssetId: 7,
+  });
+  {
+    const { status, body } = await post(overCap.id, { assetId: 9, slot: 3 });
+    check(() => assert.equal(status, 400, "a slot past MAX_PHOTO_SLOTS is refused"));
+    check(() =>
+      assert.match(String(body.error), /no photo slot 3/, "the refusal names the over-cap slot"),
+    );
+    check(() => assert.equal(writes.length, 0, "an over-cap slot writes nothing"));
+  }
+
+  // 6. A malformed slot is an error rather than a surprise write to slot 1.
+  for (const bad of [0, -1, true, {}, "2"]) {
+    const { status } = await post(two.id, { assetId: 9, slot: bad });
+    check(() =>
+      assert.equal(status, 400, `slot ${JSON.stringify(bad)} is refused rather than coerced`),
+    );
+    check(() => assert.equal(writes.length, 0, `slot ${JSON.stringify(bad)} writes nothing`));
+  }
+
+  console.log(`photo/route.test.ts: all ${checks} assertions passed`);
+})();

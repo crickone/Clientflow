@@ -148,7 +148,14 @@ export async function POST(
     templateId: DESIGNED_TEMPLATE_ID,
     designHtml: result.slide.html,
     renderFilename: result.slide.renderFilename,
-    backgroundAssetId: result.slide.photoAssetId ?? undefined,
+    // Explicit null, never `undefined`: drizzle reads undefined as "leave the
+    // column", so a redesign that came back using only {{PHOTO:2}} stored the
+    // list [null, id] beside a STALE background_asset_id. The renderers read
+    // the list and looked right while every direct reader of the column --
+    // applyTemplate, the delete path's "is this photo on the slide" check,
+    // slideToBlob -- acted on a photograph the slide no longer has.
+    // photoAssetId IS photoAssetIds[0] (see designPost.ts).
+    backgroundAssetId: result.slide.photoAssetId ?? null,
     // Slot 2's id has nowhere else to live -- background_asset_id is slot 1's
     // column alone -- and the text editor resolves a slide's photographs from
     // exactly this list. Without it a redesigned comparison lost its second
