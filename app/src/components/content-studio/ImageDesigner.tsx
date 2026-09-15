@@ -69,6 +69,7 @@ import {
 } from "@/lib/image/slots";
 import { SlideCanvas, useCanvasFonts, useLogoImage } from "./SlideCanvas";
 import type { DesignSystem } from "@/lib/design/parse";
+import { usesPhoto } from "@/lib/design/photoSlots";
 import { DESIGNED_TEMPLATE_ID, slideDimensions, slideSurface } from "@/lib/image/paintSlide";
 import { renderFileUrl } from "@/lib/image/renderStore.client";
 import { SlideFilmstrip } from "./SlideFilmstrip";
@@ -3167,7 +3168,11 @@ function RedesignSlideButton({
   const scene = slide.imagePrompt?.trim() ?? "";
   // A slide designed on a flat ground has nowhere to put a picture, so making
   // one redesigns the slide around it — slower, and worth saying so.
-  const hasPhotoSlot = (slide.designHtml ?? "").includes("{{PHOTO}}");
+  // Asks the module that owns the placeholder rather than matching a literal:
+  // a slide using only the indexed form has a photo slot too, and a bare
+  // `.includes("{{PHOTO}}")` would have said it did not and sent the operator
+  // down the redesign-around-a-new-photo path for no reason.
+  const hasPhotoSlot = usesPhoto(slide.designHtml ?? "");
 
   function reset() {
     setNote("");

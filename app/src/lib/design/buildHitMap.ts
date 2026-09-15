@@ -1,4 +1,4 @@
-import { PHOTO_TOKEN } from "@/lib/ai/designPost.parse";
+import { fillPhotoSlots } from "@/lib/design/photoSlots";
 
 import { hitColour } from "./hitMap";
 import { standInPhoto } from "./renderDesignedSlide";
@@ -81,7 +81,11 @@ export async function buildHitMapHtml(
   // and the {{PHOTO}} token that is still in the stored markup.
   const standIn = await standInPhoto(width, height);
   out = out.replace(/(<img[^>]*\ssrc\s*=\s*)("[^"]*"|'[^']*')/gi, `$1"${standIn}"`);
-  out = out.split(PHOTO_TOKEN).join(standIn);
+  // Every slot, not just the bare one: a two-photograph slide whose second
+  // token survived here would hit-test a layout with a missing image, and the
+  // click boxes would land in the wrong place -- the same class of bug the
+  // 1x1 stand-in caused before it was replaced with a same-size one.
+  out = fillPhotoSlots(out, () => standIn);
 
   return { html: out, runs };
 }

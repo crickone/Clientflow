@@ -9,7 +9,7 @@ import { getDesignSystem } from "@/lib/design/system";
 import { renderDesignedSlide } from "@/lib/design/renderDesignedSlide";
 import { redesignSlide } from "@/lib/ai/designPost";
 import { resolveLogoPath } from "@/lib/branding";
-import { PHOTO_TOKEN } from "@/lib/ai/designPost.parse";
+import { usesPhoto } from "@/lib/design/photoSlots";
 import { findTextRuns } from "@/lib/design/textRuns";
 import { AiCapError } from "@/lib/ai/usage";
 import { generatePostImage } from "@/lib/ai/image/generatePostImage";
@@ -169,7 +169,7 @@ export async function POST(
       return NextResponse.json({ ok: false, error: message }, { status: 500 });
     }
   } else {
-    if (!slide.designHtml.includes(PHOTO_TOKEN)) {
+    if (!usesPhoto(slide.designHtml)) {
       return NextResponse.json(
         {
           ok: false,
@@ -204,7 +204,7 @@ export async function POST(
   // slide WITH photography available. Refusing here (which is what used to
   // happen) left "Make a new photo" dead on most of a set, since the designer
   // typically photographs one slide in five.
-  if (!slide.designHtml.includes(PHOTO_TOKEN)) {
+  if (!usesPhoto(slide.designHtml)) {
     try {
       const result = await redesignSlide(
         {
