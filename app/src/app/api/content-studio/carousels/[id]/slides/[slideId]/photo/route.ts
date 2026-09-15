@@ -362,6 +362,36 @@ export async function POST(
   while (nextIds.length < slotCount) nextIds.push(null);
   nextIds.length = slotCount;
   nextIds[slot - 1] = photo.id;
+
+  // Every slot the markup asks for gets a photograph, including the ones this
+  // swap is not touching.
+  //
+  // A slot left null does not render as "no picture": fillPhotoSlots removes
+  // its <img> entirely, so a composition built around two photographs comes
+  // back with a HOLE where the second one belongs -- the label still there,
+  // the picture gone. That is what an operator saw after picking a photograph
+  // for the top half of an infrared/HBOT comparison: the bottom half went
+  // blank, because the stored list had never covered slot 2 and the padding
+  // above filled it with null.
+  //
+  // An unfilled slot takes one from the library, preferring a picture not
+  // already on this slide so a comparison shows two things rather than one
+  // thing twice. Only slots the markup actually has are filled -- the list
+  // was cut to those above -- and a deliberate clear never reaches here,
+  // because a designed slide's clear returns before this branch.
+  // Iterated over the markup's OWN slot numbers, never over the padded
+  // array's indices: a design that writes {{PHOTO:2}} alone has no slot 1,
+  // and index 0 exists there only to keep slot 2 at index 1. Filling it would
+  // record a photograph for a slot nothing renders.
+  if (slots.some((n) => nextIds[n - 1] == null)) {
+    const library = photoChoices();
+    for (const n of slots) {
+      if (nextIds[n - 1] != null || library.length === 0) continue;
+      const unused = library.find((p) => !nextIds.includes(p.id));
+      nextIds[n - 1] = (unused ?? library[0]).id;
+    }
+  }
+
   // A slot whose id is missing from the library (deleted under the slide)
   // resolves to null and loses its <img>, rather than photoChoiceFor's
   // "any photograph" answer dropping an unrelated picture into it.

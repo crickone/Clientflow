@@ -179,14 +179,14 @@ function check(fn: () => void) {
   }
 
   // 1b. A slot-2 pick on a slide whose slot 1 has never held a photograph
-  //     (background_asset_id AND the list both null) still writes
-  //     background_asset_id as an explicit null, not an absent key. Case 1
-  //     above only ever exercises a POPULATED slot 1, so `nextIds[0]` and
-  //     `nextIds[0] ?? null` are indistinguishable there; this pins the
-  //     never-photographed shape too, so a future change to how nextIds is
-  //     built (the padding, the truncation, parsePhotoAssetIds' fallback)
-  //     that stops leaving index 0 densely populated is caught here instead
-  //     of surfacing as a stale column in production.
+  //     (background_asset_id AND the list both null) leaves NO slot the markup
+  //     declares empty: an empty slot renders as a hole -- fillPhotoSlots drops
+  //     that slot's whole <img> -- so a composition built around two
+  //     photographs comes back as one photograph beside bare plaster. The
+  //     untargeted slot is given a photograph from the library instead, and
+  //     both columns are still written explicitly and in agreement (`undefined`
+  //     in the patch means "leave the column", which is what let
+  //     background_asset_id and the list drift apart).
   const neverPhotographed = makeSlide({
     id: 5,
     designHtml: '<img src="{{PHOTO}}" /><img src="{{PHOTO:2}}" />',
@@ -201,16 +201,55 @@ function check(fn: () => void) {
     const patch = writes.at(-1)?.patch ?? {};
     check(() =>
       assert.equal(
-        patch.backgroundAssetId,
-        null,
-        "slot 1 stays null -- the pick was for slot 2 alone",
+        patch.photoAssetIds,
+        "[5,9]",
+        "the pick lands at slot 2 and the empty slot 1 is given a library photograph, not left to render as a hole",
       ),
     );
     check(() =>
       assert.equal(
+        patch.backgroundAssetId,
+        5,
+        "background_asset_id equals slot 1's filled id -- the columns agree",
+      ),
+    );
+    check(() =>
+      assert.deepEqual(
+        renderedPhotos,
+        ["/photos/5.jpg", "/photos/9.jpg"],
+        "the render has a photograph in both slots",
+      ),
+    );
+  }
+
+  // 1c. THE REPORTED BUG. A two-slot slide carrying only slot 1's id (the shape
+  //     every route left behind before photo_asset_ids existed, and the shape a
+  //     slide-text edit used to write) is swapped on slot 1. The list is padded
+  //     to the markup's slot count, so slot 2 arrives null -- and stored that
+  //     way it renders as the empty half the operator reported: a photograph on
+  //     top, an "HBOT" label floating on bare plaster below.
+  const legacyTwoSlot = makeSlide({
+    id: 6,
+    designHtml: '<img src="{{PHOTO}}" /><img src="{{PHOTO:2}}" />',
+    backgroundAssetId: 8,
+    photoAssetIds: null,
+  });
+  {
+    const { status } = await post(legacyTwoSlot.id, { assetId: 11, slot: 1 });
+    check(() => assert.equal(status, 200, "a slot-1 pick on a legacy two-slot slide is accepted"));
+    const patch = writes.at(-1)?.patch ?? {};
+    check(() =>
+      assert.equal(
         patch.photoAssetIds,
-        "[null,9]",
-        "the list records null for the empty slot 1 and the pick at slot 2",
+        "[11,5]",
+        "slot 1 takes exactly the picked photograph and slot 2 is filled rather than padded with null",
+      ),
+    );
+    check(() =>
+      assert.equal(
+        renderedPhotos.filter((p) => p == null).length,
+        0,
+        "neither half of the render is missing its photograph",
       ),
     );
   }
