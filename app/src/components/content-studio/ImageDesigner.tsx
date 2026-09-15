@@ -1000,7 +1000,7 @@ export function ImageDesigner({
       });
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error || "Couldn't delete.");
-      router.push("/content-studio/images");
+      router.push("/content-studio");
       router.refresh();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Couldn't delete.");

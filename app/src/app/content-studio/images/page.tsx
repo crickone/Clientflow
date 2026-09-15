@@ -1,47 +1,14 @@
-import Link from "next/link";
-import { Image as ImageIcon, Plus } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Button } from "@/components/ui/Button";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { listCarousels } from "@/lib/image/carousels";
-import { CarouselList } from "@/components/content-studio/CarouselList";
+import { redirect } from "next/navigation";
 
-export const dynamic = "force-dynamic";
-
+/**
+ * A second list of the same designs used to live here, reachable only from the
+ * designer's back link and the post-delete redirect -- never from the nav. It
+ * called the same listCarousels() the Content Studio hub calls, and painted a
+ * gradient where the hub paints the slide's real render, so the worse list was
+ * the one an operator landed on after deleting a design.
+ *
+ * The route stays so a bookmark still works; the page is the hub.
+ */
 export default function ImagesPage() {
-  const designs = listCarousels();
-  return (
-    <>
-      <PageHeader
-        eyebrow="AI Image"
-        title="Images"
-        subtitle="Pick a template, drop in a photo, edit the copy. Add more slides any time to turn a single design into a carousel."
-        actions={
-          <Link href="/content-studio/images/new">
-            <Button>
-              <Plus size={15} />
-              New design
-            </Button>
-          </Link>
-        }
-      />
-      {designs.length === 0 ? (
-        <EmptyState
-          icon={<ImageIcon size={32} strokeWidth={1.4} />}
-          title="No designs yet"
-          message="Start a design — pick a template, drop in a photo, write a heading."
-          action={
-            <Link href="/content-studio/images/new">
-              <Button>
-                <Plus size={15} />
-                New design
-              </Button>
-            </Link>
-          }
-        />
-      ) : (
-        <CarouselList carousels={designs} />
-      )}
-    </>
-  );
+  redirect("/content-studio");
 }

@@ -47,7 +47,7 @@ export default function ImageDesignPage({
         title={design.name}
         subtitle={subtitle}
         actions={
-          <Link href="/content-studio/images">
+          <Link href="/content-studio">
             <Button variant="outline">
               <ArrowLeft size={15} />
               All designs
