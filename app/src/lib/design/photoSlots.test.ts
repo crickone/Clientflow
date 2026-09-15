@@ -11,6 +11,7 @@ import {
   MAX_PHOTO_SLOTS,
   PHOTO_TOKEN,
   fillPhotoSlots,
+  multiSlotImgTags,
   photoSlotsUsed,
   slotsOverCap,
   tokenForSlot,
@@ -152,6 +153,26 @@ check(
     const result = fillPhotoSlots(two, (slot) => (slot === 1 ? "xxx{{PHOTO:2}}yyy" : "SRC2"));
     return result.includes("xxx{{PHOTO:2}}yyy") && !result.includes("xxxSRC2yyy");
   })(),
+);
+
+// Finding 1: multiSlotImgTags is what the audit (checkDesigns, in
+// lib/ai/designPost.parse.ts) calls to reject a two-token <img> -- it must not
+// regress to the naive `<img[^>]*>` form that a quoted '>' inside an earlier
+// attribute (legal HTML) used to defeat.
+check(
+  "multiSlotImgTags catches a two-token <img> even behind a quoted '>' in an earlier attribute",
+  (() => {
+    const html = `<div style="display:flex"><img alt="Before > After" src="${PHOTO_TOKEN}{{PHOTO:2}}"/></div>`;
+    return multiSlotImgTags(html).length === 1;
+  })(),
+);
+check(
+  "a clean two-<img> slide, one token each, is not flagged",
+  multiSlotImgTags(img(PHOTO_TOKEN) + img("{{PHOTO:2}}")).length === 0,
+);
+check(
+  "the same slot repeated within one <img> is not flagged -- it fills once, same as fillPhotoSlots",
+  multiSlotImgTags(img(PHOTO_TOKEN + PHOTO_TOKEN)).length === 0,
 );
 
 console.log(`\nphotoSlots: ${passed} checks passed`);

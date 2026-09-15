@@ -26,8 +26,9 @@
  *     markup asks for, including ones past MAX_PHOTO_SLOTS -- it does not
  *     reject anything. Silently dropping an out-of-range slot here would hide
  *     the exact thing the audit exists to catch.
- *   - The slide audit (src/lib/design/htmlAudit.ts) is what REJECTS markup
- *     where slotsOverCap(html) is non-empty.
+ *   - The slide audit (checkDesigns, in src/lib/ai/designPost.parse.ts) is
+ *     what REJECTS markup where slotsOverCap(html) is non-empty, or where
+ *     multiSlotImgTags(html) finds an <img> carrying more than one slot.
  *   - The renderer (fillPhotoSlots, below) only ever leaves a slot with no
  *     photograph empty; it has no opinion on whether that slot should have
  *     existed at all.
@@ -142,6 +143,22 @@ function findImgTags(html: string): { start: number; end: number; text: string }
     openRe.lastIndex = end;
   }
   return tags;
+}
+
+/**
+ * `<img>` tags that carry more than one slot token -- malformed, since an
+ * `<img>` has exactly one `src`. Built on the same quote-aware scan as
+ * `fillPhotoSlots`, so a quoted `>` in an earlier attribute (legal HTML, e.g.
+ * `alt="Before > After"`) cannot hide a second token the way the naive
+ * `<img[^>]*>` form used to: that regex stopped at the first `>`, wherever it
+ * fell, and never reached a token sitting past it.
+ *
+ * A slot repeated within one tag (the same token twice) is not flagged here --
+ * that fills once, same as `fillPhotoSlots` treats it; only DISTINCT slots
+ * sharing one element are malformed.
+ */
+export function multiSlotImgTags(html: string): { start: number; end: number; text: string }[] {
+  return findImgTags(html).filter((tag) => photoSlotsUsed(tag.text).length > 1);
 }
 
 /** Replaces every token in `remaining` within one text segment, in a single pass. */

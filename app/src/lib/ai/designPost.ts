@@ -464,7 +464,7 @@ export async function redesignSlide(
       { role: "user" as const, content: askFor },
       {
         role: "assistant" as const,
-        content: `<design>\n${JSON.stringify({ caption: "", slides: [{ photo: "", html: input.previousHtml }] })}\n</design>`,
+        content: `<design>\n${JSON.stringify({ caption: "", slides: [{ photos: [""], html: input.previousHtml }] })}\n</design>`,
       },
       {
         role: "user" as const,

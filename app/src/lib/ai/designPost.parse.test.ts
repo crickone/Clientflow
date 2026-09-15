@@ -395,6 +395,70 @@ check(
   oneRead.slides[0].photos.length === 1 && oneRead.slides[0].photos[0] === "a quiet room",
 );
 
+// Finding 3: `photos` is positional -- index 0 is slot 1's scene, index 1 is
+// slot 2's. `.filter(Boolean)` used to REMOVE a blank entry instead of keeping
+// its place, so a reply naming only slot 2 ("", "an infrared bed") silently
+// handed slot 2's brief to slot 1. These pin the position, not just the count.
+const leadingBlankPayload = `<design>${JSON.stringify({
+  caption: "c",
+  slides: [{ photos: ["", "an infrared bed"], html: "<div/>" }],
+})}</design>`;
+const leadingBlankRead = extractDesignPayload(leadingBlankPayload);
+check(
+  "a leading blank scene keeps its position instead of being squeezed out",
+  leadingBlankRead.slides[0].photos.length === 2 &&
+    leadingBlankRead.slides[0].photos[0] === "" &&
+    leadingBlankRead.slides[0].photos[1] === "an infrared bed",
+);
+check(
+  "`photo` reflects the ACTUAL slot-1 entry (blank), not slot 2's scene sliding into it",
+  leadingBlankRead.slides[0].photo === "",
+);
+
+const nonStringEntryPayload = `<design>${JSON.stringify({
+  caption: "c",
+  slides: [{ photos: [42, "a room"], html: "<div/>" }],
+})}</design>`;
+const nonStringEntryRead = extractDesignPayload(nonStringEntryPayload);
+check(
+  "a non-string entry becomes an empty scene at its own position, not dropped",
+  nonStringEntryRead.slides[0].photos.length === 2 &&
+    nonStringEntryRead.slides[0].photos[0] === "" &&
+    nonStringEntryRead.slides[0].photos[1] === "a room",
+);
+
+const emptyPhotosPayload = `<design>${JSON.stringify({
+  caption: "c",
+  slides: [{ photos: [], html: "<div/>" }],
+})}</design>`;
+const emptyPhotosRead = extractDesignPayload(emptyPhotosPayload);
+check(
+  "an empty photos list stays empty",
+  emptyPhotosRead.slides[0].photos.length === 0 && emptyPhotosRead.slides[0].photo === "",
+);
+
+const nonArrayPhotosPayload = `<design>${JSON.stringify({
+  caption: "c",
+  slides: [{ photos: "not an array", photo: "a scene", html: "<div/>" }],
+})}</design>`;
+const nonArrayPhotosRead = extractDesignPayload(nonArrayPhotosPayload);
+check(
+  "a non-array `photos` falls back to the singular `photo` field",
+  nonArrayPhotosRead.slides[0].photos.length === 1 && nonArrayPhotosRead.slides[0].photos[0] === "a scene",
+);
+
+const overCapPhotosPayload = `<design>${JSON.stringify({
+  caption: "c",
+  slides: [{ photos: ["a", "b", "c"], html: "<div/>" }],
+})}</design>`;
+const overCapPhotosRead = extractDesignPayload(overCapPhotosPayload);
+check(
+  "photos beyond the slot cap are sliced off, keeping the first entries in order",
+  overCapPhotosRead.slides[0].photos.length === 2 &&
+    overCapPhotosRead.slides[0].photos[0] === "a" &&
+    overCapPhotosRead.slides[0].photos[1] === "b",
+);
+
 const threeSlots = checkDesigns(
   [
     {
@@ -427,6 +491,26 @@ const twoTokensOneImg = checkDesigns(
 check(
   "two tokens in one <img> is a violation, not a silently broken image",
   twoTokensOneImg.designs[0].violations.some((v) => /single src/i.test(v)),
+);
+
+// Finding 1: the audit used to spot this with `r.html.match(/<img\b[^>]*>/gi)`,
+// which cannot cross a quoted '>' -- legal HTML like `alt="Before > After"`
+// truncated the match before it ever reached the tokens, so this exact
+// two-token <img> sailed through undetected and the raw {{PHOTO}} text would
+// have reached satori. The audit now shares photoSlots' quote-aware scanner.
+const quotedGtTwoTokenImg = checkDesigns(
+  [
+    {
+      html: '<div style="display:flex"><img alt="Before > After" src="{{PHOTO}}{{PHOTO:2}}"/></div>',
+      photo: "a",
+      photos: ["a", "b"],
+    },
+  ],
+  SYSTEM,
+);
+check(
+  "a two-token <img> is still caught behind a quoted '>' in an earlier attribute",
+  quotedGtTwoTokenImg.designs[0].violations.some((v) => /single src/i.test(v)),
 );
 
 // A clean two-<img> slide, one token each, is NOT a violation of either new

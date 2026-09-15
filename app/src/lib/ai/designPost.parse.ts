@@ -9,7 +9,13 @@
  */
 import { auditDesignHtml, extractColours } from "@/lib/design/htmlAudit";
 import { TYPE_LEVELS, columnWidth, type DesignSystem } from "@/lib/design/parse";
-import { MAX_PHOTO_SLOTS, PHOTO_TOKEN, photoSlotsUsed, slotsOverCap } from "@/lib/design/photoSlots";
+import {
+  MAX_PHOTO_SLOTS,
+  PHOTO_TOKEN,
+  multiSlotImgTags,
+  slotsOverCap,
+  tokenForSlot,
+} from "@/lib/design/photoSlots";
 import { findTextRuns } from "@/lib/design/textRuns";
 
 export interface RawDesign {
@@ -175,7 +181,7 @@ Never place two items SIDE BY SIDE to compare them -- at feed size a pair of col
 
 Where a slide uses a photograph, write the src EXACTLY as ${PHOTO_TOKEN} -- that placeholder is replaced with the real image.
 
-A slide may carry at most TWO photographs. For a SECOND one, write its src as {{PHOTO:2}}. Two is for a genuine comparison -- two therapies, before and after, two ways of doing a thing -- where the pictures carry the point between them. It is not for decoration: one photograph well placed beats two fighting each other. Never write {{PHOTO:3}} or higher.
+A slide may carry at most TWO photographs. For a SECOND one, write its src as {{PHOTO:2}}, and give it its OWN <img> -- never two tokens in one element, since an <img> has a single src. Two is for a genuine comparison -- two therapies, before and after, two ways of doing a thing -- where the pictures carry the point between them, STACKED one above the other, never side by side. It is not for decoration: one photograph well placed beats two fighting each other. Never write {{PHOTO:3}} or higher.
 
 EVERY slide gets a "photos" field: a LIST of scenes, one per photograph the design uses, in slot order. A slide with one photograph has one entry; a slide with two has two, the first describing {{PHOTO}} and the second describing {{PHOTO:2}}. A slide you designed on a flat ground still gives one entry, naming the photograph that WOULD suit it -- that is how the operator gets the picture that is missing. Each entry names subject, setting, mood, composition. Never describe text, signage or lettering in shot. Never leave the list empty.
 
@@ -246,9 +252,16 @@ Do not draw a logo, a wordmark or the business name yourself.`;
 export const NO_PHOTOGRAPHY_RULE = `NO PHOTOGRAPHY IS AVAILABLE for this post. Every slide must work on a flat ground. Do not write ${PHOTO_TOKEN}, do not write an <img>, and do not build a scrim or gradient of the kind that only makes sense over an image. Still fill in "photos" on every slide with a one-entry list holding the scene that would suit it -- that is how the operator gets the picture that is missing -- but design as though it will never arrive.`;
 
 /**
- * The scenes a reply carries, from either shape. Trimmed, empties dropped, and
- * capped at the slot limit so a model that ignored the cap cannot make the
- * renderer look for photographs that the audit is about to reject anyway.
+ * The scenes a reply carries, from either shape, trimmed and capped at the
+ * slot limit so a model that ignored the cap cannot make the renderer look
+ * for photographs that the audit is about to reject anyway.
+ *
+ * POSITIONAL: index 0 is always slot 1's scene, index 1 always slot 2's. A
+ * non-string or blank entry becomes "" IN PLACE rather than being removed --
+ * `.filter(Boolean)` used to compact the list, so a reply naming only slot 2
+ * ("", "an infrared bed") silently slid slot 2's brief onto slot 1. Only
+ * TRAILING blanks are dropped, since a genuinely one-photograph slide should
+ * not carry a trailing "" it never wrote.
  */
 function readScenes(o: Record<string, unknown>): string[] {
   const list = Array.isArray(o.photos)
@@ -256,10 +269,9 @@ function readScenes(o: Record<string, unknown>): string[] {
     : typeof o.photo === "string"
       ? [o.photo]
       : [];
-  return list
-    .map((s) => (typeof s === "string" ? s.trim() : ""))
-    .filter(Boolean)
-    .slice(0, MAX_PHOTO_SLOTS);
+  const scenes = list.map((s) => (typeof s === "string" ? s.trim() : ""));
+  while (scenes.length > 0 && scenes[scenes.length - 1] === "") scenes.pop();
+  return scenes.slice(0, MAX_PHOTO_SLOTS);
 }
 
 export function extractDesignPayload(text: string): {
@@ -412,11 +424,14 @@ export function checkDesigns(
       // A slot past the cap would render as a broken box: nothing ever assigns
       // a photograph to it. Cheaper to let the repair call redesign the slide
       // than to drop the extra image and leave a composition built around a
-      // picture that is gone.
-      const slots = photoSlotsUsed(r.html);
-      if (slotsOverCap(r.html).length > 0) {
+      // picture that is gone. Named by slot, not by count -- "this one asks
+      // for 1" told a repair model nothing about which token was the problem,
+      // since it read as a COUNT violation when the real defect is the INDEX.
+      const overCapSlots = slotsOverCap(r.html);
+      if (overCapSlots.length > 0) {
+        const named = overCapSlots.map((s) => tokenForSlot(s)).join(" and ");
         violations.push(
-          `A slide may carry at most two photographs; this one asks for ${slots.length}.`,
+          `A slide may carry at most two photographs -- only ${tokenForSlot(1)} and ${tokenForSlot(2)} exist as slots. ${named} cannot be filled; remove ${overCapSlots.length === 1 ? "it" : "them"}, or fold that photograph into slot 1 or 2.`,
         );
       }
       // An <img> has exactly one "src". Two slot tokens in the same element is
@@ -425,11 +440,10 @@ export function checkDesigns(
       // wins -- both raw "{{PHOTO}}"-style tokens would then reach the
       // renderer and satori draws them as empty boxes. Catch it here instead,
       // where the repair call can redesign the slide with two separate <img>s.
-      const imgTags = r.html.match(/<img\b[^>]*>/gi) ?? [];
-      const multiTokenImg = imgTags.some(
-        (tag) => (tag.match(/\{\{PHOTO(?::\d+)?\}\}/g) ?? []).length > 1,
-      );
-      if (multiTokenImg) {
+      // multiSlotImgTags shares photoSlots' quote-aware tag scanner, so a
+      // quoted '>' inside an earlier attribute (legal HTML) cannot hide the
+      // second token the way a naive <img[^>]*> regex used to.
+      if (multiSlotImgTags(r.html).length > 0) {
         violations.push(
           "One <img> element carries two photo tokens; an <img> has a single src -- give each photograph its own <img>.",
         );
