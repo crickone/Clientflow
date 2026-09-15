@@ -10,6 +10,7 @@ import {
   DESIGN_RULES,
   NO_PHOTOGRAPHY_RULE,
   ONE_PHOTOGRAPH_RULE,
+  redesignPhotoSlots,
   photographyRuleFor,
   checkDesigns,
   checkSet,
@@ -572,6 +573,71 @@ check(
     const rule = photographyRuleFor(n);
     return rule === null || rule === NO_PHOTOGRAPHY_RULE || rule === ONE_PHOTOGRAPH_RULE;
   }),
+);
+
+// ---------------------------------------------------------------------------
+// redesignPhotoSlots -- which photograph a REDESIGNED slide puts in each slot.
+//
+// The operator asked for "a horizontal split screen, infrared on top" as a
+// nudge on an existing slide. That is the redesign path, which carried exactly
+// one photograph: the prompt therefore forbade {{PHOTO:2}} outright, and even
+// had the model written it anyway, both slots would have shown the same
+// picture. These pin the supply side of that fix.
+// ---------------------------------------------------------------------------
+const lib = [1, 2, 3].map((id) => ({ id, path: `/p/${id}.jpg` }));
+const own = { id: 7, path: "/p/7.jpg" };
+const TWO = '<img src="{{PHOTO}}" /><img src="{{PHOTO:2}}" />';
+
+check(
+  "the slide's own photograph keeps slot 1 -- a regenerate changes the composition, not the picture",
+  redesignPhotoSlots(TWO, own, [own, ...lib])[0]?.id === 7,
+);
+check(
+  "slot 2 gets a DIFFERENT photograph, which is the whole point of a comparison",
+  redesignPhotoSlots(TWO, own, [own, ...lib])[1]?.id === 1,
+);
+check(
+  "a one-slot design is untouched -- exactly one entry, the slide's own photograph",
+  (() => {
+    const got = redesignPhotoSlots('<img src="{{PHOTO}}" />', own, [own, ...lib]);
+    return got.length === 1 && got[0]?.id === 7;
+  })(),
+);
+check(
+  "markup using ONLY {{PHOTO:2}} puts the photograph at index 1, where the <img> is",
+  (() => {
+    const got = redesignPhotoSlots('<img src="{{PHOTO:2}}" />', own, [own, ...lib]);
+    return got.length === 2 && got[0] === null && got[1]?.id === 7;
+  })(),
+);
+check(
+  "a library of one repeats the slide's own photograph rather than leaving slot 2 a hole",
+  (() => {
+    const got = redesignPhotoSlots(TWO, own, [own]);
+    return got[0]?.id === 7 && got[1]?.id === 7;
+  })(),
+);
+check(
+  "no photograph of its own -- slot 1 takes the library's first and slot 2 the next",
+  (() => {
+    const got = redesignPhotoSlots(TWO, null, lib);
+    return got[0]?.id === 1 && got[1]?.id === 2;
+  })(),
+);
+check(
+  "a slot past the cap is left unassigned, matching the audit that called it unfillable",
+  (() => {
+    const got = redesignPhotoSlots(
+      '<img src="{{PHOTO}}" /><img src="{{PHOTO:2}}" /><img src="{{PHOTO:3}}" />',
+      own,
+      [own, ...lib],
+    );
+    return got.length === 2;
+  })(),
+);
+check(
+  "a flat design asks for nothing",
+  redesignPhotoSlots("<div>no photograph</div>", own, [own, ...lib]).length === 0,
 );
 
 console.log(`\ndesignPost.parse: ${passed} checks passed`);

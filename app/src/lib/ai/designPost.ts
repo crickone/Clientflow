@@ -10,7 +10,9 @@ import {
   checkDesigns,
   describeSystemForDesign,
   extractDesignPayload,
+  redesignPhotoSlots,
   type CheckedDesign,
+  type PhotoChoice,
   type RawDesign,
 } from "@/lib/ai/designPost.parse";
 import {
@@ -51,20 +53,7 @@ const DESIGN_MAX_TOKENS = 32000;
 /** Settings key holding the opening move the LAST post used, so the next one can't repeat it. */
 const LAST_OPENING_MOVE_KEY = "last_opening_move";
 
-/**
- * One photograph the renderer may use, and the library row it came from.
- *
- * The id is carried so a finished slide can RECORD which photo it used. Without
- * it a re-render has to guess, and every designed slide in a set was in fact
- * handed the same guess -- `listLibraryAssets()[0]` -- which is why a set of
- * seven slides came back with one picture on all of them regardless of what
- * each slide had asked for.
- */
-export interface PhotoChoice {
-  /** The image-library asset, or null for a path with no row behind it. */
-  id: number | null;
-  path: string;
-}
+export type { PhotoChoice };
 
 export interface DesignedSlide {
   /** The authored markup, with the photo placeholder still in it. Source of
@@ -454,8 +443,15 @@ export async function redesignSlide(
     /** The operator's instruction, or null for a plain regenerate. */
     note: string | null;
     aspectRatio?: "1:1" | "4:5" | "9:16";
-    /** The photograph this slide may use, when it asks for one. */
+    /** The photograph this slide already has: it keeps the first slot. */
     photo?: PhotoChoice | null;
+    /**
+     * Everything the library can supply, for a slide the model redesigns into
+     * a genuine comparison. Without it a redesign carried one photograph, so
+     * the prompt forbade a second slot outright and "make this a split screen,
+     * infrared on top" could not be answered.
+     */
+    photoLibrary?: PhotoChoice[];
     logoPath?: string | null;
   },
   meter: MeterContext,
@@ -468,6 +464,16 @@ export async function redesignSlide(
   const { width, height } = canvasFor(aspectRatio);
   const hasPhotography = !!input.photo;
 
+  // The slide's own photograph first, then the rest of the library with it
+  // removed, so the count is of DISTINCT pictures and redesignPhotoSlots draws
+  // a second slot from something the slide is not already showing.
+  const available: PhotoChoice[] = [
+    ...(input.photo ? [input.photo] : []),
+    ...(input.photoLibrary ?? []).filter(
+      (p) => input.photo == null || p.id == null || p.id !== input.photo.id,
+    ),
+  ];
+
   // Computed from the real logo file, not stated as a fraction: its height is
   // its own aspect ratio at the stamped width, which no fixed phrasing can
   // stand in for. See logoReserveRule.
@@ -478,13 +484,15 @@ export async function redesignSlide(
     describeSystemForDesign(system),
     DESIGN_RULES,
     logoReserveRule(reserve, width, height),
-    // A redesign holds ONE photograph at most -- input.photo, the picture the
-    // slide already had -- so the count here is never more than 1 and the
-    // second slot is never fillable. Without this the prompt taught
-    // {{PHOTO:2}} and the filler below put input.photo in both slots, so
-    // "redesign this as a before-and-after" came back showing one picture
-    // twice under two headings and reported no error.
-    photographyRuleFor(input.photo ? 1 : 0),
+    // Counted over what a redesign can ACTUALLY fill: the slide's own
+    // photograph plus the library behind it. It used to be `input.photo ? 1 :
+    // 0`, which is the count that makes photographyRuleFor emit "do NOT write
+    // {{PHOTO:2}} anywhere" -- so a two-photograph slide was unreachable from
+    // the one place an operator asks for one, and the request came back as a
+    // single picture with no error. A library that genuinely holds one
+    // photograph still gets that rule, since two slots would then show the
+    // same picture twice under two headings.
+    photographyRuleFor(available.length),
     getSignoffRule("social"),
   ]
     .filter(Boolean)
@@ -555,15 +563,10 @@ export async function redesignSlide(
   // already flagged them as unfillable, and handing one a photograph would
   // contradict that.
   //
-  // One photograph goes in, so a two-slot redesign shows it in both slots:
-  // redesigning a slide swaps the composition, not the library. That is what
-  // `attempt`'s rotation does too whenever the library holds one photograph.
-  const slots = photoSlotsUsed(design.html).filter((s) => s <= MAX_PHOTO_SLOTS);
-  const forThisSlide: (PhotoChoice | null)[] = Array.from(
-    { length: slots.length > 0 ? Math.max(...slots) : 0 },
-    () => null,
-  );
-  for (const slot of slots) forThisSlide[slot - 1] = input.photo ?? null;
+  // The slide's own photograph keeps the first slot -- a plain regenerate is a
+  // change of composition, not of picture -- and a second slot draws a
+  // DIFFERENT one from the library. See redesignPhotoSlots.
+  const forThisSlide = redesignPhotoSlots(design.html, input.photo ?? null, available);
   // Derived from the list that was RENDERED, never from "does this markup use
   // a photograph": recording [input.photo.id] for markup using only slot 2
   // claimed slot 1 held that asset while the render carried no photograph --

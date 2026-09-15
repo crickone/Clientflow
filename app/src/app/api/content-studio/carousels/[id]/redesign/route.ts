@@ -112,6 +112,10 @@ export async function POST(
         note: note || null,
         aspectRatio: slide.aspectRatio,
         photo,
+        // A second slot needs a second picture. Without the library a redesign
+        // was told only one photograph existed, and the prompt then forbade
+        // {{PHOTO:2}} -- so "make this a split screen" could not be answered.
+        photoLibrary: photoChoices(),
         logoPath: carousel.showLogo ? resolveLogoPath() : null,
       },
       { tenantId, agentKey: "carousel" },

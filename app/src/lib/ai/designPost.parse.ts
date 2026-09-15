@@ -13,10 +13,76 @@ import {
   MAX_PHOTO_SLOTS,
   PHOTO_TOKEN,
   multiSlotImgTags,
+  photoSlotsUsed,
   slotsOverCap,
   tokenForSlot,
 } from "@/lib/design/photoSlots";
 import { findTextRuns } from "@/lib/design/textRuns";
+
+/**
+ * One photograph the renderer may use, and the library row it came from.
+ *
+ * The id is carried so a finished slide can RECORD which photo it used. Without
+ * it a re-render has to guess, and every designed slide in a set was in fact
+ * handed the same guess -- `listLibraryAssets()[0]` -- which is why a set of
+ * seven slides came back with one picture on all of them regardless of what
+ * each slide had asked for.
+ *
+ * Declared here rather than in ./designPost.ts so the pure half can name it;
+ * that module re-exports it, so every existing importer is unaffected.
+ */
+export interface PhotoChoice {
+  /** The image-library asset, or null for a path with no row behind it. */
+  id: number | null;
+  path: string;
+}
+
+/**
+ * Which photograph fills each slot of a REDESIGNED slide, indexed by slot --
+ * entry `n - 1` is slot n, the order renderDesignedSlide reads.
+ *
+ * The slide's own photograph keeps the first slot the markup actually uses:
+ * that is what makes a plain regenerate a change of composition rather than a
+ * change of picture, and a design written with only {{PHOTO:2}} must not have
+ * its one photograph land at index 0, where there is no <img> to fill.
+ *
+ * Every LATER slot takes a different photograph from the library. A redesign
+ * used to carry exactly one picture, so an operator asking for "a horizontal
+ * split, infrared on top" was answered with the SAME photograph twice -- and,
+ * because one photograph also means the prompt forbids {{PHOTO:2}} outright,
+ * usually with no second slot at all. Where the library cannot supply a
+ * distinct picture the slide's own is repeated, which is the old behaviour and
+ * still better than a slot rendering as a hole.
+ *
+ * Slots past MAX_PHOTO_SLOTS are left unassigned deliberately: the audit has
+ * already flagged them as unfillable, and handing one a photograph would
+ * contradict that.
+ */
+export function redesignPhotoSlots(
+  html: string,
+  own: PhotoChoice | null,
+  library: PhotoChoice[],
+): (PhotoChoice | null)[] {
+  const slots = photoSlotsUsed(html).filter((slot) => slot <= MAX_PHOTO_SLOTS);
+  const photos: (PhotoChoice | null)[] = Array.from(
+    { length: slots.length > 0 ? Math.max(...slots) : 0 },
+    () => null,
+  );
+  const taken = new Set<number>();
+  if (own?.id != null) taken.add(own.id);
+  for (let i = 0; i < slots.length; i++) {
+    const slot = slots[i];
+    if (i === 0) {
+      photos[slot - 1] = own ?? library[0] ?? null;
+      if (own == null && library[0]?.id != null) taken.add(library[0].id);
+      continue;
+    }
+    const fresh = library.find((p) => p.id == null || !taken.has(p.id));
+    if (fresh?.id != null) taken.add(fresh.id);
+    photos[slot - 1] = fresh ?? own ?? null;
+  }
+  return photos;
+}
 
 export interface RawDesign {
   html: string;

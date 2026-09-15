@@ -272,6 +272,7 @@ export async function POST(
           note: "Use the photograph on this slide.",
           aspectRatio: slide.aspectRatio,
           photo,
+          photoLibrary: photoChoices(),
           logoPath: carousel.showLogo ? resolveLogoPath() : null,
         },
         { tenantId, agentKey: "carousel" },
