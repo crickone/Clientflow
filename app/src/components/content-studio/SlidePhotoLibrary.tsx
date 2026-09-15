@@ -18,6 +18,17 @@ import type { ImageLibraryAsset } from "@/lib/db/schema";
 import { libraryFileUrl } from "@/lib/image/paintSlide";
 
 /**
+ * What to call a slot in front of an operator. Position, not slot number: the
+ * markup's "{{PHOTO:2}}" is an implementation detail, and what the operator
+ * sees is a first and a second picture. Numbered past the cap
+ * (MAX_PHOTO_SLOTS is 2) only so a slide that somehow carries more still
+ * labels every button distinctly.
+ */
+function ordinalName(index: number): string {
+  return index === 0 ? "First" : index === 1 ? "Second" : `Photo ${index + 1}`;
+}
+
+/**
  * The photo library, as a strip under the preview.
  *
  * It used to sit at the bottom of the "Layout & photo" section, so choosing a
@@ -35,6 +46,9 @@ export function SlidePhotoLibrary({
   uploadProgress = null,
   applyingAssetId = null,
   canClear = true,
+  slots = [],
+  activeSlot = 1,
+  onSlotChange,
 }: {
   assets: ImageLibraryAsset[];
   activeAssetId: number | null;
@@ -61,6 +75,15 @@ export function SlidePhotoLibrary({
   applyingAssetId?: number | null;
   /** False where the slide's photograph cannot be removed, only swapped. */
   canClear?: boolean;
+  /**
+   * Slot numbers this slide has, ascending. One entry (or none) hides the
+   * chooser entirely: a slide with one photograph has no choice to make, and
+   * a control that offers none is just a row in the way.
+   */
+  slots?: number[];
+  /** Which slot a pick will replace. */
+  activeSlot?: number;
+  onSlotChange?: (slot: number) => void;
 }) {
   const applying = applyingAssetId != null;
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -171,6 +194,27 @@ export function SlidePhotoLibrary({
             />
           </div>
         </div>
+        {/* Only a slide with two slots gets a target to choose. It sits on its
+            own line rather than in the row above: the header already wraps at
+            252px, and a chooser that jumps between lines as the Clear button
+            comes and goes is harder to hit than one that stays put. */}
+        {slots.length > 1 && (
+          <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>Replacing</span>
+            {slots.map((s, i) => (
+              <Button
+                key={s}
+                type="button"
+                size="sm"
+                variant={s === activeSlot ? "secondary" : "ghost"}
+                onClick={() => onSlotChange?.(s)}
+                title={`Replace the ${ordinalName(i).toLowerCase()} photograph`}
+              >
+                {ordinalName(i)}
+              </Button>
+            ))}
+          </div>
+        )}
         {uploadProgress && uploadProgress.total > 1 && (
           <div style={{ display: "grid", gap: 5 }}>
             <div

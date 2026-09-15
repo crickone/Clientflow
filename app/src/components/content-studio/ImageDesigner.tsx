@@ -69,7 +69,8 @@ import {
 } from "@/lib/image/slots";
 import { SlideCanvas, useCanvasFonts, useLogoImage } from "./SlideCanvas";
 import type { DesignSystem } from "@/lib/design/parse";
-import { usesPhoto } from "@/lib/design/photoSlots";
+import { photoSlotsUsed, usesPhoto } from "@/lib/design/photoSlots";
+import { parsePhotoAssetIds } from "@/lib/image/photoAssetIds";
 import { DESIGNED_TEMPLATE_ID, slideDimensions, slideSurface } from "@/lib/image/paintSlide";
 import { renderFileUrl } from "@/lib/image/renderStore.client";
 import { SlideFilmstrip } from "./SlideFilmstrip";
@@ -423,6 +424,28 @@ export function ImageDesigner({
   const isCarousel = total > 1;
   const activeSlide = slidesInSlot[activeIdx] ?? null;
 
+  // Which of the slide's photographs a pick replaces. A designed slide can
+  // carry two, and picking a library photo had nowhere to say WHICH -- it
+  // always meant the first.
+  const photoSlots = useMemo(
+    () => photoSlotsUsed(activeSlide?.designHtml ?? ""),
+    [activeSlide?.designHtml],
+  );
+  const [photoSlot, setPhotoSlot] = useState(1);
+  useEffect(() => {
+    // A slot number means nothing on a different slide: slide 3's second
+    // picture is not slide 4's, and a slide with one photograph has no second
+    // at all. Back to the first on every move.
+    setPhotoSlot(1);
+  }, [activeSlide?.id]);
+  // The photograph the chosen slot currently holds, so the strip highlights
+  // the picture the operator is about to replace rather than always slot 1's.
+  const activeSlotAssetId = activeSlide
+    ? (parsePhotoAssetIds(activeSlide.photoAssetIds, activeSlide.backgroundAssetId)[
+        photoSlot - 1
+      ] ?? null)
+    : null;
+
   /**
    * A designed slide whose markup the renderer rejected has no PNG, so there is
    * nothing to show and nothing to export. That is the one problem an operator
@@ -548,7 +571,9 @@ export function ImageDesigner({
               {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ assetId }),
+                // The slot the panel is pointing at. The route reads an absent
+                // one as slot 1, so a one-photograph slide is unaffected.
+                body: JSON.stringify({ assetId, slot: photoSlot }),
               },
             );
             // A gateway status is the app restarting under you, not a refusal
@@ -596,7 +621,7 @@ export function ImageDesigner({
         ).catch(() => {});
       }
     },
-    [design, designId],
+    [design, designId, photoSlot],
   );
 
   // Auto-save active slide (debounced)
@@ -1504,7 +1529,10 @@ export function ImageDesigner({
                   onOpenChange={setPhotosOpen}
                   photoCount={imageLibrary.length}
                   assets={imageLibrary}
-                  activeAssetId={activeSlide.backgroundAssetId}
+                  activeAssetId={activeSlotAssetId}
+                  slots={photoSlots}
+                  activeSlot={photoSlot}
+                  onSlotChange={setPhotoSlot}
                   onPick={setSlideBackgroundManually}
                   onUpload={uploadFiles}
                   onDelete={deleteAsset}
@@ -1743,6 +1771,9 @@ export function ImageDesigner({
                     designId={designId}
                     slide={activeSlide}
                     imageGenEnabled={imageGenEnabled}
+                    // "Make a new photo" replaces the picture the photo panel
+                    // is pointing at, not always the first one.
+                    photoSlot={photoSlot}
                     onBeforeRedesign={() => snapshotForUndo(activeSlide)}
                     onUpdated={(next) => dispatch({ type: "slideUpdated", slide: next })}
                   />
@@ -3137,12 +3168,15 @@ function RedesignSlideButton({
   onUpdated,
   onBeforeRedesign,
   imageGenEnabled = false,
+  photoSlot = 1,
 }: {
   designId: number;
   slide: CarouselSlide;
   onUpdated: (slide: CarouselSlide) => void;
   onBeforeRedesign: () => void;
   imageGenEnabled?: boolean;
+  /** Which photograph "Make a new photo" replaces, 1-based. */
+  photoSlot?: number;
 }) {
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState("");
@@ -3241,7 +3275,10 @@ function RedesignSlideButton({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ generate: true, onlyGenerate: true }),
+          // The slot goes on step 1 too, though it writes nothing: a slot this
+          // slide does not have is then refused BEFORE the generation is paid
+          // for, rather than after.
+          body: JSON.stringify({ generate: true, onlyGenerate: true, slot: photoSlot }),
           // Above the route's own 120s maxDuration -- mirrors post() below, so
           // a slow generation can't abort client-side after the server has
           // already finished (and charged) but before the response lands.
@@ -3294,7 +3331,7 @@ function RedesignSlideButton({
       setBusy("applyingPhoto");
       await post(
         `/api/content-studio/carousels/${designId}/slides/${slide.id}/photo`,
-        { assetId: asset.id },
+        { assetId: asset.id, slot: photoSlot },
         (json) => {
           applied = true;
           return json.slide as CarouselSlide | undefined;

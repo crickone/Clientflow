@@ -9,7 +9,8 @@ import { getDesignSystem } from "@/lib/design/system";
 import { renderDesignedSlide } from "@/lib/design/renderDesignedSlide";
 import { redesignSlide } from "@/lib/ai/designPost";
 import { resolveLogoPath } from "@/lib/branding";
-import { usesPhoto } from "@/lib/design/photoSlots";
+import { photoSlotsUsed, usesPhoto } from "@/lib/design/photoSlots";
+import { parsePhotoAssetIds, serialisePhotoAssetIds } from "@/lib/image/photoAssetIds";
 import { findTextRuns } from "@/lib/design/textRuns";
 import { AiCapError } from "@/lib/ai/usage";
 import { generatePostImage } from "@/lib/ai/image/generatePostImage";
@@ -75,6 +76,10 @@ function sceneFromSlideCopy(slide: { designHtml: string | null }): string {
  *                                       carries the 120s ceiling below: an
  *                                       image plus a design, in one request.
  *
+ * Every shape also takes an optional `slot` -- which of the slide's photo
+ * slots the picture is for, 1-based. Absent means slot 1, so every caller
+ * written before two-photograph slides keeps working.
+ *
  * A slide the designer built on a flat ground has no {{PHOTO}} placeholder,
  * so PICKING is refused there (there is nothing to swap) while GENERATING
  * (the one-shot mode above) redesigns the slide around the new photograph
@@ -120,7 +125,31 @@ export async function POST(
   } catch {
     body = {};
   }
-  const o = (body ?? {}) as { assetId?: unknown; generate?: unknown; onlyGenerate?: unknown };
+  const o = (body ?? {}) as {
+    assetId?: unknown;
+    generate?: unknown;
+    onlyGenerate?: unknown;
+    /** Which photo slot to act on, 1-based. Absent means slot 1. */
+    slot?: unknown;
+  };
+
+  // Resolved here, above every branch, because all three body shapes can end
+  // with a photograph on this slide and each of them has to target the same
+  // slot. Absent means slot 1, so every caller written before two-photograph
+  // slides keeps working unchanged. A slot the markup does not use is refused
+  // rather than stored: a photograph nothing renders is exactly how the
+  // columns and the pixels drift apart. A slide with NO slots at all is not
+  // refused -- it falls through to the redesign branch below, which gives it
+  // one.
+  const slots = photoSlotsUsed(slide.designHtml);
+  const requestedSlot = Number(o.slot);
+  const slot = Number.isFinite(requestedSlot) && requestedSlot >= 1 ? requestedSlot : 1;
+  if (slots.length > 0 && !slots.includes(slot)) {
+    return NextResponse.json(
+      { ok: false, error: `This slide has no photo slot ${slot}.` },
+      { status: 400 },
+    );
+  }
 
   let photo: { id: number; path: string } | null = null;
   let scene = "";
@@ -244,6 +273,14 @@ export async function POST(
         designHtml: result.slide.html,
         renderFilename: result.slide.renderFilename,
         backgroundAssetId: result.slide.photoAssetId ?? undefined,
+        // The redesign is free to come back with TWO photographs -- the model
+        // is taught {{PHOTO:2}} and a comparison is the obvious thing to reach
+        // for -- and slot 2's id has nowhere but this column to live. Writing
+        // only background_asset_id rendered both pictures and remembered one:
+        // the next text edit read the list as a single entry and dropped slot 2
+        // for good. Null for a one-photograph result, which also clears a stale
+        // list left by the markup this redesign just replaced.
+        photoAssetIds: serialisePhotoAssetIds(result.slide.photoAssetIds),
         imagePrompt: result.slide.photo || scene,
       });
       const after = getCarousel(carousel.id);
@@ -262,6 +299,21 @@ export async function POST(
     }
   }
 
+  // The slide's WHOLE cast of photographs, with one part recast. A swap that
+  // knew only about the picture it was changing re-rendered a two-photograph
+  // slide with the other slot empty, and wrote that render onto the row.
+  //
+  // The list is padded to reach the slot when the slide has never had one
+  // there (a second slot in the markup that no photograph has filled yet), so
+  // slot 1 keeps index 0 whatever order the operator works in.
+  const nextIds = parsePhotoAssetIds(slide.photoAssetIds, slide.backgroundAssetId);
+  while (nextIds.length < slot) nextIds.push(null);
+  nextIds[slot - 1] = photo.id;
+  // A slot whose id is missing from the library (deleted under the slide)
+  // resolves to null and loses its <img>, rather than photoChoiceFor's
+  // "any photograph" answer dropping an unrelated picture into it.
+  const photos = nextIds.map((id) => (id == null ? null : photoChoiceFor(id)));
+
   try {
     // The whole recipe -- grade, substitute, render, stamp, measure, store --
     // behind one call. The overflow it measures has nowhere to go in this
@@ -271,7 +323,7 @@ export async function POST(
     const { filename: renderFilename } = await renderDesignedSlide({
       html: slide.designHtml,
       aspectRatio: slide.aspectRatio,
-      photo,
+      photos,
       logoPath: carousel.showLogo ? resolveLogoPath() : null,
       system,
     });
@@ -280,7 +332,13 @@ export async function POST(
     // a data URI into the row and make the next change impossible.
     updateSlide(slide.id, {
       renderFilename,
-      backgroundAssetId: photo.id,
+      // Both columns in one call, so they cannot disagree. background_asset_id
+      // is slot 1's home and photo_asset_ids is the rest; writing only the
+      // former left a stale [a,b] in the list, and the text-edit route prefers
+      // the list -- so the operator's swap was silently reverted the next time
+      // they changed a word.
+      backgroundAssetId: nextIds[0] ?? null,
+      photoAssetIds: serialisePhotoAssetIds(nextIds),
       // scene is only ever set on the one-shot { generate } path above; a
       // plain { assetId } swap -- what the dialog's own step 2 now sends --
       // reaches here with scene still "", so this is a no-op for it and
