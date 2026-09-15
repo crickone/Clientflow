@@ -1,10 +1,10 @@
 import "server-only";
 
-import { PHOTO_TOKEN } from "@/lib/ai/designPost.parse";
 import { saveRender } from "@/lib/image/renderStore";
 
 import { loadDesignFonts } from "./fonts";
 import type { DesignSystem } from "./parse";
+import { fillPhotoSlots, photoSlotsUsed } from "./photoSlots";
 import {
   gradedPhotoDataUri,
   measureOverflowPx,
@@ -51,18 +51,6 @@ export function canvasFor(aspectRatio: string | null | undefined): {
   return CANVAS[aspectRatio ?? "1:1"] ?? CANVAS["1:1"];
 }
 
-/**
- * Built from PHOTO_TOKEN rather than written out, so the placeholder has ONE
- * definition. A literal `\{\{PHOTO\}\}` here would keep matching after someone
- * changed the constant, and the failure would be silent: the token simply
- * survives into the markup and satori draws an empty box where the photograph
- * should be.
- */
-const PHOTO_IMG_TAG = new RegExp(
-  `<img[^>]*${PHOTO_TOKEN.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[^>]*>`,
-  "gi",
-);
-
 /** The photograph a slide may use. Structural on purpose -- the generator's
  *  PhotoChoice and the routes' library rows both satisfy it without this
  *  module needing to know about either. */
@@ -77,6 +65,15 @@ export interface RenderDesignedSlideInput {
   aspectRatio?: string | null;
   /** The photograph to substitute, or null to strip the <img> instead. */
   photo?: SlidePhoto | null;
+  /**
+   * A photograph per slot, index 0 being slot 1. A slot whose entry is null or
+   * absent has its <img> removed rather than left with a broken src.
+   *
+   * `photo` above is the one-slot shorthand and still works: a single
+   * photograph is the common slide and should not have to be wrapped in a list.
+   * When both are given, `photos` wins.
+   */
+  photos?: (SlidePhoto | null)[];
   /** The tenant's logo file, stamped after the design. Null omits it. */
   logoPath?: string | null;
   /** The tenant's design system -- supplies the photo grade and the faces. */
@@ -102,24 +99,38 @@ export interface DesignedSlideRender {
 }
 
 /**
- * Resolve the photo placeholder.
+ * Resolve every photo placeholder, each slot with its own photograph.
  *
  * Substitution happens here rather than in the model's markup because satori
  * cannot fetch a URL and has no CSS filter: the image has to arrive already
  * graded, and inline. With no photograph the whole <img> goes rather than its
  * src, because a broken src is drawn as an empty box.
+ *
+ * This was `html.split(PHOTO_TOKEN).join(uri)` -- the same picture everywhere
+ * the token appeared -- so a slide asking for two showed one of them twice.
  */
-async function withPhoto(
+async function withPhotos(
   html: string,
-  photo: SlidePhoto | null,
+  photos: (SlidePhoto | null)[],
   width: number,
   height: number,
   system: DesignSystem,
 ): Promise<string> {
-  if (!html.includes(PHOTO_TOKEN)) return html;
-  if (!photo) return html.replace(PHOTO_IMG_TAG, "");
-  const uri = await gradedPhotoDataUri(photo.path, width, height, system.photo);
-  return html.split(PHOTO_TOKEN).join(uri);
+  const slots = photoSlotsUsed(html);
+  if (slots.length === 0) return html;
+
+  // Grade each slot's photograph ONCE, before substitution: fillPhotoSlots is
+  // synchronous, and grading is the expensive step -- a slot that appears twice
+  // in the markup must not pay for it twice.
+  const uriBySlot = new Map<number, string | null>();
+  for (const slot of slots) {
+    const photo = photos[slot - 1] ?? null;
+    uriBySlot.set(
+      slot,
+      photo ? await gradedPhotoDataUri(photo.path, width, height, system.photo) : null,
+    );
+  }
+  return fillPhotoSlots(html, (slot) => uriBySlot.get(slot) ?? null);
 }
 
 /**
@@ -150,8 +161,8 @@ export async function standInPhoto(width: number, height: number): Promise<strin
 }
 
 /**
- * The markup with its photograph swapped for a flat image of the same pixel
- * size, for measuring only.
+ * The markup with EVERY slot's photograph swapped for a flat image of the same
+ * pixel size, for measuring only.
  */
 async function standInForPhoto(
   html: string,
@@ -168,13 +179,17 @@ async function standInForPhoto(
   // and the whole match is case-insensitive -- a data URI spelled
   // "DATA:IMAGE/JPEG;BASE64," is valid and was silently skipped before.
   //
-  // The one real divergence this leaves: a SECOND embedded image at a
-  // different intrinsic size would be measured at THIS canvas's size instead
-  // of its own, since every match is replaced with the same WxH stand-in.
-  // Unreachable today -- the design prompt allows exactly one photograph and
-  // a model cannot author base64 of its own -- but worth writing down, since
-  // the day a design legitimately carries a second image this stops being
-  // exact.
+  // A slide may now carry TWO photographs, and both are covered here: this
+  // runs AFTER withPhotos, so each slot is already a data URI and each match
+  // is replaced. Both stay exact, because withPhotos grades every slot's
+  // photograph at the CANVAS's dimensions -- the same size this stand-in is
+  // made at -- so satori infers the same intrinsic size either way.
+  //
+  // The divergence that would remain: an embedded image at some OTHER
+  // intrinsic size would be measured at this canvas's size instead of its own,
+  // since every match is replaced with the same WxH stand-in. Nothing produces
+  // one today -- every image in a design is a graded photograph, and a model
+  // cannot author base64 of its own -- but worth writing down.
   return html.replace(/data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+/gi, uri);
 }
 
@@ -192,13 +207,9 @@ export async function renderDesignedSlide(
   input: RenderDesignedSlideInput,
 ): Promise<DesignedSlideRender> {
   const { width, height } = canvasFor(input.aspectRatio);
-  const html = await withPhoto(
-    input.html,
-    input.photo ?? null,
-    width,
-    height,
-    input.system,
-  );
+  // `photos` wins over `photo`; `photo` is the one-slot shorthand.
+  const photos = input.photos ?? (input.photo ? [input.photo] : []);
+  const html = await withPhotos(input.html, photos, width, height, input.system);
 
   const fonts = await loadDesignFonts(
     input.system.font,

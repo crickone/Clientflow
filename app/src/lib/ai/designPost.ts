@@ -7,7 +7,6 @@ import {
   DESIGN_RULES,
   logoReserveRule,
   NO_PHOTOGRAPHY_RULE,
-  PHOTO_TOKEN,
   checkDesigns,
   describeSystemForDesign,
   extractDesignPayload,
@@ -21,6 +20,7 @@ import {
 } from "@/lib/ai/generateCarousel";
 import { meteredCreateStreamed, type MeterContext } from "@/lib/ai/metered";
 import { logoBox } from "@/lib/design/renderDesign";
+import { MAX_PHOTO_SLOTS, photoSlotsUsed, usesPhoto } from "@/lib/design/photoSlots";
 import {
   canvasFor,
   overflowViolation,
@@ -75,8 +75,13 @@ export interface DesignedSlide {
   /** The scene the design asked for, in the designer's words. Kept so a slide
    *  can be re-photographed later against what it actually wanted. */
   photo: string;
-  /** The library asset this slide's photograph came from, if it used one. */
+  /** The library asset slot 1's photograph came from, if it used one. Kept as
+   *  the shorthand every reader that only cares about one photograph already
+   *  uses (the routes, background_asset_id), and it is photoAssetIds[0]. */
   photoAssetId: number | null;
+  /** The library asset per slot, index 0 being slot 1. Empty on a flat slide;
+   *  one entry on the common one-photograph slide. */
+  photoAssetIds: (number | null)[];
   violations: string[];
 }
 
@@ -107,14 +112,14 @@ async function renderOne(
   design: CheckedDesign,
   system: DesignSystem,
   aspectRatio: string,
-  photo: PhotoChoice | null,
+  photos: (PhotoChoice | null)[],
   logoPath: string | null,
 ): Promise<{ renderFilename: string | null; violation: string | null }> {
   try {
     const render = await renderDesignedSlide({
       html: design.html,
       aspectRatio,
-      photo,
+      photos,
       logoPath,
       system,
     });
@@ -142,6 +147,17 @@ async function renderOne(
       violation: `This design could not be rendered: ${message}`,
     };
   }
+}
+
+/**
+ * Whether two slides were handed the same photographs, slot for slot. What the
+ * reuse check above compares: identical markup on identical pictures paints
+ * identical pixels, so the render can be carried over instead of redone. It was
+ * a single `===` on one asset id, which could not tell "the same picture in
+ * both slots" from "two different ones".
+ */
+function sameAssetIds(a: (number | null)[], b: (number | null)[]): boolean {
+  return a.length === b.length && a.every((id, i) => id === b[i]);
 }
 
 export async function designPost(
@@ -304,21 +320,35 @@ export async function designPost(
         .filter((p) => p.renderFilename)
         .map((p) => [p.html, p] as const),
     );
-    // Advanced only by slides that actually take a photograph, so two photo
+    // Advanced only by slots that actually take a photograph, so two photo
     // slides never land on the same picture just because a flat slide sat
-    // between them.
+    // between them. It now advances per SLOT rather than per slide, which is
+    // the same rule applied one level down: a slide asking for two pictures
+    // takes the next two, so a comparison shows two things rather than one
+    // thing twice.
     let nextPhoto = 0;
     for (let i = 0; i < checked.designs.length; i++) {
       const design = checked.designs[i];
-      const wantsPhoto = design.html.includes(PHOTO_TOKEN);
-      const photo =
-        wantsPhoto && photos.length > 0
-          ? photos[nextPhoto++ % photos.length]
-          : null;
+      // Slots past the cap are left unassigned deliberately: the audit has
+      // already flagged them as unfillable, and handing one a photograph would
+      // contradict that. They render with the <img> dropped instead.
+      const slots = photoSlotsUsed(design.html).filter((s) => s <= MAX_PHOTO_SLOTS);
+      // Indexed BY SLOT, not by order of appearance -- renderDesignedSlide
+      // reads photos[slot - 1], so a design that writes only {{PHOTO:2}} must
+      // not have its picture land in slot 1's place.
+      const forThisSlide: (PhotoChoice | null)[] = Array.from(
+        { length: slots.length > 0 ? Math.max(...slots) : 0 },
+        () => null,
+      );
+      for (const slot of slots) {
+        forThisSlide[slot - 1] =
+          photos.length > 0 ? photos[nextPhoto++ % photos.length] : null;
+      }
+      const assetIds = forThisSlide.map((p) => p?.id ?? null);
 
-      // Identical markup on the identical photograph paints identical pixels.
+      // Identical markup on the identical photographs paints identical pixels.
       const already = unchanged.get(design.html);
-      if (already && already.photoAssetId === (photo?.id ?? null)) {
+      if (already && sameAssetIds(already.photoAssetIds, assetIds)) {
         already.violations.forEach((v) => problems.push(`Slide ${i + 1}: ${v}`));
         rendered.push({ ...already, violations: [...already.violations] });
         continue;
@@ -329,7 +359,7 @@ export async function designPost(
         design,
         system!,
         aspectRatio,
-        photo,
+        forThisSlide,
         options.logoPath ?? null,
       );
       if (violation) problems.push(`Slide ${i + 1}: ${violation}`);
@@ -337,7 +367,8 @@ export async function designPost(
         html: design.html,
         renderFilename,
         photo: design.photo,
-        photoAssetId: photo?.id ?? null,
+        photoAssetId: assetIds[0] ?? null,
+        photoAssetIds: assetIds,
         violations: violation
           ? [...design.violations, violation]
           : design.violations,
@@ -495,11 +526,14 @@ export async function redesignSlide(
 
   const checked = checkDesigns([first], system);
   const design = checked.designs[0];
+  // One photograph: redesigning a slide swaps the composition, not the
+  // library. A two-slot design redesigned here fills slot 1 and drops slot 2's
+  // <img> rather than refusing to render.
   const { renderFilename, violation } = await renderOne(
     design,
     system,
     aspectRatio,
-    input.photo ?? null,
+    [input.photo ?? null],
     input.logoPath ?? null,
   );
 
@@ -508,7 +542,8 @@ export async function redesignSlide(
       html: design.html,
       renderFilename,
       photo: design.photo,
-      photoAssetId: design.html.includes(PHOTO_TOKEN) ? (input.photo?.id ?? null) : null,
+      photoAssetId: usesPhoto(design.html) ? (input.photo?.id ?? null) : null,
+      photoAssetIds: usesPhoto(design.html) ? [input.photo?.id ?? null] : [],
       violations: violation
         ? [...design.violations, violation]
         : design.violations,

@@ -14,6 +14,7 @@ import { isImageGenConfigured } from "@/lib/ai/image/falClient";
 import { getTemplate, templateUsesPhoto } from "@/lib/image/templates";
 import { DESIGNED_TEMPLATE_ID } from "@/lib/image/paintSlide";
 import { photoChoices } from "@/lib/image/library";
+import { serialisePhotoAssetIds } from "@/lib/image/photoAssetIds";
 import {
   addSlide,
   deleteSlot,
@@ -152,6 +153,10 @@ export async function runCarouselGeneration(
           // against what it actually asked for. Inert for painting -- a
           // designed slide is its stored PNG (see paintSlide).
           backgroundAssetId: slide.photoAssetId ?? undefined,
+          // Slot 1 stays in background_asset_id, so a one-photograph slide is
+          // stored exactly as it was before two-photograph slides existed;
+          // this column is written only when there is a second one to record.
+          photoAssetIds: serialisePhotoAssetIds(slide.photoAssetIds),
           imagePrompt: slide.photo || null,
         });
       }

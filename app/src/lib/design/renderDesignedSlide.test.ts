@@ -41,9 +41,13 @@ function check(name: string, cond: boolean) {
  * a 38-second render per pass. A smooth image is both a fairer stand-in for a
  * real photograph and three orders of magnitude cheaper.
  */
-async function samplePhoto(dir: string, name: string): Promise<string> {
+async function samplePhoto(
+  dir: string,
+  name: string,
+  background: { r: number; g: number; b: number } = { r: 120, g: 140, b: 110 },
+): Promise<string> {
   const png = await sharp({
-    create: { width: 320, height: 240, channels: 3, background: { r: 120, g: 140, b: 110 } },
+    create: { width: 320, height: 240, channels: 3, background },
   })
     .blur(8)
     .png()
@@ -97,6 +101,11 @@ function slideHtml(bodyPx: number): string {
 async function main() {
   const tmp = mkdtempSync(path.join(tmpdir(), "renderDesignedSlide-"));
   const photoPath = await samplePhoto(tmp, "photo.png");
+  // Two DISTINCT photographs for the two-slot checks: same smooth fixture, a
+  // different colour. If they were identical, "renders differently from the
+  // same one twice" would hold no matter what the renderer did with the slots.
+  const photoA = photoPath;
+  const photoB = await samplePhoto(tmp, "photo-b.png", { r: 40, g: 70, b: 160 });
   const logoPath = await writeLogo(tmp);
 
   // ── the canvas table ────────────────────────────────────────────────────
@@ -300,6 +309,80 @@ async function main() {
     threw = true;
   }
   check("a step that cannot complete throws rather than returning a half-render", threw);
+
+  // ── two photographs, one per slot ──────────────────────────────
+
+  // Two photographs, each in its own slot. Before this, substitution was
+  // `html.split(PHOTO_TOKEN).join(uri)` -- the same picture everywhere the token
+  // appeared -- so a comparison slide showed one photograph twice.
+  {
+    const twoSlot =
+      '<div style="display:flex;flex-direction:column;width:1080px;height:1080px;background-color:#f2f3ed;">' +
+      `<img src="${PHOTO_TOKEN}" style="width:1080px;height:540px;object-fit:cover"/>` +
+      '<img src="{{PHOTO:2}}" style="width:1080px;height:540px;object-fit:cover"/>' +
+      "</div>";
+
+    const both = await renderDesignedSlide({
+      html: twoSlot,
+      aspectRatio: "1:1",
+      photos: [{ path: photoA }, { path: photoB }],
+      logoPath: null,
+      system: SYSTEM,
+    });
+    const sameTwice = await renderDesignedSlide({
+      html: twoSlot,
+      aspectRatio: "1:1",
+      photos: [{ path: photoA }, { path: photoA }],
+      logoPath: null,
+      system: SYSTEM,
+    });
+    check(
+      "two different photographs render differently from the same one twice",
+      both.filename !== sameTwice.filename,
+    );
+
+    const missingSecond = await renderDesignedSlide({
+      html: twoSlot,
+      aspectRatio: "1:1",
+      photos: [{ path: photoA }, null],
+      logoPath: null,
+      system: SYSTEM,
+    });
+    check(
+      "a slot with no photograph still renders",
+      typeof missingSecond.filename === "string" && missingSecond.filename.length > 0,
+    );
+    check(
+      "and it differs from the render where both slots were filled",
+      missingSecond.filename !== both.filename,
+    );
+
+    // The stand-in must cover BOTH slots, or overflow is measured against a
+    // layout with one image missing.
+    const overflowTwo = await renderDesignedSlide({
+      html: twoSlot,
+      aspectRatio: "1:1",
+      photos: [{ path: photoA }, { path: photoB }],
+      logoPath: null,
+      system: SYSTEM,
+    });
+    check("a two-photograph slide that fits reports no overflow", overflowTwo.overflowPx === 0);
+  }
+
+  // The single-photograph shorthand still works and is identical to the list form.
+  {
+    const oneSlot =
+      '<div style="display:flex;width:1080px;height:1080px;background-color:#f2f3ed;">' +
+      `<img src="${PHOTO_TOKEN}" style="width:1080px;height:1080px;object-fit:cover"/>` +
+      "</div>";
+    const viaPhoto = await renderDesignedSlide({
+      html: oneSlot, aspectRatio: "1:1", photo: { path: photoA }, logoPath: null, system: SYSTEM,
+    });
+    const viaPhotos = await renderDesignedSlide({
+      html: oneSlot, aspectRatio: "1:1", photos: [{ path: photoA }], logoPath: null, system: SYSTEM,
+    });
+    check("the `photo` shorthand and a one-entry `photos` produce the same render", viaPhoto.filename === viaPhotos.filename);
+  }
 
   console.log(`\nrenderDesignedSlide: ${passed} checks passed`);
 }
