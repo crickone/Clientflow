@@ -149,6 +149,9 @@ export interface AddSlideInput {
   accentColor?: string;
   backgroundColor?: string | null;
   backgroundAssetId?: number | null;
+  /** Asset id per photo slot, as JSON (lib/image/photoAssetIds.ts). Null unless
+   *  the slide carries more than one photograph. */
+  photoAssetIds?: string | null;
   backgroundFit?: "cover" | "contain";
   backgroundOffsetX?: number;
   backgroundOffsetY?: number;
@@ -198,6 +201,7 @@ export function addSlide(input: AddSlideInput): CarouselSlide {
       accentColor: input.accentColor ?? "#2c6ce0",
       backgroundColor: input.backgroundColor ?? null,
       backgroundAssetId: input.backgroundAssetId ?? null,
+      photoAssetIds: input.photoAssetIds ?? null,
       backgroundFit: input.backgroundFit ?? "cover",
       backgroundOffsetX: input.backgroundOffsetX ?? 0.5,
       backgroundOffsetY: input.backgroundOffsetY ?? 0.5,

@@ -951,6 +951,14 @@ export const carouselSlides = sqliteTable("carousel_slides", {
     () => imageLibraryAssets.id,
     { onDelete: "set null" },
   ),
+  /**
+   * Asset id per photo slot as a JSON array, index 0 being slot 1. Null when
+   * the slide has at most one photograph -- background_asset_id above already
+   * says which, and leaving it null keeps every row written before
+   * two-photograph slides indistinguishable from one written after.
+   * See lib/image/photoAssetIds.ts.
+   */
+  photoAssetIds: text("photo_asset_ids"),
   backgroundFit: text("background_fit", {
     enum: ["cover", "contain"],
   })

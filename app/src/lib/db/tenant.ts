@@ -1597,6 +1597,9 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     if (designCols.length > 0 && !designCols.some((c) => c.name === "render_filename")) {
       sqlite.exec("ALTER TABLE carousel_slides ADD COLUMN render_filename TEXT");
     }
+    if (designCols.length > 0 && !designCols.some((c) => c.name === "photo_asset_ids")) {
+      sqlite.exec("ALTER TABLE carousel_slides ADD COLUMN photo_asset_ids TEXT");
+    }
   } catch (err) {
     console.error("[db] carousel_slides design columns migration failed:", err);
   }
