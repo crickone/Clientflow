@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { Check, Loader2, Pencil, X } from "lucide-react";
+import { Check, Loader2, Pencil, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { renderFileUrl } from "@/lib/image/renderStore.client";
@@ -61,6 +61,9 @@ export function SlideTextEditor({
   const [draft, setDraft] = useState("");
   const [hovered, setHovered] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  /** A rewrite in flight. Separate from `saving` so the two buttons can
+   *  disable together while only one of them spins. */
+  const [rewriting, setRewriting] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
   const reduce = useReducedMotion();
   const dur = reduce ? 0 : DUR.base;
@@ -128,6 +131,44 @@ export function SlideTextEditor({
   function open(run: TextRunSummary) {
     setEditing(run);
     setDraft(run.text);
+  }
+
+  /**
+   * Ask for different words for the line being edited.
+   *
+   * The result lands in the TEXTAREA, not on the slide. Nothing is saved and
+   * nothing is re-rendered, so pressing it again is free and the operator can
+   * keep going until something reads right -- then Save, or Cancel and keep
+   * what was already there. A version that wrote straight to the slide would
+   * make "try another" cost a render each time and leave no way back to the
+   * line they liked two presses ago.
+   */
+  async function rewrite() {
+    if (!editing) return;
+    setRewriting(true);
+    try {
+      const d = await fetch(
+        `/api/content-studio/carousels/${carouselId}/slide-text/rewrite`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          // The draft goes too: on a repeat press it is what the operator
+          // just rejected, and asking for something different from it is what
+          // makes pressing again worth doing.
+          body: JSON.stringify({ slideId, index: editing.index, avoid: [draft] }),
+          signal: AbortSignal.timeout(60_000),
+        },
+      ).then((r) => r.json());
+      if (!d.ok) {
+        toast.error(d.error ?? "Couldn't rewrite that.");
+        return;
+      }
+      setDraft(d.text as string);
+    } catch {
+      toast.error("Couldn't rewrite that.");
+    } finally {
+      setRewriting(false);
+    }
   }
 
   async function save() {
@@ -258,12 +299,31 @@ export function SlideTextEditor({
                 lineHeight: 1.4,
               }}
             />
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <button className="btn btn--primary btn--sm" onClick={() => void save()} disabled={saving}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <button
+                className="btn btn--primary btn--sm"
+                onClick={() => void save()}
+                disabled={saving || rewriting}
+              >
                 {saving ? <Loader2 size={13} className="spin" /> : <Check size={13} />}
                 {saving ? "Rendering…" : "Save"}
               </button>
-              <button className="btn btn--ghost btn--sm" onClick={() => setEditing(null)} disabled={saving}>
+              {/* Repeatable on purpose: it fills the box above, it does not
+                  touch the slide. Press it until something reads right. */}
+              <button
+                className="btn btn--outline btn--sm"
+                onClick={() => void rewrite()}
+                disabled={saving || rewriting}
+                title="Write this line again. Press as often as you like — nothing changes until you save."
+              >
+                {rewriting ? <Loader2 size={13} className="spin" /> : <Sparkles size={13} />}
+                {rewriting ? "Writing…" : "Rewrite"}
+              </button>
+              <button
+                className="btn btn--ghost btn--sm"
+                onClick={() => setEditing(null)}
+                disabled={saving || rewriting}
+              >
                 <X size={13} />
                 Cancel
               </button>

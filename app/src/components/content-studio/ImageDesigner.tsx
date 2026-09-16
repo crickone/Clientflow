@@ -2015,11 +2015,20 @@ export function ImageDesigner({
                 >
                   {group.label}
                 </div>
+                {/* NAME ONLY, packed tight. Every card used to carry its
+                    blurb and its aspect ratio, which made a list of ~14
+                    choices into a wall of prose four screens long -- and the
+                    blurb is the one thing you do not need while SCANNING for
+                    a name you already recognise. It moves to the tooltip, so
+                    it is there when you want it and silent when you don't.
+                    auto-fill rather than a fixed count: the panel is 320-480px
+                    on desktop and 358px on a phone, and this packs as many
+                    chips as fit either way. */}
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                    gap: 10,
+                    gridTemplateColumns: "repeat(auto-fill, minmax(118px, 1fr))",
+                    gap: 6,
                   }}
                 >
                   {group.templates.map((t) => {
@@ -2030,56 +2039,31 @@ export function ImageDesigner({
                         type="button"
                         onClick={() => applyTemplate(t)}
                         aria-pressed={active}
+                        title={`${t.name} — ${t.blurb} (${t.aspectRatio})`}
                         style={{
                           textAlign: "left",
-                          padding: "12px 14px",
-                          borderRadius: "var(--radius)",
+                          padding: "8px 10px",
+                          borderRadius: "var(--radius-sm)",
                           border: active
                             ? "1px solid var(--text-primary)"
                             : "1px solid var(--hairline)",
                           background: active ? "var(--surface-2)" : "var(--bg)",
                           cursor: "pointer",
                           fontFamily: "inherit",
-                          display: "grid",
-                          gap: 4,
-                          position: "relative",
+                          fontSize: 12,
+                          fontWeight: active ? 600 : 500,
+                          lineHeight: 1.25,
+                          color: "var(--text-primary)",
+                          // A name too long for its chip is clipped with an
+                          // ellipsis rather than wrapping: equal-height chips
+                          // are what make a dense grid scannable.
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          minWidth: 0,
                         }}
                       >
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            gap: 8,
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: 13,
-                              fontWeight: 500,
-                              color: "var(--text-primary)",
-                            }}
-                          >
-                            {t.name}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: 11,
-                              color: "var(--text-tertiary)",
-                            }}
-                          >
-                            {t.aspectRatio}
-                          </span>
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 11,
-                            color: "var(--text-tertiary)",
-                            letterSpacing: "0.02em",
-                          }}
-                        >
-                          {t.blurb}
-                        </div>
+                        {t.name}
                       </button>
                     );
                   })}
