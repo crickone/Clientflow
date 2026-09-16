@@ -226,7 +226,11 @@ export function SlideTextEditor({
         }}
       />
 
-      {clickable && (
+      {/* Hidden while the editor is open: "Click any text to edit it" is
+          guidance for someone who has not clicked yet, and on a phone -- where
+          the badge sits over the slide's own first line -- it is just covering
+          the design while you work on it. */}
+      {clickable && !editing && (
         <div
           style={{
             position: "absolute",
@@ -253,6 +257,11 @@ export function SlideTextEditor({
       <AnimatePresence>
         {editing && (
           <motion.div
+            // On a phone the stylesheet takes this out of the overlay and
+            // drops it BELOW the slide: at 286px the popover covered almost
+            // the whole preview, so you were editing a line with no sight of
+            // the design it sits in. See globals.css.
+            className="slide-text-popover"
             initial={{ opacity: 0, y: reduce ? 0 : 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: reduce ? 0 : 6 }}

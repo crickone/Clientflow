@@ -655,6 +655,35 @@ a {
   }
 }
 
+/* EDITING A LINE MUST NOT HIDE THE SLIDE IT IS ON.
+   The text popover is an overlay pinned to the bottom of the preview, which
+   is right at desktop sizes where the preview is 400-480px. At 286px it
+   covered nearly all of it -- you were editing a heading with no sight of the
+   design it belongs to. Below this width it leaves the overlay and flows
+   underneath instead, so the slide stays visible while you work on it. */
+@media (max-width: 760px) {
+  .slide-text-popover {
+    position: static !important;
+    margin-top: 10px;
+  }
+}
+
+/* 44px is the smallest target a finger hits reliably (Fitts). btn--sm is
+   32px, which is right for a mouse and too small for a thumb -- and these are
+   the buttons in the text editor, the photo panel and the slide actions, i.e.
+   the ones actually used on a phone. Height alone, so the horizontal padding
+   and type size stay as designed. */
+@media (max-width: 760px) {
+  .btn--sm {
+    height: auto;
+    min-height: 44px;
+  }
+  .btn--icon {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 /* Wide content shouldn't break narrow layouts. */
 @media (max-width: 700px) {
   /* TWO-COLUMN LAYOUTS COLLAPSE TO ONE ON A PHONE.
