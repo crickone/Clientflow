@@ -3,6 +3,7 @@ import { decodeHTML } from "entities";
 import sharp from "sharp";
 
 import type { DesignFont } from "./fonts";
+import { textBlocks, textCollisions, type TextCollision } from "./layoutBoxes";
 
 /**
  * satori and satori-html are loaded LAZILY, for two reasons.
@@ -54,18 +55,42 @@ export async function renderDesignToPng(
   height: number,
   fonts: DesignFont[],
 ): Promise<Buffer> {
+  const { svg } = await renderDesignToSvg(html, width, height, fonts);
+  return sharp(Buffer.from(svg)).png().toBuffer();
+}
+
+/**
+ * The render one step before the raster: satori's SVG, and the node tree it
+ * laid out.
+ *
+ * Both halves are returned because they are only useful together. The SVG
+ * carries an overflow mask per element holding that element's FINAL geometry,
+ * and the tree says which of those elements hold text and what path they sit
+ * at -- see ./layoutBoxes, which is the only reason this seam is exported at
+ * all. Reading the geometry out of a render that was happening anyway is what
+ * makes measuring the layout free; the alternative was a font-metrics
+ * reimplementation of satori's own line breaking, which would be a second
+ * opinion rather than a measurement.
+ */
+export async function renderDesignToSvg(
+  html: string,
+  width: number,
+  height: number,
+  fonts: DesignFont[],
+): Promise<{ svg: string; nodes: unknown }> {
   const { satori, toNodes } = await loadSatori();
   // The cast is the honest shape of this seam: satori-html returns its own
   // node tree, satori types its input as ReactNode, and the two are structurally
   // the same object. `prepare` preserves that structure exactly.
   const nodes = prepare(toNodes(html)) as Parameters<SatoriFn>[0];
   const svg = await satori(nodes, { width, height, fonts });
-  return sharp(Buffer.from(svg)).png().toBuffer();
+  return { svg, nodes };
 }
 
 /**
- * How far a design's content runs PAST the bottom of its canvas, in pixels.
- * 0 means it fits.
+ * The two ways a design can be laid out wrongly, measured in one satori pass:
+ * how far its content runs PAST the bottom of the canvas (0 means it fits),
+ * and which of its text blocks landed on top of one another.
  *
  * Why this is needed at all: satori has no auto-fit. The fixed templates shrink
  * a heading until it fits (autoFitHeading in lib/image/templates), but a
@@ -93,16 +118,26 @@ export async function renderDesignToPng(
  * model call, and it feeds the existing repair loop, so the alternative is
  * shipping the operator a slide with its last line sliced off.
  */
-export async function measureOverflowPx(
+export async function measureLayout(
   html: string,
   width: number,
   height: number,
   fonts: DesignFont[],
   slack = 500,
-): Promise<number> {
-  const { satori, toNodes } = await loadSatori();
-  const nodes = prepare(toNodes(html)) as Parameters<SatoriFn>[0];
-  const svg = await satori(nodes, { width, height: height + slack, fonts });
+): Promise<{ overflowPx: number; collisions: TextCollision[] }> {
+  const { svg, nodes } = await renderDesignToSvg(html, width, height + slack, fonts);
+
+  // Free, and the reason it lives here rather than in a pass of its own: this
+  // render already laid the whole slide out, and satori's SVG carries every
+  // element's final box. Measuring where the blocks LANDED is the only way to
+  // catch a heading that wrapped to one more line than the "top" below it
+  // budgeted for -- the model cannot know that number when it writes the
+  // markup, because satori does the wrapping afterwards. See ./layoutBoxes.
+  //
+  // The slack height changes nothing here: these designs position their blocks
+  // absolutely from the top, and the root carries an explicit height.
+  const collisions = textCollisions(svg, textBlocks(nodes));
+
   const { data, info } = await sharp(Buffer.from(svg))
     .ensureAlpha()
     .raw()
@@ -124,8 +159,8 @@ export async function measureOverflowPx(
   // A handful of pixels is antialiasing on a shape that ends exactly at the
   // edge, not a cut-off sentence. Requiring a real cluster keeps the repair
   // loop from being triggered by a rounding artefact.
-  if (painted < 32 || lowest < 0) return 0;
-  return lowest - height + 1;
+  const overflowPx = painted < 32 || lowest < 0 ? 0 : lowest - height + 1;
+  return { overflowPx, collisions };
 }
 
 /**

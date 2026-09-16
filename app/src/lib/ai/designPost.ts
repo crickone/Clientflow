@@ -22,6 +22,7 @@ import {
 } from "@/lib/ai/generateCarousel";
 import { meteredCreateStreamed, type MeterContext } from "@/lib/ai/metered";
 import { logoBox } from "@/lib/design/renderDesign";
+import { collisionViolation } from "@/lib/design/layoutBoxes";
 import { MAX_PHOTO_SLOTS, photoSlotsUsed } from "@/lib/design/photoSlots";
 import {
   canvasFor,
@@ -125,12 +126,22 @@ async function renderOne(
     // to the catch below. The render is still kept: a clipped slide the
     // operator can see beats no slide at all, and the violation puts it in
     // front of the repair call, which is the thing that can actually fix it.
+    //
+    // Text landing ON text is the same kind of fault and reaches the same
+    // place: the model chooses a block's `top` before satori has wrapped the
+    // block above it, so a heading that takes one line more than it budgeted
+    // for sits across its own body copy. Both are measured in one pass -- see
+    // measureLayout -- and both are reported rather than repaired here.
+    const faults = [
+      render.overflowPx > 0
+        ? overflowViolation(render.overflowPx, render.width, render.height)
+        : null,
+      render.collisions.length > 0 ? collisionViolation(render.collisions) : null,
+    ].filter((v): v is string => v !== null);
+
     return {
       renderFilename: render.filename,
-      violation:
-        render.overflowPx > 0
-          ? overflowViolation(render.overflowPx, render.width, render.height)
-          : null,
+      violation: faults.length > 0 ? faults.join(" ") : null,
     };
   } catch (err) {
     // A design that will not render must not take the whole set down with it.

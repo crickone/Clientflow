@@ -640,4 +640,20 @@ check(
   redesignPhotoSlots("<div>no photograph</div>", own, [own, ...lib]).length === 0,
 );
 
+// The rule that replaces a hope with a technique. "Nothing may overlap text"
+// was already stated and could not be followed: the model chooses a block's
+// "top" before the renderer has wrapped the block above it. A real slide came
+// back reading "Radiant warmth, nothing enclosing you" with "you" sitting
+// across its own body copy. See lib/design/layoutBoxes.
+check(
+  "the rules teach stacking text in one flex column rather than a top per block",
+  DESIGN_RULES.includes("STACK TEXT IN A CONTAINER") &&
+    DESIGN_RULES.includes("display:flex;flex-direction:column") &&
+    DESIGN_RULES.includes("Do NOT give each block its own \"top\""),
+);
+check(
+  "and say WHY -- a model told only the rule reverts to hand-placing on the next slide",
+  DESIGN_RULES.includes("cannot know how many lines a heading wraps to"),
+);
+
 console.log(`\ndesignPost.parse: ${passed} checks passed`);

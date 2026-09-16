@@ -4,10 +4,11 @@ import { saveRender } from "@/lib/image/renderStore";
 
 import { loadDesignFonts } from "./fonts";
 import type { DesignSystem } from "./parse";
+import type { TextCollision } from "@/lib/design/layoutBoxes";
 import { fillPhotoSlots, photoSlotBoxes, photoSlotsUsed } from "./photoSlots";
 import {
   gradedPhotoDataUri,
-  measureOverflowPx,
+  measureLayout,
   renderDesignToPng,
   stampLogo,
 } from "./renderDesign";
@@ -96,6 +97,10 @@ export interface DesignedSlideRender {
    * nowhere to report it may ignore it; what it must not do is not know.
    */
   overflowPx: number;
+  /** Text blocks that landed on top of one another. Empty is the normal case.
+   *  Like overflowPx, this is REPORTED rather than repaired here: the render is
+   *  kept, and the violation goes to whatever can actually redesign the slide. */
+  collisions: TextCollision[];
 }
 
 /**
@@ -344,7 +349,7 @@ export async function renderDesignedSlide(
   // for the stand-in. Paying two minutes per keystroke-save to compute a
   // number is not a trade worth making, and it would have blown through the
   // editor's own 180s client timeout on a slide with a large photograph.
-  const overflowPx = await measureOverflowPx(
+  const { overflowPx, collisions } = await measureLayout(
     await measurementHtmlFor(html, width, height, boxes),
     width,
     height,
@@ -354,7 +359,7 @@ export async function renderDesignedSlide(
   // The render is kept even when it overflows: a clipped slide the operator
   // can see beats no slide at all, and the measurement is what puts it in
   // front of whatever can fix it.
-  return { filename: saveRender(png), width, height, overflowPx };
+  return { filename: saveRender(png), width, height, overflowPx, collisions };
 }
 
 /**

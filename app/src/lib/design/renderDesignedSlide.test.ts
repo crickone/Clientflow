@@ -21,7 +21,7 @@ import { PHOTO_TOKEN } from "../ai/designPost.parse";
 import { renderFilePath } from "../image/renderStore";
 import { loadDesignFonts } from "./fonts";
 import type { DesignSystem } from "./parse";
-import { gradedPhotoDataUri, measureOverflowPx, renderDesignToPng } from "./renderDesign";
+import { gradedPhotoDataUri, measureLayout, renderDesignToPng } from "./renderDesign";
 import { fillPhotoSlots, photoSlotBoxes, photoSlotsUsed } from "./photoSlots";
 import { CANVAS, canvasFor, measurementHtmlFor, renderDesignedSlide } from "./renderDesignedSlide";
 
@@ -310,12 +310,12 @@ async function main() {
     `</div>` +
     `</div>`;
   const realPhotoUri = await gradedPhotoDataUri(photoPath, 1080, 1080, SYSTEM.photo);
-  const realOverflow = await measureOverflowPx(
+  const realOverflow = (await measureLayout(
     equivHtml.split(PHOTO_TOKEN).join(realPhotoUri),
     1080,
     1080,
     equivFonts,
-  );
+  )).overflowPx;
   const equivRender = await renderDesignedSlide({
     html: equivHtml,
     aspectRatio: "1:1",

@@ -13,7 +13,7 @@ import sharp from "sharp";
 import { composeDesignSystem, defaultPalette } from "./direction";
 import { getDirection } from "./directions";
 import { loadDesignFonts } from "./fonts";
-import { measureOverflowPx, renderDesignToPng } from "./renderDesign";
+import { measureLayout, renderDesignToPng } from "./renderDesign";
 import { buildHitMapHtml } from "./buildHitMap";
 import { indexFromColour, pickBand } from "./hitMap";
 import { OPTIMAL_HEALTH_DESIGN_SYSTEM } from "./presets";
@@ -87,7 +87,7 @@ async function main() {
   );
   check("an escaped tag stays text rather than becoming an element", escaped.length > 0);
 
-  // ── measureOverflowPx: does the design actually FIT the canvas? ──
+  // ── measureLayout: does the design actually FIT the canvas? ──
   //
   // satori has no auto-fit, so a slide with one sentence too many renders
   // "successfully" with its last lines sliced off at the canvas edge. That is
@@ -103,9 +103,9 @@ async function main() {
     `<div style="display:flex;flex-direction:column;position:relative;width:600px;height:400px;background:#f2f3ed;font-family:Inter;padding:40px;">` +
     `<span style="font-size:${px}px;line-height:1.15;color:#24231f;">${LONG}</span></div>`;
 
-  check("text that fits reports no overflow", (await measureOverflowPx(block(14), 600, 400, fonts)) === 0);
+  check("text that fits reports no overflow", ((await measureLayout(block(14), 600, 400, fonts)).overflowPx) === 0);
 
-  const past = await measureOverflowPx(block(40), 600, 400, fonts);
+  const past = (await measureLayout(block(40), 600, 400, fonts)).overflowPx;
   check("text that does not fit reports overflow", past > 0);
   check("and reports roughly how far past it runs", past > 10);
 
@@ -113,7 +113,7 @@ async function main() {
   // alpha channel, so a full-bleed background must not be mistaken for content
   // spilling out of the canvas.
   const flat = `<div style="display:flex;width:600px;height:400px;background:#24231f;font-family:Inter;"></div>`;
-  check("a full-bleed background alone reports no overflow", (await measureOverflowPx(flat, 600, 400, fonts)) === 0);
+  check("a full-bleed background alone reports no overflow", ((await measureLayout(flat, 600, 400, fonts)).overflowPx) === 0);
 
   // ── the hit map lands ON the words ──
   //
@@ -182,7 +182,7 @@ async function main() {
   for (const [i, html] of samples.entries()) {
     const png = await renderDesignToPng(html, 1080, 1080, fonts);
     check(`sample ${i + 1} renders`, png.length > 0);
-    check(`sample ${i + 1} fits the canvas`, (await measureOverflowPx(html, 1080, 1080, fonts)) === 0);
+    check(`sample ${i + 1} fits the canvas`, ((await measureLayout(html, 1080, 1080, fonts)).overflowPx) === 0);
 
     // The top-right corner is where the logo is stamped afterwards. It must
     // hold nothing but ground: sample stampLogo's actual box (a 7% margin plus
@@ -219,7 +219,7 @@ async function main() {
   for (const [i, html] of boldSamples.entries()) {
     const png = await renderDesignToPng(html, 1080, 1080, boldFonts);
     check(`bold sample ${i + 1} renders`, png.length > 0);
-    check(`bold sample ${i + 1} fits the canvas`, (await measureOverflowPx(html, 1080, 1080, boldFonts)) === 0);
+    check(`bold sample ${i + 1} fits the canvas`, ((await measureLayout(html, 1080, 1080, boldFonts)).overflowPx) === 0);
 
     const raw = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
     const cornerX = raw.info.width - Math.round(raw.info.width * 0.07) - Math.round(raw.info.width * 0.19);
