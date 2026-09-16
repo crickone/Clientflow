@@ -131,13 +131,15 @@ const isPrimaryWeight = (attrs: string) => isExplicitPrimary(attrs) || !hasVaria
 const countPrimaryWeight = (src: string) => buttonTags(src).filter(isPrimaryWeight).length;
 
 check(
-  "the designer has exactly 3 primary-weight buttons -- \"Generate\" in the " +
-    "Generate-carousel dialog, \"Generate\"/\"Regenerate\" in the per-slide AI " +
-    "background panel, and \"Redesign with that\"/\"Try a different design\" " +
-    "in the redesign-slide dialog -- one per dialog/panel, so at most one is " +
-    "ever on screen at the same time as another; adding a fourth means " +
-    "picking a non-primary variant or removing one of these three",
-  countPrimaryWeight(designer) === 3,
+  "the designer has exactly 2 primary-weight buttons -- \"Generate\"/" +
+    "\"Regenerate\" in the per-slide AI background panel, and \"Do that\"/" +
+    "\"Try a different design\" in the redesign-slide dialog -- one per " +
+    "dialog/panel, so at most one is ever on screen at the same time as " +
+    "another; adding a third means picking a non-primary variant or removing " +
+    "one of these two. It was 3: the Generate-carousel dialog held the other, " +
+    "and that whole control is gone -- the same call is what the hub's " +
+    "\"New image\" already makes, non-destructively",
+  countPrimaryWeight(designer) === 2,
 );
 check(
   "no toggle in the designer borrows the primary weight (variant must not resolve to \"primary\")",

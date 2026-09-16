@@ -22,17 +22,14 @@ import {
   Sparkles,
   Undo2,
   Trash2,
-  Wand2,
   Pencil,
 } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import {
   Dialog,
   DialogContent,
   DialogTrigger,
-  DialogClose,
 } from "@/components/ui/Dialog";
 import { Input, Label, Textarea } from "@/components/ui/Input";
 import type {
@@ -100,7 +97,6 @@ import {
   intentDescription,
   type SlideIntent,
 } from "@/lib/content-studio/slideIntent";
-import { watchGeneration } from "./GenerationWatcher";
 import { EditorSection } from "./EditorSection";
 import { PostIdeas } from "./PostIdeas";
 
@@ -1331,6 +1327,7 @@ export function ImageDesigner({
     <div className="cs-editor-stack" style={{ display: "grid", gap: 18 }}>
       {/* Top toolbar */}
       <div
+        className="cs-toolbar"
         style={{
           display: "flex",
           gap: 16,
@@ -1359,9 +1356,15 @@ export function ImageDesigner({
             />
           </div>
         ) : (
-          <div style={{ flex: 1 }} />
+          // Pushes the actions to the right ON A DESKTOP. On a phone the row
+          // wraps and this spacer was still claiming the first line's leading
+          // 68px, so "Refresh all copy" started indented while the buttons
+          // that wrapped below it sat at the margin. The stylesheet drops it
+          // there -- see .cs-toolbar in globals.css.
+          <div className="cs-toolbar-spacer" style={{ flex: 1 }} />
         )}
         <div
+          className="cs-toolbar-actions"
           style={{
             display: "flex",
             alignItems: "center",
@@ -1998,39 +2001,16 @@ export function ImageDesigner({
                 every category, sitting above the template grid as "Generate
                 carousel" while a "Carousels" tab meant something else entirely —
                 two different jobs under near-identical names. */}
-            {isCarouselKind && (
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
-            <GenerateCarouselButton
-              designId={designId}
-              designName={name}
-              slotKey={isCarouselSlot(activeSlot) ? activeSlot : carouselSlotFor()}
-              defaultTopic={
-                slidesInSlot[0]?.headingText?.trim() ||
-                slides[0]?.headingText?.trim() ||
-                name.trim() ||
-                ""
-              }
-              onStarted={(startedSlot) => {
-                lastSavedRef.current = {};
-                // Switch to the slot the run writes into, so the slides land in
-                // front of the operator rather than in a tab they have to find.
-                // The kind follows the slot on its own.
-                // Turns the poll on immediately too, so the banner shows
-                // without waiting for the first tick to confirm what we
-                // already know.
-                dispatch({
-                  type: "generationStarted",
-                  slotKey: isCarouselSlot(startedSlot)
-                    ? startedSlot
-                    : DEFAULT_CAROUSEL_SLOT,
-                });
-              }}
-            />
-                <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
-                  Writes a whole slide series on a topic
-                </span>
-              </div>
-            )}
+            {/* "Generate carousel" used to sit here, replacing every slide in
+                this design with a fresh series on a topic. It is gone because
+                the same call is what the hub's "New image" already makes, and
+                making a NEW design keeps the one you have instead of
+                overwriting it -- a destructive button is a poor way to offer
+                something you can have non-destructively. What remains covers
+                the rest: "Refresh all copy" rewrites every slide's words while
+                keeping its layout and photographs, and "Redesign slide"
+                recomposes one. The API it called is untouched; StartDesign
+                still uses it. */}
             {/* The brand's OWN slide types, when the account has a design
                 direction and this slide was designed by Adonis. They are not
                 painters like the cards below -- there is no canvas code behind
@@ -2661,7 +2641,14 @@ function SaveStatus({
 }) {
   const text = status === "error" ? "Save failed" : "";
   const color = "#dc2626";
-  if (!text) return <span style={{ width: 60 }} />;
+  // NOTHING, not a 60px hole. This reserved the message's width so the row
+  // would not shift when it appeared -- but it only ever appears on a failed
+  // save, and paying a permanent 60px indent for a rare message is the wrong
+  // way round. On a phone it was visible as a misalignment: the toolbar's
+  // first button started 68px in while every button that wrapped below it sat
+  // at the margin. A row that moves when a save fails is fine; drawing the eye
+  // is what an error is for.
+  if (!text) return null;
   return (
     <span
       style={{
@@ -2674,183 +2661,6 @@ function SaveStatus({
     >
       {text}
     </span>
-  );
-}
-
-/**
- * Generate carousel button — opens a dialog and POSTs to the generate API
- * to regenerate a coherent set of slides on a topic via Claude.
- */
-function GenerateCarouselButton({
-  designId,
-  designName,
-  slotKey,
-  defaultTopic,
-  onStarted,
-}: {
-  designId: number;
-  /** Used only to name the design in the completion notification. */
-  designName: string;
-  slotKey: string;
-  defaultTopic: string;
-  /** The run is QUEUED, not finished -- the editor polls for the slides. */
-  onStarted: (slotKey: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [topic, setTopic] = useState(defaultTopic);
-  const [slideCount, setSlideCount] = useState(5);
-  const [tone, setTone] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (open) {
-      setTopic(defaultTopic);
-      setError(null);
-    }
-  }, [open, defaultTopic]);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    // requestSubmit() with no submitter ignores the button's disabled state
-    // (per spec), and the textarea's Cmd+Enter handler calls it directly --
-    // so a second press inside the request window has to be stopped here,
-    // not by disabling a control the second press never looks at.
-    if (submitting) return;
-    if (!topic.trim()) {
-      setError("Topic is required.");
-      return;
-    }
-    setSubmitting(true);
-    setError(null);
-    try {
-      const res = await fetch(
-        `/api/content-studio/carousels/${designId}/generate`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            topic: topic.trim(),
-            slideCount,
-            tone: tone.trim() || null,
-            slotKey,
-            replaceExisting: true,
-          }),
-        },
-      );
-      const json = await res.json();
-      if (!res.ok || !json.ok) {
-        throw new Error(json.error || "Couldn't generate the carousel.");
-      }
-      // The response says the run STARTED. The slides are written by a detached
-      // continuation and arrive through the editor's poll, which is what lets
-      // the operator navigate away without killing the generation.
-      //
-      // Which is exactly why the watch is registered HERE: the editor's poll
-      // dies with this page, so the shell's watcher is what tells them it
-      // finished once they have gone elsewhere. This click is also the gesture
-      // that makes the notification-permission prompt expected -- watchGeneration
-      // asks for it, and only ever from here.
-      watchGeneration(designId, designName);
-      setOpen(false);
-      onStarted(slotKey);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Couldn't generate the carousel.",
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button
-          variant="outline"
-          title="Generate a full carousel on a topic with Claude"
-        >
-          <Sparkles size={14} />
-          Generate carousel
-        </Button>
-      </DialogTrigger>
-      <DialogContent
-        title="Generate a carousel"
-        description="Claude will write a cohesive 2-10 slide series on your topic and replace the current slides."
-      >
-        <form onSubmit={submit} style={{ display: "grid", gap: 18 }}>
-          <div>
-            <Label htmlFor="gen-topic" srOnly>Topic</Label>
-            <Textarea
-              id="gen-topic"
-              required
-              value={topic}
-              placeholder="Topic"
-              onChange={(e) => setTopic(e.target.value)}
-              onKeyDown={(e) => {
-                // Cmd/Ctrl+Enter submits from inside the box, where you are
-                // when you have finished typing. Plain Enter stays a newline:
-                // a topic is often more than one line.
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                  e.preventDefault();
-                  e.currentTarget.form?.requestSubmit();
-                }
-              }}
-              style={{ minHeight: 70 }}
-            />
-            <PostIdeas onPick={(topic) => setTopic(topic)} />
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-            <div>
-              <Label htmlFor="gen-count">Number of slides</Label>
-              <Input
-                id="gen-count"
-                type="number"
-                min={2}
-                max={10}
-                value={slideCount}
-                onChange={(e) => setSlideCount(Number(e.target.value))}
-              />
-            </div>
-            <div>
-              <Label htmlFor="gen-tone" srOnly>Tone (optional)</Label>
-              <Input
-                id="gen-tone"
-                value={tone}
-                placeholder="Tone (optional)"
-                onChange={(e) => setTone(e.target.value)}
-              />
-            </div>
-          </div>
-          {error && (
-            <div style={{ color: "#dc2626", fontSize: 13 }}>{error}</div>
-          )}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 10,
-            }}
-          >
-            <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-              Existing slides will be replaced.
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <DialogClose asChild>
-                <Button type="button" variant="ghost" size="sm">
-                  Cancel
-                </Button>
-              </DialogClose>
-              <Button type="submit" disabled={submitting || !topic.trim()}>
-                <Sparkles size={15} />
-                {submitting ? "Generating…" : "Generate"}
-              </Button>
-            </div>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }
 

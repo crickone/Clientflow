@@ -655,6 +655,28 @@ a {
   }
 }
 
+/* THE EDITOR'S TOOLBAR STARTS AT THE MARGIN ON A PHONE.
+   A flex spacer pushes the actions to the right-hand side on a desktop, which
+   is where they belong beside a wide heading. On a phone the row wraps, and
+   the spacer was still taking the first line's leading 68px: "Refresh all
+   copy" began indented while every button that wrapped below it sat at the
+   margin, so the group read as misaligned with itself. There is nothing to
+   push against at this width, so the spacer goes and the actions take the
+   full row from the left. */
+@media (max-width: 760px) {
+  .cs-toolbar {
+    gap: 8px;
+  }
+  .cs-toolbar-spacer {
+    display: none;
+  }
+  .cs-toolbar-actions {
+    width: 100%;
+    justify-content: flex-start;
+    padding-top: 0 !important;
+  }
+}
+
 /* THE PHOTO LIBRARY OPENS DOWNWARD ON A PHONE, NOT SIDEWAYS.
    Beside the preview it takes width out of the page's margin, which is the
    whole reason it is laid out in the flow rather than floated over the slide.
