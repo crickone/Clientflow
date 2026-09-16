@@ -23,6 +23,7 @@ import {
   Undo2,
   Trash2,
   Wand2,
+  Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
@@ -391,6 +392,9 @@ export function ImageDesigner({
     (a) => (a as { kind?: string }).kind !== "video",
   );
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  /** The design name is shown as the page's heading; this reveals the field
+   *  that edits it, so the row is not permanently holding a duplicate of it. */
+  const [renaming, setRenaming] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [exportingZip, setExportingZip] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -1310,6 +1314,13 @@ export function ImageDesigner({
   } | null>(null);
   const previewColMax = 480 + (photosOpen ? PHOTO_PANEL_WIDTH + 8 : 0);
   const isEmptySlot = !activeSlide || !surface;
+  // The filmstrip carries its own "+ Add slide" tile at the end of the
+  // slides, so the toolbar's button is a second door to the same room
+  // wherever the strip is on screen. It is NOT redundant on a single
+  // post, which has no strip -- that is the one case where the button is
+  // the only way to add a second slide and make it a carousel. One name
+  // for the condition, so the two can never disagree about it.
+  const filmstripShown = !isEmptySlot && (isCarouselKind || isCarousel);
 
   return (
     // Named so the mobile rules can reach it. A grid with no explicit columns
@@ -1327,15 +1338,29 @@ export function ImageDesigner({
           flexWrap: "wrap",
         }}
       >
-        <div style={{ flex: 1, minWidth: 280 }}>
-          <Label htmlFor="design-name" srOnly>Design name</Label>
-          <Input
-            id="design-name"
-            value={name}
-            placeholder="Design name"
-            onChange={(e) => setName(e.target.value)}
-          />
-        </div>
+        {/* The page's own heading already IS the design's name, so a text box
+            holding the same words sat under it saying it twice. Renaming is an
+            occasional job, so it hides behind one icon and takes the row's
+            width only while it is being done. The heading follows on save --
+            the autosave below calls router.refresh(). */}
+        {renaming ? (
+          <div style={{ flex: 1, minWidth: 240 }}>
+            <Label htmlFor="design-name" srOnly>Design name</Label>
+            <Input
+              id="design-name"
+              autoFocus
+              value={name}
+              placeholder="Design name"
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === "Escape") setRenaming(false);
+              }}
+              onBlur={() => setRenaming(false)}
+            />
+          </div>
+        ) : (
+          <div style={{ flex: 1 }} />
+        )}
         <div
           style={{
             display: "flex",
@@ -1377,6 +1402,23 @@ export function ImageDesigner({
                   : "Refresh copy"}
             </Button>
           )}
+          {!renaming && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRenaming(true)}
+              title="Rename this design"
+              aria-label="Rename this design"
+            >
+              <Pencil size={14} />
+            </Button>
+          )}
+          {/* Icon-only, with the words kept as the tooltip and the accessible
+              name. These two are recognised by their glyphs and were the
+              longest labels in the row -- "Export all (.zip)" alone was wider
+              than the three buttons beside it. Refresh and the logo toggle
+              keep their labels: one is a bulk rewrite worth reading before
+              pressing, the other reports a STATE that an icon cannot. */}
           {isCarousel && (
             <Button
               variant="outline"
@@ -1384,9 +1426,9 @@ export function ImageDesigner({
               onClick={exportAllAsZip}
               disabled={exportingZip || !fontsReady}
               title="Download all slides as a zip"
+              aria-label="Download all slides as a zip"
             >
-              <Download size={14} />
-              {exportingZip ? "Zipping…" : "Export all (.zip)"}
+              {exportingZip ? <Loader2 size={14} className="spin" /> : <Download size={14} />}
             </Button>
           )}
           {logoUrl && (
@@ -1415,9 +1457,14 @@ export function ImageDesigner({
               {showLogo ? "Logo on" : "Logo off"}
             </Button>
           )}
-          <Button variant="destructive" size="sm" onClick={deleteDesign}>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={deleteDesign}
+            title="Delete this design"
+            aria-label="Delete this design"
+          >
             <Trash2 size={14} />
-            Delete design
           </Button>
         </div>
       </div>
@@ -1712,7 +1759,7 @@ export function ImageDesigner({
               sits in. It replaces a two-column thumbnail grid that had no
               preview at all — so the ORDER, the one thing a carousel is, was
               the one thing you couldn't see or change. */}
-          {!isEmptySlot && (isCarouselKind || isCarousel) && (
+          {filmstripShown && (
             <SlideFilmstrip
               slides={slidesInSlot}
               activeIdx={activeIdx}
@@ -1761,14 +1808,16 @@ export function ImageDesigner({
             }}
           >
             <div style={{ display: "flex", gap: 8 }}>
-              <Button
-                variant="outline"
-                onClick={() => addSlide()}
-                title="Add another slide to make this a carousel"
-              >
-                <Plus size={14} />
-                Add slide
-              </Button>
+              {!filmstripShown && (
+                <Button
+                  variant="outline"
+                  onClick={() => addSlide()}
+                  title="Add another slide to make this a carousel"
+                >
+                  <Plus size={14} />
+                  Add slide
+                </Button>
+              )}
               {undoDepth > 0 && (
                 <Button
                   variant="outline"
