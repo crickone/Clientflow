@@ -9,6 +9,7 @@ import { getBrandFontIds } from "@/lib/settings";
 import { getBusinessProfile } from "@/lib/businessProfile";
 import { getChromeLogoSrc } from "@/lib/branding";
 import { isImageGenConfigured } from "@/lib/ai/image/falClient";
+import { isImageEditConfigured } from "@/lib/ai/image/openaiImageClient";
 import { ImageDesigner } from "@/components/content-studio/ImageDesigner";
 import { getDesignSystem } from "@/lib/design/system";
 
@@ -64,6 +65,7 @@ export default function ImageDesignPage({
         defaultBodyFontId={brandFonts.body}
         brand={brand}
         imageGenEnabled={isImageGenConfigured()}
+        photoEditEnabled={isImageEditConfigured()}
         logoUrl={getChromeLogoSrc()}
         initialShowLogo={design.showLogo}
         designSystem={getDesignSystem()}

@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 
 import { getCurrentMembership } from "@/lib/auth";
 import { getCarousel, updateSlide } from "@/lib/image/carousels";
+import { editPostImage } from "@/lib/ai/image/editPostImage";
+import { isImageEditConfigured } from "@/lib/ai/image/openaiImageClient";
 import { photoChoiceFor, photoChoices } from "@/lib/image/library";
 import { DESIGNED_TEMPLATE_ID } from "@/lib/image/paintSlide";
 import { getDesignSystem } from "@/lib/design/system";
@@ -132,6 +134,11 @@ export async function POST(
     onlyGenerate?: unknown;
     /** Which photo slot to act on, 1-based. Absent means slot 1. */
     slot?: unknown;
+    /** Edit the photograph this slot already has, using `note`. */
+    edit?: unknown;
+    /** The operator's own words: what to change. Steers a generation, and IS
+     *  the instruction for an edit. */
+    note?: unknown;
   };
 
   // Resolved here, above every branch, because all three body shapes can end
@@ -176,6 +183,66 @@ export async function POST(
   let photo: { id: number; path: string } | null = null;
   let scene = "";
 
+  // EDIT the photograph this slot already has, rather than making a different
+  // one. The operator typed "replace the guy in the photo with a woman" into
+  // the redesign box and pressed the only two buttons there were: one rewrites
+  // the MARKUP and cannot touch a picture, and the other threw the sentence
+  // away and regenerated from the stored scene -- which, on that slide, reads
+  // "no people visible". Neither could ever have done it. This is the branch
+  // that can. See lib/ai/image/editPostImage.
+  if (o.edit === true) {
+    if (!isImageEditConfigured()) {
+      return NextResponse.json(
+        { ok: false, error: "Photo editing isn't configured on this account." },
+        { status: 400 },
+      );
+    }
+    const instruction = typeof o.note === "string" ? o.note.trim() : "";
+    if (!instruction) {
+      return NextResponse.json(
+        { ok: false, error: "Say what to change about the photo." },
+        { status: 400 },
+      );
+    }
+    // The picture in THIS slot, which is the one the operator is looking at.
+    // A slot with no photograph has nothing to edit, and saying so beats
+    // silently editing slot 1's.
+    const currentId = parsePhotoAssetIds(slide.photoAssetIds, slide.backgroundAssetId)[slot - 1];
+    const current = currentId == null ? null : photoChoiceFor(currentId);
+    if (!current?.path) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "There's no photograph in that slot to edit yet. Use “Make a new photo” first.",
+        },
+        { status: 400 },
+      );
+    }
+    try {
+      const asset = await editPostImage(
+        {
+          sourcePath: current.path,
+          instruction,
+          aspectRatio: (slide.aspectRatio as "1:1" | "9:16" | "4:5") ?? "1:1",
+        },
+        { tenantId, agentKey: "carousel" },
+      );
+      // Same two-step contract as a generation: the new picture goes into the
+      // library and comes back, and the CLIENT decides whether to put it on
+      // the slide. An edit the operator does not like must not already have
+      // replaced the photograph they had.
+      return NextResponse.json({ ok: true, asset });
+    } catch (err) {
+      if (err instanceof AiCapError) {
+        return NextResponse.json({ ok: false, error: err.message }, { status: 429 });
+      }
+      const message = err instanceof Error ? err.message : "Couldn't edit the photo.";
+      console.error("[slide-photo] edit failed:", err);
+      return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    }
+  }
+
   if (o.generate === true) {
     if (!isImageGenConfigured()) {
       return NextResponse.json(
@@ -198,6 +265,14 @@ export async function POST(
     scene =
       sceneForSlot(slide.photoScenes, slide.imagePrompt, slot) ||
       sceneFromSlideCopy(slide);
+    // What the operator typed, if anything, STEERS the scene rather than
+    // replacing it: the design's brief still describes the shot this slide was
+    // composed around, and the note is the change they want made to it. It
+    // used to be dropped on the floor -- the client never sent it -- so typing
+    // "put a woman in it" and pressing Make a new photo regenerated the
+    // identical empty room and reported success.
+    const steer = typeof o.note === "string" ? o.note.trim() : "";
+    if (steer) scene = `${scene}. ${steer}`;
     try {
       const asset = await generatePostImage(
         {

@@ -33,6 +33,7 @@ const SANCTIONED = new Set([
   "src/lib/ai/providers/anthropic.ts", // AnthropicProvider: the streaming .messages.stream() runAgentTurn meters
   "src/lib/ai/image/falClient.ts", // falGenerateImage(): the one fal.ai call site (flat-cost images; metered via generatePostImage)
   "src/lib/ai/video/falVideoClient.ts", // falGenerateVideo(): the one fal.ai VIDEO call site (flat-cost clips; metered via generateBroll)
+  "src/lib/ai/image/openaiImageClient.ts", // openaiEditImage(): the one OpenAI image-EDIT call site (token-costed; metered via editPostImage)
 ]);
 
 // Raw-SDK-access signatures that must not appear outside SANCTIONED files.
@@ -42,6 +43,7 @@ const FORBIDDEN: { pattern: RegExp; fix: string }[] = [
   { pattern: /\.messages\s*\.\s*stream\s*\(/, fix: ".messages.stream() — streaming lives in AnthropicProvider; drive it via runAgentTurn()" },
   { pattern: /\bgetAnthropic\s*\(/, fix: "getAnthropic() — grabbing the raw client bypasses the cap; use meteredCreate()" },
   { pattern: /fal\.run/, fix: "fal.ai calls live only in lib/ai/image/falClient.ts — route image generation through generatePostImage()" },
+  { pattern: /images\/edits/, fix: "OpenAI image edits live only in lib/ai/image/openaiImageClient.ts — route photo edits through editPostImage()" },
 ];
 
 /**

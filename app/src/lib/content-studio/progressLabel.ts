@@ -8,12 +8,24 @@
  * copy is pinned by a test rather than left to drift.
  */
 
-export type DialogPhase = "designing" | "photo" | "photoThenDesign" | "applyingPhoto";
+export type DialogPhase =
+  | "designing"
+  | "photo"
+  | "photoThenDesign"
+  | "editingPhoto"
+  | "editingPhotoThenDesign"
+  | "applyingPhoto";
 
 const WORDING: Record<DialogPhase, string> = {
   designing: "Designing…",
   photo: "Making the photo…",
   photoThenDesign: "Making the photo (1 of 2)…",
+  // An edit is slower than a generation -- a measured one took 17 seconds at
+  // the cheapest quality -- so it says what it is doing rather than borrowing
+  // "Making the photo…", which would read as stuck on the picture that is
+  // already there.
+  editingPhoto: "Editing the photo…",
+  editingPhotoThenDesign: "Editing the photo (1 of 2)…",
   applyingPhoto: "Adding the photo to the slide…",
 };
 

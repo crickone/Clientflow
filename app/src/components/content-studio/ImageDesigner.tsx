@@ -22,6 +22,7 @@ import {
   Sparkles,
   Undo2,
   Trash2,
+  Wand2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
@@ -142,6 +143,7 @@ interface Props {
   brand?: BrandLabels;
   /** Whether AI background generation is configured (FAL_KEY set) — gates the AI panel + related UI. */
   imageGenEnabled?: boolean;
+  photoEditEnabled?: boolean;
   /** Same-origin URL of the tenant's uploaded logo (`getChromeLogoSrc()`), or null when none is uploaded. */
   logoUrl?: string | null;
   /** Whether this design currently draws the logo on its slides (persisted per-design). */
@@ -354,6 +356,7 @@ export function ImageDesigner({
   defaultBodyFontId = DEFAULT_BODY_FONT_ID,
   brand,
   imageGenEnabled = false,
+  photoEditEnabled = false,
   logoUrl = null,
   initialShowLogo = true,
   designSystem = null,
@@ -1798,6 +1801,7 @@ export function ImageDesigner({
                     designId={designId}
                     slide={activeSlide}
                     imageGenEnabled={imageGenEnabled}
+                    photoEditEnabled={photoEditEnabled}
                     // "Make a new photo" replaces the picture the photo panel
                     // is pointing at, not always the first one.
                     photoSlot={effectivePhotoSlot}
@@ -3195,6 +3199,7 @@ function RedesignSlideButton({
   onUpdated,
   onBeforeRedesign,
   imageGenEnabled = false,
+  photoEditEnabled = false,
   photoSlot = 1,
 }: {
   designId: number;
@@ -3202,6 +3207,9 @@ function RedesignSlideButton({
   onUpdated: (slide: CarouselSlide) => void;
   onBeforeRedesign: () => void;
   imageGenEnabled?: boolean;
+  /** Whether "Change this photo" can run — a different provider from
+   *  generation, so a separate key and a separate flag. */
+  photoEditEnabled?: boolean;
   /** Which photograph "Make a new photo" replaces, 1-based. */
   photoSlot?: number;
 }) {
@@ -3238,6 +3246,11 @@ function RedesignSlideButton({
   // `.includes("{{PHOTO}}")` would have said it did not and sent the operator
   // down the redesign-around-a-new-photo path for no reason.
   const hasPhotoSlot = usesPhoto(slide.designHtml ?? "");
+  // A slot with a MARKUP place for a photograph may still be holding none.
+  // Editing needs an actual picture to edit, so the button that offers it
+  // waits until there is one rather than failing at the server.
+  const hasPhotoInSlot =
+    parsePhotoAssetIds(slide.photoAssetIds, slide.backgroundAssetId)[photoSlot - 1] != null;
 
   function reset() {
     setNote("");
@@ -3296,8 +3309,33 @@ function RedesignSlideButton({
    * when it does not. Everything the server does in one call it can do in
    * two; what it cannot do in one is tell the operator it is halfway.
    */
-  async function newPhoto() {
-    setBusy(hasPhotoSlot ? "photo" : "photoThenDesign");
+  /**
+   * Make the picture for this slot, then put it on the slide.
+   *
+   * `mode` is the only difference between the two buttons. "generate" makes a
+   * NEW photograph from the design's scene, steered by whatever was typed;
+   * "edit" changes the photograph the slot already has, and the typed
+   * instruction IS the request -- which is why it refuses without one.
+   *
+   * The note used to be dropped here entirely: the body carried no `note`, so
+   * typing "replace the guy with a woman" and pressing Make a new photo
+   * regenerated the same empty room and reported success.
+   */
+  async function newPhoto(mode: "generate" | "edit" = "generate") {
+    const instruction = note.trim();
+    if (mode === "edit" && !instruction) {
+      setError("Say what to change about the photo.");
+      return;
+    }
+    setBusy(
+      mode === "edit"
+        ? hasPhotoSlot
+          ? "editingPhoto"
+          : "editingPhotoThenDesign"
+        : hasPhotoSlot
+          ? "photo"
+          : "photoThenDesign",
+    );
     setError(null);
     let asset: ImageLibraryAsset | null = null;
     try {
@@ -3309,7 +3347,16 @@ function RedesignSlideButton({
           // The slot goes on step 1 too, though it writes nothing: a slot this
           // slide does not have is then refused BEFORE the generation is paid
           // for, rather than after.
-          body: JSON.stringify({ generate: true, onlyGenerate: true, slot: photoSlot }),
+          body: JSON.stringify(
+            mode === "edit"
+              ? { edit: true, note: instruction, slot: photoSlot }
+              : {
+                  generate: true,
+                  onlyGenerate: true,
+                  slot: photoSlot,
+                  ...(instruction ? { note: instruction } : {}),
+                },
+          ),
           // Above the route's own 120s maxDuration -- mirrors post() below, so
           // a slow generation can't abort client-side after the server has
           // already finished (and charged) but before the response lands.
@@ -3466,7 +3513,11 @@ function RedesignSlideButton({
                 hide this button entirely, which is most of a set — the server
                 now falls back to the slide's own words. */}
             {imageGenEnabled && (
-              <Button variant="outline" onClick={newPhoto} disabled={busy !== null}>
+              <Button
+                variant="outline"
+                onClick={() => void newPhoto("generate")}
+                disabled={busy !== null}
+              >
                 {busy === "photo" || busy === "photoThenDesign" || busy === "applyingPhoto" ? (
                   <Loader2 size={15} className="spin" />
                 ) : (
@@ -3475,6 +3526,27 @@ function RedesignSlideButton({
                 {busy === "photo" || busy === "photoThenDesign" || busy === "applyingPhoto"
                   ? progressLabel(busy, elapsed)
                   : "Make a new photo"}
+              </Button>
+            )}
+            {/* Shown only with an instruction to carry out and a photograph to
+                carry it out ON. A third button is a real cost at this size
+                (Hick), so it earns its place by appearing exactly when it is
+                the thing being asked for -- "replace the guy with a woman" is
+                neither a redesign nor a fresh picture. */}
+            {photoEditEnabled && hasPhotoInSlot && note.trim() !== "" && (
+              <Button
+                variant="outline"
+                onClick={() => void newPhoto("edit")}
+                disabled={busy !== null}
+              >
+                {busy === "editingPhoto" || busy === "editingPhotoThenDesign" ? (
+                  <Loader2 size={15} className="spin" />
+                ) : (
+                  <Wand2 size={15} />
+                )}
+                {busy === "editingPhoto" || busy === "editingPhotoThenDesign"
+                  ? progressLabel(busy, elapsed)
+                  : "Change this photo"}
               </Button>
             )}
           </div>
