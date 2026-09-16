@@ -519,8 +519,15 @@ a {
   border: none;
   color: var(--text-primary);
   cursor: pointer;
-  padding: 6px;
+  /* 44x44 is the smallest target a finger hits reliably (Fitts): 6px of
+     padding round a 22px icon made 34px, and this is the control that opens
+     the ONLY navigation a phone has. It still fits the 56px topbar. */
+  min-width: 44px;
+  min-height: 44px;
+  padding: 11px;
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 8px;
 }
 .app-sidebar-close {
@@ -650,6 +657,33 @@ a {
 
 /* Wide content shouldn't break narrow layouts. */
 @media (max-width: 700px) {
+  /* TWO-COLUMN LAYOUTS COLLAPSE TO ONE ON A PHONE.
+     
+     Reached by attribute selector rather than by a class, because these grids
+     are written as INLINE styles -- `style={{display:"grid",
+     gridTemplateColumns:"1fr 1fr"}}` -- at ~65 places, and an inline style
+     cannot carry a media query. Editing all 65 would fix the 65; this fixes
+     them and every one written after it, which in a codebase with ~4,000
+     inline styles is the difference between a fix and a chore that has to be
+     repeated.
+     
+     It depends on React serialising inline styles as `prop:value` with no
+     space after the colon. That is the fragile part, so it is pinned by a test
+     (lib/ui/inlineStyleFormat.test.ts) rather than left to hold quietly.
+     
+     WHAT IS DELIBERATELY NOT MATCHED: anything written with repeat(). A photo
+     library at `repeat(3, minmax(0, 1fr))` wants to stay three across on a
+     phone -- 113px tiles, which is a picker, not a cramped form -- and a week
+     at `repeat(7, 1fr)` is seven days whatever the screen. Only the literal
+     `Nfr Nfr` forms collapse, which are the forms and detail splits. The
+     `1fr 1fr` match also catches `1fr 1fr 1fr` by substring, which is wanted.
+     
+     To opt a specific grid out, give it .keep-columns. */
+  [style*="grid-template-columns:1fr 1fr"]:not(.keep-columns),
+  [style*="grid-template-columns:1.4fr 1fr"]:not(.keep-columns) {
+    grid-template-columns: 1fr !important;
+  }
+
   .app-page table {
     display: block;
     max-width: 100%;

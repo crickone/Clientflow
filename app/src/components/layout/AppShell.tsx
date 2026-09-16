@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 
@@ -69,6 +69,71 @@ export function AppShell({
     setNavOpen(false);
   }, [pathname]);
 
+  /**
+   * The mobile drawer is the ONLY navigation a phone has, and it was a plain
+   * conditional <div> with a click-to-close backdrop: no Escape, no focus
+   * containment, and nothing returning focus when it closed. Opening it left
+   * the keyboard behind the overlay, tabbing walked into the page underneath
+   * it, and closing it dropped focus to the top of the document.
+   *
+   * Handled here rather than by swapping in the Radix dialog the app already
+   * uses elsewhere, because the drawer IS the sidebar -- the same component,
+   * the same nav, the same collapsed state -- on the far side of a media
+   * query. Wrapping it in a dialog on phones and not on desktop would mean
+   * two mount paths for one piece of navigation.
+   */
+  const hamburgerRef = useRef<HTMLButtonElement>(null);
+  const drawerRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!navOpen) return;
+    // Where focus goes back TO. Captured at open, because by the time it
+    // closes the hamburger may not be what the operator last touched.
+    const opener = hamburgerRef.current;
+
+    // Focus the drawer itself rather than its first link: a screen reader
+    // announces the region, and the first Tab still lands on that link.
+    drawerRef.current?.focus();
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setNavOpen(false);
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const root = drawerRef.current;
+      if (!root) return;
+      const focusable = [
+        ...root.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ].filter((el) => el.offsetParent !== null);
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      // Wrap at both ends, and catch the case where focus has escaped the
+      // drawer entirely (a click on the page behind it).
+      if (e.shiftKey && (active === first || active === root || !root.contains(active))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (active === last || !root.contains(active))) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    // The page behind a drawer must not scroll under it.
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      opener?.focus();
+    };
+  }, [navOpen]);
+
   const bare = NO_SHELL_PATHS.some(
     (p) => pathname === p || pathname?.startsWith(`${p}/`),
   );
@@ -92,14 +157,28 @@ export function AppShell({
           navBadges={navBadges}
           themeMode={themeMode}
           open={navOpen}
+          drawerRef={drawerRef}
           onClose={() => setNavOpen(false)}
           collapsed={navCollapsed}
           onToggleCollapsed={toggleNavCollapsed}
         />
-        {navOpen && <div className="app-backdrop" onClick={() => setNavOpen(false)} />}
+        {navOpen && (
+          <div
+            className="app-backdrop"
+            onClick={() => setNavOpen(false)}
+            aria-hidden="true"
+          />
+        )}
         <main className="app-main">
           <div className="app-topbar">
-            <button className="app-hamburger" onClick={() => setNavOpen(true)} aria-label="Open menu">
+            <button
+              ref={hamburgerRef}
+              className="app-hamburger"
+              onClick={() => setNavOpen(true)}
+              aria-label="Open menu"
+              aria-expanded={navOpen}
+              aria-controls="app-nav-drawer"
+            >
               <Menu size={22} strokeWidth={1.9} />
             </button>
             <Logo src={logoSrc} alt={businessName} height={22} />

@@ -277,6 +277,7 @@ export function Sidebar({
   navBadges = {},
   themeMode,
   open = false,
+  drawerRef,
   onClose,
   collapsed = false,
   onToggleCollapsed,
@@ -293,6 +294,9 @@ export function Sidebar({
   navBadges?: Record<string, number>;
   themeMode: ThemeMode;
   open?: boolean;
+  /** Set by AppShell so the mobile drawer's focus trap can reach this
+   *  element. Absent on desktop, where there is no trap. */
+  drawerRef?: React.Ref<HTMLElement>;
   onClose?: () => void;
   /** Desktop: narrow icon-only rail. The mobile drawer ignores this. */
   collapsed?: boolean;
@@ -545,7 +549,20 @@ export function Sidebar({
 
   return (
     <aside
+      // `drawerRef` and the dialog roles apply only while this is the mobile
+      // DRAWER. On desktop the same element is ordinary page furniture, and
+      // announcing permanent navigation as a modal dialog would be a lie --
+      // hence the conditionals rather than fixed attributes.
+      ref={drawerRef}
+      id="app-nav-drawer"
       className={`app-sidebar${open ? " is-open" : ""}${collapsed ? " is-collapsed" : ""}`}
+      role={open ? "dialog" : undefined}
+      aria-modal={open ? true : undefined}
+      aria-label={open ? "Navigation" : undefined}
+      // Focusable only while open, and only programmatically: the focus trap
+      // moves focus here on open so the region is announced, and -1 keeps it
+      // out of the tab order the rest of the time.
+      tabIndex={open ? -1 : undefined}
     >
       <button
         className="app-sidebar-close"
