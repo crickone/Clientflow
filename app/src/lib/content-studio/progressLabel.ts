@@ -9,6 +9,7 @@
  */
 
 export type DialogPhase =
+  | "reading"
   | "designing"
   | "photo"
   | "photoThenDesign"
@@ -17,6 +18,10 @@ export type DialogPhase =
   | "applyingPhoto";
 
 const WORDING: Record<DialogPhase, string> = {
+  // The classification that picks the route. Under a second, but a button
+  // that sits dead while it runs reads as broken (Doherty), and naming the
+  // step is also what makes the routing visible rather than magic.
+  reading: "Reading your request…",
   designing: "Designing…",
   photo: "Making the photo…",
   photoThenDesign: "Making the photo (1 of 2)…",

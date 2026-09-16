@@ -94,6 +94,11 @@ import {
   type DesignState,
 } from "@/lib/content-studio/designState";
 import { progressLabel, type DialogPhase } from "@/lib/content-studio/progressLabel";
+import {
+  guessIntent,
+  intentDescription,
+  type SlideIntent,
+} from "@/lib/content-studio/slideIntent";
 import { watchGeneration } from "./GenerationWatcher";
 import { EditorSection } from "./EditorSection";
 import { PostIdeas } from "./PostIdeas";
@@ -3217,6 +3222,9 @@ function RedesignSlideButton({
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState<null | DialogPhase>(null);
   const [error, setError] = useState<string | null>(null);
+  /** What the last run turned out to be, so the dialog can say so and offer
+   *  the routes it did NOT take. Null until something has run. */
+  const [lastIntent, setLastIntent] = useState<SlideIntent | null>(null);
   // Seconds since the current action started, ticking once a second while
   // busy. Reset with busy so a second action never inherits the first's clock.
   const [elapsed, setElapsed] = useState(0);
@@ -3255,6 +3263,7 @@ function RedesignSlideButton({
   function reset() {
     setNote("");
     setError(null);
+    setLastIntent(null);
   }
 
   async function post(url: string, body: unknown, pick: (json: any) => CarouselSlide | undefined) {
@@ -3300,6 +3309,58 @@ function RedesignSlideButton({
         ),
     );
     setBusy(null);
+  }
+
+  /**
+   * ONE button. The sentence picks the route.
+   *
+   * There used to be three -- redesign, make a new photo, change this photo --
+   * which asked the operator to classify their own request into a taxonomy
+   * they have no reason to know, on top of having already described it in
+   * words. Getting it wrong was silent: "change the guy in the photo to a
+   * woman" sent to the layout model came back as a re-laid-out slide with the
+   * same man in it, reported as a success.
+   *
+   * The classification is a cheap Haiku call and is FAIL-SOFT (see the
+   * interpret route), so the button always does something. What it did is
+   * named afterwards, with the other routes one click away -- the route is
+   * invisible until it is wrong, and then it has to be both obvious and
+   * cheap to correct.
+   */
+  async function interpretAndRun() {
+    const typed = note.trim();
+    if (!typed) {
+      await redesign();
+      return;
+    }
+    setBusy("reading");
+    setError(null);
+    let intent: SlideIntent = guessIntent(typed, {
+      hasPhotoSlot,
+      hasPhotoInSlot,
+      canGenerate: imageGenEnabled,
+      canEdit: photoEditEnabled,
+    });
+    try {
+      const res = await fetch(
+        `/api/content-studio/carousels/${designId}/slides/${slide.id}/interpret`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ note: typed, slot: photoSlot }),
+          signal: AbortSignal.timeout(30_000),
+        },
+      );
+      const json = await res.json().catch(() => null);
+      if (json?.ok && json.intent) intent = json.intent as SlideIntent;
+    } catch {
+      // The local guess already stands in. A router that can block the
+      // operator is worse than the three buttons it replaced.
+    }
+    setLastIntent(intent);
+    if (intent === "editPhoto") await newPhoto("edit");
+    else if (intent === "newPhoto") await newPhoto("generate");
+    else await redesign();
   }
 
   /**
@@ -3497,59 +3558,63 @@ function RedesignSlideButton({
           )}
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Button onClick={redesign} disabled={busy !== null}>
-              {busy === "designing" ? (
+            <Button onClick={() => void interpretAndRun()} disabled={busy !== null}>
+              {busy !== null ? (
                 <Loader2 size={15} className="spin" />
               ) : (
                 <RefreshCw size={15} />
               )}
-              {busy === "designing"
-                ? progressLabel("designing", elapsed)
+              {busy !== null
+                ? progressLabel(busy, elapsed)
                 : note.trim()
-                  ? "Redesign with that"
+                  ? "Do that"
                   : "Try a different design"}
             </Button>
-            {/* No `scene` condition: a slide that never recorded one used to
-                hide this button entirely, which is most of a set — the server
-                now falls back to the slide's own words. */}
-            {imageGenEnabled && (
-              <Button
-                variant="outline"
-                onClick={() => void newPhoto("generate")}
-                disabled={busy !== null}
-              >
-                {busy === "photo" || busy === "photoThenDesign" || busy === "applyingPhoto" ? (
-                  <Loader2 size={15} className="spin" />
-                ) : (
-                  <ImageIcon size={15} />
-                )}
-                {busy === "photo" || busy === "photoThenDesign" || busy === "applyingPhoto"
-                  ? progressLabel(busy, elapsed)
-                  : "Make a new photo"}
-              </Button>
-            )}
-            {/* Shown only with an instruction to carry out and a photograph to
-                carry it out ON. A third button is a real cost at this size
-                (Hick), so it earns its place by appearing exactly when it is
-                the thing being asked for -- "replace the guy with a woman" is
-                neither a redesign nor a fresh picture. */}
-            {photoEditEnabled && hasPhotoInSlot && note.trim() !== "" && (
-              <Button
-                variant="outline"
-                onClick={() => void newPhoto("edit")}
-                disabled={busy !== null}
-              >
-                {busy === "editingPhoto" || busy === "editingPhotoThenDesign" ? (
-                  <Loader2 size={15} className="spin" />
-                ) : (
-                  <Wand2 size={15} />
-                )}
-                {busy === "editingPhoto" || busy === "editingPhotoThenDesign"
-                  ? progressLabel(busy, elapsed)
-                  : "Change this photo"}
-              </Button>
-            )}
           </div>
+
+          {/* The route is invisible until it is wrong. Naming what happened is
+              what lets a mis-read be seen at once, and the other routes sit
+              beside it so correcting one is a click rather than a retype.
+              Shown only after a run, so the resting dialog is still one
+              button and one box (Hick). */}
+          {lastIntent && busy === null && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                flexWrap: "wrap",
+                fontSize: 12.5,
+                color: "var(--text-tertiary)",
+              }}
+            >
+              <span>{intentDescription(lastIntent)}</span>
+              <span>Not what you meant?</span>
+              {lastIntent !== "design" && (
+                <button type="button" className="link-button" onClick={() => void redesign()}>
+                  Redesign the slide
+                </button>
+              )}
+              {lastIntent !== "newPhoto" && imageGenEnabled && (
+                <button
+                  type="button"
+                  className="link-button"
+                  onClick={() => void newPhoto("generate")}
+                >
+                  Make a different photo
+                </button>
+              )}
+              {lastIntent !== "editPhoto" && photoEditEnabled && hasPhotoInSlot && note.trim() !== "" && (
+                <button
+                  type="button"
+                  className="link-button"
+                  onClick={() => void newPhoto("edit")}
+                >
+                  Change this photo
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

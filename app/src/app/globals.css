@@ -1548,3 +1548,33 @@ a {
 .adonis-hero-logo--light { display: none; }
 :root[data-theme="light"] .adonis-hero-logo--dark { display: none; }
 :root[data-theme="light"] .adonis-hero-logo--light { display: block; }
+
+/* A text action that sits inside a sentence rather than beside one — the
+   "Not what you meant? Redesign the slide" correction row in the redesign
+   dialog. A real <button>, so it is reachable and announced as an action;
+   styled as a link because it is an aside to what just happened, not a
+   competing primary. Hover and focus live here rather than in an inline
+   style, which cannot express either (see the 2026-07 UI audit). */
+.link-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.link-button:hover {
+  opacity: 0.8;
+}
+.link-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.link-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+  text-decoration: none;
+}
