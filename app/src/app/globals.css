@@ -655,6 +655,20 @@ a {
   }
 }
 
+/* THE PHOTO LIBRARY OPENS DOWNWARD ON A PHONE, NOT SIDEWAYS.
+   Beside the preview it takes width out of the page's margin, which is the
+   whole reason it is laid out in the flow rather than floated over the slide.
+   A phone has no margin to take -- the slide is already the screen -- so the
+   tab moves to the top and the panel takes height instead. Matches
+   NARROW_QUERY in lib/ui/useMediaQuery.ts, which is what tells the panel to
+   animate its height rather than its width; the two have to agree. */
+@media (max-width: 760px) {
+  .cs-photo-row {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+}
+
 /* EDITING A LINE MUST NOT HIDE THE SLIDE IT IS ON.
    The text popover is an overlay pinned to the bottom of the preview, which
    is right at desktop sizes where the preview is 400-480px. At 286px it

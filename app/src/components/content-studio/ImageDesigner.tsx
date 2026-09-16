@@ -1568,7 +1568,11 @@ export function ImageDesigner({
                  laid out beside it. It was a strip under the slide (a scroll
                  away from what it changed) and then a pill on the slide itself
                  (read as part of the design). Here it is neither. */
-              <div style={{ display: "flex", alignItems: "stretch" }}>
+              // A row beside the preview on a desktop; a column above it on a
+              // phone, where the panel opens downward and there is no margin
+              // for it to take sideways. The class is the switch — see the
+              // .cs-photo-row block in globals.css.
+              <div className="cs-photo-row" style={{ display: "flex", alignItems: "stretch" }}>
                 <SlidePhotoLibraryPopout
                   onOpenChange={setPhotosOpen}
                   photoCount={imageLibrary.length}

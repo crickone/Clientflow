@@ -6,11 +6,14 @@ import {
   ChevronDown,
   Image as ImageIcon,
   Loader2,
+  Maximize2,
+  Minimize2,
   Trash2,
   Upload,
 } from "lucide-react";
 
 import { DUR, EASE } from "@/lib/motion";
+import { NARROW_QUERY, useMediaQuery } from "@/lib/ui/useMediaQuery";
 
 import { Button } from "@/components/ui/Button";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -49,6 +52,9 @@ export function SlidePhotoLibrary({
   slots = [],
   activeSlot = 1,
   onSlotChange,
+  layout = "grid",
+  tall = false,
+  onToggleTall,
 }: {
   assets: ImageLibraryAsset[];
   activeAssetId: number | null;
@@ -56,6 +62,16 @@ export function SlidePhotoLibrary({
   onPick: (assetId: number | null) => void;
   onUpload: (files: File[]) => void;
   onDelete: (assetId: number) => void;
+  /**
+   * "strip" is the phone's one-row sideways scroller; "grid" is the contact
+   * sheet. The panel above chooses, because it is the thing that knows how
+   * much room it took.
+   */
+  layout?: "grid" | "strip";
+  /** Whether the phone's panel is currently grown. Only for the control's label. */
+  tall?: boolean;
+  /** Present only on a phone: grows the strip into a browsable grid. */
+  onToggleTall?: () => void;
   uploading: boolean;
   /**
    * How far through a multi-file upload we are, or null when none is running.
@@ -138,7 +154,23 @@ export function SlidePhotoLibrary({
               {assets.length > 0 ? ` · ${assets.length}` : ""}
             </span>
           </span>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {/* Phone only. The strip is deliberately one row -- every row the
+                panel takes is a row the slide loses -- so this is how you buy
+                more of it when you are actually picking rather than glancing. */}
+            {onToggleTall && (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={onToggleTall}
+                aria-expanded={tall}
+                title={tall ? "Back to one row" : "Show more photos at once"}
+              >
+                {tall ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+                {tall ? "Collapse" : "Expand"}
+              </Button>
+            )}
             {applying && (
               <span
                 style={{
@@ -273,18 +305,41 @@ export function SlidePhotoLibrary({
         </div>
       ) : (
         <div
-          style={{
-            display: "grid",
-            // Exactly three across, at whatever size that makes them. A
-            // photograph is recognisable small, and three columns is what
-            // turns a panel this narrow into a contact sheet you can scan
-            // rather than a one-file-wide list you scroll.
-            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-            gap: 7,
-            alignContent: "start",
-            minHeight: 0,
-            overflowY: "auto",
-          }}
+          style={
+            layout === "strip"
+              ? {
+                  // ONE ROW, SCROLLED SIDEWAYS. On a phone the panel sits above
+                  // the slide, so every row it takes is a row the slide loses.
+                  // A single row of 88px tiles costs ~108px and keeps the
+                  // whole library reachable with a thumb-flick; "Expand" is
+                  // there for when picking, rather than glancing, is the job.
+                  display: "grid",
+                  gridAutoFlow: "column",
+                  gridAutoColumns: `${PHOTO_TILE}px`,
+                  gap: 7,
+                  overflowX: "auto",
+                  overflowY: "hidden",
+                  alignContent: "start",
+                  minHeight: 0,
+                  // Momentum scrolling, and tiles that come to rest aligned
+                  // instead of half-cut.
+                  scrollSnapType: "x proximity",
+                  WebkitOverflowScrolling: "touch",
+                  paddingBottom: 4,
+                }
+              : {
+                  display: "grid",
+                  // Exactly three across, at whatever size that makes them. A
+                  // photograph is recognisable small, and three columns is what
+                  // turns a panel this narrow into a contact sheet you can scan
+                  // rather than a one-file-wide list you scroll.
+                  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                  gap: 7,
+                  alignContent: "start",
+                  minHeight: 0,
+                  overflowY: "auto",
+                }
+          }
         >
           {assets.map((asset) => {
             const active = asset.id === activeAssetId;
@@ -296,7 +351,13 @@ export function SlidePhotoLibrary({
                 style={{
                   position: "relative",
                   width: "100%",
-                  paddingBottom: "100%",
+                  // In the strip the column is already 88px wide, so the
+                  // padding trick that makes a square from a fluid column
+                  // would make an 88px-tall tile in a 104px box. A fixed
+                  // height is the honest version there.
+                  ...(layout === "strip"
+                    ? { height: PHOTO_TILE, scrollSnapAlign: "start" }
+                    : { paddingBottom: "100%" }),
                   borderRadius: "var(--radius)",
                   overflow: "hidden",
                   border:
@@ -383,6 +444,19 @@ const OPEN_KEY = "cs.photoLibraryOpen";
  */
 export const PHOTO_PANEL_WIDTH = 252;
 
+/** The tile edge in the phone's one-row strip. Big enough to recognise a
+ *  photograph, small enough that a row of them costs little of the screen. */
+const PHOTO_TILE = 88;
+/**
+ * The strip's height, from its parts rather than by eye: the panel's own
+ * header is 44px, the scroller needs the tile plus its 4px of bottom padding,
+ * and the panel's padding and gaps take the remaining 36px. Guessing 108 here
+ * gave the scroller 28px for a 92px tile and sliced every thumbnail in half.
+ */
+const PHOTO_STRIP_HEIGHT = 44 + (PHOTO_TILE + 4) + 36;
+/** What "Expand" buys: about three rows, without swallowing the screen. */
+const PHOTO_STRIP_TALL = 360;
+
 /**
  * The photo library as a panel that expands out BESIDE the preview.
  *
@@ -401,6 +475,14 @@ export const PHOTO_PANEL_WIDTH = 252;
  * not have to open it on every slide, and one who never uses it should not keep
  * dismissing it. Storage can throw (private windows, blocked site data), so
  * every access is guarded and the default simply wins.
+ *
+ * ON A PHONE THE SAME REASONING INVERTS THE LAYOUT. There is no margin to take
+ * width out of -- the slide is already the whole screen -- so a panel beside
+ * the preview can only come off the slide. It moves ABOVE it instead and takes
+ * HEIGHT: a full-width tab, and under it a single row of tiles that scrolls
+ * sideways. One row costs ~108px and leaves the slide the size it was.
+ * "Expand" trades more of the screen for a browsable grid when picking is the
+ * job rather than glancing.
  */
 export function SlidePhotoLibraryPopout(
   props: Parameters<typeof SlidePhotoLibrary>[0] & {
@@ -411,6 +493,10 @@ export function SlidePhotoLibraryPopout(
   },
 ) {
   const [open, setOpen] = useState(false);
+  /** Phone only: the strip grown into a grid. Not persisted -- it is a
+   *  this-moment choice ("let me actually look"), unlike open/closed. */
+  const [tall, setTall] = useState(false);
+  const narrow = useMediaQuery(NARROW_QUERY);
   const { photoCount, onOpenChange, ...libraryProps } = props;
 
   useEffect(() => {
@@ -450,7 +536,13 @@ export function SlidePhotoLibraryPopout(
   }, [open]);
 
   return (
-    <div style={{ display: "flex", alignItems: "stretch", minWidth: 0 }}>
+    <div
+      style={
+        narrow
+          ? { display: "flex", flexDirection: "column", minWidth: 0 }
+          : { display: "flex", alignItems: "stretch", minWidth: 0 }
+      }
+    >
       <button
         type="button"
         onClick={toggle}
@@ -459,28 +551,41 @@ export function SlidePhotoLibraryPopout(
         title={open ? "Hide photos" : "Show photos"}
         style={{
           display: "flex",
-          flexDirection: "column",
+          // A tab down the left edge becomes a bar across the top: the panel
+          // it opens is above the slide now, and a control has to sit on the
+          // side it opens from.
+          flexDirection: narrow ? "row" : "column",
           alignItems: "center",
-          justifyContent: "center",
+          justifyContent: narrow ? "flex-start" : "center",
           gap: 7,
-          width: 34,
+          width: narrow ? "100%" : 34,
+          minHeight: narrow ? 44 : undefined,
           flexShrink: 0,
-          padding: "14px 0",
-          borderRadius: "var(--radius) 0 0 var(--radius)",
+          padding: narrow ? "0 12px" : "14px 0",
+          borderRadius: narrow
+            ? "var(--radius) var(--radius) 0 0"
+            : "var(--radius) 0 0 var(--radius)",
           border: "1px solid var(--hairline)",
-          borderRight: "none",
+          borderRight: narrow ? undefined : "none",
+          borderBottom: narrow ? "none" : undefined,
           background: open ? "var(--surface-2)" : "var(--bg)",
           color: open ? "var(--text-primary)" : "var(--text-secondary)",
           cursor: "pointer",
           fontFamily: "inherit",
-          fontSize: 9.5,
+          fontSize: narrow ? 11 : 9.5,
           fontWeight: 600,
           letterSpacing: "0.1em",
           transition: `background ${DUR.base}s, color ${DUR.base}s`,
         }}
       >
         <ImageIcon size={14} />
-        <span style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}>
+        <span
+          style={
+            narrow
+              ? undefined
+              : { writingMode: "vertical-rl", textOrientation: "mixed" }
+          }
+        >
           PHOTOS
         </span>
         {photoCount > 0 && (
@@ -491,8 +596,16 @@ export function SlidePhotoLibraryPopout(
         <ChevronDown
           size={12}
           style={{
-            transform: open ? "rotate(90deg)" : "rotate(-90deg)",
+            // Down/up when it opens downward; right/left when it opens sideways.
+            transform: narrow
+              ? open
+                ? "rotate(180deg)"
+                : "none"
+              : open
+                ? "rotate(90deg)"
+                : "rotate(-90deg)",
             transition: `transform ${DUR.base}s`,
+            marginLeft: narrow ? "auto" : undefined,
           }}
         />
       </button>
@@ -504,9 +617,16 @@ export function SlidePhotoLibraryPopout(
           // on top of something. overflow:hidden keeps the contents from
           // spilling while that width is still opening.
           <motion.div
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: PHOTO_PANEL_WIDTH, opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
+            // HEIGHT on a phone, WIDTH beside the preview. The panel takes the
+            // room it is actually asking for in each layout, so the thing it
+            // pushes is the page's margin rather than the slide.
+            initial={narrow ? { height: 0, opacity: 0 } : { width: 0, opacity: 0 }}
+            animate={
+              narrow
+                ? { height: tall ? PHOTO_STRIP_TALL : PHOTO_STRIP_HEIGHT, opacity: 1 }
+                : { width: PHOTO_PANEL_WIDTH, opacity: 1 }
+            }
+            exit={narrow ? { height: 0, opacity: 0 } : { width: 0, opacity: 0 }}
             transition={{ duration: DUR.base, ease: EASE }}
             // position:relative + an absolutely-positioned child is what keeps
             // the panel from DRIVING the row's height: with no in-flow content
@@ -515,19 +635,30 @@ export function SlidePhotoLibraryPopout(
             // back to the panel. Without it, a full library made the column
             // taller and pushed the slide actions (Add slide, Undo, Delete)
             // down out of the sticky column.
-            style={{ overflow: "hidden", flexShrink: 0, position: "relative" }}
+            style={{
+              overflow: "hidden",
+              flexShrink: 0,
+              position: "relative",
+              width: narrow ? "100%" : undefined,
+            }}
           >
-            {/* Fixed width inside the animating box, so the tiles are laid out
-                at their final size throughout rather than reflowing 3-across
-                on every frame. */}
+            {/* Fixed size inside the animating box, so the tiles are laid out
+                at their final dimensions throughout rather than reflowing on
+                every frame. */}
             <div
               style={{
                 position: "absolute",
                 inset: 0,
-                width: PHOTO_PANEL_WIDTH,
+                width: narrow ? "100%" : PHOTO_PANEL_WIDTH,
+                height: narrow ? (tall ? PHOTO_STRIP_TALL : PHOTO_STRIP_HEIGHT) : undefined,
               }}
             >
-              <SlidePhotoLibrary {...libraryProps} />
+              <SlidePhotoLibrary
+                {...libraryProps}
+                layout={narrow ? (tall ? "grid" : "strip") : "grid"}
+                onToggleTall={narrow ? () => setTall((t) => !t) : undefined}
+                tall={tall}
+              />
             </div>
           </motion.div>
         )}
