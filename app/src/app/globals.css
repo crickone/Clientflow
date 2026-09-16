@@ -915,8 +915,44 @@ a {
    320px settings sidebar drops below the main editing column on narrow
    screens instead of crushing it. */
 @media (max-width: 860px) {
+  /* minmax(0, …), NOT 1fr.
+     
+     `1fr` is shorthand for `minmax(auto, 1fr)`, and `auto` as a MINIMUM means
+     "never smaller than the content's min-content width". The Content Studio
+     editor's filmstrip is a row of slide thumbnails, so its min-content is the
+     width of all of them side by side — which on a four-slide carousel is
+     680px. That floor propagated up and made the whole column 680px inside a
+     358px screen, and .app-main's overflow-x:hidden then CLIPPED it: the slide
+     preview was cut off mid-word, the template cards lost their right-hand
+     column, and the caption ran off the edge. Nothing scrolled, because the
+     document itself was still exactly 390px wide — the content was simply
+     sliced.
+     
+     minmax(0, 1fr) removes that automatic floor, so the column is the screen
+     and the filmstrip's own overflow-x:auto does what it was always meant to.
+     The same reasoning applies to the grid's children, which are grid items
+     with the same `auto` minimum. */
+  /* The Content Studio editor's outer stack. A grid with no explicit columns
+     has one IMPLICIT track, sized `auto` -- by its content, not by its box --
+     so it grew to the filmstrip's min-content and overflowed. */
+  .cs-editor-stack {
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+  }
+  .cs-editor-stack > * {
+    min-width: 0;
+  }
   .cms-editor-grid {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    /* On the grid ITSELF as well as its column: this element is a flex item
+       in the page's layout, and a flex item carries the same `min-width:auto`
+       floor, so without this the box sizes to its 680px min-content and
+       overflows a 358px parent even with the column fixed. */
+    min-width: 0 !important;
+  }
+  .cms-editor-grid > *,
+  .cms-editor-grid > * > * {
+    min-width: 0;
   }
   /* Stacked on mobile, an editor's sticky preview would pin over its own
      controls — let it scroll away instead. */

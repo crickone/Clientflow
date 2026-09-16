@@ -1312,7 +1312,12 @@ export function ImageDesigner({
   const isEmptySlot = !activeSlide || !surface;
 
   return (
-    <div style={{ display: "grid", gap: 18 }}>
+    // Named so the mobile rules can reach it. A grid with no explicit columns
+    // gets ONE implicit `auto` track, and an auto track is sized by its
+    // content rather than by its box -- so on a phone this stack sized itself
+    // to the filmstrip's 680px min-content and its children were clipped by
+    // .app-main's overflow-x:hidden. See globals.css.
+    <div className="cs-editor-stack" style={{ display: "grid", gap: 18 }}>
       {/* Top toolbar */}
       <div
         style={{
@@ -1337,6 +1342,10 @@ export function ImageDesigner({
             alignItems: "center",
             gap: 8,
             paddingTop: 22,
+            // The row above wraps; this group did not, so on a phone its four
+            // buttons ran past the edge and "Export all (.zip)" was sliced in
+            // half by .app-main's overflow-x:hidden.
+            flexWrap: "wrap",
           }}
         >
           <SaveStatus status={saveStatus} />
