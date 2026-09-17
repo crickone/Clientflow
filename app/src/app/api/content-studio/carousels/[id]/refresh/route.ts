@@ -1,5 +1,7 @@
 import { guard } from "@/lib/api/guard";
 import { NextResponse } from "next/server";
+
+import { copyOf } from "@/lib/content-studio/slideCopy";
 import { getCurrentMembership } from "@/lib/auth";
 import { getCarousel, updateSlide } from "@/lib/image/carousels";
 import { DESIGNED_TEMPLATE_ID } from "@/lib/image/paintSlide";
@@ -54,34 +56,54 @@ export async function POST(
   // and wrote the reply into fields no renderer reads: a metered call that
   // changed nothing on screen. The per-slide Refresh button already hides for
   // designed slides; this is the toolbar's "Refresh all copy" catching up.
-  const slotSlides = carousel.slides
-    .filter((s) => s.slotKey === slotKey && s.templateId !== DESIGNED_TEMPLATE_ID)
+  // EVERY slide in the slot, designed or not. The caption belongs to the slot
+  // rather than to a kind of slide, and the editor reads it off slides[0]
+  // whatever that slide is.
+  const allSlotSlides = carousel.slides
+    .filter((s) => s.slotKey === slotKey)
     .sort((a, b) => a.slideOrder - b.slideOrder);
+  const slotSlides = allSlotSlides.filter(
+    (s) => s.templateId !== DESIGNED_TEMPLATE_ID,
+  );
   const target = requestedIds
     ? slotSlides.filter((s) => requestedIds.includes(s.id))
     : slotSlides;
 
-  if (target.length === 0) {
-    return NextResponse.json(
-      { ok: false, error: "No slides to refresh in this slot." },
-      { status: 400 },
-    );
-  }
-
-  // Caption-only path: just rewrite the caption on slide[0] of the slot.
+  // Caption-only path: rewrite the caption on slide[0] of the slot.
+  //
+  // It runs BEFORE the copy path's emptiness check, and over allSlotSlides
+  // rather than slotSlides. Both were wrong for a designed set, and together
+  // they made the Refresh button beside the caption do nothing at all:
+  //
+  //  - the check rejected the request outright. Optimal Health's sets are
+  //    designed end to end, so slotSlides was empty, and the operator got
+  //    "No slides to refresh in this slot." for a slot plainly full of them.
+  //  - and had it run, updateSlide(slotSlides[0]) would have written the
+  //    caption onto the first NON-designed slide while the editor reads it
+  //    off the first slide of any kind -- so on a mixed set the new caption
+  //    would have landed somewhere nobody was looking.
+  //
+  // The exclusion is right for the COPY path below and stays there: a designed
+  // slide's heading and body columns are empty, and rewriting them is a
+  // metered call that changes nothing on screen.
   if (captionOnly) {
+    if (allSlotSlides.length === 0) {
+      return NextResponse.json(
+        { ok: false, error: "No slides in this slot to caption." },
+        { status: 400 },
+      );
+    }
     try {
       const result = await refreshCaptionOnly({
-        slides: slotSlides.map((s) => ({
-          template: s.templateId,
-          heading: s.headingText,
-          body: s.bodyText,
-        })),
+        // copyOf, because a designed slide keeps its words in designHtml and
+        // its heading/body columns are empty. Passing those columns wrote the
+        // caption from "(empty)" once per slide.
+        slides: allSlotSlides.map((s) => copyOf(s, DESIGNED_TEMPLATE_ID)),
         designName: carousel.name,
         tone,
         tenantId,
       });
-      updateSlide(slotSlides[0].id, { caption: result.caption });
+      updateSlide(allSlotSlides[0].id, { caption: result.caption });
       return NextResponse.json({
         ok: true,
         carousel: getCarousel(carouselId),
@@ -98,6 +120,13 @@ export async function POST(
       console.error("[carousel-refresh-caption] error:", err);
       return NextResponse.json({ ok: false, error: message }, { status: 500 });
     }
+  }
+
+  if (target.length === 0) {
+    return NextResponse.json(
+      { ok: false, error: "No slides to refresh in this slot." },
+      { status: 400 },
+    );
   }
 
   let result;

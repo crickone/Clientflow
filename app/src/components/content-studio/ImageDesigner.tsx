@@ -1377,7 +1377,15 @@ export function ImageDesigner({
           }}
         >
           <SaveStatus status={saveStatus} />
-          {slidesInSlot.length > 0 && !writing && (
+          {/* Offered only where it can actually run. Refreshing COPY rewrites
+              headingText/bodyText, and a designed slide has neither -- its
+              words live inside design_html -- so the route excludes designed
+              slides and a set made only of them got "No slides to refresh in
+              this slot." every time. A button that always errors is worse
+              than no button. The per-slide route for designed copy is to
+              click the text on the slide and press Rewrite. */}
+          {slidesInSlot.some((s) => s.templateId !== DESIGNED_TEMPLATE_ID) &&
+            !writing && (
             <Button
               variant="outline"
               size="sm"
