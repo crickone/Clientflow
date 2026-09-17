@@ -97,6 +97,11 @@ export function SlidePhotoLibrary({
 
   return (
     <div
+      // The tab is this sheet's HEADER, not a separate card: the two share an
+      // outline, so whichever edge they meet along carries no border and no
+      // corner radius on either side. See .cs-photo-sheet in globals.css --
+      // the overrides need !important because these are inline styles.
+      className="cs-photo-sheet"
       style={{
         border: "1px solid var(--hairline)",
         borderRadius: "var(--radius)",

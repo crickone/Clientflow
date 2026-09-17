@@ -780,6 +780,18 @@ a {
   display: none;
 }
 
+/* THE TAB AND THE SHEET ARE ONE BOX.
+   They were two: the tab drew its own outline and the sheet drew a complete
+   second one inside it, so where they met there were two lines and a pair of
+   rounded corners curving away from each other. Read as two cards that had
+   failed to line up -- most obviously on a phone, where a full-width bar sits
+   directly on a full-width sheet.
+   Beside the preview the tab is on the LEFT, so that is the edge that joins. */
+.cs-photo-sheet {
+  border-left: none !important;
+  border-radius: 0 var(--radius) var(--radius) 0 !important;
+}
+
 @media (max-width: 760px) {
   .cs-photo-popout {
     flex-direction: column;
@@ -855,6 +867,12 @@ a {
   }
   .cs-photo-expand {
     display: inline-flex;
+  }
+  /* Above the preview the tab is on TOP, so the joining edge moves. */
+  .cs-photo-sheet {
+    border-left: 1px solid var(--hairline) !important;
+    border-top: none !important;
+    border-radius: 0 0 var(--radius) var(--radius) !important;
   }
 }
 
