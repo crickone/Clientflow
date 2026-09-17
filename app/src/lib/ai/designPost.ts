@@ -1,7 +1,11 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 
-import { getBusinessContext, getSignoffRule } from "@/lib/ai/businessContext";
+import {
+  getBusinessContext,
+  getConfiguredFacts,
+  getSignoffRule,
+} from "@/lib/ai/businessContext";
 import { CONTENT_MODEL } from "@/lib/ai/client";
 import {
   DESIGN_RULES,
@@ -322,7 +326,7 @@ export async function designPost(
    * slow".
    */
   async function attempt(slides: RawDesign[], previous?: DesignedSlide[]) {
-    const checked = checkDesigns(slides, system!);
+    const checked = checkDesigns(slides, system!, getConfiguredFacts());
     const problems = [...checked.problems];
     const rendered: DesignedSlide[] = [];
     const unchanged = new Map(
@@ -560,7 +564,7 @@ export async function redesignSlide(
   const first = payload.slides[0];
   if (!first) throw new Error("The designer returned no slide.");
 
-  const checked = checkDesigns([first], system);
+  const checked = checkDesigns([first], system, getConfiguredFacts());
   const design = checked.designs[0];
 
   // The same slot-indexed assignment `attempt` makes, for the same reason:

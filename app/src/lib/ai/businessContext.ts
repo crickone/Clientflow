@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { ConfiguredFacts } from "@/lib/ai/factCheck";
+
 import { db } from "@/lib/db";
 import { therapies } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -87,6 +89,39 @@ function formatServices(): string {
  */
 export function getServicesList(): string {
   return formatServices();
+}
+
+/**
+ * The tenant's own durations and prices, as numbers rather than prose.
+ *
+ * formatServices puts the same values into the prompt as words. This returns
+ * them as data so a finished slide can be CHECKED against them -- the prompt
+ * has always forbidden inventing a session length and a carousel still came
+ * back saying fifteen minutes on one slide and twelve on the next. See
+ * lib/ai/factCheck.
+ */
+export function getConfiguredFacts(): ConfiguredFacts {
+  const rows = db
+    .select()
+    .from(therapies)
+    .where(eq(therapies.isActive, true))
+    .all();
+  return {
+    durations: [
+      ...new Set(
+        rows
+          .map((t) => t.defaultDurationMinutes)
+          .filter((n): n is number => typeof n === "number" && n > 0),
+      ),
+    ],
+    prices: [
+      ...new Set(
+        rows
+          .map((t) => t.defaultPriceEur)
+          .filter((n): n is number => typeof n === "number" && n > 0),
+      ),
+    ],
+  };
 }
 
 /**

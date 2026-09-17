@@ -700,4 +700,37 @@ check(
   DESIGN_RULES.includes("fetch a real detail from the business context or cut the sentence"),
 );
 
+// The post that prompted this: "HBOT or infrared — how to actually decide
+// between them", five slides, zero education on either. Every slide described
+// the room -- "you lie down, the chamber closes, sixty minutes" -- and slide 4
+// reduced the whole comparison to "Which stillness do you want?". A reader
+// finished knowing what an hour looks like and nothing about what either
+// therapy is. Note that "SAY THE THING" does NOT catch this: "sixty minutes,
+// fully enclosed" is concrete. Concrete and uninformative are different
+// failures and need different rules.
+check(
+  "a post has to leave the reader knowing something new",
+  DESIGN_RULES.includes("TEACH SOMETHING") &&
+    DESIGN_RULES.includes("did not know when they started"),
+);
+check(
+  "with the room-description failure named, since it reads as concrete",
+  DESIGN_RULES.includes("Describing a room is not teaching"),
+);
+check(
+  "mechanism is licensed explicitly, and separated from a health claim",
+  DESIGN_RULES.includes("EXPLAIN THE MECHANISM") &&
+    DESIGN_RULES.includes("is not a health claim") &&
+    DESIGN_RULES.includes("this will fix your fatigue"),
+);
+check(
+  "a comparison must carry the actual difference",
+  DESIGN_RULES.includes("A COMPARISON POST OWES THE READER THE DIFFERENCE") &&
+    DESIGN_RULES.includes("is not a comparison, it is a way of avoiding one"),
+);
+check(
+  "and there is a way out when the facts are not there",
+  DESIGN_RULES.includes("write about one of them properly instead"),
+);
+
 console.log(`\ndesignPost.parse: ${passed} checks passed`);

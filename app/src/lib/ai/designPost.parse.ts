@@ -18,6 +18,7 @@ import {
   tokenForSlot,
 } from "@/lib/design/photoSlots";
 import { findTextRuns } from "@/lib/design/textRuns";
+import { unsupportedNumbers, type ConfiguredFacts } from "@/lib/ai/factCheck";
 
 /**
  * One photograph the renderer may use, and the library row it came from.
@@ -254,6 +255,12 @@ A slide may carry at most TWO photographs. For a SECOND one, write its src as {{
 EVERY slide gets a "photos" field: a LIST of scenes, one per photograph the design uses, in slot order. A slide with one photograph has one entry; a slide with two has two, the first describing {{PHOTO}} and the second describing {{PHOTO:2}}. A slide you designed on a flat ground still gives one entry, naming the photograph that WOULD suit it -- that is how the operator gets the picture that is missing. Each entry names subject, setting, mood, composition. Never describe text, signage or lettering in shot. Never leave the list empty.
 
 Copy: plain text, no markdown, no emojis, no hashtags. Headings short and concrete.
+
+TEACH SOMETHING. A reader who finishes this post must know something they did not know when they started: how a thing actually works, what makes two options different, why one suits a person and the other does not. Describing a room is not teaching. "You lie down, the chamber closes, sixty minutes, nothing to do but rest" tells a reader what an hour looks like and nothing whatever about what pressurised oxygen is or does -- and a whole carousel of that is five slides about furniture.
+
+EXPLAIN THE MECHANISM. What physically happens is a FACT and is the most useful thing you can put on a slide: pressure rises and more oxygen dissolves into the blood plasma; infrared warms the tissue directly and the vessels near the surface widen. That is not a health claim and it is not a promise -- "this will fix your fatigue" is the claim, and that you never write. Where the business context gives you the mechanism, use it. Where it does not, say plainly what the thing IS rather than reaching for how the room feels.
+
+A COMPARISON POST OWES THE READER THE DIFFERENCE. If the post asks "X or Y", the middle slides have to explain what actually separates them -- the mechanism of each, what each is for, who picks which and why. "Which of these two moods would you prefer?" is not a comparison, it is a way of avoiding one. If you do not have the facts to explain a real difference, this is the wrong post: write about one of them properly instead.
 
 SAY THE THING. Every sentence carries something a reader could act on, check or picture exactly: what it is, how long it takes, what they do while it happens, who it suits, what to do next. A sentence whose only content is atmosphere is filler -- "the warmth builds slowly while the room stays quiet around you" tells a reader nothing they did not already assume, and a slide made of those says nothing at all while sounding like it said something.
 
@@ -500,6 +507,13 @@ export function checkSet(raw: RawDesign[], system: DesignSystem): string[] {
 export function checkDesigns(
   raw: RawDesign[],
   system: DesignSystem,
+  /**
+   * The tenant's own durations and prices. Optional: an account with no
+   * services configured has nothing to check against, and every caller that
+   * has the list should pass it -- see lib/ai/factCheck for why this is a
+   * check rather than another sentence in the prompt.
+   */
+  facts?: ConfiguredFacts,
 ): { designs: CheckedDesign[]; problems: string[] } {
   const problems: string[] = [];
   const designs: CheckedDesign[] = [];
@@ -525,6 +539,16 @@ export function checkDesigns(
         violations.push(
           "This uses <br>, which is not a line break here -- it puts the text side by side on one line. Let the text wrap inside an explicit width instead.",
         );
+      }
+      // A number that contradicts the business's own services. The prompt has
+      // always forbidden inventing one and the real list is in it; a carousel
+      // still said a session was fifteen minutes on one slide and twelve on
+      // the next. Checked against the words the slide will actually show.
+      if (facts) {
+        const words = findTextRuns(r.html)
+          .map((run) => run.text)
+          .join("\n");
+        violations.push(...unsupportedNumbers(words, facts));
       }
       // A slot past the cap would render as a broken box: nothing ever assigns
       // a photograph to it. Cheaper to let the repair call redesign the slide
