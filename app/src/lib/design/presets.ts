@@ -76,7 +76,7 @@ export const OPTIMAL_HEALTH_DESIGN_SYSTEM: DesignSystem = {
     display: { size: 84, leading: 0.96, tracking: -0.035, weight: 600 },
     headline: { size: 64, leading: 1.02, tracking: -0.03, weight: 600 },
     subhead: { size: 30, leading: 1.26, tracking: -0.01, weight: 500 },
-    body: { size: 21, leading: 1.52, tracking: 0, weight: 400 },
+    body: { size: 23, leading: 1.52, tracking: 0, weight: 400 },
     label: { size: 15, leading: 1, tracking: 0.2, weight: 600, upper: true },
   },
 
