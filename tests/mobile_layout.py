@@ -45,12 +45,34 @@ def check(cond: bool, name: str) -> None:
         failures.append(name)
 
 
-def login(pg, base: str) -> None:
-    pg.goto(f"{base}/login")
-    pg.fill('input[type="email"]', EMAIL)
-    pg.fill('input[type="password"]', PASSWORD)
-    with pg.expect_navigation(wait_until="networkidle", timeout=30000):
+def login(pg, base: str, attempts: int = 3) -> None:
+    """Sign in, retrying while the page is still hydrating.
+
+    The sign-in form submits through JavaScript. Click it before the page has
+    hydrated -- routine against a dev server that is still compiling the route
+    -- and the browser does a plain native submit instead, landing back on
+    /login with nothing filled in. That is a test-harness race, not a bug in
+    the app, so it is retried rather than reported.
+    """
+    for attempt in range(attempts):
+        pg.goto(f"{base}/login", wait_until="networkidle")
+        pg.wait_for_selector('input[type="email"]', timeout=30000)
+        # Hydration, not just paint: the handler has to be attached before the
+        # click, or the click is a native form submit.
+        pg.wait_for_timeout(1200)
+        pg.fill('input[type="email"]', EMAIL)
+        pg.fill('input[type="password"]', PASSWORD)
         pg.click('button[type="submit"]')
+        try:
+            pg.wait_for_url(lambda u: "/login" not in u, timeout=20000)
+        except Exception:
+            if attempt == attempts - 1:
+                raise RuntimeError(
+                    "could not sign in -- is the dev server up and "
+                    "`node scripts/dev-user.mjs` run?"
+                )
+            continue
+        break
     if "select-account" in pg.url:
         with pg.expect_navigation(wait_until="networkidle", timeout=30000):
             pg.click(f'text="{TENANT}"')
@@ -107,6 +129,35 @@ def main() -> int:
             check(width <= PHONE["width"] + 2, f"{name}: no horizontal page scroll ({width}px)")
             clipped = pg.evaluate(CLIPPED_JS)
             check(not clipped, f"{name}: nothing clipped" + (f" -- {clipped}" if clipped else ""))
+
+        print("\nThe layout is right BEFORE JavaScript runs")
+        # The photo library was a JS branch on a measured viewport. A server
+        # has no viewport, so it rendered the DESKTOP rail into every phone's
+        # HTML and only corrected it after the editor hydrated -- seconds, on a
+        # component this size, of a 34px rail in the corner that does not
+        # answer a tap. The slides beside it were dead for the same reason:
+        # nothing was hydrated yet. Anything that decides LAYOUT from the
+        # viewport has to do it in CSS.
+        if design:
+            nojs = browser.new_context(
+                viewport=PHONE, is_mobile=True, has_touch=True, java_script_enabled=False
+            )
+            nojs.add_cookies(pg.context.cookies())
+            npg = nojs.new_page()
+            npg.goto(f"{args.base}{design}", wait_until="domcontentloaded")
+            npg.wait_for_timeout(1200)
+            tab = npg.query_selector(
+                'button[aria-label="Show photos"], button[aria-label="Hide photos"]'
+            )
+            check(tab is not None, "the photo library is in the server's HTML at all")
+            if tab:
+                box = tab.bounding_box()
+                check(
+                    box["width"] > 200,
+                    f"it is a full-width bar across the top, not the desktop side rail "
+                    f"({round(box['width'])}x{round(box['height'])})",
+                )
+            nojs.close()
 
         print("\nThe mobile drawer behaves like a dialog")
         pg.goto(f"{args.base}/content-studio")

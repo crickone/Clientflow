@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import {
   ChevronDown,
   Image as ImageIcon,
@@ -12,8 +11,6 @@ import {
   Upload,
 } from "lucide-react";
 
-import { DUR, EASE } from "@/lib/motion";
-import { NARROW_QUERY, useMediaQuery } from "@/lib/ui/useMediaQuery";
 
 import { Button } from "@/components/ui/Button";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -52,7 +49,6 @@ export function SlidePhotoLibrary({
   slots = [],
   activeSlot = 1,
   onSlotChange,
-  layout = "grid",
   tall = false,
   onToggleTall,
 }: {
@@ -62,15 +58,10 @@ export function SlidePhotoLibrary({
   onPick: (assetId: number | null) => void;
   onUpload: (files: File[]) => void;
   onDelete: (assetId: number) => void;
-  /**
-   * "strip" is the phone's one-row sideways scroller; "grid" is the contact
-   * sheet. The panel above chooses, because it is the thing that knows how
-   * much room it took.
-   */
-  layout?: "grid" | "strip";
   /** Whether the phone's panel is currently grown. Only for the control's label. */
   tall?: boolean;
-  /** Present only on a phone: grows the strip into a browsable grid. */
+  /** Grows the strip into a browsable grid. Its control is hidden by CSS
+   *  where there is no strip to grow. */
   onToggleTall?: () => void;
   uploading: boolean;
   /**
@@ -163,6 +154,7 @@ export function SlidePhotoLibrary({
                 type="button"
                 size="sm"
                 variant="ghost"
+                className="cs-photo-expand"
                 onClick={onToggleTall}
                 aria-expanded={tall}
                 title={tall ? "Back to one row" : "Show more photos at once"}
@@ -305,41 +297,9 @@ export function SlidePhotoLibrary({
         </div>
       ) : (
         <div
-          style={
-            layout === "strip"
-              ? {
-                  // ONE ROW, SCROLLED SIDEWAYS. On a phone the panel sits above
-                  // the slide, so every row it takes is a row the slide loses.
-                  // A single row of 88px tiles costs ~108px and keeps the
-                  // whole library reachable with a thumb-flick; "Expand" is
-                  // there for when picking, rather than glancing, is the job.
-                  display: "grid",
-                  gridAutoFlow: "column",
-                  gridAutoColumns: `${PHOTO_TILE}px`,
-                  gap: 7,
-                  overflowX: "auto",
-                  overflowY: "hidden",
-                  alignContent: "start",
-                  minHeight: 0,
-                  // Momentum scrolling, and tiles that come to rest aligned
-                  // instead of half-cut.
-                  scrollSnapType: "x proximity",
-                  WebkitOverflowScrolling: "touch",
-                  paddingBottom: 4,
-                }
-              : {
-                  display: "grid",
-                  // Exactly three across, at whatever size that makes them. A
-                  // photograph is recognisable small, and three columns is what
-                  // turns a panel this narrow into a contact sheet you can scan
-                  // rather than a one-file-wide list you scroll.
-                  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-                  gap: 7,
-                  alignContent: "start",
-                  minHeight: 0,
-                  overflowY: "auto",
-                }
-          }
+          // A single row scrolled sideways on a phone, a three-across contact
+          // sheet beside the preview. CSS, not a prop: see .cs-photo-tab.
+          className="cs-photo-tiles"
         >
           {assets.map((asset) => {
             const active = asset.id === activeAssetId;
@@ -351,13 +311,10 @@ export function SlidePhotoLibrary({
                 style={{
                   position: "relative",
                   width: "100%",
-                  // In the strip the column is already 88px wide, so the
-                  // padding trick that makes a square from a fluid column
-                  // would make an 88px-tall tile in a 104px box. A fixed
-                  // height is the honest version there.
-                  ...(layout === "strip"
-                    ? { height: PHOTO_TILE, scrollSnapAlign: "start" }
-                    : { paddingBottom: "100%" }),
+                  // Squared by CSS: the strip's columns are a fixed width so
+                  // its tiles take a fixed height, while the contact sheet's
+                  // are fluid and use the padding trick. Both live in
+                  // .cs-photo-tiles.
                   borderRadius: "var(--radius)",
                   overflow: "hidden",
                   border:
@@ -442,20 +399,18 @@ const OPEN_KEY = "cs.photoLibraryOpen";
  * or covered. Sized to three tiles: 12px padding either side, two 7px gaps,
  * and three ~71px squares.
  */
+/**
+ * How much room the open panel takes beside the preview, and how much
+ * ImageDesigner widens the preview column by so it comes out of the page's
+ * margin rather than off the slide.
+ *
+ * The SAME number is in globals.css (.cs-photo-panel.is-open), which is what
+ * actually sizes the panel — the sizing moved to CSS so the layout is right
+ * before any JavaScript runs. This copy exists because the column's width is
+ * arithmetic, not a class. Change one and change the other; both say so.
+ */
 export const PHOTO_PANEL_WIDTH = 252;
 
-/** The tile edge in the phone's one-row strip. Big enough to recognise a
- *  photograph, small enough that a row of them costs little of the screen. */
-const PHOTO_TILE = 88;
-/**
- * The strip's height, from its parts rather than by eye: the panel's own
- * header is 44px, the scroller needs the tile plus its 4px of bottom padding,
- * and the panel's padding and gaps take the remaining 36px. Guessing 108 here
- * gave the scroller 28px for a 92px tile and sliced every thumbnail in half.
- */
-const PHOTO_STRIP_HEIGHT = 44 + (PHOTO_TILE + 4) + 36;
-/** What "Expand" buys: about three rows, without swallowing the screen. */
-const PHOTO_STRIP_TALL = 360;
 
 /**
  * The photo library as a panel that expands out BESIDE the preview.
@@ -493,10 +448,10 @@ export function SlidePhotoLibraryPopout(
   },
 ) {
   const [open, setOpen] = useState(false);
-  /** Phone only: the strip grown into a grid. Not persisted -- it is a
-   *  this-moment choice ("let me actually look"), unlike open/closed. */
+  /** The strip grown into a grid. Not persisted -- it is a this-moment
+   *  choice ("let me actually look"), unlike open/closed. Only reachable on a
+   *  phone, where the control that sets it is the only one rendered. */
   const [tall, setTall] = useState(false);
-  const narrow = useMediaQuery(NARROW_QUERY);
   const { photoCount, onOpenChange, ...libraryProps } = props;
 
   useEffect(() => {
@@ -536,133 +491,45 @@ export function SlidePhotoLibraryPopout(
   }, [open]);
 
   return (
-    <div
-      style={
-        narrow
-          ? { display: "flex", flexDirection: "column", minWidth: 0 }
-          : { display: "flex", alignItems: "stretch", minWidth: 0 }
-      }
-    >
+    <div className="cs-photo-popout">
       <button
         type="button"
         onClick={toggle}
         aria-expanded={open}
         aria-label={open ? "Hide photos" : "Show photos"}
         title={open ? "Hide photos" : "Show photos"}
-        style={{
-          display: "flex",
-          // A tab down the left edge becomes a bar across the top: the panel
-          // it opens is above the slide now, and a control has to sit on the
-          // side it opens from.
-          flexDirection: narrow ? "row" : "column",
-          alignItems: "center",
-          justifyContent: narrow ? "flex-start" : "center",
-          gap: 7,
-          width: narrow ? "100%" : 34,
-          minHeight: narrow ? 44 : undefined,
-          flexShrink: 0,
-          padding: narrow ? "0 12px" : "14px 0",
-          borderRadius: narrow
-            ? "var(--radius) var(--radius) 0 0"
-            : "var(--radius) 0 0 var(--radius)",
-          border: "1px solid var(--hairline)",
-          borderRight: narrow ? undefined : "none",
-          borderBottom: narrow ? "none" : undefined,
-          background: open ? "var(--surface-2)" : "var(--bg)",
-          color: open ? "var(--text-primary)" : "var(--text-secondary)",
-          cursor: "pointer",
-          fontFamily: "inherit",
-          fontSize: narrow ? 11 : 9.5,
-          fontWeight: 600,
-          letterSpacing: "0.1em",
-          transition: `background ${DUR.base}s, color ${DUR.base}s`,
-        }}
+        // A tab down the LEFT EDGE beside the preview, and a bar across the
+        // TOP above it on a phone. Both shapes are CSS (.cs-photo-tab), not a
+        // branch on a measured viewport: the server cannot measure one, so a
+        // JS branch renders the desktop rail into the HTML of every phone and
+        // only corrects it once the editor has hydrated. On a component this
+        // size that is seconds of a 34px rail in the corner that does not
+        // answer a tap -- which is exactly what it looked like.
+        className={`cs-photo-tab${open ? " is-open" : ""}`}
       >
         <ImageIcon size={14} />
-        <span
-          style={
-            narrow
-              ? undefined
-              : { writingMode: "vertical-rl", textOrientation: "mixed" }
-          }
-        >
-          PHOTOS
-        </span>
-        {photoCount > 0 && (
-          <span style={{ fontWeight: 400, opacity: 0.65, letterSpacing: 0 }}>
-            {photoCount}
-          </span>
-        )}
-        <ChevronDown
-          size={12}
-          style={{
-            // Down/up when it opens downward; right/left when it opens sideways.
-            transform: narrow
-              ? open
-                ? "rotate(180deg)"
-                : "none"
-              : open
-                ? "rotate(90deg)"
-                : "rotate(-90deg)",
-            transition: `transform ${DUR.base}s`,
-            marginLeft: narrow ? "auto" : undefined,
-          }}
-        />
+        <span className="cs-photo-tab-label">PHOTOS</span>
+        {photoCount > 0 && <span className="cs-photo-tab-count">{photoCount}</span>}
+        <ChevronDown size={12} className="cs-photo-tab-chevron" />
       </button>
 
-      <AnimatePresence initial={false}>
-        {open && (
-          // Width is what animates, because width is what the panel is taking:
-          // it grows into the room the column just made rather than appearing
-          // on top of something. overflow:hidden keeps the contents from
-          // spilling while that width is still opening.
-          <motion.div
-            // HEIGHT on a phone, WIDTH beside the preview. The panel takes the
-            // room it is actually asking for in each layout, so the thing it
-            // pushes is the page's margin rather than the slide.
-            initial={narrow ? { height: 0, opacity: 0 } : { width: 0, opacity: 0 }}
-            animate={
-              narrow
-                ? { height: tall ? PHOTO_STRIP_TALL : PHOTO_STRIP_HEIGHT, opacity: 1 }
-                : { width: PHOTO_PANEL_WIDTH, opacity: 1 }
-            }
-            exit={narrow ? { height: 0, opacity: 0 } : { width: 0, opacity: 0 }}
-            transition={{ duration: DUR.base, ease: EASE }}
-            // position:relative + an absolutely-positioned child is what keeps
-            // the panel from DRIVING the row's height: with no in-flow content
-            // this box contributes no height of its own, so the row stays as
-            // tall as the preview and align-items:stretch hands that height
-            // back to the panel. Without it, a full library made the column
-            // taller and pushed the slide actions (Add slide, Undo, Delete)
-            // down out of the sticky column.
-            style={{
-              overflow: "hidden",
-              flexShrink: 0,
-              position: "relative",
-              width: narrow ? "100%" : undefined,
-            }}
-          >
-            {/* Fixed size inside the animating box, so the tiles are laid out
-                at their final dimensions throughout rather than reflowing on
-                every frame. */}
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                width: narrow ? "100%" : PHOTO_PANEL_WIDTH,
-                height: narrow ? (tall ? PHOTO_STRIP_TALL : PHOTO_STRIP_HEIGHT) : undefined,
-              }}
-            >
-              <SlidePhotoLibrary
-                {...libraryProps}
-                layout={narrow ? (tall ? "grid" : "strip") : "grid"}
-                onToggleTall={narrow ? () => setTall((t) => !t) : undefined}
-                tall={tall}
-              />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Sized and animated by CSS, for the same reason as the tab: the
+          open/closed size differs by AXIS between the two layouts (width
+          beside the preview, height above it) and a stylesheet knows which
+          one applies before any JavaScript runs. `hidden` while closed keeps
+          it out of the tab order and off a screen reader. */}
+      <div
+        className={`cs-photo-panel${open ? " is-open" : ""}${tall ? " is-tall" : ""}`}
+        hidden={!open}
+      >
+        <div className="cs-photo-panel-inner">
+          <SlidePhotoLibrary
+            {...libraryProps}
+            onToggleTall={() => setTall((t) => !t)}
+            tall={tall}
+          />
+        </div>
+      </div>
     </div>
   );
 }

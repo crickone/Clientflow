@@ -677,6 +677,187 @@ a {
   }
 }
 
+/* ── THE SLIDE PHOTO LIBRARY ─────────────────────────────────────────────
+   Beside the preview it is a tab down the left edge that opens sideways into
+   the page's margin. On a phone there IS no margin -- the slide is already the
+   screen -- so it becomes a bar across the top that opens downward into a
+   single row of tiles scrolled sideways.
+
+   ALL OF IT IS CSS, deliberately. This was a JS branch on a measured viewport
+   and that cannot work: the server has no viewport, so it rendered the desktop
+   rail into every phone's HTML and only corrected it once the editor had
+   hydrated. On a 3,500-line component that is seconds of a 34px rail sitting
+   in the corner not answering taps -- which is what it looked like, and why
+   the slides beside it were dead too. A stylesheet is right before the first
+   paint and does not depend on JavaScript arriving at all. */
+.cs-photo-popout {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+.cs-photo-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 34px;
+  flex-shrink: 0;
+  padding: 14px 0;
+  border: 1px solid var(--hairline);
+  border-right: none;
+  border-radius: var(--radius) 0 0 var(--radius);
+  background: var(--bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  transition: background 0.2s var(--ease), color 0.2s var(--ease);
+}
+.cs-photo-tab.is-open {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+.cs-photo-tab-label {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+.cs-photo-tab-count {
+  font-weight: 400;
+  opacity: 0.65;
+  letter-spacing: 0;
+}
+.cs-photo-tab-chevron {
+  transform: rotate(-90deg);
+  transition: transform 0.2s var(--ease);
+}
+.cs-photo-tab.is-open .cs-photo-tab-chevron {
+  transform: rotate(90deg);
+}
+
+/* The panel. Closed is zero on the axis it opens along, so the transition has
+   something to animate between and the closed state takes no room at all. */
+.cs-photo-panel {
+  overflow: hidden;
+  flex-shrink: 0;
+  position: relative;
+  width: 0;
+  transition: width 0.2s var(--ease), opacity 0.2s var(--ease);
+  opacity: 0;
+}
+.cs-photo-panel.is-open {
+  width: 252px; /* PHOTO_PANEL_WIDTH — ImageDesigner widens the column by this */
+  opacity: 1;
+}
+/* position:absolute keeps the panel from DRIVING the row's height beside the
+   preview: with no in-flow content the box contributes no height of its own,
+   so the row stays as tall as the slide and align-items:stretch hands that
+   height back. Without it a full library pushed the slide actions out of the
+   sticky column. */
+.cs-photo-panel-inner {
+  position: absolute;
+  inset: 0;
+  width: 252px;
+}
+.cs-photo-tiles {
+  display: grid;
+  /* Exactly three across, at whatever size that makes them. A photograph is
+     recognisable small, and three columns is what turns a panel this narrow
+     into a contact sheet you can scan rather than a one-file-wide list. */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  align-content: start;
+  min-height: 0;
+  overflow-y: auto;
+}
+.cs-photo-tiles > .photo-tile {
+  padding-bottom: 100%; /* square from a fluid column */
+}
+/* Nothing to expand where the tiles are already a grid. */
+.cs-photo-expand {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .cs-photo-popout {
+    flex-direction: column;
+  }
+  .cs-photo-tab {
+    flex-direction: row;
+    justify-content: flex-start;
+    width: 100%;
+    min-height: 44px; /* a finger, not a cursor */
+    padding: 0 12px;
+    font-size: 11px;
+    border-right: 1px solid var(--hairline);
+    border-bottom: none;
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
+  .cs-photo-tab-label {
+    writing-mode: horizontal-tb;
+  }
+  .cs-photo-tab-chevron {
+    transform: none;
+    margin-left: auto;
+  }
+  .cs-photo-tab.is-open .cs-photo-tab-chevron {
+    transform: rotate(180deg);
+  }
+
+  /* HEIGHT is the axis here, and the numbers come from the parts: the panel's
+     own header is 44px, the scroller needs the 88px tile plus its 4px of
+     bottom padding, and padding and gaps take the remaining 36px. Guessing
+     108 gave the scroller 28px for a 92px tile and sliced every thumbnail. */
+  .cs-photo-panel {
+    width: 100%;
+    height: 0;
+    transition: height 0.2s var(--ease), opacity 0.2s var(--ease);
+  }
+  .cs-photo-panel.is-open {
+    width: 100%;
+    height: 172px;
+  }
+  .cs-photo-panel.is-open.is-tall {
+    height: 360px;
+  }
+  .cs-photo-panel-inner {
+    width: 100%;
+  }
+  /* ONE ROW, SCROLLED SIDEWAYS. Above the slide, every row the panel takes is
+     a row the slide loses. */
+  .cs-photo-tiles {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 88px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+  }
+  .cs-photo-tiles > .photo-tile {
+    height: 88px;
+    padding-bottom: 0;
+    scroll-snap-align: start;
+  }
+  /* Expanded, it is a contact sheet again. */
+  .cs-photo-panel.is-tall .cs-photo-tiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-flow: row;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+  .cs-photo-panel.is-tall .cs-photo-tiles > .photo-tile {
+    height: auto;
+    padding-bottom: 100%;
+  }
+  .cs-photo-expand {
+    display: inline-flex;
+  }
+}
+
 /* THE PHOTO LIBRARY OPENS DOWNWARD ON A PHONE, NOT SIDEWAYS.
    Beside the preview it takes width out of the page's margin, which is the
    whole reason it is laid out in the flow rather than floated over the slide.
@@ -690,7 +871,6 @@ a {
     align-items: stretch !important;
   }
 }
-
 /* EDITING A LINE MUST NOT HIDE THE SLIDE IT IS ON.
    The text popover is an overlay pinned to the bottom of the preview, which
    is right at desktop sizes where the preview is 400-480px. At 286px it
