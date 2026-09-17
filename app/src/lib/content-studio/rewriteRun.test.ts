@@ -147,4 +147,12 @@ check(
     .includes("covers the EQUIPMENT too"),
 );
 
+check(
+  "a rewrite must say something too -- atmosphere alone is filler",
+  (() => {
+    const p = rewritePrompt({ text: "x", runs: [{ index: 0, text: "x" }], index: 0, topic: "t", business: "b" });
+    return p.includes("SAY THE THING") && p.includes("Concrete experience is welcome");
+  })(),
+);
+
 console.log(`\nrewriteRun: ${passed} checks passed`);

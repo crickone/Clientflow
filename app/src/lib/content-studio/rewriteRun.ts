@@ -76,6 +76,7 @@ export function rewritePrompt(input: {
     `- Between ${min} and ${max} characters. This is not a style preference: the slide's layout was built around the length of the line you are replacing, and a longer one wraps onto an extra line and collides with the text beneath it.`,
     "- Keep its job on the slide. A heading stays a heading; a supporting line stays supporting. Do not turn one into the other.",
     "- Do not repeat what the other lines on this slide already say.",
+    "- SAY THE THING. Carry something a reader could act on, check or picture exactly -- what it is, how long, what they do, who it suits, what to do next. A line whose only content is atmosphere (\"the warmth builds slowly while the room stays quiet around you\") is filler: it sounds like it said something and did not. Concrete experience is welcome -- \"you lie face-up, fully clothed, for twelve minutes\" -- vague mood is not.",
     "- It MUST be different from the line it replaces. Say the same thing another way, or find a better angle on it -- but do not hand back what you were given.",
     "- Plain text. No markdown, no emojis, no hashtags, no quotation marks around the whole line.",
     "- NEVER INVENT A FACT. Prices, session lengths, opening times, offers, phone numbers, addresses and statistics all count. If a number is not in the business context above, write the line without it.",

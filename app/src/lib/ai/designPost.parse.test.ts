@@ -673,4 +673,31 @@ check(
   DESIGN_RULES.includes("make it from what you DO know"),
 );
 
+// The register the operator rejected: "A full-body infrared bed for twelve
+// minutes, supporting circulation and easing tension -- the warmth builds
+// slowly while the room stays quiet around you." That sentence is the brief
+// working as written ("describe the experience over asserting an effect",
+// "the room is quiet and the writing should be too"), which leaves atmosphere
+// as the only thing left to write about once effects are off the table. The
+// rule below separates concrete experience, which is worth the space, from
+// mood, which is what copy reaches for when it has run out of facts.
+check(
+  "the rules demand every sentence carry something actionable or checkable",
+  DESIGN_RULES.includes("SAY THE THING") &&
+    DESIGN_RULES.includes("act on, check or picture exactly"),
+);
+check(
+  "with the rejected sentence named, so the line is not read as a ban on detail",
+  DESIGN_RULES.includes("the warmth builds slowly while the room stays quiet around you"),
+);
+check(
+  "and concrete experience explicitly protected",
+  DESIGN_RULES.includes("NOT a ban on describing the experience") &&
+    DESIGN_RULES.includes("fully clothed, for twelve minutes"),
+);
+check(
+  "the way out is a real detail or a shorter slide, not a vaguer sentence",
+  DESIGN_RULES.includes("fetch a real detail from the business context or cut the sentence"),
+);
+
 console.log(`\ndesignPost.parse: ${passed} checks passed`);
