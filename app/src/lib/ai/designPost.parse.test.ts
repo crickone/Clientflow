@@ -733,4 +733,30 @@ check(
   DESIGN_RULES.includes("write about one of them properly instead"),
 );
 
+// TEACH SOMETHING with no size attached to it cost a real generation. Five
+// slides had always come to about 6,600 characters of markup in total, ~1,300
+// each. The first run after the teach rules landed produced roughly 34,000
+// OUTPUT TOKENS -- seventeen times that -- blew through the 32,000 ceiling,
+// failed with "ran out of room", and charged 50c for nothing. "Teach" without
+// a bound reads as "write an essay", and the canvas has not changed size.
+check(
+  "the rules say how much actually fits on a slide",
+  DESIGN_RULES.includes("HOW MUCH FITS ON ONE SLIDE") &&
+    DESIGN_RULES.includes("1,000-1,800 characters"),
+);
+check(
+  "and tie it to the teach rule directly, which is what ran away",
+  DESIGN_RULES.includes("TEACHING SOMETHING DOES NOT MEAN WRITING MORE"),
+);
+check(
+  "with somewhere for the overflow to go instead of onto the slide",
+  DESIGN_RULES.includes("it is the next slide, or a different post"),
+);
+// The budget has to sit with the rule it bounds, or the two are read apart.
+check(
+  "the budget is stated before the mechanism rule it bounds",
+  DESIGN_RULES.indexOf("HOW MUCH FITS ON ONE SLIDE") <
+    DESIGN_RULES.indexOf("EXPLAIN THE MECHANISM"),
+);
+
 console.log(`\ndesignPost.parse: ${passed} checks passed`);
