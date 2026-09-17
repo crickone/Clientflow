@@ -1644,6 +1644,14 @@ export function ImageDesigner({
                   canClear={activeSlide.templateId !== DESIGNED_TEMPLATE_ID}
                 />
               <div
+                // Both the gap and the squared corners below assume the tab is
+                // to the LEFT. On a phone it is ABOVE, so the margin became a
+                // left indent that pushed this card 8px off the edge every
+                // other box on the page lines up with, and the closed state
+                // squared the corners on the wrong side entirely. The
+                // stylesheet turns both onto the other axis -- see
+                // .cs-preview-card.
+                className={`cs-preview-card${photosOpen ? " is-photos-open" : ""}`}
                 style={{
                   flex: 1,
                   minWidth: 0,

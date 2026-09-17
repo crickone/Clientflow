@@ -874,6 +874,19 @@ a {
     border-top: none !important;
     border-radius: 0 0 var(--radius) var(--radius) !important;
   }
+  /* And so does everything the preview card does about the tab. Its 8px gap
+     was a LEFT margin, which in a column is not a gap at all -- it is an
+     indent, and it put this card 8px inside the edge every other box on the
+     page shares. Same for its corners: folded away, the tab now sits on top
+     of it, so the square pair is the TOP one. */
+  .cs-preview-card {
+    margin-left: 0 !important;
+    border-radius: 0 0 var(--radius) var(--radius) !important;
+  }
+  .cs-preview-card.is-photos-open {
+    margin-top: 8px;
+    border-radius: var(--radius) !important;
+  }
 }
 
 /* THE PHOTO LIBRARY OPENS DOWNWARD ON A PHONE, NOT SIDEWAYS.
