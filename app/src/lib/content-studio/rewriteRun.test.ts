@@ -141,4 +141,10 @@ check(
     "Heat that reaches deeper",
 );
 
+check(
+  "a rewrite may not invent the equipment either -- the gap that let a clinic's infrared bed be called \"open, no seal\"",
+  rewritePrompt({ text: "x", runs: [{ index: 0, text: "x" }], index: 0, topic: "t", business: "b" })
+    .includes("covers the EQUIPMENT too"),
+);
+
 console.log(`\nrewriteRun: ${passed} checks passed`);

@@ -656,4 +656,21 @@ check(
   DESIGN_RULES.includes("cannot know how many lines a heading wraps to"),
 );
 
+// The no-fabrication rule used to enumerate NUMBERS -- prices, session
+// lengths, opening times, statistics -- and closed with "if a NUMBER is not in
+// the business context". A physical claim about the equipment fell outside it
+// entirely, so a post described a clinic's infrared BED as "open, no seal"
+// purely to sharpen a contrast with the hyperbaric chamber. Nothing in that
+// account's brief, therapies or marketing brain says anything of the kind, and
+// the bed is not open. Worse than a wrong price, which someone notices.
+check(
+  "the rules forbid inventing what the equipment IS, not only what it costs",
+  DESIGN_RULES.includes("AND IT COVERS THE EQUIPMENT") &&
+    DESIGN_RULES.includes("how it encloses or does not enclose someone"),
+);
+check(
+  "and say what to do instead of inventing a contrast",
+  DESIGN_RULES.includes("make it from what you DO know"),
+);
+
 console.log(`\ndesignPost.parse: ${passed} checks passed`);

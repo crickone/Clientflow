@@ -79,6 +79,7 @@ export function rewritePrompt(input: {
     "- It MUST be different from the line it replaces. Say the same thing another way, or find a better angle on it -- but do not hand back what you were given.",
     "- Plain text. No markdown, no emojis, no hashtags, no quotation marks around the whole line.",
     "- NEVER INVENT A FACT. Prices, session lengths, opening times, offers, phone numbers, addresses and statistics all count. If a number is not in the business context above, write the line without it.",
+    "- That covers the EQUIPMENT too, not only the numbers: what a machine looks like, whether it encloses someone, what a room feels like, what a client can do during a session. Unless the business context above says so, you do not know it. A slide called an infrared BED \"open, no seal\" to sharpen a contrast -- invented, plausible, and wrong.",
     input.note ? `- What the operator asked for: ${input.note}` : "",
     (input.avoid ?? []).filter((a) => a.trim()).length > 0
       ? `- Already tried, so do not return any of these:\n${(input.avoid ?? [])
