@@ -1,8 +1,5 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { Button } from "@/components/ui/Button";
 import { getCarousel } from "@/lib/image/carousels";
 import { listLibraryAssets } from "@/lib/image/library";
 import { getBrandFontIds } from "@/lib/settings";
@@ -47,14 +44,11 @@ export default function ImageDesignPage({
         eyebrow={`Design #${design.id}`}
         title={design.name}
         subtitle={subtitle}
-        actions={
-          <Link href="/content-studio">
-            <Button variant="outline">
-              <ArrowLeft size={15} />
-              All designs
-            </Button>
-          </Link>
-        }
+        // No "All designs" action. It was a THIRD route to /content-studio,
+        // beside the "back to Content Studio" link ContentStudioTabs puts on
+        // every route in this section and the sidebar's own entry -- and it
+        // was the only thing on the page competing with the design's name for
+        // the top-right corner.
       />
       <ImageDesigner
         designId={design.id}
