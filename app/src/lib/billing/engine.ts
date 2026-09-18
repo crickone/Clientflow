@@ -11,6 +11,7 @@ import { addMonthClamped, addDays, cmpDate, dublinDayOfMonth, dublinToday } from
 import { getVatRateBp } from "./settings";
 import { monthlyLines, monthlySubtotalCents, type MonthlyLine } from "./addons";
 import { sendBillingEmail } from "./emails";
+import { claimCreditsForInvoice } from "./adjustments";
 
 /** Retry offsets (days after the due date). 4 attempts total incl. the due-day one. */
 const RETRY_OFFSETS = [1, 3, 7] as const;
@@ -118,6 +119,9 @@ function ensureInvoice(tenantId: number, periodStart: string, anchorDay: number)
   const periodEnd = addMonthClamped(periodStart, anchorDay);
   const lines = monthlyLines(tenantId);
   const subtotal = lines.reduce((sum, l) => sum + l.netCents, 0);
+  // Credits owed are taken off THIS invoice, but only once: the claim below
+  // stamps them with this invoice's id, and it runs after the insert so a
+  // credit is never consumed by an invoice that the ON CONFLICT dropped.
   const { netCents, vatCents, grossCents } = computeVat(subtotal, getVatRateBp());
   const res = controlSqlite
     .prepare(
@@ -130,7 +134,30 @@ function ensureInvoice(tenantId: number, periodStart: string, anchorDay: number)
       .prepare("SELECT * FROM billing_invoices WHERE tenant_id = ? AND period_start = ?")
       .get(tenantId, periodStart) as Record<string, unknown>,
   );
-  if (res.changes > 0) writeInvoiceLines(inv.id, lines);
+  if (res.changes > 0) {
+    writeInvoiceLines(inv.id, lines);
+
+    // Anything the business is owed comes off now, as one negative line, and
+    // the invoice totals are recomputed to match. Clamped at zero: a credit
+    // larger than the bill leaves nothing to pay rather than a negative
+    // charge, and the remainder stays on their account for next month.
+    const creditCents = claimCreditsForInvoice(tenantId, inv.id);
+    if (creditCents > 0) {
+      const creditedSubtotal = Math.max(0, subtotal - creditCents);
+      const totals = computeVat(creditedSubtotal, getVatRateBp());
+      controlSqlite
+        .prepare(
+          "INSERT INTO billing_invoice_lines (invoice_id, kind, addon_key, description, net_cents) VALUES (?, 'credit', '', ?, ?)",
+        )
+        .run(inv.id, "Credit applied", -Math.min(creditCents, subtotal));
+      controlSqlite
+        .prepare("UPDATE billing_invoices SET net_cents = ?, vat_cents = ?, gross_cents = ? WHERE id = ?")
+        .run(totals.netCents, totals.vatCents, totals.grossCents, inv.id);
+      return rowToInvoice(
+        controlSqlite.prepare("SELECT * FROM billing_invoices WHERE id = ?").get(inv.id) as Record<string, unknown>,
+      );
+    }
+  }
   return inv;
 }
 

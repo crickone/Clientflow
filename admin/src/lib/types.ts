@@ -440,3 +440,23 @@ export interface TenantData {
   lifecycle: TenantLifecycle | null;
 }
 
+/** A credit owed to a business (console Money tab). */
+export interface CreditRow {
+  id: number;
+  tenantId: number;
+  netCents: number;
+  description: string;
+  reason: string | null;
+  createdBy: string;
+  appliedInvoiceId: number | null;
+  appliedAt: number | null;
+  createdAt: number;
+}
+
+export interface TenantMoney {
+  priceOverrideCents: number | null;
+  platformPriceCents: number;
+  credits: CreditRow[];
+  outstandingCreditCents: number;
+}
+

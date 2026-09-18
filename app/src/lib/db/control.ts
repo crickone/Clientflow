@@ -672,6 +672,22 @@ export function ensureControlTables() {
     -- as a single implicit base line — see listInvoiceLines in billing/engine.
     -- addon_key is '' (not NULL) for the base line purely so the UNIQUE index
     -- below works without a COALESCE expression index.
+    -- A credit owed to a business: money off their next invoice, or a
+    -- goodwill adjustment. Applied once, then marked with the invoice that
+    -- consumed it, so a credit can never be spent twice.
+    CREATE TABLE IF NOT EXISTS billing_credits (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id    INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      net_cents    INTEGER NOT NULL,
+      description  TEXT NOT NULL,
+      reason       TEXT,
+      created_by   TEXT NOT NULL DEFAULT '',
+      applied_invoice_id INTEGER,
+      applied_at   INTEGER,
+      created_at   INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_billing_credits_tenant ON billing_credits(tenant_id, applied_at);
+
     CREATE TABLE IF NOT EXISTS billing_invoice_lines (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       invoice_id  INTEGER NOT NULL,
@@ -817,6 +833,17 @@ export function ensureControlTables() {
       "[control] auth_sessions active_tenant_id migration failed:",
       err,
     );
+  }
+
+  // Platform Console v2 (slice 7): a negotiated price for one business, and
+  // credit notes that come off their next invoice.
+  try {
+    const cols = controlSqlite.prepare("PRAGMA table_info(tenant_billing)").all() as Array<{ name: string }>;
+    if (!cols.find((c) => c.name === "price_override_cents")) {
+      controlSqlite.exec("ALTER TABLE tenant_billing ADD COLUMN price_override_cents INTEGER");
+    }
+  } catch (err) {
+    console.error("[control] tenant_billing price_override_cents migration failed:", err);
   }
 
   // Platform Console v2 (slice 6): a business is ARCHIVED before it is

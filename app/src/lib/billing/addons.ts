@@ -1,7 +1,7 @@
 import "server-only";
 
 import { controlSqlite } from "@/lib/db/control";
-import { getMonthlyPriceCents } from "./settings";
+import { getEffectiveMonthlyPriceCents } from "./adjustments";
 
 /**
  * Paid add-ons: the entitlement layer between the flat base subscription and
@@ -197,7 +197,10 @@ export interface MonthlyLine {
  */
 export function monthlyLines(tenantId: number): MonthlyLine[] {
   const lines: MonthlyLine[] = [
-    { kind: "base", addonKey: "", description: "AdonisAgent subscription", netCents: getMonthlyPriceCents() },
+    // The tenant's own negotiated price when one is set, else the platform
+    // price. Routed through getEffectiveMonthlyPriceCents so an override
+    // reaches the invoice, the estimate and every total by one path.
+    { kind: "base", addonKey: "", description: "AdonisAgent subscription", netCents: getEffectiveMonthlyPriceCents(tenantId) },
   ];
   for (const a of billableAddons(tenantId)) {
     lines.push({

@@ -5,7 +5,9 @@ import { fmtCents, fmtDate, fmtDay } from "@/lib/format";
 import { ConfirmButton } from "@/components/ConfirmButton";
 import { GrantCreditsForm } from "@/components/GrantCreditsForm";
 import { Card } from "@/components/ui/Card";
-import type { InvoiceRow, TenantDetail } from "@/lib/types";
+import { MoneyAdjustments } from "@/components/money/MoneyAdjustments";
+import { requireAdminSession } from "@/lib/session";
+import type { InvoiceRow, TenantDetail, TenantMoney } from "@/lib/types";
 import {
   tenantAction,
   grantCreditsAction,
@@ -58,6 +60,15 @@ export default async function GymMoneyPage({
   }
 
   const { tenant, invoices } = data;
+  const me = await requireAdminSession();
+  // Price override + credits live on their own endpoint (slice 7); a
+  // failure there must not take the whole billing page down.
+  let money: TenantMoney | null = null;
+  try {
+    money = await api<TenantMoney>(`/tenants/${id}/money`);
+  } catch {
+    money = null;
+  }
   // The archive window drives the whole danger zone below.
   const archivedAt = data.lifecycle?.archivedAt ?? null;
   const daysLeft = data.lifecycle?.daysLeft ?? null;
@@ -525,6 +536,8 @@ export default async function GymMoneyPage({
           </table>
         )}
       </Card>
+
+      {money && <MoneyAdjustments tenantId={id} data={money} isOwner={me.role === "owner"} />}
 
       {/* Invoices */}
       <Card style={{ padding: 24 }}>
