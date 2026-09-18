@@ -9,6 +9,7 @@ import {
   DEFAULT_HEADING_FONT_ID,
 } from "@/lib/image/fonts";
 import { DEFAULT_THEME, HEADING_FONTS, isHexColor, type ThemeConfig } from "@/lib/theme";
+import { parseFeatureFlags, type FeatureFlags } from "@/lib/features";
 
 export type { VenueType };
 
@@ -179,4 +180,38 @@ export function setTheme(cfg: ThemeConfig) {
 
 export function clearTheme() {
   deleteKey("theme");
+}
+
+// ─── Module flags (Platform Console v2, slice 4) ─────────────────────────────
+
+export const FEATURES_KEY = "features";
+
+/**
+ * Which modules this business has. An unset key means every module is on,
+ * which is how every tenant behaved before flags existed -- see
+ * @/lib/features for the catalog and the "unset means on" rule.
+ */
+export function getFeatureFlags(): FeatureFlags {
+  return parseFeatureFlags(readKey<unknown>(FEATURES_KEY, null));
+}
+
+/** For background work and the platform console, which have no request scope. */
+export function getFeatureFlagsForTenant(tenantId: number): FeatureFlags {
+  return parseFeatureFlags(readKeyForTenant<unknown>(tenantId, FEATURES_KEY, null));
+}
+
+export function setFeatureFlags(flags: FeatureFlags): void {
+  setKey(FEATURES_KEY, parseFeatureFlags(flags));
+}
+
+/** Venue type for an EXPLICIT tenant — the platform console has no request scope. */
+export function getVenueTypeForTenant(tenantId: number): VenueType {
+  return readKeyForTenant<string>(tenantId, "venue_type", "clinic") === "gym" ? "gym" : "clinic";
+}
+
+/** Scheduling mode for an EXPLICIT tenant, with the same venue-type default as getSchedulingMode. */
+export function getSchedulingModeForTenant(tenantId: number): SchedulingMode {
+  const v = readKeyForTenant<string>(tenantId, "scheduling_mode", "");
+  if (v === "appointments" || v === "timetable") return v;
+  return getVenueTypeForTenant(tenantId) === "gym" ? "timetable" : "appointments";
 }

@@ -15,7 +15,7 @@ import {
 import { getClientSession } from "@/lib/clientAuth";
 import type { SidebarAccount } from "@/components/layout/Sidebar";
 import { resolveCurrentTenant } from "@/lib/db/tenant";
-import { getTheme, getVenueType, getSchedulingMode } from "@/lib/settings";
+import { getTheme, getVenueType, getSchedulingMode, getFeatureFlags } from "@/lib/settings";
 import { getVocab } from "@/lib/vocabulary";
 import {
   DEFAULT_HEADING_FONT,
@@ -32,6 +32,7 @@ import { getBilling } from "@/lib/billing/engine";
 import { countLeadsInEntryStage } from "@/lib/leads";
 import { countPendingRequests } from "@/lib/cms/requests";
 import { PastDueBanner } from "@/components/billing/PastDueBanner";
+import { pathAllowed, type FeatureFlags } from "@/lib/features";
 import { ImpersonationBanner } from "@/components/layout/ImpersonationBanner";
 // Side-effect import: boots the daily automation scheduler (birthdays etc.) on
 // the server. This is a nodejs-only server component, so better-sqlite3 stays
@@ -95,6 +96,9 @@ export default async function RootLayout({
   // sidebar chrome (and getCurrentTenant() below would resolve the unrelated
   // DEFAULT tenant) instead of seeing a standalone branded form.
   const pathname = headers().get("x-pathname") ?? "";
+  // Populated once the active tenant is known (see the module gate below);
+  // handed to the sidebar so a switched-off module is not offered either.
+  let featureFlags: FeatureFlags = {};
   const isStudio = /^\/cms\/[^/]+\/studio(\/|$)/.test(pathname);
   if (pathname.startsWith("/site/") || pathname.startsWith("/f/")) {
     return (
@@ -259,6 +263,16 @@ export default async function RootLayout({
         if (!onExempt && billing.status === "suspended") redirect("/billing/suspended");
         showPastDue = billing.status === "past_due";
       }
+
+      // Module gate (Platform Console v2, slice 4). A module switched off in
+      // the console is not merely hidden from the sidebar: its routes are
+      // refused here, the one place that sees both the tenant and the path.
+      // Unset flags mean every module is on, so a tenant nobody has touched
+      // behaves exactly as before. See @/lib/features.
+      featureFlags = getFeatureFlags();
+      if (!bare && !pathname.startsWith("/api/") && !pathAllowed(featureFlags, pathname)) {
+        redirect("/dashboard");
+      }
     }
   }
 
@@ -313,6 +327,7 @@ export default async function RootLayout({
                 activeTenantId={activeTenantId}
                 tenantSlug={tenantSlug}
                 schedulingMode={schedulingMode}
+                featureFlags={featureFlags}
                 showSetup={showSetup}
                 navBadges={navBadges}
                 themeMode={themeMode}

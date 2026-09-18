@@ -382,3 +382,18 @@ export interface FleetHealth {
   schedulers: { key: string; label: string; lastRun: string | null }[];
 }
 
+/** One switchable module (console Features tab). */
+export interface ModuleView {
+  key: string;
+  label: string;
+  blurb: string;
+  paths: string[];
+  on: boolean;
+}
+
+export interface TenantFeatures {
+  modules: ModuleView[];
+  venueType: string;
+  schedulingMode: string;
+}
+

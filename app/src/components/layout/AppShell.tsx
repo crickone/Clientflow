@@ -14,6 +14,7 @@ import { VocabProvider } from "@/components/providers/VocabProvider";
 import { GenerationWatcher } from "@/components/content-studio/GenerationWatcher";
 import type { Vocab } from "@/lib/vocabulary";
 import type { ThemeMode } from "@/lib/theme";
+import type { FeatureFlags } from "@/lib/features";
 
 const NO_SHELL_PATHS = ["/login", "/change-password", "/select-account", "/accept-invite"];
 
@@ -23,6 +24,7 @@ export function AppShell({
   activeTenantId,
   tenantSlug,
   schedulingMode,
+  featureFlags,
   vocab,
   logoSrc,
   businessName,
@@ -36,6 +38,8 @@ export function AppShell({
   activeTenantId: number | null;
   tenantSlug: string;
   schedulingMode: "appointments" | "timetable";
+  /** Modules this business has; a switched-off one is not offered in the nav. */
+  featureFlags: FeatureFlags;
   vocab: Vocab;
   logoSrc: string | null;
   businessName: string;
@@ -151,6 +155,7 @@ export function AppShell({
           activeTenantId={activeTenantId}
           tenantSlug={tenantSlug}
           schedulingMode={schedulingMode}
+          featureFlags={featureFlags}
           logoSrc={logoSrc}
           businessName={businessName}
           showSetup={showSetup}

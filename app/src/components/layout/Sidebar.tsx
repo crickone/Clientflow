@@ -60,6 +60,7 @@ import { LogoLoader, finishSwitchLoader } from "@/components/ui/LogoLoader";
 import { useVocab } from "@/components/providers/VocabProvider";
 import { Logo } from "@/components/ui/Logo";
 import type { Vocab } from "@/lib/vocabulary";
+import { pathAllowed, type FeatureFlags } from "@/lib/features";
 
 export type SidebarUser = {
   id: number;
@@ -274,6 +275,7 @@ export function Sidebar({
   activeTenantId,
   tenantSlug,
   schedulingMode,
+  featureFlags,
   logoSrc,
   businessName,
   showSetup,
@@ -290,6 +292,8 @@ export function Sidebar({
   activeTenantId: number | null;
   tenantSlug: string;
   schedulingMode: "appointments" | "timetable";
+  /** Modules this business has. A switched-off module's links are not rendered. */
+  featureFlags: FeatureFlags;
   logoSrc: string | null;
   businessName: string;
   showSetup: boolean;
@@ -323,6 +327,9 @@ export function Sidebar({
     (!l.adminOnly || isAdmin) &&
     (!l.tenants || l.tenants.includes(tenantSlug)) &&
     (!l.mode || l.mode === schedulingMode) &&
+    // A module switched off in the platform console is not offered here.
+    // Hiding is the courtesy; the layout's gate is the actual enforcement.
+    pathAllowed(featureFlags, l.href) &&
     (l.href !== "/setup" || showSetup);
   const filterEntry = (e: NavEntry): NavEntry | null => {
     if (isGroup(e)) {
