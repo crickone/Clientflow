@@ -58,6 +58,9 @@ export default async function GymMoneyPage({
   }
 
   const { tenant, invoices } = data;
+  // The archive window drives the whole danger zone below.
+  const archivedAt = data.lifecycle?.archivedAt ?? null;
+  const daysLeft = data.lifecycle?.daysLeft ?? null;
   // `undefined` = never enabled; a 'cancelled' row is a different thing (it
   // was on once, and its negotiated price is still frozen on the row).
   const voiceAddon = data.addons.find((a) => a.key === "voice");
@@ -587,21 +590,49 @@ export default async function GymMoneyPage({
         )}
       </Card>
 
-      {/* Danger zone */}
+      {/* Danger zone. Archiving is reversible for 30 days; purging is not. */}
       <Card style={{ padding: 24, borderColor: "var(--red)" }}>
         <h2 style={{ margin: "0 0 6px", fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em", color: "var(--red)" }}>Danger zone</h2>
-        <p style={{ margin: "0 0 14px", color: "var(--text-secondary)", fontSize: 13 }}>
-          Offboarding archives the business&apos;s data (DB + members + invoices), then permanently deletes the
-          account — tenant, billing, memberships, domains — and its live database. The slug is freed for
-          re-provisioning. This cannot be undone from here.
-        </p>
-        <ConfirmButton
-          label="Offboard business"
-          danger
-          slug={tenant.slug}
-          redirectTo="/gyms"
-          action={tenantAction.bind(null, tenant.id, "offboard", {})}
-        />
+        {archivedAt ? (
+          <>
+            <p style={{ margin: "0 0 14px", color: "var(--text-secondary)", fontSize: 13 }}>
+              This business is <strong style={{ color: "var(--amber)" }}>archived</strong>. Their logins are closed and
+              nothing is charged, but all their data is still here.{" "}
+              {daysLeft === 0
+                ? "The automatic purge is due on the next daily run."
+                : `It is permanently deleted in ${daysLeft} day${daysLeft === 1 ? "" : "s"}.`}{" "}
+              Restoring puts everything back as it was.
+            </p>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <ConfirmButton
+                label="Restore business"
+                confirm={`Restore ${tenant.name}? Their people will be able to sign in again.`}
+                action={tenantAction.bind(null, tenant.id, "restore", {})}
+              />
+              <ConfirmButton
+                label="Purge now (permanent)"
+                danger
+                slug={tenant.slug}
+                redirectTo="/gyms"
+                action={tenantAction.bind(null, tenant.id, "purge-now", {})}
+              />
+            </div>
+          </>
+        ) : (
+          <p style={{ margin: "0 0 14px", color: "var(--text-secondary)", fontSize: 13 }}>
+            Offboarding <strong>archives</strong> the business: logins close, the site stops serving and nothing is
+            charged, but every byte stays for 30 days and can be restored with one click. After 30 days a backup is
+            written and the account and its database are permanently deleted.
+          </p>
+        )}
+        {!archivedAt && (
+          <ConfirmButton
+            label="Offboard business"
+            danger
+            slug={tenant.slug}
+            action={tenantAction.bind(null, tenant.id, "offboard", { reason: "offboarded from the console" })}
+          />
+        )}
       </Card>
     </div>
   );

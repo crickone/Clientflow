@@ -159,6 +159,8 @@ export interface EmailAllowanceState {
 
 export interface TenantDetail {
   tenant: TenantSummary;
+  /** Archive/purge state — drives the Money tab's danger zone. */
+  lifecycle?: TenantLifecycle | null;
   usage: { clients: number; staff: number };
   invoices: InvoiceRow[];
   events: EventRow[];
@@ -395,5 +397,46 @@ export interface TenantFeatures {
   modules: ModuleView[];
   venueType: string;
   schedulingMode: string;
+}
+
+/** Counts, storage and search results for the console Data tab. */
+export interface DataCount {
+  key: string;
+  label: string;
+  count: number;
+}
+
+export interface PersonHit {
+  kind: "client" | "lead";
+  id: number;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  createdAt: number | null;
+}
+
+export interface BackupRow {
+  name: string;
+  bytes: number;
+  createdAt: number;
+}
+
+export interface TenantLifecycle {
+  tenantId: number;
+  slug: string;
+  name: string;
+  isActive: boolean;
+  archivedAt: number | null;
+  purgeAt: number | null;
+  daysLeft: number | null;
+}
+
+export interface TenantData {
+  counts: DataCount[];
+  dbBytes: number;
+  storage: { key: string; label: string; bytes: number }[];
+  people: PersonHit[];
+  backups: BackupRow[];
+  lifecycle: TenantLifecycle | null;
 }
 

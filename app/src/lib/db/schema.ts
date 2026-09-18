@@ -351,6 +351,10 @@ export const leads = sqliteTable("leads", {
  * default pipeline at creation, so a campaign board opens looking like the
  * one the operator already knows.
  */
+// (tenants.archivedAt is declared on the control-plane `tenants` table in
+// db/control.ts's DDL; the drizzle table for it lives in this file too --
+// see `tenants` above.)
+
 export const pipelines = sqliteTable("pipelines", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
@@ -512,6 +516,13 @@ export const tenants = sqliteTable("tenants", {
   name: text("name").notNull(),
   dbFile: text("db_file").notNull(),
   isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  /**
+   * When this business was archived: logins closed, site not served, nothing
+   * charged, data intact. Null for a live tenant. A dated job purges the
+   * data 30 days after this, and an owner can restore inside that window.
+   * See lib/platform/lifecycle.
+   */
+  archivedAt: integer("archived_at", { mode: "timestamp_ms" }),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),

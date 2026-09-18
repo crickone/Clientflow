@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { guardPlatform } from "@/lib/platform/auth";
 import { canDo, requiresReason } from "@/lib/platform/roles";
+import { archiveTenant, purgeTenant, restoreTenant } from "@/lib/platform/lifecycle";
 import { recordAudit, requestIp } from "@/lib/platform/audit";
 import { setTenantVenueType } from "@/lib/platform/queries";
 import { grantAdminMembership } from "@/lib/platform/access";
@@ -11,7 +12,6 @@ import {
   chargeOutstanding,
   compMonths,
   markPaid,
-  offboardTenant,
   reactivateTenant,
   setBillingExempt,
   suspendTenant,
@@ -206,9 +206,26 @@ export async function POST(
         const appUrl = (process.env.APP_URL ?? "https://app.adonisagent.ie").replace(/\/+$/, "");
         return NextResponse.json({ ok: true, url: `${appUrl}/open?token=${token}` });
       }
-      case "offboard":
-        offboardTenant(id, actor);
+      // "Offboard" ARCHIVES (Platform Console v2, slice 6): logins close,
+      // the site stops serving, nothing is charged, every byte stays. The
+      // 30-day purge job, or an owner's explicit purge-now, does the
+      // deleting -- both through offboardTenant, which still takes the
+      // backup first.
+      case "offboard": {
+        const r = archiveTenant(id, actor, reason);
+        if (!r.ok) return refuse(r.error, 400);
         break;
+      }
+      case "restore": {
+        const r = restoreTenant(id, actor);
+        if (!r.ok) return refuse(r.error, 400);
+        break;
+      }
+      case "purge-now": {
+        const r = purgeTenant(id, actor);
+        if (!r.ok) return refuse(r.error, 400);
+        break;
+      }
       default:
         return NextResponse.json({ error: "Unknown action" }, { status: 404 });
     }

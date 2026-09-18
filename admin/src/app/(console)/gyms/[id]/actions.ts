@@ -27,7 +27,9 @@ export type TenantActionName =
   | "suspend-voice"
   | "resume-voice"
   | "email-included"
-  | "offboard";
+  | "offboard"
+  | "restore"
+  | "purge-now";
 
 /**
  * Single funnel for every per-tenant billing action. Posts to the platform API

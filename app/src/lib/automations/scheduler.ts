@@ -17,6 +17,7 @@ import { runBillingForDate } from "@/lib/billing/engine";
 import { dublinToday } from "@/lib/billing/dates";
 import { placesConfigured } from "@/lib/research/places";
 import { refreshTenant } from "@/lib/research/refresh";
+import { runDuePurges } from "@/lib/platform/lifecycle";
 
 function isLeapYear(y: number): boolean {
   return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
@@ -226,7 +227,7 @@ async function runWeeklyCompetitorRefresh(
 }
 
 /** Run all daily (time-based) automations across every active tenant. */
-export async function runDailyAutomations(): Promise<{ tenants: number; birthdaysSent: number; videosFilled: number; postsPublished: number }> {
+export async function runDailyAutomations(): Promise<{ tenants: number; birthdaysSent: number; videosFilled: number; postsPublished: number; tenantsPurged: number }> {
   const list = controlDb.select({ id: tenants.id }).from(tenants).where(eq(tenants.isActive, true)).all();
   let birthdaysSent = 0;
   let postsPublished = 0;
@@ -286,7 +287,21 @@ export async function runDailyAutomations(): Promise<{ tenants: number; birthday
     console.error("[research-refresh] weekly pass failed:", err);
   }
 
-  return { tenants: list.length, birthdaysSent, videosFilled, postsPublished };
+  // Businesses whose 30-day archive window has passed (Platform Console v2,
+  // slice 6). Each purge takes a backup before it deletes anything, and a
+  // failure simply leaves that business for tomorrow's run.
+  let tenantsPurged = 0;
+  try {
+    const result = runDuePurges();
+    tenantsPurged = result.purged;
+    if (result.purged > 0 || result.failed > 0) {
+      console.log(`[lifecycle] daily purge: ${result.purged} purged, ${result.failed} failed`);
+    }
+  } catch (err) {
+    console.error("[lifecycle] daily purge pass failed:", err);
+  }
+
+  return { tenants: list.length, birthdaysSent, videosFilled, postsPublished, tenantsPurged };
 }
 
 // ── In-process daily timer ────────────────────────────────────────────────────

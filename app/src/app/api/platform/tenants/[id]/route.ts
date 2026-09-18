@@ -11,6 +11,7 @@ import { listTenantAddons } from "@/lib/billing/addons";
 import { getVoiceBalanceCents, isVoiceSuspended, listVoiceLedger } from "@/lib/voice/credits";
 import { getMonthUsage, getVoiceCapCents, includedMinutesRemaining, trialSecondsRemaining } from "@/lib/voice/usage";
 import { getVoicePricePerMinuteCents } from "@/lib/voice/pricing";
+import { getTenantLifecycle } from "@/lib/platform/lifecycle";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,9 @@ export async function GET(
   return NextResponse.json({
     tenant,
     usage: tenantUsage(id),
+    // Archive/purge state: the console's danger zone is entirely driven by
+    // whether this business is inside its 30-day window.
+    lifecycle: getTenantLifecycle(id),
     invoices: listInvoices(id),
     events: listEvents(id),
     emailBalanceCents: getEmailBalanceCents(id),

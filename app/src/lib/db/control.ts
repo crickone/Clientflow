@@ -92,6 +92,7 @@ export function ensureControlTables() {
       name TEXT NOT NULL,
       db_file TEXT NOT NULL,
       is_active INTEGER NOT NULL DEFAULT 1,
+      archived_at INTEGER,
       created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
 
@@ -816,6 +817,17 @@ export function ensureControlTables() {
       "[control] auth_sessions active_tenant_id migration failed:",
       err,
     );
+  }
+
+  // Platform Console v2 (slice 6): a business is ARCHIVED before it is
+  // purged -- data intact, logins closed -- and purged 30 days later.
+  try {
+    const tenantCols = controlSqlite.prepare("PRAGMA table_info(tenants)").all() as Array<{ name: string }>;
+    if (!tenantCols.find((c) => c.name === "archived_at")) {
+      controlSqlite.exec("ALTER TABLE tenants ADD COLUMN archived_at INTEGER");
+    }
+  } catch (err) {
+    console.error("[control] tenants archived_at migration failed:", err);
   }
 
   // Platform Console v2 (slice 1): the console's own role + audit columns.

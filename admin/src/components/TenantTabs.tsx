@@ -8,9 +8,8 @@ import { cn } from "@/lib/cn";
 /**
  * The tenant hub's tabs.
  *
- * Only tabs that exist are listed. The scope has nine; Data arrives with
- * its own slice, and listing it early as an empty shell would make the
- * console look finished when it is not.
+ * Eight of the scope's nine tabs. Usage and limits is the one still to
+ * come; its numbers live on Money and Health today.
  */
 const TABS = [
   { slug: "", label: "Overview" },
@@ -18,6 +17,7 @@ const TABS = [
   { slug: "integrations", label: "Integrations" },
   { slug: "money", label: "Money" },
   { slug: "features", label: "Features" },
+  { slug: "data", label: "Data" },
   { slug: "health", label: "Health" },
   { slug: "timeline", label: "Timeline" },
 ] as const;
