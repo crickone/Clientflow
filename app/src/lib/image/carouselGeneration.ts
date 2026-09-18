@@ -64,21 +64,62 @@ export interface CarouselGenerationInput {
  */
 export function queueCarouselGeneration(input: CarouselGenerationInput): void {
   setGenerationStatus(input.carouselId, "writing");
-  void runWithTenant(input.tenantId, async () => {
-    try {
-      await runCarouselGeneration(input);
-      setGenerationStatus(input.carouselId, null);
-    } catch (err) {
-      const message =
-        err instanceof AiCapError
+  void runWithTenant(input.tenantId, () => runAndRecord(input));
+}
+
+/**
+ * The same run, but one at a time across the whole process.
+ *
+ * The agent creates a week of posts in one approval: seven designs, each two
+ * to four minutes of model calls and renders. Fired the way the editor's
+ * Generate button fires them they would all run at once, and seven concurrent
+ * satori renders on the one Node process that serves every tenant is the kind
+ * of load that turns into a restart. So they queue behind each other instead.
+ *
+ * The row says 'writing' from the moment it is queued -- the editor and the
+ * agent's list both need to show it as in hand -- and is stamped 'writing'
+ * AGAIN when its turn actually comes, which restarts the staleness clock
+ * (generationState's GENERATION_STALE_MS). Without that second stamp the
+ * seventh post in a queue would be reported as lost before it had begun.
+ *
+ * A failed run never breaks the chain: each link swallows its own outcome
+ * into the row, so the next design always gets its turn.
+ */
+let generationQueue: Promise<void> = Promise.resolve();
+
+export function enqueueCarouselGeneration(input: CarouselGenerationInput): void {
+  setGenerationStatus(input.carouselId, "writing");
+  generationQueue = generationQueue
+    .then(() =>
+      runWithTenant(input.tenantId, async () => {
+        // The design may have been deleted while it waited; a run on a
+        // missing row would only log an error that means nothing to anyone.
+        if (!getCarousel(input.carouselId)) return;
+        setGenerationStatus(input.carouselId, "writing");
+        await runAndRecord(input);
+      }),
+    )
+    .catch(() => {
+      // runAndRecord never throws; this guards the chain against anything
+      // runWithTenant itself might raise, so one bad link cannot stall the rest.
+    });
+}
+
+/** Run one generation and write its outcome onto the row. Never throws. */
+async function runAndRecord(input: CarouselGenerationInput): Promise<void> {
+  try {
+    await runCarouselGeneration(input);
+    setGenerationStatus(input.carouselId, null);
+  } catch (err) {
+    const message =
+      err instanceof AiCapError
+        ? err.message
+        : err instanceof Error
           ? err.message
-          : err instanceof Error
-            ? err.message
-            : "Couldn't write the slides.";
-      console.error(`[carousel-generate] design ${input.carouselId} failed:`, err);
-      setGenerationStatus(input.carouselId, "failed", message);
-    }
-  });
+          : "Couldn't write the slides.";
+    console.error(`[carousel-generate] design ${input.carouselId} failed:`, err);
+    setGenerationStatus(input.carouselId, "failed", message);
+  }
 }
 
 /**

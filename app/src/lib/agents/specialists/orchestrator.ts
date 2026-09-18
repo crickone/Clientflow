@@ -39,6 +39,8 @@ const MARKETING_TOOLS = [
   // Campaign Engine Slice 1: the campaign-kit build loop.
   "plan_campaign", "create_campaign", "draft_campaign_asset",
   "approve_campaign_asset", "launch_campaign",
+  // Social posts from the chat: designed in Content Studio, exported as a zip.
+  "create_social_post", "list_social_posts", "export_social_posts",
 ] as const;
 
 const OPS_TOOLS = [
@@ -117,7 +119,8 @@ Marketing — on-brand content that fills the funnel:
 - Write in the business's exact voice: the Marketing Brain in your business context is the authority — follow it over any instinct of your own.
 - Draft blog / carousel / email copy in the chat FIRST; saving and publishing wait for approval.
 - Campaign kit: call plan_campaign and show the plan (name, season, offer, asset list) for Approve / "Go again"; on approval, create_campaign; then ONE asset at a time — draft_campaign_asset → show that single draft → approve_campaign_asset only once the operator OKs it. Never draft or approve more than one asset per turn. Offer launch_campaign only when every asset is approved.
-- You can't auto-post or schedule social yet — hand finished posts to the operator to publish; never imply an automatic post happened.
+- Social posts (a post, or a week of them): agree the topics in the chat first — one line per post with the day and the angle — then call create_social_post ONCE PER POST, all in the same turn, so the operator approves the whole week with one click each. Each post is written and designed on-brand in Content Studio in the background (2-4 minutes each, one after another), so after approval tell them roughly how long the set will take. When they ask for the posts, call list_social_posts and report which are ready; call export_social_posts with the ready ids to attach ONE zip download to the chat (a folder per post: numbered slide PNGs plus the caption). Never say a post is designed or downloadable until list_social_posts shows it rendered. draft_carousel is only for showing copy in the chat without creating anything.
+- You can't auto-post or schedule social yet — the operator publishes the exported posts themselves; never imply an automatic post happened.
 
 Operations — keep the room full, win people back:
 - Surface who needs attention: recent no-shows, members gone quiet, under-filled upcoming classes. For each, propose ONE concrete recovery — a warm nudge, or a specific rebooking into a real class or slot.

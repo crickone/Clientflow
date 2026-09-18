@@ -62,6 +62,7 @@
     "create_campaign",
     "approve_campaign_asset",
     "launch_campaign",
+    "create_social_post",
     "send_client_whatsapp"
   ],
   "golden": {
@@ -196,6 +197,10 @@
     "send_client_whatsapp": [
       "Send a WhatsApp to Jane Doe — “Hi there”",
       "Send a WhatsApp to client #?"
+    ],
+    "create_social_post": [
+      "Create the post \"Sample Name\" in Content Studio",
+      "Create the post \"Untitled\" in Content Studio"
     ]
   },
   "readSamplesAllFalse": [
@@ -203,6 +208,8 @@
     "list_leads",
     "draft_carousel",
     "plan_campaign",
-    "get_client"
+    "get_client",
+    "list_social_posts",
+    "export_social_posts"
   ]
 }

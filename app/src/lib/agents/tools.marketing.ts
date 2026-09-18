@@ -160,7 +160,7 @@ export const MARKETING_TOOLS: Anthropic.Tool[] = [
   {
     name: "draft_carousel",
     description:
-      "Draft an Instagram/Facebook carousel (slide headings/bodies + a caption) on a topic. Returns ONLY a draft — it does NOT post or save anything; the operator refines and exports it in Content Studio.",
+      "Draft an Instagram/Facebook carousel (slide headings/bodies + a caption) on a topic, as TEXT in the chat only. It does NOT create, design, post or save anything. To actually make a post in Content Studio (designed, on-brand, downloadable) use create_social_post instead.",
     input_schema: {
       type: "object",
       properties: {

@@ -69,6 +69,12 @@ import {
 } from "@/lib/agents/tools.marketing";
 import { SKILL_TOOLS, loadSkillTool } from "@/lib/agents/tools.skills";
 import {
+  POSTS_TOOLS,
+  createSocialPostTool,
+  exportSocialPostsTool,
+  listSocialPostsTool,
+} from "@/lib/agents/tools.posts";
+import {
   CAMPAIGN_TOOLS,
   approveCampaignAssetTool,
   createCampaignTool,
@@ -167,6 +173,12 @@ const WRITE_TOOL_META: Record<string, WriteToolMeta> = {
   create_campaign: { label: "Create campaign", summarize: ({ v, input }) => { const assetCount = Array.isArray(input.assets) ? input.assets.length : 0; return `Create campaign "${v("name") || "Untitled"}"${assetCount ? ` and ${assetCount} asset${assetCount === 1 ? "" : "s"}` : ""}`; } },
   approve_campaign_asset: { label: "Approve campaign asset", summarize: ({ v }) => { const assetLabel = v("assetTitle") || `asset #${v("assetId") || "?"}`; return `Approve the ${assetLabel}${v("campaignName") ? ` for "${v("campaignName")}"` : ""}`; } },
   launch_campaign: { label: "Launch campaign", summarize: ({ v }) => `Launch ${v("campaignName") ? `"${v("campaignName")}"` : `campaign #${v("campaignId") || "?"}`}` },
+
+  // Social posts from the chat (tools.posts.ts): creating a design in Content
+  // Studio spends AI budget and leaves a row the operator will see, so it is
+  // gated. The 2 read tools (list_social_posts, export_social_posts) are
+  // absent — the export only bundles renders that already exist.
+  create_social_post: { label: "Create social post", summarize: ({ v }) => `Create the post "${v("name") || v("topic") || "Untitled"}" in Content Studio${v("slideCount") ? ` (${v("slideCount")} slides)` : ""}` },
 
   // Operations agent (Operations Task 1): WhatsApp send to a CLIENT (distinct
   // from the sales agent's lead-scoped send_whatsapp above) — gated. The 2 read
@@ -735,6 +747,10 @@ export const TOOLS: Anthropic.Tool[] = [
   // launch. ──
   ...CAMPAIGN_TOOLS,
 
+  // ── Social posts from the chat: create a designed post in Content Studio,
+  // list what's there, export finished ones as a download. ──
+  ...POSTS_TOOLS,
+
   // ── Operations agent (Operations Task 1): no-show + lapsed-member tools ──
   ...OPERATIONS_TOOLS,
 
@@ -880,6 +896,12 @@ export async function executeTool(
         return loadSkillTool(ctx, ctx.agentKey ?? "orchestrator", input);
       case "launch_campaign":
         return await launchCampaignTool(ctx, input);
+      case "create_social_post":
+        return createSocialPostTool(ctx, input);
+      case "list_social_posts":
+        return listSocialPostsTool(ctx, input);
+      case "export_social_posts":
+        return await exportSocialPostsTool(ctx, input);
       case "list_no_shows":
         return listNoShowsTool(ctx, input);
       case "list_lapsed_members":

@@ -7,6 +7,9 @@ import { createSiteBlogPost } from "@/lib/cms/blog";
 import { updateBlogContent } from "@/lib/blog/posts";
 
 import { createCarousel, addSlide } from "@/lib/image/carousels";
+import { enqueueCarouselGeneration } from "@/lib/image/carouselGeneration";
+import { DEFAULT_CAROUSEL_SLOT } from "@/lib/image/slots";
+import { getDesignSystem } from "@/lib/design/system";
 import { queueSlideImages, type SlideImageJob } from "@/lib/image/autoImages";
 import { isImageGenConfigured } from "@/lib/ai/image/falClient";
 import { buildImagePrompt, defaultImageStyle, fallbackScene } from "@/lib/ai/image/prompt";
@@ -16,7 +19,7 @@ import { getBusinessProfile } from "@/lib/businessProfile";
 import { createCampaign as createEmailCampaign } from "@/lib/marketing/campaigns";
 import { getEmailSenderForTenant } from "@/lib/email";
 
-import { parseSocialBody, parseEmailBody } from "./assetBody";
+import { parseSocialBody, parseEmailBody, type ParsedSocialBody } from "./assetBody";
 
 /**
  * Materialise-on-approve (Campaign Engine Slice 1, Task 4): when the operator
@@ -131,6 +134,30 @@ function materialiseSocial(asset: CampaignAsset, campaign: Campaign, tenantId: n
 
   const carousel = createCarousel({ name: `${campaign.name} — ${asset.title}` });
 
+  // A tenant with a design system gets the same AI-DESIGNED post the Content
+  // Studio's Generate button (and the agent's create_social_post) produces:
+  // the approved copy goes in as the brief, verbatim, and the designed
+  // pipeline lays it out and renders it in the background. Before this, a
+  // campaign's social posts landed as template slides with AI backgrounds,
+  // which is a different look from every other post the studio makes -- and
+  // one with no server-side render, so the agent could not export it.
+  //
+  // Without a design system the designed path would only fall through to
+  // re-writing the copy from the brief, so the template path below keeps
+  // the approved copy exactly as it was approved.
+  if (getDesignSystem()) {
+    enqueueCarouselGeneration({
+      tenantId,
+      carouselId: carousel.id,
+      topic: approvedCopyBrief(parsed),
+      slideCount: Math.min(10, Math.max(2, parsed.slides.length)),
+      tone: null,
+      slotKey: DEFAULT_CAROUSEL_SLOT,
+      replaceExisting: false,
+    });
+    return { externalKind: "carousel_set", externalId: carousel.id };
+  }
+
   // Same house-style + per-slide prompt logic as
   // api/content-studio/carousels/[id]/generate/route.ts, so a materialised
   // carousel's images look identical to a manually-generated one's. showLogo
@@ -166,6 +193,29 @@ function materialiseSocial(asset: CampaignAsset, campaign: Campaign, tenantId: n
   if (jobs.length > 0) queueSlideImages(tenantId, jobs);
 
   return { externalKind: "carousel_set", externalId: carousel.id };
+}
+
+/**
+ * The approved copy as a brief the designed pipeline can be handed. The
+ * operator approved these exact words, so the brief says so: the model's job
+ * is the layout, not a second draft.
+ */
+function approvedCopyBrief(parsed: ParsedSocialBody): string {
+  const slides = parsed.slides
+    .map((s, i) => {
+      const lines = [`Slide ${i + 1}: ${s.heading}`];
+      if (s.body.trim()) lines.push(s.body.trim());
+      if (s.image.trim()) lines.push(`(photo idea: ${s.image.trim()})`);
+      return lines.join("\n");
+    })
+    .join("\n\n");
+  return [
+    "Design this post from the copy below. The copy is already approved by the operator: keep every heading and body line word for word, in this order -- do not rewrite, shorten or add to it.",
+    "",
+    slides,
+    "",
+    `Caption (use exactly): ${parsed.caption}`,
+  ].join("\n");
 }
 
 function materialiseEmail(asset: CampaignAsset, campaign: Campaign, tenantId: number): MaterialiseResult | null {

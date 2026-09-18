@@ -63,6 +63,7 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
     tools: [
       "list_blog_posts", "draft_blog_post", "save_blog_post", "publish_blog_post", "draft_carousel",
       "plan_campaign", "create_campaign", "draft_campaign_asset", "approve_campaign_asset", "launch_campaign",
+      "create_social_post", "list_social_posts", "export_social_posts",
     ],
   },
   {
