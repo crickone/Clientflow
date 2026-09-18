@@ -45,6 +45,8 @@ let writes: { id: number; patch: Record<string, unknown> }[] = [];
 let renderedPhotos: (string | null)[] = [];
 /** What the stubbed model hands back, set per case. */
 let redesignResult: unknown = null;
+/** What the route briefed the DESIGN model with, per redesign call. */
+let redesignInput: { photo?: { id: number } | null } | null = null;
 /** The scene the route briefed the image model with, per generate call. */
 let briefedScene = "";
 
@@ -104,7 +106,12 @@ const stubs: Record<string, unknown> = {
       return { filename: "render.png", width: 1080, height: 1080, overflowPx: 0 };
     },
   },
-  "@/lib/ai/designPost": { redesignSlide: async () => redesignResult },
+  "@/lib/ai/designPost": {
+    redesignSlide: async (input: { photo?: { id: number } | null }) => {
+      redesignInput = input;
+      return redesignResult;
+    },
+  },
   "@/lib/branding": { resolveLogoPath: () => null },
   "@/lib/ai/usage": { AiCapError: class AiCapError extends Error {} },
   "@/lib/ai/image/generatePostImage": {
@@ -141,6 +148,7 @@ function check(fn: () => void) {
     writes = [];
     renderedPhotos = [];
     briefedScene = "";
+    redesignInput = null;
     const res = await POST({ json: async () => body } as unknown as Request, {
       params: { id: String(CAROUSEL_ID), slideId: String(slideId) },
     });
@@ -482,6 +490,58 @@ function check(fn: () => void) {
     check(() =>
       assert.equal(patch.photoScenes, null, "a one-scene redesign stores no list"),
     );
+  }
+
+  // 11. PICKING a library photo for a slide with no {{PHOTO}} in its markup.
+  //     This used to be a 400 ("there's nowhere to put one") that told the
+  //     operator to press “Make a new photo” instead -- charging them for a
+  //     generated picture purely to reach the redesign, and throwing away the
+  //     one they had just chosen. It redesigns around THEIR photograph now:
+  //     one metered call, not two, and no image generated at all.
+  const flatPick = makeSlide({ id: 10, designHtml: "<div>no photograph here</div>" });
+  {
+    redesignResult = {
+      slide: {
+        html: '<img src="{{PHOTO}}" />',
+        renderFilename: "redesigned.png",
+        photo: "a quiet treatment room",
+        photoScenes: ["a quiet treatment room"],
+        photoAssetId: 11,
+        photoAssetIds: [11],
+        violations: [],
+      },
+      usage: {},
+    };
+    const { status } = await post(flatPick.id, { assetId: 11 });
+    check(() =>
+      assert.equal(status, 200, "a pick on a slide with no photo slot is accepted"),
+    );
+    check(() =>
+      assert.equal(
+        redesignInput?.photo?.id,
+        11,
+        "and the model is briefed with the photograph the OPERATOR picked",
+      ),
+    );
+    check(() => assert.equal(briefedScene, "", "no image was generated to get there"));
+    const patch = writes.at(-1)?.patch ?? {};
+    check(() =>
+      assert.equal(
+        patch.backgroundAssetId,
+        11,
+        "the redesign's slot 1 is persisted, so the columns agree",
+      ),
+    );
+  }
+
+  // 11b. A photo that is not in the library is still refused on that path --
+  //      falling through to a redesign must not mean skipping the lookup.
+  {
+    const { status, body } = await post(flatPick.id, { assetId: 404 });
+    check(() =>
+      assert.equal(status, 404, "an asset outside the library is refused, slot or no slot"),
+    );
+    check(() => assert.match(String(body.error), /isn't in your library/, "and says why"));
   }
 
   console.log(`photo/route.test.ts: all ${checks} assertions passed`);

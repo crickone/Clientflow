@@ -84,9 +84,20 @@ function sceneFromSlideCopy(slide: { designHtml: string | null }): string {
  * written before two-photograph slides keeps working.
  *
  * A slide the designer built on a flat ground has no {{PHOTO}} placeholder,
- * so PICKING is refused there (there is nothing to swap) while GENERATING
- * (the one-shot mode above) redesigns the slide around the new photograph
- * instead.
+ * and NEITHER shape is refused there: both fall through to the redesign
+ * branch, which rebuilds the slide around the photograph and so gives it the
+ * slot it never had. Picking used to be refused ("there's nowhere to put
+ * one") with the operator pointed at “Make a new photo”, which charged them
+ * for a generated picture purely to reach the redesign -- discarding the one
+ * they had already chosen. A pick that redesigns is one metered call; the
+ * refusal made it two.
+ *
+ * So a pick is metered AFTER ALL on such a slide, which is the one thing about
+ * this route that is not obvious from its body shape: { assetId } is free when
+ * the markup has a slot and costs a design call when it does not. The client
+ * says which is about to happen before the click (see SlidePhotoLibrary) and
+ * snapshots the slide for undo when it is the second -- a redesign REPLACES
+ * designHtml, and a picture is one click.
  */
 export async function POST(
   req: Request,
@@ -303,16 +314,19 @@ export async function POST(
       return NextResponse.json({ ok: false, error: message }, { status: 500 });
     }
   } else {
-    if (!usesPhoto(slide.designHtml)) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error:
-            "This slide was designed without a photograph, so there's nowhere to put one. Use “Make a new photo” and Adonis will redesign it around the picture.",
-        },
-        { status: 400 },
-      );
-    }
+    // NO usesPhoto GATE HERE, deliberately. Picking a library photo for a
+    // slide designed on a flat ground used to be refused outright ("there's
+    // nowhere to put one") and the operator was told to press "Make a new
+    // photo" instead -- which meant paying for a photograph they did not want
+    // in order to reach the redesign that puts one on the slide. The picture
+    // they had already chosen was the thing being thrown away.
+    //
+    // A pick with no slot to fill falls through to the redesign branch below
+    // instead: same call, same persistence, one fewer image generated. The
+    // model rebuilds the slide WITH the chosen photograph available, which is
+    // also why this cannot be done by injecting an <img> here -- copy written
+    // for a flat ground is not legible over a photograph, and only a redesign
+    // re-composes it.
     const assetId = Number(o.assetId);
     if (!Number.isFinite(assetId)) {
       return NextResponse.json({ ok: false, error: "Pick a photo." }, { status: 400 });

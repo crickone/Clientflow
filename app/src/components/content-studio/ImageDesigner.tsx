@@ -597,6 +597,16 @@ export function ImageDesigner({
       if (plan.kind === "none") return;
       if (plan.kind === "rephotograph") {
         const { slideId, assetId } = plan;
+        // A slide designed on a flat ground has no {{PHOTO}} to swap into, so
+        // the route redesigns it around the picture instead -- which REPLACES
+        // designHtml. Snapshot first: picking a photograph is one click, and
+        // without this it is a one-click way to lose a composition. Every
+        // other structural change (switching template, redesigning) already
+        // snapshots for exactly this reason; this path only became structural
+        // when the pick stopped being refused here.
+        if (photoSlots.length === 0 && activeSlide?.id === slideId) {
+          snapshotForUndo(activeSlide);
+        }
         dispatch({ type: "photoSwapStarted", slideId, assetId });
         setActionError(null);
         void (async () => {
@@ -656,7 +666,7 @@ export function ImageDesigner({
         ).catch(() => {});
       }
     },
-    [design, designId, effectivePhotoSlot],
+    [design, designId, effectivePhotoSlot, photoSlots, activeSlide, snapshotForUndo],
   );
 
   // Auto-save active slide (debounced)
@@ -1640,6 +1650,14 @@ export function ImageDesigner({
                   activeSlot={effectivePhotoSlot}
                   onSlotChange={setPhotoSlot}
                   onPick={setSlideBackgroundManually}
+                  // A designed slide with no photo slot gets one by being
+                  // redesigned around the picture, which costs a model call
+                  // and a dozen seconds. Worth saying before the click, not
+                  // only during it.
+                  redesignsOnPick={
+                    activeSlide.templateId === DESIGNED_TEMPLATE_ID &&
+                    photoSlots.length === 0
+                  }
                   onUpload={uploadFiles}
                   onDelete={deleteAsset}
                   uploading={uploading}

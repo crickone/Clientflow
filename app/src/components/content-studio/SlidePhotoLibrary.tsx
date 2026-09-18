@@ -46,6 +46,7 @@ export function SlidePhotoLibrary({
   uploadProgress = null,
   applyingAssetId = null,
   canClear = true,
+  redesignsOnPick = false,
   slots = [],
   activeSlot = 1,
   onSlotChange,
@@ -82,6 +83,16 @@ export function SlidePhotoLibrary({
   applyingAssetId?: number | null;
   /** False where the slide's photograph cannot be removed, only swapped. */
   canClear?: boolean;
+  /**
+   * Whether picking will REDESIGN the slide rather than swap a picture into
+   * it -- true for a designed slide whose markup has no photo slot, where the
+   * only way a photograph can reach the composition is for the model to
+   * rebuild it around one. Changes both what the strip says beforehand and
+   * what it says while the work runs, because the two actions feel nothing
+   * alike: a swap is a re-render, this is a model call and the slide comes
+   * back re-composed.
+   */
+  redesignsOnPick?: boolean;
   /**
    * Slot numbers this slide has, ascending. One entry (or none) hides the
    * chooser entirely: a slide with one photograph has no choice to make, and
@@ -182,7 +193,7 @@ export function SlidePhotoLibrary({
                 }}
               >
                 <Loader2 size={13} className="spin" />
-                Putting it on the slide…
+                {redesignsOnPick ? "Redesigning around it…" : "Putting it on the slide…"}
               </span>
             )}
             {canClear && activeAssetId != null && !applying && (
@@ -242,6 +253,24 @@ export function SlidePhotoLibrary({
                 {ordinalName(i)}
               </Button>
             ))}
+          </div>
+        )}
+        {/* Said BEFORE the click, not only during it: on this slide a pick is
+            a model call and ten-odd seconds, not an instant swap, and an
+            operator who does not expect that reads the wait as the tile
+            having done nothing. Hidden while one is running -- the spinner
+            beside it is already saying the same thing in the present tense.
+            Deliberately does NOT offer Undo as the way back. The editor does
+            snapshot the slide first (ImageDesigner), so Undo restores it on
+            screen -- but undo is client state and AUTOSAVE_FIELDS carries
+            neither designHtml nor renderFilename, so the old composition is
+            not written back. That gap predates this note and is shared with
+            the Redesign Slide button; promising a durable undo here would be
+            the only new thing about it. */}
+        {redesignsOnPick && assets.length > 0 && !applying && (
+          <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", lineHeight: 1.45 }}>
+            This slide has no photo in it. Picking one asks Adonis to redesign
+            it around your photo.
           </div>
         )}
         {uploadProgress && uploadProgress.total > 1 && (
