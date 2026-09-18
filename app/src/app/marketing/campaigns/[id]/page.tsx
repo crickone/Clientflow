@@ -23,6 +23,7 @@ import { getBlogPost } from "@/lib/blog/posts";
 import { getSiteById } from "@/lib/cms/sites";
 import { parseEmailBody, parseLandingBody, parseSocialBody } from "@/lib/campaigns/assetBody";
 import { countLeadsByCampaign } from "@/lib/leads";
+import { pipelineForCampaign } from "@/lib/pipeline/pipelineRepo";
 import { formatDate } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -200,6 +201,8 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
   const landingAsset = findApprovedLandingAsset(campaign.status, assets);
   const landingUrl = landingAsset ? await getCampaignLandingUrl(campaign.slug) : null;
   const signupCount = countLeadsByCampaign(campaign.name);
+  // The campaign's own board (one per campaign, created with it).
+  const pipeline = pipelineForCampaign(campaign.id);
 
   const dateRange =
     campaign.startsOn || campaign.endsOn
@@ -303,8 +306,13 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
                 </span>
               )}
             </div>
-            <div style={{ fontSize: 12.5, color: "var(--text-tertiary)", marginTop: 8 }}>
-              {signupCount === 1 ? "1 sign-up so far" : `${signupCount} sign-ups so far`}
+            <div style={{ fontSize: 12.5, color: "var(--text-tertiary)", marginTop: 8, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <span>{signupCount === 1 ? "1 sign-up so far" : `${signupCount} sign-ups so far`}</span>
+              {pipeline && (
+                <Link href={`/leads?pipeline=${pipeline.id}`} style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 500 }}>
+                  Open this campaign&rsquo;s pipeline
+                </Link>
+              )}
             </div>
           </div>
         )}

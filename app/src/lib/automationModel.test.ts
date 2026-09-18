@@ -25,12 +25,12 @@ function check(name: string, cond: boolean) {
 // (clients/actions.ts, clients/appAccessActions.ts) and 1 via the birthday
 // job (automations/scheduler.ts). Every other catalog entry is configurable
 // in the UI but nothing ever calls fireTrigger() for it.
-const EXPECTED_ACTIVE = ["new_client_created", "nutrition_plan_added", "workout_plan_added", "client_birthday"];
+const EXPECTED_ACTIVE = ["new_client_created", "nutrition_plan_added", "workout_plan_added", "client_birthday", "campaign_signup"];
 
-check("TRIGGER_CATALOG has exactly 12 entries (the fixed Kahunas trigger list)", TRIGGER_CATALOG.length === 12);
+check("TRIGGER_CATALOG has exactly 13 entries (the fixed Kahunas trigger list plus the campaign sign-up nurture trigger)", TRIGGER_CATALOG.length === 13);
 
 check(
-  "ACTIVE_TRIGGER_KEYS is exactly the 4 verified-active triggers, no more, no fewer",
+  "ACTIVE_TRIGGER_KEYS is exactly the 5 verified-active triggers, no more, no fewer",
   ACTIVE_TRIGGER_KEYS.size === EXPECTED_ACTIVE.length && EXPECTED_ACTIVE.every((k) => ACTIVE_TRIGGER_KEYS.has(k)),
 );
 

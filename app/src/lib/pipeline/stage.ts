@@ -5,6 +5,9 @@ import { and, eq, gt, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { logActivity } from "@/lib/queries";
 import { listStages, resolveStageIdByRole, resolveEntryStageId } from "./stageRepo";
+import { leadPipelineId } from "./pipelineRepo";
+import { cancelNurtureForLead } from "@/lib/automations/nurture";
+import { INACTIVE_ROLES } from "./roles";
 import { shouldAdvance, ROLE_TO_LEGACY_KEY, type StageRecord, type StageRole } from "./roles";
 
 export type { StageRole } from "./roles";
@@ -22,11 +25,14 @@ export type { StageRole } from "./roles";
  * on every hook until some other write happens to set stage_id first.
  */
 export function currentStageRecord(leadId: number): StageRecord | null {
-  const row = db.select({ stageId: schema.leads.stageId }).from(schema.leads).where(eq(schema.leads.id, leadId)).get();
+  const row = db.select({ stageId: schema.leads.stageId, pipelineId: schema.leads.pipelineId }).from(schema.leads).where(eq(schema.leads.id, leadId)).get();
   if (!row) return null;
-  const stages = listStages();
+  // The lead's OWN board: the same stage name has a different id on every
+  // pipeline, so resolving against the default board would move a campaign
+  // lead onto a board it is not on.
+  const stages = listStages(row.pipelineId);
   if (row.stageId == null) {
-    const entryId = resolveEntryStageId();
+    const entryId = resolveEntryStageId(row.pipelineId);
     return stages.find((s) => s.id === entryId) ?? null;
   }
   return stages.find((s) => s.id === row.stageId) ?? null;
@@ -38,8 +44,18 @@ export function currentStageRecord(leadId: number): StageRecord | null {
  * working during the transition. Logs an activity row.
  */
 export function writeStageId(leadId: number, stageId: number, note: string): void {
-  const stage = listStages().find((s) => s.id === stageId);
+  const pipelineId = leadPipelineId(leadId);
+  const stage = pipelineId == null ? undefined : listStages(pipelineId).find((s) => s.id === stageId);
   const legacy = stage?.role ? ROLE_TO_LEGACY_KEY[stage.role] : undefined;
+  // A customer, or a no, is out of the nurture sequence: whatever is still
+  // queued for them is dropped here, at the one place a stage is written.
+  if (stage?.role && INACTIVE_ROLES.has(stage.role)) {
+    try {
+      cancelNurtureForLead(leadId);
+    } catch (err) {
+      console.error(`[pipeline] could not cancel nurture for lead #${leadId}:`, err);
+    }
+  }
   db.update(schema.leads)
     .set({ stageId, ...(legacy ? { pipelineStage: legacy as typeof schema.leads.$inferInsert.pipelineStage } : {}), updatedAt: new Date() })
     .where(eq(schema.leads.id, leadId))
@@ -55,9 +71,10 @@ export function writeStageId(leadId: number, stageId: number, note: string): voi
 export function advanceStage(leadId: number, role: StageRole): void {
   const cur = currentStageRecord(leadId);
   if (!cur) return;
-  const targetId = resolveStageIdByRole(role);
-  if (targetId == null) return; // this tenant doesn't use that role → automation off
-  const stages = listStages();
+  const pipelineId = leadPipelineId(leadId) ?? undefined;
+  const targetId = resolveStageIdByRole(role, pipelineId);
+  if (targetId == null) return; // this board doesn't use that role → automation off
+  const stages = listStages(pipelineId);
   const candidate = stages.find((s) => s.id === targetId);
   if (!candidate) return;
   if (!shouldAdvance(cur, candidate)) return;
@@ -66,9 +83,11 @@ export function advanceStage(leadId: number, role: StageRole): void {
 
 /** Operator override — set ANY stage by id (drag / picker / agent), bypassing forward-only. */
 export function setStageToId(leadId: number, stageId: number): void {
-  const exists = db.select({ id: schema.leads.id }).from(schema.leads).where(eq(schema.leads.id, leadId)).get();
+  const exists = db.select({ id: schema.leads.id, pipelineId: schema.leads.pipelineId }).from(schema.leads).where(eq(schema.leads.id, leadId)).get();
   if (!exists) return;
-  const stage = listStages().find((s) => s.id === stageId);
+  // A stage from another board is refused, not silently applied: the lead
+  // would then show in no column of the board it is on.
+  const stage = listStages(exists.pipelineId).find((s) => s.id === stageId);
   if (!stage) return;
   writeStageId(leadId, stageId, `Lead set to ${stage.name} (manual)`);
 }

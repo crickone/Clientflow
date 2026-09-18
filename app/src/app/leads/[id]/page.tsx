@@ -15,7 +15,7 @@ export default async function LeadDetailPage({
   const lead = getLead(id);
   if (!lead) notFound();
   const messages = getLeadMessages(id);
-  const stages = listStages();
+  const stages = listStages(lead.pipelineId);
   const voice = voiceAvailability();
 
   return (

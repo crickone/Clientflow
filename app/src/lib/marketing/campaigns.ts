@@ -96,7 +96,7 @@ function parseContactTags(raw: string | null): string[] {
   }
 }
 
-function toRecord(row: EmailCampaign): CampaignRecord {
+export function toRecord(row: EmailCampaign): CampaignRecord {
   return {
     id: row.id,
     name: row.name,

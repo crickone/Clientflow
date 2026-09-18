@@ -1,10 +1,12 @@
 import "server-only";
-import { and, desc, eq, isNotNull, like, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, like, or, sql } from "drizzle-orm";
 import { db } from "./db";
 import { leadMessages, leads, pipelineStages, type Lead, type LeadMessage } from "./db/schema";
 import { normalizePhone } from "./whatsapp/phone";
 import { splitFullName } from "./humanName";
 import { resolveEntryStageId } from "./pipeline/stageRepo";
+import { defaultPipelineId, getPipeline, listPipelines } from "./pipeline/pipelineRepo";
+import { enrolLeadInNurture } from "./automations/nurture";
 import { getCurrentTenantDb } from "./db/tenant";
 import { getCallFlow } from "./voice/flow";
 import { enqueueCall } from "./voice/queue";
@@ -24,6 +26,8 @@ export interface NormalizedLeadInput {
   therapyInterest?: string | null;
   notes?: string | null;
   rawPayload?: unknown;
+  /** The board the lead enters. Omitted = the default pipeline. */
+  pipelineId?: number | null;
 }
 
 /**
@@ -59,6 +63,14 @@ export function upsertLead(input: NormalizedLeadInput): {
     if (existing) return { lead: existing, created: false };
   }
 
+  // A lead lands on the board it was asked for (a campaign's own pipeline,
+  // from its landing page) or on the default board. An id that names no
+  // board falls back to the default rather than stranding the lead on a
+  // board that does not exist.
+  const requestedPipeline = input.pipelineId ?? null;
+  const pipelineId =
+    requestedPipeline != null && getPipeline(requestedPipeline) ? requestedPipeline : defaultPipelineId();
+
   const inserted = db
     .insert(leads)
     .values({
@@ -72,13 +84,32 @@ export function upsertLead(input: NormalizedLeadInput): {
       therapyInterest: nz(input.therapyInterest),
       notes: nz(input.notes),
       rawPayload: input.rawPayload ? JSON.stringify(input.rawPayload) : null,
-      stageId: resolveEntryStageId() ?? undefined,
+      pipelineId,
+      stageId: resolveEntryStageId(pipelineId) ?? undefined,
     })
     .returning()
     .all();
   const lead = inserted[0];
   enrolInCallFlow(lead);
+  enrolInNurture(lead);
   return { lead, created: true };
+}
+
+/**
+ * Start the campaign nurture sequence for a lead that came in on a campaign.
+ * Same shape and reasoning as enrolInCallFlow below: every source of a lead
+ * funnels through upsertLead, and the sequence is the SAME for every
+ * campaign, so the one place to start it is here. Only leads with a campaign
+ * qualify -- a walk-in added by hand is not in a campaign funnel. Fail-soft:
+ * the lead is the money path, the follow-up is not.
+ */
+function enrolInNurture(lead: Lead): void {
+  if (!lead.campaign) return;
+  try {
+    enrolLeadInNurture(lead);
+  } catch (err) {
+    console.error(`[leads] nurture enrolment failed for lead #${lead.id}:`, err);
+  }
 }
 
 /**
@@ -260,13 +291,16 @@ export function countLeadsByCampaign(campaign: string): number {
  * list + a single indexed-by-FK count), safe to run on every page load.
  */
 export function countLeadsInEntryStage(): number {
-  const stageId = resolveEntryStageId();
-  if (stageId == null) return 0;
+  // Each board has its own entry stage; a campaign's new sign-ups count too.
+  const entryIds = listPipelines()
+    .map((p) => resolveEntryStageId(p.id))
+    .filter((id): id is number => id != null);
+  if (entryIds.length === 0) return 0;
   return (
     db
       .select({ n: sql<number>`count(*)` })
       .from(leads)
-      .where(eq(leads.stageId, stageId))
+      .where(inArray(leads.stageId, entryIds))
       .get()?.n ?? 0
   );
 }
@@ -285,7 +319,7 @@ export type LeadWithSla = Lead & {
  * null when a lead has no stage_id. Ordered newest-first; the board buckets
  * by stage client-side.
  */
-export function listLeadsForBoard(): LeadWithSla[] {
+export function listLeadsForBoard(pipelineId?: number): LeadWithSla[] {
   const firstOutbound = db
     .select({
       leadId: leadMessages.leadId,
@@ -305,6 +339,7 @@ export function listLeadsForBoard(): LeadWithSla[] {
     .from(leads)
     .leftJoin(firstOutbound, eq(firstOutbound.leadId, leads.id))
     .leftJoin(pipelineStages, eq(pipelineStages.id, leads.stageId))
+    .where(pipelineId == null ? undefined : eq(leads.pipelineId, pipelineId))
     .orderBy(desc(leads.createdAt))
     .all();
 

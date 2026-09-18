@@ -40,6 +40,10 @@ import "@/lib/automations/scheduler";
 // scheduler above). Separate timer on purpose: speed-to-lead is the point of
 // automatic calling, and a daily tick would make it a different product.
 import "@/lib/voice/runner";
+// The dispatch ticker: scheduled email campaigns, scheduled social posts and
+// the campaign nurture sequence, sent when their time comes. Self-starts on
+// import, same as the two above.
+import "@/lib/dispatch/ticker";
 import {
   bebasNeue,
   body,

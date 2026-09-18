@@ -323,6 +323,8 @@ export const leads = sqliteTable("leads", {
   // Pipeline Management: the editable-stage FK. Supersedes `pipelineStage` (which
   // is frozen: kept for backfill + rollback, dual-written during transition).
   stageId: integer("stage_id").references(() => pipelineStages.id),
+  /** The board this lead is worked on. 1 = the default pipeline. */
+  pipelineId: integer("pipeline_id").notNull().default(1),
   clientId: integer("client_id").references(() => clients.id),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
@@ -339,19 +341,42 @@ export const leads = sqliteTable("leads", {
  * how the auto-advance engine targets a stage without depending on its name.
  * `position` drives board order + funnel advancement.
  */
+/**
+ * A pipeline is a board: its own ordered stages, its own leads. Every tenant
+ * has one default pipeline (id 1, seeded by migration 0005) that all of
+ * today's stages and leads belong to, and every campaign gets one of its own
+ * at creation -- "the same nurture sequence for all campaigns but different
+ * pipelines" -- so a campaign's sign-ups are worked on their own board
+ * rather than filtered out of the main one. Stages are cloned from the
+ * default pipeline at creation, so a campaign board opens looking like the
+ * one the operator already knows.
+ */
+export const pipelines = sqliteTable("pipelines", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  /** The campaign this board was made for, or null for the default board. */
+  campaignId: integer("campaign_id"),
+  isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+export type Pipeline = typeof pipelines.$inferSelect;
+
 export const pipelineStages = sqliteTable(
   "pipeline_stages",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
+    pipelineId: integer("pipeline_id").notNull().default(1),
     name: text("name").notNull(),
     colour: text("colour").notNull(),
     position: integer("position").notNull(),
-    role: text("role"), // StageRole | null; app-enforced unique-where-set
+    role: text("role"), // StageRole | null; app-enforced unique-where-set PER PIPELINE
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
   },
-  (t) => ({ byRole: uniqueIndex("idx_pipeline_stages_role").on(t.role) }),
+  (t) => ({ byPipelineRole: uniqueIndex("idx_pipeline_stages_pipeline_role").on(t.pipelineId, t.role) }),
 );
 
 /**
@@ -1016,6 +1041,44 @@ export const carouselSlides = sqliteTable("carousel_slides", {
     .default(sql`(unixepoch() * 1000)`),
 });
 
+/**
+ * A design booked to go out on social at a time. This is the internal half of
+ * scheduling: the row, the time, the channels, and an honest status. The
+ * other half -- actually posting -- is behind lib/social/publisher.ts, which
+ * is a no-op until a Meta connection exists (App Review pending). Until then
+ * a due post stays "scheduled" with a reason on it, and the moment a
+ * connection is stored the same ticker publishes it. Nothing here has to
+ * change for that.
+ */
+export const scheduledPosts = sqliteTable(
+  "scheduled_posts",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    carouselSetId: integer("carousel_set_id")
+      .notNull()
+      .references(() => carouselSets.id, { onDelete: "cascade" }),
+    /** The campaign this post belongs to, when it came from a kit. */
+    campaignId: integer("campaign_id"),
+    /** JSON array of "facebook" | "instagram". */
+    channels: text("channels").notNull().default('["facebook","instagram"]'),
+    scheduledFor: integer("scheduled_for", { mode: "timestamp_ms" }).notNull(),
+    status: text("status", { enum: ["scheduled", "posting", "posted", "failed", "cancelled"] })
+      .notNull()
+      .default("scheduled"),
+    /** Why the last attempt did not post (e.g. no Meta connection yet). */
+    error: text("error"),
+    lastAttemptAt: integer("last_attempt_at", { mode: "timestamp_ms" }),
+    postedAt: integer("posted_at", { mode: "timestamp_ms" }),
+    /** JSON of the platform ids a successful publish returned. */
+    externalRefs: text("external_refs"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => ({ due: index("idx_scheduled_posts_due").on(t.status, t.scheduledFor) }),
+);
+export type ScheduledPost = typeof scheduledPosts.$inferSelect;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Campaign Engine (Slice 1 + Slice 2): a seasonal campaign kit the Marketing
 // agent builds one artifact at a time (offer, landing page, blog, socials,
@@ -1266,7 +1329,9 @@ export const emailCampaigns = sqliteTable("email_campaigns", {
   bodyHtml: text("body_html").notNull(),
   audience: text("audience").notNull(), // JSON {kind:'all_subscribed'} | {kind:'tag', tag:'...'}
   status: text("status", {
-    enum: ["draft", "sending", "sent", "paused", "failed"],
+    // "scheduled": a draft with a send time, sent by the dispatch ticker
+    // (lib/dispatch/ticker.ts) when that time comes.
+    enum: ["draft", "scheduled", "sending", "sent", "paused", "failed"],
   })
     .notNull()
     .default("draft"),
@@ -2269,6 +2334,36 @@ export const automationLog = sqliteTable("automation_log", {
 export type AutomationTrigger = typeof automationTriggers.$inferSelect;
 export type AutomationMessage = typeof automationMessages.$inferSelect;
 export type AutomationLogRow = typeof automationLog.$inferSelect;
+
+/**
+ * Messages an automation has decided to send LATER. A trigger with a delayed
+ * message series (the campaign sign-up nurture sequence) renders each message
+ * for the recipient at enrolment time and parks it here with its due time;
+ * the dispatch ticker sends whatever is due and records the outcome in
+ * automation_log, the same log an immediate send writes to.
+ */
+export const automationQueue = sqliteTable(
+  "automation_queue",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    triggerKey: text("trigger_key").notNull(),
+    leadId: integer("lead_id"),
+    clientId: integer("client_id"),
+    channel: text("channel", { enum: ["email", "push", "chat"] }).notNull(),
+    subject: text("subject"),
+    body: text("body").notNull(),
+    sendTo: text("send_to"),
+    dueAt: integer("due_at", { mode: "timestamp_ms" }).notNull(),
+    status: text("status", { enum: ["queued", "sent", "failed", "cancelled"] }).notNull().default("queued"),
+    error: text("error"),
+    sentAt: integer("sent_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => ({ due: index("idx_automation_queue_due").on(t.status, t.dueAt) }),
+);
+export type AutomationQueueRow = typeof automationQueue.$inferSelect;
 
 // ── Forms (Kahunas — questionnaires, check-ins, habits, contact, terms) ────────
 

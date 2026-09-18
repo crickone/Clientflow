@@ -111,6 +111,8 @@ export function shouldAdvance(current: StageLike, candidate: StageLike): boolean
 
 export interface StageRecord {
   id: number;
+  /** The board this stage belongs to. Absent only in bare test fixtures. */
+  pipelineId?: number;
   name: string;
   colour: string;
   position: number;

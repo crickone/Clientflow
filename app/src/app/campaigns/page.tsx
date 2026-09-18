@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
 
 const STATUS_TONE: Record<string, "neutral" | "amber" | "green" | "red"> = {
   draft: "neutral",
+  scheduled: "amber",
   sending: "amber",
   sent: "green",
   paused: "amber",

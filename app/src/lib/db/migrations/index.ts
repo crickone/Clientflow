@@ -242,6 +242,18 @@ export const TENANT_MIGRATIONS: Migration[] = [
       sqlite.exec("DELETE FROM competitor_events WHERE type IN ('new_ad', 'ad_stopped')");
     },
   },
+  {
+    id: "0005-default-pipeline",
+    description:
+      "Seed the default pipeline (id 1) that every existing stage and lead already points at via their pipeline_id DEFAULT 1, so 'one board per campaign' starts from a board that exists.",
+    up: (sqlite) => {
+      const n = (sqlite.prepare("SELECT count(*) AS n FROM pipelines").get() as { n: number }).n;
+      if (n > 0) return;
+      sqlite
+        .prepare("INSERT INTO pipelines (id, name, campaign_id, is_default) VALUES (1, 'Main pipeline', NULL, 1)")
+        .run();
+    },
+  },
 ];
 
 /**

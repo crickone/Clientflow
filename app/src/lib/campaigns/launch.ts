@@ -94,6 +94,8 @@ export interface LaunchItem {
   kind: CampaignAsset["kind"];
   title: string;
   where: string;
+  /** The real row behind the item (an email_campaigns id, a carousel_sets id, a blog_posts id), so it can be scheduled. */
+  externalId?: number | null;
 }
 
 export interface LaunchResult {
@@ -184,7 +186,7 @@ function queueEmail(asset: CampaignAsset): LaunchItem | null {
     record.status === "draft"
       ? "email draft ready to send in Email campaigns"
       : `email campaign is "${record.status}" in Email campaigns`;
-  return { kind: "email", title: asset.title, where };
+  return { kind: "email", title: asset.title, where, externalId: record.id };
 }
 
 /** Report one social asset as queued for manual posting — no DB round-trip needed (nothing about a carousel_sets row can invalidate this label). */
@@ -192,7 +194,8 @@ function queueSocial(asset: CampaignAsset): LaunchItem {
   return {
     kind: "social",
     title: asset.title,
-    where: "social ready to post (auto-posting coming after Meta review)",
+    where: "designed in Content Studio, ready to schedule (schedule_social_post)",
+    externalId: asset.externalId,
   };
 }
 

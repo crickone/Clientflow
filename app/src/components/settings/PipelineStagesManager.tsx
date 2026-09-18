@@ -63,7 +63,7 @@ const selectStyle: CSSProperties = {
   fontFamily: "inherit",
 };
 
-export function PipelineStagesManager({ stages: initialStages }: { stages: StageRecord[] }) {
+export function PipelineStagesManager({ stages: initialStages, pipelineId }: { stages: StageRecord[]; pipelineId?: number }) {
   const router = useRouter();
   const [stages, setStages] = useState<StageRecord[]>(initialStages);
 
@@ -94,7 +94,7 @@ export function PipelineStagesManager({ stages: initialStages }: { stages: Stage
     const next = arrayMove(stages, oldIndex, newIndex);
     setStages(next); // optimistic — instant reorder feedback
 
-    reorderStagesAction(next.map((s) => s.id)).then((res) => {
+    reorderStagesAction(next.map((s) => s.id), pipelineId).then((res) => {
       if (!res.ok) {
         toast.error(res.error);
         setStages(previous);
@@ -109,16 +109,16 @@ export function PipelineStagesManager({ stages: initialStages }: { stages: Stage
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={stages.map((s) => s.id)} strategy={verticalListSortingStrategy}>
           {stages.map((stage) => (
-            <StageRow key={stage.id} stage={stage} stages={stages} />
+            <StageRow key={stage.id} stage={stage} stages={stages} pipelineId={pipelineId} />
           ))}
         </SortableContext>
       </DndContext>
-      <AddStageRow existing={stages} />
+      <AddStageRow existing={stages} pipelineId={pipelineId} />
     </div>
   );
 }
 
-function StageRow({ stage, stages }: { stage: StageRecord; stages: StageRecord[] }) {
+function StageRow({ stage, stages, pipelineId }: { stage: StageRecord; stages: StageRecord[]; pipelineId?: number }) {
   const router = useRouter();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: stage.id,
@@ -135,7 +135,7 @@ function StageRow({ stage, stages }: { stage: StageRecord; stages: StageRecord[]
     }
     if (trimmed === stage.name) return;
     startSave(async () => {
-      const res = await updateStageAction(stage.id, { name: trimmed });
+      const res = await updateStageAction(stage.id, { name: trimmed }, pipelineId);
       if (!res.ok) {
         toast.error(res.error);
         setName(stage.name);
@@ -149,7 +149,7 @@ function StageRow({ stage, stages }: { stage: StageRecord; stages: StageRecord[]
     setColourOpen(false);
     if (colour === stage.colour) return;
     startSave(async () => {
-      const res = await updateStageAction(stage.id, { colour });
+      const res = await updateStageAction(stage.id, { colour }, pipelineId);
       if (!res.ok) {
         toast.error(res.error);
         return;
@@ -160,7 +160,7 @@ function StageRow({ stage, stages }: { stage: StageRecord; stages: StageRecord[]
 
   function pickRole(role: StageRole | null) {
     startSave(async () => {
-      const res = await updateStageAction(stage.id, { role });
+      const res = await updateStageAction(stage.id, { role }, pipelineId);
       if (!res.ok) {
         toast.error(res.error);
         return;
@@ -244,7 +244,7 @@ function StageRow({ stage, stages }: { stage: StageRecord; stages: StageRecord[]
           })}
         </select>
 
-        <DeleteStageButton stage={stage} stages={stages} />
+        <DeleteStageButton stage={stage} stages={stages} pipelineId={pipelineId} />
       </Card>
     </div>
   );
@@ -308,7 +308,7 @@ function ColourSwatchButton({
   );
 }
 
-function DeleteStageButton({ stage, stages }: { stage: StageRecord; stages: StageRecord[] }) {
+function DeleteStageButton({ stage, stages, pipelineId }: { stage: StageRecord; stages: StageRecord[]; pipelineId?: number }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
@@ -320,7 +320,7 @@ function DeleteStageButton({ stage, stages }: { stage: StageRecord; stages: Stag
   function confirmDelete() {
     if (!gate.ok || moveToId === "") return;
     start(async () => {
-      const res = await deleteStageAction(stage.id, moveToId);
+      const res = await deleteStageAction(stage.id, moveToId, pipelineId);
       if (!res.ok) {
         toast.error(res.error);
         return;
@@ -390,7 +390,7 @@ function DeleteStageButton({ stage, stages }: { stage: StageRecord; stages: Stag
   );
 }
 
-function AddStageRow({ existing }: { existing: StageRecord[] }) {
+function AddStageRow({ existing, pipelineId }: { existing: StageRecord[]; pipelineId?: number }) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [colour, setColour] = useState(PALETTE[0]);
@@ -405,7 +405,7 @@ function AddStageRow({ existing }: { existing: StageRecord[] }) {
       return;
     }
     start(async () => {
-      const res = await addStageAction({ name: trimmed, colour, role: (role || null) as StageRole | null });
+      const res = await addStageAction({ name: trimmed, colour, role: (role || null) as StageRole | null, pipelineId });
       if (!res.ok) {
         toast.error(res.error);
         return;

@@ -1,12 +1,13 @@
 import "server-only";
 
 import type Anthropic from "@anthropic-ai/sdk";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 
 import { leadMessages, leads } from "@/lib/db/schema";
 import { addMessage, getLead } from "@/lib/leads";
 import { currentStageRecord, setStageToId } from "@/lib/pipeline/stage";
-import { listStages, listStagesOnConn } from "@/lib/pipeline/stageRepo";
+import { listStages, listAllStagesOnConn } from "@/lib/pipeline/stageRepo";
+import { leadPipelineId } from "@/lib/pipeline/pipelineRepo";
 import { sendWhatsApp } from "@/lib/whatsapp/send";
 import { draftFollowup } from "@/lib/ai/draftFollowup";
 import { fenceUntrusted, tdb, type ToolContext, type ToolResult } from "@/lib/agents/toolKit";
@@ -148,17 +149,21 @@ export const SALES_TOOLS: Anthropic.Tool[] = [
  */
 export function listLeadsTool(ctx: ToolContext, input: Record<string, unknown>): ToolResult {
   const db = tdb(ctx);
-  const stages = listStagesOnConn(db);
+  // Every board's stages: the list spans pipelines, and a stage NAME (what
+  // the model asks by) exists once per board, so a name filter matches the
+  // same-named stage on every board.
+  const stages = listAllStagesOnConn(db);
   const stageNameById = new Map(stages.map((s) => [s.id, s.name]));
   const stageArg = typeof input.stage === "string" ? input.stage : "";
-  const stageMatch = stageArg ? stages.find((s) => s.name === stageArg) : undefined;
+  const stageIds = stageArg ? stages.filter((s) => s.name === stageArg).map((s) => s.id) : [];
+  const stageMatch = stageIds.length > 0 ? { ids: stageIds } : undefined;
   const limitArg = Number(input.limit);
   const limit = Number.isFinite(limitArg) && limitArg > 0 ? Math.min(200, Math.round(limitArg)) : 50;
 
   const rows = db
     .select()
     .from(leads)
-    .where(stageMatch ? eq(leads.stageId, stageMatch.id) : undefined)
+    .where(stageMatch ? inArray(leads.stageId, stageMatch.ids) : undefined)
     .orderBy(desc(leads.updatedAt))
     .limit(limit)
     .all();
@@ -277,7 +282,8 @@ export function setLeadStageTool(ctx: ToolContext, input: Record<string, unknown
   const stage = String(input.stage || "");
   if (!leadId) return { text: JSON.stringify({ error: "leadId is required." }) };
 
-  const stages = listStages();
+  // The lead's OWN board: the same name is a different stage id per board.
+  const stages = listStages(leadPipelineId(leadId) ?? undefined);
   const target = stages.find((s) => s.name === stage);
   if (!target) {
     return { text: JSON.stringify({ error: `stage must be one of: ${stages.map((s) => s.name).join(", ")}.` }) };

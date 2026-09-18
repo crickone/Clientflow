@@ -1,4 +1,5 @@
 import "server-only";
+import { isTriggerEnabled } from "@/lib/automations/nurture";
 
 import { asc, desc, eq } from "drizzle-orm";
 
@@ -45,7 +46,7 @@ export function listTriggers(): TriggerListRow[] {
     label: t.label,
     description: t.description,
     status: t.status,
-    enabled: stateByKey.get(t.key)?.enabled ?? false,
+    enabled: isTriggerEnabled(t.key, stateByKey.get(t.key)),
     messageCount: counts.get(t.key) ?? 0,
   }));
 }
@@ -85,7 +86,7 @@ export function getTrigger(key: string): TriggerDetail | null {
     label: def.label,
     description: def.description,
     status: def.status,
-    enabled: state?.enabled ?? false,
+    enabled: isTriggerEnabled(key, state),
     externalEnabled: state?.externalEnabled ?? false,
     messages: mapped,
   };

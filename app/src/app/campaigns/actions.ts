@@ -11,6 +11,7 @@ import {
   type CampaignRecord,
 } from "@/lib/marketing/campaigns";
 import { markCampaignSending, precheckCampaign, runCampaignSend } from "@/lib/marketing/send";
+import { scheduleEmailCampaign, unscheduleEmailCampaign } from "@/lib/marketing/schedule";
 import { runWithTenant } from "@/lib/db/tenant";
 import { getAppBaseUrl } from "@/lib/appUrl";
 import { draftCampaignEmail } from "@/lib/ai/draftCampaign";
@@ -209,5 +210,30 @@ export async function sendCampaignAction(id: number): Promise<SendCampaignAction
   // Fire-and-forget: intentionally not awaited. See the doc comment above.
   void runWithTenant(tid, () => runCampaignSend(tid, id, baseUrl));
 
+  return { ok: true };
+}
+
+/** Book a draft's send for a time (an ISO instant from the browser). Admin-only. */
+export async function scheduleCampaignAction(id: number, whenIso: string): Promise<SendCampaignActionResult> {
+  await requireAdmin();
+  const when = new Date(String(whenIso ?? ""));
+  if (!Number.isFinite(when.getTime())) return { ok: false, error: "Pick a date and time." };
+  const res = scheduleEmailCampaign(id, when);
+  if (!res.ok) return { ok: false, error: res.error };
+  await logActivity("campaigns.send", `Scheduled "${res.campaign.name}" to send at ${when.toISOString()}`);
+  revalidatePath(`/campaigns/${id}`);
+  revalidatePath("/campaigns");
+  revalidatePath("/marketing/schedule");
+  return { ok: true };
+}
+
+/** Take a scheduled send off the schedule (back to draft). Admin-only. */
+export async function unscheduleCampaignAction(id: number): Promise<SendCampaignActionResult> {
+  await requireAdmin();
+  const res = unscheduleEmailCampaign(id);
+  if (!res.ok) return { ok: false, error: res.error };
+  revalidatePath(`/campaigns/${id}`);
+  revalidatePath("/campaigns");
+  revalidatePath("/marketing/schedule");
   return { ok: true };
 }

@@ -10,6 +10,7 @@ import { completeForLead } from "@/lib/voice/queue";
 import { getCallFlowForTenant } from "@/lib/voice/flow";
 import { setStageToId } from "@/lib/pipeline/stage";
 import { listStagesOnConn } from "@/lib/pipeline/stageRepo";
+import { leadPipelineIdOnConn } from "@/lib/pipeline/pipelineRepo";
 
 export const dynamic = "force-dynamic";
 
@@ -147,7 +148,7 @@ export async function POST(req: Request) {
         const flow = getCallFlowForTenant(resolved.tenantId);
         if (flow.onAnsweredStageRole) {
           try {
-            const stage = listStagesOnConn(tdb).find((st) => st.role === flow.onAnsweredStageRole);
+            const stage = listStagesOnConn(tdb, leadPipelineIdOnConn(tdb, call.leadId) ?? undefined).find((st) => st.role === flow.onAnsweredStageRole);
             if (stage) setStageToId(call.leadId, stage.id);
           } catch (err) {
             // A stage that has since been renamed or deleted must not cost us

@@ -6,13 +6,20 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { PipelineBoard } from "@/components/pipeline/PipelineBoard";
 import { listLeadsForBoard } from "@/lib/leads";
 import { listStages } from "@/lib/pipeline/stageRepo";
+import { defaultPipelineId, listPipelines } from "@/lib/pipeline/pipelineRepo";
 import { getCurrentMembership } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-export default async function LeadsPage() {
-  const leads = listLeadsForBoard();
-  const stages = listStages();
+export default async function LeadsPage({ searchParams }: { searchParams?: { pipeline?: string } }) {
+  // One board per campaign: `?pipeline=<id>` picks the board, the default
+  // board when absent or unknown. Leads and stages are both read for THAT
+  // board only, so a campaign's sign-ups never mix into the main funnel.
+  const pipelines = listPipelines();
+  const requested = Number(searchParams?.pipeline);
+  const activePipelineId = pipelines.some((p) => p.id === requested) ? requested : defaultPipelineId();
+  const leads = listLeadsForBoard(activePipelineId);
+  const stages = listStages(activePipelineId);
   // Only admins get the "Manage stages" affordance on the board (the editor
   // actions are admin-guarded server-side too).
   const canManageStages = getCurrentMembership()?.role === "admin";
@@ -33,7 +40,7 @@ export default async function LeadsPage() {
         }
       />
 
-      {leads.length === 0 ? (
+      {leads.length === 0 && pipelines.length <= 1 ? (
         <EmptyState
           icon={<Sparkles size={32} strokeWidth={1.4} />}
           title="No leads yet"
@@ -48,7 +55,7 @@ export default async function LeadsPage() {
           }
         />
       ) : (
-        <PipelineBoard leads={leads} stages={stages} canManageStages={canManageStages} />
+        <PipelineBoard leads={leads} stages={stages} canManageStages={canManageStages} pipelines={pipelines} activePipelineId={activePipelineId} />
       )}
     </div>
   );

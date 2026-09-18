@@ -15,12 +15,14 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
+import Link from "next/link";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 
 import type { LeadWithSla } from "@/lib/leads";
 import { setLeadStageAction } from "@/app/leads/actions";
 import { WON_ROLES, type StageRecord } from "@/lib/pipeline/roles";
+import type { PipelineRecord } from "@/lib/pipeline/pipelineRepo";
 import { computeBoardMetrics, type LeadMetricInput } from "@/lib/pipeline/boardMetrics";
 import { Input } from "@/components/ui/Input";
 import { LeadList } from "@/components/leads/LeadList";
@@ -50,7 +52,22 @@ const selectStyle: CSSProperties = {
   minWidth: 140,
 };
 
-export function PipelineBoard({ leads: propLeads, stages, canManageStages }: { leads: LeadWithSla[]; stages: StageRecord[]; canManageStages: boolean }) {
+export function PipelineBoard({
+  leads: propLeads,
+  stages,
+  canManageStages,
+  pipelines = [],
+  activePipelineId,
+}: {
+  leads: LeadWithSla[];
+  stages: StageRecord[];
+  canManageStages: boolean;
+  /** Every board the tenant has; tabs are shown when there is more than one. */
+  pipelines?: PipelineRecord[];
+  /** The board on screen. Stage edits from the Manage dialog apply to it. */
+  activePipelineId?: number;
+}) {
+  const activePipeline = pipelines.find((p) => p.id === activePipelineId) ?? null;
   const router = useRouter();
   const [leads, setLeads] = useState<LeadWithSla[]>(propLeads);
   const [view, setView] = useState<"board" | "list">("board");
@@ -247,6 +264,33 @@ export function PipelineBoard({ leads: propLeads, stages, canManageStages }: { l
 
   return (
     <>
+      {pipelines.length > 1 && (
+        <nav aria-label="Pipelines" style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
+          {pipelines.map((p) => {
+            const active = p.id === activePipelineId;
+            return (
+              <Link
+                key={p.id}
+                href={p.isDefault ? "/leads" : `/leads?pipeline=${p.id}`}
+                aria-current={active ? "page" : undefined}
+                style={{
+                  padding: "7px 14px",
+                  borderRadius: 999,
+                  border: `1px solid ${active ? "var(--accent)" : "var(--hairline)"}`,
+                  background: active ? "var(--accent)" : "var(--surface-1)",
+                  color: active ? "#fff" : "var(--text-secondary)",
+                  fontSize: 13,
+                  fontWeight: active ? 600 : 500,
+                  textDecoration: "none",
+                }}
+              >
+                {p.name}
+              </Link>
+            );
+          })}
+        </nav>
+      )}
+
       <PipelineMetrics metrics={metrics} />
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
@@ -377,8 +421,8 @@ export function PipelineBoard({ leads: propLeads, stages, canManageStages }: { l
 
       {canManageStages && (
         <Dialog open={manageOpen} onOpenChange={setManageOpen}>
-          <DialogContent title="Pipeline stages" description="Add, rename, reorder or recolour your stages — changes apply to the board immediately." width={720}>
-            <PipelineStagesManager stages={stages} />
+          <DialogContent title={activePipeline ? `${activePipeline.name} stages` : "Pipeline stages"} description="Add, rename, reorder or recolour your stages — changes apply to the board immediately." width={720}>
+            <PipelineStagesManager stages={stages} pipelineId={activePipelineId} />
           </DialogContent>
         </Dialog>
       )}

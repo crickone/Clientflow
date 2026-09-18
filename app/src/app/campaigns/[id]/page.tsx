@@ -5,6 +5,8 @@ import { ArrowLeft } from "lucide-react";
 import { getCurrentMembership, requireAdminPage } from "@/lib/auth";
 import { getCampaign, listContactTags, resolveAudience } from "@/lib/marketing/campaigns";
 import { getSendingDomain } from "@/lib/marketing/domains";
+import { lastScheduleError } from "@/lib/marketing/schedule";
+import { ScheduleSendCard } from "@/components/campaigns/ScheduleSendCard";
 import { getCampaignSendCounts } from "@/lib/marketing/events";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { CampaignEditor } from "@/components/campaigns/CampaignEditor";
@@ -74,6 +76,12 @@ export default async function CampaignDetailPage({
         availableTags={tags}
         recipientCount={recipientCount}
         sendingDomain={domain?.domain ?? null}
+      />
+      <ScheduleSendCard
+        campaignId={campaign.id}
+        status={campaign.status}
+        scheduledAt={campaign.scheduledAt}
+        lastError={lastScheduleError(campaign)}
       />
       {counts && (
         <Card style={{ padding: 20, marginTop: 24 }}>

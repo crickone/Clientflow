@@ -63,6 +63,9 @@
     "approve_campaign_asset",
     "launch_campaign",
     "create_social_post",
+    "schedule_social_post",
+    "schedule_email_campaign",
+    "cancel_scheduled_item",
     "send_client_whatsapp"
   ],
   "golden": {
@@ -201,6 +204,18 @@
     "create_social_post": [
       "Create the post \"Sample Name\" in Content Studio",
       "Create the post \"Untitled\" in Content Studio"
+    ],
+    "cancel_scheduled_item": [
+      "Cancel the scheduled item \"Sample Name\"",
+      "Cancel the scheduled item"
+    ],
+    "schedule_email_campaign": [
+      "Send \"Sample Name\" at the scheduled time",
+      "Send email campaign #? at the scheduled time"
+    ],
+    "schedule_social_post": [
+      "Schedule \"Sample Name\" to go out on social",
+      "Schedule post #? to go out on social"
     ]
   },
   "readSamplesAllFalse": [
@@ -210,6 +225,7 @@
     "plan_campaign",
     "get_client",
     "list_social_posts",
-    "export_social_posts"
+    "export_social_posts",
+    "list_schedule"
   ]
 }

@@ -24,6 +24,7 @@ import type { CampaignAudience, CampaignRecord } from "@/lib/marketing/campaigns
 
 const STATUS_TONE: Record<CampaignRecord["status"], "neutral" | "amber" | "green" | "red"> = {
   draft: "neutral",
+  scheduled: "amber",
   sending: "amber",
   sent: "green",
   paused: "amber",

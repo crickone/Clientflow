@@ -75,6 +75,15 @@ import {
   listSocialPostsTool,
 } from "@/lib/agents/tools.posts";
 import {
+  SCHEDULE_TOOLS,
+  cancelScheduledItemTool,
+  formatDublin,
+  listScheduleTool,
+  parseWhen,
+  scheduleEmailCampaignTool,
+  scheduleSocialPostTool,
+} from "@/lib/agents/tools.schedule";
+import {
   CAMPAIGN_TOOLS,
   approveCampaignAssetTool,
   createCampaignTool,
@@ -179,6 +188,13 @@ const WRITE_TOOL_META: Record<string, WriteToolMeta> = {
   // gated. The 2 read tools (list_social_posts, export_social_posts) are
   // absent — the export only bundles renders that already exist.
   create_social_post: { label: "Create social post", summarize: ({ v }) => `Create the post "${v("name") || v("topic") || "Untitled"}" in Content Studio${v("slideCount") ? ` (${v("slideCount")} slides)` : ""}` },
+
+  // Scheduling (tools.schedule.ts): booking a post or a send commits the
+  // business to a time, and cancelling undoes a commitment, so all three are
+  // gated. list_schedule is a read.
+  schedule_social_post: { label: "Schedule social post", summarize: ({ v }) => { const when = parseWhen(v("when")); return `Schedule ${v("name") ? `"${v("name")}"` : `post #${v("postId") || "?"}`} to go out${when ? ` on ${formatDublin(when.getTime())}` : " on social"}`; } },
+  schedule_email_campaign: { label: "Schedule email send", summarize: ({ v }) => { const when = parseWhen(v("when")); return `Send ${v("name") ? `"${v("name")}"` : `email campaign #${v("emailCampaignId") || "?"}`}${when ? ` on ${formatDublin(when.getTime())}` : " at the scheduled time"}`; } },
+  cancel_scheduled_item: { label: "Cancel scheduled item", summarize: ({ v }) => `Cancel the scheduled ${v("kind") || "item"}${v("name") ? ` "${v("name")}"` : ""}` },
 
   // Operations agent (Operations Task 1): WhatsApp send to a CLIENT (distinct
   // from the sales agent's lead-scoped send_whatsapp above) — gated. The 2 read
@@ -751,6 +767,9 @@ export const TOOLS: Anthropic.Tool[] = [
   // list what's there, export finished ones as a download. ──
   ...POSTS_TOOLS,
 
+  // ── Scheduling: book posts and email sends for a time, see the schedule. ──
+  ...SCHEDULE_TOOLS,
+
   // ── Operations agent (Operations Task 1): no-show + lapsed-member tools ──
   ...OPERATIONS_TOOLS,
 
@@ -902,6 +921,14 @@ export async function executeTool(
         return listSocialPostsTool(ctx, input);
       case "export_social_posts":
         return await exportSocialPostsTool(ctx, input);
+      case "schedule_social_post":
+        return scheduleSocialPostTool(ctx, input);
+      case "schedule_email_campaign":
+        return scheduleEmailCampaignTool(ctx, input);
+      case "cancel_scheduled_item":
+        return cancelScheduledItemTool(ctx, input);
+      case "list_schedule":
+        return listScheduleTool(ctx, input);
       case "list_no_shows":
         return listNoShowsTool(ctx, input);
       case "list_lapsed_members":

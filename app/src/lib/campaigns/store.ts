@@ -3,6 +3,7 @@ import "server-only";
 import { asc, desc, eq, sql } from "drizzle-orm";
 
 import { db, schema } from "@/lib/db";
+import { createPipeline } from "@/lib/pipeline/pipelineRepo";
 import { addCampaignNote } from "@/lib/marketing/calendarNotes";
 import type { Campaign, CampaignAsset } from "@/lib/db/schema";
 
@@ -105,6 +106,15 @@ export function createCampaign(input: CreateCampaignInput): Campaign {
     } catch (err) {
       console.error("[campaigns] calendar note failed:", err);
     }
+  }
+  // Every campaign gets its own board, cloned from the default one, so its
+  // sign-ups are worked separately from the main funnel. Fail-soft: a
+  // campaign without a board still takes sign-ups (they land on the default
+  // board, see the signup route), it just is not separated.
+  try {
+    createPipeline({ name: campaign.name, campaignId: campaign.id });
+  } catch (err) {
+    console.error(`[campaigns] pipeline for campaign #${campaign.id} failed:`, err);
   }
   return campaign;
 }

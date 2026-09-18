@@ -12,6 +12,13 @@ import {
   updateStage,
 } from "@/lib/pipeline/stageRepo";
 import { ALL_ROLES, canDeleteStage, roleConflict, type StageRole } from "@/lib/pipeline/roles";
+import { defaultPipelineId, getPipeline } from "@/lib/pipeline/pipelineRepo";
+
+/** The board an action works on: the one named, if it exists, else the default. */
+function boardId(pipelineId: number | undefined): number {
+  if (pipelineId != null && Number.isInteger(pipelineId) && getPipeline(pipelineId)) return pipelineId;
+  return defaultPipelineId();
+}
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -58,8 +65,10 @@ export async function addStageAction(input: {
   name: string;
   colour: string;
   role: StageRole | null;
+  pipelineId?: number;
 }): Promise<ActionResult> {
   await adminTenantId();
+  const pipelineId = boardId(input?.pipelineId);
 
   const name = nameField.safeParse(input?.name);
   if (!name.success) {
@@ -75,13 +84,13 @@ export async function addStageAction(input: {
 
   const role = input.role;
   if (role) {
-    const conflict = roleConflict(listStages(), role, null);
+    const conflict = roleConflict(listStages(pipelineId), role, null);
     if (conflict) {
       return { ok: false, error: `That role is already used by "${conflict.name}".` };
     }
   }
 
-  createStage({ name: name.data, colour: colour.data, role });
+  createStage({ name: name.data, colour: colour.data, role, pipelineId });
   revalidate();
   return { ok: true };
 }
@@ -93,11 +102,12 @@ export async function addStageAction(input: {
 export async function updateStageAction(
   id: number,
   patch: { name?: string; colour?: string; role?: StageRole | null },
+  pipelineId?: number,
 ): Promise<ActionResult> {
   await adminTenantId();
   if (!Number.isInteger(id)) return { ok: false, error: "Invalid stage" };
 
-  const stages = listStages();
+  const stages = listStages(boardId(pipelineId));
   if (!stages.some((s) => s.id === id)) return { ok: false, error: "Stage not found." };
 
   const next: { name?: string; colour?: string; role?: StageRole | null } = {};
@@ -121,7 +131,7 @@ export async function updateStageAction(
   if (patch.role !== undefined) {
     if (!isValidRole(patch.role)) return { ok: false, error: "Invalid role" };
     if (patch.role) {
-      const conflict = roleConflict(listStages(), patch.role, id);
+      const conflict = roleConflict(stages, patch.role, id);
       if (conflict) {
         return { ok: false, error: `That role is already used by "${conflict.name}".` };
       }
@@ -143,13 +153,13 @@ export async function updateStageAction(
  * active tenant's current stage ids (any order) — a stale/partial list is
  * rejected rather than silently corrupting positions.
  */
-export async function reorderStagesAction(orderedIds: number[]): Promise<ActionResult> {
+export async function reorderStagesAction(orderedIds: number[], pipelineId?: number): Promise<ActionResult> {
   await adminTenantId();
   if (!Array.isArray(orderedIds) || orderedIds.length === 0 || orderedIds.some((n) => !Number.isInteger(n))) {
     return { ok: false, error: "Invalid order" };
   }
 
-  const currentIds = new Set(listStages().map((s) => s.id));
+  const currentIds = new Set(listStages(boardId(pipelineId)).map((s) => s.id));
   const sameSet = orderedIds.length === currentIds.size && orderedIds.every((id) => currentIds.has(id)) && new Set(orderedIds).size === orderedIds.length;
   if (!sameSet) {
     return { ok: false, error: "Stage list is out of date — refresh and try again." };
@@ -164,7 +174,7 @@ export async function reorderStagesAction(orderedIds: number[]): Promise<ActionR
  * Delete a stage, moving its leads to `moveToId` first. Rejects deleting the
  * last remaining stage (a pipeline always needs at least one).
  */
-export async function deleteStageAction(id: number, moveToId: number): Promise<ActionResult> {
+export async function deleteStageAction(id: number, moveToId: number, pipelineId?: number): Promise<ActionResult> {
   await adminTenantId();
   if (!Number.isInteger(id) || !Number.isInteger(moveToId)) {
     return { ok: false, error: "Invalid stage" };
@@ -173,7 +183,7 @@ export async function deleteStageAction(id: number, moveToId: number): Promise<A
     return { ok: false, error: "Choose a different stage to move its leads to." };
   }
 
-  const stages = listStages();
+  const stages = listStages(boardId(pipelineId));
   if (!stages.some((s) => s.id === id)) return { ok: false, error: "Stage not found." };
   const gate = canDeleteStage(stages, id);
   if (!gate.ok) {

@@ -649,7 +649,7 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(socialLaunch.queued[0].kind, "social");
     assert.equal(
       socialLaunch.queued[0].where,
-      "social ready to post (auto-posting coming after Meta review)",
+      "designed in Content Studio, ready to schedule (schedule_social_post)",
       "social-queue test: the exact honest label — auto-posting is never claimed",
     );
 

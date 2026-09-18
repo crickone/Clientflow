@@ -5,7 +5,8 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { slugify } from "@/lib/cms/blog";
 import { generateAsset } from "@/lib/campaigns/generate";
 import { materialiseAsset } from "@/lib/campaigns/materialise";
-import { launchCampaign } from "@/lib/campaigns/launch";
+import { launchCampaign, type LaunchItem } from "@/lib/campaigns/launch";
+import { pipelineForCampaign } from "@/lib/pipeline/pipelineRepo";
 import { getCampaignBuildModel, campaignModelLabel } from "@/lib/campaigns/buildModel";
 import { estimateCampaignBuildCents, formatCentsEur } from "@/lib/campaigns/costEstimate";
 import {
@@ -505,6 +506,41 @@ export function approveCampaignAssetTool(ctx: ToolContext, input: Record<string,
  * ONLY what `launchCampaign` actually reports back: never claims a
  * publish/send that didn't happen.
  */
+/**
+ * A first-cut timetable for what launch queued, in Irish local time:
+ * announce on the start date, proof half-way, last chance two days before
+ * the end; posts spread across the window at midday. Dates the campaign
+ * does not have fall back to tomorrow onwards. Suggestions only -- the
+ * operator approves each one when the agent schedules it.
+ */
+function suggestSchedule(
+  campaign: Campaign,
+  queued: LaunchItem[],
+): { emails: { emailCampaignId: number; title: string; when: string }[]; posts: { postId: number; title: string; when: string }[] } {
+  const day = 86_400_000;
+  const startOf = (iso: string | null | undefined, fallbackOffsetDays: number): number => {
+    const d = iso ? new Date(`${iso}T00:00:00`) : null;
+    return d && Number.isFinite(d.getTime()) ? d.getTime() : Date.now() + fallbackOffsetDays * day;
+  };
+  const start = Math.max(startOf(campaign.startsOn, 1), Date.now() + day);
+  const end = Math.max(startOf(campaign.endsOn, 15), start + 3 * day);
+  const local = (ms: number, hour: number) => {
+    const d = new Date(ms);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${dd}T${String(hour).padStart(2, "0")}:00`;
+  };
+  const emails = queued.filter((q) => q.kind === "email" && q.externalId != null);
+  const posts = queued.filter((q) => q.kind === "social" && q.externalId != null);
+  const emailTimes = [start, start + Math.floor((end - start) / 2), end - 2 * day];
+  const postTimes = posts.map((_, i) => start + Math.floor(((end - start) * (i + 1)) / (posts.length + 1)));
+  return {
+    emails: emails.map((e, i) => ({ emailCampaignId: e.externalId!, title: e.title, when: local(emailTimes[Math.min(i, emailTimes.length - 1)], 9) })),
+    posts: posts.map((p, i) => ({ postId: p.externalId!, title: p.title, when: local(postTimes[i], 12) })),
+  };
+}
+
 export async function launchCampaignTool(ctx: ToolContext, input: Record<string, unknown>): Promise<ToolResult> {
   void ctx; // no tenant-scoped read needed beyond the campaign row itself (ambient db)
   const campaignId = Number(input.campaignId);
@@ -539,6 +575,12 @@ export async function launchCampaignTool(ctx: ToolContext, input: Record<string,
         status: "active",
         published,
         queued,
+        // The next step, spelled out: every queued email and post carries
+        // its id, and a proposed time for each. The operator approves the
+        // times; each schedule call is its own approval card.
+        suggestedSchedule: suggestSchedule(campaign, queued),
+        pipeline: pipelineForCampaign(campaignId) ? `/leads?pipeline=${pipelineForCampaign(campaignId)!.id}` : null,
+        next: "Show the suggested dates and times. When the operator approves them (or gives their own), call schedule_email_campaign for each email and schedule_social_post for each post. The nurture sequence for sign-ups is on by default (Automations > Campaign sign-up).",
       }),
     };
   } catch (e) {

@@ -206,6 +206,9 @@ const NAV_GROUPS: NavGroup[] = [
       // rail. Same admin-only reasoning as "Marketing" above (this page is
       // requireAdminPage'd; Build-campaign from here opens Adonis on /adonis).
       { href: "/marketing/calendar", label: "Seasonal calendar", icon: Calendar, adminOnly: true },
+      // Everything booked for a time: scheduled posts, scheduled email sends,
+      // and the nurture queue. Admin-only like the rest of this group.
+      { href: "/marketing/schedule", label: "Schedule", icon: CalendarClock, adminOnly: true },
       // Market Research P1 (Task 10): the competitor-tracking dashboard —
       // ranked list, rating/review trends, a change feed, per-competitor
       // detail. Admin-gated (requireAdminPage) for the same reason as the

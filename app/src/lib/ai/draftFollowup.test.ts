@@ -87,6 +87,7 @@ const requireLocal = createRequire(import.meta.url);
     notes: null,
     rawPayload: null,
     doNotCall: false,
+        pipelineId: 1,
     status: "new",
     pipelineStage: "new_lead",
     stageId: null,

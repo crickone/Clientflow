@@ -5,6 +5,7 @@ import { isHoneypotTripped, validateSignup } from "@/lib/campaigns/signup";
 import { verifyCampaignSignupToken } from "@/lib/campaigns/signupToken";
 import { runWithTenant } from "@/lib/db/tenant";
 import { upsertLead } from "@/lib/leads";
+import { pipelineForCampaign } from "@/lib/pipeline/pipelineRepo";
 import { clientIp, rateLimit } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
@@ -132,6 +133,9 @@ export async function POST(req: NextRequest) {
       source: "landing",
       sourceLeadId,
       campaign: campaign.name,
+      // The campaign's own board (created with the campaign). Null when it
+      // has none, which upsertLead reads as "the default board".
+      pipelineId: pipelineForCampaign(campaign.id)?.id ?? null,
       fullName: name,
       email: email || null,
       phone: phone || null,

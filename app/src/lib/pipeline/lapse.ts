@@ -5,7 +5,8 @@ import { and, eq, gt, inArray, sql } from "drizzle-orm";
 import { schema } from "@/lib/db";
 import { openTenantDb, type TenantDb } from "@/lib/db/tenant";
 import { listTenants } from "@/lib/tenants";
-import { resolveStageIdByRoleOnConn } from "./stageRepo";
+import { resolveStageIdByRoleOnConn, stageIdsByRoleOnConn } from "./stageRepo";
+import { leadPipelineIdOnConn } from "./pipelineRepo";
 import { ROLE_TO_LEGACY_KEY, type StageRole } from "./roles";
 
 const LAPSE_DAYS = 90;
@@ -55,8 +56,9 @@ function paidCount(conn: TenantDb, clientId: number): number {
  * explicit connection passed in.
  */
 function writeLapseStage(conn: TenantDb, leadId: number, role: "lapsed" | "won" | "repeat"): void {
-  const stageId = resolveStageIdByRoleOnConn(conn, role);
-  if (stageId == null) return; // tenant doesn't use this role → skip
+  const pipelineId = leadPipelineIdOnConn(conn, leadId) ?? undefined;
+  const stageId = resolveStageIdByRoleOnConn(conn, role, pipelineId);
+  if (stageId == null) return; // this board doesn't use this role → skip
   conn
     .update(schema.leads)
     .set({ stageId, pipelineStage: ROLE_TO_LEGACY_KEY[role] as typeof schema.leads.$inferInsert.pipelineStage, updatedAt: new Date() })
@@ -87,10 +89,10 @@ export function recomputeLapsed(conn: TenantDb): {
   let lapsed = 0;
   let reactivated = 0;
 
-  const wonId = resolveStageIdByRoleOnConn(conn, "won");
-  const repeatId = resolveStageIdByRoleOnConn(conn, "repeat");
-  const lapsedId = resolveStageIdByRoleOnConn(conn, "lapsed");
-  const customerStageIds = [wonId, repeatId].filter((x): x is number => x != null);
+  // Every board's won/repeat/lapsed stages: a customer lapses wherever they
+  // were won, and is written back onto that same board above.
+  const customerStageIds = [...stageIdsByRoleOnConn(conn, "won"), ...stageIdsByRoleOnConn(conn, "repeat")];
+  const lapsedIds = stageIdsByRoleOnConn(conn, "lapsed");
 
   const customers = customerStageIds.length
     ? conn.select({ id: schema.leads.id, clientId: schema.leads.clientId }).from(schema.leads).where(inArray(schema.leads.stageId, customerStageIds)).all()
@@ -100,8 +102,8 @@ export function recomputeLapsed(conn: TenantDb): {
     if (!isActive(conn, l.clientId, cutoffIso, cutoffMs)) { writeLapseStage(conn, l.id, "lapsed"); lapsed++; }
   }
 
-  const lapsedLeads = lapsedId != null
-    ? conn.select({ id: schema.leads.id, clientId: schema.leads.clientId }).from(schema.leads).where(eq(schema.leads.stageId, lapsedId)).all()
+  const lapsedLeads = lapsedIds.length
+    ? conn.select({ id: schema.leads.id, clientId: schema.leads.clientId }).from(schema.leads).where(inArray(schema.leads.stageId, lapsedIds)).all()
     : [];
   for (const l of lapsedLeads) {
     if (l.clientId == null) continue;

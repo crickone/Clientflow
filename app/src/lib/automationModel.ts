@@ -39,6 +39,11 @@ export const TRIGGER_CATALOG: TriggerDef[] = [
   { key: "client_check_in_reminder", label: "Client check-in reminder", description: "A reminder before a client's check-in is due.", status: "coming_soon" },
   { key: "client_birthday", label: "Client's birthday", description: "On a client's birthday.", status: "active" },
   { key: "supplement_plan_updated", label: "Supplement plan updated", description: "When a client's supplement plan changes.", status: "coming_soon" },
+  // The campaign nurture sequence. One series, every campaign: whoever signs
+  // up through ANY campaign landing page (or arrives tagged with a campaign)
+  // gets these messages, spaced by their delays. The only trigger whose
+  // delays are honoured -- see DELAYED_TRIGGER_KEYS.
+  { key: "campaign_signup", label: "Campaign sign-up", description: "When someone signs up through a campaign landing page. The same follow-up sequence runs for every campaign; each message goes out after its delay.", status: "active" },
 ];
 
 export const TRIGGER_LABELS: Record<string, string> = Object.fromEntries(
@@ -68,8 +73,38 @@ export const ACTIVE_TRIGGER_KEYS: ReadonlySet<string> = new Set(
 export const LIVE_CHANNEL: Channel = "email";
 export const LIVE_DELAY_VALUE = 0;
 
-/** True iff `m` would actually be dispatched by fireTrigger()/the birthday job — see LIVE_CHANNEL/LIVE_DELAY_VALUE above. */
-export function isMessageLive(m: { channel: Channel; delayValue: number }): boolean {
+/**
+ * Triggers whose messages are QUEUED rather than sent on the spot, so their
+ * delays mean what they say. Dispatched by lib/automations/nurture.ts through
+ * the automation_queue table and the dispatch ticker. Every other trigger
+ * still sends immediately and only its delay-0 messages (see isMessageLive).
+ */
+export const DELAYED_TRIGGER_KEYS: ReadonlySet<string> = new Set(["campaign_signup"]);
+
+export function supportsDelays(triggerKey: string): boolean {
+  return DELAYED_TRIGGER_KEYS.has(triggerKey);
+}
+
+/** A delay in the editor's units, as milliseconds. */
+export function delayToMs(value: number, unit: IntervalUnit): number {
+  const v = Math.max(0, Number(value) || 0);
+  switch (unit) {
+    case "days":
+      return v * 86_400_000;
+    case "hours":
+      return v * 3_600_000;
+    default:
+      return v * 60_000;
+  }
+}
+
+/**
+ * True iff `m` would actually be dispatched — see LIVE_CHANNEL/LIVE_DELAY_VALUE
+ * above. For a trigger that supports delays (DELAYED_TRIGGER_KEYS) the delay
+ * is no longer a reason to drop a message: only the channel has to be live.
+ */
+export function isMessageLive(m: { channel: Channel; delayValue: number }, triggerKey?: string): boolean {
+  if (triggerKey && supportsDelays(triggerKey)) return m.channel === LIVE_CHANNEL;
   return m.channel === LIVE_CHANNEL && m.delayValue === LIVE_DELAY_VALUE;
 }
 
@@ -172,5 +207,10 @@ export const DEFAULT_MESSAGES: Record<string, MessageInput[]> = {
   ],
   supplement_plan_updated: [
     msg("chat", null, "Hi [FIRST_NAME], your supplement plan has been updated — check the app for the details."),
+  ],
+  campaign_signup: [
+    msg("email", "Thanks for signing up, [FIRST_NAME]", "Hi [FIRST_NAME],\n\nThanks for signing up with [BUSINESS_NAME]. We'll be in touch very shortly to get you booked in — if you'd rather not wait, just reply to this email and we'll sort it now.\n\nTalk soon."),
+    { ...msg("email", "A quick question, [FIRST_NAME]", "Hi [FIRST_NAME],\n\nJust checking in — what made you sign up? Knowing what you're hoping to get out of it helps us point you at the right first step.\n\nReply with a line or two and we'll take it from there."), delayValue: 2, delayUnit: "days" },
+    { ...msg("email", "Still thinking it over, [FIRST_NAME]?", "Hi [FIRST_NAME],\n\nNo pressure at all — but if there's anything holding you back, tell us and we'll answer it straight. When you're ready, reply here and we'll get you in.\n\n[BUSINESS_NAME]"), delayValue: 5, delayUnit: "days" },
   ],
 };

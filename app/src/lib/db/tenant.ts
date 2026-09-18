@@ -1067,15 +1067,57 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
     CREATE INDEX IF NOT EXISTS idx_leads_source_dedup ON leads(source, source_lead_id);
 
+    CREATE TABLE IF NOT EXISTS pipelines (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      campaign_id INTEGER,
+      is_default INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+
     CREATE TABLE IF NOT EXISTS pipeline_stages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pipeline_id INTEGER NOT NULL DEFAULT 1,
       name TEXT NOT NULL,
       colour TEXT NOT NULL,
       position INTEGER NOT NULL,
       role TEXT,
       created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_pipeline_stages_role ON pipeline_stages(role);
+    -- The (pipeline_id, role) unique index is created in the guarded block
+    -- below, AFTER pipeline_id is guaranteed to exist on older databases.
+
+    CREATE TABLE IF NOT EXISTS scheduled_posts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      carousel_set_id INTEGER NOT NULL REFERENCES carousel_sets(id) ON DELETE CASCADE,
+      campaign_id INTEGER,
+      channels TEXT NOT NULL DEFAULT '["facebook","instagram"]',
+      scheduled_for INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'scheduled',
+      error TEXT,
+      last_attempt_at INTEGER,
+      posted_at INTEGER,
+      external_refs TEXT,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_scheduled_posts_due ON scheduled_posts(status, scheduled_for);
+
+    CREATE TABLE IF NOT EXISTS automation_queue (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      trigger_key TEXT NOT NULL,
+      lead_id INTEGER,
+      client_id INTEGER,
+      channel TEXT NOT NULL,
+      subject TEXT,
+      body TEXT NOT NULL,
+      send_to TEXT,
+      due_at INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'queued',
+      error TEXT,
+      sent_at INTEGER,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_automation_queue_due ON automation_queue(status, due_at);
 
     CREATE TABLE IF NOT EXISTS lead_messages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1538,6 +1580,29 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     }
   } catch (err) {
     console.error("[db] leads stage_id migration failed:", err);
+  }
+
+  // Pipelines (one board per campaign): stages and leads each carry the
+  // pipeline they belong to, defaulting to 1 = the default pipeline that
+  // migration 0005 seeds. The role-uniqueness index moves from (role) to
+  // (pipeline_id, role) so every board can have its own "new"/"won"/... --
+  // done HERE rather than in the CREATE block because on an existing database
+  // the column has to exist before an index can name it.
+  try {
+    const stageCols = sqlite.prepare("PRAGMA table_info(pipeline_stages)").all() as Array<{ name: string }>;
+    if (!stageCols.some((c) => c.name === "pipeline_id")) {
+      sqlite.exec("ALTER TABLE pipeline_stages ADD COLUMN pipeline_id INTEGER NOT NULL DEFAULT 1");
+    }
+    sqlite.exec("DROP INDEX IF EXISTS idx_pipeline_stages_role");
+    sqlite.exec(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_pipeline_stages_pipeline_role ON pipeline_stages(pipeline_id, role)",
+    );
+    const leadCols = sqlite.prepare("PRAGMA table_info(leads)").all() as Array<{ name: string }>;
+    if (!leadCols.some((c) => c.name === "pipeline_id")) {
+      sqlite.exec("ALTER TABLE leads ADD COLUMN pipeline_id INTEGER NOT NULL DEFAULT 1");
+    }
+  } catch (err) {
+    console.error("[db] pipelines migration failed:", err);
   }
 
   // Campaign Engine (Slice 5): manual ad-spend input the CFA/ROAS scoreboard

@@ -14,6 +14,7 @@ import {
   blankMessage,
   CHANNEL_LABEL,
   LIVE_CHANNEL,
+  supportsDelays,
   SHORTCODES,
   type Channel,
   type MessageInput,
@@ -120,6 +121,7 @@ export function TriggerEditor({ initial, businessName }: { initial: Detail; busi
               onPatch={(p) => patch(i, p)}
               onRemove={() => removeMsg(i)}
               businessName={businessName}
+              delaysLive={supportsDelays(initial.key)}
             />
           ))}
 
@@ -150,6 +152,7 @@ function MessageCard({
   onPatch,
   onRemove,
   businessName,
+  delaysLive,
 }: {
   index: number;
   message: MessageInput;
@@ -157,6 +160,8 @@ function MessageCard({
   onPatch: (p: Partial<MessageInput>) => void;
   onRemove: () => void;
   businessName: string;
+  /** Whether this trigger honours the delay (the campaign nurture sequence does; see DELAYED_TRIGGER_KEYS). */
+  delaysLive: boolean;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -287,20 +292,29 @@ function MessageCard({
         )}
       </div>
 
-      {/* timing — disabled: every message sends immediately today (Theme D1) */}
+      {/* timing — live only for triggers that queue their messages (the nurture sequence); every other trigger sends immediately today (Theme D1) */}
       <div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, opacity: 0.55 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, opacity: delaysLive ? 1 : 0.55 }}>
           <div>
-            <Label htmlFor={`delay-${index}`}>When do you want to send this message?</Label>
-            <Input id={`delay-${index}`} type="number" min={0} value={message.delayValue} disabled style={{ cursor: "not-allowed" }} />
+            <Label htmlFor={`delay-${index}`}>{delaysLive ? "Send this message after" : "When do you want to send this message?"}</Label>
+            <Input
+              id={`delay-${index}`}
+              type="number"
+              min={0}
+              value={message.delayValue}
+              disabled={!delaysLive}
+              onChange={(e) => onPatch({ delayValue: Math.max(0, Number(e.target.value) || 0) })}
+              style={delaysLive ? undefined : { cursor: "not-allowed" }}
+            />
           </div>
           <div>
             <Label htmlFor={`unit-${index}`}>Interval</Label>
             <select
               id={`unit-${index}`}
               value={message.delayUnit}
-              disabled
-              style={{ width: "100%", height: 40, padding: "0 12px", borderRadius: "var(--radius)", border: "1px solid var(--hairline)", background: "var(--surface-1)", color: "var(--text-primary)", fontSize: 13, cursor: "not-allowed" }}
+              disabled={!delaysLive}
+              onChange={(e) => onPatch({ delayUnit: e.target.value as MessageInput["delayUnit"] })}
+              style={{ width: "100%", height: 40, padding: "0 12px", borderRadius: "var(--radius)", border: "1px solid var(--hairline)", background: "var(--surface-1)", color: "var(--text-primary)", fontSize: 13, cursor: delaysLive ? "pointer" : "not-allowed" }}
             >
               <option value="minutes">Minutes</option>
               <option value="hours">Hours</option>
@@ -309,7 +323,9 @@ function MessageCard({
           </div>
         </div>
         <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 6 }}>
-          Scheduled &amp; multi-channel sending coming soon — for now every message sends by Email, immediately.
+          {delaysLive
+            ? "Counted from the moment the person signs up. 0 sends straight away."
+            : "Scheduled & multi-channel sending coming soon — for now every message sends by Email, immediately."}
         </div>
       </div>
 
