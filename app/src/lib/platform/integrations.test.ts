@@ -140,7 +140,7 @@ const requireLocal = createRequire(import.meta.url);
     for (const [name, secret] of Object.entries(SECRETS)) {
       assert.equal(wire.includes(secret), false, `${name} does not appear in the board sent to the console`);
     }
-    assert.equal(wire.includes(generated.key), false, "the API key body does not appear either");
+    assert.equal(wire.includes(generated.raw), false, "the API key body does not appear either");
     assert.ok(wire.includes(generated.prefix), "…only its prefix, which is what identifies it");
 
     // ── revoking a key ───────────────────────────────────────────────────

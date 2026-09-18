@@ -340,3 +340,45 @@ export interface TenantIntegrations {
   siteDomains: SiteDomainView[];
 }
 
+/** Health of one business (console Health tab). */
+export interface HealthAlert {
+  level: "warn" | "bad";
+  message: string;
+}
+
+export interface QueueDepth {
+  key: string;
+  label: string;
+  due: number;
+  waiting: number;
+  failed: number;
+  note: string | null;
+}
+
+export interface TenantHealth {
+  tenantId: number;
+  dbBytes: number;
+  walBytes: number;
+  dbExists: boolean;
+  integrity: "ok" | "failed" | "unknown";
+  integrityDetail: string | null;
+  migrations: { applied: number; expected: number; missing: string[] };
+  queues: QueueDepth[];
+  stuckGenerations: number;
+  schedulers: { key: string; label: string; lastRun: string | null }[];
+  alerts: HealthAlert[];
+}
+
+export interface FleetHealthRow {
+  tenantId: number;
+  name: string;
+  slug: string;
+  dbBytes: number;
+  alerts: HealthAlert[];
+}
+
+export interface FleetHealth {
+  tenants: FleetHealthRow[];
+  schedulers: { key: string; label: string; lastRun: string | null }[];
+}
+

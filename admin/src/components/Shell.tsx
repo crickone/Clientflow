@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import {
+  Activity,
   Dumbbell,
   LayoutDashboard,
   LogOut,
@@ -24,6 +25,8 @@ const NAV = [
   { href: "/gyms", label: "Businesses", icon: Dumbbell },
   { href: "/provision", label: "Provision", icon: Rocket },
   // Every console action, including refused ones. Both roles can read it.
+  // Every business's alerts in one list; shallow, for skimming.
+  { href: "/health", label: "Health", icon: Activity },
   { href: "/audit", label: "Audit log", icon: ScrollText },
   { href: "/staff", label: "Platform staff", icon: Users },
   { href: "/settings", label: "Settings", icon: SettingsIcon },
