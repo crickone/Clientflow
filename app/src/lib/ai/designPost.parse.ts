@@ -240,7 +240,15 @@ The canvas is EXACTLY the size you are told. The outermost element sets that wid
 
 STACK TEXT IN A CONTAINER, NEVER BY HAND. Blocks that sit one under another -- an eyebrow, the heading, the paragraph beneath it -- go in ONE positioned container with "display:flex;flex-direction:column" and a "gap", as its children. Do NOT give each block its own "top". You cannot know how many lines a heading wraps to: the renderer decides that after you are finished, so any "top" you choose for the block below it is a guess, and a heading that takes one line more than you expected lands ON the paragraph. Position the CONTAINER and let the renderer stack what is inside it. Absolute positioning is for that container, for a photograph, a footer, a figure bled off an edge -- not for the individual lines of a text block.
 
-Keep every element inside the canvas and clear of the others. Nothing may overlap text, and nothing may run off an edge unless you meant it to. Give every text element an explicit "width" so it wraps where you intend rather than where it runs out of canvas.
+COLOUR BEHIND TEXT GOES ON THE TEXT, NEVER IN A RECTANGLE BEHIND IT. For a marker-pen highlight, a knocked-out label, a band of colour under a line: put "background-color" and a "padding" ON THE TEXT ELEMENT ITSELF, add "align-self:flex-start", and give that element NO width. It then shrinks to exactly the words it holds, so the colour ends where the line ends -- at any length, in any face, with nothing measured.
+
+Never draw a separate block of colour behind the text and choose its width. This is STACK TEXT IN A CONTAINER on the other axis: you cannot know how WIDE a line sets any more than you know how many lines it wraps to, because the renderer decides that after you are finished. A real slide wrote a 340px strip behind a heading that set 465px wide -- it covered "One night is a" and stopped dead before "blip.".
+
+An inline <span> with a background does NOT work: it is dropped and the colour never renders at all. One element per highlighted run. To highlight only PART of a line, make the parent "display:flex;flex-direction:row;align-items:baseline" and give the highlighted words their own child, with the rest of the line as its own child beside it.
+
+A highlighted line is the ONE text element that goes without a width. Every other one still needs one.
+
+Keep every element inside the canvas and clear of the others. Nothing may overlap text, and nothing may run off an edge unless you meant it to. Give every text element an explicit "width" so it wraps where you intend rather than where it runs out of canvas -- every one except a highlighted line, which takes its width from its own words.
 
 ANCHOR THE COMPOSITION, and do not leave a hole in it. Quiet space is a BAND at one edge, never a gap in the middle: either the content runs down to the bottom margin, or it starts below the midline and the space sits above it. A slide that fills the top two thirds and then stops -- a band of nothing between the last paragraph and the footer -- reads as unfinished, not composed. If the copy does not reach the bottom on its own, set it larger, move the whole block down, or close the slide with something that belongs there: a figure, a rule, a caption, a band of a second ground, a photograph.
 

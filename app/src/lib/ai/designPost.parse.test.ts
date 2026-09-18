@@ -89,6 +89,32 @@ check("no CSS filter is stated", DESIGN_RULES.includes("filter"));
 check("img sizing in style is stated", DESIGN_RULES.includes("object-fit"));
 check("the entity trap is stated", DESIGN_RULES.toLowerCase().includes("entit"));
 check("the photo placeholder is specified", DESIGN_RULES.includes("{{PHOTO}}"));
+
+// A highlight is a WIDTH the model cannot measure, and it guessed: a live
+// Inspire slide drew a 340px strip behind a heading that set 465px wide, so
+// the colour covered "One night is a" and stopped before "blip.". Probed
+// against satori before this was written -- an inline <span> background is
+// dropped entirely (no box in the laid-out SVG at all), which is why a
+// positioned rectangle was the only thing left to reach for, and a text
+// element with align-self:flex-start and NO width shrank to exactly 465px.
+check(
+  "putting the colour on the text element is stated",
+  DESIGN_RULES.includes("align-self:flex-start"),
+);
+check(
+  "and the reason -- the model cannot measure a line's width",
+  DESIGN_RULES.includes("you cannot know how WIDE a line sets"),
+);
+check(
+  "the dead <span> is named, since it is the obvious thing to try",
+  DESIGN_RULES.includes("<span> with a background does NOT work"),
+);
+// The blanket width rule sits further down the same prompt; left unqualified
+// it reads as a flat contradiction of the exception just granted.
+check(
+  "the blanket width rule names the exception",
+  DESIGN_RULES.includes("except a highlighted line"),
+);
 // The compositional vocabulary MOVED: it belongs with the system description
 // (where a brand's own motifs can replace it), not with the renderer's rules.
 // DESIGN_RULES is now purely what satori can and cannot draw.
