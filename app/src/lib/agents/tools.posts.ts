@@ -9,7 +9,7 @@ import { saveDownload } from "@/lib/assistant/downloadStore";
 import { createCarousel, getCarousel, listCarousels, type CarouselWithSlides } from "@/lib/image/carousels";
 import { enqueueCarouselGeneration } from "@/lib/image/carouselGeneration";
 import { renderFilePath } from "@/lib/image/renderStore";
-import { DEFAULT_CAROUSEL_SLOT, isCarouselSlot } from "@/lib/image/slots";
+import { DEFAULT_CAROUSEL_SLOT, DEFAULT_SLOT, isCarouselSlot } from "@/lib/image/slots";
 import type { ToolContext, ToolResult } from "@/lib/agents/toolKit";
 
 /**
@@ -69,10 +69,15 @@ export const POSTS_TOOLS: Anthropic.Tool[] = [
   {
     name: "create_social_post",
     description:
-      "Create ONE social post (an Instagram/Facebook carousel) in Content Studio and start designing it: the slides are written and designed on-brand in the background, exactly as the studio's own Generate button does. Returns the new post's id and editor link. The design takes 2-4 minutes and posts queue one after another, so call this once per post (a week of posts = several calls, each approved separately), then use list_social_posts to see when they're ready and export_social_posts to hand them over as a download. Never say a post is designed until list_social_posts shows it rendered.",
+      "Create ONE social post in Content Studio and start designing it: either a single-image post (format \"single\", one statement, offer or quote) or a carousel (format \"carousel\", 2-10 slides that teach something). The copy is written and the post designed on-brand in the background, exactly as the studio's own Generate button does. Returns the new post's id and editor link. A design takes 1-4 minutes and posts queue one after another, so call this once per post (a week of posts = several calls, each approved separately), then use list_social_posts to see when they're ready and export_social_posts to hand them over as a download. Never say a post is designed until list_social_posts shows it rendered.",
     input_schema: {
       type: "object",
       properties: {
+        format: {
+          type: "string",
+          enum: ["single", "carousel"],
+          description: "\"single\" for a one-image post, \"carousel\" for a swipeable set (default carousel).",
+        },
         name: {
           type: "string",
           description: "Short name for the post as it will appear in Content Studio, e.g. \"Mon - Why HBOT helps recovery\".",
@@ -83,7 +88,7 @@ export const POSTS_TOOLS: Anthropic.Tool[] = [
         },
         slideCount: {
           type: "integer",
-          description: `Number of slides, ${MIN_SLIDES}-${MAX_SLIDES} (default ${DEFAULT_SLIDES}).`,
+          description: `Carousels only: number of slides, ${MIN_SLIDES}-${MAX_SLIDES} (default ${DEFAULT_SLIDES}). Ignored for a single.`,
         },
         tone: { type: "string", description: "Optional tone notes." },
       },
@@ -174,9 +179,11 @@ function editorUrl(id: number): string {
 function summarise(carousel: CarouselWithSlides) {
   const status = postStatus(carousel);
   const rendered = exportableSlides(carousel).length;
+  const hasCarousel = carousel.slides.some((s) => isCarouselSlot(s.slotKey));
   return {
     id: carousel.id,
     name: carousel.name,
+    format: hasCarousel ? "carousel" : "single",
     status,
     stage: status === "writing" ? (carousel.generationStage ?? null) : null,
     error: status === "failed" ? (carousel.generationError ?? null) : null,
@@ -197,11 +204,17 @@ export function createSocialPostTool(ctx: ToolContext, input: Record<string, unk
   if (!name) return { text: JSON.stringify({ error: "name is required." }) };
   if (!topic) return { text: JSON.stringify({ error: "topic is required." }) };
   const tone = input.tone != null ? String(input.tone).trim() || null : null;
+  const format = String(input.format || "carousel").trim().toLowerCase() === "single" ? "single" : "carousel";
   const countArg = Number(input.slideCount);
   const slideCount =
-    Number.isFinite(countArg) && countArg > 0
-      ? Math.min(MAX_SLIDES, Math.max(MIN_SLIDES, Math.round(countArg)))
-      : DEFAULT_SLIDES;
+    format === "single"
+      ? 1
+      : Number.isFinite(countArg) && countArg > 0
+        ? Math.min(MAX_SLIDES, Math.max(MIN_SLIDES, Math.round(countArg)))
+        : DEFAULT_SLIDES;
+  // A single lives in the studio's single-image slot, a carousel in its
+  // carousel slot: the slot IS the kind as far as the editor is concerned.
+  const slotKey = format === "single" ? DEFAULT_SLOT : DEFAULT_CAROUSEL_SLOT;
 
   // Checked HERE, before anything is created: a tenant over its allowance
   // gets a clean refusal instead of an empty design that fails a beat later
@@ -220,15 +233,16 @@ export function createSocialPostTool(ctx: ToolContext, input: Record<string, unk
     topic,
     slideCount,
     tone,
-    slotKey: DEFAULT_CAROUSEL_SLOT,
+    slotKey,
     replaceExisting: false,
   });
 
   return {
     text: JSON.stringify({
-      result: `Created "${name}" in Content Studio and queued its design (${slideCount} slides). It is being written and designed in the background -- 2-4 minutes, one post at a time. Check list_social_posts before telling the operator it is ready.`,
+      result: `Created "${name}" in Content Studio and queued its design (${format === "single" ? "single image" : `${slideCount}-slide carousel`}). It is being written and designed in the background -- 1-4 minutes, one post at a time. Check list_social_posts before telling the operator it is ready.`,
       postId: carousel.id,
       status: "writing",
+      format,
       slideCount,
       editorUrl: editorUrl(carousel.id),
     }),

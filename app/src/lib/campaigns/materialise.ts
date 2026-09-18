@@ -8,7 +8,7 @@ import { updateBlogContent } from "@/lib/blog/posts";
 
 import { createCarousel, addSlide } from "@/lib/image/carousels";
 import { enqueueCarouselGeneration } from "@/lib/image/carouselGeneration";
-import { DEFAULT_CAROUSEL_SLOT } from "@/lib/image/slots";
+import { DEFAULT_CAROUSEL_SLOT, DEFAULT_SLOT } from "@/lib/image/slots";
 import { getDesignSystem } from "@/lib/design/system";
 import { queueSlideImages, type SlideImageJob } from "@/lib/image/autoImages";
 import { isImageGenConfigured } from "@/lib/ai/image/falClient";
@@ -146,13 +146,16 @@ function materialiseSocial(asset: CampaignAsset, campaign: Campaign, tenantId: n
   // re-writing the copy from the brief, so the template path below keeps
   // the approved copy exactly as it was approved.
   if (getDesignSystem()) {
+    // One approved slide is a single-image post and lives in the studio's
+    // single-image slot; more is a carousel. See socialFormatFromTitle.
+    const slideCount = Math.min(10, Math.max(1, parsed.slides.length));
     enqueueCarouselGeneration({
       tenantId,
       carouselId: carousel.id,
       topic: approvedCopyBrief(parsed),
-      slideCount: Math.min(10, Math.max(2, parsed.slides.length)),
+      slideCount,
       tone: null,
-      slotKey: DEFAULT_CAROUSEL_SLOT,
+      slotKey: slideCount === 1 ? DEFAULT_SLOT : DEFAULT_CAROUSEL_SLOT,
       replaceExisting: false,
     });
     return { externalKind: "carousel_set", externalId: carousel.id };

@@ -90,7 +90,7 @@ const requireLocal = createRequire(import.meta.url);
     } catch {
       // best effort
     }
-    for (const f of [renderA, renderB]) {
+    for (const f of [renderA, renderB, "design-test-posts-cccc.png"]) {
       try {
         fs.unlinkSync(renderFilePath(f));
       } catch {
@@ -145,6 +145,18 @@ const requireLocal = createRequire(import.meta.url);
     assert.match(queued[0].topic, /HBOT/);
     assert.equal(runWithTenant(tid, () => getCarousel(created.postId))?.name, "Mon - Why HBOT helps recovery");
 
+    // A single-image post: one slide, queued into the single-image slot.
+    const single = JSON.parse(
+      runWithTenant(tid, () =>
+        createSocialPostTool(ctx, { format: "single", name: "Fri - One line on rest days", topic: "Rest days are training too", slideCount: 7 }),
+      ).text,
+    );
+    assert.ok(!single.error, `single create succeeds: ${single.error ?? ""}`);
+    assert.equal(single.format, "single");
+    assert.equal(single.slideCount, 1, "a single is one slide whatever slideCount says");
+    assert.equal(queued[queued.length - 1].slotKey, "default", "a single is queued into the single-image slot");
+    assert.equal(queued[queued.length - 1].slideCount, 1);
+
     // Out-of-range slide counts are clamped, not rejected.
     const clamped = JSON.parse(
       runWithTenant(tid, () => createSocialPostTool(ctx, { name: "Tue", topic: "PEMF", slideCount: 40 })).text,
@@ -168,6 +180,14 @@ const requireLocal = createRequire(import.meta.url);
       addSlide({ carouselSetId: ready.id, slotKey: "carousel-content", templateId: DESIGNED_TEMPLATE_ID, aspectRatio: "1:1", renderFilename: "design-does-not-exist.png" });
     });
 
+    // A finished SINGLE: one designed slide in the default slot.
+    const renderC = "design-test-posts-cccc.png";
+    fs.writeFileSync(renderFilePath(renderC), Buffer.from("png-c"));
+    const readySingle = runWithTenant(tid, () => createCarousel({ name: "Fri - Rest days" }));
+    runWithTenant(tid, () => {
+      addSlide({ carouselSetId: readySingle.id, slotKey: "default", templateId: DESIGNED_TEMPLATE_ID, aspectRatio: "1:1", caption: "Rest is part of the plan.", renderFilename: renderC });
+    });
+
     // A template-style design: slides but nothing rendered server-side.
     const templated = runWithTenant(tid, () => createCarousel({ name: "Thu - template only" }));
     runWithTenant(tid, () => {
@@ -182,22 +202,26 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(byId.get(ready.id)?.status, "ready");
     assert.equal(byId.get(ready.id)?.renderedSlides, 2, "only slides with a render on disk count");
     assert.equal(byId.get(ready.id)?.exportable, true);
+    assert.equal(byId.get(ready.id)?.format, "carousel");
+    assert.equal(byId.get(readySingle.id)?.format, "single");
+    assert.equal(byId.get(readySingle.id)?.exportable, true, "a rendered single is exportable");
     assert.equal(byId.get(templated.id)?.status, "ready");
     assert.equal(byId.get(templated.id)?.exportable, false, "a template-style design is not exportable from the chat");
 
     // ── (f) export_social_posts: one zip, the rendered post in, the rest
     // named with a reason, artifact attached ──
     const exported = await runWithTenant(tid, () =>
-      exportSocialPostsTool(ctx, { postIds: [ready.id, writingId, templated.id, 999999] }),
+      exportSocialPostsTool(ctx, { postIds: [ready.id, readySingle.id, writingId, templated.id, 999999] }),
     );
     const body = JSON.parse(exported.text);
     assert.ok(!body.error, `export succeeds: ${body.error ?? ""}`);
     assert.deepEqual(
       body.included.map((p: { id: number }) => p.id),
-      [ready.id],
-      "only the rendered post is included",
+      [ready.id, readySingle.id],
+      "only the rendered posts are included, in the order asked for",
     );
     assert.equal(body.included[0].slides, 2);
+    assert.equal(body.included[1].slides, 1);
     const skippedIds = body.skipped.map((s: { id: number }) => s.id).sort((a: number, b: number) => a - b);
     assert.deepEqual(skippedIds, [writingId, templated.id, 999999].sort((a, b) => a - b), "every other post is named as skipped");
     assert.match(body.skipped.find((s: { id: number }) => s.id === writingId).reason, /still being designed/i);
@@ -206,7 +230,7 @@ const requireLocal = createRequire(import.meta.url);
 
     assert.ok(exported.artifact, "the zip is attached as a chat artifact");
     assert.match(exported.artifact!.url, /^\/api\/assistant\/download\/[a-f0-9]{32}$/);
-    assert.match(exported.artifact!.label, /Infrared sauna myths/);
+    assert.match(exported.artifact!.label, /2 posts/);
 
     const downloadId = exported.artifact!.url.split("/").pop()!;
     const stored = readDownload(tid, downloadId);
@@ -218,7 +242,10 @@ const requireLocal = createRequire(import.meta.url);
       "01-wed-infrared-sauna-myths/01.png",
       "01-wed-infrared-sauna-myths/02.png",
       "01-wed-infrared-sauna-myths/caption.txt",
+      "02-fri-rest-days/01.png",
+      "02-fri-rest-days/caption.txt",
     ]);
+    assert.equal(await zip.file("02-fri-rest-days/01.png")!.async("string"), "png-c");
     assert.equal(await zip.file("01-wed-infrared-sauna-myths/01.png")!.async("string"), "png-a");
     assert.equal(await zip.file("01-wed-infrared-sauna-myths/caption.txt")!.async("string"), "Three myths about infrared, busted.");
 

@@ -6,6 +6,9 @@ import { CONTENT_MODEL } from "@/lib/ai/client";
 import { meteredCreate, meteredComplete, type MeterContext } from "@/lib/ai/metered";
 import { draftBlogPost } from "@/lib/ai/draftBlog";
 import { generateCarouselSlides } from "@/lib/ai/generateCarousel";
+import { refreshSlidesContent } from "@/lib/ai/refreshSlides";
+import { DEFAULT_SINGLE_TEMPLATE } from "@/lib/image/slots";
+import { socialFormatFromTitle } from "./plan";
 import { draftCampaignEmail } from "@/lib/ai/draftCampaign";
 import { getCampaignBuildModel } from "@/lib/campaigns/buildModel";
 import type { Campaign, CampaignAsset } from "@/lib/db/schema";
@@ -291,6 +294,27 @@ export async function generateAsset(
     case "social": {
       const topicLines = [`Campaign: ${campaign.name}`, `Offer: ${campaign.offer || "(not yet defined)"}`];
       if (tweak && tweak.trim()) topicLines.push(`Operator tweak: ${tweak.trim()}`);
+
+      // A single-image post is one statement, not a short series, so it is
+      // written by the single-slide copy writer rather than the carousel
+      // generator (which refuses fewer than two slides). Same body shape
+      // either way -- one slide in the list -- so materialise reads both.
+      if (socialFormatFromTitle(asset.title) === "single") {
+        const copy = await refreshSlidesContent({
+          slides: [{ template: DEFAULT_SINGLE_TEMPLATE, heading: "", body: "" }],
+          designName: topicLines.join("\n"),
+          tone: null,
+          tenantId: meter.tenantId,
+        });
+        const slide = copy.slides[0] ?? { heading: "", body: "" };
+        return {
+          title: asset.title,
+          body: JSON.stringify({
+            caption: copy.caption,
+            slides: [{ template: DEFAULT_SINGLE_TEMPLATE, heading: slide.heading, body: slide.body, image: "" }],
+          }),
+        };
+      }
 
       const draft = await generateCarouselSlides(
         { topic: topicLines.join("\n"), slideCount: 5, tone: null },

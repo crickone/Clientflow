@@ -116,7 +116,7 @@ export const CAMPAIGN_TOOLS: Anthropic.Tool[] = [
   {
     name: "plan_campaign",
     description:
-      "Plan a new seasonal campaign kit from a brief: proposes a name/season/dates and GENERATES a real, house-rule-guarded core offer, plus the standard 11-asset build plan (one offer, one landing page, one blog post, 3 social posts, 3 emails, one ad copy, one video script). Returns ONLY a plan — it does NOT save anything. Show the plan to the operator for Approve/Go-again before calling create_campaign.",
+      "Plan a new seasonal campaign kit from a brief: proposes a name/season/dates and GENERATES a real, house-rule-guarded core offer, plus the standard 11-asset build plan (one offer, one landing page, one blog post, 3 social posts -- two carousels and one single image, say which in each title -- 3 emails, one ad copy, one video script). Returns ONLY a plan — it does NOT save anything. Show the plan to the operator for Approve/Go-again before calling create_campaign.",
     input_schema: {
       type: "object",
       properties: {
@@ -148,7 +148,7 @@ export const CAMPAIGN_TOOLS: Anthropic.Tool[] = [
         assets: {
           type: "array",
           description:
-            "The asset plan to seed — normally plan_campaign's `assets` verbatim, or trimmed if the operator asked to drop some. Defaults to the standard 11-asset plan (offer, landing page, blog post, 3 social posts, 3 emails, ad copy, video script) if omitted.",
+            "The asset plan to seed — normally plan_campaign's `assets` verbatim, or trimmed if the operator asked to drop some. Defaults to the standard 11-asset plan (offer, landing page, blog post, 3 social posts: two carousels + one single image, 3 emails, ad copy, video script) if omitted. A social asset whose title contains the word single is made as a single-image post; any other is a carousel.",
           items: {
             type: "object",
             properties: {

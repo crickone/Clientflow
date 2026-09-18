@@ -14,6 +14,9 @@ import { isImageGenConfigured } from "@/lib/ai/image/falClient";
 import { getTemplate, templateUsesPhoto } from "@/lib/image/templates";
 import { DESIGNED_TEMPLATE_ID } from "@/lib/image/paintSlide";
 import { photoChoices } from "@/lib/image/library";
+import { getDesignSystem } from "@/lib/design/system";
+import { refreshSlidesContent } from "@/lib/ai/refreshSlides";
+import { DEFAULT_SINGLE_TEMPLATE } from "@/lib/image/slots";
 import { serialisePhotoAssetIds } from "@/lib/image/photoAssetIds";
 import { serialisePhotoScenes } from "@/lib/image/photoScenes";
 import {
@@ -123,6 +126,51 @@ async function runAndRecord(input: CarouselGenerationInput): Promise<void> {
 }
 
 /**
+ * One template slide with copy written for it, and a background queued if the
+ * template shows one. Mirrors what the editor does when an operator starts a
+ * single post with AI and presses Refresh copy: the same copy writer
+ * (refreshSlidesContent) and the same background queue.
+ */
+async function writeSingleTemplateSlide(input: CarouselGenerationInput): Promise<void> {
+  const { tenantId, carouselId, topic, tone, slotKey, replaceExisting } = input;
+  const copy = await refreshSlidesContent({
+    slides: [{ template: DEFAULT_SINGLE_TEMPLATE, heading: "", body: "" }],
+    designName: topic,
+    tone,
+    tenantId,
+  });
+  const written = copy.slides[0];
+  if (!written) throw new Error("The copy writer returned no slide.");
+
+  if (replaceExisting) deleteSlot(carouselId, slotKey);
+
+  const template = getTemplate(DEFAULT_SINGLE_TEMPLATE);
+  const houseStyle = isImageGenConfigured()
+    ? (getBrandImageStyle() ?? defaultImageStyle(getBusinessProfile()))
+    : null;
+  const prompt =
+    houseStyle && template && templateUsesPhoto(template)
+      ? buildImagePrompt({
+          houseStyle,
+          scene: fallbackScene({ heading: written.heading, body: written.body }),
+        })
+      : null;
+
+  const row = addSlide({
+    carouselSetId: carouselId,
+    slotKey,
+    templateId: DEFAULT_SINGLE_TEMPLATE,
+    aspectRatio: "1:1",
+    headingText: template?.headingHighlight ? written.heading : written.heading.replace(/\*/g, ""),
+    bodyText: written.body,
+    caption: copy.caption,
+    imagePrompt: prompt,
+    imageStatus: prompt ? "generating" : null,
+  });
+  if (prompt) queueSlideImages(tenantId, [{ slideId: row.id, prompt, aspectRatio: "1:1" }]);
+}
+
+/**
  * The generation itself. Throws on failure -- the caller decides whether that
  * becomes a response or a row of state.
  */
@@ -133,6 +181,21 @@ export async function runCarouselGeneration(
     input;
   const carousel = getCarousel(carouselId);
   if (!carousel) throw new Error("The design was deleted while it was being written.");
+
+  // A single-image post without a design system. designPost designs one slide
+  // as readily as ten, but its template fallback (generateCarouselSlides) is a
+  // SERIES writer and refuses fewer than two -- and a single post is not a
+  // short series, it is one statement. The studio's own single-post flow seeds
+  // one template slide and has the copy written onto it; this is that flow,
+  // run detached so the agent can queue a single the same way as a carousel.
+  if (slideCount === 1 && !getDesignSystem()) {
+    await writeSingleTemplateSlide(input);
+    db.update(schema.carouselSets)
+      .set({ updatedAt: new Date() })
+      .where(eq(schema.carouselSets.id, carouselId))
+      .run();
+    return;
+  }
 
   // The tenant's own library, so a design asking for a photograph gets a real
   // one, graded to the brand's numbers at render time. The whole list, not the

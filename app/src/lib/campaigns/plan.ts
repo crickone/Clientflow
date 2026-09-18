@@ -39,7 +39,9 @@ export interface AssetDef {
 
 /**
  * The default 11-asset kit, in build order: one offer, one landing page, one
- * blog post, 3 social posts, 3 emails, one ad copy, one video script.
+ * blog post, 3 social posts (two carousels and one single image -- the mix a
+ * week of posting actually needs; see socialFormatFromTitle), 3 emails, one ad
+ * copy, one video script.
  * sortOrder is 0..10 and doubles as campaign_assets.sort_order at insert
  * time — store.ts's addAssets(campaignId, DEFAULT_ASSET_PLAN) inserts these
  * verbatim under a freshly created campaign. landing_page sits right after
@@ -50,15 +52,28 @@ export const DEFAULT_ASSET_PLAN: AssetDef[] = [
   { kind: "offer", title: "Offer", sortOrder: 0 },
   { kind: "landing_page", title: "Landing page", sortOrder: 1 },
   { kind: "blog", title: "Blog post", sortOrder: 2 },
-  { kind: "social", title: "Social post 1", sortOrder: 3 },
-  { kind: "social", title: "Social post 2", sortOrder: 4 },
-  { kind: "social", title: "Social post 3", sortOrder: 5 },
+  { kind: "social", title: "Social post 1 (carousel)", sortOrder: 3 },
+  { kind: "social", title: "Social post 2 (carousel)", sortOrder: 4 },
+  { kind: "social", title: "Social post 3 (single image)", sortOrder: 5 },
   { kind: "email", title: "Email — Announce", sortOrder: 6 },
   { kind: "email", title: "Email — Proof", sortOrder: 7 },
   { kind: "email", title: "Email — Last chance", sortOrder: 8 },
   { kind: "ad_copy", title: "Ad copy", sortOrder: 9 },
   { kind: "video_script", title: "Video script", sortOrder: 10 },
 ];
+
+export type SocialFormat = "single" | "carousel";
+
+/**
+ * Which shape a social asset takes, read from its title. campaign_assets has
+ * no format column, and a title the operator (or plan_campaign) wrote is the
+ * one place the intent already lives -- "Social post 3 (single image)" says
+ * it outright. Anything that does not say "single" is a carousel, which is
+ * what every social asset was before singles existed.
+ */
+export function socialFormatFromTitle(title: string): SocialFormat {
+  return /\bsingle\b/i.test(title) ? "single" : "carousel";
+}
 
 /** The minimal asset shape nextPendingAsset needs — matches both a real CampaignAsset row and a bare test fixture. */
 export interface AssetLike {
