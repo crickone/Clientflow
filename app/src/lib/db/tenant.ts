@@ -1464,6 +1464,19 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     );
     CREATE INDEX IF NOT EXISTS idx_agents_key ON agents(key);
 
+    -- Reusable instruction blocks an agent can be given. Per tenant, because
+    -- one client's house rules are not another's. Which agents use one is on
+    -- the agent (agents.enabled_skills), not here, so a skill can serve
+    -- several without being copied.
+    CREATE TABLE IF NOT EXISTS skills (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      name         TEXT NOT NULL,
+      description  TEXT NOT NULL DEFAULT '',
+      body         TEXT NOT NULL DEFAULT '',
+      created_at   INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+      updated_at   INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+
     -- ── Agentic OS: durable runs (DR1) ───────────────────────────────────────
     -- One row per agent run on the specialist chat route
     -- (/api/agents/[key]/chat). Persists progress + the final result/pending
@@ -1809,6 +1822,28 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     }
   } catch (err) {
     console.error("[db] carousel imagery migration failed:", err);
+  }
+
+  // Skills (per-tenant instruction blocks) landed after these databases did:
+  // create the table and the agent's allowlist column on an existing tenant.
+  // Additive and PRAGMA-guarded, like every migration above it.
+  try {
+    sqlite.exec(`
+      CREATE TABLE IF NOT EXISTS skills (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        name         TEXT NOT NULL,
+        description  TEXT NOT NULL DEFAULT '',
+        body         TEXT NOT NULL DEFAULT '',
+        created_at   INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+        updated_at   INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+      );
+    `);
+    const agentCols = sqlite.prepare("PRAGMA table_info(agents)").all() as { name: string }[];
+    if (agentCols.length > 0 && !agentCols.find((c) => c.name === "enabled_skills")) {
+      sqlite.exec("ALTER TABLE agents ADD COLUMN enabled_skills TEXT");
+    }
+  } catch (err) {
+    console.error("[db] skills migration failed:", err);
   }
 
   // image_library_assets predates the unified media library; add the kind

@@ -1,4 +1,5 @@
 import "server-only";
+import { skillBodiesFor } from "@/lib/agents/skills";
 import { getAgent } from "@/lib/agents/registry";
 import { getBusinessContext } from "@/lib/ai/businessContext";
 import { OUTPUT_STYLE } from "@/lib/ai/responseStyle";
@@ -29,9 +30,24 @@ export function composeAgentSystem(tenantId: number, key: string): string {
   const agent = getAgent(tenantId, key);
   const base = SPECIALISTS[key]?.basePlaybook ?? "You are a helpful business agent.";
   const custom = (agent?.instructions ?? "").trim();
+
+  // Skills the operator has switched on for THIS agent. Each is a reusable
+  // block of instructions kept per tenant, so one can serve several agents
+  // without being copied into each one's instructions by hand.
+  //
+  // ABOVE the operator's own instructions, deliberately. A skill is a standing
+  // rule; the instructions box is where this operator overrides things for
+  // this agent, and the later text is the one that wins an argument.
+  const skills = skillBodiesFor(tenantId, key);
+  const skillText = skills.length
+    ? "\n\n=== SKILLS ===\n" +
+      skills.map((s) => `--- ${s.name} ---\n${s.body}`).join("\n\n")
+    : "";
+
   return [
     base,
     "\n\n=== BUSINESS CONTEXT ===\n" + getBusinessContext(),
+    skillText,
     custom ? "\n\n=== OPERATOR INSTRUCTIONS (from the Agents tab) ===\n" + custom : "",
     OUTPUT_STYLE,
     SAFETY_RAILS,

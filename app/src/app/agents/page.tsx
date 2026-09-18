@@ -1,4 +1,6 @@
 import { PageHeader } from "@/components/layout/PageHeader";
+import { SkillLibrary } from "@/components/agents/SkillLibrary";
+import { listSkills } from "@/lib/agents/skills";
 import { requireAdminPage, getCurrentMembership } from "@/lib/auth";
 import { listAgents } from "@/lib/agents/registry";
 import {
@@ -40,6 +42,7 @@ export default async function AgentsPage() {
         capCents={capCents}
         monthCents={monthCents}
       />
+      <SkillLibrary skills={listSkills(tenantId)} />
       <AiCreditsCard
         monthCents={monthCents}
         freeTrancheCents={capCents}

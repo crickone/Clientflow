@@ -9,14 +9,17 @@ import { Badge } from "@/components/ui/Badge";
 import { Reveal, RevealGroup } from "@/components/motion/Reveal";
 import { formatEur } from "@/lib/utils";
 import type { Agent } from "@/lib/db/schema";
+import type { SkillToggle } from "@/lib/agents/skills.parse";
 import { MODEL_CATALOG, isCatalogModel, type ModelChoice } from "@/lib/ai/modelCatalog";
 import { groupToolsByCategory } from "@/lib/agents/toolCategories";
-import { saveModel, saveDisabledTools } from "@/app/agents/actions";
+import { saveModel, saveDisabledTools, saveAgentSkills } from "@/app/agents/actions";
 import { AgentContextEditor } from "./AgentContextEditor";
 
 interface Layers {
   base: string;
   businessContext: string;
+  /** The skills switched on, already composed. "" when none are. */
+  skills: string;
   operator: string;
   rails: string;
 }
@@ -31,6 +34,7 @@ interface Props {
   toolNames: readonly string[];
   /** The agent's OFF list (tool names it may not use) — parsed from agents.disabled_tools in page.tsx via parseDisabledTools. Seeds the tool-access toggles; empty = every tool on. */
   disabledTools: string[];
+  skills: SkillToggle[];
   usageCents: number;
   capCents: number;
   /** Whether `OPENROUTER_API_KEY` is set — computed server-side (page.tsx) and passed down so a client component never has to guess at env state. Gates the DeepSeek/OpenRouter option in the model picker below. */
@@ -43,7 +47,7 @@ interface Props {
  * `composeAgentSystem` — @/lib/agents/context — actually concatenates them
  * for a live run), and the agent's working chat (or a dormant placeholder).
  */
-export function AgentDetail({ agent, mandate, roles, layers, toolNames, disabledTools, usageCents, capCents, openRouterConfigured }: Props) {
+export function AgentDetail({ agent, mandate, roles, layers, toolNames, disabledTools, skills, usageCents, capCents, openRouterConfigured }: Props) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 36 }}>
       <RevealGroup style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
@@ -56,6 +60,7 @@ export function AgentDetail({ agent, mandate, roles, layers, toolNames, disabled
       </RevealGroup>
 
       <Reveal>
+        <SkillsSection agentKey={agent.key} skills={skills} />
         <ToolAccessSection agentKey={agent.key} toolNames={toolNames} disabledTools={disabledTools} />
       </Reveal>
 
@@ -69,9 +74,15 @@ export function AgentDetail({ agent, mandate, roles, layers, toolNames, disabled
             <Connector />
             <LockedLayer index={2} title="Business context" text={layers.businessContext} />
             <Connector />
-            <EditableLayer index={3} agentKey={agent.key} initial={layers.operator} />
+            {/* Numbered 3 so the list reads in PROMPT ORDER. Skills sit above
+                the operator's own instructions, and a preview that showed them
+                anywhere else would misrepresent which one wins an argument. */}
+            {layers.skills && (
+              <LockedLayer index={3} title="Skills" text={layers.skills} />
+            )}
+            <EditableLayer index={layers.skills ? 4 : 3} agentKey={agent.key} initial={layers.operator} />
             <Connector />
-            <LockedLayer index={4} title="Safety rails" text={layers.rails} />
+            <LockedLayer index={layers.skills ? 5 : 4} title="Safety rails" text={layers.rails} />
           </div>
         </section>
       </Reveal>
@@ -364,6 +375,88 @@ function Toggle({ on, onToggle, pending, label }: { on: boolean; onToggle: () =>
  * is persisted via `saveDisabledTools`, and a rejected save reverts + toasts.
  * We store the DISABLED (off) set, so an unchanged tool stays on by default.
  */
+/**
+ * The tenant's skills, switched on or off for THIS agent.
+ *
+ * An allowlist, unlike the tool toggles below it: a tool added to the app
+ * should work for everyone, but a skill added to the tenant must not rewrite
+ * every agent's prompt without someone saying so.
+ *
+ * Optimistic with a revert, the same shape as ToolAccessSection -- a toggle
+ * that waits for a round trip feels broken, and one that lies when the server
+ * refuses is worse.
+ */
+function SkillsSection({ agentKey, skills }: { agentKey: string; skills: SkillToggle[] }) {
+  const [on, setOn] = useState<Set<number>>(
+    () => new Set(skills.filter((s) => s.enabled).map((s) => s.id)),
+  );
+  const [pending, startTransition] = useTransition();
+  // What the operator is actually spending: a skill's body goes into the
+  // prompt verbatim on every message this agent handles.
+  const charCount = skills.filter((s) => on.has(s.id)).reduce((n, s) => n + s.size, 0);
+
+  function toggle(id: number) {
+    const prev = on;
+    const next = new Set(on);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setOn(next);
+    startTransition(async () => {
+      try {
+        await saveAgentSkills(agentKey, [...next]);
+      } catch (err) {
+        setOn(prev);
+        toast.error(err instanceof Error ? err.message : "Could not update skills.");
+      }
+    });
+  }
+
+  return (
+    <div>
+      <SectionLabel>Skills — standing instructions this agent follows</SectionLabel>
+      <Card>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
+          <p style={{ fontSize: 12.5, color: "var(--text-tertiary)", margin: 0, lineHeight: 1.5, maxWidth: 620 }}>
+            A skill is a block of instructions kept for this account and shared across agents. Switching one on adds it to this agent&apos;s system prompt on every message; it sits above the operator instructions, so anything you write there still wins.
+          </p>
+          <span style={{ fontFamily: "var(--font-mono), ui-monospace, monospace", fontSize: 12, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+            {on.size} / {skills.length} on{charCount > 0 ? ` · ${charCount.toLocaleString()} chars` : ""}
+          </span>
+        </div>
+        {skills.length === 0 ? (
+          <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: 0 }}>
+            No skills yet. Add one under Agents to make it available to every agent on this account.
+          </p>
+        ) : (
+          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+            {skills.map((s) => (
+              <li
+                key={s.id}
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 0", borderTop: "1px solid var(--hairline)" }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>{s.name}</div>
+                  {s.description && (
+                    <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2, lineHeight: 1.45 }}>
+                      {s.description}
+                    </div>
+                  )}
+                </div>
+                <Toggle
+                  on={on.has(s.id)}
+                  pending={pending}
+                  label={`Turn the ${s.name} skill ${on.has(s.id) ? "off" : "on"} for this agent`}
+                  onToggle={() => toggle(s.id)}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 function ToolAccessSection({ agentKey, toolNames, disabledTools }: { agentKey: string; toolNames: readonly string[]; disabledTools: string[] }) {
   const [disabled, setDisabled] = useState<Set<string>>(() => new Set(disabledTools));
   const [pending, startTransition] = useTransition();

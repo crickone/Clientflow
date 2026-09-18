@@ -2397,6 +2397,28 @@ export type ClientWorkoutProgram = typeof clientWorkoutPrograms.$inferSelect;
 // One row per role-based agent this tenant can run. `instructions` is a
 // tenant-editable custom layer over that agent's built-in system prompt;
 // `status` gates whether it's actually invoked (later tasks wire this up).
+/**
+ * A reusable block of instructions an agent can be given — the app's own
+ * version of a "skill".
+ *
+ * PER TENANT, because it lives in the tenant database: one client's house
+ * writing rules are not another's. `body` is the text that gets appended to an
+ * agent's system prompt; `description` is the one-liner the operator reads in
+ * the toggle list and never reaches the model.
+ *
+ * Which agents USE a skill is not stored here — it is on the agent
+ * (agents.enabledSkills), so one skill can serve several agents without being
+ * copied, and turning it off for Sales leaves Marketing alone.
+ */
+export const skills = sqliteTable("skills", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  body: text("body").notNull().default(""),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});
+
 export const agents = sqliteTable("agents", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   key: text("key").notNull().unique(),
@@ -2414,6 +2436,12 @@ export const agents = sqliteTable("agents", {
   // runs without operator approval. Parse via `parseDisabledTools`
   // (@/lib/agents/registry).
   disabledTools: text("disabled_tools"),
+  // Per-agent skill ACCESS: a JSON array of skills.id this agent is given.
+  // An ALLOWLIST, the opposite of disabledTools above, and deliberately so: a
+  // skill added to the tenant later must not switch itself on for every agent
+  // that already exists. Null/absent = no skills = today's behaviour exactly.
+  // Parse via `parseEnabledSkills` (@/lib/agents/skills).
+  enabledSkills: text("enabled_skills"),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull().default(sql`(unixepoch() * 1000)`),
 });
 export type Agent = typeof agents.$inferSelect;

@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { requireAdminPage, getCurrentMembership } from "@/lib/auth";
 import { AGENT_CATALOG, getAgent, parseDisabledTools } from "@/lib/agents/registry";
+import { skillBodiesFor, skillTogglesFor } from "@/lib/agents/skills";
 import { SAFETY_RAILS } from "@/lib/agents/context";
 import { SPECIALISTS } from "@/lib/agents/specialists";
 import { getBusinessContext } from "@/lib/ai/businessContext";
@@ -73,6 +74,11 @@ export default async function AgentDetailPage({
         ? "You are the Concierge — the general business assistant: inbox/email + WhatsApp, invoices & money, nutrition/workout plans, admin, and anything else outside Sales/Marketing/Operations. You have no single fixed playbook — your system prompt and full toolkit (see Tools, right) are computed fresh for every task from this account's current scheduling mode and Google Drive connection."
         : "You are a helpful business agent."),
     businessContext: getBusinessContext(),
+    // The same composition composeAgentSystem does, so this preview cannot
+    // drift from what the agent is actually sent.
+    skills: skillBodiesFor(tenantId, agent.key)
+      .map((sk) => `--- ${sk.name} ---\n${sk.body}`)
+      .join("\n\n"),
     operator: agent.instructions,
     rails: SAFETY_RAILS,
   };
@@ -118,6 +124,7 @@ export default async function AgentDetailPage({
         layers={layers}
         toolNames={isConcierge ? conciergeToolNames : spec?.toolNames ?? []}
         disabledTools={parseDisabledTools(agent.disabledTools)}
+        skills={skillTogglesFor(tenantId, agent.key)}
         usageCents={usageCents}
         capCents={capCents}
         openRouterConfigured={openRouterConfigured}

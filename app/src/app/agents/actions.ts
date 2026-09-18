@@ -6,6 +6,12 @@ import { requireAdmin, getCurrentMembership } from "@/lib/auth";
 import { AGENT_CATALOG, updateAgentInstructions, updateAgentModel, updateAgentDisabledTools } from "@/lib/agents/registry";
 import { SPECIALISTS } from "@/lib/agents/specialists";
 import { setTenantCapCents } from "@/lib/ai/usage";
+import {
+  createSkill,
+  deleteSkill,
+  setAgentSkills,
+  updateSkill,
+} from "@/lib/agents/skills";
 
 /**
  * Admin-gated server actions for the Agent detail page (/agents/[key]).
@@ -81,5 +87,53 @@ export async function saveCapEur(eur: number): Promise<void> {
   await requireAdmin();
   const tenantId = getCurrentMembership()!.tenant.id;
   setTenantCapCents(tenantId, Math.round(eur * 100));
+  revalidatePath("/agents");
+}
+
+
+/**
+ * Which skills this agent is given.
+ *
+ * An ALLOWLIST of ids, admin-gated and tenant-derived like everything else in
+ * this file. setAgentSkills drops ids that do not exist, so a form posted
+ * before someone deleted a skill cannot write a dead one back onto the agent.
+ */
+export async function saveAgentSkills(key: string, ids: number[]): Promise<void> {
+  await requireAdmin();
+  assertKnownAgent(key);
+  const tenantId = getCurrentMembership()!.tenant.id;
+  setAgentSkills(tenantId, key, ids);
+  revalidatePath(`/agents/${key}`);
+}
+
+/** Add a skill to this TENANT's library. It is off for every agent until switched on. */
+export async function addSkill(input: {
+  name: string;
+  description: string;
+  body: string;
+}): Promise<void> {
+  await requireAdmin();
+  const tenantId = getCurrentMembership()!.tenant.id;
+  if (!input.name.trim()) throw new Error("A skill needs a name.");
+  createSkill(tenantId, input);
+  revalidatePath("/agents");
+}
+
+export async function editSkill(
+  id: number,
+  input: { name: string; description: string; body: string },
+): Promise<void> {
+  await requireAdmin();
+  const tenantId = getCurrentMembership()!.tenant.id;
+  if (!input.name.trim()) throw new Error("A skill needs a name.");
+  updateSkill(tenantId, id, input);
+  revalidatePath("/agents");
+}
+
+/** Remove a skill, and take it off every agent that had it on. */
+export async function removeSkill(id: number): Promise<void> {
+  await requireAdmin();
+  const tenantId = getCurrentMembership()!.tenant.id;
+  deleteSkill(tenantId, id);
   revalidatePath("/agents");
 }
