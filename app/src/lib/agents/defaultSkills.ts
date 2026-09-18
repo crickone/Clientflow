@@ -17,6 +17,14 @@
  * the model has to decide is relevant before applying is no rule at all. The
  * onDemand mode is for reference material — design guidelines, a brand book —
  * that earns its tokens on some jobs and wastes them on the rest.
+ *
+ * "Check your skills first" is the one that makes that split work. On-demand
+ * skills are only as good as the agent's willingness to go and fetch one, and
+ * the failure is never forgetting — it is starting the work and noticing
+ * afterwards. So it is stated as a rule with the specific rationalisations
+ * named, since those are what a model talks itself into. It is deliberately
+ * tiny: a few hundred tokens, always on, so the expensive ones can be
+ * on-demand.
  */
 import type { SkillLoadMode } from "./skills.parse";
 
@@ -28,6 +36,27 @@ export interface DefaultSkill {
 }
 
 export const DEFAULT_SKILLS: DefaultSkill[] = [
+  {
+    name: "Check your skills first",
+    description: "Read a relevant skill before starting work, not after",
+    loadMode: "always",
+    body: `If your prompt has an AVAILABLE SKILLS section, check it before you answer.
+
+If there is even a small chance one of those skills applies to what you have been asked, call load_skill with its name and read it BEFORE doing anything else — before clarifying questions, before looking anything up, before starting the work. If it turns out not to fit, you have lost a few seconds. If you skip it and it did fit, the work is wrong and nobody finds out until it is finished.
+
+These thoughts mean you are about to skip one. They are all wrong:
+
+- "This is a simple question." Questions are tasks. Check.
+- "I need more context first." The skill tells you what context to get.
+- "Let me look at what we have first." The skill tells you how to look.
+- "I remember roughly what that skill says." Read the current version.
+- "The skill is overkill for this." Simple jobs turn out not to be.
+- "I will just start and check if it gets complicated." Check before starting.
+
+When you use one, say which: "Using <skill> to <purpose>."
+
+If there is no AVAILABLE SKILLS section, or nothing on it is relevant, carry on normally — this rule costs nothing when it does not apply.`,
+  },
   {
     name: "Say the thing",
     description: "Cuts atmosphere-as-filler and keeps every sentence carrying something real",
