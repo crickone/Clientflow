@@ -288,4 +288,14 @@ export const CONTROL_MIGRATIONS: Migration[] = [
         .run();
     },
   },
+  {
+    id: "0004-platform-roles",
+    description:
+      "Platform Console v2: give every existing platform admin the 'owner' role. The console has two roles (owner, manager) and everyone who had console access before roles existed had it unrestricted, so owner is the only honest backfill — a manager downgrade is a deliberate act, made from the console.",
+    up: (sqlite) => {
+      sqlite
+        .prepare("UPDATE users SET platform_role = 'owner' WHERE is_platform_admin = 1 AND platform_role IS NULL")
+        .run();
+    },
+  },
 ];

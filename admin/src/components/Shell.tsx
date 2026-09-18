@@ -9,7 +9,9 @@ import {
   LogOut,
   Menu,
   Rocket,
+  ScrollText,
   Settings as SettingsIcon,
+  Users,
   X,
 } from "lucide-react";
 
@@ -21,6 +23,9 @@ const NAV = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/gyms", label: "Businesses", icon: Dumbbell },
   { href: "/provision", label: "Provision", icon: Rocket },
+  // Every console action, including refused ones. Both roles can read it.
+  { href: "/audit", label: "Audit log", icon: ScrollText },
+  { href: "/staff", label: "Platform staff", icon: Users },
   { href: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
@@ -128,7 +133,7 @@ export function Shell({ user, children }: { user: AdminUser; children: ReactNode
                 letterSpacing: "0.1em",
               }}
             >
-              Admin
+              {user.role}
             </div>
           </div>
           <button

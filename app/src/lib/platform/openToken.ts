@@ -14,6 +14,8 @@ const OPEN_TOKEN_TTL_MS = 60 * 1000;
 export interface OpenTokenClaim {
   userId: number;
   tenantId: number;
+  /** Why the staff member opened this tenant. Shown in the tenant app's banner and kept on the audit row. */
+  reason: string | null;
 }
 
 /**
@@ -23,15 +25,15 @@ export interface OpenTokenClaim {
  * generator `lib/platform/auth.ts`'s `platformLogin` already uses for
  * platform session tokens.
  */
-export function createOpenToken(userId: number, tenantId: number): string {
+export function createOpenToken(userId: number, tenantId: number, reason: string | null = null): string {
   const token = crypto.randomBytes(32).toString("hex");
   const now = Date.now();
   controlSqlite
     .prepare(
-      `INSERT INTO platform_open_tokens (token, user_id, tenant_id, expires_at, created_at)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO platform_open_tokens (token, user_id, tenant_id, reason, expires_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
     )
-    .run(token, userId, tenantId, now + OPEN_TOKEN_TTL_MS, now);
+    .run(token, userId, tenantId, reason, now + OPEN_TOKEN_TTL_MS, now);
   pruneExpiredOpenTokens();
   return token;
 }
@@ -61,14 +63,14 @@ export function consumeOpenToken(token: string): OpenTokenClaim | null {
   if (claim.changes !== 1) return null;
 
   const row = controlSqlite
-    .prepare("SELECT user_id, tenant_id FROM platform_open_tokens WHERE token = ?")
-    .get(token) as { user_id: number; tenant_id: number } | undefined;
+    .prepare("SELECT user_id, tenant_id, reason FROM platform_open_tokens WHERE token = ?")
+    .get(token) as { user_id: number; tenant_id: number; reason: string | null } | undefined;
   // Unreachable in practice: the UPDATE above only ever matches a row that
   // still exists (nothing deletes a token between the two statements on a
   // single-threaded better-sqlite3 connection) — guarded anyway so a future
   // change here fails closed rather than crashing on an undefined row.
   if (!row) return null;
-  return { userId: row.user_id, tenantId: row.tenant_id };
+  return { userId: row.user_id, tenantId: row.tenant_id, reason: row.reason };
 }
 
 /** Opportunistic cleanup of expired tokens; run on every mint. */

@@ -526,6 +526,14 @@ export const users = sqliteTable("users", {
   // Control-plane: which business this user belongs to, and whether they're a
   // platform-level super-admin (manages tenants). Nullable for migration safety.
   tenantId: integer("tenant_id").references(() => tenants.id),
+  /**
+   * Which platform-console role this user holds: "owner" (everything,
+   * including deleting a tenant, refunds, price overrides, kill switches and
+   * managing platform staff) or "manager" (everything else). NULL on a user
+   * who is not platform staff at all -- `isPlatformAdmin` stays the on/off
+   * switch, this says what they may do once they are in. See lib/platform/roles.
+   */
+  platformRole: text("platform_role", { enum: ["owner", "manager"] }),
   isPlatformAdmin: integer("is_platform_admin", { mode: "boolean" })
     .notNull()
     .default(false),
@@ -551,6 +559,15 @@ export const authSessions = sqliteTable("auth_sessions", {
   // a multi-clinic user who hasn't picked yet (→ /select-account). Resolved per
   // request by getCurrentTenant() / getCurrentMembership().
   activeTenantId: integer("active_tenant_id").references(() => tenants.id),
+  /**
+   * Set when this session was created by platform staff opening a tenant from
+   * the console, and carrying the reason they gave. The tenant app shows a
+   * banner for the whole life of such a session, so nobody -- staff or
+   * operator looking over their shoulder -- mistakes it for the client's own
+   * login. See lib/platform/openToken and components/layout/ImpersonationBanner.
+   */
+  impersonatedBy: integer("impersonated_by").references(() => users.id),
+  impersonationReason: text("impersonation_reason"),
   expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
@@ -2763,3 +2780,44 @@ export type CompetitorReviewRow = typeof competitorReviews.$inferSelect;
 export type CompetitorEventRow = typeof competitorEvents.$inferSelect;
 export type CompetitorAdRow = typeof competitorAds.$inferSelect;
 export type NewAgentRun = typeof agentRuns.$inferInsert;
+
+/**
+ * Every write the platform console makes, and who made it.
+ *
+ * `billing_events` already records money movements per tenant, but it is a
+ * tenant's billing history, not an account of console activity: it has no
+ * actor identity beyond a string, no reason, and nothing outside billing
+ * writes to it. This table is the console's own log -- one row per action,
+ * with the acting staff member, the tenant it touched, what changed, and why
+ * where a reason was required. It is append-only and nothing in the product
+ * deletes from it.
+ *
+ * Control-plane, not per-tenant: a console action can be fleet-wide (a kill
+ * switch, a price change) and must be recorded even when it names no tenant.
+ */
+export const platformAudit = sqliteTable(
+  "platform_audit",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    actorUserId: integer("actor_user_id").references(() => users.id),
+    /** Kept alongside the id so the log still reads correctly after a staff member is removed. */
+    actorEmail: text("actor_email").notNull().default(""),
+    actorRole: text("actor_role"),
+    tenantId: integer("tenant_id").references(() => tenants.id),
+    action: text("action").notNull(),
+    /** JSON: the arguments, and a before/after pair where one applies. */
+    detail: text("detail"),
+    reason: text("reason"),
+    ip: text("ip"),
+    ok: integer("ok", { mode: "boolean" }).notNull().default(true),
+    error: text("error"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => ({
+    byTenant: index("idx_platform_audit_tenant").on(t.tenantId, t.createdAt),
+    byActor: index("idx_platform_audit_actor").on(t.actorUserId, t.createdAt),
+  }),
+);
+export type PlatformAuditRow = typeof platformAudit.$inferSelect;

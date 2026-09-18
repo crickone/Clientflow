@@ -30,7 +30,18 @@ try {
   // length is ever increased, only fails if it drops below the ≥32-byte floor.
   assert.ok(token.length >= 64, "token is at least 32 bytes, hex-encoded");
   const claim = consumeOpenToken(token);
-  assert.deepEqual(claim, { userId: u.id, tenantId: t.id });
+  // `reason` is the open-as justification (Platform Console v2): null here
+  // because this token was minted without one.
+  assert.deepEqual(claim, { userId: u.id, tenantId: t.id, reason: null });
+
+  // A token minted WITH a reason carries it through to the tenant app, which
+  // shows it in the staff-access banner for the life of the session.
+  const withReason = createOpenToken(u.id, t.id, "checking a failed import");
+  assert.deepEqual(consumeOpenToken(withReason), {
+    userId: u.id,
+    tenantId: t.id,
+    reason: "checking a failed import",
+  });
 
   // A SECOND consume of the SAME token -> null (single-use / can't be replayed).
   assert.equal(consumeOpenToken(token), null, "replaying a used token -> null");

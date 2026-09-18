@@ -60,11 +60,12 @@ export async function tenantAction(
  */
 export async function openTenant(
   id: number,
+  reason: string,
 ): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
   try {
     const res = await api<{ ok: true; url: string }>(`/tenants/${id}/open`, {
       method: "POST",
-      body: {},
+      body: { reason },
     });
     revalidatePath(`/gyms/${id}`); // the "opened_by_admin" event now shows in Events
     revalidatePath("/gyms");

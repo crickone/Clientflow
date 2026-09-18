@@ -33,12 +33,23 @@ export { hashPassword, verifyPassword } from "@/lib/password";
 export async function createSession(
   userId: number,
   activeTenantId: number | null = null,
+  /**
+   * Set when platform staff opened this tenant from the console. Stored on
+   * the session so the tenant app can show a banner for its whole life --
+   * see components/layout/ImpersonationBanner.
+   */
+  impersonation: { byUserId: number; reason: string | null } | null = null,
 ): Promise<string> {
   const id = crypto.randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
-  await authDb
-    .insert(authSessions)
-    .values({ id, userId, activeTenantId, expiresAt });
+  await authDb.insert(authSessions).values({
+    id,
+    userId,
+    activeTenantId,
+    expiresAt,
+    impersonatedBy: impersonation?.byUserId ?? null,
+    impersonationReason: impersonation?.reason ?? null,
+  });
   cookies().set(SESSION_COOKIE, id, {
     httpOnly: true,
     sameSite: "lax",
@@ -61,6 +72,11 @@ export interface CurrentMembership {
   user: User;
   tenant: Tenant;
   role: Role;
+  /**
+   * Set when this session was opened by platform staff from the console.
+   * The layout reads it to show the staff-access banner on every page.
+   */
+  impersonation: { byUserId: number; reason: string | null } | null;
 }
 
 /**
@@ -91,6 +107,8 @@ export const getCurrentMembership = cache((): CurrentMembership | null => {
       userId: authSessions.userId,
       activeTenantId: authSessions.activeTenantId,
       expiresAt: authSessions.expiresAt,
+      impersonatedBy: authSessions.impersonatedBy,
+      impersonationReason: authSessions.impersonationReason,
     })
     .from(authSessions)
     .where(eq(authSessions.id, token))
@@ -118,7 +136,15 @@ export const getCurrentMembership = cache((): CurrentMembership | null => {
     .get();
   if (!tenant || !tenant.isActive) return null;
 
-  return { user, tenant, role: resolved.role };
+  return {
+    user,
+    tenant,
+    role: resolved.role,
+    impersonation:
+      session.impersonatedBy != null
+        ? { byUserId: session.impersonatedBy, reason: session.impersonationReason }
+        : null,
+  };
 });
 
 export interface MembershipOption {

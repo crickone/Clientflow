@@ -43,7 +43,12 @@ export async function GET(req: NextRequest) {
   // httpOnly clientflow_session cookie. The membership already exists
   // (granted by the mint endpoint), so the app's ordinary tenant resolution
   // (getCurrentMembership) just works from here — no bypass, no special case.
-  await createSession(claim.userId, claim.tenantId);
+  // The session is marked as an open-as for its whole life, so the tenant app
+  // can say so on every page rather than only on the first one.
+  await createSession(claim.userId, claim.tenantId, {
+    byUserId: claim.userId,
+    reason: claim.reason,
+  });
 
   return NextResponse.redirect(new URL("/dashboard", base));
 }

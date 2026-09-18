@@ -3,6 +3,7 @@ import crypto, { timingSafeEqual } from "node:crypto";
 
 import { controlSqlite } from "@/lib/db/control";
 import { verifyPassword } from "@/lib/password";
+import { roleOf, type PlatformRole } from "./roles";
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
@@ -16,16 +17,16 @@ export function checkServiceKey(req: Request): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-export type PlatformUser = { userId: number; email: string; name: string | null };
+export type PlatformUser = { userId: number; email: string; name: string | null; role: PlatformRole };
 
 export function platformLogin(
   email: string,
   password: string,
 ): { ok: true; token: string; user: PlatformUser } | { ok: false; error: string } {
   const u = controlSqlite
-    .prepare("SELECT id, email, name, password_hash, is_platform_admin, is_active FROM users WHERE email = ?")
+    .prepare("SELECT id, email, name, password_hash, platform_role, is_platform_admin, is_active FROM users WHERE email = ?")
     .get(email.trim().toLowerCase()) as
-    | { id: number; email: string; name: string | null; password_hash: string; is_platform_admin: number; is_active: number }
+    | { id: number; email: string; name: string | null; password_hash: string; platform_role: string | null; is_platform_admin: number; is_active: number }
     | undefined;
   // Uniform failure: never reveal which factor failed.
   const fail = { ok: false as const, error: "Invalid email or password" };
@@ -36,7 +37,7 @@ export function platformLogin(
   controlSqlite
     .prepare("INSERT INTO platform_sessions (token, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)")
     .run(token, u.id, Date.now() + SESSION_TTL_MS, Date.now());
-  return { ok: true, token, user: { userId: u.id, email: u.email, name: u.name } };
+  return { ok: true, token, user: { userId: u.id, email: u.email, name: u.name, role: roleOf(u) } };
 }
 
 export function requirePlatformSession(req: Request): PlatformUser {
@@ -44,16 +45,16 @@ export function requirePlatformSession(req: Request): PlatformUser {
   if (!token) throw new Error("UNAUTHORIZED");
   const row = controlSqlite
     .prepare(
-      `SELECT s.user_id, s.expires_at, u.email, u.name, u.is_platform_admin, u.is_active
+      `SELECT s.user_id, s.expires_at, u.email, u.name, u.platform_role, u.is_platform_admin, u.is_active
        FROM platform_sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?`,
     )
     .get(token) as
-    | { user_id: number; expires_at: number; email: string; name: string | null; is_platform_admin: number; is_active: number }
+    | { user_id: number; expires_at: number; email: string; name: string | null; platform_role: string | null; is_platform_admin: number; is_active: number }
     | undefined;
   if (!row || row.expires_at < Date.now() || !row.is_platform_admin || !row.is_active) {
     throw new Error("UNAUTHORIZED");
   }
-  return { userId: row.user_id, email: row.email, name: row.name };
+  return { userId: row.user_id, email: row.email, name: row.name, role: roleOf(row) };
 }
 
 export function destroyPlatformSession(req: Request): void {

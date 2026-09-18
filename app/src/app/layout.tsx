@@ -32,6 +32,7 @@ import { getBilling } from "@/lib/billing/engine";
 import { countLeadsInEntryStage } from "@/lib/leads";
 import { countPendingRequests } from "@/lib/cms/requests";
 import { PastDueBanner } from "@/components/billing/PastDueBanner";
+import { ImpersonationBanner } from "@/components/layout/ImpersonationBanner";
 // Side-effect import: boots the daily automation scheduler (birthdays etc.) on
 // the server. This is a nodejs-only server component, so better-sqlite3 stays
 // out of the edge bundle. Guarded internally against duplicate timers.
@@ -326,6 +327,12 @@ export default async function RootLayout({
                     : null
                 }
               >
+                {current?.impersonation ? (
+                  <ImpersonationBanner
+                    businessName={businessName}
+                    reason={current.impersonation.reason}
+                  />
+                ) : null}
                 {showPastDue ? <PastDueBanner /> : null}
                 {children}
               </AppShell>

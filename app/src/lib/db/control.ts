@@ -102,6 +102,7 @@ export function ensureControlTables() {
       password_hash TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT 'staff',
       tenant_id INTEGER REFERENCES tenants(id),
+      platform_role TEXT,
       is_platform_admin INTEGER NOT NULL DEFAULT 0,
       must_change_password INTEGER NOT NULL DEFAULT 0,
       is_active INTEGER NOT NULL DEFAULT 1,
@@ -114,6 +115,8 @@ export function ensureControlTables() {
       id TEXT PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       active_tenant_id INTEGER REFERENCES tenants(id),
+      impersonated_by INTEGER REFERENCES users(id),
+      impersonation_reason TEXT,
       expires_at INTEGER NOT NULL,
       created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
@@ -369,6 +372,23 @@ export function ensureControlTables() {
       created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
 
+    CREATE TABLE IF NOT EXISTS platform_audit (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      actor_user_id  INTEGER REFERENCES users(id),
+      actor_email    TEXT NOT NULL DEFAULT '',
+      actor_role     TEXT,
+      tenant_id      INTEGER REFERENCES tenants(id),
+      action         TEXT NOT NULL,
+      detail         TEXT,
+      reason         TEXT,
+      ip             TEXT,
+      ok             INTEGER NOT NULL DEFAULT 1,
+      error          TEXT,
+      created_at     INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_audit_tenant ON platform_audit(tenant_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_platform_audit_actor ON platform_audit(actor_user_id, created_at);
+
     CREATE TABLE IF NOT EXISTS platform_settings (
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL
@@ -385,6 +405,7 @@ export function ensureControlTables() {
       token      TEXT PRIMARY KEY,
       user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       tenant_id  INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      reason     TEXT,
       expires_at INTEGER NOT NULL,
       used_at    INTEGER,
       created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
@@ -795,6 +816,31 @@ export function ensureControlTables() {
       "[control] auth_sessions active_tenant_id migration failed:",
       err,
     );
+  }
+
+  // Platform Console v2 (slice 1): the console's own role + audit columns.
+  // users.platform_role says what a platform staff member may do once inside
+  // (is_platform_admin stays the in/out switch); auth_sessions gains the two
+  // impersonation columns that drive the tenant-app banner. All PRAGMA-guarded
+  // and additive, like every other guard in this function.
+  try {
+    const userCols = controlSqlite.prepare("PRAGMA table_info(users)").all() as Array<{ name: string }>;
+    if (!userCols.find((c) => c.name === "platform_role")) {
+      controlSqlite.exec("ALTER TABLE users ADD COLUMN platform_role TEXT");
+    }
+    const sessionCols = controlSqlite.prepare("PRAGMA table_info(auth_sessions)").all() as Array<{ name: string }>;
+    if (!sessionCols.find((c) => c.name === "impersonated_by")) {
+      controlSqlite.exec("ALTER TABLE auth_sessions ADD COLUMN impersonated_by INTEGER REFERENCES users(id)");
+    }
+    if (!sessionCols.find((c) => c.name === "impersonation_reason")) {
+      controlSqlite.exec("ALTER TABLE auth_sessions ADD COLUMN impersonation_reason TEXT");
+    }
+    const openCols = controlSqlite.prepare("PRAGMA table_info(platform_open_tokens)").all() as Array<{ name: string }>;
+    if (!openCols.find((c) => c.name === "reason")) {
+      controlSqlite.exec("ALTER TABLE platform_open_tokens ADD COLUMN reason TEXT");
+    }
+  } catch (err) {
+    console.error("[control] platform console v2 column migration failed:", err);
   }
 
   // Existing control DBs predate billing_invoices.charge_started_at (the atomic

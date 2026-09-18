@@ -226,3 +226,42 @@ export interface PlatformAnalytics {
     perGym: PerGymRow[];
   };
 }
+
+/** Platform-console roles (see app: lib/platform/roles.ts). */
+export type PlatformRole = "owner" | "manager";
+
+export interface PlatformStaffRow {
+  userId: number;
+  email: string;
+  name: string | null;
+  role: PlatformRole;
+  isActive: boolean;
+  lastLoginAt: number | null;
+}
+
+export interface StaffResponse {
+  staff: PlatformStaffRow[];
+  you: { userId: number; role: PlatformRole };
+}
+
+/** One console action, from the platform_audit log. */
+export interface AuditEntry {
+  id: number;
+  actorUserId: number | null;
+  actorEmail: string;
+  actorRole: string | null;
+  tenantId: number | null;
+  tenantName: string | null;
+  action: string;
+  detail: unknown;
+  reason: string | null;
+  ip: string | null;
+  ok: boolean;
+  error: string | null;
+  createdAt: number;
+}
+
+export interface AuditResponse {
+  entries: AuditEntry[];
+}
+

@@ -4,8 +4,9 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { api, ApiError, ADMIN_COOKIE } from "./api";
+import type { PlatformRole } from "./types";
 
-export interface AdminUser { userId: number; email: string; name: string | null }
+export interface AdminUser { userId: number; email: string; name: string | null; role: PlatformRole }
 
 /** Page guard: verified against /auth/me; redirects to /login when invalid. */
 export const requireAdminSession = cache(async (): Promise<AdminUser> => {
