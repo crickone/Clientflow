@@ -124,8 +124,28 @@ Answered by the operator 2026-09-18.
 1. **Platform roles: two — Owner and Manager.** Owner can do everything, including deleting a tenant, refunds, price overrides, kill switches and managing platform staff. Manager can do everything else: support, people, integrations, features, health, notes, credits and grants. Both roles are enforced in the API, not just hidden in the UI.
 2. **Deleting a tenant: automatic hard delete 30 days after cancellation.** Cancelling (or offboarding) archives the tenant immediately: logins are closed, the site stops serving, nothing is charged, and the data stays. A dated purge job deletes the database and the tenant's files on day 30 and writes a final audit row. An Owner can restore inside the window with one click, or purge immediately with a typed confirmation. A backup is written to the archive folder before any purge.
 3. **Module flags: per module, grouped.** The sidebar has around 25 destinations; they collapse to roughly a dozen switchable modules (Clients, Leads, Calendar and appointments, Timetable and attendance, Nutrition, Workout, Forms, Automations, Memberships and packages, Staff and reports, Marketing and CMS, Content Studio, Email campaigns, Voice, Client app). Per-module matches the pricing model already agreed: a base price plus add-ons, not tiers. Tiers can be layered on later as presets that set the same flags. Stored as a `features` key in the tenant's settings; unset means everything on, so no existing tenant changes.
-4. **Storage: visibility first, no enforcement yet.** The volume holds 1.4 GB today: uploads 780 MB (namespaced per tenant), image library 475 MB (one flat folder, tenant-scoped by database row), renders 117 MB (218 generated slide PNGs), tenant databases 14 MB. Because two of the three folders are flat, a per-tenant figure needs a nightly job that sums file sizes from each tenant's own rows rather than a folder measurement. Build the number and the trend; add a quota only when a tenant is actually large enough to matter.
+4. **Storage: show it now, limit it later, and give them a way out before anything is deleted.** The volume holds 1.4 GB today: uploads 780 MB (namespaced per tenant), image library 475 MB (one flat folder, tenant-scoped by database row), renders 117 MB (218 generated slide PNGs), tenant databases 14 MB. Because two of the three folders are flat, a per-tenant figure needs a nightly job that sums file sizes from each tenant's own rows rather than a folder measurement. See "Storage lifecycle" below for the limit and the archive-to-Drive path the operator asked for.
 5. **Order after slices 1 and 2: Integrations, then Health.** Integrations is where support questions land today (a Gmail that stopped syncing, a domain that will not verify, a Facebook page that dropped), and the Meta posting connection arrives into the same board. Health follows.
+
+## Storage lifecycle
+
+The operator's steer: a limit will be needed, but a client should be prompted to tidy up, and offered a move to their own Google Drive, before anything leaves the system. Three stages, built in that order.
+
+**Stage 1 — show it (slice 5, with Health).** A nightly job writes each tenant's storage by kind into `tenant_stats`: uploads, image library, renders, database. The console shows the number, the split and the trend; the tenant sees their own figure in Settings with a plain sentence about what is using the space. No limit, nothing blocked.
+
+**Stage 2 — a soft limit that warns.** A per-tenant allowance (a platform default, overridable per tenant from the console) that only warns. At 80 per cent the tenant gets a nudge on the dashboard and in the setup card; at 100 per cent the nudge becomes persistent and the console flags the tenant on the fleet health page. Uploading still works. Nothing is ever deleted by the system.
+
+**Stage 3 — "Free up space", the tenant's own flow.** A page in the tenant app listing what is actually using the space, biggest first, grouped by kind: finished posts and their renders, source videos in the image library, old uploads, campaign exports. For each item or a multi-select:
+
+- **Save to Google Drive, then remove.** Reuses the Drive integration that already exists (`ensureDriveFolder` and `uploadFilesToDrive` in `lib/google/drive.ts`, authorised by the same Google connection the invoice bundler uses, detected by the `drive` scope on the Gmail connection). Files land in a dated folder in the client's own Drive, the upload is verified, and only then is the local copy deleted and the row marked archived with its Drive link kept, so the post still appears in their history with a link to the file.
+- **Download, then remove.** A zip for a client with no Drive connected, the same verify-then-delete order.
+- **Remove.** For material they genuinely do not want, with a typed confirmation.
+
+Automatic housekeeping that needs no prompt, since none of it is the client's content: renders belonging to designs that were deleted, superseded renders of a redesigned slide, assistant download bundles (already swept after two hours), and campaign export zips older than 30 days.
+
+Console side: see usage and the split per tenant, set the allowance, see who is over, and send the tidy-up nudge by hand. The console never deletes a tenant's content on their behalf; it asks.
+
+Effort: stage 1 is part of slice 5. Stages 2 and 3 are their own slice, roughly one session, best scheduled once a real tenant approaches a limit.
 
 ## Decision notes worth keeping
 
