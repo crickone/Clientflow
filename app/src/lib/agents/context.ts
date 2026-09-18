@@ -1,5 +1,5 @@
 import "server-only";
-import { skillBodiesFor } from "@/lib/agents/skills";
+import { skillBodiesFor, skillMenuFor } from "@/lib/agents/skills";
 import { getAgent } from "@/lib/agents/registry";
 import { getBusinessContext } from "@/lib/ai/businessContext";
 import { OUTPUT_STYLE } from "@/lib/ai/responseStyle";
@@ -44,10 +44,21 @@ export function composeAgentSystem(tenantId: number, key: string): string {
       skills.map((s) => `--- ${s.name} ---\n${s.body}`).join("\n\n")
     : "";
 
+  // The on-demand ones, as a menu rather than their contents. A name and a
+  // line each, against the thousands of tokens a body costs on every message
+  // it is not needed for. The agent reads this and calls load_skill.
+  const menu = skillMenuFor(tenantId, key);
+  const menuText = menu.length
+    ? "\n\n=== AVAILABLE SKILLS ===\n" +
+      "Reference material you can read when a job needs it. Call load_skill with the name BEFORE starting that kind of work, not after.\n" +
+      menu.map((s) => `- ${s.name}: ${s.description || "(no description)"}`).join("\n")
+    : "";
+
   return [
     base,
     "\n\n=== BUSINESS CONTEXT ===\n" + getBusinessContext(),
     skillText,
+    menuText,
     custom ? "\n\n=== OPERATOR INSTRUCTIONS (from the Agents tab) ===\n" + custom : "",
     OUTPUT_STYLE,
     SAFETY_RAILS,

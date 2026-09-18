@@ -7,7 +7,12 @@ import { Download, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input, Label } from "@/components/ui/Input";
-import { MAX_SKILL_BODY, MAX_SKILL_DESCRIPTION, MAX_SKILL_NAME } from "@/lib/agents/skills.parse";
+import {
+  MAX_SKILL_BODY,
+  MAX_SKILL_DESCRIPTION,
+  MAX_SKILL_NAME,
+  type SkillLoadMode,
+} from "@/lib/agents/skills.parse";
 import { addSkill, editSkill, fetchSkillFrom, removeSkill } from "@/app/agents/actions";
 
 export interface SkillRow {
@@ -15,6 +20,7 @@ export interface SkillRow {
   name: string;
   description: string;
   body: string;
+  loadMode: SkillLoadMode;
 }
 
 /**
@@ -88,7 +94,8 @@ export function SkillLibrary({ skills }: { skills: SkillRow[] }) {
                       {s.name}
                     </div>
                     <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2, lineHeight: 1.45 }}>
-                      {s.description || "No description"} · {s.body.length.toLocaleString()} chars
+                      {s.description || "No description"} · {s.body.length.toLocaleString()} chars ·{" "}
+                      {s.loadMode === "always" ? "always on" : "when needed"}
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
@@ -145,6 +152,7 @@ function SkillForm({ initial, onDone }: { initial: SkillRow | null; onDone: () =
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [body, setBody] = useState(initial?.body ?? "");
+  const [loadMode, setLoadMode] = useState<SkillLoadMode>(initial?.loadMode ?? "always");
   const [pending, startTransition] = useTransition();
   const [source, setSource] = useState("");
   const [importing, setImporting] = useState(false);
@@ -184,8 +192,8 @@ function SkillForm({ initial, onDone }: { initial: SkillRow | null; onDone: () =
     }
     startTransition(async () => {
       try {
-        if (initial) await editSkill(initial.id, { name, description, body });
-        else await addSkill({ name, description, body });
+        if (initial) await editSkill(initial.id, { name, description, body, loadMode });
+        else await addSkill({ name, description, body, loadMode });
         toast.success(initial ? `Saved "${name}".` : `Added "${name}".`);
         onDone();
       } catch (err) {
@@ -284,6 +292,24 @@ function SkillForm({ initial, onDone }: { initial: SkillRow | null; onDone: () =
           >
             {body.length.toLocaleString()} / {MAX_SKILL_BODY.toLocaleString()} characters
             {tooLong ? " — the rest will be cut when saved" : " · every one of these is sent on every message the agent handles"}
+          </div>
+        </div>
+        <div>
+          <Label htmlFor="skill-mode">When the agent reads it</Label>
+          <select
+            id="skill-mode"
+            className="field"
+            value={loadMode}
+            onChange={(e) => setLoadMode(e.target.value as SkillLoadMode)}
+            style={{ width: "100%" }}
+          >
+            <option value="always">Always — in every message this agent handles</option>
+            <option value="onDemand">When needed — the agent fetches it for relevant work</option>
+          </select>
+          <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 6, lineHeight: 1.5 }}>
+            {loadMode === "always"
+              ? "Right for standing rules — a writing style is no use if the agent has to decide it applies first. Costs its length on every message."
+              : "Right for reference material — design guidelines, a brand book. Only its name and description are carried until a job needs it."}
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

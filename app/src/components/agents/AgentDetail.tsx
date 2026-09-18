@@ -391,9 +391,14 @@ function SkillsSection({ agentKey, skills }: { agentKey: string; skills: SkillTo
     () => new Set(skills.filter((s) => s.enabled).map((s) => s.id)),
   );
   const [pending, startTransition] = useTransition();
-  // What the operator is actually spending: a skill's body goes into the
-  // prompt verbatim on every message this agent handles.
-  const charCount = skills.filter((s) => on.has(s.id)).reduce((n, s) => n + s.size, 0);
+  // What the operator is actually spending. ONLY the always-on ones: an
+  // on-demand skill costs its name and description until a job needs it, and
+  // counting its whole body here would overstate the bill several times over.
+  const enabled = skills.filter((s) => on.has(s.id));
+  const charCount = enabled
+    .filter((s) => s.loadMode === "always")
+    .reduce((n, s) => n + s.size, 0);
+  const onDemandCount = enabled.filter((s) => s.loadMode === "onDemand").length;
 
   function toggle(id: number) {
     const prev = on;
@@ -420,7 +425,9 @@ function SkillsSection({ agentKey, skills }: { agentKey: string; skills: SkillTo
             A skill is a block of instructions kept for this account and shared across agents. Switching one on adds it to this agent&apos;s system prompt on every message; it sits above the operator instructions, so anything you write there still wins.
           </p>
           <span style={{ fontFamily: "var(--font-mono), ui-monospace, monospace", fontSize: 12, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-            {on.size} / {skills.length} on{charCount > 0 ? ` · ${charCount.toLocaleString()} chars` : ""}
+            {on.size} / {skills.length} on
+            {charCount > 0 ? ` · ${charCount.toLocaleString()} chars every message` : ""}
+            {onDemandCount > 0 ? ` · ${onDemandCount} on request` : ""}
           </span>
         </div>
         {skills.length === 0 ? (
@@ -436,11 +443,12 @@ function SkillsSection({ agentKey, skills }: { agentKey: string; skills: SkillTo
               >
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text-primary)" }}>{s.name}</div>
-                  {s.description && (
-                    <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2, lineHeight: 1.45 }}>
-                      {s.description}
-                    </div>
-                  )}
+                  <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2, lineHeight: 1.45 }}>
+                    {s.description ? `${s.description} · ` : ""}
+                    {s.loadMode === "always"
+                      ? `${s.size.toLocaleString()} chars on every message`
+                      : "fetched when a job needs it"}
+                  </div>
                 </div>
                 <Toggle
                   on={on.has(s.id)}

@@ -68,7 +68,15 @@ export type ToolResult = {
 // instead of a hardcoded default — no current tool does this (it was the
 // Concierge-delegate's path), but the field is harmless and left in place.
 // Undefined for callers that don't set it.
-export type ToolContext = { tenantId: number; userId?: number; callerModel?: string };
+export type ToolContext = {
+  tenantId: number;
+  userId?: number;
+  callerModel?: string;
+  /** Which agent is running. Set by the agent chat route; absent for callers
+   *  that are not one particular agent. Only load_skill needs it, to scope a
+   *  lookup to the skills THAT agent has switched on. */
+  agentKey?: string;
+};
 
 export function tdb(ctx: ToolContext) {
   return getTenantDbById(ctx.tenantId);

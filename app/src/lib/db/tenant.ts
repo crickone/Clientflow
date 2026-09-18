@@ -1473,6 +1473,7 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       name         TEXT NOT NULL,
       description  TEXT NOT NULL DEFAULT '',
       body         TEXT NOT NULL DEFAULT '',
+      load_mode    TEXT NOT NULL DEFAULT 'always',  -- 'always' | 'onDemand'
       created_at   INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
       updated_at   INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
@@ -1841,6 +1842,12 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     const agentCols = sqlite.prepare("PRAGMA table_info(agents)").all() as { name: string }[];
     if (agentCols.length > 0 && !agentCols.find((c) => c.name === "enabled_skills")) {
       sqlite.exec("ALTER TABLE agents ADD COLUMN enabled_skills TEXT");
+    }
+    const skillCols = sqlite.prepare("PRAGMA table_info(skills)").all() as { name: string }[];
+    if (skillCols.length > 0 && !skillCols.find((c) => c.name === "load_mode")) {
+      // Defaults to 'always', which is what every skill written before this
+      // column existed already did.
+      sqlite.exec("ALTER TABLE skills ADD COLUMN load_mode TEXT NOT NULL DEFAULT 'always'");
     }
   } catch (err) {
     console.error("[db] skills migration failed:", err);

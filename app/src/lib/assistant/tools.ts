@@ -67,6 +67,7 @@ import {
   publishBlogPostTool,
   saveBlogPostTool,
 } from "@/lib/agents/tools.marketing";
+import { SKILL_TOOLS, loadSkillTool } from "@/lib/agents/tools.skills";
 import {
   CAMPAIGN_TOOLS,
   approveCampaignAssetTool,
@@ -736,6 +737,10 @@ export const TOOLS: Anthropic.Tool[] = [
 
   // ── Operations agent (Operations Task 1): no-show + lapsed-member tools ──
   ...OPERATIONS_TOOLS,
+
+  // ── Skills: read one the operator switched on for this agent. Read-only,
+  // so no approval gate; see lib/agents/tools.skills.ts. ──
+  ...SKILL_TOOLS,
 ];
 
 /**
@@ -871,6 +876,8 @@ export async function executeTool(
         return await draftCampaignAssetTool(ctx, input);
       case "approve_campaign_asset":
         return approveCampaignAssetTool(ctx, input);
+      case "load_skill":
+        return loadSkillTool(ctx, ctx.agentKey ?? "orchestrator", input);
       case "launch_campaign":
         return await launchCampaignTool(ctx, input);
       case "list_no_shows":

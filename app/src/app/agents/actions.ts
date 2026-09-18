@@ -7,7 +7,7 @@ import { AGENT_CATALOG, updateAgentInstructions, updateAgentModel, updateAgentDi
 import { SPECIALISTS } from "@/lib/agents/specialists";
 import { setTenantCapCents } from "@/lib/ai/usage";
 import { candidateUrls, parseSkillMarkdown } from "@/lib/agents/skillImport";
-import { MAX_SKILL_BODY } from "@/lib/agents/skills.parse";
+import { MAX_SKILL_BODY, type SkillLoadMode } from "@/lib/agents/skills.parse";
 import {
   createSkill,
   deleteSkill,
@@ -113,6 +113,7 @@ export async function addSkill(input: {
   name: string;
   description: string;
   body: string;
+  loadMode?: SkillLoadMode;
 }): Promise<void> {
   await requireAdmin();
   const tenantId = getCurrentMembership()!.tenant.id;
@@ -123,7 +124,7 @@ export async function addSkill(input: {
 
 export async function editSkill(
   id: number,
-  input: { name: string; description: string; body: string },
+  input: { name: string; description: string; body: string; loadMode?: SkillLoadMode },
 ): Promise<void> {
   await requireAdmin();
   const tenantId = getCurrentMembership()!.tenant.id;

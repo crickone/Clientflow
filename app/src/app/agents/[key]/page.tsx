@@ -5,7 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { requireAdminPage, getCurrentMembership } from "@/lib/auth";
 import { AGENT_CATALOG, getAgent, parseDisabledTools } from "@/lib/agents/registry";
-import { skillBodiesFor, skillTogglesFor } from "@/lib/agents/skills";
+import { skillBodiesFor, skillMenuFor, skillTogglesFor } from "@/lib/agents/skills";
 import { SAFETY_RAILS } from "@/lib/agents/context";
 import { SPECIALISTS } from "@/lib/agents/specialists";
 import { getBusinessContext } from "@/lib/ai/businessContext";
@@ -76,8 +76,21 @@ export default async function AgentDetailPage({
     businessContext: getBusinessContext(),
     // The same composition composeAgentSystem does, so this preview cannot
     // drift from what the agent is actually sent.
-    skills: skillBodiesFor(tenantId, agent.key)
-      .map((sk) => `--- ${sk.name} ---\n${sk.body}`)
+    skills: [
+      skillBodiesFor(tenantId, agent.key)
+        .map((sk) => `--- ${sk.name} ---\n${sk.body}`)
+        .join("\n\n"),
+      // The on-demand ones reach the model as a menu, so the preview shows
+      // the menu. Leaving them out entirely would tell an operator the agent
+      // knows nothing about them, which is not true — it can fetch them.
+      skillMenuFor(tenantId, agent.key).length
+        ? "AVAILABLE ON REQUEST (the agent fetches these when a job needs one)\n" +
+          skillMenuFor(tenantId, agent.key)
+            .map((sk) => `- ${sk.name}: ${sk.description || "(no description)"}`)
+            .join("\n")
+        : "",
+    ]
+      .filter(Boolean)
       .join("\n\n"),
     operator: agent.instructions,
     rails: SAFETY_RAILS,

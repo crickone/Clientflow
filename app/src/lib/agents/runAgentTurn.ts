@@ -151,7 +151,7 @@ export async function runAgentTurn(
           // nested loop without its own agent record could inherit THIS agent's
           // configured model instead of a hardcoded one. (No current tool does;
           // the field is harmless — see ToolContext in @/lib/assistant/tools.)
-          const tr = await executeTool(call.name, call.input, { tenantId, userId, callerModel: model });
+          const tr = await executeTool(call.name, call.input, { tenantId, userId, callerModel: model, agentKey });
           if (tr.artifact) { artifacts.push(tr.artifact); onArtifact?.(tr.artifact); }
           // A nested runAgentTurn's result can carry MULTIPLE artifacts (its own
           // whole `artifacts` list) rather than the single `tr.artifact` a

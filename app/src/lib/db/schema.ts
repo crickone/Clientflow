@@ -2415,6 +2415,9 @@ export const skills = sqliteTable("skills", {
   name: text("name").notNull(),
   description: text("description").notNull().default(""),
   body: text("body").notNull().default(""),
+  /** "always" | "onDemand" — when the body reaches the model. See
+   *  SkillLoadMode (@/lib/agents/skills.parse). */
+  loadMode: text("load_mode").notNull().default("always"),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });
