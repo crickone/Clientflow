@@ -117,10 +117,17 @@ Roughly nine to ten sessions in total. Slices 1 and 2 first; after that the orde
 - Restore and re-run migrations run on a copy first and report before touching the live file.
 - Platform staff roles are enforced in the API, not only hidden in the UI.
 
-## Decisions needed
+## Decisions
 
-1. Platform roles: are four roles (owner, support, finance, read-only) the right cut, or is owner plus support enough for now?
-2. Deleting a tenant: archive-only with manual purge, or a 30-day automatic hard delete?
-3. Module flags: per module, or bundle into plan tiers the flags follow?
-4. Storage quotas: visibility only, or enforce at a limit?
-5. Order after slices 1 and 2: health first, or integrations first?
+Answered by the operator 2026-09-18.
+
+1. **Platform roles: two — Owner and Manager.** Owner can do everything, including deleting a tenant, refunds, price overrides, kill switches and managing platform staff. Manager can do everything else: support, people, integrations, features, health, notes, credits and grants. Both roles are enforced in the API, not just hidden in the UI.
+2. **Deleting a tenant: automatic hard delete 30 days after cancellation.** Cancelling (or offboarding) archives the tenant immediately: logins are closed, the site stops serving, nothing is charged, and the data stays. A dated purge job deletes the database and the tenant's files on day 30 and writes a final audit row. An Owner can restore inside the window with one click, or purge immediately with a typed confirmation. A backup is written to the archive folder before any purge.
+3. **Module flags: per module, grouped.** The sidebar has around 25 destinations; they collapse to roughly a dozen switchable modules (Clients, Leads, Calendar and appointments, Timetable and attendance, Nutrition, Workout, Forms, Automations, Memberships and packages, Staff and reports, Marketing and CMS, Content Studio, Email campaigns, Voice, Client app). Per-module matches the pricing model already agreed: a base price plus add-ons, not tiers. Tiers can be layered on later as presets that set the same flags. Stored as a `features` key in the tenant's settings; unset means everything on, so no existing tenant changes.
+4. **Storage: visibility first, no enforcement yet.** The volume holds 1.4 GB today: uploads 780 MB (namespaced per tenant), image library 475 MB (one flat folder, tenant-scoped by database row), renders 117 MB (218 generated slide PNGs), tenant databases 14 MB. Because two of the three folders are flat, a per-tenant figure needs a nightly job that sums file sizes from each tenant's own rows rather than a folder measurement. Build the number and the trend; add a quota only when a tenant is actually large enough to matter.
+5. **Order after slices 1 and 2: Integrations, then Health.** Integrations is where support questions land today (a Gmail that stopped syncing, a domain that will not verify, a Facebook page that dropped), and the Meta posting connection arrives into the same board. Health follows.
+
+## Decision notes worth keeping
+
+- The image library and renders are single flat folders on disk. Access is correctly scoped through the database row, and filenames are unguessable, so this is not a security problem. It does mean per-tenant storage is a computed figure, and that a future per-tenant purge has to delete by row, not by folder.
+- `facebook_pages` in the control plane already stores a page access token for lead ads. The Meta posting connection should reuse that row rather than introduce a second Facebook credential.
