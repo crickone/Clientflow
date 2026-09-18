@@ -8,12 +8,13 @@ import { cn } from "@/lib/cn";
 /**
  * The tenant hub's tabs.
  *
- * Only tabs that exist are listed. The scope has nine; People, Integrations,
+ * Only tabs that exist are listed. The scope has nine; Integrations,
  * Features, Data and Health arrive with their own slices, and listing them
  * early as empty shells would make the console look finished when it is not.
  */
 const TABS = [
   { slug: "", label: "Overview" },
+  { slug: "people", label: "People" },
   { slug: "money", label: "Money" },
   { slug: "timeline", label: "Timeline" },
 ] as const;

@@ -265,3 +265,41 @@ export interface AuditResponse {
   entries: AuditEntry[];
 }
 
+/** One person with access to a business (console People tab). */
+export interface TenantPerson {
+  userId: number;
+  email: string;
+  name: string | null;
+  role: "admin" | "staff";
+  membershipActive: boolean;
+  accountActive: boolean;
+  mustChangePassword: boolean;
+  lastLoginAt: number | null;
+  createdAt: number;
+  activeSessions: number;
+  isPlatformStaff: boolean;
+}
+
+export interface PendingInvite {
+  id: number;
+  email: string;
+  role: "admin" | "staff";
+  invitedByEmail: string | null;
+  expiresAt: number;
+  expired: boolean;
+  createdAt: number;
+}
+
+export interface OpenReset {
+  userId: number;
+  email: string;
+  expiresAt: number;
+  createdAt: number;
+}
+
+export interface TenantPeople {
+  people: TenantPerson[];
+  invites: PendingInvite[];
+  resets: OpenReset[];
+}
+
