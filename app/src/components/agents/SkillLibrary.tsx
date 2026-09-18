@@ -2,13 +2,13 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Pencil, Plus, Trash2, X } from "lucide-react";
+import { Download, Pencil, Plus, Trash2, X } from "lucide-react";
 
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input, Label } from "@/components/ui/Input";
 import { MAX_SKILL_BODY, MAX_SKILL_DESCRIPTION, MAX_SKILL_NAME } from "@/lib/agents/skills.parse";
-import { addSkill, editSkill, removeSkill } from "@/app/agents/actions";
+import { addSkill, editSkill, fetchSkillFrom, removeSkill } from "@/app/agents/actions";
 
 export interface SkillRow {
   id: number;
@@ -146,7 +146,36 @@ function SkillForm({ initial, onDone }: { initial: SkillRow | null; onDone: () =
   const [description, setDescription] = useState(initial?.description ?? "");
   const [body, setBody] = useState(initial?.body ?? "");
   const [pending, startTransition] = useTransition();
+  const [source, setSource] = useState("");
+  const [importing, setImporting] = useState(false);
   const tooLong = body.length > MAX_SKILL_BODY;
+
+  /**
+   * Fetch a skill off GitHub into THIS FORM rather than straight into the
+   * library. The body ends up in an agent's system prompt verbatim, so the
+   * point of the round trip is that somebody reads it first — filling the
+   * fields is the whole feature, saving is still a separate press.
+   */
+  async function pull() {
+    const pasted = source.trim();
+    if (!pasted) return;
+    setImporting(true);
+    try {
+      const got = await fetchSkillFrom(pasted);
+      if (got.name && !name.trim()) setName(got.name);
+      if (got.description && !description.trim()) setDescription(got.description);
+      setBody(got.body);
+      toast.success(
+        got.truncated
+          ? "Fetched, but it was longer than the limit and has been cut — check the end."
+          : "Fetched. Read it before you save it.",
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not fetch that skill.");
+    } finally {
+      setImporting(false);
+    }
+  }
 
   function save() {
     if (!name.trim()) {
@@ -168,6 +197,39 @@ function SkillForm({ initial, onDone }: { initial: SkillRow | null; onDone: () =
   return (
     <Card>
       <div style={{ display: "grid", gap: 14 }}>
+        <div>
+          <Label htmlFor="skill-source">
+            Install from GitHub — paste a repo, a SKILL.md link, or an install line
+          </Label>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 260 }}>
+              <Input
+                id="skill-source"
+                value={source}
+                placeholder="https://github.com/owner/repo"
+                onChange={(e) => setSource(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void pull();
+                  }
+                }}
+              />
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => void pull()}
+              disabled={importing || !source.trim()}
+            >
+              <Download size={14} />
+              {importing ? "Fetching…" : "Fetch"}
+            </Button>
+          </div>
+          <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 6, lineHeight: 1.5 }}>
+            Fills the fields below for you to read. Nothing is saved until you press
+            Add skill, and nothing from the repo is ever run — only its SKILL.md is read.
+          </div>
+        </div>
         <div>
           <Label htmlFor="skill-name">Name</Label>
           <Input

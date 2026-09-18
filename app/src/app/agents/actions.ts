@@ -6,6 +6,8 @@ import { requireAdmin, getCurrentMembership } from "@/lib/auth";
 import { AGENT_CATALOG, updateAgentInstructions, updateAgentModel, updateAgentDisabledTools } from "@/lib/agents/registry";
 import { SPECIALISTS } from "@/lib/agents/specialists";
 import { setTenantCapCents } from "@/lib/ai/usage";
+import { candidateUrls, parseSkillMarkdown } from "@/lib/agents/skillImport";
+import { MAX_SKILL_BODY } from "@/lib/agents/skills.parse";
 import {
   createSkill,
   deleteSkill,
@@ -136,4 +138,70 @@ export async function removeSkill(id: number): Promise<void> {
   const tenantId = getCurrentMembership()!.tenant.id;
   deleteSkill(tenantId, id);
   revalidatePath("/agents");
+}
+
+
+/**
+ * Fetch a skill from GitHub so it can be reviewed before it is saved.
+ *
+ * RETURNS THE FIELDS, SAVES NOTHING. What comes back goes into the form for a
+ * human to read first. A skill's body is appended to an agent's system prompt
+ * verbatim, so text fetched off the internet must not be able to get there
+ * without someone having looked at it — the review IS the control.
+ *
+ * Only GitHub, enforced by candidateUrls returning nothing for any other host:
+ * there is no list to fetch rather than a check that can be skipped. Redirects
+ * are refused for the same reason, since following one would leave the
+ * allowlist behind. Each candidate is tried in turn because a repository keeps
+ * its SKILL.md in one of a few conventional places.
+ */
+export async function fetchSkillFrom(pasted: string): Promise<{
+  name: string;
+  description: string;
+  body: string;
+  source: string;
+  truncated: boolean;
+}> {
+  await requireAdmin();
+  const urls = candidateUrls(pasted);
+  if (urls.length === 0) {
+    throw new Error(
+      "That needs to be a GitHub link — a repository, a SKILL.md, or an install line containing one.",
+    );
+  }
+
+  const tried: string[] = [];
+  for (const url of urls) {
+    tried.push(url);
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        redirect: "error",
+        signal: AbortSignal.timeout(15_000),
+        headers: { Accept: "text/plain" },
+      });
+    } catch {
+      continue;
+    }
+    if (!res.ok) continue;
+
+    // Read a bounded amount. A body is capped at MAX_SKILL_BODY anyway, and
+    // without a ceiling a wrong link could stream something enormous into the
+    // server before anyone finds out it was not a skill.
+    const text = (await res.text()).slice(0, MAX_SKILL_BODY * 4);
+    const parsed = parseSkillMarkdown(text);
+    if (!parsed) continue;
+
+    return {
+      name: parsed.name,
+      description: parsed.description,
+      body: parsed.body.slice(0, MAX_SKILL_BODY),
+      source: url,
+      truncated: parsed.body.length > MAX_SKILL_BODY,
+    };
+  }
+
+  throw new Error(
+    `No SKILL.md found. Tried ${tried.length} location${tried.length === 1 ? "" : "s"} — paste a direct link to the file if it lives somewhere else.`,
+  );
 }
