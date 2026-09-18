@@ -460,3 +460,33 @@ export interface TenantMoney {
   outstandingCreditCents: number;
 }
 
+/** A platform-wide switch (console fleet page). */
+export interface KillSwitchState {
+  key: "ai" | "email" | "posting";
+  label: string;
+  blurb: string;
+  stopped: boolean;
+  reason: string | null;
+  since: number | null;
+  by: string | null;
+}
+
+export interface FleetTenantRow {
+  id: number;
+  name: string;
+  slug: string;
+  venueType: string | null;
+  isActive: boolean;
+  archivedAt: number | null;
+  billingStatus: string | null;
+  billingExempt: boolean;
+  nextRenewalAt: string | null;
+  createdAt: number;
+  users: number;
+}
+
+export interface FleetResponse {
+  tenants: FleetTenantRow[];
+  killSwitches: KillSwitchState[];
+}
+

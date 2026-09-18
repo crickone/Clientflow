@@ -19,6 +19,7 @@ import { recordSent, splitBillable } from "@/lib/email/included";
 import { escapeHtml, renderEmailShell, textToParagraphs } from "@/lib/email";
 import { getBusinessProfileForTenant } from "@/lib/businessProfile";
 import { getThemeForTenant } from "@/lib/settings";
+import { isStopped } from "@/lib/platform/killSwitch";
 
 /**
  * The send pipeline (Task 5) — ties together every earlier task into the
@@ -214,6 +215,12 @@ export async function precheckCampaign(
     // any tenant-DB work: a platform admin can suspend a tenant's marketing
     // independent of credit balance. Fails closed — reads only the control
     // DB, so this can never be bypassed by a tenant-DB-side inconsistency.
+    // The fleet-wide stop comes first: when sending is stopped from the
+    // console, no account sends, whatever its own state. See
+    // lib/platform/fleet.
+    if (isStopped("email")) {
+      return { ok: false, error: "Email sending is paused across the platform right now. Your campaign is untouched." };
+    }
     if (isMarketingSuspended(tenantId)) {
       return { ok: false, error: "Email marketing is suspended for this account. Contact support to resolve." };
     }

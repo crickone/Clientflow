@@ -10,6 +10,7 @@ import { renderFilePath } from "@/lib/image/renderStore";
 import { isCarouselSlot } from "@/lib/image/slots";
 import { getSocialPublisher, type SocialChannel } from "./publisher";
 import { renderTokensConfigured, signRenderToken } from "./renderToken";
+import { isStopped } from "@/lib/platform/killSwitch";
 
 /**
  * Booking a Content Studio design to go out on social at a time.
@@ -27,6 +28,7 @@ export type ScheduledPostStatus = "scheduled" | "posting" | "posted" | "failed" 
 export const ALL_CHANNELS: SocialChannel[] = ["facebook", "instagram"];
 
 export const NOT_CONNECTED_MESSAGE = "Waiting for the Facebook connection (Meta app review in progress).";
+export const PLATFORM_PAUSED_MESSAGE = "Posting is paused across the platform; this will go out when it resumes.";
 
 const MIN_LEAD_MS = 60_000;
 
@@ -165,6 +167,21 @@ export async function dispatchDueScheduledPosts(tenantId: number, baseUrl: strin
     .limit(PER_TICK)
     .all();
   if (due.length === 0) return 0;
+
+  // Stopped fleet-wide from the console: due posts WAIT rather than fail,
+  // exactly as they do when there is no connection yet, so nothing is lost
+  // and they go out when posting is turned back on.
+  if (isStopped("posting")) {
+    for (const row of due) {
+      if (row.error !== PLATFORM_PAUSED_MESSAGE) {
+        tdb.update(schema.scheduledPosts)
+          .set({ error: PLATFORM_PAUSED_MESSAGE, lastAttemptAt: new Date(now) })
+          .where(eq(schema.scheduledPosts.id, row.id))
+          .run();
+      }
+    }
+    return 0;
+  }
 
   const publisher = getSocialPublisher(tenantId);
   if (!publisher) {

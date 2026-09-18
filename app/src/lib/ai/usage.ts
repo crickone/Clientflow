@@ -4,6 +4,7 @@ import { controlSqlite } from "@/lib/db/control";
 import { assertUnderMonthlyCap, currentMonthKey, readTenantCapCents } from "@/lib/monthlyCap";
 import { estCostCents, type Usage } from "./client";
 import { getAiBalanceCents, isAiSuspended, recordAiSpend, withMargin } from "./creditsLedger";
+import { isStopped } from "@/lib/platform/killSwitch";
 
 /**
  * Central per-tenant AI spend metering + hard cap. Every AI call records its
@@ -166,6 +167,12 @@ export function assertUnderCap(tenantId: number): void {
  * cap — so this is an inert-by-default replacement for `assertUnderCap`.
  */
 export function assertAiAllowed(tenantId: number): void {
+  // The fleet-wide stop, checked before anything per-tenant: when AI is
+  // stopped from the console it is stopped for everyone, including the
+  // tenants who still have credit. See lib/platform/fleet.
+  if (isStopped("ai")) {
+    throw new AiCapError("AI is paused across the platform right now. It will resume shortly.");
+  }
   if (isAiSuspended(tenantId)) {
     throw new AiCapError("AI is currently suspended for this account.");
   }
