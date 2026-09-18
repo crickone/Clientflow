@@ -303,3 +303,40 @@ export interface TenantPeople {
   resets: OpenReset[];
 }
 
+/** One outside connection on the console's Integrations board. Never carries a secret. */
+export interface ConnectionRow {
+  key: string;
+  label: string;
+  state: "connected" | "needs_attention" | "not_connected";
+  identity: string | null;
+  detail: string | null;
+  connectedAt: number | null;
+  lastUsedAt: number | null;
+  actions: ("disconnect" | "reverify")[];
+}
+
+export interface ApiKeyView {
+  id: number;
+  prefix: string;
+  label: string | null;
+  scopes: string;
+  lastUsedAt: number | null;
+  createdAt: number;
+  revokedAt: number | null;
+}
+
+export interface SiteDomainView {
+  id: number;
+  host: string;
+  siteId: number;
+  siteName: string | null;
+  isPrimary: boolean;
+  verifiedAt: number | null;
+}
+
+export interface TenantIntegrations {
+  connections: ConnectionRow[];
+  apiKeys: ApiKeyView[];
+  siteDomains: SiteDomainView[];
+}
+
