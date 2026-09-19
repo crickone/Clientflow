@@ -130,5 +130,11 @@ export const CHROME_CONTENT_CSS = `
 .cms-list li:last-child article{border-bottom:0}
 .cms-back{display:inline-block;font-size:14px;opacity:.7;text-decoration:none}
 .cms-back:hover{opacity:1}
+/* Keyboard focus has to be visible. These designs strip underlines from
+   links for navigation, and a site that never had a list of article links
+   has no rule covering them — so without this, tabbing through the blog
+   moves an invisible cursor. currentColor keeps it in the site's palette
+   rather than introducing one. */
+.cms-shell a:focus-visible{outline:2px solid currentColor;outline-offset:3px;border-radius:2px}
 @media(max-width:600px){.cms-prose{font-size:16px}}
 `;
