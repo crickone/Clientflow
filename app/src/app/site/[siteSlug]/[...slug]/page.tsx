@@ -8,6 +8,7 @@ import {
   pathFromSlugParam,
 } from "@/lib/cms/render";
 import { studioEditability } from "@/lib/cms/pageBody";
+import { MetaPixel } from "@/components/cms/MetaPixel";
 import { StudioCanvas } from "@/components/cms/StudioCanvas";
 import { StudioUneditablePanel } from "@/components/cms/StudioUneditablePanel";
 
@@ -45,5 +46,14 @@ export default async function PublicSitePage({ params, searchParams }: Props) {
   const pc = resolvePageContext(params, searchParams);
   if (!pc || !pc.template) notFound();
   const T = pc.template.Component;
-  return <T ctx={pc.ctx} page={pc.page} />;
+  return (
+    <>
+      {/* Public surface, so the client's pixel belongs here. Deliberately
+          NOT reached by the cmsedit branch above: an operator editing a page
+          is not a visitor, and counting them would poison the audiences the
+          pixel builds. */}
+      <MetaPixel pixelId={pc.resolved.site.metaPixelId} />
+      <T ctx={pc.ctx} page={pc.page} />
+    </>
+  );
 }

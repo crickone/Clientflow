@@ -5,12 +5,14 @@ import { redirect } from "next/navigation";
 
 import { requireUserPage, requireAdminPage } from "@/lib/auth";
 import { createRequest } from "@/lib/cms/requests";
+import { isValidPixelId } from "@/components/cms/MetaPixel";
 import {
   createSite,
   deleteSiteCascade,
   getSiteBySlug,
   normalizeSlug,
   summariseSiteDeletion,
+  updateSite,
   type SiteDeletionSummary,
 } from "@/lib/cms/sites";
 import { canDeleteSite } from "@/lib/cms/siteDeletion";
@@ -98,5 +100,36 @@ export async function deleteSiteAction(
 
   await deleteSiteCascade(site.id);
   revalidatePath("/cms");
+  return { ok: true };
+}
+
+/**
+ * Set (or clear) a site's Meta Pixel id.
+ *
+ * Validated here as well as at render: the render-time check stops a bad
+ * value reaching a <script> tag, but refusing it at the point of typing is
+ * the only place an operator finds out they pasted the wrong thing. A
+ * Google Tag Manager container id in this box would otherwise just silently
+ * never fire.
+ */
+export async function saveMetaPixelAction(
+  siteSlug: string,
+  pixelId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  await requireAdminPage();
+  const site = await getSiteBySlug(siteSlug);
+  if (!site) return { ok: false, error: "Unknown site." };
+
+  const trimmed = pixelId.trim();
+  if (trimmed && !isValidPixelId(trimmed)) {
+    return {
+      ok: false,
+      error:
+        "That does not look like a Meta Pixel id. It is 8 to 20 digits, nothing else — a GTM container (GTM-XXXX) goes elsewhere.",
+    };
+  }
+
+  await updateSite(site.id, { metaPixelId: trimmed || null });
+  revalidatePath(`/cms/${siteSlug}`);
   return { ok: true };
 }

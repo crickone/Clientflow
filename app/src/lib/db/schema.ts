@@ -1480,6 +1480,14 @@ export const sites = sqliteTable("sites", {
   name: text("name").notNull(),
   linkedTenantSlug: text("linked_tenant_slug"),
   primaryHost: text("primary_host"),
+  /**
+   * The site's Meta (Facebook) Pixel id, or null.
+   *
+   * Per SITE rather than per tenant: an agency tenant can run several
+   * clients' websites, and one client's ad account must never receive
+   * another's traffic.
+   */
+  metaPixelId: text("meta_pixel_id"),
   defaultLocale: text("default_locale").notNull().default("en"),
   themeJson: text("theme_json"),
   status: text("status", { enum: ["draft", "live"] })

@@ -1385,6 +1385,7 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       name TEXT NOT NULL,
       linked_tenant_slug TEXT,
       primary_host TEXT,
+      meta_pixel_id TEXT,
       default_locale TEXT NOT NULL DEFAULT 'en',
       theme_json TEXT,
       status TEXT NOT NULL DEFAULT 'draft',
@@ -1589,6 +1590,18 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     }
   } catch (err) {
     console.error("[db] leads pipeline_stage migration failed:", err);
+  }
+
+  // Meta (Facebook) Pixel, per site. Existing tenant DBs predate it; the
+  // CREATE above only applies to fresh installs, so add it once here —
+  // PRAGMA-guarded, mirroring every other column-add in this function.
+  try {
+    const siteCols = sqlite.prepare("PRAGMA table_info(sites)").all() as Array<{ name: string }>;
+    if (!siteCols.some((c) => c.name === "meta_pixel_id")) {
+      sqlite.exec("ALTER TABLE sites ADD COLUMN meta_pixel_id TEXT");
+    }
+  } catch (err) {
+    console.error("[db] sites meta_pixel_id migration failed:", err);
   }
 
   try {
