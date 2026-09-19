@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   FileText,
+  FolderOpen,
   Image as ImageIcon,
   Layers,
   Play,
@@ -213,18 +214,30 @@ export function ContentStudioHome({
         ))}
       </div>
 
-      <div className="cs-filter" role="tablist" aria-label="Filter content by type">
-        {FILTERS.map(({ key, label, n }) => (
-          <button
-            key={key}
-            role="tab"
-            aria-selected={filter === key}
-            onClick={() => setFilter(key)}
-          >
-            {label}
-            <span className="cs-n">{n}</span>
-          </button>
-        ))}
+      <div className="cs-tabrow">
+        <div className="cs-filter" role="tablist" aria-label="Filter content by type">
+          {FILTERS.map(({ key, label, n }) => (
+            <button
+              key={key}
+              role="tab"
+              aria-selected={filter === key}
+              onClick={() => setFilter(key)}
+            >
+              {label}
+              <span className="cs-n">{n}</span>
+            </button>
+          ))}
+        </div>
+        {/* Deliberately a link, not a fifth tab. The tabs filter the list
+            below; this goes to the media library, which is a different
+            place — the photographs and clips you uploaded, rather than the
+            work you made from them. It was already built and reachable only
+            by typing the URL. */}
+        <Link href="/content-studio/library" className="cs-libref">
+          <FolderOpen size={14} strokeWidth={1.8} />
+          Library
+          <span className="cs-n">{library.length}</span>
+        </Link>
       </div>
 
       {shown.length === 0 ? (
