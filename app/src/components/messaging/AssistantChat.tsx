@@ -6,6 +6,8 @@ import { createPortal } from "react-dom";
 import { Sparkles, Send, Download, Loader2, Check, History, Plus, Trash2, MessageSquare, Mic, Square, Paperclip, X as XIcon } from "lucide-react";
 import { toast } from "sonner";
 import { EASE } from "@/lib/motion";
+import { humanResult, splitAttachments } from "@/components/messaging/chatText";
+
 
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
@@ -776,7 +778,7 @@ export function AssistantChat({
         }));
         return;
       }
-      const lines = data.results.map((r) => (r.ok ? r.text : `Failed: ${r.text}`)).join("\n\n");
+      const lines = data.results.map((r) => (r.ok ? humanResult(r.text) : `Failed: ${humanResult(r.text)}`)).join("\n\n");
       const arts = data.results.flatMap((r) => (r.artifact ? [r.artifact] : []));
       // Campaign Engine Slice 1 (Task 6): fold any executed campaign write's
       // result into the progress-strip log — a no-op (returns null) for
@@ -1435,8 +1437,49 @@ function MessageBubble({
             {streaming && m.steps.some((s) => !s.done) && <div className="ai-shimmer" />}
           </div>
         )}
-        {m.content && (
-          <RichText text={m.content} />
+        {isUser ? (
+          (() => {
+            const { body, attached } = splitAttachments(m.content);
+            return (
+              <>
+                {body && <RichText text={body} />}
+                {attached.length > 0 && (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 6,
+                      marginTop: body ? 8 : 0,
+                    }}
+                  >
+                    {attached.map((a) => (
+                      <span
+                        key={a.id}
+                        title={`${a.name} (${a.kind})`}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          maxWidth: 240,
+                          padding: "4px 9px",
+                          borderRadius: 999,
+                          background: "rgba(0,0,0,.14)",
+                          fontSize: 12,
+                        }}
+                      >
+                        <Paperclip size={11} strokeWidth={2} />
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {a.name}
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </>
+            );
+          })()
+        ) : (
+          m.content && <RichText text={m.content} />
         )}
         {streaming && m.content && <span className="ai-caret" aria-hidden />}
         {m.pending && (m.pending.status === "awaiting" || m.pending.status === "approving") && (
