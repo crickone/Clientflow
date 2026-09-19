@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { requireAdminPage } from "@/lib/auth";
 import { getSiteBySlug } from "@/lib/cms/sites";
-import { MetaPixelCard } from "@/components/cms/MetaPixelCard";
+import { TrackingCard } from "@/components/cms/TrackingCard";
 
 export const dynamic = "force-dynamic";
 
@@ -80,7 +80,11 @@ export default async function SiteDashboard({
           </Link>
         ))}
       </div>
-      <MetaPixelCard siteSlug={site.slug} initialPixelId={site.metaPixelId} />
+      <TrackingCard
+        siteSlug={site.slug}
+        initialPixelId={site.metaPixelId}
+        initialGoogleTagId={site.googleTagId}
+      />
     </div>
   );
 }

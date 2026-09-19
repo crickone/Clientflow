@@ -87,7 +87,7 @@ export async function createSite(input: CreateSiteInput): Promise<Site> {
 export async function updateSite(
   id: number,
   patch: Partial<
-    Pick<Site, "name" | "primaryHost" | "status" | "linkedTenantSlug" | "themeJson" | "metaPixelId">
+    Pick<Site, "name" | "primaryHost" | "status" | "linkedTenantSlug" | "themeJson" | "metaPixelId" | "googleTagId">
   >,
 ): Promise<void> {
   db.update(sites)

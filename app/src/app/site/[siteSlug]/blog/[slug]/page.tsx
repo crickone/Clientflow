@@ -7,6 +7,7 @@ import { getPublishedPostBySlug } from "@/lib/cms/blog";
 import { renderMarkdown, excerptFromMarkdown } from "@/lib/cms/markdown";
 import { getSiteChrome, CHROME_CONTENT_CSS } from "@/lib/cms/siteChrome";
 import { MetaPixel } from "@/components/cms/MetaPixel";
+import { GoogleTag } from "@/components/cms/GoogleTag";
 
 export const dynamic = "force-dynamic";
 
@@ -90,6 +91,7 @@ export default function PublicBlogPost({
   return (
     <>
       <MetaPixel pixelId={resolved.site.metaPixelId} />
+      <GoogleTag tagId={resolved.site.googleTagId} />
       <div dangerouslySetInnerHTML={{ __html: chrome.head }} />
       <style dangerouslySetInnerHTML={{ __html: CHROME_CONTENT_CSS }} />
       {chrome.header && <div dangerouslySetInnerHTML={{ __html: chrome.header }} />}

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DomainsManager } from "@/components/cms/DomainsManager";
-import { MetaPixelCard } from "@/components/cms/MetaPixelCard";
+import { TrackingCard } from "@/components/cms/TrackingCard";
 import { requireAdminPage, getCurrentMembership } from "@/lib/auth";
 import { getSiteBySlug } from "@/lib/cms/sites";
 import { listDomains } from "@/lib/cms/domains";
@@ -40,7 +40,11 @@ export default async function SiteDomainsPage({
           site stops reporting conversions. It is also on the site dashboard,
           but this is the screen an operator is on when they do the switch —
           and the visual editor's own sidebar links here, not there. */}
-      <MetaPixelCard siteSlug={site.slug} initialPixelId={site.metaPixelId} />
+      <TrackingCard
+        siteSlug={site.slug}
+        initialPixelId={site.metaPixelId}
+        initialGoogleTagId={site.googleTagId}
+      />
     </div>
   );
 }

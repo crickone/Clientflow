@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { requireUserPage, requireAdminPage } from "@/lib/auth";
 import { createRequest } from "@/lib/cms/requests";
 import { isValidPixelId } from "@/components/cms/MetaPixel";
+import { isValidGoogleTagId } from "@/components/cms/GoogleTag";
 import {
   createSite,
   deleteSiteCascade,
@@ -104,32 +105,48 @@ export async function deleteSiteAction(
 }
 
 /**
- * Set (or clear) a site's Meta Pixel id.
+ * Set (or clear) a site's tracking tags.
  *
- * Validated here as well as at render: the render-time check stops a bad
- * value reaching a <script> tag, but refusing it at the point of typing is
- * the only place an operator finds out they pasted the wrong thing. A
- * Google Tag Manager container id in this box would otherwise just silently
- * never fire.
+ * Validated here as well as at render. The render check stops a bad value
+ * reaching a <script> tag; validating on save is the only place an operator
+ * finds out they pasted the wrong thing. A GTM container typed into the
+ * Meta box would otherwise just silently never fire, and nobody looks again
+ * for weeks.
+ *
+ * Both are written in one call so a half-saved pair cannot exist.
  */
-export async function saveMetaPixelAction(
+export async function saveTrackingAction(
   siteSlug: string,
   pixelId: string,
+  googleTagId: string,
 ): Promise<{ ok: boolean; error?: string }> {
   await requireAdminPage();
   const site = await getSiteBySlug(siteSlug);
   if (!site) return { ok: false, error: "Unknown site." };
 
-  const trimmed = pixelId.trim();
-  if (trimmed && !isValidPixelId(trimmed)) {
+  const pixel = pixelId.trim();
+  const google = googleTagId.trim();
+
+  if (pixel && !isValidPixelId(pixel)) {
     return {
       ok: false,
       error:
-        "That does not look like a Meta Pixel id. It is 8 to 20 digits, nothing else — a GTM container (GTM-XXXX) goes elsewhere.",
+        "That Meta Pixel id does not look right. It is 8 to 20 digits and nothing else — a GTM container goes in the Google box.",
+    };
+  }
+  if (google && !isValidGoogleTagId(google)) {
+    return {
+      ok: false,
+      error:
+        "That Google tag does not look right. Use a container (GTM-XXXXXXX), a GA4 tag (G-XXXXXXXXXX) or an Ads id (AW-123456789).",
     };
   }
 
-  await updateSite(site.id, { metaPixelId: trimmed || null });
+  await updateSite(site.id, {
+    metaPixelId: pixel || null,
+    googleTagId: google ? google.toUpperCase() : null,
+  });
   revalidatePath(`/cms/${siteSlug}`);
+  revalidatePath(`/cms/${siteSlug}/domains`);
   return { ok: true };
 }

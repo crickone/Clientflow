@@ -1488,6 +1488,13 @@ export const sites = sqliteTable("sites", {
    * another's traffic.
    */
   metaPixelId: text("meta_pixel_id"),
+  /**
+   * The site's Google tag: a GTM container (GTM-…), a GA4 measurement id
+   * (G-…) or a Google Ads conversion id (AW-…). One field for all three
+   * because a site has one Google tag; if a business uses GTM, its GA4 goes
+   * inside the container rather than on the page a second time.
+   */
+  googleTagId: text("google_tag_id"),
   defaultLocale: text("default_locale").notNull().default("en"),
   themeJson: text("theme_json"),
   status: text("status", { enum: ["draft", "live"] })

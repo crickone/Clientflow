@@ -1386,6 +1386,7 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       linked_tenant_slug TEXT,
       primary_host TEXT,
       meta_pixel_id TEXT,
+      google_tag_id TEXT,
       default_locale TEXT NOT NULL DEFAULT 'en',
       theme_json TEXT,
       status TEXT NOT NULL DEFAULT 'draft',
@@ -1599,6 +1600,9 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     const siteCols = sqlite.prepare("PRAGMA table_info(sites)").all() as Array<{ name: string }>;
     if (!siteCols.some((c) => c.name === "meta_pixel_id")) {
       sqlite.exec("ALTER TABLE sites ADD COLUMN meta_pixel_id TEXT");
+    }
+    if (!siteCols.some((c) => c.name === "google_tag_id")) {
+      sqlite.exec("ALTER TABLE sites ADD COLUMN google_tag_id TEXT");
     }
   } catch (err) {
     console.error("[db] sites meta_pixel_id migration failed:", err);
