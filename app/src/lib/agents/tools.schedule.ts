@@ -9,6 +9,8 @@ import { scheduleEmailCampaign, unscheduleEmailCampaign, listScheduledEmailCampa
 import { cancelScheduledPost, listScheduledPosts, normalizeChannels, schedulePost } from "@/lib/social/schedule";
 import { isMetaConnected } from "@/lib/social/publisher";
 import { getCarousel } from "@/lib/image/carousels";
+import { getSiteBlogPost, listSiteBlogPosts, setPublishState } from "@/lib/cms/blog";
+import { resolveSite } from "@/lib/agents/tools.marketing";
 import type { ToolContext, ToolResult } from "@/lib/agents/toolKit";
 
 /**
@@ -118,13 +120,27 @@ export const SCHEDULE_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
-    name: "cancel_scheduled_item",
-    description: "Take a scheduled post or a scheduled email send off the schedule. A cancelled email goes back to draft; a cancelled post stays in Content Studio.",
+    name: "schedule_blog_post",
+    description:
+      "Book a finished blog post to go live on the website at a date and time. The post stays invisible to visitors until then and publishes itself at that moment. Use this instead of publish_blog_post whenever the operator wants it live later — publish_blog_post puts it live immediately. Only schedule a time the operator has approved.",
     input_schema: {
       type: "object",
       properties: {
-        kind: { type: "string", enum: ["post", "email"] },
-        id: { type: "integer", description: "For a post: the scheduled post's id (from list_schedule). For an email: the email campaign's id." },
+        postId: { type: "integer", description: "The blog post's id (from save_blog_post, or the campaign launch summary)." },
+        when: { type: "string", description: "When to go live: YYYY-MM-DDTHH:mm in Irish local time (e.g. 2026-10-03T09:00), or a full ISO timestamp." },
+        siteId: { type: "integer", description: "Optional: which website, when the business has more than one." },
+      },
+      required: ["postId", "when"],
+    },
+  },
+  {
+    name: "cancel_scheduled_item",
+    description: "Take a scheduled social post, email send or blog post off the schedule. A cancelled email goes back to draft; a cancelled social post stays in Content Studio; a cancelled blog post goes back to a draft and stays unpublished.",
+    input_schema: {
+      type: "object",
+      properties: {
+        kind: { type: "string", enum: ["post", "email", "blog"] },
+        id: { type: "integer", description: "For a social post: the scheduled post's id (from list_schedule). For an email: the email campaign's id. For a blog: the blog post's id." },
         name: { type: "string", description: "Optional: the item's name, purely for the approval card." },
       },
       required: ["kind", "id"],
@@ -133,7 +149,7 @@ export const SCHEDULE_TOOLS: Anthropic.Tool[] = [
   {
     name: "list_schedule",
     description:
-      "Everything booked for a time, soonest first: scheduled social posts (with whether posting is connected yet), scheduled email sends, and how many nurture-sequence messages are queued. Also lists email campaign drafts that could be scheduled. Use before scheduling, and to answer 'what's going out this week'.",
+      "Everything booked for a time, soonest first: scheduled social posts (with whether posting is connected yet), scheduled email sends, scheduled blog posts, and how many nurture-sequence messages are queued. Also lists email campaign drafts that could be scheduled. Use before scheduling, and to answer 'what's going out this week'.",
     input_schema: { type: "object", properties: {} },
   },
 ];
@@ -188,7 +204,62 @@ export function scheduleEmailCampaignTool(_ctx: ToolContext, input: Record<strin
   };
 }
 
-/** WRITE -- unbook a post or an email send. Approve-gated. */
+/**
+ * WRITE -- book a blog post to go live at a time. Approve-gated.
+ *
+ * Same Irish-local `when` as the other two scheduling tools, deliberately:
+ * an operator saying "Tuesday at 9" means the same thing whether they are
+ * talking about an email, a post or a blog, and three different parsers
+ * would eventually disagree about one of them.
+ *
+ * Refuses a time in the past rather than quietly publishing at once. A past
+ * date would be picked up by the very next dispatch tick and go live within
+ * the minute, which is publish_blog_post's job and not what anyone typing a
+ * date is asking for.
+ */
+export function scheduleBlogPostTool(ctx: ToolContext, input: Record<string, unknown>): ToolResult {
+  const postId = Number(input.postId);
+  if (!postId) return { text: JSON.stringify({ error: "postId is required." }) };
+
+  const when = parseWhen(input.when);
+  if (!when) return { text: JSON.stringify({ error: "when must be YYYY-MM-DDTHH:mm (Irish time) or an ISO timestamp." }) };
+  if (when.getTime() <= Date.now()) {
+    return {
+      text: JSON.stringify({
+        error: `${formatDublin(when.getTime())} is in the past. Pick a future time, or use publish_blog_post to put it live now.`,
+      }),
+    };
+  }
+
+  const site = resolveSite(ctx, input.siteId);
+  if ("error" in site) return site.error;
+
+  const post = getSiteBlogPost(site.id, postId);
+  if (!post) return { text: JSON.stringify({ error: `No blog post with id ${postId} on ${site.name}.` }) };
+  if (post.publishState === "published") {
+    return {
+      text: JSON.stringify({
+        error: `"${post.title}" is already live. Unpublish it first if it should go out at a different time.`,
+      }),
+    };
+  }
+  if (!post.content || !post.content.trim()) {
+    return { text: JSON.stringify({ error: `"${post.title}" has no content yet — write it before scheduling it.` }) };
+  }
+
+  setPublishState(site.id, postId, "scheduled", when);
+  return {
+    text: JSON.stringify({
+      result: `"${post.title}" will go live on ${site.name} at ${formatDublin(when.getTime())}. It stays hidden from visitors until then.`,
+      postId,
+      siteId: site.id,
+      publishState: "scheduled",
+      scheduledFor: when.toISOString(),
+    }),
+  };
+}
+
+/** WRITE -- unbook a post, an email send or a blog post. Approve-gated. */
 export function cancelScheduledItemTool(_ctx: ToolContext, input: Record<string, unknown>): ToolResult {
   const kind = String(input.kind || "");
   const id = Number(input.id);
@@ -201,7 +272,18 @@ export function cancelScheduledItemTool(_ctx: ToolContext, input: Record<string,
     const res = unscheduleEmailCampaign(id);
     return { text: JSON.stringify(res.ok ? { result: `"${res.campaign.name}" is back to a draft and will not send.` } : { error: res.error }) };
   }
-  return { text: JSON.stringify({ error: 'kind must be "post" or "email".' }) };
+  if (kind === "blog") {
+    const site = resolveSite(_ctx, input.siteId);
+    if ("error" in site) return site.error;
+    const post = getSiteBlogPost(site.id, id);
+    if (!post) return { text: JSON.stringify({ error: `No blog post with id ${id} on ${site.name}.` }) };
+    if (post.publishState !== "scheduled") {
+      return { text: JSON.stringify({ error: `"${post.title}" is not scheduled — nothing to cancel.` }) };
+    }
+    setPublishState(site.id, id, "draft");
+    return { text: JSON.stringify({ result: `"${post.title}" is back to a draft and will not go live.` }) };
+  }
+  return { text: JSON.stringify({ error: 'kind must be "post", "email" or "blog".' }) };
 }
 
 /** READ -- the whole schedule. */
@@ -242,11 +324,33 @@ export function listScheduleTool(ctx: ToolContext, _input: Record<string, unknow
     .limit(1)
     .get();
 
+  // Blog posts booked to go live, across every site this business has — the
+  // schedule is a question about the business, not about one website, and a
+  // tenant with two sites would otherwise be shown half its schedule.
+  const scheduledBlogs = db
+    .select({ id: schema.sites.id, name: schema.sites.name })
+    .from(schema.sites)
+    .all()
+    .flatMap((site) =>
+      listSiteBlogPosts(site.id)
+        .filter((post) => post.publishState === "scheduled" && post.scheduledFor)
+        .map((post) => ({
+          blogPostId: post.id,
+          title: post.title,
+          site: site.name,
+          siteId: site.id,
+          when: formatDublin(post.scheduledFor!.getTime()),
+          whenIso: post.scheduledFor!.toISOString(),
+        })),
+    )
+    .sort((a, b) => a.whenIso.localeCompare(b.whenIso));
+
   return {
     text: JSON.stringify({
       postingConnected: isMetaConnected(ctx.tenantId),
       scheduledPosts: posts,
       scheduledEmails: emails,
+      scheduledBlogs,
       emailDraftsAvailable: drafts,
       nurtureQueue: { queued, next: nextNurture ? formatDublin(nextNurture.dueAt.getTime()) : null },
       note: "Times are Irish local time. A post with a note is waiting on the Facebook connection.",

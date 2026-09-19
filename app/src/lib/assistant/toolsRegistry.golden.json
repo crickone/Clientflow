@@ -65,6 +65,7 @@
     "create_social_post",
     "schedule_social_post",
     "schedule_email_campaign",
+    "schedule_blog_post",
     "cancel_scheduled_item",
     "send_client_whatsapp"
   ],
@@ -216,6 +217,10 @@
     "schedule_social_post": [
       "Schedule \"Sample Name\" to go out on social",
       "Schedule post #? to go out on social"
+    ],
+    "schedule_blog_post": [
+      "Put blog post #3 live at the scheduled time",
+      "Put blog post #? live at the scheduled time"
     ]
   },
   "readSamplesAllFalse": [

@@ -81,6 +81,7 @@ import {
   listScheduleTool,
   parseWhen,
   scheduleEmailCampaignTool,
+  scheduleBlogPostTool,
   scheduleSocialPostTool,
 } from "@/lib/agents/tools.schedule";
 import {
@@ -194,6 +195,7 @@ const WRITE_TOOL_META: Record<string, WriteToolMeta> = {
   // gated. list_schedule is a read.
   schedule_social_post: { label: "Schedule social post", summarize: ({ v }) => { const when = parseWhen(v("when")); return `Schedule ${v("name") ? `"${v("name")}"` : `post #${v("postId") || "?"}`} to go out${when ? ` on ${formatDublin(when.getTime())}` : " on social"}`; } },
   schedule_email_campaign: { label: "Schedule email send", summarize: ({ v }) => { const when = parseWhen(v("when")); return `Send ${v("name") ? `"${v("name")}"` : `email campaign #${v("emailCampaignId") || "?"}`}${when ? ` on ${formatDublin(when.getTime())}` : " at the scheduled time"}`; } },
+  schedule_blog_post: { label: "Schedule blog post", summarize: ({ v }) => { const when = parseWhen(v("when")); return `Put blog post #${v("postId") || "?"} live${when ? ` on ${formatDublin(when.getTime())}` : " at the scheduled time"}`; } },
   cancel_scheduled_item: { label: "Cancel scheduled item", summarize: ({ v }) => `Cancel the scheduled ${v("kind") || "item"}${v("name") ? ` "${v("name")}"` : ""}` },
 
   // Operations agent (Operations Task 1): WhatsApp send to a CLIENT (distinct
@@ -925,6 +927,8 @@ export async function executeTool(
         return scheduleSocialPostTool(ctx, input);
       case "schedule_email_campaign":
         return scheduleEmailCampaignTool(ctx, input);
+      case "schedule_blog_post":
+        return scheduleBlogPostTool(ctx, input);
       case "cancel_scheduled_item":
         return cancelScheduledItemTool(ctx, input);
       case "list_schedule":
