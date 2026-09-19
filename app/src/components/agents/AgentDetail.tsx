@@ -2,9 +2,10 @@
 
 import { type ReactNode, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { ChevronDown, CircleCheck, Cpu, Gauge, Lock } from "lucide-react";
+import { ChevronDown, CircleCheck, Cpu, Gauge, Lock, Pencil, Plus } from "lucide-react";
 
 import { Card, CardLabel } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Reveal, RevealGroup } from "@/components/motion/Reveal";
 import { formatEur } from "@/lib/utils";
@@ -14,6 +15,7 @@ import { MODEL_CATALOG, isCatalogModel, type ModelChoice } from "@/lib/ai/modelC
 import { groupToolsByCategory } from "@/lib/agents/toolCategories";
 import { saveModel, saveDisabledTools, saveAgentSkills } from "@/app/agents/actions";
 import { AgentContextEditor } from "./AgentContextEditor";
+import { SkillForm, type SkillRow } from "./SkillForm";
 
 interface Layers {
   base: string;
@@ -35,6 +37,8 @@ interface Props {
   /** The agent's OFF list (tool names it may not use) — parsed from agents.disabled_tools in page.tsx via parseDisabledTools. Seeds the tool-access toggles; empty = every tool on. */
   disabledTools: string[];
   skills: SkillToggle[];
+  /** Full text per skill id — the edit form opens without a second fetch. */
+  skillBodies: Record<number, string>;
   usageCents: number;
   capCents: number;
   /** Whether `OPENROUTER_API_KEY` is set — computed server-side (page.tsx) and passed down so a client component never has to guess at env state. Gates the DeepSeek/OpenRouter option in the model picker below. */
@@ -47,7 +51,7 @@ interface Props {
  * `composeAgentSystem` — @/lib/agents/context — actually concatenates them
  * for a live run), and the agent's working chat (or a dormant placeholder).
  */
-export function AgentDetail({ agent, mandate, roles, layers, toolNames, disabledTools, skills, usageCents, capCents, openRouterConfigured }: Props) {
+export function AgentDetail({ agent, mandate, roles, layers, toolNames, disabledTools, skills, skillBodies, usageCents, capCents, openRouterConfigured }: Props) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 36 }}>
       <RevealGroup style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
@@ -60,7 +64,7 @@ export function AgentDetail({ agent, mandate, roles, layers, toolNames, disabled
       </RevealGroup>
 
       <Reveal>
-        <SkillsSection agentKey={agent.key} skills={skills} />
+        <SkillsSection agentKey={agent.key} skills={skills} bodies={skillBodies} />
         <ToolAccessSection agentKey={agent.key} toolNames={toolNames} disabledTools={disabledTools} />
       </Reveal>
 
@@ -386,11 +390,31 @@ function Toggle({ on, onToggle, pending, label }: { on: boolean; onToggle: () =>
  * that waits for a round trip feels broken, and one that lies when the server
  * refuses is worse.
  */
-function SkillsSection({ agentKey, skills }: { agentKey: string; skills: SkillToggle[] }) {
+/**
+ * Skills: switch one on for this agent, and edit what it actually says.
+ *
+ * Both live here on purpose. They used to be split — toggles on this page,
+ * the text on the Agents index — which left an operator looking at a
+ * switch with nowhere to click to read it, and two screens each claiming
+ * to be the skills page. Editing from here changes the skill for the whole
+ * ACCOUNT, since that is where a skill belongs; the note in the header
+ * says so.
+ */
+function SkillsSection({
+  agentKey,
+  skills,
+  bodies,
+}: {
+  agentKey: string;
+  skills: SkillToggle[];
+  /** Full text per skill id, so a row can be opened without another round trip. */
+  bodies: Record<number, string>;
+}) {
   const [on, setOn] = useState<Set<number>>(
     () => new Set(skills.filter((s) => s.enabled).map((s) => s.id)),
   );
   const [pending, startTransition] = useTransition();
+  const [editing, setEditing] = useState<SkillRow | "new" | null>(null);
   // What the operator is actually spending. ONLY the always-on ones: an
   // on-demand skill costs its name and description until a job needs it, and
   // counting its whole body here would overstate the bill several times over.
@@ -424,15 +448,31 @@ function SkillsSection({ agentKey, skills }: { agentKey: string; skills: SkillTo
           <p style={{ fontSize: 12.5, color: "var(--text-tertiary)", margin: 0, lineHeight: 1.5, maxWidth: 620 }}>
             A skill is a block of instructions kept for this account and shared across agents. Switching one on adds it to this agent&apos;s system prompt on every message; it sits above the operator instructions, so anything you write there still wins.
           </p>
-          <span style={{ fontFamily: "var(--font-mono), ui-monospace, monospace", fontSize: 12, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-            {on.size} / {skills.length} on
-            {charCount > 0 ? ` · ${charCount.toLocaleString()} chars every message` : ""}
-            {onDemandCount > 0 ? ` · ${onDemandCount} on request` : ""}
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+            <span style={{ fontFamily: "var(--font-mono), ui-monospace, monospace", fontSize: 12, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+              {on.size} / {skills.length} on
+              {charCount > 0 ? ` · ${charCount.toLocaleString()} chars every message` : ""}
+              {onDemandCount > 0 ? ` · ${onDemandCount} on request` : ""}
+            </span>
+            {editing === null && (
+              <Button size="sm" variant="outline" onClick={() => setEditing("new")}>
+                <Plus size={13} /> New skill
+              </Button>
+            )}
+          </div>
         </div>
+
+        {editing !== null && (
+          <div style={{ marginBottom: 18 }}>
+            <SkillForm
+              initial={editing === "new" ? null : editing}
+              onDone={() => setEditing(null)}
+            />
+          </div>
+        )}
         {skills.length === 0 ? (
           <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: 0 }}>
-            No skills yet. Add one under Agents to make it available to every agent on this account.
+            No skills yet. Add one above — it becomes available to every agent on this account.
           </p>
         ) : (
           <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 2 }}>
@@ -450,12 +490,31 @@ function SkillsSection({ agentKey, skills }: { agentKey: string; skills: SkillTo
                       : "fetched when a job needs it"}
                   </div>
                 </div>
-                <Toggle
-                  on={on.has(s.id)}
-                  pending={pending}
-                  label={`Turn the ${s.name} skill ${on.has(s.id) ? "off" : "on"} for this agent`}
-                  onToggle={() => toggle(s.id)}
-                />
+                <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label={`Edit what the ${s.name} skill says`}
+                    title={`Edit what the ${s.name} skill says`}
+                    onClick={() =>
+                      setEditing({
+                        id: s.id,
+                        name: s.name,
+                        description: s.description,
+                        body: bodies[s.id] ?? "",
+                        loadMode: s.loadMode,
+                      })
+                    }
+                  >
+                    <Pencil size={13} />
+                  </Button>
+                  <Toggle
+                    on={on.has(s.id)}
+                    pending={pending}
+                    label={`Turn the ${s.name} skill ${on.has(s.id) ? "off" : "on"} for this agent`}
+                    onToggle={() => toggle(s.id)}
+                  />
+                </div>
               </li>
             ))}
           </ul>

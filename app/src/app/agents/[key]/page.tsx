@@ -5,7 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { requireAdminPage, getCurrentMembership } from "@/lib/auth";
 import { AGENT_CATALOG, getAgent, parseDisabledTools } from "@/lib/agents/registry";
-import { skillBodiesFor, skillMenuFor, skillTogglesFor } from "@/lib/agents/skills";
+import { listSkills, skillBodiesFor, skillMenuFor, skillTogglesFor } from "@/lib/agents/skills";
 import { SAFETY_RAILS } from "@/lib/agents/context";
 import { SPECIALISTS } from "@/lib/agents/specialists";
 import { getBusinessContext } from "@/lib/ai/businessContext";
@@ -138,6 +138,7 @@ export default async function AgentDetailPage({
         toolNames={isConcierge ? conciergeToolNames : spec?.toolNames ?? []}
         disabledTools={parseDisabledTools(agent.disabledTools)}
         skills={skillTogglesFor(tenantId, agent.key)}
+        skillBodies={Object.fromEntries(listSkills(tenantId).map((s) => [s.id, s.body]))}
         usageCents={usageCents}
         capCents={capCents}
         openRouterConfigured={openRouterConfigured}
