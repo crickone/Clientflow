@@ -10,6 +10,7 @@ import { getBusinessProfileForTenant } from "@/lib/businessProfile";
 import { listAllExercisesForBackfill, selectExercisesNeedingVideo, setExerciseVideoUrl } from "@/lib/exerciseLibrary";
 import { getThemeForTenant } from "@/lib/settings";
 import { seedMarketingSite } from "@/lib/cms/seedMarketingSite";
+import { syncBundledSites } from "@/lib/cms/syncBundledSite";
 import { renderEmailShell, sendEmailForTenant, textToParagraphs } from "@/lib/email";
 import { searchExerciseVideoDetailed } from "@/lib/youtube";
 import { publishDueScheduledPosts } from "@/lib/cms/blog";
@@ -369,4 +370,9 @@ if (process.env.NEXT_PHASE !== "phase-production-build") {
   // tenant on boot (create-if-missing; ships its HTML in the build). Runs once
   // here rather than in a tick so the preview is ready immediately after deploy.
   seedMarketingSite();
+  // Publish any bespoke client site whose pages ship in this build. A deploy
+  // otherwise updates the app and a site's images while leaving its PAGES on
+  // whatever the last import left behind. Content-hash gated, and it never
+  // overwrites a page somebody edited in Studio.
+  syncBundledSites();
 }
