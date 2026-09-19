@@ -8,6 +8,7 @@ import { getSiteBySlug } from "@/lib/cms/sites";
 import { upsertPage, setPageStatus, getPage } from "@/lib/cms/pages";
 import { upsertBlock } from "@/lib/cms/blocks";
 import { upsertSeo } from "@/lib/cms/seo";
+import { restoreRevision } from "@/lib/cms/pageRevisions";
 import { getTemplate } from "@/lib/cms/templates";
 import { db, schema } from "@/lib/db";
 import { and, eq } from "drizzle-orm";
@@ -17,6 +18,35 @@ async function siteOrThrow(siteSlug: string) {
   const site = await getSiteBySlug(siteSlug);
   if (!site) throw new Error(`Unknown site: ${siteSlug}`);
   return site;
+}
+
+/**
+ * Put a page back to an earlier version.
+ *
+ * Returns a result rather than throwing, because a version can legitimately
+ * be gone — pruned by the per-page cap, or the page rewritten since the list
+ * was rendered — and an operator clicking Restore deserves a sentence, not
+ * an error page.
+ */
+export async function restorePageVersionAction(
+  siteSlug: string,
+  pageId: number,
+  revisionId: number,
+): Promise<{ ok: boolean; error?: string }> {
+  const user = await requireAdminPage();
+  const site = await getSiteBySlug(siteSlug);
+  if (!site) return { ok: false, error: "Unknown site." };
+  const page = getPage(site.id, pageId);
+  if (!page) return { ok: false, error: "Unknown page." };
+
+  const out = restoreRevision(site.id, pageId, revisionId, user.id);
+  if (!out.ok) return { ok: false, error: out.error };
+
+  revalidatePath(`/cms/${siteSlug}/pages/${pageId}`);
+  // The live page too, or the operator restores a version and still sees the
+  // old one on the site.
+  revalidatePath(`/site/${siteSlug}${page.path === "/" ? "" : page.path}`);
+  return { ok: true };
 }
 
 function normalizePath(p: string): string {
