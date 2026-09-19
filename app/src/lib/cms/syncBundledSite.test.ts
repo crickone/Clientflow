@@ -170,6 +170,85 @@ const page = (key: string, body: string) => ({
       "the marker still names the tenant actually written to",
     );
 
+    // ── THE BLOG SEED IS CREATE-ONLY ─────────────────────────────────────
+    // Pages are upserted because the repo owns them. A blog post is the
+    // client's own writing — they will edit it, retitle it, add to it — so
+    // the seed may create what is missing and must NEVER touch what exists.
+    // That is the entire safety story for carrying 22 articles across from a
+    // site we are replacing, so it is the thing to assert.
+    const writePosts = (posts: Array<{ slug: string; title: string; content: string }>) =>
+      fs.writeFileSync(
+        path.join(SANDBOX, "public", "sites", "inspire", "_posts.json"),
+        JSON.stringify({
+          posts: posts.map((p) => ({
+            ...p,
+            excerpt: `${p.slug} excerpt`,
+            seoTitle: `${p.title} | SEO`,
+            seoDescription: "",
+            coverImageUrl: null,
+            sourceUrl: `https://old.example/${p.slug}`,
+          })),
+        }),
+      );
+
+    writePosts([
+      { slug: "first-post", title: "First post", content: "# First\n\nHello." },
+      { slug: "second-post", title: "Second post", content: "# Second\n\nAlso hello." },
+    ]);
+    syncBundledSites();
+
+    const postRow = (slug: string) =>
+      sqlite
+        .prepare("SELECT * FROM blog_posts WHERE site_id = ? AND slug = ?")
+        .get(sid, slug) as
+        | { id: number; title: string; content: string; publish_state: string; published_at: number | null; seo_title: string | null; excerpt: string | null }
+        | undefined;
+
+    assert.ok(postRow("first-post"), "a post from the bundle is created");
+    assert.ok(postRow("second-post"), "…and so is the second");
+    assert.equal(postRow("first-post")!.publish_state, "published", "posts arrive PUBLISHED, matching the site being replaced");
+    assert.ok(postRow("first-post")!.published_at, "…with a published timestamp, so they sort correctly");
+    assert.equal(postRow("first-post")!.seo_title, "First post | SEO", "SEO travels with the post");
+    assert.equal(postRow("first-post")!.excerpt, "first-post excerpt", "…and so does the excerpt");
+
+    // Running the same bundle again is inert.
+    const firstId = postRow("first-post")!.id;
+    syncBundledSites();
+    assert.equal(postRow("first-post")!.id, firstId, "the same bundle does not duplicate posts");
+
+    // THE PROPERTY: an edited post is never overwritten, even by a changed
+    // bundle, and a genuinely new post still lands beside it.
+    sqlite
+      .prepare("UPDATE blog_posts SET title = ?, content = ? WHERE id = ?")
+      .run("The client retitled this", "Rewritten by a human.", firstId);
+    writePosts([
+      { slug: "first-post", title: "First post", content: "# First\n\nHello, revised." },
+      { slug: "second-post", title: "Second post", content: "# Second\n\nAlso hello." },
+      { slug: "third-post", title: "Third post", content: "# Third\n\nBrand new." },
+    ]);
+    syncBundledSites();
+
+    assert.equal(postRow("first-post")!.title, "The client retitled this", "AN EXISTING POST IS NEVER OVERWRITTEN");
+    assert.equal(postRow("first-post")!.content, "Rewritten by a human.", "…not its title and not its body");
+    assert.ok(postRow("third-post"), "…while a genuinely new post is still created");
+    assert.equal(
+      (sqlite.prepare("SELECT count(*) c FROM blog_posts WHERE site_id = ?").get(sid) as { c: number }).c,
+      3,
+      "three posts in total — nothing duplicated",
+    );
+
+    // A post with no slug, title or content is skipped rather than inserted
+    // as a broken row. The Inspire blog already had one of those.
+    writePosts([{ slug: "", title: "", content: "" }]);
+    syncBundledSites();
+    assert.equal(
+      (sqlite.prepare("SELECT count(*) c FROM blog_posts WHERE site_id = ?").get(sid) as { c: number }).c,
+      3,
+      "an empty post entry creates nothing",
+    );
+
+    fs.rmSync(path.join(SANDBOX, "public", "sites", "inspire", "_posts.json"));
+
     // ── a missing bundle is simply nothing to do ─────────────────────────
     fs.rmSync(path.join(SANDBOX, "public", "sites", "inspire", "_pages.json"));
     assert.doesNotThrow(() => syncBundledSites(), "no bundle in the build is not an error");

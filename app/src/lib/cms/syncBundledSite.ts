@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -65,7 +66,101 @@ export function syncBundledSites(): void {
     } catch (err) {
       console.error(`[syncBundledSite] '${site}' failed (non-fatal):`, err);
     }
+    try {
+      seedBundledPosts(site);
+    } catch (err) {
+      console.error(`[syncBundledSite] '${site}' blog seed failed (non-fatal):`, err);
+    }
   }
+}
+
+type BundledPost = {
+  slug: string;
+  title: string;
+  content: string;
+  excerpt: string;
+  seoTitle: string;
+  seoDescription: string;
+  coverImageUrl: string | null;
+  sourceUrl: string;
+};
+
+const postsRevKey = (slug: string) => `site_posts_rev_${slug}`;
+
+/**
+ * Seed a site's blog from `public/sites/<slug>/_posts.json`, produced by
+ * tools/scrape-webflow-blog.cjs when a client's writing is carried across
+ * from the site we are replacing.
+ *
+ * CREATE ONLY, and that is the important difference from the page sync above.
+ * A bespoke page's source of truth is the repo, so it is upserted. A blog post
+ * is the client's own writing: they will edit it, retitle it, add to it. So a
+ * post whose slug already exists is left completely alone, forever — this
+ * migrates what is missing and never overwrites what is there. There is no
+ * Studio-edit guard because it needs none: nothing here can overwrite
+ * anything.
+ *
+ * Posts arrive PUBLISHED, matching the state they are in on the site being
+ * replaced. A launch that silently turned 22 live articles into drafts would
+ * lose the client every search result pointing at them.
+ */
+function seedBundledPosts(siteSlug: string): void {
+  const file = path.join(process.cwd(), "public", "sites", siteSlug, "_posts.json");
+  if (!fs.existsSync(file)) return;
+
+  const bundle = JSON.parse(fs.readFileSync(file, "utf8")) as { posts?: BundledPost[] };
+  const posts = (bundle.posts ?? []).filter((p) => p.slug && p.title && p.content);
+  if (posts.length === 0) return;
+
+  const rev = createHash("sha256").update(JSON.stringify(posts)).digest("hex").slice(0, 16);
+
+  const served = findSiteSlugOwners(siteSlug)[0];
+  if (!served) return;
+
+  const applied = `${served.tenantId}:${rev}`;
+  if (getPlatformSetting(postsRevKey(siteSlug)) === applied) return;
+
+  const { sqlite } = openTenantDb(served.dbFile);
+  const sid = served.siteId;
+
+  const exists = sqlite.prepare("SELECT id FROM blog_posts WHERE site_id = ? AND slug = ?");
+  const insert = sqlite.prepare(
+    `INSERT INTO blog_posts
+       (title, input_mode, target_words, content, status, site_id, slug, excerpt,
+        cover_image_url, seo_title, seo_description, publish_state, published_at, created_at, updated_at)
+     VALUES (?, 'prompt', ?, ?, 'ready', ?, ?, ?, ?, ?, ?, 'published', ?, ?, ?)`,
+  );
+
+  const created: string[] = [];
+  sqlite.transaction(() => {
+    for (const post of posts) {
+      if (exists.get(sid, post.slug)) continue; // the client's copy wins, always
+      const now = Date.now();
+      insert.run(
+        post.title,
+        post.content.trim().split(/\s+/).length,
+        post.content,
+        sid,
+        post.slug,
+        post.excerpt || null,
+        post.coverImageUrl || null,
+        post.seoTitle || post.title,
+        post.seoDescription || post.excerpt || null,
+        now,
+        now,
+        now,
+      );
+      created.push(post.slug);
+    }
+  })();
+
+  setPlatformSetting(postsRevKey(siteSlug), applied);
+
+  console.log(
+    `[syncBundledSite] '${siteSlug}' blog rev ${rev} -> tenant ${served.tenantSlug}#${served.tenantId} ` +
+      `site #${sid}: ${created.length} of ${posts.length} post(s) created` +
+      (created.length === 0 ? " (all already present)" : ""),
+  );
 }
 
 function syncOne(siteSlug: string): void {
