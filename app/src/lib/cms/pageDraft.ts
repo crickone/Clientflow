@@ -147,7 +147,22 @@ export type PublishOutcome =
  * here because they operate on the ambient `db`, not the transaction's `tx`;
  * the write shape below mirrors them exactly, applied through `tx`.
  */
-export function publishDraft(siteId: number, pageId: number): PublishOutcome {
+/**
+ * Publish a page's draft over its body.
+ *
+ * `updatedBy` is the id of the person publishing, and it is not decoration.
+ * `content_blocks.updated_by` is the flag that tells the deploy-time site
+ * sync (lib/cms/syncBundledSite) "a human has been here, leave this page
+ * alone". Nothing in the app ever wrote that column, so the guard could
+ * never fire: an edit made in Studio survived until the next deploy that
+ * changed the page bundle, and was then silently replaced by the file from
+ * the repo. The operator's work simply disappeared, with nothing in the log
+ * to say so.
+ *
+ * Optional, because a caller that genuinely has no user (a background job)
+ * should not be forced to invent one — but every human path passes it.
+ */
+export function publishDraft(siteId: number, pageId: number, updatedBy?: number | null): PublishOutcome {
   const draft = getDraftContent(siteId, pageId);
   if (draft == null) return { ok: false, reason: "no-draft" };
   const body = getBlock(siteId, pageId, "body")?.value ?? "";
@@ -174,12 +189,26 @@ export function publishDraft(siteId: number, pageId: number): PublishOutcome {
       .get();
     if (existingBody) {
       tx.update(contentBlocks)
-        .set({ kind: "html", value: nextBody, mediaAssetId: null, updatedAt: new Date() })
+        .set({
+          kind: "html",
+          value: nextBody,
+          mediaAssetId: null,
+          updatedBy: updatedBy ?? existingBody.updatedBy ?? null,
+          updatedAt: new Date(),
+        })
         .where(eq(contentBlocks.id, existingBody.id))
         .run();
     } else {
       tx.insert(contentBlocks)
-        .values({ siteId, pageId, name: "body", kind: "html", value: nextBody, mediaAssetId: null })
+        .values({
+          siteId,
+          pageId,
+          name: "body",
+          kind: "html",
+          value: nextBody,
+          mediaAssetId: null,
+          updatedBy: updatedBy ?? null,
+        })
         .run();
     }
     tx.delete(contentBlocks)

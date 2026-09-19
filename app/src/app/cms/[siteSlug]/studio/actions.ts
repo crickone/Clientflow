@@ -11,12 +11,12 @@ type Result = { ok: boolean; error?: string };
 
 /** Resolve site + page for the caller's own tenant, or an error result. */
 async function resolve(siteSlug: string, path: string) {
-  await requireAdminPage();
+  const user = await requireAdminPage();
   const site = await getSiteBySlug(siteSlug);
   if (!site) return { error: "Unknown site." as const };
   const page = getPageByPath(site.id, path);
   if (!page) return { error: `No page at ${path}.` as const };
-  return { site, page };
+  return { site, page, user };
 }
 
 /**
@@ -41,7 +41,11 @@ export async function publishDraftAction(
 ): Promise<Result> {
   const r = await resolve(siteSlug, path);
   if ("error" in r) return { ok: false, error: r.error };
-  const outcome = publishDraft(r.site.id, r.page.id);
+  // Stamping who published is what tells the deploy-time site sync that a
+  // human has edited this page and it must not be replaced from the repo.
+  // Without it the guard in syncBundledSite can never fire, and an operator's
+  // work vanishes on the next deploy that changes the page bundle.
+  const outcome = publishDraft(r.site.id, r.page.id, r.user.id);
   if (!outcome.ok) {
     if (outcome.reason === "no-draft") return { ok: false, error: "Nothing to publish." };
     // "empty"/"too-small": publishDraft refused because the draft would

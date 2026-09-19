@@ -293,6 +293,55 @@ const page = (key: string, body: string) => ({
 
     fs.rmSync(path.join(SANDBOX, "public", "sites", "inspire", "_posts.json"));
 
+    // ── AN EDIT MADE IN STUDIO SURVIVES A DEPLOY ─────────────────────────
+    // The guard above reads content_blocks.updated_by, and for a long time
+    // NOTHING in the app ever wrote that column — so it could never fire.
+    // An operator's edit lived until the next deploy that changed the page
+    // bundle and was then silently replaced by the file from the repo, with
+    // nothing in the log to say so. publishDraft now stamps the publisher,
+    // which is what makes the guard real; this proves the two halves meet.
+    {
+      const { publishDraft } = await import("./pageDraft");
+      const { setDraftContent } = await import("./pageDraft");
+      const { runWithTenant } = await import("../db/tenant");
+
+      const homeId = (
+        sqlite.prepare("SELECT id FROM pages WHERE site_id = ? AND path = '/'").get(sid) as { id: number }
+      ).id;
+      const liveBody = (
+        sqlite
+          .prepare("SELECT value v FROM content_blocks WHERE site_id=? AND page_id=? AND name='body'")
+          .get(sid, homeId) as { v: string }
+      ).v;
+
+      // Edit and publish it the way the Studio does, as user 42.
+      await runWithTenant(tenant.id, async () => {
+        setDraftContent(sid, homeId, `${liveBody} <p>edited by a person</p>`);
+        const outcome = publishDraft(sid, homeId, 42);
+        assert.ok(outcome.ok, "the edit publishes");
+      });
+
+      const stamped = sqlite
+        .prepare("SELECT updated_by u, value v FROM content_blocks WHERE site_id=? AND page_id=? AND name='body'")
+        .get(sid, homeId) as { u: number | null; v: string };
+      assert.equal(stamped.u, 42, "PUBLISHING RECORDS WHO DID IT — the guard has something to read");
+      assert.match(stamped.v, /edited by a person/, "and the edit is live");
+
+      // Now ship a new bundle. The edited page must be left alone.
+      writeBundle("rev-after-edit", [
+        page("index", "<p>home from the repo, again</p>"),
+        page("about", "<p>about from the repo</p>"),
+      ]);
+      syncBundledSites();
+
+      const after = (
+        sqlite
+          .prepare("SELECT value v FROM content_blocks WHERE site_id=? AND page_id=? AND name='body'")
+          .get(sid, homeId) as { v: string }
+      ).v;
+      assert.match(after, /edited by a person/, "THE DEPLOY DOES NOT OVERWRITE IT");
+    }
+
     // ── a missing bundle is simply nothing to do ─────────────────────────
     fs.rmSync(path.join(SANDBOX, "public", "sites", "inspire", "_pages.json"));
     assert.doesNotThrow(() => syncBundledSites(), "no bundle in the build is not an error");
