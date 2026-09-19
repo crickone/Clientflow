@@ -49,7 +49,7 @@ export function getLibraryAsset(id: number) {
  */
 export function photoChoices(): { id: number; path: string }[] {
   return listLibraryAssets()
-    .filter((a: { kind?: string | null }) => a.kind !== "video")
+    .filter((a: { kind?: string | null }) => a.kind !== "video" && a.kind !== "file")
     .map((a: { id: number; filename: string }) => ({
       id: a.id,
       path: libraryFilePath(a.filename),
@@ -81,7 +81,7 @@ export function addLibraryAsset(input: {
   filename: string;
   originalName: string;
   mimeType: string;
-  kind?: "image" | "video";
+  kind?: "image" | "video" | "file";
   sizeBytes: number;
   width: number | null;
   height: number | null;

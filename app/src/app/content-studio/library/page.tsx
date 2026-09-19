@@ -11,7 +11,7 @@ export default function LibraryPage() {
       <PageHeader
         eyebrow="Media"
         title="Library"
-        subtitle="Upload your images and videos once, then reuse them across your content. Images are available in the Images designer; videos are stored here for your projects."
+        subtitle="Upload once, use anywhere. Images appear in the Images designer and are what Adonis offers when you ask it to change a picture on the website. Videos and documents are kept here for your projects."
       />
       <LibraryManager initialAssets={assets} />
     </>

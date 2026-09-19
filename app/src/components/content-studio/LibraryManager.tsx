@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Film, ImageIcon, Loader2, Trash2, Upload } from "lucide-react";
+import { FileText, Film, ImageIcon, Loader2, Trash2, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
@@ -17,7 +17,7 @@ type Asset = {
   label: string | null;
 };
 
-type Filter = "all" | "image" | "video";
+type Filter = "all" | "image" | "video" | "file";
 
 function fileUrl(filename: string) {
   return `/api/content-studio/image-library/file/${encodeURIComponent(filename)}`;
@@ -50,21 +50,23 @@ export function LibraryManager({ initialAssets }: { initialAssets: Asset[] }) {
   const [busyId, setBusyId] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // "image" is everything that is not a video and not a document, rather
+  // than kind === "image": rows uploaded before the kind column existed have
+  // no kind at all, and they are pictures.
+  const kindOf = (a: Asset): Exclude<Filter, "all"> =>
+    a.kind === "video" ? "video" : a.kind === "file" ? "file" : "image";
+
   const counts = useMemo(
     () => ({
       all: assets.length,
-      image: assets.filter((a) => a.kind !== "video").length,
-      video: assets.filter((a) => a.kind === "video").length,
+      image: assets.filter((a) => kindOf(a) === "image").length,
+      video: assets.filter((a) => kindOf(a) === "video").length,
+      file: assets.filter((a) => kindOf(a) === "file").length,
     }),
     [assets],
   );
   const shown = useMemo(
-    () =>
-      filter === "all"
-        ? assets
-        : assets.filter((a) =>
-            filter === "video" ? a.kind === "video" : a.kind !== "video",
-          ),
+    () => (filter === "all" ? assets : assets.filter((a) => kindOf(a) === filter)),
     [assets, filter],
   );
 
@@ -144,18 +146,19 @@ export function LibraryManager({ initialAssets }: { initialAssets: Asset[] }) {
         {tab("all", "All")}
         {tab("image", "Images")}
         {tab("video", "Videos")}
+        {tab("file", "Files")}
         <div style={{ marginLeft: "auto" }}>
           <input
             ref={inputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm"
+            accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm,application/pdf,text/plain,text/csv,text/markdown,application/json,.docx,.xlsx,.pptx"
             multiple
             hidden
             onChange={(e) => upload(e.target.files)}
           />
           <Button onClick={() => inputRef.current?.click()} disabled={uploading}>
             {uploading ? <Loader2 size={15} className="spin" /> : <Upload size={15} />}
-            {uploading ? "Uploading…" : "Upload media"}
+            {uploading ? "Uploading…" : "Upload"}
           </Button>
         </div>
       </div>
@@ -175,7 +178,8 @@ export function LibraryManager({ initialAssets }: { initialAssets: Asset[] }) {
             Nothing here yet
           </div>
           <div style={{ fontSize: 13, marginTop: 4 }}>
-            Upload images (JPEG, PNG, WebP) or videos (MP4, MOV, WebM) to build your library.
+            Upload images (JPEG, PNG, WebP), video (MP4, MOV, WebM) or documents
+            (PDF, CSV, TXT, MD, JSON, DOCX, XLSX, PPTX).
           </div>
         </div>
       ) : (
@@ -187,7 +191,9 @@ export function LibraryManager({ initialAssets }: { initialAssets: Asset[] }) {
           }}
         >
           {shown.map((a) => {
-            const isVideo = a.kind === "video";
+            const kind = kindOf(a);
+            const isVideo = kind === "video";
+            const isFile = kind === "file";
             return (
               <div
                 key={a.id}
@@ -199,7 +205,38 @@ export function LibraryManager({ initialAssets }: { initialAssets: Asset[] }) {
                 }}
               >
                 <div style={{ position: "relative", aspectRatio: "4 / 3", background: "var(--surface-2)" }}>
-                  {isVideo ? (
+                  {isFile ? (
+                    // A document has no thumbnail to show, so the tile is the
+                    // link: its extension, large enough to recognise at a
+                    // glance, and clicking it downloads the file.
+                    <a
+                      href={fileUrl(a.filename)}
+                      download
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 6,
+                        width: "100%",
+                        height: "100%",
+                        color: "var(--text-secondary)",
+                        textDecoration: "none",
+                      }}
+                    >
+                      <FileText size={26} strokeWidth={1.5} />
+                      <span
+                        style={{
+                          fontFamily: "var(--font-mono), ui-monospace, monospace",
+                          fontSize: 12,
+                          letterSpacing: ".06em",
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        {(a.originalName.split(".").pop() || "file").slice(0, 5)}
+                      </span>
+                    </a>
+                  ) : isVideo ? (
                     <video
                       src={fileUrl(a.filename)}
                       controls
@@ -231,8 +268,8 @@ export function LibraryManager({ initialAssets }: { initialAssets: Asset[] }) {
                       letterSpacing: ".06em",
                     }}
                   >
-                    {isVideo ? <Film size={11} /> : <ImageIcon size={11} />}
-                    {isVideo ? "Video" : "Image"}
+                    {isFile ? <FileText size={11} /> : isVideo ? <Film size={11} /> : <ImageIcon size={11} />}
+                    {isFile ? "File" : isVideo ? "Video" : "Image"}
                   </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px" }}>

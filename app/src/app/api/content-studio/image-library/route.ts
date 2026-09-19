@@ -26,6 +26,28 @@ const VIDEO_EXT: Record<string, string> = {
   "video/webm": ".webm",
 };
 
+/**
+ * Documents. The library was images and clips only, so a gym with a PDF price
+ * list, a timetable spreadsheet or a signed waiver had nowhere in the product
+ * to keep it and no way to hand one to the assistant.
+ *
+ * An allow-list, not a block-list, and it stops short of anything a browser
+ * will execute or that carries macros: no HTML, no SVG, no .doc/.xls (the
+ * legacy macro-bearing formats), no archives. Everything here is either
+ * inert or opens in a sandboxed viewer, and the serve route sends them as
+ * downloads with the media security headers on top.
+ */
+const ALLOWED_FILE: Record<string, string> = {
+  "application/pdf": ".pdf",
+  "text/plain": ".txt",
+  "text/csv": ".csv",
+  "text/markdown": ".md",
+  "application/json": ".json",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
+};
+
 export async function GET() {
   const __auth = await guard("user");
   if (__auth) return __auth;
@@ -67,26 +89,33 @@ export async function POST(req: Request) {
     const mime = (file.type || "").toLowerCase();
     const isVideo = ALLOWED_VIDEO.has(mime);
     const isImage = ALLOWED_IMAGE.has(mime);
-    if (mime && !isVideo && !isImage) {
+    const isFile = mime in ALLOWED_FILE;
+    if (mime && !isVideo && !isImage && !isFile) {
       return NextResponse.json(
         {
           ok: false,
-          error: `Unsupported file type: ${file.type}. Use JPEG, PNG, WebP, MP4, MOV or WebM.`,
+          error: `Unsupported file type: ${file.type}. Images (JPEG, PNG, WebP), video (MP4, MOV, WebM) and documents (PDF, CSV, TXT, MD, JSON, DOCX, XLSX, PPTX).`,
         },
         { status: 400 },
       );
     }
-    const prefix = isVideo ? "vid" : "img";
-    const ext = (isVideo ? VIDEO_EXT[mime] : path.extname(file.name)) || (isVideo ? ".mp4" : ".jpg");
+    const prefix = isVideo ? "vid" : isFile ? "doc" : "img";
+    // The stored extension comes from the ALLOWED map, never from the
+    // uploaded name: a name is attacker-controlled and the extension is what
+    // the serve route derives a Content-Type from.
+    const ext = isFile
+      ? ALLOWED_FILE[mime]
+      : (isVideo ? VIDEO_EXT[mime] : path.extname(file.name)) || (isVideo ? ".mp4" : ".jpg");
     const filename = `${prefix}-${Date.now()}-${crypto.randomBytes(4).toString("hex")}${ext}`;
     const dest = path.join(dir, filename);
     const rawBuf = Buffer.from(await file.arrayBuffer());
     // Batch 5c: downscale + re-encode image uploads (background photos for
     // the carousel/card designer). Video/broll clips are left completely
     // untouched. Failure-safe — falls back to rawBuf if sharp can't decode.
-    const { buffer: buf, width: procWidth, height: procHeight } = isVideo
-      ? { buffer: rawBuf, width: null as number | null, height: null as number | null }
-      : await processImageUpload(rawBuf, mime || "image/jpeg");
+    const { buffer: buf, width: procWidth, height: procHeight } =
+      isVideo || isFile
+        ? { buffer: rawBuf, width: null as number | null, height: null as number | null }
+        : await processImageUpload(rawBuf, mime || "image/jpeg");
     fs.writeFileSync(dest, buf);
     // Prefer the actual (post-resize) dimensions; fall back to the client-
     // reported ones (measured pre-upload) for video, or if sharp couldn't
@@ -99,7 +128,7 @@ export async function POST(req: Request) {
       filename,
       originalName: file.name,
       mimeType: mime || "image/jpeg",
-      kind: isVideo ? "video" : "image",
+      kind: isVideo ? "video" : isFile ? "file" : "image",
       sizeBytes: buf.length,
       width,
       height,
