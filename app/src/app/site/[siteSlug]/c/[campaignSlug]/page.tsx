@@ -27,6 +27,7 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { resolvePublicSite, siteUrl, type PublicSite } from "@/lib/cms/resolveHost";
+import { siteVerificationMeta } from "@/lib/cms/render";
 import { runWithTenant, getCurrentTenant } from "@/lib/db/tenant";
 import {
   findApprovedLandingAsset,
@@ -309,6 +310,7 @@ export function generateMetadata({ params, searchParams }: Props): Metadata {
     title,
     description,
     alternates: { canonical },
+    verification: siteVerificationMeta(publicSite.site),
     openGraph: {
       title,
       description,

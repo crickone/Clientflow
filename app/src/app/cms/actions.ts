@@ -5,7 +5,13 @@ import { redirect } from "next/navigation";
 
 import { requireUserPage, requireAdminPage } from "@/lib/auth";
 import { createRequest } from "@/lib/cms/requests";
-import { isValidGoogleTagId, isValidPixelId } from "@/lib/cms/trackingIds";
+import {
+  extractVerificationToken,
+  isValidGoogleTagId,
+  isValidPixelId,
+  isValidSiteVerification,
+  looksLikeMetaTag,
+} from "@/lib/cms/trackingIds";
 import {
   createSite,
   deleteSiteCascade,
@@ -118,6 +124,7 @@ export async function saveTrackingAction(
   siteSlug: string,
   pixelId: string,
   googleTagId: string,
+  siteVerification = "",
 ): Promise<{ ok: boolean; error?: string }> {
   await requireAdminPage();
   const site = await getSiteBySlug(siteSlug);
@@ -125,6 +132,9 @@ export async function saveTrackingAction(
 
   const pixel = pixelId.trim();
   const google = googleTagId.trim();
+  // Google shows the token inside a whole <meta> tag, and that is what
+  // gets copied. Take the token out of the paste rather than rejecting it.
+  const verification = extractVerificationToken(siteVerification);
 
   if (pixel && !isValidPixelId(pixel)) {
     return {
@@ -141,9 +151,19 @@ export async function saveTrackingAction(
     };
   }
 
+  if (verification && !isValidSiteVerification(verification)) {
+    return {
+      ok: false,
+      error: looksLikeMetaTag(siteVerification)
+        ? "That meta tag has no content=\"…\" value to read. Copy the token Google shows, or the whole tag including its content attribute."
+        : "That Google verification token does not look right. It is the long content=\"…\" value from Search Console — letters, digits, hyphens and underscores.",
+    };
+  }
+
   await updateSite(site.id, {
     metaPixelId: pixel || null,
     googleTagId: google ? google.toUpperCase() : null,
+    googleSiteVerification: verification || null,
   });
   revalidatePath(`/cms/${siteSlug}`);
   revalidatePath(`/cms/${siteSlug}/domains`);

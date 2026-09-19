@@ -12,9 +12,12 @@ import assert from "node:assert/strict";
 
 import {
   consentStorageKey,
+  extractVerificationToken,
   googleTagKind,
   isValidGoogleTagId,
   isValidPixelId,
+  isValidSiteVerification,
+  looksLikeMetaTag,
   mayTrack,
   parseConsent,
 } from "./trackingIds";
@@ -92,6 +95,54 @@ for (const ch of ["'", '"', "`", "\\", "<", ">", "\n", ";", "/"]) {
 // and both tags quietly do nothing.
 assert.equal(isValidPixelId("GTM-NHRBKKN4"), false, "a container is not a Meta pixel");
 assert.equal(isValidGoogleTagId("1234567890123456"), false, "a Meta pixel is not a Google tag");
+
+// ── Google site verification ────────────────────────────────────────────────
+//
+// This one is not a script, it is a meta tag's content. The risk is
+// different: a value with a quote in it would break OUT of the attribute, so
+// the character class is what matters more than the length.
+
+const REAL_TOKEN = "googleXYZ_abc-123defGHIjklMNOpqrstuvWX";
+assert.equal(isValidSiteVerification(REAL_TOKEN), true, "a Search Console token");
+assert.equal(isValidSiteVerification(`  ${REAL_TOKEN}  `), true, "pasted with whitespace");
+
+for (const bad of [
+  "",
+  "short",
+  'abc" /><script>alert(1)</script>',
+  `${REAL_TOKEN} ${REAL_TOKEN}`,
+  "token with spaces in the middle aaaaaaaaaa",
+  "tok<en>aaaaaaaaaaaaaaaaaaaaa",
+]) {
+  assert.equal(
+    isValidSiteVerification(bad),
+    false,
+    `${JSON.stringify(bad)} is not a verification token`,
+  );
+}
+
+// What an operator ACTUALLY copies out of Search Console is the whole tag.
+// Reading the token out of it is the difference between the field working
+// first time and the operator being told they are wrong when they are not.
+const PASTED = `<meta name="google-site-verification" content="${REAL_TOKEN}" />`;
+assert.equal(extractVerificationToken(PASTED), REAL_TOKEN, "the token comes out of the tag");
+assert.equal(isValidSiteVerification(extractVerificationToken(PASTED)), true);
+assert.equal(
+  extractVerificationToken(`<meta content='${REAL_TOKEN}' name="google-site-verification">`),
+  REAL_TOKEN,
+  "single quotes too",
+);
+assert.equal(extractVerificationToken(REAL_TOKEN), REAL_TOKEN, "a bare token passes through");
+assert.equal(extractVerificationToken(`  ${REAL_TOKEN} `), REAL_TOKEN);
+
+// A tag with nothing to read must still be REJECTED, not stored as markup.
+assert.equal(looksLikeMetaTag('<meta name="google-site-verification">'), true);
+assert.equal(
+  isValidSiteVerification(extractVerificationToken('<meta name="google-site-verification">')),
+  false,
+  "a tag with no content attribute is not a token",
+);
+assert.equal(looksLikeMetaTag(REAL_TOKEN), false, "a bare token is not a tag");
 
 // ── consent ─────────────────────────────────────────────────────────────────
 //

@@ -10,7 +10,8 @@ import { Card } from "@/components/ui/Card";
 import { saveTrackingAction } from "@/app/cms/actions";
 
 /**
- * The client's analytics and advertising tags for this website.
+ * The client's analytics, advertising and search-console tags for this
+ * website.
  *
  * One card, because they are one job done at one moment: before a client's
  * domain is pointed here. That day is the day their old site stops
@@ -27,26 +28,33 @@ export function TrackingCard({
   siteSlug,
   initialPixelId,
   initialGoogleTagId,
+  initialSiteVerification,
 }: {
   siteSlug: string;
   initialPixelId: string | null;
   initialGoogleTagId: string | null;
+  initialSiteVerification: string | null;
 }) {
   const [pixel, setPixel] = useState(initialPixelId ?? "");
   const [google, setGoogle] = useState(initialGoogleTagId ?? "");
+  const [verify, setVerify] = useState(initialSiteVerification ?? "");
   const [saved, setSaved] = useState({
     pixel: initialPixelId ?? "",
     google: initialGoogleTagId ?? "",
+    verify: initialSiteVerification ?? "",
   });
   const [pending, startTransition] = useTransition();
 
-  const dirty = pixel.trim() !== saved.pixel.trim() || google.trim() !== saved.google.trim();
+  const dirty =
+    pixel.trim() !== saved.pixel.trim() ||
+    google.trim() !== saved.google.trim() ||
+    verify.trim() !== saved.verify.trim();
 
   function save() {
     startTransition(async () => {
-      const res = await saveTrackingAction(siteSlug, pixel, google);
+      const res = await saveTrackingAction(siteSlug, pixel, google, verify);
       if (res.ok) {
-        setSaved({ pixel: pixel.trim(), google: google.trim() });
+        setSaved({ pixel: pixel.trim(), google: google.trim(), verify: verify.trim() });
         toast.success("Tracking saved.");
       } else {
         toast.error(res.error ?? "Could not save that.");
@@ -116,6 +124,14 @@ export function TrackingCard({
           setGoogle,
           "GTM-XXXXXXX",
           Boolean(saved.google) && google.trim() === saved.google.trim(),
+        )}
+        {field(
+          "Google site verification",
+          "From Search Console's HTML-tag method. Paste the token or the whole meta tag. Not a cookie, so it is not held back by the consent notice.",
+          verify,
+          setVerify,
+          "Xy3_aBcD…",
+          Boolean(saved.verify) && verify.trim() === saved.verify.trim(),
         )}
       </div>
 

@@ -84,6 +84,7 @@ export default async function SiteDashboard({
         siteSlug={site.slug}
         initialPixelId={site.metaPixelId}
         initialGoogleTagId={site.googleTagId}
+        initialSiteVerification={site.googleSiteVerification}
       />
     </div>
   );

@@ -153,6 +153,30 @@ const SITE_OG_DEFAULTS: Record<string, string> = {
   clientflow: "/sites/clientflow/assets/og.png",
 };
 
+/**
+ * The Google Search Console verification meta tag for a site, if it has one.
+ *
+ * Every public route emits this, not just the home page: Search Console is
+ * usually verified at the root, but a domain that has just moved is exactly
+ * when someone checks a deep URL, and a tag that is only on one page fails
+ * verification the moment Google fetches a different one.
+ *
+ * Deliberately NOT behind the cookie notice, unlike the Pixel and the Google
+ * tag. This sets no cookie, loads no script and identifies nobody — it is a
+ * static string proving ownership of a domain. Gating it would mean the site
+ * silently fails verification for every visitor who has not answered a
+ * question about cookies, including Googlebot, which never answers one.
+ *
+ * The stored value is validated on the way in (see trackingIds), and Next
+ * escapes attribute content, so a bad paste cannot break out of the tag.
+ */
+export function siteVerificationMeta(site: {
+  googleSiteVerification?: string | null;
+}): Metadata["verification"] | undefined {
+  const token = (site.googleSiteVerification ?? "").trim();
+  return token ? { google: token } : undefined;
+}
+
 export function buildPageMetadata(pc: PageContext): Metadata {
   const seo = getSeoPublic(pc.resolved.db, pc.resolved.site.id, pc.page.id);
   const title = seo?.seoTitle || pc.page.title || pc.resolved.site.name;
@@ -174,6 +198,7 @@ export function buildPageMetadata(pc: PageContext): Metadata {
       : `${title} — ${pc.resolved.site.name}`,
     description,
     alternates: { canonical },
+    verification: siteVerificationMeta(pc.resolved.site),
     robots: seo?.robots || undefined,
     openGraph: {
       title,

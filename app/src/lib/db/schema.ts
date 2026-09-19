@@ -1495,6 +1495,15 @@ export const sites = sqliteTable("sites", {
    * inside the container rather than on the page a second time.
    */
   googleTagId: text("google_tag_id"),
+  /**
+   * The Google Search Console verification token, rendered as a meta tag.
+   *
+   * Not tracking and NOT behind consent: it sets no cookie and identifies
+   * nobody. It is how you get told a domain migration went wrong — pages
+   * dropping out of the index, old URLs not redirecting — which is exactly
+   * the moment it is needed.
+   */
+  googleSiteVerification: text("google_site_verification"),
   defaultLocale: text("default_locale").notNull().default("en"),
   themeJson: text("theme_json"),
   status: text("status", { enum: ["draft", "live"] })

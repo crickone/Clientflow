@@ -6,6 +6,7 @@ import { resolvePublicSite, siteUrl } from "@/lib/cms/resolveHost";
 import { getPublishedPostBySlug } from "@/lib/cms/blog";
 import { renderMarkdown, excerptFromMarkdown } from "@/lib/cms/markdown";
 import { getSiteChrome, CHROME_CONTENT_CSS } from "@/lib/cms/siteChrome";
+import { siteVerificationMeta } from "@/lib/cms/render";
 import { SiteTracking } from "@/components/cms/SiteTracking";
 
 export const dynamic = "force-dynamic";
@@ -43,6 +44,7 @@ export function generateMetadata({
     title: `${title} — ${resolved.site.name}`,
     description,
     alternates: { canonical },
+    verification: siteVerificationMeta(resolved.site),
     openGraph: {
       title,
       description,

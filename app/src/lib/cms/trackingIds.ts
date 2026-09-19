@@ -42,6 +42,33 @@ export function isValidGoogleTagId(raw: string): boolean {
   return googleTagKind(raw) !== null;
 }
 
+/**
+ * A Google Search Console verification token.
+ *
+ * Google issues a ~43-character URL-safe string. Accepting a range rather
+ * than an exact length because Google has changed it before, but still
+ * refusing anything with a character that could escape an HTML attribute —
+ * this ends up inside a meta tag's content.
+ *
+ * Operators often paste the whole <meta> tag rather than the token, so that
+ * case is detected and rejected with something they can act on rather than
+ * silently stored.
+ */
+export function isValidSiteVerification(raw: string): boolean {
+  return /^[A-Za-z0-9_-]{20,128}$/.test(raw.trim());
+}
+
+/** True when someone pasted the entire meta tag instead of just the token. */
+export function looksLikeMetaTag(raw: string): boolean {
+  return /<\s*meta/i.test(raw);
+}
+
+/** Pull the token out of a pasted <meta> tag, so the paste just works. */
+export function extractVerificationToken(raw: string): string {
+  const m = /content\s*=\s*["']([^"']+)["']/i.exec(raw);
+  return (m ? m[1] : raw).trim();
+}
+
 // ── consent ─────────────────────────────────────────────────────────────────
 
 export type ConsentChoice = "granted" | "denied";

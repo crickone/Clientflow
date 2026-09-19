@@ -1,12 +1,14 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
-import { resolvePublicSite } from "@/lib/cms/resolveHost";
+import { resolvePublicSite, siteUrl } from "@/lib/cms/resolveHost";
 import { listPublishedPosts } from "@/lib/cms/blog";
 import { excerptFromMarkdown } from "@/lib/cms/markdown";
 import { getSiteChrome, CHROME_CONTENT_CSS } from "@/lib/cms/siteChrome";
 import { SiteTracking } from "@/components/cms/SiteTracking";
+import { siteVerificationMeta } from "@/lib/cms/render";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +24,28 @@ export const dynamic = "force-dynamic";
  * the pictures the client had chosen for each article were nowhere, and
  * nothing invited a click.
  */
+/**
+ * The index had no metadata of its own, so it inherited the app shell's —
+ * the CRM's title, on a client's public website. Named here, with the
+ * canonical URL and the site's search-console tag.
+ */
+export function generateMetadata({
+  params,
+  searchParams,
+}: {
+  params: { siteSlug: string };
+  searchParams: { site?: string };
+}): Metadata {
+  const host = headers().get("host");
+  const resolved = resolvePublicSite({ host, siteParam: searchParams.site ?? params.siteSlug });
+  if (!resolved) return { title: "Not found" };
+  return {
+    title: `Blog — ${resolved.site.name}`,
+    alternates: { canonical: siteUrl(resolved, "/blog", host) },
+    verification: siteVerificationMeta(resolved.site),
+  };
+}
+
 export default function PublicBlogIndex({
   params,
   searchParams,

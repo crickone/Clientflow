@@ -44,6 +44,7 @@ export default async function SiteDomainsPage({
         siteSlug={site.slug}
         initialPixelId={site.metaPixelId}
         initialGoogleTagId={site.googleTagId}
+        initialSiteVerification={site.googleSiteVerification}
       />
     </div>
   );
