@@ -3,6 +3,7 @@ import "server-only";
 import fs from "node:fs";
 import path from "node:path";
 
+import { findDuplicateSiteSlugs } from "@/lib/cms/siteSlugs";
 import { controlSqlite, getCronState } from "@/lib/db/control";
 import { getTenantDbById, runWithTenant } from "@/lib/db/tenant";
 import { TENANT_MIGRATIONS } from "@/lib/db/migrations";
@@ -215,7 +216,11 @@ export interface FleetHealthRow {
  * Every active tenant's alerts, for the fleet page. Shallow by design: no
  * integrity check, because that reads every byte of every database.
  */
-export function getFleetHealth(): { tenants: FleetHealthRow[]; schedulers: TenantHealth["schedulers"] } {
+export function getFleetHealth(): {
+  tenants: FleetHealthRow[];
+  schedulers: TenantHealth["schedulers"];
+  duplicateSiteSlugs: Array<{ slug: string; owners: string[]; servedBy: string }>;
+} {
   const rows = controlSqlite
     .prepare("SELECT id, name, slug FROM tenants WHERE is_active = 1 ORDER BY name")
     .all() as Array<{ id: number; name: string; slug: string }>;
@@ -237,7 +242,18 @@ export function getFleetHealth(): { tenants: FleetHealthRow[]; schedulers: Tenan
       });
     }
   }
-  return { tenants, schedulers };
+  // A site slug is the public URL, and the renderer serves the first active
+  // tenant holding it, so a slug in two tenants means one of those websites
+  // cannot be reached at all. It is invisible from inside either business —
+  // both open normally in the CMS — which is why it belongs on the fleet
+  // board, where somebody is looking across tenants in the first place.
+  const duplicateSiteSlugs = findDuplicateSiteSlugs().map((d) => ({
+    slug: d.slug,
+    owners: d.owners.map((o) => `${o.tenantName} (${o.tenantSlug}#${o.tenantId})`),
+    servedBy: `${d.owners[0].tenantName} (${d.owners[0].tenantSlug}#${d.owners[0].tenantId})`,
+  }));
+
+  return { tenants, schedulers, duplicateSiteSlugs };
 }
 
 export type HealthActionResult = { ok: true; note: string } | { ok: false; error: string };

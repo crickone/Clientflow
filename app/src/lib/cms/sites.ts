@@ -3,6 +3,7 @@ import "server-only";
 import { and, asc, eq } from "drizzle-orm";
 
 import { getCurrentMembership } from "@/lib/auth";
+import { findSiteSlugOwners } from "@/lib/cms/siteSlugs";
 import { db } from "@/lib/db";
 import { authDb } from "@/lib/db/control";
 import {
@@ -59,6 +60,18 @@ export async function createSite(input: CreateSiteInput): Promise<Site> {
   if (!slug) throw new Error("A valid site slug is required.");
   const existing = await getSiteBySlug(slug);
   if (existing) throw new Error(`A site with slug "${slug}" already exists.`);
+
+  // A slug is the PUBLIC URL (/site/<slug>/...), and the renderer serves the
+  // first active tenant that has it. Two businesses sharing a slug means one
+  // of their websites silently cannot be reached, so refuse here rather than
+  // let somebody discover it months later when a domain is pointed at us.
+  const elsewhere = findSiteSlugOwners(slug);
+  if (elsewhere.length > 0) {
+    const owner = elsewhere[0];
+    throw new Error(
+      `The slug "${slug}" is already used by ${owner.tenantName}. A site slug is the public web address, so it has to be unique across every business. Pick another.`,
+    );
+  }
   return db
     .insert(sites)
     .values({

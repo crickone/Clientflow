@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { openTenantDb } from "@/lib/db/tenant";
-import { listTenants } from "@/lib/tenants";
+import { findSiteSlugOwners } from "@/lib/cms/siteSlugs";
 import { getPlatformSetting, setPlatformSetting } from "@/lib/billing/settings";
 
 /**
@@ -68,46 +68,6 @@ export function syncBundledSites(): void {
   }
 }
 
-/**
- * Find the site the PUBLIC RENDERER would serve for this slug.
- *
- * Deliberately not "the tenant of the same name". A site slug is unique
- * within a tenant but not across them, and `resolveHost`'s fallback walks the
- * active tenants in registry order and serves the first match. Naming a
- * tenant here would be a second, independent guess at the same question, and
- * the two can disagree: `tools/import-site.cjs` defaults to the legacy
- * tenant's database, so a site imported without an explicit --db lands there
- * and shadows the copy in the client's own tenant. Publishing to the wrong
- * one writes a perfect copy of the pages into a database nobody reads, which
- * looks exactly like success.
- *
- * So resolve the way the renderer resolves, and say so when the slug is
- * ambiguous — a duplicate is worth a human's attention, and is invisible
- * otherwise.
- */
-function resolveServedSite(siteSlug: string) {
-  const matches: Array<{ tenantId: number; tenantSlug: string; dbFile: string; siteId: number }> = [];
-  for (const tenant of listTenants()) {
-    if (tenant.isActive === false) continue;
-    const conn = openTenantDb(tenant.dbFile);
-    const row = conn.sqlite.prepare("SELECT id FROM sites WHERE slug = ?").get(siteSlug) as
-      | { id: number }
-      | undefined;
-    if (row) {
-      matches.push({ tenantId: tenant.id, tenantSlug: tenant.slug, dbFile: tenant.dbFile, siteId: row.id });
-    }
-  }
-  if (matches.length > 1) {
-    console.warn(
-      `[syncBundledSite] '${siteSlug}' exists in ${matches.length} tenants ` +
-        `(${matches.map((m) => `${m.tenantSlug}#${m.tenantId}`).join(", ")}). ` +
-        `Publishing to '${matches[0].tenantSlug}', which is the one the public site resolves to. ` +
-        `The others are shadowed copies nobody can see and should be removed.`,
-    );
-  }
-  return matches[0] ?? null;
-}
-
 function syncOne(siteSlug: string): void {
   const bundlePath = path.join(process.cwd(), "public", "sites", siteSlug, "_pages.json");
   if (!fs.existsSync(bundlePath)) return;
@@ -115,7 +75,23 @@ function syncOne(siteSlug: string): void {
   const bundle = JSON.parse(fs.readFileSync(bundlePath, "utf8")) as Bundle;
   if (!bundle.rev || !Array.isArray(bundle.pages) || bundle.pages.length === 0) return;
 
-  const served = resolveServedSite(siteSlug);
+  // Publish to the copy the PUBLIC RENDERER serves, not to "the tenant of
+  // the same name". Those are two independent answers to one question and
+  // they have disagreed in production: a site imported into the legacy
+  // tenant shadowed the client's own copy, so publishing by name wrote a
+  // perfect set of pages into a database nobody reads. findSiteSlugOwners
+  // scans in the renderer's own order, so the first owner is what visitors
+  // get, by construction rather than by agreement.
+  const owners = findSiteSlugOwners(siteSlug);
+  if (owners.length > 1) {
+    console.warn(
+      `[syncBundledSite] '${siteSlug}' exists in ${owners.length} tenants ` +
+        `(${owners.map((o) => `${o.tenantSlug}#${o.tenantId}`).join(", ")}). ` +
+        `Publishing to '${owners[0].tenantSlug}', the one the public site resolves to. ` +
+        `The others are shadowed copies nobody can see and should be removed.`,
+    );
+  }
+  const served = owners[0];
   if (!served) return; // no tenant in this environment has the site yet
 
   // Guard 1: nothing changed since the last applied bundle. The marker is
