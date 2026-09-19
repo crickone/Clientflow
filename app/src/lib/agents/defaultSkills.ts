@@ -1,5 +1,23 @@
 /**
  * The skills every tenant starts with.
+ *
+ * ALL BUT ONE ARE ON DEMAND: the agent reads a menu of names and
+ * descriptions, decides which apply to the job in front of it, and fetches
+ * the ones it needs with load_skill. That is the operator's stated
+ * preference -- the AI determines when it needs each skill -- and it is
+ * also what keeps the standing prompt small.
+ *
+ * THE EXCEPTION IS using-superpowers, AND IT CANNOT BE ANYTHING ELSE. It is
+ * the rule that tells the agent to consult the menu at all. On demand, the
+ * agent would have to decide to load the skill that tells it to load
+ * skills, which is circular: nothing would ever be fetched. It stays
+ * always-on so every other skill can be on demand.
+ *
+ * WHICH MAKES THE DESCRIPTION THE WHOLE DECISION. For an on-demand skill
+ * the description is all the agent sees until it fetches the body, so each
+ * one below states WHEN to reach for it, not what it contains. A
+ * description that reads as a summary ("every piece teaches something")
+ * gives the agent nothing to match a task against.
  * ZERO RUNTIME IMPORTS — seeded by ./skills.ts, tested without a database.
  *
  * MIXED PROVENANCE, AND THE DIFFERENCE MATTERS.
@@ -81,8 +99,8 @@ export const DEFAULT_SKILLS: DefaultSkill[] = [
   },
   {
     name: "Teach something",
-    description: "Every piece leaves the reader knowing something they did not know",
-    loadMode: "always",
+    description: "Use BEFORE writing any blog post, social caption, email, ad or web page: every piece must leave the reader knowing something they did not know.",
+    loadMode: "onDemand",
     body: `A reader who finishes must know something they did not know when they started: how a thing actually works, what makes two options different, why one suits a person and another does not.
 
 Describing a room is not teaching. "You lie down, the door closes, sixty minutes, nothing to do but rest" tells a reader what an hour looks like and nothing about what the thing IS or does.
@@ -93,8 +111,8 @@ A COMPARISON OWES THE READER THE DIFFERENCE. If the piece asks "X or Y", the mid
   },
   {
     name: "Never invent a fact",
-    description: "Numbers, equipment and what a session is like all come from the business, or are left out",
-    loadMode: "always",
+    description: "Use BEFORE writing anything that states a number, a price, a duration, a result, a piece of equipment or what a session involves \u2014 marketing copy, website text, or a reply to a client.",
+    loadMode: "onDemand",
     body: `Take prices, session lengths, opening times and every other number ONLY from this account's own service list and business context. If a number is not there, write the sentence without it. A plausible-looking price is worse than no price, because someone will arrive expecting it.
 
 Do not contradict yourself. If a session is fifteen minutes on one slide it is fifteen minutes on the next. Check a number against the service list before you write it a second time.
@@ -109,8 +127,8 @@ Never quote a testimonial you were not given. You may quote one that exists; you
   },
   {
     name: "Clinic and wellness compliance",
-    description: "Irish health-advertising guardrails: no cures, no conditions treated, mechanism is fine",
-    loadMode: "always",
+    description: "Use BEFORE writing ANY public-facing copy for a health, clinic, therapy or wellness business \u2014 social, ads, blog, website, email, landing pages. Irish health-advertising rules: no cures, no conditions treated, describing the mechanism is fine.",
+    loadMode: "onDemand",
     body: `For a clinic, gym or wellness business, these are not style preferences.
 
 NEVER say a service cures, treats, heals, fixes or resolves a condition. Do not promise a therapeutic outcome or a result.

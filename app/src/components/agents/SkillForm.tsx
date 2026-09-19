@@ -40,7 +40,10 @@ export function SkillForm({ initial, onDone }: { initial: SkillRow | null; onDon
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [body, setBody] = useState(initial?.body ?? "");
-  const [loadMode, setLoadMode] = useState<SkillLoadMode>(initial?.loadMode ?? "always");
+  // A NEW SKILL DEFAULTS TO ON DEMAND: the agent reads the menu and decides
+  // when a skill applies. "Always" is the deliberate exception, for a rule
+  // that must never be skipped even when the agent judges it irrelevant.
+  const [loadMode, setLoadMode] = useState<SkillLoadMode>(initial?.loadMode ?? "onDemand");
   const [pending, startTransition] = useTransition();
   const [source, setSource] = useState("");
   const [importing, setImporting] = useState(false);
