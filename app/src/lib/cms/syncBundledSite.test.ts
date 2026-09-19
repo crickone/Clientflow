@@ -55,7 +55,8 @@ const page = (key: string, body: string) => ({
   try {
     const { syncBundledSites } = await import("./syncBundledSite");
     const { controlSqlite } = await import("../db/control");
-    const { getTenantBySlug, openTenantDb } = await import("../db/tenant");
+    const { openTenantDb } = await import("../db/tenant");
+    const { getTenantBySlug } = await import("../tenants");
     const { getPlatformSetting } = await import("../billing/settings");
 
     // A tenant and a site for the bundle to land in.
@@ -91,7 +92,12 @@ const page = (key: string, body: string) => ({
 
     assert.equal(bodyOf("/"), "<p>home one</p>", "the home page is published");
     assert.equal(bodyOf("/about"), "<p>about one</p>", "…and so is the second page");
-    assert.equal(getPlatformSetting("site_bundle_rev_inspire"), "rev-one", "the applied rev is recorded");
+    const tenantId = tenant.id;
+    assert.equal(
+      getPlatformSetting("site_bundle_rev_inspire"),
+      `${tenantId}:rev-one`,
+      "the marker records the hash AND the tenant it was applied to",
+    );
 
     const published = sqlite
       .prepare("SELECT status, template_id FROM pages WHERE site_id = ? AND path = '/'")
@@ -125,13 +131,44 @@ const page = (key: string, body: string) => ({
 
     assert.equal(bodyOf("/about"), byHand, "THE STUDIO EDIT IS NOT OVERWRITTEN");
     assert.equal(bodyOf("/"), "<p>home two</p>", "…and the pages around it still publish");
-    assert.equal(getPlatformSetting("site_bundle_rev_inspire"), "rev-two", "the new rev is recorded");
+    assert.equal(getPlatformSetting("site_bundle_rev_inspire"), `${tenantId}:rev-two`, "the new rev is recorded");
 
     // Recording the rev even when a page was skipped is what stops the sync
     // reopening the same transaction on every single boot.
     const afterSkip = stampOf("/");
     syncBundledSites();
     assert.equal(stampOf("/"), afterSkip, "and the skip does not leave the bundle pending forever");
+
+    // ── THE SHADOWED-COPY BUG ────────────────────────────────────────────
+    // A site slug is unique within a tenant, not across them. The public
+    // renderer serves the FIRST active tenant in registry order that has the
+    // slug, so publishing to "the tenant of the same name" can write a
+    // perfect copy of every page into a database nobody reads — which looks
+    // exactly like success and is how the Inspire site stayed stale through
+    // a deploy that reported publishing it.
+    controlSqlite
+      .prepare("INSERT INTO tenants (slug, name, db_file, is_active) VALUES (?, ?, ?, 1)")
+      .run("legacy-first", "Legacy", "tenants/legacy/legacy.db");
+    // Registry order is insertion order, and this tenant was added AFTER the
+    // first one, so the original still wins. Give it the same slug anyway to
+    // prove the sync picks by resolution order rather than by name.
+    const legacy = getTenantBySlug("legacy-first")!;
+    const legacyConn = openTenantDb(legacy.dbFile);
+    legacyConn.sqlite.prepare("INSERT INTO sites (slug, name, status) VALUES ('inspire', 'Shadow', 'live')").run();
+
+    writeBundle("rev-three", [page("index", "<p>home three</p>")]);
+    syncBundledSites();
+
+    assert.equal(bodyOf("/"), "<p>home three</p>", "the sync publishes to the tenant the renderer resolves to");
+    const shadowPages = legacyConn.sqlite
+      .prepare("SELECT count(*) c FROM pages")
+      .get() as { c: number };
+    assert.equal(shadowPages.c, 0, "…and writes NOTHING into the shadowed copy");
+    assert.equal(
+      getPlatformSetting("site_bundle_rev_inspire"),
+      `${tenantId}:rev-three`,
+      "the marker still names the tenant actually written to",
+    );
 
     // ── a missing bundle is simply nothing to do ─────────────────────────
     fs.rmSync(path.join(SANDBOX, "public", "sites", "inspire", "_pages.json"));

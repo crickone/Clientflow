@@ -252,9 +252,19 @@ export async function launchCampaign(campaignId: number): Promise<LaunchResult> 
       const url = await getCampaignLandingUrl(campaign.slug);
       if (url) {
         published.push({ kind: "landing_page", title: landingAsset.title, where: `landing page live at ${url}` });
+      } else {
+        // No site to host it on. This used to be omitted from the summary
+        // on the grounds that there was no honest URL to report — but the
+        // silence read as success, and the operator was told the campaign
+        // was live while its landing page had nowhere to exist. Saying so is
+        // the honest version of having nothing to say.
+        published.push({
+          kind: "landing_page",
+          title: landingAsset.title,
+          where:
+            "NOT live — this business has no website in the system, so there is nowhere to host the landing page. Add one under CMS, Sites, then relaunch.",
+        });
       }
-      // url === null -> tenant has no CMS site to host it on; omitted from
-      // the summary entirely (no honest URL to report), never a crash.
     } catch (err) {
       console.error(`[launch] campaign #${campaignId}: failed to resolve the landing page URL — omitting it from the summary:`, err);
     }

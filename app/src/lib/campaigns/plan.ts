@@ -154,3 +154,74 @@ export function findApprovedLandingAsset<T extends LandingAssetLike>(
   if (campaignStatus !== "ready" && campaignStatus !== "active") return null;
   return assets.find((a) => a.kind === "landing_page" && a.status === "approved") ?? null;
 }
+
+// ─── What the tenant's websites allow ────────────────────────────────────────
+
+/**
+ * Some campaign assets are not self-contained: they only exist as a page on
+ * one of the tenant's websites. If the tenant has no website in the system,
+ * those assets can be written, approved and reported as done while producing
+ * nothing anybody can visit.
+ *
+ * That used to be exactly what happened. A landing page for a tenant with no
+ * site was saved to `campaign_assets`, materialise returned null for it by
+ * design, and launch simply left the URL line out of its summary — so the
+ * operator was told the campaign was live and never told the landing page had
+ * nowhere to live. A blog asset failed the same way, needing not just a site
+ * but EXACTLY one, since with two it cannot tell which was meant.
+ *
+ * So the plan is filtered against the tenant's sites up front, and drafting a
+ * blocked asset is refused rather than quietly producing a dead artifact. The
+ * check is pure and takes a count, not a database, so the rule is testable on
+ * its own and reads the same everywhere it is applied.
+ */
+export interface SiteAvailability {
+  /** How many CMS sites the tenant has. */
+  siteCount: number;
+}
+
+/**
+ * Why this asset kind cannot be built for this tenant, phrased for the
+ * operator, or `null` if it can. The text names the fix, because "we cannot
+ * build this" without "here is how to make it buildable" is a dead end.
+ */
+export function assetBlockedReason(kind: AssetKind, sites: SiteAvailability): string | null {
+  if (kind === "landing_page" && sites.siteCount === 0) {
+    return "a landing page has to live on a website, and this business has no website in the system yet. Add one under CMS, Sites, then the landing page can be built.";
+  }
+  if (kind === "blog" && sites.siteCount === 0) {
+    return "a blog post has to be published to a website, and this business has no website in the system yet. Add one under CMS, Sites, then the blog post can be built.";
+  }
+  if (kind === "blog" && sites.siteCount > 1) {
+    return `a blog post is published to one website, and this business has ${sites.siteCount} of them, so there is no way to tell which was meant. Ask the operator which site it should go on.`;
+  }
+  return null;
+}
+
+export interface FilteredPlan {
+  /** The assets that can actually be built, re-sequenced so sortOrder stays 0-based and gapless. */
+  assets: AssetDef[];
+  /** What was removed and why, so the operator is told rather than left to notice. */
+  dropped: Array<{ kind: AssetKind; title: string; reason: string }>;
+}
+
+/**
+ * Drop the assets this tenant cannot build, and say what went and why.
+ *
+ * sortOrder is re-sequenced rather than left with holes: it doubles as
+ * `campaign_assets.sort_order` and drives `nextPendingAsset`, so a gap would
+ * be a second, subtler bug on top of the one this prevents.
+ */
+export function filterPlanForSites(plan: AssetDef[], sites: SiteAvailability): FilteredPlan {
+  const dropped: FilteredPlan["dropped"] = [];
+  const kept: AssetDef[] = [];
+  for (const asset of plan) {
+    const reason = assetBlockedReason(asset.kind, sites);
+    if (reason) dropped.push({ kind: asset.kind, title: asset.title, reason });
+    else kept.push(asset);
+  }
+  return {
+    assets: kept.map((a, i) => ({ ...a, sortOrder: i })),
+    dropped,
+  };
+}

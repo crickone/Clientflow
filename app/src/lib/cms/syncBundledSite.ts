@@ -3,7 +3,8 @@ import "server-only";
 import fs from "node:fs";
 import path from "node:path";
 
-import { getTenantBySlug, openTenantDb } from "@/lib/db/tenant";
+import { openTenantDb } from "@/lib/db/tenant";
+import { listTenants } from "@/lib/tenants";
 import { getPlatformSetting, setPlatformSetting } from "@/lib/billing/settings";
 
 /**
@@ -40,10 +41,10 @@ import { getPlatformSetting, setPlatformSetting } from "@/lib/billing/settings";
  *
  * Never throws — publishing a marketing page must not take down boot.
  */
-const BUNDLED_SITES: ReadonlyArray<{ site: string; tenant: string }> = [
+const BUNDLED_SITES: readonly string[] = [
   // Inspire Health & Fitness, Clonmel. Built in sites/inspire/, not authored
   // in Studio, so the repo is the source of truth.
-  { site: "inspire", tenant: "inspire" },
+  "inspire",
 ];
 
 type BundledPage = {
@@ -58,34 +59,76 @@ type Bundle = { slug: string; tenant: string; rev: string; pages: BundledPage[] 
 const revKey = (slug: string) => `site_bundle_rev_${slug}`;
 
 export function syncBundledSites(): void {
-  for (const { site, tenant } of BUNDLED_SITES) {
+  for (const site of BUNDLED_SITES) {
     try {
-      syncOne(site, tenant);
+      syncOne(site);
     } catch (err) {
       console.error(`[syncBundledSite] '${site}' failed (non-fatal):`, err);
     }
   }
 }
 
-function syncOne(siteSlug: string, tenantSlug: string): void {
+/**
+ * Find the site the PUBLIC RENDERER would serve for this slug.
+ *
+ * Deliberately not "the tenant of the same name". A site slug is unique
+ * within a tenant but not across them, and `resolveHost`'s fallback walks the
+ * active tenants in registry order and serves the first match. Naming a
+ * tenant here would be a second, independent guess at the same question, and
+ * the two can disagree: `tools/import-site.cjs` defaults to the legacy
+ * tenant's database, so a site imported without an explicit --db lands there
+ * and shadows the copy in the client's own tenant. Publishing to the wrong
+ * one writes a perfect copy of the pages into a database nobody reads, which
+ * looks exactly like success.
+ *
+ * So resolve the way the renderer resolves, and say so when the slug is
+ * ambiguous — a duplicate is worth a human's attention, and is invisible
+ * otherwise.
+ */
+function resolveServedSite(siteSlug: string) {
+  const matches: Array<{ tenantId: number; tenantSlug: string; dbFile: string; siteId: number }> = [];
+  for (const tenant of listTenants()) {
+    if (tenant.isActive === false) continue;
+    const conn = openTenantDb(tenant.dbFile);
+    const row = conn.sqlite.prepare("SELECT id FROM sites WHERE slug = ?").get(siteSlug) as
+      | { id: number }
+      | undefined;
+    if (row) {
+      matches.push({ tenantId: tenant.id, tenantSlug: tenant.slug, dbFile: tenant.dbFile, siteId: row.id });
+    }
+  }
+  if (matches.length > 1) {
+    console.warn(
+      `[syncBundledSite] '${siteSlug}' exists in ${matches.length} tenants ` +
+        `(${matches.map((m) => `${m.tenantSlug}#${m.tenantId}`).join(", ")}). ` +
+        `Publishing to '${matches[0].tenantSlug}', which is the one the public site resolves to. ` +
+        `The others are shadowed copies nobody can see and should be removed.`,
+    );
+  }
+  return matches[0] ?? null;
+}
+
+function syncOne(siteSlug: string): void {
   const bundlePath = path.join(process.cwd(), "public", "sites", siteSlug, "_pages.json");
   if (!fs.existsSync(bundlePath)) return;
 
   const bundle = JSON.parse(fs.readFileSync(bundlePath, "utf8")) as Bundle;
   if (!bundle.rev || !Array.isArray(bundle.pages) || bundle.pages.length === 0) return;
 
-  // Guard 1: nothing changed since the last applied bundle.
-  if (getPlatformSetting(revKey(siteSlug)) === bundle.rev) return;
+  const served = resolveServedSite(siteSlug);
+  if (!served) return; // no tenant in this environment has the site yet
 
-  const tenant = getTenantBySlug(tenantSlug);
-  if (!tenant) return; // not present in this environment
+  // Guard 1: nothing changed since the last applied bundle. The marker is
+  // the content hash AND the tenant it was applied to, because those are two
+  // independent ways for the live pages to be out of date. Recording the hash
+  // alone once let a bundle applied to a shadowed copy of the site mark
+  // itself done, so the boot after the target was corrected skipped the work
+  // it existed to do.
+  const applied = `${served.tenantId}:${bundle.rev}`;
+  if (getPlatformSetting(revKey(siteSlug)) === applied) return;
 
-  const { sqlite } = openTenantDb(tenant.dbFile);
-  const site = sqlite.prepare("SELECT id FROM sites WHERE slug = ?").get(siteSlug) as
-    | { id: number }
-    | undefined;
-  if (!site) return; // the site has not been created in this tenant yet
-  const sid = site.id;
+  const { sqlite } = openTenantDb(served.dbFile);
+  const sid = served.siteId;
 
   const findPage = sqlite.prepare("SELECT id FROM pages WHERE site_id = ? AND path = ?");
   const findBlock = sqlite.prepare(
@@ -145,10 +188,11 @@ function syncOne(siteSlug: string, tenantSlug: string): void {
   // Record the rev even when every page was skipped or already current:
   // the bundle HAS been considered, and re-examining it on every boot would
   // reopen the same transaction forever.
-  setPlatformSetting(revKey(siteSlug), bundle.rev);
+  setPlatformSetting(revKey(siteSlug), applied);
 
   console.log(
-    `[syncBundledSite] '${siteSlug}' rev ${bundle.rev}: ${written} page(s) published` +
+    `[syncBundledSite] '${siteSlug}' rev ${bundle.rev} -> tenant ${served.tenantSlug}#${served.tenantId} ` +
+      `site #${sid}: ${written} page(s) published` +
       (skipped.length ? `, ${skipped.length} left alone (edited in Studio): ${skipped.join(", ")}` : ""),
   );
 }

@@ -12,6 +12,8 @@ import { listSites } from "@/lib/cms/sites";
 import {
   ASSET_ORDER,
   DEFAULT_ASSET_PLAN,
+  assetBlockedReason,
+  filterPlanForSites,
   findApprovedLandingAsset,
   isTerminalStatus,
   nextPendingAsset,
@@ -20,7 +22,9 @@ import {
   type AssetLike,
   type AssetStatus,
   type CampaignStatus,
+  type FilteredPlan,
   type LandingAssetLike,
+  type SiteAvailability,
 } from "./plan";
 import { buildCampaignLandingUrl } from "./landingUrl";
 
@@ -51,12 +55,23 @@ import { buildCampaignLandingUrl } from "./landingUrl";
 export {
   ASSET_ORDER,
   DEFAULT_ASSET_PLAN,
+  assetBlockedReason,
+  filterPlanForSites,
   findApprovedLandingAsset,
   isTerminalStatus,
   nextPendingAsset,
   buildCampaignLandingUrl,
 };
-export type { AssetDef, AssetKind, AssetLike, AssetStatus, CampaignStatus, LandingAssetLike };
+export type {
+  AssetDef,
+  AssetKind,
+  AssetLike,
+  AssetStatus,
+  CampaignStatus,
+  FilteredPlan,
+  LandingAssetLike,
+  SiteAvailability,
+};
 export type { Campaign, CampaignAsset };
 
 // ── campaigns ────────────────────────────────────────────────────────────
@@ -221,6 +236,20 @@ export function incrementCampaignViews(campaignId: number): void {
  * landing URL's copy/view affordance) call — neither re-implements the
  * site-picking rule itself, so they can't diverge on it.
  */
+/**
+ * How many websites this tenant has, for the pure asset gate in ./plan.
+ *
+ * A campaign's landing page and blog post are pages on one of the tenant's
+ * sites; with no site they can be approved and reported as done while
+ * producing nothing anybody can visit. Reads through the same listSites() the
+ * URL builder below uses, so the gate and the URL can never disagree about
+ * whether a site exists.
+ */
+export async function getSiteAvailability(): Promise<SiteAvailability> {
+  const sites = await listSites();
+  return { siteCount: sites.length };
+}
+
 export async function getCampaignLandingUrl(campaignSlug: string): Promise<string | null> {
   const sites = await listSites();
   return buildCampaignLandingUrl(sites, campaignSlug);

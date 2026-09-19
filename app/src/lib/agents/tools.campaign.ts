@@ -13,6 +13,9 @@ import {
   ASSET_ORDER,
   DEFAULT_ASSET_PLAN,
   addAssets,
+  assetBlockedReason,
+  filterPlanForSites,
+  getSiteAvailability,
   approveAsset,
   createCampaign,
   getAsset,
@@ -283,20 +286,33 @@ export async function planCampaignTool(ctx: ToolContext, input: Record<string, u
     // modelLabel, for any future UI consumer of this tool result) and folded
     // into `result`'s own text, since that's the one line the model reliably
     // relays to the operator when it shows the plan.
+    // Some assets are pages on one of the tenant's websites, so a tenant
+    // with no site cannot have them. Drop them from the PROPOSED plan rather
+    // than letting the operator approve a kit containing an artifact that
+    // would be built, approved and then quietly have nowhere to live.
+    const { assets: plannedAssets, dropped } = filterPlanForSites(
+      DEFAULT_ASSET_PLAN,
+      await getSiteAvailability(),
+    );
+    const droppedLine = dropped.length
+      ? ` Left out of this plan: ${dropped.map((d) => `${d.title} — ${d.reason}`).join(" ")} Tell the operator this plainly; do not offer to build them anyway.`
+      : "";
+
     const buildModel = await getCampaignBuildModel();
     const modelLabel = campaignModelLabel(buildModel);
-    const estimateCents = estimateCampaignBuildCents(DEFAULT_ASSET_PLAN, buildModel);
+    const estimateCents = estimateCampaignBuildCents(plannedAssets, buildModel);
     const estimateLine = `Estimated build cost: ${formatCentsEur(estimateCents)} on ${modelLabel} (an estimate — change the campaign model on the campaigns page to lower it).`;
 
     return {
       text: JSON.stringify({
-        result: `Plan prepared — nothing has been saved. Show it to the operator; once they approve (trimming \`assets\` first if they want fewer), call create_campaign with this exact shape. ${estimateLine}`,
+        result: `Plan prepared — nothing has been saved. Show it to the operator; once they approve (trimming \`assets\` first if they want fewer), call create_campaign with this exact shape. ${estimateLine}${droppedLine}`,
         name: draftName,
         season: season || null,
         startsOn: startsOn || null,
         endsOn: endsOn || null,
         offer,
-        assets: DEFAULT_ASSET_PLAN,
+        assets: plannedAssets,
+        dropped,
         estimateCents,
         modelLabel,
       }),
@@ -307,7 +323,10 @@ export async function planCampaignTool(ctx: ToolContext, input: Record<string, u
 }
 
 /** WRITE — persist a campaign + its asset plan. Call ONLY after the operator has approved plan_campaign's output. */
-export function createCampaignTool(ctx: ToolContext, input: Record<string, unknown>): ToolResult {
+export async function createCampaignTool(
+  ctx: ToolContext,
+  input: Record<string, unknown>,
+): Promise<ToolResult> {
   const name = String(input.name || "").trim();
   if (!name) return { text: JSON.stringify({ error: "name is required." }) };
 
@@ -328,12 +347,31 @@ export function createCampaignTool(ctx: ToolContext, input: Record<string, unkno
     assetDefs = normalized;
   }
 
+  // The same gate plan_campaign applies, enforced again here because the plan
+  // is only a suggestion: the model can pass its own `assets` array. Seeding
+  // an asset that can never be built would be worse than dropping it, because
+  // a campaign only becomes ready once EVERY asset is approved — one
+  // permanently unbuildable asset would leave the campaign unlaunchable with
+  // nothing to show for it.
+  const { assets: buildable, dropped } = filterPlanForSites(assetDefs, await getSiteAvailability());
+  if (buildable.length === 0) {
+    return {
+      text: JSON.stringify({
+        error: `Nothing in this campaign can be built: ${dropped.map((d) => d.reason).join(" ")}`,
+      }),
+    };
+  }
+  assetDefs = buildable;
+
   // Deterministic, no random/timestamp suffix — two campaigns with the exact
   // same name land on the exact same slug (dedupe is not required for v1).
   const slug = slugify(name) || "campaign";
 
   const campaign = createCampaign({ name, slug, season, startsOn, endsOn, offer });
   const assets = addAssets(campaign.id, assetDefs);
+  const droppedLine = dropped.length
+    ? ` Not included: ${dropped.map((d) => `${d.title} — ${d.reason}`).join(" ")} Say so plainly rather than letting the operator assume it was built.`
+    : "";
 
   // Pre-seed the offer asset (kind "offer") with the already-generated,
   // already-shown offer text, moving it straight to "drafted" — so its first
@@ -350,9 +388,10 @@ export function createCampaignTool(ctx: ToolContext, input: Record<string, unkno
 
   return {
     text: JSON.stringify({
-      result: `Created campaign "${name}" with ${assets.length} asset${assets.length === 1 ? "" : "s"}.`,
+      result: `Created campaign "${name}" with ${assets.length} asset${assets.length === 1 ? "" : "s"}.${droppedLine}`,
       campaignId: campaign.id,
       slug: campaign.slug,
+      dropped,
       nextAsset,
     }),
   };
@@ -384,6 +423,21 @@ export async function draftCampaignAssetTool(ctx: ToolContext, input: Record<str
     return {
       text: JSON.stringify({
         error: `"${asset.title}" is already approved and can't be regenerated. Edit it in its home (the blog/social/email draft it was saved to), or start a fresh campaign.`,
+      }),
+    };
+  }
+
+  // Refuse rather than generate something that cannot exist. This catches
+  // assets seeded before the tenant's sites changed, and campaigns created
+  // before this gate existed — the plan and create steps stop new ones, but
+  // an asset already sitting in the database would otherwise still be drafted,
+  // approved, and reported as done with nowhere to live.
+  const blocked = assetBlockedReason(asset.kind, await getSiteAvailability());
+  if (blocked) {
+    return {
+      text: JSON.stringify({
+        error: `"${asset.title}" cannot be built: ${blocked}`,
+        remedy: "site_required",
       }),
     };
   }

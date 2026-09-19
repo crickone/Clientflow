@@ -906,7 +906,7 @@ export async function executeTool(
       case "plan_campaign":
         return await planCampaignTool(ctx, input);
       case "create_campaign":
-        return createCampaignTool(ctx, input);
+        return await createCampaignTool(ctx, input);
       case "draft_campaign_asset":
         return await draftCampaignAssetTool(ctx, input);
       case "approve_campaign_asset":

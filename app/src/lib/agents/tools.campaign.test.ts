@@ -176,7 +176,7 @@ const requireLocal = createRequire(import.meta.url);
 
     // ── (b) create_campaign (WRITE) — missing name rejected before any DB
     // write. ──
-    const missingName = JSON.parse(runWithTenant(tid, () => createCampaignTool(ctx, { offer: "20% off" })).text);
+    const missingName = JSON.parse((await runWithTenant(tid, async () => createCampaignTool(ctx, { offer: "20% off" }))).text);
     assert.ok(missingName.error, "create_campaign requires a name");
 
     // ── (c) create_campaign (WRITE) — a valid call slugifies the name
@@ -187,13 +187,13 @@ const requireLocal = createRequire(import.meta.url);
     // other asset. ──
     const offerText = "20% off all 6-week transformation programmes booked before June 30th";
     const created = JSON.parse(
-      runWithTenant(tid, () =>
+      (await runWithTenant(tid, async () =>
         createCampaignTool(ctx, {
           name: "Summer Shape Up 2026!",
           season: "Summer 2026",
           offer: offerText,
         }),
-      ).text,
+      )).text,
     );
     assert.ok(created.result && !created.error, "create_campaign succeeds for a valid call");
     const campaignId = created.campaignId as number;
@@ -209,7 +209,7 @@ const requireLocal = createRequire(import.meta.url);
     // random/timestamp suffix) — dedupe isn't required for v1, but the slug
     // itself must be a pure function of the name.
     const created2 = JSON.parse(
-      runWithTenant(tid, () => createCampaignTool(ctx, { name: "Summer Shape Up 2026!", offer: "x" })).text,
+      (await runWithTenant(tid, async () => createCampaignTool(ctx, { name: "Summer Shape Up 2026!", offer: "x" }))).text,
     );
     assert.equal(
       runWithTenant(tid, () => getCampaign(created2.campaignId as number))?.slug,
@@ -217,12 +217,39 @@ const requireLocal = createRequire(import.meta.url);
       "slugify(name) is deterministic across two separate create_campaign calls with the same name",
     );
 
+    // THIS TENANT HAS NO CMS SITE (see the header comment), and a landing
+    // page and a blog post are pages ON a site. They used to be seeded
+    // anyway, drafted, approved, and then silently fail to materialise — the
+    // operator was shown a finished campaign whose landing page existed only
+    // as a row. create_campaign now drops them and says why.
+    const expectedKinds = DEFAULT_ASSET_PLAN.map((a) => a.kind).filter(
+      (k) => k !== "landing_page" && k !== "blog",
+    );
     const seededAssets = runWithTenant(tid, () => listAssets(campaignId));
-    assert.equal(seededAssets.length, DEFAULT_ASSET_PLAN.length, "create_campaign seeds the default asset plan when assets is omitted");
+    assert.equal(
+      seededAssets.length,
+      expectedKinds.length,
+      "create_campaign seeds the default plan MINUS the assets this site-less tenant cannot build",
+    );
     assert.deepEqual(
       seededAssets.map((a) => a.kind),
-      DEFAULT_ASSET_PLAN.map((a) => a.kind),
-      "seeded asset kinds/order match DEFAULT_ASSET_PLAN",
+      expectedKinds,
+      "seeded asset kinds/order match the default plan with the site-backed assets removed",
+    );
+    assert.deepEqual(
+      (created.dropped as Array<{ kind: string }>).map((d) => d.kind),
+      ["landing_page", "blog"],
+      "…and create_campaign REPORTS what it dropped rather than leaving the operator to notice",
+    );
+    assert.match(
+      created.result as string,
+      /no website in the system/i,
+      "the result text says it plainly, since that is the line the model relays",
+    );
+    assert.deepEqual(
+      seededAssets.map((a) => a.sortOrder),
+      seededAssets.map((_, i) => i),
+      "sort_order is re-sequenced gapless, so nextPendingAsset still walks the kit in order",
     );
     const offerAsset = seededAssets.find((a) => a.kind === "offer")!;
     assert.ok(offerAsset, "sanity: a seeded offer asset exists");
@@ -233,7 +260,7 @@ const requireLocal = createRequire(import.meta.url);
     // ── (d) create_campaign (WRITE) — a custom, trimmed `assets` array is
     // honoured instead of the default plan, and an invalid kind is rejected. ──
     const trimmed = JSON.parse(
-      runWithTenant(tid, () =>
+      (await runWithTenant(tid, async () =>
         createCampaignTool(ctx, {
           name: "Trimmed Kit",
           offer: "y",
@@ -242,16 +269,57 @@ const requireLocal = createRequire(import.meta.url);
             { kind: "blog", title: "Blog post" },
           ],
         }),
-      ).text,
+      )).text,
     );
     assert.ok(!trimmed.error, "create_campaign accepts a custom assets array");
     const trimmedAssets = runWithTenant(tid, () => listAssets(trimmed.campaignId as number));
-    assert.equal(trimmedAssets.length, 2, "create_campaign seeds exactly the custom assets given, not the default 11");
+    assert.equal(
+      trimmedAssets.length,
+      1,
+      "the custom array is honoured, and the gate still applies to it: the blog is dropped on a site-less tenant",
+    );
+    assert.deepEqual(trimmedAssets.map((a) => a.kind), ["offer"], "only the offer survives");
+
+    // A custom array of assets that DON'T need a website is seeded whole —
+    // the gate must not cost a tenant work that would have succeeded.
+    const trimmedOk = JSON.parse(
+      (await runWithTenant(tid, async () =>
+        createCampaignTool(ctx, {
+          name: "Trimmed Kit No Pages",
+          offer: "y2",
+          assets: [
+            { kind: "offer", title: "Offer" },
+            { kind: "email", title: "Email — Announce" },
+          ],
+        }),
+      )).text,
+    );
+    assert.ok(!trimmedOk.error, "create_campaign accepts a custom array of self-contained assets");
+    assert.equal(
+      runWithTenant(tid, () => listAssets(trimmedOk.campaignId as number)).length,
+      2,
+      "create_campaign seeds exactly the custom assets given, not the default plan",
+    );
+
+    // A campaign made ENTIRELY of assets this tenant cannot build is refused
+    // outright, rather than created empty and left unlaunchable forever (a
+    // campaign only becomes ready once every asset is approved).
+    const allBlocked = JSON.parse(
+      (await runWithTenant(tid, async () =>
+        createCampaignTool(ctx, {
+          name: "Pages Only Kit",
+          offer: "p",
+          assets: [{ kind: "landing_page", title: "Landing page" }],
+        }),
+      )).text,
+    );
+    assert.ok(allBlocked.error, "a campaign with nothing buildable in it is refused");
+    assert.match(allBlocked.error as string, /no website in the system/i, "…with the reason, not a bare failure");
 
     const badKind = JSON.parse(
-      runWithTenant(tid, () =>
+      (await runWithTenant(tid, async () =>
         createCampaignTool(ctx, { name: "Bad Kit", offer: "z", assets: [{ kind: "nonsense", title: "?" }] }),
-      ).text,
+      )).text,
     );
     assert.ok(badKind.error, "create_campaign rejects an asset with an invalid kind");
 
@@ -313,7 +381,24 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(plan.name, "Summer Shape Up 2026");
     assert.equal(plan.season, "Summer 2026");
     assert.ok(typeof plan.offer === "string" && plan.offer.length > 0, "plan_campaign returns a generated, non-empty offer");
-    assert.deepEqual(plan.assets, DEFAULT_ASSET_PLAN, "plan_campaign proposes DEFAULT_ASSET_PLAN's exact 11-asset kit");
+    // plan_campaign applies the same site gate as create_campaign, so the
+    // operator never approves a kit containing an artifact that would be
+    // built and then quietly have nowhere to live. This tenant has no site.
+    assert.deepEqual(
+      (plan.assets as Array<{ kind: string }>).map((a) => a.kind),
+      expectedKinds,
+      "plan_campaign proposes the default kit MINUS what a site-less tenant cannot build",
+    );
+    assert.deepEqual(
+      (plan.dropped as Array<{ kind: string }>).map((d) => d.kind),
+      ["landing_page", "blog"],
+      "…and names what it left out",
+    );
+    assert.match(
+      plan.result as string,
+      /no website in the system/i,
+      "…in the result text the model actually relays to the operator",
+    );
     const planMissingBrief = JSON.parse((await planCampaignTool(ctx, {})).text);
     assert.ok(planMissingBrief.error, "plan_campaign requires a brief");
 
@@ -321,9 +406,12 @@ const requireLocal = createRequire(import.meta.url);
     // drafted, an unknown id, and a campaignId/assetId mismatch; a valid
     // approval advances nextAsset and only flips the campaign to "ready" once
     // EVERY asset is approved. ──
-    const stillPendingBlog = seededAssets.find((a) => a.kind === "blog")!;
+    // Any asset that has not been drafted yet will do here; the offer is
+    // pre-drafted at create time, so take the first one after it.
+    const stillPending = seededAssets.find((a) => a.status === "pending")!;
+    assert.ok(stillPending, "sanity: the kit has at least one undrafted asset to test against");
     const approvePending = runWithTenant(tid, () =>
-      approveCampaignAssetTool(ctx, { campaignId, assetId: stillPendingBlog.id }),
+      approveCampaignAssetTool(ctx, { campaignId, assetId: stillPending.id }),
     );
     assert.ok(JSON.parse(approvePending.text).error, "approve_campaign_asset rejects an asset that hasn't been drafted yet");
 
@@ -422,7 +510,7 @@ const requireLocal = createRequire(import.meta.url);
     assert.ok(seededSite?.id, "blog-publish test sanity: a CMS site now exists on this tenant");
 
     const blogCampaign = JSON.parse(
-      runWithTenant(tid, () =>
+      (await runWithTenant(tid, async () =>
         createCampaignTool(ctx, {
           name: "Blog Publish Test",
           offer: "blog-only kit",
@@ -431,7 +519,7 @@ const requireLocal = createRequire(import.meta.url);
             { kind: "blog", title: "Blog post" },
           ],
         }),
-      ).text,
+      )).text,
     );
     assert.ok(!blogCampaign.error, "blog-publish test: create_campaign succeeds");
     const blogCampaignId = blogCampaign.campaignId as number;
@@ -517,7 +605,7 @@ const requireLocal = createRequire(import.meta.url);
     // external row (materialise.ts, by design), so externalKind stays null
     // even though the launch summary reports it. ──
     const landingCampaign = JSON.parse(
-      runWithTenant(tid, () =>
+      (await runWithTenant(tid, async () =>
         createCampaignTool(ctx, {
           name: "Landing URL Test",
           offer: "landing-only kit",
@@ -526,7 +614,7 @@ const requireLocal = createRequire(import.meta.url);
             { kind: "landing_page", title: "Landing page" },
           ],
         }),
-      ).text,
+      )).text,
     );
     assert.ok(!landingCampaign.error, "landing-url test: create_campaign succeeds");
     const landingCampaignId = landingCampaign.campaignId as number;
@@ -606,13 +694,13 @@ const requireLocal = createRequire(import.meta.url);
     // materialises into a real carousel_sets row, then launch and assert
     // it's queued with the exact honest label. ──
     const socialCampaign = JSON.parse(
-      runWithTenant(tid, () =>
+      (await runWithTenant(tid, async () =>
         createCampaignTool(ctx, {
           name: "Social Queue Test",
           offer: "social-only kit",
           assets: [{ kind: "social", title: "Social post 1" }],
         }),
-      ).text,
+      )).text,
     );
     assert.ok(!socialCampaign.error, "social-queue test: create_campaign succeeds");
     const socialCampaignId = socialCampaign.campaignId as number;
@@ -660,9 +748,9 @@ const requireLocal = createRequire(import.meta.url);
     // email_campaigns rows, then approve again and assert no new rows were
     // created + the response carries alreadyApproved: true. ──
     const regressionCampaign = JSON.parse(
-      runWithTenant(tid, () =>
+      (await runWithTenant(tid, async () =>
         createCampaignTool(ctx, { name: "Regression Test Campaign", offer: "50% off" }),
-      ).text,
+      )).text,
     );
     assert.ok(!regressionCampaign.error, "regression test: create_campaign succeeds");
     const regCampaignId = regressionCampaign.campaignId as number;
@@ -744,9 +832,9 @@ const requireLocal = createRequire(import.meta.url);
     // can't regenerate), (b) asset status STILL "approved" (not flipped back to
     // drafted), (c) asset body UNCHANGED (no regeneration ran). ──
     const noRedraftCampaign = JSON.parse(
-      runWithTenant(tid, () =>
+      (await runWithTenant(tid, async () =>
         createCampaignTool(ctx, { name: "No-Redraft Test Campaign", offer: "25% off" }),
-      ).text,
+      )).text,
     );
     assert.ok(!noRedraftCampaign.error, "no-redraft test: create_campaign succeeds");
     const noRedraftCampaignId = noRedraftCampaign.campaignId as number;
