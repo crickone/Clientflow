@@ -175,6 +175,10 @@ export function DeleteSiteDialog({ site }: { site: { slug: string; name: string 
                 marginBottom: 18,
               }}
             >
+              <div style={{ marginBottom: 8 }}>
+                Deleting <strong>{summary.site.slug}</strong> from{" "}
+                <strong>{summary.tenantName}</strong>.
+              </div>
               This will permanently delete {summarySentence(summary)}.
               {verifiedDomains > 0 && (
                 <div style={{ color: "#dc2626", marginTop: 8, fontWeight: 500 }}>

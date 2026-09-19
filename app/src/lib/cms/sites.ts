@@ -91,6 +91,14 @@ export async function updateSite(
 
 export interface SiteDeletionSummary {
   site: Site;
+  /**
+   * The business this site belongs to. A site slug is unique within a tenant
+   * but not across them, and the confirmation asks the operator to type the
+   * SLUG — so with the same slug in two businesses, typing it proves nothing
+   * about which copy is about to go. Naming the business is what makes the
+   * confirmation mean something.
+   */
+  tenantName: string;
   pages: number;
   blogPosts: number;
   mediaAssets: number;
@@ -138,6 +146,7 @@ export async function summariseSiteDeletion(siteId: number): Promise<SiteDeletio
 
   return {
     site,
+    tenantName: membership.tenant.name,
     pages: pageRows.length,
     blogPosts: blogRows.length,
     mediaAssets: mediaRows.length,
