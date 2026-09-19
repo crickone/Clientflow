@@ -7,6 +7,18 @@
  * (also a dedicated route ahead of the catch-all, for the same structural
  * reason). Not a bug — just a reserved-namespace cost worth knowing about if
  * a client ever wants a CMS page at `/c/...`.
+ *
+ * NO SITE CHROME HERE, DELIBERATELY. The blog routes render inside the
+ * tenant's own stylesheet, navbar and footer (lib/cms/siteChrome), because a
+ * blog is part of the website and looked like a stranger's page without it.
+ * A campaign landing page is not: its single job is the signup form, and
+ * every link in a navbar is an exit from it. So this page stays branded from
+ * the tenant's theme, fonts and logo and keeps no navigation at all.
+ *
+ * Decided with the operator on 2026-09-19, after the blog was given chrome
+ * and the obvious next step looked like doing the same here. If you are
+ * reading this while about to add getSiteChrome to this route: that is the
+ * change that was considered and declined, not an oversight.
  */
 import type { Metadata } from "next";
 import fs from "node:fs";
