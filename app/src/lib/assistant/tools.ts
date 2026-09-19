@@ -204,7 +204,7 @@ const WRITE_TOOL_META: Record<string, WriteToolMeta> = {
   schedule_social_post: { label: "Schedule social post", summarize: ({ v }) => { const when = parseWhen(v("when")); return `Schedule ${v("name") ? `"${v("name")}"` : `post #${v("postId") || "?"}`} to go out${when ? ` on ${formatDublin(when.getTime())}` : " on social"}`; } },
   schedule_email_campaign: { label: "Schedule email send", summarize: ({ v }) => { const when = parseWhen(v("when")); return `Send ${v("name") ? `"${v("name")}"` : `email campaign #${v("emailCampaignId") || "?"}`}${when ? ` on ${formatDublin(when.getTime())}` : " at the scheduled time"}`; } },
   edit_website_text: { label: "Edit website text", summarize: ({ v }) => `Change wording on ${v("path") || "a page"}: "${(v("find") || "").slice(0, 40)}" -> "${(v("replace") || "").slice(0, 40)}"` },
-  replace_website_image: { label: "Replace website image", summarize: ({ v }) => `Replace an image on ${v("path") || "a page"} with library image #${v("imageId") || "?"}` },
+  replace_website_image: { label: "Replace website image", summarize: ({ v }) => `Replace an image on ${v("path") || "a page"} with ${v("source") === "content-studio" ? "Content Studio" : "website"} image #${v("imageId") || "?"}` },
   schedule_blog_post: { label: "Schedule blog post", summarize: ({ v }) => { const when = parseWhen(v("when")); return `Put blog post #${v("postId") || "?"} live${when ? ` on ${formatDublin(when.getTime())}` : " at the scheduled time"}`; } },
   cancel_scheduled_item: { label: "Cancel scheduled item", summarize: ({ v }) => `Cancel the scheduled ${v("kind") || "item"}${v("name") ? ` "${v("name")}"` : ""}` },
 
@@ -953,7 +953,7 @@ export async function executeTool(
       case "edit_website_text":
         return editWebsiteTextTool(ctx, input);
       case "replace_website_image":
-        return replaceWebsiteImageTool(ctx, input);
+        return await replaceWebsiteImageTool(ctx, input);
       case "list_no_shows":
         return listNoShowsTool(ctx, input);
       case "list_lapsed_members":

@@ -229,8 +229,8 @@
       "Change wording on a page: \"\" -> \"\""
     ],
     "replace_website_image": [
-      "Replace an image on a page with library image #?",
-      "Replace an image on a page with library image #?"
+      "Replace an image on a page with website image #?",
+      "Replace an image on a page with website image #?"
     ]
   },
   "readSamplesAllFalse": [

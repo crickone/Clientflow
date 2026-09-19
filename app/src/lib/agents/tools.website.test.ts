@@ -170,7 +170,7 @@ const TAIL = `<script src="https://cdn.example/gsap.min.js"></script><script>con
 
       // ── REPLACING AN IMAGE ──────────────────────────────────────────────
       assert.ok(
-        parse(web.replaceWebsiteImageTool(ctx, { path: "/", currentSrc: "/sites/wt/assets/old.jpg", imageId: 999_999 })).error,
+        parse(await web.replaceWebsiteImageTool(ctx, { path: "/", currentSrc: "/sites/wt/assets/old.jpg", imageId: 999_999, source: "website" })).error,
         "an image id that does not exist is refused",
       );
 
@@ -184,9 +184,9 @@ const TAIL = `<script src="https://cdn.example/gsap.min.js"></script><script>con
         controlSqlite.prepare("SELECT id FROM cms_library_assets WHERE storage_key='k-other'").get() as { id: number }
       ).id;
       const stolen = parse(
-        web.replaceWebsiteImageTool(ctx, { path: "/", currentSrc: "/sites/wt/assets/old.jpg", imageId: otherId }),
+        await web.replaceWebsiteImageTool(ctx, { path: "/", currentSrc: "/sites/wt/assets/old.jpg", imageId: otherId, source: "website" }),
       );
-      assert.match(stolen.error as string, /media library/, "ANOTHER TENANT'S IMAGE IS REFUSED");
+      assert.match(stolen.error as string, /website images/, "ANOTHER TENANT'S IMAGE IS REFUSED");
       controlSqlite.prepare("DELETE FROM cms_library_assets WHERE id = ?").run(otherId);
 
       // Our own image.
@@ -206,14 +206,15 @@ const TAIL = `<script src="https://cdn.example/gsap.min.js"></script><script>con
       );
 
       assert.ok(
-        parse(web.replaceWebsiteImageTool(ctx, { path: "/", currentSrc: "/no/such.jpg", imageId: mineId })).error,
+        parse(await web.replaceWebsiteImageTool(ctx, { path: "/", currentSrc: "/no/such.jpg", imageId: mineId, source: "website" })).error,
         "a src that is not on the page is refused",
       );
 
       const swapped = parse(
-        web.replaceWebsiteImageTool(ctx, {
+        await web.replaceWebsiteImageTool(ctx, {
           path: "/",
           currentSrc: "/sites/wt/assets/old.jpg",
+          source: "website",
           imageId: mineId,
           alt: "Members training in the weights room",
         }),
@@ -227,6 +228,94 @@ const TAIL = `<script src="https://cdn.example/gsap.min.js"></script><script>con
       assert.ok(body.includes('class="hero-img"'), "THE TAG'S CLASSES SURVIVE — they are what make it fit the design");
       assert.ok(body.includes('src="/sites/wt/assets/two.jpg"'), "the OTHER image on the page is untouched");
       assert.ok(body.startsWith(HEAD) && body.endsWith(TAIL), "the stylesheet and scripts still bracket the page");
+
+      // ── A CONTENT STUDIO PHOTO CAN GO ON THE SITE ───────────────────────
+      // The business keeps its photographs in Content Studio, and the CMS
+      // library started empty. Asking a client to upload everything twice to
+      // put a picture on their own website is the wrong answer, so a Studio
+      // photo is COPIED across the first time it is used — its own file
+      // route is behind a login, so linking it directly would show visitors
+      // a broken image.
+      const { libraryDir } = requireLocal("../image/library") as typeof import("../image/library");
+      const studioFile = "studio-photo-1.jpg";
+      fs.mkdirSync(libraryDir(), { recursive: true });
+      fs.writeFileSync(path.join(libraryDir(), studioFile), Buffer.from("not-a-real-jpeg-but-bytes"));
+      sqlite
+        .prepare(
+          "INSERT INTO image_library_assets (filename, original_name, mime_type, kind, size_bytes, label) VALUES (?,?,?,?,?,?)",
+        )
+        .run(studioFile, "squat rack.jpg", "image/jpeg", "image", 25, "the squat rack");
+      const studioId = (
+        sqlite.prepare("SELECT id FROM image_library_assets WHERE filename = ?").get(studioFile) as { id: number }
+      ).id;
+
+      const both = parse(web.listWebsiteImagesTool(ctx));
+      const offered = both.images as Array<{ imageId: number; name: string; source: string }>;
+      assert.ok(
+        offered.some((i) => i.source === "content-studio" && i.name === "squat rack.jpg"),
+        "THE STUDIO PHOTO IS OFFERED alongside the website's own images",
+      );
+      assert.ok(offered.some((i) => i.source === "website"), "…and the website images are still listed");
+
+      const fromStudio = parse(
+        await web.replaceWebsiteImageTool(ctx, {
+          path: "/",
+          currentSrc: "/sites/wt/assets/two.jpg",
+          imageId: studioId,
+          source: "content-studio",
+        }),
+      );
+      assert.ok(!fromStudio.error, `a Studio photo can be placed: ${fromStudio.error ?? ""}`);
+
+      const withStudio = bodyNow();
+      const copiedId = Number(/src="\/library-media\/(\d+)"/.exec(withStudio)?.[1] ?? 0);
+      assert.ok(copiedId > 0, "the page points at a library id");
+      assert.ok(!withStudio.includes("/sites/wt/assets/two.jpg"), "the old image is gone");
+      assert.ok(
+        /src="\/library-media\/\d+"/.test(withStudio),
+        "…and the new one is served from the PUBLIC library route, not Studio's logged-in one",
+      );
+      assert.ok(!withStudio.includes("content-studio"), "no logged-in Studio URL reaches the page");
+
+      // Using the same photo again reuses the copy rather than making another.
+      const copiesBefore = (
+        controlSqlite
+          .prepare("SELECT count(*) c FROM cms_library_assets WHERE tenant_id = ? AND original_name LIKE 'studio-%'")
+          .get(tid) as { c: number }
+      ).c;
+      assert.equal(copiesBefore, 1, "one copy was made");
+      // Place the SAME Studio photo again, over a different image.
+      await web.replaceWebsiteImageTool(ctx, {
+        path: "/",
+        currentSrc: `/library-media/${copiedId}`,
+        imageId: studioId,
+        source: "content-studio",
+      });
+      const copiesAfter = (
+        controlSqlite
+          .prepare("SELECT count(*) c FROM cms_library_assets WHERE tenant_id = ? AND original_name LIKE 'studio-%'")
+          .get(tid) as { c: number }
+      ).c;
+      assert.equal(copiesAfter, 1, "USING IT TWICE DOES NOT COPY IT TWICE");
+
+      // A video in the Studio library is refused — a page wants a picture.
+      sqlite
+        .prepare(
+          "INSERT INTO image_library_assets (filename, original_name, mime_type, kind, size_bytes) VALUES (?,?,?,?,?)",
+        )
+        .run("clip.mp4", "a clip.mp4", "video/mp4", "video", 99);
+      const vidId = (
+        sqlite.prepare("SELECT id FROM image_library_assets WHERE filename='clip.mp4'").get() as { id: number }
+      ).id;
+      const video = parse(
+        await web.replaceWebsiteImageTool(ctx, {
+          path: "/",
+          currentSrc: "/sites/wt/assets/old.jpg",
+          imageId: vidId,
+          source: "content-studio",
+        }),
+      );
+      assert.match(video.error as string, /video, not an image/, "a video is refused");
     });
 
     console.log("tools.website.test.ts: all assertions passed");

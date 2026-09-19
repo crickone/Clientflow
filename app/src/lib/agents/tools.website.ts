@@ -6,7 +6,20 @@ import { listPages, getPageByPath } from "@/lib/cms/pages";
 import { getBlock } from "@/lib/cms/blocks";
 import { splitPageBody, studioEditability } from "@/lib/cms/pageBody";
 import { setDraftContent, publishDraft } from "@/lib/cms/pageDraft";
-import { listLibraryAssets, getLibraryAsset, canManageLibraryAsset, libraryUrl } from "@/lib/cms/library";
+import fs from "node:fs";
+
+import {
+  listLibraryAssets,
+  getLibraryAsset,
+  canManageLibraryAsset,
+  libraryUrl,
+  addLibraryAsset,
+} from "@/lib/cms/library";
+import {
+  listLibraryAssets as listStudioAssets,
+  getLibraryAsset as getStudioAsset,
+  libraryFilePath as studioFilePath,
+} from "@/lib/image/library";
 import { resolveSite } from "@/lib/agents/tools.marketing";
 import type { ToolContext, ToolResult } from "@/lib/agents/toolKit";
 
@@ -39,6 +52,58 @@ import type { ToolContext, ToolResult } from "@/lib/agents/toolKit";
  * and the publish is stamped with the operator's id so the deploy-time site
  * sync leaves the page alone afterwards.
  */
+
+/**
+ * Content Studio's photo library, made usable on the website.
+ *
+ * The business keeps its photographs in Content Studio — 77 of them, in
+ * Inspire's case — while the CMS has its own, separate library that was
+ * empty. Asking the client to upload everything a second time to put a
+ * picture on their own site is the wrong answer, so a Studio photo is
+ * COPIED into the CMS library the first time it is used.
+ *
+ * Copied, rather than served directly, on purpose. Studio images are behind
+ * a login (`guard("user")` on their file route) because they are working
+ * material, not published assets; exposing that route to the public would
+ * make the whole library enumerable by id, including photographs the client
+ * has not chosen to publish. Copying keeps the public surface to exactly the
+ * images actually placed on a page, and reuses `/library-media/<id>`, which
+ * is already public and already scoped.
+ *
+ * The copy is made once: a second use of the same photo finds the previous
+ * copy by its marker and reuses it, so a picture used on three pages is one
+ * file and one row, not three.
+ */
+const STUDIO_COPY_PREFIX = "studio-";
+
+const studioCopyName = (studioId: number, name: string) => `${STUDIO_COPY_PREFIX}${studioId}-${name}`;
+
+async function cmsAssetForStudioPhoto(
+  tenantId: number,
+  studioId: number,
+): Promise<{ error: string } | { asset: { id: number; originalName: string } }> {
+  const studio = getStudioAsset(studioId);
+  if (!studio) return { error: `No image with id ${studioId} in Content Studio.` };
+  if (studio.kind !== "image") return { error: `"${studio.originalName}" is a video, not an image.` };
+
+  const marker = studioCopyName(studioId, studio.originalName);
+  const already = listLibraryAssets(tenantId).find((a) => a.originalName === marker);
+  if (already) return { asset: already };
+
+  const file = studioFilePath(studio.filename);
+  if (!fs.existsSync(file)) return { error: `The file for "${studio.originalName}" is missing from the library.` };
+
+  const copied = await addLibraryAsset({
+    originalName: marker,
+    mimeType: studio.mimeType,
+    bytes: fs.readFileSync(file),
+    width: studio.width,
+    height: studio.height,
+    alt: studio.label ?? null,
+    tenantId,
+  });
+  return { asset: copied };
+}
 
 /** A page's body split into what can be edited and what must be carried untouched. */
 function readPage(ctx: ToolContext, siteId: number, path: string) {
@@ -118,7 +183,7 @@ export const WEBSITE_TOOLS: Anthropic.Tool[] = [
   {
     name: "list_website_images",
     description:
-      "List the images in the business's media library, with their ids and alt text. These are the only images that can be put on a page — use it to offer the operator real choices before calling replace_website_image.",
+      "List every image the business can put on its website: the ones already used on the site, and its whole Content Studio photo library. Each has an id — pass it as imageId to replace_website_image. Use this to offer the operator real choices rather than guessing what photographs exist.",
     input_schema: { type: "object", properties: {} },
   },
   {
@@ -145,11 +210,16 @@ export const WEBSITE_TOOLS: Anthropic.Tool[] = [
       properties: {
         path: { type: "string", description: "The page's path, e.g. / or /about." },
         currentSrc: { type: "string", description: "The src of the image being replaced, exactly as read_website_page reported it." },
-        imageId: { type: "integer", description: "The media library image's id, from list_website_images." },
+        imageId: { type: "integer", description: "The image's id, from list_website_images." },
+        source: {
+          type: "string",
+          enum: ["website", "content-studio"],
+          description: "Which library the id came from — copy the `source` list_website_images reported for that image. The two libraries number their images separately, so this is what tells them apart.",
+        },
         alt: { type: "string", description: "Optional: new alt text describing the new image." },
         siteId: { type: "integer" },
       },
-      required: ["path", "currentSrc", "imageId"],
+      required: ["path", "currentSrc", "imageId", "source"],
     },
   },
 ];
@@ -201,19 +271,36 @@ export function readWebsitePageTool(ctx: ToolContext, input: Record<string, unkn
   };
 }
 
-/** READ — the media library. */
+/**
+ * READ — every image the business could put on its site.
+ *
+ * Both libraries, presented as one list, because the distinction is ours and
+ * not the operator's: they have photographs, and they want one on a page.
+ * A Content Studio photo is copied into the website's own library the first
+ * time it is used (see cmsAssetForStudioPhoto), which is why its id is
+ * offered here as an ordinary choice.
+ */
 export function listWebsiteImagesTool(ctx: ToolContext): ToolResult {
-  const assets = listLibraryAssets(ctx.tenantId);
+  const onSite = listLibraryAssets(ctx.tenantId)
+    // The copies made from Studio photos are the same pictures under a
+    // marker name; listing both halves would show every one of them twice.
+    .filter((a) => !a.originalName.startsWith(STUDIO_COPY_PREFIX))
+    .map((a) => ({ imageId: a.id, name: a.originalName, alt: a.alt ?? "", source: "website" as const }));
+
+  const inStudio = listStudioAssets()
+    .filter((a) => a.kind === "image")
+    .map((a) => ({
+      imageId: a.id,
+      name: a.originalName,
+      alt: a.label ?? "",
+      source: "content-studio" as const,
+    }));
+
   return {
     text: JSON.stringify({
-      count: assets.length,
-      images: assets.slice(0, 60).map((a) => ({
-        imageId: a.id,
-        name: a.originalName,
-        alt: a.alt ?? "",
-        url: libraryUrl(a.id),
-      })),
-      note: "Use imageId with replace_website_image.",
+      count: onSite.length + inStudio.length,
+      images: [...onSite, ...inStudio].slice(0, 80),
+      note: "Pass imageId to replace_website_image, together with the image's `source`. A Content Studio photo is copied to the website automatically the first time it is used.",
     }),
   };
 }
@@ -295,22 +382,45 @@ export function editWebsiteTextTool(ctx: ToolContext, input: Record<string, unkn
 }
 
 /** WRITE — swap one image for a library image. Approve-gated. */
-export function replaceWebsiteImageTool(ctx: ToolContext, input: Record<string, unknown>): ToolResult {
+export async function replaceWebsiteImageTool(
+  ctx: ToolContext,
+  input: Record<string, unknown>,
+): Promise<ToolResult> {
   const path = String(input.path || "").trim();
   const currentSrc = String(input.currentSrc || "").trim();
   const imageId = Number(input.imageId);
+  const source = String(input.source || "website");
   if (!path) return { text: JSON.stringify({ error: "path is required." }) };
   if (!currentSrc) return { text: JSON.stringify({ error: "currentSrc is required." }) };
   if (!imageId) return { text: JSON.stringify({ error: "imageId is required." }) };
+  if (source !== "website" && source !== "content-studio") {
+    return { text: JSON.stringify({ error: 'source must be "website" or "content-studio".' }) };
+  }
 
   const site = resolveSite(ctx, input.siteId);
   if ("error" in site) return site.error;
 
-  // The image must be one this business owns. Without this a model could
-  // name any id and put another tenant's picture on the page.
-  const asset = getLibraryAsset(imageId);
-  if (!asset || !canManageLibraryAsset(asset, ctx.tenantId)) {
-    return { text: JSON.stringify({ error: `No image with id ${imageId} in this business's media library.` }) };
+  // Resolve the picture to something the public can actually load.
+  //
+  // A Content Studio photo is copied into the website's library here — its
+  // own file route is behind a login, so linking it directly would put a
+  // broken image on the page for every visitor.
+  //
+  // Either way the id is checked against THIS tenant. Without that a model
+  // could name any number and put a stranger's photograph on the page:
+  // Studio ids are tenant-scoped by the database the row lives in, and CMS
+  // ids by canManageLibraryAsset.
+  let asset: { id: number; originalName: string };
+  if (source === "content-studio") {
+    const resolved = await cmsAssetForStudioPhoto(ctx.tenantId, imageId);
+    if ("error" in resolved) return { text: JSON.stringify({ error: resolved.error }) };
+    asset = resolved.asset;
+  } else {
+    const existing = getLibraryAsset(imageId);
+    if (!existing || !canManageLibraryAsset(existing, ctx.tenantId)) {
+      return { text: JSON.stringify({ error: `No image with id ${imageId} in this business's website images.` }) };
+    }
+    asset = existing;
   }
 
   const read = readPage(ctx, site.id, path);
@@ -360,7 +470,7 @@ export function replaceWebsiteImageTool(ctx: ToolContext, input: Record<string, 
 
   return {
     text: JSON.stringify({
-      result: `Replaced the image on ${path} with "${asset.originalName}". The change is live.`,
+      result: `Replaced the image on ${path} with "${asset.originalName.replace(new RegExp(`^${STUDIO_COPY_PREFIX}\\d+-`), "")}". The change is live.`,
       path,
       siteId: site.id,
       newSrc: nextUrl,
