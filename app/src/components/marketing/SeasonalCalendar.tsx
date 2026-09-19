@@ -363,16 +363,41 @@ function YearNavLink({ year, label, children }: { year: number; label: string; c
   );
 }
 
+/**
+ * The next 60 days, as a list of occasions worth a campaign.
+ *
+ * Each row is three things, and the first version ran them together into one
+ * sentence: the DATE (what anchors it), the OCCASION (why the date matters),
+ * and the IDEA (what to do about it). Reading "October Bank Holiday Autumn
+ * Reset Program — Bank holiday's a good marker to…" meant parsing a
+ * paragraph to find the one thing you scan for, which is how far away it is.
+ *
+ * So the date is a block, not a line of text, tinted with the season of the
+ * month it falls in — the same four tints the year grid below uses, so a row
+ * here and its month card down there read as the same thing. The idea gets
+ * its own line above its hook, and the hook is held to a readable measure
+ * instead of running the full width of the card.
+ */
 function ComingUpRail({ radar }: { radar: RadarSuggestion[] }) {
   return (
     <Card style={{ marginBottom: 28 }}>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-        <CardLabel>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: "4px 16px",
+          marginBottom: 6,
+        }}
+      >
+        <CardLabel style={{ marginBottom: 0 }}>
           <Radar size={11} style={{ display: "inline", verticalAlign: -1, marginRight: 6 }} />
           Coming up
         </CardLabel>
-        <span style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 10 }}>
-          Next 60 days, from today — independent of the year browsed below
+        {/* Worth saying once: paging the year below does not move this rail. */}
+        <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
+          Always the next 60 days, whichever year you browse below
         </span>
       </div>
 
@@ -382,32 +407,88 @@ function ComingUpRail({ radar }: { radar: RadarSuggestion[] }) {
         </p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column" }}>
-          {radar.map((r, i) => (
-            <div
-              key={r.dateId}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 16,
-                padding: "12px 0",
-                borderTop: i === 0 ? "none" : "1px solid var(--hairline)",
-                flexWrap: "wrap",
-              }}
-            >
-              <div style={{ minWidth: 128 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-primary)" }}>{r.dateName}</div>
-                <div style={{ fontSize: 11, color: "var(--text-tertiary)", fontFamily: "var(--font-mono), ui-monospace, monospace" }}>
-                  {fmtIso(r.dateIso)} · {daysAwayLabel(r.daysAway)}
+          {radar.map((r, i) => {
+            const tint = SEASON_TINT[seasonForMonth(Number(r.dateIso.slice(5, 7)))];
+            const [, mm, dd] = r.dateIso.split("-");
+            return (
+              <div
+                key={r.dateId}
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 16,
+                  padding: i === 0 ? "14px 0 4px" : "16px 0 4px",
+                  borderTop: i === 0 ? "none" : "1px solid var(--hairline)",
+                  flexWrap: "wrap",
+                }}
+              >
+                <div
+                  aria-hidden
+                  style={{
+                    flexShrink: 0,
+                    width: 52,
+                    padding: "7px 0 8px",
+                    textAlign: "center",
+                    borderRadius: "var(--radius)",
+                    background: tint.bg,
+                    border: `1px solid ${tint.border}`,
+                    fontFamily: "var(--font-mono), ui-monospace, monospace",
+                    lineHeight: 1.1,
+                  }}
+                >
+                  <div style={{ fontSize: 19, color: tint.fg, fontVariantNumeric: "tabular-nums" }}>
+                    {Number(dd)}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: "var(--text-tertiary)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.1em",
+                      marginTop: 3,
+                    }}
+                  >
+                    {MONTH_SHORT[Number(mm) - 1] ?? mm}
+                  </div>
+                </div>
+
+                <div style={{ flex: "1 1 240px", minWidth: 0 }}>
+                  <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginBottom: 3 }}>
+                    {/* The date block carries the day, so this line carries
+                        the two things it cannot: what the day IS, and how
+                        long you have to prepare for it. */}
+                    <span style={{ color: "var(--text-secondary)" }}>{r.dateName}</span>
+                    <span style={{ fontFamily: "var(--font-mono), ui-monospace, monospace" }}>
+                      {" · "}
+                      {daysAwayLabel(r.daysAway)}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 14.5, fontWeight: 600, color: "var(--text-primary)", lineHeight: 1.3 }}>
+                    {r.suggestionName}
+                  </div>
+                  <p
+                    style={{
+                      margin: "4px 0 0",
+                      fontSize: 13,
+                      color: "var(--text-secondary)",
+                      lineHeight: 1.5,
+                      maxWidth: "72ch",
+                    }}
+                  >
+                    {r.suggestionHook}
+                  </p>
+                </div>
+
+                <div style={{ flexShrink: 0, paddingTop: 2 }}>
+                  <BuildCampaignLink
+                    seedName={r.suggestionName}
+                    startsOn={r.dateIso}
+                    angle={r.suggestionHook}
+                  />
                 </div>
               </div>
-              <div style={{ flex: 1, minWidth: 220, fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.45 }}>
-                <strong style={{ color: "var(--text-primary)", fontWeight: 600 }}>{r.suggestionName}</strong>
-                {" — "}
-                {r.suggestionHook}
-              </div>
-              <BuildCampaignLink seedName={r.suggestionName} startsOn={r.dateIso} angle={r.suggestionHook} compact />
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </Card>
