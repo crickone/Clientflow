@@ -363,132 +363,328 @@ function YearNavLink({ year, label, children }: { year: number; label: string; c
   );
 }
 
+const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** ISO + n days, in UTC, same TZ discipline as fmtIso and seasonalCalendar.ts. */
+function isoAddDays(iso: string, n: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+function daysBetweenIso(fromIso: string, toIso: string): number {
+  const a = new Date(`${fromIso}T00:00:00Z`).getTime();
+  const b = new Date(`${toIso}T00:00:00Z`).getTime();
+  return Math.round((b - a) / 86400000);
+}
+
+/** "Mon 26 Oct" — the weekday matters when you are planning around a date. */
+function fmtIsoLong(iso: string): string {
+  const wd = WEEKDAY_SHORT[new Date(`${iso}T00:00:00Z`).getUTCDay()];
+  return `${wd} ${fmtIso(iso)}`;
+}
+
+const RUNWAY_DAYS = 60;
+
+/** The next 60 days cut into month-long pieces, each sized by how many of
+ *  its days fall inside the window. Months, not arbitrary ticks: they are
+ *  the unit the year grid below is built from, so the two read together. */
+function runwaySegments(todayIso: string): { month: number; days: number; season: Season }[] {
+  const out: { month: number; days: number; season: Season }[] = [];
+  let cursor = 0;
+  while (cursor <= RUNWAY_DAYS) {
+    const iso = isoAddDays(todayIso, cursor);
+    const year = Number(iso.slice(0, 4));
+    const month = Number(iso.slice(5, 7));
+    const lastIso = `${year}-${pad(month)}-${pad(daysInMonth(year, month))}`;
+    const lastOffset = Math.min(RUNWAY_DAYS, daysBetweenIso(todayIso, lastIso));
+    out.push({ month, days: lastOffset - cursor + 1, season: seasonForMonth(month) });
+    cursor = lastOffset + 1;
+  }
+  return out;
+}
+
 /**
- * The next 60 days, as a list of occasions worth a campaign.
+ * The runway: the next 60 days as a strip, today at the left edge, each
+ * occasion pinned where it actually falls.
  *
- * Each row is three things, and the first version ran them together into one
- * sentence: the DATE (what anchors it), the OCCASION (why the date matters),
- * and the IDEA (what to do about it). Reading "October Bank Holiday Autumn
- * Reset Program — Bank holiday's a good marker to…" meant parsing a
- * paragraph to find the one thing you scan for, which is how far away it is.
+ * This is the one thing a list of rows cannot say. The useful fact about the
+ * radar is not what is on it, it is the SHAPE of it — five clear weeks and
+ * then two things a fortnight apart is a different month's work from three
+ * dates stacked in one week, and you can only see that if position means
+ * time. It also retires a caption: a strip that starts at TODAY does not
+ * need a sentence explaining that paging the year below will not move it.
  *
- * So the date is a block, not a line of text, tinted with the season of the
- * month it falls in — the same four tints the year grid below uses, so a row
- * here and its month card down there read as the same thing. The idea gets
- * its own line above its hook, and the hook is held to a readable measure
- * instead of running the full width of the card.
+ * Tinted by season, per month, from the same four tints the year grid uses,
+ * so an occasion keeps one colour all the way down the page: its pin here,
+ * its countdown below, its month card in the grid.
  */
-function ComingUpRail({ radar }: { radar: RadarSuggestion[] }) {
+function Runway({ todayIso, radar }: { todayIso: string; radar: RadarSuggestion[] }) {
+  const segments = runwaySegments(todayIso);
   return (
-    <Card style={{ marginBottom: 28 }}>
+    <div style={{ margin: "18px 0 26px" }}>
+      <div style={{ position: "relative" }}>
+        <div style={{ display: "flex", gap: 3, height: 26 }}>
+          {segments.map((seg, i) => {
+            const tint = SEASON_TINT[seg.season];
+            return (
+              <div
+                key={`${seg.month}-${i}`}
+                style={{
+                  flexGrow: seg.days,
+                  flexBasis: 0,
+                  minWidth: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden",
+                  borderRadius: 5,
+                  background: tint.bg,
+                  border: `1px solid ${tint.border}`,
+                  fontFamily: "var(--font-mono), ui-monospace, monospace",
+                  fontSize: 9.5,
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  color: "var(--text-tertiary)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {MONTH_SHORT[seg.month - 1]}
+              </div>
+            );
+          })}
+        </div>
+
+        {radar.map((r) => {
+          const tint = SEASON_TINT[seasonForMonth(Number(r.dateIso.slice(5, 7)))];
+          // Clamped so a date sitting exactly on day 60 still draws inside
+          // the strip rather than half outside its right edge.
+          const pct = Math.min(99, Math.max(0.6, (r.daysAway / RUNWAY_DAYS) * 100));
+          return (
+            <div
+              key={r.dateId}
+              aria-hidden
+              style={{ position: "absolute", top: -4, left: `${pct}%`, transform: "translateX(-50%)" }}
+            >
+              <div style={{ width: 7, height: 7, borderRadius: 999, background: tint.fg, margin: "0 auto" }} />
+              <div style={{ width: 1.5, height: 30, background: tint.fg, opacity: 0.65, margin: "0 auto" }} />
+            </div>
+          );
+        })}
+      </div>
+
       <div
         style={{
           display: "flex",
-          alignItems: "baseline",
           justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: "4px 16px",
-          marginBottom: 6,
+          marginTop: 8,
+          fontFamily: "var(--font-mono), ui-monospace, monospace",
+          fontSize: 10,
+          letterSpacing: "0.14em",
+          textTransform: "uppercase",
+          color: "var(--text-tertiary)",
         }}
       >
+        <span>Today</span>
+        <span>+60 days</span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The countdown, in the page's display face. Words for the two days where a
+ * numeral would be silly, because "1 DAY" is how a spreadsheet says it.
+ *
+ * Plain ink, NOT the season tint. The first version coloured it, and for an
+ * autumn date that tint lands a shade off the brand orange — so the number,
+ * the pin and the button were all orange and the button stopped being the
+ * only thing to press. The season colour stays where it means something:
+ * on the runway, saying which month a date sits in.
+ */
+function Countdown({ daysAway }: { daysAway: number }) {
+  const colour = "var(--text-primary)";
+  const word = daysAway <= 0 ? "Today" : daysAway === 1 ? "Tomorrow" : null;
+  return (
+    <div style={{ flexShrink: 0, width: 92, textAlign: "center" }}>
+      {word ? (
+        <div
+          style={{
+            fontFamily: "var(--font-heading), sans-serif",
+            fontSize: 20,
+            textTransform: "uppercase",
+            letterSpacing: "-0.01em",
+            color: colour,
+            lineHeight: 1,
+            padding: "8px 0",
+          }}
+        >
+          {word}
+        </div>
+      ) : (
+        <>
+          <div
+            style={{
+              fontFamily: "var(--font-heading), sans-serif",
+              fontSize: 42,
+              lineHeight: 0.9,
+              letterSpacing: "-0.02em",
+              color: colour,
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {daysAway}
+          </div>
+          <div
+            style={{
+              fontFamily: "var(--font-mono), ui-monospace, monospace",
+              fontSize: 9.5,
+              letterSpacing: "0.16em",
+              textTransform: "uppercase",
+              color: "var(--text-tertiary)",
+              marginTop: 7,
+            }}
+          >
+            Days away
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The next 60 days, and what to do about them.
+ *
+ * Three versions in: a run-on sentence, then a tidy list of rows, and the
+ * list was the real problem. The radar holds at most five dates and usually
+ * ONE, so a list UI spends its whole life rendering a single row — which is
+ * why it read as unfinished no matter how the row was spaced.
+ *
+ * So it is not a list. It is a runway with the nearest occasion written out
+ * underneath it: the countdown is the number you actually came here for, in
+ * the display face the page titles use, and anything further out is a quiet
+ * line below rather than a second row of equal weight. Hierarchy by
+ * urgency, which is the only ordering a radar has.
+ */
+function ComingUpRail({ radar }: { radar: RadarSuggestion[] }) {
+  if (radar.length === 0) {
+    return (
+      <Card style={{ marginBottom: 28 }}>
         <CardLabel style={{ marginBottom: 0 }}>
           <Radar size={11} style={{ display: "inline", verticalAlign: -1, marginRight: 6 }} />
           Coming up
         </CardLabel>
-        {/* Worth saying once: paging the year below does not move this rail. */}
-        <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
-          Always the next 60 days, whichever year you browse below
-        </span>
-      </div>
-
-      {radar.length === 0 ? (
         <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "12px 0 0", lineHeight: 1.5 }}>
           Nothing on the radar in the next 60 days. Browse the year below for what&apos;s further out.
         </p>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          {radar.map((r, i) => {
-            const tint = SEASON_TINT[seasonForMonth(Number(r.dateIso.slice(5, 7)))];
-            const [, mm, dd] = r.dateIso.split("-");
-            return (
-              <div
-                key={r.dateId}
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: 16,
-                  padding: i === 0 ? "14px 0 4px" : "16px 0 4px",
-                  borderTop: i === 0 ? "none" : "1px solid var(--hairline)",
-                  flexWrap: "wrap",
-                }}
-              >
-                <div
-                  aria-hidden
-                  style={{
-                    flexShrink: 0,
-                    width: 52,
-                    padding: "7px 0 8px",
-                    textAlign: "center",
-                    borderRadius: "var(--radius)",
-                    background: tint.bg,
-                    border: `1px solid ${tint.border}`,
-                    fontFamily: "var(--font-mono), ui-monospace, monospace",
-                    lineHeight: 1.1,
-                  }}
-                >
-                  <div style={{ fontSize: 19, color: tint.fg, fontVariantNumeric: "tabular-nums" }}>
-                    {Number(dd)}
-                  </div>
-                  <div
+      </Card>
+    );
+  }
+
+  const [lead, ...rest] = radar;
+  // Derived from the lead rather than read off the clock: daysAway was
+  // measured against the radar's own "today", and two sources of now can
+  // disagree by a day at a midnight boundary.
+  const todayIso = isoAddDays(lead.dateIso, -lead.daysAway);
+
+  return (
+    <Card style={{ marginBottom: 28 }}>
+      <CardLabel style={{ marginBottom: 0 }}>
+        <Radar size={11} style={{ display: "inline", verticalAlign: -1, marginRight: 6 }} />
+        Coming up
+      </CardLabel>
+
+      <Runway todayIso={todayIso} radar={radar} />
+
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 20, flexWrap: "wrap" }}>
+        <Countdown daysAway={lead.daysAway} />
+
+        <div style={{ flex: "1 1 260px", minWidth: 0 }}>
+          <div
+            style={{
+              fontFamily: "var(--font-mono), ui-monospace, monospace",
+              fontSize: 10.5,
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              color: "var(--text-tertiary)",
+              marginBottom: 7,
+            }}
+          >
+            {lead.dateName}
+            <span style={{ color: "var(--text-tertiary)", opacity: 0.5 }}>{" / "}</span>
+            {fmtIsoLong(lead.dateIso)}
+          </div>
+          <div style={{ fontSize: 17, fontWeight: 600, color: "var(--text-primary)", lineHeight: 1.25 }}>
+            {lead.suggestionName}
+          </div>
+          <p
+            style={{
+              margin: "6px 0 0",
+              fontSize: 13,
+              color: "var(--text-secondary)",
+              lineHeight: 1.55,
+              maxWidth: "68ch",
+            }}
+          >
+            {lead.suggestionHook}
+          </p>
+        </div>
+
+        <div style={{ flexShrink: 0 }}>
+          <BuildCampaignLink seedName={lead.suggestionName} startsOn={lead.dateIso} angle={lead.suggestionHook} />
+        </div>
+      </div>
+
+      {rest.length > 0 && (
+        <div style={{ marginTop: 20, borderTop: "1px solid var(--hairline)", paddingTop: 14 }}>
+          <div
+            style={{
+              fontFamily: "var(--font-mono), ui-monospace, monospace",
+              fontSize: 9.5,
+              letterSpacing: "0.16em",
+              textTransform: "uppercase",
+              color: "var(--text-tertiary)",
+              marginBottom: 10,
+            }}
+          >
+            Then
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+            {rest.map((r) => {
+              const tint = SEASON_TINT[seasonForMonth(Number(r.dateIso.slice(5, 7)))];
+              return (
+                <div key={r.dateId} style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                  <span
                     style={{
-                      fontSize: 10,
-                      color: "var(--text-tertiary)",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.1em",
-                      marginTop: 3,
+                      flexShrink: 0,
+                      width: 92,
+                      textAlign: "center",
+                      fontFamily: "var(--font-mono), ui-monospace, monospace",
+                      fontSize: 11,
+                      color: tint.fg,
+                      fontVariantNumeric: "tabular-nums",
                     }}
                   >
-                    {MONTH_SHORT[Number(mm) - 1] ?? mm}
-                  </div>
-                </div>
-
-                <div style={{ flex: "1 1 240px", minWidth: 0 }}>
-                  <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginBottom: 3 }}>
-                    {/* The date block carries the day, so this line carries
-                        the two things it cannot: what the day IS, and how
-                        long you have to prepare for it. */}
-                    <span style={{ color: "var(--text-secondary)" }}>{r.dateName}</span>
-                    <span style={{ fontFamily: "var(--font-mono), ui-monospace, monospace" }}>
+                    {fmtIso(r.dateIso)}
+                  </span>
+                  <span style={{ flex: "1 1 240px", minWidth: 0, fontSize: 13, color: "var(--text-secondary)" }}>
+                    <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>{r.suggestionName}</span>
+                    <span style={{ color: "var(--text-tertiary)" }}>
                       {" · "}
-                      {daysAwayLabel(r.daysAway)}
+                      {r.dateName} · {daysAwayLabel(r.daysAway)}
                     </span>
-                  </div>
-                  <div style={{ fontSize: 14.5, fontWeight: 600, color: "var(--text-primary)", lineHeight: 1.3 }}>
-                    {r.suggestionName}
-                  </div>
-                  <p
-                    style={{
-                      margin: "4px 0 0",
-                      fontSize: 13,
-                      color: "var(--text-secondary)",
-                      lineHeight: 1.5,
-                      maxWidth: "72ch",
-                    }}
-                  >
-                    {r.suggestionHook}
-                  </p>
-                </div>
-
-                <div style={{ flexShrink: 0, paddingTop: 2 }}>
+                  </span>
                   <BuildCampaignLink
                     seedName={r.suggestionName}
                     startsOn={r.dateIso}
                     angle={r.suggestionHook}
+                    compact
                   />
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
     </Card>
