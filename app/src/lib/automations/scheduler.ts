@@ -104,10 +104,16 @@ async function runBirthdayForTenant(tenantId: number): Promise<number> {
  * request scope), mirroring runBirthdayForTenant above: resolve the tenant's
  * own DB by id and operate on it directly — never the request-scoped `db`
  * proxy, which publishDueScheduledPosts() itself is built to avoid.
- * v1 granularity: this only runs once/day (the daily tick below), so a post
- * scheduled for e.g. 9am may not actually go live until the next tick after
- * 8am UTC that day (or the following day's tick if scheduled after that).
- * Good enough for the current use case; revisit if same-day precision matters.
+ *
+ * NO LONGER THE PRIMARY PATH. The minute dispatch ticker
+ * (lib/dispatch/ticker.ts) publishes due posts now, so a post booked for 9am
+ * goes live at 9am. This once ran alone and only after 08:00 UTC, which meant
+ * that 9am post usually appeared the FOLLOWING morning — it was not due at
+ * 08:00 and nothing looked again that day.
+ *
+ * Kept as a backstop: publishDueScheduledPosts only matches rows still in
+ * publishState "scheduled", so running it twice cannot double-publish, and a
+ * ticker that has died should not leave posts stranded until someone notices.
  */
 function runBlogScheduleForTenant(tenantId: number): number {
   const tdb = getTenantDbById(tenantId);

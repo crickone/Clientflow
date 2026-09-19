@@ -9,6 +9,10 @@
 //   - email sends (lib/marketing/schedule): schedule/unschedule flip status
 //     and time; a due send whose precheck fails (no sending domain here)
 //     goes BACK to draft with the reason on its stats and the time cleared;
+//   - scheduled BLOG posts (lib/cms/blog via the ticker): a due post goes
+//     live through the TICKER, not merely through the library function —
+//     the function was always correct, and the bug was that the only thing
+//     calling it ran once a day;
 //   - the nurture sequence (lib/automations/nurture): a lead created on a
 //     campaign is enrolled with the default three messages spaced by their
 //     delays; only the due one is attempted; a lead marked lost is
@@ -169,6 +173,68 @@ const requireLocal = createRequire(import.meta.url);
       const later = upsertLead({ source: "landing", campaign: "Summer", firstName: "Off", email: "off@example.com" }).lead;
       assert.equal(nurture.listQueuedForLead(later.id).length, 0, "a disabled trigger enrols nobody");
     });
+
+    // ── scheduled blog posts go live ON THE MINUTE TICK ──
+    //
+    // publishDueScheduledPosts has always been correct and has its own unit
+    // test. The defect was upstream of it: the only caller was the DAILY
+    // scheduler, gated to after 08:00 UTC, so a post booked for 9am was not
+    // due at 08:00 and nothing looked again until the next morning. So this
+    // asserts against the ticker — the thing that actually runs — rather than
+    // against the function that was never the problem. Per-tenant, because
+    // runDispatchOnce walks every active business in the control plane.
+    const site = await runWithTenant(tid, async () =>
+      db.insert(schema.sites).values({ slug: "blog-tick", name: "Blog Tick" }).returning().get(),
+    );
+    const mkPost = async (title: string, state: "draft" | "scheduled", when: Date | null) =>
+      runWithTenant(tid, async () =>
+        db
+          .insert(schema.blogPosts)
+          .values({
+            title,
+            inputMode: "prompt",
+            content: "body",
+            status: "ready",
+            siteId: site.id,
+            slug: title.toLowerCase().replace(/\s+/g, "-"),
+            publishState: state,
+            scheduledFor: when,
+          })
+          .returning()
+          .get(),
+      );
+
+    const duePost = await mkPost("Due now", "scheduled", new Date(Date.now() - HOUR));
+    const futurePost = await mkPost("Not yet", "scheduled", new Date(Date.now() + DAY));
+    const draftPost = await mkPost("Just a draft", "draft", null);
+
+    const { runDispatchForTenant } = requireLocal("./ticker") as typeof import("./ticker");
+    const summary = await runDispatchForTenant(tid, "http://localhost:3000");
+    assert.equal(summary.blogsPublished, 1, "the tick reports publishing exactly the one due post");
+
+    const reload = async (id: number) =>
+      runWithTenant(tid, async () =>
+        db.select().from(schema.blogPosts).where(eq(schema.blogPosts.id, id)).get(),
+      );
+
+    const dueAfter = await reload(duePost.id);
+    assert.equal(dueAfter!.publishState, "published", "A DUE POST IS LIVE AFTER ONE TICK, not the next morning");
+    assert.ok(dueAfter!.publishedAt, "…with a published timestamp");
+    assert.equal(dueAfter!.scheduledFor, null, "…and its schedule cleared");
+
+    assert.equal((await reload(futurePost.id))!.publishState, "scheduled", "a future post is left alone");
+    assert.equal((await reload(draftPost.id))!.publishState, "draft", "a draft is never published by the tick");
+
+    // Idempotent: the daily scheduler still calls the same function as a
+    // backstop, so a second pass must not touch anything it already did.
+    const publishedAt = dueAfter!.publishedAt!.getTime();
+    const second = await runDispatchForTenant(tid, "http://localhost:3000");
+    assert.equal(second.blogsPublished, 0, "a second tick finds nothing due");
+    assert.equal(
+      (await reload(duePost.id))!.publishedAt!.getTime(),
+      publishedAt,
+      "a second tick does not re-publish or re-stamp an already published post",
+    );
 
     console.log("dispatch.test.ts: all assertions passed");
   } finally {
