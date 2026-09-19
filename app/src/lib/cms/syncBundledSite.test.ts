@@ -176,7 +176,9 @@ const page = (key: string, body: string) => ({
     // the seed may create what is missing and must NEVER touch what exists.
     // That is the entire safety story for carrying 22 articles across from a
     // site we are replacing, so it is the thing to assert.
-    const writePosts = (posts: Array<{ slug: string; title: string; content: string }>) =>
+    const writePosts = (
+      posts: Array<{ slug: string; title: string; content: string; coverImageUrl?: string | null }>,
+    ) =>
       fs.writeFileSync(
         path.join(SANDBOX, "public", "sites", "inspire", "_posts.json"),
         JSON.stringify({
@@ -185,7 +187,7 @@ const page = (key: string, body: string) => ({
             excerpt: `${p.slug} excerpt`,
             seoTitle: `${p.title} | SEO`,
             seoDescription: "",
-            coverImageUrl: null,
+            coverImageUrl: p.coverImageUrl ?? null,
             sourceUrl: `https://old.example/${p.slug}`,
           })),
         }),
@@ -236,6 +238,48 @@ const page = (key: string, body: string) => ({
       3,
       "three posts in total — nothing duplicated",
     );
+
+    // ── FILLING A BLANK IS NOT OVERWRITING ────────────────────────────────
+    // The first import dropped every cover image (the source site used its
+    // logo as the og:image for all 22 articles) and the real pictures were
+    // found later. Pure create-only would have meant they could never reach
+    // posts that already existed — a blog stuck as a wall of text forever.
+    // So an EMPTY field may be filled, while anything written stays put.
+    const coverOf = (slug: string) =>
+      (
+        sqlite.prepare("SELECT cover_image_url c FROM blog_posts WHERE site_id=? AND slug=?").get(sid, slug) as
+          | { c: string | null }
+          | undefined
+      )?.c ?? null;
+
+    assert.equal(coverOf("second-post"), null, "starts with no cover");
+    // Same bodies as the posts already in the database — a differing body is
+    // the signal that a human has edited it, and would exempt the post.
+    writePosts([
+      { slug: "first-post", title: "First post", content: "# First\n\nHello, revised.", coverImageUrl: "/img/one.jpg" },
+      { slug: "second-post", title: "Second post", content: "# Second\n\nAlso hello.", coverImageUrl: "/img/two.jpg" },
+      { slug: "third-post", title: "Third post", content: "# Third\n\nBrand new.", coverImageUrl: "/img/three.jpg" },
+    ]);
+    syncBundledSites();
+
+    assert.equal(coverOf("second-post"), "/img/two.jpg", "A BLANK COVER IS FILLED IN");
+    assert.equal(postRow("second-post")!.title, "Second post", "…and the title is untouched");
+    assert.equal(
+      postRow("first-post")!.title,
+      "The client retitled this",
+      "a post whose writing has changed is exempt, even from filling a blank",
+    );
+    assert.equal(coverOf("first-post"), null, "…nothing at all is written to it");
+
+    // A cover that is already set is never replaced.
+    sqlite
+      .prepare("UPDATE blog_posts SET cover_image_url='/img/chosen-by-hand.jpg' WHERE site_id=? AND slug='third-post'")
+      .run(sid);
+    writePosts([
+      { slug: "third-post", title: "Third post", content: "# Third\n\nBrand new.", coverImageUrl: "/img/different.jpg" },
+    ]);
+    syncBundledSites();
+    assert.equal(coverOf("third-post"), "/img/chosen-by-hand.jpg", "A FIELD THAT HAS A VALUE IS NEVER OVERWRITTEN");
 
     // A post with no slug, title or content is skipped rather than inserted
     // as a broken row. The Inspire blog already had one of those.

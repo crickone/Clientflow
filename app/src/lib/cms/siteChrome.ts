@@ -110,31 +110,63 @@ export function getSiteChrome(db: TenantDb, siteId: number): SiteChrome {
  * globally for navigation, which is right there and wrong in an article.
  */
 export const CHROME_CONTENT_CSS = `
-.cms-shell{max-width:860px;margin:0 auto;padding:clamp(72px,11vw,150px) 22px clamp(72px,10vw,130px)}
-.cms-shell>*+*{margin-top:1.1em}
+/* Layout only. The site's own stylesheet is already on the page and owns the
+   palette and the typefaces; anything named here would be a guess and wrong
+   on half the platform. What a bespoke marketing site has never had is a
+   TEXT page and a LIST page, so that is what this provides: measure, rhythm,
+   and a grid. Sizes are clamped rather than stepped, so every width between
+   the breakpoints is designed for, not just the three anyone tests. */
+.cms-shell{max-width:1180px;margin:0 auto;padding:clamp(56px,9vw,120px) clamp(18px,4vw,40px) clamp(64px,9vw,120px)}
+.cms-shell--narrow{max-width:760px}
+
+/* Page heading. The site styles h1 for a hero, where the size comes from a
+   utility class the CMS has no business borrowing, so the scale is set here. */
+.cms-head{margin:0 0 clamp(28px,4vw,52px)}
+.cms-head h1{font-size:clamp(38px,7vw,76px);line-height:1.02;margin:0}
+.cms-head p{margin:.7em 0 0;max-width:52ch;opacity:.75;line-height:1.6}
+
+/* The index: three across, then two, then one. */
+.cms-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(24px,3vw,38px);list-style:none;padding:0;margin:0}
+@media(max-width:1000px){.cms-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.cms-grid{grid-template-columns:1fr;gap:30px}}
+
+.cms-card{height:100%}
+.cms-card a{display:flex;flex-direction:column;height:100%;text-decoration:none;color:inherit}
+.cms-card__media{aspect-ratio:3/2;overflow:hidden;border-radius:10px;margin-bottom:14px}
+.cms-card__media img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .6s cubic-bezier(.2,.7,.3,1)}
+.cms-card a:hover .cms-card__media img{transform:scale(1.04)}
+.cms-card h2{font-size:clamp(19px,2vw,23px);line-height:1.25;margin:0 0 .35em}
+.cms-card time{display:block;font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;opacity:.55;margin-bottom:.55em}
+.cms-card p{margin:0;font-size:15px;line-height:1.6;opacity:.78}
+/* A card with no picture keeps its place in the row rather than collapsing. */
+.cms-card__media--empty{aspect-ratio:3/2;border-radius:10px;margin-bottom:14px;border:1px solid currentColor;opacity:.13}
+
+/* A post. */
 .cms-prose{line-height:1.75;font-size:17px}
-.cms-prose h2{margin:1.9em 0 .55em;line-height:1.15}
-.cms-prose h3{margin:1.5em 0 .45em;line-height:1.2}
+.cms-prose h2{font-size:clamp(23px,2.6vw,30px);margin:1.9em 0 .55em;line-height:1.18}
+.cms-prose h3{font-size:clamp(19px,2.1vw,23px);margin:1.5em 0 .45em;line-height:1.25}
 .cms-prose p,.cms-prose ul,.cms-prose ol,.cms-prose blockquote{margin:0 0 1.15em}
 .cms-prose ul,.cms-prose ol{padding-left:1.35em}
 .cms-prose li{margin:.35em 0}
-.cms-prose img{max-width:100%;height:auto;border-radius:8px;display:block;margin:1.8em 0}
+.cms-prose img{max-width:100%;height:auto;border-radius:10px;display:block;margin:1.9em 0}
 .cms-prose a{text-decoration:underline;text-underline-offset:3px}
 .cms-prose blockquote{padding-left:1em;border-left:2px solid currentColor;opacity:.85}
-.cms-list{display:grid;gap:clamp(26px,4vw,40px)}
-.cms-list a{text-decoration:none;color:inherit;display:block}
-.cms-list h2{margin:0 0 .3em;line-height:1.15}
-.cms-list time{display:block;font-size:13px;opacity:.6;margin-bottom:.5em}
-.cms-list p{margin:0;opacity:.85;line-height:1.6}
-.cms-list article{padding-bottom:clamp(26px,4vw,40px);border-bottom:1px solid currentColor;border-color:color-mix(in srgb, currentColor 18%, transparent)}
-.cms-list li:last-child article{border-bottom:0}
-.cms-back{display:inline-block;font-size:14px;opacity:.7;text-decoration:none}
+.cms-hero{width:100%;aspect-ratio:16/9;max-height:460px;overflow:hidden;border-radius:12px;margin:26px 0 8px}
+.cms-hero img{width:100%;height:100%;object-fit:cover;display:block}
+.cms-meta{display:block;font-size:13px;letter-spacing:.06em;text-transform:uppercase;opacity:.6;margin-top:.6em}
+.cms-back{display:inline-block;font-size:13.5px;letter-spacing:.04em;opacity:.7;text-decoration:none;margin-bottom:1.6em}
 .cms-back:hover{opacity:1}
+
 /* Keyboard focus has to be visible. These designs strip underlines from
    links for navigation, and a site that never had a list of article links
    has no rule covering them — so without this, tabbing through the blog
    moves an invisible cursor. currentColor keeps it in the site's palette
    rather than introducing one. */
-.cms-shell a:focus-visible{outline:2px solid currentColor;outline-offset:3px;border-radius:2px}
+.cms-shell a:focus-visible{outline:2px solid currentColor;outline-offset:3px;border-radius:3px}
+
+@media(prefers-reduced-motion:reduce){
+  .cms-card__media img{transition:none}
+  .cms-card a:hover .cms-card__media img{transform:none}
+}
 @media(max-width:600px){.cms-prose{font-size:16px}}
 `;

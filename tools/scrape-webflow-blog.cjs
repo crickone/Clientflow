@@ -19,7 +19,12 @@
  * output rather than guessed at in advance:
  *
  *   - every post's og:image was the site LOGO, so importing covers verbatim
- *     would have given 25 identical logo cards. --drop-cover discards them.
+ *     would have given 25 identical logo cards. --drop-cover discards them,
+ *     and the REAL cover is read off the index instead: the card image sits
+ *     immediately before its own post link, which is the only place on the
+ *     whole site where each article's hero is unambiguously its own. (A post
+ *     page cannot be used — it carries a "related posts" strip holding every
+ *     other article's image too.)
  *   - images live on the old host's CDN and die when that site is taken down,
  *     so --assets downloads them and rewrites the links.
  *   - internal links pointed at the old absolute domain; they are rewritten to
@@ -41,8 +46,10 @@ const ROOT = path.resolve(__dirname, "..");
 // other tools in here.
 const sharp = require(path.join(ROOT, "app", "node_modules", "sharp"));
 
-/** Widest an in-article image needs to be; the CDN serves originals at 4096px. */
+/** Widest an image needs to be here; the CDN serves originals up to 6000px. */
 const MAX_IMAGE_WIDTH = 1600;
+/** Above this, re-encode even a correctly-sized image. */
+const MAX_IMAGE_BYTES = 400 * 1024;
 
 const arg = (name, def) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -190,6 +197,36 @@ if (reportFile) {
   console.log(`${slugs.length} posts linked from ${indexUrl}\n`);
 
   /**
+   * Each card's hero image, taken from the index in document order: an image
+   * belongs to the next post link that follows it, unless another image gets
+   * there first. Anchoring on position rather than a class name keeps this
+   * working on a differently-themed export of the same CMS.
+   *
+   * `src` deliberately, not the widest entry in `srcset` — these originals
+   * run to 6000px, and the resize on the way in would only throw that away.
+   */
+  const coverBySlug = new Map();
+  {
+    const marks = [];
+    for (const m of index.matchAll(/<img\b[^>]*\bsrc="(https:\/\/[^"]+)"[^>]*>/gi)) {
+      marks.push({ at: m.index ?? 0, kind: "img", value: m[1] });
+    }
+    for (const m of index.matchAll(new RegExp(`href="${prefix}([^"#?]+)"`, "gi"))) {
+      marks.push({ at: m.index ?? 0, kind: "link", value: m[1] });
+    }
+    marks.sort((a, b) => a.at - b.at);
+    let pending = null;
+    for (const mark of marks) {
+      if (mark.kind === "img") pending = mark.value;
+      else if (pending && !coverBySlug.has(mark.value)) {
+        coverBySlug.set(mark.value, pending);
+        pending = null;
+      }
+    }
+    console.log(`${coverBySlug.size} card images matched to posts on the index\n`);
+  }
+
+  /**
    * Bring an image onto our own host. An article that keeps pointing at the
    * old site's CDN looks fine right up until that site is switched off, which
    * is the whole point of this migration.
@@ -214,9 +251,25 @@ if (reportFile) {
       let note = `${(original.length / 1024).toFixed(0)} KB`;
       try {
         const meta = await sharp(original).metadata();
-        if (meta.width && meta.width > MAX_IMAGE_WIDTH) {
-          out = await sharp(original).resize({ width: MAX_IMAGE_WIDTH }).jpeg({ quality: 82 }).toBuffer();
-          note = `${meta.width}px ${(original.length / 1024).toFixed(0)} KB -> ${MAX_IMAGE_WIDTH}px ${(out.length / 1024).toFixed(0)} KB`;
+        const tooWide = Boolean(meta.width && meta.width > MAX_IMAGE_WIDTH);
+        // Width alone is not enough: one card image was a correctly-sized
+        // PNG weighing 1.5 MB, which costs a visitor more than a 6000px JPEG
+        // that gets resized. Judge by what actually crosses the wire.
+        const tooHeavy = original.length > MAX_IMAGE_BYTES;
+        if (tooWide || tooHeavy) {
+          const pipeline = sharp(original);
+          if (tooWide) pipeline.resize({ width: MAX_IMAGE_WIDTH });
+          const encoded = await pipeline.jpeg({ quality: 82 }).toBuffer();
+          // Only keep the re-encode if it actually helped; a small PNG of flat
+          // colour can come out BIGGER as a JPEG.
+          if (encoded.length < original.length) {
+            out = encoded;
+            note =
+              `${meta.width ?? "?"}px ${(original.length / 1024).toFixed(0)} KB -> ` +
+              `${tooWide ? MAX_IMAGE_WIDTH : (meta.width ?? "?")}px ${(out.length / 1024).toFixed(0)} KB`;
+          } else {
+            note = `${(original.length / 1024).toFixed(0)} KB (re-encode was larger, kept original)`;
+          }
         }
       } catch {
         // Not something sharp understands (an SVG, say) — keep the original.
@@ -279,7 +332,10 @@ if (reportFile) {
       }
       const firstPara = content.split("\n\n").find((b) => !b.startsWith("#") && !b.startsWith("!") && b.length > 60);
 
-      const cover = ogImage || firstImg || null;
+      // The index's card image first: it is the one picture chosen FOR this
+      // article. og:image is the fallback, and on this site it is the logo.
+      const fromIndex = coverBySlug.get(slug) || null;
+      const cover = fromIndex || ogImage || firstImg || null;
       const coverIsBoilerplate = Boolean(dropCover && cover && cover.toLowerCase().includes(dropCover.toLowerCase()));
 
       posts.push({

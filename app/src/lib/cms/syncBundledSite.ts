@@ -92,13 +92,33 @@ const postsRevKey = (slug: string) => `site_posts_rev_${slug}`;
  * tools/scrape-webflow-blog.cjs when a client's writing is carried across
  * from the site we are replacing.
  *
- * CREATE ONLY, and that is the important difference from the page sync above.
- * A bespoke page's source of truth is the repo, so it is upserted. A blog post
- * is the client's own writing: they will edit it, retitle it, add to it. So a
- * post whose slug already exists is left completely alone, forever — this
- * migrates what is missing and never overwrites what is there. There is no
- * Studio-edit guard because it needs none: nothing here can overwrite
- * anything.
+ * CREATE, OR FILL A BLANK. Never overwrite. That is the important difference
+ * from the page sync above: a bespoke page's source of truth is the repo, so
+ * it is upserted, but a blog post is the client's own writing — they will
+ * edit it, retitle it, add to it.
+ *
+ * So a post whose slug already exists keeps its title and its body, always.
+ * What the seed may still do is fill a field that is EMPTY: a cover image, an
+ * excerpt, an SEO title or description. That is not a compromise of the rule,
+ * it is the rule applied to a field rather than a row — writing into a blank
+ * takes nothing away from anyone.
+ *
+ * It earned its keep immediately. The first import dropped every cover, since
+ * the source site used its own logo as the og:image for all 22 articles; the
+ * real card images were found later on the index page. Without blank-filling,
+ * pure create-only would have meant those pictures could never reach posts
+ * that already existed, and the client's blog would have stayed a wall of
+ * text forever.
+ *
+ * A post anyone has touched is exempt even from blank-filling: an empty
+ * excerpt on an edited post may well be deliberate.
+ *
+ * "Touched" is decided by comparing the stored body with the bundle's,
+ * because blog_posts has no `updated_by` column — that lives on
+ * content_blocks, and assuming otherwise is what made the first version of
+ * this throw. The comparison is a better signal anyway: it asks whether the
+ * writing has actually changed since it was imported, which is the thing
+ * that matters, rather than whether a row was saved at some point.
  *
  * Posts arrive PUBLISHED, matching the state they are in on the site being
  * replaced. A launch that silently turned 22 live articles into drafts would
@@ -123,7 +143,10 @@ function seedBundledPosts(siteSlug: string): void {
   const { sqlite } = openTenantDb(served.dbFile);
   const sid = served.siteId;
 
-  const exists = sqlite.prepare("SELECT id FROM blog_posts WHERE site_id = ? AND slug = ?");
+  const exists = sqlite.prepare(
+    `SELECT id, content, cover_image_url, excerpt, seo_title, seo_description
+       FROM blog_posts WHERE site_id = ? AND slug = ?`,
+  );
   const insert = sqlite.prepare(
     `INSERT INTO blog_posts
        (title, input_mode, target_words, content, status, site_id, slug, excerpt,
@@ -132,9 +155,52 @@ function seedBundledPosts(siteSlug: string): void {
   );
 
   const created: string[] = [];
+  const filled: string[] = [];
+
+  /** A field worth filling: absent, or present but empty. */
+  const blank = (v: unknown) => v == null || String(v).trim() === "";
+
   sqlite.transaction(() => {
     for (const post of posts) {
-      if (exists.get(sid, post.slug)) continue; // the client's copy wins, always
+      const row = exists.get(sid, post.slug) as
+        | {
+            id: number;
+            content: string | null;
+            cover_image_url: string | null;
+            excerpt: string | null;
+            seo_title: string | null;
+            seo_description: string | null;
+          }
+        | undefined;
+
+      if (row) {
+        // The writing has changed since it was imported, so a human has been
+        // here. Leave every part of the post alone, blanks included.
+        if ((row.content ?? "").trim() !== post.content.trim()) continue;
+
+        const set: string[] = [];
+        const values: unknown[] = [];
+        const fill = (column: string, current: unknown, next: string | null) => {
+          if (blank(current) && !blank(next)) {
+            set.push(`${column} = ?`);
+            values.push(next);
+          }
+        };
+        fill("cover_image_url", row.cover_image_url, post.coverImageUrl);
+        fill("excerpt", row.excerpt, post.excerpt);
+        fill("seo_title", row.seo_title, post.seoTitle || post.title);
+        fill("seo_description", row.seo_description, post.seoDescription || post.excerpt);
+
+        if (set.length > 0) {
+          values.push(Date.now(), sid, row.id);
+          sqlite
+            .prepare(`UPDATE blog_posts SET ${set.join(", ")}, updated_at = ? WHERE site_id = ? AND id = ?`)
+            .run(...values);
+          filled.push(post.slug);
+        }
+        continue;
+      }
+
       const now = Date.now();
       insert.run(
         post.title,
@@ -159,7 +225,8 @@ function seedBundledPosts(siteSlug: string): void {
   console.log(
     `[syncBundledSite] '${siteSlug}' blog rev ${rev} -> tenant ${served.tenantSlug}#${served.tenantId} ` +
       `site #${sid}: ${created.length} of ${posts.length} post(s) created` +
-      (created.length === 0 ? " (all already present)" : ""),
+      (filled.length ? `, ${filled.length} had blank fields filled` : "") +
+      (created.length === 0 && filled.length === 0 ? " (all already present and complete)" : ""),
   );
 }
 

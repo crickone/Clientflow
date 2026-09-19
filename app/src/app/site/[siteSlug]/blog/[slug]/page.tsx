@@ -97,16 +97,15 @@ export default function PublicBlogPost({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <main className="cms-shell">
+      <main className="cms-shell cms-shell--narrow">
         <a className="cms-back" href={`${base}/blog`}>
           &larr; Back to blog
         </a>
-        <h1>{post.title}</h1>
+        <h1 style={{ fontSize: "clamp(31px,4.6vw,52px)", lineHeight: 1.08, margin: 0 }}>
+          {post.title}
+        </h1>
         {post.publishedAt && (
-          <time
-            dateTime={new Date(post.publishedAt).toISOString()}
-            style={{ display: "block", fontSize: 14, opacity: 0.65 }}
-          >
+          <time className="cms-meta" dateTime={new Date(post.publishedAt).toISOString()}>
             {new Date(post.publishedAt).toLocaleDateString("en-IE", {
               year: "numeric",
               month: "long",
@@ -115,26 +114,12 @@ export default function PublicBlogPost({
           </time>
         )}
         {post.coverImageUrl && (
-          <div
-            style={{
-              width: "100%",
-              aspectRatio: post.coverAspect ?? "16 / 9",
-              maxHeight: 460,
-              overflow: "hidden",
-              borderRadius: 12,
-            }}
-          >
+          <div className="cms-hero" style={{ aspectRatio: post.coverAspect ?? undefined }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={post.coverImageUrl}
-              alt={post.title}
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-                objectPosition: post.coverPosition ?? "50% 50%",
-                display: "block",
-              }}
+              alt=""
+              style={{ objectPosition: post.coverPosition ?? "50% 50%" }}
             />
           </div>
         )}

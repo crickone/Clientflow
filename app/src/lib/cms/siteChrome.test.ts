@@ -133,6 +133,36 @@ const HOME_BODY = [
     assert.match(CHROME_CONTENT_CSS, /currentColor/, "…borders defer to the inherited colour");
     assert.match(CHROME_CONTENT_CSS, /max-width/, "…what it DOES set is measure and rhythm");
 
+    // ── the index is a GRID, and it responds at every width ───────────────
+    // Asked for explicitly: three across on desktop, and usable on every
+    // breakpoint rather than the three someone happens to test.
+    assert.match(CHROME_CONTENT_CSS, /\.cms-grid\{[^}]*grid-template-columns:repeat\(3,/, "three across by default");
+    const narrower = CHROME_CONTENT_CSS.match(/@media\(max-width:(\d+)px\)\{\.cms-grid\{grid-template-columns:repeat\(2,/);
+    assert.ok(narrower, "…dropping to two columns at a stated width");
+    const single = CHROME_CONTENT_CSS.match(/@media\(max-width:(\d+)px\)\{\.cms-grid\{grid-template-columns:1fr/);
+    assert.ok(single, "…and to one on a phone");
+    assert.ok(
+      Number(single![1]) < Number(narrower![1]),
+      "the single-column breakpoint is narrower than the two-column one — otherwise one never applies",
+    );
+
+    // minmax(0,1fr), not 1fr: a long unbroken word in a title otherwise
+    // widens its track and knocks the row out of alignment.
+    assert.match(CHROME_CONTENT_CSS, /repeat\(3,minmax\(0,1fr\)\)/, "columns cannot be stretched by their content");
+
+    // Clamped sizing means every width between breakpoints is designed for.
+    assert.ok((CHROME_CONTENT_CSS.match(/clamp\(/g) || []).length >= 6, "sizes scale fluidly, not in steps");
+
+    // A card's picture must hold its shape, or rows of different-sized
+    // photographs stagger.
+    assert.match(CHROME_CONTENT_CSS, /\.cms-card__media\{[^}]*aspect-ratio:3\/2/, "card images share one aspect ratio");
+    assert.match(CHROME_CONTENT_CSS, /\.cms-card__media img\{[^}]*object-fit:cover/, "…and crop rather than distort");
+    assert.match(CHROME_CONTENT_CSS, /\.cms-card__media--empty\{[^}]*aspect-ratio:3\/2/, "a card with no picture keeps the row aligned");
+
+    // Motion is opt-out.
+    assert.match(CHROME_CONTENT_CSS, /@media\(prefers-reduced-motion:reduce\)/, "the hover zoom respects reduced motion");
+    assert.match(CHROME_CONTENT_CSS, /:focus-visible/, "keyboard focus stays visible");
+
     console.log("siteChrome.test.ts: all assertions passed");
   } finally {
     process.chdir(ORIGINAL_CWD);
