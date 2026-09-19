@@ -37,8 +37,8 @@ export const MODEL_CATALOG: ModelChoice[] = [
     note: "Balanced default — best all-round tool use.",
   },
   {
-    id: "claude-opus-4-8",
-    label: "Opus 4.8",
+    id: "claude-opus-5",
+    label: "Opus 5",
     provider: "anthropic",
     note: "Most capable — for the hardest tasks.",
   },
@@ -124,8 +124,18 @@ export const MODEL_CATALOG: ModelChoice[] = [
 ];
 
 /** id -> label, falling back to the raw id for anything not in the catalog (e.g. a legacy or hand-set model). Never throws. */
+/**
+ * Models no longer offered, but which an agent's stored `model` may still
+ * name until the tenant migration reaches their database. Labelled so the UI
+ * reads "Opus 4.8" rather than a raw id — a retired model is still worth
+ * naming plainly to whoever is looking at it.
+ */
+const RETIRED_LABELS: Record<string, string> = {
+  "claude-opus-4-8": "Opus 4.8",
+};
+
 export function modelLabel(id: string): string {
-  return MODEL_CATALOG.find((m) => m.id === id)?.label ?? id;
+  return MODEL_CATALOG.find((m) => m.id === id)?.label ?? RETIRED_LABELS[id] ?? id;
 }
 
 /** True iff `id` is one of the ids above — the single predicate the picker and `updateAgentModel`'s allowlist both rely on. */

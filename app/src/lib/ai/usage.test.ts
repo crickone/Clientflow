@@ -41,14 +41,17 @@ import { MODELS } from "./client";
     assert.equal(getMonthlyUsageCents(tid), 0, "no usage recorded yet");
     assert.doesNotThrow(() => assertUnderCap(tid), "0 spend is under the cap");
 
-    // 1,000,000 output tokens on sonnet ($15/1M out, list price) -> 1500c
-    recordUsage(tid, "sales", MODELS.sonnet, { inputTokens: 0, outputTokens: 1_000_000 });
+    // 1,500,000 output tokens on sonnet ($10/1M out, list price) -> 1500c.
+    // The COUNT moved when Sonnet 5's price was corrected from the Sonnet
+    // 4.x rate; the cost deliberately did not, so the cap arithmetic below
+    // reads exactly as before and the price change stays in one place.
+    recordUsage(tid, "sales", MODELS.sonnet, { inputTokens: 0, outputTokens: 1_500_000 });
     const afterFirst = getMonthlyUsageCents(tid);
     assert.ok(Math.abs(afterFirst - 1500) < 0.01, `expected ~1500c, got ${afterFirst}`);
     assert.doesNotThrow(() => assertUnderCap(tid), "1500c is under the $25 cap");
 
-    // +1,000,000 output tokens again -> +1500c = 3000c, at/over MONTHLY_CAP_CENTS (2500)
-    recordUsage(tid, "sales", MODELS.sonnet, { inputTokens: 0, outputTokens: 1_000_000 });
+    // +1500c = 3000c, at/over MONTHLY_CAP_CENTS (2500)
+    recordUsage(tid, "sales", MODELS.sonnet, { inputTokens: 0, outputTokens: 1_500_000 });
     const afterSecond = getMonthlyUsageCents(tid);
     assert.ok(
       afterSecond >= MONTHLY_CAP_CENTS,
@@ -127,9 +130,9 @@ import { MODELS } from "./client";
     // Unset -> assertUnderCap falls back to the DEFAULT MONTHLY_CAP_CENTS.
     assert.equal(getTenantCapCents(tid2), MONTHLY_CAP_CENTS, "no tenant_ai_cap row -> reads the default");
 
-    // Same math the top-of-file test already proved: 1,000,000 sonnet output
+    // Same math the top-of-file test already proved: 1,500,000 sonnet output
     // tokens -> ~1500c — comfortably under the $25 default, nowhere near it.
-    recordUsage(tid2, "sales", MODELS.sonnet, { inputTokens: 0, outputTokens: 1_000_000 });
+    recordUsage(tid2, "sales", MODELS.sonnet, { inputTokens: 0, outputTokens: 1_500_000 });
     const spend = getMonthlyUsageCents(tid2);
     assert.ok(spend > 0 && spend < MONTHLY_CAP_CENTS, `expected spend under the ${MONTHLY_CAP_CENTS}c default, got ${spend}`);
     assert.doesNotThrow(() => assertUnderCap(tid2), "spend under the DEFAULT cap doesn't throw");

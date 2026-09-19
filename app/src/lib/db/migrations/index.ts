@@ -254,6 +254,16 @@ export const TENANT_MIGRATIONS: Migration[] = [
         .run();
     },
   },
+  {
+    id: "0006-opus-5",
+    description:
+      "Move agents pinned to Opus 4.8 onto Opus 5. Opus 4.8 is legacy now and no longer offered in the picker, so an agent still naming it would show an empty model selector and sit on an older model nobody chose. Opus 5 is its direct successor at the same price ($5/$25 per MTok), so this changes capability upward and cost not at all. Deliberately scoped to that exact id: an agent on Sonnet, Haiku or an OpenRouter model is left alone, because moving somebody off a model they picked is a different act entirely.",
+    up: (sqlite) => {
+      sqlite
+        .prepare("UPDATE agents SET model = 'claude-opus-5' WHERE model = 'claude-opus-4-8'")
+        .run();
+    },
+  },
 ];
 
 /**

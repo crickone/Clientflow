@@ -100,7 +100,12 @@ const requireLocal = createRequire(import.meta.url);
   try {
     // ── over-cap: assertUnderCap trips before any network call ──
     // 2,000,000 output tokens on sonnet ($15/1M out) -> 3000c, over the 2500c cap.
-    recordUsage(tid, "sales", MODELS.sonnet, { inputTokens: 0, outputTokens: 2_000_000 });
+    // 3M sonnet output tokens at $10/1M = 3000c, over the 2500c cap. The
+    // count rose when Sonnet 5's price was corrected from the Sonnet 4.x
+    // rate: at the new price 2M tokens comes to 2000c and no longer trips
+    // the cap, so the test would have sailed past the very branch it exists
+    // to cover and failed further downstream on something unrelated.
+    recordUsage(tid, "sales", MODELS.sonnet, { inputTokens: 0, outputTokens: 3_000_000 });
 
     await assert.rejects(
       () => draftFollowup({ lead, history, tenantId: tid }),

@@ -1,11 +1,21 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 
-/** Gym-facing model tiers. FABLE IS DELIBERATELY EXCLUDED (cost). */
+/**
+ * Gym-facing model tiers.
+ *
+ * FABLE IS DELIBERATELY EXCLUDED (cost): at $10/$50 per million tokens it is
+ * five times Sonnet, and nothing a gym asks for needs it. Still true as of
+ * Fable 5.1 — revisit only if a tenant has a job Opus genuinely cannot do.
+ *
+ * Verified against platform.claude.com/docs/en/docs/about-claude/models/overview
+ * on 2026-09-19: Sonnet 5 and Haiku 4.5 are current; Opus 4.8 is legacy and
+ * Opus 5 replaces it.
+ */
 export const MODELS = {
   haiku: "claude-haiku-4-5-20251001",
   sonnet: "claude-sonnet-5",
-  opus: "claude-opus-4-8",
+  opus: "claude-opus-5",
 } as const;
 export type ModelTier = keyof typeof MODELS;
 export const DEFAULT_AGENT_MODEL: ModelTier = "sonnet";
@@ -21,11 +31,27 @@ export const DEFAULT_AGENT_MODEL: ModelTier = "sonnet";
  */
 export const CONTENT_MODEL: string = MODELS.sonnet;
 
-/** List price in CENTS per 1,000,000 tokens. */
+/**
+ * List price in CENTS per 1,000,000 tokens.
+ *
+ * Checked against the published table on 2026-09-19. Sonnet 5 was priced
+ * here at $3/$15 — the Sonnet 4.x rate. It is $2/$10, and has been since
+ * Sonnet 5 shipped, so every tenant's metered spend on the platform's
+ * busiest model (CONTENT_MODEL, below) was running 50% high and their
+ * monthly cap tripping a third early. Recorded usage is not restated; this
+ * only corrects what is metered from here on.
+ *
+ * Superseded ids are kept: a tenant's `agents.model` may still name one
+ * until the migration reaches their database, and an unpriced id would fall
+ * through to the default rate rather than fail loudly.
+ */
 export const PRICING: Record<string, { inCents: number; outCents: number }> = {
   [MODELS.haiku]: { inCents: 100, outCents: 500 },
-  [MODELS.sonnet]: { inCents: 300, outCents: 1500 },
+  [MODELS.sonnet]: { inCents: 200, outCents: 1000 },
   [MODELS.opus]: { inCents: 500, outCents: 2500 },
+  // Legacy, still answered by the API; priced so an un-migrated agent meters
+  // correctly rather than silently at the fallback rate.
+  "claude-opus-4-8": { inCents: 500, outCents: 2500 },
   // OpenRouter DeepSeek V4 Flash (dated snapshot "0731" — matches the catalog
   // id in @/lib/ai/modelCatalog's MODEL_CATALOG; pinned rather than the
   // "-latest" alias so this price can't silently drift if OpenRouter

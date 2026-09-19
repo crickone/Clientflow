@@ -33,7 +33,7 @@ function ok(name: string, cond: boolean) {
 // Model IDs must be pinned exactly, and Fable must never appear anywhere in
 // MODELS — it's deliberately excluded for cost reasons (see client.ts).
 check("MODELS.sonnet is claude-sonnet-5", MODELS.sonnet, "claude-sonnet-5");
-check("MODELS.opus is claude-opus-4-8", MODELS.opus, "claude-opus-4-8");
+check("MODELS.opus is claude-opus-5", MODELS.opus, "claude-opus-5");
 check(
   "MODELS.haiku is claude-haiku-4-5-20251001",
   MODELS.haiku,
@@ -45,21 +45,49 @@ ok(
 );
 
 // estCostCents — list pricing, cents per 1M tokens.
-// Sonnet: $3/1M in, $15/1M out -> 300c / 1500c
+//
+// Sonnet 5 is $2/1M in, $10/1M out -> 200c / 1000c. It was pinned here at
+// the Sonnet 4.x rate of $3/$15 long after Sonnet 5 shipped, which metered
+// every tenant 50% high on the platform's busiest model and tripped their
+// monthly cap a third early. Figures verified against the published pricing
+// table, not inferred from the previous generation.
 check(
-  "1M input + 1M output tokens on sonnet costs 1800c",
+  "1M input + 1M output tokens on sonnet costs 1200c",
   estCostCents(MODELS.sonnet, { inputTokens: 1_000_000, outputTokens: 1_000_000 }),
-  1800,
+  1200,
 );
 // cache read is 0.1x input price
 check(
-  "1M cache-read tokens on sonnet costs 30c (0.1x input price)",
+  "1M cache-read tokens on sonnet costs 20c (0.1x input price)",
   estCostCents(MODELS.sonnet, {
     inputTokens: 0,
     outputTokens: 0,
     cacheReadTokens: 1_000_000,
   }),
-  30,
+  20,
+);
+// Opus 5 replaced Opus 4.8 at the SAME price, so the upgrade cost nothing.
+check(
+  "1M input + 1M output tokens on opus costs 3000c",
+  estCostCents(MODELS.opus, { inputTokens: 1_000_000, outputTokens: 1_000_000 }),
+  3000,
+);
+// The superseded id stays priced: a tenant's agents.model may still name it
+// until the migration reaches their database, and an unpriced id would fall
+// through to the default rate instead of failing loudly.
+check(
+  "the retired Opus 4.8 id is still priced correctly",
+  estCostCents("claude-opus-4-8", { inputTokens: 1_000_000, outputTokens: 1_000_000 }),
+  3000,
+);
+// Every tier must be cheaper than the one above it, or the picker's "most
+// capable / balanced / fastest" ordering is a lie about cost.
+ok(
+  "haiku < sonnet < opus on both input and output",
+  PRICING[MODELS.haiku].inCents < PRICING[MODELS.sonnet].inCents &&
+    PRICING[MODELS.sonnet].inCents < PRICING[MODELS.opus].inCents &&
+    PRICING[MODELS.haiku].outCents < PRICING[MODELS.sonnet].outCents &&
+    PRICING[MODELS.sonnet].outCents < PRICING[MODELS.opus].outCents,
 );
 
 // MP3: DeepSeek (via OpenRouter) must be priced for real, not silently
@@ -74,7 +102,7 @@ check(
   const id = deepseek!.id;
   ok(`PRICING has a dedicated entry for ${id}`, id in PRICING);
   ok(
-    "that entry is NOT the Sonnet fallback values (300/1500) — it's priced for real",
+    "that entry is NOT the Sonnet fallback values — it's priced for real",
     PRICING[id].inCents !== PRICING[MODELS.sonnet].inCents || PRICING[id].outCents !== PRICING[MODELS.sonnet].outCents,
   );
   ok(

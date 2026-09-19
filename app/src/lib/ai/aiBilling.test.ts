@@ -41,15 +41,19 @@ import { estCostCents, MODELS } from "./client";
     setAiMarginBp(500); // pin 5% for deterministic arithmetic
     setTenantCapCents(tid, 100); // €1 free tranche
 
-    // Pricing anchors — Sonnet output is $15/1M, so these token counts give
-    // round raw costs. If pricing changes, this line fails first (not the math).
-    assert.equal(estCostCents(MODELS.sonnet, { inputTokens: 0, outputTokens: 200_000 }), 300, "200k out = 300c raw");
-    assert.equal(estCostCents(MODELS.sonnet, { inputTokens: 0, outputTokens: 20_000 }), 30, "20k out = 30c raw");
+    // Pricing anchors — Sonnet output is $10/1M, so these token counts give
+    // round raw costs. If pricing changes, this line fails first (not the
+    // math), which is exactly what happened when Sonnet 5's price was
+    // corrected from the Sonnet 4.x rate: the counts moved, the costs below
+    // deliberately did not, so every assertion after this still reads the
+    // same and the change stayed visible in one place.
+    assert.equal(estCostCents(MODELS.sonnet, { inputTokens: 0, outputTokens: 300_000 }), 300, "300k out = 300c raw");
+    assert.equal(estCostCents(MODELS.sonnet, { inputTokens: 0, outputTokens: 30_000 }), 30, "30k out = 30c raw");
 
     // ── A. inside the free tranche, no credits → allowed, nothing billed ──
     reset();
     assert.doesNotThrow(() => assertAiAllowed(tid), "0 usage is inside the free tranche");
-    meterAndCharge(tid, "brief", MODELS.sonnet, { inputTokens: 0, outputTokens: 20_000 }); // 30c, under 100c tranche
+    meterAndCharge(tid, "brief", MODELS.sonnet, { inputTokens: 0, outputTokens: 30_000 }); // 30c, under 100c tranche
     assert.equal(getMonthlyUsageCents(tid), 30, "usage recorded");
     assert.equal(getAiBalanceCents(tid), 0, "nothing billed inside the tranche");
 
@@ -57,13 +61,13 @@ import { estCostCents, MODELS } from "./client";
     reset();
     grantAiCredits(tid, 10_000, "admin:test");
     assert.doesNotThrow(() => assertAiAllowed(tid), "under tranche + has credits");
-    meterAndCharge(tid, "blog", MODELS.sonnet, { inputTokens: 0, outputTokens: 200_000 }); // 300c raw
+    meterAndCharge(tid, "blog", MODELS.sonnet, { inputTokens: 0, outputTokens: 300_000 }); // 300c raw
     // freeRemaining = 100, overflow = 300 - 100 = 200, billable = ceil(200 * 1.05) = 210
     assert.equal(getAiBalanceCents(tid), 10_000 - 210, "only the 200c over the tranche is billed, +5% = 210c");
 
     // ── C. fully past the tranche → the whole next call is billed ──
     assert.doesNotThrow(() => assertAiAllowed(tid), "over tranche but has credits");
-    meterAndCharge(tid, "blog", MODELS.sonnet, { inputTokens: 0, outputTokens: 200_000 }); // 300c raw, freeRemaining now 0
+    meterAndCharge(tid, "blog", MODELS.sonnet, { inputTokens: 0, outputTokens: 300_000 }); // 300c raw, freeRemaining now 0
     // overflow = 300, billable = ceil(300 * 1.05) = 315
     assert.equal(getAiBalanceCents(tid), 10_000 - 210 - 315, "whole 300c billed once tranche is exhausted");
 
@@ -72,7 +76,7 @@ import { estCostCents, MODELS } from "./client";
     // one call slips through (still under tranche at gate time) and records its
     // true overflow as debt (can't un-burn tokens): 300c raw, overflow 200 → 210c
     assert.doesNotThrow(() => assertAiAllowed(tid), "first call is under the tranche");
-    meterAndCharge(tid, "sales", MODELS.sonnet, { inputTokens: 0, outputTokens: 200_000 });
+    meterAndCharge(tid, "sales", MODELS.sonnet, { inputTokens: 0, outputTokens: 300_000 });
     assert.equal(getAiBalanceCents(tid), -210, "the single overshoot is recorded as a small debt");
     assert.throws(() => assertAiAllowed(tid), AiCapError, "over tranche + no credits (negative balance) is blocked");
 
