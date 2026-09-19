@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { notFound, permanentRedirect } from "next/navigation";
 
-import { resolvePublicSite, siteUrl } from "@/lib/cms/resolveHost";
+import { resolvePublicSite } from "@/lib/cms/resolveHost";
 import { getPublishedPostBySlug } from "@/lib/cms/blog";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +29,16 @@ export const dynamic = "force-dynamic";
  * request for a deleted article to a URL that is also a 404 turns one honest
  * missing page into a redirect chain ending in the same place, which is worse
  * for both a reader and a crawler than simply saying it is gone.
+ *
+ * ALWAYS STAYS ON THE HOST THE REQUEST ARRIVED ON, which is why it builds the
+ * path by hand instead of calling siteUrl. siteUrl returns an absolute URL on
+ * the site's `primary_host`, and that column is set as soon as a domain is
+ * planned — long before DNS actually points anywhere. The first version of
+ * this file used it, and on the preview host it issued a 308 to
+ * inspirehealthandfitness.ie, which still serves the OLD site: a redirect
+ * that pushed previewers off our platform and onto a 404 on the site we are
+ * replacing. Fixing the path is this route's whole job; moving someone
+ * between domains is a different concern and not one to do by accident.
  */
 export default function LegacyBlogPostUrl({
   params,
@@ -47,8 +57,10 @@ export default function LegacyBlogPostUrl({
   const post = getPublishedPostBySlug(resolved.db, resolved.site.id, params.slug);
   if (!post) notFound();
 
-  // siteUrl gives a clean domain-root URL once a primary host is mapped, and
-  // the /site/<slug> mount before then — so this lands in the right place
-  // both on the client's own domain and on the preview host.
-  permanentRedirect(siteUrl(resolved, `/blog/${post.slug}`, host));
+  // A root-relative target keeps the browser on whatever host it is already
+  // talking to. `resolvedVia` says which shape that host expects: a mapped
+  // domain serves the site at its root, everything else at the /site/<slug>
+  // mount.
+  const prefix = resolved.resolvedVia === "host" ? "" : `/site/${resolved.site.slug}`;
+  permanentRedirect(`${prefix}/blog/${post.slug}`);
 }
