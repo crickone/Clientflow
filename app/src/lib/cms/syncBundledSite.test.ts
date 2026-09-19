@@ -342,6 +342,78 @@ const page = (key: string, body: string) => ({
       assert.match(after, /edited by a person/, "THE DEPLOY DOES NOT OVERWRITE IT");
     }
 
+    // ── BOTH SIDES CHANGED THE PAGE, AND BOTH SURVIVE ────────────────────
+    // The point of the merge. Until now an edited page was locked against
+    // the repo outright, so a footer fix could not reach a page whose
+    // headline the client had rewritten — even though the two changes have
+    // nothing to do with each other.
+    {
+      const { publishDraft, setDraftContent } = await import("./pageDraft");
+      const { runWithTenant } = await import("../db/tenant");
+
+      const L = (...x: string[]) => x.join("\n");
+      const v1 = L("<style>.s{}</style>", "<header>nav</header>", "<h1>Old headline</h1>", "<p>Open six days.</p>", "<footer>old footer</footer>");
+
+      writeBundle("merge-base", [page("merged", v1)]);
+      syncBundledSites();
+      assert.equal(bodyOf("/merged"), v1, "the repo publishes the starting version");
+
+      // The client rewrites the headline in Studio.
+      const theirs = v1.replace("<h1>Old headline</h1>", "<h1>THEIR headline</h1>");
+      const homeId = (
+        sqlite.prepare("SELECT id FROM pages WHERE site_id = ? AND path = '/merged'").get(sid) as { id: number }
+      ).id;
+      await runWithTenant(tenant.id, async () => {
+        setDraftContent(sid, homeId, theirs);
+        assert.ok(publishDraft(sid, homeId, 99).ok, "their edit publishes");
+      });
+      assert.match(bodyOf("/merged")!, /THEIR headline/);
+
+      // We ship a footer fix from the repo, on a different line.
+      const ours = v1.replace("<footer>old footer</footer>", "<footer>NEW footer</footer>");
+      writeBundle("merge-ours", [page("merged", ours)]);
+      syncBundledSites();
+
+      const after = bodyOf("/merged")!;
+      assert.match(after, /THEIR headline/, "THE CLIENT'S EDIT SURVIVED THE DEPLOY");
+      assert.match(after, /NEW footer/, "…and our fix landed anyway");
+      assert.ok(!after.includes("Old headline"), "neither version is half-applied");
+      assert.ok(!after.includes("old footer"));
+      assert.ok(after.startsWith("<style>.s{}</style>"), "the stylesheet is untouched");
+
+      // The merged page is still theirs: they edited it, so a later deploy
+      // must not treat it as repo-owned again.
+      const stamp = sqlite
+        .prepare("SELECT updated_by u FROM content_blocks WHERE site_id=? AND page_id=? AND name='body'")
+        .get(sid, homeId) as { u: number | null };
+      assert.equal(stamp.u, 99, "the page is still marked as the client's");
+
+      // And the merge is recoverable, like any other write.
+      const { listRevisions } = await import("./pageRevisions");
+      const history = await runWithTenant(tenant.id, async () => listRevisions(sid, homeId));
+      assert.ok(
+        history.some((h) => /THEIR headline/.test(h.body) && !/NEW footer/.test(h.body)),
+        "their pre-merge version is in the history, so a bad merge is one click from undone",
+      );
+
+      // ── AND WHEN THEY DISAGREE, IT REFUSES ─────────────────────────────
+      const conflicting = bodyOf("/merged")!.replace("<h1>THEIR headline</h1>", "<h1>THEIR SECOND headline</h1>");
+      await runWithTenant(tenant.id, async () => {
+        setDraftContent(sid, homeId, conflicting);
+        assert.ok(publishDraft(sid, homeId, 99).ok);
+      });
+      const clash = v1
+        .replace("<h1>Old headline</h1>", "<h1>OUR headline</h1>")
+        .replace("<footer>old footer</footer>", "<footer>NEW footer</footer>");
+      writeBundle("merge-clash", [page("merged", clash)]);
+      syncBundledSites();
+
+      const unchanged = bodyOf("/merged")!;
+      assert.match(unchanged, /THEIR SECOND headline/, "WHEN BOTH REWROTE THE HEADLINE, THEIRS IS LEFT ALONE");
+      assert.ok(!unchanged.includes("OUR headline"), "…ours is not forced over it");
+      assert.ok(!unchanged.includes("<<<"), "…and no conflict marker is ever published");
+    }
+
     // ── a missing bundle is simply nothing to do ─────────────────────────
     fs.rmSync(path.join(SANDBOX, "public", "sites", "inspire", "_pages.json"));
     assert.doesNotThrow(() => syncBundledSites(), "no bundle in the build is not an error");

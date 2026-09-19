@@ -6,6 +6,7 @@ import path from "node:path";
 
 import { openTenantDb } from "@/lib/db/tenant";
 import { findSiteSlugOwners } from "@/lib/cms/siteSlugs";
+import { merge3, mergeLooksSane } from "@/lib/cms/merge3";
 import { getPlatformSetting, setPlatformSetting } from "@/lib/billing/settings";
 
 /**
@@ -308,7 +309,28 @@ function syncOne(siteSlug: string): void {
     "SELECT count(*) AS n FROM page_revisions WHERE site_id = ? AND page_id = ?",
   );
 
+  /**
+   * The last version this sync published to each page, kept so a later
+   * deploy can tell OUR change from THEIRS.
+   *
+   * Without it there are only two versions to compare and no way to know who
+   * moved what, which is why the old rule could only ever lock a page
+   * outright. It lives in content_blocks under its own name, the same shape
+   * as the editor's existing `body:draft` row, so it needs no new table and
+   * is deleted with the page.
+   */
+  const BASE_BLOCK = "body:repo-base";
+  const findBase = sqlite.prepare(
+    "SELECT value FROM content_blocks WHERE site_id = ? AND page_id = ? AND name = ?",
+  );
+  const upBase = sqlite.prepare(
+    `INSERT INTO content_blocks (site_id, page_id, name, kind, value, created_at, updated_at)
+     VALUES (?, ?, ?, 'html', ?, ?, ?)
+     ON CONFLICT(site_id, page_id, name) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+  );
+
   const skipped: string[] = [];
+  const merged: string[] = [];
   let written = 0;
 
   // One transaction: a half-published site is worse than an out-of-date one.
@@ -317,16 +339,43 @@ function syncOne(siteSlug: string): void {
       const now = Date.now();
       const existing = findPage.get(sid, page.path) as { id: number } | undefined;
 
+      // What actually gets written: the bundle's page, unless a merge
+      // produces something better.
+      let bodyToWrite = page.body;
+
       if (existing) {
         const block = findBlock.get(sid, existing.id) as
           | { value: string | null; updated_by: number | null }
           | undefined;
-        // Guard 2: a human edited this page in Studio. Their work wins.
+        const live = block?.value ?? "";
+
+        if (live === page.body) continue; // already current
+
+        // Guard 2: a person has edited this page. Their work is never
+        // overwritten — but it does not have to BLOCK ours either, when the
+        // two changes are in different places.
         if (block?.updated_by != null) {
-          skipped.push(page.path);
-          continue;
+          const base = (findBase.get(sid, existing.id, BASE_BLOCK) as { value: string | null } | undefined)?.value;
+          if (!base) {
+            // No record of what we last published, so there is no way to
+            // tell our change from theirs. Leave it alone, as before.
+            skipped.push(page.path);
+            continue;
+          }
+          const attempt = merge3(base, page.body, live);
+          if (!attempt.ok) {
+            skipped.push(`${page.path} (both changed the same part)`);
+            continue;
+          }
+          const sane = mergeLooksSane(attempt.merged, live);
+          if (!sane.ok) {
+            skipped.push(`${page.path} (merge rejected: ${sane.reason})`);
+            continue;
+          }
+          if (attempt.merged === live) continue; // their page already has our change
+          bodyToWrite = attempt.merged;
+          merged.push(page.path);
         }
-        if (block?.value === page.body) continue; // already current
       }
 
       upPage.run(sid, page.key, page.path, page.title, now, now, now);
@@ -343,7 +392,11 @@ function syncOne(siteSlug: string): void {
         sid,
         pid,
       );
-      upBlock.run(sid, pid, page.body, now, now);
+      upBlock.run(sid, pid, bodyToWrite, now, now);
+      // The BASE is always the bundle's own page, never the merged result:
+      // it records what the repo published, which is what the next deploy
+      // must diff against to find its own change.
+      upBase.run(sid, pid, BASE_BLOCK, page.body, now, now);
       upSeo.run(sid, pid, page.title, page.desc, now, now);
       written++;
     }
@@ -358,6 +411,7 @@ function syncOne(siteSlug: string): void {
   console.log(
     `[syncBundledSite] '${siteSlug}' rev ${bundle.rev} -> tenant ${served.tenantSlug}#${served.tenantId} ` +
       `site #${sid}: ${written} page(s) published` +
-      (skipped.length ? `, ${skipped.length} left alone (edited in Studio): ${skipped.join(", ")}` : ""),
+      (merged.length ? `, ${merged.length} merged with a human's edits: ${merged.join(", ")}` : "") +
+      (skipped.length ? `, ${skipped.length} left alone: ${skipped.join(", ")}` : ""),
   );
 }
