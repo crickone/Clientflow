@@ -129,6 +129,7 @@ if (studioEdited.length && !FORCE) {
   console.error("Refusing: these pages were edited in Studio and would be overwritten:");
   for (const s of studioEdited) console.error("  " + s);
   console.error("Re-run with --overwrite-studio-edits if the files on disk are the truth.");
+  console.error("(That also hands those pages back to the repo, so later deploys manage them again.)");
   process.exit(2);
 }
 if (!APPLY) { console.log(""); console.log(changed + " page(s) would change. Dry run - nothing written."); process.exit(0); }
@@ -136,7 +137,13 @@ if (changed === 0) { console.log(""); console.log("Nothing to do."); process.exi
 
 const upPage = db.prepare("INSERT INTO pages (site_id,page_key,path,title,template_id,status,published_at,created_at,updated_at) VALUES (@sid,@key,@path,@title,'clientflow-live','published',@now,@now,@now) ON CONFLICT(site_id,path) DO UPDATE SET title=@title, template_id='clientflow-live', status='published', published_at=@now, updated_at=@now");
 const getPage = db.prepare("SELECT id FROM pages WHERE site_id=? AND path=?");
-const upBlock = db.prepare("INSERT INTO content_blocks (site_id,page_id,name,kind,value,created_at,updated_at) VALUES (@sid,@pid,'body','html',@val,@now,@now) ON CONFLICT(site_id,page_id,name) DO UPDATE SET value=@val, kind='html', updated_at=@now");
+// Overriding hands the page BACK to the repo: updated_by is cleared, so the
+// ordinary deploy sync owns it again from here. Without that, a page edited
+// once in Studio or through the assistant would be skipped by every future
+// deploy forever, and each later change would need this override again — the
+// guard would stop being "a human edited this" and become "this page is
+// permanently manual".
+const upBlock = db.prepare("INSERT INTO content_blocks (site_id,page_id,name,kind,value,updated_by,created_at,updated_at) VALUES (@sid,@pid,'body','html',@val,NULL,@now,@now) ON CONFLICT(site_id,page_id,name) DO UPDATE SET value=@val, kind='html', updated_by=NULL, updated_at=@now");
 const upSeo = db.prepare("INSERT INTO seo_meta (site_id,page_id,seo_title,seo_description,robots,created_at,updated_at) VALUES (@sid,@pid,@title,@desc,'index,follow',@now,@now) ON CONFLICT(site_id,page_id) DO UPDATE SET seo_title=@title, seo_description=@desc, updated_at=@now");
 
 // One transaction: a half-written site is worse than an out-of-date one.
