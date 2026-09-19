@@ -65,6 +65,8 @@
     "create_social_post",
     "schedule_social_post",
     "schedule_email_campaign",
+    "edit_website_text",
+    "replace_website_image",
     "schedule_blog_post",
     "cancel_scheduled_item",
     "send_client_whatsapp"
@@ -221,6 +223,14 @@
     "schedule_blog_post": [
       "Put blog post #3 live at the scheduled time",
       "Put blog post #? live at the scheduled time"
+    ],
+    "edit_website_text": [
+      "Change wording on a page: \"\" -> \"\"",
+      "Change wording on a page: \"\" -> \"\""
+    ],
+    "replace_website_image": [
+      "Replace an image on a page with library image #?",
+      "Replace an image on a page with library image #?"
     ]
   },
   "readSamplesAllFalse": [

@@ -41,8 +41,13 @@ const MARKETING_TOOLS = [
   "approve_campaign_asset", "launch_campaign",
   // Social posts from the chat: designed in Content Studio, exported as a zip.
   "create_social_post", "list_social_posts", "export_social_posts",
-  // Scheduling: posts and email sends booked for a time; the schedule itself.
-  "schedule_social_post", "schedule_email_campaign", "cancel_scheduled_item", "list_schedule",
+  // Scheduling: posts, email sends and blog posts booked for a time; the
+  // schedule itself.
+  "schedule_social_post", "schedule_email_campaign", "schedule_blog_post",
+  "cancel_scheduled_item", "list_schedule",
+  // The client's own website: read a page, change wording, swap a picture.
+  "list_website_pages", "read_website_page", "list_website_images",
+  "edit_website_text", "replace_website_image",
 ] as const;
 
 const OPS_TOOLS = [

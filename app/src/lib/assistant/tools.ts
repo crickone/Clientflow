@@ -85,6 +85,14 @@ import {
   scheduleSocialPostTool,
 } from "@/lib/agents/tools.schedule";
 import {
+  WEBSITE_TOOLS,
+  listWebsitePagesTool,
+  readWebsitePageTool,
+  listWebsiteImagesTool,
+  editWebsiteTextTool,
+  replaceWebsiteImageTool,
+} from "@/lib/agents/tools.website";
+import {
   CAMPAIGN_TOOLS,
   approveCampaignAssetTool,
   createCampaignTool,
@@ -195,6 +203,8 @@ const WRITE_TOOL_META: Record<string, WriteToolMeta> = {
   // gated. list_schedule is a read.
   schedule_social_post: { label: "Schedule social post", summarize: ({ v }) => { const when = parseWhen(v("when")); return `Schedule ${v("name") ? `"${v("name")}"` : `post #${v("postId") || "?"}`} to go out${when ? ` on ${formatDublin(when.getTime())}` : " on social"}`; } },
   schedule_email_campaign: { label: "Schedule email send", summarize: ({ v }) => { const when = parseWhen(v("when")); return `Send ${v("name") ? `"${v("name")}"` : `email campaign #${v("emailCampaignId") || "?"}`}${when ? ` on ${formatDublin(when.getTime())}` : " at the scheduled time"}`; } },
+  edit_website_text: { label: "Edit website text", summarize: ({ v }) => `Change wording on ${v("path") || "a page"}: "${(v("find") || "").slice(0, 40)}" -> "${(v("replace") || "").slice(0, 40)}"` },
+  replace_website_image: { label: "Replace website image", summarize: ({ v }) => `Replace an image on ${v("path") || "a page"} with library image #${v("imageId") || "?"}` },
   schedule_blog_post: { label: "Schedule blog post", summarize: ({ v }) => { const when = parseWhen(v("when")); return `Put blog post #${v("postId") || "?"} live${when ? ` on ${formatDublin(when.getTime())}` : " at the scheduled time"}`; } },
   cancel_scheduled_item: { label: "Cancel scheduled item", summarize: ({ v }) => `Cancel the scheduled ${v("kind") || "item"}${v("name") ? ` "${v("name")}"` : ""}` },
 
@@ -771,6 +781,7 @@ export const TOOLS: Anthropic.Tool[] = [
 
   // ── Scheduling: book posts and email sends for a time, see the schedule. ──
   ...SCHEDULE_TOOLS,
+  ...WEBSITE_TOOLS,
 
   // ── Operations agent (Operations Task 1): no-show + lapsed-member tools ──
   ...OPERATIONS_TOOLS,
@@ -933,6 +944,16 @@ export async function executeTool(
         return cancelScheduledItemTool(ctx, input);
       case "list_schedule":
         return listScheduleTool(ctx, input);
+      case "list_website_pages":
+        return listWebsitePagesTool(ctx, input);
+      case "read_website_page":
+        return readWebsitePageTool(ctx, input);
+      case "list_website_images":
+        return listWebsiteImagesTool(ctx);
+      case "edit_website_text":
+        return editWebsiteTextTool(ctx, input);
+      case "replace_website_image":
+        return replaceWebsiteImageTool(ctx, input);
       case "list_no_shows":
         return listNoShowsTool(ctx, input);
       case "list_lapsed_members":
