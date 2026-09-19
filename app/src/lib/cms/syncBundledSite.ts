@@ -293,6 +293,21 @@ function syncOne(siteSlug: string): void {
        updated_at = excluded.updated_at`,
   );
 
+  // Keep the version a deploy is about to replace. Raw SQL on this
+  // connection rather than lib/cms/pageRevisions, which uses the ambient
+  // request-scoped db — this runs at boot, outside any request, against a
+  // tenant resolved by hand.
+  const snapshot = sqlite.prepare(
+    `INSERT INTO page_revisions (site_id, page_id, body, source, created_by, note, created_at)
+     SELECT ?, ?, cb.value, ?, NULL, ?, ?
+       FROM content_blocks cb
+      WHERE cb.site_id = ? AND cb.page_id = ? AND cb.name = 'body'
+        AND cb.value IS NOT NULL AND trim(cb.value) <> ''`,
+  );
+  const countRevisions = sqlite.prepare(
+    "SELECT count(*) AS n FROM page_revisions WHERE site_id = ? AND page_id = ?",
+  );
+
   const skipped: string[] = [];
   let written = 0;
 
@@ -316,6 +331,18 @@ function syncOne(siteSlug: string): void {
 
       upPage.run(sid, page.key, page.path, page.title, now, now, now);
       const pid = (findPage.get(sid, page.path) as { id: number }).id;
+      // The first snapshot for a page is whatever was there before any
+      // history existed — not an edit anyone made, so label it honestly.
+      const priorCount = (countRevisions.get(sid, pid) as { n: number }).n;
+      snapshot.run(
+        sid,
+        pid,
+        priorCount === 0 ? "baseline" : "deploy",
+        priorCount === 0 ? "State before version history existed" : `Replaced by deploy ${bundle.rev}`,
+        now,
+        sid,
+        pid,
+      );
       upBlock.run(sid, pid, page.body, now, now);
       upSeo.run(sid, pid, page.title, page.desc, now, now);
       written++;

@@ -1233,6 +1233,46 @@ export const blogPosts = sqliteTable("blog_posts", {
     .default(sql`(unixepoch() * 1000)`),
 });
 
+/**
+ * Every published version of a page, newest last.
+ *
+ * A page used to have exactly one body, so any write was irreversible — and
+ * that is the only reason the deploy sync had to lock a whole page the
+ * moment a person edited it. With a history, an overwrite is recoverable and
+ * the lock can be a preference rather than a necessity.
+ *
+ * `body` is the WHOLE stored block (head + content + tail), not just the
+ * editable middle: restoring half a page would leave its stylesheet and its
+ * markup from different moments.
+ */
+export const pageRevisions = sqliteTable(
+  "page_revisions",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    siteId: integer("site_id")
+      .notNull()
+      .references(() => sites.id, { onDelete: "cascade" }),
+    pageId: integer("page_id")
+      .notNull()
+      .references(() => pages.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    /** Who or what wrote it. "baseline" is the state found before history existed. */
+    source: text("source", {
+      enum: ["studio", "agent", "deploy", "restore", "baseline"],
+    })
+      .notNull()
+      .default("studio"),
+    createdBy: integer("created_by"),
+    note: text("note"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => ({
+    byPage: index("idx_page_revisions_page").on(t.siteId, t.pageId, t.createdAt),
+  }),
+);
+
 export const activityLog = sqliteTable("activity_log", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   type: text("type").notNull(),

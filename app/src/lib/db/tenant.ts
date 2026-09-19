@@ -1443,6 +1443,30 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       UNIQUE(site_id, page_id, name)
     );
     CREATE INDEX IF NOT EXISTS idx_content_blocks_lookup ON content_blocks(site_id, page_id, name);
+
+    -- Every published version of a page, so an edit is never final.
+    --
+    -- A page had exactly one body, which meant any write was irreversible and
+    -- the only way to protect a client's edit was to lock the whole page
+    -- against ours. With a history, an overwrite stops being a decision
+    -- nobody can take back.
+    --
+    -- The body column is the WHOLE stored block (head + content + tail), not
+    -- just the editable middle: restoring half a page would leave its
+    -- stylesheet and its markup from different moments.
+    CREATE TABLE IF NOT EXISTS page_revisions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      site_id INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+      page_id INTEGER NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+      body TEXT NOT NULL,
+      -- Who or what wrote it: 'studio' | 'agent' | 'deploy' | 'restore'
+      -- | 'baseline' (the state found before history existed).
+      source TEXT NOT NULL DEFAULT 'studio',
+      created_by INTEGER,
+      note TEXT,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_page_revisions_page ON page_revisions(site_id, page_id, created_at DESC);
     -- SQLite treats NULLs as distinct in UNIQUE, so enforce global-block
     -- uniqueness (page_id IS NULL) with a partial index.
     CREATE UNIQUE INDEX IF NOT EXISTS idx_content_blocks_global ON content_blocks(site_id, name) WHERE page_id IS NULL;

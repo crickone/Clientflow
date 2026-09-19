@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getBlock, upsertBlock, deleteBlock } from "@/lib/cms/blocks";
 import { rebuildBodyWithContent, splitPageBody } from "@/lib/cms/pageBody";
+import { snapshotPage } from "./pageRevisions";
 import type { TenantDb } from "@/lib/db/tenant";
 
 const { contentBlocks, pages } = schema;
@@ -174,6 +175,13 @@ export function publishDraft(siteId: number, pageId: number, updatedBy?: number 
   }
 
   const nextBody = rebuildBodyWithContent(body, draft);
+
+  // Keep what is about to be replaced. Outside the transaction on purpose:
+  // a history that cannot be written must not stop the operator publishing.
+  snapshotPage(siteId, pageId, {
+    source: updatedBy == null ? "deploy" : "studio",
+    createdBy: updatedBy ?? null,
+  });
 
   db.transaction((tx) => {
     const existingBody = tx
