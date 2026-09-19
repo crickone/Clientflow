@@ -19,6 +19,9 @@ const fs = require("fs");
 const ROOT = path.resolve(__dirname, "..");
 const APP = path.join(ROOT, "app");
 const Database = require(path.join(APP, "node_modules", "better-sqlite3"));
+// The HTML -> CMS page transform is shared with tools/push-site-to-prod.cjs
+// so a page imported locally and a page pushed to production are identical.
+const { readSitePages } = require("./lib/siteHtml.cjs");
 
 function arg(name, def) {
   const i = process.argv.indexOf(`--${name}`);
@@ -62,31 +65,6 @@ for (const folder of ["assets", "logo", "fonts"]) {
   }
 }
 
-// 3) Helpers.
-const EXCLUDE = /(_Ad_Library_|mockup-)/i;
-const m1 = (re, s) => (s.match(re) || [])[1] || null;
-const decode = (s) =>
-  s
-    .replace(/&amp;/g, "&")
-    .replace(/&#39;/g, "'")
-    .replace(/&rsquo;/g, "’")
-    .replace(/&quot;/g, '"')
-    .replace(/&mdash;/g, "—")
-    .replace(/&ndash;/g, "–")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">");
-const rewrite = (html) =>
-  html
-    // asset folders → namespaced public path
-    .replace(/(["'(])(assets|logo|fonts)\//g, `$1/sites/${slug}/$2/`)
-    // internal *.html links → CMS site paths
-    .replace(/href="([a-z0-9-]+)\.html(#[^"]*)?"/gi, (full, n, frag) => {
-      const f = frag || "";
-      return n === "index"
-        ? `href="/site/${slug}${f}"`
-        : `href="/site/${slug}/${n}${f}"`;
-    });
-
 const upPage = db.prepare(
   `INSERT INTO pages (site_id,page_key,path,title,template_id,status,published_at,created_at,updated_at)
    VALUES (@sid,@key,@path,@title,@tpl,'published',@now,@now,@now)
@@ -105,29 +83,14 @@ const upSeo = db.prepare(
 );
 
 // 4) Import pages.
-const files = fs
-  .readdirSync(dir)
-  .filter((f) => f.endsWith(".html") && !EXCLUDE.test(f));
-let n = 0;
-for (const file of files) {
-  const raw = fs.readFileSync(path.join(dir, file), "utf8");
-  const base = file.replace(/\.html$/, "");
-  const pagePath = base === "index" ? "/" : `/${base}`;
-  const title = decode((m1(/<title>([\s\S]*?)<\/title>/i, raw) || base).trim());
-  const desc = decode(
-    (m1(/<meta\s+name="description"\s+content="([\s\S]*?)"/i, raw) || "").trim(),
-  );
-  const styles = (raw.match(/<style[\s\S]*?<\/style>/gi) || []).join("\n");
-  const gfonts = (raw.match(/<link[^>]*fonts\.(googleapis|gstatic)[^>]*>/gi) || []).join("\n");
-  const body = m1(/<body[^>]*>([\s\S]*?)<\/body>/i, raw) || "";
-  const combined = rewrite(`${gfonts}\n${styles}\n${body}`);
-
+const pages = readSitePages(dir, slug);
+for (const pg of pages) {
   const now = Date.now();
-  upPage.run({ sid: SID, key: base, path: pagePath, title, tpl: template, now });
-  const pid = getPage.get(SID, pagePath).id;
-  upBlock.run({ sid: SID, pid, val: combined, now });
-  upSeo.run({ sid: SID, pid, title, desc, now });
-  n++;
+  upPage.run({ sid: SID, key: pg.key, path: pg.path, title: pg.title, tpl: template, now });
+  const pid = getPage.get(SID, pg.path).id;
+  upBlock.run({ sid: SID, pid, val: pg.body, now });
+  upSeo.run({ sid: SID, pid, title: pg.title, desc: pg.desc, now });
 }
+const n = pages.length;
 console.log(`imported ${n} pages into site '${slug}' (#${SID})`);
 console.log(`assets → app/public/sites/${slug}/  ·  serve paths /sites/${slug}/...`);
