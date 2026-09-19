@@ -5,8 +5,7 @@ import { redirect } from "next/navigation";
 
 import { requireUserPage, requireAdminPage } from "@/lib/auth";
 import { createRequest } from "@/lib/cms/requests";
-import { isValidPixelId } from "@/components/cms/MetaPixel";
-import { isValidGoogleTagId } from "@/components/cms/GoogleTag";
+import { isValidGoogleTagId, isValidPixelId } from "@/lib/cms/trackingIds";
 import {
   createSite,
   deleteSiteCascade,

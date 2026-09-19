@@ -1,4 +1,4 @@
-// Run: npm test -- src/components/cms/tracking.test.ts
+// Run: npm test -- src/components/cms/trackingIds.test.ts
 //
 // The pixel id is interpolated into a <script> on a client's public website.
 // A value that is not an id does not merely fail to track — a stray quote
@@ -10,8 +10,14 @@
 // gates on is pure and is what actually decides.
 import assert from "node:assert/strict";
 
-import { isValidPixelId } from "./MetaPixel";
-import { googleTagKind, isValidGoogleTagId } from "./GoogleTag";
+import {
+  consentStorageKey,
+  googleTagKind,
+  isValidGoogleTagId,
+  isValidPixelId,
+  mayTrack,
+  parseConsent,
+} from "./trackingIds";
 
 // Real Meta pixel ids are long numeric strings.
 for (const id of ["1234567890123456", "12345678", "12345678901234567890"]) {
@@ -87,4 +93,40 @@ for (const ch of ["'", '"', "`", "\\", "<", ">", "\n", ";", "/"]) {
 assert.equal(isValidPixelId("GTM-NHRBKKN4"), false, "a container is not a Meta pixel");
 assert.equal(isValidGoogleTagId("1234567890123456"), false, "a Meta pixel is not a Google tag");
 
-console.log("tracking.test.ts: all assertions passed");
+// ── consent ─────────────────────────────────────────────────────────────────
+//
+// These tags fire on Irish businesses' sites serving EU visitors, so nothing
+// may load before the visitor agrees. The direction of every failure here is
+// the whole point: anything that is not an explicit yes must read as no.
+
+assert.equal(parseConsent("granted"), "granted");
+assert.equal(parseConsent("denied"), "denied");
+
+for (const junk of [null, undefined, "", "true", "yes", "1", "GRANTED", "accepted", "{}"]) {
+  assert.equal(
+    parseConsent(junk as string | null),
+    null,
+    `${JSON.stringify(junk)} is NOT a decision — the visitor gets asked again`,
+  );
+}
+
+assert.equal(mayTrack("granted"), true, "an explicit yes permits tracking");
+assert.equal(mayTrack("denied"), false, "an explicit no does not");
+assert.equal(mayTrack(null), false, "AND NEITHER DOES NO ANSWER — silence is not consent");
+
+// Junk in storage must never become permission. This is the one that would
+// hurt: a half-written or foreign value read as a yes would track everybody.
+for (const junk of ["", "true", "yes", "1", "accepted", "GRANTED"]) {
+  assert.equal(
+    mayTrack(parseConsent(junk)),
+    false,
+    `a stored value of ${JSON.stringify(junk)} does not permit tracking`,
+  );
+}
+
+// One decision per site: an agency runs several clients' websites from the
+// same platform, and agreeing on one is not agreeing on another.
+assert.notEqual(consentStorageKey("inspire"), consentStorageKey("other-gym"));
+assert.match(consentStorageKey("inspire"), /inspire/);
+
+console.log("trackingIds.test.ts: all assertions passed");

@@ -8,8 +8,7 @@ import {
   pathFromSlugParam,
 } from "@/lib/cms/render";
 import { studioEditability } from "@/lib/cms/pageBody";
-import { MetaPixel } from "@/components/cms/MetaPixel";
-import { GoogleTag } from "@/components/cms/GoogleTag";
+import { SiteTracking } from "@/components/cms/SiteTracking";
 import { StudioCanvas } from "@/components/cms/StudioCanvas";
 import { StudioUneditablePanel } from "@/components/cms/StudioUneditablePanel";
 
@@ -53,8 +52,11 @@ export default async function PublicSitePage({ params, searchParams }: Props) {
           NOT reached by the cmsedit branch above: an operator editing a page
           is not a visitor, and counting them would poison the audiences the
           pixel builds. */}
-      <MetaPixel pixelId={pc.resolved.site.metaPixelId} />
-      <GoogleTag tagId={pc.resolved.site.googleTagId} />
+      <SiteTracking
+        siteSlug={pc.resolved.site.slug}
+        pixelId={pc.resolved.site.metaPixelId}
+        googleTagId={pc.resolved.site.googleTagId}
+      />
       <T ctx={pc.ctx} page={pc.page} />
     </>
   );
