@@ -5,9 +5,22 @@ import { notFound } from "next/navigation";
 import { resolvePublicSite } from "@/lib/cms/resolveHost";
 import { listPublishedPosts } from "@/lib/cms/blog";
 import { excerptFromMarkdown } from "@/lib/cms/markdown";
+import { getSiteChrome, CHROME_CONTENT_CSS } from "@/lib/cms/siteChrome";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * The blog index, inside the client's own site chrome.
+ *
+ * This page used to hardcode a cream background, an orange accent and a
+ * system font — the same look for every tenant on the platform, and nobody's
+ * actual brand. On a gym whose site is black and gold it read as a different
+ * website, which is exactly what it was.
+ *
+ * Everything visual now comes from the site's own stylesheet, navbar and
+ * footer (see lib/cms/siteChrome). What is written here is only the shape of
+ * a list of articles.
+ */
 export default function PublicBlogIndex({
   params,
   searchParams,
@@ -24,54 +37,47 @@ export default function PublicBlogIndex({
 
   const { db, site } = resolved;
   const posts = listPublishedPosts(db, site.id);
+  const chrome = getSiteChrome(db, site.id);
+  // A mapped domain serves the site at its root; everything else at the mount.
+  const base = resolved.resolvedVia === "host" ? "" : `/site/${site.slug}`;
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#faf9f6",
-        color: "#16161a",
-        fontFamily: "var(--font-body), system-ui, sans-serif",
-      }}
-    >
-      <div style={{ maxWidth: 760, margin: "0 auto", padding: "80px 24px 120px" }}>
-        <p style={{ letterSpacing: "0.18em", textTransform: "uppercase", fontSize: 12, color: "#ef5a24" }}>
-          {site.name}
-        </p>
-        <h1 style={{ fontSize: "clamp(36px,6vw,56px)", margin: "12px 0 40px", fontWeight: 600 }}>
-          Blog
-        </h1>
+    <>
+      <div dangerouslySetInnerHTML={{ __html: chrome.head }} />
+      <style dangerouslySetInnerHTML={{ __html: CHROME_CONTENT_CSS }} />
+      {chrome.header && <div dangerouslySetInnerHTML={{ __html: chrome.header }} />}
 
+      <main className="cms-shell">
+        <h1>Blog</h1>
         {posts.length === 0 ? (
-          <p style={{ color: "#6b6b70" }}>No posts published yet.</p>
+          <p>No posts published yet.</p>
         ) : (
-          <div style={{ display: "grid", gap: 28 }}>
+          <ul className="cms-list" style={{ listStyle: "none", padding: 0, margin: 0 }}>
             {posts.map((p) => (
-              <Link
-                key={p.id}
-                href={`/site/${params.siteSlug}/blog/${p.slug}`}
-                style={{ display: "block", textDecoration: "none", color: "inherit" }}
-              >
-                <article style={{ borderBottom: "1px solid #e6e4de", paddingBottom: 24 }}>
-                  <h2 style={{ fontSize: 24, fontWeight: 600, margin: 0 }}>{p.title}</h2>
-                  {p.publishedAt && (
-                    <time style={{ fontSize: 13, color: "#9a9a9f" }}>
-                      {new Date(p.publishedAt).toLocaleDateString("en-IE", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      })}
-                    </time>
-                  )}
-                  <p style={{ color: "#4a4a50", marginTop: 10 }}>
-                    {p.excerpt || excerptFromMarkdown(p.content)}
-                  </p>
+              <li key={p.id}>
+                <article>
+                  <Link href={`${base}/blog/${p.slug}`}>
+                    <h2>{p.title}</h2>
+                    {p.publishedAt && (
+                      <time dateTime={new Date(p.publishedAt).toISOString()}>
+                        {new Date(p.publishedAt).toLocaleDateString("en-IE", {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        })}
+                      </time>
+                    )}
+                    <p>{p.excerpt || excerptFromMarkdown(p.content)}</p>
+                  </Link>
                 </article>
-              </Link>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
-      </div>
-    </main>
+      </main>
+
+      {chrome.footer && <div dangerouslySetInnerHTML={{ __html: chrome.footer }} />}
+      {chrome.tail && <div dangerouslySetInnerHTML={{ __html: chrome.tail }} />}
+    </>
   );
 }

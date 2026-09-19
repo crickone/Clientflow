@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { resolvePublicSite, siteUrl } from "@/lib/cms/resolveHost";
 import { getPublishedPostBySlug } from "@/lib/cms/blog";
 import { renderMarkdown, excerptFromMarkdown } from "@/lib/cms/markdown";
+import { getSiteChrome, CHROME_CONTENT_CSS } from "@/lib/cms/siteChrome";
 
 export const dynamic = "force-dynamic";
 
@@ -81,31 +82,31 @@ export default function PublicBlogPost({
     publisher: { "@type": "Organization", name: resolved.site.name },
   };
 
+  const chrome = getSiteChrome(resolved.db, resolved.site.id);
+  // A mapped domain serves the site at its root; everything else at the mount.
+  const base = resolved.resolvedVia === "host" ? "" : `/site/${resolved.site.slug}`;
+
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#faf9f6",
-        color: "#16161a",
-        fontFamily: "var(--font-body), system-ui, sans-serif",
-      }}
-    >
+    <>
+      <div dangerouslySetInnerHTML={{ __html: chrome.head }} />
+      <style dangerouslySetInnerHTML={{ __html: CHROME_CONTENT_CSS }} />
+      {chrome.header && <div dangerouslySetInnerHTML={{ __html: chrome.header }} />}
+
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <article style={{ maxWidth: 720, margin: "0 auto", padding: "80px 24px 120px" }}>
-        <a
-          href={`/site/${params.siteSlug}/blog`}
-          style={{ fontSize: 13, color: "#ef5a24", textDecoration: "none" }}
-        >
-          ← Back to blog
+
+      <main className="cms-shell">
+        <a className="cms-back" href={`${base}/blog`}>
+          &larr; Back to blog
         </a>
-        <h1 style={{ fontSize: "clamp(32px,5vw,52px)", margin: "16px 0 8px", fontWeight: 600 }}>
-          {post.title}
-        </h1>
+        <h1>{post.title}</h1>
         {post.publishedAt && (
-          <time style={{ fontSize: 14, color: "#9a9a9f" }}>
+          <time
+            dateTime={new Date(post.publishedAt).toISOString()}
+            style={{ display: "block", fontSize: 14, opacity: 0.65 }}
+          >
             {new Date(post.publishedAt).toLocaleDateString("en-IE", {
               year: "numeric",
               month: "long",
@@ -121,7 +122,6 @@ export default function PublicBlogPost({
               maxHeight: 460,
               overflow: "hidden",
               borderRadius: 12,
-              margin: "28px 0 0",
             }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -138,12 +138,11 @@ export default function PublicBlogPost({
             />
           </div>
         )}
-        <div
-          className="cms-prose"
-          style={{ marginTop: 32, lineHeight: 1.75, fontSize: 17 }}
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
-      </article>
-    </main>
+        <div className="cms-prose" dangerouslySetInnerHTML={{ __html: html }} />
+      </main>
+
+      {chrome.footer && <div dangerouslySetInnerHTML={{ __html: chrome.footer }} />}
+      {chrome.tail && <div dangerouslySetInnerHTML={{ __html: chrome.tail }} />}
+    </>
   );
 }
