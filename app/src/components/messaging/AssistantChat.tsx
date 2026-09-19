@@ -3,7 +3,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { createPortal } from "react-dom";
-import { Sparkles, Send, Download, Loader2, Check, History, Plus, Trash2, MessageSquare, Mic, Square } from "lucide-react";
+import { Sparkles, Send, Download, Loader2, Check, History, Plus, Trash2, MessageSquare, Mic, Square, Paperclip, X as XIcon } from "lucide-react";
+import { toast } from "sonner";
 import { EASE } from "@/lib/motion";
 
 import { Button } from "@/components/ui/Button";
@@ -299,6 +300,53 @@ export function AssistantChat({
   // focus it and place the caret at the end (see the effect just below) —
   // the only reason this component needs a ref on its own textarea at all.
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  /**
+   * Files attached to the next message.
+   *
+   * An attachment is uploaded to the media library the moment it is picked,
+   * not held in the browser until send: the library is where the business's
+   * files belong anyway, and it means the assistant is handed an id it can
+   * act on (place that photograph on a page, read that document) rather than
+   * bytes it would have to be given a whole new channel to receive.
+   *
+   * What reaches the model is a plain line naming each file and its id. That
+   * keeps this feature out of the transport entirely — no new message shape,
+   * no change to history, nothing to migrate.
+   */
+  const attachRef = useRef<HTMLInputElement>(null);
+  const [attachments, setAttachments] = useState<
+    { id: number; name: string; kind: string }[]
+  >([]);
+  const [attaching, setAttaching] = useState(false);
+
+  async function attachFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setAttaching(true);
+    try {
+      const form = new FormData();
+      for (const f of Array.from(files)) form.append("file", f);
+      const res = await fetch("/api/content-studio/image-library", { method: "POST", body: form });
+      const json = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        assets?: { id: number; originalName: string; kind: string }[];
+      };
+      if (!res.ok || !json.ok || !json.assets) {
+        toast.error(json.error || "Could not attach that file.");
+        return;
+      }
+      setAttachments((prev) => [
+        ...prev,
+        ...json.assets!.map((a) => ({ id: a.id, name: a.originalName, kind: a.kind })),
+      ]);
+    } catch {
+      toast.error("Could not attach that file.");
+    } finally {
+      setAttaching(false);
+      if (attachRef.current) attachRef.current.value = "";
+    }
+  }
   // One-shot guard: flipped true the instant a transcript is appended,
   // consumed by the effect below on the very next render — i.e. once
   // `input`'s new value has actually committed to the textarea's DOM value —
@@ -540,9 +588,17 @@ export function AssistantChat({
   }, [messages]);
 
   async function send(text: string) {
-    const q = text.trim();
+    // Name the attachments in the message itself. The id is the useful part:
+    // it is what every tool that touches a picture or a document takes.
+    const attachLine = attachments.length
+      ? attachments
+          .map((a) => `[Attached to the library: "${a.name}" — ${a.kind} #${a.id}]`)
+          .join("\n")
+      : "";
+    const q = [text.trim(), attachLine].filter(Boolean).join("\n\n");
     if (!q || busy || !activeId) return;
     setInput("");
+    setAttachments([]);
     const convId = activeId; // pin updates to THIS chat, even if the user switches
     // DR2: a fresh turn supersedes any resume still polling for this same
     // conversation (e.g. the user chose not to wait) — stop it so it can't
@@ -1123,6 +1179,55 @@ export function AssistantChat({
         </div>
       )}
 
+      {attachments.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 6,
+            padding: bare ? "10px 0 0" : "10px 12px 0",
+          }}
+        >
+          {attachments.map((a) => (
+            <span
+              key={a.id}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                maxWidth: 260,
+                padding: "5px 8px 5px 10px",
+                border: "1px solid var(--hairline)",
+                borderRadius: 999,
+                background: "var(--surface-1)",
+                color: "var(--text-secondary)",
+                fontSize: 12,
+              }}
+            >
+              <Paperclip size={12} strokeWidth={2} />
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {a.name}
+              </span>
+              <button
+                type="button"
+                onClick={() => setAttachments((prev) => prev.filter((x) => x.id !== a.id))}
+                aria-label={`Remove ${a.name}`}
+                style={{
+                  display: "inline-flex",
+                  background: "none",
+                  border: "none",
+                  padding: 2,
+                  color: "var(--text-tertiary)",
+                  cursor: "pointer",
+                }}
+              >
+                <XIcon size={12} strokeWidth={2} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
       <div style={{ borderTop: bare ? "none" : "1px solid var(--hairline)", padding: bare ? "12px 0 0" : 12, display: "flex", gap: 8 }}>
         {voice.state === "recording" && voice.stream ? (
           // While recording, the wave takes the textarea's slot in the row —
@@ -1143,7 +1248,7 @@ export function AssistantChat({
                 // Voice T2: a transcript-in-flight shouldn't send a half-dictated
                 // message out from under the operator — mirrors the Send
                 // button's own disabled condition just below.
-                if (voice.state === "idle") send(input);
+                if (voice.state === "idle" && (input.trim() || attachments.length > 0)) send(input);
               }
             }}
             rows={1}
@@ -1165,6 +1270,24 @@ export function AssistantChat({
             }}
           />
         )}
+        <input
+          ref={attachRef}
+          type="file"
+          multiple
+          hidden
+          accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm,application/pdf,text/plain,text/csv,text/markdown,application/json,.docx,.xlsx,.pptx"
+          onChange={(e) => void attachFiles(e.target.files)}
+        />
+        <Tooltip label="Attach a file">
+          <Button
+            variant="secondary"
+            onClick={() => attachRef.current?.click()}
+            disabled={busy || attaching}
+            aria-label="Attach a file"
+          >
+            {attaching ? <Loader2 size={15} className="spin" /> : <Paperclip size={15} strokeWidth={2} />}
+          </Button>
+        </Tooltip>
         {voiceEnabled && (
           <>
             {voice.state === "recording" && (
@@ -1205,7 +1328,10 @@ export function AssistantChat({
             </Tooltip>
           </>
         )}
-        <Button onClick={() => send(input)} disabled={busy || !input.trim() || voice.state !== "idle"}>
+        <Button
+          onClick={() => send(input)}
+          disabled={busy || (!input.trim() && attachments.length === 0) || voice.state !== "idle"}
+        >
           {busy ? <Loader2 size={15} className="spin" /> : <Send size={15} strokeWidth={2} />}
         </Button>
       </div>
