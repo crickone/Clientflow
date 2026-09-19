@@ -96,6 +96,12 @@ h1,h2,h3,h4{font-family:"Bebas Neue",sans-serif;font-weight:400;letter-spacing:.
 .plan li{padding-left:18px;position:relative}.plan li::before{content:"◇";position:absolute;left:0;color:var(--gold);font-size:10px;top:3px}
 .plan .btn{margin-top:auto}
 @media(max-width:900px){.plans{grid-template-columns:repeat(2,1fr)}}@media(max-width:520px){.plans{grid-template-columns:1fr}}
+/* The sign-up form is hosted by GoHighLevel, where the gym's leads land. It
+   renders as an opaque white card that we cannot restyle from out here, so it
+   gets a light panel of its own instead of fighting the dark page around it. */
+.formwrap{max-width:760px;margin:0 auto;background:#fff;border-radius:10px;padding:10px;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.formwrap iframe{display:block;width:100%;border:0;border-radius:6px;min-height:640px}
+.formnote{max-width:760px;margin:20px auto 0;text-align:center;color:var(--ink-faint);font-size:14px}
 .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
 .step{border:1px solid var(--line);border-radius:6px;padding:30px;background:var(--surface)}
 .step .num{font-family:"Bebas Neue",sans-serif;font-size:44px;color:var(--gold);line-height:1}
@@ -158,14 +164,33 @@ h1,h2,h3,h4{font-family:"Bebas Neue",sans-serif;font-weight:400;letter-spacing:.
 </header>
 <section class="page-hero"><div style="position:absolute;inset:0;z-index:0"><img src="assets/strength.jpg" alt="" style="width:100%;height:100%;object-fit:cover;filter:grayscale(.3) brightness(.5)"/></div><div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,8,10,.5),rgba(8,8,10,.92))"></div><div class="shell" style="position:relative;z-index:2"><div class="crumb">Inspire · Sign Up</div><h1 class="display">Join Inspire Now.</h1><p>Take the first step towards your fitness journey today with our supportive community.</p></div></section>
 <section class="section"><div class="shell">
-  <div class="sec-head"><div><span class="eyebrow" data-rise>Get Started</span><h2 class="display" data-rise style="margin-top:14px">Pick your<br/>plan.</h2></div><p data-rise>Sign up today to begin your fitness journey! We offer various membership options including Monthly, Student, Off-Peak, and Couple plans — each with unlimited class access and gym facilities.</p></div>
-  <div class="plans" data-stagger>
-    <div class="plan"><h4>Monthly</h4><div class="price">Contact for pricing</div><ul><li>Unlimited class access</li><li>Full gym facilities</li><li>Community &amp; support</li></ul><a class="btn btn--gold" href="tel:0838897736"><span>Get started</span><span class="arw">→</span></a></div>
-    <div class="plan"><h4>Student</h4><div class="price">Contact for pricing</div><ul><li>Unlimited class access</li><li>Full gym facilities</li><li>Student rate</li></ul><a class="btn" href="tel:0838897736"><span>Get started</span><span class="arw">→</span></a></div>
-    <div class="plan"><h4>Off-Peak</h4><div class="price">Contact for pricing</div><ul><li>Off-peak access</li><li>Unlimited class access</li><li>Great value</li></ul><a class="btn" href="tel:0838897736"><span>Get started</span><span class="arw">→</span></a></div>
-    <div class="plan"><h4>Couple</h4><div class="price">Contact for pricing</div><ul><li>Two memberships</li><li>Train together</li><li>Shared rate</li></ul><a class="btn" href="tel:0838897736"><span>Get started</span><span class="arw">→</span></a></div>
+  <!-- Four cards all reading "Contact for pricing" were a price list with no
+       prices — they asked people to choose before we had told them anything
+       to choose between. The membership options are named in the paragraph
+       and answered in the FAQs below; the page's job here is to take a name
+       and a number. The plan cards go back in when the client gives us real
+       prices. -->
+  <div class="sec-head"><div><span class="eyebrow" data-rise>Get Started</span><h2 class="display" data-rise style="margin-top:14px">Sign up<br/>today.</h2></div><p data-rise>Leave your details and we will be in touch about the right membership for you. Monthly, Student, Off-Peak and Couple plans are available, each with unlimited class access and full gym facilities.</p></div>
+  <div class="formwrap" data-rise>
+    <iframe
+      src="https://api.leadconnectorhq.com/widget/form/vzwoLA9cjW7wyR7qnMra"
+      id="inline-vzwoLA9cjW7wyR7qnMra"
+      data-layout="{'id':'INLINE'}"
+      data-trigger-type="alwaysShow"
+      data-trigger-value=""
+      data-activation-type="alwaysActivated"
+      data-activation-value=""
+      data-deactivation-type="neverDeactivate"
+      data-deactivation-value=""
+      data-form-name="Inspire Signup Form"
+      data-height="636"
+      data-layout-iframe-id="inline-vzwoLA9cjW7wyR7qnMra"
+      data-form-id="vzwoLA9cjW7wyR7qnMra"
+      title="Inspire Signup Form"></iframe>
   </div>
+  <p class="formnote" data-rise>Prefer to talk? Call <a class="gold" href="tel:0838897736">083 889 7736</a> or drop into the gym.</p>
 </div></section>
+<script src="https://link.msgsndr.com/js/form_embed.js"></script>
 <section class="section" style="padding-top:0"><div class="shell">
   <div class="sec-head"><div><span class="eyebrow" data-rise>FAQs</span><h2 class="display" data-rise style="margin-top:14px">Before you<br/>join.</h2></div><p data-rise>Find answers to common questions about our memberships and the sign-up process.</p></div>
   <div class="faqs" data-stagger><details class="faq"><summary>What membership options do you offer?</summary><div class="a">We offer various membership options including Monthly, Student, Off-Peak, and Couple plans. Each option provides unlimited class access and gym facilities. Choose the one that best fits your lifestyle.</div></details><details class="faq"><summary>Is there a joining fee?</summary><div class="a">No, we currently do not charge a joining fee for new members. This allows you to start your fitness journey without any initial financial burden. Join us today and experience the Inspire community!</div></details><details class="faq"><summary>What are your opening hours?</summary><div class="a">Our gym is open Monday to Thursday from 6 AM to 11 AM and 4 PM to 8 PM, Fridays from 6 AM to 11 AM and 4 PM to 7 PM, and Saturdays from 8 AM to 12 PM. We're closed on Sundays and bank holidays. Check our website for any holiday hours.</div></details><details class="faq"><summary>How do I sign up?</summary><div class="a">Signing up is easy! Simply fill out our online form or visit us at the gym. Our friendly staff will assist you through the process.</div></details></div>
