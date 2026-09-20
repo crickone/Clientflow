@@ -5,9 +5,16 @@ interface Props {
   title: string;
   subtitle?: string;
   actions?: ReactNode;
+  /**
+   * Drop the 32px gap this header normally leaves under itself. For a header
+   * rendered INSIDE a container that owns its own padding — the agent detail
+   * page's hologram hero is the one caller today — where that gap lands as
+   * dead space inside the box rather than as separation from what follows.
+   */
+  flush?: boolean;
 }
 
-export function PageHeader({ eyebrow, title, subtitle, actions }: Props) {
+export function PageHeader({ eyebrow, title, subtitle, actions, flush }: Props) {
   return (
     <div
       style={{
@@ -16,7 +23,7 @@ export function PageHeader({ eyebrow, title, subtitle, actions }: Props) {
         alignItems: "flex-end",
         gap: 24,
         flexWrap: "wrap",
-        marginBottom: 32,
+        marginBottom: flush ? 0 : 32,
       }}
     >
       <div>

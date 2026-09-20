@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Card } from "@/components/ui/Card";
 import { requireAdminPage, getCurrentMembership } from "@/lib/auth";
 import { AGENT_CATALOG, getAgent, parseDisabledTools } from "@/lib/agents/registry";
 import { listSkills, skillBodiesFor, skillMenuFor, skillTogglesFor } from "@/lib/agents/skills";
@@ -123,7 +124,25 @@ export default async function AgentDetailPage({
       >
         <ArrowLeft size={14} /> Back to Agents
       </Link>
-      <PageHeader eyebrow="AI Staff" title={agent.name} subtitle={catalogEntry?.mandate} />
+      {/* The agent's own hero, wearing the same hologram as its card on
+          /agents (styles in globals.css, under "Agents: the AI staff card") —
+          the signal that this page is where the agent lives, rather than one
+          more settings screen. Same rule as the card: only for an ACTIVE
+          agent, or the shimmer stops meaning anything. */}
+      <Card
+        className={agent.status === "active" ? "agent-holo" : undefined}
+        style={{ padding: 30, marginBottom: 32 }}
+      >
+        {agent.status === "active" && (
+          <>
+            <span className="agent-holo-layer agent-holo-wash" aria-hidden />
+            <span className="agent-holo-layer agent-holo-lines" aria-hidden />
+            <span className="agent-holo-layer agent-holo-scan" aria-hidden />
+            <span className="agent-holo-layer agent-holo-rim" aria-hidden />
+          </>
+        )}
+        <PageHeader eyebrow="AI Staff" title={agent.name} subtitle={catalogEntry?.mandate} flush />
+      </Card>
       <AgentDetail
         // Fresh mount (fresh useState seeding — model picker, operator-
         // instructions dirty state) if this ever renders for a DIFFERENT agent
