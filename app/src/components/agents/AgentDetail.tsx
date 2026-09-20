@@ -102,6 +102,17 @@ export function AgentDetail({ agent, mandate, roles, layers, toolNames, disabled
  * "Chat") just renders as the title. Non-string children fall back to the old
  * single-line eyebrow.
  */
+/**
+ * A section heading BELONGS to the block under it, so it needs more air above
+ * than below. The page's 36px flex gap gave it the same separation from the
+ * card above as every other pair, while it sits 16px off its own card — close
+ * enough that "Tools" read as the tail of the Skills card rather than the head
+ * of its own. This margin is on top of that gap (a flex item is an independent
+ * formatting context, so it can't collapse out), putting the heading ~56px
+ * under what precedes it against 16px over what it introduces.
+ */
+const LABEL_TOP = 20;
+
 function SectionLabel({ children }: { children: ReactNode }) {
   if (typeof children !== "string") {
     return (
@@ -112,6 +123,7 @@ function SectionLabel({ children }: { children: ReactNode }) {
           letterSpacing: "0.12em",
           textTransform: "uppercase",
           color: "var(--text-tertiary)",
+          marginTop: LABEL_TOP,
           marginBottom: 14,
         }}
       >
@@ -125,7 +137,7 @@ function SectionLabel({ children }: { children: ReactNode }) {
   const subtitle = dash >= 0 ? children.slice(dash + 1).trim() : "";
 
   return (
-    <div style={{ marginBottom: 16 }}>
+    <div style={{ marginTop: LABEL_TOP, marginBottom: 16 }}>
       <div
         style={{
           fontFamily: "var(--font-heading), sans-serif",
