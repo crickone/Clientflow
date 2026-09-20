@@ -279,17 +279,7 @@ function AgentCard({
     <Link
       href={`/agents/${agent.key}`}
       aria-label={`${agent.name} — open agent settings`}
-      style={
-        isOrchestrator
-          ? {
-              display: "block",
-              width: "min(620px, 100%)",
-              margin: "0 auto",
-              textDecoration: "none",
-              color: "inherit",
-            }
-          : { display: "block", height: "100%", textDecoration: "none", color: "inherit" }
-      }
+      style={{ display: "block", height: "100%", textDecoration: "none", color: "inherit" }}
     >
       <Card
         interactive
@@ -390,11 +380,30 @@ function AgentCard({
           </div>
         )}
 
-        <div style={{ marginTop: "auto", marginBottom: isOrchestrator ? 16 : 12 }}>
-          <Badge>{modelLabel(agent.model)}</Badge>
-        </div>
-
-        <UsageMeter valueCents={usageCents} capCents={capCents} compact />
+        {isOrchestrator ? (
+          <div
+            style={{
+              marginTop: "auto",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 20,
+              flexWrap: "wrap",
+            }}
+          >
+            <Badge>{modelLabel(agent.model)}</Badge>
+            <div style={{ flex: "1 1 240px", maxWidth: 380 }}>
+              <UsageMeter valueCents={usageCents} capCents={capCents} compact />
+            </div>
+          </div>
+        ) : (
+          <>
+            <div style={{ marginTop: "auto", marginBottom: 12 }}>
+              <Badge>{modelLabel(agent.model)}</Badge>
+            </div>
+            <UsageMeter valueCents={usageCents} capCents={capCents} compact />
+          </>
+        )}
       </Card>
     </Link>
   );
