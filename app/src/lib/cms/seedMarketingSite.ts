@@ -39,8 +39,7 @@ const SITE_NAME = "AdonisAgent";
  *   rev 3 (2026-08-12) — drop Lenis (its scroll hijack breaks scrolling inside
  *   the CMS-embedded template); native smooth scroll + scroll-padding-top.
  */
-// rev 4 (2026-09-20): cinematic dark redesign and connected demo-request form.
-const MARKETING_SITE_REV = 4;
+const MARKETING_SITE_REV = 3;
 const REV_KEY = "marketing_site_rev";
 
 export function seedMarketingSite(): void {
