@@ -274,6 +274,10 @@ function AgentCard({
   const Icon = ICON[agent.key] ?? Bot;
   const isOrchestrator = variant === "orchestrator";
   const mandate = MANDATE[agent.key] || agent.instructions || "AI specialist.";
+  /* The hologram is how the card says the agent is LIVE, so a dormant agent
+     stays flat -- otherwise the shimmer means nothing. Specialist cards are
+     small and sit several to a row; the effect would read as noise there. */
+  const holo = isOrchestrator && active;
 
   return (
     <Link
@@ -283,6 +287,7 @@ function AgentCard({
     >
       <Card
         interactive
+        className={holo ? "agent-holo" : undefined}
         style={{
           borderColor: isOrchestrator ? "var(--hairline-strong)" : undefined,
           height: "100%",
@@ -291,6 +296,18 @@ function AgentCard({
           padding: isOrchestrator ? 30 : undefined,
         }}
       >
+        {/* Purely decorative -- the hologram layers (styles in globals.css,
+            under "Agents: the AI staff card"). They sit inside the Card so the
+            hover lift carries them, and behind its content via z-index: -1 in
+            the card's own stacking context. */}
+        {holo && (
+          <>
+            <span className="agent-holo-layer agent-holo-wash" aria-hidden />
+            <span className="agent-holo-layer agent-holo-lines" aria-hidden />
+            <span className="agent-holo-layer agent-holo-scan" aria-hidden />
+            <span className="agent-holo-layer agent-holo-rim" aria-hidden />
+          </>
+        )}
         <div
           style={{
             display: "flex",

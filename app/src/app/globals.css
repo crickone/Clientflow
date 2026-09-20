@@ -1159,6 +1159,131 @@ a {
   .design-writing-sweep { opacity: 0.5; }
 }
 
+/* Agents: the AI staff card, rendered as a hologram of the agent (see
+   AgentOrgChart's AgentCard). Four layers, all INSIDE the card so they ride
+   the hover lift with it, and all behind the content (z-index -1 inside the
+   card's own stacking context paints above its background, below its text):
+
+     rim   a single band of light travelling the border
+     wash  two soft pools of colour drifting under the content
+     lines the scanlines that make the whole thing read as a projection
+     scan  one slow bar of light crossing the face
+
+   Every colour derives from the tenant's own --accent, hue-rotated either
+   side of it rather than a fixed rainbow, so the effect re-skins with the
+   rest of the admin instead of fighting a tenant's palette.
+
+   Only ever applied to an ACTIVE agent: the shimmer is the card saying the
+   agent is live, so a dormant one has to stay flat for that to mean
+   anything. */
+@property --holo-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+@keyframes holoSpin {
+  to { --holo-angle: 360deg; }
+}
+/* The iridescence itself: the hue drifts either side of the accent, so the
+   rim shifts through neighbouring colours the way a foil does under a moving
+   light. Paired with holoSpin on the same element -- different properties, so
+   the two run independently at different periods and never visibly loop
+   together. */
+@keyframes holoShift {
+  0%, 100% { filter: hue-rotate(-40deg) saturate(1.15); }
+  50%      { filter: hue-rotate(40deg) saturate(1.35); }
+}
+@keyframes holoDrift {
+  0%, 100% { transform: translate3d(-4%, -3%, 0) scale(1.05); }
+  50%      { transform: translate3d(5%, 4%, 0) scale(1.18); }
+}
+@keyframes holoCrawl {
+  to { background-position-y: 6px; }
+}
+@keyframes holoScan {
+  0%   { transform: translateX(-160%) rotate(14deg); opacity: 0; }
+  10%  { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { transform: translateX(160%) rotate(14deg); opacity: 0; }
+}
+
+.agent-holo {
+  position: relative;
+  overflow: hidden;
+  /* Its own stacking context, so the layers' z-index: -1 stays local to the
+     card and can't slip behind the page. */
+  isolation: isolate;
+}
+.agent-holo > .agent-holo-layer {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+}
+/* Masked to its own 1px padding box: the conic gradient fills the card, and
+   the XOR mask knocks out everything but the border, leaving the band of
+   light running the edge. */
+.agent-holo-rim {
+  padding: 1px;
+  background: conic-gradient(
+    from var(--holo-angle) at 50% 50%,
+    transparent 0 10%,
+    color-mix(in oklab, var(--accent) 80%, white) 19%,
+    transparent 30% 60%,
+    color-mix(in oklab, var(--accent) 55%, white) 70%,
+    transparent 82% 100%
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0.85;
+  animation: holoSpin 9s linear infinite, holoShift 13s ease-in-out infinite;
+}
+/* Two pools rather than one wash, and two HUES rather than one: iridescence
+   is several colours present at once, and a single accent-coloured haze just
+   reads as a dirty surface. The second pool is the accent pulled toward cyan,
+   so it still moves with the tenant's palette instead of being a fixed blue.
+   Soft rather than blurred -- wide gradient stops cost nothing next to a 58px
+   filter: blur() running on a loop behind live text. */
+.agent-holo-wash {
+  background:
+    radial-gradient(30% 95% at 12% 0%, color-mix(in oklab, var(--accent) 45%, transparent), transparent 70%),
+    radial-gradient(34% 105% at 86% 100%, color-mix(in oklab, color-mix(in oklab, var(--accent) 50%, #4fb6ff) 40%, transparent), transparent 72%);
+  opacity: 0.18;
+  will-change: transform;
+  animation: holoDrift 17s ease-in-out infinite, holoShift 13s ease-in-out infinite;
+}
+.agent-holo-lines {
+  background-image: repeating-linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.035) 0 1px,
+    transparent 1px 4px
+  );
+  mask-image: radial-gradient(90% 100% at 50% 50%, #000 30%, transparent 100%);
+  -webkit-mask-image: radial-gradient(90% 100% at 50% 50%, #000 30%, transparent 100%);
+  animation: holoCrawl 2.4s linear infinite;
+}
+.agent-holo-scan {
+  top: -30%;
+  bottom: -30%;
+  left: 0;
+  right: auto;
+  width: 18%;
+  border-radius: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.07), transparent);
+  animation: holoScan 11s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-holo-rim,
+  .agent-holo-wash,
+  .agent-holo-lines { animation: none; }
+  /* The sweep is the one layer that is ONLY movement -- with the animation
+     off it would park a bright bar down the left edge. */
+  .agent-holo-scan { display: none; }
+}
+
 /* Voice T2: the mic button's "live" recording indicator — a small pulsing
    dot pinned to the button's corner (the button itself gets `position:
    relative` inline, only while recording — see AssistantChat.tsx). Same
