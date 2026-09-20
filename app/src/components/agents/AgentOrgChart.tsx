@@ -209,6 +209,11 @@ export function AgentOrgChart({ agents, usageByAgent, usageByModel, capCents, mo
       <style jsx>{`
         .agent-orgchart {
           position: relative;
+          /* Mirrors the usage Card's marginBottom above, so the agent card
+             sits in the same 40px rhythm as the rest of the page. Without it
+             this block ends flush against AiCreditsCard, which carries no top
+             margin of its own. */
+          margin-bottom: 40px;
         }
         .agent-orgchart-links {
           position: relative;
@@ -299,10 +304,10 @@ function AgentCard({
         <div
           style={{
             display: "flex",
-            alignItems: "flex-start",
+            alignItems: "center",
             justifyContent: "space-between",
             gap: 12,
-            marginBottom: isOrchestrator ? 16 : 12,
+            marginBottom: isOrchestrator ? 18 : 12,
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: isOrchestrator ? 14 : 10, minWidth: 0 }}>
@@ -385,7 +390,7 @@ function AgentCard({
           </div>
         )}
 
-        <div style={{ marginTop: "auto", marginBottom: 10 }}>
+        <div style={{ marginTop: "auto", marginBottom: isOrchestrator ? 16 : 12 }}>
           <Badge>{modelLabel(agent.model)}</Badge>
         </div>
 
