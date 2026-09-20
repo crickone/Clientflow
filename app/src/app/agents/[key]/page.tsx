@@ -131,7 +131,9 @@ export default async function AgentDetailPage({
           agent, or the shimmer stops meaning anything. */}
       <Card
         className={agent.status === "active" ? "agent-holo" : undefined}
-        style={{ padding: 30, marginBottom: 32 }}
+        /* 36 is what AgentDetail puts between its own sections, so the hero
+           sits in that rhythm rather than a near-miss of it. */
+        style={{ padding: 30, marginBottom: 36 }}
       >
         {agent.status === "active" && (
           <>
