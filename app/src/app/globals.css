@@ -1201,15 +1201,30 @@ a {
   --holo-b: #0891b2;
   --holo-c: #db2777;
   --holo-line: rgba(20, 21, 23, 0.035);
-  --holo-bloom: rgba(124, 58, 237, 0.26);
-  --holo-bloom-mid: rgba(124, 58, 237, 0.12);
-  --holo-bloom-edge: rgba(124, 58, 237, 0.03);
+  --holo-bloom: rgba(124, 58, 237, 0.15);
+  --holo-bloom-mid: rgba(124, 58, 237, 0.07);
+  --holo-bloom-edge: rgba(124, 58, 237, 0.02);
   /* Colour on a light surface subtracts. */
   --holo-blend: multiply;
-  /* Well above the dark value: multiply against a near-white card has far
-     less range to work with than light added to a near-black one. */
-  --holo-wash-opacity: 0.4;
+  /* Light-mode text is DARK, so every bit of colour multiplied into the card
+     eats the contrast under it. The dark mode can afford a heavier wash
+     because its text is white and the pools only lift the surface toward it;
+     here they pull the surface toward the ink. Kept low deliberately -- the
+     rim, which sits on the border where nothing is read, carries the effect
+     instead. */
+  --holo-wash-opacity: 0.2;
   --holo-rim-opacity: 1;
+}
+
+/* The card's own text, darkened against the wash. These are the same tokens
+   the rest of the admin uses, redefined for this subtree only, so every
+   descendant reading var(--text-secondary) picks them up without a single
+   component knowing it is sitting on a hologram. Dark mode needs none of
+   this: white text over an additive wash only gains contrast. */
+:root[data-theme="light"] .agent-holo {
+  --text-primary: rgba(20, 21, 23, 0.98);
+  --text-secondary: rgba(20, 21, 23, 0.82);
+  --text-tertiary: rgba(20, 21, 23, 0.66);
 }
 
 @property --holo-angle {
