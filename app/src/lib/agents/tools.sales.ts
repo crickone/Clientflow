@@ -10,6 +10,8 @@ import { listStages, listAllStagesOnConn } from "@/lib/pipeline/stageRepo";
 import { leadPipelineId } from "@/lib/pipeline/pipelineRepo";
 import { sendWhatsApp } from "@/lib/whatsapp/send";
 import { draftFollowup } from "@/lib/ai/draftFollowup";
+import { offerableSlots } from "@/lib/scheduling/availability";
+import { bookConsultation } from "@/lib/scheduling/bookConsultation";
 import { fenceUntrusted, tdb, type ToolContext, type ToolResult } from "@/lib/agents/toolKit";
 
 /**
@@ -122,6 +124,37 @@ export const SALES_TOOLS: Anthropic.Tool[] = [
       required: ["leadId"],
     },
   },
+  {
+    name: "offer_slots",
+    description:
+      "Look at the real diary and return appointment times that are actually free. READ-ONLY — books nothing. " +
+      "Call this before offering a lead any time: never invent, guess or repeat a previously offered slot, because " +
+      "the diary moves. Returns times already spread across different days, in Europe/Dublin.",
+    input_schema: {
+      type: "object",
+      properties: {
+        count: { type: "integer", description: "How many times to offer. Two is usually right; three at most." },
+      },
+    },
+  },
+  {
+    name: "book_consultation",
+    description:
+      "Book a lead into a free slot. Converts the lead to a client, creates the appointment and moves them to the " +
+      "booked stage. Only call with a date and time that came back from offer_slots AND that the lead has agreed to. " +
+      "If the slot was taken in the meantime this returns slot_taken and books nothing — call offer_slots again and " +
+      "offer the lead the new times.",
+    input_schema: {
+      type: "object",
+      properties: {
+        leadId: { type: "integer", description: "The lead's id." },
+        date: { type: "string", description: "ISO date, YYYY-MM-DD, exactly as offer_slots returned it." },
+        startTime: { type: "string", description: "HH:mm, exactly as offer_slots returned it." },
+        notes: { type: "string", description: "Optional note for the appointment, e.g. what they asked about." },
+      },
+      required: ["leadId", "date", "startTime"],
+    },
+  }
 ];
 
 // ─── Executors ───────────────────────────────────────────────────────────────
@@ -323,4 +356,54 @@ export function logLeadTouchTool(ctx: ToolContext, input: Record<string, unknown
   });
 
   return { text: JSON.stringify({ result: `Logged a touch for ${leadName(lead)}.` }) };
+}
+
+/** READ — free appointment times from the live diary. Books nothing. */
+export function offerSlotsTool(_ctx: ToolContext, input: Record<string, unknown>): ToolResult {
+  const raw = Number(input.count);
+  const count = Number.isFinite(raw) ? Math.min(3, Math.max(1, raw)) : 2;
+  const { slots, config } = offerableSlots(count);
+  if (slots.length === 0) {
+    return {
+      text: JSON.stringify({
+        slots: [],
+        note:
+          "Nothing free in the booking window. Do NOT invent a time — tell the lead you will come back to them " +
+          "with times, and hand over to the owner.",
+      }),
+    };
+  }
+  return {
+    text: JSON.stringify({
+      durationMinutes: config.durationMinutes,
+      timezone: "Europe/Dublin",
+      slots,
+      note: "Offer these exactly as given. They were free when this was called; book_consultation re-checks.",
+    }),
+  };
+}
+
+/** WRITE — convert the lead, create the appointment, advance the stage. */
+export function bookConsultationTool(_ctx: ToolContext, input: Record<string, unknown>): ToolResult {
+  const leadId = Number(input.leadId);
+  const date = String(input.date || "").trim();
+  const startTime = String(input.startTime || "").trim();
+  if (!leadId || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(startTime)) {
+    return { text: JSON.stringify({ error: "leadId, date (YYYY-MM-DD) and startTime (HH:mm) are required." }) };
+  }
+  const notes = typeof input.notes === "string" ? input.notes : undefined;
+  const result = bookConsultation({ leadId, date, startTime, notes });
+  if (!result.ok) {
+    return { text: JSON.stringify({ error: result.error, reason: result.reason }) };
+  }
+  return {
+    text: JSON.stringify({
+      result: "Booked.",
+      appointmentId: result.appointmentId,
+      clientId: result.clientId,
+      date: result.date,
+      startTime: result.startTime,
+      endTime: result.endTime,
+    }),
+  };
 }

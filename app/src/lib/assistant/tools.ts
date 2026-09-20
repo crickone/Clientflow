@@ -57,6 +57,8 @@ import {
   listLeadsTool,
   logLeadTouchTool,
   sendWhatsappTool,
+  offerSlotsTool,
+  bookConsultationTool,
   setLeadStageTool,
 } from "@/lib/agents/tools.sales";
 import {
@@ -176,6 +178,15 @@ const WRITE_TOOL_META: Record<string, WriteToolMeta> = {
   send_whatsapp: { label: "Send WhatsApp", summarize: ({ v, who }) => `Send a WhatsApp to ${who || `lead #${v("leadId") || "?"}`}${v("text") ? ` — “${v("text")}”` : ""}` },
   set_lead_stage: { label: "Change lead stage", summarize: ({ v, who }) => `Move ${who || `lead #${v("leadId") || "?"}`} to "${v("stage") || "a new stage"}"` },
   log_lead_touch: { label: "Log lead touch", summarize: ({ v, who }) => `Log a touch for ${who || `lead #${v("leadId") || "?"}`}` },
+  // Booking writes an appointment and converts the lead to a client, so it is
+  // gated like any other write. Its partner `offer_slots` is READ-ONLY and is
+  // deliberately absent from this map — the agent must be free to check the
+  // diary without an approval round-trip, or it cannot hold a conversation.
+  book_consultation: {
+    label: "Book consultation",
+    summarize: ({ v, who }) =>
+      `Book ${who || `lead #${v("leadId") || "?"}`} in for ${v("date") || "a date"} at ${v("startTime") || "a time"}`,
+  },
 
   // Marketing agent (Marketing Task 1): persisting a draft is low-stakes, but
   // publishing pushes to the LIVE public site — both gated. The 3 read tools
@@ -906,6 +917,10 @@ export async function executeTool(
         return setLeadStageTool(ctx, input);
       case "log_lead_touch":
         return logLeadTouchTool(ctx, input);
+      case "offer_slots":
+        return offerSlotsTool(ctx, input);
+      case "book_consultation":
+        return bookConsultationTool(ctx, input);
       case "list_blog_posts":
         return listBlogPostsTool(ctx, input);
       case "draft_blog_post":

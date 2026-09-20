@@ -57,6 +57,7 @@
     "send_whatsapp",
     "set_lead_stage",
     "log_lead_touch",
+    "book_consultation",
     "save_blog_post",
     "publish_blog_post",
     "create_campaign",
@@ -231,6 +232,10 @@
     "replace_website_image": [
       "Replace an image on a page with website image #?",
       "Replace an image on a page with website image #?"
+    ],
+    "book_consultation": [
+      "Book Jane Doe in for 2026-09-01 at 10:00",
+      "Book lead #? in for a date at a time"
     ]
   },
   "readSamplesAllFalse": [

@@ -23,6 +23,11 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
     tools: ["list_leads", "get_lead_health", "create_lead", "draft_lead_reply", "set_lead_stage", "log_lead_touch"],
   },
   {
+    key: "booking",
+    label: "Booking",
+    tools: ["offer_slots", "book_consultation"],
+  },
+  {
     key: "messaging",
     label: "Messaging",
     tools: ["list_recent_messages", "search_messages", "send_client_email", "send_whatsapp", "send_client_whatsapp"],
