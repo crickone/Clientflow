@@ -96,3 +96,77 @@ export function allResourceIds(): number[] {
     .map((t) => virtualResourceId(t.id));
   return [...real, ...virtual];
 }
+
+// ─── Editing (settings screen) ───────────────────────────────────────────────
+
+export interface ResourceRow {
+  id: number;
+  name: string;
+  kind: "space" | "equipment";
+  concurrency: number;
+  isActive: boolean;
+  /** Therapy ids that consume this resource. */
+  therapyIds: number[];
+}
+
+/** Every resource, active or not, with the therapies mapped onto it. */
+export function listResources(): ResourceRow[] {
+  const rows = db.select().from(resources).orderBy(resources.id).all();
+  const links = db
+    .select({ therapyId: therapyResources.therapyId, resourceId: therapyResources.resourceId })
+    .from(therapyResources)
+    .all();
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    kind: r.kind,
+    concurrency: r.concurrency,
+    isActive: r.isActive,
+    therapyIds: links.filter((l) => l.resourceId === r.id).map((l) => l.therapyId),
+  }));
+}
+
+export function createResource(input: { name: string; kind: "space" | "equipment"; concurrency: number }): number {
+  const inserted = db
+    .insert(resources)
+    .values({ name: input.name, kind: input.kind, concurrency: input.concurrency })
+    .returning({ id: resources.id })
+    .all();
+  return inserted[0]!.id;
+}
+
+export function updateResource(
+  id: number,
+  patch: { name?: string; kind?: "space" | "equipment"; concurrency?: number; isActive?: boolean },
+): void {
+  db.update(resources).set({ ...patch, updatedAt: new Date() }).where(eq(resources.id, id)).run();
+}
+
+/** Removing a resource unmaps it too (FK cascade), so the therapies fall back to one-at-a-time. */
+export function deleteResource(id: number): void {
+  db.delete(resources).where(eq(resources.id, id)).run();
+}
+
+/**
+ * Replace the set of therapies that use a resource.
+ *
+ * This is the screen's whole point: a clinic with four kinds of massage and
+ * one table ticks all four against "Massage table", and they stop being four
+ * independent things that can all be booked at 2pm.
+ */
+export function setResourceTherapies(resourceId: number, therapyIds: number[]): void {
+  db.transaction((tx) => {
+    tx.delete(therapyResources).where(eq(therapyResources.resourceId, resourceId)).run();
+    for (const therapyId of therapyIds) {
+      tx.insert(therapyResources).values({ therapyId, resourceId, units: 1 }).run();
+    }
+  });
+}
+
+/** Therapies with no resource at all — they fall back to a virtual one-at-a-time resource. */
+export function unmappedTherapyIds(): number[] {
+  const mapped = new Set(
+    db.selectDistinct({ id: therapyResources.therapyId }).from(therapyResources).all().map((r) => r.id),
+  );
+  return db.select({ id: therapies.id }).from(therapies).all().map((t) => t.id).filter((id) => !mapped.has(id));
+}

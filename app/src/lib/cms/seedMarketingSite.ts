@@ -39,7 +39,12 @@ const SITE_NAME = "AdonisAgent";
  *   rev 3 (2026-08-12) — drop Lenis (its scroll hijack breaks scrolling inside
  *   the CMS-embedded template); native smooth scroll + scroll-padding-top.
  */
-const MARKETING_SITE_REV = 3;
+// rev 4 (2026-09-20): cinematic dark redesign and connected demo-request form.
+// rev 5 (2026-09-21): the copy rewrite. Rev 4 was consumed by a deploy that
+//   carried the redesign up from an uncommitted working tree BEFORE the copy
+//   pass, so the stored rev is already 4 and a rev-4 build republishes
+//   nothing. A new number is the only way the new copy reaches the site.
+const MARKETING_SITE_REV = 5;
 const REV_KEY = "marketing_site_rev";
 
 export function seedMarketingSite(): void {
