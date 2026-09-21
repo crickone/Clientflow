@@ -556,3 +556,13 @@ table.tbl { border-collapse: collapse; width: 100%; }
   .signin-body { grid-template-columns: minmax(0, 1fr); }
   .signin-form { max-width: 420px; }
 }
+.signin-forgot {
+  display: inline-block;
+  margin-top: 16px;
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  text-decoration: none;
+  border-bottom: 1px solid var(--hairline-strong);
+  padding-bottom: 1px;
+}
+.signin-forgot:hover { color: var(--text-primary); }

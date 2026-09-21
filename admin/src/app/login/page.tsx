@@ -5,6 +5,17 @@ import { useState, type FormEvent } from "react";
 import { Logo } from "@/components/Logo";
 
 /**
+ * Where a locked-out admin goes. The reset flow lives in the CRM
+ * (app/src/app/forgot-password) and works on the same control-plane `users`
+ * row the console authenticates against, so it can reset a console password —
+ * there is just no console-native page for it yet.
+ *
+ * Overridable for local work; the fallback is production, because the common
+ * case is someone locked out of the real console.
+ */
+const RESET_URL = `${process.env.NEXT_PUBLIC_MAIN_APP_URL ?? "https://app.adonisagent.ie"}/forgot-password`;
+
+/**
  * Console sign-in.
  *
  * Structured like a modern consumer sign-in (Revolut's is the reference the
@@ -18,6 +29,7 @@ import { Logo } from "@/components/Logo";
  * sites/adonisagent, so the console and the website open with the same object.
  * Decorative, aria-hidden, and it degrades to nothing on a narrow screen.
  */
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -92,6 +104,10 @@ export default function LoginPage() {
               {busy ? "Signing in…" : "Continue"}
             </button>
           </form>
+
+          <a className="signin-forgot" href={RESET_URL}>
+            Forgot your password?
+          </a>
 
           <p className="signin-note">
             Platform admins only. Business owners sign in at{" "}
