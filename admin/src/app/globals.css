@@ -436,3 +436,123 @@ table.tbl { border-collapse: collapse; width: 100%; }
   .spin { animation: none; }
   html { scroll-behavior: auto !important; }
 }
+
+/* ─── Console sign-in ────────────────────────────────────────────────────────
+   The page is the surface: no card, wordmark pinned top-left, content held
+   left of centre, legal line at the foot. See src/app/login/page.tsx. */
+.signin {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: 34px 40px 28px;
+  overflow: hidden;
+  isolation: isolate;
+}
+/* One cool pool of light behind the top-left corner, the way the marketing
+   site lights its hero. Sized in vmax so it scales with the viewport instead
+   of pooling in a corner on a large screen. */
+.signin-wash {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(60vmax 45vmax at 8% -10%, rgba(96, 132, 186, 0.22), transparent 62%),
+    radial-gradient(45vmax 40vmax at 88% 108%, rgba(124, 92, 190, 0.14), transparent 66%);
+  pointer-events: none;
+}
+.signin-mark { flex: 0 0 auto; }
+.signin-body {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
+  align-items: center;
+  gap: 40px;
+  max-width: 1180px;
+  width: 100%;
+  margin: 0 auto;
+}
+.signin-form { max-width: 380px; }
+.signin-form h1 {
+  font-family: var(--font-heading), system-ui, sans-serif;
+  font-size: clamp(30px, 4vw, 38px);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin: 0 0 10px;
+}
+.signin-sub { margin: 0 0 28px; color: var(--text-secondary); font-size: 14.5px; line-height: 1.5; }
+
+/* Filled, rounded, placeholder-as-label — the same field language the CRM
+   moved to (see the app's Revolut restyle). Deliberately NOT .input: these are
+   larger and label-less, and quietly widening .input would resize every form
+   in the console. */
+.field {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  border-radius: 14px;
+  padding: 17px 18px;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 15px;
+  transition: background 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+.field::placeholder { color: var(--text-tertiary); }
+.field:focus,
+.field:focus-visible {
+  outline: none;
+  background: var(--surface-3, var(--surface-2));
+  border-color: var(--hairline-strong);
+}
+
+.signin-go {
+  width: 100%;
+  margin-top: 10px;
+  padding: 17px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #0b0e12;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s var(--ease), filter 0.15s var(--ease);
+}
+.signin-go:hover:not(:disabled) { filter: brightness(1.06); }
+.signin-go:active:not(:disabled) { transform: translateY(1px); }
+.signin-go:disabled { opacity: 0.55; cursor: default; }
+
+.signin-error { margin: 2px 0 0; color: var(--red); font-size: 13.5px; }
+.signin-note { margin: 22px 0 0; color: var(--text-tertiary); font-size: 12.5px; line-height: 1.5; }
+.signin-note a { color: var(--text-secondary); }
+
+.signin-art { display: grid; place-items: center; }
+.signin-art svg { width: min(100%, 460px); height: auto; transform: rotate(-8deg); }
+.sculpt-depth { fill: none; stroke: url(#edge); stroke-width: 35; stroke-linecap: square; transform: translate(5px, 13px); }
+.sculpt-face { fill: none; stroke: url(#metal); stroke-width: 30; stroke-linecap: square; }
+.sculpt-edge { fill: none; stroke: #ecf6ff; stroke-width: 0.9; stroke-linecap: square; opacity: 0.8; transform: translate(-13px, -13px); }
+
+.signin-foot {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 22px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.signin-foot a { color: var(--text-tertiary); text-decoration: none; }
+.signin-foot a:hover { color: var(--text-secondary); }
+
+@media (max-width: 900px) {
+  .signin { padding: 26px 22px 22px; }
+  /* The sculpture is decoration; on a phone the form gets the whole screen. */
+  .signin-art { display: none; }
+  .signin-body { grid-template-columns: minmax(0, 1fr); }
+  .signin-form { max-width: 420px; }
+}
