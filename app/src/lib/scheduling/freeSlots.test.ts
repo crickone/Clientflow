@@ -5,6 +5,14 @@
 import assert from "node:assert/strict";
 
 import { computeFreeSlots, spreadSlots, hmToMin, minToHm, type DayAvailability } from "./freeSlots";
+import type { ResourceLimit } from "./resourceDemand";
+
+/** The clinic shape: one machine, concurrency 1. Resource 99 is a second, unrelated machine. */
+const LIMITS = new Map<number, ResourceLimit>([
+  [1, { id: 1, name: "HBOT chamber", concurrency: 1 }],
+  [99, { id: 99, name: "Other machine", concurrency: 1 }],
+]);
+const WANTS_1 = new Map([[1, 1]]);
 
 let passed = 0;
 function check(name: string, actual: unknown, expected: unknown) {
@@ -25,7 +33,8 @@ const base = {
   durationMinutes: 20,
   bufferMinutes: 0,
   granularityMinutes: 30,
-  therapyIds: [1],
+  demand: WANTS_1,
+  limits: LIMITS,
   earliest: { date: "2026-10-05", min: 0 },
   limit: 100,
 };
@@ -54,36 +63,50 @@ check("closed days contribute nothing", computeFreeSlots({ ...base, days: [day("
 const booked = day("2026-10-05", {
   openMin: hmToMin("09:00"),
   closeMin: hmToMin("11:00"),
-  busy: [{ startMin: hmToMin("09:30"), endMin: hmToMin("10:00"), therapyIds: [1] }],
+  busy: [{ startMin: hmToMin("09:30"), endMin: hmToMin("10:00"), demand: new Map([[1, 1]]) }],
 });
 check(
-  "a booking sharing a therapy blocks its own span only",
+  "a booking wanting the same resource blocks its own span only",
   computeFreeSlots({ ...base, days: [booked] }).map((s) => s.startTime),
   ["09:00", "10:00", "10:30"],
 );
 
 check(
-  "a booking for a DIFFERENT therapy does not block",
+  "a booking wanting a DIFFERENT resource does not block",
   computeFreeSlots({
     ...base,
     days: [day("2026-10-05", {
       closeMin: hmToMin("11:00"),
-      busy: [{ startMin: hmToMin("09:30"), endMin: hmToMin("10:00"), therapyIds: [99] }],
+      busy: [{ startMin: hmToMin("09:30"), endMin: hmToMin("10:00"), demand: new Map([[99, 1]]) }],
     })],
   }).map((s) => s.startTime),
   ["09:00", "09:30", "10:00", "10:30"],
 );
 
+// A block-out closes the place, so availability.ts expands it into a span
+// demanding EVERY known resource. A span demanding nothing blocks nothing —
+// that is the arithmetic, and it is why the expansion has to happen upstream.
 check(
-  "a block-out (no therapies) blocks everything",
+  "a block-out (expanded to every resource) blocks the whole span",
   computeFreeSlots({
     ...base,
     days: [day("2026-10-05", {
       closeMin: hmToMin("11:00"),
-      busy: [{ startMin: hmToMin("09:30"), endMin: hmToMin("10:00"), therapyIds: [] }],
+      busy: [{ startMin: hmToMin("09:30"), endMin: hmToMin("10:00"), demand: new Map([[1, 1], [99, 1]]) }],
     })],
   }).map((s) => s.startTime),
   ["09:00", "10:00", "10:30"],
+);
+check(
+  "a span demanding nothing blocks nothing",
+  computeFreeSlots({
+    ...base,
+    days: [day("2026-10-05", {
+      closeMin: hmToMin("11:00"),
+      busy: [{ startMin: hmToMin("09:30"), endMin: hmToMin("10:00"), demand: new Map() }],
+    })],
+  }).map((s) => s.startTime),
+  ["09:00", "09:30", "10:00", "10:30"],
 );
 
 // Half-open spans: a 09:00-09:20 slot does NOT clash with a 09:20 booking.
@@ -93,7 +116,7 @@ check(
     ...base,
     days: [day("2026-10-05", {
       closeMin: hmToMin("10:00"),
-      busy: [{ startMin: hmToMin("09:20"), endMin: hmToMin("09:40"), therapyIds: [1] }],
+      busy: [{ startMin: hmToMin("09:20"), endMin: hmToMin("09:40"), demand: new Map([[1, 1]]) }],
     })],
   }).map((s) => s.startTime),
   ["09:00"],
@@ -107,7 +130,7 @@ check(
     bufferMinutes: 15,
     days: [day("2026-10-05", {
       closeMin: hmToMin("11:00"),
-      busy: [{ startMin: hmToMin("09:30"), endMin: hmToMin("10:00"), therapyIds: [1] }],
+      busy: [{ startMin: hmToMin("09:30"), endMin: hmToMin("10:00"), demand: new Map([[1, 1]]) }],
     })],
   }).map((s) => s.startTime),
   ["10:30"],

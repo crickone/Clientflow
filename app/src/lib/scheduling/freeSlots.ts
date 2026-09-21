@@ -1,25 +1,18 @@
 /**
  * PURE free-slot arithmetic — no DB, no `server-only`, so it loads under the
- * plain-tsx test runner (same convention as pipeline/roles.ts and
- * pipeline/boardMetrics.ts).
+ * plain-tsx test runner (same convention as pipeline/roles.ts).
  *
- * The rules here deliberately mirror `checkBookingSlot` (@/lib/schedule),
- * which validates ONE proposed time against the diary. This module answers
- * the opposite question — "what times are free?" — over a date range, from
- * data the caller has already loaded. Keeping the two in step matters: a slot
- * this module offers that `checkBookingSlot` then refuses is a lead being
- * offered a time they cannot have, so `availability.ts` re-checks every slot
- * it is about to hand out and `bookConsultation` re-checks again at the moment
- * of writing. Three passes sounds excessive; it is what stops two leads taking
- * the same Thursday at 18:30 ninety seconds apart.
- *
- * Capacity model, also mirrored from checkBookingSlot: two appointments only
- * conflict if they overlap in time AND share at least one therapy. A
- * consultation with no therapy attached therefore never blocks anything and is
- * never blocked — which is wrong for a one-room clinic, so `availability.ts`
- * passes the tenant's consultation therapy ids in and they take part in the
- * overlap test like any other booking.
+ * This module answers "what times are free?" over a date range. It does NOT
+ * own the rule for whether a time is free: that lives in ./resourceDemand and
+ * is the same function `checkBookingSlot` (@/lib/schedule) uses to validate a
+ * single proposed booking. An earlier version of this file reimplemented the
+ * overlap test, which meant two copies of the rule and a standing risk that a
+ * slot offered here would be refused at booking. One rule now, called twice.
  */
+
+import { firstConflict, type BookedSpan, type Demand, type ResourceLimit } from "./resourceDemand";
+
+export type { BookedSpan, Demand, ResourceLimit };
 
 /** Minutes from midnight for "HH:mm". Duplicated from @/lib/schedule so this module stays DB-free. */
 export function hmToMin(hm: string): number {
@@ -34,12 +27,7 @@ export function minToHm(mins: number): string {
 }
 
 /** One booked or blocked span on a given day, in minutes from midnight. */
-export interface BusySpan {
-  startMin: number;
-  endMin: number;
-  /** Empty = blocks everything (a block-out). Non-empty = only conflicts with a booking sharing a therapy. */
-  therapyIds: number[];
-}
+export type BusySpan = BookedSpan;
 
 export interface DayAvailability {
   /** ISO date, YYYY-MM-DD. */
@@ -59,8 +47,10 @@ export interface FreeSlotsInput {
   bufferMinutes: number;
   /** Candidate starts land on this grid, e.g. 15 -> :00 :15 :30 :45. */
   granularityMinutes: number;
-  /** The therapies this booking occupies; drives the shared-therapy overlap test. */
-  therapyIds: number[];
+  /** What one booking of this service consumes. */
+  demand: Demand;
+  /** Concurrency per resource. Absent = 1. */
+  limits: Map<number, ResourceLimit>;
   /** Nothing before this instant is offered. `{ date, min }` = ISO date + minutes from midnight. */
   earliest: { date: string; min: number };
   /** Stop after this many slots. */
@@ -75,28 +65,20 @@ export interface FreeSlot {
   endTime: string;
 }
 
-/** True when [aStart,aEnd) and [bStart,bEnd) overlap. Half-open, so 10:00-10:30 and 10:30-11:00 do not. */
-function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
-  return aStart < bEnd && bStart < aEnd;
-}
-
 /**
  * Every free start time across `days`, earliest first.
  *
- * A candidate survives when it fits inside opening hours and clashes with no
- * busy span — where "clash" means the two overlap once the buffer is applied
- * AND they share a therapy (or the busy span is a block-out, which shares
- * nothing and blocks everything).
+ * A candidate survives when it fits inside opening hours and over-subscribes
+ * no resource once the buffer is applied.
  */
 export function computeFreeSlots(input: FreeSlotsInput): FreeSlot[] {
   const {
     days, durationMinutes, bufferMinutes, granularityMinutes,
-    therapyIds, earliest, limit, maxPerDay,
+    demand, limits, earliest, limit, maxPerDay,
   } = input;
 
   if (durationMinutes <= 0 || granularityMinutes <= 0 || limit <= 0) return [];
 
-  const mine = new Set(therapyIds);
   const out: FreeSlot[] = [];
 
   for (const day of [...days].sort((a, b) => a.date.localeCompare(b.date))) {
@@ -118,13 +100,16 @@ export function computeFreeSlots(input: FreeSlotsInput): FreeSlot[] {
       if (maxPerDay != null && onThisDay >= maxPerDay) break;
 
       const end = start + durationMinutes;
-      const clashes = day.busy.some((b) => {
-        if (!overlaps(start - bufferMinutes, end + bufferMinutes, b.startMin, b.endMin)) return false;
-        // A span with no therapies is a block-out: it blocks everything.
-        if (b.therapyIds.length === 0) return true;
-        return b.therapyIds.some((id) => mine.has(id));
+      // The SAME rule the booking path enforces — see ./resourceDemand.
+      const clash = firstConflict({
+        startMin: start,
+        endMin: end,
+        demand,
+        booked: day.busy,
+        bufferMinutes,
+        limits,
       });
-      if (clashes) continue;
+      if (clash) continue;
 
       out.push({ date: day.date, startTime: minToHm(start), endTime: minToHm(end) });
       onThisDay++;

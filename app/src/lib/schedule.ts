@@ -3,6 +3,8 @@ import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { appointments, blockOuts, type BlockOut } from "./db/schema";
 import { getSettings, type OpeningHour } from "./settings";
+import { conflictReason, firstConflict } from "./scheduling/resourceDemand";
+import { demandForTherapies, demandResolver, resourceLimits } from "./scheduling/resourceRepo";
 
 /**
  * Convert "HH:mm" to minutes from midnight.
@@ -108,34 +110,40 @@ export function checkBookingSlot(
     }
   }
 
-  // 3. Existing appointments — capacity 1 per therapy. Two bookings only
-  //    conflict if they share a therapy.
+  // 3. Existing appointments — RESOURCES. A booking conflicts when it would
+  //    over-subscribe something it needs: one HBOT chamber takes one booking,
+  //    three treatment rooms take three, one gym floor takes one class. The
+  //    arithmetic is @/lib/scheduling/resourceDemand, shared with the
+  //    free-slot engine so a time offered to a lead is a time they can have.
+  //
+  //    This replaces "conflict iff the two share a therapy", which was never a
+  //    capacity model — it behaved like one-of-each-therapy-at-a-time, right
+  //    only for a clinic with exactly one of every machine. A therapy with no
+  //    resource mapped still falls back to exactly that (see resourceRepo), so
+  //    an unconfigured tenant is unaffected.
   const buffer = settings.bufferMinutes;
-  const mySet = new Set(therapyIds);
+  const demandOf = demandResolver();
   const existing = db
     .select()
     .from(appointments)
     .where(eq(appointments.date, dateIso))
     .all();
-  for (const a of existing) {
-    if (excludeAppointmentId != null && a.id === excludeAppointmentId) continue;
-    if (a.status === "cancelled") continue;
-    const as = hmToMin(a.startTime) - buffer;
-    const ae = hmToMin(a.endTime) + buffer;
-    if (!(startMin < ae && as < endMin)) continue; // no time overlap
-    let theirIds: number[] = [];
-    try {
-      theirIds = JSON.parse(a.therapyIds || "[]");
-    } catch {
-      // ignore
-    }
-    const shared = theirIds.filter((id) => mySet.has(id));
-    if (shared.length === 0) continue; // different therapy, allowed
-    return {
-      ok: false,
-      reason: `Therapy already booked at this time (appointment #${a.id}, ${a.startTime}–${a.endTime}).`,
-    };
-  }
+
+  const conflict = firstConflict({
+    startMin,
+    endMin,
+    demand: demandForTherapies(therapyIds),
+    bufferMinutes: buffer,
+    limits: resourceLimits(),
+    booked: existing
+      .filter((a) => a.status !== "cancelled" && (excludeAppointmentId == null || a.id !== excludeAppointmentId))
+      .map((a) => ({
+        startMin: hmToMin(a.startTime),
+        endMin: hmToMin(a.endTime),
+        demand: demandOf(a.therapyIds),
+      })),
+  });
+  if (conflict) return { ok: false, reason: conflictReason(conflict) };
 
   return { ok: true };
 }

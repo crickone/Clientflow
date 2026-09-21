@@ -264,6 +264,31 @@ export const TENANT_MIGRATIONS: Migration[] = [
         .run();
     },
   },
+  {
+    id: "0007-seed-therapy-resources",
+    description:
+      "Give every existing therapy its own resource at concurrency 1, and map the therapy to it. This is a BEHAVIOUR-PRESERVING seed: the old conflict rule was 'two appointments clash if they overlap and share a therapy', which is exactly what one capacity-1 resource per therapy expresses. A tenant sees no change until they edit their resources — at which point a spa can say it has three massage rooms and a gym can say every class wants the same floor, neither of which the old rule could express. Create-only: a therapy that already has a resource mapped is left alone, so re-running (or running after someone has configured their own) changes nothing.",
+    up: (sqlite) => {
+      const therapies = sqlite
+        .prepare("SELECT id, name FROM therapies")
+        .all() as { id: number; name: string }[];
+      const mapped = new Set(
+        (sqlite.prepare("SELECT DISTINCT therapy_id AS id FROM therapy_resources").all() as { id: number }[])
+          .map((r) => r.id),
+      );
+      const insertResource = sqlite.prepare(
+        "INSERT INTO resources (name, kind, concurrency, is_active) VALUES (?, 'equipment', 1, 1)",
+      );
+      const link = sqlite.prepare(
+        "INSERT INTO therapy_resources (therapy_id, resource_id, units) VALUES (?, ?, 1)",
+      );
+      for (const t of therapies) {
+        if (mapped.has(t.id)) continue;
+        const res = insertResource.run(t.name);
+        link.run(t.id, Number(res.lastInsertRowid));
+      }
+    },
+  },
 ];
 
 /**

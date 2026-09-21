@@ -487,6 +487,23 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       is_active INTEGER NOT NULL DEFAULT 1
     );
 
+    CREATE TABLE IF NOT EXISTS resources (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'equipment',
+      concurrency INTEGER NOT NULL DEFAULT 1,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+
+    CREATE TABLE IF NOT EXISTS therapy_resources (
+      therapy_id INTEGER NOT NULL REFERENCES therapies(id) ON DELETE CASCADE,
+      resource_id INTEGER NOT NULL REFERENCES resources(id) ON DELETE CASCADE,
+      units INTEGER NOT NULL DEFAULT 1,
+      PRIMARY KEY (therapy_id, resource_id)
+    );
+
     CREATE TABLE IF NOT EXISTS appointments (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,

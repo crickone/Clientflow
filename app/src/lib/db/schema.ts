@@ -1,6 +1,7 @@
 import {
   index,
   integer,
+  primaryKey,
   real,
   sqliteTable,
   text,
@@ -110,6 +111,52 @@ export const therapies = sqliteTable("therapies", {
   // multiple spots (gym). Behaviour unchanged until class rosters land later.
   capacity: integer("capacity").notNull().default(1),
 });
+
+/**
+ * A thing that can only be in so many places at once: a treatment room, an
+ * HBOT chamber, a studio floor. Bookings consume resources; a resource is
+ * over-subscribed when overlapping bookings want more of it than it has.
+ *
+ * This replaces an accident. The old conflict rule was "two appointments
+ * clash if they overlap AND share a therapy", which behaves like "one of each
+ * therapy at a time" — right for a clinic with one of each machine, wrong for
+ * a spa with three massage rooms and wrong for a gym, where every class wants
+ * the same floor. Seeding one resource per therapy at concurrency 1 reproduces
+ * the old behaviour exactly, so nothing changes until a tenant edits it.
+ *
+ * `concurrency` is how many bookings can use it at the same time. It is NOT
+ * `therapies.capacity` (spots in a class) or `timetable_sessions.capacity`
+ * (attendees) — three different numbers, deliberately three different names.
+ */
+export const resources = sqliteTable("resources", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  /** "space" = a room or floor; "equipment" = a machine, chamber or mat. Presentational only — the arithmetic treats them identically. */
+  kind: text("kind", { enum: ["space", "equipment"] }).notNull().default("equipment"),
+  concurrency: integer("concurrency").notNull().default(1),
+  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
+/** What one booking of a therapy takes up. `units` > 1 for a service needing two of something. */
+export const therapyResources = sqliteTable(
+  "therapy_resources",
+  {
+    therapyId: integer("therapy_id")
+      .notNull()
+      .references(() => therapies.id, { onDelete: "cascade" }),
+    resourceId: integer("resource_id")
+      .notNull()
+      .references(() => resources.id, { onDelete: "cascade" }),
+    units: integer("units").notNull().default(1),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.therapyId, t.resourceId] }) }),
+);
 
 export const appointments = sqliteTable("appointments", {
   id: integer("id").primaryKey({ autoIncrement: true }),

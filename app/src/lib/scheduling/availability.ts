@@ -6,18 +6,19 @@ import { appointments, blockOuts } from "@/lib/db/schema";
 import { getSettings, readKey } from "@/lib/settings";
 import { daysForBlock, dayOfWeek, checkBookingSlot } from "@/lib/schedule";
 import { computeFreeSlots, spreadSlots, hmToMin, type DayAvailability, type FreeSlot } from "./freeSlots";
+import { allResourceIds, demandForTherapies, demandResolver, resourceLimits } from "./resourceRepo";
 
 /**
  * "What times can I offer this lead?" — the diary side of the lead engine.
  *
  * The arithmetic lives in ./freeSlots (pure, tested). This module is only the
  * data-loading shell: it reads opening hours, block-outs and the appointments
- * in range ONCE for the whole window, hands them over, then re-validates
- * whatever comes back through `checkBookingSlot` — the same function the
- * booking API uses. That last step looks redundant and is not: `computeFreeSlots`
- * reimplements the overlap rules over pre-loaded data, and the day the two
- * drift apart is the day a lead is offered a time they cannot have. The
- * re-check is cheap (a handful of slots) and it fails closed.
+ * in range ONCE for the whole window and hands them over. Both it and
+ * `checkBookingSlot` apply the SAME conflict rule (./resourceDemand), so a
+ * slot offered here is a slot the booking path accepts. The final re-check
+ * through `checkBookingSlot` is kept anyway: it is cheap over a handful of
+ * slots, it catches a diary that moved between loading and offering, and it
+ * fails closed.
  *
  * Time zone: every date here is a Europe/Dublin calendar date, never the
  * server's (Railway runs UTC, the clinic does not). See @/lib/billing/dates
@@ -124,6 +125,14 @@ export function findFreeSlots(opts: { limit?: number; maxPerDay?: number; now?: 
     .all();
   const allBlocks = db.select().from(blockOuts).all();
 
+  const limits = resourceLimits();
+  const demandOf = demandResolver();
+  const myDemand = demandForTherapies(config.therapyIds);
+  // A block-out closes the place, so it has to occupy everything — including
+  // the virtual resources standing in for unmapped therapies. A span that
+  // demands nothing blocks nothing (see resourceDemand.ts).
+  const everything = new Map(allResourceIds().map((id) => [id, Number.MAX_SAFE_INTEGER]));
+
   const byDate = new Map<string, typeof booked>();
   for (const a of booked) {
     const list = byDate.get(a.date);
@@ -141,26 +150,18 @@ export function findFreeSlots(opts: { limit?: number; maxPerDay?: number; now?: 
       continue;
     }
 
-    const busy = (byDate.get(date) ?? []).map((a) => {
-      let ids: number[] = [];
-      try {
-        ids = JSON.parse(a.therapyIds || "[]");
-      } catch {
-        ids = [];
-      }
-      // An appointment with no therapy recorded would, under the shared-therapy
-      // rule, block nothing at all. Treat it as blocking everything: a body in
-      // the room is a body in the room.
-      return { startMin: hmToMin(a.startTime), endMin: hmToMin(a.endTime), therapyIds: ids };
-    });
+    const busy = (byDate.get(date) ?? []).map((a) => ({
+      startMin: hmToMin(a.startTime),
+      endMin: hmToMin(a.endTime),
+      demand: demandOf(a.therapyIds),
+    }));
 
     for (const b of allBlocks) {
       const hits = b.type === "one_off"
         ? (b.date ?? "") <= date && date <= (b.endDate ?? b.date ?? "")
         : daysForBlock(b).includes(dayOfWeek(date));
       if (!hits) continue;
-      // therapyIds: [] marks a block-out, which blocks every therapy.
-      busy.push({ startMin: hmToMin(b.startTime), endMin: hmToMin(b.endTime), therapyIds: [] });
+      busy.push({ startMin: hmToMin(b.startTime), endMin: hmToMin(b.endTime), demand: everything });
     }
 
     days.push({
@@ -177,7 +178,8 @@ export function findFreeSlots(opts: { limit?: number; maxPerDay?: number; now?: 
     durationMinutes: config.durationMinutes,
     bufferMinutes,
     granularityMinutes: config.granularityMinutes,
-    therapyIds: config.therapyIds,
+    demand: myDemand,
+    limits,
     earliest: { date: earliestDate, min: earliestMinOnDay },
     limit: limit * 3, // over-fetch so `spreadSlots` has room to pick across days
     maxPerDay: opts.maxPerDay,
