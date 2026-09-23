@@ -1534,7 +1534,7 @@ function MessageBubble({
                 <Button variant="ghost" size="sm" onClick={() => setTweakOpen(false)}>
                   Back
                 </Button>
-                <Button size="sm" onClick={submitGoAgain} disabled={busy}>
+                <Button size="sm" onClick={submitGoAgain} loading={busy}>
                   Regenerate
                 </Button>
               </div>

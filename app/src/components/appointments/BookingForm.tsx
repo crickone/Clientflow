@@ -926,7 +926,7 @@ export function BookingForm({
       <input type="hidden" name="status" value="scheduled" />
 
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-        <Button type="submit" disabled={submitting}>
+        <Button type="submit" loading={submitting}>
           {submitting ? "Booking…" : vocab.bookCta}
         </Button>
       </div>

@@ -183,7 +183,7 @@ export function PageEditor({
           </div>
 
           <div>
-            <Button type="submit" disabled={saving}>
+            <Button type="submit" loading={saving}>
               <Save size={15} />
               {saving ? "Saving…" : "Save"}
             </Button>
@@ -212,7 +212,7 @@ export function PageEditor({
             </Button>
           ) : (
             <Button
-              disabled={pending}
+              loading={pending}
               onClick={() =>
                 startTransition(async () => {
                   await publishPageAction(siteSlug, page.id);

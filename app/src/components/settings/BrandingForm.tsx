@@ -163,7 +163,7 @@ export function BrandingForm({
             <Button
               type="button"
               onClick={() => fileRef.current?.click()}
-              disabled={busy}
+              loading={busy}
             >
               <Upload size={14} />
               {hasLogo ? "Replace logo" : "Upload logo"}

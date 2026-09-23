@@ -137,7 +137,7 @@ export function TriggerEditor({ initial, businessName }: { initial: Detail; busi
         <Button variant="ghost" onClick={() => router.push("/automations")} disabled={saving}>
           Cancel
         </Button>
-        <Button onClick={save} disabled={saving}>
+        <Button onClick={save} loading={saving}>
           {saving ? "Saving…" : "Save trigger"}
         </Button>
       </div>

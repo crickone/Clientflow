@@ -468,7 +468,7 @@ export function VideoEditor({
           <Button variant="outline" onClick={undo} disabled={undoStack.length === 0 || busy}>
             <Undo2 size={14} /> Undo
           </Button>
-          <Button onClick={onExport} disabled={busy || rendering}>
+          <Button onClick={onExport} loading={busy || rendering}>
             <Download size={14} /> Export MP4
           </Button>
         </div>
@@ -520,7 +520,7 @@ export function VideoEditor({
                   <Button
                     size="sm"
                     onClick={() => onSetMainRotation(mainAsset.suggestedRotation)}
-                    disabled={busy}
+                    loading={busy}
                   >
                     <RotateCw size={13} />
                     Rotate {mainAsset.suggestedRotation === 270 ? "left" : "right"}

@@ -24,7 +24,7 @@ const initial: DomainState = { ok: false };
 function AddButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending}>
+    <Button type="submit" loading={pending}>
       {pending ? "Adding…" : "Add domain"}
     </Button>
   );

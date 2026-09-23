@@ -204,7 +204,7 @@ export function SkillForm({ initial, onDone }: { initial: SkillRow | null; onDon
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <Button onClick={save} disabled={pending}>
+          <Button onClick={save} loading={pending}>
             {pending ? "Saving…" : initial ? "Save skill" : "Add skill"}
           </Button>
           <Button variant="ghost" onClick={onDone} disabled={pending}>

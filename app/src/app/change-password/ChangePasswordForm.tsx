@@ -142,7 +142,7 @@ export function ChangePasswordForm({ forced }: { forced: boolean }) {
             </div>
           )}
 
-          <Button type="submit" disabled={busy} style={{ marginTop: 6 }}>
+          <Button type="submit" loading={busy} style={{ marginTop: 6 }}>
             {busy ? "Saving…" : "Update password"}
           </Button>
         </form>

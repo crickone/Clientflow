@@ -109,7 +109,7 @@ export function ClientLoginForm({ logoSrc, businessName }: { logoSrc: string | n
           <Input id="cl-pass" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" autoComplete="current-password" />
         </div>
         {error && <div style={{ color: "#f87171", fontSize: 13 }}>{error}</div>}
-        <Button type="submit" disabled={busy} style={{ justifyContent: "center", height: 46, marginTop: 4 }}>
+        <Button type="submit" loading={busy} style={{ justifyContent: "center", height: 46, marginTop: 4 }}>
           {busy ? <Loader2 size={16} className="spin" /> : "Sign in"}
         </Button>
       </form>

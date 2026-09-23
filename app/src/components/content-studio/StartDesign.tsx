@@ -280,7 +280,7 @@ export function StartDesign() {
             </select>
           </span>
         )}
-        <Button onClick={startWithAi} disabled={working}>
+        <Button onClick={startWithAi} loading={working}>
           {busy === "ai" ? <Loader2 size={15} className="spin" /> : <Sparkles size={15} />}
           {busy === "ai" ? "Starting…" : "Write it with Adonis"}
         </Button>

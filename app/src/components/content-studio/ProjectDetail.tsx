@@ -378,7 +378,7 @@ export function ProjectDetail({
               </Button>
             )}
             {canRender && hasPlan && !planEdited && (
-              <Button onClick={() => startRender(true)} disabled={busy}>
+              <Button onClick={() => startRender(true)} loading={busy}>
                 <RefreshCw size={14} />
                 {project.status === "rendered" ? "Re-render" : "Render"}
               </Button>

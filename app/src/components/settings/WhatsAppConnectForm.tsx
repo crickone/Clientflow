@@ -139,7 +139,7 @@ export function WhatsAppConnectForm({
             </div>
           </div>
           <div>
-            <Button onClick={save} disabled={isPending}>
+            <Button onClick={save} loading={isPending}>
               {isPending ? "Saving…" : "Save & connect"}
             </Button>
           </div>

@@ -62,7 +62,7 @@ export function MonthNote({
           >
             Cancel
           </Button>
-          <Button size="sm" onClick={save} disabled={pending}>
+          <Button size="sm" onClick={save} loading={pending}>
             {pending ? <Loader2 size={12} className="spin" /> : <Check size={12} />}
             Save
           </Button>

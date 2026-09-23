@@ -231,7 +231,7 @@ export function BlogPostEditor({
             </div>
           </div>
           <div>
-            <Button type="submit" disabled={saving}>
+            <Button type="submit" loading={saving}>
               <Save size={15} />
               {saving ? "Saving…" : "Save"}
             </Button>
@@ -273,7 +273,7 @@ export function BlogPostEditor({
             ) : (
               <>
                 <Button
-                  disabled={pending}
+                  loading={pending}
                   onClick={() =>
                     startTransition(async () => {
                       await publishPostAction(siteSlug, post.id);

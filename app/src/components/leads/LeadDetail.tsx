@@ -509,7 +509,7 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
                         {lead.phone && (
                           <Button
                             size="sm"
-                            disabled={pending}
+                            loading={pending}
                             onClick={() => sendViaWhatsApp(m.id, editText)}
                           >
                             <Send size={13} />
@@ -571,7 +571,7 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
                           {lead.phone && (
                             <Button
                               size="sm"
-                              disabled={pending}
+                              loading={pending}
                               onClick={() => sendViaWhatsApp(m.id, m.content)}
                             >
                               <Send size={13} />
@@ -624,7 +624,7 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
                 <Button variant="ghost" size="sm" onClick={() => setReplyOpen(false)}>
                   Cancel
                 </Button>
-                <Button size="sm" disabled={pending} onClick={logReply}>
+                <Button size="sm" loading={pending} onClick={logReply}>
                   Save reply
                 </Button>
               </div>
