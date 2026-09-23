@@ -233,10 +233,15 @@ a {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  font-family: var(--font-mono), ui-monospace, monospace;
-  font-weight: 400;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  /* Body font, sentence case. Uppercase monospace is the voice this system
+     uses for METADATA — eyebrows, labels, timestamps — and an action is not
+     metadata: caps destroy word shapes and mono widens every label by about a
+     fifth, so "I'll write it myself" was crossing half a screen. It also left
+     the CRM as the only surface still shouting, after the marketing site and
+     the platform console both moved to sentence case. */
+  font-family: var(--font-body), system-ui, sans-serif;
+  font-weight: 500;
+  letter-spacing: -0.005em;
   border-radius: var(--radius);
   cursor: pointer;
   border: 1px solid transparent;
@@ -249,13 +254,18 @@ a {
 .btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; filter: none; }
 .btn--loading { cursor: progress; }
 
-.btn--sm { font-size: 11px; padding: 6px 14px; height: 32px; }
-.btn--md { font-size: 12px; padding: 9px 18px; height: 38px; }
-.btn--lg { font-size: 13px; padding: 11px 22px; height: 44px; }
+/* Larger than before: 11–13px mono uppercase was compensating for how small
+   caps read. Sentence case at a normal size is easier and looks calmer. */
+.btn--sm { font-size: 13px; padding: 0 13px; height: 32px; }
+.btn--md { font-size: 14px; padding: 0 17px; height: 38px; }
+.btn--lg { font-size: 15px; padding: 0 21px; height: 44px; }
 .btn--icon { padding: 0; width: 36px; height: 36px; }
 
-.btn--primary { background: var(--accent); color: var(--accent-contrast); box-shadow: var(--accent-glow); font-weight: 600; }
-.btn--primary:hover:not(:disabled) { opacity: 0.88; }
+/* No glow. --accent-glow throws a 24px shadow under every primary, which on
+   light mode is a dark halo under a dark button. Brightness on hover instead
+   of opacity, so the label does not fade with the fill. */
+.btn--primary { background: var(--accent); color: var(--accent-contrast); font-weight: 600; }
+.btn--primary:hover:not(:disabled) { filter: brightness(1.12); }
 .btn--secondary { background: var(--surface-2); color: var(--text-primary); border-color: var(--grid); }
 .btn--secondary:hover:not(:disabled) { background: var(--surface-3); border-color: var(--hairline-strong); }
 .btn--outline { background: transparent; color: var(--text-primary); border-color: var(--hairline-strong); }
