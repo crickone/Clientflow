@@ -4,7 +4,6 @@ import { listLibraryAssets } from "@/lib/image/library";
 import { getBrandFontIds, getTheme } from "@/lib/settings";
 import { getBusinessProfile } from "@/lib/businessProfile";
 import { getChromeLogoSrc } from "@/lib/branding";
-import { getDesignSystem } from "@/lib/design/system";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +40,6 @@ export default function NewImagePage() {
         defaultBodyFontId={brandFonts.body}
         logoUrl={getChromeLogoSrc()}
         accentColor={getTheme().accent}
-        hasDesignSystem={getDesignSystem() !== null}
       />
     </>
   );

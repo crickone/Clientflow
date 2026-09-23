@@ -32,7 +32,6 @@ export function StartTabs({
   accentColor,
   /** Whether this tenant has a design system — it changes what the AI tab
    *  actually does, so it changes what the tab promises. */
-  hasDesignSystem = false,
 }: {
   library: ImageLibraryAsset[];
   brand?: BrandLabels;
@@ -40,7 +39,6 @@ export function StartTabs({
   defaultBodyFontId: string;
   logoUrl: string | null;
   accentColor?: string;
-  hasDesignSystem?: boolean;
 }) {
   const [tab, setTab] = useState<Tab>("ai");
 
@@ -95,21 +93,6 @@ export function StartTabs({
 
       {tab === "ai" ? (
         <div role="tabpanel">
-          {hasDesignSystem && (
-            <p
-              style={{
-                margin: "0 0 18px",
-                fontSize: 13,
-                color: "var(--text-secondary)",
-                maxWidth: "62ch",
-              }}
-            >
-              Adonis composes each slide&rsquo;s layout from your own design
-              system — its grounds, its type scale, its grid — and checks every
-              one against your brand&rsquo;s contrast and rotation rules before
-              you see it.
-            </p>
-          )}
           <StartDesign />
         </div>
       ) : (

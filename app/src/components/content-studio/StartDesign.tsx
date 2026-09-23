@@ -191,13 +191,9 @@ export function StartDesign() {
         <Label htmlFor="topic" srOnly>
           What&rsquo;s this post about?
         </Label>
-        <h2 style={{ margin: "0 0 6px", fontSize: 19, fontWeight: 600, letterSpacing: "-0.01em" }}>
+        <h2 style={{ margin: "0 0 12px", fontSize: 19, fontWeight: 600, letterSpacing: "-0.01em" }}>
           What&rsquo;s this post about?
         </h2>
-        <p style={{ margin: "0 0 14px", fontSize: 13.5, color: "var(--text-secondary)", maxWidth: "62ch" }}>
-          One line is enough. Adonis writes the copy from your business, your marketing
-          brain and this month&rsquo;s plan — you edit anything you don&rsquo;t like.
-        </p>
         <Textarea
           id="topic"
           value={topic}

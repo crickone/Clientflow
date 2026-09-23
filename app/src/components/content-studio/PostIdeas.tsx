@@ -196,9 +196,9 @@ export function PostIdeas({ onPick }: { onPick: (topic: string) => void }) {
           </Button>
         )}
 
-        <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-          {showLibrary ? "Ideas you kept" : "In-depth, across your content pillars"}
-        </span>
+        {showLibrary ? (
+          <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Ideas you kept</span>
+        ) : null}
       </div>
 
       {error && <div style={{ marginTop: 8, fontSize: 12.5, color: "var(--danger)" }}>{error}</div>}
