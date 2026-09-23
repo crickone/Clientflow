@@ -2160,3 +2160,129 @@ a {
   cursor: default;
   text-decoration: none;
 }
+
+/* ─── Signed-out pages (sign in, forgot password, reset password) ────────────
+   The page is the surface: no card, lockup top-left, one column held left of
+   centre. Matches the platform console's sign-in. See components/auth/AuthLayout. */
+.auth {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: 34px 40px 28px;
+  overflow: hidden;
+  isolation: isolate;
+}
+.auth-wash {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(60vmax 45vmax at 8% -10%, color-mix(in oklab, var(--accent) 16%, transparent), transparent 62%),
+    radial-gradient(45vmax 40vmax at 92% 108%, color-mix(in oklab, var(--accent) 10%, transparent), transparent 66%);
+  pointer-events: none;
+}
+.auth-mark { flex: 0 0 auto; }
+.auth-body {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  max-width: 1180px;
+  width: 100%;
+  margin: 0 auto;
+}
+.auth-col { width: 100%; max-width: 380px; }
+.auth-col h1 {
+  /* The BRAND face, not var(--font-heading): a tenant's display face (Bebas,
+     Clash) is chosen for dashboards, and "Welcome back" in condensed all-caps
+     is not a welcome. */
+  font-family: var(--font-space-grotesk), var(--font-body), system-ui, sans-serif;
+  font-size: clamp(28px, 4vw, 36px);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+  text-transform: none;
+  margin: 0 0 10px;
+}
+.auth-lede { margin: 0 0 26px; color: var(--text-secondary); font-size: 14.5px; line-height: 1.5; }
+
+.auth-field {
+  width: 100%;
+  background: var(--field-bg);
+  border: 1px solid transparent;
+  border-radius: 14px;
+  padding: 17px 18px;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 15px;
+  transition: background 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+.auth-field::placeholder { color: var(--text-tertiary); }
+.auth-field:focus,
+.auth-field:focus-visible {
+  outline: none;
+  background: var(--field-bg-focus);
+  border-color: var(--hairline-strong);
+}
+
+.auth-go {
+  width: 100%;
+  margin-top: 10px;
+  padding: 17px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s var(--ease), filter 0.15s var(--ease);
+}
+.auth-go:hover:not(:disabled) { filter: brightness(1.06); }
+.auth-go:active:not(:disabled) { transform: translateY(1px); }
+.auth-go:disabled { opacity: 0.55; cursor: default; }
+
+.auth-error { margin: 2px 0 0; color: var(--red); font-size: 13.5px; line-height: 1.45; }
+.auth-notice {
+  margin: 0 0 18px;
+  padding: 13px 15px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.auth-sent {
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.auth-sent strong { color: var(--text-primary); font-weight: 600; }
+
+.auth-footer-links { margin-top: 18px; display: flex; gap: 20px; font-size: 13.5px; }
+.auth-footer-links a { color: var(--text-secondary); text-decoration: none; border-bottom: 1px solid var(--hairline-strong); padding-bottom: 1px; }
+.auth-footer-links a:hover { color: var(--text-primary); }
+
+.auth-foot {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 22px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.auth-foot a { color: var(--text-tertiary); text-decoration: none; }
+.auth-foot a:hover { color: var(--text-secondary); }
+
+@media (max-width: 700px) {
+  .auth { padding: 26px 20px 20px; }
+  .auth-col { max-width: 440px; }
+}

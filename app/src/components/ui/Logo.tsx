@@ -62,7 +62,11 @@ export function Logo({
         <span
           aria-hidden
           style={{
-            fontFamily: "var(--font-heading), system-ui, sans-serif",
+            // The BRAND face, pinned — deliberately not var(--font-heading),
+            // which is whatever display face the tenant chose in Appearance.
+            // Inspire's is Bebas Neue, so the lockup rendered as condensed
+            // all-caps "ADONISAGENT." on every signed-out page.
+            fontFamily: "var(--font-space-grotesk), var(--font-body), system-ui, sans-serif",
             fontSize: height,
             fontWeight: 500,
             letterSpacing: "-0.01em",

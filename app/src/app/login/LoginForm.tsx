@@ -4,9 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
 
-import { Button } from "@/components/ui/Button";
-import { Input, Label } from "@/components/ui/Input";
-import { Logo } from "@/components/ui/Logo";
+import { AuthLayout } from "@/components/auth/AuthLayout";
+
 
 export function LoginForm({
   logoSrc,
@@ -52,127 +51,52 @@ export function LoginForm({
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 24,
-        background: "var(--bg)",
-      }}
+    <AuthLayout
+      title="Welcome back"
+      lede={businessName ? `Sign in to ${businessName}.` : "Sign in to your workspace."}
+      logoSrc={logoSrc}
+      businessName={businessName}
+      footer={<Link href="/forgot-password">Forgot your password?</Link>}
     >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 380,
-          background: "var(--surface-1)",
-          border: "1px solid var(--hairline)",
-          borderRadius: "var(--radius)",
-          padding: "36px 32px",
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "center", marginBottom: 28 }}>
-          <Logo src={logoSrc} alt={businessName} height={28} />
-        </div>
-        <h1
-          style={{
-            fontFamily: "var(--font-heading), sans-serif",
-            fontSize: 22,
-            fontWeight: 400,
-            color: "var(--text-primary)",
-            textAlign: "center",
-            textTransform: "uppercase",
-            letterSpacing: "-0.005em",
-            marginBottom: 6,
-          }}
-        >
-          Sign in
-        </h1>
-        <p
-          style={{
-            color: "var(--text-secondary)",
-            fontSize: 13,
-            textAlign: "center",
-            marginBottom: 26,
-          }}
-        >
-          Access your dashboard.
-        </p>
+      {notice ? <p className="auth-notice">{notice}</p> : null}
 
-        {notice && (
-          <div
-            style={{
-              background: "var(--accent-soft)",
-              border: "1px solid rgba(255, 106, 50, 0.3)",
-              color: "var(--accent-ink)",
-              fontSize: 13,
-              padding: "8px 12px",
-              borderRadius: "var(--radius)",
-              marginBottom: 14,
-            }}
-          >
-            {notice}
-          </div>
-        )}
+      <form onSubmit={onSubmit}>
+        <input
+          className="auth-field"
+          id="email"
+          type="email"
+          autoComplete="email"
+          aria-label="Email address"
+          required
+          autoFocus
+          placeholder="Email address"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          disabled={busy}
+        />
+        <input
+          className="auth-field"
+          id="password"
+          type="password"
+          autoComplete="current-password"
+          aria-label="Password"
+          required
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          disabled={busy}
+        />
 
-        <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div>
-            <Label htmlFor="email" srOnly>Email</Label>
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              required
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={busy}
-            />
-          </div>
-          <div>
-            <Label htmlFor="password" srOnly>Password</Label>
-            <Input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={busy}
-            />
-          </div>
+        {error ? (
+          <p className="auth-error" role="alert">
+            {error}
+          </p>
+        ) : null}
 
-          {error && (
-            <div
-              style={{
-                background: "rgba(220, 38, 38, 0.08)",
-                border: "1px solid rgba(220, 38, 38, 0.3)",
-                color: "#dc2626",
-                fontSize: 13,
-                padding: "8px 12px",
-                borderRadius: "var(--radius)",
-              }}
-            >
-              {error}
-            </div>
-          )}
-
-          <Button type="submit" disabled={busy} style={{ marginTop: 6 }}>
-            {busy ? "Signing in…" : "Sign in"}
-          </Button>
-        </form>
-
-        <div style={{ textAlign: "center", marginTop: 18 }}>
-          <Link
-            href="/forgot-password"
-            style={{ color: "var(--text-tertiary)", fontSize: 13, textDecoration: "none" }}
-          >
-            Forgot password?
-          </Link>
-        </div>
-      </div>
-    </div>
+        <button className="auth-go" type="submit" disabled={busy}>
+          {busy ? "Signing in…" : "Continue"}
+        </button>
+      </form>
+    </AuthLayout>
   );
 }

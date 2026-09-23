@@ -3,9 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 
-import { Button } from "@/components/ui/Button";
-import { Input, Label } from "@/components/ui/Input";
-import { Logo } from "@/components/ui/Logo";
+import { AuthLayout } from "@/components/auth/AuthLayout";
+
 import { requestPasswordResetAction } from "./actions";
 
 export function ForgotPasswordForm() {
@@ -27,97 +26,40 @@ export function ForgotPasswordForm() {
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 24,
-        background: "var(--bg)",
-      }}
+    <AuthLayout
+      title={sent ? "Check your inbox" : "Reset your password"}
+      lede={
+        sent
+          ? undefined
+          : "Give us the email you sign in with and we'll send you a link to set a new password."
+      }
+      footer={<Link href="/login">Back to sign in</Link>}
     >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 380,
-          background: "var(--surface-1)",
-          border: "1px solid var(--hairline)",
-          borderRadius: "var(--radius)",
-          padding: "36px 32px",
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "center", marginBottom: 28 }}>
-          <Logo src={null} alt="" height={28} />
+      {sent ? (
+        <div className="auth-sent">
+          If an account exists for <strong>{email}</strong>, the link is on its way. It expires in an hour, and
+          it only works once. Worth checking your spam folder if it has not arrived in a few minutes.
         </div>
-        <h1
-          style={{
-            fontFamily: "var(--font-heading), sans-serif",
-            fontSize: 22,
-            fontWeight: 400,
-            color: "var(--text-primary)",
-            textAlign: "center",
-            textTransform: "uppercase",
-            letterSpacing: "-0.005em",
-            marginBottom: 6,
-          }}
-        >
-          Forgot password
-        </h1>
-        <p
-          style={{
-            color: "var(--text-secondary)",
-            fontSize: 13,
-            textAlign: "center",
-            marginBottom: 26,
-          }}
-        >
-          We&apos;ll email you a link to reset it.
-        </p>
-
-        {sent ? (
-          <div
-            style={{
-              background: "var(--accent-soft)",
-              border: "1px solid rgba(255, 106, 50, 0.3)",
-              color: "var(--accent-ink)",
-              fontSize: 13,
-              padding: "10px 12px",
-              borderRadius: "var(--radius)",
-              lineHeight: 1.5,
-            }}
-          >
-            If an account exists for <strong>{email}</strong>, we&apos;ve sent a link to reset your password. Check
-            your inbox (and spam).
-          </div>
-        ) : (
-          <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <div>
-              <Label htmlFor="email" srOnly>Email</Label>
-              <Input
-                id="email"
-                type="email"
-                autoComplete="email"
-                required
-                autoFocus
-                placeholder="Email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={busy}
-              />
-            </div>
-            <Button type="submit" disabled={busy} style={{ marginTop: 6 }}>
-              {busy ? "Sending…" : "Email me a reset link"}
-            </Button>
-          </form>
-        )}
-
-        <div style={{ textAlign: "center", marginTop: 20 }}>
-          <Link href="/login" style={{ color: "var(--text-tertiary)", fontSize: 13, textDecoration: "none" }}>
-            Back to sign in
-          </Link>
-        </div>
-      </div>
-    </div>
+      ) : (
+        <form onSubmit={onSubmit}>
+          <input
+            className="auth-field"
+            id="email"
+            type="email"
+            autoComplete="email"
+            aria-label="Email address"
+            required
+            autoFocus
+            placeholder="Email address"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={busy}
+          />
+          <button className="auth-go" type="submit" disabled={busy}>
+            {busy ? "Sending…" : "Send the link"}
+          </button>
+        </form>
+      )}
+    </AuthLayout>
   );
 }
