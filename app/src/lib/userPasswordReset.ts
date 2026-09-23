@@ -265,7 +265,11 @@ export async function requestPlatformUserReset(
 
   // Fire-and-forget, so the response time is the same whether or not an
   // account exists — the timing is part of the enumeration defence.
-  void sendPlatformEmail(user.email, "Reset your AdonisAgent console password", bodyHtml).catch((err) => {
+  void sendPlatformEmail(user.email, "Reset your AdonisAgent console password", bodyHtml, {
+    // NOT the billing identity: this is a security email.
+    name: "AdonisAgent",
+    email: process.env.PLATFORM_SECURITY_FROM ?? "no-reply@adonisagent.ie",
+  }).catch((err) => {
     console.error("[platform reset] send failed", err);
   });
   return { ok: true };

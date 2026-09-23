@@ -17,6 +17,13 @@ export async function sendPlatformEmail(
   to: string,
   subject: string,
   bodyHtml: string,
+  /**
+   * Override the sender. The default is the BILLING identity, which is right
+   * for receipts and dunning and wrong for anything security-related: a
+   * password reset arriving from "AdonisAgent Billing" looks like marketing,
+   * which is how it ends up unread in Promotions.
+   */
+  from?: { name: string; email: string },
 ): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return;
@@ -27,14 +34,18 @@ export async function sendPlatformEmail(
   try {
     const resend = new Resend(apiKey);
     await resend.emails.send({
-      from: `${getPlatformSetting("billing_from_name")} <${getPlatformSetting("billing_from_email")}>`,
+      from: from
+        ? `${from.name} <${from.email}>`
+        : `${getPlatformSetting("billing_from_name")} <${getPlatformSetting("billing_from_email")}>`,
       to,
       subject,
       html: renderEmailShell({
         businessName: "AdonisAgent",
         heading: subject,
         bodyHtml,
-        footer: "You received this because you're the account owner on AdonisAgent.",
+        footer: from
+          ? "You received this because someone asked to reset the password on this account."
+          : "You received this because you're the account owner on AdonisAgent.",
       }),
     });
   } catch (err) {
