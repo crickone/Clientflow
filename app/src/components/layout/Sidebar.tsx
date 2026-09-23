@@ -117,11 +117,18 @@ function groupHasActiveDescendant(group: NavGroup, pathname: string | null): boo
 }
 
 /** The flagship item — pinned above Dashboard, rendered prominently, not part of a group. */
-const ADONIS_LINK: NavLink = { href: "/adonis", label: "Adonis", icon: Bot };
-const DASHBOARD_LINK: NavLink = { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard };
+export const ADONIS_LINK: NavLink = { href: "/adonis", label: "Adonis", icon: Bot };
+export const DASHBOARD_LINK: NavLink = { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard };
 
-/** Five collapsible top-level groups, folded by default (see `openGroups`). */
-const NAV_GROUPS: NavGroup[] = [
+/**
+ * Five collapsible top-level groups, folded by default (see `openGroups`).
+ *
+ * EXPORTED because the command palette indexes this exact tree — see
+ * @/lib/ui/commands. A second, hand-written list of destinations would drift,
+ * and a palette offering a page the sidebar hides sends someone to a route the
+ * layout redirects away from.
+ */
+export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Clients",
     icon: Users,
