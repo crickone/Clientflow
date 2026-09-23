@@ -566,3 +566,13 @@ table.tbl { border-collapse: collapse; width: 100%; }
   padding-bottom: 1px;
 }
 .signin-forgot:hover { color: var(--text-primary); }
+.signin-sent {
+  margin: 0;
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.signin-sent strong { color: var(--text-primary); font-weight: 600; }

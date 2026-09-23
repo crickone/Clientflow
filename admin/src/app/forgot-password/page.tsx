@@ -3,49 +3,27 @@
 import { useState, type FormEvent } from "react";
 
 import { Logo } from "@/components/Logo";
+import { requestConsoleResetAction } from "./actions";
 
 /**
- * Console sign-in.
+ * Console password reset — the console's OWN page.
  *
- * Structured like a modern consumer sign-in (Revolut's is the reference the
- * brief named): the page itself is the surface — wordmark pinned top-left, one
- * column of content held left of centre, a quiet legal line at the foot — with
- * no card boxing the form in. A boxed form floating in the middle of an empty
- * page reads as an afterthought; this reads as a front door.
- *
- * The right-hand half carries the marketing site's metal sculpture rather than
- * a QR code (there is no phone app to scan with). It is the same SVG as
- * sites/adonisagent, so the console and the website open with the same object.
- * Decorative, aria-hidden, and it degrades to nothing on a narrow screen.
+ * It used to link to the CRM's flow at app.adonisagent.ie, which sent a
+ * platform admin to a customer product to recover an admin password and
+ * dropped them in a tenant workspace afterwards. The token is the same
+ * control-plane one; only the journey is the console's.
  */
-
-export default function LoginPage() {
+export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    setError(null);
     setBusy(true);
-    try {
-      const res = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) {
-        setError(data.error ?? "Sign-in failed");
-        setBusy(false);
-        return;
-      }
-      window.location.href = "/";
-    } catch {
-      setError("Network error — please try again.");
-      setBusy(false);
-    }
+    await requestConsoleResetAction(email);
+    setBusy(false);
+    setSent(true);
   }
 
   return (
@@ -58,9 +36,15 @@ export default function LoginPage() {
 
       <div className="signin-body">
         <section className="signin-form">
-          <h1>Welcome back</h1>
-          <p className="signin-sub">Sign in to the AdonisAgent platform console.</p>
+          <h1>Reset your password</h1>
+          <p className="signin-sub">Give us the email you sign in with and we&apos;ll send a link to set a new one.</p>
 
+          {sent ? (
+            <p className="signin-sent">
+              If an account exists for <strong>{email}</strong>, the link is on its way. It expires in two hours
+              and works once. Check your spam folder if it has not arrived in a few minutes.
+            </p>
+          ) : (
           <form onSubmit={onSubmit} noValidate>
             <input
               className="field"
@@ -72,36 +56,15 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
             />
-            <input
-              className="field"
-              type="password"
-              autoComplete="current-password"
-              placeholder="Password"
-              aria-label="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-
-            {error ? (
-              <p className="signin-error" role="alert">
-                {error}
-              </p>
-            ) : null}
-
             <button className="signin-go" type="submit" disabled={busy}>
-              {busy ? "Signing in…" : "Continue"}
+              {busy ? "Sending…" : "Send the link"}
             </button>
           </form>
+          )}
 
-          <a className="signin-forgot" href="/forgot-password">
-            Forgot your password?
+          <a className="signin-forgot" href="/login">
+            Back to sign in
           </a>
-
-          <p className="signin-note">
-            Platform admins only. Business owners sign in at{" "}
-            <a href="https://app.adonisagent.ie">app.adonisagent.ie</a>.
-          </p>
         </section>
 
         <aside className="signin-art" aria-hidden>

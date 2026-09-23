@@ -221,6 +221,56 @@ async function sendUserResetEmail(tenantId: number, email: string, token: string
   });
 }
 
+/**
+ * A reset for the PLATFORM CONSOLE, not a tenant.
+ *
+ * Two things differ from `requestUserReset`, and both matter:
+ *
+ *  1. The link points at the console, not the CRM. Sending a platform admin to
+ *     app.adonisagent.ie to recover their admin.adonisagent.ie password is
+ *     confusing at best, and lands them in a customer workspace at worst.
+ *  2. The email is PLATFORM-branded (`sendPlatformEmail`), so it needs no
+ *     tenant. `requestUserReset` finds the user's first active membership to
+ *     brand the mail and silently sends NOTHING when there is none — which
+ *     means a console admin who belongs to no tenant could never recover at
+ *     all. This path has no such hole.
+ *
+ * Enumeration-safe: always resolves ok, whatever the email.
+ */
+export async function requestPlatformUserReset(
+  email: string,
+  consoleBaseUrl: string,
+): Promise<{ ok: true }> {
+  const normEmail = email.trim().toLowerCase();
+  if (!normEmail.includes("@")) return { ok: true };
+
+  const user = authDb
+    .select({ id: users.id, email: users.email, isActive: users.isActive })
+    .from(users)
+    .where(eq(users.email, normEmail))
+    .get();
+  if (!user || !user.isActive) return { ok: true };
+
+  const token = createUserResetToken(user.id);
+  const link = `${consoleBaseUrl.replace(/\/$/, "")}/reset-password?token=${encodeURIComponent(token)}`;
+
+  const { sendPlatformEmail } = await import("@/lib/billing/emails");
+  const bodyHtml = `
+    <p style="margin:0 0 18px;">We received a request to reset the password for your AdonisAgent platform console account.</p>
+    <p style="margin:0 0 24px;">
+      <a href="${link}" style="display:inline-block;background:#ffffff;color:#0b0e12;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:8px;font-size:14px;">Set a new password</a>
+    </p>
+    <p style="margin:0;font-size:13px;color:#6b7280;">Or paste this link into your browser:<br/><span style="word-break:break-all;">${link}</span></p>
+    <p style="margin:16px 0 0;font-size:13px;color:#6b7280;">It expires in 2 hours and can only be used once. If you didn't request this, you can ignore this email.</p>`;
+
+  // Fire-and-forget, so the response time is the same whether or not an
+  // account exists — the timing is part of the enumeration defence.
+  void sendPlatformEmail(user.email, "Reset your AdonisAgent console password", bodyHtml).catch((err) => {
+    console.error("[platform reset] send failed", err);
+  });
+  return { ok: true };
+}
+
 /** Housekeeping: drop expired, unused tokens (safe to call from schedulers). */
 export function purgeExpiredUserResets(): void {
   authDb
