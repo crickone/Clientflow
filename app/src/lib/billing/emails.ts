@@ -41,6 +41,10 @@ export async function sendPlatformEmail(
       subject,
       html: renderEmailShell({
         businessName: "AdonisAgent",
+        // The real lockup, as a 2x PNG — see renderEmailShell's note on why an
+        // email cannot use the SVG mark or the brand font directly.
+        logoUrl: `${(process.env.PUBLIC_APP_URL ?? "https://app.adonisagent.ie").replace(/\/$/, "")}/email/adonisagent-lockup.png`,
+        accent: "#0b0e12",
         heading: subject,
         bodyHtml,
         footer: from

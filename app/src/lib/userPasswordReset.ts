@@ -258,7 +258,7 @@ export async function requestPlatformUserReset(
   const bodyHtml = `
     <p style="margin:0 0 18px;">We received a request to reset the password for your AdonisAgent platform console account.</p>
     <p style="margin:0 0 24px;">
-      <a href="${link}" style="display:inline-block;background:#ffffff;color:#0b0e12;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:8px;font-size:14px;">Set a new password</a>
+      <a href="${link}" style="display:inline-block;background:#0b0e12;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:8px;font-size:14px;">Set a new password</a>
     </p>
     <p style="margin:0;font-size:13px;color:#6b7280;">Or paste this link into your browser:<br/><span style="word-break:break-all;">${link}</span></p>
     <p style="margin:16px 0 0;font-size:13px;color:#6b7280;">It expires in 2 hours and can only be used once. If you didn't request this, you can ignore this email.</p>`;

@@ -264,6 +264,17 @@ export function renderEmailShell(opts: {
   heading?: string;
   bodyHtml: string;
   footer?: string;
+  /**
+   * An absolute URL to a logo image, shown in place of the business name.
+   *
+   * It has to be a raster image on a public URL: Gmail strips inline SVG and
+   * ignores @font-face, so the mark and the Space Grotesk wordmark cannot
+   * reach an inbox any other way. The file is rendered at 2x and displayed at
+   * `logoWidth` so it stays sharp on a retina screen.
+   */
+  logoUrl?: string;
+  /** Display width in CSS px. Defaults to 190, which suits the 380px-wide lockup. */
+  logoWidth?: number;
 }): string {
   const accent = opts.accent || "#c9a24c";
   const heading = opts.heading
@@ -276,7 +287,11 @@ export function renderEmailShell(opts: {
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
     <tr><td style="height:4px;background:${accent};"></td></tr>
     <tr><td style="padding:32px 32px 28px;">
-      <div style="font-size:13px;font-weight:700;letter-spacing:.02em;color:${accent};text-transform:uppercase;margin-bottom:20px;">${escapeHtml(opts.businessName)}</div>
+      ${
+        opts.logoUrl
+          ? `<img src="${opts.logoUrl}" width="${opts.logoWidth ?? 190}" alt="${escapeHtml(opts.businessName)}" style="display:block;border:0;outline:none;text-decoration:none;margin:0 0 22px;max-width:100%;height:auto;" />`
+          : `<div style="font-size:13px;font-weight:700;letter-spacing:.02em;color:${accent};text-transform:uppercase;margin-bottom:20px;">${escapeHtml(opts.businessName)}</div>`
+      }
       ${heading}
       <div style="font-size:15px;line-height:1.6;color:#374151;">${opts.bodyHtml}</div>
     </td></tr>
