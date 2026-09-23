@@ -28,8 +28,12 @@ export async function requestConsoleResetAction(email: string): Promise<{ ok: tr
       body: { email, consoleUrl },
     });
   } catch (err) {
-    // Even a failure reports success, for the same reason.
-    if (!(err instanceof ApiError)) console.error("[console reset] request failed", err);
+    // The CALLER still gets success — the response must not reveal which
+    // addresses exist — but every failure is logged. Swallowing an ApiError
+    // silently is how MAIN_APP_URL sitting on a retired domain
+    // (app.clientflow.ie) produced a page that said "check your inbox" while
+    // nothing had been sent, for an hour, with no trace anywhere.
+    console.error("[console reset] request failed", err instanceof ApiError ? `${err.status} ${err.message}` : err);
   }
   return { ok: true };
 }
