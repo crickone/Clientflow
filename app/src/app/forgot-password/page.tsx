@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { getSessionUser } from "@/lib/auth";
+
 import { ForgotPasswordForm } from "./ForgotPasswordForm";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +14,9 @@ export const metadata: Metadata = {
   description: "Reset your AdonisAgent password.",
 };
 
-export default function ForgotPasswordPage() {
-  return <ForgotPasswordForm />;
+export default async function ForgotPasswordPage() {
+  // Deliberately NOT a redirect: wanting a new password while signed in is a
+  // normal thing to want. The form just says so, and offers the way back.
+  const user = await getSessionUser();
+  return <ForgotPasswordForm signedInAs={user?.email ?? null} />;
 }

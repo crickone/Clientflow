@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { Logo } from "@/components/ui/Logo";
+import { SignOutLink } from "./SignOutLink";
 
 /**
  * The frame every signed-out page shares: sign in, forgot password, reset
@@ -22,6 +23,7 @@ export function AuthLayout({
   businessName = "",
   children,
   footer,
+  signedInAs,
 }: {
   title: string;
   lede?: string;
@@ -30,6 +32,16 @@ export function AuthLayout({
   children: ReactNode;
   /** Below the form: a "back to sign in" link, a forgot-password link. */
   footer?: ReactNode;
+  /**
+   * The email of an already-signed-in operator, when there is one.
+   *
+   * These pages are reachable with a live session — you can want a new
+   * password while signed in — and staying silent about it is how "Back to
+   * sign in" lands you on the dashboard with no explanation: /login redirects
+   * a signed-in user straight there. Saying so, and offering the way out,
+   * costs one line.
+   */
+  signedInAs?: string | null;
 }) {
   return (
     <main className="auth">
@@ -45,6 +57,12 @@ export function AuthLayout({
           {lede ? <p className="auth-lede">{lede}</p> : null}
           {children}
           {footer ? <div className="auth-footer-links">{footer}</div> : null}
+          {signedInAs ? (
+            <p className="auth-session">
+              You are signed in as <strong>{signedInAs}</strong>.{" "}
+              <a href="/dashboard">Go to your dashboard</a> or <SignOutLink />.
+            </p>
+          ) : null}
         </section>
       </div>
 

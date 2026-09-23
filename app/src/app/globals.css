@@ -2286,3 +2286,22 @@ a {
   .auth { padding: 26px 20px 20px; }
   .auth-col { max-width: 440px; }
 }
+.auth-session { margin: 20px 0 0; color: var(--text-tertiary); font-size: 13px; line-height: 1.55; }
+.auth-session strong { color: var(--text-secondary); font-weight: 500; }
+.auth-session a,
+.auth-linkish {
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+/* A button that has to read as a link: /api/auth/logout is POST-only. */
+.auth-linkish {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+.auth-session a:hover,
+.auth-linkish:hover { color: var(--text-primary); }
+.auth-linkish:disabled { opacity: 0.6; cursor: default; }

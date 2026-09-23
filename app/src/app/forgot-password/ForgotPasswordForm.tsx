@@ -7,7 +7,7 @@ import { AuthLayout } from "@/components/auth/AuthLayout";
 
 import { requestPasswordResetAction } from "./actions";
 
-export function ForgotPasswordForm() {
+export function ForgotPasswordForm({ signedInAs }: { signedInAs?: string | null }) {
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
@@ -33,7 +33,14 @@ export function ForgotPasswordForm() {
           ? undefined
           : "Give us the email you sign in with and we'll send you a link to set a new password."
       }
-      footer={<Link href="/login">Back to sign in</Link>}
+      signedInAs={signedInAs}
+      footer={
+        signedInAs ? (
+          <Link href="/dashboard">Back to your dashboard</Link>
+        ) : (
+          <Link href="/login">Back to sign in</Link>
+        )
+      }
     >
       {sent ? (
         <div className="auth-sent">
