@@ -576,3 +576,184 @@ table.tbl { border-collapse: collapse; width: 100%; }
   line-height: 1.55;
 }
 .signin-sent strong { color: var(--text-primary); font-weight: 600; }
+
+/* ─── The fleet board (console dashboard) ────────────────────────────────────
+   An instrument panel, not a metrics page: mono for every figure, hairlines
+   instead of boxes, and the sculpture's metal used exactly twice — the hero
+   count and the sparkline stroke. See src/app/(console)/page.tsx. */
+.board { display: flex; flex-direction: column; gap: 44px; }
+
+.board-eyebrow {
+  margin: 0 0 14px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.board-hero h1 {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  flex-wrap: wrap;
+  font-family: var(--font-heading), system-ui, sans-serif;
+  font-weight: 400;
+  font-size: clamp(22px, 2.6vw, 30px);
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+  color: var(--text-secondary);
+}
+/* The one place the metal appears in type. Everything else is ink. */
+.board-figure {
+  font-size: clamp(54px, 7vw, 82px);
+  font-weight: 500;
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+  background: linear-gradient(135deg, #ffffff 0%, #9fb0c4 38%, #f4f8ff 56%, #5d7286 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.board-sentence { max-width: 30ch; }
+.board-sentence strong { color: var(--text-primary); font-weight: 500; }
+
+.board-meters {
+  margin-top: 30px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  border-top: 1px solid var(--grid);
+  border-bottom: 1px solid var(--grid);
+}
+.readout { padding: 16px 26px 16px 0; margin-right: 26px; border-right: 1px solid var(--grid); }
+.readout:last-child { border-right: 0; margin-right: 0; padding-right: 0; }
+.readout-label {
+  display: block;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: 8px;
+}
+.readout-value {
+  display: block;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  line-height: 1;
+}
+.readout-note {
+  display: block;
+  margin-top: 7px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+}
+
+.fleet-head, .cluster h2, .board-trends h2 { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.fleet-head h2, .cluster h2 {
+  margin: 0 0 2px;
+  font-family: var(--font-heading), system-ui, sans-serif;
+  font-size: 17px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+.fleet-count {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.fleet-list { list-style: none; margin: 0; padding: 0; }
+.fleet-list li + li { border-top: 1px solid var(--grid); }
+.fleet-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) 118px minmax(80px, 1fr) 70px 110px 20px;
+  align-items: center;
+  gap: 18px;
+  padding: 17px 8px 17px 0;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s var(--ease), padding-left 0.15s var(--ease);
+}
+.fleet-row:hover { background: rgba(255, 255, 255, 0.022); padding-left: 10px; }
+.fleet-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.fleet-name {
+  min-width: 0;
+  font-size: 15px;
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.fleet-type {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.fleet-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.fleet-status i { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+.sharebar { display: block; height: 3px; background: rgba(255, 255, 255, 0.07); border-radius: 999px; overflow: hidden; }
+.sharebar-fill { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #47596a, #8193a9 60%, #f1f7ff); }
+.fleet-num {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--text-secondary);
+}
+.fleet-gmv { color: var(--text-primary); }
+.fleet-go { color: var(--text-tertiary); text-align: right; transition: transform 0.15s var(--ease); }
+.fleet-row:hover .fleet-go { transform: translateX(3px); color: var(--text-secondary); }
+.fleet-legend {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) 118px minmax(80px, 1fr) 70px 110px 20px;
+  gap: 18px;
+  padding: 18px 8px 10px 0;
+  border-bottom: 1px solid var(--hairline);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.fleet-legend span:nth-child(4), .fleet-legend span:nth-child(5) { text-align: right; }
+
+.board-trends { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0; border-top: 1px solid var(--grid); }
+.trend { padding: 22px 30px 22px 0; margin-right: 30px; border-right: 1px solid var(--grid); }
+.trend:last-child { border-right: 0; margin-right: 0; padding-right: 0; }
+.trend-top { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.trend-top .readout-label { margin-bottom: 0; }
+.trend-note { margin: 14px 0 0; font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+
+.cluster-row { margin-top: 18px; display: flex; flex-wrap: wrap; border-top: 1px solid var(--grid); }
+.cluster-row .readout { padding-top: 18px; padding-bottom: 0; }
+
+.board-empty { margin: 18px 0 0; color: var(--text-secondary); font-size: 14px; }
+.board-empty a { color: var(--text-primary); }
+
+@media (max-width: 860px) {
+  .board { gap: 34px; }
+  /* The share bar and the member count are comparisons; on a phone the name,
+     status and money are what survive. */
+  .fleet-row, .fleet-legend { grid-template-columns: minmax(0, 1fr) 104px 96px; }
+  .fleet-share, .fleet-num:not(.fleet-gmv), .fleet-go,
+  .fleet-legend span:nth-child(3), .fleet-legend span:nth-child(4), .fleet-legend span:nth-child(6) { display: none; }
+  .readout { padding-right: 20px; margin-right: 20px; }
+}
