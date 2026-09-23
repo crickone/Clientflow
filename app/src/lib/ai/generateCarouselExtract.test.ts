@@ -66,4 +66,25 @@ const requireLocal = createRequire(import.meta.url);
   assert.equal(c.slides[3].tagline, undefined, "non-string tagline is undefined");
 
   console.log("generateCarouselExtract.test.ts: all assertions passed");
+
+// The prompt now asks for "caption" AFTER "slides", so that the model writes it
+// having already written the post rather than guessing at it. Key order is
+// meaningless to JSON.parse, but these pin the contract both ways: the new
+// order must work, and a model that emits the old order must still parse — the
+// two will coexist in the wild for as long as anything is retried or cached.
+{
+  const captionLast = `<slides>{"slides":[
+    {"template":"carousel-cover","heading":"H","body":"B","image":"I"},
+    {"template":"carousel-cta","heading":"H2","body":"B2","image":"I2"}
+  ],"caption":"written after the slides"}</slides>`;
+  const got = extractPayload(captionLast);
+  assert.equal(got.caption, "written after the slides", "caption AFTER slides parses");
+  assert.equal(got.slides.length, 2, "caption-last still yields every slide");
+
+  const captionFirst = `<slides>{"caption":"written before","slides":[
+    {"template":"carousel-cover","heading":"H","body":"B","image":"I"}
+  ]}</slides>`;
+  assert.equal(extractPayload(captionFirst).caption, "written before", "caption BEFORE slides still parses");
+}
+
 })();

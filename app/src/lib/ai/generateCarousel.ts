@@ -53,9 +53,17 @@ On every dark-editorial slide, wrap ONE key phrase of the heading in *asterisks*
 
 Some templates read a "tagline" field (the stat on "carousel-stat", the "TIP 02" label on "carousel-tip", the margin figure and section label above). Include "tagline" on a slide when its template uses one; omit it elsewhere.
 
-You ALSO write the Instagram / Facebook caption that goes with this carousel when it's posted. The caption should:
+You ALSO write the Instagram / Facebook caption that goes with this carousel when it's posted.
+
+WRITE THE CAPTION LAST, after every slide is written — it is the final key in the JSON for that
+reason. Draw on the lines you actually wrote, not the ones you were planning to write: echo a
+phrase from the cover, answer the question the slides raise, land where the last slide lands. A
+caption written before the slides can only describe the topic; one written after can carry the
+post.
+
+The caption should:
 - Open with a hook (one short sentence that earns the second line).
-- Expand with 2–4 short paragraphs of real value tied to the slides.
+- Expand with 2–4 short paragraphs of real value tied to the slides you just wrote.
 - End with the sign-off below, mentioning the business by name.
 - Be 80–200 words total. Plain text, no markdown. No emojis, no hashtag spam.
 - (Optional: 3–5 relevant hashtags at the very end, only if useful.)
@@ -63,16 +71,16 @@ You ALSO write the Instagram / Facebook caption that goes with this carousel whe
 Output format — return ONLY a JSON object inside <slides>...</slides> tags, no other text:
 <slides>
 {
-  "caption": "...",
   "slides": [
     { "template": "carousel-cover", "heading": "...", "body": "...", "image": "..." },
     { "template": "carousel-content", "heading": "...", "body": "...", "image": "..." },
     { "template": "carousel-cta", "heading": "...", "body": "...", "image": "..." }
-  ]
+  ],
+  "caption": "..."
 }
 </slides>
 
-The "slides" array must contain exactly the number of slides requested, in order. The "caption" string accompanies the whole carousel.`;
+The "slides" array must contain exactly the number of slides requested, in order. The "caption" string comes AFTER them and accompanies the whole carousel.`;
 
 export interface GeneratedSlide {
   template: string;
