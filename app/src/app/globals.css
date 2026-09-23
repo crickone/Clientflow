@@ -2326,13 +2326,16 @@ a {
   z-index: 200;
   background: rgba(4, 6, 9, 0.5);
   backdrop-filter: blur(3px);
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 12vh 20px 20px;
 }
+/* Positioned rather than centred by the backdrop: the two are portal SIBLINGS
+   (Radix Overlay + Content), not parent and child. */
 .cmdk {
-  width: min(560px, 100%);
+  position: fixed;
+  top: 12vh;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 201;
+  width: min(560px, calc(100vw - 40px));
   background: var(--surface-1);
   border: 1px solid var(--hairline-strong);
   border-radius: 14px;
@@ -2394,4 +2397,4 @@ a {
   color: var(--text-secondary);
   background: var(--surface-1);
 }
-@media (max-width: 640px) { .cmdk-backdrop { padding: 8vh 12px 12px; } }
+@media (max-width: 640px) { .cmdk { top: 8vh; width: calc(100vw - 24px); } }

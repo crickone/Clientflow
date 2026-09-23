@@ -14,10 +14,9 @@ import { VocabProvider } from "@/components/providers/VocabProvider";
 import { GenerationWatcher } from "@/components/content-studio/GenerationWatcher";
 import type { Vocab } from "@/lib/vocabulary";
 import type { ThemeMode } from "@/lib/theme";
-import { pathAllowed, type FeatureFlags } from "@/lib/features";
+import type { FeatureFlags } from "@/lib/features";
 import { isBarePath } from "@/lib/barePaths";
-import { CommandPalette } from "./CommandPalette";
-import { resolveAppShortcut } from "@/lib/ui/shortcuts";
+import { CommandK } from "./CommandK";
 
 export function AppShell({
   user,
@@ -139,77 +138,6 @@ export function AppShell({
     };
   }, [navOpen]);
 
-  // ─── The app-wide keymap (Jakob) ──────────────────────────────────────────
-  // One window listener for the whole app. The bindings themselves live in
-  // @/lib/ui/shortcuts, which is pure and tested; this only wires them up.
-  const [palette, setPalette] = useState<null | "commands" | "help">(null);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const action = resolveAppShortcut({
-        key: e.key,
-        metaKey: e.metaKey,
-        ctrlKey: e.ctrlKey,
-        altKey: e.altKey,
-        shiftKey: e.shiftKey,
-        target: e.target as { tagName?: string; isContentEditable?: boolean } | null,
-      });
-      if (!action) return;
-
-      // Esc and the palette's own keys belong to the palette while it is open.
-      if (palette) {
-        if (action === "close") {
-          e.preventDefault();
-          setPalette(null);
-        }
-        return;
-      }
-
-      // Anything else with a dialog open is that dialog's business. The
-      // `:not([data-state="closed"])` form is REQUIRED: Radix keeps content
-      // mounted mid-exit-animation carrying data-state="closed", and the
-      // hand-rolled panels set role="dialog" with no data-state at all. This
-      // is the same guard the designer's keymap needed — see
-      // @/lib/content-studio/shortcuts and the note in ImageDesigner.
-      const dialogOpen = document.querySelector('[role="dialog"]:not([data-state="closed"])');
-
-      if (action === "palette") {
-        e.preventDefault();
-        setPalette("commands");
-        return;
-      }
-      if (dialogOpen) return;
-
-      if (action === "help") {
-        e.preventDefault();
-        setPalette("help");
-        return;
-      }
-      if (action === "search") {
-        const box = document.querySelector<HTMLInputElement>('input[type="search"], input[data-search]');
-        if (box) {
-          e.preventDefault();
-          box.focus();
-          box.select();
-        }
-        return;
-      }
-      if (action === "submit") {
-        // Submit the form the focus is in — and ONLY if its submit control is
-        // live. requestSubmit() ignores a disabled button, which is how two
-        // presses once started two metered runs in the designer.
-        const form = (e.target as HTMLElement | null)?.closest?.("form");
-        if (!form) return;
-        const submit = form.querySelector<HTMLButtonElement>('button[type="submit"], button:not([type])');
-        if (submit?.disabled) return;
-        e.preventDefault();
-        form.requestSubmit(submit ?? undefined);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [palette]);
-
   const bare = isBarePath(pathname);
 
   if (bare || !user) {
@@ -218,19 +146,14 @@ export function AppShell({
 
   return (
     <VocabProvider value={vocab}>
-      <CommandPalette
-        open={palette !== null}
-        showHelp={palette === "help"}
-        onClose={() => setPalette(null)}
-        ctx={{
-          isAdmin: user.role === "admin",
-          mode: schedulingMode,
-          tenantSlug,
-          vocab: vocab as unknown as Record<string, string>,
-          // The layout refuses a route whose module is switched off; the
-          // palette must not offer it, or the two disagree in front of the user.
-          pathAllowed: (href) => pathAllowed(featureFlags, href),
-        }}
+      {/* Cmd+K and the app-wide keymap. Mounted here AND on the root layout's
+          Studio branch, which skips this shell entirely. */}
+      <CommandK
+        isAdmin={user.role === "admin"}
+        mode={schedulingMode}
+        tenantSlug={tenantSlug}
+        vocab={vocab}
+        featureFlags={featureFlags}
       />
       <div className="app-shell">
         <Sidebar

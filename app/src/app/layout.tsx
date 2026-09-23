@@ -3,6 +3,7 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Toaster } from "sonner";
 import { AppShell } from "@/components/layout/AppShell";
+import { CommandK } from "@/components/layout/CommandK";
 import { isBarePath } from "@/lib/barePaths";
 import { ClientAppFrame } from "@/components/clientapp/ClientAppFrame";
 import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
@@ -121,10 +122,28 @@ export default async function RootLayout({
   // isStudio only — /site and /f stay exactly as bare as before, so
   // public-site bundles don't pick up Radix Dialog for a dialog they never use.
   if (isStudio) {
+    // Cmd+K comes too. Opting out of the sidebar is not opting out of the app:
+    // the Studio is a full-screen tool an operator sits in for an hour, and
+    // being the one authenticated screen where the app-wide shortcut dies is
+    // exactly the drift the palette was built to avoid. The context AppShell
+    // would have supplied is resolved here instead, guarded on an active
+    // membership because tenant settings are fail-closed (the Studio page
+    // enforces the admin check itself).
+    const studioUser = await getSessionUser();
+    const studioMembership = studioUser ? getCurrentMembership() : null;
     return (
       <html lang="en" className={FONT_VARS}>
         <body>
           <ConfirmProvider>{children}</ConfirmProvider>
+          {studioUser && studioMembership ? (
+            <CommandK
+              isAdmin={studioUser.role === "admin"}
+              mode={getSchedulingMode()}
+              tenantSlug={studioMembership.tenant.slug}
+              vocab={getVocab(getVenueType())}
+              featureFlags={getFeatureFlags()}
+            />
+          ) : null}
           <Toaster
             richColors
             position="top-right"
