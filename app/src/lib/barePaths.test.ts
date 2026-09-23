@@ -40,4 +40,16 @@ check("null is not bare", isBarePath(null), false);
 check("undefined is not bare", isBarePath(undefined), false);
 check("empty string is not bare", isBarePath(""), false);
 
+// The layout redirects a stale session to /login for any path that is NOT
+// bare. These are the paths that must never be caught by that, or a signed-out
+// visitor bounces off the very page that would sign them in.
+for (const p of ["/login", "/forgot-password", "/reset-password", "/accept-invite", "/select-account", "/change-password"]) {
+  check(`${p} survives the stale-session redirect`, isBarePath(p), true);
+}
+// …and the ones that must be caught, so a dead cookie cannot reach a page that
+// touches the tenant DB.
+for (const p of ["/dashboard", "/clients", "/settings/pipeline", "/agents/orchestrator"]) {
+  check(`${p} is caught by the stale-session redirect`, isBarePath(p), false);
+}
+
 console.log(`barePaths: ${passed} checks passed.`);

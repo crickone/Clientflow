@@ -268,6 +268,18 @@ export default async function RootLayout({
         redirect("/dashboard");
       }
     }
+  } else if (!isBarePath(pathname) && !pathname.startsWith("/open")) {
+    // A session cookie that no longer resolves to a user: revoked by a
+    // password reset (completeUserReset drops every session), expired, or
+    // signed out elsewhere. Middleware only checks the cookie EXISTS — the
+    // edge runtime cannot reach SQLite — so these requests sail through, and
+    // the page then throws TenantResolutionError the moment it touches the
+    // tenant DB. The operator sees a raw 500 on an app they are simply signed
+    // out of. Send them to sign in instead.
+    //
+    // /open is exempt: it is the platform's pre-session token handoff, which
+    // by design arrives without a session and creates one.
+    redirect("/login");
   }
 
   // Tenant chrome (theme, logo, vocabulary) resolves only with an active
