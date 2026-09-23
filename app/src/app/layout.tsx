@@ -3,6 +3,7 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Toaster } from "sonner";
 import { AppShell } from "@/components/layout/AppShell";
+import { isBarePath } from "@/lib/barePaths";
 import { ClientAppFrame } from "@/components/clientapp/ClientAppFrame";
 import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
 import { TooltipProvider } from "@/components/ui/Tooltip";
@@ -228,14 +229,7 @@ export default async function RootLayout({
   let showPastDue = false;
   const current = user ? getCurrentMembership() : null;
   if (user) {
-    const bare = [
-      "/login",
-      "/change-password",
-      "/select-account",
-      "/accept-invite",
-      "/forgot-password",
-      "/reset-password",
-    ].some((p) => pathname === p || pathname.startsWith(`${p}/`));
+    const bare = isBarePath(pathname);
     if (!bare && !current) {
       redirect("/select-account");
     }

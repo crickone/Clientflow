@@ -15,8 +15,7 @@ import { GenerationWatcher } from "@/components/content-studio/GenerationWatcher
 import type { Vocab } from "@/lib/vocabulary";
 import type { ThemeMode } from "@/lib/theme";
 import type { FeatureFlags } from "@/lib/features";
-
-const NO_SHELL_PATHS = ["/login", "/change-password", "/select-account", "/accept-invite"];
+import { isBarePath } from "@/lib/barePaths";
 
 export function AppShell({
   user,
@@ -138,9 +137,7 @@ export function AppShell({
     };
   }, [navOpen]);
 
-  const bare = NO_SHELL_PATHS.some(
-    (p) => pathname === p || pathname?.startsWith(`${p}/`),
-  );
+  const bare = isBarePath(pathname);
 
   if (bare || !user) {
     return <VocabProvider value={vocab}>{children}</VocabProvider>;
