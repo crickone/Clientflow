@@ -26,6 +26,11 @@
 // regression.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+
+// The extractor moved to @/lib/ui/emphasis so the app-wide budget test
+// (components/emphasisBudget.app.test.ts) shares one implementation — two
+// copies of a character scanner is two places for the same bug to hide.
+import { buttonTags, hasVariantProp, isExplicitPrimary, isPrimaryWeight } from "@/lib/ui/emphasis";
 import { join } from "node:path";
 
 let passed = 0;
@@ -62,72 +67,9 @@ const count = (src: string, re: RegExp) => (src.match(re) ?? []).length;
 // from the captured attrs.
 // Verified against every `<Button` in ImageDesigner.tsx (18 usages): this
 // extracts exactly 18 tags, matching a plain `/<Button\b/g` count.
-function buttonTags(src: string): string[] {
-  const tags: string[] = [];
-  const openRe = /<Button\b/g;
-  let m: RegExpExecArray | null;
-  while ((m = openRe.exec(src))) {
-    const start = m.index + m[0].length;
-    let i = start;
-    let depth = 0;
-    let quote: string | null = null;
-    let end = -1;
-    while (i < src.length) {
-      const c = src[i];
-      if (quote) {
-        if (c === "\\") {
-          i += 2;
-          continue;
-        }
-        if (c === quote) quote = null;
-        i++;
-        continue;
-      }
-      if (c === '"' || c === "'" || c === "`") {
-        quote = c;
-        i++;
-        continue;
-      }
-      if (c === "/" && src[i + 1] === "/") {
-        i = src.indexOf("\n", i + 2);
-        if (i === -1) i = src.length;
-        continue;
-      }
-      if (c === "/" && src[i + 1] === "*") {
-        const closeAt = src.indexOf("*/", i + 2);
-        i = closeAt === -1 ? src.length : closeAt + 2;
-        continue;
-      }
-      if (c === "{") {
-        depth++;
-        i++;
-        continue;
-      }
-      if (c === "}") {
-        depth--;
-        i++;
-        continue;
-      }
-      if (c === ">" && depth === 0) {
-        end = i;
-        break;
-      }
-      i++;
-    }
-    if (end === -1) continue; // unterminated tag -- nothing sane to capture
-    let attrs = src.slice(start, end);
-    if (attrs.endsWith("/")) attrs = attrs.slice(0, -1); // self-closing `/>`
-    tags.push(attrs);
-    openRe.lastIndex = end + 1;
-  }
-  return tags;
-}
 
-const hasVariantProp = (attrs: string) => /\bvariant\s*=/.test(attrs);
-const isExplicitPrimary = (attrs: string) => /variant\s*=\s*"primary"/.test(attrs);
 // Primary-weight = declared primary, or no variant prop at all (Button's
 // default). Order doesn't matter for the OR, but a Button can't be both.
-const isPrimaryWeight = (attrs: string) => isExplicitPrimary(attrs) || !hasVariantProp(attrs);
 const countPrimaryWeight = (src: string) => buttonTags(src).filter(isPrimaryWeight).length;
 
 check(
