@@ -2,12 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import {
+  Fragment,
   useCallback,
   useEffect,
   useMemo,
   useReducer,
   useRef,
   useState,
+  type CSSProperties,
 } from "react";
 import JSZip from "jszip";
 import {
@@ -73,6 +75,7 @@ import { parsePhotoAssetIds } from "@/lib/image/photoAssetIds";
 import { sceneForSlot } from "@/lib/image/photoScenes";
 import { DESIGNED_TEMPLATE_ID, slideDimensions, slideSurface } from "@/lib/image/paintSlide";
 import { renderFileUrl } from "@/lib/image/renderStore.client";
+import { elapsedLabel, readGenerationStage } from "@/lib/content-studio/generationProgress";
 import { SlideFilmstrip } from "./SlideFilmstrip";
 import { SlideColorPicker } from "./SlideColorPicker";
 import { PHOTO_PANEL_WIDTH, SlidePhotoLibraryPopout } from "./SlidePhotoLibrary";
@@ -2596,28 +2599,90 @@ export function ImageDesigner({
  * survives leaving, because that is the thing an operator cannot see and would
  * otherwise assume the opposite of.
  */
+/**
+ * Three structures the frame cycles through while a design is being written.
+ *
+ * Abstract on purpose, and DIFFERENT from each other on purpose: they say "a
+ * composition is being chosen", which is what is happening, without promising
+ * the one that will arrive. Loosely the shapes the brand's own structures take
+ * -- a stacked headline, a photograph over copy, a figure beside copy.
+ */
+const CORNERS: CSSProperties[] = [
+  { left: 0, top: 0 },
+  { right: 0, top: 0 },
+  { left: 0, bottom: 0 },
+  { right: 0, bottom: 0 },
+];
+
+const COMPOSITIONS: { kind?: "strong" | "photo"; at: CSSProperties }[][] = [
+  [
+    { kind: "strong", at: { left: 0, top: "14%", width: "74%", height: "7%" } },
+    { kind: "strong", at: { left: 0, top: "24%", width: "52%", height: "7%" } },
+    { at: { left: 0, top: "38%", width: "64%", height: "3%" } },
+    { at: { left: 0, top: "44%", width: "58%", height: "3%" } },
+    { at: { left: 0, bottom: 0, width: "26%", height: "3%" } },
+  ],
+  [
+    { kind: "photo", at: { left: 0, top: 0, width: "100%", height: "52%" } },
+    { kind: "strong", at: { left: 0, top: "60%", width: "86%", height: "8%" } },
+    { at: { left: 0, top: "74%", width: "70%", height: "3%" } },
+    { at: { left: 0, top: "80%", width: "46%", height: "3%" } },
+  ],
+  [
+    { at: { left: 0, top: 0, width: "18%", height: "3%" } },
+    { kind: "strong", at: { left: 0, top: "26%", width: "44%", height: "22%" } },
+    { at: { left: "52%", top: "28%", width: "48%", height: "3%" } },
+    { at: { left: "52%", top: "34%", width: "40%", height: "3%" } },
+    { at: { left: "52%", top: "40%", width: "44%", height: "3%" } },
+    { kind: "photo", at: { left: 0, bottom: 0, width: "100%", height: "26%" } },
+  ],
+];
+
 function WritingDesign({ stage }: { stage?: string | null }) {
-  // Three blobs, each on its own path and its own clock, so the field never
+  // The count comes from the stage strings and has to survive the ones that
+  // name none ("Correcting…", "Saving…"), or the rail would vanish for the
+  // length of the repair pass.
+  const [total, setTotal] = useState<number | null>(null);
+  const progress = readGenerationStage(stage, total);
+  useEffect(() => {
+    if (progress.total != null && progress.total !== total) setTotal(progress.total);
+  }, [progress.total, total]);
+
+  // Time passing, because the field alone cannot show it. This runs for two to
+  // four minutes and minute three used to look exactly like minute one, which
+  // is where an operator decides it has hung.
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const started = Date.now();
+    const t = setInterval(() => setElapsed((Date.now() - started) / 1000), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const clock = elapsedLabel(elapsed);
+
+  // Two blobs, each on its own path and its own clock, so the field never
   // repeats a frame an operator could catch. Sized well over the frame: a blob
   // whose edge is visible reads as a circle, and the point is a field of light.
+  // Dimmer than they were -- the structures below are the subject now, and
+  // three blobs at half opacity washed them out.
   const blobs = [
-    { anim: "designDriftA", dur: "13s", size: "88%", left: "-18%", top: "-14%", colour: "color-mix(in srgb, var(--accent) 70%, transparent)" },
-    { anim: "designDriftB", dur: "17s", size: "76%", left: "26%", top: "8%", colour: "color-mix(in srgb, var(--accent) 38%, #4a9eff)" },
-    { anim: "designDriftC", dur: "21s", size: "94%", left: "-6%", top: "22%", colour: "color-mix(in srgb, var(--accent) 22%, transparent)" },
+    { anim: "designDriftA", dur: "15s", size: "70%", left: "-10%", top: "-6%", opacity: 0.33, colour: "color-mix(in srgb, var(--accent) 38%, transparent)" },
+    { anim: "designDriftB", dur: "19s", size: "62%", left: "34%", top: "26%", opacity: 0.3, colour: "color-mix(in srgb, var(--accent) 22%, #4a9eff)" },
   ];
   return (
     <div
       style={{
         display: "grid",
-        gap: 14,
+        gap: 12,
         justifyItems: "center",
         padding: "8px 0 24px",
+        width: "min(520px, 100%)",
+        margin: "0 auto",
       }}
     >
       <div
         className="design-writing"
         style={{
-          width: "min(520px, 100%)",
+          width: "100%",
           aspectRatio: "1 / 1",
           border: "1px solid var(--hairline)",
           borderRadius: "var(--radius)",
@@ -2633,25 +2698,89 @@ function WritingDesign({ stage }: { stage?: string | null }) {
               left: b.left,
               top: b.top,
               background: b.colour,
-              opacity: 0.5,
+              opacity: b.opacity,
               animation: `${b.anim} ${b.dur} ease-in-out infinite`,
             }}
           />
         ))}
         <div className="design-writing-grid" />
+        <div className="design-writing-guides">
+          {/* A tick at each corner: one arm along the top or bottom edge, one
+              down the side, both starting from the same point. */}
+          {CORNERS.map((at, i) => (
+            <Fragment key={i}>
+              <i style={at} />
+              <i className="v" style={at} />
+            </Fragment>
+          ))}
+        </div>
+        {COMPOSITIONS.map((blocks, i) => (
+          <div
+            key={i}
+            className="design-comp"
+            style={{ animationName: `designComp${i + 1}` }}
+            aria-hidden
+          >
+            {blocks.map((b, j) => (
+              <span key={j} className={b.kind ? `is-${b.kind}` : undefined} style={b.at} />
+            ))}
+          </div>
+        ))}
         <div className="design-writing-sweep" />
       </div>
+
+      {/* One mark per slide. Absent until a stage has said how many there are:
+          a rail of a guessed length is worse than no rail. */}
+      {progress.total ? (
+        <div
+          className="design-rail"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={progress.total}
+          aria-valuenow={progress.done}
+          aria-label={`Slide ${progress.done} of ${progress.total} finished`}
+        >
+          {Array.from({ length: progress.total }, (_, i) => {
+            const n = i + 1;
+            return (
+              <span
+                key={n}
+                className={`design-rail-mark${n <= progress.done ? " is-done" : ""}`}
+              >
+                {n === progress.slide ? <i /> : null}
+              </span>
+            );
+          })}
+        </div>
+      ) : null}
+
       <div
         style={{
           display: "flex",
           alignItems: "center",
           gap: 9,
+          width: "100%",
           fontSize: 13,
           color: "var(--text-secondary)",
         }}
       >
         <Loader2 size={14} className="spin" />
-        {stage?.trim() || "Writing the slides."}
+        <span>{progress.label}</span>
+        {clock ? (
+          <span
+            style={{
+              marginLeft: "auto",
+              fontFamily: "var(--font-mono), ui-monospace, monospace",
+              fontSize: 11.5,
+              color: "var(--text-tertiary)",
+              // Steady digits: proportional numerals make the clock jitter as
+              // it counts, which reads as the page redrawing.
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {clock}
+          </span>
+        ) : null}
       </div>
     </div>
   );

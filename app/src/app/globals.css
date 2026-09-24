@@ -1089,6 +1089,25 @@ a {
   border-radius: 2px;
 }
 
+/* The field's ink, as a token rather than white.
+
+   Every layer here was rgba(255,255,255,…), which is correct on the dark
+   theme and nearly invisible on the light one -- the same mistake the agent
+   hologram made, for the same reason. Mixed off --text-primary instead, so it
+   is light ink on the dark ground and dark ink on the light one without a
+   second set of rules. (The ADMIN accent is monochrome by design, so it
+   cannot carry this: see the hologram note below.) */
+:root {
+  --writing-ink-4: color-mix(in srgb, var(--text-primary) 4%, transparent);
+  --writing-ink-5: color-mix(in srgb, var(--text-primary) 5%, transparent);
+  --writing-ink-7: color-mix(in srgb, var(--text-primary) 7%, transparent);
+  --writing-ink-9: color-mix(in srgb, var(--text-primary) 9%, transparent);
+  --writing-ink-10: color-mix(in srgb, var(--text-primary) 10%, transparent);
+  --writing-ink-11: color-mix(in srgb, var(--text-primary) 11%, transparent);
+  --writing-ink-16: color-mix(in srgb, var(--text-primary) 16%, transparent);
+  --writing-ink-28: color-mix(in srgb, var(--text-primary) 28%, transparent);
+}
+
 /* Content Studio: a design being WRITTEN (ImageDesigner's WritingDesign).
 
    Abstract rather than a skeleton of the slide: a skeleton promises a shape the
@@ -1104,7 +1123,7 @@ a {
   overflow: hidden;
   isolation: isolate;
   background:
-    radial-gradient(120% 90% at 50% 0%, rgba(255, 255, 255, 0.04), transparent 60%),
+    radial-gradient(120% 90% at 50% 0%, var(--writing-ink-4), transparent 60%),
     var(--surface-2);
 }
 .design-writing-blob {
@@ -1144,29 +1163,138 @@ a {
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(255, 255, 255, 0.1),
+    var(--writing-ink-11),
     transparent
   );
   animation: designSweep 4.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
   pointer-events: none;
 }
+/* The canvas's own layout guides: the margin every designed slide keeps, and
+   a tick at each corner. Static on purpose -- guides are not motion, and they
+   are what makes the frame read as a canvas being worked on rather than as a
+   rectangle of weather. */
+.design-writing-guides {
+  position: absolute;
+  inset: 9%;
+  border: 1px solid var(--writing-ink-7);
+  pointer-events: none;
+}
+.design-writing-guides i {
+  position: absolute;
+  width: 9px;
+  height: 1px;
+  background: var(--writing-ink-28);
+}
+.design-writing-guides i.v {
+  width: 1px;
+  height: 9px;
+}
+
+/* Compositions being TRIED, one after another.
+
+   The first version of this screen was a field of drifting light and nothing
+   else: it said "working" and said it identically in minute three and minute
+   one. A skeleton of the slide was rejected then, and rightly -- it promises a
+   shape the design has not chosen yet.
+
+   This is the third answer, and it is the honest one: the model is choosing
+   between the brand's own structures, so the frame shows structures being
+   tried and discarded. Nothing here can be mistaken for the finished slide
+   BECAUSE it keeps changing -- the rearranging is the message. */
+.design-comp {
+  position: absolute;
+  inset: 9%;
+  opacity: 0;
+  animation-duration: 12s;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+  pointer-events: none;
+}
+.design-comp span {
+  position: absolute;
+  background: var(--writing-ink-9);
+  border-radius: 2px;
+}
+.design-comp span.is-strong { background: var(--writing-ink-16); }
+.design-comp span.is-photo {
+  background: var(--writing-ink-4);
+  border: 1px solid var(--writing-ink-10);
+}
+/* Each rises as it arrives, the way an element is placed rather than switched
+   on. Held, then dropped before the next one is placed. */
+@keyframes designComp1 {
+  0%, 1%   { opacity: 0; transform: translateY(7px); }
+  7%, 28%  { opacity: 1; transform: none; }
+  34%, 100% { opacity: 0; transform: none; }
+}
+@keyframes designComp2 {
+  0%, 34%  { opacity: 0; transform: translateY(7px); }
+  40%, 61% { opacity: 1; transform: none; }
+  67%, 100% { opacity: 0; transform: none; }
+}
+@keyframes designComp3 {
+  0%, 67%  { opacity: 0; transform: translateY(7px); }
+  73%, 94% { opacity: 1; transform: none; }
+  100%     { opacity: 0; transform: none; }
+}
+
 /* A fine grid over the whole thing, low enough to register as texture rather
    than as a chart. */
 .design-writing-grid {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+    linear-gradient(var(--writing-ink-5) 1px, transparent 1px),
+    linear-gradient(90deg, var(--writing-ink-5) 1px, transparent 1px);
   background-size: 44px 44px;
   mask-image: radial-gradient(75% 75% at 50% 50%, #000 35%, transparent 100%);
   -webkit-mask-image: radial-gradient(75% 75% at 50% 50%, #000 35%, transparent 100%);
   pointer-events: none;
 }
+/* The run's own progress, under the field: one mark per slide.
+
+   Derived from what the SERVER said it was doing (readGenerationStage), never
+   from a timer -- a rail that fills on a guess is the reason people stop
+   believing rails. A mark fills only once its slide is behind the work, and
+   the mark being worked on carries a light running through it. */
+.design-rail {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+}
+.design-rail-mark {
+  position: relative;
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--grid);
+  overflow: hidden;
+}
+.design-rail-mark.is-done {
+  background: color-mix(in srgb, var(--accent) 60%, transparent);
+}
+.design-rail-mark i {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  transform: translateX(-100%);
+  animation: designRailRun 1.5s ease-in-out infinite;
+}
+@keyframes designRailRun {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .design-writing-blob,
   .design-writing-sweep { animation: none; }
   .design-writing-sweep { opacity: 0.5; }
+  /* One composition, held. The point survives without the cycling. */
+  .design-comp { animation: none; opacity: 0; transform: none; }
+  .design-comp:first-of-type { opacity: 1; }
+  /* The mark still shows WHERE the work is; it just stops travelling. */
+  .design-rail-mark i { animation: none; transform: none; opacity: 0.55; }
 }
 
 /* Agents: the AI staff card, rendered as a hologram of the agent (see
