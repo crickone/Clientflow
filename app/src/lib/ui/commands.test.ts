@@ -85,8 +85,21 @@ const base = { isAdmin: true, mode: "appointments" as const, tenantSlug: "inspir
   check("a word INSIDE the label is found", filterCommands(all, "studio")[0]!.href, "/content-studio");
   check("the group name surfaces its pages", filterCommands(all, "marketing").length >= 2, true);
   check("no match is empty, not everything", filterCommands(all, "zzzz"), []);
-  check("an empty query keeps nav order", filterCommands(all, "")[0]!.href, "/dashboard");
-  check("whitespace is not a query", filterCommands(all, "   ")[0]!.href, "/dashboard");
+  // Alphabetical, not nav order: with no query you are scanning names you
+  // already know, and predictable beats "considered".
+  check(
+    "an empty query lists everything alphabetically",
+    filterCommands(all, "").map((c) => c.label),
+    ["Appointments", "Campaigns", "Clients", "Contacts", "Content Studio", "Dashboard", "Leads", "Settings"],
+  );
+  check("whitespace is not a query", filterCommands(all, "   ")[0]!.label, "Appointments");
+  // Score still decides the bands — the four label matches all come before the
+  // two that only matched on their group — and alphabetical orders each band.
+  check(
+    "ties inside a score band are alphabetical too",
+    filterCommands(all, "c").map((c) => c.label),
+    ["Campaigns", "Clients", "Contacts", "Content Studio", "Appointments", "Leads"],
+  );
   check("case does not matter", filterCommands(all, "LEADS")[0]!.href, "/leads");
   check("scoring an unrelated term is 0", scoreCommand({ href: "/x", label: "Leads", group: "" }, "zzz"), 0);
 }

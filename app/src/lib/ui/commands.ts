@@ -94,11 +94,26 @@ export function scoreCommand(cmd: Command, query: string): number {
   return 0;
 }
 
-/** Matching commands, best first, ties broken by nav order (which is a considered order). */
+/**
+ * Matching commands, best first, ties broken ALPHABETICALLY.
+ *
+ * Nav order was the tiebreak first, on the reasoning that the sidebar's order
+ * is a considered one. It is — for the sidebar, where the groups are on screen
+ * to explain it. Stripped of its groups into one flat list, that same order
+ * reads as no order at all: with an empty query you are scanning forty names
+ * for one you already know, and the only arrangement that helps you is the one
+ * you can predict. Alphabetical also settles ties inside a score band, so
+ * "Plans" and "Programs" do not swap places as the nav changes underneath.
+ */
 export function filterCommands(commands: Command[], query: string): Command[] {
   return commands
-    .map((cmd, i) => ({ cmd, score: scoreCommand(cmd, query), i }))
+    .map((cmd) => ({ cmd, score: scoreCommand(cmd, query) }))
     .filter((r) => r.score > 0)
-    .sort((a, b) => b.score - a.score || a.i - b.i)
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        a.cmd.label.localeCompare(b.cmd.label) ||
+        a.cmd.group.localeCompare(b.cmd.group),
+    )
     .map((r) => r.cmd);
 }
