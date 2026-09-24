@@ -1099,22 +1099,25 @@ a {
    cannot carry this: see the hologram note below.) */
 :root {
   --writing-ink-4: color-mix(in srgb, var(--text-primary) 4%, transparent);
-  --writing-ink-5: color-mix(in srgb, var(--text-primary) 5%, transparent);
   --writing-ink-7: color-mix(in srgb, var(--text-primary) 7%, transparent);
   --writing-ink-9: color-mix(in srgb, var(--text-primary) 9%, transparent);
   --writing-ink-10: color-mix(in srgb, var(--text-primary) 10%, transparent);
-  --writing-ink-11: color-mix(in srgb, var(--text-primary) 11%, transparent);
   --writing-ink-16: color-mix(in srgb, var(--text-primary) 16%, transparent);
   --writing-ink-28: color-mix(in srgb, var(--text-primary) 28%, transparent);
 }
 
 /* Content Studio: a design being WRITTEN (ImageDesigner's WritingDesign).
 
-   Abstract rather than a skeleton of the slide: a skeleton promises a shape the
-   design has not chosen yet, and every one of these posts is composed from
-   scratch. Large blurred blobs in the tenant's own accent drift across a dark
-   field, with a slow light sweep over them -- movement that says "working"
-   without claiming to know what is being made.
+   The frame is a canvas being worked on: the agent's own hologram for a
+   ground (.agent-holo, further down -- this IS the agent working, so it wears
+   the surface the agent lives on rather than an effect invented for one
+   screen), the layout guides a designed slide keeps, and the brand's
+   structures placed and cleared on a loop above them.
+
+   What was here before: blurred grey blobs in the admin accent, a grid and a
+   light sweep. The accent is monochrome in the admin chrome, so "the tenant's
+   own colour" could only ever come out grey, and it did -- a smudge that said
+   "working" and nothing else for three minutes.
 
    Deliberately unhurried. This runs for two to four minutes; a fast loop at
    that length is agitating rather than reassuring. */
@@ -1125,49 +1128,21 @@ a {
   background:
     radial-gradient(120% 90% at 50% 0%, var(--writing-ink-4), transparent 60%),
     var(--surface-2);
+
+  /* It wears the agent card's hologram (.agent-holo below), turned UP. The
+     card keeps its wash low because live text sits on it and every bit of
+     colour multiplied under a word costs contrast. Nothing here is read --
+     the shapes on this field are abstract blocks standing in for a design
+     that does not exist yet -- so the effect can be the subject rather than
+     the setting. */
+  --holo-wash-opacity: 0.42;
 }
-.design-writing-blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(58px);
-  will-change: transform;
-  pointer-events: none;
-}
-@keyframes designDriftA {
-  0%, 100% { transform: translate(-12%, -8%) scale(1); }
-  33%      { transform: translate(28%, 18%) scale(1.25); }
-  66%      { transform: translate(6%, 34%) scale(0.9); }
-}
-@keyframes designDriftB {
-  0%, 100% { transform: translate(34%, 28%) scale(1.1); }
-  40%      { transform: translate(-8%, 6%) scale(0.85); }
-  70%      { transform: translate(22%, -10%) scale(1.3); }
-}
-@keyframes designDriftC {
-  0%, 100% { transform: translate(10%, 44%) scale(0.95); }
-  50%      { transform: translate(-16%, 12%) scale(1.35); }
-}
-/* A single bar of light crossing the frame, tilted so it reads as a sweep
-   rather than a loading bar. */
-@keyframes designSweep {
-  0%   { transform: translateX(-140%) rotate(12deg); opacity: 0; }
-  12%  { opacity: 1; }
-  88%  { opacity: 1; }
-  100% { transform: translateX(140%) rotate(12deg); opacity: 0; }
-}
-.design-writing-sweep {
-  position: absolute;
-  top: -25%;
-  bottom: -25%;
-  width: 22%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    var(--writing-ink-11),
-    transparent
-  );
-  animation: designSweep 4.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
-  pointer-events: none;
+:root[data-theme="light"] .design-writing {
+  /* Still the card's bargain on light, where colour subtracts: the rim
+     carries the effect and the wash stays a tint. Raised from the card's 0.2
+     only because this surface is twenty times the size, and what reads as
+     iridescence at 300px reads as a smudge at 520. */
+  --holo-wash-opacity: 0.5;
 }
 /* The canvas's own layout guides: the margin every designed slide keeps, and
    a tick at each corner. Static on purpose -- guides are not motion, and they
@@ -1238,19 +1213,6 @@ a {
   100%     { opacity: 0; transform: none; }
 }
 
-/* A fine grid over the whole thing, low enough to register as texture rather
-   than as a chart. */
-.design-writing-grid {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(var(--writing-ink-5) 1px, transparent 1px),
-    linear-gradient(90deg, var(--writing-ink-5) 1px, transparent 1px);
-  background-size: 44px 44px;
-  mask-image: radial-gradient(75% 75% at 50% 50%, #000 35%, transparent 100%);
-  -webkit-mask-image: radial-gradient(75% 75% at 50% 50%, #000 35%, transparent 100%);
-  pointer-events: none;
-}
 /* The run's own progress, under the field: one mark per slide.
 
    Derived from what the SERVER said it was doing (readGenerationStage), never
@@ -1287,9 +1249,6 @@ a {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .design-writing-blob,
-  .design-writing-sweep { animation: none; }
-  .design-writing-sweep { opacity: 0.5; }
   /* One composition, held. The point survives without the cycling. */
   .design-comp { animation: none; opacity: 0; transform: none; }
   .design-comp:first-of-type { opacity: 1; }

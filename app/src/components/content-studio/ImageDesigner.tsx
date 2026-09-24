@@ -2659,15 +2659,6 @@ function WritingDesign({ stage }: { stage?: string | null }) {
   }, []);
   const clock = elapsedLabel(elapsed);
 
-  // Two blobs, each on its own path and its own clock, so the field never
-  // repeats a frame an operator could catch. Sized well over the frame: a blob
-  // whose edge is visible reads as a circle, and the point is a field of light.
-  // Dimmer than they were -- the structures below are the subject now, and
-  // three blobs at half opacity washed them out.
-  const blobs = [
-    { anim: "designDriftA", dur: "15s", size: "70%", left: "-10%", top: "-6%", opacity: 0.33, colour: "color-mix(in srgb, var(--accent) 38%, transparent)" },
-    { anim: "designDriftB", dur: "19s", size: "62%", left: "34%", top: "26%", opacity: 0.3, colour: "color-mix(in srgb, var(--accent) 22%, #4a9eff)" },
-  ];
   return (
     <div
       style={{
@@ -2679,8 +2670,14 @@ function WritingDesign({ stage }: { stage?: string | null }) {
         margin: "0 auto",
       }}
     >
+      {/* The same hologram the agent card wears (.agent-holo, globals.css):
+          this IS the agent working, so it should look like the place the agent
+          lives rather than like a second effect invented for one screen. Its
+          own layers -- a field of drifting light, a wash of three hues, a
+          band travelling the border -- replace the grey blobs and the grid
+          that were here. */}
       <div
-        className="design-writing"
+        className="design-writing agent-holo"
         style={{
           width: "100%",
           aspectRatio: "1 / 1",
@@ -2688,22 +2685,10 @@ function WritingDesign({ stage }: { stage?: string | null }) {
           borderRadius: "var(--radius)",
         }}
       >
-        {blobs.map((b) => (
-          <div
-            key={b.anim}
-            className="design-writing-blob"
-            style={{
-              width: b.size,
-              height: b.size,
-              left: b.left,
-              top: b.top,
-              background: b.colour,
-              opacity: b.opacity,
-              animation: `${b.anim} ${b.dur} ease-in-out infinite`,
-            }}
-          />
-        ))}
-        <div className="design-writing-grid" />
+        <div className="agent-holo-layer agent-holo-rim" />
+        <div className="agent-holo-layer agent-holo-wash" />
+        <div className="agent-holo-layer agent-holo-lines" />
+        <div className="agent-holo-layer agent-holo-scan" />
         <div className="design-writing-guides">
           {/* A tick at each corner: one arm along the top or bottom edge, one
               down the side, both starting from the same point. */}
@@ -2726,7 +2711,6 @@ function WritingDesign({ stage }: { stage?: string | null }) {
             ))}
           </div>
         ))}
-        <div className="design-writing-sweep" />
       </div>
 
       {/* One mark per slide. Absent until a stage has said how many there are:
