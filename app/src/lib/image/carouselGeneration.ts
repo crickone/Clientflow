@@ -11,9 +11,10 @@ import { getBusinessProfile } from "@/lib/businessProfile";
 import { resolveLogoPath } from "@/lib/branding";
 import { buildImagePrompt, defaultImageStyle, fallbackScene } from "@/lib/ai/image/prompt";
 import { isImageGenConfigured } from "@/lib/ai/image/falClient";
+import { generatePostImage } from "@/lib/ai/image/generatePostImage";
 import { getTemplate, templateUsesPhoto } from "@/lib/image/templates";
 import { DESIGNED_TEMPLATE_ID } from "@/lib/image/paintSlide";
-import { photoChoices } from "@/lib/image/library";
+import { libraryFilePath, photoChoices } from "@/lib/image/library";
 import { getDesignSystem } from "@/lib/design/system";
 import { refreshSlidesContent } from "@/lib/ai/refreshSlides";
 import { DEFAULT_SINGLE_TEMPLATE } from "@/lib/image/slots";
@@ -197,11 +198,33 @@ export async function runCarouselGeneration(
     return;
   }
 
-  // The tenant's own library, so a design asking for a photograph gets a real
-  // one, graded to the brand's numbers at render time. The whole list, not the
-  // first of it: each photo slide takes the next, so a set moves through the
-  // library instead of putting one picture on every slide.
+  // A designed slide names the scene it wants. So the photograph is MADE to
+  // that brief, one per photo slot, rather than taken off the shelf -- a
+  // slide asking for "a quiet treatment room, late afternoon light" should get
+  // that, not the next thing in the library because it happened to be next.
+  //
+  // The library is the fallback, still rotated so two photo slides never land
+  // on the same picture. It stopped being a good default the day real
+  // photographs went into it: the rotation has no idea which of 162 pictures
+  // suits this slide, so it reached for whatever came next.
+  const imageGen = isImageGenConfigured();
+  const houseStyle = imageGen
+    ? (getBrandImageStyle() ?? defaultImageStyle(getBusinessProfile()))
+    : null;
   const photos = photoChoices();
+  const makePhoto =
+    imageGen && houseStyle
+      ? async (scene: string) => {
+          const asset = await generatePostImage(
+            {
+              prompt: buildImagePrompt({ houseStyle, scene: scene || topic }),
+              aspectRatio: "1:1",
+            },
+            { tenantId, agentKey: "carousel" },
+          );
+          return { id: asset.id, path: libraryFilePath(asset.filename) };
+        }
+      : undefined;
 
   // designPost is the entry point for BOTH paths: with a tenant design system
   // the AI designs each slide as HTML and this renders it; without one it
@@ -213,6 +236,24 @@ export async function runCarouselGeneration(
     {
       aspectRatio: "1:1",
       photos,
+      makePhoto: makePhoto
+        ? async (scene) => {
+            try {
+              return await makePhoto(scene);
+            } catch (err) {
+              // The monthly cap is the operator's to act on, so it stops the
+              // run and reaches them as the reason it stopped. Anything else
+              // -- the provider hiccuping on one image -- falls back to the
+              // library rather than losing a post that is otherwise written.
+              if (err instanceof AiCapError) throw err;
+              console.warn(
+                `[carousel-generate] design ${carouselId}: photograph failed, using the library instead:`,
+                err,
+              );
+              return null;
+            }
+          }
+        : undefined,
       // The design carries the logo the same way a template slide does, and
       // obeys the same per-design switch.
       logoPath: carousel.showLogo ? resolveLogoPath() : null,
@@ -230,10 +271,6 @@ export async function runCarouselGeneration(
 
   if (replaceExisting) deleteSlot(carouselId, slotKey);
 
-  const imageGen = isImageGenConfigured();
-  const houseStyle = imageGen
-    ? (getBrandImageStyle() ?? defaultImageStyle(getBusinessProfile()))
-    : null;
   const jobs: SlideImageJob[] = [];
 
   try {

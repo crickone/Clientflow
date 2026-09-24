@@ -28,6 +28,7 @@ import { meteredCreateStreamed, type MeterContext } from "@/lib/ai/metered";
 import { logoBox } from "@/lib/design/renderDesign";
 import { collisionViolation } from "@/lib/design/layoutBoxes";
 import { MAX_PHOTO_SLOTS, photoSlotsUsed } from "@/lib/design/photoSlots";
+import { choosePhotos } from "@/lib/design/choosePhotos";
 import {
   canvasFor,
   overflowViolation,
@@ -183,6 +184,22 @@ export async function designPost(
      * photo slides than photos.
      */
     photos?: PhotoChoice[];
+    /**
+     * Make a photograph to the design's own brief, for a caller that can.
+     *
+     * When this is supplied it is the FIRST answer for every photo slot and
+     * `photos` becomes the fallback: the design asks for a specific scene, so
+     * a picture made to that brief beats the next one off a shelf. It is
+     * passed in rather than imported because generating is a metered,
+     * server-only call and this module has to stay loadable under the test
+     * runner.
+     *
+     * Returning null means "I could not make one" (the provider declined, the
+     * spend cap is close) and the library answers instead. Anything it THROWS
+     * stops the run -- that is how a hit cap reaches the operator as a reason
+     * rather than as a quietly different post.
+     */
+    makePhoto?: (scene: string) => Promise<PhotoChoice | null>;
     /** The tenant's logo file, stamped onto every slide. Null to omit it. */
     logoPath?: string | null;
     /**
@@ -210,7 +227,12 @@ export async function designPost(
   // what it gets. Offering a photograph that will then be stripped leaves the
   // scrim built for it lying on a flat ground.
   const photos = options.photos ?? [];
-  const hasPhotography = photos.length > 0;
+  const makePhoto = options.makePhoto;
+  // A photographer means photography is effectively unlimited: every slot gets
+  // a picture made to its own brief. The count below only exists to warn the
+  // model when there are none, or only one to go round.
+  const available = makePhoto ? MAX_PHOTO_SLOTS + 1 : photos.length;
+  const hasPhotography = available > 0;
   const onProgress = options.onProgress;
 
   // Computed from the real logo file, not stated as a fraction: its height is
@@ -227,7 +249,7 @@ export async function designPost(
     // choice to both slots of a two-slot slide whenever the library holds one
     // photograph, so a library of one that was invited to design a comparison
     // produced the same picture twice. See photographyRuleFor.
-    photographyRuleFor(photos.length),
+    photographyRuleFor(available),
     getSignoffRule("social"),
   ]
     .filter(Boolean)
@@ -347,21 +369,36 @@ export async function designPost(
       // already flagged them as unfillable, and handing one a photograph would
       // contradict that. They render with the <img> dropped instead.
       const slots = photoSlotsUsed(design.html).filter((s) => s <= MAX_PHOTO_SLOTS);
-      // Indexed BY SLOT, not by order of appearance -- renderDesignedSlide
-      // reads photos[slot - 1], so a design that writes only {{PHOTO:2}} must
-      // not have its picture land in slot 1's place.
-      const forThisSlide: (PhotoChoice | null)[] = Array.from(
-        { length: slots.length > 0 ? Math.max(...slots) : 0 },
-        () => null,
-      );
-      for (const slot of slots) {
-        forThisSlide[slot - 1] =
-          photos.length > 0 ? photos[nextPhoto++ % photos.length] : null;
+      const already = unchanged.get(design.html);
+
+      // A repair returns the WHOLE post with only the named slides fixed, so a
+      // slide can come back byte-identical. With a photographer that has to be
+      // settled BEFORE any photograph is made: re-photographing a slide the
+      // repair did not touch would pay for the same picture twice and change a
+      // slide nobody asked to change.
+      if (already && makePhoto) {
+        already.violations.forEach((v) => problems.push(`Slide ${i + 1}: ${v}`));
+        rendered.push({ ...already, violations: [...already.violations] });
+        continue;
       }
+
+      // Made-beats-taken, positional slots, and a rotation that advances per
+      // SLOT: the rule lives in @/lib/design/choosePhotos, where it is tested.
+      const chosen = await choosePhotos({
+        slots,
+        scenes: design.photos ?? [],
+        fallbackScene: design.photo ?? "",
+        library: photos,
+        nextPhoto,
+        makePhoto,
+        onPhotographing: () =>
+          onProgress?.(`Photographing slide ${i + 1} of ${checked.designs.length}`),
+      });
+      const forThisSlide = chosen.photos;
+      nextPhoto = chosen.nextPhoto;
       const assetIds = forThisSlide.map((p) => p?.id ?? null);
 
       // Identical markup on the identical photographs paints identical pixels.
-      const already = unchanged.get(design.html);
       if (already && sameAssetIds(already.photoAssetIds, assetIds)) {
         already.violations.forEach((v) => problems.push(`Slide ${i + 1}: ${v}`));
         rendered.push({ ...already, violations: [...already.violations] });
