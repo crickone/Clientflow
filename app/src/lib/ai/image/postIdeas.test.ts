@@ -28,8 +28,14 @@ function ok(name: string, cond: boolean) {
   passed++;
 }
 
-const { extractIdeaObjects: extract } =
-  requireLocal("./postIdeas") as typeof import("./postIdeas");
+const {
+  extractIdeaObjects: extract,
+  normaliseHook,
+  similarHooks,
+  dedupeIdeas,
+  pickAngles,
+  IDEA_ANGLES,
+} = requireLocal("./postIdeas") as typeof import("./postIdeas");
 
 const idea = (n: number) =>
   `{"pillar":"Strength","hook":"Hook ${n}","teaches":"Teaches ${n}","basis":"Basis ${n}"}`;
@@ -79,5 +85,103 @@ const idea = (n: number) =>
 // ── Nothing usable ────────────────────────────────────────────────────────
 ok("empty text yields nothing", extract("").length === 0);
 ok("prose with no JSON yields nothing", extract("I couldn't come up with any.").length === 0);
+
+
+// ── THE REPEAT BUG: the same ideas came back run after run ────────────────
+//
+// The generator sent an identical prompt every time and remembered nothing it
+// had proposed, so "New ideas" returned the same angles with new wording. The
+// prompt now carries an avoid list and a fresh set of angles; these pin the
+// half that is a guarantee rather than a request — the reply filter.
+
+const mk = (hook: string, pillar = "Strength") => ({
+  pillar,
+  hook,
+  teaches: "t",
+  basis: "b",
+});
+
+// normaliseHook — the "literally the same line" key
+{
+  ok("casing and punctuation are ignored", normaliseHook("Why Protein, Really?") === "why protein really");
+  ok("whitespace is collapsed", normaliseHook("  a   b  ") === "a b");
+}
+
+// similarHooks — the repeats that actually annoy an operator are rephrasings
+{
+  ok(
+    "a verbatim repeat is caught",
+    similarHooks("Why progressive overload stalls", "why progressive overload stalls!"),
+  );
+  ok(
+    "a rephrasing is caught",
+    similarHooks(
+      "Why protein timing matters less than total intake",
+      "Protein timing vs total daily intake: what actually matters",
+    ),
+  );
+  ok(
+    "two genuinely different ideas are left alone",
+    !similarHooks(
+      "Why protein timing matters less than total intake",
+      "How sleep debt blunts strength gains",
+    ),
+  );
+  ok(
+    "short hooks sharing under three content words do not trip",
+    !similarHooks("Sleep and recovery", "Recovery and rest days"),
+  );
+  ok("an empty hook never matches", !similarHooks("", "anything at all"));
+}
+
+// dedupeIdeas — the guarantee behind the prompt's request
+{
+  const batch = [
+    mk("Why progressive overload stalls"),
+    mk("Protein timing vs total daily intake: what actually matters"),
+    mk("How sleep debt blunts strength gains"),
+  ];
+  const kept = dedupeIdeas(batch, ["Why protein timing matters less than total intake"], 6);
+  ok("an idea already proposed is dropped", kept.length === 2);
+  ok("the dropped one is the rephrasing", !kept.some((k) => k.hook.startsWith("Protein timing")));
+  ok("the new ideas survive", kept[0].hook === "Why progressive overload stalls");
+}
+{
+  const batch = [mk("Why progressive overload stalls"), mk("Why progressive overload stalls")];
+  ok("a duplicate INSIDE one batch is dropped too", dedupeIdeas(batch, [], 6).length === 1);
+}
+{
+  const batch = [mk("A"), mk("B"), mk("C"), mk("D")];
+  ok("the requested count is the ceiling", dedupeIdeas(batch, [], 2).length === 2);
+}
+{
+  // Fewer-than-asked is the intended outcome, not an error: five new ideas
+  // beats six of which two were seen last week.
+  const batch = [mk("Why progressive overload stalls")];
+  ok("everything filtered out yields nothing", dedupeIdeas(batch, ["why progressive overload stalls"], 6).length === 0);
+}
+{
+  ok("an empty avoid list keeps everything", dedupeIdeas([mk("A"), mk("B")], [], 6).length === 2);
+  ok("blank entries in the avoid list are ignored", dedupeIdeas([mk("A")], ["", "   "], 6).length === 1);
+}
+
+// pickAngles — the request itself must differ run to run
+{
+  const angles = pickAngles(6, () => 0.5);
+  ok("the requested number of angles comes back", angles.length === 6);
+  ok("angles are distinct", new Set(angles).size === 6);
+  ok("angles come from the catalogue", angles.every((a) => IDEA_ANGLES.includes(a)));
+  ok(
+    "asking for more than the catalogue holds does not repeat one",
+    pickAngles(99).length === IDEA_ANGLES.length,
+  );
+  // Different draws on the same catalogue: with a real shuffle two runs of six
+  // out of fourteen should differ. Pinned with a counter so it cannot flake.
+  let i = 0;
+  const seq = () => ((i = (i + 7) % 11), i / 11);
+  const a = pickAngles(6, seq);
+  const b = pickAngles(6, seq);
+  ok("consecutive draws are not identical", a.join("|") !== b.join("|"));
+}
 
 console.log(`postIdeas.test.ts: all ${passed} assertions passed`);

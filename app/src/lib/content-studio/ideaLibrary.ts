@@ -112,3 +112,62 @@ export function markIdeaUsed(hook: string, tdb?: TenantDb): void {
     )
     .run(hook);
 }
+
+// ── What the generator has already proposed ────────────────────────────────
+//
+// The library above is what an operator CHOSE to keep. That is a much smaller
+// set than what they have been shown, and feeding only the kept ideas back to
+// the generator left it free to re-propose everything that was skipped — which
+// is exactly what "the ideas keep repeating" was. `post_idea_seen` records
+// every hook that reached the screen, and is read back as the avoid list for
+// the next run (@/lib/ai/image/postIdeas).
+//
+// It is a ledger, not content: nothing displays it, it dedupes on `hook`, and
+// it is pruned so a tenant generating ideas weekly for a year doesn't carry a
+// prompt-sized history around.
+
+/** How many recent hooks to keep on the ledger. Beyond this, the oldest are dropped. */
+const SEEN_LIMIT = 400;
+
+/** Record hooks the operator has now been shown. Idempotent, and prunes the tail. */
+export function recordSuggested(hooks: readonly string[], tdb?: TenantDb): void {
+  const clean = hooks.map((h) => h?.trim()).filter((h): h is string => Boolean(h));
+  if (clean.length === 0) return;
+  const c = conn(tdb);
+  const ins = c.prepare("INSERT INTO post_idea_seen (hook) VALUES (?) ON CONFLICT(hook) DO NOTHING");
+  c.transaction(() => {
+    for (const h of clean) ins.run(h);
+    c.prepare(
+      `DELETE FROM post_idea_seen WHERE id NOT IN (
+         SELECT id FROM post_idea_seen ORDER BY id DESC LIMIT ?
+       )`,
+    ).run(SEEN_LIMIT);
+  })();
+}
+
+/**
+ * The hooks to keep the generator away from, newest first: everything recently
+ * shown, plus everything in the library. The library is folded in because a
+ * saved or used idea must not come back as a "new" suggestion even after it has
+ * fallen off the seen ledger.
+ *
+ * Ordered on `created_at`, not on id: the two tables have independent
+ * autoincrement counters, so their ids are not comparable and sorting on them
+ * would quietly rank a saved idea from last year above one shown this morning.
+ * GROUP BY collapses a hook that lives in both tables to a single line.
+ */
+export function hooksToAvoid(limit = 60, tdb?: TenantDb): string[] {
+  const rows = conn(tdb)
+    .prepare(
+      `SELECT hook, MAX(created_at) AS seen_at FROM (
+         SELECT hook, created_at FROM post_idea_seen
+         UNION ALL
+         SELECT hook, created_at FROM post_ideas
+       )
+       GROUP BY hook
+       ORDER BY seen_at DESC
+       LIMIT ?`,
+    )
+    .all(limit) as { hook: string }[];
+  return rows.map((r) => r.hook);
+}

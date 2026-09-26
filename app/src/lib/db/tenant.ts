@@ -1233,6 +1233,23 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_post_ideas_hook ON post_ideas(hook);
     CREATE INDEX IF NOT EXISTS idx_post_ideas_status ON post_ideas(status, id);
+
+    -- Every post idea this tenant has been SHOWN, whether or not they kept it.
+    --
+    -- post_ideas above only holds what an operator deliberately saved, so the
+    -- generator had no idea what it had already proposed and "New ideas" kept
+    -- returning the same angles. This is the exclusion ledger that fixes that:
+    -- purely a memory of what has been on screen, fed back into the prompt and
+    -- used to filter the reply (@/lib/ai/image/postIdeas). It is NOT a library
+    -- -- nothing reads it for display -- so it is pruned to the most recent few
+    -- hundred hooks rather than kept forever.
+    CREATE TABLE IF NOT EXISTS post_idea_seen (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      hook TEXT NOT NULL,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_post_idea_seen_hook ON post_idea_seen(hook);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_voice_queue_one_pending ON voice_call_queue(lead_id)
       WHERE status = 'pending';
     CREATE UNIQUE INDEX IF NOT EXISTS idx_voice_calls_provider ON voice_calls(provider_call_id)
