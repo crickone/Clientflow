@@ -36,6 +36,7 @@ import { countPendingRequests } from "@/lib/cms/requests";
 import { PastDueBanner } from "@/components/billing/PastDueBanner";
 import { pathAllowed, type FeatureFlags } from "@/lib/features";
 import { ImpersonationBanner } from "@/components/layout/ImpersonationBanner";
+import { TenantTabGuard } from "@/components/layout/TenantTabGuard";
 // Side-effect import: boots the daily automation scheduler (birthdays etc.) on
 // the server. This is a nodejs-only server component, so better-sqlite3 stays
 // out of the edge bundle. Guarded internally against duplicate timers.
@@ -340,6 +341,10 @@ export default async function RootLayout({
             globals.css so the derived palette wins. data-theme on <html> lets
             CSS key off the active mode (e.g. the /adonis mark swap). */}
         <style id="tenant-theme" dangerouslySetInnerHTML={{ __html: themeStyle }} />
+        {/* Which clinic this HTML was rendered for. Every /api call carries it
+            back so a tab left open while another switched account fails loudly
+            instead of writing to the wrong business — see @/lib/api/tenantStamp. */}
+        <TenantTabGuard tenantId={activeTenantId} />
         <div className="grain" aria-hidden />
         <MotionRoot>
           <TooltipProvider delayDuration={300}>
