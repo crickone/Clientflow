@@ -58,6 +58,7 @@ export function resolvePageContext(
 
   const ctx: RenderCtx = {
     db: resolved.db,
+    tenantId: resolved.tenantId,
     siteId: resolved.site.id,
     siteSlug: resolved.site.slug,
     pageId: page.id,

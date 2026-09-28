@@ -8,6 +8,8 @@ import { sanitizeHtml } from "@/lib/cms/html";
 
 export interface RenderCtx {
   db: TenantDb;
+  /** The tenant that owns the site — needed to mint tokens that name it (lib/cms/enquiryToken). */
+  tenantId: number;
   siteId: number;
   siteSlug: string;
   pageId: number;

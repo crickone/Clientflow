@@ -3,6 +3,7 @@ import "server-only";
 import { registerTemplate } from "@/lib/cms/templates";
 import { getBlockValue } from "@/lib/cms/blocks";
 import { sanitizeHtmlKeepStyles } from "@/lib/cms/html";
+import { injectEnquiryToken, signSiteEnquiryToken } from "@/lib/cms/enquiryToken";
 
 /**
  * Bespoke-site templates (controlled-HTML bridge) — shared by every imported
@@ -37,8 +38,14 @@ registerTemplate({
   Component: ({ ctx }) => {
     const row = getBlockValue(ctx.db, ctx.siteId, ctx.pageId, "body");
     // Verbatim render: first-party HTML with its own styles + scripts. Server-
-    // rendered, so the browser runs the scripts on load.
-    return <div dangerouslySetInnerHTML={{ __html: row?.value ?? "" }} />;
+    // rendered, so the browser runs the scripts on load. The one substitution:
+    // a page carrying the enquiry placeholder gets a token minted for THIS
+    // tenant and site, so its form can post to /api/site/enquiry. Pages
+    // without it are returned untouched (see injectEnquiryToken).
+    const html = injectEnquiryToken(row?.value ?? "", () =>
+      signSiteEnquiryToken({ tenantId: ctx.tenantId, siteId: ctx.siteId }),
+    );
+    return <div dangerouslySetInnerHTML={{ __html: html }} />;
   },
 });
 
