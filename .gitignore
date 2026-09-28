@@ -28,3 +28,6 @@ app/seed/**/*.db-wal
 
 # Local scratch
 *.bak-*
+
+# brainstorming visual companion sessions
+.superpowers/
