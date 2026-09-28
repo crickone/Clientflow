@@ -35,5 +35,9 @@ check("return path: query and hash stripped", safeReturnPath("/site/healthwise/c
 check("return path: absolute url refused", safeReturnPath("https://evil.example/") === "/contact");
 check("return path: protocol-relative refused", safeReturnPath("//evil.example") === "/contact");
 check("return path: missing -> fallback", safeReturnPath(undefined) === "/contact");
+check("return path: tab smuggling refused", safeReturnPath("/\t/evil.example") === "/contact");
+check("return path: newline smuggling refused", safeReturnPath("/\n/evil.example") === "/contact");
+check("return path: carriage return refused", safeReturnPath("/\r/evil.example") === "/contact");
+check("return path: encoded slashes stay a path", safeReturnPath("/%2f%2fevil.example") === "/%2f%2fevil.example");
 
 console.log(`enquiry.test.ts: ${passed} checks passed`);

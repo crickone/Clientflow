@@ -1,6 +1,6 @@
 import { clientIp, rateLimit } from "@/lib/rateLimit";
 import { runWithTenant } from "@/lib/db/tenant";
-import { upsertLead } from "@/lib/leads";
+import { appendLeadNotes, upsertLead } from "@/lib/leads";
 import { logActivity } from "@/lib/queries";
 import { verifySiteEnquiryToken } from "@/lib/cms/enquiryToken";
 import { enquiryNotes, isEnquiryHoneypotTripped, safeReturnPath, validateEnquiry } from "@/lib/cms/enquiry";
@@ -63,8 +63,10 @@ export async function POST(req: Request) {
   if (!claim) return respondPublicForm(req, returnTo, false, { status: 400, error: "Invalid or missing token." });
 
   // Stable dedupe key so a double-click or a second enquiry from the same
-  // person updates one card rather than adding a twin (upsertLead is
-  // idempotent on source + sourceLeadId). validateEnquiry guarantees one of
+  // person lands on one card rather than a twin (upsertLead is idempotent on
+  // source + sourceLeadId). A repeat's programme/about is not discarded: it
+  // is appended to the existing lead's notes below, so nothing the visitor
+  // typed the second time round is lost. validateEnquiry guarantees one of
   // email/phone is present.
   const contactKey = (data.email || data.phone || "").toLowerCase().replace(/\s+/g, "");
   const result = await runWithTenant(claim.tenantId, async () => {
@@ -77,10 +79,16 @@ export async function POST(req: Request) {
       phone: data.phone,
       notes: enquiryNotes(data),
     });
+    if (!created) {
+      appendLeadNotes(
+        lead.id,
+        `Repeat enquiry ${new Date().toISOString().slice(0, 10)}: ${enquiryNotes(data).replace(/\n/g, " · ")}`,
+      );
+    }
     await logActivity(
       "lead.new",
       created ? `Website enquiry: ${data.name}` : `Repeat website enquiry: ${data.name}`,
-      { leadId: lead.id, programme: data.programme, siteId: claim.siteId, created },
+      { leadId: lead.id, programme: data.programme, siteId: claim.siteId, created, about: data.about },
     );
     return { leadId: lead.id, created };
   });

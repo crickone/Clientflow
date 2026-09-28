@@ -89,12 +89,25 @@ process.env.EMAIL_TOKEN_SECRET = SECRET;
     assert.match(lead?.notes ?? "", /Programme: Vitality 60\+/);
     assert.match(lead?.notes ?? "", /Had a stent/);
 
-    // 2. a repeat from the same contact dedupes to the same lead
-    const r2 = await post({ name: "Mary Byrne", phone: "086 123 4567", programme: "heartwise", token });
+    // 2. a repeat from the same contact dedupes to the same lead, and its
+    //    message is appended rather than dropped
+    const r2 = await post({
+      name: "Mary Byrne",
+      phone: "086 123 4567",
+      programme: "heartwise",
+      about: "Consultant referred me.",
+      token,
+    });
     assert.equal(r2.status, 200);
     const b2 = (await r2.json()) as { ok: boolean; created: boolean };
     assert.equal(b2.created, false, "same phone -> existing lead, not a duplicate");
     assert.equal(leadCount(), 1);
+    const leadAfterRepeat = tdb.select().from(leads).get();
+    assert.match(leadAfterRepeat?.notes ?? "", /Programme: Vitality 60\+/, "the first enquiry's programme survives");
+    assert.match(leadAfterRepeat?.notes ?? "", /Had a stent/, "the first enquiry's message survives");
+    assert.match(leadAfterRepeat?.notes ?? "", /Repeat enquiry/, "the repeat is appended, not silently dropped");
+    assert.match(leadAfterRepeat?.notes ?? "", /Programme: Heartwise/, "the repeat's new programme is recorded");
+    assert.match(leadAfterRepeat?.notes ?? "", /Consultant referred me\./, "the repeat's about text is recorded");
 
     // 3. tampered / campaign-shaped / missing tokens are one 400, nothing written
     //    (own IP: the route counts a rejected request against the caller's

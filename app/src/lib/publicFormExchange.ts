@@ -8,6 +8,9 @@
  * Plain Request/Response, not next/server, so the routes that use this load
  * in the test runner (see f/[slug]/submit/route.ts's banner for the reason).
  */
+/** The one honeypot field name both public forms (f/[slug]/submit and api/site/enquiry) agree on. */
+export const PUBLIC_FORM_HONEYPOT_FIELD = "company_website";
+
 export function isJsonExchange(req: Request): boolean {
   const accept = req.headers.get("accept") || "";
   const contentType = req.headers.get("content-type") || "";
@@ -38,6 +41,7 @@ export interface PublicFormReply {
   error?: string;
   /** Extra JSON fields for a fetch caller (a lead id, a created flag). Ignored on the redirect path. */
   extra?: Record<string, unknown>;
+  /** Sent on the JSON reply only — a `Response.redirect` (the no-JS path) cannot carry extra headers. */
   headers?: HeadersInit;
 }
 

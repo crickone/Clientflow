@@ -2,7 +2,7 @@ import { clientIp, rateLimit } from "@/lib/rateLimit";
 import { runWithTenant } from "@/lib/db/tenant";
 import { logActivity } from "@/lib/queries";
 import { buildAnswers, insertFormSubmission, resolveFormBySlug, validateRequired } from "@/lib/publicForms";
-import { parsePublicFormFields, respondPublicForm } from "@/lib/publicFormExchange";
+import { PUBLIC_FORM_HONEYPOT_FIELD, parsePublicFormFields, respondPublicForm } from "@/lib/publicFormExchange";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +27,6 @@ export const dynamic = "force-dynamic";
  * plain Request/Response (see api/health/route.ts for the same choice).
  */
 const MAX_BODY_BYTES = 20 * 1024; // forms can have several long-answer fields
-const HONEYPOT_FIELD = "company_website";
 
 export async function POST(req: Request, { params }: { params: { slug: string } }) {
   const slug = params.slug;
@@ -59,7 +58,7 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
 
   // Honeypot hit: silently "succeed" without storing anything — a 4xx here
   // would just teach the bot to retry differently.
-  if ((fields[HONEYPOT_FIELD] || "").trim()) {
+  if ((fields[PUBLIC_FORM_HONEYPOT_FIELD] || "").trim()) {
     return respondPublicForm(req, `/f/${slug}`, true);
   }
 

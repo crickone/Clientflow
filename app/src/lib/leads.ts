@@ -241,6 +241,13 @@ export function setLeadStatus(id: number, status: LeadStatus) {
     .run();
 }
 
+/** Append a line to a lead's notes — a repeat enquiry from the same contact adds to the one card rather than being dropped. */
+export function appendLeadNotes(leadId: number, line: string): void {
+  const existing = db.select({ notes: leads.notes }).from(leads).where(eq(leads.id, leadId)).get();
+  const notes = existing?.notes ? `${existing.notes}\n${line}` : line;
+  db.update(leads).set({ notes }).where(eq(leads.id, leadId)).run();
+}
+
 export function leadCounts() {
   const rows = db
     .select({

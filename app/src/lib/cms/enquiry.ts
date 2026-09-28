@@ -3,6 +3,8 @@
  * JSON and the url-encoded path of POST /api/site/enquiry. Pure: no DB, no
  * request object. Mirrors lib/campaigns/signup.ts's shape and caps.
  */
+import { PUBLIC_FORM_HONEYPOT_FIELD } from "@/lib/publicFormExchange";
+
 export const ENQUIRY_PROGRAMMES = ["livewell", "vitality", "heartwise", "unsure"] as const;
 export type EnquiryProgramme = (typeof ENQUIRY_PROGRAMMES)[number];
 
@@ -13,7 +15,8 @@ const PROGRAMME_LABEL: Record<EnquiryProgramme, string> = {
   unsure: "Not sure yet",
 };
 
-export const ENQUIRY_HONEYPOT_FIELD = "company_website";
+/** The two public forms (this one and f/[slug]/submit) share one honeypot field name. */
+export const ENQUIRY_HONEYPOT_FIELD = PUBLIC_FORM_HONEYPOT_FIELD;
 
 export interface ValidEnquiry {
   name: string;
@@ -70,9 +73,13 @@ export function validateEnquiry(fields: Record<string, string>): ValidateEnquiry
  * The no-JS fallback bounces back to the page the form was on. That path is
  * client input, so it is accepted only as a root-relative path: no scheme, no
  * protocol-relative "//host", no backslash tricks, query and hash dropped.
+ * Any control character (tab, LF, CR, ...) is rejected outright too, since
+ * `new URL()` strips them before parsing and one could otherwise smuggle a
+ * protocol-relative "//host" past the startsWith("//") guard.
  */
 export function safeReturnPath(v: unknown, fallback = "/contact"): string {
   const s = asString(v);
+  if (/[\x00-\x1f\x7f]/.test(s)) return fallback;
   if (!s.startsWith("/") || s.startsWith("//") || s.includes("\\")) return fallback;
   const bare = s.split("?")[0]!.split("#")[0]!;
   return bare || fallback;
