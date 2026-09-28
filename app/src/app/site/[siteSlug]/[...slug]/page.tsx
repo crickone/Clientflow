@@ -53,14 +53,18 @@ export default async function PublicSitePage({ params, searchParams }: Props) {
     // URL here (public/sites/<slug>/_redirects.json — see lib/cms/siteRedirects).
     // A blog target is only issued when the post actually exists, so a
     // missing article gets a 404 rather than a redirect into another 404.
-    const host = headers().get("host");
-    const resolved = resolvePublicSite({ host, siteParam: searchParams.site ?? params.siteSlug });
+    // A page row with no template already resolved the site; only a missing
+    // page needs the lookup done again.
+    const resolved =
+      pc?.resolved ?? resolvePublicSite({ host: headers().get("host"), siteParam: searchParams.site ?? params.siteSlug });
     if (resolved) {
       const hit = resolveSiteRedirect(resolved.site.slug, pathFromSlugParam(params.slug));
       if (hit) {
         if (hit.kind === "external") permanentRedirect(hit.target);
         const blog = /^\/blog\/([^/]+)$/.exec(hit.target);
-        const postOk = !blog || getPublishedPostBySlug(resolved.db, resolved.site.id, decodeURIComponent(blog[1]!)) !== null;
+        // pathFromSlugParam already decoded the segment once; the same string
+        // is what lands in the Location header, so it is checked as-is.
+        const postOk = !blog || getPublishedPostBySlug(resolved.db, resolved.site.id, blog[1]!) !== null;
         if (postOk) {
           // Root-relative keeps the browser on its current host; a mapped
           // domain serves the site at its root, the preview mount at /site/<slug>.
