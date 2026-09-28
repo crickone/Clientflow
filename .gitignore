@@ -31,3 +31,6 @@ app/seed/**/*.db-wal
 
 # brainstorming visual companion sessions
 .superpowers/
+
+# Healthwise photography candidates (only the picks are committed)
+sites/healthwise/assets/ai/
