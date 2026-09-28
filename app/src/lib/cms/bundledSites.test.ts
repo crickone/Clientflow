@@ -7,6 +7,7 @@
 // to drift. Same idea for the public route list in middleware.ts: a public
 // form whose route is not listed 307s every visitor to /login, while the
 // route's own tests (which call the handler directly) stay green.
+// To stop syncing a shipped site later, delete its bundle files from public/sites/<slug>/ rather than removing the slug here; the module's opt-in policy protects Studio-authored sites, and this test only insists that what ships is applied.
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -20,7 +21,8 @@ function check(name: string, cond: boolean) {
 
 const root = process.cwd(); // app/
 const sync = fs.readFileSync(path.join(root, "src/lib/cms/syncBundledSite.ts"), "utf8");
-const listSrc = /const BUNDLED_SITES[^=]*=\s*\[([\s\S]*?)\];/.exec(sync)?.[1] ?? "";
+const stripComments = (s: string) => s.replace(/\/\/.*$/gm, "");
+const listSrc = stripComments(/const BUNDLED_SITES[^=]*=\s*\[([\s\S]*?)\];/.exec(sync)?.[1] ?? "");
 const bundled = [...listSrc.matchAll(/"([a-z0-9-]+)"/g)].map((m) => m[1]);
 check("BUNDLED_SITES parsed from source", bundled.length > 0);
 
@@ -34,7 +36,7 @@ for (const slug of shipped) {
 }
 
 const middleware = fs.readFileSync(path.join(root, "src/middleware.ts"), "utf8");
-const prefixesSrc = /const PUBLIC_API_PREFIXES\s*=\s*\[([\s\S]*?)\];/.exec(middleware)?.[1] ?? "";
+const prefixesSrc = stripComments(/const PUBLIC_API_PREFIXES\s*=\s*\[([\s\S]*?)\];/.exec(middleware)?.[1] ?? "");
 const prefixes = [...prefixesSrc.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
 check("PUBLIC_API_PREFIXES parsed from source", prefixes.length > 0);
 for (const p of ["/api/site/enquiry", "/api/campaigns/signup", "/api/leads/inbound"]) {
