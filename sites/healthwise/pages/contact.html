@@ -1,0 +1,55 @@
+<section class="phero">
+  <div class="wrap">
+    <p class="eyebrow" data-rise>Contact</p>
+    <h1 class="d h1" data-rise>Book a consultation.</h1>
+    {{PULSE}}
+    <p class="lead" data-rise>A conversation and an assessment, no commitment. Send your details and we'll be in touch to arrange a time, or ring <a class="link" href="tel:+353862422388">086 242 2388</a>.</p>
+  </div>
+</section>
+
+<section class="sec" id="book">
+  <div class="wrap split" style="align-items:start">
+    <form class="form" method="post" action="/api/site/enquiry" data-enquiry>
+      <div class="field"><label for="c-name">Your name</label><input id="c-name" name="name" type="text" autocomplete="name" required /></div>
+      <div class="field"><label for="c-phone">Phone number</label><input id="c-phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" /></div>
+      <div class="field"><label for="c-email">Email address</label><input id="c-email" name="email" type="email" autocomplete="email" inputmode="email" /></div>
+      <div class="field"><label for="c-programme">Which programme are you interested in?</label>
+        <select id="c-programme" name="programme">
+          <option value="unsure">Not sure yet</option>
+          <option value="livewell">Livewell, 40 to 60</option>
+          <option value="vitality">Vitality, 60 and over</option>
+          <option value="heartwise">Heartwise, after a cardiac event</option>
+        </select>
+      </div>
+      <div class="field"><label for="c-about">A little about you (optional)</label><textarea id="c-about" name="about" maxlength="1000" placeholder="Do you exercise already? Anything we should know?"></textarea></div>
+      <input type="hidden" name="token" value="{{TOKEN}}" />
+      <input type="hidden" name="return" value="/contact" />
+      <div class="form__hp" aria-hidden="true"><label>Company website<input name="company_website" type="text" tabindex="-1" autocomplete="off" /></label></div>
+      <p class="form__ok" hidden>Thanks — we'll be in touch shortly.</p>
+      <p class="form__err" hidden></p>
+      <button class="btn" type="submit">Book a consultation</button>
+      <p class="form__note">Give us a phone number or an email address, whichever you prefer. We use your details only to reply to you.</p>
+    </form>
+    <div class="facts">
+      <div class="fact"><b>Ring DJ</b><a href="tel:+353862422388">086 242 2388</a></div>
+      <div class="fact"><b>Email</b><a href="mailto:dj@healthwiseclonmel.ie">dj@healthwiseclonmel.ie</a></div>
+      <div class="fact"><b>The studio</b>Unit 12E Ard Gaoithe Business Park,<br />Cashel Road, Clonmel, Co. Tipperary, E91 A6F4<br /><a class="link" href="{{MAPS}}" rel="noopener">Directions</a></div>
+      <div class="fact"><b>Finding the unit</b>Ard Gaoithe Business Park is on the Cashel Road side of Clonmel. Healthwise is Unit 12E, with the sign over the door and parking outside.</div>
+      <div class="fact"><b>Classes</b>From 7am, mornings and evenings. See the <a class="link" href="classes.html">timetable</a>.</div>
+      <div class="fact"><b>Follow</b><a href="https://www.facebook.com/healthwiseclonmel/" rel="noopener">Facebook</a> · <a href="https://www.instagram.com/healthwise_clonmel" rel="noopener">Instagram</a></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec sec--surf">
+  <div class="wrap split split--wide">
+    <figure class="wipe"><img src="assets/shopfront.jpg" alt="The Healthwise sign over the studio door" width="1600" height="900" /></figure>
+    <div>
+      <p class="eyebrow">What happens next</p>
+      <h2 class="d h2">A conversation first. Then a plan.</h2>
+      <div class="body">
+        <p>We'll ring or email to arrange a time. The consultation is a conversation about your history, your medication if any, and what you want back, followed by a short assessment. From that, DJ writes a programme and tells you which class to start in.</p>
+      </div>
+    </div>
+  </div>
+</section>
