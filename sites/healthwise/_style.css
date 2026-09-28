@@ -103,13 +103,6 @@ ul,ol{padding:0;list-style:none}
 .phero__img img{width:100%;aspect-ratio:3/2;object-fit:cover}
 .phero__mark{height:44px;width:auto;margin-bottom:18px}
 
-/* ---- proof strip ---- */
-.proof{background:var(--surf);padding:22px 0}
-.proof ul{display:flex;flex-wrap:wrap;gap:10px 26px;font-size:15px;color:var(--mid)}
-.proof li{display:flex;align-items:center;gap:10px}
-.proof li::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--red);flex:none}
-.proof b{color:var(--navy);font-weight:600}
-
 /* ---- sections ---- */
 .sec{padding:clamp(48px,7vw,96px) 0}
 .sec--surf{background:var(--surf)}
@@ -134,7 +127,7 @@ ul,ol{padding:0;list-style:none}
 
 /* ---- the method, numbered because it is a sequence ---- */
 .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:30px;border-top:1px solid rgba(255,255,255,.25);padding-top:28px}
-.step__n{font-family:var(--display);font-weight:800;font-size:15px;letter-spacing:.06em;color:#F06068}
+.step__n{font-family:var(--display);font-weight:800;font-size:19px;letter-spacing:.06em;color:#F06068}
 .step .h3{margin:8px 0}
 .step p{font-size:16px;color:#d7d5ea}
 @media (max-width:980px){.steps{grid-template-columns:1fr 1fr}}
