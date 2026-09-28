@@ -47,6 +47,9 @@ const BUNDLED_SITES: readonly string[] = [
   // Inspire Health & Fitness, Clonmel. Built in sites/inspire/, not authored
   // in Studio, so the repo is the source of truth.
   "inspire",
+  // Healthwise, Clonmel. Built in sites/healthwise/ the same way; its
+  // _pages.json, _posts.json and _redirects.json ship in the build.
+  "healthwise",
 ];
 
 type BundledPage = {
