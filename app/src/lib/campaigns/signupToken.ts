@@ -49,7 +49,7 @@ import { readTokenPayload, signTokenPayload } from "@/lib/signedToken";
  * where `payload` is `JSON.stringify({t: tenantId, c: campaignId})`. The HMAC
  * is computed over the base64url PAYLOAD TEXT (not the raw pre-encoded
  * JSON) — an implementation detail that only has to be self-consistent
- * between sign and verify, which it is (both go through `sign()` below).
+ * between sign and verify, which it is (both go through lib/signedToken.ts).
  *
  * The HMAC primitive itself lives in lib/signedToken.ts, shared with the
  * site enquiry token.

@@ -1,3 +1,5 @@
+import "server-only";
+
 import { readTokenPayload, signTokenPayload } from "@/lib/signedToken";
 
 /**

@@ -75,8 +75,17 @@ try {
   const bodyYes = `<input value="${ENQUIRY_TOKEN_PLACEHOLDER}"><span>${ENQUIRY_TOKEN_PLACEHOLDER}</span>`;
   const out = injectEnquiryToken(bodyYes, () => "TOK");
   check("placeholder replaced everywhere", out === "<input value=\"TOK\"><span>TOK</span>");
-  const outThrow = injectEnquiryToken(bodyYes, () => { throw new Error("no secret"); });
+  const realError = console.error;
+  let logged = 0;
+  console.error = () => { logged++; };
+  let outThrow = "";
+  try {
+    outThrow = injectEnquiryToken(bodyYes, () => { throw new Error("no secret"); });
+  } finally {
+    console.error = realError;
+  }
   check("mint failure -> empty token, page still renders", outThrow === "<input value=\"\"><span></span>");
+  check("mint failure is logged once", logged === 1);
 
   // fail closed without a secret
   delete process.env.EMAIL_TOKEN_SECRET;
