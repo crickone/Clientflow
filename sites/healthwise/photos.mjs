@@ -82,16 +82,30 @@ if (cmd === "list") {
 } else if (cmd === "generate") {
   mkdirSync(AI, { recursive: true });
   const wanted = args.length ? SHOTS.filter((s) => args.includes(s.name)) : SHOTS;
-  const log = existsSync(join(AI, "prompts.json")) ? JSON.parse(readFileSync(join(AI, "prompts.json"), "utf8")) : {};
+  const logPath = join(AI, "prompts.json");
+  const log = existsSync(logPath) ? JSON.parse(readFileSync(logPath, "utf8")) : {};
+  const failed = [];
   for (const shot of wanted) {
     for (let i = 1; i <= CANDIDATES; i++) {
-      const { out, seed } = await generateOne(shot, i);
-      log[`${shot.name}-${i}`] = { prompt: prompt(shot), seed };
-      console.log("wrote", out, "seed", seed);
+      try {
+        const { out, seed } = await generateOne(shot, i);
+        log[`${shot.name}-${i}`] = { prompt: prompt(shot), seed };
+        console.log("wrote", out, "seed", seed);
+      } catch (err) {
+        // One bad request must not cost the shots that already succeeded:
+        // record what we have, name the failure, carry on.
+        failed.push(`${shot.name}-${i}`);
+        console.error(`failed ${shot.name}-${i}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      writeFileSync(logPath, JSON.stringify(log, null, 2));
     }
   }
-  writeFileSync(join(AI, "prompts.json"), JSON.stringify(log, null, 2));
-  console.log(`${wanted.length * CANDIDATES} candidates in assets/ai/ — now look at every one.`);
+  const done = wanted.length * CANDIDATES - failed.length;
+  console.log(`${done} candidates in assets/ai/ — now look at every one.`);
+  if (failed.length) {
+    console.error(`${failed.length} failed: ${failed.join(", ")} — re-run \`generate <name>\` for those shots.`);
+    process.exitCode = 1;
+  }
 } else if (cmd === "pick") {
   const picks = existsSync(join(ASSETS, "photos.json")) ? JSON.parse(readFileSync(join(ASSETS, "photos.json"), "utf8")) : {};
   const log = JSON.parse(readFileSync(join(AI, "prompts.json"), "utf8"));
