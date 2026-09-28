@@ -1,14 +1,20 @@
 import { redirect } from "next/navigation";
+import { Lock } from "lucide-react";
 
 import { requireUserPage, getCurrentMembership } from "@/lib/auth";
 import { getBilling } from "@/lib/billing/engine";
 import { computeVat, formatCents } from "@/lib/billing/money";
 import { getVatRateBp } from "@/lib/billing/settings";
 import { monthlyLines } from "@/lib/billing/addons";
+import { addMonthClamped, dublinDayOfMonth, dublinToday } from "@/lib/billing/dates";
 import { startCapture } from "@/lib/billing/capture";
+import { getFeatureFlags } from "@/lib/settings";
+import { MODULE_CATALOG, isModuleOn } from "@/lib/features";
+import { formatDate } from "@/lib/utils";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { Card } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
+import { Card, CardLabel } from "@/components/ui/Card";
+import { Reveal, RevealGroup } from "@/components/motion/Reveal";
+import { ActivateButton } from "@/components/billing/ActivateButton";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Activate — AdonisAgent" };
@@ -23,10 +29,25 @@ export default async function ActivatePage() {
   // Base plan + any add-on already switched on — the same composition
   // startCapture authorises and ensureInvoice bills, so all three agree.
   const lines = monthlyLines(m.tenant.id);
-  const { netCents, vatCents, grossCents } = computeVat(
+  const vatRateBp = getVatRateBp();
+  const { vatCents, grossCents } = computeVat(
     lines.reduce((sum, l) => sum + l.netCents, 0),
-    getVatRateBp(),
+    vatRateBp,
   );
+  const gross = formatCents(grossCents);
+
+  // What the first charge anchors: activateTenant takes today's Dublin day as
+  // the anchor and sets the next renewal a month on (clamped), so quoting it
+  // the same way here means the date on this page is the date they're billed.
+  const today = dublinToday();
+  const nextCharge = addMonthClamped(today, dublinDayOfMonth(today));
+
+  // The modules actually switched on for THIS business, not a generic feature
+  // list — it answers "what am I paying for?" with their own entitlement.
+  const flags = getFeatureFlags();
+  const included = MODULE_CATALOG.filter((mod) => isModuleOn(flags, mod.key));
+
+  const isAdmin = m.role === "admin";
 
   async function pay() {
     "use server";
@@ -37,55 +58,72 @@ export default async function ActivatePage() {
   }
 
   return (
-    <div className="app-page" style={{ maxWidth: 560 }}>
+    <div className="app-page">
       <PageHeader
-        eyebrow="Billing"
+        eyebrow="Activation"
         title={`Activate ${m.tenant.name}`}
-        subtitle="Your AdonisAgent subscription starts today — one flat monthly price, cancel any time."
+        subtitle="One flat monthly price for everything below. Cancel any time."
       />
-      <Card style={{ padding: 28 }}>
-        <div
-          style={{
-            padding: 16,
-            borderRadius: "var(--radius)",
-            border: "1px solid var(--hairline)",
-          }}
-        >
-          {lines.map((l) => (
-            <Row key={l.kind + l.addonKey} label={l.description} value={formatCents(l.netCents)} />
-          ))}
-          <Row label="VAT" value={formatCents(vatCents)} />
-          <Row label="Due today" value={formatCents(grossCents)} strong />
-        </div>
-        {m.role === "admin" ? (
-          <form action={pay} style={{ marginTop: 18 }}>
-            <Button variant="primary" size="lg" style={{ width: "100%" }}>
-              Pay {formatCents(grossCents)} &amp; activate
-            </Button>
-          </form>
-        ) : (
-          <p style={{ marginTop: 18, fontSize: 13.5, color: "var(--text-secondary)" }}>
-            Ask your account owner to sign in and complete activation.
-          </p>
-        )}
-      </Card>
-    </div>
-  );
-}
 
-function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        padding: "6px 0",
-        fontWeight: strong ? 600 : 400,
-        color: strong ? "var(--text-primary)" : "var(--text-secondary)",
-      }}
-    >
-      <span>{label}</span>
-      <span>{value}</span>
+      <div className="activate-grid">
+        <Card style={{ padding: 0, overflow: "hidden" }}>
+          <div className="activate-manifest-head">
+            <CardLabel style={{ margin: 0 }}>
+              Included — {included.length} {included.length === 1 ? "module" : "modules"}
+            </CardLabel>
+          </div>
+          <RevealGroup stagger={0.03}>
+            <ul className="activate-manifest">
+              {included.map((mod) => (
+                <Reveal key={mod.key} as="li" className="activate-item">
+                  <span className="activate-item__label">{mod.label}</span>
+                  <span className="activate-item__blurb">{mod.blurb}</span>
+                </Reveal>
+              ))}
+            </ul>
+          </RevealGroup>
+        </Card>
+
+        <div className="activate-summary">
+          <div className="activate-panel">
+            <CardLabel style={{ margin: 0 }}>Due today</CardLabel>
+            <div className="activate-total">{gross}</div>
+
+            <dl className="activate-lines">
+              {lines.map((l) => (
+                <div className="activate-line" key={l.kind + l.addonKey}>
+                  <dt>{l.description}</dt>
+                  <dd>{formatCents(l.netCents)}</dd>
+                </div>
+              ))}
+              <div className="activate-line">
+                <dt>VAT {vatRateBp / 100}%</dt>
+                <dd>{formatCents(vatCents)}</dd>
+              </div>
+            </dl>
+
+            {isAdmin ? (
+              <form action={pay} className="activate-action">
+                <ActivateButton amount={gross} />
+              </form>
+            ) : (
+              <p className="activate-note activate-note--block">
+                Only an admin can activate. Ask your account owner to sign in and
+                finish this step.
+              </p>
+            )}
+
+            <p className="activate-renewal">
+              Then {gross} on {formatDate(nextCharge)}, and the same day each month.
+            </p>
+            <p className="activate-note">
+              <Lock size={12} aria-hidden />
+              Your card is handled by our payment provider. We store the last four
+              digits, never the full number.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

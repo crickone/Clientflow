@@ -2485,3 +2485,141 @@ a {
   background: var(--surface-1);
 }
 @media (max-width: 640px) { .cmdk { top: 8vh; width: calc(100vw - 24px); } }
+
+/* ── Activation (/billing/activate) ───────────────────────────────────────────
+   The screen a newly provisioned business lands on before it can use anything.
+   Two columns on desktop: the manifest of what switches on, beside a sticky
+   order summary. Classes rather than inline styles so sticky, hover/focus and
+   the breakpoints actually work (see the Button comment for the same reason). */
+.activate-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 372px;
+  gap: 24px;
+  align-items: start;
+}
+.activate-summary { position: sticky; top: 32px; }
+
+/* Below the two-column threshold the money leads: someone on a phone is here
+   to pay, not to read the manifest, so the summary jumps above it. */
+@media (max-width: 980px) {
+  .activate-grid { grid-template-columns: minmax(0, 1fr); }
+  .activate-summary { position: static; order: -1; }
+}
+
+.activate-manifest-head {
+  padding: 20px 24px 14px;
+  border-bottom: 1px solid var(--grid);
+}
+.activate-manifest { list-style: none; margin: 0; padding: 0 24px 8px; }
+.activate-item {
+  position: relative;
+  padding: 14px 0 14px 18px;
+  border-top: 1px solid var(--grid);
+}
+.activate-item:first-child { border-top: 0; }
+/* A short accent rule per row — the list is a manifest of things coming online,
+   so the marker is a tick of the same ink as the rest of the app's live state. */
+.activate-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 21px;
+  width: 8px;
+  height: 1px;
+  background: var(--accent);
+  opacity: 0.55;
+}
+.activate-item__label {
+  display: block;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+.activate-item__blurb {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+}
+
+/* Wide enough for two: the manifest pairs up so the whole decision — what you
+   get, what it costs, the button — lands in one screen rather than pushing the
+   total off the top as you read. A grid rather than CSS `columns` because the
+   rows carry hairlines: multi-column flows each column independently and the
+   rules stop lining up across the gutter. */
+@media (min-width: 1200px) {
+  .activate-manifest {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 32px;
+    padding-bottom: 16px;
+  }
+  /* The top ROW loses its rule, not just the first cell. */
+  .activate-item:nth-child(-n + 2) { border-top: 0; }
+}
+
+/* The one accent edge on the page: the summary is the live object, everything
+   else is reference. */
+.activate-panel {
+  background: var(--surface-2);
+  border: 1px solid var(--grid);
+  border-top: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 22px;
+  box-shadow: var(--shadow-2);
+}
+.activate-total {
+  font-family: var(--font-heading), sans-serif;
+  font-size: 42px;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  margin: 10px 0 20px;
+  font-variant-numeric: tabular-nums;
+}
+.activate-lines { margin: 0; padding: 0; }
+.activate-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 9px 0;
+  border-top: 1px solid var(--grid);
+}
+.activate-line dt { font-size: 13px; color: var(--text-secondary); }
+.activate-line dd {
+  margin: 0;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 13px;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.activate-action { margin-top: 20px; }
+.activate-renewal {
+  margin: 14px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+.activate-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-tertiary);
+}
+.activate-note svg { flex-shrink: 0; margin-top: 2px; }
+.activate-note--block {
+  margin-top: 20px;
+  padding: 12px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+}
