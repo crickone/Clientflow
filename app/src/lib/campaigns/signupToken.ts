@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { readTokenPayload, signTokenPayload } from "@/lib/signedToken";
 
 /**
  * Signed campaign-signup token — closes the cross-tenant lead-injection hole
@@ -50,28 +50,10 @@ import { createHmac, timingSafeEqual } from "node:crypto";
  * is computed over the base64url PAYLOAD TEXT (not the raw pre-encoded
  * JSON) — an implementation detail that only has to be self-consistent
  * between sign and verify, which it is (both go through `sign()` below).
- */
-
-/** Compute the base64url HMAC-SHA256 signature over a (base64url) payload string. */
-function sign(payload: string, secret: string): string {
-  return createHmac("sha256", secret).update(payload).digest("base64url");
-}
-
-/**
- * Reads EMAIL_TOKEN_SECRET fresh on every call (no module-level caching, same
- * choice as unsubscribeToken.ts's getSecret() / tokenCrypto.ts's deriveKey).
  *
- * No dev-constant fallback, in any environment: signCampaignSignupToken and
- * verifyCampaignSignupToken MUST always agree on whether a secret exists, in
- * the SAME process, or a token minted with a silent fallback could never be
- * verified by verifyCampaignSignupToken's unconditional fail-closed check
- * below — a worse failure mode (every landing-page submission mysteriously
- * rejected) than simply refusing to mint at all.
+ * The HMAC primitive itself lives in lib/signedToken.ts, shared with the
+ * site enquiry token.
  */
-function getSecret(): string | null {
-  const secret = process.env.EMAIL_TOKEN_SECRET;
-  return secret ? secret : null;
-}
 
 export interface CampaignSignupClaim {
   tenantId: number;
@@ -97,17 +79,14 @@ export function signCampaignSignupToken(input: { tenantId: number; campaignId: n
       `[campaigns] signCampaignSignupToken: tenantId and campaignId must be positive integers (got ${tenantId}, ${campaignId}).`,
     );
   }
-  const secret = getSecret();
-  if (!secret) {
+  const token = signTokenPayload({ t: tenantId, c: campaignId });
+  if (!token) {
     throw new Error(
       "[campaigns] EMAIL_TOKEN_SECRET is not set — refusing to mint a campaign-signup token. " +
         "Set EMAIL_TOKEN_SECRET before rendering a campaign landing page.",
     );
   }
-  const payload = Buffer.from(JSON.stringify({ t: tenantId, c: campaignId }), "utf8").toString(
-    "base64url",
-  );
-  return `${payload}.${sign(payload, secret)}`;
+  return token;
 }
 
 /**
@@ -125,37 +104,9 @@ export function signCampaignSignupToken(input: { tenantId: number; campaignId: n
  * a valid signature.
  */
 export function verifyCampaignSignupToken(token: string): CampaignSignupClaim | null {
-  const secret = getSecret();
-  if (!secret) return null; // fail closed: unconfigured deployment can never accept a token
+  const obj = readTokenPayload(token);
+  if (!obj) return null;
 
-  if (typeof token !== "string" || !token) return null;
-  const parts = token.split(".");
-  if (parts.length !== 2) return null;
-  const [payload, sig] = parts;
-  if (!payload || !sig) return null;
-
-  const expected = sign(payload, secret);
-  const a = Buffer.from(sig);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length) return null;
-  if (!timingSafeEqual(a, b)) return null;
-
-  let decoded: string;
-  try {
-    decoded = Buffer.from(payload, "base64url").toString("utf8");
-  } catch {
-    return null;
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(decoded);
-  } catch {
-    return null;
-  }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
-
-  const obj = parsed as Record<string, unknown>;
   const tenantId = obj.t;
   const campaignId = obj.c;
   if (typeof tenantId !== "number" || !Number.isSafeInteger(tenantId) || tenantId <= 0) {
