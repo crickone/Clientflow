@@ -1509,13 +1509,6 @@ ul,ol{padding:0;list-style:none}
 .phero__img img{width:100%;aspect-ratio:3/2;object-fit:cover}
 .phero__mark{height:44px;width:auto;margin-bottom:18px}
 
-/* ---- proof strip ---- */
-.proof{background:var(--surf);padding:22px 0}
-.proof ul{display:flex;flex-wrap:wrap;gap:10px 26px;font-size:15px;color:var(--mid)}
-.proof li{display:flex;align-items:center;gap:10px}
-.proof li::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--red);flex:none}
-.proof b{color:var(--navy);font-weight:600}
-
 /* ---- sections ---- */
 .sec{padding:clamp(48px,7vw,96px) 0}
 .sec--surf{background:var(--surf)}
@@ -1973,33 +1966,22 @@ console.log(`${built} page(s) built`);
   <div class="wrap hero__in">
     <div class="hero__copy">
       <p class="eyebrow" data-rise>Exercise &amp; lifestyle management · Clonmel</p>
-      <h1 class="d h1" data-rise>Getting older doesn't mean slowing down.</h1>
+      <h1 class="d h1" data-rise>Get strong. Stay well. Coached the whole way.</h1>
       {{PULSE}}
-      <p class="lead" data-rise>Coached exercise for adults over 40, over 60, and after a cardiac event. Small groups, one studio in Ard Gaoithe Business Park, and fifteen years of doing this properly.</p>
+      <p class="lead" data-rise>Small-group exercise and lifestyle coaching in Clonmel, built around where you are rather than a one-size-fits-all class. One studio in Ard Gaoithe Business Park, and fifteen years of doing this properly.</p>
       <div class="hero__ctas" data-rise>
         <a class="btn" href="contact.html#book">Book a consultation</a>
         <a class="link" href="#programmes">See the three programmes</a>
       </div>
     </div>
     <figure class="hero__photo wipe">
-      <img src="assets/hero-portrait.jpg" alt="A woman in her sixties mid-set at the Healthwise studio, laughing with someone off camera" width="1152" height="1440" />
+      <img src="assets/hero-portrait.jpg" alt="Two people mid-session at the Healthwise studio, a coach beside them adjusting a machine" width="1152" height="1440" />
       <figcaption class="hero__cap">The studio, Ard Gaoithe Business Park.</figcaption>
     </figure>
   </div>
 </section>
 
-<!-- Proof strip: the credentials, in one line. -->
-<section class="proof" aria-label="DJ O'Dwyer's credentials">
-  <div class="wrap">
-    <ul>
-      <li><b>MSc</b> Performance Coaching</li>
-      <li><b>BACPR</b> cardiac rehabilitation</li>
-      <li><b>30 years</b> An Garda Síochána</li>
-      <li>Lecturer, <b>Garda College</b></li>
-      <li>S&amp;C, <b>Clonmel Commercials</b> &amp; <b>Munster Rugby</b></li>
-    </ul>
-  </div>
-</section>
+<!-- No credentials strip here (client decision 2026-09-28): the hero speaks to every adult the studio serves; the credentials live on About. -->
 
 <!-- Three programmes, three doors. -->
 <section class="sec" id="programmes">
@@ -2658,7 +2640,7 @@ const STYLE =
   "Documentary photograph, 35mm lens, natural window light, shallow depth of field, muted colour, quiet composition. No text, no logos, no signage, no watermark.";
 
 const SHOTS = [
-  { name: "hero-portrait", w: 1152, h: 1440, brief: "A woman in her mid-sixties with grey hair, mid-set with light dumbbells, seated, laughing at someone off-frame to the left. Waist-up, three-quarter view." },
+  { name: "hero-portrait", w: 1152, h: 1440, brief: "A woman in her mid-forties and a man in his sixties on neighbouring resistance machines, both mid-effort, a coach's arm reaching in from the side to adjust a setting; the younger person nearer the camera. Waist-up, three-quarter view." },
   { name: "livewell", w: 1440, h: 1088, brief: "A woman around fifty resting a kettlebell at her side between sets, breathing, focused, looking down. Three-quarter length." },
   { name: "vitality", w: 1440, h: 1088, brief: "Three people over sixty-five seated on white resistance machines, a coach in a plain navy t-shirt standing beside one of them, talking. Wide shot." },
   { name: "heartwise", w: 1440, h: 1088, brief: "A man around seventy walking steadily on a treadmill, a coach beside him with one hand near the console, both calm. Side view." },

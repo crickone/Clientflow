@@ -16,9 +16,11 @@ way every tenant site on the platform is built: static HTML in
 by the CMS wearing the site's own chrome, published by the site bundle on
 deploy, served on the client's domain.
 
-The site has one job: turn a nervous visitor — over 40 or over 60, usually a
-woman, often after a health event, often arriving from one of DJ's Meta ads —
-into an enquiry that lands on the Healthwise leads board. Its second job is
+The site has one job: turn a visitor — any adult, though the ads today bring
+mostly people over 40, often after a health event — into an enquiry that
+lands on the Healthwise leads board. The studio serves a broad range of ages
+and the site must read that way (client decision 2026-09-28); the age bands
+belong to the programmes, not to the front door. Its second job is
 to keep booking painless for existing members, which LegitFit does today and
 keeps doing.
 
@@ -89,7 +91,7 @@ and a "€1 drop-in". We print no prices.
 
 | Path | Page | Content |
 |---|---|---|
-| `/` | Home | Hero, proof strip, three programmes, method, DJ in one paragraph, three hand-picked blog links, contact strip |
+| `/` | Home | Hero, three programmes, method, DJ in one paragraph, three hand-picked blog links, closing band. No credentials strip on the home page (client decision 2026-09-28); the credentials live on About |
 | `/livewell` | Livewell 40–60 | Who it's for, the five classes, what a week looks like, the coach, enquiry CTA |
 | `/vitality` | Vitality 60+ | The Studio 60 promise; what a session actually is; for beginners and people coming back; morning and afternoon; enquiry CTA |
 | `/heartwise` | Heartwise | After hospital rehab ends; diabetes, blood pressure, weight; the Heartwise lockup; BACPR; since 2013; enquiry CTA |
@@ -112,6 +114,12 @@ Bodega appear only in the footer under "Also at Ard Gaoithe".
 **Idea.** A good clinic, not a gym. White ground, big calm navy type, one
 photograph doing the emotional work per section, the pulse line as the only
 decoration, and a structure that follows DJ's actual method.
+
+**The hero speaks to every adult the studio serves** (client decision
+2026-09-28: the business is aimed at a broad range of ages, not older people).
+Headline: *Get strong. Stay well. Coached the whole way.* Lead: small-group
+exercise and lifestyle coaching built around where you are. Age bands appear
+only at the three programme doors, never in the headline or the hero photo.
 
 **Colour** — the brand's own values, nothing added (from the logo file and
 the social post kit's contrast-checked palette):
@@ -191,7 +199,7 @@ specified, no stock smile, caught mid-movement or mid-conversation.
 
 | # | File | Ratio | Brief |
 |---|---|---|---|
-| 1 | `hero-portrait` | 4:5 | Woman, mid-60s, grey hair, mid-set with light dumbbells or on a recumbent bike, laughing at someone off-frame |
+| 1 | `hero-portrait` | 4:5 | A woman in her mid-forties and a man in his sixties on neighbouring machines, both mid-effort, a coach's arm reaching in to adjust a setting; the younger person nearer the camera. Two ages in one frame, so the hero reads as broad |
 | 2 | `livewell` | 4:3 | Woman around 50, kettlebell at her side, resting between sets, focused |
 | 3 | `vitality` | 4:3 | Three people over 65 seated on the white machines, a coach standing beside one |
 | 4 | `heartwise` | 4:3 | Man around 70 walking on a treadmill, coach beside him with a hand near the console |
