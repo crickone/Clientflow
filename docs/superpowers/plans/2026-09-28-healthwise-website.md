@@ -29,9 +29,13 @@
 ## File Structure
 
 **Platform (app/src):**
-- `lib/cms/enquiryToken.ts` — sign/verify the site-enquiry HMAC token; the `__ADONIS_ENQUIRY_TOKEN__` placeholder substitution. Pure, no DB.
+- `lib/signedToken.ts` — the one HMAC primitive (sign a claim, verify + parse a token), shared by the campaign signup token and the site enquiry token. Pure.
+- `lib/campaigns/signupToken.ts` — refactored onto `lib/signedToken.ts`; wire format, behaviour and tests unchanged.
+- `lib/cms/enquiryToken.ts` — the site-enquiry claim's shape on top of the primitive; the `__ADONIS_ENQUIRY_TOKEN__` placeholder substitution. Pure, no DB.
 - `lib/cms/enquiry.ts` — validation of the enquiry form fields, honeypot, safe return path, notes text. Pure.
-- `app/api/site/enquiry/route.ts` — the public POST handler (JSON and url-encoded), creates the lead inside `runWithTenant`.
+- `lib/publicFormExchange.ts` — how a public form talks to a route: JSON-or-url-encoded field parsing and the JSON-or-303 reply. Shared by `f/[slug]/submit` and `api/site/enquiry`.
+- `app/f/[slug]/submit/route.ts` — refactored onto `lib/publicFormExchange.ts`; behaviour and test unchanged.
+- `app/api/site/enquiry/route.ts` — the public POST handler, creates the lead inside `runWithTenant`.
 - `lib/cms/siteRedirects.ts` — loads `public/sites/<slug>/_redirects.json`, matches exact and `:param` patterns. Pure apart from `fs`.
 - `components/cms/Block.tsx` — `RenderCtx` gains `tenantId`.
 - `lib/cms/render.ts` — sets `ctx.tenantId`.
@@ -51,16 +55,226 @@
 
 ---
 
-### Task 1: Site enquiry token
+### Task 1: Shared signed-token helper and the site enquiry token
 
 **Files:**
+- Create: `app/src/lib/signedToken.ts`
+- Test: `app/src/lib/signedToken.test.ts`
+- Modify: `app/src/lib/campaigns/signupToken.ts` (use the helper; wire format and behaviour unchanged; `app/src/lib/campaigns/signupToken.test.ts` must pass UNCHANGED)
 - Create: `app/src/lib/cms/enquiryToken.ts`
 - Test: `app/src/lib/cms/enquiryToken.test.ts`
 
 **Interfaces:**
-- Produces: `ENQUIRY_TOKEN_PLACEHOLDER = "__ADONIS_ENQUIRY_TOKEN__"`, `signSiteEnquiryToken({tenantId, siteId}): string` (throws when `EMAIL_TOKEN_SECRET` unset), `verifySiteEnquiryToken(token): {tenantId, siteId} | null`, `injectEnquiryToken(body: string, mint: () => string): string`.
+- Produces: `signTokenPayload(claim: object): string | null`, `readTokenPayload(token: string): Record<string, unknown> | null`, `getTokenSecret(): string | null` in `@/lib/signedToken`; `ENQUIRY_TOKEN_PLACEHOLDER = "__ADONIS_ENQUIRY_TOKEN__"`, `signSiteEnquiryToken({tenantId, siteId}): string` (throws when `EMAIL_TOKEN_SECRET` unset), `verifySiteEnquiryToken(token): {tenantId, siteId} | null`, `injectEnquiryToken(body: string, mint: () => string): string` in `@/lib/cms/enquiryToken`.
+- Decision (pre-flight, 2026-09-28): the HMAC primitive is SHARED, not mirrored. The campaign token keeps its own shape checks and its own module; only `sign`, `getSecret` and the signature/parse block move into the helper.
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Write the failing helper test**
+
+`app/src/lib/signedToken.test.ts`:
+
+```ts
+// Run: npm test -- src/lib/signedToken.test.ts
+//
+// The one HMAC primitive behind every server-minted browser token. Round
+// trip, tamper detection on payload and signature, malformed shapes never
+// throw, fail closed without EMAIL_TOKEN_SECRET, and non-object payloads
+// (arrays, strings) come back null so callers can shape-check an object.
+import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
+
+import { getTokenSecret, readTokenPayload, signTokenPayload } from "./signedToken";
+
+let passed = 0;
+function check(name: string, cond: boolean) {
+  assert.ok(cond, name);
+  passed++;
+  console.log("  ✓", name);
+}
+
+const SECRET = "test-signed-token-secret-do-not-use";
+const originalSecret = process.env.EMAIL_TOKEN_SECRET;
+
+function buildToken(payloadText: string, secret: string): string {
+  const payload = Buffer.from(payloadText, "utf8").toString("base64url");
+  const sig = createHmac("sha256", secret).update(payload).digest("base64url");
+  return `${payload}.${sig}`;
+}
+
+try {
+  process.env.EMAIL_TOKEN_SECRET = SECRET;
+  check("secret is read", getTokenSecret() === SECRET);
+
+  const token = signTokenPayload({ a: 1, b: "two" });
+  check("sign returns payload.signature", typeof token === "string" && token.split(".").length === 2);
+  const back = readTokenPayload(token!);
+  check("round-trip object", back?.a === 1 && back?.b === "two");
+  check("hand-built token with the same secret reads", readTokenPayload(buildToken(JSON.stringify({ x: 9 }), SECRET))?.x === 9);
+
+  const [payload, sig] = token!.split(".");
+  const other = Buffer.from(JSON.stringify({ a: 2, b: "two" }), "utf8").toString("base64url");
+  check("payload swap fails", readTokenPayload(`${other}.${sig}`) === null);
+  const flipped = sig!.endsWith("A") ? sig!.slice(0, -1) + "B" : sig!.slice(0, -1) + "A";
+  check("flipped signature char fails", readTokenPayload(`${payload}.${flipped}`) === null);
+  check("wrong secret fails", readTokenPayload(buildToken(JSON.stringify({ x: 1 }), "another-secret")) === null);
+
+  check("empty -> null", readTokenPayload("") === null);
+  check("no dot -> null", readTokenPayload("abc") === null);
+  check("two dots -> null", readTokenPayload("a.b.c") === null);
+  check("empty payload part -> null", readTokenPayload(`.${sig}`) === null);
+  check("non-JSON payload -> null", readTokenPayload(buildToken("not json", SECRET)) === null);
+  check("array payload -> null", readTokenPayload(buildToken("[1,2]", SECRET)) === null);
+  check("string payload -> null", readTokenPayload(buildToken("\"str\"", SECRET)) === null);
+  check("null payload -> null", readTokenPayload(buildToken("null", SECRET)) === null);
+  check("non-string token -> null", readTokenPayload(undefined as unknown as string) === null);
+
+  delete process.env.EMAIL_TOKEN_SECRET;
+  check("no secret -> getTokenSecret null", getTokenSecret() === null);
+  check("no secret -> sign null", signTokenPayload({ a: 1 }) === null);
+  check("no secret -> read null even for a valid token", readTokenPayload(token!) === null);
+
+  console.log(`signedToken.test.ts: ${passed} checks passed`);
+} finally {
+  if (originalSecret === undefined) delete process.env.EMAIL_TOKEN_SECRET;
+  else process.env.EMAIL_TOKEN_SECRET = originalSecret;
+}
+```
+
+- [ ] **Step 2: Run it to verify it fails**
+
+Run: `cd app && npm test -- src/lib/signedToken.test.ts`
+Expected: FAIL — `Cannot find module './signedToken'`.
+
+- [ ] **Step 3: Write the helper**
+
+`app/src/lib/signedToken.ts`:
+
+```ts
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+/**
+ * The one HMAC token primitive behind every server-minted claim the platform
+ * hands to a browser — the campaign signup token (lib/campaigns/signupToken)
+ * and the site enquiry token (lib/cms/enquiryToken). It signs a JSON claim,
+ * verifies a signature in constant time, and returns the parsed payload for
+ * the caller to shape-check; what a claim MEANS stays with each token kind.
+ *
+ * Wire format: `<base64url(payload)>.<base64url(HMAC-SHA256(secret, payloadB64))>`
+ * where the HMAC is computed over the base64url payload text. The secret is
+ * EMAIL_TOKEN_SECRET, read fresh on every call with no dev fallback, so sign
+ * and read always agree on whether one exists (see signupToken.ts's header
+ * for why a silent fallback is the worse failure). Reading fails closed:
+ * every bad case is `null`, never a throw, so a public route answers one 400.
+ *
+ * Extracted from signupToken.ts (2026-09-28) when a second token kind
+ * needed the same primitive; the wire format did not change.
+ */
+export function getTokenSecret(): string | null {
+  const secret = process.env.EMAIL_TOKEN_SECRET;
+  return secret ? secret : null;
+}
+
+function sign(payloadB64: string, secret: string): string {
+  return createHmac("sha256", secret).update(payloadB64).digest("base64url");
+}
+
+/** Mint a token for a JSON-serialisable claim. Null when the secret is unset — the caller decides whether that throws. */
+export function signTokenPayload(claim: object): string | null {
+  const secret = getTokenSecret();
+  if (!secret) return null;
+  const payload = Buffer.from(JSON.stringify(claim), "utf8").toString("base64url");
+  return `${payload}.${sign(payload, secret)}`;
+}
+
+/**
+ * Verify a token's signature and return its parsed object payload, or null
+ * for every failure: unset secret, wrong shape, bad signature, undecodable
+ * payload, or a payload that is not a plain object. Constant-time compare
+ * (length check, then timingSafeEqual, never `===`).
+ */
+export function readTokenPayload(token: string): Record<string, unknown> | null {
+  const secret = getTokenSecret();
+  if (!secret) return null;
+  if (typeof token !== "string" || !token) return null;
+  const parts = token.split(".");
+  if (parts.length !== 2) return null;
+  const [payload, sig] = parts;
+  if (!payload || !sig) return null;
+
+  const expected = sign(payload, secret);
+  const a = Buffer.from(sig);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return null;
+  if (!timingSafeEqual(a, b)) return null;
+
+  let decoded: string;
+  try {
+    decoded = Buffer.from(payload, "base64url").toString("utf8");
+  } catch {
+    return null;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(decoded);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  return parsed as Record<string, unknown>;
+}
+```
+
+- [ ] **Step 4: Run the helper test**
+
+Run: `cd app && npm test -- src/lib/signedToken.test.ts`
+Expected: `signedToken.test.ts: 19 checks passed`.
+
+- [ ] **Step 5: Refactor the campaign token onto the helper**
+
+In `app/src/lib/campaigns/signupToken.ts`:
+
+1. Replace the import `import { createHmac, timingSafeEqual } from "node:crypto";` with `import { readTokenPayload, signTokenPayload } from "@/lib/signedToken";`.
+2. Delete the local `sign()` function, the local `getSecret()` function and their doc comments (the header comment above them stays; add one line to it: `The HMAC primitive itself lives in lib/signedToken.ts, shared with the site enquiry token.`).
+3. `signCampaignSignupToken` keeps its argument guard exactly as it is, then becomes:
+
+```ts
+  const token = signTokenPayload({ t: tenantId, c: campaignId });
+  if (!token) {
+    throw new Error(
+      "[campaigns] EMAIL_TOKEN_SECRET is not set — refusing to mint a campaign-signup token. " +
+        "Set EMAIL_TOKEN_SECRET before rendering a campaign landing page.",
+    );
+  }
+  return token;
+```
+
+4. `verifyCampaignSignupToken` keeps its doc comment and becomes:
+
+```ts
+export function verifyCampaignSignupToken(token: string): CampaignSignupClaim | null {
+  const obj = readTokenPayload(token);
+  if (!obj) return null;
+
+  const tenantId = obj.t;
+  const campaignId = obj.c;
+  if (typeof tenantId !== "number" || !Number.isSafeInteger(tenantId) || tenantId <= 0) {
+    return null;
+  }
+  if (typeof campaignId !== "number" || !Number.isSafeInteger(campaignId) || campaignId <= 0) {
+    return null;
+  }
+
+  return { tenantId, campaignId };
+}
+```
+
+Nothing else in the file changes. Do NOT edit `signupToken.test.ts`.
+
+- [ ] **Step 6: Prove the campaign token is unchanged**
+
+Run: `cd app && npm test -- src/lib/campaigns/signupToken.test.ts && npm test -- src/lib/campaigns/signup.test.ts`
+Expected: both pass with the same check counts they printed before (run `git stash; npm test -- src/lib/campaigns/signupToken.test.ts; git stash pop` first if you want the "before" number in front of you).
+
+- [ ] **Step 7: Write the failing enquiry-token test**
 
 `app/src/lib/cms/enquiryToken.test.ts`:
 
@@ -68,13 +282,11 @@
 // Run: npm test -- src/lib/cms/enquiryToken.test.ts
 //
 // The site-enquiry token is the ONLY thing that names a tenant for
-// POST /api/site/enquiry — the browser never sends a slug or id. Mirrors
-// src/lib/campaigns/signupToken.test.ts: round trip, tamper detection on
-// payload and signature separately, malformed shapes never throw, fail-closed
-// when EMAIL_TOKEN_SECRET is unset, and the property that matters here: a
-// CAMPAIGN token ({t, c}) signed with the same secret must never verify as an
-// enquiry claim, and vice versa. Plus the placeholder substitution the
-// verbatim template performs at render time.
+// POST /api/site/enquiry — the browser never sends a slug or id. Built on
+// lib/signedToken (which owns the crypto tests); this file covers what THIS
+// claim means: its shape, that a CAMPAIGN token ({t, c}) signed with the
+// same secret never verifies as an enquiry claim, fail-closed behaviour, and
+// the placeholder substitution the verbatim template performs at render.
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 
@@ -160,17 +372,17 @@ try {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 8: Run it to verify it fails**
 
 Run: `cd app && npm test -- src/lib/cms/enquiryToken.test.ts`
 Expected: FAIL — `Cannot find module './enquiryToken'`.
 
-- [ ] **Step 3: Write the implementation**
+- [ ] **Step 9: Write the enquiry token**
 
 `app/src/lib/cms/enquiryToken.ts`:
 
 ```ts
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { readTokenPayload, signTokenPayload } from "@/lib/signedToken";
 
 /**
  * The site-enquiry token: how a bespoke site's contact form proves which
@@ -182,22 +394,12 @@ import { createHmac, timingSafeEqual } from "node:crypto";
  * encoding {tenantId, siteId}. POST /api/site/enquiry verifies it and writes
  * the lead into THAT tenant. The claim carries `k: "enquiry"` and a campaign
  * token carries `c`, so neither shape verifies as the other even though they
- * share a secret.
+ * share a secret and the primitive in lib/signedToken.ts.
  *
  * The placeholder is a literal string the site's HTML carries in its hidden
  * `token` field. Sites that never wrote it are untouched by injection.
  */
 export const ENQUIRY_TOKEN_PLACEHOLDER = "__ADONIS_ENQUIRY_TOKEN__";
-
-function sign(payload: string, secret: string): string {
-  return createHmac("sha256", secret).update(payload).digest("base64url");
-}
-
-/** Read fresh on every call; no dev fallback (see signupToken.ts getSecret). */
-function getSecret(): string | null {
-  const secret = process.env.EMAIL_TOKEN_SECRET;
-  return secret ? secret : null;
-}
 
 export interface SiteEnquiryClaim {
   tenantId: number;
@@ -212,51 +414,24 @@ export function signSiteEnquiryToken(input: { tenantId: number; siteId: number }
       `[cms] signSiteEnquiryToken: tenantId and siteId must be positive integers (got ${tenantId}, ${siteId}).`,
     );
   }
-  const secret = getSecret();
-  if (!secret) {
+  const token = signTokenPayload({ t: tenantId, s: siteId, k: "enquiry" });
+  if (!token) {
     throw new Error(
       "[cms] EMAIL_TOKEN_SECRET is not set — refusing to mint a site-enquiry token. Set EMAIL_TOKEN_SECRET before rendering a bespoke site.",
     );
   }
-  const payload = Buffer.from(JSON.stringify({ t: tenantId, s: siteId, k: "enquiry" }), "utf8").toString(
-    "base64url",
-  );
-  return `${payload}.${sign(payload, secret)}`;
+  return token;
 }
 
-/**
- * Verify + decode. Fails CLOSED with `null` for every bad case (unset secret,
- * shape, JSON, kind, types, signature) so the public route answers one 400.
- * Constant-time compare, never `===` (see signupToken.ts).
- */
+/** Verify + decode. Fails CLOSED with `null` for every bad case (see readTokenPayload) plus the wrong claim kind or ids. */
 export function verifySiteEnquiryToken(token: string): SiteEnquiryClaim | null {
-  const secret = getSecret();
-  if (!secret) return null;
-  if (typeof token !== "string" || !token) return null;
-  const parts = token.split(".");
-  if (parts.length !== 2) return null;
-  const [payload, sig] = parts;
-  if (!payload || !sig) return null;
-
-  const expected = sign(payload, secret);
-  const a = Buffer.from(sig);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length) return null;
-  if (!timingSafeEqual(a, b)) return null;
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
-  } catch {
-    return null;
-  }
-  if (!parsed || typeof parsed !== "object") return null;
-  const o = parsed as Record<string, unknown>;
-  if (o.k !== "enquiry") return null;
-  const t = o.t;
-  const s = o.s;
-  if (typeof t !== "number" || !Number.isInteger(t) || t <= 0) return null;
-  if (typeof s !== "number" || !Number.isInteger(s) || s <= 0) return null;
+  const obj = readTokenPayload(token);
+  if (!obj) return null;
+  if (obj.k !== "enquiry") return null;
+  const t = obj.t;
+  const s = obj.s;
+  if (typeof t !== "number" || !Number.isSafeInteger(t) || t <= 0) return null;
+  if (typeof s !== "number" || !Number.isSafeInteger(s) || s <= 0) return null;
   return { tenantId: t, siteId: s };
 }
 
@@ -279,16 +454,23 @@ export function injectEnquiryToken(body: string, mint: () => string): string {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] **Step 10: Run the enquiry test, then typecheck and the whole suite**
 
 Run: `cd app && npm test -- src/lib/cms/enquiryToken.test.ts`
-Expected: `enquiryToken.test.ts: 21 checks passed` and `1/1 test file(s) passed`.
+Expected: `enquiryToken.test.ts: 21 checks passed`.
 
-- [ ] **Step 5: Commit**
+Run: `cd app && npm run typecheck && npm test`
+Expected: typecheck prints nothing; every test file passes.
+
+- [ ] **Step 11: Commit**
 
 ```bash
-git add app/src/lib/cms/enquiryToken.ts app/src/lib/cms/enquiryToken.test.ts
+git add app/src/lib/signedToken.ts app/src/lib/signedToken.test.ts app/src/lib/campaigns/signupToken.ts app/src/lib/cms/enquiryToken.ts app/src/lib/cms/enquiryToken.test.ts
 git commit -m "feat(cms): a bespoke site can prove which tenant its enquiry form belongs to
+
+One HMAC primitive (lib/signedToken) now serves both the campaign signup
+token and the new site enquiry token; the campaign token's wire format and
+tests are unchanged.
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```
@@ -376,17 +558,20 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 ---
 
-### Task 3: Enquiry validation and the public route
+### Task 3: Enquiry validation, the shared form exchange, and the public route
 
 **Files:**
 - Create: `app/src/lib/cms/enquiry.ts`
 - Test: `app/src/lib/cms/enquiry.test.ts`
+- Create: `app/src/lib/publicFormExchange.ts`
+- Modify: `app/src/app/f/[slug]/submit/route.ts` (use the shared exchange; behaviour unchanged; `app/src/app/f/[slug]/submit/route.test.ts` must pass UNCHANGED)
 - Create: `app/src/app/api/site/enquiry/route.ts`
 - Test: `app/src/app/api/site/enquiry/route.test.ts`
 
 **Interfaces:**
 - Consumes: `verifySiteEnquiryToken`, `signSiteEnquiryToken` (Task 1); `rateLimit(key, limit, windowMs)`, `clientIp(req)` from `@/lib/rateLimit`; `runWithTenant(tenantId, fn)` from `@/lib/db/tenant`; `upsertLead(input): {lead, created}` from `@/lib/leads`; `logActivity(type, message, meta)` from `@/lib/queries`.
-- Produces: `ENQUIRY_HONEYPOT_FIELD = "company_website"`, `validateEnquiry(fields): {ok:true, data: ValidEnquiry} | {ok:false, error}`, `safeReturnPath(v, fallback)`, `enquiryNotes(data)`, and `POST /api/site/enquiry` accepting fields `name, phone, email, programme, about, token, return, company_website`.
+- Produces: `ENQUIRY_HONEYPOT_FIELD = "company_website"`, `validateEnquiry(fields): {ok:true, data: ValidEnquiry} | {ok:false, error}`, `safeReturnPath(v, fallback)`, `enquiryNotes(data)`; `isJsonExchange(req)`, `parsePublicFormFields(req, rawText): Record<string,string>` (throws on malformed JSON), `respondPublicForm(req, returnPath, ok, {status?, error?, extra?, headers?})` in `@/lib/publicFormExchange`; and `POST /api/site/enquiry` accepting fields `name, phone, email, programme, about, token, return, company_website`.
+- Decision (pre-flight, 2026-09-28): the JSON/url-encoded exchange is SHARED with `f/[slug]/submit`, not mirrored.
 
 - [ ] **Step 1: Write the failing validation test**
 
@@ -536,6 +721,89 @@ export function enquiryNotes(d: ValidEnquiry): string {
 
 Run: `cd app && npm test -- src/lib/cms/enquiry.test.ts`
 Expected: `enquiry.test.ts: 20 checks passed`.
+
+- [ ] **Step 4b: Extract the shared form exchange and move `f/[slug]/submit` onto it**
+
+Create `app/src/lib/publicFormExchange.ts`:
+
+```ts
+/**
+ * How a public form talks to a route. Two exchanges, branched on Content-Type
+ * and Accept: a page's fetch (JSON in, JSON out) and a plain <form> post with
+ * JavaScript off (url-encoded in, a 303 back to the page with `?ok=1` or
+ * `?err=…` out, which the page reads). Shared by f/[slug]/submit and
+ * api/site/enquiry so the two public forms cannot drift in how they answer.
+ *
+ * Plain Request/Response, not next/server, so the routes that use this load
+ * in the test runner (see f/[slug]/submit/route.ts's banner for the reason).
+ */
+export function isJsonExchange(req: Request): boolean {
+  const accept = req.headers.get("accept") || "";
+  const contentType = req.headers.get("content-type") || "";
+  return accept.includes("application/json") || contentType.includes("application/json");
+}
+
+/**
+ * The submitted fields as flat strings, whichever way they arrived. Throws on
+ * malformed JSON — the caller turns that into its own 400.
+ */
+export function parsePublicFormFields(req: Request, rawText: string): Record<string, string> {
+  const fields: Record<string, string> = {};
+  if (isJsonExchange(req)) {
+    const body: unknown = rawText ? JSON.parse(rawText) : {};
+    if (body && typeof body === "object") {
+      for (const [k, v] of Object.entries(body as Record<string, unknown>)) {
+        fields[k] = v == null ? "" : String(v);
+      }
+    }
+  } else {
+    for (const [k, v] of new URLSearchParams(rawText).entries()) fields[k] = v;
+  }
+  return fields;
+}
+
+export interface PublicFormReply {
+  status?: number;
+  error?: string;
+  /** Extra JSON fields for a fetch caller (a lead id, a created flag). Ignored on the redirect path. */
+  extra?: Record<string, unknown>;
+  headers?: HeadersInit;
+}
+
+/** JSON callers get `{ok, error, ...extra}`; a plain form post is bounced to `returnPath` with the outcome in the query. */
+export function respondPublicForm(req: Request, returnPath: string, ok: boolean, opts: PublicFormReply = {}): Response {
+  if (isJsonExchange(req)) {
+    return Response.json(
+      { ok, error: opts.error, ...(opts.extra ?? {}) },
+      { status: opts.status ?? (ok ? 200 : 400), headers: opts.headers },
+    );
+  }
+  const url = new URL(returnPath, req.url);
+  url.search = ok ? "ok=1" : `err=${encodeURIComponent(opts.error || "Something went wrong.")}`;
+  return Response.redirect(url.toString(), 303);
+}
+```
+
+Then in `app/src/app/f/[slug]/submit/route.ts`:
+
+1. Add `import { parsePublicFormFields, respondPublicForm } from "@/lib/publicFormExchange";`.
+2. Delete the local `isJsonExchange` and `respond` functions.
+3. Replace every call `respond(req, slug, X, Y)` with `respondPublicForm(req, \`/f/${slug}\`, X, Y)` (there are seven; `respond(req, slug, true)` becomes `respondPublicForm(req, \`/f/${slug}\`, true)`).
+4. Replace the fields-parsing block (from `const fields: Record<string, string> = {};` through the closing `}` of its `catch`) with:
+
+```ts
+  let fields: Record<string, string>;
+  try {
+    fields = parsePublicFormFields(req, rawText);
+  } catch {
+    return respondPublicForm(req, `/f/${slug}`, false, { status: 400, error: "Please check the form and try again." });
+  }
+```
+
+5. Update the banner comment's sentence that describes the branching to say the exchange lives in `lib/publicFormExchange.ts`.
+
+Run: `cd app && npm test -- "src/app/f/[slug]/submit/route.test.ts"`
+Expected: `f/[slug]/submit/route.test.ts: all assertions passed` — the test file is unchanged.
 
 - [ ] **Step 5: Write the failing route test**
 
@@ -725,6 +993,7 @@ import { upsertLead } from "@/lib/leads";
 import { logActivity } from "@/lib/queries";
 import { verifySiteEnquiryToken } from "@/lib/cms/enquiryToken";
 import { enquiryNotes, isEnquiryHoneypotTripped, safeReturnPath, validateEnquiry } from "@/lib/cms/enquiry";
+import { parsePublicFormFields, respondPublicForm } from "@/lib/publicFormExchange";
 
 export const dynamic = "force-dynamic";
 
@@ -735,8 +1004,8 @@ export const dynamic = "force-dynamic";
  * the same model as api/campaigns/signup/route.ts, whose header explains why
  * host- or slug-based resolution is not safe here. Protections mirror
  * f/[slug]/submit/route.ts: size cap before parsing, honeypot, per-IP
- * throttle, and both a JSON path (the page's fetch) and a url-encoded path
- * (the form with JavaScript off), branched on Content-Type/Accept.
+ * throttle; the JSON-or-url-encoded exchange itself is shared with that
+ * route (lib/publicFormExchange.ts).
  *
  * Plain Request/Response, not next/server, so the route loads in the test
  * runner (see f/[slug]/submit/route.ts for the same choice).
@@ -745,68 +1014,42 @@ const MAX_BODY_BYTES = 32 * 1024;
 const RATE_LIMIT = 8;
 const RATE_WINDOW_MS = 10 * 60 * 1000;
 
-function isJsonExchange(req: Request): boolean {
-  const accept = req.headers.get("accept") || "";
-  const contentType = req.headers.get("content-type") || "";
-  return accept.includes("application/json") || contentType.includes("application/json");
-}
-
-function respond(
-  req: Request,
-  returnTo: string,
-  ok: boolean,
-  opts: { status?: number; error?: string; leadId?: number; created?: boolean } = {},
-): Response {
-  if (isJsonExchange(req)) {
-    return Response.json(
-      { ok, error: opts.error, leadId: opts.leadId, created: opts.created },
-      { status: opts.status ?? (ok ? 200 : 400), headers: opts.status === 429 ? { "Retry-After": "60" } : {} },
-    );
-  }
-  const url = new URL(returnTo, req.url);
-  url.search = ok ? "ok=1" : `err=${encodeURIComponent(opts.error || "Something went wrong.")}`;
-  return Response.redirect(url.toString(), 303);
-}
-
 export async function POST(req: Request) {
   const declared = Number(req.headers.get("content-length") ?? "0");
   if (declared > MAX_BODY_BYTES) {
-    return respond(req, "/contact", false, { status: 413, error: "That message is too long." });
+    return respondPublicForm(req, "/contact", false, { status: 413, error: "That message is too long." });
   }
   const rawText = await req.text();
   if (rawText.length > MAX_BODY_BYTES) {
-    return respond(req, "/contact", false, { status: 413, error: "That message is too long." });
+    return respondPublicForm(req, "/contact", false, { status: 413, error: "That message is too long." });
   }
 
-  const fields: Record<string, string> = {};
+  let fields: Record<string, string>;
   try {
-    if (isJsonExchange(req)) {
-      const body = rawText ? JSON.parse(rawText) : {};
-      if (body && typeof body === "object") {
-        for (const [k, v] of Object.entries(body as Record<string, unknown>)) fields[k] = v == null ? "" : String(v);
-      }
-    } else {
-      for (const [k, v] of new URLSearchParams(rawText).entries()) fields[k] = v;
-    }
+    fields = parsePublicFormFields(req, rawText);
   } catch {
-    return respond(req, "/contact", false, { status: 400, error: "Please check the form and try again." });
+    return respondPublicForm(req, "/contact", false, { status: 400, error: "Please check the form and try again." });
   }
   const returnTo = safeReturnPath(fields.return);
 
   // Honeypot: a bot that fills every field gets a quiet success and nothing stored.
-  if (isEnquiryHoneypotTripped(fields)) return respond(req, returnTo, true);
+  if (isEnquiryHoneypotTripped(fields)) return respondPublicForm(req, returnTo, true);
 
   const rl = rateLimit(`site-enquiry:${clientIp(req)}`, RATE_LIMIT, RATE_WINDOW_MS);
   if (!rl.ok) {
-    return respond(req, returnTo, false, { status: 429, error: "Too many messages — please try again shortly." });
+    return respondPublicForm(req, returnTo, false, {
+      status: 429,
+      error: "Too many messages — please try again shortly.",
+      headers: { "Retry-After": String(rl.retryAfterSec) },
+    });
   }
 
   const validated = validateEnquiry(fields);
-  if (!validated.ok) return respond(req, returnTo, false, { status: 400, error: validated.error });
+  if (!validated.ok) return respondPublicForm(req, returnTo, false, { status: 400, error: validated.error });
   const data = validated.data;
 
   const claim = verifySiteEnquiryToken(fields.token ?? "");
-  if (!claim) return respond(req, returnTo, false, { status: 400, error: "Invalid or missing token." });
+  if (!claim) return respondPublicForm(req, returnTo, false, { status: 400, error: "Invalid or missing token." });
 
   // Stable dedupe key so a double-click or a second enquiry from the same
   // person updates one card rather than adding a twin (upsertLead is
@@ -831,7 +1074,7 @@ export async function POST(req: Request) {
     return { leadId: lead.id, created };
   });
 
-  return respond(req, returnTo, true, { leadId: result.leadId, created: result.created });
+  return respondPublicForm(req, returnTo, true, { extra: { leadId: result.leadId, created: result.created } });
 }
 ```
 
@@ -846,8 +1089,11 @@ Expected: clean typecheck; every file passes.
 - [ ] **Step 9: Commit**
 
 ```bash
-git add app/src/lib/cms/enquiry.ts app/src/lib/cms/enquiry.test.ts app/src/app/api/site/enquiry/route.ts app/src/app/api/site/enquiry/route.test.ts
+git add app/src/lib/cms/enquiry.ts app/src/lib/cms/enquiry.test.ts app/src/lib/publicFormExchange.ts "app/src/app/f/[slug]/submit/route.ts" app/src/app/api/site/enquiry/route.ts app/src/app/api/site/enquiry/route.test.ts
 git commit -m "feat(cms): a bespoke site's enquiry form lands as a lead in its own tenant
+
+The JSON-or-url-encoded exchange is shared with the public forms route
+(lib/publicFormExchange), which moves onto it unchanged in behaviour.
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```
