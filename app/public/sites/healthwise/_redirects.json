@@ -1,0 +1,8 @@
+{
+  "/post/:slug": "/blog/:slug",
+  "/about-healthwise": "/about",
+  "/classes-timetable": "/classes",
+  "/contact-page": "/contact",
+  "/sign-up": "/contact",
+  "/inspire-health-fitness": "https://inspirehealthandfitness.ie"
+}

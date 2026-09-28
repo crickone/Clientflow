@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { headers } from "next/headers";
+import { notFound, permanentRedirect } from "next/navigation";
 
 import {
   resolvePageContext,
@@ -8,6 +9,9 @@ import {
   pathFromSlugParam,
 } from "@/lib/cms/render";
 import { studioEditability } from "@/lib/cms/pageBody";
+import { resolvePublicSite } from "@/lib/cms/resolveHost";
+import { getPublishedPostBySlug } from "@/lib/cms/blog";
+import { resolveSiteRedirect } from "@/lib/cms/siteRedirects";
 import { SiteTracking } from "@/components/cms/SiteTracking";
 import { StudioCanvas } from "@/components/cms/StudioCanvas";
 import { StudioUneditablePanel } from "@/components/cms/StudioUneditablePanel";
@@ -44,7 +48,29 @@ export default async function PublicSitePage({ params, searchParams }: Props) {
   }
 
   const pc = resolvePageContext(params, searchParams);
-  if (!pc || !pc.template) notFound();
+  if (!pc || !pc.template) {
+    // No page at this path. Before 404ing, a bespoke site may map an OLD
+    // URL here (public/sites/<slug>/_redirects.json — see lib/cms/siteRedirects).
+    // A blog target is only issued when the post actually exists, so a
+    // missing article gets a 404 rather than a redirect into another 404.
+    const host = headers().get("host");
+    const resolved = resolvePublicSite({ host, siteParam: searchParams.site ?? params.siteSlug });
+    if (resolved) {
+      const hit = resolveSiteRedirect(resolved.site.slug, pathFromSlugParam(params.slug));
+      if (hit) {
+        if (hit.kind === "external") permanentRedirect(hit.target);
+        const blog = /^\/blog\/([^/]+)$/.exec(hit.target);
+        const postOk = !blog || getPublishedPostBySlug(resolved.db, resolved.site.id, decodeURIComponent(blog[1]!)) !== null;
+        if (postOk) {
+          // Root-relative keeps the browser on its current host; a mapped
+          // domain serves the site at its root, the preview mount at /site/<slug>.
+          const prefix = resolved.resolvedVia === "host" ? "" : `/site/${resolved.site.slug}`;
+          permanentRedirect(`${prefix}${hit.target}`);
+        }
+      }
+    }
+    notFound();
+  }
   const T = pc.template.Component;
   return (
     <>
