@@ -785,23 +785,34 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
    Three stages, each a dotted rule with its span in the left margin, so
    the page reads as a sequence rather than three unrelated panels.
 
-   Two departures from the brief this came from, and both are the departure
-   the .qa block already made for the same reason. The brief dimmed the
-   stage key with opacity:.55 and the stage body with opacity:.85. Measured,
-   .55 of --ink lands at 3.52:1 on plaster and 3.16:1 on sage -- well under
-   the 4.5:1 an 11px uppercase label needs, and this label is the thing that
-   tells a reader which week they are reading about. Quieter is the colour's
-   job on this site, not the compositor's, so both quiet elements take
-   --deep (5.10:1 on plaster) and both get the three-ground carve-outs every
-   other quiet text here has: --ink on sage, where --deep is only 3.62:1,
-   and --sage on ink, where --deep is 2.76:1. The stage's own line, .arc__t,
-   stays at full strength -- it is what the row is actually saying.
+   Two departures from the brief this came from, but only one of them is a
+   contrast fix. The brief dimmed the stage key with opacity:.55 and the
+   stage body with opacity:.85. Measured, .55 of --ink lands at 3.52:1 on
+   plaster and 3.16:1 on sage -- well under the 4.5:1 an 11px uppercase
+   label needs, and this label is the thing that tells a reader which week
+   they are reading about. That one had to move, and it is the departure
+   the .qa block already made for the same reason.
+
+   .85 is a different sum. .85 of --ink lands at 9.01:1 on plaster and
+   6.99:1 on sage -- nowhere near the bar. That is not the .qa precedent:
+   .qa's .85 multiplies against --deep, which is already reduced, and lands
+   near 4.1:1, under the bar; .arc__b's .85 multiplies against full --ink,
+   which does not. So .arc__b did not need to move for contrast. It was
+   moved anyway, to match .arc__k and every other quiet element on this
+   site: quieter is the colour's job here, not the compositor's. That is a
+   house-consistency call, not a correctness one, and it has a real cost --
+   9.01:1 down to 5.10:1 on plaster -- that a future editor should be able
+   to see was a choice. Both elements take --deep and both get the
+   three-ground carve-outs every other quiet text here has: --ink on sage,
+   where --deep is only 3.62:1, and --sage on ink, where --deep is 2.76:1.
+   The stage's own line, .arc__t, stays at full strength -- it is what the
+   row is actually saying.
 
    The rules take the ink carve-out too. A dotted rule written as
    rgba(36,35,31,.4) is ink on ink: invisible on a --band--ink ground, which
    would leave the stages as three unseparated paragraphs on the one ground
    where the sequence matters most.                                       */
-.arc{border-top:1px dotted rgba(36,35,31,.4)}
+.arc{border-top:1px dotted rgba(36,35,31,.4);list-style:none;margin:0;padding:0}
 .band--ink .arc{border-top-color:rgba(242,243,237,.4)}
 .arc__row{
   display:grid;gap:clamp(10px,2vw,32px);
@@ -810,7 +821,7 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
   border-bottom:1px dotted rgba(36,35,31,.4);
 }
 .band--ink .arc__row{border-bottom-color:rgba(242,243,237,.4)}
-@media (min-width:760px){.arc__row{grid-template-columns:130px minmax(0,1fr)}}
+@media (min-width:760px){.arc__row{grid-template-columns:minmax(130px,auto) minmax(0,1fr)}}
 .arc__k{
   font-size:11px;letter-spacing:.15em;text-transform:uppercase;
   color:var(--deep);font-variant-numeric:tabular-nums;
@@ -899,7 +910,7 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
     <div class="body">
       <h2 class="lede">Light you feel as warmth.</h2>
       <p style="margin-top:22px">The bed gives off red and near-infrared light rather than hot air. That light passes into skin and the connective tissue under it, which is why the warmth reads as deep and even rather than stifling &mdash; nearer to standing in spring sunshine than to sitting in a sauna.</p>
-      <p>You lie down in comfortable clothes, the bed warms gradually, and the whole visit is over inside half an hour. There is no sweating to speak of, no effort, and nothing to recover from afterwards. Most people book it for the evening, on the grounds that it is easier to wind down after than to work after.</p>
+      <p>You lie down in comfortable clothes, the bed warms gradually, and the whole visit is over inside half an hour. There is little sweating to speak of, no effort, and nothing to recover from afterwards. Most people book it for the evening, on the grounds that it is easier to wind down after than to work after.</p>
     </div>
     <div class="tile__img"><img src="assets/reception.jpg" alt="Reception at the Clonmel clinic" /></div>
   </div>
@@ -999,7 +1010,9 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
 
 <!-- PLASTER. The twelve weeks, as a sequence. Each stage is a dotted rule
      with its span in the left margin, so the three read as one arc rather
-     than three panels that happen to be stacked. -->
+     than three panels that happen to be stacked. An ordered list, not a
+     stack of divs, so the sequence reaches assistive technology as well as
+     the eye. -->
 <section class="band" data-chapter="What to expect" id="s05" aria-label="What to expect">
   <div>
     <div class="band__head">
@@ -1008,29 +1021,29 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
       </div>
     </div>
     <p class="body" style="margin-bottom:clamp(24px,3vw,36px)">This is not a promise about how you will look or feel. It is an account of what the process is understood to be doing at each stage, set out so you can judge the rhythm against something honest rather than against a photograph.</p>
-    <div class="arc" data-stagger>
-      <div class="arc__row">
+    <ol class="arc" data-stagger>
+      <li class="arc__row">
         <p class="arc__k">Weeks 1&ndash;2</p>
         <div>
           <p class="arc__t">Circulation, not collagen.</p>
-          <p class="arc__b">In the first fortnight the light is working on cellular energy and on microcirculation: more blood to the area being warmed, and the inflammatory signalling around it beginning to settle. Tissue often feels calmer and less tight, and people commonly say they look a little fresher. It is worth being plain about what that is. No collagen has been rebuilt at this stage. Whatever you notice in the first two weeks is blood flow, lymphatic drainage and a quieter inflammatory picture &mdash; the groundwork, not the build.</p>
+          <p class="arc__b">In the first fortnight the light is thought to act on cellular energy and on microcirculation: blood flow to the area being warmed can increase, and the inflammatory signalling around it can begin to settle. Tissue often feels calmer and less tight, and people commonly say they look a little fresher. It is worth being plain about what that is. No collagen has been rebuilt at this stage. Whatever you notice in the first two weeks is blood flow, lymphatic drainage and a quieter inflammatory picture &mdash; the groundwork, not the build.</p>
         </div>
-      </div>
-      <div class="arc__row">
+      </li>
+      <li class="arc__row">
         <p class="arc__k">Weeks 4&ndash;6</p>
         <div>
           <p class="arc__t">Fibroblasts get to work.</p>
-          <p class="arc__b">This is the window in which the collagen-making cells can begin laying down new procollagen, along with the molecules that hold water in the dermis. Skin can feel springier and hold moisture better; in tendon and ligament, early collagen organisation is thought to begin around here. Any early change in firmness belongs to this stage rather than the last one. Consistency is what carries it, and so does eating enough protein and vitamin C, which is what the body builds collagen out of.</p>
+          <p class="arc__b">This is the window in which the collagen-making cells can begin laying down new procollagen, along with the molecules that hold water in the dermis. Skin can feel springier and hold moisture better; in tendon and ligament, early collagen organisation is thought to begin around here. Any early change in firmness belongs to this stage rather than the last one. Consistency carries it, and so does eating enough protein and vitamin C, which is what the body builds collagen out of.</p>
         </div>
-      </div>
-      <div class="arc__row">
+      </li>
+      <li class="arc__row">
         <p class="arc__k">Weeks 8&ndash;12+</p>
         <div>
           <p class="arc__t">Reorganising, not just adding.</p>
-          <p class="arc__b">Later on the fibres start to reorganise and align rather than simply accumulate, with more of the mature Type I collagen forming and the enzymes that break collagen down dialling back. This is the slow half of the work, and the half a fortnight cannot reach. It is also why people who get this far tend to space sessions out rather than stop: on a twelve-week timescale the useful question is upkeep, not how fast anything can be built.</p>
+          <p class="arc__b">Later on, the working account is that the fibres reorganise and align rather than simply accumulate, with more of the mature Type I collagen forming and the enzymes that break collagen down dialling back. This is the slow half of the work, and the half a fortnight cannot reach. On a twelve-week timescale, the useful question is upkeep, not how fast anything can be built.</p>
         </div>
-      </div>
-    </div>
+      </li>
+    </ol>
   </div>
 </section>
 
@@ -1066,7 +1079,7 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
       <details class="qa__row">
         <summary class="qa__q">How long is a session, and how often should I come?</summary>
         <div class="qa__a">
-          <p>The bed itself runs fifteen to twenty-five minutes, so the whole visit sits inside half an hour. Most people start with two or three a week for a couple of weeks, then settle into whatever fits their evenings and their training.</p>
+          <p>The bed itself runs twelve minutes, so the whole visit sits inside half an hour. Most people start with two or three a week for a couple of weeks, then settle into whatever fits their evenings and their training.</p>
           <p>The stages above are written in weeks rather than in sessions because that is the timescale the series works on. There is nothing wrong with coming once; it is simply a different thing from coming for three months.</p>
         </div>
       </details>
@@ -1099,6 +1112,11 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
   </div>
 </section>
 
+<!-- OPEN: session length. The client's per-session price list and their
+     "12-Minute Session" page both say twelve minutes; their membership tiers
+     say 15 to 25 minutes and one FAQ says 15 to 20 minutes. Twelve is used
+     here because it is the per-session product and this page's prices are
+     the per-session ones. Confirm before the site goes live. -->
 <!-- SAGE -->
 <section class="band band--sage" data-chapter="Pricing" id="s07" aria-label="Pricing">
   <div>
@@ -1110,7 +1128,7 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
     <div class="roll roll--rates" data-stagger>
       <div class="roll__row">
         <span class="roll__n">One session</span>
-        <span class="roll__x"><span class="rate"><span class="rate__v">&euro;50</span><span class="rate__k">15&ndash;25 min</span></span></span>
+        <span class="roll__x"><span class="rate"><span class="rate__v">&euro;50</span><span class="rate__k">12 min</span></span></span>
       </div>
       <div class="roll__row">
         <span class="roll__n">Five sessions</span>

@@ -785,23 +785,34 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
    Three stages, each a dotted rule with its span in the left margin, so
    the page reads as a sequence rather than three unrelated panels.
 
-   Two departures from the brief this came from, and both are the departure
-   the .qa block already made for the same reason. The brief dimmed the
-   stage key with opacity:.55 and the stage body with opacity:.85. Measured,
-   .55 of --ink lands at 3.52:1 on plaster and 3.16:1 on sage -- well under
-   the 4.5:1 an 11px uppercase label needs, and this label is the thing that
-   tells a reader which week they are reading about. Quieter is the colour's
-   job on this site, not the compositor's, so both quiet elements take
-   --deep (5.10:1 on plaster) and both get the three-ground carve-outs every
-   other quiet text here has: --ink on sage, where --deep is only 3.62:1,
-   and --sage on ink, where --deep is 2.76:1. The stage's own line, .arc__t,
-   stays at full strength -- it is what the row is actually saying.
+   Two departures from the brief this came from, but only one of them is a
+   contrast fix. The brief dimmed the stage key with opacity:.55 and the
+   stage body with opacity:.85. Measured, .55 of --ink lands at 3.52:1 on
+   plaster and 3.16:1 on sage -- well under the 4.5:1 an 11px uppercase
+   label needs, and this label is the thing that tells a reader which week
+   they are reading about. That one had to move, and it is the departure
+   the .qa block already made for the same reason.
+
+   .85 is a different sum. .85 of --ink lands at 9.01:1 on plaster and
+   6.99:1 on sage -- nowhere near the bar. That is not the .qa precedent:
+   .qa's .85 multiplies against --deep, which is already reduced, and lands
+   near 4.1:1, under the bar; .arc__b's .85 multiplies against full --ink,
+   which does not. So .arc__b did not need to move for contrast. It was
+   moved anyway, to match .arc__k and every other quiet element on this
+   site: quieter is the colour's job here, not the compositor's. That is a
+   house-consistency call, not a correctness one, and it has a real cost --
+   9.01:1 down to 5.10:1 on plaster -- that a future editor should be able
+   to see was a choice. Both elements take --deep and both get the
+   three-ground carve-outs every other quiet text here has: --ink on sage,
+   where --deep is only 3.62:1, and --sage on ink, where --deep is 2.76:1.
+   The stage's own line, .arc__t, stays at full strength -- it is what the
+   row is actually saying.
 
    The rules take the ink carve-out too. A dotted rule written as
    rgba(36,35,31,.4) is ink on ink: invisible on a --band--ink ground, which
    would leave the stages as three unseparated paragraphs on the one ground
    where the sequence matters most.                                       */
-.arc{border-top:1px dotted rgba(36,35,31,.4)}
+.arc{border-top:1px dotted rgba(36,35,31,.4);list-style:none;margin:0;padding:0}
 .band--ink .arc{border-top-color:rgba(242,243,237,.4)}
 .arc__row{
   display:grid;gap:clamp(10px,2vw,32px);
@@ -810,7 +821,7 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
   border-bottom:1px dotted rgba(36,35,31,.4);
 }
 .band--ink .arc__row{border-bottom-color:rgba(242,243,237,.4)}
-@media (min-width:760px){.arc__row{grid-template-columns:130px minmax(0,1fr)}}
+@media (min-width:760px){.arc__row{grid-template-columns:minmax(130px,auto) minmax(0,1fr)}}
 .arc__k{
   font-size:11px;letter-spacing:.15em;text-transform:uppercase;
   color:var(--deep);font-variant-numeric:tabular-nums;
