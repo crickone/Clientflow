@@ -10,6 +10,7 @@ import {
   ROLE_TO_LEGACY_KEY,
   roleOf,
   shouldAdvance,
+  reopensOnRepeatEnquiry,
   ALL_ROLES,
   WON_ROLES,
   INACTIVE_ROLES,
@@ -55,6 +56,16 @@ check("lost→engaged blocked", shouldAdvance(S(8, "lost"), S(1, "engaged")), fa
 check("lapsed→won pulls out (even though lapsed.position > won.position)", shouldAdvance(S(7, "lapsed"), S(5, "won")), true);
 check("lapsed→repeat pulls out", shouldAdvance(S(7, "lapsed"), S(6, "repeat")), true);
 check("lapsed→lapsed no-op", shouldAdvance(S(7, "lapsed"), S(7, "lapsed")), false);
+
+// reopensOnRepeatEnquiry — the one deliberate act that overrides the lost freeze.
+check("lost reopens on a repeat enquiry", reopensOnRepeatEnquiry(S(8, "lost")), true);
+check("won does NOT reopen (a paying customer is not a fresh lead)", reopensOnRepeatEnquiry(S(5, "won")), false);
+check("repeat does NOT reopen", reopensOnRepeatEnquiry(S(6, "repeat")), false);
+check("lapsed does NOT reopen (reactivation is a separate decision)", reopensOnRepeatEnquiry(S(7, "lapsed")), false);
+check("a live funnel stage does NOT reopen", reopensOnRepeatEnquiry(S(1, "engaged")), false);
+check("a manual-only stage does NOT reopen", reopensOnRepeatEnquiry(S(3, null)), false);
+// The freeze it overrides is still in force for passive events.
+check("lost stays frozen for auto-advance", shouldAdvance(S(8, "lost"), S(1, "engaged")), false);
 
 // Candidate into an out-of-band role is never an 'advance' via this fn (lapse job / manual set it directly).
 check("funnel→lapsed not via shouldAdvance", shouldAdvance(S(5, "won"), S(7, "lapsed")), false);

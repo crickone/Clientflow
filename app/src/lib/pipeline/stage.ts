@@ -8,7 +8,7 @@ import { listStages, resolveStageIdByRole, resolveEntryStageId } from "./stageRe
 import { leadPipelineId } from "./pipelineRepo";
 import { cancelNurtureForLead } from "@/lib/automations/nurture";
 import { INACTIVE_ROLES } from "./roles";
-import { shouldAdvance, ROLE_TO_LEGACY_KEY, type StageRecord, type StageRole } from "./roles";
+import { reopensOnRepeatEnquiry, shouldAdvance, ROLE_TO_LEGACY_KEY, type StageRecord, type StageRole } from "./roles";
 
 export type { StageRole } from "./roles";
 
@@ -79,6 +79,55 @@ export function advanceStage(leadId: number, role: StageRole): void {
   if (!candidate) return;
   if (!shouldAdvance(cur, candidate)) return;
   writeStageId(leadId, candidate.id, `Lead moved to ${candidate.name}`);
+}
+
+/**
+ * Bring a written-off lead back onto the board, at its own board's entry
+ * stage. Called when the person themselves enquires again.
+ *
+ * Deliberately not `advanceStage`, which treats a `lost` stage as frozen so
+ * no passive event can resurrect a dead lead; `reopensOnRepeatEnquiry` in
+ * ./roles.ts carries that reasoning and decides which roles qualify.
+ *
+ * The legacy `leads.status` is reset alongside the stage. A lead can still be
+ * marked lost that way from the leads list, and a reopen that left the status
+ * reading "lost" would only half-reopen it.
+ *
+ * Nurture is NOT restarted here. Whatever was queued for this lead was
+ * cancelled when they were written off, and what a reopened lead should be
+ * sent is a copy decision the operator has not made.
+ *
+ * Returns true when something actually changed.
+ */
+export function reopenLostLead(leadId: number, note: string): boolean {
+  const row = db
+    .select({ status: schema.leads.status })
+    .from(schema.leads)
+    .where(eq(schema.leads.id, leadId))
+    .get();
+  if (!row) return false;
+
+  let reopened = false;
+
+  const cur = currentStageRecord(leadId);
+  if (cur && reopensOnRepeatEnquiry(cur)) {
+    const pipelineId = leadPipelineId(leadId) ?? undefined;
+    const entryId = resolveEntryStageId(pipelineId);
+    // An entry stage that IS the lost stage (a one-column board, say) would
+    // make this a no-op write and a misleading activity line.
+    if (entryId != null && entryId !== cur.id) {
+      writeStageId(leadId, entryId, note);
+      reopened = true;
+    }
+  }
+
+  if (row.status === "lost") {
+    db.update(schema.leads).set({ status: "new", updatedAt: new Date() }).where(eq(schema.leads.id, leadId)).run();
+    if (!reopened) void logActivity("pipeline.stage", note, { leadId });
+    reopened = true;
+  }
+
+  return reopened;
 }
 
 /** Operator override — set ANY stage by id (drag / picker / agent), bypassing forward-only. */

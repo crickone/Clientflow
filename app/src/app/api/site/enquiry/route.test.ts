@@ -9,7 +9,8 @@
 // campaign-shaped token and a missing token are all one 400 with nothing
 // written; honeypot is a silent 200; validation 400; url-encoded no-JS path
 // gets a 303 back to a SAFE return path; oversized payload 413; the per-IP
-// rate limit; a repeat enquiry from the same contact dedupes to one lead.
+// rate limit; a repeat enquiry from the same contact dedupes to one lead, and
+// reopens that lead when the business had written it off as lost.
 import assert from "node:assert/strict";
 import Module from "node:module";
 import { createRequire } from "node:module";
@@ -36,7 +37,7 @@ process.env.EMAIL_TOKEN_SECRET = SECRET;
 (async () => {
   const { controlSqlite } = requireLocal("../../../../lib/db/control") as typeof import("@/lib/db/control");
   const { getTenantDbById } = requireLocal("../../../../lib/db/tenant") as typeof import("@/lib/db/tenant");
-  const { leads } = requireLocal("../../../../lib/db/schema") as typeof import("@/lib/db/schema");
+  const { leads, pipelineStages } = requireLocal("../../../../lib/db/schema") as typeof import("@/lib/db/schema");
   const { signSiteEnquiryToken } = requireLocal("../../../../lib/cms/enquiryToken") as typeof import("@/lib/cms/enquiryToken");
   const { POST } = requireLocal("./route") as typeof import("./route");
 
@@ -108,6 +109,45 @@ process.env.EMAIL_TOKEN_SECRET = SECRET;
     assert.match(leadAfterRepeat?.notes ?? "", /Repeat enquiry/, "the repeat is appended, not silently dropped");
     assert.match(leadAfterRepeat?.notes ?? "", /Programme: Heartwise/, "the repeat's new programme is recorded");
     assert.match(leadAfterRepeat?.notes ?? "", /Consultant referred me\./, "the repeat's about text is recorded");
+
+    // 2b. a repeat enquiry from someone the business wrote off REOPENS the
+    //     lead: it comes back to the board's entry stage and the legacy
+    //     status stops saying lost, so the operator actually sees them.
+    const stages = tdb.select().from(pipelineStages).all();
+    const lostStage = stages.find((st) => st.role === "lost");
+    const entryStage = stages.find((st) => st.role === "new");
+    assert.ok(lostStage && entryStage, "the scratch tenant seeded a lost and a new stage");
+    tdb
+      .update(leads)
+      .set({ stageId: lostStage!.id, pipelineStage: "lost", status: "lost" })
+      .run();
+    const lostLead = tdb.select().from(leads).get();
+    assert.equal(lostLead?.stageId, lostStage!.id, "setup: the lead really is in Lost");
+
+    const r2b = await post(
+      { name: "Mary Byrne", phone: "086 123 4567", programme: "vitality", about: "Changed my mind.", token },
+      "10.77.0.9",
+    );
+    assert.equal(r2b.status, 200);
+    const b2b = (await r2b.json()) as { created: boolean; reopened: boolean };
+    assert.equal(b2b.created, false, "still the same lead, not a new one");
+    assert.equal(b2b.reopened, true, "the route reports that it reopened a lost lead");
+    assert.equal(leadCount(), 1, "reopening does not create a second card");
+    const reopenedLead = tdb.select().from(leads).get();
+    assert.equal(reopenedLead?.stageId, entryStage!.id, "the lead is back at the entry stage");
+    assert.equal(reopenedLead?.pipelineStage, "new_lead", "the frozen dual-write column follows the stage");
+    assert.equal(reopenedLead?.status, "new", "the legacy status stops saying lost");
+    assert.match(reopenedLead?.notes ?? "", /Changed my mind\./, "the reopening enquiry's message is kept");
+    assert.match(reopenedLead?.notes ?? "", /Had a stent/, "the original enquiry still survives");
+
+    // 2c. a repeat from a lead that is NOT lost leaves the stage alone
+    const r2c = await post(
+      { name: "Mary Byrne", phone: "086 123 4567", programme: "livewell", about: "One more thing.", token },
+      "10.77.0.10",
+    );
+    const b2c = (await r2c.json()) as { created: boolean; reopened: boolean };
+    assert.equal(b2c.reopened, false, "an already-open lead is not reported as reopened");
+    assert.equal(tdb.select().from(leads).get()?.stageId, entryStage!.id, "and it has not been moved");
 
     // 3. tampered / campaign-shaped / missing tokens are one 400, nothing written
     //    (own IP: the route counts a rejected request against the caller's

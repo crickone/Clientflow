@@ -2,6 +2,7 @@ import { clientIp, rateLimit } from "@/lib/rateLimit";
 import { runWithTenant } from "@/lib/db/tenant";
 import { appendLeadNotes, upsertLead } from "@/lib/leads";
 import { logActivity } from "@/lib/queries";
+import { reopenLostLead } from "@/lib/pipeline/stage";
 import { verifySiteEnquiryToken } from "@/lib/cms/enquiryToken";
 import {
   enquiryNotes,
@@ -85,19 +86,29 @@ export async function POST(req: Request) {
       phone: data.phone,
       notes: enquiryNotes(data),
     });
+    // A lead the business had written off is put back on the board when the
+    // person enquires again: they are asking to be contacted, so the card has
+    // to be somewhere the operator will see it. Only a `lost` lead reopens —
+    // lib/pipeline/stage.ts carries which roles qualify and why.
+    let reopened = false;
     if (!created) {
       appendLeadNotes(
         lead.id,
         `Repeat enquiry ${new Date().toISOString().slice(0, 10)}: ${enquiryNotes(data).replace(/\n/g, " · ")}`,
       );
+      reopened = reopenLostLead(lead.id, `Reopened by a repeat website enquiry from ${data.name}`);
     }
     await logActivity(
       "lead.new",
-      created ? `Website enquiry: ${data.name}` : `Repeat website enquiry: ${data.name}`,
-      { leadId: lead.id, programme: data.programme, siteId: claim.siteId, created, about: data.about },
+      created
+        ? `Website enquiry: ${data.name}`
+        : reopened
+          ? `Repeat website enquiry reopened a lost lead: ${data.name}`
+          : `Repeat website enquiry: ${data.name}`,
+      { leadId: lead.id, programme: data.programme, siteId: claim.siteId, created, reopened, about: data.about },
     );
-    return { leadId: lead.id, created };
+    return { leadId: lead.id, created, reopened };
   });
 
-  return respondPublicForm(req, returnTo, true, { extra: { leadId: result.leadId, created: result.created } });
+  return respondPublicForm(req, returnTo, true, { extra: { leadId: result.leadId, created: result.created, reopened: result.reopened } });
 }

@@ -109,6 +109,24 @@ export function shouldAdvance(current: StageLike, candidate: StageLike): boolean
   return candidate.position > current.position;
 }
 
+/**
+ * PURE: does a repeat enquiry from the person themselves reopen this stage?
+ *
+ * Only `lost`. A lost lead is one the business wrote off, and someone filling
+ * the enquiry form in again is them saying otherwise, so the card comes back.
+ * The other closed roles deliberately do NOT reopen: `won` and `repeat` are
+ * paying customers, and moving one back to the entry stage would report a
+ * member as a fresh lead, while `lapsed` reactivation is a separate question.
+ *
+ * Kept apart from `shouldAdvance` on purpose. There, a `lost` stage is frozen
+ * so that no PASSIVE event (an inbound message, an appointment webhook) can
+ * resurrect a dead lead behind the operator's back. That rule stands; this is
+ * the one deliberate act by the person themselves that overrides it.
+ */
+export function reopensOnRepeatEnquiry(current: StageLike): boolean {
+  return current.role === "lost";
+}
+
 export interface StageRecord {
   id: number;
   /** The board this stage belongs to. Absent only in bare test fixtures. */
