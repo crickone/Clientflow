@@ -305,6 +305,19 @@ h1,h2,h3,p,figure,blockquote{margin:0}
 /* ---- three-up cards with a caption under ---- */
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--gap)}
 @media (max-width:820px){.grid3{grid-template-columns:1fr}}
+/* Two across instead of three, for cards whose body is a list of full
+   sentences rather than a caption: three of them across the documented
+   column leaves each bullet about four words wide.
+
+   It exists as a class because the inline style it replaces could not
+   collapse. An inline declaration outranks a stylesheet rule whatever the
+   media query says, so `style="grid-template-columns:repeat(2,1fr)"` held
+   the hyperbaric page's five benefit clusters two-abreast in a 390px
+   viewport, with bullets breaking every second word for a dozen lines.
+   The same inline override is still on the infrared and HIFEM pages and
+   wants the same swap.                                                  */
+.grid3--two{grid-template-columns:repeat(2,1fr)}
+@media (max-width:820px){.grid3--two{grid-template-columns:1fr}}
 .tile{text-decoration:none;color:inherit;display:block}
 .tile__img{position:relative;aspect-ratio:4/3;overflow:hidden;background:var(--ink)}
 .tile__img img{width:100%;height:100%;object-fit:cover;transition:transform 1s cubic-bezier(.2,.7,.2,1)}
@@ -465,6 +478,57 @@ html:not(.js) .roll__media img{clip-path:none;transform:none}
 .qa p{margin-top:12px;max-width:62ch;font-size:clamp(13px,1.05vw,15px);color:var(--deep)}
 .band--ink .qa p{color:var(--sage)}
 .band--sage .qa p{color:var(--ink)}
+
+/* ---- questions, the long form ---------------------------------------
+   The block above dresses a four-row aside. The hyperbaric page carries
+   eighteen, and that length changes what the markup has to do: the row
+   gets an explicit shape -- .qa__row / .qa__q / .qa__a -- so the whole
+   strip of type is the press target rather than only the words, and so an
+   answer can be a wrapper instead of a bare <p> and run to two paragraphs
+   without them drifting apart.
+
+   Still <details>, never a scripted panel: it opens with no JavaScript,
+   takes keyboard operation for free, and stays findable by the browser's
+   own in-page search, which a scripted accordion is not.
+
+   These rows ARE <details> inside .qa, so everything above still reaches
+   them. The selectors below are deliberately written to outweigh that --
+   summary.qa__q, not .qa__q -- because a bare class loses to `.qa summary`
+   and the half of the block that landed would leave each row padded twice
+   and wearing two markers at once.
+
+   A chevron rather than the +/-: at eighteen rows a column of plus signs
+   reads as a form to fill in. It is two borders, so it is a rule and not
+   type, which is what lets it sit on plaster at all -- and it still takes
+   the same three-ground colouring as the glyph above it, for the pages
+   that put their questions on sage or on ink.
+
+   No opacity on the answer. The brief this came from dimmed it to .85,
+   but .qa p is already --deep, which is 5.10:1 on plaster; multiplying
+   that by .85 lands near 4.1:1 and puts the longest body copy on the site
+   under the bar. Quieter is the colour's job here, not the compositor's. */
+details.qa__row{padding:0}
+summary.qa__q{
+  display:block;position:relative;
+  padding:18px 34px 18px 0;
+  font-size:clamp(15px,1.25vw,18px);line-height:1.4;
+}
+summary.qa__q::after{
+  content:"";position:absolute;right:6px;top:50%;
+  width:9px;height:9px;margin:-6px 0 0;
+  border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;
+  color:var(--deep);
+  transform:rotate(45deg);transition:transform .25s ease;
+}
+.band--ink .qa__q::after{color:var(--timber)}
+.band--sage .qa__q::after{color:var(--ink)}
+.qa__row[open] .qa__q::after{transform:rotate(-135deg);margin-top:-2px}
+@media (prefers-reduced-motion:reduce){summary.qa__q::after{transition:none}}
+.qa__q:focus-visible{outline:2px solid var(--deep);outline-offset:3px}
+.band--sage .qa__q:focus-visible{outline-color:var(--ink)}
+.qa__a{padding:0 clamp(24px,6vw,90px) 22px 0;max-width:62ch}
+.qa__a p{margin-top:0}
+.qa__a p + p{margin-top:12px}
 
 /* ---- contact details + form ---- */
 .cols4{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--gap)}

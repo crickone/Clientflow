@@ -1,3 +1,9 @@
+<!-- Grounds, in order: ink hero, sage, ink, plaster, sage, plaster,
+     plaster, sage, plaster. Nine sections -- four plaster, three sage,
+     two ink -- and sage never lands twice running. The two ink sections
+     are the hero and the quote, which is the only use of ink this site
+     makes: a photograph at full bleed, and one sentence from a client. -->
+
 <!-- INK. The chamber does the work. -->
 <section class="hero">
   <div class="hero__media"><img src="assets/hbot.jpg" alt="A client seated in the hyperbaric oxygen chamber at the Clonmel clinic" /></div>
@@ -12,10 +18,12 @@
   </div>
 </section>
 
-<!-- PLASTER -->
-<section class="band" data-chapter="What it is">
+<!-- SAGE. The signature ground takes the first chapter: one colour step
+     straight off the ink hero, carrying the plain-language answer to the
+     only question a first visit has. -->
+<section class="band band--sage" data-chapter="What it is">
   <div class="says">
-    <div>
+    <div class="body">
       <h2 class="lede">More oxygen, where your body needs it.</h2>
       <p style="margin-top:22px">As your cells take in higher levels of oxygen, everyday fatigue starts to fade, focus sharpens, and recovery feels easier &mdash; not just from workouts, but from life.</p>
       <p>Most people describe a calm clarity and steadier energy that lasts well beyond the session itself.</p>
@@ -24,7 +32,38 @@
   </div>
 </section>
 
-<!-- SAGE. The signature ground carries the detail. -->
+<!-- INK. Proof, and it sits inside the first chapter rather than at the
+     foot of the page: the reader has just been told what this is, and the
+     next voice they hear is somebody who uses it. Deliberately not a
+     chapter of its own -- it carries no <h2 class="lede">, and the rail
+     is a list of the page's arguments, not of its punctuation. -->
+<section class="band band--ink on-ink">
+  <div class="says">
+    <div class="band__head__l">
+      <p class="title">In their words</p>
+      <figure style="margin:22px 0 0">
+        <blockquote class="says__t" style="margin:0 0 18px">&ldquo;I'm in my hyperbaric chamber 6 days a week and can honestly say my recovery is so much better.&rdquo;</blockquote>
+        <figcaption class="says__a">Micheal Sandbach &middot; Hyrox World Elite</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- PLASTER. The mechanism, and the longest reading on the page, so it
+     gets the highest-contrast ground. -->
+<section class="band" data-chapter="How it works">
+  <div class="says">
+    <div class="body">
+      <h2 class="lede">Oxygen under gentle pressure.</h2>
+      <p style="margin-top:22px">That is most of the idea. You sit in a clear, comfortable chamber and breathe air with a higher concentration of oxygen than the room has, while the pressure inside is raised slowly over the first few minutes. Nothing is attached to you and nothing is injected. Most people notice the pressure the way they would on a plane coming in to land &mdash; a soft fullness in the ears that clears when they swallow &mdash; and then stop noticing it for the rest of the hour.</p>
+      <p>At room pressure almost all the oxygen you breathe is carried by red blood cells, and those cells are close to full already, so breathing harder does not add much. Pressure changes that. It dissolves oxygen directly into the plasma, the fluid those cells travel in, so your blood carries more of it than it otherwise could and can bring it further into tissue. Oxygen is the fuel the body repairs itself with. A session is simply an hour of having more of it to hand than usual.</p>
+      <p>One session is one session. What builds is the series. Given more oxygen more often, the body responds by growing new capillaries &mdash; the smallest blood vessels, the ones that reach where the larger ones do not &mdash; and by laying down stronger collagen, the protein that gives skin, tendon and connective tissue their structure. That is why sessions are usually bought as a block of five or ten rather than one at a time, and why people tend to judge it after a few weeks rather than after an hour.</p>
+    </div>
+    <div class="tile__img"><img src="assets/hbot.jpg" alt="Inside the hyperbaric oxygen chamber" /></div>
+  </div>
+</section>
+
+<!-- SAGE -->
 <section class="band band--sage" data-chapter="What it supports">
   <div>
     <div class="band__head">
@@ -32,7 +71,7 @@
         <h2 class="lede">Where people notice it.</h2>
       </div>
     </div>
-    <div class="grid3" data-stagger style="grid-template-columns:repeat(2,1fr)">
+    <div class="grid3 grid3--two" data-stagger>
       <div>
         <h3 class="panel__t" style="text-align:left">Overall wellness</h3>
         <ul class="body">
@@ -46,7 +85,7 @@
         <h3 class="panel__t" style="text-align:left">Recovery and repair</h3>
         <ul class="body">
           <li>Aids post-exercise recovery without adding more strain</li>
-          <li>Encourages healing after minor injuries or strains</li>
+          <li>Encourages recovery after minor injuries or strains</li>
           <li>Assists tissue repair by improving oxygen delivery to areas with poorer circulation</li>
         </ul>
       </div>
@@ -59,11 +98,18 @@
         </ul>
       </div>
       <div>
-        <h3 class="panel__t" style="text-align:left">Circulation, sleep and rest</h3>
+        <h3 class="panel__t" style="text-align:left">Circulation and cardiovascular support</h3>
         <ul class="body">
           <li>Enhances blood oxygen saturation, supporting circulation generally</li>
           <li>Promotes capillary growth and improved microcirculation</li>
+          <li>Supports healthy vascular function</li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="panel__t" style="text-align:left">Sleep, stress and longevity</h3>
+        <ul class="body">
           <li>Promotes deeper, more restorative sleep by calming the nervous system</li>
+          <li>Supports stress reduction and overall relaxation</li>
           <li>Contributes to healthy ageing by improving oxygen use</li>
         </ul>
       </div>
@@ -88,28 +134,168 @@
   </div>
 </section>
 
-<!-- INK. Proof. -->
-<section class="band band--ink on-ink">
-  <div class="says">
-    <div class="band__head__l">
-      <p class="title">In their words</p>
-      <figure style="margin:22px 0 0">
-        <blockquote class="says__t" style="margin:0 0 18px">&ldquo;I'm in my hyperbaric chamber 6 days a week and can honestly say my recovery is so much better.&rdquo;</blockquote>
-        <figcaption class="says__a">Micheal Sandbach &middot; Hyrox World Elite</figcaption>
-      </figure>
+<!-- PLASTER. Eighteen rows of body copy want the highest-contrast ground
+     on the site, and they want it closed: the page stays scannable, and a
+     reader opens only the one they came for. -->
+<section class="band" data-chapter="Questions">
+  <div>
+    <div class="band__head">
+      <div class="band__head__l">
+        <h2 class="lede">What people ask before their first session.</h2>
+      </div>
+    </div>
+    <div class="qa" data-stagger>
+      <details class="qa__row">
+        <summary class="qa__q">Is this a medical treatment?</summary>
+        <div class="qa__a">
+          <p>No. Hospitals and accredited clinics use higher-pressure hyperbaric oxygen for specific medical indications, under a doctor's care. What we offer is mild hyperbaric oxygen for general wellness goals: energy, clarity, sleep, and feeling more ready between training or busy days. We do not diagnose or treat medical conditions.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">What is hyperbaric oxygen therapy?</summary>
+        <div class="qa__a">
+          <p>A calm, guided session in a pressurised chamber, breathing air with a higher concentration of oxygen than the room has. The gentle pressure helps your body take on more oxygen than usual, which may support steadier energy, a clearer head, better sleep and day-to-day recovery.</p>
+          <p>At Optimal Health and Recovery we offer mild hyperbaric oxygen for general wellness only. We do not diagnose or treat medical conditions.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">Who is it suitable for?</summary>
+        <div class="qa__a">
+          <p>Busy professionals, parents, people over forty building strength, and desk workers who want a calm hour that supports energy, focus, sleep routine and everyday ease. If you have specific medical concerns, speak with your GP first.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">How long is a session, and how often should I come?</summary>
+        <div class="qa__a">
+          <p>A session here runs forty-five to sixty minutes. Most people start with one or two a week for three to four weeks, then adjust around how they feel and what the week looks like.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">What does it feel like inside the chamber?</summary>
+        <div class="qa__a">
+          <p>Most people describe it as quiet and relaxing. At the start you will notice gentle pressure in your ears, similar to an aircraft landing. We will show you an easy equalising technique and stay in touch throughout, so you are comfortable the whole way.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">What if I feel claustrophobic?</summary>
+        <div class="qa__a">
+          <p>We can arrange a familiarisation sit-in with no pressure at all, so you can see the space and practise equalising before you commit to a session. You can talk to us at any point once you are inside, and we can pause or depressurise whenever you ask.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">What should I wear and bring?</summary>
+        <div class="qa__a">
+          <p>Comfortable everyday clothes, and arrive hydrated. For safety in an oxygen-rich environment, leave off oily lotions, hairsprays and perfumes just before your session. We will tell you what can and cannot go into the chamber.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">Can I read or use my phone?</summary>
+        <div class="qa__a">
+          <p>We would rather you had a distraction-free hour, so you can actually switch off. If a book or audio is allowed, we will confirm what is safe to bring inside. Plenty of people simply rest or nap.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">Will I notice anything after the first session?</summary>
+        <div class="qa__a">
+          <p>It varies from person to person. Some people feel clearer and more settled after the first visit; others notice sleep or energy change after a few. We keep short check-ins on energy, sleep and general ease, so you can decide for yourself whether the rhythm is working.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">What should I do afterwards?</summary>
+        <div class="qa__a">
+          <p>Hydrate, move gently, and notice how your energy and sleep feel over the next twenty-four hours. There is no downtime. Most people go straight back to work or on with the day.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">Is it safe, and are there side effects?</summary>
+        <div class="qa__a">
+          <p>Run correctly, mild hyperbaric oxygen is generally considered safe. Possible effects include temporary ear or sinus pressure, mild ear discomfort if equalising is difficult, and occasionally short-lived shifts in vision. We supervise every session, brief you before you begin, and stop or adjust if anything feels off.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">Who should check with a GP before booking?</summary>
+        <div class="qa__a">
+          <p>If you are pregnant or trying to conceive, have ear or sinus problems, difficulty equalising pressure, heart or respiratory conditions, implanted medical devices, recent surgery, or significant claustrophobia, please consult your GP before using hyperbaric oxygen.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">Are there people who should avoid it altogether?</summary>
+        <div class="qa__a">
+          <p>If you have had a recent pneumothorax, certain ear surgeries, or have devices or conditions that are not compatible with pressure changes, hyperbaric oxygen may not be suitable for you. Share your health history with us; we may ask for GP clearance before going ahead.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">Can I come while pregnant?</summary>
+        <div class="qa__a">
+          <p>Please get advice from your GP. We do not proceed without appropriate clearance.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">Can I come with a cold or sinus congestion?</summary>
+        <div class="qa__a">
+          <p>Better to reschedule. Congestion makes equalising uncomfortable. Wait until you are fully better, and check with your GP if you are unsure.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">Can I train on the same day?</summary>
+        <div class="qa__a">
+          <p>Yes. Plenty of people book the chamber in the morning for a clear head and train later, or train first and book infrared in the evening to wind down. We will help you place sessions so you feel ready rather than sluggish.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">Can I combine it with the other therapies?</summary>
+        <div class="qa__a">
+          <p>Yes, and most regulars do. A common week is hyperbaric oxygen in the morning for focus and infrared in the evening for wind-down and sleep, with HIFEM or a massage placed where they suit you. Tell us what your week looks like and we will space them sensibly.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">What is the best way to start?</summary>
+        <div class="qa__a">
+          <p>Book a single session, or ring us first on 083 867 2844 if you would rather talk it through. We will confirm it suits you, suggest timing &mdash; mornings for a clear day, evenings for sleep &mdash; and plan your first week so you know exactly what to expect.</p>
+        </div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- SAGE -->
+<section class="band band--sage" data-chapter="Pricing">
+  <div>
+    <div class="band__head">
+      <div class="band__head__l">
+        <h2 class="lede">What it costs.</h2>
+      </div>
+    </div>
+    <div class="roll roll--rates" data-stagger>
+      <div class="roll__row">
+        <span class="roll__n">One session</span>
+        <span class="roll__x"><span class="rate"><span class="rate__v">&euro;50</span><span class="rate__k">45&ndash;60 min</span></span></span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Five sessions</span>
+        <span class="roll__x"><span class="rate"><span class="rate__v">&euro;450</span><span class="rate__k">Block</span></span></span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Ten sessions</span>
+        <span class="roll__x"><span class="rate"><span class="rate__v">&euro;800</span><span class="rate__k">Block</span></span></span>
+      </div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:clamp(16px,2vw,28px);margin-top:clamp(28px,3.4vw,40px)">
+      <a class="btn" href="https://optimalhealthatinspire.simplybook.it/v2">Book a session</a>
+      <a class="explore" href="pricing.html">All pricing</a>
     </div>
   </div>
 </section>
 
 <!-- /chapters -->
 
-<!-- SAGE -->
-<section class="band band--sage">
+<!-- PLASTER -->
+<section class="band">
   <div class="says">
-    <div class="band__head__l">
+    <div class="band__head__l body">
       <p class="title">Getting started</p>
       
-      <h2 class="lede">Try a single session first.</h2>
+      <h2 class="lede" style="margin-top:14px">Try a single session first.</h2>
       <p style="margin-top:22px">Most people start with one to see how they find it, then move to a block. Tell us what you are hoping to get out of it and we will point you the right way.</p>
       <p style="margin-top:28px"><a class="btn" href="https://optimalhealthatinspire.simplybook.it/v2">Book a session</a></p>
     </div>
