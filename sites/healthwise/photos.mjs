@@ -33,6 +33,8 @@ const SHOTS = [
   { name: "hero-portrait", w: 1152, h: 1440, brief: "A woman in her mid-forties and a man in his sixties on neighbouring resistance machines, both mid-effort, a coach's arm reaching in from the side to adjust a setting; the younger person nearer the camera. Waist-up, three-quarter view." },
   { name: "livewell", w: 1440, h: 1088, brief: "A woman around fifty resting a kettlebell at her side between sets, breathing, focused, looking down. Three-quarter length." },
   { name: "vitality", w: 1440, h: 1088, brief: "Three people over sixty-five seated on white resistance machines, a coach in a plain navy t-shirt standing beside one of them, talking. Wide shot." },
+  { name: "studio60", w: 1440, h: 1088, brief: "Two people in their sixties working with free weights in the studio, one mid-press with a dumbbell in each hand, the other steady on a bench alongside; both capable and unhurried, no coach in frame. Three-quarter length." },
+  { name: "studio60-hero", w: 1440, h: 960, brief: "A man and a woman in their late sixties training side by side with barbells and dumbbells in the free-weight corner, moving confidently, a coach watching from a few steps back. Wide shot." },
   { name: "heartwise", w: 1440, h: 1088, brief: "A man around seventy walking steadily on a treadmill, a coach beside him with one hand near the console, both calm. Side view." },
   { name: "livewell-hero", w: 1440, h: 960, brief: "A small group of four adults between forty-five and sixty working through a circuit with resistance bands, spaced across the room. Wide shot." },
   { name: "vitality-hero", w: 1440, h: 960, brief: "A woman around seventy on a seated leg press, smiling at a coach who is crouched beside the machine. Medium shot." },

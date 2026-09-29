@@ -82,5 +82,19 @@
     "seed": 1749511973,
     "width": 1152,
     "height": 1152
+  },
+  "studio60": {
+    "candidate": 3,
+    "prompt": "Two people in their sixties working with free weights in the studio, one mid-press with a dumbbell in each hand, the other steady on a bench alongside; both capable and unhurried, no coach in frame. Three-quarter length. Realistic Irish adults, ordinary gym clothes (plain t-shirts, leggings, trainers), natural skin, grey and white hair where the age calls for it, no stock smile, caught mid-movement or mid-conversation. Setting: a small bright exercise studio in Ireland; pale blue-grey painted walls; white and maroon resistance machines; black treadmills and recumbent bikes; a thin blue LED strip along one wall; a drop ceiling; large front windows with soft daylight; grey rubber floor. Documentary photograph, 35mm lens, natural window light, shallow depth of field, muted colour, quiet composition. No text, no logos, no signage, no watermark.",
+    "seed": 1741446913,
+    "width": 1440,
+    "height": 1088
+  },
+  "studio60-hero": {
+    "candidate": 1,
+    "prompt": "A man and a woman in their late sixties training side by side with barbells and dumbbells in the free-weight corner, moving confidently, a coach watching from a few steps back. Wide shot. Realistic Irish adults, ordinary gym clothes (plain t-shirts, leggings, trainers), natural skin, grey and white hair where the age calls for it, no stock smile, caught mid-movement or mid-conversation. Setting: a small bright exercise studio in Ireland; pale blue-grey painted walls; white and maroon resistance machines; black treadmills and recumbent bikes; a thin blue LED strip along one wall; a drop ceiling; large front windows with soft daylight; grey rubber floor. Documentary photograph, 35mm lens, natural window light, shallow depth of field, muted colour, quiet composition. No text, no logos, no signage, no watermark.",
+    "seed": 1611989247,
+    "width": 1440,
+    "height": 960
   }
 }

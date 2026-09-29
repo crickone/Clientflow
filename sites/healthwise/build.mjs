@@ -30,10 +30,18 @@ const PHONE_DISPLAY = "086 242 2388";
 const PHONE_TEL = "+353862422388";
 const EMAIL = "dj@healthwiseclonmel.ie";
 
-const NAV_LINKS = [
+// Four programmes would make seven top-level nav items, which crowds the row
+// long before the mobile menu takes over, so they live under one "Programmes"
+// disclosure. It opens on hover and on focus in CSS, so it works with no
+// JavaScript at all; the tail script only adds click, Escape and click-away.
+const PROGRAMMES = [
   ["livewell.html", "Livewell 40–60", "livewell"],
   ["vitality.html", "Vitality 60+", "vitality"],
+  ["studio60.html", "Studio 60", "studio60"],
   ["heartwise.html", "Heartwise", "heartwise"],
+];
+
+const NAV_LINKS = [
   ["classes.html", "Classes", "classes"],
   ["about.html", "About", "about"],
   ["blog.html", "Blog", "blog"],
@@ -49,6 +57,12 @@ const nav = (key) => `<header class="nav">
   <div class="nav__in">
     <a class="nav__logo" href="index.html" aria-label="Healthwise, home"><img src="assets/logo.png" alt="Healthwise — Educate, Motivate, Activate" width="819" height="168" /></a>
     <nav class="nav__links" id="nav-links" aria-label="Primary">
+      <div class="nav__group${PROGRAMMES.some(([, , k]) => k === key) ? " nav__group--current" : ""}">
+        <button class="nav__grouptop" type="button" aria-expanded="false" aria-controls="nav-programmes">Programmes</button>
+        <div class="nav__sub" id="nav-programmes">
+${PROGRAMMES.map(([h, t, k]) => `          <a href="${h}"${k === key ? ' aria-current="page"' : ""}>${t}</a>`).join("\n")}
+        </div>
+      </div>
 ${NAV_LINKS.map(([h, t, k]) => `      <a href="${h}"${k === key ? ' aria-current="page"' : ""}>${t}</a>`).join("\n")}
     </nav>
     <div class="nav__cta">
@@ -77,6 +91,7 @@ const footer = () => `<footer class="foot">
         <b>Programmes</b>
         <a href="livewell.html">Livewell 40–60</a>
         <a href="vitality.html">Vitality 60+</a>
+        <a href="studio60.html">Studio 60</a>
         <a href="heartwise.html">Heartwise</a>
         <a href="drivewise.html">Drivewise for companies</a>
         <a href="blog.html">Blog</a>
@@ -112,6 +127,7 @@ const GHL_FORM_ID = "deWzd4mniNdSM7H84TiJ";
 const PROGRAMME_LABEL = {
   livewell: "Livewell, 40 to 60",
   vitality: "Vitality, 60 and over",
+  studio60: "Studio 60, 60 and over",
   heartwise: "Heartwise, after a cardiac event",
 };
 
@@ -158,6 +174,33 @@ const scripts = () => `<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dis
       var open = nav.classList.toggle('nav--open');
       menu.setAttribute('aria-expanded', open ? 'true' : 'false');
       menu.textContent = open ? 'Close' : 'Menu';
+    });
+  }
+
+  // Programmes disclosure. CSS already opens it on hover and focus, so this
+  // only adds what CSS cannot: a click target for touch, Escape to close, and
+  // closing when the pointer goes elsewhere. Below the mobile breakpoint the
+  // sheet shows every programme already, so the button does nothing there.
+  var group = document.querySelector('.nav__group');
+  var groupTop = group && group.querySelector('.nav__grouptop');
+  if (group && groupTop) {
+    var setOpen = function (open) {
+      group.classList.toggle('nav__group--open', open);
+      groupTop.setAttribute('aria-expanded', open ? 'true' : 'false');
+    };
+    groupTop.addEventListener('click', function (e) {
+      if (window.matchMedia('(max-width:980px)').matches) return;
+      e.preventDefault();
+      setOpen(!group.classList.contains('nav__group--open'));
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && group.classList.contains('nav__group--open')) {
+        setOpen(false);
+        groupTop.focus();
+      }
+    });
+    document.addEventListener('click', function (e) {
+      if (!group.contains(e.target)) setOpen(false);
     });
   }
 
@@ -309,6 +352,8 @@ const META = {
     description: "Five coached classes a week for adults aged 40 to 60: Women's Cardio Tone, MoveWell Strength, Men's Gym, MoveWell Mobility and Women's Circuit, at Healthwise in Clonmel." },
   vitality: { file: "vitality.html", title: "Vitality 60+ | Gentle group exercise for over 60s in Clonmel | Healthwise",
     description: "Gentle, coached group exercise for men and women over 60 in Clonmel. For beginners, limited mobility, and anyone coming back after a health event. Morning and afternoon classes." },
+  studio60: { file: "studio60.html", title: "Studio 60 | Coached strength training for active over 60s | Healthwise Clonmel",
+    description: "Coached strength and conditioning in Clonmel for men and women over 60 who are already active. Free weights, machines and conditioning work in a small group, with the load progressed as you get stronger." },
   heartwise: { file: "heartwise.html", title: "Heartwise | Supervised exercise after a cardiac event | Healthwise Clonmel",
     description: "Supervised exercise and lifestyle coaching in Clonmel for people who have had a cardiac procedure, and for managing type 2 diabetes, blood pressure and weight. BACPR-certified, since 2013." },
   classes: { file: "classes.html", title: "Classes and timetable | Healthwise Clonmel",
@@ -325,7 +370,7 @@ const substitute = (html) =>
   html
     .replace(/\{\{PULSE\}\}/g, pulseSvg("pulse--draw"))
     .replace(/\{\{RULE\}\}/g, ruleSvg())
-    .replace(/\{\{STRIP:([a-z]+)\}\}/g, (_m, p) => strip(p))
+    .replace(/\{\{STRIP:([a-z0-9]+)\}\}/g, (_m, p) => strip(p))
     .replace(/\{\{FORM\}\}/g, ghlForm({ title: "Book a consultation with Healthwise", prefill: "" }))
     .replace(/\{\{TOKEN\}\}/g, TOKEN)
     .replace(/\{\{MAPS\}\}/g, MAPS);
