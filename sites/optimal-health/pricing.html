@@ -395,6 +395,105 @@ textarea.field__i{resize:vertical;min-height:120px}
 }
 
 :focus-visible{outline:2px solid var(--timber);outline-offset:3px}
+
+/* ---- the documented page --------------------------------------------
+   Long pages carry a numbered index in the left margin. The rail IS the
+   label column: each section's own label is simply its live entry, so the
+   page never sets the same words twice.
+
+   Below 900px there is no margin to give it. The rail lies down as a strip
+   that sticks under the header, and Book moves to a bar pinned to the
+   bottom of the viewport -- the thumb's reach, and where a phone visitor
+   actually converts.                                                    */
+.doc{display:block;--doc-gap:clamp(24px,3vw,56px)}
+.doc__body{min-width:0}
+.rail{display:none}
+
+.strip{
+  position:sticky;top:0;z-index:20;
+  background:var(--plaster);
+  border-bottom:1px solid rgba(36,35,31,.14);
+  overflow:hidden;
+}
+.strip__nav{
+  display:flex;gap:8px;align-items:center;
+  padding:10px var(--pad);
+  overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+}
+.strip__nav::-webkit-scrollbar{display:none}
+.strip__a{
+  flex:none;text-decoration:none;white-space:nowrap;
+  font-size:11px;letter-spacing:.11em;text-transform:uppercase;
+  padding:6px 10px;border:1px solid rgba(36,35,31,.22);
+  color:#666661;
+  transition:background-color .2s ease,color .2s ease,border-color .2s ease;
+}
+.strip__a.is-on{background:var(--ink);color:var(--plaster);border-color:var(--ink)}
+.strip__a:focus-visible{outline:2px solid var(--deep);outline-offset:2px}
+
+.bookbar{
+  position:fixed;left:0;right:0;bottom:0;z-index:30;
+  padding:10px var(--pad);
+  background:var(--ink);
+  padding-bottom:calc(10px + env(safe-area-inset-bottom));
+}
+.bookbar .btn{display:flex;justify-content:center;width:100%}
+/* The bar is fixed, so it takes no room in the flow and would otherwise park
+   on the closing wordmark. The footer gives the height back rather than the
+   body, so the ink ground runs on under the bar instead of leaving a pale
+   sliver between the two. Scoped with :has, because a page that declares no
+   chapters has no bar and should keep a flush foot. */
+body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))}
+
+@media (min-width:900px){
+  .doc{
+    display:grid;
+    grid-template-columns:clamp(190px,17vw,250px) minmax(0,1fr);
+    gap:var(--doc-gap);
+    padding-left:var(--pad);
+    align-items:start;
+  }
+  .strip,.bookbar{display:none}
+  body:has(.bookbar) .foot{padding-bottom:0}
+
+  .rail{display:block;position:sticky;top:0;padding:clamp(40px,6vw,88px) 0}
+  .rail__in{border-right:1px solid rgba(36,35,31,.14);padding-right:clamp(16px,1.6vw,24px)}
+  .rail__k{
+    font-size:11px;letter-spacing:.17em;text-transform:uppercase;
+    color:#666661;margin-bottom:14px;
+  }
+  .rail__nav{display:flex;flex-direction:column;gap:2px}
+  .rail__a{
+    display:flex;gap:10px;align-items:baseline;
+    text-decoration:none;padding:5px 0;
+    font-size:13px;line-height:1.35;
+    color:#666661;transition:color .22s ease,border-color .22s ease;
+    border-left:1.5px solid transparent;padding-left:10px;margin-left:-11.5px;
+  }
+  .rail__a:hover{color:var(--ink)}
+  .rail__a.is-on{color:var(--deep);font-weight:500;border-left-color:var(--timber)}
+  .rail__a:focus-visible{outline:2px solid var(--deep);outline-offset:2px}
+  .rail__n{font-variant-numeric:tabular-nums;font-size:11px}
+  .btn--rail{display:flex;justify-content:center;margin-top:22px;font-size:11px}
+
+  /* Inside the column the grid already insets a band, so it keeps its
+     vertical rhythm and drops the horizontal padding it no longer needs.
+     But a sage or ink ground cut flush at its own first letter reads as a
+     crop, not a panel -- so every band bleeds back half the gutter and pads
+     it again. The text column holds one line the whole way down; only the
+     colour moves, and it always stops halfway to the rail's rule. */
+  .doc__body .band{
+    margin-left:calc(var(--doc-gap) / -2);
+    padding-left:calc(var(--doc-gap) / 2);
+    padding-right:var(--pad);
+  }
+}
+
+@media (prefers-reduced-motion:no-preference){
+  html{scroll-behavior:smooth}
+}
+.doc__body [id^="s"]{scroll-margin-top:76px}
+@media (min-width:900px){.doc__body [id^="s"]{scroll-margin-top:24px}}
 </style>
 </head>
 <body>
@@ -762,6 +861,69 @@ textarea.field__i{resize:vertical;min-height:120px}
       scrollTrigger: { trigger: group, start: 'top 85%' }
     });
   });
+}());
+
+/* ---- the chapter rail ------------------------------------------------
+   Its own IIFE, deliberately: the motion one above returns early when GSAP
+   is missing or the viewer prefers reduced motion, and the rail has to
+   follow the reader in both of those cases. It is decoration for nobody.
+
+   Progressive enhancement over a plain anchor list: with this script
+   removed the rail still lists every section and every link still jumps
+   to it. One handler drives both the desktop rail and the phone strip,
+   because they are two renderings of the same anchor list.
+
+   Position is decided by a line a quarter of the way down the viewport:
+   the current chapter is the last one whose top has crossed it. That is
+   deterministic, unlike ranking IntersectionObserver ratios, which
+   reorder unpredictably when one section is much taller than another.
+--------------------------------------------------------------------- */
+(function () {
+  var railAnchors = [].slice.call(document.querySelectorAll('[data-rail]'));
+  if (railAnchors.length) {
+    var byId = {};
+    railAnchors.forEach(function (a) {
+      var id = a.getAttribute('data-rail');
+      (byId[id] = byId[id] || []).push(a);
+    });
+    var ids = Object.keys(byId);
+    var sections = ids.map(function (id) { return document.getElementById(id); })
+                      .filter(Boolean);
+    var current = null;
+    var mark = function (id) {
+      if (id === current) return;
+      current = id;
+      railAnchors.forEach(function (a) {
+        a.classList.remove('is-on');
+        a.removeAttribute('aria-current');
+      });
+      (byId[id] || []).forEach(function (a) {
+        a.classList.add('is-on');
+        a.setAttribute('aria-current', 'true');
+        var strip = a.parentNode;
+        if (strip && strip.className === 'strip__nav') {
+          strip.scrollTo({ left: Math.max(0, a.offsetLeft - 16), behavior: 'smooth' });
+        }
+      });
+    };
+    var queued = false;
+    var settle = function () {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(function () {
+        queued = false;
+        var line = window.innerHeight * 0.25;
+        var pick = sections[0];
+        sections.forEach(function (s) {
+          if (s.getBoundingClientRect().top <= line) pick = s;
+        });
+        if (pick) mark(pick.id);
+      });
+    };
+    window.addEventListener('scroll', settle, { passive: true });
+    window.addEventListener('resize', settle);
+    settle();
+  }
 }());
 </script>
 </body>

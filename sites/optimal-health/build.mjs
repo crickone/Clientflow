@@ -310,7 +310,7 @@ function documentise(body) {
   const marked = body.replace(CHAPTER_RE, (_m, pre, label, post) => {
     const n = String(chapters.length + 1).padStart(2, "0");
     chapters.push({ n, label, id: `s${n}` });
-    return `<section${pre} data-chapter="${label}"${post} id="s${n}">`;
+    return `<section${pre} data-chapter="${label}"${post} id="s${n}" aria-label="${label}">`;
   });
   if (!chapters.length) return marked;
 

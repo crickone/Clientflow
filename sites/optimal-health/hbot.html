@@ -425,10 +425,11 @@ textarea.field__i{resize:vertical;min-height:120px}
   flex:none;text-decoration:none;white-space:nowrap;
   font-size:11px;letter-spacing:.11em;text-transform:uppercase;
   padding:6px 10px;border:1px solid rgba(36,35,31,.22);
-  color:var(--ink);opacity:.55;
-  transition:opacity .2s ease,background-color .2s ease,color .2s ease;
+  color:#666661;
+  transition:background-color .2s ease,color .2s ease,border-color .2s ease;
 }
-.strip__a.is-on{opacity:1;background:var(--ink);color:var(--plaster);border-color:var(--ink)}
+.strip__a.is-on{background:var(--ink);color:var(--plaster);border-color:var(--ink)}
+.strip__a:focus-visible{outline:2px solid var(--deep);outline-offset:2px}
 
 .bookbar{
   position:fixed;left:0;right:0;bottom:0;z-index:30;
@@ -459,19 +460,20 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
   .rail__in{border-right:1px solid rgba(36,35,31,.14);padding-right:clamp(16px,1.6vw,24px)}
   .rail__k{
     font-size:11px;letter-spacing:.17em;text-transform:uppercase;
-    opacity:.42;margin-bottom:14px;
+    color:#666661;margin-bottom:14px;
   }
   .rail__nav{display:flex;flex-direction:column;gap:2px}
   .rail__a{
     display:flex;gap:10px;align-items:baseline;
     text-decoration:none;padding:5px 0;
     font-size:13px;line-height:1.35;
-    opacity:.42;transition:opacity .22s ease,color .22s ease;
+    color:#666661;transition:color .22s ease,border-color .22s ease;
     border-left:1.5px solid transparent;padding-left:10px;margin-left:-11.5px;
   }
-  .rail__a:hover{opacity:.75}
-  .rail__a.is-on{opacity:1;color:var(--deep);font-weight:500;border-left-color:var(--timber)}
-  .rail__n{font-variant-numeric:tabular-nums;opacity:.6;font-size:11px}
+  .rail__a:hover{color:var(--ink)}
+  .rail__a.is-on{color:var(--deep);font-weight:500;border-left-color:var(--timber)}
+  .rail__a:focus-visible{outline:2px solid var(--deep);outline-offset:2px}
+  .rail__n{font-variant-numeric:tabular-nums;font-size:11px}
   .btn--rail{display:flex;justify-content:center;margin-top:22px;font-size:11px}
 
   /* Inside the column the grid already insets a band, so it keeps its
@@ -546,11 +548,9 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
     <a class="strip__a" href="#s04" data-rail="s04"><span class="rail__n">04</span> In their words</a>
   </div>
 </nav>
-<section class="band" data-chapter="What it is" id="s01">
+<section class="band" data-chapter="What it is" id="s01" aria-label="What it is">
   <div class="says">
     <div>
-      <p class="title">What it is</p>
-      
       <h2 class="lede">More oxygen, where your body needs it.</h2>
       <p style="margin-top:22px">As your cells take in higher levels of oxygen, everyday fatigue starts to fade, focus sharpens, and recovery feels easier &mdash; not just from workouts, but from life.</p>
       <p>Most people describe a calm clarity and steadier energy that lasts well beyond the session itself.</p>
@@ -560,12 +560,10 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
 </section>
 
 <!-- SAGE. The signature ground carries the detail. -->
-<section class="band band--sage" data-chapter="What it supports" id="s02">
+<section class="band band--sage" data-chapter="What it supports" id="s02" aria-label="What it supports">
   <div>
     <div class="band__head">
       <div class="band__head__l">
-        <p class="title">What it supports</p>
-        
         <h2 class="lede">Where people notice it.</h2>
       </div>
     </div>
@@ -609,12 +607,10 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
 </section>
 
 <!-- PLASTER -->
-<section class="band" data-chapter="A session" id="s03">
+<section class="band" data-chapter="A session" id="s03" aria-label="A session">
   <div>
     <div class="band__head">
       <div class="band__head__l">
-        <p class="title">Practicalities</p>
-        
         <h2 class="lede">A session, start to finish.</h2>
       </div>
     </div>
@@ -628,11 +624,9 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
 </section>
 
 <!-- INK. Proof. -->
-<section class="band band--ink on-ink" data-chapter="In their words" id="s04">
+<section class="band band--ink on-ink" data-chapter="In their words" id="s04" aria-label="In their words">
   <div class="says">
     <div class="band__head__l">
-      <p class="title">In their words</p>
-      
       <figure style="margin:22px 0 0">
         <blockquote class="says__t" style="margin:0 0 18px">&ldquo;I'm in my hyperbaric chamber 6 days a week and can honestly say my recovery is so much better.&rdquo;</blockquote>
         <figcaption class="says__a">Micheal Sandbach &middot; Hyrox World Elite</figcaption>

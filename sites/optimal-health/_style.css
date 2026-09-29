@@ -413,10 +413,11 @@ textarea.field__i{resize:vertical;min-height:120px}
   flex:none;text-decoration:none;white-space:nowrap;
   font-size:11px;letter-spacing:.11em;text-transform:uppercase;
   padding:6px 10px;border:1px solid rgba(36,35,31,.22);
-  color:var(--ink);opacity:.55;
-  transition:opacity .2s ease,background-color .2s ease,color .2s ease;
+  color:#666661;
+  transition:background-color .2s ease,color .2s ease,border-color .2s ease;
 }
-.strip__a.is-on{opacity:1;background:var(--ink);color:var(--plaster);border-color:var(--ink)}
+.strip__a.is-on{background:var(--ink);color:var(--plaster);border-color:var(--ink)}
+.strip__a:focus-visible{outline:2px solid var(--deep);outline-offset:2px}
 
 .bookbar{
   position:fixed;left:0;right:0;bottom:0;z-index:30;
@@ -447,19 +448,20 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
   .rail__in{border-right:1px solid rgba(36,35,31,.14);padding-right:clamp(16px,1.6vw,24px)}
   .rail__k{
     font-size:11px;letter-spacing:.17em;text-transform:uppercase;
-    opacity:.42;margin-bottom:14px;
+    color:#666661;margin-bottom:14px;
   }
   .rail__nav{display:flex;flex-direction:column;gap:2px}
   .rail__a{
     display:flex;gap:10px;align-items:baseline;
     text-decoration:none;padding:5px 0;
     font-size:13px;line-height:1.35;
-    opacity:.42;transition:opacity .22s ease,color .22s ease;
+    color:#666661;transition:color .22s ease,border-color .22s ease;
     border-left:1.5px solid transparent;padding-left:10px;margin-left:-11.5px;
   }
-  .rail__a:hover{opacity:.75}
-  .rail__a.is-on{opacity:1;color:var(--deep);font-weight:500;border-left-color:var(--timber)}
-  .rail__n{font-variant-numeric:tabular-nums;opacity:.6;font-size:11px}
+  .rail__a:hover{color:var(--ink)}
+  .rail__a.is-on{color:var(--deep);font-weight:500;border-left-color:var(--timber)}
+  .rail__a:focus-visible{outline:2px solid var(--deep);outline-offset:2px}
+  .rail__n{font-variant-numeric:tabular-nums;font-size:11px}
   .btn--rail{display:flex;justify-content:center;margin-top:22px;font-size:11px}
 
   /* Inside the column the grid already insets a band, so it keeps its
