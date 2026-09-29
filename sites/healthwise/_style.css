@@ -20,7 +20,7 @@
      Set as a group so the panel is always the brand's navy with white type
      and the red primary, never a half-inherited mix. */
   --cms-consent-bg:#28245C; --cms-consent-fg:#FFFFFF;
-  --cms-consent-accent:#EA1C28; --cms-consent-accent-fg:#FFFFFF;
+  --cms-consent-accent:#BB1620; --cms-consent-accent-fg:#FFFFFF;
   --display:'Manrope',sans-serif; --text:'Open Sans',sans-serif;
 }
 *,*::before,*::after{box-sizing:border-box}
