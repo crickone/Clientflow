@@ -43,4 +43,26 @@ for (const p of ["/api/site/enquiry", "/api/campaigns/signup", "/api/leads/inbou
   check(`public form route ${p} is reachable without a session`, prefixes.includes(p));
 }
 
+// A bundle carries its pages' HTML, but NOT the images that HTML points at:
+// those are files under public/sites/<slug>/assets/, copied there by the
+// importer. Add a photograph to a site's source folder, rebuild the bundle
+// and deploy, and the page ships referencing a file that was never copied —
+// the deploy is green, every check passes, and the visitor sees a broken
+// image. Studio 60 shipped exactly that. So: every asset any shipped bundle
+// references must exist on disk.
+for (const slug of shipped) {
+  const bundleFile = path.join(sitesDir, slug, "_pages.json");
+  if (!fs.existsSync(bundleFile)) continue;
+  const bundle = JSON.parse(fs.readFileSync(bundleFile, "utf8")) as { pages?: Array<{ path: string; body: string }> };
+  const missing = new Set<string>();
+  for (const page of bundle.pages ?? []) {
+    // src="/sites/<slug>/assets/x.jpg", and the same inside url(...) in styles.
+    for (const m of page.body.matchAll(/\/sites\/[a-z0-9-]+\/[^"')\s]+\.(?:jpg|jpeg|png|webp|svg|avif)/gi)) {
+      const rel = m[0].replace(/^\/sites\//, "");
+      if (!fs.existsSync(path.join(sitesDir, rel))) missing.add(m[0]);
+    }
+  }
+  check(`bundle "${slug}" references no missing asset${missing.size ? ` (${[...missing].join(", ")})` : ""}`, missing.size === 0);
+}
+
 console.log(`bundledSites.test.ts: ${passed} checks passed`);
