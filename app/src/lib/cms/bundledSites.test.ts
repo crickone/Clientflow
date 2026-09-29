@@ -85,4 +85,29 @@ for (const m of tracking.matchAll(/var\(\s*--cms-consent-[a-z-]+\s*,\s*([^)]+)\)
   check(`cookie notice colour "${m[1].trim()}" has a fallback`, m[1].trim().length > 0);
 }
 
+// Every public page of a client's site must carry the tracking component:
+// it is what fires their pixel and analytics, and what asks for consent
+// first. The site's HOME page shipped without it — the busiest page on every
+// site, the one advertising lands on, silently untracked and with no cookie
+// notice — because nothing tied the routes together. Redirect-only routes
+// have nothing to track, and the campaign landing page is deliberately
+// outside the site's chrome and excluded by name.
+const siteRoutes = (function walk(dir: string): string[] {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const full = path.join(dir, e.name);
+    if (e.isDirectory()) return walk(full);
+    return e.name === "page.tsx" ? [full] : [];
+  });
+})(path.join(root, "src/app/site"));
+check("public site routes found", siteRoutes.length > 0);
+for (const file of siteRoutes) {
+  const src = fs.readFileSync(file, "utf8");
+  const rel = path.relative(path.join(root, "src/app"), file);
+  // A route that only redirects renders nothing to track.
+  if (/permanentRedirect|\bredirect\(/.test(src) && !/pc\.template|<T /.test(src)) continue;
+  // The campaign landing page renders its own surface, outside site chrome.
+  if (rel.includes("[campaignSlug]")) continue;
+  check(`${rel} renders <SiteTracking>`, /<SiteTracking\b/.test(stripComments(src)));
+}
+
 console.log(`bundledSites.test.ts: ${passed} checks passed`);

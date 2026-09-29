@@ -11,6 +11,7 @@ import {
 import { studioEditability } from "@/lib/cms/pageBody";
 import { StudioCanvas } from "@/components/cms/StudioCanvas";
 import { StudioUneditablePanel } from "@/components/cms/StudioUneditablePanel";
+import { SiteTracking } from "@/components/cms/SiteTracking";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +47,22 @@ export default async function PublicSiteHome({ params, searchParams }: Props) {
   const pc = resolvePageContext(params, searchParams);
   if (pc?.template) {
     const T = pc.template.Component;
-    return <T ctx={pc.ctx} page={pc.page} />;
+    return (
+      <>
+        {/* The home page is a public surface like any other, and the busiest
+            one — it is where advertising lands. It rendered without this for
+            a long time, so the client's pixel and analytics never fired on
+            it and the cookie notice never appeared there either. Same
+            placement and same cmsedit exclusion as the catch-all route: an
+            operator editing a page is not a visitor. */}
+        <SiteTracking
+          siteSlug={pc.resolved.site.slug}
+          pixelId={pc.resolved.site.metaPixelId}
+          googleTagId={pc.resolved.site.googleTagId}
+        />
+        <T ctx={pc.ctx} page={pc.page} />
+      </>
+    );
   }
 
   // No home page yet — show a minimal holding screen if the site exists.
