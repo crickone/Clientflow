@@ -115,9 +115,20 @@ async function findClipping(page) {
         id: el.id || "",
         cls: typeof el.className === "string" ? el.className.trim() : "",
         amount: Math.round(amount),
+        overflowX: getComputedStyle(el).overflowX,
       }));
     offenders.sort((a, b) => b.amount - a.amount);
-    return offenders.slice(0, 8);
+    // scrollWidth > clientWidth means two different things depending on
+    // whether the element ever lets a visitor reach the extra width. The
+    // chapter strip (.strip__nav) is overflow-x:auto on purpose, wrapping
+    // white-space:nowrap pills -- its "overflow" is a horizontal scroller a
+    // visitor can pan through, not content anyone loses. Reporting it next
+    // to a genuine clip forever is how a probe stops being read; splitting
+    // on the element's own overflow-x keeps it visible without asking
+    // anyone to remember which line is the one to ignore.
+    const scrollable = offenders.filter((o) => o.overflowX === "auto" || o.overflowX === "scroll");
+    const clipped = offenders.filter((o) => o.overflowX !== "auto" && o.overflowX !== "scroll");
+    return { clipped: clipped.slice(0, 8), scrollable: scrollable.slice(0, 8) };
   });
 }
 
@@ -125,6 +136,7 @@ const pages = readdirSync(here).filter((f) => f.endsWith(".html")).sort();
 const browser = await chromium.launch({ executablePath: CHROME });
 let overflowCount = 0;
 let clipCount = 0;
+let scrollCount = 0;
 
 for (const [label, width, height] of [["desktop", 1440, 900], ["phone", 390, 844]]) {
   const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 2 });
@@ -168,14 +180,21 @@ for (const [label, width, height] of [["desktop", 1440, 900], ["phone", 390, 844
     }
 
     const clipping = await findClipping(page);
-    if (clipping.length) {
+    if (clipping.clipped.length) {
       clipCount++;
-      console.log(`  ${label.padEnd(8)} ${f}  !! CLIPPING: ${clipping.length} element(s) whose own content is wider than they are`);
-      for (const o of clipping) {
+      console.log(`  ${label.padEnd(8)} ${f}  !! CLIPPING: ${clipping.clipped.length} element(s) whose own content is wider than they are`);
+      for (const o of clipping.clipped) {
         console.log(`             -> ${describeOffender(o)}  scrollWidth exceeds clientWidth by ${o.amount}px`);
       }
     } else {
       console.log(`  ${label.padEnd(8)} ${f}  ok, no clipping (every element's content fits its own box)`);
+    }
+    if (clipping.scrollable.length) {
+      scrollCount++;
+      console.log(`  ${label.padEnd(8)} ${f}  .. SCROLLABLE: ${clipping.scrollable.length} element(s) wider than their own box on purpose (overflow-x:auto/scroll) -- reachable by scrolling, not lost`);
+      for (const o of clipping.scrollable) {
+        console.log(`             -> ${describeOffender(o)}  scrollWidth exceeds clientWidth by ${o.amount}px, overflow-x:${o.overflowX}`);
+      }
     }
 
     await page.screenshot({ path: join(out, `${f.replace(/\.html$/, "")}-${label}.png`), fullPage: true });
@@ -193,4 +212,7 @@ if (clipCount > 0) {
   console.log(`!! ${clipCount} page/width combination(s) clip an element's own content -- see CLIPPING lines above. This does not fail the run; the screenshots were still taken.`);
 } else {
   console.log("No clipping found at any page or width.");
+}
+if (scrollCount > 0) {
+  console.log(`.. ${scrollCount} page/width combination(s) carry a deliberately scrollable element (overflow-x:auto/scroll) -- see SCROLLABLE lines above. Not a defect.`);
 }

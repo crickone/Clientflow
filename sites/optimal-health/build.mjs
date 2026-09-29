@@ -28,7 +28,7 @@ const NAV_LINKS = [
 // stops fitting one row without ever taking Book down with it. See the
 // ".nav__links" comment in _style.css for why the row cannot simply wrap.
 const nav = () => `<header class="nav">
-  <a class="nav__brand" href="index.html" aria-label="Optimal Health and Recovery at Inspire, home">
+  <a href="index.html" aria-label="Optimal Health and Recovery at Inspire, home">
     <img class="nav__logo" src="assets/logo-ink.png" alt="Optimal Health and Recovery at Inspire" />
   </a>
   <nav class="nav__links" id="nav-links" aria-label="Primary">
@@ -74,12 +74,20 @@ const scripts = () => `<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dis
 <script>
 (function () {
   var root = document.documentElement;
+  // \`js\` means GSAP loaded, nothing more -- it is not a proxy for whether
+  // the visitor wants to watch it move. Stripping it for reduced motion too
+  // (an earlier pass did) fed the CSS no-scripting fallbacks -- the nav
+  // sheet, the therapies panels, both keyed on html:not(.js) -- to a
+  // visitor whose nav__menu click handler two IIFEs down works perfectly
+  // well; the sheet then had no toggle, no way to close, and being
+  // \`position:absolute\` sat over the page instead of in it. Scripting and
+  // motion are different questions, so they get different signals: \`js\`
+  // stays for as long as GSAP is actually running, and \`calm\` below alone
+  // decides which animations fire.
   if (!window.gsap) { root.className = root.className.replace(/\\bjs\\b/, ''); return; }
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    root.className = root.className.replace(/\\bjs\\b/, ''); return;
-  }
   gsap.registerPlugin(ScrollTrigger);
   if (window.CustomEase) gsap.registerPlugin(CustomEase);
+  var calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   /* ---- one easing vocabulary, used by everything ----------------------
      "Smooth but with a snap" is a curve that leaves fast and lands slow:
@@ -101,50 +109,59 @@ const scripts = () => `<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dis
   var PRESS = window.CustomEase ? CustomEase.create('press', '.3,.9,.2,1') : 'power2.out';
   var EASE = SNAP;
 
-  if (document.querySelector('.hero')) {
-    var tl = gsap.timeline();
-    tl.to('.hero__media img', { scale: 1, duration: 2.4, ease: GLIDE }, 0)
-      .to('.hero__mark > span', { y: '0%', duration: 1.05, ease: SNAP }, 0.1)
-      .to('.hero [data-rise]', { opacity: 1, y: 0, duration: .85, ease: SNAP, stagger: 0.08 }, 0.28);
-    gsap.to('.hero__media img', {
-      yPercent: 10, ease: 'none',
-      scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: true }
-    });
-  }
+  // Every scroll-triggered entrance and parallax below is the motion
+  // \`calm\` opts out of. Skipping the setup is enough on its own -- nothing
+  // is left stuck mid-transition, because nothing ever starts one -- as
+  // long as the resting values it would have animated TO are also the CSS
+  // values a \`js\` html element carries before any of this runs. They are:
+  // the reduced-motion query beside the \`.js\` pre-animation states in
+  // _style.css restates every one of them.
+  if (!calm) {
+    if (document.querySelector('.hero')) {
+      var tl = gsap.timeline();
+      tl.to('.hero__media img', { scale: 1, duration: 2.4, ease: GLIDE }, 0)
+        .to('.hero__mark > span', { y: '0%', duration: 1.05, ease: SNAP }, 0.1)
+        .to('.hero [data-rise]', { opacity: 1, y: 0, duration: .85, ease: SNAP, stagger: 0.08 }, 0.28);
+      gsap.to('.hero__media img', {
+        yPercent: 10, ease: 'none',
+        scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: true }
+      });
+    }
 
-  // Photographs wipe up as they are reached, and drift a little
-  // while they are on screen.
-  gsap.utils.toArray('.duo__img img, .tile__img img').forEach(function (img) {
-    gsap.to(img, {
-      clipPath: 'inset(0% 0 0 0)', scale: 1, duration: 1.15, ease: SNAP,
-      scrollTrigger: { trigger: img, start: 'top 88%' }
+    // Photographs wipe up as they are reached, and drift a little
+    // while they are on screen.
+    gsap.utils.toArray('.duo__img img, .tile__img img').forEach(function (img) {
+      gsap.to(img, {
+        clipPath: 'inset(0% 0 0 0)', scale: 1, duration: 1.15, ease: SNAP,
+        scrollTrigger: { trigger: img, start: 'top 88%' }
+      });
     });
-  });
-  gsap.utils.toArray('.duo__img').forEach(function (box) {
-    gsap.fromTo(box.querySelector('img'), { yPercent: -3 }, {
-      yPercent: 3, ease: 'none',
-      scrollTrigger: { trigger: box, start: 'top bottom', end: 'bottom top', scrub: true }
+    gsap.utils.toArray('.duo__img').forEach(function (box) {
+      gsap.fromTo(box.querySelector('img'), { yPercent: -3 }, {
+        yPercent: 3, ease: 'none',
+        scrollTrigger: { trigger: box, start: 'top bottom', end: 'bottom top', scrub: true }
+      });
     });
-  });
 
-  // Section titles and list rows arrive in sequence.
-  gsap.utils.toArray('.band__head .title').forEach(function (t) {
-    gsap.to(t, { opacity: 1, y: 0, duration: .8, ease: SNAP,
-      scrollTrigger: { trigger: t, start: 'top 92%' } });
-  });
-  gsap.utils.toArray('.roll').forEach(function (roll) {
-    gsap.to(roll.querySelectorAll('.roll__row'), {
-      opacity: 1, y: 0, duration: .85, ease: SNAP, stagger: 0.07,
-      scrollTrigger: { trigger: roll, start: 'top 84%' }
+    // Section titles and list rows arrive in sequence.
+    gsap.utils.toArray('.band__head .title').forEach(function (t) {
+      gsap.to(t, { opacity: 1, y: 0, duration: .8, ease: SNAP,
+        scrollTrigger: { trigger: t, start: 'top 92%' } });
     });
-  });
+    gsap.utils.toArray('.roll').forEach(function (roll) {
+      gsap.to(roll.querySelectorAll('.roll__row'), {
+        opacity: 1, y: 0, duration: .85, ease: SNAP, stagger: 0.07,
+        scrollTrigger: { trigger: roll, start: 'top 84%' }
+      });
+    });
 
-  // The closing wordmark lifts into place like the one at the top.
-  if (document.querySelector('.foot__mark > span')) {
-    gsap.to('.foot__mark > span', {
-      y: '0%', duration: 1.05, ease: SNAP,
-      scrollTrigger: { trigger: '.foot__mark', start: 'top 95%' }
-    });
+    // The closing wordmark lifts into place like the one at the top.
+    if (document.querySelector('.foot__mark > span')) {
+      gsap.to('.foot__mark > span', {
+        y: '0%', duration: 1.05, ease: SNAP,
+        scrollTrigger: { trigger: '.foot__mark', start: 'top 95%' }
+      });
+    }
   }
 
   /* ---- the therapies: hover to reveal, tap to open --------------------
@@ -158,6 +175,11 @@ const scripts = () => `<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dis
      Height is animated to a measured pixel value rather than 'auto': auto
      forces a layout read mid-tween and the first frame stutters, which is
      exactly the jolt this is meant to avoid.
+
+     This wiring runs even when \`calm\` is true, unlike the reveals above:
+     opening a panel is content the visitor asked for, not decoration that
+     happened to them, so a reduced-motion visitor still gets a working
+     accordion -- every duration below just collapses to zero.
   --------------------------------------------------------------------- */
   var rolls = gsap.utils.toArray('.roll--therapies');
   rolls.forEach(function (roll) {
@@ -176,11 +198,12 @@ const scripts = () => `<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dis
         row.classList.remove('is-open');
         head.setAttribute('aria-expanded', 'false');
         gsap.killTweensOf([panel, img, copy]);
+        var instant = now || calm;
         gsap.to(panel, {
-          height: 0, duration: now ? 0 : 0.42, ease: GLIDE,
+          height: 0, duration: instant ? 0 : 0.42, ease: GLIDE,
           onComplete: function () { panel.hidden = true; }
         });
-        gsap.to(copy, { opacity: 0, y: 8, duration: now ? 0 : 0.2, ease: PRESS });
+        gsap.to(copy, { opacity: 0, y: 8, duration: instant ? 0 : 0.2, ease: PRESS });
       };
 
       row._open = function () {
@@ -196,17 +219,18 @@ const scripts = () => `<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dis
         // at that size yet, then animate to the number.
         gsap.set(panel, { height: 'auto' });
         var target = panel.offsetHeight;
-        gsap.fromTo(panel, { height: 0 }, { height: target, duration: 0.62, ease: SNAP });
+        gsap.fromTo(panel, { height: 0 }, { height: target, duration: calm ? 0 : 0.62, ease: SNAP });
 
         // The photograph wipes up and settles out of a slight overscale --
         // the same move the section images make when they scroll in, so the
-        // panel feels like part of the page rather than a widget.
+        // panel feels like part of the page rather than a widget. Calm
+        // visitors get the same open, just without the settle.
         gsap.fromTo(img,
           { clipPath: 'inset(0 0 100% 0)', scale: 1.06 },
-          { clipPath: 'inset(0 0 0% 0)', scale: 1, duration: 0.85, ease: SNAP, delay: 0.05 });
+          { clipPath: 'inset(0 0 0% 0)', scale: 1, duration: calm ? 0 : 0.85, ease: SNAP, delay: calm ? 0 : 0.05 });
         gsap.fromTo(copy,
           { opacity: 0, y: 14 },
-          { opacity: 1, y: 0, duration: 0.6, ease: SNAP, stagger: 0.07, delay: 0.12 });
+          { opacity: 1, y: 0, duration: calm ? 0 : 0.6, ease: SNAP, stagger: calm ? 0 : 0.07, delay: calm ? 0 : 0.12 });
       };
 
       head.addEventListener('click', function () {
@@ -229,23 +253,31 @@ const scripts = () => `<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dis
     }
   });
 
-  gsap.utils.toArray('[data-stagger]').forEach(function (group) {
-    gsap.to(group.children, {
-      opacity: 1, y: 0, duration: 0.85, ease: SNAP, stagger: 0.07,
-      scrollTrigger: { trigger: group, start: 'top 85%' }
+  // Card and row groups that arrive together, same rule as the reveals
+  // above: skipped for calm, not merely instant -- .js [data-stagger]>* in
+  // _style.css already carries the resting values.
+  if (!calm) {
+    gsap.utils.toArray('[data-stagger]').forEach(function (group) {
+      gsap.to(group.children, {
+        opacity: 1, y: 0, duration: 0.85, ease: SNAP, stagger: 0.07,
+        scrollTrigger: { trigger: group, start: 'top 85%' }
+      });
     });
-  });
+  }
 }());
 
 /* ---- the nav Menu disclosure ------------------------------------------
-   Its own IIFE, deliberately, for the same reason as the chapter rail
-   below: the motion IIFE above returns early with no GSAP or under reduced
-   motion, and a reader in either state still has to be able to open the
-   menu. CSS already shows every link with no JavaScript at all
-   (html:not(.js) .nav__links in _style.css) -- this only adds what CSS
-   cannot: a click target below the breakpoint, Escape to close, and
-   closing on an outside click. Book never lives behind this toggle; it is
-   a sibling in the markup, not a link this script could hide.
+   Its own IIFE, deliberately: the motion IIFE above still returns early
+   when GSAP itself never loads, and a reader in that state still has to be
+   able to open the menu. Reduced motion no longer forces that return --
+   see the \`calm\` flag above -- so this is now the only fallback CSS keys
+   off html:not(.js): genuinely no scripting at all, not "scripting but no
+   animation". This only adds what CSS cannot: a click target below the
+   breakpoint, moving focus into the sheet on open (the disclosed links
+   sit before this button in the markup -- see the nav() comment in this
+   file for why Book cannot move), Escape to close, and closing on an
+   outside click. Book never lives behind this toggle; it is a sibling in
+   the markup, not a link this script could hide.
 --------------------------------------------------------------------- */
 (function () {
   var nav = document.querySelector('.nav');
@@ -256,6 +288,15 @@ const scripts = () => `<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dis
     nav.classList.toggle('nav--open', open);
     menu.setAttribute('aria-expanded', open ? 'true' : 'false');
     menu.textContent = open ? 'Close' : 'Menu';
+    // The links sit before this button in the DOM (Book must stay put --
+    // see nav()), so a forward Tab from the button would otherwise walk
+    // straight past them into the page. Send focus in on open instead: the
+    // first link becomes reachable immediately, and Tab from there walks
+    // the rest of the sheet before it reaches Book and Menu again.
+    if (open) {
+      var first = links.querySelector('a');
+      if (first) first.focus();
+    }
   };
   menu.addEventListener('click', function () {
     setOpen(!nav.classList.contains('nav--open'));
@@ -272,9 +313,9 @@ const scripts = () => `<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dis
 }());
 
 /* ---- the chapter rail ------------------------------------------------
-   Its own IIFE, deliberately: the motion one above returns early when GSAP
-   is missing or the viewer prefers reduced motion, and the rail has to
-   follow the reader in both of those cases. It is decoration for nobody.
+   Its own IIFE, deliberately: the motion one above still returns early
+   when GSAP itself is missing. The rail does not use GSAP at all, so it
+   has to keep working in exactly that case. It is decoration for nobody.
 
    Progressive enhancement over a plain anchor list: with this script
    removed the rail still lists every section and every link still jumps

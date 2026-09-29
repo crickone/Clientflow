@@ -123,13 +123,12 @@ h1,h2,h3,p,figure,blockquote{margin:0}
   padding-top:12px;
 }
 .on-ink .spread{border-top-color:rgba(242,243,237,.42)}
-/* Same failure as the wordmark and the same fix: `nowrap` here was never
-   tested against a narrow viewport carrying five labels (home's eyebrow
-   row) or four (massage's), and the new clipping probe caught both --
-   clipped away by the hero's own overflow:hidden, same as the headline
-   was. A label wrapping to two lines is a soft failure; forcing the row
-   past the edge of a hidden box was not. */
-.spread span{overflow-wrap:break-word}
+/* No overflow-wrap here: `.spread span` is a flex item of `.spread`, and a
+   flex item's automatic min-width floors at its min-content size --
+   break-word does not count toward that calculation (only the stronger
+   overflow-wrap:anywhere does), so the declaration this comment used to
+   defend could never shrink the row below its widest label's natural
+   width. The labels themselves are short enough not to need it. */
 
 /* ---- buttons ---- */
 .btn{
@@ -203,17 +202,27 @@ h1,h2,h3,p,figure,blockquote{margin:0}
      would otherwise read those same values as an offset from its own
      static spot -- shoving the whole header sideways instead of leaving it
      alone, which is exactly the kind of overflow this pass exists to
-     remove, not add. */
-  .nav{position:relative;top:0;left:0;border-radius:0;width:100%;justify-content:space-between;gap:16px}
+     remove, not add. flex-wrap so the sheet below has a line of its own to
+     drop onto instead of forcing the brand/Book row to make room for it. */
+  .nav{position:relative;top:0;left:0;border-radius:0;width:100%;justify-content:space-between;gap:16px;flex-wrap:wrap}
   .nav__links{
     display:none;
-    position:absolute;top:100%;left:0;right:0;
+    /* Static, not absolute: html:not(.js) (no scripting at all) is the
+       one case this list still has no toggle for and stays permanently
+       open, and an open sheet with nothing to close it must push the page
+       down rather than float over it -- the shape the pre-2026-09-29 mobile
+       nav actually had. order + flex-basis put it on its own line under
+       the brand/Book row without moving it in the markup: the comment
+       above this media query says Book never moves, and reordering the
+       DOM to make the wrap land right would break that promise. */
+    order:1;flex-basis:100%;
+    position:static;
     flex-direction:column;gap:0;
     background:var(--plaster);
     padding:4px 16px 14px;
     /* Ink at low alpha, the same value .roll's dotted rules already use --
-       not a new colour, just enough separation to read as a dropped panel
-       rather than part of the hero behind it. */
+       enough separation to read as its own panel where the header row
+       ends, not simply more list under the same gap. */
     box-shadow:0 18px 36px -22px rgba(36,35,31,.4);
   }
   .nav--open .nav__links,html:not(.js) .nav__links{display:flex}
@@ -523,9 +532,22 @@ textarea.field__i{resize:vertical;min-height:120px}
 .js .roll__row{opacity:0;transform:translateY(18px)}
 .js .band__head .title{opacity:0;transform:translateY(14px)}
 
+/* build.mjs keeps the `js` flag for as long as GSAP is actually running,
+   reduced motion or not (see the `calm` flag there), and skips only the
+   tweens that would otherwise clear every pre-animation state above. So
+   this query now carries the full list, not just the ones a flash of
+   unrevealed content would show fastest: without every line below, a
+   reduced-motion visitor with working GSAP gets the wordmark stuck behind
+   its own baseline, photographs stuck fully clipped, and every list row
+   and section title stuck invisible -- the exact defect this pass exists
+   to remove from the nav, reappearing in five other places at once. */
 @media (prefers-reduced-motion:reduce){
   .js [data-rise],.js [data-stagger]>*,.js .hero__mark{opacity:1;transform:none}
   .js .hero__media img{transform:none}
+  .js .hero .hero__mark > span,.js .foot__mark > span{transform:none}
+  .js .duo__img img,.js .tile__img img{clip-path:none;transform:none}
+  .js .roll__row{opacity:1;transform:none}
+  .js .band__head .title{opacity:1;transform:none}
   .duo__img img,.tile__img img{transition:none}
 }
 
