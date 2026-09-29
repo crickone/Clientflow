@@ -35,7 +35,7 @@ const NAV_LINKS = [
   ["vitality.html", "Vitality 60+", "vitality"],
   ["heartwise.html", "Heartwise", "heartwise"],
   ["classes.html", "Classes", "classes"],
-  ["about.html", "About DJ", "about"],
+  ["about.html", "About", "about"],
   ["blog.html", "Blog", "blog"],
 ];
 
@@ -68,7 +68,7 @@ const footer = () => `<footer class="foot">
         <p style="margin-top:10px"><a href="${MAPS}" rel="noopener">Directions</a></p>
       </div>
       <div class="foot__links">
-        <b>Talk to DJ</b>
+        <b>Talk to us</b>
         <a href="tel:${PHONE_TEL}">${PHONE_DISPLAY}</a>
         <a href="mailto:${EMAIL}">${EMAIL}</a>
         <p style="margin-top:10px">Classes from 7am, mornings and evenings. See the <a href="classes.html">timetable</a>.</p>
@@ -128,7 +128,7 @@ const ghlForm = ({ title, prefill }) => {
     data-deactivation-type="neverDeactivate" data-deactivation-value=""
     data-form-name="${title}" data-height="636"
     data-layout-iframe-id="inline-${GHL_FORM_ID}" data-form-id="${GHL_FORM_ID}"></iframe>
-  <p class="frame__note">Form not loading? Ring DJ on <a class="link" href="tel:+353862422388">${PHONE_DISPLAY}</a> or email <a class="link" href="mailto:dj@healthwiseclonmel.ie">dj@healthwiseclonmel.ie</a>.</p>`;
+  <p class="frame__note">Form not loading? Ring us on <a class="link" href="tel:+353862422388">${PHONE_DISPLAY}</a> or email <a class="link" href="mailto:dj@healthwiseclonmel.ie">dj@healthwiseclonmel.ie</a>.</p>`;
 };
 
 // The booking block on programme pages, at the #book anchor every "Book a
@@ -304,7 +304,7 @@ ${body.includes("leadconnectorhq") ? `<script src="https://link.msgsndr.com/js/f
 
 const META = {
   home: { file: "index.html", title: "Healthwise Clonmel | Coached exercise for over 40s, over 60s and after a cardiac event",
-    description: "Small-group coached exercise in Clonmel for adults over 40, over 60, and after a cardiac event. Livewell, Vitality and Heartwise, led by DJ O'Dwyer since 2011." },
+    description: "Small-group coached exercise in Clonmel for adults over 40, over 60, and after a cardiac event. Livewell, Vitality and Heartwise, coached in small groups since 2011." },
   livewell: { file: "livewell.html", title: "Livewell 40–60 | Strength, mobility and cardio classes in Clonmel | Healthwise",
     description: "Five coached classes a week for adults aged 40 to 60: Women's Cardio Tone, MoveWell Strength, Men's Gym, MoveWell Mobility and Women's Circuit, at Healthwise in Clonmel." },
   vitality: { file: "vitality.html", title: "Vitality 60+ | Gentle group exercise for over 60s in Clonmel | Healthwise",
@@ -313,10 +313,10 @@ const META = {
     description: "Supervised exercise and lifestyle coaching in Clonmel for people who have had a cardiac procedure, and for managing type 2 diabetes, blood pressure and weight. BACPR-certified, since 2013." },
   classes: { file: "classes.html", title: "Classes and timetable | Healthwise Clonmel",
     description: "Every Healthwise class described, who it is for, and the live timetable. Classes from 7am, mornings and evenings, at Ard Gaoithe Business Park, Clonmel." },
-  about: { file: "about.html", title: "About DJ O'Dwyer | Healthwise Clonmel",
-    description: "DJ O'Dwyer founded Healthwise in 2011: MSc Performance Coaching, BACPR cardiac rehabilitation, thirty years in An Garda Síochána, strength and conditioning coach to county and Munster champions." },
+  about: { file: "about.html", title: "About Healthwise | Exercise and lifestyle studio, Clonmel",
+    description: "Healthwise is an exercise and lifestyle management studio in Clonmel, open since 2011: three coached programmes, small groups, and coaching built on an MSc in Performance Coaching and BACPR cardiac rehabilitation." },
   contact: { file: "contact.html", title: "Book a consultation | Healthwise Clonmel",
-    description: "Book a consultation with DJ at Healthwise, Unit 12E Ard Gaoithe Business Park, Clonmel. Ring 086 242 2388 or send your details and we'll be in touch." },
+    description: "Book a consultation at Healthwise, Unit 12E Ard Gaoithe Business Park, Clonmel. Ring 086 242 2388 or send your details and we'll be in touch." },
   drivewise: { file: "drivewise.html", title: "Drivewise | Driver safety and wellness for companies | Healthwise",
     description: "Drivewise by Healthwise: driver wellness screening, functional movement testing, classroom education and on-road evaluation for company drivers." },
 };
