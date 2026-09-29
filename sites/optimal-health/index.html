@@ -456,7 +456,20 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
   .strip,.bookbar{display:none}
   body:has(.bookbar) .foot{padding-bottom:0}
 
-  .rail{display:block;position:sticky;top:0;padding:clamp(40px,6vw,88px) 0}
+  /* Three chapters fit anywhere; eight do not, and a sticky column taller
+     than the viewport puts its last entries out of reach at every scroll
+     position. It scrolls itself, and keeps that scroll to itself.
+
+     Scrolling one axis makes the other a scroll container too -- there is no
+     "visible vertically, scrolling horizontally" -- and the current entry's
+     tick hangs 11.5px into the gutter, so it would be clipped away. The rail
+     takes that much padding and gives it straight back as margin: the tick
+     lands inside the box it is now clipped to, and nothing moves. */
+  .rail{
+    display:block;position:sticky;top:0;
+    padding:clamp(40px,6vw,88px) 0 clamp(40px,6vw,88px) 12px;margin-left:-12px;
+    max-height:100vh;overflow-y:auto;overscroll-behavior:contain;
+  }
   .rail__in{border-right:1px solid rgba(36,35,31,.14);padding-right:clamp(16px,1.6vw,24px)}
   .rail__k{
     font-size:11px;letter-spacing:.17em;text-transform:uppercase;
@@ -470,8 +483,14 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
     color:#666661;transition:color .22s ease,border-color .22s ease;
     border-left:1.5px solid transparent;padding-left:10px;margin-left:-11.5px;
   }
-  .rail__a:hover{color:var(--ink)}
-  .rail__a.is-on{color:var(--deep);font-weight:500;border-left-color:var(--timber)}
+  /* Emphasis climbs: grey at rest, the house hover colour under the pointer,
+     full ink for where the reader is. It used to run backwards -- current was
+     --deep, a hue shift off the resting grey with no lightness step at all
+     (1.01:1 between them, so nothing in greyscale), while hover was darker
+     than current, making the strongest mark on the rail the accident of where
+     the pointer sat. Ink is 14:1 on plaster, --deep 5.1:1, the grey 5.2:1. */
+  .rail__a:hover{color:var(--deep)}
+  .rail__a.is-on{color:var(--ink);font-weight:500;border-left-color:var(--timber)}
   .rail__a:focus-visible{outline:2px solid var(--deep);outline-offset:2px}
   .rail__n{font-variant-numeric:tabular-nums;font-size:11px}
   .btn--rail{display:flex;justify-content:center;margin-top:22px;font-size:11px}
@@ -492,8 +511,12 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
 @media (prefers-reduced-motion:no-preference){
   html{scroll-behavior:smooth}
 }
-.doc__body [id^="s"]{scroll-margin-top:76px}
-@media (min-width:900px){.doc__body [id^="s"]{scroll-margin-top:24px}}
+/* The chapter sections, and only those: an id prefix would also catch
+   #services, #signup and every other section a later page names with an s.
+   The mark that makes a chapter is the mark that gets the landing room --
+   under the sticky strip on a phone, clear of the page edge on a desktop. */
+.doc__body [data-chapter]{scroll-margin-top:76px}
+@media (min-width:900px){.doc__body [data-chapter]{scroll-margin-top:24px}}
 </style>
 </head>
 <body>
@@ -935,6 +958,7 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
    reorder unpredictably when one section is much taller than another.
 --------------------------------------------------------------------- */
 (function () {
+  var calm = window.matchMedia('(prefers-reduced-motion: reduce)');
   var railAnchors = [].slice.call(document.querySelectorAll('[data-rail]'));
   if (railAnchors.length) {
     var byId = {};
@@ -957,8 +981,14 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
         a.classList.add('is-on');
         a.setAttribute('aria-current', 'true');
         var strip = a.parentNode;
-        if (strip && strip.className === 'strip__nav') {
-          strip.scrollTo({ left: Math.max(0, a.offsetLeft - 16), behavior: 'smooth' });
+        if (strip && strip.classList && strip.classList.contains('strip__nav')) {
+          // The stylesheet gates its smooth scrolling on the same preference,
+          // and a pan nobody asked for is worse than one they can follow: a
+          // reduced-motion reader gets the jump, everyone else the glide.
+          strip.scrollTo({
+            left: Math.max(0, a.offsetLeft - 16),
+            behavior: calm.matches ? 'auto' : 'smooth'
+          });
         }
       });
     };

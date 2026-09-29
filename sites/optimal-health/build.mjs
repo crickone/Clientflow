@@ -244,6 +244,7 @@ const scripts = () => `<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dis
    reorder unpredictably when one section is much taller than another.
 --------------------------------------------------------------------- */
 (function () {
+  var calm = window.matchMedia('(prefers-reduced-motion: reduce)');
   var railAnchors = [].slice.call(document.querySelectorAll('[data-rail]'));
   if (railAnchors.length) {
     var byId = {};
@@ -266,8 +267,14 @@ const scripts = () => `<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dis
         a.classList.add('is-on');
         a.setAttribute('aria-current', 'true');
         var strip = a.parentNode;
-        if (strip && strip.className === 'strip__nav') {
-          strip.scrollTo({ left: Math.max(0, a.offsetLeft - 16), behavior: 'smooth' });
+        if (strip && strip.classList && strip.classList.contains('strip__nav')) {
+          // The stylesheet gates its smooth scrolling on the same preference,
+          // and a pan nobody asked for is worse than one they can follow: a
+          // reduced-motion reader gets the jump, everyone else the glide.
+          strip.scrollTo({
+            left: Math.max(0, a.offsetLeft - 16),
+            behavior: calm.matches ? 'auto' : 'smooth'
+          });
         }
       });
     };
@@ -305,24 +312,70 @@ const scripts = () => `<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dis
 const BOOK = "https://optimalhealthatinspire.simplybook.it/v2";
 const CHAPTER_RE = /<section\b([^>]*?)\sdata-chapter="([^"]+)"([^>]*)>/g;
 
-function documentise(body) {
+// Deliberately looser than CHAPTER_RE: whatever this finds and CHAPTER_RE
+// cannot match is exactly the mark that would be silently ignored.
+const CHAPTER_ANY = /\sdata-chapter\s*=/g;
+const OWN_ATTR_RE = /\s(id|aria-label)\s*=/;
+
+// The label reaches three markup contexts and the capture admits & and <, so
+// a therapy called "Sleep & recovery" would otherwise emit invalid markup and
+// a label with a tag in it would write into the rail. The & rule spares an
+// ampersand that is already an entity, because "Sleep &amp; recovery" is the
+// correct way to write that attribute and must not come out doubled.
+const esc = (s) =>
+  s.replace(/&(?![#\w]+;)/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+// Twelve later pages will write partials against this contract and none of
+// them will read this function, so every way of getting it wrong throws with
+// the page named. A mark that does not become an entry is worse than a build
+// that stops: the page still renders, and the index quietly lies.
+function documentise(body, page) {
   const chapters = [];
   const marked = body.replace(CHAPTER_RE, (_m, pre, label, post) => {
+    // The id and the accessible name belong to this function. A section that
+    // brings its own emits the attribute twice; the first one wins, so the
+    // entry points at an element that does not answer to it, the spy drops it
+    // and the build still reports success.
+    const own = OWN_ATTR_RE.exec(` ${pre} ${post}`);
+    if (own) {
+      throw new Error(
+        `${page}: chapter "${label}" already carries ${own[1]}=. documentise sets id ` +
+          `and aria-label on every chapter -- remove it from the <section> tag.`,
+      );
+    }
     const n = String(chapters.length + 1).padStart(2, "0");
     chapters.push({ n, label, id: `s${n}` });
-    return `<section${pre} data-chapter="${label}"${post} id="s${n}" aria-label="${label}">`;
+    return `<section${pre} data-chapter="${label}"${post} id="s${n}" aria-label="${esc(label)}">`;
   });
   if (!chapters.length) return marked;
 
+  const declared = (body.match(CHAPTER_ANY) || []).length;
+  if (declared !== chapters.length) {
+    throw new Error(
+      `${page}: ${declared} data-chapter marks in the body but ${chapters.length} became ` +
+        `chapters. A chapter is a <section> whose data-chapter value is double-quoted.`,
+    );
+  }
+
   const start = marked.search(/<section\b[^>]*\sdata-chapter=/);
   const endMark = marked.indexOf("<!-- /chapters -->");
+  // The marker closes the documented column. Before the first chapter it
+  // would slice an empty column and then re-emit the sections that follow --
+  // a duplicated page carrying duplicate ids, built without a word.
+  if (endMark !== -1 && endMark < start) {
+    throw new Error(
+      `${page}: <!-- /chapters --> comes before the first data-chapter section. ` +
+        `The marker closes the documented column, so every chapter must precede it.`,
+    );
+  }
   const end = endMark === -1 ? marked.length : endMark;
 
   const rail = `<aside class="rail" aria-label="On this page">
   <div class="rail__in">
     <p class="rail__k">On this page</p>
     <nav class="rail__nav">
-${chapters.map((c) => `      <a class="rail__a" href="#${c.id}" data-rail="${c.id}"><span class="rail__n">${c.n}</span><span class="rail__l">${c.label}</span></a>`).join("\n")}
+${chapters.map((c) => `      <a class="rail__a" href="#${c.id}" data-rail="${c.id}"><span class="rail__n">${c.n}</span><span class="rail__l">${esc(c.label)}</span></a>`).join("\n")}
     </nav>
     <a class="btn btn--rail" href="${BOOK}">Book a session</a>
   </div>
@@ -330,11 +383,12 @@ ${chapters.map((c) => `      <a class="rail__a" href="#${c.id}" data-rail="${c.i
 
   const strip = `<nav class="strip" aria-label="On this page">
   <div class="strip__nav">
-${chapters.map((c) => `    <a class="strip__a" href="#${c.id}" data-rail="${c.id}"><span class="rail__n">${c.n}</span> ${c.label}</a>`).join("\n")}
+${chapters.map((c) => `    <a class="strip__a" href="#${c.id}" data-rail="${c.id}"><span class="rail__n">${c.n}</span> ${esc(c.label)}</a>`).join("\n")}
   </div>
 </nav>`;
 
-  const bar = `<div class="bookbar"><a class="btn" href="${BOOK}">Book a session</a></div>`;
+  // The bar's ground is ink, so the default ink button has no edge on it.
+  const bar = `<div class="bookbar"><a class="btn btn--light" href="${BOOK}">Book a session</a></div>`;
 
   return [
     marked.slice(0, start),
@@ -445,7 +499,7 @@ for (const name of readdirSync(join(here, "pages"))) {
     continue;
   }
   const raw = readFileSync(join(here, "pages", name), "utf8");
-  const body = documentise(raw);
+  const body = documentise(raw, `pages/${name}`);
   writeFileSync(join(here, meta.file), shell({ ...meta, body }));
   console.log(`  ${meta.file.padEnd(18)} ${body.length} chars of content`);
   built++;
