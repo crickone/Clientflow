@@ -549,7 +549,8 @@ In `pages/hbot.html`, add `data-chapter` to the four existing content sections a
 | `<section class="band">` containing `What it is` | `data-chapter="What it is"` |
 | `<section class="band band--sage">` containing `What it supports` | `data-chapter="What it supports"` |
 | the `Practicalities` / `A session, start to finish` section | `data-chapter="A session"` |
-| the `In their words` section | `data-chapter="In their words"` |
+
+The `In their words` section is **not** a chapter. It is a bare pull-quote with no `<h2 class="lede">`, so under the headline rule above it keeps its eyebrow, stays out of the index, and gets no `data-chapter`.
 
 Then put `<!-- /chapters -->` on its own line immediately before the final `Getting started` section, so the closing call to action stays full-bleed.
 
@@ -562,7 +563,7 @@ cd /Users/truep/Desktop/Clients/Renova/sites/optimal-health && node build.mjs &&
   grep -c 'data-rail=' hbot.html && grep -o 'id="s0[0-9]"' hbot.html | sort -u
 ```
 
-Expected: `8` (four chapters rendered twice — rail and strip), then `id="s01"` through `id="s04"`.
+Expected: `6` (three chapters rendered twice — rail and strip), then `id="s01"` through `id="s03"`.
 
 - [ ] **Step 8: Confirm the page still imports**
 
