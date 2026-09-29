@@ -542,7 +542,7 @@ In `build.mjs`, inside the `scripts()` template literal, immediately before the 
 
 - [ ] **Step 6: Mark the HBOT page's sections**
 
-In `pages/hbot.html`, add `data-chapter` to the four existing content sections and close the column. The labels must read as an index, not as headings:
+In `pages/hbot.html`, add `data-chapter` to the three existing content sections that have an `<h2 class="lede">` headline, and close the column. The labels must read as an index, not as headings:
 
 | Existing section | Add |
 | --- | --- |
@@ -554,7 +554,7 @@ The `In their words` section is **not** a chapter. It is a bare pull-quote with 
 
 Then put `<!-- /chapters -->` on its own line immediately before the final `Getting started` section, so the closing call to action stays full-bleed.
 
-**Delete the `<p class="title">` eyebrow from each of those four sections.** The rail now carries that label, and printing it again is the duplication this design exists to remove. The `<h2 class="lede">` headline stays — it is the section's heading, not its label. The generator puts the label on the section as `aria-label`, so the section keeps an accessible name without setting the words twice.
+**Delete the `<p class="title">` eyebrow from each of those three sections.** The rail now carries that label, and printing it again is the duplication this design exists to remove. The `<h2 class="lede">` headline stays — it is the section's heading, not its label. The generator puts the label on the section as `aria-label`, so the section keeps an accessible name without setting the words twice.
 
 - [ ] **Step 7: Build and check the rail came out right**
 
