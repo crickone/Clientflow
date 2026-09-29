@@ -630,6 +630,65 @@ textarea.field__i{resize:vertical;min-height:120px}
 /* Pulled up under the button, which the grid gap would otherwise set adrift. */
 .form__note{font-size:clamp(12px,1vw,14px);margin-top:-6px}
 
+/* ---- an article ------------------------------------------------------
+   A post is not a documented page. It declares no data-chapter, so it
+   takes no rail and no chapter strip: the rail is an index of a page's
+   arguments, and an article has one argument, read top to bottom. What
+   it needs instead is a measure, because a band's content box is over
+   1300px wide on a 1440px screen and a line of prose that long is not
+   read, it is scanned.
+
+   .body's 58ch is the site's measure for prose sitting beside a
+   photograph, in a column already half the width of the band. An article
+   sets its prose against the whole band, so it carries the constraint
+   itself -- and one step up in size and leading, because this is the only
+   thing on the site somebody reads for several minutes at a stretch.   */
+.post__t{
+  font-size:clamp(26px,3.5vw,50px);
+  line-height:1.06;
+  letter-spacing:-.02em;
+  font-weight:500;
+  max-width:19ch;
+}
+.post__m{
+  margin-top:clamp(18px,2.2vw,26px);
+  font-size:clamp(10px,.82vw,12px);
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--sage);
+}
+.post__body{
+  max-width:58ch;
+  font-size:clamp(15px,1.12vw,17px);
+  line-height:1.62;
+}
+.post__body > * + *{margin-top:1em}
+/* A subhead is a new thought, so it takes more air above it than a
+   paragraph does -- and none of the uppercase tracking .title and
+   .panel__t carry, which is sized for two or three words and turns a
+   sentence into a wall. */
+.post__body h2{
+  font-size:clamp(17px,1.55vw,22px);
+  line-height:1.28;
+  letter-spacing:-.012em;
+  font-weight:500;
+  margin-top:clamp(30px,3.6vw,48px);
+}
+.post__body h2:first-child{margin-top:0}
+.post__body ul{padding-left:1.15em}
+.post__body li + li{margin-top:.4em}
+/* The standfirst under a card's title. The tiles elsewhere on this site
+   caption a photograph in two or three words, which is what .panel__t's
+   uppercase is sized for; an article title is a sentence, and a sentence
+   set that way runs to five lines in a third of a row. */
+.tile__h{
+  margin-top:10px;
+  font-size:clamp(15px,1.3vw,19px);
+  line-height:1.25;
+  letter-spacing:-.01em;
+  font-weight:500;
+}
+
 /* ---- footer, bookended by the wordmark ---- */
 .foot{background:var(--ink);color:var(--plaster);padding:clamp(48px,7vw,96px) var(--pad) 0}
 .foot a{color:inherit;text-decoration:none}
@@ -1312,7 +1371,7 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
     </div>
     <div>
       <p class="foot__k">Therapies</p>
-      <p class="foot__v"><a href="hbot.html">Hyperbaric oxygen</a><a href="infrared.html">Infrared</a><a href="hifem.html">HIFEM</a><a href="massage.html">Massage</a><a href="collagen.html">Skin and collagen</a><a href="testimonials.html">What people say</a></p>
+      <p class="foot__v"><a href="hbot.html">Hyperbaric oxygen</a><a href="infrared.html">Infrared</a><a href="hifem.html">HIFEM</a><a href="massage.html">Massage</a><a href="collagen.html">Skin and collagen</a><a href="testimonials.html">What people say</a><a href="blog.html">The journal</a></p>
     </div>
   </div>
   <div class="foot__bar">
@@ -1403,8 +1462,17 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
     // was .title only, the "explore" links sitting beside three home-page
     // headings were hidden by the CSS and restored by nothing: invisible on
     // the live page since the site was built. Reveal what you hide.
+    //
+    // The .title inside a .band__head is in the query for the same reason,
+    // from the other direction. The stylesheet hides that selector too, on its own
+    // line, whether or not the element also carries [data-rise] -- so a head
+    // whose eyebrow was written without the attribute (therapies has two,
+    // massage one, and every article's "Read next") was hidden by the CSS
+    // and reached by nothing here, leaving an eyebrow-shaped hole above the
+    // heading on the live page. The query now matches what the CSS hides,
+    // which is the only version of this that cannot drift again.
     gsap.utils.toArray('.band__head').forEach(function (head) {
-      var rise = head.querySelectorAll('[data-rise]');
+      var rise = head.querySelectorAll('[data-rise], .title');
       if (!rise.length) return;
       gsap.to(rise, { opacity: 1, y: 0, duration: .8, ease: SNAP, stagger: 0.06,
         scrollTrigger: { trigger: head, start: 'top 92%' } });

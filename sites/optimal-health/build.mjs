@@ -63,7 +63,7 @@ const footer = () => `<footer class="foot on-ink">
     </div>
     <div>
       <p class="foot__k">Therapies</p>
-      <p class="foot__v"><a href="hbot.html">Hyperbaric oxygen</a><a href="infrared.html">Infrared</a><a href="hifem.html">HIFEM</a><a href="massage.html">Massage</a><a href="collagen.html">Skin and collagen</a><a href="testimonials.html">What people say</a></p>
+      <p class="foot__v"><a href="hbot.html">Hyperbaric oxygen</a><a href="infrared.html">Infrared</a><a href="hifem.html">HIFEM</a><a href="massage.html">Massage</a><a href="collagen.html">Skin and collagen</a><a href="testimonials.html">What people say</a><a href="blog.html">The journal</a></p>
     </div>
   </div>
   <div class="foot__bar">
@@ -158,8 +158,17 @@ const scripts = () => `<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dis
     // was .title only, the "explore" links sitting beside three home-page
     // headings were hidden by the CSS and restored by nothing: invisible on
     // the live page since the site was built. Reveal what you hide.
+    //
+    // The .title inside a .band__head is in the query for the same reason,
+    // from the other direction. The stylesheet hides that selector too, on its own
+    // line, whether or not the element also carries [data-rise] -- so a head
+    // whose eyebrow was written without the attribute (therapies has two,
+    // massage one, and every article's "Read next") was hidden by the CSS
+    // and reached by nothing here, leaving an eyebrow-shaped hole above the
+    // heading on the live page. The query now matches what the CSS hides,
+    // which is the only version of this that cannot drift again.
     gsap.utils.toArray('.band__head').forEach(function (head) {
-      var rise = head.querySelectorAll('[data-rise]');
+      var rise = head.querySelectorAll('[data-rise], .title');
       if (!rise.length) return;
       gsap.to(rise, { opacity: 1, y: 0, duration: .8, ease: SNAP, stagger: 0.06,
         scrollTrigger: { trigger: head, start: 'top 92%' } });
@@ -733,6 +742,143 @@ const META = {
     description:
       "Find us at Ard Gaoithe Business Park, Clonmel. Call 083 867 2844 or send us a message.",
   },
+  blog: {
+    file: "blog.html",
+    title: "The journal | Optimal Health & Recovery at Inspire",
+    description:
+      "Plain writing about infrared, hyperbaric oxygen and the HIFEM chair at our Clonmel clinic: what each one is, and what people actually report.",
+  },
+};
+
+/* ---- the journal ----------------------------------------------------
+   Six articles carried across from the client's Webflow site, where they
+   lived at /post/<slug>. Those URLs are kept by _redirects.json, which
+   maps each old one onto the new page below.
+
+   WHY THEY HAVE THEIR OWN FOLDER AND THEIR OWN LOOP, rather than a row in
+   META beside the thirteen pages:
+
+   - An article needs metadata a page does not. The index card wants a
+     topic, a photograph and a standfirst as well as a title, and the
+     index is DERIVED from this list rather than written a second time in
+     the partial -- the same rule the chapter rail follows, and for the
+     same reason: a hand-written card can point at an article that is not
+     there, and a derived one cannot.
+   - pages/ is the site's argument, in the order the nav walks it. An
+     article is not part of that argument, and dropping six more files
+     into pages/ would make the nav's own source folder the place you go
+     to find out what is on the blog.
+
+   WHY THE BUILT FILE IS FLAT AT THE SITE ROOT, blog-<slug>.html:
+   tools/lib/siteHtml.cjs is the one definition of how a static file
+   becomes a CMS page, and it reads only the TOP LEVEL of this folder,
+   mapping <base>.html to the page path /<base>. A posts/ directory in the
+   OUTPUT would not be imported at all. Each post is therefore emitted
+   through the same shell() as every page and is self-contained in exactly
+   the same way: its own <style> in the head, its markup in the body, its
+   scripts at the end.
+
+   A post declares no data-chapter, so documentise() returns it untouched
+   and it takes no rail, no chapter strip and no fixed book bar. That is
+   deliberate: the rail is an index of a page's arguments, and an article
+   has one argument, read from the top. The blog INDEX does take the rail,
+   because an index is exactly what the rail is for.
+
+   Order here is the order on the index, which is the order the client's
+   own site listed them in.                                              */
+const POSTS = [
+  {
+    slug: "stress-sleep-and-the-evening-session",
+    topic: "Recovery",
+    title: "Stress, sleep, and the twelve minutes after work",
+    excerpt:
+      "The most reliable thing an evening session gives a busy person is a bounded half hour with the phone somewhere else. The bed is what makes you keep the appointment.",
+    photo: "reception.jpg",
+    alt: "Reception at the Clonmel clinic",
+    room: true,
+    description:
+      "An evening infrared session at our Clonmel clinic: twelve minutes, comfortable clothes, and half an hour nobody can reach you in.",
+  },
+  {
+    slug: "the-hifem-chair-and-a-week-sitting-down",
+    topic: "HIFEM",
+    title: "The HIFEM chair, and a week spent sitting down",
+    excerpt:
+      "Long sitting leaves some muscle doing almost nothing. The chair asks it to work &mdash; twenty to thirty minutes, seated and fully clothed &mdash; and it is muscle work, so plan it like one.",
+    photo: "hifem.jpg",
+    alt: "A client seated fully clothed on the HIFEM chair at the Clonmel clinic",
+    description:
+      "What the HIFEM chair does after a week at a desk, at our Clonmel clinic: twenty to thirty minutes, seated and fully clothed, planned like a gym session.",
+  },
+  {
+    slug: "infrared-and-everyday-aches",
+    topic: "Infrared",
+    title: "Infrared and everyday aches: what the light is actually doing",
+    excerpt:
+      "What the bed emits, what the light is understood to do once it is in tissue, and why the honest account of it is written in weeks rather than in sessions.",
+    photo: "infrared.jpg",
+    alt: "The infrared therapy bed at the Clonmel clinic",
+    description:
+      "Twelve minutes of red and near-infrared light at our Clonmel clinic: what the bed emits, what the light is understood to do, and what people say afterwards.",
+  },
+  {
+    slug: "between-hard-sessions",
+    topic: "Hyperbaric oxygen",
+    title: "Between hard sessions: where the chamber fits in a training week",
+    excerpt:
+      "How you recover is part of the training week rather than an afterthought to it. Where an hour in the chamber sits in that week, and what two competitors who use it say.",
+    photo: "hbot.jpg",
+    alt: "Inside the hyperbaric oxygen chamber at the Clonmel clinic",
+    description:
+      "Where an hour in the hyperbaric chamber sits in a training week, at our Clonmel clinic, and what two competitors who use it say about it.",
+  },
+  {
+    slug: "panels-lasers-and-the-bed",
+    topic: "Infrared",
+    title: "Panels, lasers, and a bed you lie down in",
+    excerpt:
+      "Light therapy is not one thing. A hand-held laser, a panel on a stand and a full-length bed do different jobs, and the difference is mostly how much of you the light reaches.",
+    photo: "room.jpg",
+    alt: "A treatment room at the Clonmel clinic",
+    description:
+      "How a full-length infrared bed differs from a laser or a panel, and why a session at our Clonmel clinic runs twelve minutes.",
+  },
+  {
+    slug: "hyperbaric-oxygen-and-mental-clarity",
+    topic: "Hyperbaric oxygen",
+    title: "Hyperbaric oxygen and mental clarity after a hard week",
+    excerpt:
+      "Forty-five to sixty minutes in a pressurised chamber, breathing air with more oxygen in it than the room has. What the hour is like, and what people report from it.",
+    photo: "hbot.jpg",
+    alt: "A client seated in the hyperbaric oxygen chamber at the Clonmel clinic",
+    description:
+      "What an hour in the hyperbaric chamber at our Clonmel clinic is actually like, why the pressure matters, and what people report after a run of sessions.",
+  },
+];
+
+// The index is derived, never written twice. `<!-- cards -->` in
+// pages/blog.html is where the six land; the build refuses to compose the
+// page without it rather than quietly publishing an empty index.
+const CARDS_MARK = "<!-- cards -->";
+const card = (p, pad) => `${pad}<a class="tile" href="blog-${p.slug}.html">
+${pad}  <div class="tile__img${p.room ? " shot--room" : ""}"><img src="assets/${p.photo}" alt="${esc(p.alt)}" /></div>
+${pad}  <p class="tile__n">${esc(p.topic)}</p>
+${pad}  <h3 class="tile__h">${p.title}</h3>
+${pad}  <p class="tile__m">${p.excerpt}</p>
+${pad}</a>`;
+const cards = () => POSTS.map((p) => card(p, "      ")).join("\n");
+
+// Each article closes with the two that follow it, wrapping round at the
+// end, so every post is linked from two others and the run reads as a
+// sequence rather than six dead ends. Derived from the same list for the
+// same reason the index is: a hand-written "read next" is the one link on
+// a page nobody re-checks when a slug changes.
+const NEXT_MARK = "<!-- next -->";
+const nextCards = (slug) => {
+  const i = POSTS.findIndex((p) => p.slug === slug);
+  return [POSTS[(i + 1) % POSTS.length], POSTS[(i + 2) % POSTS.length]]
+    .map((p) => card(p, "      "))
+    .join("\n");
 };
 
 // Two passes, because documentise throws and the built pages are committed
@@ -749,12 +895,58 @@ for (const name of readdirSync(join(here, "pages"))) {
     console.warn(`  no metadata for pages/${name} - skipped`);
     continue;
   }
-  const raw = readFileSync(join(here, "pages", name), "utf8");
+  let raw = readFileSync(join(here, "pages", name), "utf8");
+  if (key === "blog") {
+    if (!raw.includes(CARDS_MARK)) {
+      throw new Error(
+        `pages/${name}: no ${CARDS_MARK} marker. The journal index is built from the POSTS ` +
+          `list above, so the marker is where the six cards go -- without it the page ships ` +
+          `as an index of nothing.`,
+      );
+    }
+    raw = raw.replace(CARDS_MARK, cards());
+  }
   const body = documentise(raw, `pages/${name}`);
   composed.push({ file: meta.file, chars: body.length, html: shell({ ...meta, body }) });
 }
+
+// The articles, composed the same way and written into the same tree. A
+// post in POSTS with no partial is a card pointing at a 404, and a partial
+// with no entry is an article nothing links to; both stop the build rather
+// than shipping.
+const postFiles = new Set(readdirSync(join(here, "posts")).filter((n) => n.endsWith(".html")));
+for (const post of POSTS) {
+  const name = `${post.slug}.html`;
+  if (!postFiles.delete(name)) {
+    throw new Error(`POSTS lists "${post.slug}" but there is no posts/${name} to compose.`);
+  }
+  let raw = readFileSync(join(here, "posts", name), "utf8");
+  if (!raw.includes(NEXT_MARK)) {
+    throw new Error(
+      `posts/${name}: no ${NEXT_MARK} marker. Every article closes with the two that follow ` +
+        `it in POSTS, and the marker is where they go.`,
+    );
+  }
+  raw = raw.replace(NEXT_MARK, nextCards(post.slug));
+  const body = documentise(raw, `posts/${name}`);
+  composed.push({
+    file: `blog-${post.slug}.html`,
+    chars: body.length,
+    html: shell({
+      title: `${post.title} | Optimal Health & Recovery at Inspire`,
+      description: post.description,
+      body,
+    }),
+  });
+}
+if (postFiles.size) {
+  throw new Error(
+    `posts/${[...postFiles].join(", posts/")} is not in the POSTS list, so nothing links to it ` +
+      `and the journal index would not carry it.`,
+  );
+}
 for (const page of composed) {
   writeFileSync(join(here, page.file), page.html);
-  console.log(`  ${page.file.padEnd(18)} ${page.chars} chars of content`);
+  console.log(`  ${page.file.padEnd(44)} ${page.chars} chars of content`);
 }
-console.log(`\n${composed.length} pages built.`);
+console.log(`\n${composed.length - POSTS.length} pages and ${POSTS.length} posts built.`);
