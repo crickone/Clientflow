@@ -199,6 +199,14 @@ ul,ol{padding:0;list-style:none}
 .frame iframe{display:block;width:100%;max-width:600px;height:800px;margin:0 auto;border:0;background:#fff}
 .frame__note{text-align:center;margin-top:14px;font-size:15px;color:var(--mid)}
 
+/* ---- the embedded GoHighLevel enquiry form ----
+   Their form renders itself inside the iframe, so the page owns only the box
+   it sits in. form_embed.js sets an inline height once it has measured the
+   content; the height here is what a visitor sees before that runs, and is
+   deliberately generous so the form never opens mid-field. */
+.ghl{display:block;width:100%;max-width:640px;height:760px;margin:0 auto;border:0;border-radius:3px;background:#fff}
+.formwrap{background:var(--surf);border-top:3px solid var(--navy);padding:clamp(16px,3vw,28px)}
+
 /* ---- forms ---- */
 .form{display:grid;gap:18px;max-width:560px;position:relative}
 .field{display:grid;gap:6px}
@@ -360,18 +368,15 @@ html.js [data-stagger]>*{opacity:0;transform:translateY(14px)}
 <section class="sec sec--surf" style="padding-top:0">
   <div class="wrap"><div class="strip" id="book">
   <h2 class="h3">Book a consultation</h2>
-  <form class="form" method="post" action="/api/site/enquiry" data-enquiry>
-    <div class="field"><label for="strip-name">Your name</label><input id="strip-name" name="name" type="text" autocomplete="name" required /></div>
-    <div class="field"><label for="strip-phone">Phone number</label><input id="strip-phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" required /></div>
-    <button class="btn" type="submit">Book a consultation</button>
-    <input type="hidden" name="programme" value="livewell" />
-    <input type="hidden" name="token" value="__ADONIS_ENQUIRY_TOKEN__" />
-    <input type="hidden" name="return" value="/contact" />
-    <div class="form__hp" aria-hidden="true"><label>Company website<input name="company_website" type="text" tabindex="-1" autocomplete="off" /></label></div>
-    <p class="form__ok" hidden>Thanks — we'll be in touch shortly.</p>
-    <p class="form__err" hidden></p>
-    <p class="form__note">We use your details only to reply to you.</p>
-  </form>
+  <iframe class="ghl" src="https://api.leadconnectorhq.com/widget/form/deWzd4mniNdSM7H84TiJ?message=I%20am%20interested%20in%20Livewell%2C%2040%20to%2060."
+    title="Book a consultation — Livewell, 40 to 60"
+    id="inline-deWzd4mniNdSM7H84TiJ" data-layout="{'id':'INLINE'}"
+    data-trigger-type="alwaysShow" data-trigger-value=""
+    data-activation-type="alwaysActivated" data-activation-value=""
+    data-deactivation-type="neverDeactivate" data-deactivation-value=""
+    data-form-name="Book a consultation — Livewell, 40 to 60" data-height="636"
+    data-layout-iframe-id="inline-deWzd4mniNdSM7H84TiJ" data-form-id="deWzd4mniNdSM7H84TiJ"></iframe>
+  <p class="frame__note">Form not loading? Ring DJ on <a class="link" href="tel:+353862422388">086 242 2388</a> or email <a class="link" href="mailto:dj@healthwiseclonmel.ie">dj@healthwiseclonmel.ie</a>.</p>
 </div></div>
 </section>
 </main>
@@ -507,5 +512,6 @@ html.js [data-stagger]>*{opacity:0;transform:translateY(14px)}
   });
 }());
 </script>
+<script src="https://link.msgsndr.com/js/form_embed.js"></script>
 </body>
 </html>

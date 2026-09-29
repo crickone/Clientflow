@@ -11,7 +11,8 @@
 // Partials in pages/ may use these substitutions:
 //   {{PULSE}}            the hero pulse line (draws on with JS)
 //   {{RULE}}             a full-width pulse rule before a section title
-//   {{STRIP:vitality}}   the compact enquiry strip, programme preselected
+//   {{STRIP:vitality}}   the booking block, programme carried into the form
+//   {{FORM}}             the enquiry form on its own (contact page)
 //   {{TOKEN}}            the literal enquiry-token placeholder
 //   {{MAPS}}             the Google Maps link for the studio
 import { readFileSync, writeFileSync, readdirSync } from "node:fs";
@@ -96,23 +97,48 @@ const footer = () => `<footer class="foot">
   </div>
 </footer>`;
 
-// The compact enquiry strip on programme pages: name and phone, programme
-// preselected, same endpoint as the full form. No script inside (the tail
-// zone owns behaviour); works as a plain POST without JavaScript.
+// Healthwise run their enquiries through GoHighLevel, so for now THEIR form is
+// the enquiry form and this embeds the live one. The native form and its
+// /api/site/enquiry endpoint are untouched in git, so moving enquiries back
+// onto the platform's leads board later is a revert, not a rebuild.
+//
+// Consequence to keep in mind: a submission here reaches GoHighLevel and
+// nothing else. It does not appear on the Healthwise leads board.
+const GHL_FORM_ID = "deWzd4mniNdSM7H84TiJ";
+
+// Their form has no programme field, so the programme a visitor was reading
+// about is carried in the message, which GoHighLevel prefills from the query
+// string. The visitor can edit it; DJ still sees which page they came from.
+const PROGRAMME_LABEL = {
+  livewell: "Livewell, 40 to 60",
+  vitality: "Vitality, 60 and over",
+  heartwise: "Heartwise, after a cardiac event",
+};
+
+const ghlForm = ({ title, prefill }) => {
+  const query = prefill ? `?message=${encodeURIComponent(prefill)}` : "";
+  // Deliberately NOT loading="lazy". form_embed.js hides the iframe while it
+  // wraps it, and the browser will not load a lazy iframe it considers hidden,
+  // so the two together left the form permanently blank on the longer pages.
+  return `<iframe class="ghl" src="https://api.leadconnectorhq.com/widget/form/${GHL_FORM_ID}${query}"
+    title="${title}"
+    id="inline-${GHL_FORM_ID}" data-layout="{'id':'INLINE'}"
+    data-trigger-type="alwaysShow" data-trigger-value=""
+    data-activation-type="alwaysActivated" data-activation-value=""
+    data-deactivation-type="neverDeactivate" data-deactivation-value=""
+    data-form-name="${title}" data-height="636"
+    data-layout-iframe-id="inline-${GHL_FORM_ID}" data-form-id="${GHL_FORM_ID}"></iframe>
+  <p class="frame__note">Form not loading? Ring DJ on <a class="link" href="tel:+353862422388">${PHONE_DISPLAY}</a> or email <a class="link" href="mailto:dj@healthwiseclonmel.ie">dj@healthwiseclonmel.ie</a>.</p>`;
+};
+
+// The booking block on programme pages, at the #book anchor every "Book a
+// consultation" button on those pages points at.
 const strip = (programme) => `<div class="strip" id="book">
   <h2 class="h3">Book a consultation</h2>
-  <form class="form" method="post" action="/api/site/enquiry" data-enquiry>
-    <div class="field"><label for="strip-name">Your name</label><input id="strip-name" name="name" type="text" autocomplete="name" required /></div>
-    <div class="field"><label for="strip-phone">Phone number</label><input id="strip-phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" required /></div>
-    <button class="btn" type="submit">Book a consultation</button>
-    <input type="hidden" name="programme" value="${programme}" />
-    <input type="hidden" name="token" value="${TOKEN}" />
-    <input type="hidden" name="return" value="/contact" />
-    <div class="form__hp" aria-hidden="true"><label>Company website<input name="company_website" type="text" tabindex="-1" autocomplete="off" /></label></div>
-    <p class="form__ok" hidden>Thanks — we'll be in touch shortly.</p>
-    <p class="form__err" hidden></p>
-    <p class="form__note">We use your details only to reply to you.</p>
-  </form>
+  ${ghlForm({
+    title: `Book a consultation — ${PROGRAMME_LABEL[programme] ?? "Healthwise"}`,
+    prefill: PROGRAMME_LABEL[programme] ? `I am interested in ${PROGRAMME_LABEL[programme]}.` : "",
+  })}
 </div>`;
 
 // Scripts sit at the very end of the body so the importer files them in the
@@ -272,7 +298,7 @@ ${body.trim()}
 ${footer()}
 
 ${scripts()}
-</body>
+${body.includes("leadconnectorhq") ? `<script src="https://link.msgsndr.com/js/form_embed.js"></script>\n` : ""}</body>
 </html>
 `;
 
@@ -300,6 +326,7 @@ const substitute = (html) =>
     .replace(/\{\{PULSE\}\}/g, pulseSvg("pulse--draw"))
     .replace(/\{\{RULE\}\}/g, ruleSvg())
     .replace(/\{\{STRIP:([a-z]+)\}\}/g, (_m, p) => strip(p))
+    .replace(/\{\{FORM\}\}/g, ghlForm({ title: "Book a consultation with Healthwise", prefill: "" }))
     .replace(/\{\{TOKEN\}\}/g, TOKEN)
     .replace(/\{\{MAPS\}\}/g, MAPS);
 

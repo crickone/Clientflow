@@ -199,6 +199,14 @@ ul,ol{padding:0;list-style:none}
 .frame iframe{display:block;width:100%;max-width:600px;height:800px;margin:0 auto;border:0;background:#fff}
 .frame__note{text-align:center;margin-top:14px;font-size:15px;color:var(--mid)}
 
+/* ---- the embedded GoHighLevel enquiry form ----
+   Their form renders itself inside the iframe, so the page owns only the box
+   it sits in. form_embed.js sets an inline height once it has measured the
+   content; the height here is what a visitor sees before that runs, and is
+   deliberately generous so the form never opens mid-field. */
+.ghl{display:block;width:100%;max-width:640px;height:760px;margin:0 auto;border:0;border-radius:3px;background:#fff}
+.formwrap{background:var(--surf);border-top:3px solid var(--navy);padding:clamp(16px,3vw,28px)}
+
 /* ---- forms ---- */
 .form{display:grid;gap:18px;max-width:560px;position:relative}
 .field{display:grid;gap:6px}

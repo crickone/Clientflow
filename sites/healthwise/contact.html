@@ -199,6 +199,14 @@ ul,ol{padding:0;list-style:none}
 .frame iframe{display:block;width:100%;max-width:600px;height:800px;margin:0 auto;border:0;background:#fff}
 .frame__note{text-align:center;margin-top:14px;font-size:15px;color:var(--mid)}
 
+/* ---- the embedded GoHighLevel enquiry form ----
+   Their form renders itself inside the iframe, so the page owns only the box
+   it sits in. form_embed.js sets an inline height once it has measured the
+   content; the height here is what a visitor sees before that runs, and is
+   deliberately generous so the form never opens mid-field. */
+.ghl{display:block;width:100%;max-width:640px;height:760px;margin:0 auto;border:0;border-radius:3px;background:#fff}
+.formwrap{background:var(--surf);border-top:3px solid var(--navy);padding:clamp(16px,3vw,28px)}
+
 /* ---- forms ---- */
 .form{display:grid;gap:18px;max-width:560px;position:relative}
 .field{display:grid;gap:6px}
@@ -310,27 +318,15 @@ html.js [data-stagger]>*{opacity:0;transform:translateY(14px)}
 
 <section class="sec" id="book">
   <div class="wrap split" style="align-items:start">
-    <form class="form" method="post" action="/api/site/enquiry" data-enquiry>
-      <div class="field"><label for="c-name">Your name</label><input id="c-name" name="name" type="text" autocomplete="name" required /></div>
-      <div class="field"><label for="c-phone">Phone number</label><input id="c-phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" /></div>
-      <div class="field"><label for="c-email">Email address</label><input id="c-email" name="email" type="email" autocomplete="email" inputmode="email" /></div>
-      <div class="field"><label for="c-programme">Which programme are you interested in?</label>
-        <select id="c-programme" name="programme">
-          <option value="unsure">Not sure yet</option>
-          <option value="livewell">Livewell, 40 to 60</option>
-          <option value="vitality">Vitality, 60 and over</option>
-          <option value="heartwise">Heartwise, after a cardiac event</option>
-        </select>
-      </div>
-      <div class="field"><label for="c-about">A little about you (optional)</label><textarea id="c-about" name="about" maxlength="1000" placeholder="Do you exercise already? Anything we should know?"></textarea></div>
-      <input type="hidden" name="token" value="__ADONIS_ENQUIRY_TOKEN__" />
-      <input type="hidden" name="return" value="/contact" />
-      <div class="form__hp" aria-hidden="true"><label>Company website<input name="company_website" type="text" tabindex="-1" autocomplete="off" /></label></div>
-      <p class="form__ok" hidden>Thanks — we'll be in touch shortly.</p>
-      <p class="form__err" hidden></p>
-      <button class="btn" type="submit">Book a consultation</button>
-      <p class="form__note">Give us a phone number or an email address, whichever you prefer. We use your details only to reply to you.</p>
-    </form>
+    <div class="formwrap"><iframe class="ghl" src="https://api.leadconnectorhq.com/widget/form/deWzd4mniNdSM7H84TiJ"
+    title="Book a consultation with Healthwise"
+    id="inline-deWzd4mniNdSM7H84TiJ" data-layout="{'id':'INLINE'}"
+    data-trigger-type="alwaysShow" data-trigger-value=""
+    data-activation-type="alwaysActivated" data-activation-value=""
+    data-deactivation-type="neverDeactivate" data-deactivation-value=""
+    data-form-name="Book a consultation with Healthwise" data-height="636"
+    data-layout-iframe-id="inline-deWzd4mniNdSM7H84TiJ" data-form-id="deWzd4mniNdSM7H84TiJ"></iframe>
+  <p class="frame__note">Form not loading? Ring DJ on <a class="link" href="tel:+353862422388">086 242 2388</a> or email <a class="link" href="mailto:dj@healthwiseclonmel.ie">dj@healthwiseclonmel.ie</a>.</p></div>
     <div class="facts">
       <div class="fact"><b>Ring DJ</b><a href="tel:+353862422388">086 242 2388</a></div>
       <div class="fact"><b>Email</b><a href="mailto:dj@healthwiseclonmel.ie">dj@healthwiseclonmel.ie</a></div>
@@ -487,5 +483,6 @@ html.js [data-stagger]>*{opacity:0;transform:translateY(14px)}
   });
 }());
 </script>
+<script src="https://link.msgsndr.com/js/form_embed.js"></script>
 </body>
 </html>

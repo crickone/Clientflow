@@ -9,27 +9,7 @@
 
 <section class="sec" id="book">
   <div class="wrap split" style="align-items:start">
-    <form class="form" method="post" action="/api/site/enquiry" data-enquiry>
-      <div class="field"><label for="c-name">Your name</label><input id="c-name" name="name" type="text" autocomplete="name" required /></div>
-      <div class="field"><label for="c-phone">Phone number</label><input id="c-phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" /></div>
-      <div class="field"><label for="c-email">Email address</label><input id="c-email" name="email" type="email" autocomplete="email" inputmode="email" /></div>
-      <div class="field"><label for="c-programme">Which programme are you interested in?</label>
-        <select id="c-programme" name="programme">
-          <option value="unsure">Not sure yet</option>
-          <option value="livewell">Livewell, 40 to 60</option>
-          <option value="vitality">Vitality, 60 and over</option>
-          <option value="heartwise">Heartwise, after a cardiac event</option>
-        </select>
-      </div>
-      <div class="field"><label for="c-about">A little about you (optional)</label><textarea id="c-about" name="about" maxlength="1000" placeholder="Do you exercise already? Anything we should know?"></textarea></div>
-      <input type="hidden" name="token" value="{{TOKEN}}" />
-      <input type="hidden" name="return" value="/contact" />
-      <div class="form__hp" aria-hidden="true"><label>Company website<input name="company_website" type="text" tabindex="-1" autocomplete="off" /></label></div>
-      <p class="form__ok" hidden>Thanks — we'll be in touch shortly.</p>
-      <p class="form__err" hidden></p>
-      <button class="btn" type="submit">Book a consultation</button>
-      <p class="form__note">Give us a phone number or an email address, whichever you prefer. We use your details only to reply to you.</p>
-    </form>
+    <div class="formwrap">{{FORM}}</div>
     <div class="facts">
       <div class="fact"><b>Ring DJ</b><a href="tel:+353862422388">086 242 2388</a></div>
       <div class="fact"><b>Email</b><a href="mailto:dj@healthwiseclonmel.ie">dj@healthwiseclonmel.ie</a></div>
