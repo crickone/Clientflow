@@ -85,6 +85,23 @@ export function safeReturnPath(v: unknown, fallback = "/contact"): string {
   return bare || fallback;
 }
 
+/**
+ * The path of a same-origin Referer, or null. A plain form post carries the
+ * page it came from in Referer; that is the right place to send the no-JS
+ * visitor back to, on whichever host or mount the site is served from.
+ */
+export function sameOriginRefererPath(referer: string | null, requestUrl: string): string | null {
+  if (!referer) return null;
+  try {
+    const ref = new URL(referer);
+    const req = new URL(requestUrl);
+    if (ref.origin !== req.origin) return null;
+    return ref.pathname;
+  } catch {
+    return null;
+  }
+}
+
 /** The lead's notes: what the operator sees on the card. */
 export function enquiryNotes(d: ValidEnquiry): string {
   const lines = [`Programme: ${PROGRAMME_LABEL[d.programme]}`];

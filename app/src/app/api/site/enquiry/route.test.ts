@@ -159,6 +159,39 @@ process.env.EMAIL_TOKEN_SECRET = SECRET;
     assert.equal(r6b.status, 303);
     assert.match(r6b.headers.get("location") ?? "", /^http:\/\/localhost\/site\/healthwise\/contact\?err=/);
 
+    // 6c. no-JS with a same-origin Referer: the reply returns to the page the
+    //     visitor was on, whichever mount the site is served from
+    const r6c = await POST(
+      new Request("http://localhost/api/site/enquiry", {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          accept: "text/html",
+          referer: "http://localhost/site/healthwise/contact",
+          "x-forwarded-for": "10.77.0.5",
+        },
+        body: new URLSearchParams({ name: "Referer Rita", email: "rita@example.ie", return: "/contact", token }).toString(),
+      }),
+    );
+    assert.equal(r6c.status, 303);
+    assert.equal(r6c.headers.get("location"), "http://localhost/site/healthwise/contact?ok=1", "same-origin referer path wins over the hidden default");
+    // 6d. a cross-origin Referer is ignored
+    const r6d = await POST(
+      new Request("http://localhost/api/site/enquiry", {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          accept: "text/html",
+          referer: "https://evil.example/site/healthwise/contact",
+          "x-forwarded-for": "10.77.0.5",
+        },
+        body: new URLSearchParams({ name: "Cross Origin Carl", email: "carl@example.ie", return: "/contact", token }).toString(),
+      }),
+    );
+    assert.equal(r6d.status, 303);
+    assert.equal(r6d.headers.get("location"), "http://localhost/contact?ok=1", "cross-origin referer ignored -> the hidden field's path");
+    assert.equal(leadCount(), 4, "both referer scenarios wrote leads");
+
     // 7. oversized
     const r7 = await post({ name: "x".repeat(40_000), phone: "1", token });
     assert.equal(r7.status, 413);

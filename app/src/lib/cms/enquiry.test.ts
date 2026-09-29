@@ -1,7 +1,14 @@
 // Run: npm test -- src/lib/cms/enquiry.test.ts
 import assert from "node:assert/strict";
 
-import { ENQUIRY_HONEYPOT_FIELD, enquiryNotes, isEnquiryHoneypotTripped, safeReturnPath, validateEnquiry } from "./enquiry";
+import {
+  ENQUIRY_HONEYPOT_FIELD,
+  enquiryNotes,
+  isEnquiryHoneypotTripped,
+  safeReturnPath,
+  sameOriginRefererPath,
+  validateEnquiry,
+} from "./enquiry";
 
 let passed = 0;
 function check(name: string, cond: boolean) {
@@ -39,5 +46,10 @@ check("return path: tab smuggling refused", safeReturnPath("/\t/evil.example") =
 check("return path: newline smuggling refused", safeReturnPath("/\n/evil.example") === "/contact");
 check("return path: carriage return refused", safeReturnPath("/\r/evil.example") === "/contact");
 check("return path: encoded slashes stay a path", safeReturnPath("/%2f%2fevil.example") === "/%2f%2fevil.example");
+
+check("referer path: same origin -> its path", sameOriginRefererPath("http://localhost:3000/site/healthwise/contact?x=1", "http://localhost:3000/api/site/enquiry") === "/site/healthwise/contact");
+check("referer path: cross origin -> null", sameOriginRefererPath("https://evil.example/site/healthwise/contact", "http://localhost:3000/api/site/enquiry") === null);
+check("referer path: missing -> null", sameOriginRefererPath(null, "http://localhost:3000/api/site/enquiry") === null);
+check("referer path: garbage -> null", sameOriginRefererPath("not a url", "http://localhost:3000/api/site/enquiry") === null);
 
 console.log(`enquiry.test.ts: ${passed} checks passed`);

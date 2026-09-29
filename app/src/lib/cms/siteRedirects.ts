@@ -55,8 +55,12 @@ function normalize(pathname: string): string {
   return pathname;
 }
 
-function classify(target: string): RedirectMatch {
-  return /^https?:\/\//i.test(target) ? { target, kind: "external" } : { target, kind: "internal" };
+function classify(target: string): RedirectMatch | null {
+  if (/^https?:\/\//i.test(target)) return { target, kind: "external" };
+  // An internal target must be a single-slash root-relative path: not
+  // protocol-relative ("//evil.example") and not missing its leading slash.
+  if (!/^\/(?!\/)/.test(target)) return null;
+  return { target, kind: "internal" };
 }
 
 /** Pure matcher over an already-loaded map. Exact keys win; then `:param` patterns in object order. */

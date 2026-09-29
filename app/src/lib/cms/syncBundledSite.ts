@@ -139,7 +139,13 @@ function seedBundledPosts(siteSlug: string): void {
   const rev = createHash("sha256").update(JSON.stringify(posts)).digest("hex").slice(0, 16);
 
   const served = findSiteSlugOwners(siteSlug)[0];
-  if (!served) return;
+  if (!served) {
+    console.warn(
+      `[syncBundledSite] '${siteSlug}' ships a post bundle but no active tenant has a site with that slug; ` +
+        `no posts seeded. Create the site first and restart.`,
+    );
+    return;
+  }
 
   const applied = `${served.tenantId}:${rev}`;
   if (getPlatformSetting(postsRevKey(siteSlug)) === applied) return;
@@ -258,7 +264,13 @@ function syncOne(siteSlug: string): void {
     );
   }
   const served = owners[0];
-  if (!served) return; // no tenant in this environment has the site yet
+  if (!served) {
+    console.warn(
+      `[syncBundledSite] '${siteSlug}' ships a page bundle but no active tenant has a site with that slug; ` +
+        `nothing published. Create the site (CMS -> Sites -> Add site, signed in AS that tenant, slug '${siteSlug}') and restart.`,
+    );
+    return;
+  }
 
   // Guard 1: nothing changed since the last applied bundle. The marker is
   // the content hash AND the tenant it was applied to, because those are two

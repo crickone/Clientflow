@@ -3,7 +3,13 @@ import { runWithTenant } from "@/lib/db/tenant";
 import { appendLeadNotes, upsertLead } from "@/lib/leads";
 import { logActivity } from "@/lib/queries";
 import { verifySiteEnquiryToken } from "@/lib/cms/enquiryToken";
-import { enquiryNotes, isEnquiryHoneypotTripped, safeReturnPath, validateEnquiry } from "@/lib/cms/enquiry";
+import {
+  enquiryNotes,
+  isEnquiryHoneypotTripped,
+  safeReturnPath,
+  sameOriginRefererPath,
+  validateEnquiry,
+} from "@/lib/cms/enquiry";
 import { parsePublicFormFields, respondPublicForm } from "@/lib/publicFormExchange";
 
 export const dynamic = "force-dynamic";
@@ -41,7 +47,7 @@ export async function POST(req: Request) {
   } catch {
     return respondPublicForm(req, "/contact", false, { status: 400, error: "Please check the form and try again." });
   }
-  const returnTo = safeReturnPath(fields.return);
+  const returnTo = safeReturnPath(sameOriginRefererPath(req.headers.get("referer"), req.url) ?? fields.return);
 
   // Honeypot: a bot that fills every field gets a quiet success and nothing stored.
   if (isEnquiryHoneypotTripped(fields)) return respondPublicForm(req, returnTo, true);

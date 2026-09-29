@@ -245,7 +245,7 @@ export function setLeadStatus(id: number, status: LeadStatus) {
 export function appendLeadNotes(leadId: number, line: string): void {
   const existing = db.select({ notes: leads.notes }).from(leads).where(eq(leads.id, leadId)).get();
   const notes = existing?.notes ? `${existing.notes}\n${line}` : line;
-  db.update(leads).set({ notes }).where(eq(leads.id, leadId)).run();
+  db.update(leads).set({ notes, updatedAt: new Date() }).where(eq(leads.id, leadId)).run();
 }
 
 export function leadCounts() {

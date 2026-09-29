@@ -49,6 +49,9 @@ try {
   check("matchRedirect ignores non-string targets", matchRedirect({ "/a": 1 as unknown as string, "/b": "/c" }, "/a") === null);
   check("exact key wins over a pattern that also matches",
     matchRedirect({ "/post/:slug": "/blog/:slug", "/post/latest": "/blog" }, "/post/latest")?.target === "/blog");
+  check("substituted target that becomes protocol-relative is refused", matchRedirect({ "/go/:x": "/:x" }, "/go//evil.example") === null);
+  check("internal target without a leading slash is refused", matchRedirect({ "/a": "b" }, "/a") === null);
+  check("exact target that is protocol-relative is refused", matchRedirect({ "/a": "//evil.example" }, "/a") === null);
 
   console.log(`siteRedirects.test.ts: ${passed} checks passed`);
 } finally {
