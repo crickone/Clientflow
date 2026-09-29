@@ -143,10 +143,17 @@ const scripts = () => `<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dis
       });
     });
 
-    // Section titles and list rows arrive in sequence.
-    gsap.utils.toArray('.band__head .title').forEach(function (t) {
-      gsap.to(t, { opacity: 1, y: 0, duration: .8, ease: SNAP,
-        scrollTrigger: { trigger: t, start: 'top 92%' } });
+    // Section heads arrive in sequence -- every [data-rise] in them, not
+    // just the .title. The stylesheet hides ALL [data-rise] at opacity 0 and
+    // relies on something here to bring each one back. While this selector
+    // was .title only, the "explore" links sitting beside three home-page
+    // headings were hidden by the CSS and restored by nothing: invisible on
+    // the live page since the site was built. Reveal what you hide.
+    gsap.utils.toArray('.band__head').forEach(function (head) {
+      var rise = head.querySelectorAll('[data-rise]');
+      if (!rise.length) return;
+      gsap.to(rise, { opacity: 1, y: 0, duration: .8, ease: SNAP, stagger: 0.06,
+        scrollTrigger: { trigger: head, start: 'top 92%' } });
     });
     gsap.utils.toArray('.roll').forEach(function (roll) {
       gsap.to(roll.querySelectorAll('.roll__row'), {
@@ -391,6 +398,75 @@ const scripts = () => `<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dis
     window.addEventListener('scroll', settle, { passive: true });
     window.addEventListener('resize', settle);
     settle();
+  }
+}());
+
+(function () {
+  // The enquiry form, posted as JSON so the answer lands in the page instead
+  // of bouncing the reader to a blank redirect. Its own IIFE, deliberately:
+  // the motion block above returns early when GSAP has not loaded, and a
+  // visitor who cannot see a confirmation is worse off than one who cannot
+  // see an animation. Without this the form still works -- it is an ordinary
+  // POST, and the route sends the reader back with ok=1 or err= in the query
+  // string, which the last few lines here read on the way in.
+  var forms = document.querySelectorAll('form[data-enquiry]');
+  Array.prototype.forEach.call(forms, function (form) {
+    // The hidden field carries a sensible default for a reader with no
+    // scripting; with scripting we know the page they are actually on,
+    // whichever host or mount the site is served from.
+    var ret = form.querySelector('input[name="return"]');
+    if (ret) ret.value = location.pathname;
+    var ok = form.querySelector('.form__ok');
+    var err = form.querySelector('.form__err');
+    var btn = form.querySelector('button[type="submit"]');
+    form.addEventListener('submit', function (e) {
+      if (!window.fetch) return;
+      e.preventDefault();
+      if (err) err.hidden = true;
+      var label = btn ? btn.textContent : '';
+      if (btn) { btn.disabled = true; btn.textContent = 'Sending'; }
+      var data = {};
+      new FormData(form).forEach(function (v, k) { data[k] = v; });
+      fetch(form.getAttribute('action'), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'accept': 'application/json' },
+        body: JSON.stringify(data)
+      }).then(function (r) { return r.json(); }).then(function (j) {
+        if (j && j.ok) {
+          if (ok) ok.hidden = false;
+          // The fields go, the confirmation stays: leaving a filled form
+          // under a thank-you reads as though nothing was sent, and invites
+          // a second send of the same enquiry.
+          Array.prototype.forEach.call(form.querySelectorAll('.field, button[type="submit"]'), function (el) { el.hidden = true; });
+        } else if (err) {
+          // The route's own words where it has them: it is the side that
+          // knows whether this was a bad address, a refused option or a
+          // throttle, and a generic apology would throw that away.
+          err.textContent = (j && j.error) || 'Something went wrong. Please ring us instead.';
+          err.hidden = false;
+        }
+      }).catch(function () {
+        if (err) { err.textContent = 'Something went wrong. Please ring us instead.'; err.hidden = false; }
+      }).then(function () {
+        if (btn) { btn.disabled = false; btn.textContent = label; }
+      });
+    });
+  });
+
+  // The no-scripting path lands back here with the answer in the query
+  // string. Reading it costs nothing and means the reader who posted the
+  // form natively -- before this script ran, or with fetch missing -- is
+  // told what happened rather than shown the same empty form again.
+  var q = new URLSearchParams(location.search);
+  if (q.get('ok') === '1' || q.get('err')) {
+    var first = document.querySelector('form[data-enquiry]');
+    if (first) {
+      var fok = first.querySelector('.form__ok');
+      var ferr = first.querySelector('.form__err');
+      if (q.get('ok') === '1' && fok) fok.hidden = false;
+      if (q.get('err') && ferr) { ferr.textContent = q.get('err'); ferr.hidden = false; }
+      first.scrollIntoView();
+    }
   }
 }());
 </script>`;

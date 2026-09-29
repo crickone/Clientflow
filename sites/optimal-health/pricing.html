@@ -381,7 +381,11 @@ h1,h2,h3,p,figure,blockquote{margin:0}
    quieter than the first. */
 .roll--menu .roll__x{display:flex;flex-direction:column;align-items:flex-end;gap:3px;text-align:right}
 .roll__p{font-size:clamp(12px,1vw,15px);letter-spacing:.06em;white-space:nowrap;text-transform:none}
-.roll__p--alt{opacity:.6;font-size:clamp(10px,.84vw,12px)}
+/* The quieter half of a rate row -- a colour, not an opacity: ink at .6
+   computes to 4.07:1 on plaster and 3.58:1 on sage, and this is type. */
+.roll__p--alt{color:#666661;font-size:clamp(10px,.84vw,12px)}
+.band--sage .roll__p--alt{color:var(--ink)}
+.band--ink .roll__p--alt{color:var(--sage)}
 .roll--menu .roll__n{font-size:clamp(19px,2.1vw,30px)}
 .roll--menu .roll__m{max-width:40ch}
 
@@ -542,6 +546,9 @@ summary.qa__q::after{
 @media (max-width:520px){.cols4{grid-template-columns:1fr}}
 .cell__k{font-size:clamp(10px,.82vw,12px);letter-spacing:.14em;text-transform:uppercase;color:var(--deep);margin-bottom:8px}
 .band--ink .cell__k{color:var(--sage)}
+/* --deep is 3.62:1 on sage, so a cell key washes out there. Same carve-out
+   the field key already has below. */
+.band--sage .cell__k{color:var(--ink)}
 .cell__v{font-size:clamp(13px,1.1vw,16px)}
 .cell__v a{text-decoration:none;border-bottom:1px solid var(--timber);padding-bottom:2px}
 .form{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap);max-width:840px;margin-top:clamp(22px,3vw,34px)}
@@ -558,6 +565,20 @@ summary.qa__q::after{
 }
 .field__i:focus{outline:none;border-color:var(--timber)}
 textarea.field__i{resize:vertical;min-height:120px}
+
+/* The honeypot field. Parked off the left edge rather than display:none,
+   which some bots know to skip, and out of flow so it claims no cell in the
+   form grid. Deliberately not a 1px box with content inside it: that reads to
+   this site's own shots.mjs probe as a clipped element, and a probe that cries
+   wolf stops being read. */
+.form__hp{position:absolute;left:-10000px;top:0}
+/* The form's three messages span the grid. Ink on every ground the form sits
+   on: #666661 is 4.03:1 on sage, which fails, and the one thing on this site
+   a visitor has to use rather than read cannot have a message they squint at. */
+.form__ok,.form__err,.form__note{grid-column:1/-1;color:var(--ink)}
+.form__err{font-weight:600}
+/* Pulled up under the button, which the grid gap would otherwise set adrift. */
+.form__note{font-size:clamp(12px,1vw,14px);margin-top:-6px}
 
 /* ---- footer, bookended by the wordmark ---- */
 .foot{background:var(--ink);color:var(--plaster);padding:clamp(48px,7vw,96px) var(--pad) 0}
@@ -853,88 +874,126 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
   </div>
 </header>
 
-<!-- PLASTER. No hero photograph: this page is a table of facts. -->
+<!-- Grounds, in order: plaster hero, plaster, sage, plaster, sage, plaster,
+     ink. Seven sections -- four plaster, two sage, one ink -- and sage never
+     lands twice running. The one ink section is the close, because it is the
+     only thing on this page that is an invitation rather than a number.
+
+     No hero photograph: this page is a table of facts, and a photograph over
+     the top of it would be selling rather than telling. -->
+
+<!-- PLASTER -->
 <section class="band" style="padding-top:clamp(72px,11vw,140px)">
   <div class="says">
     <div class="band__head__l">
       <p class="title">Pricing</p>
-      
       <h1 class="wordmark hero__mark"><span>What it costs.</span></h1>
-      <p style="margin-top:22px">Start with a single session. Blocks of ten work out cheaper if you decide to keep going, and combined blocks let you use more than one therapy.</p>
+      <p style="margin-top:22px">Start with a single session. Blocks bring the per-session price down if you decide to keep going, and every block is priced per therapy so you can see exactly what you are buying.</p>
     </div>
   </div>
 </section>
 
-<!-- PLASTER -->
-<section class="band">
+<!-- PLASTER. The three therapies, each row carrying its own session count.
+     The chair sells in sixes and twelves where infrared and hyperbaric sell
+     in fives and tens, so one header row across the top could only ever have
+     been true for two rows out of three. -->
+
+<div class="doc">
+<aside class="rail" aria-label="On this page">
+  <div class="rail__in">
+    <p class="rail__k">On this page</p>
+    <nav class="rail__nav">
+      <a class="rail__a" href="#s01" data-rail="s01"><span class="rail__n">01</span><span class="rail__l">Sessions</span></a>
+      <a class="rail__a" href="#s02" data-rail="s02"><span class="rail__n">02</span><span class="rail__l">Memberships</span></a>
+      <a class="rail__a" href="#s03" data-rail="s03"><span class="rail__n">03</span><span class="rail__l">Massage</span></a>
+      <a class="rail__a" href="#s04" data-rail="s04"><span class="rail__n">04</span><span class="rail__l">Insurance</span></a>
+      <a class="rail__a" href="#s05" data-rail="s05"><span class="rail__n">05</span><span class="rail__l">Worth knowing</span></a>
+    </nav>
+    <a class="btn btn--rail" href="https://optimalhealthatinspire.simplybook.it/v2">Book a session</a>
+  </div>
+</aside>
+<div class="doc__body">
+<nav class="strip" aria-label="On this page">
+  <div class="strip__nav">
+    <a class="strip__a" href="#s01" data-rail="s01"><span class="rail__n">01</span> Sessions</a>
+    <a class="strip__a" href="#s02" data-rail="s02"><span class="rail__n">02</span> Memberships</a>
+    <a class="strip__a" href="#s03" data-rail="s03"><span class="rail__n">03</span> Massage</a>
+    <a class="strip__a" href="#s04" data-rail="s04"><span class="rail__n">04</span> Insurance</a>
+    <a class="strip__a" href="#s05" data-rail="s05"><span class="rail__n">05</span> Worth knowing</a>
+  </div>
+</nav>
+<section class="band" data-chapter="Sessions" id="s01" aria-label="Sessions">
   <div>
     <div class="band__head">
       <div class="band__head__l">
-        <p class="title">Single therapy</p>
-        
-        <h2 class="lede">Ten-session blocks.</h2>
+        <h2 class="lede">Single, or in a block.</h2>
       </div>
     </div>
-    <div class="grid3" data-stagger>
-      <div class="tile">
-        <p class="roll__n">&euro;225</p>
-        <p class="tile__m">was &euro;250</p>
-        <p class="tile__m">Ten sessions, one therapy.</p>
+    <div class="roll roll--rates" data-stagger>
+      <div class="roll__row">
+        <span class="roll__n">Infrared</span>
+        <span class="roll__m">Red and near-infrared light, lying down and fully clothed. Twelve minutes on the bed.</span>
+        <span class="roll__x"><span class="rate"><span class="rate__v">&euro;50</span><span class="rate__k">1 session</span></span><span class="rate"><span class="rate__v">&euro;225</span><span class="rate__k">5 sessions</span></span><span class="rate"><span class="rate__v">&euro;400</span><span class="rate__k">10 sessions</span></span></span>
       </div>
-      <div class="tile">
-        <p class="roll__n">&euro;315</p>
-        <p class="tile__m">was &euro;325</p>
-        <p class="tile__m">Ten sessions, longer format.</p>
+      <div class="roll__row">
+        <span class="roll__n">Hyperbaric oxygen</span>
+        <span class="roll__m">A pressurised chamber and a soft mask. Forty-five to sixty minutes.</span>
+        <span class="roll__x"><span class="rate"><span class="rate__v">&euro;100</span><span class="rate__k">1 session</span></span><span class="rate"><span class="rate__v">&euro;450</span><span class="rate__k">5 sessions</span></span><span class="rate"><span class="rate__v">&euro;800</span><span class="rate__k">10 sessions</span></span></span>
       </div>
-      <div class="tile">
-        <p class="roll__n">&euro;400</p>
-        <p class="tile__m">was &euro;450</p>
-        <p class="tile__m">Ten sessions, extended.</p>
+      <div class="roll__row">
+        <span class="roll__n">HIFEM chair</span>
+        <span class="roll__m">Seated, fully clothed, with the intensity set with you. Twenty to thirty minutes.</span>
+        <span class="roll__x"><span class="rate"><span class="rate__v">&euro;70</span><span class="rate__k">1 session</span></span><span class="rate"><span class="rate__v">&euro;375</span><span class="rate__k">6 sessions</span></span><span class="rate"><span class="rate__v">&euro;670</span><span class="rate__k">12 sessions</span></span></span>
       </div>
     </div>
+    <p class="body" style="margin-top:clamp(24px,3vw,36px)">A block is for the one therapy named beside it. The chair runs in sixes and twelves where the other two run in fives and tens &mdash; that is how the machine is sold, not a rounding of ours. Ask us at the desk what happens if you want to change therapy part-way through a block and we will tell you straight.</p>
+    <p style="margin-top:clamp(20px,2.4vw,28px)"><a class="explore" href="therapies.html">What each therapy is</a></p>
   </div>
 </section>
 
+<!-- OPEN: the three tiers' session counts are unconfirmed. Their live site
+     writes each tier's contents as a number of sessions on each machine, and
+     the chair sells in sixes and twelves rather than fives and tens, so the
+     monthly counts do not follow from the block sizes above and cannot be
+     derived from them. Ask the client before putting numbers here. The prices
+     themselves are confirmed; the top tier is quoted in dollars on their live
+     site, which is a typo, and it is euro here. -->
 <!-- SAGE -->
-<section class="band band--sage">
+<section class="band band--sage" data-chapter="Memberships" id="s02" aria-label="Memberships">
   <div>
     <div class="band__head">
       <div class="band__head__l">
-        <p class="title">Combined</p>
-        
-        <h2 class="lede">More than one therapy.</h2>
-        <p style="margin-top:22px">If you want to use two or three of them across a block, these are the combined rates.</p>
+        <h2 class="lede">Monthly, if you are here most weeks.</h2>
       </div>
     </div>
     <div class="grid3" data-stagger>
-      <div class="tile" style="background:var(--plaster)">
-        <p class="roll__n">&euro;450</p>
-        <p class="tile__m">was &euro;600</p>
-        <p class="tile__m">Combined therapies, ten sessions.</p>
+      <div>
+        <p class="roll__n">&euro;169</p>
+        <p class="rate__k" style="margin-top:8px">A month</p>
+        <p class="tile__m" style="margin-top:14px">The starting tier. Suits someone who has been in a few times and would rather come on a rhythm than book session by session.</p>
       </div>
-      <div class="tile" style="background:var(--plaster)">
-        <p class="roll__n">&euro;560</p>
-        <p class="tile__m">was &euro;700</p>
-        <p class="tile__m">Combined therapies, extended block.</p>
+      <div>
+        <p class="roll__n">&euro;299</p>
+        <p class="rate__k" style="margin-top:8px">A month</p>
+        <p class="tile__m" style="margin-top:14px">The middle tier. Suits someone here most weeks, usually moving between more than one of the rooms.</p>
       </div>
-      <div class="tile" style="background:var(--plaster)">
-        <p class="roll__n">&euro;800</p>
-        <p class="tile__m">was &euro;1200</p>
-        <p class="tile__m">The full block, all three therapies.</p>
+      <div>
+        <p class="roll__n">&euro;399</p>
+        <p class="rate__k" style="margin-top:8px">A month</p>
+        <p class="tile__m" style="margin-top:14px">The fullest tier. Suits someone whose week is built around recovery, often training alongside it and in more than once a week.</p>
       </div>
     </div>
+    <p class="body" style="margin-top:clamp(28px,3.4vw,40px)">Ask us what each month includes &mdash; we will build it around what you are actually doing. There is no sense in selling you a set of sessions on a machine you do not use, and we would rather set the shape of it with you than print a list here and have you find out at the desk.</p>
+    <p style="margin-top:clamp(20px,2.4vw,28px)"><a class="explore" href="contact.html">Ask about a membership</a></p>
   </div>
 </section>
 
-<!-- PLASTER -->
-
-<!-- PLASTER. Massage is priced per treatment, not in blocks, so it gets its
-     own section rather than being forced into the block table above. -->
-<section class="band">
+<!-- PLASTER. Massage is priced per treatment rather than in blocks, so it
+     gets its own table instead of being forced into the one above. -->
+<section class="band" data-chapter="Massage" id="s03" aria-label="Massage">
   <div>
     <div class="band__head">
       <div class="band__head__l">
-        <p class="title" data-rise>Massage therapy</p>
         <h2 class="lede">Priced per treatment.</h2>
       </div>
     </div>
@@ -980,37 +1039,82 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
         <span class="roll__x"><span class="roll__p">1 hr &euro;80</span></span>
       </div>
     </div>
+    <p style="margin-top:clamp(24px,3vw,36px)"><a class="explore" href="massage.html">More about the bodywork</a></p>
   </div>
 </section>
 
-<section class="band">
+<!-- SAGE. Written as "may be able to", because whether a plan pays anything
+     back is a fact about the plan and not about us. Nothing here says a
+     treatment is covered. -->
+<section class="band band--sage" data-chapter="Insurance" id="s04" aria-label="Insurance">
   <div>
     <div class="band__head">
       <div class="band__head__l">
-        <p class="title">Worth knowing</p>
-        
+        <h2 class="lede">Claiming some of it back.</h2>
+      </div>
+    </div>
+    <div class="body">
+      <p>Some health insurance plans pay back part of the cost of hands-on treatments. If you hold Irish Life or Laya cover, you may be able to claim back on massage, depending on your plan. If you hold VHI cover, you may be able to claim back on reflexology, depending on your plan.</p>
+      <p>Whether you can, and how much, is set by your own policy and its level rather than by us, and we are not in a position to tell you what yours allows. Ring your provider before you book, name the treatment you are coming for, and ask them directly. We will give you a receipt with everything a claim form asks for.</p>
+      <p>Gift vouchers are a separate thing again, and they are bought online rather than at the desk.</p>
+    </div>
+    <p style="margin-top:clamp(20px,2.4vw,28px)"><a class="explore" href="https://optimalhealth.voucherconnect.com">Buy a voucher</a></p>
+  </div>
+</section>
+
+<!-- PLASTER. The questions a block raises, closed by default so the page
+     stays scannable and a reader opens only the one they came for. -->
+<section class="band" data-chapter="Worth knowing" id="s05" aria-label="Worth knowing">
+  <div>
+    <div class="band__head">
+      <div class="band__head__l">
         <h2 class="lede">Before you buy a block.</h2>
       </div>
     </div>
     <div class="qa" data-stagger>
-      <details>
-        <summary>Can I try one session first?</summary>
-        <p>Yes, and we would rather you did. Call us and we will sort a single session so you can see how you find it.</p>
+      <details class="qa__row">
+        <summary class="qa__q">Can I try one session first?</summary>
+        <div class="qa__a">
+          <p>Yes, and we would rather you did. Every therapy above has a single-session price for exactly that reason. Call us and we will sort one so you can see how you find it before you commit to a run of them.</p>
+        </div>
       </details>
-      <details>
-        <summary>Do blocks expire?</summary>
-        <p>Ask us when you buy and we will tell you exactly where you stand. We would rather be clear up front than have you lose sessions.</p>
+      <details class="qa__row">
+        <summary class="qa__q">Do blocks expire?</summary>
+        <div class="qa__a">
+          <p>Ask us when you buy and we will tell you exactly where you stand. We would rather be clear up front than have you lose sessions you have paid for.</p>
+        </div>
       </details>
-      <details>
-        <summary>Can I share a block?</summary>
-        <p>Talk to us. It depends on the therapy and how the block is set up.</p>
+      <details class="qa__row">
+        <summary class="qa__q">Can I share a block?</summary>
+        <div class="qa__a">
+          <p>Talk to us. It depends on the therapy and on how the block is set up, and it is a conversation at the desk rather than a rule we can print.</p>
+        </div>
       </details>
-      <details>
-        <summary>Are vouchers available?</summary>
-        <p>Yes. Get in touch and we will arrange one.</p>
+      <details class="qa__row">
+        <summary class="qa__q">Are vouchers available?</summary>
+        <div class="qa__a">
+          <p>Yes, and you can buy one online at <a href="https://optimalhealth.voucherconnect.com">optimalhealth.voucherconnect.com</a>. If you would rather sort it with a person, ring us on 083 867 2844.</p>
+        </div>
       </details>
     </div>
-    <p style="margin-top:36px"><a class="btn" href="https://optimalhealthatinspire.simplybook.it/v2">Book a session</a></p>
+  </div>
+</section>
+
+
+</div>
+</div>
+<div class="bookbar"><a class="btn btn--light" href="https://optimalhealthatinspire.simplybook.it/v2">Book a session</a></div>
+<!-- /chapters -->
+
+<!-- INK -->
+<section class="band band--ink on-ink">
+  <div class="says">
+    <div class="band__head__l body">
+      <p class="title" style="color:var(--timber)">Getting started</p>
+      <h2 class="lede" style="margin-top:14px;color:var(--sage)">Come in once and see.</h2>
+      <p style="margin-top:22px">One session will tell you more about whether a block is worth it than this page can. Nothing above is a commitment, and there is no obligation to buy a block afterwards.</p>
+      <p style="margin-top:28px"><a class="btn btn--light" href="https://optimalhealthatinspire.simplybook.it/v2">Book a session</a></p>
+    </div>
   </div>
 </section>
 
@@ -1112,10 +1216,17 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
       });
     });
 
-    // Section titles and list rows arrive in sequence.
-    gsap.utils.toArray('.band__head .title').forEach(function (t) {
-      gsap.to(t, { opacity: 1, y: 0, duration: .8, ease: SNAP,
-        scrollTrigger: { trigger: t, start: 'top 92%' } });
+    // Section heads arrive in sequence -- every [data-rise] in them, not
+    // just the .title. The stylesheet hides ALL [data-rise] at opacity 0 and
+    // relies on something here to bring each one back. While this selector
+    // was .title only, the "explore" links sitting beside three home-page
+    // headings were hidden by the CSS and restored by nothing: invisible on
+    // the live page since the site was built. Reveal what you hide.
+    gsap.utils.toArray('.band__head').forEach(function (head) {
+      var rise = head.querySelectorAll('[data-rise]');
+      if (!rise.length) return;
+      gsap.to(rise, { opacity: 1, y: 0, duration: .8, ease: SNAP, stagger: 0.06,
+        scrollTrigger: { trigger: head, start: 'top 92%' } });
     });
     gsap.utils.toArray('.roll').forEach(function (roll) {
       gsap.to(roll.querySelectorAll('.roll__row'), {
@@ -1360,6 +1471,75 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
     window.addEventListener('scroll', settle, { passive: true });
     window.addEventListener('resize', settle);
     settle();
+  }
+}());
+
+(function () {
+  // The enquiry form, posted as JSON so the answer lands in the page instead
+  // of bouncing the reader to a blank redirect. Its own IIFE, deliberately:
+  // the motion block above returns early when GSAP has not loaded, and a
+  // visitor who cannot see a confirmation is worse off than one who cannot
+  // see an animation. Without this the form still works -- it is an ordinary
+  // POST, and the route sends the reader back with ok=1 or err= in the query
+  // string, which the last few lines here read on the way in.
+  var forms = document.querySelectorAll('form[data-enquiry]');
+  Array.prototype.forEach.call(forms, function (form) {
+    // The hidden field carries a sensible default for a reader with no
+    // scripting; with scripting we know the page they are actually on,
+    // whichever host or mount the site is served from.
+    var ret = form.querySelector('input[name="return"]');
+    if (ret) ret.value = location.pathname;
+    var ok = form.querySelector('.form__ok');
+    var err = form.querySelector('.form__err');
+    var btn = form.querySelector('button[type="submit"]');
+    form.addEventListener('submit', function (e) {
+      if (!window.fetch) return;
+      e.preventDefault();
+      if (err) err.hidden = true;
+      var label = btn ? btn.textContent : '';
+      if (btn) { btn.disabled = true; btn.textContent = 'Sending'; }
+      var data = {};
+      new FormData(form).forEach(function (v, k) { data[k] = v; });
+      fetch(form.getAttribute('action'), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'accept': 'application/json' },
+        body: JSON.stringify(data)
+      }).then(function (r) { return r.json(); }).then(function (j) {
+        if (j && j.ok) {
+          if (ok) ok.hidden = false;
+          // The fields go, the confirmation stays: leaving a filled form
+          // under a thank-you reads as though nothing was sent, and invites
+          // a second send of the same enquiry.
+          Array.prototype.forEach.call(form.querySelectorAll('.field, button[type="submit"]'), function (el) { el.hidden = true; });
+        } else if (err) {
+          // The route's own words where it has them: it is the side that
+          // knows whether this was a bad address, a refused option or a
+          // throttle, and a generic apology would throw that away.
+          err.textContent = (j && j.error) || 'Something went wrong. Please ring us instead.';
+          err.hidden = false;
+        }
+      }).catch(function () {
+        if (err) { err.textContent = 'Something went wrong. Please ring us instead.'; err.hidden = false; }
+      }).then(function () {
+        if (btn) { btn.disabled = false; btn.textContent = label; }
+      });
+    });
+  });
+
+  // The no-scripting path lands back here with the answer in the query
+  // string. Reading it costs nothing and means the reader who posted the
+  // form natively -- before this script ran, or with fetch missing -- is
+  // told what happened rather than shown the same empty form again.
+  var q = new URLSearchParams(location.search);
+  if (q.get('ok') === '1' || q.get('err')) {
+    var first = document.querySelector('form[data-enquiry]');
+    if (first) {
+      var fok = first.querySelector('.form__ok');
+      var ferr = first.querySelector('.form__err');
+      if (q.get('ok') === '1' && fok) fok.hidden = false;
+      if (q.get('err') && ferr) { ferr.textContent = q.get('err'); ferr.hidden = false; }
+      first.scrollIntoView();
+    }
   }
 }());
 </script>

@@ -381,7 +381,11 @@ h1,h2,h3,p,figure,blockquote{margin:0}
    quieter than the first. */
 .roll--menu .roll__x{display:flex;flex-direction:column;align-items:flex-end;gap:3px;text-align:right}
 .roll__p{font-size:clamp(12px,1vw,15px);letter-spacing:.06em;white-space:nowrap;text-transform:none}
-.roll__p--alt{opacity:.6;font-size:clamp(10px,.84vw,12px)}
+/* The quieter half of a rate row -- a colour, not an opacity: ink at .6
+   computes to 4.07:1 on plaster and 3.58:1 on sage, and this is type. */
+.roll__p--alt{color:#666661;font-size:clamp(10px,.84vw,12px)}
+.band--sage .roll__p--alt{color:var(--ink)}
+.band--ink .roll__p--alt{color:var(--sage)}
 .roll--menu .roll__n{font-size:clamp(19px,2.1vw,30px)}
 .roll--menu .roll__m{max-width:40ch}
 
@@ -542,6 +546,9 @@ summary.qa__q::after{
 @media (max-width:520px){.cols4{grid-template-columns:1fr}}
 .cell__k{font-size:clamp(10px,.82vw,12px);letter-spacing:.14em;text-transform:uppercase;color:var(--deep);margin-bottom:8px}
 .band--ink .cell__k{color:var(--sage)}
+/* --deep is 3.62:1 on sage, so a cell key washes out there. Same carve-out
+   the field key already has below. */
+.band--sage .cell__k{color:var(--ink)}
 .cell__v{font-size:clamp(13px,1.1vw,16px)}
 .cell__v a{text-decoration:none;border-bottom:1px solid var(--timber);padding-bottom:2px}
 .form{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap);max-width:840px;margin-top:clamp(22px,3vw,34px)}
@@ -558,6 +565,20 @@ summary.qa__q::after{
 }
 .field__i:focus{outline:none;border-color:var(--timber)}
 textarea.field__i{resize:vertical;min-height:120px}
+
+/* The honeypot field. Parked off the left edge rather than display:none,
+   which some bots know to skip, and out of flow so it claims no cell in the
+   form grid. Deliberately not a 1px box with content inside it: that reads to
+   this site's own shots.mjs probe as a clipped element, and a probe that cries
+   wolf stops being read. */
+.form__hp{position:absolute;left:-10000px;top:0}
+/* The form's three messages span the grid. Ink on every ground the form sits
+   on: #666661 is 4.03:1 on sage, which fails, and the one thing on this site
+   a visitor has to use rather than read cannot have a message they squint at. */
+.form__ok,.form__err,.form__note{grid-column:1/-1;color:var(--ink)}
+.form__err{font-weight:600}
+/* Pulled up under the button, which the grid gap would otherwise set adrift. */
+.form__note{font-size:clamp(12px,1vw,14px);margin-top:-6px}
 
 /* ---- footer, bookended by the wordmark ---- */
 .foot{background:var(--ink);color:var(--plaster);padding:clamp(48px,7vw,96px) var(--pad) 0}
@@ -853,142 +874,495 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
   </div>
 </header>
 
+<!-- Grounds, in order: ink hero, sage, ink, plaster, sage, plaster,
+     plaster, sage, plaster, plaster. Ten sections -- five plaster, three
+     sage, two ink -- and sage never lands twice running. The two ink
+     sections are the hero photograph and the note about who carries the
+     treatments out, which is the only other thing on this page flat
+     enough to earn the strongest ground: one fact, stated once.
+
+     There is no client quote on this page. Every testimonial the clinic
+     has given us is about the chamber, and an oxygen quote under a
+     massage heading would be borrowing somebody else's words for a
+     treatment they did not buy. The ink band carries the therapists
+     instead. If a massage or reflexology testimonial arrives, it belongs
+     inside the first chapter, the way the quote sits on hbot and hifem.
+
+     PHOTOGRAPHY. This page carried the hero photograph twice -- at the
+     top, and again halfway down. The second is now the treatment-room
+     picture, which is a stopgap rather than a decision: the site owns
+     eight photographs in total and this page could carry three of its
+     own. A room, a pair of hands and the reflexology couch would do it.
+     Note that this comment ships inside the built page, so it must not
+     name an image file either: the check that this page shows the hero
+     only once counts every occurrence of the path, prose included.
+
+     THE CUTS. The live site's massage page names conditions and claims
+     outcomes, and the clinic has never supplied the compliance document
+     its brand pack refers to. Reflexology loses the digestive and
+     hormonal condition list, and "organs, glands and systems throughout
+     the body" is now set out as the principle the discipline works from
+     rather than asserted as fact. Lymphatic drainage loses the
+     post-surgical claims, the immune claims and the clearing-out
+     mechanism; what survives is the anatomy, which is not a claim, and
+     the caution, which is safety information. "Oncology cancer care
+     massage" keeps its name because that is the treatment's name -- the
+     page says only that it is massage adapted for people in or after
+     treatment, and nothing about what it does for anything. -->
+
+<!-- INK. The hands do the work. -->
 <section class="hero">
   <div class="hero__media"><img src="assets/massage.jpg" alt="A therapist working during a massage treatment at the Clonmel clinic" /></div>
   <div class="hero__inner">
-    <div class="spread micro" data-rise>
-      <span>Therapy</span>
-      <span>Massage</span>
-      <span>Reflexology</span>
-      <span>Lymphatic drainage</span>
-    </div>
-    <h1 class="wordmark hero__mark"><span>Massage</span></h1>
-    <div class="hero__foot">
-      <p class="lede hero__sub" data-rise>Hands-on bodywork from clinical therapists. Therapeutic massage, reflexology and lymphatic drainage, on their own or alongside the other therapies.</p>
-      <a class="btn btn--light" href="https://optimalhealthatinspire.simplybook.it/v2" data-rise>Book a session</a>
+    <p class="micro" data-rise style="color:var(--sage)">Therapy</p>
+    <h1 class="wordmark hero__mark" style="margin-top:22px">Massage.</h1>
+    <p class="lede hero__sub" data-rise>Hands-on bodywork from clinical therapists. Ten treatments, from a straightforward hour on the table to reflexology and lymphatic drainage.</p>
+    <div class="hero__foot" data-rise>
+      <a class="btn" href="https://optimalhealthatinspire.simplybook.it/v2">Book a session</a>
+      <a class="explore" href="pricing.html">See pricing</a>
     </div>
   </div>
 </section>
 
-<div class="duo">
-  <div class="duo__panel duo__panel--plaster" data-stagger>
-    <h2 class="panel__t">Therapeutic massage</h2>
-    <p class="panel__s">Release what has tightened</p>
-    <p class="duo__body">Works into muscle tissue to ease chronic tension and support recovery after training or a long week at a desk.</p>
-  </div>
-  <div class="duo__img"><img src="assets/massage.jpg" alt="Therapeutic massage at the clinic" /></div>
-</div>
+<!-- SAGE. The signature ground takes the first chapter: one colour step
+     straight off the ink hero, and the full menu with it. Ten names is a
+     lot to meet at once, so the prose ahead of it says which three are
+     disciplines in their own right and get a chapter of their own. -->
 
-<section class="band band--sage">
-  <div class="band__head">
-    <h2 class="title" data-rise>The full menu</h2>
-    <a class="explore" href="contact.html" data-rise>Ask which suits you</a>
+<div class="doc">
+<aside class="rail" aria-label="On this page">
+  <div class="rail__in">
+    <p class="rail__k">On this page</p>
+    <nav class="rail__nav">
+      <a class="rail__a" href="#s01" data-rail="s01"><span class="rail__n">01</span><span class="rail__l">What we offer</span></a>
+      <a class="rail__a" href="#s02" data-rail="s02"><span class="rail__n">02</span><span class="rail__l">Massage</span></a>
+      <a class="rail__a" href="#s03" data-rail="s03"><span class="rail__n">03</span><span class="rail__l">Lymphatic drainage</span></a>
+      <a class="rail__a" href="#s04" data-rail="s04"><span class="rail__n">04</span><span class="rail__l">Reflexology</span></a>
+      <a class="rail__a" href="#s05" data-rail="s05"><span class="rail__n">05</span><span class="rail__l">Insurance</span></a>
+      <a class="rail__a" href="#s06" data-rail="s06"><span class="rail__n">06</span><span class="rail__l">Prices</span></a>
+    </nav>
+    <a class="btn btn--rail" href="https://optimalhealthatinspire.simplybook.it/v2">Book a session</a>
   </div>
-  <div class="roll roll--menu" data-stagger>
-    <div class="roll__row">
-      <span class="roll__n">Swedish massage</span>
-      <span class="roll__m">Flowing, full-body work at a moderate pressure</span>
-      <span class="roll__x"><span class="roll__p">1 hr &euro;80</span><span class="roll__p roll__p--alt">30 min &euro;50</span></span>
+</aside>
+<div class="doc__body">
+<nav class="strip" aria-label="On this page">
+  <div class="strip__nav">
+    <a class="strip__a" href="#s01" data-rail="s01"><span class="rail__n">01</span> What we offer</a>
+    <a class="strip__a" href="#s02" data-rail="s02"><span class="rail__n">02</span> Massage</a>
+    <a class="strip__a" href="#s03" data-rail="s03"><span class="rail__n">03</span> Lymphatic drainage</a>
+    <a class="strip__a" href="#s04" data-rail="s04"><span class="rail__n">04</span> Reflexology</a>
+    <a class="strip__a" href="#s05" data-rail="s05"><span class="rail__n">05</span> Insurance</a>
+    <a class="strip__a" href="#s06" data-rail="s06"><span class="rail__n">06</span> Prices</a>
+  </div>
+</nav>
+<section class="band band--sage" data-chapter="What we offer" id="s01" aria-label="What we offer">
+  <div>
+    <div class="says">
+      <div class="body">
+        <h2 class="lede">Ten treatments, and somebody to tell you which one.</h2>
+        <p style="margin-top:22px">Everything on this page is hands-on work. Three of them are disciplines in their own right and get their own chapter below &mdash; massage, lymphatic drainage and reflexology. The rest are variations on the table: a different pressure, a different set of hands-on tools, a different length of hour.</p>
+        <p>If you do not know which to book, ring us and say what the last few weeks have been like. Two minutes on the phone is a better use of your money than the wrong hour, and we will say so if the answer is one of the other therapies instead.</p>
+      </div>
+      <div class="tile__img"><img src="assets/room.jpg" alt="A treatment room at the Clonmel clinic" /></div>
     </div>
-    <div class="roll__row">
-      <span class="roll__n">Deep tissue</span>
-      <span class="roll__m">Slower, firmer work through the deeper layers of muscle</span>
-      <span class="roll__x"><span class="roll__p">1 hr &euro;80</span><span class="roll__p roll__p--alt">30 min &euro;50</span></span>
+    <!-- The menu stays inside the chapter that introduces it. Split into a
+         band of its own it would have put sage against sage, and a list of
+         ten names with nobody to read it is a price list rather than a
+         menu. Names and what the therapist does; the prices have their own
+         chapter at the foot of the page. -->
+    <div class="band__head" style="margin-top:clamp(44px,5.4vw,80px)">
+      <div class="band__head__l">
+        <p class="title">The full menu</p>
+      </div>
+      <a class="explore" href="contact.html">Ask which suits you</a>
     </div>
-    <div class="roll__row">
-      <span class="roll__n">Sports massage</span>
-      <span class="roll__m">Focused work around training, before or after it</span>
-      <span class="roll__x"><span class="roll__p">1 hr &euro;80</span><span class="roll__p roll__p--alt">30 min &euro;50</span></span>
-    </div>
-    <div class="roll__row">
-      <span class="roll__n">Hot lava shells</span>
-      <span class="roll__m">Warmed shells worked over the muscle, so the heat goes with the pressure</span>
-      <span class="roll__x"><span class="roll__p">1 hr &euro;100</span></span>
-    </div>
-    <div class="roll__row">
-      <span class="roll__n">Reflexology</span>
-      <span class="roll__m">Precise work on the feet, for deep relaxation and a calmer nervous system</span>
-      <span class="roll__x"><span class="roll__p">1 hr &euro;80</span></span>
-    </div>
-    <div class="roll__row">
-      <span class="roll__n">Sculpting lifting facial</span>
-      <span class="roll__m">Facial massage worked through the face, jaw and neck</span>
-      <span class="roll__x"><span class="roll__p">1 hr &euro;80</span></span>
-    </div>
-    <div class="roll__row">
-      <span class="roll__n">Indian head massage</span>
-      <span class="roll__m">Seated work through the scalp, neck and shoulders</span>
-      <span class="roll__x"><span class="roll__p">40 min &euro;60</span></span>
-    </div>
-    <div class="roll__row">
-      <span class="roll__n">Oncology cancer care massage</span>
-      <span class="roll__m">Gentle, adapted bodywork from a therapist trained for it</span>
-      <span class="roll__x"><span class="roll__p">1 hr &euro;80</span></span>
-    </div>
-    <div class="roll__row">
-      <span class="roll__n">Cupping massage</span>
-      <span class="roll__m">Suction cups drawn over the muscle alongside hands-on work</span>
-      <span class="roll__x"><span class="roll__p">1 hr &euro;80</span></span>
-    </div>
-    <div class="roll__row">
-      <span class="roll__n">Lymphatic drainage</span>
-      <span class="roll__m">Gentle, rhythmic work supporting the body's own drainage and fluid balance</span>
-      <span class="roll__x"><span class="roll__p">1 hr &euro;80</span></span>
+    <div class="roll roll--menu" data-stagger>
+      <div class="roll__row">
+        <span class="roll__n">Swedish massage</span>
+        <span class="roll__m">Flowing, full-body work at a moderate pressure</span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Deep tissue</span>
+        <span class="roll__m">Slower, firmer work through the deeper layers of muscle</span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Sports massage</span>
+        <span class="roll__m">Focused work around training, before it or after it</span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Hot lava shells</span>
+        <span class="roll__m">Warmed shells worked over the muscle, so the heat travels with the pressure</span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Reflexology</span>
+        <span class="roll__m">Precise work on the feet, and a discipline in its own right rather than a foot massage</span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Sculpting lifting facial</span>
+        <span class="roll__m">Massage worked through the face, the jaw and the neck</span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Indian head massage</span>
+        <span class="roll__m">Seated work through the scalp, neck and shoulders, and you stay dressed</span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Oncology cancer care massage</span>
+        <span class="roll__m">Massage adapted for people in or after treatment, from a therapist trained for that work</span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Cupping massage</span>
+        <span class="roll__m">Suction cups drawn over the muscle alongside hands-on work</span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Lymphatic drainage</span>
+        <span class="roll__m">Very light, rhythmic work following the vessels that sit under the skin</span>
+      </div>
     </div>
   </div>
 </section>
 
-<section class="band">
-  <div class="band__head">
-    <h2 class="title" data-rise>What it supports</h2>
-  </div>
-  <div class="grid3" data-stagger>
-    <div>
-      <p class="panel__t" style="text-align:left">Muscle comfort</p>
-      <p class="tile__m">Supports the release of tension held through training, work or long periods of sitting.</p>
-    </div>
-    <div>
-      <p class="panel__t" style="text-align:left">Circulation</p>
-      <p class="tile__m">Supports blood flow to tissue and the body's natural drainage processes.</p>
-    </div>
-    <div>
-      <p class="panel__t" style="text-align:left">Rest</p>
-      <p class="tile__m">Shifts the nervous system down a gear. Most people leave calmer than they arrived.</p>
-    </div>
-  </div>
-</section>
-
+<!-- INK. One fact, and the only one on this page worth the strongest
+     ground: a machine does not care who switches it on, and a pair of
+     hands is the whole product here. Deliberately not a chapter -- it
+     carries no <h2 class="lede">, and the rail is a list of the page's
+     arguments, not of its guarantees. Timber on the eyebrow: ink is the
+     one ground the house rule lets it carry type on, at 4.69:1. -->
 <section class="band band--ink on-ink">
-  <div class="band__head">
-    <h2 class="title" data-rise>Worth asking about</h2>
-  </div>
-  <div class="qa" data-stagger>
-    <details>
-      <summary>Which of the three should I book?</summary>
-      <p>Tell us what you are hoping for and we will say which we think fits. If none of them do, we will tell you that too.</p>
-    </details>
-    <details>
-      <summary>Can I combine it with the other therapies?</summary>
-      <p>Yes. Bodywork sits alongside infrared, hyperbaric oxygen and HIFEM, and many people use a combined block for exactly that.</p>
-    </details>
-    <details>
-      <summary>Recovering from an operation?</summary>
-      <p>Talk to us first, and to whoever is looking after your recovery. We will only go ahead with their agreement.</p>
-    </details>
-    <details>
-      <summary>Who carries out the treatment?</summary>
-      <p>Clinical therapists. You will be told what a session involves before anything starts.</p>
-    </details>
+  <div class="says">
+    <div class="band__head__l body">
+      <p class="title" style="color:var(--timber)">Who does the work</p>
+      <p class="lede" style="margin-top:20px;color:var(--sage)">Every treatment here is carried out by a clinical therapist.</p>
+      <p style="margin-top:20px">They will tell you what a session involves before anything starts, what you will be asked to take off and what stays covered, and they will tell you when the honest answer is that a different treatment suits you better. The oncology-adapted work is done by a therapist trained specifically for it. If you would rather ask about any of that before you arrive than at the desk, ring 083 867 2844.</p>
+    </div>
   </div>
 </section>
 
-<section class="band band--sage">
-  <div class="says" data-stagger>
-    <div>
-      <h2 class="panel__t" style="text-align:left">Book a treatment</h2>
-      <p class="lede" style="margin-top:16px">Call us and we will find a time. No obligation to book a block.</p>
+<!-- PLASTER. The first of the three disciplines, and the longest reading
+     of them, so it takes the highest-contrast ground. The second
+     paragraph says the hedge out loud rather than leaving it to the
+     verbs, the way the infrared page does. -->
+<section class="band" data-chapter="Massage" id="s02" aria-label="Massage">
+  <div>
+    <div class="band__head">
+      <div class="band__head__l">
+        <h2 class="lede">What the hands are actually doing.</h2>
+      </div>
     </div>
-    <div><a class="btn" href="https://optimalhealthatinspire.simplybook.it/v2">Book a session</a></div>
+    <div class="body" style="margin-bottom:clamp(28px,3.4vw,44px)">
+      <p>A therapeutic massage is an hour of somebody working directly into muscle: slow, firm pressure through the layers that have tightened, at a depth the two of you agree before anything starts. You lie on a table under towels, only the area being worked is uncovered, and the pressure changes on a word.</p>
+      <p>The account of why it helps is straightforward enough. Pressure and movement across muscle can encourage local blood flow, and blood flow is what carries oxygen and nutrients into tissue and takes the by-products of hard work back out. Sustained, unhurried contact is also understood to move the nervous system towards its resting state &mdash; the side of it that governs rest and repair rather than alertness. Both of those are a &ldquo;can&rdquo; rather than a &ldquo;will&rdquo;, and we would rather say so out loud than leave the verbs to carry it: it is what the work is understood to encourage over a run of treatments, not a forecast of what one hour will do for you.</p>
+      <p>What people report is less complicated than any of that. They get off the table looser through the shoulders and the lower back, and they sleep well that night. Whether it is worth it to you is a judgement best made after one rather than after a block.</p>
+    </div>
+    <div class="grid3" data-stagger>
+      <div>
+        <h3 class="panel__t" style="text-align:left">Muscle and tension</h3>
+        <ul class="body">
+          <li>Supports the release of tension held through training, work or long sitting</li>
+          <li>Slower, firmer work where you want it, and a lighter hour where you do not</li>
+          <li>Often booked around a training week, before the hard session or after it</li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="panel__t" style="text-align:left">Rest and wind-down</h3>
+        <ul class="body">
+          <li>Encourages the body towards its resting state rather than its alert one</li>
+          <li>Many people say they sleep better the night of a treatment</li>
+          <li>An hour with nothing asked of you, which is rarer than it sounds</li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="panel__t" style="text-align:left">Circulation</h3>
+        <ul class="body">
+          <li>May encourage local blood flow to the area being worked</li>
+          <li>Supports the delivery of oxygen and nutrients to tissue</li>
+          <li>Encourages the body's own drainage</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SAGE. The lightest treatment on the menu, and the one people most
+     often arrive with the wrong expectation of, so the first thing the
+     chapter does is say how light it is. -->
+<section class="band band--sage" data-chapter="Lymphatic drainage" id="s03" aria-label="Lymphatic drainage">
+  <div>
+    <div class="band__head">
+      <div class="band__head__l">
+        <h2 class="lede">Very light work, and deliberately so.</h2>
+      </div>
+    </div>
+    <div class="body" style="margin-bottom:clamp(28px,3.4vw,44px)">
+      <p>Manual lymphatic drainage looks, from the outside, like almost nothing happening. The pressure is a fraction of a massage's &mdash; slow, rhythmic, not much more than the weight of a hand, following particular routes across the skin. Anyone who books it expecting a deep-tissue hour is surprised, so it is worth knowing before you arrive that the lightness is the technique rather than the therapist going easy on you.</p>
+      <p>The reason for it is anatomical. Your lymphatic system moves fluid around the body alongside the blood, and unlike the circulatory system it has no pump of its own: it depends on movement, on breathing, and on being worked from outside. Those vessels sit just under the skin, which is why heavy pressure is the wrong tool &mdash; it presses straight past them. The working account is that light, directional contact can encourage fluid to move along them. That is a &ldquo;can&rdquo;, and this page is not going to dress it up as more.</p>
+      <p>What we will not tell you is what that clears or settles. It is a gentle, unhurried hour that a lot of people find calming, and it is more often booked by somebody who feels heavy than by somebody who feels sore. If you have had surgery, or you are under a consultant's care for anything at all, talk to them and to us before you book. We go ahead with their agreement and not otherwise.</p>
+    </div>
+    <div class="grid3" data-stagger>
+      <div>
+        <h3 class="panel__t" style="text-align:left">What it feels like</h3>
+        <ul class="body">
+          <li>Barely more pressure than the weight of a hand</li>
+          <li>Slow and rhythmic, following set routes across the skin</li>
+          <li>An hour most people find calming rather than demanding</li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="panel__t" style="text-align:left">What it supports</h3>
+        <ul class="body">
+          <li>May encourage fluid to move along the vessels sitting under the skin</li>
+          <li>Supports the body's own fluid balance</li>
+          <li>Usually booked by people who feel heavy rather than sore</li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="panel__t" style="text-align:left">Before you book</h3>
+        <ul class="body">
+          <li>Tell us about any surgery, however long ago, and about anyone whose care you are under</li>
+          <li>Where there is a clinician involved, we wait for their answer rather than make the call ourselves</li>
+          <li>If it is not the right treatment for you, we will say so and suggest what is</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PLASTER. The discipline this page had to be most careful with. The
+     live site presents the reflex map as fact and then hangs a list of
+     named conditions off it; the second paragraph below sets the map out
+     as the discipline's own principle instead, and says which part of the
+     hour is not in question. -->
+<section class="band" data-chapter="Reflexology" id="s04" aria-label="Reflexology">
+  <div>
+    <div class="band__head">
+      <div class="band__head__l">
+        <h2 class="lede">An hour on your feet, and nothing else.</h2>
+      </div>
+    </div>
+    <div class="body" style="margin-bottom:clamp(28px,3.4vw,44px)">
+      <p>Reflexology is precise thumb and finger work on the feet, done with you lying down and only your shoes and socks off. It is a discipline in its own right rather than a foot massage, it is trained and examined separately, and the therapists who offer it here hold that training.</p>
+      <p>It works from a principle rather than from a mechanism anyone can show you: that particular points on the feet correspond to the rest of the body, and that working them carefully has an effect beyond the foot. That is the map the discipline is built on, and we would rather set it out as the discipline's own account than present it as something settled. What is not in question is what the hour is like &mdash; sustained, precise, unhurried pressure, which is among the more reliable ways there is of getting a nervous system to stand down.</p>
+      <p>So that is what we will claim for it, and no more. People come off the table calmer than they got on it, and the ones who rebook are usually rebooking the calm. VHI members may be able to claim some of the cost back depending on their plan; there is more on that below.</p>
+    </div>
+    <div class="grid3" data-stagger>
+      <div>
+        <h3 class="panel__t" style="text-align:left">What the hour is</h3>
+        <ul class="body">
+          <li>Precise thumb and finger work on the feet, lying down</li>
+          <li>Shoes and socks off, and nothing else</li>
+          <li>The therapist works in silence if you would rather, and talks if you would rather that</li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="panel__t" style="text-align:left">Rest and wind-down</h3>
+        <ul class="body">
+          <li>Sustained pressure that encourages the body towards its resting state</li>
+          <li>Commonly described as leaving calmer than you arrived</li>
+          <li>Often booked for the evening, for the same reason as the infrared bed</li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="panel__t" style="text-align:left">Circulation</h3>
+        <ul class="body">
+          <li>May encourage blood flow through the feet and lower legs</li>
+          <li>Supports the body's own drainage</li>
+          <li>A useful hour for anyone who has been on their feet all week, or off them all week</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PLASTER. Nine rows of body copy want the highest-contrast ground, and
+     they want it closed: the page stays scannable and a reader opens only
+     the one they came for. Deliberately not a chapter -- six is what this
+     page argues, and the rail should say six. The rows about surgery,
+     pregnancy and the oncology-adapted work are safety information rather
+     than claims, so they are kept in full and in plain words. -->
+<section class="band">
+  <div>
+    <div class="band__head">
+      <div class="band__head__l">
+        <p class="title">Worth asking</p>
+        <h2 class="lede" style="margin-top:14px">What people ask before they book.</h2>
+      </div>
+    </div>
+    <div class="qa" data-stagger>
+      <details class="qa__row">
+        <summary class="qa__q">Which one should I book?</summary>
+        <div class="qa__a">
+          <p>Ring us and say what has been going on &mdash; a heavy training block, a desk and a long commute, a week that will not switch off. We will say which we think fits. If none of them do, or if one of the other therapies is the better answer, we will say that instead.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">Do I have to undress?</summary>
+        <div class="qa__a">
+          <p>It depends which one you book. For massage you undress to your underwear and stay under towels throughout, with only the area being worked uncovered. For reflexology it is shoes and socks. For Indian head massage you stay seated and dressed. Whichever it is, the therapist tells you before anything starts rather than after you are in the room.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">Is it going to hurt?</summary>
+        <div class="qa__a">
+          <p>Deep tissue work can be uncomfortable at the edges, and it should never be more than that. The pressure is set with you at the start and changed the moment you say so. Nobody here is impressed by how much you can take.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">How often should I come?</summary>
+        <div class="qa__a">
+          <p>There is no schedule to keep. Some people book a treatment when a training block has caught up with them, and some keep a standing hour every second week because it is the only one in the fortnight that is theirs. Start with one and see which of those you turn out to be.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">Can I book it alongside the other therapies?</summary>
+        <div class="qa__a">
+          <p>Yes, and plenty of people do. Bodywork sits alongside infrared, hyperbaric oxygen and the HIFEM chair rather than competing with them. Tell us what your week looks like and we will space them sensibly.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">Is this a medical treatment?</summary>
+        <div class="qa__a">
+          <p>No. What we offer is wellness bodywork, for tension, comfort and rest. We do not diagnose medical conditions and we do not claim to resolve them. If you have a diagnosed condition, or you are under anyone's care, follow their advice and tell us before you book so we can say honestly whether this suits you.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">I am recovering from an operation.</summary>
+        <div class="qa__a">
+          <p>Talk to us, and to whoever is looking after your recovery. We will only go ahead with their agreement, and we would far rather wait a fortnight than get that one wrong. Tell us about older surgery too, however long ago it was.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">Can I book while pregnant?</summary>
+        <div class="qa__a">
+          <p>Tell us when you book. Some of these are suitable with adjustments and some are not, and where there is any doubt at all we will ask you to check with your midwife or GP first.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">What is the oncology cancer care massage?</summary>
+        <div class="qa__a">
+          <p>It is massage adapted for people who are in treatment or have been, carried out by a therapist trained for that work: lighter, slower, planned around you, and adjusted for the day rather than the booking. We are not telling you it does anything about your treatment, because that is not ours to say. Tell us where you are up to when you book, speak to your medical team first, and we will go ahead with their agreement.</p>
+        </div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- SAGE. Reused on the pricing page, so it stands on its own: no
+     sentence in it depends on anything above. "May be able to claim back,
+     depending on the plan" is the load-bearing phrase and must survive
+     every edit -- the clinic is not the insurer and cannot say what any
+     individual policy covers.
+
+     CSS WANTED: .band--sage .cell__k{color:var(--ink)}. .cell__k defaults
+     to --deep, which measures 3.62:1 on sage and fails AA for small text;
+     --ink is 10.01:1 there. Exactly the correction .band--sage .field__k
+     already carries at _style.css:541, for the contact form on the same
+     ground. -->
+<section class="band band--sage" data-chapter="Insurance" id="s05" aria-label="Insurance">
+  <div>
+    <div class="band__head">
+      <div class="band__head__l">
+        <h2 class="lede">You may be able to claim some of this back.</h2>
+      </div>
+    </div>
+    <div class="cols4" data-stagger>
+      <div>
+        <p class="cell__k">Irish Life and Laya</p>
+        <p class="cell__v">Members may be able to claim back for massage therapy, depending on the plan.</p>
+      </div>
+      <div>
+        <p class="cell__k">VHI</p>
+        <p class="cell__v">Members may be able to claim back for reflexology, depending on the plan.</p>
+      </div>
+      <div>
+        <p class="cell__k">Before you book</p>
+        <p class="cell__v">Contact your provider to confirm what complementary therapy benefit you have. We are happy to help with any questions.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PLASTER, where the other therapy pages put Pricing on sage: the
+     insurance chapter above has taken sage, and sage does not land twice
+     running. The numbers are the client's own and are not touched here.
+
+     CSS WANTED: .roll__p--alt{opacity:1;color:var(--deep)} plus
+     .band--sage .roll__p--alt{color:var(--ink)}. The second price on a row
+     is quietened with opacity:.6, which computes to 4.07:1 on plaster and
+     3.58:1 on sage -- under AA either way. Quietening it with --deep
+     instead keeps the same hierarchy at 5.10:1, and fixes the identical
+     table on pricing.html in the same line. -->
+<section class="band" data-chapter="Prices" id="s06" aria-label="Prices">
+  <div>
+    <div class="band__head">
+      <div class="band__head__l">
+        <h2 class="lede">What each one costs.</h2>
+      </div>
+    </div>
+    <p class="body" style="margin-bottom:clamp(24px,3vw,36px)">Bodywork is priced per treatment rather than in blocks, so there is nothing to commit to. Where a treatment runs to two lengths, both are listed.</p>
+    <div class="roll roll--menu" data-stagger>
+      <div class="roll__row">
+        <span class="roll__n">Swedish massage</span>
+        <span class="roll__x"><span class="roll__p">1 hr &euro;80</span><span class="roll__p roll__p--alt">30 min &euro;50</span></span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Deep tissue</span>
+        <span class="roll__x"><span class="roll__p">1 hr &euro;80</span><span class="roll__p roll__p--alt">30 min &euro;50</span></span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Sports massage</span>
+        <span class="roll__x"><span class="roll__p">1 hr &euro;80</span><span class="roll__p roll__p--alt">30 min &euro;50</span></span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Hot lava shells</span>
+        <span class="roll__x"><span class="roll__p">1 hr &euro;100</span></span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Reflexology</span>
+        <span class="roll__x"><span class="roll__p">1 hr &euro;80</span></span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Sculpting lifting facial</span>
+        <span class="roll__x"><span class="roll__p">1 hr &euro;80</span></span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Indian head massage</span>
+        <span class="roll__x"><span class="roll__p">40 min &euro;60</span></span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Oncology cancer care massage</span>
+        <span class="roll__x"><span class="roll__p">1 hr &euro;80</span></span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Cupping massage</span>
+        <span class="roll__x"><span class="roll__p">1 hr &euro;80</span></span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Lymphatic drainage</span>
+        <span class="roll__x"><span class="roll__p">1 hr &euro;80</span></span>
+      </div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:clamp(16px,2vw,28px);margin-top:clamp(28px,3.4vw,40px)">
+      <a class="btn" href="https://optimalhealthatinspire.simplybook.it/v2">Book a session</a>
+      <a class="explore" href="pricing.html">All pricing</a>
+    </div>
+  </div>
+</section>
+
+
+</div>
+</div>
+<div class="bookbar"><a class="btn btn--light" href="https://optimalhealthatinspire.simplybook.it/v2">Book a session</a></div>
+<!-- /chapters -->
+
+<!-- PLASTER -->
+<section class="band">
+  <div class="says">
+    <div class="band__head__l body">
+      <p class="title">Getting started</p>
+
+      <h2 class="lede" style="margin-top:14px">Book one and see.</h2>
+      <p style="margin-top:22px">If you are not sure which of the ten you want, ring us on 083 867 2844 and say what the last few weeks have been like. We will tell you which we think fits, including when the honest answer is one of the other therapies instead.</p>
+      <p style="margin-top:28px"><a class="btn" href="https://optimalhealthatinspire.simplybook.it/v2">Book a session</a></p>
+    </div>
   </div>
 </section>
 
@@ -1090,10 +1464,17 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
       });
     });
 
-    // Section titles and list rows arrive in sequence.
-    gsap.utils.toArray('.band__head .title').forEach(function (t) {
-      gsap.to(t, { opacity: 1, y: 0, duration: .8, ease: SNAP,
-        scrollTrigger: { trigger: t, start: 'top 92%' } });
+    // Section heads arrive in sequence -- every [data-rise] in them, not
+    // just the .title. The stylesheet hides ALL [data-rise] at opacity 0 and
+    // relies on something here to bring each one back. While this selector
+    // was .title only, the "explore" links sitting beside three home-page
+    // headings were hidden by the CSS and restored by nothing: invisible on
+    // the live page since the site was built. Reveal what you hide.
+    gsap.utils.toArray('.band__head').forEach(function (head) {
+      var rise = head.querySelectorAll('[data-rise]');
+      if (!rise.length) return;
+      gsap.to(rise, { opacity: 1, y: 0, duration: .8, ease: SNAP, stagger: 0.06,
+        scrollTrigger: { trigger: head, start: 'top 92%' } });
     });
     gsap.utils.toArray('.roll').forEach(function (roll) {
       gsap.to(roll.querySelectorAll('.roll__row'), {
@@ -1338,6 +1719,75 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
     window.addEventListener('scroll', settle, { passive: true });
     window.addEventListener('resize', settle);
     settle();
+  }
+}());
+
+(function () {
+  // The enquiry form, posted as JSON so the answer lands in the page instead
+  // of bouncing the reader to a blank redirect. Its own IIFE, deliberately:
+  // the motion block above returns early when GSAP has not loaded, and a
+  // visitor who cannot see a confirmation is worse off than one who cannot
+  // see an animation. Without this the form still works -- it is an ordinary
+  // POST, and the route sends the reader back with ok=1 or err= in the query
+  // string, which the last few lines here read on the way in.
+  var forms = document.querySelectorAll('form[data-enquiry]');
+  Array.prototype.forEach.call(forms, function (form) {
+    // The hidden field carries a sensible default for a reader with no
+    // scripting; with scripting we know the page they are actually on,
+    // whichever host or mount the site is served from.
+    var ret = form.querySelector('input[name="return"]');
+    if (ret) ret.value = location.pathname;
+    var ok = form.querySelector('.form__ok');
+    var err = form.querySelector('.form__err');
+    var btn = form.querySelector('button[type="submit"]');
+    form.addEventListener('submit', function (e) {
+      if (!window.fetch) return;
+      e.preventDefault();
+      if (err) err.hidden = true;
+      var label = btn ? btn.textContent : '';
+      if (btn) { btn.disabled = true; btn.textContent = 'Sending'; }
+      var data = {};
+      new FormData(form).forEach(function (v, k) { data[k] = v; });
+      fetch(form.getAttribute('action'), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'accept': 'application/json' },
+        body: JSON.stringify(data)
+      }).then(function (r) { return r.json(); }).then(function (j) {
+        if (j && j.ok) {
+          if (ok) ok.hidden = false;
+          // The fields go, the confirmation stays: leaving a filled form
+          // under a thank-you reads as though nothing was sent, and invites
+          // a second send of the same enquiry.
+          Array.prototype.forEach.call(form.querySelectorAll('.field, button[type="submit"]'), function (el) { el.hidden = true; });
+        } else if (err) {
+          // The route's own words where it has them: it is the side that
+          // knows whether this was a bad address, a refused option or a
+          // throttle, and a generic apology would throw that away.
+          err.textContent = (j && j.error) || 'Something went wrong. Please ring us instead.';
+          err.hidden = false;
+        }
+      }).catch(function () {
+        if (err) { err.textContent = 'Something went wrong. Please ring us instead.'; err.hidden = false; }
+      }).then(function () {
+        if (btn) { btn.disabled = false; btn.textContent = label; }
+      });
+    });
+  });
+
+  // The no-scripting path lands back here with the answer in the query
+  // string. Reading it costs nothing and means the reader who posted the
+  // form natively -- before this script ran, or with fetch missing -- is
+  // told what happened rather than shown the same empty form again.
+  var q = new URLSearchParams(location.search);
+  if (q.get('ok') === '1' || q.get('err')) {
+    var first = document.querySelector('form[data-enquiry]');
+    if (first) {
+      var fok = first.querySelector('.form__ok');
+      var ferr = first.querySelector('.form__err');
+      if (q.get('ok') === '1' && fok) fok.hidden = false;
+      if (q.get('err') && ferr) { ferr.textContent = q.get('err'); ferr.hidden = false; }
+      first.scrollIntoView();
+    }
   }
 }());
 </script>

@@ -53,26 +53,54 @@
         <p style="margin-top:22px">A sentence is plenty. We will come back to you and say which therapy we think fits, or whether we think none of them do.</p>
       </div>
     </div>
-    <form class="form" method="post" action="#" data-stagger>
-      <label class="field">
+    <!-- Posts to the platform, which lands it as a lead on this clinic's own
+         board (app/src/app/api/site/enquiry). The field names are the ones
+         lib/cms/enquiry.ts validates, and the programme values are exactly
+         programmesForSite("optimal-health") -- a value outside that set is
+         refused by the server, so the two lists have to stay in step. -->
+    <form class="form" method="post" action="/api/site/enquiry" data-enquiry>
+      <label class="field" for="c-name">
         <span class="field__k">Your name</span>
-        <input class="field__i" type="text" name="name" autocomplete="name" required />
+        <input class="field__i" id="c-name" type="text" name="name" autocomplete="name" required />
       </label>
-      <label class="field">
+      <label class="field" for="c-email">
         <span class="field__k">Email</span>
-        <input class="field__i" type="email" name="email" autocomplete="email" required />
+        <input class="field__i" id="c-email" type="email" name="email" autocomplete="email" inputmode="email" required />
       </label>
-      <label class="field">
+      <label class="field" for="c-phone">
         <span class="field__k">Phone</span>
-        <input class="field__i" type="tel" name="phone" autocomplete="tel" />
+        <input class="field__i" id="c-phone" type="tel" name="phone" autocomplete="tel" inputmode="tel" />
       </label>
-      <label class="field field--wide">
+      <label class="field" for="c-programme">
+        <span class="field__k">Which therapy?</span>
+        <select class="field__i" id="c-programme" name="programme">
+          <option value="hbot">Hyperbaric oxygen</option>
+          <option value="infrared">Infrared</option>
+          <option value="hifem">HIFEM chair</option>
+          <option value="massage">Massage and bodywork</option>
+          <option value="unsure" selected>Not sure yet</option>
+        </select>
+      </label>
+      <label class="field field--wide" for="c-about">
         <span class="field__k">What are you hoping to get out of it?</span>
-        <textarea class="field__i" name="message" rows="4"></textarea>
+        <textarea class="field__i" id="c-about" name="about" rows="4" maxlength="1000"></textarea>
       </label>
+      <!-- Signed by the server as the page renders, naming this tenant and
+           this site (app/src/lib/cms/enquiryToken.ts). Without it the enquiry
+           names no tenant and the route refuses it. -->
+      <input type="hidden" name="token" value="__ADONIS_ENQUIRY_TOKEN__" />
+      <input type="hidden" name="return" value="/contact" />
+      <!-- Honeypot: a bot that fills every field gets a quiet success and
+           nothing is stored. .form__hp parks it off the left edge. -->
+      <div class="form__hp" aria-hidden="true">
+        <label>Company website<input name="company_website" type="text" tabindex="-1" autocomplete="off" /></label>
+      </div>
+      <p class="form__ok" role="status" hidden>Thanks. We will come back to you shortly.</p>
+      <p class="form__err" role="alert" hidden></p>
       <div class="field field--wide">
         <button class="btn" type="submit">Send</button>
       </div>
+      <p class="form__note">We use your details only to reply to you. Prefer to talk? Ring <a href="tel:+353838672844">083 867 2844</a>.</p>
     </form>
   </div>
 </section>

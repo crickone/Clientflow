@@ -369,7 +369,11 @@ h1,h2,h3,p,figure,blockquote{margin:0}
    quieter than the first. */
 .roll--menu .roll__x{display:flex;flex-direction:column;align-items:flex-end;gap:3px;text-align:right}
 .roll__p{font-size:clamp(12px,1vw,15px);letter-spacing:.06em;white-space:nowrap;text-transform:none}
-.roll__p--alt{opacity:.6;font-size:clamp(10px,.84vw,12px)}
+/* The quieter half of a rate row -- a colour, not an opacity: ink at .6
+   computes to 4.07:1 on plaster and 3.58:1 on sage, and this is type. */
+.roll__p--alt{color:#666661;font-size:clamp(10px,.84vw,12px)}
+.band--sage .roll__p--alt{color:var(--ink)}
+.band--ink .roll__p--alt{color:var(--sage)}
 .roll--menu .roll__n{font-size:clamp(19px,2.1vw,30px)}
 .roll--menu .roll__m{max-width:40ch}
 
@@ -530,6 +534,9 @@ summary.qa__q::after{
 @media (max-width:520px){.cols4{grid-template-columns:1fr}}
 .cell__k{font-size:clamp(10px,.82vw,12px);letter-spacing:.14em;text-transform:uppercase;color:var(--deep);margin-bottom:8px}
 .band--ink .cell__k{color:var(--sage)}
+/* --deep is 3.62:1 on sage, so a cell key washes out there. Same carve-out
+   the field key already has below. */
+.band--sage .cell__k{color:var(--ink)}
 .cell__v{font-size:clamp(13px,1.1vw,16px)}
 .cell__v a{text-decoration:none;border-bottom:1px solid var(--timber);padding-bottom:2px}
 .form{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap);max-width:840px;margin-top:clamp(22px,3vw,34px)}
@@ -546,6 +553,20 @@ summary.qa__q::after{
 }
 .field__i:focus{outline:none;border-color:var(--timber)}
 textarea.field__i{resize:vertical;min-height:120px}
+
+/* The honeypot field. Parked off the left edge rather than display:none,
+   which some bots know to skip, and out of flow so it claims no cell in the
+   form grid. Deliberately not a 1px box with content inside it: that reads to
+   this site's own shots.mjs probe as a clipped element, and a probe that cries
+   wolf stops being read. */
+.form__hp{position:absolute;left:-10000px;top:0}
+/* The form's three messages span the grid. Ink on every ground the form sits
+   on: #666661 is 4.03:1 on sage, which fails, and the one thing on this site
+   a visitor has to use rather than read cannot have a message they squint at. */
+.form__ok,.form__err,.form__note{grid-column:1/-1;color:var(--ink)}
+.form__err{font-weight:600}
+/* Pulled up under the button, which the grid gap would otherwise set adrift. */
+.form__note{font-size:clamp(12px,1vw,14px);margin-top:-6px}
 
 /* ---- footer, bookended by the wordmark ---- */
 .foot{background:var(--ink);color:var(--plaster);padding:clamp(48px,7vw,96px) var(--pad) 0}

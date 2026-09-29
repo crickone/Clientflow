@@ -381,7 +381,11 @@ h1,h2,h3,p,figure,blockquote{margin:0}
    quieter than the first. */
 .roll--menu .roll__x{display:flex;flex-direction:column;align-items:flex-end;gap:3px;text-align:right}
 .roll__p{font-size:clamp(12px,1vw,15px);letter-spacing:.06em;white-space:nowrap;text-transform:none}
-.roll__p--alt{opacity:.6;font-size:clamp(10px,.84vw,12px)}
+/* The quieter half of a rate row -- a colour, not an opacity: ink at .6
+   computes to 4.07:1 on plaster and 3.58:1 on sage, and this is type. */
+.roll__p--alt{color:#666661;font-size:clamp(10px,.84vw,12px)}
+.band--sage .roll__p--alt{color:var(--ink)}
+.band--ink .roll__p--alt{color:var(--sage)}
 .roll--menu .roll__n{font-size:clamp(19px,2.1vw,30px)}
 .roll--menu .roll__m{max-width:40ch}
 
@@ -542,6 +546,9 @@ summary.qa__q::after{
 @media (max-width:520px){.cols4{grid-template-columns:1fr}}
 .cell__k{font-size:clamp(10px,.82vw,12px);letter-spacing:.14em;text-transform:uppercase;color:var(--deep);margin-bottom:8px}
 .band--ink .cell__k{color:var(--sage)}
+/* --deep is 3.62:1 on sage, so a cell key washes out there. Same carve-out
+   the field key already has below. */
+.band--sage .cell__k{color:var(--ink)}
 .cell__v{font-size:clamp(13px,1.1vw,16px)}
 .cell__v a{text-decoration:none;border-bottom:1px solid var(--timber);padding-bottom:2px}
 .form{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap);max-width:840px;margin-top:clamp(22px,3vw,34px)}
@@ -558,6 +565,20 @@ summary.qa__q::after{
 }
 .field__i:focus{outline:none;border-color:var(--timber)}
 textarea.field__i{resize:vertical;min-height:120px}
+
+/* The honeypot field. Parked off the left edge rather than display:none,
+   which some bots know to skip, and out of flow so it claims no cell in the
+   form grid. Deliberately not a 1px box with content inside it: that reads to
+   this site's own shots.mjs probe as a clipped element, and a probe that cries
+   wolf stops being read. */
+.form__hp{position:absolute;left:-10000px;top:0}
+/* The form's three messages span the grid. Ink on every ground the form sits
+   on: #666661 is 4.03:1 on sage, which fails, and the one thing on this site
+   a visitor has to use rather than read cannot have a message they squint at. */
+.form__ok,.form__err,.form__note{grid-column:1/-1;color:var(--ink)}
+.form__err{font-weight:600}
+/* Pulled up under the button, which the grid gap would otherwise set adrift. */
+.form__note{font-size:clamp(12px,1vw,14px);margin-top:-6px}
 
 /* ---- footer, bookended by the wordmark ---- */
 .foot{background:var(--ink);color:var(--plaster);padding:clamp(48px,7vw,96px) var(--pad) 0}
@@ -1263,10 +1284,17 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
       });
     });
 
-    // Section titles and list rows arrive in sequence.
-    gsap.utils.toArray('.band__head .title').forEach(function (t) {
-      gsap.to(t, { opacity: 1, y: 0, duration: .8, ease: SNAP,
-        scrollTrigger: { trigger: t, start: 'top 92%' } });
+    // Section heads arrive in sequence -- every [data-rise] in them, not
+    // just the .title. The stylesheet hides ALL [data-rise] at opacity 0 and
+    // relies on something here to bring each one back. While this selector
+    // was .title only, the "explore" links sitting beside three home-page
+    // headings were hidden by the CSS and restored by nothing: invisible on
+    // the live page since the site was built. Reveal what you hide.
+    gsap.utils.toArray('.band__head').forEach(function (head) {
+      var rise = head.querySelectorAll('[data-rise]');
+      if (!rise.length) return;
+      gsap.to(rise, { opacity: 1, y: 0, duration: .8, ease: SNAP, stagger: 0.06,
+        scrollTrigger: { trigger: head, start: 'top 92%' } });
     });
     gsap.utils.toArray('.roll').forEach(function (roll) {
       gsap.to(roll.querySelectorAll('.roll__row'), {
@@ -1511,6 +1539,75 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
     window.addEventListener('scroll', settle, { passive: true });
     window.addEventListener('resize', settle);
     settle();
+  }
+}());
+
+(function () {
+  // The enquiry form, posted as JSON so the answer lands in the page instead
+  // of bouncing the reader to a blank redirect. Its own IIFE, deliberately:
+  // the motion block above returns early when GSAP has not loaded, and a
+  // visitor who cannot see a confirmation is worse off than one who cannot
+  // see an animation. Without this the form still works -- it is an ordinary
+  // POST, and the route sends the reader back with ok=1 or err= in the query
+  // string, which the last few lines here read on the way in.
+  var forms = document.querySelectorAll('form[data-enquiry]');
+  Array.prototype.forEach.call(forms, function (form) {
+    // The hidden field carries a sensible default for a reader with no
+    // scripting; with scripting we know the page they are actually on,
+    // whichever host or mount the site is served from.
+    var ret = form.querySelector('input[name="return"]');
+    if (ret) ret.value = location.pathname;
+    var ok = form.querySelector('.form__ok');
+    var err = form.querySelector('.form__err');
+    var btn = form.querySelector('button[type="submit"]');
+    form.addEventListener('submit', function (e) {
+      if (!window.fetch) return;
+      e.preventDefault();
+      if (err) err.hidden = true;
+      var label = btn ? btn.textContent : '';
+      if (btn) { btn.disabled = true; btn.textContent = 'Sending'; }
+      var data = {};
+      new FormData(form).forEach(function (v, k) { data[k] = v; });
+      fetch(form.getAttribute('action'), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'accept': 'application/json' },
+        body: JSON.stringify(data)
+      }).then(function (r) { return r.json(); }).then(function (j) {
+        if (j && j.ok) {
+          if (ok) ok.hidden = false;
+          // The fields go, the confirmation stays: leaving a filled form
+          // under a thank-you reads as though nothing was sent, and invites
+          // a second send of the same enquiry.
+          Array.prototype.forEach.call(form.querySelectorAll('.field, button[type="submit"]'), function (el) { el.hidden = true; });
+        } else if (err) {
+          // The route's own words where it has them: it is the side that
+          // knows whether this was a bad address, a refused option or a
+          // throttle, and a generic apology would throw that away.
+          err.textContent = (j && j.error) || 'Something went wrong. Please ring us instead.';
+          err.hidden = false;
+        }
+      }).catch(function () {
+        if (err) { err.textContent = 'Something went wrong. Please ring us instead.'; err.hidden = false; }
+      }).then(function () {
+        if (btn) { btn.disabled = false; btn.textContent = label; }
+      });
+    });
+  });
+
+  // The no-scripting path lands back here with the answer in the query
+  // string. Reading it costs nothing and means the reader who posted the
+  // form natively -- before this script ran, or with fetch missing -- is
+  // told what happened rather than shown the same empty form again.
+  var q = new URLSearchParams(location.search);
+  if (q.get('ok') === '1' || q.get('err')) {
+    var first = document.querySelector('form[data-enquiry]');
+    if (first) {
+      var fok = first.querySelector('.form__ok');
+      var ferr = first.querySelector('.form__err');
+      if (q.get('ok') === '1' && fok) fok.hidden = false;
+      if (q.get('err') && ferr) { ferr.textContent = q.get('err'); ferr.hidden = false; }
+      first.scrollIntoView();
+    }
   }
 }());
 </script>
