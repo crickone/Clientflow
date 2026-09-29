@@ -35,8 +35,25 @@ for (const [label, width, height] of [["desktop", 1440, 900], ["phone", 390, 844
   const page = await ctx.newPage();
   for (const f of pages) {
     const url = base ? `${base}/${f}` : `file://${join(here, f)}`;
-    await page.goto(url, { waitUntil: "networkidle" });
+    await page.goto(url, { waitUntil: "networkidle", timeout: 60000 }).catch(() => {});
+    // Walk the page so every scroll-triggered reveal has fired before the
+    // capture. Without this, everything below the fold is still at opacity 0
+    // -- fullPage does not scroll, so GSAP never fires and the screenshot is
+    // a column of empty colour blocks that looks like a broken page.
+    await page.evaluate(async () => {
+      await new Promise((res) => {
+        let y = 0;
+        const step = () => {
+          y += 500;
+          window.scrollTo(0, y);
+          if (y < document.body.scrollHeight) setTimeout(step, 120);
+          else res();
+        };
+        step();
+      });
+    });
     await page.waitForTimeout(900);
+    await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: join(out, `${f.replace(/\.html$/, "")}-${label}.png`), fullPage: true });
     console.log(`  ${label.padEnd(8)} ${f}`);
   }
