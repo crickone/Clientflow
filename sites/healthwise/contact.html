@@ -152,6 +152,10 @@ ul,ol{padding:0;list-style:none}
 .split{display:grid;grid-template-columns:1fr 1fr;gap:clamp(28px,5vw,72px);align-items:center}
 .split img{width:100%;aspect-ratio:4/5;object-fit:cover}
 .split--wide img{aspect-ratio:4/3}
+/* A 16:9 photograph in the 4:5 box loses a third of its width, and a centred
+   crop takes that off both sides — which cut the "He" off the shopfront sign.
+   Hold the crop window left of centre so the whole wordmark survives. */
+.split .wipe--left img{object-position:27% 50%}
 .split .h2{margin-top:14px}
 .split .body{margin-top:20px}
 .split .link{display:inline-block;margin-top:22px}
