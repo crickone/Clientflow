@@ -15,6 +15,8 @@
 - **Every emitted page must stay self-contained** — its own `<style>` in the head, scripts at the end of the body. That is the shape `tools/import-site.cjs` files correctly into the CMS's head / content / tail zones.
 - **Claims language:** supports, promotes, may help, encourages. Never treats, cures, heals, eliminates, or reverses. No named medical conditions anywhere on the site. No outcome promises. No before/after framing.
 - **Palette is five values, no sixth:** `--sage:#C7D2BB` `--ink:#24231F` `--plaster:#F2F3ED` `--timber:#B0844F` `--deep:#5E6B4E`. Timber never carries type — it is 2.14:1 on sage and fails contrast.
+- **Every piece of text meets WCAG AA (4.5:1).** Faded-back UI text is still text. Do not dim type with `opacity` below `.68` on plaster, and never stack two opacities on nested elements — set an explicit colour instead. Ink at `.68` on plaster is `#666661`, 5.17:1, and is the floor for secondary type.
+- **A section that declares `data-chapter` does not also print its own `<p class="title">` eyebrow.** The rail carries that label; printing it again is the exact duplication the design exists to remove. Keep the `<h2 class="lede">` headline — that is the section's actual heading, not its label. Non-chapter sections keep their eyebrow.
 - **Grounds rotate:** plaster about half the sections, sage about a third and never twice running, ink about a sixth.
 - **The therapy is the HIFEM chair.** The string `PEMF` appears nowhere on this site.
 - **Prices are exactly:** Infrared €50 / €225 for 5 / €400 for 10 · Hyperbaric oxygen €100 / €450 for 5 / €800 for 10 · HIFEM chair €70 / €375 for 6 / €670 for 12. No struck-through "was" prices.
@@ -312,7 +314,7 @@ function documentise(body) {
   const marked = body.replace(CHAPTER_RE, (_m, pre, label, post) => {
     const n = String(chapters.length + 1).padStart(2, "0");
     chapters.push({ n, label, id: `s${n}` });
-    return `<section${pre} data-chapter="${label}"${post} id="s${n}">`;
+    return `<section${pre} data-chapter="${label}"${post} id="s${n}" aria-label="${label}">`;
   });
   if (!chapters.length) return marked;
 
@@ -414,10 +416,11 @@ Append to `_style.css`:
   flex:none;text-decoration:none;white-space:nowrap;
   font-size:11px;letter-spacing:.11em;text-transform:uppercase;
   padding:6px 10px;border:1px solid rgba(36,35,31,.22);
-  color:var(--ink);opacity:.55;
-  transition:opacity .2s ease,background-color .2s ease,color .2s ease;
+  color:#666661;
+  transition:background-color .2s ease,color .2s ease,border-color .2s ease;
 }
-.strip__a.is-on{opacity:1;background:var(--ink);color:var(--plaster);border-color:var(--ink)}
+.strip__a.is-on{background:var(--ink);color:var(--plaster);border-color:var(--ink)}
+.strip__a:focus-visible{outline:2px solid var(--deep);outline-offset:2px}
 
 .bookbar{
   position:fixed;left:0;right:0;bottom:0;z-index:30;
@@ -439,21 +442,26 @@ Append to `_style.css`:
 
   .rail{display:block;position:sticky;top:0;padding:clamp(40px,6vw,88px) 0}
   .rail__in{border-right:1px solid rgba(36,35,31,.14);padding-right:clamp(16px,1.6vw,24px)}
+  /* Colours, not opacities. An index entry is text and has to meet AA at
+     11-13px; ink at .42 on plaster is 2.48:1. #666661 is ink at .68, 5.17:1.
+     Nesting a second opacity on the numeral would multiply back below the
+     floor, so the numeral simply inherits its link's colour. */
   .rail__k{
     font-size:11px;letter-spacing:.17em;text-transform:uppercase;
-    opacity:.42;margin-bottom:14px;
+    color:#666661;margin-bottom:14px;
   }
   .rail__nav{display:flex;flex-direction:column;gap:2px}
   .rail__a{
     display:flex;gap:10px;align-items:baseline;
     text-decoration:none;padding:5px 0;
     font-size:13px;line-height:1.35;
-    opacity:.42;transition:opacity .22s ease,color .22s ease;
+    color:#666661;transition:color .22s ease,border-color .22s ease;
     border-left:1.5px solid transparent;padding-left:10px;margin-left:-11.5px;
   }
-  .rail__a:hover{opacity:.75}
-  .rail__a.is-on{opacity:1;color:var(--deep);font-weight:500;border-left-color:var(--timber)}
-  .rail__n{font-variant-numeric:tabular-nums;opacity:.6;font-size:11px}
+  .rail__a:hover{color:var(--ink)}
+  .rail__a.is-on{color:var(--deep);font-weight:500;border-left-color:var(--timber)}
+  .rail__a:focus-visible{outline:2px solid var(--deep);outline-offset:2px}
+  .rail__n{font-variant-numeric:tabular-nums;font-size:11px}
   .btn--rail{display:block;text-align:center;margin-top:22px;font-size:11px}
 
   /* Inside the column a band is already inset by the grid, so it keeps its
@@ -543,6 +551,8 @@ In `pages/hbot.html`, add `data-chapter` to the four existing content sections a
 | the `In their words` section | `data-chapter="In their words"` |
 
 Then put `<!-- /chapters -->` on its own line immediately before the final `Getting started` section, so the closing call to action stays full-bleed.
+
+**Delete the `<p class="title">` eyebrow from each of those four sections.** The rail now carries that label, and printing it again is the duplication this design exists to remove. The `<h2 class="lede">` headline stays — it is the section's heading, not its label. The generator puts the label on the section as `aria-label`, so the section keeps an accessible name without setting the words twice.
 
 - [ ] **Step 7: Build and check the rail came out right**
 
