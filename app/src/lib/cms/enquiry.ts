@@ -5,15 +5,48 @@
  */
 import { PUBLIC_FORM_HONEYPOT_FIELD } from "@/lib/publicFormExchange";
 
-export const ENQUIRY_PROGRAMMES = ["livewell", "vitality", "heartwise", "unsure"] as const;
-export type EnquiryProgramme = (typeof ENQUIRY_PROGRAMMES)[number];
-
-const PROGRAMME_LABEL: Record<EnquiryProgramme, string> = {
-  livewell: "Livewell 40–60",
-  vitality: "Vitality 60+",
-  heartwise: "Heartwise",
-  unsure: "Not sure yet",
+/**
+ * A bespoke site's enquiry form offers that site's own programmes. The sets
+ * live here rather than in each site's markup because the server has to refuse
+ * a programme the form could not have offered -- a check the form itself
+ * cannot be trusted to have made. Every set carries "unsure", which is what a
+ * submission with no programme at all falls back to.
+ */
+const SITE_PROGRAMMES: Record<string, Record<string, string>> = {
+  healthwise: {
+    livewell: "Livewell 40–60",
+    vitality: "Vitality 60+",
+    heartwise: "Heartwise",
+    unsure: "Not sure yet",
+  },
+  "optimal-health": {
+    hbot: "Hyperbaric oxygen",
+    infrared: "Infrared",
+    hifem: "HIFEM chair",
+    massage: "Massage and bodywork",
+    unsure: "Not sure yet",
+  },
 };
+
+/** A site with no set of its own offers the one option that names no programme. */
+const NEUTRAL: Record<string, string> = { unsure: "Not sure yet" };
+
+/**
+ * The slug every caller that predates per-site programmes means. Healthwise is
+ * the site this module was written for and the only one posting to it when the
+ * slug was added, so the default keeps that path byte-for-byte as it was.
+ */
+const DEFAULT_SITE = "healthwise";
+
+/** The programme values `slug`'s form may offer, in the order it should offer them. */
+export function programmesForSite(slug: string): readonly string[] {
+  return Object.keys(SITE_PROGRAMMES[slug] ?? NEUTRAL);
+}
+
+/** What the operator reads on the lead card, or the raw value when the site does not offer it. */
+export function programmeLabel(slug: string, programme: string): string {
+  return (SITE_PROGRAMMES[slug] ?? NEUTRAL)[programme] ?? programme;
+}
 
 /** The two public forms (this one and f/[slug]/submit) share one honeypot field name. */
 export const ENQUIRY_HONEYPOT_FIELD = PUBLIC_FORM_HONEYPOT_FIELD;
@@ -22,7 +55,8 @@ export interface ValidEnquiry {
   name: string;
   email: string | null;
   phone: string | null;
-  programme: EnquiryProgramme;
+  /** One of `programmesForSite(slug)` for the site the submission came from. */
+  programme: string;
   about: string | null;
 }
 
@@ -42,7 +76,10 @@ export function isEnquiryHoneypotTripped(fields: Record<string, string>): boolea
   return asString(fields[ENQUIRY_HONEYPOT_FIELD]).length > 0;
 }
 
-export function validateEnquiry(fields: Record<string, string>): ValidateEnquiryResult {
+export function validateEnquiry(
+  fields: Record<string, string>,
+  slug: string = DEFAULT_SITE,
+): ValidateEnquiryResult {
   const name = asString(fields.name);
   if (!name) return { ok: false, error: "Please enter your name." };
   if (name.length > MAX_NAME) return { ok: false, error: "That name is too long." };
@@ -55,10 +92,13 @@ export function validateEnquiry(fields: Record<string, string>): ValidateEnquiry
   if (phone.length > MAX_PHONE) return { ok: false, error: "That phone number is too long." };
   if (!email && !phone) return { ok: false, error: "Please give a phone number or an email address so we can reply." };
 
+  // A submission with no programme at all still lands -- the enquiry is the
+  // point, not the dropdown -- but a programme this site's form could not have
+  // offered is refused rather than quietly rewritten into something else.
   const rawProgramme = asString(fields.programme);
-  const programme: EnquiryProgramme = (ENQUIRY_PROGRAMMES as readonly string[]).includes(rawProgramme)
-    ? (rawProgramme as EnquiryProgramme)
-    : "unsure";
+  const allowed = programmesForSite(slug);
+  const programme = rawProgramme === "" ? "unsure" : allowed.includes(rawProgramme) ? rawProgramme : null;
+  if (programme === null) return { ok: false, error: "Please choose one of the options." };
 
   const about = asString(fields.about);
   if (about.length > MAX_ABOUT) return { ok: false, error: "Please keep the message under 1000 characters." };
@@ -102,9 +142,9 @@ export function sameOriginRefererPath(referer: string | null, requestUrl: string
   }
 }
 
-/** The lead's notes: what the operator sees on the card. */
-export function enquiryNotes(d: ValidEnquiry): string {
-  const lines = [`Programme: ${PROGRAMME_LABEL[d.programme]}`];
+/** The lead's notes: what the operator sees on the card, in the site's own words. */
+export function enquiryNotes(d: ValidEnquiry, slug: string = DEFAULT_SITE): string {
+  const lines = [`Programme: ${programmeLabel(slug, d.programme)}`];
   if (d.about) lines.push(`About: ${d.about}`);
   return lines.join("\n");
 }

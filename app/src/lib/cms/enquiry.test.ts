@@ -5,6 +5,8 @@ import {
   ENQUIRY_HONEYPOT_FIELD,
   enquiryNotes,
   isEnquiryHoneypotTripped,
+  programmeLabel,
+  programmesForSite,
   safeReturnPath,
   sameOriginRefererPath,
   validateEnquiry,
@@ -25,7 +27,11 @@ if (good.ok) {
   check("programme kept", good.data.programme === "vitality");
   check("notes carry programme label and about", enquiryNotes(good.data) === "Programme: Vitality 60+\nAbout: Had a stent in March.");
 }
-check("unknown programme -> unsure", (() => { const r = validateEnquiry({ name: "A", phone: "1", programme: "hacker" }); return r.ok && r.data.programme === "unsure"; })());
+// Flipped when programmes became per-site: a non-empty programme the site could
+// not have offered is now refused rather than rewritten to "unsure", so that a
+// form and the server cannot drift without anyone noticing. A submission with
+// no programme at all still lands, unchanged -- the check below pins that.
+check("unknown programme -> error", (() => { const r = validateEnquiry({ name: "A", phone: "1", programme: "hacker" }); return !r.ok && /choose/i.test(r.error); })());
 check("blank programme -> unsure", (() => { const r = validateEnquiry({ name: "A", email: "a@b.ie" }); return r.ok && r.data.programme === "unsure"; })());
 check("missing name -> error", (() => { const r = validateEnquiry({ phone: "1" }); return !r.ok && /name/i.test(r.error); })());
 check("no phone and no email -> error", (() => { const r = validateEnquiry({ name: "A" }); return !r.ok && /phone/i.test(r.error); })());
@@ -51,5 +57,51 @@ check("referer path: same origin -> its path", sameOriginRefererPath("http://loc
 check("referer path: cross origin -> null", sameOriginRefererPath("https://evil.example/site/healthwise/contact", "http://localhost:3000/api/site/enquiry") === null);
 check("referer path: missing -> null", sameOriginRefererPath(null, "http://localhost:3000/api/site/enquiry") === null);
 check("referer path: garbage -> null", sameOriginRefererPath("not a url", "http://localhost:3000/api/site/enquiry") === null);
+
+// --- per-site programmes -----------------------------------------------------
+// The module is named for every bespoke site, so the programme list belongs to
+// the site, not to the module. The sets live here rather than in each site's
+// markup because the server has to refuse a programme the form could not have
+// offered -- a check the form itself cannot be trusted to have made.
+const sameList = (a: readonly string[], b: readonly string[]) =>
+  a.length === b.length && a.every((x, i) => x === b[i]);
+
+check(
+  "a site's programme set is its own",
+  sameList(programmesForSite("healthwise"), ["livewell", "vitality", "heartwise", "unsure"]) &&
+    sameList(programmesForSite("optimal-health"), ["hbot", "infrared", "hifem", "massage", "unsure"]),
+);
+check("an unknown site falls back to the one neutral option", sameList(programmesForSite("nobody"), ["unsure"]));
+check(
+  "a programme from another site is rejected",
+  (() => {
+    const r = validateEnquiry({ name: "Aoife", phone: "0838672844", programme: "livewell" }, "optimal-health");
+    return !r.ok;
+  })(),
+);
+check(
+  "optimal-health accepts its own therapies",
+  (() => {
+    const r = validateEnquiry({ name: "Aoife", phone: "0838672844", programme: "hifem" }, "optimal-health");
+    return r.ok && r.data.programme === "hifem";
+  })(),
+);
+check(
+  "healthwise still validates with no slug passed",
+  (() => {
+    const r = validateEnquiry({ name: "Aoife", phone: "0838672844", programme: "vitality" });
+    return r.ok;
+  })(),
+);
+check(
+  "a label comes from the site that offers it",
+  programmeLabel("optimal-health", "hifem") === "HIFEM chair" && programmeLabel("healthwise", "livewell") === "Livewell 40–60",
+);
+check("a label the site does not offer is the raw value", programmeLabel("optimal-health", "livewell") === "livewell");
+check(
+  "notes take the site's own label",
+  enquiryNotes({ name: "Aoife", email: null, phone: "0838672844", programme: "hifem", about: null }, "optimal-health") ===
+    "Programme: HIFEM chair",
+);
 
 console.log(`enquiry.test.ts: ${passed} checks passed`);

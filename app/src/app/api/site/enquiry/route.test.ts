@@ -37,7 +37,7 @@ process.env.EMAIL_TOKEN_SECRET = SECRET;
 (async () => {
   const { controlSqlite } = requireLocal("../../../../lib/db/control") as typeof import("@/lib/db/control");
   const { getTenantDbById } = requireLocal("../../../../lib/db/tenant") as typeof import("@/lib/db/tenant");
-  const { leads, pipelineStages } = requireLocal("../../../../lib/db/schema") as typeof import("@/lib/db/schema");
+  const { leads, pipelineStages, sites } = requireLocal("../../../../lib/db/schema") as typeof import("@/lib/db/schema");
   const { signSiteEnquiryToken } = requireLocal("../../../../lib/cms/enquiryToken") as typeof import("@/lib/cms/enquiryToken");
   const { POST } = requireLocal("./route") as typeof import("./route");
 
@@ -63,7 +63,16 @@ process.env.EMAIL_TOKEN_SECRET = SECRET;
   try {
     const tdb = getTenantDbById(tid);
     const leadCount = () => tdb.select({ id: leads.id }).from(leads).all().length;
-    const token = signSiteEnquiryToken({ tenantId: tid, siteId: 1 });
+    // One tenant, two sites -- the agency case, and the reason "which site"
+    // cannot be inferred from the tenant. The scratch DB is seeded with a
+    // "renova" site at id 1 (lib/cms/seed.ts); these are the two the enquiry
+    // form is wired to, and the token names one of them.
+    const siteId = (name: string, slug: string) =>
+      tdb.insert(sites).values({ slug, name }).returning({ id: sites.id }).get().id;
+    const hwSiteId = siteId("Healthwise", "healthwise");
+    const ohSiteId = siteId("Optimal Health", "optimal-health");
+    const token = signSiteEnquiryToken({ tenantId: tid, siteId: hwSiteId });
+    const ohToken = signSiteEnquiryToken({ tenantId: tid, siteId: ohSiteId });
 
     const post = (body: Record<string, string>, ip = "10.77.0.1") =>
       POST(
@@ -243,6 +252,42 @@ process.env.EMAIL_TOKEN_SECRET = SECRET;
       last = r.status;
     }
     assert.equal(last, 429, "the ninth request in the window is throttled");
+
+    // 9. the programme list belongs to the SITE, and the site comes from the
+    //    signed token -- never from the body, which would let a caller pick
+    //    which list they are checked against and defeat the check entirely.
+    const leadWith = (email: string) => tdb.select().from(leads).all().find((l) => l.email === email);
+    const before9 = leadCount();
+
+    const r9 = await post({ name: "Aoife Nolan", email: "aoife@example.ie", programme: "hifem", token: ohToken }, "10.77.0.11");
+    assert.equal(r9.status, 200, "optimal-health's own therapy is accepted");
+    assert.equal(leadCount(), before9 + 1, "and it landed as a lead");
+    assert.match(leadWith("aoife@example.ie")?.notes ?? "", /Programme: HIFEM chair/, "the note carries optimal-health's own label");
+
+    const r9b = await post({ name: "Wrong List", email: "wrong@example.ie", programme: "livewell", token: ohToken }, "10.77.0.12");
+    assert.equal(r9b.status, 400, "healthwise's programme is refused on optimal-health's form");
+    assert.equal(((await r9b.json()) as { error: string }).error, "Please choose one of the options.");
+    assert.equal(leadCount(), before9 + 1, "and nothing was written");
+
+    const r9c = await post({ name: "Other Way", email: "other@example.ie", programme: "hifem", token }, "10.77.0.13");
+    assert.equal(r9c.status, 400, "and it refuses in the other direction too");
+    assert.equal(leadCount(), before9 + 1);
+
+    // A submission with no programme at all still lands: the enquiry is the
+    // point, not the dropdown, and a form that never carried the field must
+    // not start failing (sections 5, 6 and 6c above post without one).
+    const r9d = await post({ name: "No Dropdown Dave", email: "dave@example.ie", token: ohToken }, "10.77.0.14");
+    assert.equal(r9d.status, 200);
+    assert.match(leadWith("dave@example.ie")?.notes ?? "", /Programme: Not sure yet/);
+
+    // A claim naming a site that is not there any more cannot say what its
+    // form offered, so it is refused rather than checked against some other
+    // site's list. Same answer as every other unusable token.
+    const goneToken = signSiteEnquiryToken({ tenantId: tid, siteId: 99_999 });
+    const r9e = await post({ name: "Ghost Site", email: "ghost@example.ie", programme: "unsure", token: goneToken }, "10.77.0.15");
+    assert.equal(r9e.status, 400);
+    assert.equal(((await r9e.json()) as { error: string }).error, "Invalid or missing token.");
+    assert.equal(leadCount(), before9 + 2, "only the two accepted enquiries wrote leads");
 
     console.log("api/site/enquiry/route.test.ts: all assertions passed");
   } finally {

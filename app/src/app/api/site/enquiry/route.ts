@@ -1,9 +1,12 @@
+import { eq } from "drizzle-orm";
+
 import { clientIp, rateLimit } from "@/lib/rateLimit";
-import { runWithTenant } from "@/lib/db/tenant";
+import { getTenantDbById, runWithTenant } from "@/lib/db/tenant";
+import { sites } from "@/lib/db/schema";
 import { appendLeadNotes, upsertLead } from "@/lib/leads";
 import { logActivity } from "@/lib/queries";
 import { reopenLostLead } from "@/lib/pipeline/stage";
-import { verifySiteEnquiryToken } from "@/lib/cms/enquiryToken";
+import { verifySiteEnquiryToken, type SiteEnquiryClaim } from "@/lib/cms/enquiryToken";
 import {
   enquiryNotes,
   isEnquiryHoneypotTripped,
@@ -31,6 +34,33 @@ export const dynamic = "force-dynamic";
 const MAX_BODY_BYTES = 32 * 1024;
 const RATE_LIMIT = 8;
 const RATE_WINDOW_MS = 10 * 60 * 1000;
+
+/**
+ * The slug of the site the claim names, or null.
+ *
+ * The programme list belongs to the site (lib/cms/enquiry.ts), so the server
+ * has to learn WHICH site from something the browser cannot edit. That is the
+ * signed claim, never a field in the body: a slug the caller posts would let
+ * them pick the list they are checked against, and a check you can choose your
+ * own answer to is not a check.
+ *
+ * Null when the tenant or the site is no longer there. A claim naming a site
+ * that does not exist cannot say what that site's form offered, so the route
+ * answers it as it answers every other unusable token rather than falling back
+ * to some other site's list.
+ */
+function siteSlugFromClaim(claim: SiteEnquiryClaim): string | null {
+  try {
+    const row = getTenantDbById(claim.tenantId)
+      .select({ slug: sites.slug })
+      .from(sites)
+      .where(eq(sites.id, claim.siteId))
+      .get();
+    return row?.slug ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export async function POST(req: Request) {
   const declared = Number(req.headers.get("content-length") ?? "0");
@@ -62,12 +92,22 @@ export async function POST(req: Request) {
     });
   }
 
-  const validated = validateEnquiry(fields);
+  // The claim is read BEFORE the fields, because it names the site and a
+  // programme can only be checked against the list that site's own form
+  // offers. It also keeps a caller with no usable claim out of the validator
+  // altogether. Nothing that was already answered changes its answer: a
+  // request with good fields and a bad token was refused for the token
+  // before, and one with a good token and bad fields is still refused for the
+  // fields.
+  const claim = verifySiteEnquiryToken(fields.token ?? "");
+  const siteSlug = claim ? siteSlugFromClaim(claim) : null;
+  if (!claim || !siteSlug) {
+    return respondPublicForm(req, returnTo, false, { status: 400, error: "Invalid or missing token." });
+  }
+
+  const validated = validateEnquiry(fields, siteSlug);
   if (!validated.ok) return respondPublicForm(req, returnTo, false, { status: 400, error: validated.error });
   const data = validated.data;
-
-  const claim = verifySiteEnquiryToken(fields.token ?? "");
-  if (!claim) return respondPublicForm(req, returnTo, false, { status: 400, error: "Invalid or missing token." });
 
   // Stable dedupe key so a double-click or a second enquiry from the same
   // person lands on one card rather than a twin (upsertLead is idempotent on
@@ -84,7 +124,7 @@ export async function POST(req: Request) {
       fullName: data.name,
       email: data.email,
       phone: data.phone,
-      notes: enquiryNotes(data),
+      notes: enquiryNotes(data, siteSlug),
     });
     // A lead the business had written off is put back on the board when the
     // person enquires again: they are asking to be contacted, so the card has
@@ -94,7 +134,7 @@ export async function POST(req: Request) {
     if (!created) {
       appendLeadNotes(
         lead.id,
-        `Repeat enquiry ${new Date().toISOString().slice(0, 10)}: ${enquiryNotes(data).replace(/\n/g, " · ")}`,
+        `Repeat enquiry ${new Date().toISOString().slice(0, 10)}: ${enquiryNotes(data, siteSlug).replace(/\n/g, " · ")}`,
       );
       reopened = reopenLostLead(lead.id, `Reopened by a repeat website enquiry from ${data.name}`);
     }
