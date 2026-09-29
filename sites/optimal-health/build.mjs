@@ -266,16 +266,28 @@ const scripts = () => `<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dis
       (byId[id] || []).forEach(function (a) {
         a.classList.add('is-on');
         a.setAttribute('aria-current', 'true');
+        // The stylesheet gates its smooth scrolling on the same preference,
+        // and a pan nobody asked for is worse than one they can follow: a
+        // reduced-motion reader gets the jump, everyone else the glide.
+        var how = calm.matches ? 'auto' : 'smooth';
         var strip = a.parentNode;
         if (strip && strip.classList && strip.classList.contains('strip__nav')) {
-          // The stylesheet gates its smooth scrolling on the same preference,
-          // and a pan nobody asked for is worse than one they can follow: a
-          // reduced-motion reader gets the jump, everyone else the glide.
-          strip.scrollTo({
-            left: Math.max(0, a.offsetLeft - 16),
-            behavior: calm.matches ? 'auto' : 'smooth'
-          });
+          strip.scrollTo({ left: Math.max(0, a.offsetLeft - 16), behavior: how });
+          return;
         }
+        // The rail is a scroll container of its own, and the later pages carry
+        // six and seven chapters: on a short viewport the lit entry can sit
+        // outside the rail's visible range, which is the one thing the rail
+        // exists to prevent. Only when it is really overflowing, though -- on
+        // a page whose index fits, this would be a no-op that still cancels
+        // whatever scroll the reader is in the middle of.
+        var rail = a.closest && a.closest('.rail');
+        if (!rail || rail.scrollHeight <= rail.clientHeight + 1) return;
+        var into = a.getBoundingClientRect().top - rail.getBoundingClientRect().top;
+        rail.scrollTo({
+          top: Math.max(0, rail.scrollTop + into - (rail.clientHeight - a.offsetHeight) / 2),
+          behavior: how
+        });
       });
     };
     var queued = false;
@@ -315,7 +327,24 @@ const CHAPTER_RE = /<section\b([^>]*?)\sdata-chapter="([^"]+)"([^>]*)>/g;
 // Deliberately looser than CHAPTER_RE: whatever this finds and CHAPTER_RE
 // cannot match is exactly the mark that would be silently ignored.
 const CHAPTER_ANY = /\sdata-chapter\s*=/g;
-const OWN_ATTR_RE = /\s(id|aria-label)\s*=/;
+
+// The count below reads markup with the prose taken out. A partial that
+// quotes the contract back at itself in an HTML comment is not declaring a
+// chapter, and would otherwise fail a page that is entirely correct, with a
+// message describing a fault it does not have.
+const HTML_COMMENT = /<!--[\s\S]*?-->/g;
+
+// Case-insensitive because HTML attribute names are: <section ID="intro"> is
+// an id as far as the browser is concerned, and collides exactly the same.
+const OWN_ATTR_RE = /\s(id|aria-label)\s*=/i;
+
+// sNN is this function's own id space. Anything in a partial already wearing
+// one of those ids is a duplicate waiting to happen.
+const STRAY_ID_RE = /\sid\s*=\s*["']?(s\d\d)\b/i;
+
+// The chapter sections as they stand after numbering, to find the first and
+// the last of them in the rewritten body.
+const MARKED_SECTION = /<section\b[^>]*\sdata-chapter=/g;
 
 // The label reaches three markup contexts and the capture admits & and <, so
 // a therapy called "Sleep & recovery" would otherwise emit invalid markup and
@@ -348,24 +377,46 @@ function documentise(body, page) {
     chapters.push({ n, label, id: `s${n}` });
     return `<section${pre} data-chapter="${label}"${post} id="s${n}" aria-label="${esc(label)}">`;
   });
-  if (!chapters.length) return marked;
-
-  const declared = (body.match(CHAPTER_ANY) || []).length;
+  // Above the early return, deliberately. When EVERY mark on a page fails
+  // CHAPTER_RE -- all the values single-quoted, the marks put on <div> or
+  // <article>, a `>` inside an earlier attribute on each marked tag -- there
+  // are no chapters, and behind the early return the page would come back
+  // untouched: no rail, no error, `9 pages built.` over a page that asked for
+  // one. A page with genuinely no marks still returns early below, because
+  // for it declared === 0 === chapters.length.
+  const declared = (body.replace(HTML_COMMENT, "").match(CHAPTER_ANY) || []).length;
   if (declared !== chapters.length) {
     throw new Error(
       `${page}: ${declared} data-chapter marks in the body but ${chapters.length} became ` +
         `chapters. A chapter is a <section> whose data-chapter value is double-quoted.`,
     );
   }
+  if (!chapters.length) return marked;
 
-  const start = marked.search(/<section\b[^>]*\sdata-chapter=/);
-  const endMark = marked.indexOf("<!-- /chapters -->");
-  // The marker closes the documented column. Before the first chapter it
-  // would slice an empty column and then re-emit the sections that follow --
-  // a duplicated page carrying duplicate ids, built without a word.
-  if (endMark !== -1 && endMark < start) {
+  // The own-attribute guard above only ever sees chapter tags. An sNN id
+  // anywhere else in the partial is a duplicate, getElementById answers with
+  // whichever came first, and the spy then follows the wrong element -- with
+  // the build reporting success.
+  const stray = STRAY_ID_RE.exec(body);
+  if (stray) {
     throw new Error(
-      `${page}: <!-- /chapters --> comes before the first data-chapter section. ` +
+      `${page}: the body already carries id="${stray[1]}". documentise numbers the ` +
+        `chapters s01, s02, ... and owns those ids -- name the element something else.`,
+    );
+  }
+
+  const at = [...marked.matchAll(MARKED_SECTION)].map((m) => m.index);
+  const start = at[0];
+  const endMark = marked.indexOf("<!-- /chapters -->");
+  // The marker closes the documented column, so it has to follow the LAST
+  // chapter, not merely the first. Before the first it slices an empty column
+  // and then re-emits the sections that follow -- a duplicated page carrying
+  // duplicate ids. Between two, the later chapters fall outside .doc__body:
+  // they keep their ids and their entries in the index, but lose the band
+  // bleed and the scroll landing room while the rail goes on listing them.
+  if (endMark !== -1 && endMark < at[at.length - 1]) {
+    throw new Error(
+      `${page}: <!-- /chapters --> comes before the last data-chapter section. ` +
         `The marker closes the documented column, so every chapter must precede it.`,
     );
   }
@@ -489,7 +540,12 @@ const META = {
   },
 };
 
-let built = 0;
+// Two passes, because documentise throws and the built pages are committed
+// output. Writing as we go would leave the alphabetically earlier pages
+// rewritten with the new stylesheet and the rest stale -- a half-rebuilt tree
+// that someone can commit without ever re-running the build. Nothing is
+// written until every page has composed.
+const composed = [];
 for (const name of readdirSync(join(here, "pages"))) {
   if (!name.endsWith(".html")) continue;
   const key = name.replace(/\.html$/, "");
@@ -500,8 +556,10 @@ for (const name of readdirSync(join(here, "pages"))) {
   }
   const raw = readFileSync(join(here, "pages", name), "utf8");
   const body = documentise(raw, `pages/${name}`);
-  writeFileSync(join(here, meta.file), shell({ ...meta, body }));
-  console.log(`  ${meta.file.padEnd(18)} ${body.length} chars of content`);
-  built++;
+  composed.push({ file: meta.file, chars: body.length, html: shell({ ...meta, body }) });
 }
-console.log(`\n${built} pages built.`);
+for (const page of composed) {
+  writeFileSync(join(here, page.file), page.html);
+  console.log(`  ${page.file.padEnd(18)} ${page.chars} chars of content`);
+}
+console.log(`\n${composed.length} pages built.`);

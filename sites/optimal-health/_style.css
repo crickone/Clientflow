@@ -446,17 +446,28 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
 
   /* Three chapters fit anywhere; eight do not, and a sticky column taller
      than the viewport puts its last entries out of reach at every scroll
-     position. It scrolls itself, and keeps that scroll to itself.
+     position. It scrolls itself.
 
      Scrolling one axis makes the other a scroll container too -- there is no
      "visible vertically, scrolling horizontally" -- and the current entry's
-     tick hangs 11.5px into the gutter, so it would be clipped away. The rail
+     tick hangs out into the gutter, so it would be clipped away. The rail
      takes that much padding and gives it straight back as margin: the tick
-     lands inside the box it is now clipped to, and nothing moves. */
+     lands inside the box it is now clipped to, and nothing moves.
+
+     How far it hangs is the tick's own line plus its pad, which is why that
+     is written here as a sum rather than as a number repeated in two places.
+     The pair below draws the tick from these; this reads the same two back,
+     so neither end can drift out from under the other. The spare pixel is
+     slack, so a fractional border never lands on the clip edge itself. */
   .rail{
+    --tick-line:1.5px;
+    --tick-pad:10px;
+    --tick-reach:calc(var(--tick-line) + var(--tick-pad));
+    --tick-room:calc(var(--tick-reach) + 1px);
     display:block;position:sticky;top:0;
-    padding:clamp(40px,6vw,88px) 0 clamp(40px,6vw,88px) 12px;margin-left:-12px;
-    max-height:100vh;overflow-y:auto;overscroll-behavior:contain;
+    padding:clamp(40px,6vw,88px) 0 clamp(40px,6vw,88px) var(--tick-room);
+    margin-left:calc(var(--tick-room) * -1);
+    max-height:100vh;overflow-y:auto;
   }
   .rail__in{border-right:1px solid rgba(36,35,31,.14);padding-right:clamp(16px,1.6vw,24px)}
   .rail__k{
@@ -469,7 +480,8 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
     text-decoration:none;padding:5px 0;
     font-size:13px;line-height:1.35;
     color:#666661;transition:color .22s ease,border-color .22s ease;
-    border-left:1.5px solid transparent;padding-left:10px;margin-left:-11.5px;
+    border-left:var(--tick-line) solid transparent;padding-left:var(--tick-pad);
+    margin-left:calc(var(--tick-reach) * -1);
   }
   /* Emphasis climbs: grey at rest, the house hover colour under the pointer,
      full ink for where the reader is. It used to run backwards -- current was

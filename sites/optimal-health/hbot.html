@@ -458,17 +458,28 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
 
   /* Three chapters fit anywhere; eight do not, and a sticky column taller
      than the viewport puts its last entries out of reach at every scroll
-     position. It scrolls itself, and keeps that scroll to itself.
+     position. It scrolls itself.
 
      Scrolling one axis makes the other a scroll container too -- there is no
      "visible vertically, scrolling horizontally" -- and the current entry's
-     tick hangs 11.5px into the gutter, so it would be clipped away. The rail
+     tick hangs out into the gutter, so it would be clipped away. The rail
      takes that much padding and gives it straight back as margin: the tick
-     lands inside the box it is now clipped to, and nothing moves. */
+     lands inside the box it is now clipped to, and nothing moves.
+
+     How far it hangs is the tick's own line plus its pad, which is why that
+     is written here as a sum rather than as a number repeated in two places.
+     The pair below draws the tick from these; this reads the same two back,
+     so neither end can drift out from under the other. The spare pixel is
+     slack, so a fractional border never lands on the clip edge itself. */
   .rail{
+    --tick-line:1.5px;
+    --tick-pad:10px;
+    --tick-reach:calc(var(--tick-line) + var(--tick-pad));
+    --tick-room:calc(var(--tick-reach) + 1px);
     display:block;position:sticky;top:0;
-    padding:clamp(40px,6vw,88px) 0 clamp(40px,6vw,88px) 12px;margin-left:-12px;
-    max-height:100vh;overflow-y:auto;overscroll-behavior:contain;
+    padding:clamp(40px,6vw,88px) 0 clamp(40px,6vw,88px) var(--tick-room);
+    margin-left:calc(var(--tick-room) * -1);
+    max-height:100vh;overflow-y:auto;
   }
   .rail__in{border-right:1px solid rgba(36,35,31,.14);padding-right:clamp(16px,1.6vw,24px)}
   .rail__k{
@@ -481,7 +492,8 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
     text-decoration:none;padding:5px 0;
     font-size:13px;line-height:1.35;
     color:#666661;transition:color .22s ease,border-color .22s ease;
-    border-left:1.5px solid transparent;padding-left:10px;margin-left:-11.5px;
+    border-left:var(--tick-line) solid transparent;padding-left:var(--tick-pad);
+    margin-left:calc(var(--tick-reach) * -1);
   }
   /* Emphasis climbs: grey at rest, the house hover colour under the pointer,
      full ink for where the reader is. It used to run backwards -- current was
@@ -906,16 +918,28 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
       (byId[id] || []).forEach(function (a) {
         a.classList.add('is-on');
         a.setAttribute('aria-current', 'true');
+        // The stylesheet gates its smooth scrolling on the same preference,
+        // and a pan nobody asked for is worse than one they can follow: a
+        // reduced-motion reader gets the jump, everyone else the glide.
+        var how = calm.matches ? 'auto' : 'smooth';
         var strip = a.parentNode;
         if (strip && strip.classList && strip.classList.contains('strip__nav')) {
-          // The stylesheet gates its smooth scrolling on the same preference,
-          // and a pan nobody asked for is worse than one they can follow: a
-          // reduced-motion reader gets the jump, everyone else the glide.
-          strip.scrollTo({
-            left: Math.max(0, a.offsetLeft - 16),
-            behavior: calm.matches ? 'auto' : 'smooth'
-          });
+          strip.scrollTo({ left: Math.max(0, a.offsetLeft - 16), behavior: how });
+          return;
         }
+        // The rail is a scroll container of its own, and the later pages carry
+        // six and seven chapters: on a short viewport the lit entry can sit
+        // outside the rail's visible range, which is the one thing the rail
+        // exists to prevent. Only when it is really overflowing, though -- on
+        // a page whose index fits, this would be a no-op that still cancels
+        // whatever scroll the reader is in the middle of.
+        var rail = a.closest && a.closest('.rail');
+        if (!rail || rail.scrollHeight <= rail.clientHeight + 1) return;
+        var into = a.getBoundingClientRect().top - rail.getBoundingClientRect().top;
+        rail.scrollTo({
+          top: Math.max(0, rail.scrollTop + into - (rail.clientHeight - a.offsetHeight) / 2),
+          behavior: how
+        });
       });
     };
     var queued = false;
