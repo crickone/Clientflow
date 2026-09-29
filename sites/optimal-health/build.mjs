@@ -340,7 +340,7 @@ const OWN_ATTR_RE = /\s(id|aria-label)\s*=/i;
 
 // sNN is this function's own id space. Anything in a partial already wearing
 // one of those ids is a duplicate waiting to happen.
-const STRAY_ID_RE = /\sid\s*=\s*["']?(s\d\d)\b/i;
+const STRAY_ID_RE = /\sid\s*=\s*["']?(s\d\d)(?=["'\s>]|$)/i;
 
 // The chapter sections as they stand after numbering, to find the first and
 // the last of them in the rewritten body.
