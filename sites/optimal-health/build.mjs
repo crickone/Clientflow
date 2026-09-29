@@ -618,6 +618,30 @@ const META = {
     description:
       "Hands-on bodywork from clinical therapists in Clonmel: therapeutic massage, reflexology and lymphatic drainage.",
   },
+  recovery: {
+    file: "recovery.html",
+    title: "Recovery and everyday health | Optimal Health & Recovery at Inspire",
+    description:
+      "Recovery sessions in Clonmel for people living busy lives: infrared, hyperbaric oxygen and the HIFEM chair, guided from start to finish.",
+  },
+  athletes: {
+    file: "athletes.html",
+    title: "Athletic performance and recovery | Optimal Health & Recovery at Inspire",
+    description:
+      "Recovery between hard sessions, in Clonmel. Infrared, hyperbaric oxygen and the HIFEM chair, around a training week.",
+  },
+  collagen: {
+    file: "collagen.html",
+    title: "Skin and collagen | Optimal Health & Recovery at Inspire",
+    description:
+      "Infrared light for skin and connective tissue at our Clonmel clinic. What collagen is, what the bed does, and what the first twelve weeks look like.",
+  },
+  testimonials: {
+    file: "testimonials.html",
+    title: "What people say | Optimal Health & Recovery at Inspire",
+    description:
+      "What clients and athletes say about the hyperbaric chamber, infrared and the HIFEM chair at our Clonmel clinic.",
+  },
   contact: {
     file: "contact.html",
     title: "Contact | Optimal Health & Recovery at Inspire",
