@@ -18,6 +18,8 @@ const css = readFileSync(join(here, "_style.css"), "utf8");
 
 const NAV_LINKS = [
   ["therapies.html", "Therapies"],
+  ["recovery.html", "Recovery"],
+  ["athletes.html", "Athletes"],
   ["pricing.html", "Pricing"],
   ["about.html", "About"],
   ["contact.html", "Contact"],
@@ -27,6 +29,13 @@ const NAV_LINKS = [
 // the list collapse behind a Menu disclosure below the breakpoint where it
 // stops fitting one row without ever taking Book down with it. See the
 // ".nav__links" comment in _style.css for why the row cannot simply wrap.
+//
+// The six above plus Vouchers plus Book is the eight-item row that comment
+// was measured against before the items existed. They exist now, and the
+// measurement was re-run at 1440, 768, 414, 390 and 360 at default and 150%
+// text: the row clears 1440 at both sizes and every narrower width is behind
+// the disclosure. A seventh link in this array would need that measurement
+// taken again, not assumed.
 const nav = () => `<header class="nav">
   <a href="index.html" aria-label="Optimal Health and Recovery at Inspire, home">
     <img class="nav__logo" src="assets/logo-ink.png" alt="Optimal Health and Recovery at Inspire" />
@@ -54,7 +63,7 @@ const footer = () => `<footer class="foot on-ink">
     </div>
     <div>
       <p class="foot__k">Therapies</p>
-      <p class="foot__v"><a href="hbot.html">Hyperbaric oxygen</a><a href="infrared.html">Infrared</a><a href="hifem.html">HIFEM</a><a href="massage.html">Massage</a></p>
+      <p class="foot__v"><a href="hbot.html">Hyperbaric oxygen</a><a href="infrared.html">Infrared</a><a href="hifem.html">HIFEM</a><a href="massage.html">Massage</a><a href="collagen.html">Skin and collagen</a><a href="testimonials.html">What people say</a></p>
     </div>
   </div>
   <div class="foot__bar">
@@ -650,13 +659,13 @@ const META = {
     file: "index.html",
     title: "Optimal Health & Recovery at Inspire | Infrared, HBOT & HIFEM, Clonmel",
     description:
-      "A recovery clinic in Clonmel. Infrared, hyperbaric oxygen and HIFEM sessions, guided from start to finish, in a room built to be calm.",
+      "A recovery clinic in Clonmel. Infrared, hyperbaric oxygen, HIFEM and massage, guided from start to finish, in a room built to be calm.",
   },
   therapies: {
     file: "therapies.html",
-    title: "The three therapies | Optimal Health & Recovery at Inspire",
+    title: "The four therapies | Optimal Health & Recovery at Inspire",
     description:
-      "Hyperbaric oxygen, infrared and HIFEM at our Clonmel clinic. What each one is, what it supports, and how long a session takes.",
+      "Hyperbaric oxygen, infrared, HIFEM and massage at our Clonmel clinic. What each one is, what it supports, and how long a session takes.",
   },
   hbot: {
     file: "hbot.html",
@@ -674,7 +683,7 @@ const META = {
     file: "hifem.html",
     title: "HIFEM therapy | Optimal Health & Recovery at Inspire",
     description:
-      "HIFEM sessions in Clonmel, including pelvic floor support. Supports cellular energy, circulation and everyday movement.",
+      "HIFEM sessions in Clonmel, including pelvic floor support. Seated, fully clothed, twenty to thirty minutes.",
   },
   pricing: {
     file: "pricing.html",

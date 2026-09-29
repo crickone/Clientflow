@@ -140,7 +140,20 @@ h1,h2,h3,p,figure,blockquote{margin:0}
    break-word does not count toward that calculation (only the stronger
    overflow-wrap:anywhere does), so the declaration this comment used to
    defend could never shrink the row below its widest label's natural
-   width. The labels themselves are short enough not to need it. */
+   width. The labels themselves are short enough not to need it.
+
+   What the row needed instead was permission to use a second line. Five
+   labels in one no-wrap row under space-between ran past their own box by
+   8px at 390, 23px at 375 and 38px at 360 -- "Massage" losing most of
+   itself on the phones most people actually hold -- and "Hyperbaric oxygen"
+   broke across two lines inside its own flex item while it did. Wrapping
+   the row fixes both: the labels stay whole, the overflow goes, and the
+   run reads left to right instead of stretching to the edges, which is
+   what space-between would do to a second line carrying two items. The
+   dotted rule above it is unchanged, and above 640px nothing moves. */
+@media (max-width:640px){
+  .spread{flex-wrap:wrap;justify-content:flex-start;gap:8px 18px}
+}
 
 /* ---- buttons ---- */
 .btn{
@@ -187,9 +200,11 @@ h1,h2,h3,p,figure,blockquote{margin:0}
 
 /* ---- the row that cannot wrap ---------------------------------------
    .nav__links held four short words before the booking work; it now holds
-   five plus a Vouchers link, and a later pass adds two more -- eight items
-   in a `display:flex` row with no `flex-wrap`, no `min-width:0`, no
-   truncation, was never going to survive that. Wrapping the row in place
+   seven -- Therapies, Recovery, Athletes, Pricing, About, Contact and
+   Vouchers -- with Book alongside, which is the eight items this rule was
+   measured against. A `display:flex` row with no `flex-wrap`, no
+   `min-width:0` and no truncation was never going to survive that.
+   Wrapping the row in place
    was rejected: on a floating box that hugs its own content (not a
    full-width bar) a wrapped second line reads as a mistake, not a design,
    and it still leaves Book exactly as easy to lose as before -- wrapping
@@ -203,11 +218,12 @@ h1,h2,h3,p,figure,blockquote{margin:0}
    part where healthwise also hides its CTA on mobile. This site's booking
    pill does not get that trade.
 
-   720px is not the line: measured with eight items (this pass's six plus
-   the two a later pass adds) at a 150% text size, the inline row already
-   pushes Book off the right edge at 768px and at 820px, and only clears it
-   at 860px -- so the breakpoint sits at 900px, an existing line in this
-   file, with margin above the measured failure rather than exactly on it. */
+   720px is not the line: measured with eight items at a 150% text size,
+   the inline row already pushes Book off the right edge at 768px and at
+   820px, and only clears it at 860px -- so the breakpoint sits at 900px, an
+   existing line in this file, with margin above the measured failure rather
+   than exactly on it. Re-measured on 2026-09-29 with all eight shipping for
+   real, at 1440/768/414/390/360 and at both text sizes: unchanged. */
 @media (max-width:900px){
   /* top/left reset to 0: the base rule's clamp() values position the box
      inside the hero when .nav is `absolute`, and position:relative here
@@ -259,6 +275,32 @@ h1,h2,h3,p,figure,blockquote{margin:0}
 }
 .hero__inner{position:relative;z-index:2;padding:var(--pad);color:var(--plaster);width:100%}
 .hero__eyebrow{position:absolute;top:clamp(22px,2.6vw,34px);right:var(--pad);z-index:2;color:var(--sage)}
+/* ---- the hero eyebrow gets a ground of its own ----------------------
+   Nine heroes open with a small sage label above the mark, and the label
+   was the one line on each of them relying on the photograph to be dark
+   where it happened to land. It is the top line of a bottom-anchored
+   block, so where it lands moves with how much copy is under it -- and
+   the hero scrim is close to nothing between 24% and 44% of the frame,
+   which is exactly where a tall hero puts it.
+
+   Measured against the bare photographs at 1440x900 and 390x844, sage on
+   the picture: therapies 1.56:1, about 1.54:1, testimonials 2.84:1,
+   athletes 3.19:1, hbot 3.41:1, massage 3.85:1, hifem 4.20:1 on a phone.
+   Six of the nine below AA, the worst of them barely above no contrast at
+   all. Only collagen and infrared cleared it, and only because the
+   infrared bed happens to be dark where the label sits.
+
+   A stronger scrim does not fix it: taking the gradient far enough to
+   hold sage at 44% of the frame took the whole picture down with it and
+   still fell short of 4.5:1. So the label stops depending on the
+   photograph. Ink behind it, sage on top, 10.11:1 on every hero, and the
+   picture keeps its colour everywhere else. The chip is the same device
+   .tile__chip already uses on the pricing cards, inverted.             */
+.hero__inner > p.micro{
+  display:inline-block;
+  background:var(--ink);
+  padding:7px 12px 6px;
+}
 .hero .spread{border-top-color:rgba(242,243,237,.55);color:var(--plaster);margin-bottom:clamp(16px,2.4vw,28px)}
 /* No colour of its own: .hero__inner already sets plaster on everything
    inside it, which is the only ground this class was written for. Contact
@@ -295,6 +337,14 @@ h1,h2,h3,p,figure,blockquote{margin:0}
 .duo__inset{width:min(260px,72%);aspect-ratio:4/3;overflow:hidden}
 .duo__inset img{width:100%;height:100%;object-fit:cover}
 .duo__body{max-width:42ch;font-size:clamp(13px,1.05vw,15px)}
+/* The two audience routes on index.html and therapies.html are .duo rows
+   with a panel on each side and no photograph between them. The 78vh above
+   is sized for a row where one half is a picture; with two short panels
+   facing each other it leaves both of them floating in the middle of a
+   screen-and-a-bit of colour. This is close to what the panels ask for on
+   their own -- the padding alone is most of it -- so the row still reads as
+   one of the page's half-and-half bands rather than a box. */
+.duo--routes{min-height:min(46vh,420px)}
 
 /* ---- section shell ---- */
 .band{padding:clamp(48px,7vw,104px) var(--pad)}
@@ -853,6 +903,68 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
 .arc__b{max-width:60ch;color:var(--deep)}
 .band--sage .arc__b{color:var(--ink)}
 .band--ink .arc__b{color:var(--sage)}
+
+/* ---- the reception photograph, without the wall boards ----------------
+   assets/reception.jpg is the only picture of the room itself, which is
+   why nine places on this site reach for it. It also has the clinic's own
+   marketing boards on the back wall, and at hero size they are legible:
+   "Increases oxygen delivery for faster recovery", "Reduces inflammation
+   after intense training", "Enhances stamina and performance capacity",
+   "Accelerates muscle recovery". Those are outcome claims, and they are
+   the exact claims every page of this site takes out of its copy. Holding
+   the line in the words and then breaking it in the picture is worse than
+   not holding it: the reader believes the photograph.
+
+   So the boards are cropped off rather than retouched away. The asset is
+   untouched and every use opts in by class, which means one removal here
+   puts the whole frame back -- and if the clinic ever takes the boards
+   down, the class goes and nothing else changes.
+
+   WHAT SURVIVES. The boards begin at 61% of the frame's width and run to
+   its right edge, so the crop keeps the left 60%: the plant, the panelled
+   wall, both doors, the table and the near arm of the sofa. It still reads
+   as a photograph of a room rather than a detail of a sofa, which was the
+   thing to get wrong. The door's own "HYPERBARIC OXYGEN" plate and the
+   vertical "BOOST. RECOVER. PERFORM." stay -- they are labels on a room,
+   not claims about a body.
+
+   WHY NOT object-position ON ITS OWN. It can only choose between pixels
+   that already overflow, and at hero size there are none to choose from:
+   the box is about 1.74:1 and the photograph is 1.78:1, so object-fit:cover
+   leaves barely 2% of horizontal slack. Something has to narrow the frame
+   before object-position has anything to say.
+
+   HOW IT IS DONE, and why it is done twice. object-view-box is the
+   property written for exactly this: it hands object-fit a sub-rectangle
+   of the file to treat as the whole picture, so `inset(0% 40% 0% 0%)` --
+   the left 60% -- crops without changing a single box on the page. That is
+   Chrome 104 and Safari 18.2, which is most but not all of the traffic a
+   Clonmel clinic sees; Firefox and iOS 17 and 18.1 have no support and
+   would quietly show the boards.
+
+   The @supports fallback crops them the older way, by widening the image
+   box to 167% and letting the frame clip what runs past its right edge.
+   That way works everywhere and is why it is the fallback and not the
+   rule: a box wider than its frame is content wider than its own box, and
+   shots.mjs's clipping probe would report all nine of these images,
+   forever, alongside the accidental clips it exists to find. In Chrome --
+   which is what the probe runs -- only the object-view-box rule applies,
+   so the probe stays readable and the crop still lands everywhere else.
+
+   The two paths need different object-position values because they crop in
+   different orders. Under object-view-box the source is already 1.07:1, so
+   on a phone the horizontal slack is measured against that; under the
+   fallback it is measured against the full 1.78:1 frame. 50% and 30% land
+   on the same picture -- the two doors, the plant at the edge of frame.
+
+   Placed at the end of the file on purpose: `.shot--room img` and
+   `.hero__media img` have the same specificity, so source order is what
+   decides, and this has to come last.                                   */
+.shot--room img{object-view-box:inset(0% 40% 0% 0%)}
+@supports not (object-view-box: inset(0% 40% 0% 0%)) {
+  .shot--room{overflow:clip}
+  .shot--room img{width:167%;max-width:none;object-position:30% 50%}
+}
 </style>
 </head>
 <body>
@@ -863,6 +975,8 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
   </a>
   <nav class="nav__links" id="nav-links" aria-label="Primary">
     <a href="therapies.html">Therapies</a>
+    <a href="recovery.html">Recovery</a>
+    <a href="athletes.html">Athletes</a>
     <a href="pricing.html">Pricing</a>
     <a href="about.html">About</a>
     <a href="contact.html">Contact</a>
@@ -1131,7 +1245,7 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
     </div>
     <div>
       <p class="foot__k">Therapies</p>
-      <p class="foot__v"><a href="hbot.html">Hyperbaric oxygen</a><a href="infrared.html">Infrared</a><a href="hifem.html">HIFEM</a><a href="massage.html">Massage</a></p>
+      <p class="foot__v"><a href="hbot.html">Hyperbaric oxygen</a><a href="infrared.html">Infrared</a><a href="hifem.html">HIFEM</a><a href="massage.html">Massage</a><a href="collagen.html">Skin and collagen</a><a href="testimonials.html">What people say</a></p>
     </div>
   </div>
   <div class="foot__bar">
