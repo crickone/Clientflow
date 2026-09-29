@@ -1735,11 +1735,9 @@ export function programmesForSite(slug: string): readonly string[] {
 export function programmeLabel(slug: string, programme: string): string {
   return (SITE_PROGRAMMES[slug] ?? NEUTRAL)[programme] ?? programme;
 }
-
-/** @deprecated Kept for callers that predate per-site programmes. */
-export const ENQUIRY_PROGRAMMES = programmesForSite(DEFAULT_SITE);
-export type EnquiryProgramme = string;
 ```
+
+**Delete `ENQUIRY_PROGRAMMES` and `EnquiryProgramme` outright** — do not re-export them, deprecated or otherwise. Nothing outside this module imports either one (verified 2026-09-29), so keeping them would be dead code carrying a comment that is not true. If `npm run typecheck` disagrees, a consumer exists that this check missed: fix that consumer to use `programmesForSite`, and say so in your report.
 
 Then change the signature and the programme check:
 
