@@ -517,3 +517,10 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
    under the sticky strip on a phone, clear of the page edge on a desktop. */
 .doc__body [data-chapter]{scroll-margin-top:76px}
 @media (min-width:900px){.doc__body [data-chapter]{scroll-margin-top:24px}}
+
+/* The one link in the header that is asking for something. */
+.nav__book{
+  border:1px solid currentColor;
+  padding:5px 12px;
+  text-decoration:none;
+}

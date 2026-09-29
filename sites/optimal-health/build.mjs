@@ -29,6 +29,8 @@ const nav = () => `<header class="nav">
   </a>
   <nav class="nav__links" aria-label="Primary">
 ${NAV_LINKS.map(([h, t]) => `    <a href="${h}">${t}</a>`).join("\n")}
+    <a href="${VOUCHERS}">Vouchers</a>
+    <a class="nav__book" href="${BOOK}">Book</a>
   </nav>
 </header>`;
 
@@ -41,7 +43,7 @@ const footer = () => `<footer class="foot on-ink">
     </div>
     <div>
       <p class="foot__k">Get in touch</p>
-      <p class="foot__v"><a href="tel:+353838672844">083 867 2844</a><a href="mailto:info@optimalhealthatinspire.ie">info@optimalhealthatinspire.ie</a></p>
+      <p class="foot__v"><a href="tel:+353838672844">083 867 2844</a><a href="mailto:info@optimalhealthatinspire.ie">info@optimalhealthatinspire.ie</a><a href="${LOGIN}">Client login</a></p>
     </div>
     <div>
       <p class="foot__k">Therapies</p>
@@ -322,6 +324,8 @@ const scripts = () => `<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dis
    failure mode of every hand-written table of contents.
 --------------------------------------------------------------------- */
 const BOOK = "https://optimalhealthatinspire.simplybook.it/v2";
+const LOGIN = "https://optimalhealthatinspire.simplybook.it/v2/#client/sign-in";
+const VOUCHERS = "https://optimalhealth.voucherconnect.com";
 const CHAPTER_RE = /<section\b([^>]*?)\sdata-chapter="([^"]+)"([^>]*)>/g;
 
 // Deliberately looser than CHAPTER_RE: whatever this finds and CHAPTER_RE
