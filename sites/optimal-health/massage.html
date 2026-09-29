@@ -148,8 +148,59 @@ h1,h2,h3,p,figure,blockquote{margin:0}
   font-size:clamp(10px,.82vw,12px);letter-spacing:.12em;text-transform:uppercase;font-weight:500;
 }
 .nav__links a:hover,.nav__links a:focus-visible{color:var(--timber)}
-@media (max-width:720px){
-  .nav{position:static;border-radius:0;width:100%;flex-wrap:wrap;gap:12px}
+.nav__cta{display:flex;align-items:center;gap:10px}
+.nav__menu{display:none;appearance:none;background:none;color:inherit;font:inherit;border-radius:0}
+
+/* ---- the row that cannot wrap ---------------------------------------
+   .nav__links held four short words before the booking work; it now holds
+   five plus a Vouchers link, and a later pass adds two more -- eight items
+   in a `display:flex` row with no `flex-wrap`, no `min-width:0`, no
+   truncation, was never going to survive that. Wrapping the row in place
+   was rejected: on a floating box that hugs its own content (not a
+   full-width bar) a wrapped second line reads as a mistake, not a design,
+   and it still leaves Book exactly as easy to lose as before -- wrapping
+   does not decide which item survives being pushed off narrow viewports.
+
+   So Book is not part of the row that can overflow. It sits in nav__cta,
+   a sibling of the link list, and never moves. Below the point where the
+   list itself stops fitting, the list -- not Book -- steps behind a Menu
+   disclosure that opens as a sheet under the box: the same shape
+   sites/healthwise uses for its own nav once it outgrew one row, minus the
+   part where healthwise also hides its CTA on mobile. This site's booking
+   pill does not get that trade.
+
+   720px is not the line: measured with eight items (this pass's six plus
+   the two a later pass adds) at a 150% text size, the inline row already
+   pushes Book off the right edge at 768px and at 820px, and only clears it
+   at 860px -- so the breakpoint sits at 900px, an existing line in this
+   file, with margin above the measured failure rather than exactly on it. */
+@media (max-width:900px){
+  /* top/left reset to 0: the base rule's clamp() values position the box
+     inside the hero when .nav is `absolute`, and position:relative here
+     would otherwise read those same values as an offset from its own
+     static spot -- shoving the whole header sideways instead of leaving it
+     alone, which is exactly the kind of overflow this pass exists to
+     remove, not add. */
+  .nav{position:relative;top:0;left:0;border-radius:0;width:100%;justify-content:space-between;gap:16px}
+  .nav__links{
+    display:none;
+    position:absolute;top:100%;left:0;right:0;
+    flex-direction:column;gap:0;
+    background:var(--plaster);
+    padding:4px 16px 14px;
+    /* Ink at low alpha, the same value .roll's dotted rules already use --
+       not a new colour, just enough separation to read as a dropped panel
+       rather than part of the hero behind it. */
+    box-shadow:0 18px 36px -22px rgba(36,35,31,.4);
+  }
+  .nav--open .nav__links,html:not(.js) .nav__links{display:flex}
+  .nav__links a{padding:14px 0;border-bottom:1px dotted rgba(36,35,31,.28)}
+  .nav__links a:last-child{border-bottom:0}
+  .nav__menu{display:inline-flex}
+  /* With no JavaScript the list above is already showing in full (the
+     html:not(.js) rule), so a toggle that cannot toggle anything is not an
+     affordance, it is a dead button sitting in a keyboard user's way. */
+  html:not(.js) .nav__menu{display:none}
 }
 
 /* ---- hero: one photograph, edge to edge, wordmark across the foot ---- */
@@ -530,28 +581,36 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
 .doc__body [data-chapter]{scroll-margin-top:76px}
 @media (min-width:900px){.doc__body [data-chapter]{scroll-margin-top:24px}}
 
-/* The one link in the header that is asking for something. */
-.nav__book{
+/* The one link in the header that is asking for something -- and, sharing
+   its shape, the toggle for the disclosure that keeps everything else out
+   of its way below the breakpoint. Same border-as-button so the two read
+   as one pair of controls, not a link that grew a random neighbour. */
+.nav__book,.nav__menu{
   border:1px solid currentColor;
   padding:5px 12px;
   text-decoration:none;
+  font-size:clamp(10px,.82vw,12px);letter-spacing:.12em;text-transform:uppercase;font-weight:500;
+  cursor:pointer;
 }
 </style>
 </head>
 <body>
 
 <header class="nav">
-  <a href="index.html" aria-label="Optimal Health and Recovery at Inspire, home">
+  <a class="nav__brand" href="index.html" aria-label="Optimal Health and Recovery at Inspire, home">
     <img class="nav__logo" src="assets/logo-ink.png" alt="Optimal Health and Recovery at Inspire" />
   </a>
-  <nav class="nav__links" aria-label="Primary">
+  <nav class="nav__links" id="nav-links" aria-label="Primary">
     <a href="therapies.html">Therapies</a>
     <a href="pricing.html">Pricing</a>
     <a href="about.html">About</a>
     <a href="contact.html">Contact</a>
     <a href="https://optimalhealth.voucherconnect.com">Vouchers</a>
-    <a class="nav__book" href="https://optimalhealthatinspire.simplybook.it/v2">Book</a>
   </nav>
+  <div class="nav__cta">
+    <a class="nav__book" href="https://optimalhealthatinspire.simplybook.it/v2">Book</a>
+    <button class="nav__menu" type="button" aria-expanded="false" aria-controls="nav-links">Menu</button>
+  </div>
 </header>
 
 <section class="hero">
@@ -882,6 +941,40 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
       opacity: 1, y: 0, duration: 0.85, ease: SNAP, stagger: 0.07,
       scrollTrigger: { trigger: group, start: 'top 85%' }
     });
+  });
+}());
+
+/* ---- the nav Menu disclosure ------------------------------------------
+   Its own IIFE, deliberately, for the same reason as the chapter rail
+   below: the motion IIFE above returns early with no GSAP or under reduced
+   motion, and a reader in either state still has to be able to open the
+   menu. CSS already shows every link with no JavaScript at all
+   (html:not(.js) .nav__links in _style.css) -- this only adds what CSS
+   cannot: a click target below the breakpoint, Escape to close, and
+   closing on an outside click. Book never lives behind this toggle; it is
+   a sibling in the markup, not a link this script could hide.
+--------------------------------------------------------------------- */
+(function () {
+  var nav = document.querySelector('.nav');
+  var menu = document.querySelector('.nav__menu');
+  var links = document.getElementById('nav-links');
+  if (!nav || !menu || !links) return;
+  var setOpen = function (open) {
+    nav.classList.toggle('nav--open', open);
+    menu.setAttribute('aria-expanded', open ? 'true' : 'false');
+    menu.textContent = open ? 'Close' : 'Menu';
+  };
+  menu.addEventListener('click', function () {
+    setOpen(!nav.classList.contains('nav--open'));
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && nav.classList.contains('nav--open')) {
+      setOpen(false);
+      menu.focus();
+    }
+  });
+  document.addEventListener('click', function (e) {
+    if (nav.classList.contains('nav--open') && !nav.contains(e.target)) setOpen(false);
   });
 }());
 

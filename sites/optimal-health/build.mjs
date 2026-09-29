@@ -23,15 +23,22 @@ const NAV_LINKS = [
   ["contact.html", "Contact"],
 ];
 
+// Book is a sibling of the link list, not its last entry: that is what lets
+// the list collapse behind a Menu disclosure below the breakpoint where it
+// stops fitting one row without ever taking Book down with it. See the
+// ".nav__links" comment in _style.css for why the row cannot simply wrap.
 const nav = () => `<header class="nav">
-  <a href="index.html" aria-label="Optimal Health and Recovery at Inspire, home">
+  <a class="nav__brand" href="index.html" aria-label="Optimal Health and Recovery at Inspire, home">
     <img class="nav__logo" src="assets/logo-ink.png" alt="Optimal Health and Recovery at Inspire" />
   </a>
-  <nav class="nav__links" aria-label="Primary">
+  <nav class="nav__links" id="nav-links" aria-label="Primary">
 ${NAV_LINKS.map(([h, t]) => `    <a href="${h}">${t}</a>`).join("\n")}
     <a href="${VOUCHERS}">Vouchers</a>
-    <a class="nav__book" href="${BOOK}">Book</a>
   </nav>
+  <div class="nav__cta">
+    <a class="nav__book" href="${BOOK}">Book</a>
+    <button class="nav__menu" type="button" aria-expanded="false" aria-controls="nav-links">Menu</button>
+  </div>
 </header>`;
 
 const footer = () => `<footer class="foot on-ink">
@@ -227,6 +234,40 @@ const scripts = () => `<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dis
       opacity: 1, y: 0, duration: 0.85, ease: SNAP, stagger: 0.07,
       scrollTrigger: { trigger: group, start: 'top 85%' }
     });
+  });
+}());
+
+/* ---- the nav Menu disclosure ------------------------------------------
+   Its own IIFE, deliberately, for the same reason as the chapter rail
+   below: the motion IIFE above returns early with no GSAP or under reduced
+   motion, and a reader in either state still has to be able to open the
+   menu. CSS already shows every link with no JavaScript at all
+   (html:not(.js) .nav__links in _style.css) -- this only adds what CSS
+   cannot: a click target below the breakpoint, Escape to close, and
+   closing on an outside click. Book never lives behind this toggle; it is
+   a sibling in the markup, not a link this script could hide.
+--------------------------------------------------------------------- */
+(function () {
+  var nav = document.querySelector('.nav');
+  var menu = document.querySelector('.nav__menu');
+  var links = document.getElementById('nav-links');
+  if (!nav || !menu || !links) return;
+  var setOpen = function (open) {
+    nav.classList.toggle('nav--open', open);
+    menu.setAttribute('aria-expanded', open ? 'true' : 'false');
+    menu.textContent = open ? 'Close' : 'Menu';
+  };
+  menu.addEventListener('click', function () {
+    setOpen(!nav.classList.contains('nav--open'));
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && nav.classList.contains('nav--open')) {
+      setOpen(false);
+      menu.focus();
+    }
+  });
+  document.addEventListener('click', function (e) {
+    if (nav.classList.contains('nav--open') && !nav.contains(e.target)) setOpen(false);
   });
 }());
 
