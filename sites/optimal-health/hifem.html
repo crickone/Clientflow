@@ -853,13 +853,33 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
   </div>
 </header>
 
-<!-- INK -->
+<!-- Grounds, in order: ink hero, sage, ink, plaster, sage, plaster,
+     plaster, sage, plaster. Nine sections -- four plaster, three sage,
+     two ink -- and sage never lands twice running. The two ink sections
+     are the hero photograph and the quote, which is the only use of ink
+     this page makes: the machine with somebody in it, and one sentence
+     from a client.
+
+     NAMING. The client's live site gives this machine a different name --
+     the pulsed-field acronym, which the operator corrected on 2026-09-29.
+     The photograph in assets/hifem.jpg is a HIFEM chair: a seat with the
+     emitter in it, a console beside it, and a man sitting on it in his own
+     clothes. This site says HIFEM everywhere, and the name their site uses
+     appears nowhere on it, in copy, alt text or comment. The mechanism
+     below is written fresh for the same reason: their paragraph about
+     low-frequency magnetic pulses inducing microcurrents describes a mat,
+     not this chair, and carrying it across would have put equipment on the
+     page that the clinic does not own. Their benefit copy is used only
+     where it is about outcomes rather than mechanism, which is most of the
+     pelvic-floor material. -->
+
+<!-- INK. The chair does the work. -->
 <section class="hero">
-  <div class="hero__media"><img src="assets/hifem.jpg" alt="HIFEM therapy equipment at the Clonmel clinic" /></div>
+  <div class="hero__media"><img src="assets/hifem.jpg" alt="A client seated fully clothed on the HIFEM chair at the Clonmel clinic" /></div>
   <div class="hero__inner">
     <p class="micro" data-rise style="color:var(--sage)">Therapy</p>
     <h1 class="wordmark hero__mark" style="margin-top:22px">HIFEM.</h1>
-    <p class="lede hero__sub" data-rise>High-Intensity Focused Electromagnetic fields, applied while you sit or lie fully clothed. Sessions are short, and most people feel nothing more than a faint pulsing.</p>
+    <p class="lede hero__sub" data-rise>High-Intensity Focused Electromagnetic fields. You sit on the chair fully clothed, and the field works muscle that voluntary effort struggles to reach.</p>
     <div class="hero__foot" data-rise>
       <a class="btn" href="https://optimalhealthatinspire.simplybook.it/v2">Book a session</a>
       <a class="explore" href="pricing.html">See pricing</a>
@@ -867,101 +887,58 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
   </div>
 </section>
 
-<!-- PLASTER -->
-<section class="band">
+<!-- SAGE. The signature ground takes the first chapter: one colour step
+     straight off the ink hero, carrying the plain-language answer to the
+     only question a first visit has -- and, in the third paragraph, the
+     answer this page's most important reader came for. -->
+
+<div class="doc">
+<aside class="rail" aria-label="On this page">
+  <div class="rail__in">
+    <p class="rail__k">On this page</p>
+    <nav class="rail__nav">
+      <a class="rail__a" href="#s01" data-rail="s01"><span class="rail__n">01</span><span class="rail__l">What it is</span></a>
+      <a class="rail__a" href="#s02" data-rail="s02"><span class="rail__n">02</span><span class="rail__l">How it works</span></a>
+      <a class="rail__a" href="#s03" data-rail="s03"><span class="rail__n">03</span><span class="rail__l">What it supports</span></a>
+      <a class="rail__a" href="#s04" data-rail="s04"><span class="rail__n">04</span><span class="rail__l">A session</span></a>
+      <a class="rail__a" href="#s05" data-rail="s05"><span class="rail__n">05</span><span class="rail__l">Questions</span></a>
+      <a class="rail__a" href="#s06" data-rail="s06"><span class="rail__n">06</span><span class="rail__l">Pricing</span></a>
+    </nav>
+    <a class="btn btn--rail" href="https://optimalhealthatinspire.simplybook.it/v2">Book a session</a>
+  </div>
+</aside>
+<div class="doc__body">
+<nav class="strip" aria-label="On this page">
+  <div class="strip__nav">
+    <a class="strip__a" href="#s01" data-rail="s01"><span class="rail__n">01</span> What it is</a>
+    <a class="strip__a" href="#s02" data-rail="s02"><span class="rail__n">02</span> How it works</a>
+    <a class="strip__a" href="#s03" data-rail="s03"><span class="rail__n">03</span> What it supports</a>
+    <a class="strip__a" href="#s04" data-rail="s04"><span class="rail__n">04</span> A session</a>
+    <a class="strip__a" href="#s05" data-rail="s05"><span class="rail__n">05</span> Questions</a>
+    <a class="strip__a" href="#s06" data-rail="s06"><span class="rail__n">06</span> Pricing</a>
+  </div>
+</nav>
+<section class="band band--sage" data-chapter="What it is" id="s01" aria-label="What it is">
   <div class="says">
-    <div>
-      <p class="title">What it is</p>
-      
-      <h2 class="lede">Most people notice it within a few sessions.</h2>
-      <p style="margin-top:22px">Less stiffness, looser movement, a lift in energy. By helping cells function and recover more efficiently, HIFEM supports circulation, eases tension and keeps you moving well through busy weeks.</p>
-      <p>It is a low-effort way to stay consistent and keep your routine on track.</p>
+    <div class="body">
+      <h2 class="lede">A chair, and you keep your clothes on.</h2>
+      <p style="margin-top:22px">HIFEM stands for High-Intensity Focused Electromagnetic fields, and the chair is the machine rather than somewhere to wait. You sit down in whatever you arrived in, someone sets the intensity with you, and the session runs twenty to thirty minutes. There is nothing to change into and nothing to take off.</p>
+      <p>What you feel is a firm, rhythmic pulsing in the muscle underneath you. There is no heat in it, and the intensity is adjusted with you rather than at you, so it stays where you want it the whole way through. Most people talk, read, or simply sit.</p>
+      <p>A good number of people book this one for pelvic floor support, and it is worth saying plainly rather than leaving you to ask: you stay fully clothed and seated for that too, and nothing about it is internal. There is nothing awkward about ringing up to ask about it either, and we would far rather you did.</p>
     </div>
     <div class="tile__img"><img src="assets/room.jpg" alt="A treatment room at the Clonmel clinic" /></div>
   </div>
 </section>
 
-<!-- SAGE. Pelvic floor leads: it is the reason many people come in. -->
-<section class="band band--sage">
-  <div>
-    <div class="band__head">
-      <div class="band__head__l">
-        <p class="title">Pelvic floor support</p>
-        
-        <h2 class="lede">The one people ask about most.</h2>
-        <p style="margin-top:22px">You stay fully clothed and seated for the whole session. It is a common reason people come to us, and there is nothing to be shy about in asking.</p>
-      </div>
-    </div>
-    <div class="grid3" data-stagger style="grid-template-columns:repeat(3,1fr)">
-      <div>
-        <h3 class="panel__t" style="text-align:left">Bladder control</h3>
-        <p class="tile__m">May help with leaks on coughing, sneezing, running or lifting, including after pregnancy and through menopause.</p>
-      </div>
-      <div>
-        <h3 class="panel__t" style="text-align:left">Pelvic support</h3>
-        <p class="tile__m">Encourages pelvic-floor engagement for everyday tasks and for exercise.</p>
-      </div>
-      <div>
-        <h3 class="panel__t" style="text-align:left">Core and posture</h3>
-        <p class="tile__m">Coordinates the pelvic floor with the deep core to ease load on the back and hips.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- PLASTER -->
-<section class="band">
-  <div>
-    <div class="band__head">
-      <div class="band__head__l">
-        <p class="title">What else it supports</p>
-        
-        <h2 class="lede">Beyond the pelvic floor.</h2>
-      </div>
-    </div>
-    <div class="grid3" data-stagger style="grid-template-columns:repeat(2,1fr)">
-      <div>
-        <h3 class="panel__t" style="text-align:left">Energy and rest</h3>
-        <ul class="body">
-          <li>Supports cellular energy production, so the body feels more charged</li>
-          <li>Helps reduce fatigue and lift daily energy</li>
-          <li>Promotes better sleep quality and relaxation</li>
-        </ul>
-      </div>
-      <div>
-        <h3 class="panel__t" style="text-align:left">Circulation</h3>
-        <ul class="body">
-          <li>Improves blood flow and microcirculation</li>
-          <li>Enhances oxygen delivery to cells and tissues</li>
-          <li>Supports lymphatic drainage</li>
-        </ul>
-      </div>
-      <div>
-        <h3 class="panel__t" style="text-align:left">Muscle and joint</h3>
-        <ul class="body">
-          <li>Helps ease muscle stiffness and tension</li>
-          <li>Supports joint comfort after overuse or inactivity</li>
-          <li>Supports faster muscle recovery after activity</li>
-        </ul>
-      </div>
-      <div>
-        <h3 class="panel__t" style="text-align:left">Bone and tissue</h3>
-        <ul class="body">
-          <li>Encourages healthy bone density</li>
-          <li>Supports tissue repair and regeneration at a cellular level</li>
-          <li>Helps the healing of minor injuries and strains</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- INK -->
+<!-- INK. Proof, and it sits inside the first chapter rather than at the
+     foot of the page: the reader has just been told what this is, and the
+     next voice they hear is somebody who uses it. Deliberately not a
+     chapter of its own -- it carries no <h2 class="lede">, and the rail
+     is a list of the page's arguments, not of its punctuation. -->
 <section class="band band--ink on-ink">
   <div class="says">
     <div class="band__head__l">
       <p class="title">In their words</p>
-      
       <figure style="margin:22px 0 0">
         <blockquote class="says__t" style="margin:0 0 18px">&ldquo;It has made a huge difference to me physically and mentally. It's given me my freedom back.&rdquo;</blockquote>
         <figcaption class="says__a">Deirdre Cronin &middot; HIFEM client</figcaption>
@@ -970,14 +947,247 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
   </div>
 </section>
 
-<!-- SAGE -->
-<section class="band band--sage">
+<!-- PLASTER. The mechanism, written fresh, and the longest reading on the
+     page, so it gets the highest-contrast ground. The third paragraph says
+     the hedge out loud rather than leaving it to the verbs. -->
+<section class="band" data-chapter="How it works" id="s02" aria-label="How it works">
   <div class="says">
-    <div class="band__head__l">
+    <div class="body">
+      <h2 class="lede">A contraction you did not have to make.</h2>
+      <p style="margin-top:22px">The chair generates a focused magnetic field. That field passes through clothing and skin without warming either, and where it reaches muscle it prompts the nerve to fire, so the muscle contracts. That is the whole of the mechanism, and it is also the reason you keep your clothes on: a magnetic field goes straight through fabric, so nothing has to reach skin to work, and there is no heat in any of it. The field does the asking, and the muscle answers the way it would answer you.</p>
+      <p>What separates it from a set of exercises is the rate and the reach. You cannot voluntarily contract a muscle thousands of times inside half an hour, and you cannot hold a contraction at full effort without letting go to breathe. The field has neither limit. It can also work muscle that is genuinely hard to find on purpose &mdash; the pelvic floor most of all, which a great many people cannot feel well enough to train accurately even when they are doing the exercises properly.</p>
+      <p>Two things are worth being plain about. Everything above is an account of what the field is understood to do, not a forecast of what it will do for you: it is &ldquo;can&rdquo; throughout rather than &ldquo;will&rdquo;, and we would rather say so out loud than leave the verbs to carry it. And it is muscle work, so it behaves like muscle work &mdash; what moves is repetition over weeks, the same as it is in a gym. Judge it over a run of sessions rather than over one, and book a single session first if you would rather find out whether you get on with sitting in it.</p>
+    </div>
+    <div class="tile__img"><img src="assets/hifem.jpg" alt="The HIFEM chair, with the console alongside it" /></div>
+  </div>
+</section>
+
+<!-- SAGE. Pelvic floor leads, because that is what the chair is for. The
+     condition names are gone from all four clusters; the everyday
+     description carries them without the diagnosis. -->
+<section class="band band--sage" data-chapter="What it supports" id="s03" aria-label="What it supports">
+  <div>
+    <div class="band__head">
+      <div class="band__head__l">
+        <h2 class="lede">What people use it for.</h2>
+      </div>
+    </div>
+    <div class="grid3 grid3--two" data-stagger>
+      <div>
+        <h3 class="panel__t" style="text-align:left">Pelvic floor support</h3>
+        <ul class="body">
+          <li>May help with leaks on coughing, sneezing, running or lifting, including after pregnancy and through menopause</li>
+          <li>Encourages pelvic-floor engagement for everyday tasks and for exercise</li>
+          <li>Supports coordination between the pelvic floor and the deep core, which may ease load on the back and hips</li>
+          <li>Used by men as well as women, for the same engagement and core stability</li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="panel__t" style="text-align:left">Everyday energy</h3>
+        <ul class="body">
+          <li>Supports steadier day-to-day energy through busy weeks</li>
+          <li>Asks nothing of you beyond sitting still, so it fits a week when training is not happening</li>
+          <li>Most people describe getting up ready for whatever is next rather than tired</li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="panel__t" style="text-align:left">Circulation</h3>
+        <ul class="body">
+          <li>Working muscle acts as a pump, which can support local blood flow</li>
+          <li>May help tissue feel less starved after a run of desk-heavy weeks</li>
+          <li>Encourages lymphatic drainage</li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="panel__t" style="text-align:left">Muscle and joint comfort</h3>
+        <ul class="body">
+          <li>Helps ease the stiffness that settles into hips and lower back after long sitting</li>
+          <li>Supports joint comfort and easier everyday movement</li>
+          <li>Sessions often leave hips and lower back looser, so stairs, bending and the school run feel that bit easier</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PLASTER -->
+<section class="band" data-chapter="A session" id="s04" aria-label="A session">
+  <div>
+    <div class="band__head">
+      <div class="band__head__l">
+        <h2 class="lede">A session, start to finish.</h2>
+      </div>
+    </div>
+    <div class="cols4" data-stagger>
+      <div class="cell"><p class="roll__n">01</p><p class="cell__v">Someone shows you in and sets the chair up with you. You keep your clothes on and sit down.</p></div>
+      <div class="cell"><p class="roll__n">02</p><p class="cell__v">The intensity comes up gradually. It should feel strong and rhythmic rather than sharp, and we set it with you.</p></div>
+      <div class="cell"><p class="roll__n">03</p><p class="cell__v">You sit through it. Twenty to thirty minutes, and you can talk, read or say the word if you want it turned down.</p></div>
+      <div class="cell"><p class="roll__n">04</p><p class="cell__v">You stand up, have a glass of water, and go on with the day. No downtime, nothing to recover from.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- PLASTER. Fifteen rows of body copy want the highest-contrast ground on
+     the site, and they want it closed: the page stays scannable, and a
+     reader opens only the one they came for. The rows about implants,
+     pregnancy and clinical guidance are safety information rather than
+     claims, so they are kept in full and in plain words. -->
+<section class="band" data-chapter="Questions" id="s05" aria-label="Questions">
+  <div>
+    <div class="band__head">
+      <div class="band__head__l">
+        <h2 class="lede">What people ask before they book.</h2>
+      </div>
+    </div>
+    <div class="qa" data-stagger>
+      <details class="qa__row">
+        <summary class="qa__q">Do I have to undress?</summary>
+        <div class="qa__a">
+          <p>No. You stay fully clothed and seated for the whole session, pelvic-floor sessions included. Comfortable everyday clothes are all you need, and there is nothing to change into.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">What does it feel like?</summary>
+        <div class="qa__a">
+          <p>A firm, rhythmic pulsing in the muscle under you, running in bursts with short pauses between them. It should feel strong rather than sharp, and there is no heat to it. The intensity is adjustable the whole way through and we start low, so tell us at any point and we will bring it down.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">How long is a session, and how often should I come?</summary>
+        <div class="qa__a">
+          <p>Twenty to thirty minutes in the chair. Most people start with two or three sessions a week for a few weeks, then adjust around how they feel and what the week looks like.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">How many before I notice anything?</summary>
+        <div class="qa__a">
+          <p>It varies, and we would rather say so than give you a number we cannot stand over. Some people find hips and lower back looser after the first session. Pelvic-floor goals generally take a few weeks of consistent sessions, alongside the daily habits, before there is much to judge.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">Is this the same as doing pelvic-floor exercises?</summary>
+        <div class="qa__a">
+          <p>No, and it is not a replacement for them. Pelvic-floor exercises are contractions you make yourself, and the point of them is partly that you learn to find the muscle. The chair prompts the contraction for you, which is useful precisely when the muscle is hard to locate. We put it alongside your daily habits and any guidance from a women's health physio, not instead of either.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">Can I use it if I have pelvic pain, or a prolapse?</summary>
+        <div class="qa__a">
+          <p>That one needs clinical guidance first. Speak with your GP or a pelvic-health physio before booking, so that whether this is appropriate for you is a decision somebody qualified has made rather than a guess we have made.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">Is this a medical treatment?</summary>
+        <div class="qa__a">
+          <p>No. Electromagnetic muscle stimulation is used under clinician supervision for specific pelvic-health and musculoskeletal indications, with screening and protocols set for the individual. That is a different thing from what we run. At Optimal Health and Recovery this is a wellness session, for engagement, mobility and everyday comfort. We do not diagnose medical conditions and we do not claim to resolve them.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">Who should not use it?</summary>
+        <div class="qa__a">
+          <p>Anyone with a pacemaker, a neurostimulator or another implanted electronic device should not use it, and that one is not a case for discussion. If you are pregnant, have metal implants, or have had surgery recently, talk to your GP before you book. And if a clinician has already advised you against electromagnetic exposure, this is not the right therapy for you.</p>
+          <p>Tell us before you book rather than on the day. Where there is any doubt at all we will wait for your GP's answer, and a week's delay is a much smaller thing than getting this one wrong.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">What if I have a metal implant or an old injury?</summary>
+        <div class="qa__a">
+          <p>Tell us about every implant and every surgery, however long ago. Some metalwork is fine and some is not, and it is not a judgement we make on the spot &mdash; we defer to your GP or your surgeon, and we will suggest something else if the answer is no.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">Can I book while pregnant, or while trying to conceive?</summary>
+        <div class="qa__a">
+          <p>Speak with your GP first. We do not proceed during pregnancy without appropriate clearance, and where it is not advised we will point you at one of the other therapies instead.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">Is it safe, and are there side effects?</summary>
+        <div class="qa__a">
+          <p>Within the screening above it is generally well tolerated. Some people notice temporary tingling, or mild short-lived fatigue in the muscles that were worked, much like light activation work in a gym. Sessions are supervised, the intensity is adjustable throughout, and we stop if anything feels off.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">Will I be sore afterwards?</summary>
+        <div class="qa__a">
+          <p>Most people get up feeling loose rather than sore. A few notice the same mild heaviness you would get from a light set, and it passes inside a day. Water and gentle movement usually settle it.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">Can I train on the same day?</summary>
+        <div class="qa__a">
+          <p>Yes, but place it deliberately. This is muscle work rather than a rest-day therapy, so plan it the way you would plan a session in the gym rather than assuming it is free. Plenty of people put it on a light day or after their main session.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">Can I combine it with the other therapies?</summary>
+        <div class="qa__a">
+          <p>Yes, and most regulars do. A common week is hyperbaric oxygen in the morning for a clear head and infrared in the evening for wind-down and sleep, with the chair or a massage placed where they suit you. Tell us what your week looks like and we will space them sensibly.</p>
+        </div>
+      </details>
+      <details class="qa__row">
+        <summary class="qa__q">What is the best way to start?</summary>
+        <div class="qa__a">
+          <p>Book a single session, or ring us first on 083 867 2844 if you would rather talk it through &mdash; particularly if you are coming for pelvic floor support and would like to ask the questions before you arrive rather than at the desk.</p>
+        </div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- OPEN: session length. Every source we have for this machine says twenty
+     to thirty minutes, and they agree with each other for once: the client's
+     per-session price list quotes "20-30 mins" against every block, their
+     membership tiers say the same, and their own FAQ says "a typical session
+     lasts 20-30 minutes". Our home page currently says 12 min for this
+     therapy. That is infrared's number off the same price list and looks
+     misapplied -- the only other 12 on the live site is the "12-50 Minutes"
+     average session time, whose lower bound is infrared's. Twenty to thirty
+     is used here; pages/home.html should be changed to match. Confirm both
+     with the client before the site goes live. -->
+<!-- SAGE -->
+<section class="band band--sage" data-chapter="Pricing" id="s06" aria-label="Pricing">
+  <div>
+    <div class="band__head">
+      <div class="band__head__l">
+        <h2 class="lede">What it costs.</h2>
+      </div>
+    </div>
+    <div class="roll roll--rates" data-stagger>
+      <div class="roll__row">
+        <span class="roll__n">One session</span>
+        <span class="roll__x"><span class="rate"><span class="rate__v">&euro;70</span><span class="rate__k">20&ndash;30 min</span></span></span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Six sessions</span>
+        <span class="roll__x"><span class="rate"><span class="rate__v">&euro;375</span><span class="rate__k">Block</span></span></span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Twelve sessions</span>
+        <span class="roll__x"><span class="rate"><span class="rate__v">&euro;670</span><span class="rate__k">Block</span></span></span>
+      </div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:clamp(16px,2vw,28px);margin-top:clamp(28px,3.4vw,40px)">
+      <a class="btn" href="https://optimalhealthatinspire.simplybook.it/v2">Book a session</a>
+      <a class="explore" href="pricing.html">All pricing</a>
+    </div>
+  </div>
+</section>
+
+
+</div>
+</div>
+<div class="bookbar"><a class="btn btn--light" href="https://optimalhealthatinspire.simplybook.it/v2">Book a session</a></div>
+<!-- /chapters -->
+
+<!-- PLASTER -->
+<section class="band">
+  <div class="says">
+    <div class="band__head__l body">
       <p class="title">Getting started</p>
-      
-      <h2 class="lede">Ask us before you book.</h2>
-      <p style="margin-top:22px">If you are not sure whether HIFEM is the right one for you, tell us what you are hoping for and we will say so honestly.</p>
+
+      <h2 class="lede" style="margin-top:14px">Sit in it once.</h2>
+      <p style="margin-top:22px">One session will tell you more about whether you get on with the feel of it than anything on this page can. If you are not sure it is the right one for you, ring us and say what you are hoping for &mdash; we will tell you honestly, including when the answer is one of the others.</p>
       <p style="margin-top:28px"><a class="btn" href="https://optimalhealthatinspire.simplybook.it/v2">Book a session</a></p>
     </div>
   </div>
