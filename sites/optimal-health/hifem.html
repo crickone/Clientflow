@@ -41,6 +41,15 @@
   --gap:clamp(14px,1.6vw,22px);
 }
 
+/* Timber is for non-text only -- borders, underlines, outlines, rules, the
+   rail's tick. Measured: 3.01:1 on plaster, 2.14:1 on sage, enough for a
+   line but not a word. On ink it is 4.69:1, so timber may carry type there
+   and nowhere else. Type that changes on hover or focus uses --deep
+   instead (5.10:1 on plaster, 3.62:1 on sage -- weaker on sage than the
+   plaster case, but still a large step up from timber's 2.14:1 there, and
+   the only accent left in a five-colour palette once timber is off the
+   table). --deep is not a substitute on ink: 2.76:1, worse than timber. */
+
 *,*::before,*::after{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
 body{
@@ -147,7 +156,9 @@ h1,h2,h3,p,figure,blockquote{margin:0}
   text-decoration:none;
   font-size:clamp(10px,.82vw,12px);letter-spacing:.12em;text-transform:uppercase;font-weight:500;
 }
-.nav__links a:hover,.nav__links a:focus-visible{color:var(--timber)}
+/* The floating box is always on plaster, never ink, so this is the hover
+   rule from the house comment above: --deep, not timber (3.01:1 there). */
+.nav__links a:hover,.nav__links a:focus-visible{color:var(--deep)}
 .nav__cta{display:flex;align-items:center;gap:10px}
 .nav__menu{display:none;appearance:none;background:none;color:inherit;font:inherit;border-radius:0}
 
@@ -290,8 +301,14 @@ h1,h2,h3,p,figure,blockquote{margin:0}
 .roll__m{font-size:clamp(10px,.86vw,12px);color:var(--deep);max-width:34ch}
 .band--ink .roll__m{color:var(--sage)}
 .roll__x{margin-left:auto;font-size:clamp(10px,.82vw,12px);letter-spacing:.14em;text-transform:uppercase}
+/* This rule only ever fires inside the sage-ground therapies accordion
+   (.roll__head only exists on .roll--therapies rows), and .is-open is not
+   a hover -- it is what the row looks like for as long as a visitor has it
+   open, so it has to stand on its own rather than borrow a hover's excuse.
+   --deep is 3.62:1 there, short of small-text AA but the closest this
+   five-colour palette gets without repainting the row's resting ink. */
 .roll__head:hover .roll__n,.roll__head:focus-visible .roll__n,
-.roll__row.is-open .roll__n{color:var(--timber);transform:translateX(6px)}
+.roll__row.is-open .roll__n{color:var(--deep);transform:translateX(6px)}
 .roll__head:focus-visible{outline:2px solid var(--timber);outline-offset:4px}
 
 /* ---- a priced menu -------------------------------------------------
@@ -340,10 +357,13 @@ h1,h2,h3,p,figure,blockquote{margin:0}
 .roll__body{font-size:clamp(14px,1.05vw,17px);line-height:1.55;max-width:52ch;color:var(--ink)}
 .band--sage .roll__body{color:var(--ink)}
 .band--ink .roll__body{color:var(--plaster)}
+/* Resting, not hover -- every visitor sees this colour with no interaction
+   at all, on the same sage ground as the row above. --deep, same 3.62:1
+   caveat as .roll__n; currentColor carries it into the underline too. */
 .roll__go{
   display:inline-block;margin-top:clamp(14px,1.6vw,20px);
   font-size:clamp(10px,.82vw,12px);letter-spacing:.14em;text-transform:uppercase;
-  color:var(--timber);text-decoration:none;border-bottom:1px solid currentColor;padding-bottom:3px;
+  color:var(--deep);text-decoration:none;border-bottom:1px solid currentColor;padding-bottom:3px;
   transition:opacity .3s cubic-bezier(.3,.9,.2,1);
 }
 .roll__go:hover{opacity:.62}
@@ -370,7 +390,13 @@ html:not(.js) .roll__media img{clip-path:none;transform:none}
   font-size:clamp(15px,1.5vw,20px);letter-spacing:-.01em;font-weight:400;
 }
 .qa summary::-webkit-details-marker{display:none}
-.qa summary::after{content:"+";margin-left:auto;color:var(--timber);font-size:1.2em;line-height:1}
+/* The +/- is a glyph, not a rule, so it is type: the .qa block lands on all
+   three grounds across the site (pricing plaster, therapies sage, massage
+   ink), and timber only clears AA on the one of those that is ink. Default
+   to --deep for the plaster/sage cases; hand ink back its timber, which at
+   4.69:1 is the one place the house rule lets timber carry type at all. */
+.qa summary::after{content:"+";margin-left:auto;color:var(--deep);font-size:1.2em;line-height:1}
+.band--ink .qa summary::after{color:var(--timber)}
 .qa details[open] summary::after{content:"\2212"}
 .qa p{margin-top:12px;max-width:62ch;font-size:clamp(13px,1.05vw,15px);color:var(--deep)}
 .band--ink .qa p{color:var(--sage)}
@@ -399,6 +425,9 @@ textarea.field__i{resize:vertical;min-height:120px}
 /* ---- footer, bookended by the wordmark ---- */
 .foot{background:var(--ink);color:var(--plaster);padding:clamp(48px,7vw,96px) var(--pad) 0}
 .foot a{color:inherit;text-decoration:none}
+/* The footer is always ink -- the one ground the house rule lets timber
+   carry type on (4.69:1). Leave this one as timber; do not swap to --deep,
+   which is only 2.76:1 here. */
 .foot a:hover,.foot a:focus-visible{color:var(--timber)}
 .foot__say{color:var(--sage);font-size:clamp(18px,2.4vw,34px);line-height:1.2;letter-spacing:-.015em;max-width:22ch;text-transform:uppercase;font-weight:500}
 .foot__top{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:var(--gap);align-items:start}
