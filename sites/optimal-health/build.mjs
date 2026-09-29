@@ -14,7 +14,33 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const css = readFileSync(join(here, "_style.css"), "utf8");
+
+/* ---- what gets inlined, and what does not ---------------------------
+   _style.css is copied verbatim into the head of all twenty pages, so
+   every comment in it is published text on all twenty at once -- read by
+   a crawler, a summariser, a competitor's scrape and anyone's keyword
+   search, none of whom care that it is between slashes. Four hundred-odd
+   lines of it are internal reasoning, and one paragraph of it described
+   the wall boards this site crops out of its own photograph: the crop
+   took those claims off nine pictures and the comment put them into the
+   text of twenty pages.
+
+   Stripped HERE, on the way into the page, and never from the file. Those
+   comments are the best documentation in this project and the only reason
+   the next person will know why any of these rules are the shape they
+   are; the fix for "the comments ship" is to stop shipping them, not to
+   stop writing them.
+
+   A plain regex is enough because CSS has exactly one comment form and
+   this stylesheet has no string or url() carrying a `/*` for it to
+   swallow. If one is ever added, this has to become a real tokenizer --
+   silently eating half a rule would be worse than the leak it prevents.
+--------------------------------------------------------------------- */
+const CSS_COMMENT = /\/\*[\s\S]*?\*\//g;
+const css = readFileSync(join(here, "_style.css"), "utf8")
+  .replace(CSS_COMMENT, "")
+  .replace(/[ \t]+$/gm, "")
+  .replace(/\n{3,}/g, "\n\n");
 
 const NAV_LINKS = [
   ["therapies.html", "Therapies"],
@@ -526,6 +552,12 @@ const STRAY_ID_RE = /\sid\s*=\s*["']?(s\d\d)(?=["'\s>]|$)/i;
 // the last of them in the rewritten body.
 const MARKED_SECTION = /<section\b[^>]*\sdata-chapter=/g;
 
+// The headline that makes a section a chapter. Not anchored to the start of
+// the class list, and not case-sensitive, because `class="lede t-sage"` and
+// `<H2 CLASS="lede">` are the same element to a browser and would otherwise
+// fail a page that is entirely correct.
+const LEDE_RE = /<h2\b[^>]*\bclass\s*=\s*"[^"]*\blede\b/i;
+
 // The label reaches three markup contexts and the capture admits & and <, so
 // a therapy called "Sleep & recovery" would otherwise emit invalid markup and
 // a label with a tag in it would write into the rail. The & rule spares an
@@ -585,6 +617,37 @@ function documentise(body, page) {
     );
   }
 
+  // The fifth clause of the contract, and the only one that was written down
+  // without being enforced: a chapter is a section with an <h2 class="lede">
+  // headline. It is not a style rule. A chapter drops its own <p class="title">
+  // eyebrow, because the rail prints that label and printing it twice is the
+  // duplication this design exists to remove -- so a section whose only heading
+  // WAS that eyebrow opens cold, with nothing above its first paragraph, while
+  // the rail goes on sending readers to it by name. A bare pull-quote is not a
+  // chapter of a document. All twenty partials comply; this is here so the
+  // twenty-first cannot quietly stop complying and still build clean.
+  for (const c of chapters) {
+    // Sections on this site are siblings, so a chapter's own markup runs from
+    // its open tag to the next <section> or to the marker that closes the
+    // column, whichever comes first. Reading past either would let the closing
+    // call to action's headline vouch for the chapter above it.
+    const from = marked.indexOf(">", marked.indexOf(`id="${c.id}" aria-label=`)) + 1;
+    const bounds = [marked.indexOf("<section", from), marked.indexOf("<!-- /chapters -->", from)]
+      .filter((i) => i !== -1);
+    const to = bounds.length ? Math.min(...bounds) : marked.length;
+    // With the prose taken out, for the same reason the mark count above takes
+    // it out: pages/hbot.html carries a note explaining why the section under
+    // it is NOT a chapter, and quotes `<h2 class="lede">` to say so. Read
+    // literally, that note vouches for the chapter above it -- the guard reads
+    // clean over exactly the page that documents the rule.
+    if (LEDE_RE.test(marked.slice(from, to).replace(HTML_COMMENT, ""))) continue;
+    throw new Error(
+      `${page}: chapter "${c.label}" has no <h2 class="lede"> headline. A chapter gives up ` +
+        `its own eyebrow to the rail, so one without a headline opens with no heading at ` +
+        `all -- take data-chapter off it and let it keep the eyebrow.`,
+    );
+  }
+
   const at = [...marked.matchAll(MARKED_SECTION)].map((m) => m.index);
   const start = at[0];
   const endMark = marked.indexOf("<!-- /chapters -->");
@@ -634,6 +697,30 @@ ${chapters.map((c) => `    <a class="strip__a" href="#${c.id}" data-rail="${c.id
     marked.slice(end),
   ].join("\n");
 }
+
+/* ---- the partials' notes stay in the partials --------------------------
+   An HTML comment reaches the built page exactly as CSS ones did, and the
+   notes in pages/ and posts/ are working notes: which session counts are
+   still unconfirmed, which testimonials were held back for want of the
+   compliance document and what they said, which machine nobody has
+   identified yet. Every one of those belongs where it is -- the next
+   person to open the partial needs it, and deleting them to clean the
+   output would throw away the only record of why the page reads as it
+   does. None of them belongs on the client's live website.
+
+   AFTER documentise(), never before. documentise finds the end of the
+   documented column by looking for <!-- /chapters -->, and the two blog
+   passes above put their derived markup where <!-- cards --> and
+   <!-- next --> are. Strip first and all three markers are gone before
+   anything reads them: the column would run to the end of the body and
+   swallow the closing call to action, the journal index would compose as
+   an index of nothing, and every article would lose its read-next pair --
+   silently, because a missing marker cannot be missed if it was never
+   there. Stripping last also retires <!-- /chapters --> itself, which had
+   been shipping in the source of every documented page.
+--------------------------------------------------------------------- */
+const undocumented = (html) =>
+  html.replace(HTML_COMMENT, "").replace(/[ \t]+$/gm, "").replace(/\n{3,}/g, "\n\n");
 
 const shell = ({ title, description, body }) => `<!doctype html>
 <html lang="en">
@@ -906,7 +993,7 @@ for (const name of readdirSync(join(here, "pages"))) {
     }
     raw = raw.replace(CARDS_MARK, cards());
   }
-  const body = documentise(raw, `pages/${name}`);
+  const body = undocumented(documentise(raw, `pages/${name}`));
   composed.push({ file: meta.file, chars: body.length, html: shell({ ...meta, body }) });
 }
 
@@ -928,7 +1015,7 @@ for (const post of POSTS) {
     );
   }
   raw = raw.replace(NEXT_MARK, nextCards(post.slug));
-  const body = documentise(raw, `posts/${name}`);
+  const body = undocumented(documentise(raw, `posts/${name}`));
   composed.push({
     file: `blog-${post.slug}.html`,
     chars: body.length,

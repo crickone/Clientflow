@@ -10,7 +10,7 @@
 // playwright-core is resolved from app/node_modules; the browser is the
 // Playwright Chromium already on this machine.
 import { createRequire } from "node:module";
-import { mkdirSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -18,8 +18,13 @@ const here = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(join(here, "..", "..", "app", "package.json"));
 const { chromium } = require("playwright-core");
 
+// The Playwright build on THIS machine, when it happens to be there. Pinning
+// it outright -- build number, CPU architecture and all -- meant a Playwright
+// bump or a run on anyone else's machine failed at launch with a path nobody
+// could read as "install the browser". Playwright's own resolution is the
+// fallback, and it is the one that is right everywhere.
 const CHROME = join(
-  process.env.HOME,
+  process.env.HOME ?? "",
   "Library/Caches/ms-playwright/chromium_headless_shell-1243",
   "chrome-headless-shell-mac-arm64/chrome-headless-shell",
 );
@@ -133,7 +138,7 @@ async function findClipping(page) {
 }
 
 const pages = readdirSync(here).filter((f) => f.endsWith(".html")).sort();
-const browser = await chromium.launch({ executablePath: CHROME });
+const browser = await chromium.launch(existsSync(CHROME) ? { executablePath: CHROME } : {});
 let overflowCount = 0;
 let clipCount = 0;
 let scrollCount = 0;
@@ -143,7 +148,15 @@ for (const [label, width, height] of [["desktop", 1440, 900], ["phone", 390, 844
   const page = await ctx.newPage();
   for (const f of pages) {
     const url = base ? `${base}/${f}` : `file://${join(here, f)}`;
-    await page.goto(url, { waitUntil: "networkidle", timeout: 60000 }).catch(() => {});
+    // A swallowed failure is the one thing this harness cannot afford: the run
+    // carries on, measures the PREVIOUS page still loaded in the tab, writes
+    // that picture under this page's name and reports it clean. The catch stays
+    // -- one unreachable page should not lose the other nineteen screenshots --
+    // but it says so, loudly, next to the line that would otherwise read ok.
+    await page.goto(url, { waitUntil: "networkidle", timeout: 60000 }).catch((e) => {
+      console.error(`  ${label.padEnd(8)} ${f}  !! DID NOT LOAD: ${e.message.split("\n")[0]}`);
+      console.error(`             everything reported for this page is the previous one still in the tab.`);
+    });
     // Walk the page so every scroll-triggered reveal has fired before the
     // capture. Without this, everything below the fold is still at opacity 0
     // -- fullPage does not scroll, so GSAP never fires and the screenshot is

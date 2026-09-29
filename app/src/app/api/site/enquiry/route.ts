@@ -24,8 +24,8 @@ export const dynamic = "force-dynamic";
  * the verbatim template minted into the page (lib/cms/enquiryToken.ts) —
  * the same model as api/campaigns/signup/route.ts, whose header explains why
  * host- or slug-based resolution is not safe here. Protections mirror
- * f/[slug]/submit/route.ts: size cap before parsing, honeypot, per-IP
- * throttle; the JSON-or-url-encoded exchange itself is shared with that
+ * f/[slug]/submit/route.ts: size cap before parsing, per-IP throttle,
+ * honeypot; the JSON-or-url-encoded exchange itself is shared with that
  * route (lib/publicFormExchange.ts).
  *
  * Plain Request/Response, not next/server, so the route loads in the test
@@ -80,9 +80,13 @@ export async function POST(req: Request) {
   }
   const returnTo = safeReturnPath(sameOriginRefererPath(req.headers.get("referer"), req.url) ?? fields.return);
 
-  // Honeypot: a bot that fills every field gets a quiet success and nothing stored.
-  if (isEnquiryHoneypotTripped(fields)) return respondPublicForm(req, returnTo, true);
-
+  // The throttle comes BEFORE the honeypot, because the honeypot's answer is a
+  // quiet success: a bot that fills the decoy field and never learns it was
+  // caught keeps sending, and while that reply was returned first it was
+  // returned an unlimited number of times. Nothing is stored either way and no
+  // database is touched, so this was cheap requests rather than a hole — but
+  // "cheap" is per request, and the point of a per-IP budget is that the
+  // caller does not get to choose which of their requests count against it.
   const rl = rateLimit(`site-enquiry:${clientIp(req)}`, RATE_LIMIT, RATE_WINDOW_MS);
   if (!rl.ok) {
     return respondPublicForm(req, returnTo, false, {
@@ -91,6 +95,9 @@ export async function POST(req: Request) {
       headers: { "Retry-After": String(rl.retryAfterSec) },
     });
   }
+
+  // Honeypot: a bot that fills every field gets a quiet success and nothing stored.
+  if (isEnquiryHoneypotTripped(fields)) return respondPublicForm(req, returnTo, true);
 
   // The claim is read BEFORE the fields, because it names the site and a
   // programme can only be checked against the list that site's own form

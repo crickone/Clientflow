@@ -953,14 +953,20 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
 
 /* ---- the reception photograph, without the wall boards ----------------
    assets/reception.jpg is the only picture of the room itself, which is
-   why nine places on this site reach for it. It also has the clinic's own
-   marketing boards on the back wall, and at hero size they are legible:
-   "Increases oxygen delivery for faster recovery", "Reduces inflammation
-   after intense training", "Enhances stamina and performance capacity",
-   "Accelerates muscle recovery". Those are outcome claims, and they are
-   the exact claims every page of this site takes out of its copy. Holding
-   the line in the words and then breaking it in the picture is worse than
-   not holding it: the reader believes the photograph.
+   why nine places on this site reach for it. It also has four of the
+   clinic's own marketing boards on the back wall, and at hero size every
+   word on them is legible. Each of the four promises a physiological
+   outcome -- the register this site's copy deliberately does not use
+   while the compliance document the brand pack refers to has never been
+   supplied. Holding that line in the words and then breaking it in the
+   picture is worse than not holding it: the reader believes the
+   photograph.
+
+   THEIR WORDING IS NOT REPEATED HERE, and must not be added. A comment is
+   machine-readable text; build.mjs strips comments out of the copy it
+   inlines into each page, so this paragraph does not ship today, but that
+   is one regex away from changing and a claim written down is a claim
+   that can travel. Open the asset if you need to read what they say.
 
    So the boards are cropped off rather than retouched away. The asset is
    untouched and every use opts in by class, which means one removal here
