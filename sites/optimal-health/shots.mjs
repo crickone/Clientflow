@@ -77,9 +77,54 @@ function describeOffender(o) {
   return `${o.tag}${id}${cls}`;
 }
 
+// findOverflow only sees a page's own edge: document.documentElement.scrollWidth
+// vs the viewport. An ancestor set to overflow:hidden is a wall between the
+// two -- it absorbs whatever overflows inside it, so nothing above that wall
+// ever reads as wider than the viewport, no matter how badly something below
+// it is clipped. hbot.html proved it: the hero's own overflow:hidden ate a
+// headline overflowing by hundreds of pixels and findOverflow above reported
+// nothing.
+//
+// scrollWidth vs clientWidth on the SAME element sidesteps the wall, because
+// it doesn't care what the ancestor chain does with the overflow -- it asks
+// each element "is your own content wider than you are," which is true
+// whether that width is clipped away, painted over the edge, or scrolled.
+// Walking every element catches the clipping ancestor (.hero) and everything
+// between it and the actual overflowing element, all reporting close to the
+// same amount; keeping only the deepest -- the one a child does not already
+// explain -- names the element actually carrying the too-wide content instead
+// of every box it happens to be sitting inside.
+async function findClipping(page) {
+  return page.evaluate(() => {
+    const rows = [];
+    for (const el of document.querySelectorAll("body *")) {
+      const amount = el.scrollWidth - el.clientWidth;
+      if (amount <= 1) continue;
+      rows.push({ el, amount });
+    }
+    // A 2px tolerance absorbs the border/padding rounding that shifts the
+    // number by a pixel or two between nesting levels -- without it, the
+    // parent of the real culprit slips past the "explained by a child" check
+    // and gets reported a second time for the same defect.
+    const offenders = rows
+      .filter(({ el, amount }) =>
+        ![...el.children].some((c) => c.scrollWidth - c.clientWidth >= amount - 2),
+      )
+      .map(({ el, amount }) => ({
+        tag: el.tagName.toLowerCase(),
+        id: el.id || "",
+        cls: typeof el.className === "string" ? el.className.trim() : "",
+        amount: Math.round(amount),
+      }));
+    offenders.sort((a, b) => b.amount - a.amount);
+    return offenders.slice(0, 8);
+  });
+}
+
 const pages = readdirSync(here).filter((f) => f.endsWith(".html")).sort();
 const browser = await chromium.launch({ executablePath: CHROME });
 let overflowCount = 0;
+let clipCount = 0;
 
 for (const [label, width, height] of [["desktop", 1440, 900], ["phone", 390, 844]]) {
   const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 2 });
@@ -122,6 +167,17 @@ for (const [label, width, height] of [["desktop", 1440, 900], ["phone", 390, 844
       console.log(`  ${label.padEnd(8)} ${f}  ok, no horizontal overflow (scrollWidth ${overflow.docWidth}px = viewport ${overflow.vw}px)`);
     }
 
+    const clipping = await findClipping(page);
+    if (clipping.length) {
+      clipCount++;
+      console.log(`  ${label.padEnd(8)} ${f}  !! CLIPPING: ${clipping.length} element(s) whose own content is wider than they are`);
+      for (const o of clipping) {
+        console.log(`             -> ${describeOffender(o)}  scrollWidth exceeds clientWidth by ${o.amount}px`);
+      }
+    } else {
+      console.log(`  ${label.padEnd(8)} ${f}  ok, no clipping (every element's content fits its own box)`);
+    }
+
     await page.screenshot({ path: join(out, `${f.replace(/\.html$/, "")}-${label}.png`), fullPage: true });
   }
   await ctx.close();
@@ -132,4 +188,9 @@ if (overflowCount > 0) {
   console.log(`!! ${overflowCount} page/width combination(s) overflow horizontally -- see OVERFLOW lines above. This does not fail the run; the screenshots were still taken.`);
 } else {
   console.log("No horizontal overflow found at any page or width.");
+}
+if (clipCount > 0) {
+  console.log(`!! ${clipCount} page/width combination(s) clip an element's own content -- see CLIPPING lines above. This does not fail the run; the screenshots were still taken.`);
+} else {
+  console.log("No clipping found at any page or width.");
 }
