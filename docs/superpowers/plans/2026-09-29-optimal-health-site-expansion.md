@@ -847,7 +847,7 @@ Append to `_style.css`:
 
 - [ ] **Step 7: Write chapter 06, Pricing**
 
-Three rows using the existing `.roll--rates` markup: `€50 one session` · `€450 five sessions` · `€800 ten sessions`. No struck-through prices. A `Book a session` button to the SimplyBook URL and a quiet link to the full pricing page.
+Three rows using the existing `.roll--rates` markup: `€100 one session` · `€450 five sessions` · `€800 ten sessions`. That is €100, then €90 a session, then €80 — the ladder has to get cheaper per session or the blocks are pointless. No struck-through prices. A `Book a session` button to the SimplyBook URL and a quiet link to the full pricing page.
 
 - [ ] **Step 8: Build, check, shoot**
 
