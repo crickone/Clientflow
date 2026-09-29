@@ -133,11 +133,18 @@ export function SiteTracking({
         margin: "0 auto",
         padding: "16px 18px",
         borderRadius: 12,
-        // Inherits the site's own palette: this sits on the client's page,
-        // not ours, and a stranger's colour scheme on their site reads as a
-        // third-party advert rather than their own notice.
-        background: "var(--surface, #111)",
-        color: "var(--ink, #f4f4f5)",
+        // This sits on the client's page, not ours, so a site can dress it in
+        // its own palette — but ONLY through names that belong to this banner.
+        // It used to read var(--surface) and var(--ink), and those are generic
+        // enough that a site defines one and not the other: every bespoke site
+        // defines --ink (dark body text) and none defines --surface, so the
+        // panel took the #111 fallback and the text took the site's dark ink.
+        // Near-black on near-black, illegible, on every site that had a tag
+        // configured. Namespaced names cannot half-resolve like that: a site
+        // either sets the set and gets its own colours, or sets none and gets
+        // these, which are legible on their own.
+        background: "var(--cms-consent-bg, #14121f)",
+        color: "var(--cms-consent-fg, #f6f6f8)",
         border: "1px solid currentColor",
         boxShadow: "0 20px 60px rgba(0,0,0,.45)",
         display: "flex",
@@ -174,15 +181,17 @@ export function SiteTracking({
           style={{
             padding: "9px 16px",
             borderRadius: 6,
-            border: "1px solid currentColor",
-            background: "currentColor",
+            border: "1px solid transparent",
+            // Fill and label are one pair, so they can never resolve apart and
+            // leave the label the same colour as the fill it sits on.
+            background: "var(--cms-consent-accent, #f6f6f8)",
+            color: "var(--cms-consent-accent-fg, #14121f)",
             font: "inherit",
+            fontWeight: 600,
             cursor: "pointer",
           }}
         >
-          {/* The label takes the panel's background so it reads on the fill,
-              whatever palette the site uses. */}
-          <span style={{ color: "var(--surface, #111)" }}>Accept</span>
+          Accept
         </button>
       </div>
     </div>

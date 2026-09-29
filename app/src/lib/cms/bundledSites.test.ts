@@ -65,4 +65,24 @@ for (const slug of shipped) {
   check(`bundle "${slug}" references no missing asset${missing.size ? ` (${[...missing].join(", ")})` : ""}`, missing.size === 0);
 }
 
+// The cookie notice renders on the client's own page and may take the site's
+// colours, but only through names reserved for it. Reading a generic token
+// like --surface or --ink is the bug that made the panel near-black text on a
+// near-black ground everywhere: every bespoke site defines --ink and none
+// defines --surface, so one half resolved to the site and the other to the
+// fallback. Namespaced names cannot split like that.
+// Comments go first: the note above the colours names the old tokens, and a
+// scan that counted those would fail on the explanation of the fix.
+const tracking = stripComments(fs.readFileSync(path.join(root, "src/components/cms/SiteTracking.tsx"), "utf8"));
+const genericVars = [...tracking.matchAll(/var\(\s*(--[a-z0-9-]+)/gi)].map((m) => m[1]).filter((v) => !v.startsWith("--cms-consent-"));
+check(
+  `cookie notice reads only --cms-consent-* custom properties${genericVars.length ? ` (found ${[...new Set(genericVars)].join(", ")})` : ""}`,
+  genericVars.length === 0,
+);
+const consentVars = new Set([...tracking.matchAll(/var\(\s*(--cms-consent-[a-z-]+)\s*,\s*([^)]+)\)/g)].map((m) => m[1]));
+check("cookie notice names its own colours", consentVars.size >= 2);
+for (const m of tracking.matchAll(/var\(\s*--cms-consent-[a-z-]+\s*,\s*([^)]+)\)/g)) {
+  check(`cookie notice colour "${m[1].trim()}" has a fallback`, m[1].trim().length > 0);
+}
+
 console.log(`bundledSites.test.ts: ${passed} checks passed`);

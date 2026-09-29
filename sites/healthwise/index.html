@@ -27,6 +27,11 @@
   --navy:#28245C; --red:#EA1C28; --red-dark:#BB1620; --red-tint:#FCE8E9;
   --ink:#241A1B; --mid:#544D4D; --surf:#F2F2F2; --white:#FFFFFF;
   --pad:clamp(20px,5vw,64px); --max:1240px;
+  /* The platform's cookie notice reads these (components/cms/SiteTracking).
+     Set as a group so the panel is always the brand's navy with white type
+     and the red primary, never a half-inherited mix. */
+  --cms-consent-bg:#28245C; --cms-consent-fg:#FFFFFF;
+  --cms-consent-accent:#EA1C28; --cms-consent-accent-fg:#FFFFFF;
   --display:'Manrope',sans-serif; --text:'Open Sans',sans-serif;
 }
 *,*::before,*::after{box-sizing:border-box}
