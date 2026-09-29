@@ -382,8 +382,8 @@ h1,h2,h3,p,figure,blockquote{margin:0}
 .rate{display:flex;flex-direction:column;gap:2px;text-align:right;min-width:clamp(56px,6vw,84px)}
 .rate__v{font-size:clamp(14px,1.3vw,19px);letter-spacing:-.01em}
 .rate__k{font-size:clamp(9px,.72vw,11px);letter-spacing:.14em;text-transform:uppercase;color:var(--deep)}
-/* Not currently built onto any page, but written for a sage ground, so it
-   gets the same correction as every other one: --deep measures 3.62:1 on
+/* Built onto the hbot page's Pricing chapter, a sage ground, so it gets
+   the same correction as every other one: --deep measures 3.62:1 on
    sage, --ink 10.01:1. */
 .band--sage .rate__k{color:var(--ink)}
 @media (max-width:640px){
@@ -510,7 +510,13 @@ summary.qa__q::after{
 }
 .band--ink .qa__q::after{color:var(--timber)}
 .band--sage .qa__q::after{color:var(--ink)}
-.qa__row[open] .qa__q::after{transform:rotate(-135deg);margin-top:-2px}
+/* content:"" is repeated here, not left to summary.qa__q::after above, because
+   the legacy four-row block's .qa details[open] summary::after{content:"\2212"}
+   sits at (0,2,3) -- higher than summary.qa__q::after's (0,1,2) -- and these
+   rows are still `details` inside a `.qa` div, so that legacy rule reaches
+   them too and would print a stray minus glyph inside the chevron box the
+   instant a row opens. This selector is (0,3,1), which outranks it. */
+.qa__row[open] .qa__q::after{content:"";transform:rotate(-135deg);margin-top:-2px}
 @media (prefers-reduced-motion:reduce){summary.qa__q::after{transition:none}}
 .qa__q:focus-visible{outline:2px solid var(--deep);outline-offset:3px}
 .band--sage .qa__q:focus-visible{outline-color:var(--ink)}
