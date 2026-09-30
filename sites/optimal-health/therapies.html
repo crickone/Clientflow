@@ -172,8 +172,10 @@ h1,h2,h3,p,figure,blockquote{margin:0}
 .hero .spread{border-top-color:rgba(242,243,237,.55);color:var(--plaster);margin-bottom:clamp(16px,2.4vw,28px)}
 
 .hero__mark{margin-bottom:clamp(14px,2vw,22px)}
-.hero__foot{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap}
+
+.hero__foot{display:flex;align-items:flex-end;justify-content:space-between;gap:clamp(26px,3vw,36px) 24px;flex-wrap:wrap}
 .hero__sub{color:var(--sage);max-width:38ch}
+.hero__sub + .hero__foot{margin-top:clamp(26px,3vw,36px)}
 
 .duo{display:grid;grid-template-columns:1fr 1fr;min-height:min(78vh,760px)}
 @media (max-width:820px){.duo{grid-template-columns:1fr}}
@@ -192,11 +194,21 @@ h1,h2,h3,p,figure,blockquote{margin:0}
 .duo__panel--plaster{background:var(--plaster)}
 .duo__panel--ink{background:var(--ink);color:var(--plaster)}
 .duo__panel--ink .panel__s{color:var(--sage)}
+
+.duo__panel--deep{background:var(--deep);color:var(--plaster)}
+.duo__panel--deep .panel__s{color:var(--plaster)}
+
+.duo__panel--deep .explore:hover,.duo__panel--deep .explore:focus-visible,
+.duo__panel--ink .explore:hover,.duo__panel--ink .explore:focus-visible{
+  color:inherit;text-decoration:underline;text-underline-offset:5px;
+}
 .duo__inset{width:min(260px,72%);aspect-ratio:4/3;overflow:hidden}
 .duo__inset img{width:100%;height:100%;object-fit:cover}
 .duo__body{max-width:42ch;font-size:clamp(13px,1.05vw,15px)}
 
 .duo--routes{min-height:min(46vh,420px)}
+
+.duo--routes + .band--ink{border-top:1px dotted rgba(242,243,237,.42)}
 
 .band{padding:clamp(48px,7vw,104px) var(--pad)}
 .band--sage{background:var(--sage)}
@@ -270,6 +282,26 @@ h1,h2,h3,p,figure,blockquote{margin:0}
   .roll--rates .roll__x{width:100%;margin-left:0;justify-content:space-between;gap:12px}
   .rate{min-width:0}
 }
+
+.tiers{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--gap);align-items:stretch}
+@media (max-width:820px){.tiers{grid-template-columns:1fr}}
+.tier{
+  display:flex;flex-direction:column;
+  background:var(--plaster);color:var(--ink);
+  padding:clamp(22px,2.6vw,34px);
+}
+.tier__k{font-size:clamp(9px,.72vw,11px);letter-spacing:.14em;text-transform:uppercase;font-weight:500;color:var(--deep)}
+.tier__v{
+  margin-top:clamp(10px,1.4vw,16px);
+  display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
+  font-size:clamp(30px,3.4vw,46px);line-height:1;letter-spacing:-.02em;font-weight:500;
+}
+.tier__u{font-size:clamp(9px,.72vw,11px);letter-spacing:.14em;text-transform:uppercase;font-weight:500;color:var(--deep)}
+.tier__d{display:flex;flex-direction:column;flex:1 1 auto;margin:clamp(18px,2.2vw,26px) 0 0}
+.tier__d > div{padding:clamp(12px,1.5vw,16px) 0;border-top:1px dotted rgba(36,35,31,.28)}
+.tier__d > div:last-child{margin-top:auto;padding-bottom:0}
+.tier__d dt{font-size:clamp(9px,.72vw,11px);letter-spacing:.14em;text-transform:uppercase;font-weight:500;color:var(--deep)}
+.tier__d dd{margin:7px 0 0;font-size:clamp(12px,.98vw,14px);line-height:1.5}
 
 .roll__panel{overflow:hidden}
 .roll__inner{
@@ -640,7 +672,8 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
         <p style="margin-top:22px">Most people start with whichever fits the thing they came in about, then try the others. Tell us what you are hoping to get out of it and we will be straight with you.</p>
       </div>
     </div>
-    <div class="grid3" data-stagger>
+
+    <div class="grid3 grid3--two" data-stagger>
       <a class="tile" href="hbot.html">
         <div class="tile__img"><img src="assets/hbot.jpg" alt="The hyperbaric oxygen chamber" /></div>
         <h3 class="panel__t" style="text-align:left">Hyperbaric oxygen</h3>
@@ -700,13 +733,13 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
 </section>
 
 <div class="duo duo--routes">
-  <div class="duo__panel duo__panel--plaster" data-stagger>
+  <div class="duo__panel duo__panel--deep" data-stagger>
     <h2 class="panel__t">Recovery and everyday health</h2>
     <p class="panel__s">Most people who come in</p>
     <p class="duo__body">Long weeks, sleep gone off, stiffness that arrived so gradually it now counts as normal. None of that has to have a name before it is worth doing something about.</p>
     <a class="explore" href="recovery.html">More on recovery</a>
   </div>
-  <div class="duo__panel duo__panel--sage" data-stagger>
+  <div class="duo__panel duo__panel--ink" data-stagger>
     <h2 class="panel__t">Athletic performance</h2>
     <p class="panel__s">Between hard sessions</p>
     <p class="duo__body">Where each therapy sits in a week that already has enough in it. None of this is training, and none of it asks anything of you.</p>
