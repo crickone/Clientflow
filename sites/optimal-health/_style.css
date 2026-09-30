@@ -221,6 +221,18 @@ h1,h2,h3,p,figure,blockquote{margin:0}
      remove, not add. flex-wrap so the sheet below has a line of its own to
      drop onto instead of forcing the brand/Book row to make room for it. */
   .nav{position:relative;top:0;left:0;border-radius:0;width:100%;justify-content:space-between;gap:16px;flex-wrap:wrap}
+
+  /* A hero is meant to fill the screen, and below this breakpoint the nav is
+     back in normal flow -- so a 100dvh hero sits under a 64px nav and the two
+     come to a screen and a bit. The hero's own call to action falls past the
+     fold and its overflow:hidden clips it.
+
+     So the nav floats over the hero, which is exactly what it does above this
+     breakpoint. It does that ONLY where a hero actually follows it: on a page
+     that opens on a plain band there is nothing to float over, and an absolute
+     nav there would sit on the headline -- which is a bug this stylesheet has
+     already had once, on contact and pricing. `+ .hero` is the whole guard. */
+  .nav:has(+ .hero){position:absolute;top:0;left:0}
   .nav__links{
     display:none;
     /* Static, not absolute: html:not(.js) (no scripting at all) is the
@@ -271,7 +283,13 @@ h1,h2,h3,p,figure,blockquote{margin:0}
 
    Nothing changes at or below 978px of viewport height, where 92vh was
    already under the old cap -- 1440x900 renders identically. */
-.hero{position:relative;min-height:92vh;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;background:var(--ink)}
+/* The hero fills the viewport. Two declarations, not one: on a phone `vh` is
+   measured against the LARGEST viewport, so a 100vh hero sits a browser-chrome
+   height taller than the screen and the fold lands mid-wordmark. `dvh` tracks
+   the viewport as the address bar hides and shows, and the vh line above it is
+   what older browsers keep. min-height rather than height so a hero whose copy
+   runs long can still grow. */
+.hero{position:relative;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;background:var(--ink)}
 .hero__media{position:absolute;inset:0}
 .hero__media img{width:100%;height:100%;object-fit:cover}
 /* Just enough shading at the edges to hold small type. The
