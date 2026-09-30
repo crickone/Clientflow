@@ -880,9 +880,8 @@ const POSTS = [
     title: "Stress, sleep, and the twelve minutes after work",
     excerpt:
       "The most reliable thing an evening session gives a busy person is a bounded half hour with the phone somewhere else. The bed is what makes you keep the appointment.",
-    photo: "reception.jpg",
-    alt: "Reception at the Clonmel clinic",
-    room: true,
+    photo: "infrared-bed-idle.jpg",
+    alt: "The infrared bed closed and waiting in the treatment room, its orange strip lit",
     description:
       "An evening infrared session at our Clonmel clinic: twelve minutes, comfortable clothes, and half an hour nobody can reach you in.",
   },
@@ -892,8 +891,8 @@ const POSTS = [
     title: "The HIFEM chair, and a week spent sitting down",
     excerpt:
       "Long sitting leaves some muscle doing almost nothing. The chair asks it to work &mdash; twenty to thirty minutes, seated and fully clothed &mdash; and it is muscle work, so plan it like one.",
-    photo: "hifem.jpg",
-    alt: "A client seated fully clothed on the HIFEM chair at the Clonmel clinic",
+    photo: "hifem-chair.jpg",
+    alt: "The HIFEM chair and its console, empty, a cushion on the seat",
     description:
       "What the HIFEM chair does after a week at a desk, at our Clonmel clinic: twenty to thirty minutes, seated and fully clothed, planned like a gym session.",
   },
@@ -903,8 +902,8 @@ const POSTS = [
     title: "Infrared and everyday aches: what the light is actually doing",
     excerpt:
       "What the bed emits, what the light is understood to do once it is in tissue, and why the honest account of it is written in weeks rather than in sessions.",
-    photo: "infrared.jpg",
-    alt: "The infrared therapy bed at the Clonmel clinic",
+    photo: "infrared-bed-lit.jpg",
+    alt: "The infrared bed running, its red light spilling across the brick wall behind it",
     description:
       "Twelve minutes of red and near-infrared light at our Clonmel clinic: what the bed emits, what the light is understood to do, and what people say afterwards.",
   },
@@ -914,8 +913,8 @@ const POSTS = [
     title: "Between hard sessions: where the chamber fits in a training week",
     excerpt:
       "How you recover is part of the training week rather than an afterthought to it. Where an hour in the chamber sits in that week, and what two competitors who use it say.",
-    photo: "hbot.jpg",
-    alt: "Inside the hyperbaric oxygen chamber at the Clonmel clinic",
+    photo: "hbot-chamber-seated.jpg",
+    alt: "A client seated in the open hyperbaric chamber, hands on his knees",
     description:
       "Where an hour in the hyperbaric chamber sits in a training week, at our Clonmel clinic, and what two competitors who use it say about it.",
   },
@@ -925,8 +924,8 @@ const POSTS = [
     title: "Panels, lasers, and a bed you lie down in",
     excerpt:
       "Light therapy is not one thing. A hand-held laser, a panel on a stand and a full-length bed do different jobs, and the difference is mostly how much of you the light reaches.",
-    photo: "room.jpg",
-    alt: "A treatment room at the Clonmel clinic",
+    photo: "infrared-bed-open.jpg",
+    alt: "Close along the shell of the infrared bed, its orange strip lit against black brick",
     description:
       "How a full-length infrared bed differs from a laser or a panel, and why a session at our Clonmel clinic runs twelve minutes.",
   },
@@ -936,8 +935,8 @@ const POSTS = [
     title: "Hyperbaric oxygen and mental clarity after a hard week",
     excerpt:
       "Forty-five to sixty minutes in a pressurised chamber, breathing air with more oxygen in it than the room has. What the hour is like, and what people report from it.",
-    photo: "hbot.jpg",
-    alt: "A client seated in the hyperbaric oxygen chamber at the Clonmel clinic",
+    photo: "hbot-session-mask.jpg",
+    alt: "A client seated in the open hyperbaric chamber holding the oxygen mask",
     description:
       "What an hour in the hyperbaric chamber at our Clonmel clinic is actually like, why the pressure matters, and what people report after a run of sessions.",
   },
@@ -948,7 +947,7 @@ const POSTS = [
 // page without it rather than quietly publishing an empty index.
 const CARDS_MARK = "<!-- cards -->";
 const card = (p, pad) => `${pad}<a class="tile" href="blog-${p.slug}.html">
-${pad}  <div class="tile__img${p.room ? " shot--room" : ""}"><img src="assets/${p.photo}" alt="${esc(p.alt)}" /></div>
+${pad}  <div class="tile__img${p.room ? " shot--room" : ""}"><img src="assets/${p.photo}" alt="${esc(p.alt)}" loading="lazy" /></div>
 ${pad}  <p class="tile__n">${esc(p.topic)}</p>
 ${pad}  <h3 class="tile__h">${p.title}</h3>
 ${pad}  <p class="tile__m">${p.excerpt}</p>

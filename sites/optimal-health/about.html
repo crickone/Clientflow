@@ -621,6 +621,10 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
 .band--sage .arc__b{color:var(--ink)}
 .band--ink .arc__b{color:var(--sage)}
 
+.shot--band{aspect-ratio:24/7}
+
+.shot--door img{object-position:50% 30%}
+
 .shot--room img{object-view-box:inset(0% 40% 0% 0%)}
 @supports not (object-view-box: inset(0% 40% 0% 0%)) {
   .shot--room{overflow:clip}
@@ -650,7 +654,7 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
 </header>
 
 <section class="hero">
-  <div class="hero__media shot--room"><img src="assets/reception.jpg" alt="Reception at Optimal Health and Recovery, Ard Gaoithe Business Park, Clonmel" /></div>
+  <div class="hero__media shot--room"><img src="assets/reception.jpg" alt="The waiting area at Optimal Health and Recovery, Ard Gaoithe Business Park, Clonmel, bamboo beside the hyperbaric oxygen room door" /></div>
   <div class="hero__inner">
     <p class="micro" data-rise style="color:var(--sage)">About</p>
     <h1 class="wordmark hero__mark" style="margin-top:22px">A room built to be calm.</h1>
@@ -670,18 +674,19 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
       <p style="margin-top:22px">We built this for real people: training hard, living busy, or simply wanting to move, sleep and feel better again. Our sessions support your body's natural processes, so you can keep up with life rather than slow down.</p>
       <p>You do not need to be an athlete, and you do not need to know which therapy you want before you arrive.</p>
     </div>
-    <div class="tile__img"><img src="assets/room.jpg" alt="A treatment room at the clinic" /></div>
+    <div class="tile__img"><img src="assets/room.jpg" alt="The waiting area at the clinic: a green sofa, bamboo, and the treatment-room doors off it" loading="lazy" /></div>
   </div>
 </section>
 
 <section class="band band--sage">
   <div>
-    <div class="band__head">
+    <div class="says" style="margin-bottom:clamp(28px,3.4vw,44px)">
       <div class="band__head__l">
         <p class="title">How we work</p>
 
         <h2 class="lede">Guided, every session.</h2>
       </div>
+      <div class="tile__img"><img src="assets/infrared-session-start.jpg" alt="A staff member's hand on the infrared bed's control panel, a client already lying inside the open end" loading="lazy" /></div>
     </div>
     <div class="cols4" data-stagger>
       <div class="cell"><p class="roll__n">01</p><p class="cell__v">Someone shows you in and sets you up. You are never left to work out the equipment yourself.</p></div>
@@ -701,6 +706,8 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
       <p style="margin-top:22px">Unit 12m, Ard Gaoithe Business Park, Clonmel, Co. Tipperary, E91 E049. Parking on site.</p>
       <p style="margin-top:28px"><a class="explore" href="contact.html">Get directions</a></p>
     </div>
+
+    <div class="tile__img"><img src="assets/corridor-massage-door.jpg" alt="A treatment-room door at the clinic with its vacant tag, bamboo beside it, and an open door beyond onto the lit infrared bed" loading="lazy" /></div>
   </div>
 </section>
 

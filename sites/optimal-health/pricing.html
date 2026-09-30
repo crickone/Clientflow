@@ -621,6 +621,10 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
 .band--sage .arc__b{color:var(--ink)}
 .band--ink .arc__b{color:var(--sage)}
 
+.shot--band{aspect-ratio:24/7}
+
+.shot--door img{object-position:50% 30%}
+
 .shot--room img{object-view-box:inset(0% 40% 0% 0%)}
 @supports not (object-view-box: inset(0% 40% 0% 0%)) {
   .shot--room{overflow:clip}

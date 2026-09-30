@@ -621,6 +621,10 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
 .band--sage .arc__b{color:var(--ink)}
 .band--ink .arc__b{color:var(--sage)}
 
+.shot--band{aspect-ratio:24/7}
+
+.shot--door img{object-position:50% 30%}
+
 .shot--room img{object-view-box:inset(0% 40% 0% 0%)}
 @supports not (object-view-box: inset(0% 40% 0% 0%)) {
   .shot--room{overflow:clip}
@@ -650,7 +654,7 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
 </header>
 
 <section class="hero">
-  <div class="hero__media shot--room"><img src="assets/reception.jpg" alt="Reception at Optimal Health and Recovery, Clonmel" /></div>
+  <div class="hero__media"><img src="assets/waiting-room-wide.jpg" alt="The waiting area at the Clonmel clinic, with the hyperbaric oxygen room off it and an open door onto the lit infrared bed" /></div>
   <div class="hero__inner">
     <p class="micro" data-rise style="color:var(--sage)">What we do</p>
     <h1 class="wordmark hero__mark" style="margin-top:22px">Four therapies, one room.</h1>
@@ -675,22 +679,22 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
 
     <div class="grid3 grid3--two" data-stagger>
       <a class="tile" href="hbot.html">
-        <div class="tile__img"><img src="assets/hbot.jpg" alt="The hyperbaric oxygen chamber" /></div>
+        <div class="tile__img"><img src="assets/hbot.jpg" alt="The hyperbaric oxygen chamber" loading="lazy" /></div>
         <h3 class="panel__t" style="text-align:left">Hyperbaric oxygen</h3>
         <p class="tile__m">Higher oxygen levels to support recovery, clarity and steady energy.</p>
       </a>
       <a class="tile" href="infrared.html">
-        <div class="tile__img"><img src="assets/infrared.jpg" alt="The infrared therapy bed" /></div>
+        <div class="tile__img"><img src="assets/infrared.jpg" alt="The infrared therapy bed" loading="lazy" /></div>
         <h3 class="panel__t" style="text-align:left">Infrared</h3>
         <p class="tile__m">Deep, gentle warmth that helps muscles release and joints loosen.</p>
       </a>
       <a class="tile" href="massage.html">
-        <div class="tile__img"><img src="assets/massage.jpg" alt="A massage treatment at the clinic" /></div>
+        <div class="tile__img"><img src="assets/massage.jpg" alt="A massage treatment at the clinic" loading="lazy" /></div>
         <h3 class="panel__t" style="text-align:left">Massage</h3>
         <p class="tile__m">Massage, reflexology and lymphatic drainage, from clinical therapists.</p>
       </a>
       <a class="tile" href="hifem.html">
-        <div class="tile__img"><img src="assets/hifem.jpg" alt="The HIFEM therapy equipment" /></div>
+        <div class="tile__img"><img src="assets/hifem.jpg" alt="The HIFEM therapy equipment" loading="lazy" /></div>
         <h3 class="panel__t" style="text-align:left">HIFEM</h3>
         <p class="tile__m">Works muscle that is hard to switch on by yourself, the pelvic floor most of all.</p>
       </a>

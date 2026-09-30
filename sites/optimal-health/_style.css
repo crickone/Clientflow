@@ -1048,9 +1048,40 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
 .band--sage .arc__b{color:var(--ink)}
 .band--ink .arc__b{color:var(--sage)}
 
+/* ---- a photograph shaped as a band ------------------------------------
+   One modifier on .tile__img, in the same .shot-- family as the reception
+   crop below: it keeps every rule the tile already has -- the ink ground
+   behind it, object-fit:cover, the wipe-up reveal -- and only changes the
+   ratio the box holds.
+
+   It exists for assets/lounge-sofa.jpg, which is 1600x468. That file was
+   cropped to that shape for cause: the top of the original frame carried
+   the hyperbaric and infrared claim boards and was cut away. Put through
+   the site's ordinary 4/3 tile it would have kept about a quarter of its
+   own width and read as a detail of a coffee table. At 24/7 -- 3.43:1
+   against the file's 3.42:1 -- the tile shows the photograph as it was
+   cut, and the band reads as a breath between two blocks of text rather
+   than as a picture of something in particular.                         */
+.shot--band{aspect-ratio:24/7}
+
+/* ---- the hyperbaric door, which is a portrait in a landscape box -----
+   assets/door-hyperbaric.jpg is 675x1200 and every image box on this site
+   is landscape, so object-fit:cover keeps a horizontal band of it. Centred
+   -- the default -- that band starts below the door's own nameplate and
+   cuts it in half, leaving a dark slab with the bottom of some lettering
+   on it. Biasing the crop up the frame keeps the plate, the vacant tag and
+   the handle, which is the whole of what the photograph is of.
+
+   30% rather than the middle because the 4/3 box shows 42% of the file's
+   height: at 30% that window runs from 17% to 59%, and the plate sits at
+   25% to 32%.                                                           */
+.shot--door img{object-position:50% 30%}
+
 /* ---- the reception photograph, without the wall boards ----------------
-   assets/reception.jpg is the only picture of the room itself, which is
-   why nine places on this site reach for it. It also has four of the
+   assets/reception.jpg is the picture of the front desk, and three places
+   on this site reach for it: the home and recovery heroes and the contact
+   page's details block. (It was nine until the client's own photography
+   arrived; the rest now carry frames of their own.) It also has four of the
    clinic's own marketing boards on the back wall, and at hero size every
    word on them is legible. Each of the four promises a physiological
    outcome -- the register this site's copy deliberately does not use

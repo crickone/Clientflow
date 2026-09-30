@@ -621,6 +621,10 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
 .band--sage .arc__b{color:var(--ink)}
 .band--ink .arc__b{color:var(--sage)}
 
+.shot--band{aspect-ratio:24/7}
+
+.shot--door img{object-position:50% 30%}
+
 .shot--room img{object-view-box:inset(0% 40% 0% 0%)}
 @supports not (object-view-box: inset(0% 40% 0% 0%)) {
   .shot--room{overflow:clip}
@@ -650,7 +654,7 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
 </header>
 
 <section class="hero">
-  <div class="hero__media"><img src="assets/room.jpg" alt="A treatment room at the Clonmel clinic" /></div>
+  <div class="hero__media"><img src="assets/corridor-massage-door.jpg" alt="A treatment-room door at the Clonmel clinic with its vacant tag, bamboo beside it, and an open door beyond onto the lit infrared bed" /></div>
   <div class="hero__inner">
     <p class="micro" data-rise style="color:var(--sage)">The journal</p>
     <h1 class="wordmark hero__mark" style="margin-top:22px">Written plainly.</h1>
@@ -690,37 +694,37 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
     </div>
     <div class="grid3" data-stagger>
       <a class="tile" href="blog-stress-sleep-and-the-evening-session.html">
-        <div class="tile__img shot--room"><img src="assets/reception.jpg" alt="Reception at the Clonmel clinic" /></div>
+        <div class="tile__img"><img src="assets/infrared-bed-idle.jpg" alt="The infrared bed closed and waiting in the treatment room, its orange strip lit" loading="lazy" /></div>
         <p class="tile__n">Recovery</p>
         <h3 class="tile__h">Stress, sleep, and the twelve minutes after work</h3>
         <p class="tile__m">The most reliable thing an evening session gives a busy person is a bounded half hour with the phone somewhere else. The bed is what makes you keep the appointment.</p>
       </a>
       <a class="tile" href="blog-the-hifem-chair-and-a-week-sitting-down.html">
-        <div class="tile__img"><img src="assets/hifem.jpg" alt="A client seated fully clothed on the HIFEM chair at the Clonmel clinic" /></div>
+        <div class="tile__img"><img src="assets/hifem-chair.jpg" alt="The HIFEM chair and its console, empty, a cushion on the seat" loading="lazy" /></div>
         <p class="tile__n">HIFEM</p>
         <h3 class="tile__h">The HIFEM chair, and a week spent sitting down</h3>
         <p class="tile__m">Long sitting leaves some muscle doing almost nothing. The chair asks it to work &mdash; twenty to thirty minutes, seated and fully clothed &mdash; and it is muscle work, so plan it like one.</p>
       </a>
       <a class="tile" href="blog-infrared-and-everyday-aches.html">
-        <div class="tile__img"><img src="assets/infrared.jpg" alt="The infrared therapy bed at the Clonmel clinic" /></div>
+        <div class="tile__img"><img src="assets/infrared-bed-lit.jpg" alt="The infrared bed running, its red light spilling across the brick wall behind it" loading="lazy" /></div>
         <p class="tile__n">Infrared</p>
         <h3 class="tile__h">Infrared and everyday aches: what the light is actually doing</h3>
         <p class="tile__m">What the bed emits, what the light is understood to do once it is in tissue, and why the honest account of it is written in weeks rather than in sessions.</p>
       </a>
       <a class="tile" href="blog-between-hard-sessions.html">
-        <div class="tile__img"><img src="assets/hbot.jpg" alt="Inside the hyperbaric oxygen chamber at the Clonmel clinic" /></div>
+        <div class="tile__img"><img src="assets/hbot-chamber-seated.jpg" alt="A client seated in the open hyperbaric chamber, hands on his knees" loading="lazy" /></div>
         <p class="tile__n">Hyperbaric oxygen</p>
         <h3 class="tile__h">Between hard sessions: where the chamber fits in a training week</h3>
         <p class="tile__m">How you recover is part of the training week rather than an afterthought to it. Where an hour in the chamber sits in that week, and what two competitors who use it say.</p>
       </a>
       <a class="tile" href="blog-panels-lasers-and-the-bed.html">
-        <div class="tile__img"><img src="assets/room.jpg" alt="A treatment room at the Clonmel clinic" /></div>
+        <div class="tile__img"><img src="assets/infrared-bed-open.jpg" alt="Close along the shell of the infrared bed, its orange strip lit against black brick" loading="lazy" /></div>
         <p class="tile__n">Infrared</p>
         <h3 class="tile__h">Panels, lasers, and a bed you lie down in</h3>
         <p class="tile__m">Light therapy is not one thing. A hand-held laser, a panel on a stand and a full-length bed do different jobs, and the difference is mostly how much of you the light reaches.</p>
       </a>
       <a class="tile" href="blog-hyperbaric-oxygen-and-mental-clarity.html">
-        <div class="tile__img"><img src="assets/hbot.jpg" alt="A client seated in the hyperbaric oxygen chamber at the Clonmel clinic" /></div>
+        <div class="tile__img"><img src="assets/hbot-session-mask.jpg" alt="A client seated in the open hyperbaric chamber holding the oxygen mask" loading="lazy" /></div>
         <p class="tile__n">Hyperbaric oxygen</p>
         <h3 class="tile__h">Hyperbaric oxygen and mental clarity after a hard week</h3>
         <p class="tile__m">Forty-five to sixty minutes in a pressurised chamber, breathing air with more oxygen in it than the room has. What the hour is like, and what people report from it.</p>
@@ -737,7 +741,7 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
       <p>So the verbs here are mostly &ldquo;can&rdquo; and &ldquo;may&rdquo; rather than &ldquo;will&rdquo;. Where something is what clients tell us, it is written as what clients tell us. Nothing on this site diagnoses anything, and nothing here is a substitute for advice from your own clinician. If you have a diagnosed condition, follow their advice and tell us about it before you book, so we can say honestly whether a session suits you.</p>
       <p>If any of it raises a question, ring us. We would far rather answer it on the phone than have you guess from a page.</p>
     </div>
-    <div class="tile__img shot--room"><img src="assets/reception.jpg" alt="Reception at the Clonmel clinic" /></div>
+    <div class="tile__img"><img src="assets/room.jpg" alt="The waiting area at the clinic: a green sofa, bamboo, and the treatment-room doors off it" loading="lazy" /></div>
   </div>
 </section>
 

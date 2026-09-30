@@ -621,6 +621,10 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
 .band--sage .arc__b{color:var(--ink)}
 .band--ink .arc__b{color:var(--sage)}
 
+.shot--band{aspect-ratio:24/7}
+
+.shot--door img{object-position:50% 30%}
+
 .shot--room img{object-view-box:inset(0% 40% 0% 0%)}
 @supports not (object-view-box: inset(0% 40% 0% 0%)) {
   .shot--room{overflow:clip}
@@ -650,7 +654,7 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
 </header>
 
 <section class="hero">
-  <div class="hero__media"><img src="assets/massage.jpg" alt="A therapist working during a massage treatment at the Clonmel clinic" /></div>
+  <div class="hero__media"><img src="assets/massage-room.jpg" alt="A therapist working a client's back in the olive treatment room at the Clonmel clinic, a salt lamp on the shelving behind" /></div>
   <div class="hero__inner">
     <p class="micro" data-rise style="color:var(--sage)">Therapy</p>
     <h1 class="wordmark hero__mark" style="margin-top:22px">Massage.</h1>
@@ -696,7 +700,7 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
         <p style="margin-top:22px">Everything on this page is hands-on work. Three of them are disciplines in their own right and get their own chapter below &mdash; massage, lymphatic drainage and reflexology. The rest are variations on the table: a different pressure, a different set of hands-on tools, a different length of hour.</p>
         <p>If you do not know which to book, ring us and say what the last few weeks have been like. Two minutes on the phone is a better use of your money than the wrong hour, and we will say so if the answer is one of the other therapies instead.</p>
       </div>
-      <div class="tile__img"><img src="assets/room.jpg" alt="A treatment room at the Clonmel clinic" /></div>
+      <div class="tile__img"><img src="assets/massage-facial-tools.jpg" alt="Jade rollers, gua sha stones and facial cupping bulbs laid out on white linen beside a bowl of water" loading="lazy" /></div>
     </div>
 
     <div class="band__head" style="margin-top:clamp(44px,5.4vw,80px)">
@@ -762,15 +766,14 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
 
 <section class="band" data-chapter="Massage" id="s02" aria-label="Massage">
   <div>
-    <div class="band__head">
-      <div class="band__head__l">
+    <div class="says" style="margin-bottom:clamp(28px,3.4vw,44px)">
+      <div class="body">
         <h2 class="lede">What the hands are actually doing.</h2>
-      </div>
-    </div>
-    <div class="body" style="margin-bottom:clamp(28px,3.4vw,44px)">
-      <p>A therapeutic massage is an hour of somebody working directly into muscle: slow, firm pressure through the layers that have tightened, at a depth the two of you agree before anything starts. You lie on a table under towels, only the area being worked is uncovered, and the pressure changes on a word.</p>
+        <p style="margin-top:22px">A therapeutic massage is an hour of somebody working directly into muscle: slow, firm pressure through the layers that have tightened, at a depth the two of you agree before anything starts. You lie on a table under towels, only the area being worked is uncovered, and the pressure changes on a word.</p>
       <p>The account of why it helps is straightforward enough. Pressure and movement across muscle can encourage local blood flow, and blood flow is what carries oxygen and nutrients into tissue and takes the by-products of hard work back out. Sustained, unhurried contact is also understood to move the nervous system towards its resting state &mdash; the side of it that governs rest and repair rather than alertness. Both of those are a &ldquo;can&rdquo; rather than a &ldquo;will&rdquo;, and we would rather say so out loud than leave the verbs to carry it: it is what the work is understood to encourage over a run of treatments, not a forecast of what one hour will do for you.</p>
-      <p>What people report is less complicated than any of that. They get off the table looser through the shoulders and the lower back, and they sleep well that night. Whether it is worth it to you is a judgement best made after one rather than after a block.</p>
+        <p>What people report is less complicated than any of that. They get off the table looser through the shoulders and the lower back, and they sleep well that night. Whether it is worth it to you is a judgement best made after one rather than after a block.</p>
+      </div>
+      <div class="tile__img"><img src="assets/massage-back.jpg" alt="A therapist's hands working across a client's upper back" loading="lazy" /></div>
     </div>
     <div class="grid3" data-stagger>
       <div>
@@ -844,15 +847,14 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
 
 <section class="band" data-chapter="Reflexology" id="s04" aria-label="Reflexology">
   <div>
-    <div class="band__head">
-      <div class="band__head__l">
+    <div class="says" style="margin-bottom:clamp(28px,3.4vw,44px)">
+      <div class="body">
         <h2 class="lede">An hour on your feet, and nothing else.</h2>
-      </div>
-    </div>
-    <div class="body" style="margin-bottom:clamp(28px,3.4vw,44px)">
-      <p>Reflexology is precise thumb and finger work on the feet, done with you lying down and only your shoes and socks off. It is a discipline in its own right rather than a foot massage, it is trained and examined separately, and the therapists who offer it here hold that training.</p>
+        <p style="margin-top:22px">Reflexology is precise thumb and finger work on the feet, done with you lying down and only your shoes and socks off. It is a discipline in its own right rather than a foot massage, it is trained and examined separately, and the therapists who offer it here hold that training.</p>
       <p>It works from a principle rather than from a mechanism anyone can show you: that particular points on the feet correspond to the rest of the body, and that working them carefully has an effect beyond the foot. That is the map the discipline is built on, and we would rather set it out as the discipline's own account than present it as something settled. What is not in question is what the hour is like &mdash; sustained, precise, unhurried pressure, which is among the more reliable ways there is of getting a nervous system to stand down.</p>
-      <p>So that is what we will claim for it, and no more. People come off the table calmer than they got on it, and the ones who rebook are usually rebooking the calm. VHI members may be able to claim some of the cost back depending on their plan; there is more on that below.</p>
+        <p>So that is what we will claim for it, and no more. People come off the table calmer than they got on it, and the ones who rebook are usually rebooking the calm. VHI members may be able to claim some of the cost back depending on their plan; there is more on that below.</p>
+      </div>
+      <div class="tile__img"><img src="assets/massage-foot.jpg" alt="Close on a therapist's hands working a client's foot and ankle" loading="lazy" /></div>
     </div>
     <div class="grid3" data-stagger>
       <div>
@@ -977,12 +979,13 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
 
 <section class="band" data-chapter="Prices" id="s06" aria-label="Prices">
   <div>
-    <div class="band__head">
-      <div class="band__head__l">
+    <div class="says" style="margin-bottom:clamp(28px,3.4vw,44px)">
+      <div class="body">
         <h2 class="lede">What each one costs.</h2>
+        <p style="margin-top:22px">Bodywork is priced per treatment rather than in blocks, so there is nothing to commit to. Where a treatment runs to two lengths, both are listed.</p>
       </div>
+      <div class="tile__img"><img src="assets/massage-lavashell-kit.jpg" alt="Lava shells with their branded pouch, a treatment card and sachets, laid out on a shelf" loading="lazy" /></div>
     </div>
-    <p class="body" style="margin-bottom:clamp(24px,3vw,36px)">Bodywork is priced per treatment rather than in blocks, so there is nothing to commit to. Where a treatment runs to two lengths, both are listed.</p>
     <div class="roll roll--menu" data-stagger>
       <div class="roll__row">
         <span class="roll__n">Swedish massage</span>
