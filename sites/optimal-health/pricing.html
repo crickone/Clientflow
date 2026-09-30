@@ -153,7 +153,7 @@ h1,h2,h3,p,figure,blockquote{margin:0}
   html:not(.js) .nav__menu{display:none}
 }
 
-.hero{position:relative;min-height:min(92vh,900px);display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;background:var(--ink)}
+.hero{position:relative;min-height:92vh;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;background:var(--ink)}
 .hero__media{position:absolute;inset:0}
 .hero__media img{width:100%;height:100%;object-fit:cover}
 
@@ -238,10 +238,18 @@ h1,h2,h3,p,figure,blockquote{margin:0}
 .roll{border-top:1px dotted rgba(36,35,31,.42);padding-top:clamp(18px,2.4vw,26px)}
 .band--ink .roll{border-top-color:rgba(242,243,237,.42)}
 
+.roll{--roll-n:clamp(190px,37%,360px);--roll-x:auto}
 .roll__row,.roll__head{
-  display:flex;align-items:baseline;gap:clamp(10px,1.4vw,18px);flex-wrap:wrap;
+  display:grid;
+  grid-template-columns:minmax(0,var(--roll-n)) minmax(0,1fr) var(--roll-x);
+  align-items:baseline;
+  column-gap:clamp(10px,1.4vw,18px);row-gap:clamp(6px,.8vw,10px);
   padding:clamp(14px,1.9vw,22px) 0;
 }
+.roll__n{grid-column:1}
+.roll__m{grid-column:2}
+.roll__x{grid-column:3}
+
 .roll__row{border-bottom:1px dotted rgba(36,35,31,.28)}
 .band--ink .roll__row{border-bottom-color:rgba(242,243,237,.28)}
 
@@ -272,6 +280,8 @@ h1,h2,h3,p,figure,blockquote{margin:0}
 .roll--menu .roll__n{font-size:clamp(19px,2.1vw,30px)}
 .roll--menu .roll__m{max-width:40ch}
 
+.roll--menu{--roll-n:clamp(200px,44%,450px)}
+
 .roll--rates .roll__x{display:flex;gap:clamp(16px,3vw,44px);align-items:flex-start;text-transform:none;letter-spacing:0}
 .rate{display:flex;flex-direction:column;gap:2px;text-align:right;min-width:clamp(56px,6vw,84px)}
 .rate__v{font-size:clamp(14px,1.3vw,19px);letter-spacing:-.01em}
@@ -281,6 +291,50 @@ h1,h2,h3,p,figure,blockquote{margin:0}
 @media (max-width:640px){
   .roll--rates .roll__x{width:100%;margin-left:0;justify-content:space-between;gap:12px}
   .rate{min-width:0}
+}
+
+@media (max-width:1080px){
+  .roll__row,.roll__head{grid-template-columns:minmax(0,1fr) var(--roll-x)}
+  .roll__n{grid-column:1;grid-row:1}
+  .roll__m{grid-column:1;grid-row:2}
+  .roll__x{grid-column:2;grid-row:1/span 2;align-self:start}
+}
+@media (max-width:640px){
+  .roll__row,.roll__head{grid-template-columns:minmax(0,1fr)}
+  .roll__n{grid-column:1;grid-row:1}
+  .roll__m{grid-column:1;grid-row:2}
+  .roll__x{grid-column:1;grid-row:3;align-self:auto;margin-left:0}
+  .roll--menu .roll__x{align-items:flex-start;text-align:left}
+}
+
+.roll--plans .roll__row{grid-template-columns:minmax(0,1fr);align-items:start;row-gap:0}
+.roll--plans .roll__n{grid-column:1;grid-row:1}
+.roll--plans .roll__m{grid-column:1;grid-row:2;max-width:64ch;margin-top:10px}
+.roll--plans .roll__x{
+  grid-column:1;grid-row:3;align-self:auto;margin-left:0;
+  margin-top:clamp(16px,2vw,24px);
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(8px,1.1vw,16px);
+  text-transform:none;letter-spacing:0;font-size:inherit;
+}
+.roll--plans .rate{text-align:left;min-width:0;gap:0;padding:clamp(12px,1.4vw,18px)}
+.roll--plans .rate--best{background:var(--plaster)}
+.roll--plans .rate__v{margin-top:9px;font-size:clamp(19px,1.9vw,26px);line-height:1}
+.rate__u{font-size:clamp(9px,.72vw,11px);letter-spacing:.14em;text-transform:uppercase;font-weight:500;color:var(--deep)}
+.rate__s{margin-top:10px;font-size:clamp(11px,.92vw,13px);line-height:1.45;color:var(--deep)}
+.band--sage .rate__u,.band--sage .rate__s{color:var(--ink)}
+.band--sage .rate--best .rate__k,
+.band--sage .rate--best .rate__u,
+.band--sage .rate--best .rate__s{color:var(--deep)}
+
+@media (max-width:700px){
+  .roll--plans .roll__x{grid-template-columns:1fr;gap:6px}
+  .roll--plans .rate{
+    display:grid;grid-template-columns:minmax(0,1fr) auto;
+    column-gap:14px;align-items:baseline;padding:11px 13px;
+  }
+  .roll--plans .rate__k{grid-column:1;grid-row:1}
+  .roll--plans .rate__v{grid-column:2;grid-row:1;margin-top:0;text-align:right}
+  .roll--plans .rate__s{grid-column:1/-1;grid-row:2;margin-top:5px}
 }
 
 .tiers{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--gap);align-items:stretch}
@@ -721,56 +775,122 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
     <div class="band__head">
       <div class="band__head__l">
         <h2 class="lede">Monthly, if you are here most weeks.</h2>
-        <p style="margin-top:22px">Each one is built around what you are actually doing, so what is in it is set with you rather than printed here.</p>
+        <p style="margin-top:22px">Three tiers, a set number of sessions in each, and three ways to pay for any of them. What is in each one is printed here rather than settled at the desk.</p>
+      </div>
+    </div>
+    <div class="roll roll--plans" data-stagger>
+      <div class="roll__row">
+        <span class="roll__n">Reset</span>
+        <span class="roll__m">Four sessions a month, on infrared or the HIFEM chair. For a week that is already full: one session, once a week, and neither of them asks anything of you but the time.</span>
+        <span class="roll__x">
+          <span class="rate rate--best">
+            <span class="rate__k">Pay for the year</span>
+            <span class="rate__v">&euro;99 <span class="rate__u">a month</span></span>
+            <span class="rate__s">&euro;1,188 in one payment</span>
+          </span>
+          <span class="rate">
+            <span class="rate__k">Pay for six months</span>
+            <span class="rate__v">&euro;109 <span class="rate__u">a month</span></span>
+            <span class="rate__s">&euro;654 in one payment</span>
+          </span>
+          <span class="rate">
+            <span class="rate__k">Pay monthly</span>
+            <span class="rate__v">&euro;129 <span class="rate__u">a month</span></span>
+            <span class="rate__s">Nothing up front. Three months minimum.</span>
+          </span>
+        </span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Recover</span>
+        <span class="roll__m">Four sessions a month, on any of the therapies, the hyperbaric chamber included. For a week with more in it than one rest day absorbs, and for anyone who wants the chamber in the rotation rather than saved up for after a race.</span>
+        <span class="roll__x">
+          <span class="rate rate--best">
+            <span class="rate__k">Pay for the year</span>
+            <span class="rate__v">&euro;199 <span class="rate__u">a month</span></span>
+            <span class="rate__s">&euro;2,388 in one payment</span>
+          </span>
+          <span class="rate">
+            <span class="rate__k">Pay for six months</span>
+            <span class="rate__v">&euro;219 <span class="rate__u">a month</span></span>
+            <span class="rate__s">&euro;1,314 in one payment</span>
+          </span>
+          <span class="rate">
+            <span class="rate__k">Pay monthly</span>
+            <span class="rate__v">&euro;249 <span class="rate__u">a month</span></span>
+            <span class="rate__s">Nothing up front. Three months minimum.</span>
+          </span>
+        </span>
+      </div>
+      <div class="roll__row">
+        <span class="roll__n">Full Stack</span>
+        <span class="roll__m">Eight sessions a month, on any of the therapies, and a massage on top. For the week that is genuinely built around this &mdash; twice most weeks, and a pair of hands on you once a month.</span>
+        <span class="roll__x">
+          <span class="rate rate--best">
+            <span class="rate__k">Pay for the year</span>
+            <span class="rate__v">&euro;299 <span class="rate__u">a month</span></span>
+            <span class="rate__s">&euro;3,588 in one payment</span>
+          </span>
+          <span class="rate">
+            <span class="rate__k">Pay for six months</span>
+            <span class="rate__v">&euro;329 <span class="rate__u">a month</span></span>
+            <span class="rate__s">&euro;1,974 in one payment</span>
+          </span>
+          <span class="rate">
+            <span class="rate__k">Pay monthly</span>
+            <span class="rate__v">&euro;379 <span class="rate__u">a month</span></span>
+            <span class="rate__s">Nothing up front. Three months minimum.</span>
+          </span>
+        </span>
       </div>
     </div>
 
-    <div class="tiers" data-stagger>
-      <div class="tier">
-        <p class="tier__k">The starting tier</p>
-        <p class="tier__v">&euro;169<span class="tier__u">a month</span></p>
-        <dl class="tier__d">
-          <div>
-            <dt>Who it suits</dt>
-            <dd>Someone who has been in a few times and would rather come on a rhythm than book session by session.</dd>
-          </div>
-          <div>
-            <dt>What is in it</dt>
-            <dd>Set with you at the desk.</dd>
-          </div>
-        </dl>
-      </div>
-      <div class="tier">
-        <p class="tier__k">The middle tier</p>
-        <p class="tier__v">&euro;299<span class="tier__u">a month</span></p>
-        <dl class="tier__d">
-          <div>
-            <dt>Who it suits</dt>
-            <dd>Someone here most weeks, usually moving between more than one of the rooms.</dd>
-          </div>
-          <div>
-            <dt>What is in it</dt>
-            <dd>Set with you at the desk.</dd>
-          </div>
-        </dl>
-      </div>
-      <div class="tier">
-        <p class="tier__k">The fullest tier</p>
-        <p class="tier__v">&euro;399<span class="tier__u">a month</span></p>
-        <dl class="tier__d">
-          <div>
-            <dt>Who it suits</dt>
-            <dd>Someone whose week is built around recovery, often training alongside it and in more than once a week.</dd>
-          </div>
-          <div>
-            <dt>What is in it</dt>
-            <dd>Set with you at the desk.</dd>
-          </div>
-        </dl>
-      </div>
-    </div>
-    <p class="body" style="margin-top:clamp(28px,3.4vw,40px)">There is no sense in selling you a set of sessions on a machine you do not use. Tell us how your week actually looks and we will work out which tier fits, and what goes in it, before you commit to anything.</p>
-    <p style="margin-top:clamp(20px,2.4vw,28px)"><a class="explore" href="contact.html">Ask about a membership</a></p>
+    <p class="body" style="margin-top:clamp(28px,3.4vw,40px)">Massage sits in Full Stack and nowhere else. A machine can take another booking at four o'clock; a therapist cannot be in two rooms at once, and that hour is the one thing in this building that does not scale. It goes in the tier that is here most weeks because that is the tier it fits in.</p>
+    <p class="body" style="margin-top:clamp(20px,2.4vw,28px)">The terms are below. The first one is the one people tend to find out about late, so it is first.</p>
+    <ul class="arc" data-stagger>
+      <li class="arc__row">
+        <p class="arc__k">No refunds</p>
+        <div>
+          <p class="arc__t">A membership is not refunded once it is paid for.</p>
+          <p class="arc__b">Not the part of a term you have not reached, and not the sessions you did not take. It is the term most likely to matter to you, so it is at the top of this list rather than the bottom. If you are not certain, buy a single session or a block first &mdash; both are further up this page, and neither of them commits you to anything.</p>
+        </div>
+      </li>
+      <li class="arc__row">
+        <p class="arc__k">The minimum</p>
+        <div>
+          <p class="arc__t">Paying monthly runs for three months at least.</p>
+          <p class="arc__b">The six-month and twelve-month prices are paid in one payment, up front, for the term they name.</p>
+        </div>
+      </li>
+      <li class="arc__row">
+        <p class="arc__k">Pausing</p>
+        <div>
+          <p class="arc__t">It can be paused for up to three months, on medical grounds.</p>
+          <p class="arc__b">One pause in a year. Tell us as early as you can and we will sort it from the desk.</p>
+        </div>
+      </li>
+      <li class="arc__row">
+        <p class="arc__k">Rolling over</p>
+        <div>
+          <p class="arc__t">Sessions you do not use carry into the next month, and no further.</p>
+          <p class="arc__b">One month is the whole of it. They do not stack up over a year, so a month you are away is worth telling us about rather than banking.</p>
+        </div>
+      </li>
+      <li class="arc__row">
+        <p class="arc__k">Transferring</p>
+        <div>
+          <p class="arc__t">A membership can be handed to somebody else, once.</p>
+          <p class="arc__b">Once over the life of it, whichever term you are on.</p>
+        </div>
+      </li>
+      <li class="arc__row">
+        <p class="arc__k">Being a member</p>
+        <div>
+          <p class="arc__t">Priority on the book, and a guest pass every quarter.</p>
+          <p class="arc__b">Which counts for most in the evenings and on a Saturday morning, when the room fills first.</p>
+        </div>
+      </li>
+    </ul>
+    <p style="margin-top:clamp(24px,3vw,36px)"><a class="explore" href="contact.html">Ask about a membership</a></p>
   </div>
 </section>
 

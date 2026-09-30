@@ -153,7 +153,7 @@ h1,h2,h3,p,figure,blockquote{margin:0}
   html:not(.js) .nav__menu{display:none}
 }
 
-.hero{position:relative;min-height:min(92vh,900px);display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;background:var(--ink)}
+.hero{position:relative;min-height:92vh;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;background:var(--ink)}
 .hero__media{position:absolute;inset:0}
 .hero__media img{width:100%;height:100%;object-fit:cover}
 
@@ -238,10 +238,18 @@ h1,h2,h3,p,figure,blockquote{margin:0}
 .roll{border-top:1px dotted rgba(36,35,31,.42);padding-top:clamp(18px,2.4vw,26px)}
 .band--ink .roll{border-top-color:rgba(242,243,237,.42)}
 
+.roll{--roll-n:clamp(190px,37%,360px);--roll-x:auto}
 .roll__row,.roll__head{
-  display:flex;align-items:baseline;gap:clamp(10px,1.4vw,18px);flex-wrap:wrap;
+  display:grid;
+  grid-template-columns:minmax(0,var(--roll-n)) minmax(0,1fr) var(--roll-x);
+  align-items:baseline;
+  column-gap:clamp(10px,1.4vw,18px);row-gap:clamp(6px,.8vw,10px);
   padding:clamp(14px,1.9vw,22px) 0;
 }
+.roll__n{grid-column:1}
+.roll__m{grid-column:2}
+.roll__x{grid-column:3}
+
 .roll__row{border-bottom:1px dotted rgba(36,35,31,.28)}
 .band--ink .roll__row{border-bottom-color:rgba(242,243,237,.28)}
 
@@ -272,6 +280,8 @@ h1,h2,h3,p,figure,blockquote{margin:0}
 .roll--menu .roll__n{font-size:clamp(19px,2.1vw,30px)}
 .roll--menu .roll__m{max-width:40ch}
 
+.roll--menu{--roll-n:clamp(200px,44%,450px)}
+
 .roll--rates .roll__x{display:flex;gap:clamp(16px,3vw,44px);align-items:flex-start;text-transform:none;letter-spacing:0}
 .rate{display:flex;flex-direction:column;gap:2px;text-align:right;min-width:clamp(56px,6vw,84px)}
 .rate__v{font-size:clamp(14px,1.3vw,19px);letter-spacing:-.01em}
@@ -281,6 +291,50 @@ h1,h2,h3,p,figure,blockquote{margin:0}
 @media (max-width:640px){
   .roll--rates .roll__x{width:100%;margin-left:0;justify-content:space-between;gap:12px}
   .rate{min-width:0}
+}
+
+@media (max-width:1080px){
+  .roll__row,.roll__head{grid-template-columns:minmax(0,1fr) var(--roll-x)}
+  .roll__n{grid-column:1;grid-row:1}
+  .roll__m{grid-column:1;grid-row:2}
+  .roll__x{grid-column:2;grid-row:1/span 2;align-self:start}
+}
+@media (max-width:640px){
+  .roll__row,.roll__head{grid-template-columns:minmax(0,1fr)}
+  .roll__n{grid-column:1;grid-row:1}
+  .roll__m{grid-column:1;grid-row:2}
+  .roll__x{grid-column:1;grid-row:3;align-self:auto;margin-left:0}
+  .roll--menu .roll__x{align-items:flex-start;text-align:left}
+}
+
+.roll--plans .roll__row{grid-template-columns:minmax(0,1fr);align-items:start;row-gap:0}
+.roll--plans .roll__n{grid-column:1;grid-row:1}
+.roll--plans .roll__m{grid-column:1;grid-row:2;max-width:64ch;margin-top:10px}
+.roll--plans .roll__x{
+  grid-column:1;grid-row:3;align-self:auto;margin-left:0;
+  margin-top:clamp(16px,2vw,24px);
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(8px,1.1vw,16px);
+  text-transform:none;letter-spacing:0;font-size:inherit;
+}
+.roll--plans .rate{text-align:left;min-width:0;gap:0;padding:clamp(12px,1.4vw,18px)}
+.roll--plans .rate--best{background:var(--plaster)}
+.roll--plans .rate__v{margin-top:9px;font-size:clamp(19px,1.9vw,26px);line-height:1}
+.rate__u{font-size:clamp(9px,.72vw,11px);letter-spacing:.14em;text-transform:uppercase;font-weight:500;color:var(--deep)}
+.rate__s{margin-top:10px;font-size:clamp(11px,.92vw,13px);line-height:1.45;color:var(--deep)}
+.band--sage .rate__u,.band--sage .rate__s{color:var(--ink)}
+.band--sage .rate--best .rate__k,
+.band--sage .rate--best .rate__u,
+.band--sage .rate--best .rate__s{color:var(--deep)}
+
+@media (max-width:700px){
+  .roll--plans .roll__x{grid-template-columns:1fr;gap:6px}
+  .roll--plans .rate{
+    display:grid;grid-template-columns:minmax(0,1fr) auto;
+    column-gap:14px;align-items:baseline;padding:11px 13px;
+  }
+  .roll--plans .rate__k{grid-column:1;grid-row:1}
+  .roll--plans .rate__v{grid-column:2;grid-row:1;margin-top:0;text-align:right}
+  .roll--plans .rate__s{grid-column:1/-1;grid-row:2;margin-top:5px}
 }
 
 .tiers{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--gap);align-items:stretch}
@@ -697,59 +751,12 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
     <div class="says">
       <div class="body">
         <h2 class="lede">Ten treatments, and somebody to tell you which one.</h2>
-        <p style="margin-top:22px">Everything on this page is hands-on work. Three of them are disciplines in their own right and get their own chapter below &mdash; massage, lymphatic drainage and reflexology. The rest are variations on the table: a different pressure, a different set of hands-on tools, a different length of hour.</p>
-        <p>If you do not know which to book, ring us and say what the last few weeks have been like. Two minutes on the phone is a better use of your money than the wrong hour, and we will say so if the answer is one of the other therapies instead.</p>
+        <p style="margin-top:22px">Everything on this page is hands-on work, and every hour of it is carried out by a clinical therapist. Three are disciplines in their own right and get a chapter of their own below &mdash; massage, lymphatic drainage and reflexology. The rest are variations on the table: a different pressure, a different set of hands-on tools, a different length of hour. All ten are listed at the foot of the page with what each one involves and what it costs.</p>
+        <p>None of it is meant to stand on its own. Bodywork sits alongside infrared, hyperbaric oxygen and the HIFEM chair rather than competing with them, and plenty of people book an hour on the table in the same week as a session on one of those. Tell us what the week looks like and we will space them sensibly.</p>
+        <p>And if you do not know which of the ten to book, ring us and say what the last few weeks have been like. Two minutes on the phone is a better use of your money than the wrong hour, and we will say so if the answer is one of the other therapies instead.</p>
+        <p style="margin-top:28px"><a class="explore" href="contact.html">Ask which suits you</a></p>
       </div>
       <div class="tile__img"><img src="assets/massage-facial-tools.jpg" alt="Jade rollers, gua sha stones and facial cupping bulbs laid out on white linen beside a bowl of water" loading="lazy" /></div>
-    </div>
-
-    <div class="band__head" style="margin-top:clamp(44px,5.4vw,80px)">
-      <div class="band__head__l">
-        <p class="title">The full menu</p>
-      </div>
-      <a class="explore" href="contact.html">Ask which suits you</a>
-    </div>
-    <div class="roll roll--menu" data-stagger>
-      <div class="roll__row">
-        <span class="roll__n">Swedish massage</span>
-        <span class="roll__m">Flowing, full-body work at a moderate pressure</span>
-      </div>
-      <div class="roll__row">
-        <span class="roll__n">Deep tissue</span>
-        <span class="roll__m">Slower, firmer work through the deeper layers of muscle</span>
-      </div>
-      <div class="roll__row">
-        <span class="roll__n">Sports massage</span>
-        <span class="roll__m">Focused work around training, before it or after it</span>
-      </div>
-      <div class="roll__row">
-        <span class="roll__n">Hot lava shells</span>
-        <span class="roll__m">Warmed shells worked over the muscle, so the heat travels with the pressure</span>
-      </div>
-      <div class="roll__row">
-        <span class="roll__n">Reflexology</span>
-        <span class="roll__m">Precise work on the feet, and a discipline in its own right rather than a foot massage</span>
-      </div>
-      <div class="roll__row">
-        <span class="roll__n">Sculpting lifting facial</span>
-        <span class="roll__m">Massage worked through the face, the jaw and the neck</span>
-      </div>
-      <div class="roll__row">
-        <span class="roll__n">Indian head massage</span>
-        <span class="roll__m">Seated work through the scalp, neck and shoulders, and you stay dressed</span>
-      </div>
-      <div class="roll__row">
-        <span class="roll__n">Oncology cancer care massage</span>
-        <span class="roll__m">Massage adapted for people in or after treatment, from a therapist trained for that work</span>
-      </div>
-      <div class="roll__row">
-        <span class="roll__n">Cupping massage</span>
-        <span class="roll__m">Suction cups drawn over the muscle alongside hands-on work</span>
-      </div>
-      <div class="roll__row">
-        <span class="roll__n">Lymphatic drainage</span>
-        <span class="roll__m">Very light, rhythmic work following the vessels that sit under the skin</span>
-      </div>
     </div>
   </div>
 </section>
@@ -981,50 +988,60 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
   <div>
     <div class="says" style="margin-bottom:clamp(28px,3.4vw,44px)">
       <div class="body">
-        <h2 class="lede">What each one costs.</h2>
-        <p style="margin-top:22px">Bodywork is priced per treatment rather than in blocks, so there is nothing to commit to. Where a treatment runs to two lengths, both are listed.</p>
+        <h2 class="lede">All ten, what they are, and what they cost.</h2>
+        <p style="margin-top:22px">This is the full list. Bodywork is priced per treatment rather than in blocks, so there is nothing to commit to, and where a treatment runs to two lengths both are listed. If a name does not tell you enough, the line beside it says what the therapist actually does.</p>
       </div>
       <div class="tile__img"><img src="assets/massage-lavashell-kit.jpg" alt="Lava shells with their branded pouch, a treatment card and sachets, laid out on a shelf" loading="lazy" /></div>
     </div>
     <div class="roll roll--menu" data-stagger>
       <div class="roll__row">
         <span class="roll__n">Swedish massage</span>
+        <span class="roll__m">Flowing, full-body work at a moderate pressure</span>
         <span class="roll__x"><span class="roll__p">1 hr &euro;80</span><span class="roll__p roll__p--alt">30 min &euro;50</span></span>
       </div>
       <div class="roll__row">
         <span class="roll__n">Deep tissue</span>
+        <span class="roll__m">Slower, firmer work through the deeper layers of muscle</span>
         <span class="roll__x"><span class="roll__p">1 hr &euro;80</span><span class="roll__p roll__p--alt">30 min &euro;50</span></span>
       </div>
       <div class="roll__row">
         <span class="roll__n">Sports massage</span>
+        <span class="roll__m">Focused work around training, before it or after it</span>
         <span class="roll__x"><span class="roll__p">1 hr &euro;80</span><span class="roll__p roll__p--alt">30 min &euro;50</span></span>
       </div>
       <div class="roll__row">
         <span class="roll__n">Hot lava shells</span>
+        <span class="roll__m">Warmed shells worked over the muscle, so the heat travels with the pressure</span>
         <span class="roll__x"><span class="roll__p">1 hr &euro;100</span></span>
       </div>
       <div class="roll__row">
         <span class="roll__n">Reflexology</span>
+        <span class="roll__m">Precise work on the feet, and a discipline in its own right rather than a foot massage</span>
         <span class="roll__x"><span class="roll__p">1 hr &euro;80</span></span>
       </div>
       <div class="roll__row">
         <span class="roll__n">Sculpting lifting facial</span>
+        <span class="roll__m">Massage worked through the face, the jaw and the neck</span>
         <span class="roll__x"><span class="roll__p">1 hr &euro;80</span></span>
       </div>
       <div class="roll__row">
         <span class="roll__n">Indian head massage</span>
+        <span class="roll__m">Seated work through the scalp, neck and shoulders, and you stay dressed</span>
         <span class="roll__x"><span class="roll__p">40 min &euro;60</span></span>
       </div>
       <div class="roll__row">
         <span class="roll__n">Oncology cancer care massage</span>
+        <span class="roll__m">Massage adapted for people in or after treatment, from a therapist trained for that work</span>
         <span class="roll__x"><span class="roll__p">1 hr &euro;80</span></span>
       </div>
       <div class="roll__row">
         <span class="roll__n">Cupping massage</span>
+        <span class="roll__m">Suction cups drawn over the muscle alongside hands-on work</span>
         <span class="roll__x"><span class="roll__p">1 hr &euro;80</span></span>
       </div>
       <div class="roll__row">
         <span class="roll__n">Lymphatic drainage</span>
+        <span class="roll__m">Very light, rhythmic work following the vessels that sit under the skin</span>
         <span class="roll__x"><span class="roll__p">1 hr &euro;80</span></span>
       </div>
     </div>

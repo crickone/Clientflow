@@ -251,8 +251,27 @@ h1,h2,h3,p,figure,blockquote{margin:0}
   html:not(.js) .nav__menu{display:none}
 }
 
-/* ---- hero: one photograph, edge to edge, wordmark across the foot ---- */
-.hero{position:relative;min-height:min(92vh,900px);display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;background:var(--ink)}
+/* ---- hero: one photograph, edge to edge, wordmark across the foot ----
+   92vh, and no ceiling on it. The height used to be min(92vh,900px), which
+   is the same thing on a 900px-tall laptop and a quite different thing on
+   anything taller: on the operator's 1728x1117 screen the cap fired at 900
+   and the hero stopped 217px short of the fold, so a second band was always
+   half-open underneath it. That is what "not full screen" meant. Uncapped,
+   the proportion is the one the design was drawn at -- 92% of the viewport
+   whatever the viewport is, and the remaining 8% is the sliver of the next
+   band that says there is more below.
+
+   NOT 100vh, which was the other reading. A hero with nothing under it is a
+   hero with no scroll cue, and the nav floats over the picture rather than
+   sitting above it, so a full-height hero reads as the whole page. It also
+   crops the photograph harder: the box goes from 1.92:1 to 1.55:1 against a
+   16:9 source, so object-fit:cover has to scale up further and throws away
+   more of the frame's width. 92vh is both the calmer picture and the sharper
+   one.
+
+   Nothing changes at or below 978px of viewport height, where 92vh was
+   already under the old cap -- 1440x900 renders identically. */
+.hero{position:relative;min-height:92vh;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;background:var(--ink)}
 .hero__media{position:absolute;inset:0}
 .hero__media img{width:100%;height:100%;object-fit:cover}
 /* Just enough shading at the edges to hold small type. The
@@ -437,10 +456,47 @@ h1,h2,h3,p,figure,blockquote{margin:0}
    line -- so the layout lives on both, and only the container resets it.
    Putting it solely on .roll__head is what flattened the massage, pricing and
    about lists: those rows have no head. */
+/* ---- and the row is a table, not a sentence -------------------------
+   It used to be display:flex, so the description began wherever the name
+   happened to end. On the massage menu that put ten descriptions at nine
+   different x positions -- "Deep tissue" is short, "Oncology cancer care
+   massage" is long -- and the same on the pricing rate table, where
+   "Infrared", "Hyperbaric oxygen" and "HIFEM chair" each pushed their line
+   somewhere else. A list of prices that does not line up is a list nobody
+   can compare, which is the one thing a price list is for.
+
+   So three tracks, and each cell is told which one it is rather than
+   flowing into the next free space. Naming the column explicitly is what
+   lets a row leave a cell out -- several rolls carry no description at all,
+   and about half carry no right-hand cell -- without the cell after it
+   sliding left into the gap.
+
+   The first track is a percentage of the roll, not of the viewport: every
+   chaptered page gives a fifth of its width to the rail, so the same vw
+   would size the name column differently on the pages that have one. The
+   clamp's floor keeps it usable when the roll is narrow and its ceiling
+   stops the longest name reserving half the page on a wide screen. The
+   third track is `auto` by default: it takes exactly what the right-hand
+   cell needs, and because the middle track is 1fr it still finishes hard
+   against the right edge, which is where the prices were already.       */
+.roll{--roll-n:clamp(190px,37%,360px);--roll-x:auto}
 .roll__row,.roll__head{
-  display:flex;align-items:baseline;gap:clamp(10px,1.4vw,18px);flex-wrap:wrap;
+  display:grid;
+  grid-template-columns:minmax(0,var(--roll-n)) minmax(0,1fr) var(--roll-x);
+  align-items:baseline;
+  column-gap:clamp(10px,1.4vw,18px);row-gap:clamp(6px,.8vw,10px);
   padding:clamp(14px,1.9vw,22px) 0;
 }
+.roll__n{grid-column:1}
+.roll__m{grid-column:2}
+.roll__x{grid-column:3}
+
+/* The two narrower shapes of this row are NOT written here. They have to
+   undo declarations that the variants below make -- margin-left:auto on the
+   right-hand cell, align-items:flex-end inside the priced one -- and a media
+   query carries no specificity of its own, so a block written above them
+   loses to them at every width. They sit at the foot of the roll section,
+   after the last rule they have to beat. */
 .roll__row{border-bottom:1px dotted rgba(36,35,31,.28)}
 .band--ink .roll__row{border-bottom-color:rgba(242,243,237,.28)}
 
@@ -483,6 +539,13 @@ h1,h2,h3,p,figure,blockquote{margin:0}
 .band--ink .roll__p--alt{color:var(--sage)}
 .roll--menu .roll__n{font-size:clamp(19px,2.1vw,30px)}
 .roll--menu .roll__m{max-width:40ch}
+/* A wider first track than the rolls above, because this is the one list
+   whose names run long: "Oncology cancer care massage" measures 421px at
+   1440 against the 335px of the longest therapy name, and the roll it sits
+   in is narrower than theirs because the page carries a chapter rail. The
+   ceiling is that 421 plus a little, so the longest name never wraps and no
+   wider screen hands the column width it has nothing to do with.        */
+.roll--menu{--roll-n:clamp(200px,44%,450px)}
 
 /* ---- the rates table ------------------------------------------------
    Three therapies, three block sizes, and the sizes are NOT the same for
@@ -500,6 +563,101 @@ h1,h2,h3,p,figure,blockquote{margin:0}
 @media (max-width:640px){
   .roll--rates .roll__x{width:100%;margin-left:0;justify-content:space-between;gap:12px}
   .rate{min-width:0}
+}
+
+/* ---- the same row, with less room ----------------------------------
+   Written at the foot of the roll section on purpose. These two blocks
+   have to beat `.roll__x{margin-left:auto}` and `.roll--menu .roll__x{
+   align-items:flex-end}` above, and a media query adds no specificity, so
+   the first draft of this -- written next to the row rule it belongs with,
+   three hundred lines up -- lost the cascade and left the price cell
+   hugging the right margin of a one-column stack. Source order is the only
+   thing deciding it, so source order is where it is decided.
+
+   Below 1080px the three tracks stop paying. The name column is still
+   holding a 30px line, so what is left for the description is a 250px
+   gutter that sets four words a line -- aligned, and unreadable. The name
+   and the description take a column of their own, stacked, and the price
+   takes the second and spans both: the description now starts under the
+   name rather than beside it, which is still one x position for every row
+   in the list, and the price is still hard right.
+
+   Below 640px there is no second column to give it either, so the three
+   stack in reading order -- name, then what it is, then what it costs --
+   and the price aligns left under the two lines above it. Right-aligned on
+   a 350px phone it read as a fragment of some other row rather than as the
+   price of the treatment named two lines up.                            */
+@media (max-width:1080px){
+  .roll__row,.roll__head{grid-template-columns:minmax(0,1fr) var(--roll-x)}
+  .roll__n{grid-column:1;grid-row:1}
+  .roll__m{grid-column:1;grid-row:2}
+  .roll__x{grid-column:2;grid-row:1/span 2;align-self:start}
+}
+@media (max-width:640px){
+  .roll__row,.roll__head{grid-template-columns:minmax(0,1fr)}
+  .roll__n{grid-column:1;grid-row:1}
+  .roll__m{grid-column:1;grid-row:2}
+  .roll__x{grid-column:1;grid-row:3;align-self:auto;margin-left:0}
+  .roll--menu .roll__x{align-items:flex-start;text-align:left}
+}
+
+/* ---- membership plans ------------------------------------------------
+   The rate table above with a different axis: one row per tier, and the
+   three prices are three ways to pay for it rather than three block sizes.
+   Same .roll, so the two read as siblings and the names and descriptions
+   line up on the same tracks for free.
+
+   The row's three tracks collapse to one here and each part takes its own
+   line, because a plan cell carries three lines where a rate cell carries
+   two. Full width buys the thing the narrow version could not: the three
+   cells land on the same three columns on all three rows, so the nine
+   figures read down (the tiers) as well as across (the commitment ladder),
+   and the pricing logic is in the layout rather than in a sentence under it.
+
+   Every cell names its own commitment instead of a header row naming it
+   once. A header makes each cell a lookup, and on a phone it has scrolled
+   away by the third row -- the rates table above already repeats its session
+   count per row for the same reason. Self-describing cells also stack,
+   which is what makes the phone layout possible without dropping a
+   commitment tier.
+
+   The longest commitment takes a plaster ground, the same plaster-on-sage
+   the tier cards use, so one cell per row is lifted and the emphasis is a
+   ground rather than a position -- it survives the stack. No timber: this
+   is a sage band, where timber carries neither type nor rule. Quiet type is
+   ink on the sage ground (10.01:1, where --deep is 3.62:1) and --deep
+   inside the lifted plaster cell (5.10:1).                              */
+.roll--plans .roll__row{grid-template-columns:minmax(0,1fr);align-items:start;row-gap:0}
+.roll--plans .roll__n{grid-column:1;grid-row:1}
+.roll--plans .roll__m{grid-column:1;grid-row:2;max-width:64ch;margin-top:10px}
+.roll--plans .roll__x{
+  grid-column:1;grid-row:3;align-self:auto;margin-left:0;
+  margin-top:clamp(16px,2vw,24px);
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:clamp(8px,1.1vw,16px);
+  text-transform:none;letter-spacing:0;font-size:inherit;
+}
+.roll--plans .rate{text-align:left;min-width:0;gap:0;padding:clamp(12px,1.4vw,18px)}
+.roll--plans .rate--best{background:var(--plaster)}
+.roll--plans .rate__v{margin-top:9px;font-size:clamp(19px,1.9vw,26px);line-height:1}
+.rate__u{font-size:clamp(9px,.72vw,11px);letter-spacing:.14em;text-transform:uppercase;font-weight:500;color:var(--deep)}
+.rate__s{margin-top:10px;font-size:clamp(11px,.92vw,13px);line-height:1.45;color:var(--deep)}
+.band--sage .rate__u,.band--sage .rate__s{color:var(--ink)}
+.band--sage .rate--best .rate__k,
+.band--sage .rate--best .rate__u,
+.band--sage .rate--best .rate__s{color:var(--deep)}
+/* Below this the rank is one column and each cell is a single line of label
+   and price with the cash line under it. 700px rather than the sheet's usual
+   820: the three cells hold their three lines cleanly down to about 720, and
+   dropping earlier would stack them on a tablet with room for the ladder. */
+@media (max-width:700px){
+  .roll--plans .roll__x{grid-template-columns:1fr;gap:6px}
+  .roll--plans .rate{
+    display:grid;grid-template-columns:minmax(0,1fr) auto;
+    column-gap:14px;align-items:baseline;padding:11px 13px;
+  }
+  .roll--plans .rate__k{grid-column:1;grid-row:1}
+  .roll--plans .rate__v{grid-column:2;grid-row:1;margin-top:0;text-align:right}
+  .roll--plans .rate__s{grid-column:1/-1;grid-row:2;margin-top:5px}
 }
 
 /* ---- membership tiers ------------------------------------------------

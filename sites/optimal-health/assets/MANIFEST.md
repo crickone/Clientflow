@@ -67,11 +67,11 @@ employee, which is a different question, but still worth the operator's nod.
 | File | Shows | Size | Weight | Face | Notes and suggested use |
 | --- | --- | --- | --- | --- | --- |
 | `room.jpg` *(existing)* | Waiting area: clock, bamboo, TOILET / PEMF THERAPY / MASSAGE THERAPY doors, wall TV, green sofa | 1600x900 | 296 KB | none | Already in use. "PEMF THERAPY" door legible — see naming conflict above. |
-| `reception.jpg` *(existing)* | Reception desk under the claim boards | 2200x1238 | 533 KB | none | Already in use and **already cropped in CSS** (`.shot--room` in `_style.css`) to keep the claim boards out of frame. Do not use it uncropped anywhere new. Heaviest file in the folder. |
+| `reception.jpg` *(existing)* | Reception desk under the claim boards | 3456x1944 | 275 KB | none | Already in use and **already cropped in CSS** (`.shot--room` in `_style.css`) to keep the claim boards out of frame. Do not use it uncropped anywhere new. Heaviest file in the folder. **Hero.** Re-exported 2026-09-30 from `Clinic/_DSC6910`. |
 | `waiting-room-doors.jpg` | Same waiting area, tighter and more head-on: three doors, the wall TV showing a garden scene, "RECHARGE. BALANCE. STRENGTHEN." on the pillar | 1600x900 | 195 KB | none | Alternate to `room.jpg` so the two do not have to share a page. "PEMF THERAPY" door legible. Good for an "inside the clinic" or contact/visit-us section. |
-| `waiting-room-wide.jpg` | Opposite angle of the waiting area: sofas, "Relax" table, HYPERBARIC OXYGEN door, and an open door with the infrared bed glowing inside | 1600x900 | 176 KB | none | The best single wide shot of the whole space — it shows three rooms at once. Home page or About. No claim text at all. |
+| `waiting-room-wide.jpg` | Opposite angle of the waiting area: sofas, "Relax" table, HYPERBARIC OXYGEN door, and an open door with the infrared bed glowing inside | 2880x1620 | 242 KB | none | The best single wide shot of the whole space — it shows three rooms at once. Home page or About. No claim text at all. **Hero.** Re-exported 2026-09-30 from `Clinic/_DSC6907`. |
 | `lounge-sofa.jpg` | Wide band: green sofa, slatted coffee table, bamboo, treatment doors, wood floor | 1600x468 | 132 KB | none | **Already cropped** — the top of the original frame held the hyperbaric and infrared claim boards and was cut away. Shaped as a full-width section divider or a band between text blocks. |
-| `corridor-massage-door.jpg` | MASSAGE THERAPY door with its VACANT tag, an open door beyond showing the lit infrared bed, "HEAT. REPAIR. RESET." on the frame, bamboo | 1600x900 | 161 KB | none | Quiet, calm, no people. Good beside "what a visit is like", or at the top of the massage page. |
+| `corridor-massage-door.jpg` | MASSAGE THERAPY door with its VACANT tag, an open door beyond showing the lit infrared bed, "HEAT. REPAIR. RESET." on the frame, bamboo | 2880x1620 | 178 KB | none | Quiet, calm, no people. Good beside "what a visit is like", or at the top of the massage page. **Hero.** Re-exported 2026-09-30 from `Clinic/_DSC6914`. |
 | `door-hyperbaric.jpg` | Portrait: the HYPERBARIC OXYGEN door, VACANT tag, "BOOST. RECOVER. PERFORM." running up the frame | 675x1200 | 90 KB | none | Tall and narrow — made for a side column or a two-up beside body text on the hyperbaric page. Lightest photograph in the set. |
 
 ## Hyperbaric oxygen
@@ -83,9 +83,9 @@ There is no clean empty-chamber photograph anywhere in the library.
 
 | File | Shows | Size | Weight | Face | Notes and suggested use |
 | --- | --- | --- | --- | --- | --- |
-| `hbot.jpg` *(existing)* | The chamber | 1400x1400 | 323 KB | — | Already in use. |
-| `hbot-session-mask.jpg` | A man seated inside the open soft-shell chamber holding an oxygen mask, concentrator and hose at left, green wall | 1600x900 | 168 KB | clear (looking down, partly behind the mask) | The most **explanatory** picture of the therapy in the library — it is the only one that shows the mask and the concentrator together. Best choice for the hyperbaric page hero if the operator confirms consent. |
-| `hbot-session-oxygen.jpg` | A man in a black tee inside the chamber wearing the oxygen mask, a staff member's hand at the right edge | 1600x900 | 167 KB | clear | Filed in the client's `Therapy - PEMF` folder but it is plainly the hyperbaric chamber. Second choice to the one above. |
+| `hbot.jpg` *(existing)* | The chamber | 1400x1400 | 123 KB | — | Already in use. **Hero.** Re-exported 2026-09-30 from `Therapy - HBOT/HBOT man 1.jpeg`. |
+| `hbot-session-mask.jpg` | A man seated inside the open soft-shell chamber holding an oxygen mask, concentrator and hose at left, green wall | 1920x1080 | 106 KB | clear (looking down, partly behind the mask) | The most **explanatory** picture of the therapy in the library — it is the only one that shows the mask and the concentrator together. Best choice for the hyperbaric page hero if the operator confirms consent. **Hero.** Re-exported 2026-09-30 from `Therapy - HBOT/1212 (2).png`. |
+| `hbot-session-oxygen.jpg` | A man in a black tee inside the chamber wearing the oxygen mask, a staff member's hand at the right edge | 1920x1080 | 100 KB | clear | Filed in the client's `Therapy - PEMF` folder but it is plainly the hyperbaric chamber. Second choice to the one above. **Hero.** Re-exported 2026-09-30 from `Therapy - PEMF/1121 (2)(2).png`. |
 | `hbot-chamber-seated.jpg` | A man seated in the open chamber, hands on his knees, black brick wall | 1200x1200 | 164 KB | clear (looking at camera) | Square. Good for a card or a grid tile. Shows the scale of the chamber well. |
 | `hbot-chamber-open.jpg` | An older man seated in the open chamber, looking away, green wall | 1200x1200 | 154 KB | clear (in profile, looking away) | Square. The least direct of the four — his face is turned, so it is the safest of the group if consent is uncertain. |
 
@@ -97,8 +97,8 @@ branded and shot from many angles with nobody in frame.
 | File | Shows | Size | Weight | Face | Notes and suggested use |
 | --- | --- | --- | --- | --- | --- |
 | `infrared.jpg` *(existing)* | The bed | 1400x787 | 128 KB | — | Already in use. |
-| `infrared-bed-lit.jpg` | The bed running: white shell, warm red glow spilling onto black brick, OPTIMAL HEALTH on the hood | 1600x900 | 170 KB | none | The most striking image in the whole set. Hero for the infrared page. |
-| `infrared-bed-open.jpg` | The bed nose-on, hood raised, orange light inside | 1600x900 | 143 KB | none | Good "this is the machine" shot at the top of a service card. |
+| `infrared-bed-lit.jpg` | The bed running: white shell, warm red glow spilling onto black brick, OPTIMAL HEALTH on the hood | 2880x1620 | 157 KB | none | The most striking image in the whole set. Hero for the infrared page. **Hero.** Re-exported 2026-09-30 from `Therapy - Infrared/_DSC6896`. |
+| `infrared-bed-open.jpg` | The bed nose-on, hood raised, orange light inside | 2880x1620 | 76 KB | none | Good "this is the machine" shot at the top of a service card. **Hero.** Re-exported 2026-09-30 from `Therapy - Infrared/_DSC6894`. |
 | `infrared-bed-idle.jpg` | The bed unlit and closed, white shell, single orange accent strip, dark room | 1600x900 | 168 KB | none | Calm and clean — pairs well with the lit version for a before/during contrast. |
 | `infrared-bed-detail.jpg` | Close on the OPTIMAL HEALTH logo on the shell, red wash across it | 1600x900 | 173 KB | none | A detail that can sit beside a block of text without competing with a hero. |
 | `infrared-session-start.jpg` | A staff member's hand on the bed's control panel; a client's head just visible inside the open end | 1600x900 | 166 KB | none (only the back of a head) | The best "in use" infrared shot with nobody identifiable. Filed under `Therapy - HBOT` in the source but it is the infrared bed. |
@@ -111,7 +111,7 @@ excellent; the people shots are posed portraits with clear faces.
 
 | File | Shows | Size | Weight | Face | Notes and suggested use |
 | --- | --- | --- | --- | --- | --- |
-| `hifem.jpg` *(existing)* | The chair | 1400x787 | 206 KB | — | Already in use. |
+| `hifem.jpg` *(existing)* | The chair | 1920x1080 | 144 KB | — | Already in use. **Hero.** Re-exported 2026-09-30 from `Therapy - PEMF/1121 (2)(1).png`. |
 | `hifem-chair.jpg` | The chair and its OPTIMAL-branded console, empty, cushion on the seat, wood slats and black brick | 1600x900 | 208 KB | none | The cleanest equipment shot of the chair. Hero for the HIFEM page. |
 | `hifem-chair-room.jpg` | Wider version of the same, with a side table and magazine at the right | 1600x900 | 218 KB | none | Shows more of the room; a little more lived-in. Good as the second image on the page. |
 | `hifem-session-seated.jpg` | A woman in a blue linen shirt seated on the chair, relaxed, smiling | 1200x1200 | 167 KB | clear (looking at camera) | Square. Well lit, clearly a posed shoot rather than a snatched frame — the best people shot of the chair. Needs the operator's nod on consent. |
@@ -125,7 +125,7 @@ most of it is hands and detail, with the client face-down and anonymous.
 | File | Shows | Size | Weight | Face | Notes and suggested use |
 | --- | --- | --- | --- | --- | --- |
 | `massage.jpg` *(existing)* | Massage in progress | 1600x900 | 197 KB | — | Already in use. |
-| `massage-room.jpg` | The therapist working a client's back in the olive treatment room, salt lamp and shelving behind | 1600x900 | 171 KB | staff face clear; client face turned away | The warmest room shot of the massage suite. Good hero for the massage page. |
+| `massage-room.jpg` | The therapist working a client's back in the olive treatment room, salt lamp and shelving behind | 2880x1620 | 160 KB | staff face clear; client face turned away | The warmest room shot of the massage suite. Good hero for the massage page. **Hero.** Re-exported 2026-09-30 from `Massage/Massage Images/_DSC6927`. |
 | `massage-leg-stretch.jpg` | The therapist stretching a client's leg on the couch against black brick | 1600x900 | 239 KB | staff face clear; client's head is out of frame | Shows the therapy as work rather than pampering. Heaviest of the new files. |
 | `massage-back.jpg` | Therapist's hands working across a client's upper back, olive wall | 1600x900 | 167 KB | none | Anonymous. Drops in anywhere alongside text. |
 | `massage-lavashell-back.jpg` | Two LavaShells worked down either side of a client's spine | 1600x900 | 164 KB | none | The clearest picture of what a LavaShell treatment actually looks like. |
@@ -217,3 +217,55 @@ Long edge 1600px for landscape frames, 1200px for square and portrait ones — a
 for in-page imagery. The set averages 167 KB per file, against 546 KB for the
 pre-existing `reception.jpg`. Every file was decode-tested after compression and a
 sample was opened and looked at.
+
+## The ten heroes, re-exported 2026-09-30
+
+1600px is the right size for a tile and the wrong size for a hero. `.hero` is
+full-bleed, so on the operator's 1728px-wide retina screen the box is 3456 device
+pixels across and a 1600px file was being scaled **up** to fill it. That is what
+"the hero image needs to be full screen and not zoomed up" was about, and it is a
+resolution problem before it is a CSS one.
+
+The ten files used as `.hero__media` are marked **Hero** in the tables above, with
+the source frame each came from. They now export at:
+
+| | width | why |
+| --- | --- | --- |
+| Eight full-frame heroes | **2880px** | 2x of a 1440px laptop exactly, and 1.67x at 1728 — 83% of native retina density. Measured against 2560 and 3456 at 1728 on the real page: 1600 is mush, 2560 is legible, 2880 is the knee of the curve, 3456 gains a little and costs 40% more. |
+| `reception.jpg` | **3456px** | `.shot--room` keeps only the left 60% of this file, so 3456px delivers 2074px across the hero. Even that is only 1.2x at 1728 — it was **0.56x** before, an 80% upscale in CSS pixels, the worst image on the site. |
+| `hbot.jpg`, `hifem.jpg`, `hbot-session-mask.jpg`, `hbot-session-oxygen.jpg` | native | See below. They have no more pixels to give. |
+
+Compression is `sharp` with **mozjpeg** rather than `sips`, which is roughly twice
+as efficient at the same visible quality: quality 66 for the 2880px frames, 56 for
+`reception.jpg` (the 0.6 crop downsamples it again in the browser, which hides a
+lower quality), 72–74 for the small ones. `.rotate()` bakes EXIF orientation in and
+metadata is dropped, as before.
+
+The site got **lighter** doing this: 16.0 MB of imagery to 14.8 MB, and 3.86 MB of
+above-the-fold imagery to 3.64 MB. Six pages lost weight, four gained. No page
+loads more than 295 KB before the fold, which was the standing budget.
+
+### Four heroes that cannot be made sharp
+
+The hyperbaric and HIFEM heroes do not come from the DSLR shoot. Their true
+originals are a 1024x1024 JPEG (`HBOT man 1.jpeg`) and three 1920x1080 video
+stills, so there is nothing above 1920px to export and `hbot.jpg` was, and still
+is, an upscale of a 1024px source. It was re-encoded rather than resized — same
+1400x1400 box, 274 KB down to 123 KB, visibly identical — so the page stops paying
+150 KB for pixels that carry no detail, but the hyperbaric hero stays the softest
+picture on the site and no re-export will change that.
+
+**What would fix it, for the operator to decide:** `hifem.jpg` (a 1080p still of
+the chair) has a 6000x3376 equivalent in the library — `hifem-chair.jpg`, from
+`Therapy - PEMF/_DSC6889`, which this manifest already calls the cleanest equipment
+shot of the chair. Swapping the HIFEM hero to it would make that page as sharp as
+the rest. Hyperbaric has no equivalent: there is no high-resolution photograph of
+the chamber anywhere in the library, and a shoot is the only answer.
+
+### One frame, two files
+
+`reception.jpg` and `lounge-sofa.jpg` are both cut from `Clinic/_DSC6910` — the
+same sofa, table, plant and doors, one cropped to 16:9 and one to a wide strip.
+They never meet on a page today (`lounge-sofa.jpg` is only on testimonials), so the
+no-page-shows-a-photograph-twice check does not see it, but they are the same
+picture and should not be put on the same page.
