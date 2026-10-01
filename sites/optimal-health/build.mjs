@@ -893,7 +893,7 @@ const META = {
     file: "testimonials.html",
     title: "What people say | Optimal Health & Recovery at Inspire",
     description:
-      "Four clients of our Clonmel clinic, filmed in the lounge, on the HIFEM chair and the infrared bed. Nothing loads from YouTube until you press play.",
+      "Four clients of our Clonmel clinic, filmed in the lounge, on the HIFEM chair and the infrared bed, talking about how they got on.",
   },
   contact: {
     file: "contact.html",
