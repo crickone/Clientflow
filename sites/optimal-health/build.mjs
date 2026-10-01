@@ -812,6 +812,14 @@ const undocumented = (html, page) => {
   return out;
 };
 
+// The `js` flag script is the FIRST thing in <body>, never in <head>. Every
+// animation on the site hangs off that class, and the platform's
+// clientflow-live template keeps a page's head styles and links but drops
+// head SCRIPTS -- so in the head it ran in the local preview and silently
+// never ran on the platform: no flag, no animations, no error anywhere
+// (found 2026-10-01, the day the site went onto the platform). Healthwise
+// and Inspire both put it at the top of <body>, which the template keeps,
+// and it still runs before any of the body paints.
 const shell = ({ title, description, body }) => `<!doctype html>
 <html lang="en">
 <head>
@@ -822,12 +830,12 @@ const shell = ({ title, description, body }) => `<!doctype html>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
-<script>document.documentElement.className+=' js';</script>
 <style>
 ${css.trim()}
 </style>
 </head>
 <body>
+<script>document.documentElement.className+=' js';</script>
 
 ${nav()}
 
