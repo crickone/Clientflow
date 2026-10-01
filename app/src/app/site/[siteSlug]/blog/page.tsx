@@ -8,7 +8,9 @@ import { listPublishedPosts } from "@/lib/cms/blog";
 import { excerptFromMarkdown } from "@/lib/cms/markdown";
 import { getSiteChrome, CHROME_CONTENT_CSS } from "@/lib/cms/siteChrome";
 import { SiteTracking } from "@/components/cms/SiteTracking";
-import { siteVerificationMeta } from "@/lib/cms/render";
+import { siteVerificationMeta, resolvePageContext, studioEditZones } from "@/lib/cms/render";
+
+import PublicSitePage, { generateMetadata as pageMetadata } from "../[...slug]/page";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +31,26 @@ export const dynamic = "force-dynamic";
  * the CRM's title, on a client's public website. Named here, with the
  * canonical URL and the site's search-console tag.
  */
+/**
+ * A site that ships its OWN page at /blog gets that page, not this list.
+ *
+ * This route is static, so Next.js picks it over the [...slug] catch-all for
+ * /blog on every site -- which meant a bespoke site's own journal page at
+ * /blog (Optimal Health's: a designed index of its articles, imported like any
+ * other page) could never be seen. Every link to it landed here instead, on
+ * the platform's generic list of CMS blog posts, which for that site is empty.
+ *
+ * The rule: if the site has a published page at /blog, hand the request to
+ * the catch-all exactly as if this route did not exist -- the same render,
+ * metadata, tracking and Studio edit canvas every other page gets. A site
+ * without one keeps the list below, unchanged.
+ */
+const BLOG_PATH = ["blog"];
+function ownsBlogPage(siteSlug: string, searchParams: { site?: string }): boolean {
+  const pc = resolvePageContext({ siteSlug, slug: BLOG_PATH }, searchParams);
+  return Boolean(pc && pc.template);
+}
+
 export function generateMetadata({
   params,
   searchParams,
@@ -36,6 +58,9 @@ export function generateMetadata({
   params: { siteSlug: string };
   searchParams: { site?: string };
 }): Metadata {
+  if (ownsBlogPage(params.siteSlug, searchParams)) {
+    return pageMetadata({ params: { siteSlug: params.siteSlug, slug: BLOG_PATH }, searchParams });
+  }
   const host = headers().get("host");
   const resolved = resolvePublicSite({ host, siteParam: searchParams.site ?? params.siteSlug });
   if (!resolved) return { title: "Not found" };
@@ -46,13 +71,22 @@ export function generateMetadata({
   };
 }
 
-export default function PublicBlogIndex({
+export default async function PublicBlogIndex({
   params,
   searchParams,
 }: {
   params: { siteSlug: string };
-  searchParams: { site?: string };
+  searchParams: { site?: string; cmsedit?: string };
 }) {
+  // The Studio edit canvas resolves through the operator's own tenant, not
+  // the host, so it is checked the way the catch-all checks it.
+  const delegate =
+    (searchParams.cmsedit === "1" && (await studioEditZones(params.siteSlug, "/blog")) !== null) ||
+    ownsBlogPage(params.siteSlug, searchParams);
+  if (delegate) {
+    return PublicSitePage({ params: { siteSlug: params.siteSlug, slug: BLOG_PATH }, searchParams });
+  }
+
   const host = headers().get("host");
   const resolved = resolvePublicSite({
     host,

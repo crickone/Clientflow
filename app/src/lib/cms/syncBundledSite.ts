@@ -50,6 +50,11 @@ const BUNDLED_SITES: readonly string[] = [
   // Healthwise, Clonmel. Built in sites/healthwise/ the same way; its
   // _pages.json, _posts.json and _redirects.json ship in the build.
   "healthwise",
+  // Optimal Health and Recovery at Inspire (tenant 1028), built in
+  // sites/optimal-health/. Pages and _redirects.json only: its articles are
+  // designed pages (/blog-<slug>), not CMS blog posts, so there is no
+  // _posts.json, and its journal index is its own page at /blog.
+  "optimal-health",
 ];
 
 type BundledPage = {
