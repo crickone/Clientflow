@@ -261,6 +261,7 @@ const scripts = () => `<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dis
         if (row.classList.contains('is-open')) return;
         if (open && open !== row) open._close();
         open = row;
+        row._openedAt = Date.now();
         row.classList.add('is-open');
         head.setAttribute('aria-expanded', 'true');
         panel.hidden = false;
@@ -284,11 +285,28 @@ const scripts = () => `<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dis
           { opacity: 1, y: 0, duration: calm ? 0 : 0.6, ease: SNAP, stagger: calm ? 0 : 0.07, delay: calm ? 0 : 0.12 });
       };
 
+      // On a desktop the pointer opens a row on its way to clicking it, so a
+      // click that arrives within a moment of that open is the visitor asking
+      // for the row they are already looking at -- closing it there read as
+      // the click doing the opposite of what was asked. A click on a row that
+      // has been open a while still closes it.
       head.addEventListener('click', function () {
-        if (row.classList.contains('is-open')) row._close();
-        else row._open();
+        if (!row.classList.contains('is-open')) row._open();
+        else if (Date.now() - (row._openedAt || 0) > 600) row._close();
       });
-      head.addEventListener('focus', function () { row._open(); });
+      // Open on KEYBOARD focus only. A tap or a click also focuses the
+      // button, a moment before the click lands -- so opening on every focus
+      // meant a tap opened the row and the click that followed closed it
+      // again, and on a phone that focuses buttons on tap (Android Chrome)
+      // the list could not be opened at all. Found 2026-10-01 building the
+      // massage price list on this same dropdown; the home page had it too.
+      // :focus-visible is true for keyboard focus and false for a tap or a
+      // click; a browser too old to know it throws, and opens as before.
+      head.addEventListener('focus', function () {
+        var keyboard = true;
+        try { keyboard = head.matches(':focus-visible'); } catch (e) {}
+        if (keyboard) row._open();
+      });
     });
 
     // Hover only where hovering is real. A coarse pointer that reports hover
