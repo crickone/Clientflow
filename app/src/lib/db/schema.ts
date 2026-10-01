@@ -2662,7 +2662,7 @@ export const agents = sqliteTable("agents", {
   name: text("name").notNull(),
   status: text("status", { enum: ["active", "dormant"] }).notNull().default("dormant"),
   instructions: text("instructions").notNull().default(""),
-  model: text("model").notNull().default("claude-sonnet-5"),
+  model: text("model").notNull().default("claude-sonnet-5-5"),
   // Per-tenant tool ACCESS toggles: a JSON array of tool names this agent is
   // NOT allowed to use (the DISABLED set — storing what's OFF, not what's ON,
   // so a tool added to the agent later defaults to ON for every existing

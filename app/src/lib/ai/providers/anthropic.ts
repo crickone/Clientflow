@@ -30,6 +30,26 @@ import type { ModelProvider, NeutralMessage, ProviderTurnResult, StreamTurnArgs 
  * stored transcript), which are always plain text with no tool calls, so
  * there is nothing lossy to reconstruct there either.
  */
+/**
+ * PROGRESS UPDATES (2026-10-01). On Sonnet 5.5 and Opus 5.5, a note the model
+ * writes between tool calls that runs past a sentence or two -- "found three
+ * open leads, checking which have replied" -- no longer arrives as a `text`
+ * block. It arrives as a `thinking` block, and under the default display its
+ * text is EMPTY. Nothing fails; the chat just goes quiet for the length of a
+ * multi-step turn and the notes never reach the transcript.
+ *
+ * `display: "updates"` (beta) returns a short summary of each such note as
+ * the block's text while keeping the model's reasoning hidden, so it can be
+ * streamed exactly where the old text block was. Only the models that accept
+ * it get it: any other model 400s on the field, and the picker can still hold
+ * an older id until the tenant migration reaches that database.
+ *
+ * The field and the header are passed by hand because the pinned SDK (0.95)
+ * predates both; the SDK forwards unknown fields and extra headers untouched.
+ */
+const PROGRESS_UPDATES_MODELS: ReadonlySet<string> = new Set(["claude-sonnet-5-5", "claude-opus-5-5"]);
+const PROGRESS_UPDATES_BETA = "thinking-display-updates-2026-08-18";
+
 export class AnthropicProvider implements ModelProvider {
   async streamTurn(args: StreamTurnArgs): Promise<ProviderTurnResult> {
     // `args.signal` is deliberately NOT read here: the pre-MP1 inline loop
@@ -44,20 +64,39 @@ export class AnthropicProvider implements ModelProvider {
 
     const wireMessages: Anthropic.MessageParam[] = messages.map(toWireMessage);
 
-    const stream = getAnthropic().messages.stream({
-      model,
-      // Full nutrition/workout plans serialise to large tool inputs; 4096 was
-      // truncating them mid-JSON, which failed and made the model retry.
-      max_tokens: maxTokens,
-      system,
-      tools,
-      messages: wireMessages,
-    });
+    const progressUpdates = PROGRESS_UPDATES_MODELS.has(model);
+    const stream = getAnthropic().messages.stream(
+      {
+        model,
+        // Full nutrition/workout plans serialise to large tool inputs; 4096 was
+        // truncating them mid-JSON, which failed and made the model retry.
+        max_tokens: maxTokens,
+        system,
+        tools,
+        messages: wireMessages,
+        ...(progressUpdates
+          ? { thinking: { type: "adaptive", display: "updates" } as unknown as Anthropic.ThinkingConfigParam }
+          : {}),
+      },
+      progressUpdates ? { headers: { "anthropic-beta": PROGRESS_UPDATES_BETA } } : undefined,
+    );
     let text = "";
-    stream.on("text", (delta) => {
+    const emit = (delta: string) => {
       text += delta;
       onText?.(delta);
-    });
+    };
+    stream.on("text", emit);
+    if (progressUpdates) {
+      // Under "updates" the only thinking text that comes back is the progress
+      // notes -- the reasoning itself stays empty -- so every delta here is
+      // something the user is meant to read.
+      stream.on("thinking", (delta) => emit(delta));
+      // A paragraph break after each note, so it doesn't run straight into
+      // the text of the turn that follows the tool call.
+      stream.on("contentBlock", (block) => {
+        if (block.type === "thinking" && block.thinking) emit("\n\n");
+      });
+    }
     const final = await stream.finalMessage();
 
     const toolCalls = final.content

@@ -289,6 +289,17 @@ export const TENANT_MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    id: "0008-claude-5-5",
+    description:
+      "Move agents on Sonnet 5 and Opus 5 onto their direct successors, Sonnet 5.5 and Opus 5.5, which replace them in the picker. Same reasoning as 0006: an agent still naming a model the picker no longer offers shows an empty selector and sits on an older model nobody chose. Sonnet 5.5 is the same price as Sonnet 5 ($2/$10 per MTok) and Opus 5.5 is cheaper than Opus 5 ($4/$20 against $5/$25), so this moves capability up and cost flat or down. Opus 4.8 is included so a tenant whose database somehow skipped 0006 lands on the current Opus rather than the previous one. Scoped to those three exact ids: Haiku and OpenRouter models are left alone, because moving somebody off a model they picked is a different act.",
+    up: (sqlite) => {
+      sqlite.prepare("UPDATE agents SET model = 'claude-sonnet-5-5' WHERE model = 'claude-sonnet-5'").run();
+      sqlite
+        .prepare("UPDATE agents SET model = 'claude-opus-5-5' WHERE model IN ('claude-opus-5', 'claude-opus-4-8')")
+        .run();
+    },
+  },
 ];
 
 /**

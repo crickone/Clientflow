@@ -44,10 +44,19 @@ type FakeFinal = { content: unknown[]; stop_reason: string; usage: Record<string
 // Faithful to the real `Anthropic.MessageStream` surface AnthropicProvider
 // actually uses: `.on("text", cb)` and `.finalMessage()` — same shape
 // runAgentTurn.test.ts's own fake used pre-MP1.
-function fakeStream(textDeltas: string[], final: FakeFinal) {
+function fakeStream(
+  textDeltas: string[],
+  final: FakeFinal,
+  // Progress updates (Sonnet 5.5 / Opus 5.5): the `thinking` deltas a block
+  // streams, and the finished blocks `contentBlock` hands over. Default empty,
+  // so every older case below behaves exactly as it always did.
+  extra: { thinkingDeltas?: string[]; blocks?: unknown[] } = {},
+) {
   return {
     on(event: string, cb: (...args: unknown[]) => void) {
       if (event === "text") for (const d of textDeltas) cb(d, d);
+      if (event === "thinking") for (const d of extra.thinkingDeltas ?? []) cb(d, d);
+      if (event === "contentBlock") for (const b of extra.blocks ?? []) cb(b);
       return this;
     },
     finalMessage: async () => final,
@@ -56,10 +65,13 @@ function fakeStream(textDeltas: string[], final: FakeFinal) {
 
 (async () => {
   const client = getAnthropic();
-  const calls: { model: string; messages: unknown[] }[] = [];
+  const calls: { model: string; messages: unknown[]; thinking?: unknown; headers?: Record<string, string> }[] = [];
   let nextStream: ReturnType<typeof fakeStream> | null = null;
-  (client.messages as unknown as { stream: unknown }).stream = (params: { model: string; messages: unknown[] }) => {
-    calls.push({ model: params.model, messages: [...params.messages] });
+  (client.messages as unknown as { stream: unknown }).stream = (
+    params: { model: string; messages: unknown[]; thinking?: unknown },
+    options?: { headers?: Record<string, string> },
+  ) => {
+    calls.push({ model: params.model, messages: [...params.messages], thinking: params.thinking, headers: options?.headers });
     if (!nextStream) throw new Error("anthropic.test.ts: fakeStream not primed before this call");
     return nextStream;
   };
@@ -204,6 +216,50 @@ function fakeStream(textDeltas: string[], final: FakeFinal) {
     ],
     "no providerRaw -> rebuilt from content + toolCalls",
   );
+
+  // ════════════════════════════════════════════════════════════════════
+  // 6. Progress updates. On Sonnet 5.5 / Opus 5.5 a note written between
+  //    tool calls comes back as a `thinking` block, EMPTY unless the request
+  //    asks for display "updates". Without this the chat would go quiet for
+  //    a whole multi-step turn. The provider must (a) ask for it, with the
+  //    beta header, (b) stream those notes through onText exactly as text
+  //    used to arrive, with a paragraph break after each so the next turn's
+  //    text doesn't run into it, and (c) leave the thinking blocks in
+  //    assistantRaw so they are replayed verbatim next turn.
+  // ════════════════════════════════════════════════════════════════════
+  const noteBlock = { type: "thinking", thinking: "Found three open leads; checking which replied.", signature: "sig" };
+  const finalNote: FakeFinal = {
+    content: [noteBlock, { type: "tool_use", id: "tu_5", name: "list_leads", input: {} }],
+    stop_reason: "tool_use",
+    usage: { input_tokens: 1, output_tokens: 1 },
+  };
+  nextStream = fakeStream([], finalNote, {
+    thinkingDeltas: ["Found three open leads; ", "checking which replied."],
+    blocks: [noteBlock, finalNote.content[1]],
+  });
+  const noteDeltas: string[] = [];
+  const r6 = await provider.streamTurn({
+    model: "claude-sonnet-5-5",
+    system: "sys",
+    tools: [],
+    messages: [{ role: "user", content: "who replied?" }],
+    maxTokens: 1000,
+    onText: (d) => noteDeltas.push(d),
+  });
+  const six = calls[calls.length - 1];
+  assert.deepEqual(six.thinking, { type: "adaptive", display: "updates" }, "5.5 asks for progress updates");
+  assert.equal(six.headers?.["anthropic-beta"], "thinking-display-updates-2026-08-18", "with the beta header");
+  assert.equal(r6.text, "Found three open leads; checking which replied.\n\n", "the note streams as text, then a paragraph break");
+  assert.deepEqual(noteDeltas.join(""), r6.text, "onText saw exactly what text holds");
+  assert.equal(r6.assistantRaw, finalNote.content, "the thinking block stays in assistantRaw, replayed verbatim");
+
+  // A model that rejects the field must not get it: the picker can still hold
+  // an older id until the tenant migration reaches that database.
+  nextStream = fakeStream(["ok"], { content: [{ type: "text", text: "ok" }], stop_reason: "end_turn", usage: { input_tokens: 1, output_tokens: 1 } });
+  await provider.streamTurn({ model: "claude-haiku-4-5", system: "sys", tools: [], messages: [{ role: "user", content: "x" }], maxTokens: 100 });
+  const haiku = calls[calls.length - 1];
+  assert.equal(haiku.thinking, undefined, "Haiku is sent no thinking field");
+  assert.equal(haiku.headers, undefined, "and no beta header");
 
   console.log("ai/providers/anthropic.test.ts: all assertions passed");
 })();

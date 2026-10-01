@@ -8,14 +8,21 @@ import Anthropic from "@anthropic-ai/sdk";
  * five times Sonnet, and nothing a gym asks for needs it. Still true as of
  * Fable 5.1 — revisit only if a tenant has a job Opus genuinely cannot do.
  *
- * Verified against platform.claude.com/docs/en/docs/about-claude/models/overview
- * on 2026-09-19: Sonnet 5 and Haiku 4.5 are current; Opus 4.8 is legacy and
- * Opus 5 replaces it.
+ * 2026-10-01: Sonnet 5.5 and Opus 5.5 succeed Sonnet 5 and Opus 5. Sonnet
+ * 5.5 is the same price ($2/$10); Opus 5.5 is CHEAPER than Opus 5 ($4/$20
+ * against $5/$25). Haiku 4.5 is still the current Haiku -- its id moves from
+ * the dated snapshot to the alias, which names the same model.
+ *
+ * Both 5.5 models reject two request shapes their predecessors accepted, and
+ * this app sent each of them once: a forced `tool_choice` (inbox triage --
+ * see triageMessage.ts) and a sampling parameter (the slide rewrite). Neither
+ * may come back. Opus 5.5 also defaults to effort `medium` where Opus 5 ran
+ * at `high`; every Opus call site sets effort explicitly for that reason.
  */
 export const MODELS = {
-  haiku: "claude-haiku-4-5-20251001",
-  sonnet: "claude-sonnet-5",
-  opus: "claude-opus-5",
+  haiku: "claude-haiku-4-5",
+  sonnet: "claude-sonnet-5-5",
+  opus: "claude-opus-5-5",
 } as const;
 export type ModelTier = keyof typeof MODELS;
 export const DEFAULT_AGENT_MODEL: ModelTier = "sonnet";
@@ -44,13 +51,22 @@ export const CONTENT_MODEL: string = MODELS.sonnet;
  * Superseded ids are kept: a tenant's `agents.model` may still name one
  * until the migration reaches their database, and an unpriced id would fall
  * through to the default rate rather than fail loudly.
+ *
+ * Cache reads are priced at 0.1x input in estCostCents below. Sonnet 5.5 and
+ * Opus 5.5 actually read cache at $0.20 per MTok -- 0.1x for Sonnet, 0.05x
+ * for Opus -- so Opus 5.5 cache reads are slightly OVER-metered. Over is the
+ * safe side of a spend cap; left as is rather than adding a per-model cache
+ * rate this table has never carried.
  */
 export const PRICING: Record<string, { inCents: number; outCents: number }> = {
   [MODELS.haiku]: { inCents: 100, outCents: 500 },
   [MODELS.sonnet]: { inCents: 200, outCents: 1000 },
-  [MODELS.opus]: { inCents: 500, outCents: 2500 },
-  // Legacy, still answered by the API; priced so an un-migrated agent meters
-  // correctly rather than silently at the fallback rate.
+  [MODELS.opus]: { inCents: 400, outCents: 2000 },
+  // Superseded, still answered by the API; priced so an un-migrated agent
+  // meters correctly rather than silently at the fallback rate.
+  "claude-haiku-4-5-20251001": { inCents: 100, outCents: 500 },
+  "claude-sonnet-5": { inCents: 200, outCents: 1000 },
+  "claude-opus-5": { inCents: 500, outCents: 2500 },
   "claude-opus-4-8": { inCents: 500, outCents: 2500 },
   // OpenRouter DeepSeek V4 Flash (dated snapshot "0731" — matches the catalog
   // id in @/lib/ai/modelCatalog's MODEL_CATALOG; pinned rather than the

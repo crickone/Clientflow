@@ -105,7 +105,12 @@ export async function planCut(input: {
 
     return {
       model: MODELS.opus,
-      max_tokens: 2048,
+      // A JSON plan: a cut-off one does not parse. Thinking is always on with
+      // Opus 5.5 and counts against max_tokens, so the limit is set well
+      // above the plan's own length. Effort stated rather than defaulted --
+      // Opus 5.5 defaults to `medium` where Opus 5 ran at `high`.
+      max_tokens: 8192,
+      output_config: { effort: "medium" },
       system: [
         {
           type: "text",

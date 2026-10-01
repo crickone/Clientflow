@@ -31,14 +31,14 @@ export interface ModelChoice {
 
 export const MODEL_CATALOG: ModelChoice[] = [
   {
-    id: "claude-sonnet-5",
-    label: "Sonnet 5",
+    id: "claude-sonnet-5-5",
+    label: "Sonnet 5.5",
     provider: "anthropic",
     note: "Balanced default — best all-round tool use.",
   },
   {
-    id: "claude-opus-5",
-    label: "Opus 5",
+    id: "claude-opus-5-5",
+    label: "Opus 5.5",
     provider: "anthropic",
     note: "Most capable — for the hardest tasks.",
   },
@@ -132,6 +132,8 @@ export const MODEL_CATALOG: ModelChoice[] = [
  */
 const RETIRED_LABELS: Record<string, string> = {
   "claude-opus-4-8": "Opus 4.8",
+  "claude-opus-5": "Opus 5",
+  "claude-sonnet-5": "Sonnet 5",
 };
 
 export function modelLabel(id: string): string {

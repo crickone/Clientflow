@@ -94,9 +94,16 @@ export async function POST(req: Request, { params }: { params: { id: string } })
   const ask = async () => {
     const message = await meteredCreate({ tenantId, agentKey: "carousel" }, () => ({
       model: CONTENT_MODEL,
-      max_tokens: 300,
-      // A rewrite is one line. Room to vary without room to ramble.
-      temperature: 1,
+      // A rewrite is one line, but thinking counts against max_tokens, so the
+      // limit is not the length of the line. `low` effort keeps the thinking
+      // short on what is a one-line copy edit.
+      //
+      // This sent `temperature: 1` until 2026-10-01. The 5.5 models reject
+      // sampling parameters (Sonnet 5.5 any non-default value, Opus 5.5 any
+      // value at all), and 1 was the default anyway, so it bought nothing and
+      // would have broken the day CONTENT_MODEL pointed at an Opus.
+      max_tokens: 2000,
+      output_config: { effort: "low" },
       messages: [
         {
           role: "user" as const,

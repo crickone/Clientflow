@@ -36,7 +36,11 @@ function ok(name: string, cond: boolean) {
 
 // modelLabel: known id -> its label; unknown id -> the id itself, verbatim,
 // never a throw and never the string "undefined".
-ok("modelLabel(claude-sonnet-5) is Sonnet 5", modelLabel("claude-sonnet-5") === "Sonnet 5");
+ok("modelLabel(claude-sonnet-5-5) is Sonnet 5.5", modelLabel("claude-sonnet-5-5") === "Sonnet 5.5");
+ok("modelLabel(claude-opus-5-5) is Opus 5.5", modelLabel("claude-opus-5-5") === "Opus 5.5");
+// Superseded ids an un-migrated agent may still name read as a model, not a raw id.
+ok("modelLabel(claude-sonnet-5) is still Sonnet 5", modelLabel("claude-sonnet-5") === "Sonnet 5");
+ok("modelLabel(claude-opus-5) is still Opus 5", modelLabel("claude-opus-5") === "Opus 5");
 ok("modelLabel(claude-opus-4-8) is Opus 4.8", modelLabel("claude-opus-4-8") === "Opus 4.8");
 ok(
   "modelLabel of an unknown id returns the id verbatim",
@@ -47,7 +51,8 @@ ok(
 // what the picker uses to decide whether to show the "Current: <raw id>"
 // fallback line for an agent whose `model` column holds something no longer
 // (or never) in the catalog.
-ok("isCatalogModel(claude-sonnet-5) is true", isCatalogModel("claude-sonnet-5"));
+ok("isCatalogModel(claude-sonnet-5-5) is true", isCatalogModel("claude-sonnet-5-5"));
+ok("isCatalogModel(claude-sonnet-5) is false now it is superseded", !isCatalogModel("claude-sonnet-5"));
 ok("isCatalogModel(unknown id) is false", !isCatalogModel("some-unknown-model-id"));
 
 // Fable must never be selectable. It's not (and must never be) in the
@@ -60,10 +65,10 @@ ok("no catalog id contains the substring 'fable' (case-insensitive)", !/fable/i.
 // Anthropic default unchanged — Sonnet 5 must still be present as the
 // anthropic-provider entry with no needsOpenRouter gate.
 {
-  const sonnet = MODEL_CATALOG.find((m) => m.id === "claude-sonnet-5");
-  ok("claude-sonnet-5 is present and provider:anthropic", sonnet?.provider === "anthropic");
-  ok("claude-sonnet-5 does not require OpenRouter", !sonnet?.needsOpenRouter);
-  ok("claude-sonnet-5 is first in the catalog (the default)", MODEL_CATALOG[0]?.id === "claude-sonnet-5");
+  const sonnet = MODEL_CATALOG.find((m) => m.id === "claude-sonnet-5-5");
+  ok("claude-sonnet-5-5 is present and provider:anthropic", sonnet?.provider === "anthropic");
+  ok("claude-sonnet-5-5 does not require OpenRouter", !sonnet?.needsOpenRouter);
+  ok("claude-sonnet-5-5 is first in the catalog (the default)", MODEL_CATALOG[0]?.id === "claude-sonnet-5-5");
 }
 
 // Six OpenRouter entries now (DeepSeek + Kimi K2 + Qwen3 + GLM 5.2 + GPT-5 +

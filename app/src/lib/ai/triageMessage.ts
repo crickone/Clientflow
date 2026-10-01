@@ -122,41 +122,53 @@ function buildUserPrompt(input: TriageInput): string {
   return lines.join("\n");
 }
 
-const TRIAGE_TOOL: Anthropic.Tool = {
-  name: "record_triage",
-  description: "Record the triage classification for the inbound message.",
-  input_schema: {
-    type: "object",
-    properties: {
-      category: { type: "string", enum: CATEGORIES },
-      priority: { type: "string", enum: ["high", "normal", "low"] },
-      tags: {
-        type: "array",
-        items: { type: "string" },
-        description: "Lowercase tag labels; prefer the controlled list. Max 3.",
-      },
-      summary: {
-        type: "string",
-        description: "One concise sentence summarising the message.",
-      },
-      sensitive: { type: "boolean" },
-      confidence: { type: "number", description: "0-1, per the rules." },
-      suggestedReply: {
-        type: "string",
-        description: "Draft reply text, or empty string if none.",
-      },
-      autoReplyEligible: { type: "boolean" },
+/**
+ * The shape the model must answer in, enforced by structured outputs.
+ *
+ * This was a tool, `record_triage`, called through a FORCED `tool_choice`
+ * purely to get JSON back. Opus 5.5 rejects forced tool use with a 400, so
+ * the same schema now goes to `output_config.format` instead -- which still
+ * guarantees schema-valid JSON, and needs no "did it actually call the tool"
+ * check because there is no tool to skip calling.
+ *
+ * Structured outputs require `additionalProperties: false` and every
+ * property listed in `required`. `suggestedReply` used to be optional; it is
+ * required now and its description already says "empty string if none",
+ * which the parser below has always treated as no reply.
+ */
+const TRIAGE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    category: { type: "string", enum: CATEGORIES },
+    priority: { type: "string", enum: ["high", "normal", "low"] },
+    tags: {
+      type: "array",
+      items: { type: "string" },
+      description: "Lowercase tag labels; prefer the controlled list. Max 3.",
     },
-    required: [
-      "category",
-      "priority",
-      "tags",
-      "summary",
-      "sensitive",
-      "confidence",
-      "autoReplyEligible",
-    ],
+    summary: {
+      type: "string",
+      description: "One concise sentence summarising the message.",
+    },
+    sensitive: { type: "boolean" },
+    confidence: { type: "number", description: "0-1, per the rules." },
+    suggestedReply: {
+      type: "string",
+      description: "Draft reply text, or empty string if none.",
+    },
+    autoReplyEligible: { type: "boolean" },
   },
+  required: [
+    "category",
+    "priority",
+    "tags",
+    "summary",
+    "sensitive",
+    "confidence",
+    "suggestedReply",
+    "autoReplyEligible",
+  ],
 };
 
 function clamp01(n: unknown): number {
@@ -167,7 +179,7 @@ function clamp01(n: unknown): number {
 
 /**
  * Read an inbound message and classify it. One Claude call, structured output
- * via forced tool-use. The system prompt (business facts + rules + tag vocab)
+ * via `output_config.format`. The system prompt (business facts + rules + tag vocab)
  * is stable across messages, so it's cached — only the per-message content is
  * uncached, keeping cost low (mirrors the draftFollowup caching strategy).
  */
@@ -188,7 +200,18 @@ export async function triageMessage(
 
     return {
       model: MODELS.opus,
-      max_tokens: 1024,
+      // Thinking is always on with Opus 5.5 and counts against max_tokens,
+      // so 1024 -- sized for a bare JSON answer -- could cut the answer off
+      // mid-object. 4096 leaves room for both at the effort below.
+      max_tokens: 4096,
+      // Classification, so `low`: the guide's starting point for this kind
+      // of call, and the nearest thing to how the forced-tool call ran
+      // before. Set explicitly because Opus 5.5 would otherwise default to
+      // `medium`.
+      output_config: {
+        effort: "low",
+        format: { type: "json_schema", schema: TRIAGE_SCHEMA },
+      },
       system: [
         {
           type: "text",
@@ -196,21 +219,25 @@ export async function triageMessage(
           cache_control: { type: "ephemeral" },
         },
       ],
-      tools: [TRIAGE_TOOL],
-      tool_choice: { type: "tool", name: "record_triage" },
       messages: [{ role: "user", content: buildUserPrompt(input) }],
     };
   });
 
-  const toolUse = message.content.find(
-    (b): b is Anthropic.ToolUseBlock =>
-      b.type === "tool_use" && b.name === "record_triage",
-  );
-  if (!toolUse) {
-    throw new Error("Triage model did not return a record_triage tool call");
+  // A refusal arrives as a normal 200 with no answer in it; say so rather
+  // than failing on an empty parse.
+  if (message.stop_reason === "refusal") {
+    throw new Error("Triage model declined to classify this message");
   }
-
-  const raw = toolUse.input as Record<string, unknown>;
+  const json = message.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("");
+  let raw: Record<string, unknown>;
+  try {
+    raw = JSON.parse(json) as Record<string, unknown>;
+  } catch {
+    throw new Error(`Triage model returned unparseable output (stop_reason ${message.stop_reason})`);
+  }
   const category = (
     CATEGORIES.includes(raw.category as TriageCategory)
       ? raw.category

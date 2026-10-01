@@ -104,8 +104,14 @@ export async function draftFollowup({
   // records the "followup"/opus spend after. AiCapError propagates to the caller.
   const message = await meteredCreate({ tenantId, agentKey: "followup" }, () => ({
     model: MODELS.opus,
-    max_tokens: 512,
+    // A message that goes out under the business's name, so `medium` rather
+    // than `low` -- and stated, because Opus 5.5 defaults to `medium` where
+    // Opus 5 ran at `high`, and a silent default is not a decision. Thinking
+    // counts against max_tokens, which is why the limit is well above the
+    // length of a follow-up.
+    max_tokens: 4096,
     thinking: { type: "adaptive" },
+    output_config: { effort: "medium" },
     system: [
       {
         type: "text",

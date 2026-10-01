@@ -1562,7 +1562,7 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       name          TEXT NOT NULL,
       status        TEXT NOT NULL DEFAULT 'dormant', -- 'active'|'dormant'
       instructions  TEXT NOT NULL DEFAULT '',  -- tenant-editable custom layer
-      model         TEXT NOT NULL DEFAULT 'claude-sonnet-5',
+      model         TEXT NOT NULL DEFAULT 'claude-sonnet-5-5',
       updated_at    INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
     CREATE INDEX IF NOT EXISTS idx_agents_key ON agents(key);

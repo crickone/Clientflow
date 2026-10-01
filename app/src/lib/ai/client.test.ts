@@ -32,13 +32,9 @@ function ok(name: string, cond: boolean) {
 
 // Model IDs must be pinned exactly, and Fable must never appear anywhere in
 // MODELS — it's deliberately excluded for cost reasons (see client.ts).
-check("MODELS.sonnet is claude-sonnet-5", MODELS.sonnet, "claude-sonnet-5");
-check("MODELS.opus is claude-opus-5", MODELS.opus, "claude-opus-5");
-check(
-  "MODELS.haiku is claude-haiku-4-5-20251001",
-  MODELS.haiku,
-  "claude-haiku-4-5-20251001",
-);
+check("MODELS.sonnet is claude-sonnet-5-5", MODELS.sonnet, "claude-sonnet-5-5");
+check("MODELS.opus is claude-opus-5-5", MODELS.opus, "claude-opus-5-5");
+check("MODELS.haiku is claude-haiku-4-5", MODELS.haiku, "claude-haiku-4-5");
 ok(
   "MODELS never mentions fable",
   !/fable/i.test(JSON.stringify(MODELS)),
@@ -66,11 +62,12 @@ check(
   }),
   20,
 );
-// Opus 5 replaced Opus 4.8 at the SAME price, so the upgrade cost nothing.
+// Opus 5.5 is $4/$20 -- CHEAPER than the Opus 5 it replaced ($5/$25). Pinned
+// so a copy-paste of the old rate can't quietly over-meter every Opus call.
 check(
-  "1M input + 1M output tokens on opus costs 3000c",
+  "1M input + 1M output tokens on opus costs 2400c",
   estCostCents(MODELS.opus, { inputTokens: 1_000_000, outputTokens: 1_000_000 }),
-  3000,
+  2400,
 );
 // The superseded id stays priced: a tenant's agents.model may still name it
 // until the migration reaches their database, and an unpriced id would fall
@@ -79,6 +76,21 @@ check(
   "the retired Opus 4.8 id is still priced correctly",
   estCostCents("claude-opus-4-8", { inputTokens: 1_000_000, outputTokens: 1_000_000 }),
   3000,
+);
+check(
+  "the retired Opus 5 id is still priced at its own rate, not the new one",
+  estCostCents("claude-opus-5", { inputTokens: 1_000_000, outputTokens: 1_000_000 }),
+  3000,
+);
+check(
+  "the retired Sonnet 5 id is still priced",
+  estCostCents("claude-sonnet-5", { inputTokens: 1_000_000, outputTokens: 1_000_000 }),
+  1200,
+);
+check(
+  "the dated Haiku 4.5 snapshot is still priced",
+  estCostCents("claude-haiku-4-5-20251001", { inputTokens: 1_000_000, outputTokens: 1_000_000 }),
+  600,
 );
 // Every tier must be cheaper than the one above it, or the picker's "most
 // capable / balanced / fastest" ordering is a lie about cost.

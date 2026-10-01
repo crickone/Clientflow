@@ -121,7 +121,12 @@ export async function GET() {
     // sync + dashboard aggregation for an already-capped tenant.
     const res = await meteredCreate({ tenantId, agentKey: "brief" }, () => ({
       model: MODELS.opus,
-      max_tokens: 500,
+      // Five bullets. Thinking is always on with Opus 5.5 and counts against
+      // max_tokens, so 500 -- sized for the bullets alone -- could cut the
+      // brief off; and a summary of numbers already in hand is `low` work.
+      // Set explicitly: Opus 5.5 would otherwise default to `medium`.
+      max_tokens: 2000,
+      output_config: { effort: "low" },
       system: `You write a short, friendly MORNING BRIEF for the owner of ${business}, a ${mode === "timetable" ? "gym/studio" : "clinic"}, shown at the top of their dashboard.
 - 3 to 5 short bullet points, Irish English.
 - Lead with anything that needs ACTION (unanswered messages, new leads), then today's schedule/classes, then a quick members/money line, then (if present) the nearest upcoming marketing opportunity.
