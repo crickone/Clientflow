@@ -955,7 +955,7 @@ const POSTS = [
     photo: "infrared-bed-idle.jpg",
     alt: "The infrared bed closed and waiting in the treatment room, its orange strip lit",
     description:
-      "An evening infrared session at our Clonmel clinic: twelve minutes, comfortable clothes, and half an hour nobody can reach you in.",
+      "An evening infrared session at our Clonmel clinic: twelve minutes under the light, and half an hour nobody can reach you in.",
   },
   {
     slug: "the-hifem-chair-and-a-week-sitting-down",
