@@ -108,7 +108,7 @@ h1,h2,h3,p,figure,blockquote{margin:0}
   max-width:44ch;
 }
 .micro{
-  font-size:clamp(10px,.82vw,12px);
+  font-size:clamp(11px,.82vw,12px);
   letter-spacing:.14em;
   text-transform:uppercase;
   font-weight:500;
@@ -159,7 +159,7 @@ h1,h2,h3,p,figure,blockquote{margin:0}
 .btn--light:hover,.btn--light:focus-visible{background:var(--timber)}
 .explore{
   display:inline-flex;align-items:center;gap:8px;text-decoration:none;
-  font-size:clamp(10px,.82vw,12px);letter-spacing:.14em;text-transform:uppercase;font-weight:500;
+  font-size:clamp(11px,.82vw,12px);letter-spacing:.14em;text-transform:uppercase;font-weight:500;
 }
 .explore::after{content:"+";opacity:.75}
 .explore:hover,.explore:focus-visible{color:var(--deep)}
@@ -178,7 +178,7 @@ h1,h2,h3,p,figure,blockquote{margin:0}
 .nav__links{display:flex;gap:clamp(12px,1.4vw,20px)}
 .nav__links a{
   text-decoration:none;
-  font-size:clamp(10px,.82vw,12px);letter-spacing:.12em;text-transform:uppercase;font-weight:500;
+  font-size:clamp(11px,.82vw,12px);letter-spacing:.12em;text-transform:uppercase;font-weight:500;
 }
 /* The floating box is always on plaster, never ink, so this is the hover
    rule from the house comment above: --deep, not timber (3.01:1 there). */
@@ -502,7 +502,7 @@ h1,h2,h3,p,figure,blockquote{margin:0}
   display:grid;
   grid-template-columns:minmax(0,var(--roll-n)) minmax(0,1fr) var(--roll-x);
   align-items:baseline;
-  column-gap:clamp(10px,1.4vw,18px);row-gap:clamp(6px,.8vw,10px);
+  column-gap:clamp(11px,1.4vw,18px);row-gap:clamp(6px,.8vw,10px);
   padding:clamp(14px,1.9vw,22px) 0;
 }
 .roll__n{grid-column:1}
@@ -528,12 +528,12 @@ h1,h2,h3,p,figure,blockquote{margin:0}
   font-size:clamp(21px,2.9vw,40px);line-height:1;letter-spacing:-.02em;font-weight:500;
   transition:color .32s cubic-bezier(.3,.9,.2,1),transform .32s cubic-bezier(.3,.9,.2,1);
 }
-.roll__m{font-size:clamp(10px,.86vw,12px);color:var(--deep);max-width:34ch}
+.roll__m{font-size:clamp(11px,.86vw,12px);color:var(--deep);max-width:34ch}
 .band--ink .roll__m{color:var(--sage)}
 /* Every .roll__m on this site sits on a sage band (home's therapies roll,
    massage's menu): --deep is 3.62:1 there, --ink 10.01:1. */
 .band--sage .roll__m{color:var(--ink)}
-.roll__x{margin-left:auto;font-size:clamp(10px,.82vw,12px);letter-spacing:.14em;text-transform:uppercase}
+.roll__x{margin-left:auto;font-size:clamp(11px,.82vw,12px);letter-spacing:.14em;text-transform:uppercase}
 /* This rule only ever fires inside the sage-ground therapies accordion
    (.roll__head only exists on .roll--therapies rows), and .is-open is not
    a hover -- it is what the row looks like for as long as a visitor has it
@@ -552,7 +552,7 @@ h1,h2,h3,p,figure,blockquote{margin:0}
 .roll__p{font-size:clamp(12px,1vw,15px);letter-spacing:.06em;white-space:nowrap;text-transform:none}
 /* The quieter half of a rate row -- a colour, not an opacity: ink at .6
    computes to 4.07:1 on plaster and 3.58:1 on sage, and this is type. */
-.roll__p--alt{color:#666661;font-size:clamp(10px,.84vw,12px)}
+.roll__p--alt{color:#666661;font-size:clamp(11px,.84vw,12px)}
 .band--sage .roll__p--alt{color:var(--ink)}
 .band--ink .roll__p--alt{color:var(--sage)}
 .roll--menu .roll__n{font-size:clamp(19px,2.1vw,30px)}
@@ -573,7 +573,7 @@ h1,h2,h3,p,figure,blockquote{margin:0}
 .roll--rates .roll__x{display:flex;gap:clamp(16px,3vw,44px);align-items:flex-start;text-transform:none;letter-spacing:0}
 .rate{display:flex;flex-direction:column;gap:2px;text-align:right;min-width:clamp(56px,6vw,84px)}
 .rate__v{font-size:clamp(14px,1.3vw,19px);letter-spacing:-.01em}
-.rate__k{font-size:clamp(9px,.72vw,11px);letter-spacing:.14em;text-transform:uppercase;color:var(--deep)}
+.rate__k{font-size:clamp(11px,.72vw,11px);letter-spacing:.14em;text-transform:uppercase;color:var(--deep)}
 /* Built onto the hbot page's Pricing chapter, a sage ground, so it gets
    the same correction as every other one: --deep measures 3.62:1 on
    sage, --ink 10.01:1. */
@@ -657,7 +657,7 @@ h1,h2,h3,p,figure,blockquote{margin:0}
 .roll--plans .rate{text-align:left;min-width:0;gap:0;padding:clamp(12px,1.4vw,18px)}
 .roll--plans .rate--best{background:var(--plaster)}
 .roll--plans .rate__v{margin-top:9px;font-size:clamp(19px,1.9vw,26px);line-height:1}
-.rate__u{font-size:clamp(9px,.72vw,11px);letter-spacing:.14em;text-transform:uppercase;font-weight:500;color:var(--deep)}
+.rate__u{font-size:clamp(11px,.72vw,11px);letter-spacing:.14em;text-transform:uppercase;font-weight:500;color:var(--deep)}
 .rate__s{margin-top:10px;font-size:clamp(11px,.92vw,13px);line-height:1.45;color:var(--deep)}
 .band--sage .rate__u,.band--sage .rate__s{color:var(--ink)}
 .band--sage .rate--best .rate__k,
@@ -705,17 +705,17 @@ h1,h2,h3,p,figure,blockquote{margin:0}
   background:var(--plaster);color:var(--ink);
   padding:clamp(22px,2.6vw,34px);
 }
-.tier__k{font-size:clamp(9px,.72vw,11px);letter-spacing:.14em;text-transform:uppercase;font-weight:500;color:var(--deep)}
+.tier__k{font-size:clamp(11px,.72vw,11px);letter-spacing:.14em;text-transform:uppercase;font-weight:500;color:var(--deep)}
 .tier__v{
-  margin-top:clamp(10px,1.4vw,16px);
+  margin-top:clamp(11px,1.4vw,16px);
   display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
   font-size:clamp(30px,3.4vw,46px);line-height:1;letter-spacing:-.02em;font-weight:500;
 }
-.tier__u{font-size:clamp(9px,.72vw,11px);letter-spacing:.14em;text-transform:uppercase;font-weight:500;color:var(--deep)}
+.tier__u{font-size:clamp(11px,.72vw,11px);letter-spacing:.14em;text-transform:uppercase;font-weight:500;color:var(--deep)}
 .tier__d{display:flex;flex-direction:column;flex:1 1 auto;margin:clamp(18px,2.2vw,26px) 0 0}
 .tier__d > div{padding:clamp(12px,1.5vw,16px) 0;border-top:1px dotted rgba(36,35,31,.28)}
 .tier__d > div:last-child{margin-top:auto;padding-bottom:0}
-.tier__d dt{font-size:clamp(9px,.72vw,11px);letter-spacing:.14em;text-transform:uppercase;font-weight:500;color:var(--deep)}
+.tier__d dt{font-size:clamp(11px,.72vw,11px);letter-spacing:.14em;text-transform:uppercase;font-weight:500;color:var(--deep)}
 .tier__d dd{margin:7px 0 0;font-size:clamp(12px,.98vw,14px);line-height:1.5}
 
 /* ---- the explainer -------------------------------------------------- */
@@ -745,7 +745,7 @@ h1,h2,h3,p,figure,blockquote{margin:0}
    the underline too. */
 .roll__go{
   display:inline-block;margin-top:clamp(14px,1.6vw,20px);
-  font-size:clamp(10px,.82vw,12px);letter-spacing:.14em;text-transform:uppercase;
+  font-size:clamp(11px,.82vw,12px);letter-spacing:.14em;text-transform:uppercase;
   color:var(--ink);text-decoration:none;border-bottom:1px solid currentColor;padding-bottom:3px;
   transition:opacity .3s cubic-bezier(.3,.9,.2,1);
 }
@@ -760,7 +760,7 @@ html:not(.js) .roll__media img{clip-path:none;transform:none}
 .says{display:grid;grid-template-columns:1fr 1fr;gap:clamp(24px,4vw,64px)}
 @media (max-width:820px){.says{grid-template-columns:1fr}}
 .says__t{font-size:clamp(17px,1.8vw,24px);line-height:1.35;letter-spacing:-.012em;font-weight:400}
-.says__a{margin-top:14px;font-size:clamp(10px,.82vw,12px);letter-spacing:.14em;text-transform:uppercase;color:var(--sage)}
+.says__a{margin-top:14px;font-size:clamp(11px,.82vw,12px);letter-spacing:.14em;text-transform:uppercase;color:var(--sage)}
 /* Sage text by default because every quote on this site sits on an ink
    band. Written for the other two grounds too, in case that changes:
    plaster gets --deep (5.10:1); sage is carved out on its own line below
@@ -974,7 +974,7 @@ summary.qa__q::after{
 }
 .band--ink .vitals{border-top-color:rgba(242,243,237,.42);border-bottom-color:rgba(242,243,237,.42)}
 @media (max-width:640px){.vitals{grid-template-columns:1fr;gap:clamp(18px,4vw,24px)}}
-.vitals__k{font-size:clamp(10px,.82vw,12px);letter-spacing:.14em;text-transform:uppercase;color:var(--deep);margin-bottom:9px}
+.vitals__k{font-size:clamp(11px,.82vw,12px);letter-spacing:.14em;text-transform:uppercase;color:var(--deep);margin-bottom:9px}
 .band--ink .vitals__k{color:var(--sage)}
 /* --deep is 3.62:1 on sage, short of what this size needs. */
 .band--sage .vitals__k{color:var(--ink)}
@@ -987,7 +987,7 @@ summary.qa__q::after{
 .cols4{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--gap)}
 @media (max-width:820px){.cols4{grid-template-columns:1fr 1fr}}
 @media (max-width:520px){.cols4{grid-template-columns:1fr}}
-.cell__k{font-size:clamp(10px,.82vw,12px);letter-spacing:.14em;text-transform:uppercase;color:var(--deep);margin-bottom:8px}
+.cell__k{font-size:clamp(11px,.82vw,12px);letter-spacing:.14em;text-transform:uppercase;color:var(--deep);margin-bottom:8px}
 .band--ink .cell__k{color:var(--sage)}
 /* --deep is 3.62:1 on sage, so a cell key washes out there. Same carve-out
    the field key already has below. */
@@ -998,7 +998,7 @@ summary.qa__q::after{
 @media (max-width:720px){.form{grid-template-columns:1fr}}
 .field{display:grid;gap:8px}
 .field--wide{grid-column:1/-1}
-.field__k{font-size:clamp(10px,.82vw,12px);letter-spacing:.14em;text-transform:uppercase;color:var(--deep)}
+.field__k{font-size:clamp(11px,.82vw,12px);letter-spacing:.14em;text-transform:uppercase;color:var(--deep)}
 /* The contact form sits on a sage band: --deep is 3.62:1 there, --ink 10.01:1. */
 .band--sage .field__k{color:var(--ink)}
 .field__i{
@@ -1045,7 +1045,7 @@ textarea.field__i{resize:vertical;min-height:120px}
 }
 .post__m{
   margin-top:clamp(18px,2.2vw,26px);
-  font-size:clamp(10px,.82vw,12px);
+  font-size:clamp(11px,.82vw,12px);
   letter-spacing:.14em;
   text-transform:uppercase;
   color:var(--sage);
@@ -1093,13 +1093,13 @@ textarea.field__i{resize:vertical;min-height:120px}
 .foot__top{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:var(--gap);align-items:start}
 @media (max-width:820px){.foot__top{grid-template-columns:1fr 1fr}}
 @media (max-width:520px){.foot__top{grid-template-columns:1fr}}
-.foot__k{font-size:clamp(10px,.82vw,12px);letter-spacing:.14em;text-transform:uppercase;color:var(--sage);margin-bottom:10px}
+.foot__k{font-size:clamp(11px,.82vw,12px);letter-spacing:.14em;text-transform:uppercase;color:var(--sage);margin-bottom:10px}
 .foot__v{font-size:clamp(12px,1vw,14px);display:grid;gap:6px}
 .foot__bar{
   border-top:1px dotted rgba(242,243,237,.42);
   margin-top:clamp(36px,5vw,64px);padding:16px 0;
   display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
-  font-size:clamp(10px,.82vw,12px);letter-spacing:.1em;text-transform:uppercase;
+  font-size:clamp(11px,.82vw,12px);letter-spacing:.1em;text-transform:uppercase;
 }
 .foot__mark{
   color:var(--plaster);
@@ -1300,7 +1300,7 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
   border:1px solid currentColor;
   padding:5px 12px;
   text-decoration:none;
-  font-size:clamp(10px,.82vw,12px);letter-spacing:.12em;text-transform:uppercase;font-weight:500;
+  font-size:clamp(11px,.82vw,12px);letter-spacing:.12em;text-transform:uppercase;font-weight:500;
   cursor:pointer;
 }
 
@@ -1338,7 +1338,7 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
 .arc{border-top:1px dotted rgba(36,35,31,.4);list-style:none;margin:0;padding:0}
 .band--ink .arc{border-top-color:rgba(242,243,237,.4)}
 .arc__row{
-  display:grid;gap:clamp(10px,2vw,32px);
+  display:grid;gap:clamp(11px,2vw,32px);
   grid-template-columns:minmax(0,1fr);
   padding:clamp(20px,2.4vw,30px) 0;
   border-bottom:1px dotted rgba(36,35,31,.4);
@@ -1453,4 +1453,54 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
 @supports not (object-view-box: inset(0% 40% 0% 0%)) {
   .shot--room{overflow:clip}
   .shot--room img{width:167%;max-width:none;object-position:30% 50%}
+}
+
+
+/* ---- lists that are content, not navigation --------------------------
+   The benefit clusters on the therapy pages are <ul class="body">. Nothing
+   styled them, so on a phone the items set as one run-on block with no
+   marker and no space between -- "May support a clearer head ... Supports
+   recovery ..." read as a single sentence. A short rule as the marker (the
+   site draws everything else with rules), and air between items. */
+ul.body{list-style:none;padding:0;margin:0}
+ul.body li{position:relative;padding-left:18px}
+ul.body li::before{content:"";position:absolute;left:0;top:.75em;width:8px;height:1px;background:currentColor;opacity:.55}
+ul.body li + li{margin-top:10px}
+
+/* A card's title under its photograph. .panel__t carries no top margin --
+   it was written for the inside of a colour panel -- so on the therapies
+   and audience pages the title sat hard against the bottom of the image. */
+.tile__img + .panel__t{margin-top:16px}
+
+/* ---- phones -----------------------------------------------------------
+   From the 2026-10-01 mobile audit of every page at 320, 360, 390 and 414
+   px on the live platform. Nothing overflowed or clipped; what this fixes
+   is alignment, stacking order and tap targets. Kept at the foot of the
+   sheet so source order wins over the base rules above. */
+@media (max-width:820px){
+  /* The alternating photo/panel rows on the home page stack in DOM order,
+     so a panel-first row put its photograph AFTER its text and two photos
+     ended up back to back. Every row now leads with its photograph. */
+  .duo .duo__img{order:-1}
+  /* The small photograph inside a home-page panel was a 260px tile
+     centred in a full-width panel. On a phone it takes the width. */
+  .duo__inset{width:100%}
+}
+@media (max-width:640px){
+  /* The therapy names under the home hero were spread edge to edge, which
+     at phone width wrapped one name onto a line of its own. Set as a
+     plain list instead: left-aligned, wrapping where it wraps. */
+  .spread{flex-wrap:wrap;justify-content:flex-start;column-gap:16px;row-gap:6px}
+  /* A price and its label are one unit. Right-aligned in a fixed cell, the
+     price sat indented away from the label under it. */
+  .rate{text-align:left}
+  /* More space between stacked cards than inside one. */
+  .grid3{row-gap:36px}
+  /* Tap targets. The small uppercase links were 16px tall and the header
+     buttons 28px. Padding grows the hit area; the matching negative margin
+     keeps the layout exactly where it was. */
+  .explore{padding-block:12px;margin-block:-12px}
+  .nav__book,.nav__menu{min-height:40px;display:inline-flex;align-items:center;padding:0 14px}
+  .strip__a{padding-block:10px}
+  .qa details > summary{padding-block:12px}
 }
