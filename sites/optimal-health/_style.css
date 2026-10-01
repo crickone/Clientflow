@@ -799,14 +799,11 @@ html:not(.js) .roll__media img{clip-path:none;transform:none}
      box is 925px tall and the reader scrolls past one face at a time. */
   .films .film{max-width:340px}
 }
-/* The home page carries a single film beside a line of copy rather than a
-   row of four, and a lone 9/16 box at half a band's width is a column of
-   photograph nobody asked for. */
-.films--solo{grid-template-columns:minmax(0,290px) minmax(0,1fr);gap:clamp(22px,3.4vw,52px);align-items:center}
-@media (max-width:820px){
-  .films--solo{grid-template-columns:1fr}
-  .films--solo .film{max-width:290px}
-}
+/* .films--solo was here: a 290px film beside a line of copy, for the one
+   film the home page used to carry. The home page runs the full row of
+   four as of 2026-10-01, nothing else ever used the modifier, and a rule
+   whose comment describes a layout the site no longer has is worse than no
+   rule -- so it came out with the layout. */
 .film{margin:0}
 .film__box{position:relative;aspect-ratio:9/16;overflow:hidden;background:var(--ink)}
 .film__go{position:absolute;inset:0;display:block;text-decoration:none;color:inherit}

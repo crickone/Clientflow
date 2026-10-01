@@ -404,11 +404,6 @@ html:not(.js) .roll__media img{clip-path:none;transform:none}
   .films .film{max-width:340px}
 }
 
-.films--solo{grid-template-columns:minmax(0,290px) minmax(0,1fr);gap:clamp(22px,3.4vw,52px);align-items:center}
-@media (max-width:820px){
-  .films--solo{grid-template-columns:1fr}
-  .films--solo .film{max-width:290px}
-}
 .film{margin:0}
 .film__box{position:relative;aspect-ratio:9/16;overflow:hidden;background:var(--ink)}
 .film__go{position:absolute;inset:0;display:block;text-decoration:none;color:inherit}
@@ -929,40 +924,56 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
     <h2 class="title" data-rise>In their words</h2>
     <a class="explore" href="testimonials.html" data-rise>What people say</a>
   </div>
-
-  <div class="films films--solo" data-stagger>
-    <figure class="film">
-      <div class="film__box">
-        <a class="film__go" href="https://www.youtube.com/watch?v=rW-bCErJDhc" data-film="rW-bCErJDhc" data-who="Deirdre Cronin" aria-label="Watch the film of Deirdre Cronin on YouTube">
-          <img src="assets/film-deirdre-cronin.jpg" alt="" loading="lazy" />
-          <span class="film__play"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 4.5v15l13-7.5z" /></svg></span>
-        </a>
-      </div>
-      <figcaption class="film__cap">
-        <span class="film__n">Deirdre Cronin</span>
-        <span class="film__m">The HIFEM chair<span class="film__note"> &middot; watch on YouTube</span></span>
-      </figcaption>
-    </figure>
-    <p class="body">Deirdre sat down in the lounge and talked about the HIFEM chair on camera. Three more clients did the same, two about the chair and two about the infrared bed, and all four are on the testimonials page. Nothing loads from YouTube until you press play.</p>
-  </div>
-
-  <div class="says" data-stagger>
-    <figure>
-      <blockquote class="says__t">&ldquo;I'm in my hyperbaric chamber 6 days a week and can honestly say my recovery is so much better.&rdquo;</blockquote>
-      <figcaption class="says__a">Micheal Sandbach &middot; Hyrox World Elite</figcaption>
-    </figure>
-    <figure>
-      <blockquote class="says__t">&ldquo;I have been using the hyperbaric chamber for a little over 2 years now, and I can honestly say it's changed my game forever.&rdquo;</blockquote>
-      <figcaption class="says__a">Caolan Loughran &middot; UFC</figcaption>
-    </figure>
-    <figure>
-      <blockquote class="says__t">&ldquo;I can't recommend Optimal Health's hyperbaric chamber enough. It's truly transformed how I feel on a day to day basis, and I'm so grateful to have found this as part of my wellness journey.&rdquo;</blockquote>
-      <figcaption class="says__a">Samantha Faiers</figcaption>
-    </figure>
-    <figure>
-      <blockquote class="says__t">&ldquo;It has made a huge difference to me physically and mentally. It's given me my freedom back.&rdquo;</blockquote>
-      <figcaption class="says__a">Deirdre Cronin &middot; HIFEM client</figcaption>
-    </figure>
+  <p class="body" style="margin-bottom:clamp(24px,3vw,40px)">Each of these was filmed here and sits on the clinic's own YouTube channel. Two of them used the HIFEM chair and two the infrared bed, and what they say is theirs rather than ours. Nothing loads from YouTube until you press play.</p>
+  <div class="films" data-stagger>
+      <figure class="film">
+        <div class="film__box">
+          <a class="film__go" href="https://www.youtube.com/watch?v=rW-bCErJDhc" data-film="rW-bCErJDhc" data-who="Deirdre Cronin" aria-label="Watch the film of Deirdre Cronin on YouTube">
+            <img src="assets/film-deirdre-cronin.jpg" alt="" loading="lazy" />
+            <span class="film__play"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 4.5v15l13-7.5z" /></svg></span>
+          </a>
+        </div>
+        <figcaption class="film__cap">
+          <span class="film__n">Deirdre Cronin</span>
+          <span class="film__m">The HIFEM chair<span class="film__note"> &middot; watch on YouTube</span></span>
+        </figcaption>
+      </figure>
+      <figure class="film">
+        <div class="film__box">
+          <a class="film__go" href="https://www.youtube.com/watch?v=2RdgoUhygBc" data-film="2RdgoUhygBc" data-who="Sherry Powell" aria-label="Watch the film of Sherry Powell on YouTube">
+            <img src="assets/film-sherry-powell.jpg" alt="" loading="lazy" />
+            <span class="film__play"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 4.5v15l13-7.5z" /></svg></span>
+          </a>
+        </div>
+        <figcaption class="film__cap">
+          <span class="film__n">Sherry Powell</span>
+          <span class="film__m">The HIFEM chair<span class="film__note"> &middot; watch on YouTube</span></span>
+        </figcaption>
+      </figure>
+      <figure class="film">
+        <div class="film__box">
+          <a class="film__go" href="https://www.youtube.com/watch?v=LHJ-gQNco7E" data-film="LHJ-gQNco7E" data-who="Sean O'Brien" aria-label="Watch the film of Sean O'Brien on YouTube">
+            <img src="assets/film-sean-obrien.jpg" alt="" loading="lazy" />
+            <span class="film__play"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 4.5v15l13-7.5z" /></svg></span>
+          </a>
+        </div>
+        <figcaption class="film__cap">
+          <span class="film__n">Sean O'Brien</span>
+          <span class="film__m">The infrared bed<span class="film__note"> &middot; watch on YouTube</span></span>
+        </figcaption>
+      </figure>
+      <figure class="film">
+        <div class="film__box">
+          <a class="film__go" href="https://www.youtube.com/watch?v=frbAwZ7a5N8" data-film="frbAwZ7a5N8" data-who="Paul Cremin" aria-label="Watch the film of Paul Cremin on YouTube">
+            <img src="assets/film-paul-cremin.jpg" alt="" loading="lazy" />
+            <span class="film__play"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 4.5v15l13-7.5z" /></svg></span>
+          </a>
+        </div>
+        <figcaption class="film__cap">
+          <span class="film__n">Paul Cremin</span>
+          <span class="film__m">The infrared bed<span class="film__note"> &middot; watch on YouTube</span></span>
+        </figcaption>
+      </figure>
   </div>
 </section>
 

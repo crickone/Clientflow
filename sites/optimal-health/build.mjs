@@ -690,7 +690,7 @@ function documentise(body, page) {
       .filter((i) => i !== -1);
     const to = bounds.length ? Math.min(...bounds) : marked.length;
     // With the prose taken out, for the same reason the mark count above takes
-    // it out: pages/hbot.html carries a note explaining why the section under
+    // it out: pages/hifem.html carries a note explaining why the section under
     // it is NOT a chapter, and quotes `<h2 class="lede">` to say so. Read
     // literally, that note vouches for the chapter above it -- the guard reads
     // clean over exactly the page that documents the rule.
@@ -773,8 +773,26 @@ ${chapters.map((c) => `    <a class="strip__a" href="#${c.id}" data-rail="${c.id
    there. Stripping last also retires <!-- /chapters --> itself, which had
    been shipping in the source of every documented page.
 --------------------------------------------------------------------- */
-const undocumented = (html) =>
-  html.replace(HTML_COMMENT, "").replace(/[ \t]+$/gm, "").replace(/\n{3,}/g, "\n\n");
+const undocumented = (html, page) => {
+  const out = html.replace(HTML_COMMENT, "").replace(/[ \t]+$/gm, "").replace(/\n{3,}/g, "\n\n");
+  // A `-->` left after the strip means a comment ended earlier than its author
+  // did. HTML_COMMENT is non-greedy, as the parser is: a note that QUOTES a
+  // marker -- writing `<!-- /chapters -->` inside a comment about the marker is
+  // the obvious way to do it -- closes at the quoted one, and every line after
+  // it ships to the live page as body text, above the hero, in whatever colour
+  // the first band happens to be. It renders; nothing throws; the screenshot is
+  // the only thing that catches it. Cost of writing this guard: a line. Cost of
+  // not having it: one pass of this file published a paragraph of working notes
+  // about compliance exclusions onto a client's testimonials page.
+  const stray = out.indexOf("-->");
+  if (stray !== -1) {
+    throw new Error(
+      `${page}: a stray --> survived the comment strip, at ${JSON.stringify(out.slice(Math.max(0, stray - 60), stray + 3))}. ` +
+        `A comment closed early, so the rest of it is now page copy -- name the marker without its delimiters.`,
+    );
+  }
+  return out;
+};
 
 const shell = ({ title, description, body }) => `<!doctype html>
 <html lang="en">
@@ -875,7 +893,7 @@ const META = {
     file: "testimonials.html",
     title: "What people say | Optimal Health & Recovery at Inspire",
     description:
-      "Four clients on film, and athletes and clients in writing, on the hyperbaric chamber, infrared and the HIFEM chair at our Clonmel clinic.",
+      "Four clients of our Clonmel clinic, filmed in the lounge, on the HIFEM chair and the infrared bed. Nothing loads from YouTube until you press play.",
   },
   contact: {
     file: "contact.html",
@@ -966,11 +984,11 @@ const POSTS = [
     topic: "Hyperbaric oxygen",
     title: "Where the chamber fits in a training week",
     excerpt:
-      "How you recover is part of the training week, not an afterthought to it. Where an hour in the chamber sits in that week, and what two competitors who use it say.",
+      "How you recover is part of the training week, not an afterthought to it. What an hour in the chamber is, where it sits in the week, and the one therapy here that will not sit anywhere you like.",
     photo: "hbot-chamber-seated.jpg",
     alt: "A client seated in the open hyperbaric chamber, hands on his knees",
     description:
-      "Where an hour in the hyperbaric chamber sits in a training week, at our Clonmel clinic, and what two competitors who use it say about it.",
+      "Where an hour in the hyperbaric chamber sits in a training week, at our Clonmel clinic, and the one therapy here that needs planning like a gym session.",
   },
   {
     slug: "panels-lasers-and-the-bed",
@@ -1046,7 +1064,7 @@ for (const name of readdirSync(join(here, "pages"))) {
     }
     raw = raw.replace(CARDS_MARK, cards());
   }
-  const body = undocumented(documentise(raw, `pages/${name}`));
+  const body = undocumented(documentise(raw, `pages/${name}`), `pages/${name}`);
   composed.push({ file: meta.file, chars: body.length, html: shell({ ...meta, body }) });
 }
 
@@ -1068,7 +1086,7 @@ for (const post of POSTS) {
     );
   }
   raw = raw.replace(NEXT_MARK, nextCards(post.slug));
-  const body = undocumented(documentise(raw, `posts/${name}`));
+  const body = undocumented(documentise(raw, `posts/${name}`), `posts/${name}`);
   composed.push({
     file: `blog-${post.slug}.html`,
     chars: body.length,
