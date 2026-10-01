@@ -890,7 +890,7 @@ const POSTS = [
     topic: "HIFEM",
     title: "The HIFEM chair, and a week spent sitting down",
     excerpt:
-      "Long sitting leaves some muscle doing almost nothing. The chair asks it to work &mdash; twenty to thirty minutes, seated and fully clothed &mdash; and it is muscle work, so plan it like one.",
+      "Long sitting leaves some muscle doing almost nothing. The chair asks it to work for twenty to thirty minutes, seated and fully clothed. It is muscle work, so plan it like one.",
     photo: "hifem-chair.jpg",
     alt: "The HIFEM chair and its console, empty, a cushion on the seat",
     description:
@@ -899,9 +899,9 @@ const POSTS = [
   {
     slug: "infrared-and-everyday-aches",
     topic: "Infrared",
-    title: "Infrared and everyday aches: what the light is actually doing",
+    title: "What infrared light is actually doing in everyday aches",
     excerpt:
-      "What the bed emits, what the light is understood to do once it is in tissue, and why the honest account of it is written in weeks rather than in sessions.",
+      "What the bed emits, what the light is understood to do once it is in tissue, and why the honest account of it is written in weeks.",
     photo: "infrared-bed-lit.jpg",
     alt: "The infrared bed running, its red light spilling across the brick wall behind it",
     description:
@@ -910,9 +910,9 @@ const POSTS = [
   {
     slug: "between-hard-sessions",
     topic: "Hyperbaric oxygen",
-    title: "Between hard sessions: where the chamber fits in a training week",
+    title: "Where the chamber fits in a training week",
     excerpt:
-      "How you recover is part of the training week rather than an afterthought to it. Where an hour in the chamber sits in that week, and what two competitors who use it say.",
+      "How you recover is part of the training week, not an afterthought to it. Where an hour in the chamber sits in that week, and what two competitors who use it say.",
     photo: "hbot-chamber-seated.jpg",
     alt: "A client seated in the open hyperbaric chamber, hands on his knees",
     description:
