@@ -445,6 +445,60 @@ const scripts = () => `<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dis
   }
 }());
 
+/* ---- the films: nothing from YouTube until somebody asks for it -------
+   Its own IIFE, deliberately, and this is the one on the page where that
+   matters most. The motion block at the top returns early whenever GSAP
+   has not loaded, and a play control inside that return is a play control
+   that does nothing on exactly the visit where everything else already
+   went wrong. It is also outside the reduced-motion branches for the same reason
+   the therapies accordion is: pressing play is content somebody asked
+   for, not motion that happened to them.
+
+   The markup ships a poster from this site's own assets/ inside an
+   ordinary <a> to the video's YouTube page -- see the .film block in
+   _style.css -- so with this script removed the films are still four
+   working links and not four dead buttons. What this adds is the swap:
+   the anchor is replaced, at the click and not before, by an iframe
+   pointed at youtube-nocookie.com with autoplay on. No request reaches
+   youtube.com, youtube-nocookie.com or ytimg.com until that click.
+--------------------------------------------------------------------- */
+(function () {
+  var gos = document.querySelectorAll('.film__go[data-film]');
+  Array.prototype.forEach.call(gos, function (go) {
+    var id = go.getAttribute('data-film');
+    var who = go.getAttribute('data-who') || '';
+    var box = go.parentNode;
+    if (!id || !box) return;
+    // The name in the markup promises YouTube, because without this script
+    // that is where the press goes. With it, the press plays here, so the
+    // promise is rewritten to match what the control now does.
+    go.setAttribute('aria-label', 'Play the film of ' + who);
+    go.addEventListener('click', function (e) {
+      // Cmd/ctrl/shift/middle-click still mean "open the YouTube page in a
+      // new tab", which is what the href is for and what a reader who wants
+      // the full page expects. Only a plain press is ours to intercept.
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      if (typeof e.button === 'number' && e.button !== 0) return;
+      e.preventDefault();
+      var frame = document.createElement('iframe');
+      frame.className = 'film__frame';
+      frame.title = 'The film of ' + who;
+      frame.src = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(id) +
+        '?autoplay=1&rel=0&playsinline=1&modestbranding=1';
+      frame.allow = 'accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; web-share';
+      frame.setAttribute('allowfullscreen', '');
+      frame.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+      box.replaceChild(frame, go);
+      // The element that had focus has just left the document, which drops
+      // focus to <body> -- a keyboard reader would be back at the top of the
+      // page having just asked to watch something. An iframe is focusable;
+      // put them in the thing they pressed, where the player's own controls
+      // are the next tab stop.
+      frame.focus();
+    });
+  });
+}());
+
 (function () {
   // The enquiry form, posted as JSON so the answer lands in the page instead
   // of bouncing the reader to a blank redirect. Its own IIFE, deliberately:
@@ -821,7 +875,7 @@ const META = {
     file: "testimonials.html",
     title: "What people say | Optimal Health & Recovery at Inspire",
     description:
-      "What clients and athletes say about the hyperbaric chamber, infrared and the HIFEM chair at our Clonmel clinic.",
+      "Four clients on film, and athletes and clients in writing, on the hyperbaric chamber, infrared and the HIFEM chair at our Clonmel clinic.",
   },
   contact: {
     file: "contact.html",

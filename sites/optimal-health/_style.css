@@ -769,6 +769,110 @@ html:not(.js) .roll__media img{clip-path:none;transform:none}
 .band:not(.band--ink):not(.band--sage) .says__a{color:var(--deep)}
 .band--sage .says__a{color:var(--ink)}
 
+/* ---- films: a facade, not an embed -----------------------------------
+   A YouTube <iframe> written into the page fetches from youtube.com and
+   ytimg.com the moment the page loads, for every visitor, whether or not
+   anybody ever presses play -- and those requests carry the visitor with
+   them. So the page ships no iframe at all. What it ships is a poster
+   frame served from this site's own assets/ and an ordinary link to the
+   video on YouTube; the tail script turns that link into a play control
+   and builds the iframe at the click, pointed at youtube-nocookie.com.
+   Nothing third-party is fetched before then. Hotlinking the poster from
+   i.ytimg.com would have given the whole thing away for the sake of four
+   files, which is why the posters are in assets/ with everything else.
+
+   Without JavaScript the link is still a link: the play disc is the
+   affordance and the href is the YouTube page, so the films are reachable
+   rather than being four dead buttons. .film__note below is the one piece
+   of copy that only appears in that state, because "watch on YouTube" is
+   a promise the scripted version does not keep.
+
+   Portrait, 9/16, because these were filmed vertically. Four across in a
+   documented column gives each one about 240px, which is a face; two
+   across below 1100px and one below 560px, where a quarter of the width
+   would be a thumbnail of a thumbnail.                                  */
+.films{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--gap)}
+@media (max-width:1100px){.films{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:560px){
+  .films{grid-template-columns:1fr}
+  /* One across is not the same as full width: at 559px an uncapped 9/16
+     box is 925px tall and the reader scrolls past one face at a time. */
+  .films .film{max-width:340px}
+}
+/* The home page carries a single film beside a line of copy rather than a
+   row of four, and a lone 9/16 box at half a band's width is a column of
+   photograph nobody asked for. */
+.films--solo{grid-template-columns:minmax(0,290px) minmax(0,1fr);gap:clamp(22px,3.4vw,52px);align-items:center}
+@media (max-width:820px){
+  .films--solo{grid-template-columns:1fr}
+  .films--solo .film{max-width:290px}
+}
+.film{margin:0}
+.film__box{position:relative;aspect-ratio:9/16;overflow:hidden;background:var(--ink)}
+.film__go{position:absolute;inset:0;display:block;text-decoration:none;color:inherit}
+.film__go img{width:100%;height:100%;object-fit:cover;display:block;transition:transform 1s cubic-bezier(.2,.7,.2,1)}
+/* Hover only, unlike the site's other image tiles. A 4% push is a pointer
+   response, and on focus it was actively harmful: see the focus ring
+   below, which the scaled image was painting over. */
+.film__go:hover img{transform:scale(1.04)}
+/* An even ink veil, not a gradient: the disc has to separate from whatever
+   frame the film happens to open on, and two of these four are pale rooms
+   with a pale jumper in the middle of them. z-index because the veil is
+   the anchor's ::after and would otherwise paint over the disc, which is
+   an earlier child of the same box. */
+.film__go::after{content:"";position:absolute;inset:0;z-index:1;background:rgba(36,35,31,.22);transition:background-color .3s ease}
+.film__go:hover::after{background:rgba(36,35,31,.10)}
+/* The focus ring, and it has to be a box-shadow on the veil rather than an
+   outline on the anchor. Three things were in the way of the ordinary
+   outline and the third is the one that actually did it:
+
+     - .film__box clips its overflow, so the house ring (2px at a +3px
+       offset) falls outside the clip;
+     - pulling the offset negative puts it back inside, but the veil
+       ::after below sits at z-index 1, above the anchor's own paint;
+     - and the photograph scaled to 1.04 on focus, which pushes the image
+       2% past every edge -- right over the inner 1-2% where an inset ring
+       is drawn. Tested: with overflow:visible AND the veil removed, the
+       inset outline still never appeared. The scale was painting it out.
+
+   So the scale is now hover-only (above), and the ring is drawn by the one
+   layer that is reliably above the photograph: the veil pseudo-element.
+   Plaster, because the frame underneath can be anything; the veil stays at
+   its resting 22% under it rather than lifting, so the ring always has a
+   darkened picture to sit against. The disc turning timber is a second
+   signal, not the only one. */
+.film__go:focus-visible::after{box-shadow:inset 0 0 0 3px var(--plaster)}
+@media (forced-colors:active){
+  .film__go:focus-visible{outline:3px solid Highlight;outline-offset:-3px}
+}
+/* A solid ground, not a glyph floated on the photograph: plaster carries
+   the ink triangle at 10.01:1 whatever is behind it, and the hover state
+   is the house button's -- timber under ink, 4.69:1, the one ground this
+   palette lets timber carry a mark on. */
+.film__play{
+  position:absolute;left:50%;top:50%;z-index:2;
+  width:clamp(50px,4.6vw,64px);height:clamp(50px,4.6vw,64px);border-radius:50%;
+  background:var(--plaster);color:var(--ink);
+  display:flex;align-items:center;justify-content:center;
+  transform:translate(-50%,-50%);
+  transition:background-color .25s ease,transform .25s cubic-bezier(.3,.9,.2,1);
+}
+.film__go:hover .film__play,.film__go:focus-visible .film__play{
+  background:var(--timber);transform:translate(-50%,-50%) scale(1.06);
+}
+/* Optically centred: a triangle's visual centre sits left of its box. */
+.film__play svg{width:34%;height:34%;fill:currentColor;margin-left:8%}
+.film__frame{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
+/* Ours, under the picture: a poster frame says nothing about who is in it
+   or which therapy they used, and the words on the films are theirs. */
+.film__cap{margin-top:12px}
+.film__n{display:block;font-size:clamp(12px,1vw,14px);letter-spacing:.06em;text-transform:uppercase;font-weight:500}
+.film__m{display:block;margin-top:4px;font-size:clamp(11px,.92vw,13px);color:var(--deep)}
+.band--ink .film__m{color:var(--sage)}
+.band--sage .film__m{color:var(--ink)}
+.film__note{display:none}
+html:not(.js) .film__note{display:inline}
+
 /* ---- questions. Native <details>: opens with no JavaScript. ---- */
 .qa{border-top:1px dotted rgba(36,35,31,.42)}
 .band--ink .qa{border-top-color:rgba(242,243,237,.42)}

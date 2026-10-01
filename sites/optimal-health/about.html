@@ -396,6 +396,57 @@ html:not(.js) .roll__media img{clip-path:none;transform:none}
 .band:not(.band--ink):not(.band--sage) .says__a{color:var(--deep)}
 .band--sage .says__a{color:var(--ink)}
 
+.films{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--gap)}
+@media (max-width:1100px){.films{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:560px){
+  .films{grid-template-columns:1fr}
+
+  .films .film{max-width:340px}
+}
+
+.films--solo{grid-template-columns:minmax(0,290px) minmax(0,1fr);gap:clamp(22px,3.4vw,52px);align-items:center}
+@media (max-width:820px){
+  .films--solo{grid-template-columns:1fr}
+  .films--solo .film{max-width:290px}
+}
+.film{margin:0}
+.film__box{position:relative;aspect-ratio:9/16;overflow:hidden;background:var(--ink)}
+.film__go{position:absolute;inset:0;display:block;text-decoration:none;color:inherit}
+.film__go img{width:100%;height:100%;object-fit:cover;display:block;transition:transform 1s cubic-bezier(.2,.7,.2,1)}
+
+.film__go:hover img{transform:scale(1.04)}
+
+.film__go::after{content:"";position:absolute;inset:0;z-index:1;background:rgba(36,35,31,.22);transition:background-color .3s ease}
+.film__go:hover::after{background:rgba(36,35,31,.10)}
+
+.film__go:focus-visible::after{box-shadow:inset 0 0 0 3px var(--plaster)}
+@media (forced-colors:active){
+  .film__go:focus-visible{outline:3px solid Highlight;outline-offset:-3px}
+}
+
+.film__play{
+  position:absolute;left:50%;top:50%;z-index:2;
+  width:clamp(50px,4.6vw,64px);height:clamp(50px,4.6vw,64px);border-radius:50%;
+  background:var(--plaster);color:var(--ink);
+  display:flex;align-items:center;justify-content:center;
+  transform:translate(-50%,-50%);
+  transition:background-color .25s ease,transform .25s cubic-bezier(.3,.9,.2,1);
+}
+.film__go:hover .film__play,.film__go:focus-visible .film__play{
+  background:var(--timber);transform:translate(-50%,-50%) scale(1.06);
+}
+
+.film__play svg{width:34%;height:34%;fill:currentColor;margin-left:8%}
+.film__frame{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
+
+.film__cap{margin-top:12px}
+.film__n{display:block;font-size:clamp(12px,1vw,14px);letter-spacing:.06em;text-transform:uppercase;font-weight:500}
+.film__m{display:block;margin-top:4px;font-size:clamp(11px,.92vw,13px);color:var(--deep)}
+.band--ink .film__m{color:var(--sage)}
+.band--sage .film__m{color:var(--ink)}
+.film__note{display:none}
+html:not(.js) .film__note{display:inline}
+
 .qa{border-top:1px dotted rgba(36,35,31,.42)}
 .band--ink .qa{border-top-color:rgba(242,243,237,.42)}
 .qa details{border-bottom:1px dotted rgba(36,35,31,.28);padding:clamp(14px,1.8vw,20px) 0}
@@ -1141,6 +1192,60 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
     window.addEventListener('resize', settle);
     settle();
   }
+}());
+
+/* ---- the films: nothing from YouTube until somebody asks for it -------
+   Its own IIFE, deliberately, and this is the one on the page where that
+   matters most. The motion block at the top returns early whenever GSAP
+   has not loaded, and a play control inside that return is a play control
+   that does nothing on exactly the visit where everything else already
+   went wrong. It is also outside the reduced-motion branches for the same reason
+   the therapies accordion is: pressing play is content somebody asked
+   for, not motion that happened to them.
+
+   The markup ships a poster from this site's own assets/ inside an
+   ordinary <a> to the video's YouTube page -- see the .film block in
+   _style.css -- so with this script removed the films are still four
+   working links and not four dead buttons. What this adds is the swap:
+   the anchor is replaced, at the click and not before, by an iframe
+   pointed at youtube-nocookie.com with autoplay on. No request reaches
+   youtube.com, youtube-nocookie.com or ytimg.com until that click.
+--------------------------------------------------------------------- */
+(function () {
+  var gos = document.querySelectorAll('.film__go[data-film]');
+  Array.prototype.forEach.call(gos, function (go) {
+    var id = go.getAttribute('data-film');
+    var who = go.getAttribute('data-who') || '';
+    var box = go.parentNode;
+    if (!id || !box) return;
+    // The name in the markup promises YouTube, because without this script
+    // that is where the press goes. With it, the press plays here, so the
+    // promise is rewritten to match what the control now does.
+    go.setAttribute('aria-label', 'Play the film of ' + who);
+    go.addEventListener('click', function (e) {
+      // Cmd/ctrl/shift/middle-click still mean "open the YouTube page in a
+      // new tab", which is what the href is for and what a reader who wants
+      // the full page expects. Only a plain press is ours to intercept.
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      if (typeof e.button === 'number' && e.button !== 0) return;
+      e.preventDefault();
+      var frame = document.createElement('iframe');
+      frame.className = 'film__frame';
+      frame.title = 'The film of ' + who;
+      frame.src = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(id) +
+        '?autoplay=1&rel=0&playsinline=1&modestbranding=1';
+      frame.allow = 'accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; web-share';
+      frame.setAttribute('allowfullscreen', '');
+      frame.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+      box.replaceChild(frame, go);
+      // The element that had focus has just left the document, which drops
+      // focus to <body> -- a keyboard reader would be back at the top of the
+      // page having just asked to watch something. An iframe is focusable;
+      // put them in the thing they pressed, where the player's own controls
+      // are the next tab stop.
+      frame.focus();
+    });
+  });
 }());
 
 (function () {

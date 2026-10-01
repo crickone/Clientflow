@@ -213,6 +213,33 @@
     <h2 class="title" data-rise>In their words</h2>
     <a class="explore" href="testimonials.html" data-rise>What people say</a>
   </div>
+  <!-- One film, not four. The four live on testimonials.html, where they
+       are the page; here they would be four 9/16 columns in the middle of
+       a home page that already runs long, and the band would stop being
+       about the words. Deirdre Cronin's is the one that comes up because
+       her written quote is already in this band -- the film is the same
+       woman saying the same thing out loud, so it adds a face without
+       adding a claim the page was not already making.
+
+       Click-to-load, like the four on testimonials.html: the poster is in
+       assets/, the link goes to YouTube, and the iframe is built at the
+       press. See the .film block in _style.css. -->
+  <div class="films films--solo" data-stagger>
+    <figure class="film">
+      <div class="film__box">
+        <a class="film__go" href="https://www.youtube.com/watch?v=rW-bCErJDhc" data-film="rW-bCErJDhc" data-who="Deirdre Cronin" aria-label="Watch the film of Deirdre Cronin on YouTube">
+          <img src="assets/film-deirdre-cronin.jpg" alt="" loading="lazy" />
+          <span class="film__play"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 4.5v15l13-7.5z" /></svg></span>
+        </a>
+      </div>
+      <figcaption class="film__cap">
+        <span class="film__n">Deirdre Cronin</span>
+        <span class="film__m">The HIFEM chair<span class="film__note"> &middot; watch on YouTube</span></span>
+      </figcaption>
+    </figure>
+    <p class="body">Deirdre sat down in the lounge and talked about the HIFEM chair on camera. Three more clients did the same, two about the chair and two about the infrared bed, and all four are on the testimonials page. Nothing loads from YouTube until you press play.</p>
+  </div>
+
   <!-- Copied word for word from pages/testimonials.html, which is where the
        set is held and where the two the site does not carry are named. -->
   <div class="says" data-stagger>

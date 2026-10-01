@@ -1,13 +1,44 @@
-<!-- Grounds, in order: ink hero, sage, plaster, sage, plaster. Five
-     sections -- two plaster, two sage, one ink -- and sage never lands
-     twice running. Four quotes is not much to carry a page, so each
-     chapter pairs its two with a photograph and a line of context rather
-     than standing alone against empty space. -->
+<!-- Grounds, in order: ink hero, sage, plaster, plaster, ink, sage,
+     plaster. Seven sections, and sage never lands twice running. The page
+     used to be four written quotes and a bridge, which is not much to
+     carry a page; it is now built around the four films, with a pair of
+     written quotes either side of them.
 
-<!-- Two testimonials from the client's live site are deliberately absent: one
-     describes a cardiac scare the writer says passed, one says a further
-     procedure will not be needed. A claim in a client's mouth is still a
-     claim. Do not add them back without the compliance document. -->
+     The films are a chapter of their own rather than cells inside the
+     written ones, and they sit on ink. Two reasons. The register: four
+     faces looking out of the page is the strongest thing here and it is
+     not an illustration of the quotes above it. And the ground: the two
+     written chapters are sage, the bridge and its photograph plaster, so
+     ink between them is the only value left that does not repeat its
+     neighbour. -->
+
+<!-- OPERATOR DECISION, 2026-10-01: all four films are published, Sean
+     O'Brien's and Paul Cremin's included.
+
+     The comment that stood here recorded those two being held back twice,
+     in text, on compliance grounds -- one describes chest pain he feared
+     was cardiac, the other says a further procedure will not be needed.
+     The operator decided on 2026-10-01 to publish all four as video, on
+     the grounds that they are already public on the client's own site and
+     on the clinic's own YouTube channel. That decision supersedes the text
+     exclusions this comment describes, for video.
+
+     So: the two films are here on purpose and not by oversight. The
+     written exclusion is untouched -- neither man is quoted in copy
+     anywhere on this site -- and the claims line still governs every word
+     WE write around the films, which is why the captions under them say a
+     name and a machine and nothing else. -->
+
+<!-- The video ids were checked against each film's own title and
+     description before the captions were written, because the brief that
+     commissioned this page had the four ids attached to the wrong four
+     people -- rotated by one. What is below is the verified pairing:
+     rW-bCErJDhc Deirdre Cronin (chair), 2RdgoUhygBc Sherry Powell (chair),
+     LHJ-gQNco7E Sean O'Brien (bed), frbAwZ7a5N8 Paul Cremin (bed). The
+     client's own site labels the two chair films "PEMF Therapy Client".
+     This site does not use that word anywhere -- it is the HIFEM chair --
+     and the captions below are the reason the word has to be written here
+     once, in a comment that never reaches the page. -->
 
 <!-- INK. Real people, in their own words. -->
 <section class="hero">
@@ -15,7 +46,7 @@
   <div class="hero__inner">
     <p class="micro" data-rise style="color:var(--sage)">Testimonials</p>
     <h1 class="wordmark hero__mark" style="margin-top:22px">What people say.</h1>
-    <p class="lede hero__sub" data-rise>Two athletes whose sport does not forgive a slow recovery week, and two clients who tried a session for themselves.</p>
+    <p class="lede hero__sub" data-rise>Four clients on film, two athletes whose sport does not forgive a slow recovery week, and two more who wrote to us.</p>
     <div class="hero__foot" data-rise>
       <a class="btn" href="https://optimalhealthatinspire.simplybook.it/v2">Book a session</a>
       <a class="explore" href="pricing.html">See pricing</a>
@@ -47,10 +78,10 @@
   </div>
 </section>
 
-<!-- PLASTER. The bridge between the two chapters -- elite competitors, then
-     anyone who walks in the door. Not a chapter: it carries no
-     data-chapter, because the rail lists the page's arguments, not its
-     connective tissue. -->
+<!-- PLASTER. The bridge out of the athletes chapter and into the two that
+     follow it -- elite competitors, then anyone who walks in the door. Not
+     a chapter: it carries no data-chapter, because the rail lists the
+     page's arguments, not its connective tissue. -->
 <section class="band">
   <div class="says">
     <div class="band__head__l body">
@@ -61,24 +92,101 @@
   </div>
 </section>
 
-<!-- PLASTER. Four quotes and a bridge is not much page, and the bridge is
-     the one sentence on it addressed to somebody who is not an athlete. A
-     band-shaped photograph of the room they would actually sit in gives it
-     air, and it is the only place on the site the library's one wide band
-     fits without showing the same sofa twice. .shot--band changes nothing
+<!-- PLASTER. The room the bridge is talking about, and now also the room
+     the four films were shot in -- that is the same green sofa the clients
+     below are sitting on. It was placed here when the page was four quotes
+     and a bridge and needed the air; it earns its place differently now,
+     as the last quiet thing before four faces look out of the page. It is
+     still the only place on the site the library's one wide band fits
+     without showing the same sofa twice, and .shot--band changes nothing
      but the ratio the tile holds. -->
 <section class="band" style="padding-top:0">
   <div class="tile__img shot--band"><img src="assets/lounge-sofa.jpg" alt="The lounge at the clinic: a green sofa, a slatted table and bamboo against the treatment-room doors" loading="lazy" /></div>
 </section>
 
-<!-- SAGE. Second chapter: two clients who came in for themselves rather
-     than for a training camp. -->
-<section class="band band--sage" data-chapter="Clients">
+<!-- INK. The films. A chapter, so the rail sends readers straight to it:
+     on a page about what people say, four of them saying it out loud is
+     the argument and not an aside.
+
+     No photograph of the room in this one, unlike the two written
+     chapters -- the four posters ARE the photographs, and a fifth frame
+     above them would be competing with the thing it introduced.
+
+     The line about nothing loading until you press play is literally
+     true, and it is here because it is the kind of thing a reader can
+     check. See the .film block in _style.css and the films IIFE in
+     build.mjs for how it is kept true. -->
+<section class="band band--ink on-ink" data-chapter="On film">
+  <div>
+    <div class="band__head">
+      <div class="band__head__l">
+        <h2 class="lede">Four clients, filmed in the lounge.</h2>
+      </div>
+    </div>
+    <p class="body" style="margin-bottom:clamp(24px,3vw,40px)">Each of these was filmed here and sits on the clinic's own YouTube channel. Two of them used the HIFEM chair and two the infrared bed, and what they say is theirs rather than ours. Nothing loads from YouTube until you press play.</p>
+    <div class="films" data-stagger>
+      <figure class="film">
+        <div class="film__box">
+          <a class="film__go" href="https://www.youtube.com/watch?v=rW-bCErJDhc" data-film="rW-bCErJDhc" data-who="Deirdre Cronin" aria-label="Watch the film of Deirdre Cronin on YouTube">
+            <img src="assets/film-deirdre-cronin.jpg" alt="" loading="lazy" />
+            <span class="film__play"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 4.5v15l13-7.5z" /></svg></span>
+          </a>
+        </div>
+        <figcaption class="film__cap">
+          <span class="film__n">Deirdre Cronin</span>
+          <span class="film__m">The HIFEM chair<span class="film__note"> &middot; watch on YouTube</span></span>
+        </figcaption>
+      </figure>
+      <figure class="film">
+        <div class="film__box">
+          <a class="film__go" href="https://www.youtube.com/watch?v=2RdgoUhygBc" data-film="2RdgoUhygBc" data-who="Sherry Powell" aria-label="Watch the film of Sherry Powell on YouTube">
+            <img src="assets/film-sherry-powell.jpg" alt="" loading="lazy" />
+            <span class="film__play"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 4.5v15l13-7.5z" /></svg></span>
+          </a>
+        </div>
+        <figcaption class="film__cap">
+          <span class="film__n">Sherry Powell</span>
+          <span class="film__m">The HIFEM chair<span class="film__note"> &middot; watch on YouTube</span></span>
+        </figcaption>
+      </figure>
+      <figure class="film">
+        <div class="film__box">
+          <a class="film__go" href="https://www.youtube.com/watch?v=LHJ-gQNco7E" data-film="LHJ-gQNco7E" data-who="Sean O'Brien" aria-label="Watch the film of Sean O'Brien on YouTube">
+            <img src="assets/film-sean-obrien.jpg" alt="" loading="lazy" />
+            <span class="film__play"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 4.5v15l13-7.5z" /></svg></span>
+          </a>
+        </div>
+        <figcaption class="film__cap">
+          <span class="film__n">Sean O'Brien</span>
+          <span class="film__m">The infrared bed<span class="film__note"> &middot; watch on YouTube</span></span>
+        </figcaption>
+      </figure>
+      <figure class="film">
+        <div class="film__box">
+          <a class="film__go" href="https://www.youtube.com/watch?v=frbAwZ7a5N8" data-film="frbAwZ7a5N8" data-who="Paul Cremin" aria-label="Watch the film of Paul Cremin on YouTube">
+            <img src="assets/film-paul-cremin.jpg" alt="" loading="lazy" />
+            <span class="film__play"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 4.5v15l13-7.5z" /></svg></span>
+          </a>
+        </div>
+        <figcaption class="film__cap">
+          <span class="film__n">Paul Cremin</span>
+          <span class="film__m">The infrared bed<span class="film__note"> &middot; watch on YouTube</span></span>
+        </figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- SAGE. Third chapter: the two everyday clients the site has in
+     writing rather than on film. Labelled by medium, not by who they are,
+     because the four above are everyday clients too and a rail entry
+     reading "Clients" directly under "On film" would say they were not. -->
+<section class="band band--sage" data-chapter="In writing">
   <div>
     <div class="says">
       <div class="body">
-        <h2 class="lede">Everyday clients, in their own words.</h2>
-        <p style="margin-top:22px">Samantha Faiers tried the hyperbaric chamber as part of her own wellness routine. Deirdre Cronin uses the HIFEM chair. Neither is training for anything in particular &mdash; they came in for themselves.</p>
+        <h2 class="lede">Two more, in writing.</h2>
+        <p style="margin-top:22px">Samantha Faiers tried the hyperbaric chamber as part of her own wellness routine. Deirdre Cronin uses the HIFEM chair, and is the first of the four above. Neither is training for anything in particular &mdash; they came in for themselves.</p>
       </div>
       <div class="tile__img"><img src="assets/hifem-session-seated-alt.jpg" alt="A client seated on the HIFEM chair, fully clothed" loading="lazy" /></div>
     </div>

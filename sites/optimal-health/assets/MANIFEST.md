@@ -2,7 +2,9 @@
 
 Every image in `sites/optimal-health/assets/`. 8 were here already; 28 were added
 on 2026-09-30 from the client's own photography at
-`/Users/truep/Desktop/Clients/DJ/Optimal health/09 Images/`.
+`/Users/truep/Desktop/Clients/DJ/Optimal health/09 Images/`; 4 more were added on
+2026-10-01 as poster frames for the video testimonials — see "The films" at the
+bottom, which is the one section here that is not a photograph of the clinic.
 
 **Nothing here comes from `Professional Shoot` (that folder is the Inspire gym, not
 this clinic), from `10 Templates & Asset Packs`, from `_Archive`, or from
@@ -261,6 +263,45 @@ the chair) has a 6000x3376 equivalent in the library — `hifem-chair.jpg`, from
 shot of the chair. Swapping the HIFEM hero to it would make that page as sharp as
 the rest. Hyperbaric has no equivalent: there is no high-resolution photograph of
 the chamber anywhere in the library, and a shoot is the only answer.
+
+## The films
+
+Poster frames for the four video testimonials, added 2026-10-01. **These are not
+photographs of the clinic in the sense the rest of this manifest means** — each one
+is a still lifted from the client's own YouTube video and processed to the house
+shape (1600px long edge, mozjpeg), so a visitor's browser never has to ask
+`i.ytimg.com` for anything. Hotlinking them would have defeated the entire point of
+the click-to-load facade they belong to; see the `.film` block in `_style.css`.
+
+They were fetched from `https://i.ytimg.com/vi/<id>/oardefault.jpg`, which serves the
+video's own frame at 1080x1920. `maxresdefault.jpg` is the obvious source and is the
+wrong one: for a vertical video it returns a 1280x720 box with the real frame
+pillarboxed in the middle at 405px wide, so the usable picture is a quarter of the
+file. `oardefault` has no bars.
+
+**The faces are the point and consent came with publication.** All four films are
+already public on the client's own website and on the clinic's YouTube channel, and
+the operator decided on 2026-10-01 to publish all four here — see the comment at the
+top of `pages/testimonials.html`. The `face:` column below is left as a record.
+
+**Two of the four carry burned-in captions**, because the films are captioned
+throughout and there is no clean frame to be had: every alternate frame the
+thumbnail API offers (`oar1/2/3.jpg`) is captioned too. The words are the speakers'
+own, inside their own testimonial. They are not ours and they are not in our copy,
+but they are legible on the page without anyone pressing play, which is worth the
+operator knowing.
+
+| File | Shows | Size | Weight | Face | Notes and suggested use |
+| --- | --- | --- | --- | --- | --- |
+| `film-deirdre-cronin.jpg` | Deirdre Cronin on the green sofa in the lounge, mid-sentence | 900x1600 | 153 KB | clear | Poster for `rW-bCErJDhc`. On `pages/testimonials.html` and, alone, on `pages/home.html`. Burned-in caption: "my balance has greatly". |
+| `film-sherry-powell.jpg` | Sherry Powell on the same sofa, gesturing | 900x1600 | 152 KB | clear | Poster for `2RdgoUhygBc`. Burned-in caption: "That's a heck of a benefit". |
+| `film-sean-obrien.jpg` | Sean O'Brien in a purple hoodie, hand to his chest | 900x1600 | 139 KB | clear | Poster for `LHJ-gQNco7E`. No caption in frame. |
+| `film-paul-cremin.jpg` | Paul Cremin in a blazer, seated, hands together | 900x1600 | 116 KB | clear | Poster for `frbAwZ7a5N8`. No caption in frame. |
+
+All four were shot on the same green sofa as `lounge-sofa.jpg` and `reception.jpg`.
+`lounge-sofa.jpg` and the four of them DO share a page — `testimonials.html` — and
+that is deliberate: the band photograph is the empty room two sections above the
+people sitting in it. It is not the same frame as any of them.
 
 ### One frame, two files
 
