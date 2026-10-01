@@ -90,18 +90,18 @@ ok("no catalog id contains the substring 'fable' (case-insensitive)", !/fable/i.
   }
 }
 
-// MP4: the four models added in this task, pinned by exact id — each was
-// verified live against OpenRouter's model list (see modelCatalog.ts's
-// per-entry comments for the sourcing/rationale). Asserting the literal ids
-// here means a future accidental rename (e.g. repointing to a "-latest"
-// alias, or picking a different Kimi/Qwen/Gemini variant) fails a test
-// instead of silently drifting.
+// Every OpenRouter model in the picker, pinned by exact id -- each verified
+// live against OpenRouter's model list on 2026-10-01 (see modelCatalog.ts's
+// per-entry comments). Asserting the literal ids here means a future
+// accidental rename (repointing to a "-latest" alias, or picking a different
+// tier of the same family) fails a test instead of silently drifting.
 {
   const expectedLabels: Record<string, string> = {
-    "openrouter:moonshotai/kimi-k2-0905": "Kimi K2",
-    "openrouter:qwen/qwen3-235b-a22b-2507": "Qwen3 235B",
-    "openrouter:z-ai/glm-5.2": "GLM 5.2",
-    "openrouter:openai/gpt-5": "GPT-5",
+    "openrouter:deepseek/deepseek-v4.1-flash": "DeepSeek V4.1 Flash",
+    "openrouter:moonshotai/kimi-k2.6": "Kimi K2.6",
+    "openrouter:qwen/qwen3.8-flash": "Qwen 3.8 Flash",
+    "openrouter:z-ai/glm-5.3": "GLM 5.3",
+    "openrouter:openai/gpt-6.1-sol": "GPT-6.1 Sol",
     "openrouter:google/gemini-3.1-pro-preview": "Gemini 3.1 Pro",
   };
   for (const [id, label] of Object.entries(expectedLabels)) {

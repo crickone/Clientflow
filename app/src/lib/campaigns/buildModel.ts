@@ -4,7 +4,7 @@
 //
 // The options = Haiku PLUS the full agent-picker catalog (MODEL_CATALOG,
 // @/lib/ai/modelCatalog): Sonnet, Opus, and every OpenRouter open model
-// (DeepSeek, Kimi, Qwen, GLM, GPT-5, Gemini). So a campaign build has the SAME
+// (DeepSeek, Kimi, Qwen, GLM, GPT, Gemini). So a campaign build has the SAME
 // model choice the Adonis chat does — plus Haiku, a cheaper tier MODEL_CATALOG
 // itself omits. Derived from MODEL_CATALOG (not a hand-kept copy) so the two
 // lists never drift. Campaign generation routes an `openrouter:`-prefixed build

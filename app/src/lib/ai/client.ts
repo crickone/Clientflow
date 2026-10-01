@@ -68,6 +68,41 @@ export const PRICING: Record<string, { inCents: number; outCents: number }> = {
   "claude-sonnet-5": { inCents: 200, outCents: 1000 },
   "claude-opus-5": { inCents: 500, outCents: 2500 },
   "claude-opus-4-8": { inCents: 500, outCents: 2500 },
+
+  // ---- OpenRouter models in the picker (2026-10-01) ----------------------
+  // OpenRouter's LISTED price per model (openrouter.ai/api/v1/models),
+  // rounded up to whole cents per M tokens, sourced live on 2026-10-01. The
+  // per-endpoint prices behind a listing vary widely for some of these --
+  // GLM 5.3 runs from $0.12 to $1.40 input across its 39 providers -- and
+  // OpenRouter's default routing weights toward the cheaper ones, so the
+  // listed price is the better estimate of what a run actually costs. Each
+  // id must match MODEL_CATALOG exactly, or estCostCents silently prices the
+  // model at the Sonnet fallback rate.
+  "openrouter:deepseek/deepseek-v4.1-flash": { inCents: 3, outCents: 50 },
+  "openrouter:moonshotai/kimi-k2.6": { inCents: 44, outCents: 183 },
+  "openrouter:qwen/qwen3.8-flash": { inCents: 15, outCents: 47 },
+  "openrouter:z-ai/glm-5.3": { inCents: 24, outCents: 339 },
+  "openrouter:openai/gpt-6.1-sol": { inCents: 200, outCents: 1000 },
+  // Unchanged on 2026-10-01: no newer Gemini Pro is served.
+  // OpenRouter Gemini 3.1 Pro Preview (Google's current flagship "Pro" tier
+  // — see the matching catalog comment for why it's still "-preview" naming
+  // and why this is the current best pick). $2.00 in / $12.00 out per 1M
+  // tokens is OpenRouter's BASE-tier list price (prompts <200K tokens),
+  // sourced live from openrouter.ai/api/v1/models on 2026-08-09; OpenRouter
+  // roughly doubles both rates above 200K prompt tokens ($4.00/$18.00),
+  // which this flat per-model rate can't represent — a known
+  // under-estimate for very-long-context Gemini runs against the
+  // €25/tenant cap, same class of simplification the rest of this table
+  // already makes (no per-tier or cache-write-tier pricing anywhere else
+  // either).
+  "openrouter:google/gemini-3.1-pro-preview": { inCents: 200, outCents: 1200 },
+
+  // ---- Superseded OpenRouter ids -----------------------------------------
+  // Replaced in the picker on 2026-10-01 and moved by tenant migration 0009.
+  // Kept priced so an agent still naming one meters at its own rate until
+  // the migration reaches that database. The notes below are as written
+  // when each was added.
+  //
   // OpenRouter DeepSeek V4 Flash (dated snapshot "0731" — matches the catalog
   // id in @/lib/ai/modelCatalog's MODEL_CATALOG; pinned rather than the
   // "-latest" alias so this price can't silently drift if OpenRouter
@@ -110,18 +145,6 @@ export const PRICING: Record<string, { inCents: number; outCents: number }> = {
   // it would silently fall back to the Sonnet rate above, under-pricing
   // every GPT-5 run against the €25/tenant cap.
   "openrouter:openai/gpt-5": { inCents: 125, outCents: 1000 },
-  // OpenRouter Gemini 3.1 Pro Preview (Google's current flagship "Pro" tier
-  // — see the matching catalog comment for why it's still "-preview" naming
-  // and why this is the current best pick). $2.00 in / $12.00 out per 1M
-  // tokens is OpenRouter's BASE-tier list price (prompts <200K tokens),
-  // sourced live from openrouter.ai/api/v1/models on 2026-08-09; OpenRouter
-  // roughly doubles both rates above 200K prompt tokens ($4.00/$18.00),
-  // which this flat per-model rate can't represent — a known
-  // under-estimate for very-long-context Gemini runs against the
-  // €25/tenant cap, same class of simplification the rest of this table
-  // already makes (no per-tier or cache-write-tier pricing anywhere else
-  // either).
-  "openrouter:google/gemini-3.1-pro-preview": { inCents: 200, outCents: 1200 },
 };
 
 export interface Usage {

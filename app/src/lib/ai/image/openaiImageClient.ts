@@ -7,7 +7,7 @@ import "server-only";
  * as ./falClient and MailgunSender.
  *
  * WHY A SECOND IMAGE PROVIDER EXISTS. ./falClient generates a picture FROM
- * WORDS: FLUX 1.1 Pro takes a prompt and nothing else. An operator asking to
+ * WORDS: FLUX.2 Pro, as used there, takes a prompt and nothing else. An operator asking to
  * "replace the guy in the photo with a woman" is not asking for a new picture
  * from a description -- they are asking for THIS photograph, changed. That is
  * a different capability (instruction-based editing), and the model chosen for

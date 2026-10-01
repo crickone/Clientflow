@@ -292,12 +292,38 @@ export const TENANT_MIGRATIONS: Migration[] = [
   {
     id: "0008-claude-5-5",
     description:
-      "Move agents on Sonnet 5 and Opus 5 onto their direct successors, Sonnet 5.5 and Opus 5.5, which replace them in the picker. Same reasoning as 0006: an agent still naming a model the picker no longer offers shows an empty selector and sits on an older model nobody chose. Sonnet 5.5 is the same price as Sonnet 5 ($2/$10 per MTok) and Opus 5.5 is cheaper than Opus 5 ($4/$20 against $5/$25), so this moves capability up and cost flat or down. Opus 4.8 is included so a tenant whose database somehow skipped 0006 lands on the current Opus rather than the previous one. Scoped to those three exact ids: Haiku and OpenRouter models are left alone, because moving somebody off a model they picked is a different act.",
+      "Move agents on Sonnet 5 and Opus 5 onto their direct successors, Sonnet 5.5 and Opus 5.5, which replace them in the picker. Same reasoning as 0006: an agent still naming a model the picker no longer offers shows an empty selector and sits on an older model nobody chose. Sonnet 5.5 is the same price as Sonnet 5 ($2/$10 per MTok) and Opus 5.5 is cheaper than Opus 5 ($4/$20 against $5/$25), so this moves capability up and cost flat or down. Opus 4.8 is included so a tenant whose database somehow skipped 0006 lands on the current Opus rather than the previous one. Scoped to those three exact ids: OpenRouter models are left alone here, because moving somebody off a model they picked is a different act. The tenant's campaign build model (settings key campaignBuildModel, a JSON string) moves the same way, and so does Haiku there: its id changed from the dated snapshot claude-haiku-4-5-20251001 to the alias claude-haiku-4-5, the same model, and a stored id the campaign list no longer offers silently falls back to the content model -- Sonnet, at twice Haiku's price.",
     up: (sqlite) => {
-      sqlite.prepare("UPDATE agents SET model = 'claude-sonnet-5-5' WHERE model = 'claude-sonnet-5'").run();
-      sqlite
-        .prepare("UPDATE agents SET model = 'claude-opus-5-5' WHERE model IN ('claude-opus-5', 'claude-opus-4-8')")
-        .run();
+      const moves: [string[], string][] = [
+        [["claude-sonnet-5"], "claude-sonnet-5-5"],
+        [["claude-opus-5", "claude-opus-4-8"], "claude-opus-5-5"],
+      ];
+      const agent = sqlite.prepare("UPDATE agents SET model = ? WHERE model = ?");
+      for (const [froms, to] of moves) for (const from of froms) agent.run(to, from);
+
+      const setting = sqlite.prepare("UPDATE settings SET value = ? WHERE key = 'campaignBuildModel' AND value = ?");
+      for (const [froms, to] of [...moves, [["claude-haiku-4-5-20251001"], "claude-haiku-4-5"]] as [string[], string][]) {
+        for (const from of froms) setting.run(JSON.stringify(to), JSON.stringify(from));
+      }
+    },
+  },
+  {
+    id: "0009-openrouter-successors",
+    description:
+      "Move agents on the five open/OpenAI models the picker replaced on 2026-10-01 onto the models that replaced them: DeepSeek V4 Flash 0731 -> V4.1 Flash, Kimi K2 0905 -> K2.6, Qwen3 235B 2507 -> Qwen 3.8 Flash, GLM 5.2 -> GLM 5.3, GPT-5 -> GPT-6.1 Sol. Each is the same family's newer release in the same slot, chosen by the operator, so this is 0006 and 0008's reasoning rather than moving somebody off a model they picked: an agent left on a superseded id shows an empty selector and stays on a model nobody now offers. Gemini 3.1 Pro is unchanged and not touched. Mapped one exact id to one exact id, so nothing a tenant chose outside these five moves. The campaign build model (settings key campaignBuildModel, a JSON string) offers the same catalog and moves the same way.",
+    up: (sqlite) => {
+      const move = sqlite.prepare("UPDATE agents SET model = ? WHERE model = ?");
+      const setting = sqlite.prepare("UPDATE settings SET value = ? WHERE key = 'campaignBuildModel' AND value = ?");
+      for (const [from, to] of [
+        ["openrouter:deepseek/deepseek-v4-flash-0731", "openrouter:deepseek/deepseek-v4.1-flash"],
+        ["openrouter:moonshotai/kimi-k2-0905", "openrouter:moonshotai/kimi-k2.6"],
+        ["openrouter:qwen/qwen3-235b-a22b-2507", "openrouter:qwen/qwen3.8-flash"],
+        ["openrouter:z-ai/glm-5.2", "openrouter:z-ai/glm-5.3"],
+        ["openrouter:openai/gpt-5", "openrouter:openai/gpt-6.1-sol"],
+      ]) {
+        move.run(to, from);
+        setting.run(JSON.stringify(to), JSON.stringify(from));
+      }
     },
   },
 ];

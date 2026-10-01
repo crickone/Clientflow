@@ -43,70 +43,76 @@ export const MODEL_CATALOG: ModelChoice[] = [
     note: "Most capable — for the hardest tasks.",
   },
   {
-    // Dated snapshot ("0731"), deliberately NOT the "-latest" alias — see the
-    // matching PRICING entry in @/lib/ai/client for why a pinned id matters
-    // here (a "-latest" repoint could silently change both behaviour and
-    // price out from under an already-priced PRICING entry).
-    id: "openrouter:deepseek/deepseek-v4-flash-0731",
-    label: "DeepSeek V4 Flash",
+    // DeepSeek V4.1 Flash (2026-09-10), successor to the V4 Flash "0731"
+    // snapshot this slot used to carry. A bare id: OpenRouter has not issued
+    // a dated snapshot of 4.1, and its bare ids name one release rather than
+    // a moving "-latest". Verified live against openrouter.ai/api/v1/models
+    // on 2026-10-01 -- see the matching PRICING entry in @/lib/ai/client.
+    id: "openrouter:deepseek/deepseek-v4.1-flash",
+    label: "DeepSeek V4.1 Flash",
     provider: "openrouter",
     needsOpenRouter: true,
     note: "Open model — lowest cost; tool use is good but benchmark before relying on it.",
   },
   {
-    // Dated refresh ("0905") over the bare "kimi-k2" (0711 release, 131K
-    // context, no structured_outputs support) and over "kimi-k2-thinking" (a
-    // distinct reasoning-tuned sibling, not the plain agentic model this
-    // entry is meant to be) — 0905 adds a larger 262K context and
-    // structured-outputs support at the same OpenRouter price, making it the
-    // current best tool-use pick still branded plain "Kimi K2". Verified
-    // live against openrouter.ai/api/v1/models on 2026-08-09 — see the
-    // matching PRICING entry in @/lib/ai/client for the sourced price.
-    id: "openrouter:moonshotai/kimi-k2-0905",
-    label: "Kimi K2",
+    // Kimi K2.6 (2026-04-20), the newest of the plain agentic K2 line, chosen
+    // by the operator on 2026-10-01 over Kimi K3. K3 is newer but $0.66 /
+    // $10.00 per M tokens -- four times K2's output price -- which would make
+    // this slot's "great value" note untrue; K2.6 is cheaper than the K2
+    // 0905 it replaces. Verified live against openrouter.ai/api/v1/models on
+    // 2026-10-01 -- see the matching PRICING entry in @/lib/ai/client.
+    id: "openrouter:moonshotai/kimi-k2.6",
+    label: "Kimi K2.6",
     provider: "openrouter",
     needsOpenRouter: true,
     note: "Open model — excellent agentic tool use, great value.",
   },
   {
-    // "-2507" dated refresh of Qwen3 235B A22B Instruct (a post-training
-    // update over the earlier undated "qwen3-235b-a22b") — the flagship
-    // OPEN-WEIGHT Qwen3 checkpoint, distinct from Alibaba's closed
-    // "qwen3-max"/"qwen3.8-max" tier (9-20x pricier). Verified live against
-    // openrouter.ai/api/v1/models on 2026-08-09 — see the matching PRICING
-    // entry in @/lib/ai/client for the sourced price.
-    id: "openrouter:qwen/qwen3-235b-a22b-2507",
-    label: "Qwen3 235B",
+    // Qwen 3.8 Flash (2026-08-26), chosen by the operator on 2026-10-01 to
+    // replace Qwen3 235B A22B 2507. About the same cost as the model it
+    // replaces, with a 1M-token context where that had 262K. Served by a
+    // single OpenRouter provider (Alibaba) at the time of writing. Verified
+    // live against openrouter.ai/api/v1/models on 2026-10-01 -- see the
+    // matching PRICING entry in @/lib/ai/client.
+    id: "openrouter:qwen/qwen3.8-flash",
+    label: "Qwen 3.8 Flash",
     provider: "openrouter",
     needsOpenRouter: true,
-    note: "Open model — cheapest option here, solid tool use.",
+    note: "Open model — very low cost, 1M-token context, solid tool use.",
   },
   {
-    // Z.ai's GLM 5.2 (bare "glm-5.2", NOT the ":batch" async variant — that's
-    // cheaper but for offline batch jobs, not interactive tool use). A strong
-    // OPEN-WEIGHT model with a huge 1.05M-token context at open-model prices.
-    // Verified live against openrouter.ai/z-ai on 2026-08-16 — see the matching
-    // PRICING entry in @/lib/ai/client for the sourced price.
-    id: "openrouter:z-ai/glm-5.2",
-    label: "GLM 5.2",
+    // Z.ai's GLM 5.3 (bare "glm-5.3", NOT the ":batch" async variant, nor the
+    // -flash / -flashx / -prime siblings). Successor to GLM 5.2, which was
+    // the newest GLM OpenRouter served when this slot was added. Output is
+    // dearer than 5.2's listed rate was then, so the note no longer says
+    // "very low cost". Verified live against openrouter.ai/api/v1/models on
+    // 2026-10-01 -- see the matching PRICING entry in @/lib/ai/client.
+    id: "openrouter:z-ai/glm-5.3",
+    label: "GLM 5.3",
     provider: "openrouter",
     needsOpenRouter: true,
-    note: "Open model — 1M-token context, very low cost, strong agentic tool use.",
+    note: "Open model — 1M-token context, low cost, strong agentic tool use.",
   },
   {
     // OpenAI's flagship, routed through OpenRouter rather than a native
-    // OpenAI integration (there isn't one — this app is Anthropic-native;
-    // see multiprovider-design.md). Bare "gpt-5" (NOT -mini/-nano/-pro/-codex,
-    // and not the newer 5.1/5.2/... line) is OpenAI's primary GPT-5 id.
-    // Verified live against openrouter.ai/api/v1/models on 2026-08-09 — see
-    // the matching PRICING entry in @/lib/ai/client for the sourced price.
-    id: "openrouter:openai/gpt-5",
-    label: "GPT-5",
+    // OpenAI integration (there isn't one -- this app is Anthropic-native;
+    // see multiprovider-design.md). GPT-6.1 Sol (2026-09-29) is the newest
+    // mainline OpenAI model, chosen by the operator on 2026-10-01 to replace
+    // GPT-5. "Sol" is the mainline tier; "-pro" variants, "Luna" (the cheap
+    // tier) and "Astra" ($10 / $50, the same band as Claude Fable, which this
+    // catalog excludes on cost) are deliberately not listed. Verified live
+    // against openrouter.ai/api/v1/models on 2026-10-01 -- see the matching
+    // PRICING entry in @/lib/ai/client.
+    id: "openrouter:openai/gpt-6.1-sol",
+    label: "GPT-6.1 Sol",
     provider: "openrouter",
     needsOpenRouter: true,
     note: "OpenAI flagship — top-tier reasoning, premium price.",
   },
   {
+    // Unchanged on 2026-10-01: OpenRouter lists no Gemini Pro newer than
+    // this (only the 3.5-3.8 Flash line), so it is still the current pick.
+    //
     // Google's current flagship "Pro" tier — still shipping under "-preview"
     // naming (Gemini 2.5 Pro spent months the same way before the suffix was
     // dropped); there is no non-preview "gemini-3.1-pro" id yet, so this is
@@ -134,6 +140,11 @@ const RETIRED_LABELS: Record<string, string> = {
   "claude-opus-4-8": "Opus 4.8",
   "claude-opus-5": "Opus 5",
   "claude-sonnet-5": "Sonnet 5",
+  "openrouter:deepseek/deepseek-v4-flash-0731": "DeepSeek V4 Flash",
+  "openrouter:moonshotai/kimi-k2-0905": "Kimi K2",
+  "openrouter:qwen/qwen3-235b-a22b-2507": "Qwen3 235B",
+  "openrouter:z-ai/glm-5.2": "GLM 5.2",
+  "openrouter:openai/gpt-5": "GPT-5",
 };
 
 export function modelLabel(id: string): string {

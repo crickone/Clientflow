@@ -15,7 +15,7 @@ import { ASPECT_DIMS, type ImageAspect } from "./prompt";
  * The ONE metered path for a post-image generation — the image counterpart of
  * meteredCreate's gate → call → meter contract:
  *   assertAiAllowed → falGenerateImage → save into the image library →
- *   meterAndChargeFlat (flat 4¢/image under agentKey, model fal:flux-1.1-pro).
+ *   meterAndChargeFlat (flat IMAGE_COST_CENTS per image -- 3¢ on FLUX.2 Pro -- under agentKey).
  *
  * Returns the created library asset (downscaled/re-encoded through
  * processImageUpload exactly like an uploaded photo) — callers set it as a

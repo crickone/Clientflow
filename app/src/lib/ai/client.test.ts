@@ -122,23 +122,24 @@ ok(
     PRICING[id].inCents < PRICING[MODELS.sonnet].inCents && PRICING[id].outCents < PRICING[MODELS.sonnet].outCents,
   );
   check(
-    "1M input + 1M output tokens on DeepSeek costs 42c (14c in + 28c out per 1M)",
+    "1M input + 1M output tokens on DeepSeek V4.1 Flash costs 53c (3c in + 50c out per 1M)",
     estCostCents(id, { inputTokens: 1_000_000, outputTokens: 1_000_000 }),
-    42,
+    53,
   );
 }
 
-// MP4: Kimi K2, Qwen3, GPT-5, and Gemini (all via OpenRouter) — same
-// "priced for real, not the Sonnet fallback" guarantee as DeepSeek above,
-// pinned per model (rather than looped generically) so a future price edit
-// to one model can't silently break another's without a named failure.
-// Rates sourced live from openrouter.ai/api/v1/models on 2026-08-09 — see
-// modelCatalog.ts's per-entry comments for the exact-slug rationale.
+// The rest of the OpenRouter picker -- same "priced for real, not the
+// Sonnet fallback" guarantee as DeepSeek above, pinned per model (rather
+// than looped generically) so a future price edit to one model can't
+// silently break another's without a named failure. Listed rates sourced
+// live from openrouter.ai/api/v1/models on 2026-10-01 (Gemini on
+// 2026-08-09, unchanged since) -- see modelCatalog.ts's per-entry comments.
 {
   const newModelRates: Record<string, { inCents: number; outCents: number }> = {
-    "openrouter:moonshotai/kimi-k2-0905": { inCents: 60, outCents: 250 },
-    "openrouter:qwen/qwen3-235b-a22b-2507": { inCents: 9, outCents: 55 },
-    "openrouter:openai/gpt-5": { inCents: 125, outCents: 1000 },
+    "openrouter:moonshotai/kimi-k2.6": { inCents: 44, outCents: 183 },
+    "openrouter:qwen/qwen3.8-flash": { inCents: 15, outCents: 47 },
+    "openrouter:z-ai/glm-5.3": { inCents: 24, outCents: 339 },
+    "openrouter:openai/gpt-6.1-sol": { inCents: 200, outCents: 1000 },
     "openrouter:google/gemini-3.1-pro-preview": { inCents: 200, outCents: 1200 },
   };
   for (const [id, expected] of Object.entries(newModelRates)) {

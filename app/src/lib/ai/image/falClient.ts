@@ -6,14 +6,19 @@ import "server-only";
  * SDK dependency — the same deliberate choice as MailgunSender.
  */
 
-export const IMAGE_MODEL_ID = "fal:flux-1.1-pro";
+export const IMAGE_MODEL_ID = "fal:flux-2-pro";
 /**
- * fal bills FLUX 1.1 Pro at $0.04 per rounded-up megapixel; every ASPECT_DIMS
- * size (lib/ai/image/prompt.ts) is under 1MP, so one image = one flat 4¢ unit.
+ * fal bills FLUX.2 [pro] at $0.03 for the first megapixel and $0.015 for each
+ * additional one, rounded up. Every ASPECT_DIMS size (lib/ai/image/prompt.ts)
+ * is under 1MP, so one image = one flat 3¢ unit.
+ *
+ * FLUX 1.1 Pro (fal-ai/flux-pro/v1.1, 4¢) until 2026-10-01, when the operator
+ * moved post backgrounds to FLUX.2: the newer generation, at a cent less per
+ * image. Checked against fal's published schema for fal-ai/flux-2-pro.
  */
-export const IMAGE_COST_CENTS = 4;
+export const IMAGE_COST_CENTS = 3;
 
-const FAL_ENDPOINT = "https://fal.run/fal-ai/flux-pro/v1.1";
+const FAL_ENDPOINT = "https://fal.run/fal-ai/flux-2-pro";
 
 export function isImageGenConfigured(): boolean {
   return !!process.env.FAL_KEY?.trim();
@@ -31,7 +36,7 @@ interface FalImageResponse {
 }
 
 /**
- * Generate one JPEG with FLUX 1.1 Pro and return its bytes. `fetchImpl` is
+ * Generate one JPEG with FLUX.2 Pro and return its bytes. `fetchImpl` is
  * injectable for tests; defaults to global fetch. Throws ImageGenError on any
  * API/shape failure — callers map it to image_status='failed' (queue) or a
  * 500 (sync route). 60s timeout on each leg; the sync fal.run call typically
@@ -55,8 +60,11 @@ export async function falGenerateImage(
       },
       body: JSON.stringify({
         prompt: input.prompt,
+        // FLUX.2 Pro takes a {width, height} object in multiples of 16; the
+        // ASPECT_DIMS sizes are multiples of 32. It has no `num_images` --
+        // one request is one image -- so that field, which FLUX 1.1 took, is
+        // gone rather than sent to be ignored.
         image_size: { width: input.width, height: input.height },
-        num_images: 1,
         output_format: "jpeg",
         enable_safety_checker: true,
       }),

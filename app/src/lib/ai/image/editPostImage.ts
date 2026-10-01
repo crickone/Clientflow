@@ -23,7 +23,7 @@ import { ASPECT_DIMS, type ImageAspect } from "./prompt";
  * meterAndChargeFlat.
  *
  * The one real difference from a generation is the charge. A FLUX image is a
- * flat 4¢, so generatePostImage can name the price before it calls. An edit is
+ * flat price (IMAGE_COST_CENTS), so generatePostImage can name it before it calls. An edit is
  * billed on tokens that depend on the size of the photograph going in and the
  * quality coming out, so the cost is computed from the usage the call reports
  * and charged afterwards. The cap is still checked BEFORE the call -- that is

@@ -33,13 +33,14 @@ import {
     );
     assert.equal(buf.length, 4, "returns the downloaded bytes");
     assert.equal(calls.length, 2, "one generate call + one download");
-    assert.equal(calls[0].url, "https://fal.run/fal-ai/flux-pro/v1.1");
+    assert.equal(calls[0].url, "https://fal.run/fal-ai/flux-2-pro");
     const hdrs = calls[0].init?.headers as Record<string, string>;
     assert.equal(hdrs.Authorization, "Key test-key-123");
     const body = JSON.parse(String(calls[0].init?.body));
     assert.equal(body.prompt, "a calm room");
     assert.deepEqual(body.image_size, { width: 992, height: 992 });
-    assert.equal(body.num_images, 1);
+    // FLUX.2 Pro has no num_images field; one request is one image.
+    assert.equal("num_images" in body, false);
     assert.equal(body.output_format, "jpeg");
     assert.equal(body.enable_safety_checker, true);
     assert.equal(calls[1].url, "https://cdn.example/img.jpg", "downloads the URL the API returned");
@@ -77,8 +78,8 @@ import {
     );
     assert.equal(calls.length, 2, "missing key throws before any fetch happens");
 
-    assert.equal(IMAGE_COST_CENTS, 4);
-    assert.equal(IMAGE_MODEL_ID, "fal:flux-1.1-pro");
+    assert.equal(IMAGE_COST_CENTS, 3);
+    assert.equal(IMAGE_MODEL_ID, "fal:flux-2-pro");
     console.log("falClient.test.ts: all assertions passed");
   } finally {
     if (prevKey === undefined) delete process.env.FAL_KEY;

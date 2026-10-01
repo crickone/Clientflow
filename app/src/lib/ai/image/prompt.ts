@@ -7,10 +7,11 @@
 export type ImageAspect = "1:1" | "9:16" | "4:5";
 
 /**
- * fal FLUX 1.1 Pro bills $0.04 per rounded-up megapixel — every size here
- * stays under 1,000,000 px so one image is always exactly one 4¢ unit
- * (IMAGE_COST_CENTS in falClient.ts). Dimensions must be multiples of 32
- * (fal constraint). Ratio drift from the true aspect is ≤0.8% — invisible
+ * fal bills FLUX.2 Pro by the rounded-up megapixel, $0.03 for the first --
+ * every size here stays under 1,000,000 px so one image is always exactly
+ * one 3¢ unit (IMAGE_COST_CENTS in falClient.ts). Dimensions are multiples of
+ * 32, which satisfies FLUX.2's multiple-of-16 rule and FLUX 1.1's
+ * multiple-of-32 one before it. Ratio drift from the true aspect is ≤0.8% — invisible
  * under the designer's cover-fit background cropping.
  */
 export const ASPECT_DIMS: Record<ImageAspect, { width: number; height: number }> = {
