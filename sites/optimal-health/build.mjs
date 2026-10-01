@@ -951,7 +951,7 @@ const POSTS = [
     topic: "Recovery",
     title: "Stress, sleep, and the twelve minutes after work",
     excerpt:
-      "The most reliable thing an evening session gives a busy person is a bounded half hour with the phone somewhere else. The bed is what makes you keep the appointment.",
+      "An evening session gives a busy person one reliable thing: half an hour with the phone somewhere else. Having it in the diary is why you'll actually take it.",
     photo: "infrared-bed-idle.jpg",
     alt: "The infrared bed closed and waiting in the treatment room, its orange strip lit",
     description:
@@ -962,7 +962,7 @@ const POSTS = [
     topic: "HIFEM",
     title: "The HIFEM chair, and a week spent sitting down",
     excerpt:
-      "Long sitting leaves some muscle doing almost nothing. The chair asks it to work for twenty to thirty minutes, seated and fully clothed. It is muscle work, so plan it like one.",
+      "Long sitting leaves some muscle doing almost nothing. The chair asks it to work for twenty to thirty minutes, seated and fully clothed. It's muscle work, so plan it like a gym session.",
     photo: "hifem-chair.jpg",
     alt: "The HIFEM chair and its console, empty, a cushion on the seat",
     description:
@@ -971,20 +971,20 @@ const POSTS = [
   {
     slug: "infrared-and-everyday-aches",
     topic: "Infrared",
-    title: "What infrared light is actually doing in everyday aches",
+    title: "What infrared light actually does in everyday aches",
     excerpt:
-      "What the bed emits, what the light is understood to do once it is in tissue, and why the honest account of it is written in weeks.",
+      "What the bed emits, what the light is understood to do once it's in tissue, and why the honest account of it is written in weeks.",
     photo: "infrared-bed-lit.jpg",
     alt: "The infrared bed running, its red light spilling across the brick wall behind it",
     description:
-      "Twelve minutes of red and near-infrared light at our Clonmel clinic: what the bed emits, what the light is understood to do, and what people say afterwards.",
+      "Twelve minutes of red and near-infrared light at our Clonmel clinic: what the bed emits, what the light is understood to do, and what people say they notice afterwards.",
   },
   {
     slug: "between-hard-sessions",
     topic: "Hyperbaric oxygen",
     title: "Where the chamber fits in a training week",
     excerpt:
-      "How you recover is part of the training week, not an afterthought to it. What an hour in the chamber is, where it sits in the week, and the one therapy here that will not sit anywhere you like.",
+      "How you recover is part of the training week, not an afterthought to it. What an hour in the chamber involves, where it sits in the week, and the one therapy here that won't sit anywhere you like.",
     photo: "hbot-chamber-seated.jpg",
     alt: "A client seated in the open hyperbaric chamber, hands on his knees",
     description:
@@ -995,7 +995,7 @@ const POSTS = [
     topic: "Infrared",
     title: "Panels, lasers, and a bed you lie down in",
     excerpt:
-      "Light therapy is not one thing. A hand-held laser, a panel on a stand and a full-length bed do different jobs, and the difference is mostly how much of you the light reaches.",
+      "Light therapy isn't one thing. A hand-held laser, a panel on a stand and a full-length bed do different jobs, and the difference is mostly how much of you the light reaches.",
     photo: "infrared-bed-open.jpg",
     alt: "Close along the shell of the infrared bed, its orange strip lit against black brick",
     description:
@@ -1006,11 +1006,11 @@ const POSTS = [
     topic: "Hyperbaric oxygen",
     title: "Hyperbaric oxygen and mental clarity after a hard week",
     excerpt:
-      "Forty-five to sixty minutes in a pressurised chamber, breathing air with more oxygen in it than the room has. What the hour is like, and what people report from it.",
+      "Forty-five to sixty minutes in a pressurised chamber, breathing air with more oxygen in it than the room has. What the hour feels like, and what people report afterwards.",
     photo: "hbot-session-mask.jpg",
     alt: "A client seated in the open hyperbaric chamber holding the oxygen mask",
     description:
-      "What an hour in the hyperbaric chamber at our Clonmel clinic is actually like, why the pressure matters, and what people report after a run of sessions.",
+      "What an hour in the hyperbaric chamber at our Clonmel clinic is actually like, why the pressure matters, and what people say after a run of sessions.",
   },
 ];
 
