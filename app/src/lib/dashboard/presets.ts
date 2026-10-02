@@ -345,6 +345,40 @@ export const PRESETS: Preset[] = [
       ],
     },
   },
+  {
+    key: "website",
+    name: "Website",
+    description: "Visitors, top pages, sources and enquiries.",
+    icon: "Globe",
+    widgets: {
+      clinic: [
+        { key: "website.visitors", size: "S" },
+        { key: "website.pageViews", size: "S" },
+        { key: "website.submissions", size: "S" },
+        { key: "website.enquiryRate", size: "S" },
+        { key: "website.trafficTrend", size: "XL" },
+        { key: "website.topPages", size: "M" },
+        { key: "website.sources", size: "M" },
+        { key: "website.submissionsByForm", size: "M" },
+        { key: "website.blogViews", size: "M" },
+        { key: "website.recentEdits", size: "L" },
+        { key: "website.requests", size: "S" },
+      ],
+      gym: [
+        { key: "website.visitors", size: "S" },
+        { key: "website.pageViews", size: "S" },
+        { key: "website.submissions", size: "S" },
+        { key: "website.enquiryRate", size: "S" },
+        { key: "website.trafficTrend", size: "XL" },
+        { key: "website.topPages", size: "M" },
+        { key: "website.sources", size: "M" },
+        { key: "website.submissionsByForm", size: "M" },
+        { key: "website.blogViews", size: "M" },
+        { key: "website.recentEdits", size: "L" },
+        { key: "website.requests", size: "S" },
+      ],
+    },
+  },
 ];
 
 export const PRESET_BY_KEY: Map<string, Preset> = new Map(PRESETS.map((p) => [p.key, p]));

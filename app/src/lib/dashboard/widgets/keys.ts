@@ -8,3 +8,4 @@ export type FrontdeskKey = Extract<WidgetKey, `frontdesk.${string}`>;
 export type ClassesKey = Extract<WidgetKey, `classes.${string}`>;
 export type FinanceKey = Extract<WidgetKey, `finance.${string}`>;
 export type ContentKey = Extract<WidgetKey, `content.${string}`>;
+export type WebsiteKey = Extract<WidgetKey, `website.${string}`>;
