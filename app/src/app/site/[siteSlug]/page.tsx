@@ -61,7 +61,7 @@ export default async function PublicSiteHome({ params, searchParams }: Props) {
           pixelId={pc.resolved.site.metaPixelId}
           googleTagId={pc.resolved.site.googleTagId}
         />
-        <SiteBeacon />
+        {pc.page.status === "published" && <SiteBeacon />}
         <T ctx={pc.ctx} page={pc.page} />
       </>
     );

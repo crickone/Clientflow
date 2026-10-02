@@ -17,7 +17,7 @@ mod._load = function (this: unknown, request: string, ...rest: unknown[]) {
 const requireLocal = createRequire(import.meta.url);
 
 (async () => {
-  const { isBot, referrerDomain, cleanPath, cleanUtm, visitorHash, recordPageView } =
+  const { isBot, referrerDomain, cleanPath, cleanUtm, visitorHash, recordPageView, MAX_PATHS_PER_SITE_DAY } =
     requireLocal("./pageViews") as typeof import("./pageViews");
 
   assert.equal(isBot("Mozilla/5.0 (compatible; Googlebot/2.1)"), true);
@@ -77,6 +77,20 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(raw("SELECT * FROM site_visitor_hashes WHERE day = '2026-10-02'").length, 0, "old hashes purged");
     assert.equal(raw("SELECT * FROM site_page_views_daily WHERE day = '2026-10-02'").length, 2, "aggregates stay");
     assert.doesNotThrow(() => recordPageView(null as never, hit()));
+
+    // Path cardinality cap: new paths beyond the cap fold into "/other".
+    assert.equal(MAX_PATHS_PER_SITE_DAY, 500);
+    const d = "2026-11-01";
+    recordPageView(conn, hit({ day: d, path: "/p1", hash: "X" }), { maxPaths: 2 });
+    recordPageView(conn, hit({ day: d, path: "/p2", hash: "X" }), { maxPaths: 2 });
+    recordPageView(conn, hit({ day: d, path: "/p3", hash: "X", referrerDomain: "google.com", utmSource: "fb" }), { maxPaths: 2 });
+    recordPageView(conn, hit({ day: d, path: "/p1", hash: "Y" }), { maxPaths: 2 });
+    const rows = raw(`SELECT path, views, referrer_domain, utm_source FROM site_page_views_daily WHERE day = '${d}' ORDER BY path`);
+    assert.deepEqual(rows.map((r) => r.path), ["/other", "/p1", "/p2"], "third new path folded into /other");
+    assert.equal(rows.find((r) => r.path === "/p1").views, 2, "existing path still increments");
+    const other = rows.find((r) => r.path === "/other");
+    assert.equal(other.referrer_domain, "google.com");
+    assert.equal(other.utm_source, "fb");
   } finally {
     cleanup();
   }

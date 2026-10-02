@@ -35,6 +35,9 @@ export function visitorHash(secret: string, day: string, siteId: number, ip: str
   return crypto.createHash("sha256").update(`${secret}|${day}|${siteId}|${ip}|${ua}`).digest("hex");
 }
 
+export const MAX_PATHS_PER_SITE_DAY = 500;
+const OTHER_PATH = "/other";
+
 export type PageHit = {
   siteId: number;
   day: string;
@@ -50,9 +53,22 @@ export type PageHit = {
  * Hashes for earlier days are purged on every write, so only the current UTC
  * day's salted hashes are ever held.
  */
-export function recordPageView(conn: TenantDb, hit: PageHit): void {
+export function recordPageView(conn: TenantDb, rawHit: PageHit, opts: { maxPaths?: number } = {}): void {
+  const maxPaths = opts.maxPaths ?? MAX_PATHS_PER_SITE_DAY;
   try {
     conn.transaction((tx) => {
+      let hit = rawHit;
+      // Bound distinct paths per site per day: a forged beacon cannot grow the
+      // table without limit. A brand-new path past the cap folds into "/other".
+      const known = tx.get<{ n: number }>(
+        sql`SELECT COUNT(*) AS n FROM site_page_views_daily WHERE site_id = ${hit.siteId} AND day = ${hit.day} AND path = ${hit.path}`,
+      );
+      if (!known || known.n === 0) {
+        const distinct = tx.get<{ n: number }>(
+          sql`SELECT COUNT(DISTINCT path) AS n FROM site_page_views_daily WHERE site_id = ${hit.siteId} AND day = ${hit.day}`,
+        );
+        if ((distinct?.n ?? 0) >= maxPaths) hit = { ...hit, path: OTHER_PATH };
+      }
       tx.run(sql`DELETE FROM site_visitor_hashes WHERE day < ${hit.day}`);
       const newOnPath =
         tx.run(sql`INSERT OR IGNORE INTO site_visitor_hashes (day, site_id, path, hash) VALUES (${hit.day}, ${hit.siteId}, ${hit.path}, ${hit.hash})`).changes > 0;
