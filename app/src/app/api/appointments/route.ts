@@ -13,6 +13,7 @@ import {
   payments,
 } from "@/lib/db/schema";
 import { logActivity } from "@/lib/queries";
+import { appointmentStatusDates } from "@/lib/statusDates";
 import { checkBookingSlot } from "@/lib/schedule";
 import { onAppointmentBooked, onPaymentRecorded } from "@/lib/pipeline/stage";
 import { createPackage, expiryFromMonths } from "@/lib/packages";
@@ -155,6 +156,7 @@ export async function POST(req: NextRequest) {
         startTime: parsed.startTime,
         endTime,
         status,
+        ...appointmentStatusDates(null, status, new Date()),
         therapyIds: JSON.stringify(therapyIds),
         totalPriceEur: parsed.totalPriceEur,
         notes,

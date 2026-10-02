@@ -5,6 +5,7 @@ import { leadMessages, leads, pipelineStages, type Lead, type LeadMessage } from
 import { normalizePhone } from "./whatsapp/phone";
 import { splitFullName } from "./humanName";
 import { resolveEntryStageId } from "./pipeline/stageRepo";
+import { recordStageEvent, type StageActor } from "./pipeline/stageEvents";
 import { defaultPipelineId, getPipeline, listPipelines } from "./pipeline/pipelineRepo";
 import { enrolLeadInNurture } from "./automations/nurture";
 import { getCurrentTenantDb } from "./db/tenant";
@@ -28,6 +29,8 @@ export interface NormalizedLeadInput {
   rawPayload?: unknown;
   /** The board the lead enters. Omitted = the default pipeline. */
   pipelineId?: number | null;
+  /** Who created the lead, for the stage history. Omitted = system. */
+  actor?: StageActor;
 }
 
 /**
@@ -90,6 +93,9 @@ export function upsertLead(input: NormalizedLeadInput): {
     .returning()
     .all();
   const lead = inserted[0];
+  if (lead.stageId != null) {
+    recordStageEvent(db, { leadId: lead.id, pipelineId: lead.pipelineId, fromStageId: null, toStageId: lead.stageId, actor: input.actor ?? "system" });
+  }
   enrolInCallFlow(lead);
   enrolInNurture(lead);
   return { lead, created: true };

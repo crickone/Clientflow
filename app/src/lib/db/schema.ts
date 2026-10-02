@@ -180,6 +180,10 @@ export const appointments = sqliteTable("appointments", {
   updatedAt: integer("updated_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),
+  /** When it became cancelled/no_show (status_dates recorder); null otherwise. */
+  cancelledAt: integer("cancelled_at", { mode: "timestamp_ms" }),
+  /** True when cancelledAt was backfilled from updated_at, not recorded live. */
+  cancelledAtApprox: integer("cancelled_at_approx", { mode: "boolean" }).notNull().default(false),
 });
 
 export const sessions = sqliteTable("sessions", {
@@ -1981,6 +1985,8 @@ export const clientMemberships = sqliteTable(
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
+    /** When it left active (status_dates recorder); null while active. */
+    endedAt: integer("ended_at", { mode: "timestamp_ms" }),
   },
   (t) => ({
     byClient: index("idx_client_memberships_client").on(t.clientId),
@@ -2971,3 +2977,80 @@ export const dashboards = sqliteTable(
   }),
 );
 export type DashboardRow = typeof dashboards.$inferSelect;
+
+/** Every move of a lead between pipeline stages (dashboard slice 2 recorder). */
+export const leadStageEvents = sqliteTable(
+  "lead_stage_events",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    leadId: integer("lead_id").notNull(),
+    pipelineId: integer("pipeline_id").notNull(),
+    fromStageId: integer("from_stage_id"),
+    toStageId: integer("to_stage_id").notNull(),
+    actor: text("actor", { enum: ["user", "agent", "automation", "system"] }).notNull(),
+    at: integer("at", { mode: "timestamp_ms" }).notNull().default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => ({
+    byPipeline: index("idx_lead_stage_events_pipeline").on(t.pipelineId, t.at),
+    byLead: index("idx_lead_stage_events_lead").on(t.leadId, t.at),
+  }),
+);
+
+/** Every Mailgun engagement event, append-only (dashboard slice 2 recorder). */
+export const emailEvents = sqliteTable(
+  "email_events",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    campaignId: integer("campaign_id").notNull(),
+    sendId: integer("send_id"),
+    contactId: integer("contact_id"),
+    event: text("event").notNull(),
+    url: text("url"),
+    /** Mailgun's event id, so a retried webhook is recorded once. Null for events without one. */
+    providerEventId: text("provider_event_id"),
+    at: integer("at", { mode: "timestamp_ms" }).notNull().default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => ({
+    byCampaign: index("idx_email_events_campaign").on(t.campaignId, t.at),
+    byEvent: index("idx_email_events_event").on(t.event, t.at),
+    byProvider: uniqueIndex("idx_email_events_provider").on(t.providerEventId).where(sql`provider_event_id IS NOT NULL`),
+  }),
+);
+
+/** Per-day website page views, aggregated (dashboard slice 2 recorder). No visitor identifiers. */
+export const sitePageViewsDaily = sqliteTable(
+  "site_page_views_daily",
+  {
+    siteId: integer("site_id").notNull(),
+    day: text("day").notNull(),
+    path: text("path").notNull(),
+    referrerDomain: text("referrer_domain").notNull().default(""),
+    utmSource: text("utm_source").notNull().default(""),
+    views: integer("views").notNull().default(0),
+    uniques: integer("uniques").notNull().default(0),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.siteId, t.day, t.path, t.referrerDomain, t.utmSource] }) }),
+);
+
+/** Per-day unique visitors for a whole site. */
+export const siteVisitorsDaily = sqliteTable(
+  "site_visitors_daily",
+  {
+    siteId: integer("site_id").notNull(),
+    day: text("day").notNull(),
+    uniques: integer("uniques").notNull().default(0),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.siteId, t.day] }) }),
+);
+
+/** Salted daily visitor hashes, kept only for the current UTC day; path '' = site-level. */
+export const siteVisitorHashes = sqliteTable(
+  "site_visitor_hashes",
+  {
+    day: text("day").notNull(),
+    siteId: integer("site_id").notNull(),
+    path: text("path").notNull(),
+    hash: text("hash").notNull(),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.day, t.siteId, t.path, t.hash] }) }),
+);

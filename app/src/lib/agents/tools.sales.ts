@@ -325,7 +325,7 @@ export function setLeadStageTool(ctx: ToolContext, input: Record<string, unknown
   const before = currentStageRecord(leadId);
   if (!before) return { text: JSON.stringify({ error: `No lead with id ${leadId}.` }) };
 
-  setStageToId(leadId, target.id);
+  setStageToId(leadId, target.id, "agent");
   return {
     text: JSON.stringify({
       result: `Lead #${leadId} moved from "${before.name}" to "${target.name}".`,

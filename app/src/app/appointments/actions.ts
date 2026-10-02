@@ -16,6 +16,7 @@ import {
   therapies,
 } from "@/lib/db/schema";
 import { logActivity } from "@/lib/queries";
+import { appointmentStatusDates } from "@/lib/statusDates";
 import {
   onAppointmentBooked,
   onAppointmentStatus,
@@ -76,6 +77,7 @@ export async function createAppointmentAction(formData: FormData) {
       startTime: parsed.startTime,
       endTime,
       status: parsed.status,
+      ...appointmentStatusDates(null, parsed.status, new Date()),
       therapyIds: JSON.stringify(parsed.therapyIds),
       totalPriceEur: parsed.totalPriceEur,
       notes: parsed.notes ?? null,
@@ -143,8 +145,9 @@ export async function updateStatusAction(
   status: "scheduled" | "confirmed" | "completed" | "cancelled" | "no_show",
 ) {
   await requireUser();
+  const prev = db.select({ status: appointments.status }).from(appointments).where(eq(appointments.id, id)).get();
   db.update(appointments)
-    .set({ status, updatedAt: new Date() })
+    .set({ status, updatedAt: new Date(), ...appointmentStatusDates(prev?.status ?? null, status, new Date()) })
     .where(eq(appointments.id, id))
     .run();
   await logActivity(
@@ -231,7 +234,7 @@ export async function completeAppointmentAction(formData: FormData) {
   }
 
   db.update(appointments)
-    .set({ status: "completed", updatedAt: new Date() })
+    .set({ status: "completed", updatedAt: new Date(), ...appointmentStatusDates(appt.status, "completed", new Date()) })
     .where(eq(appointments.id, appt.id))
     .run();
 
@@ -286,7 +289,7 @@ export async function uncompleteAppointmentAction(id: number) {
   db.delete(sessions).where(eq(sessions.appointmentId, id)).run();
 
   db.update(appointments)
-    .set({ status: "scheduled", updatedAt: new Date() })
+    .set({ status: "scheduled", updatedAt: new Date(), ...appointmentStatusDates(appt.status, "scheduled", new Date()) })
     .where(eq(appointments.id, id))
     .run();
 

@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { appointments, clients, leads } from "@/lib/db/schema";
 import { checkBookingSlot } from "@/lib/schedule";
+import { appointmentStatusDates } from "@/lib/statusDates";
 import { onAppointmentBooked } from "@/lib/pipeline/stage";
 import { consultationConfig } from "./availability";
 import { hmToMin, minToHm } from "./freeSlots";
@@ -94,6 +95,7 @@ export function bookConsultation(input: BookInput): BookResult {
           startTime: input.startTime,
           endTime,
           status: "scheduled",
+          ...appointmentStatusDates(null, "scheduled", new Date()),
           therapyIds: JSON.stringify(config.therapyIds),
           totalPriceEur: 0,
           notes: input.notes ?? `Consultation booked from lead #${lead.id}.`,

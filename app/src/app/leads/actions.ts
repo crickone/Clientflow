@@ -74,6 +74,7 @@ export async function createManualLeadAction(
 
   const { lead } = upsertLead({
     source: "manual",
+    actor: "user",
     firstName: v.firstName,
     lastName: v.lastName ?? null,
     email: v.email || null,

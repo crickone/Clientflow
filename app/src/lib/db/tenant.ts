@@ -15,6 +15,7 @@ import path from "node:path";
 
 import * as schema from "./schema";
 import { runMigrations, TENANT_MIGRATIONS } from "./migrations";
+import { RECORDER_START_SQL } from "@/lib/recorders/started";
 import { CLIENT_SESSION_COOKIE, controlDb, controlSqlite, SESSION_COOKIE } from "./control";
 
 /**
@@ -2180,6 +2181,24 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     }
   }
 
+  // Dashboard status_dates recorder: when appointments were cancelled and
+  // memberships ended. Must exist before the 0010 backfill migration runs.
+  for (const [table, defs] of [
+    ["appointments", [["cancelled_at", "cancelled_at INTEGER"], ["cancelled_at_approx", "cancelled_at_approx INTEGER NOT NULL DEFAULT 0"]]],
+    ["client_memberships", [["ended_at", "ended_at INTEGER"]]],
+  ] as Array<[string, Array<[string, string]>]>) {
+    try {
+      const cols = sqlite.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+      for (const [name, ddl] of defs) {
+        if (cols.length > 0 && !cols.find((c) => c.name === name)) {
+          sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+        }
+      }
+    } catch (err) {
+      console.error(`[tenant] ${table} status-date columns`, err);
+    }
+  }
+
   // Venue-neutral: plan type + recurring fields on packages and templates.
   for (const table of ["packages", "package_templates"]) {
     try {
@@ -2467,6 +2486,52 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
     CREATE INDEX IF NOT EXISTS idx_dashboards_user ON dashboards(user_id, position);
+    CREATE TABLE IF NOT EXISTS lead_stage_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      lead_id INTEGER NOT NULL,
+      pipeline_id INTEGER NOT NULL,
+      from_stage_id INTEGER,
+      to_stage_id INTEGER NOT NULL,
+      actor TEXT NOT NULL,
+      at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_lead_stage_events_pipeline ON lead_stage_events(pipeline_id, at);
+    CREATE INDEX IF NOT EXISTS idx_lead_stage_events_lead ON lead_stage_events(lead_id, at);
+    CREATE TABLE IF NOT EXISTS email_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      campaign_id INTEGER NOT NULL,
+      send_id INTEGER,
+      contact_id INTEGER,
+      event TEXT NOT NULL,
+      url TEXT,
+      provider_event_id TEXT,
+      at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_email_events_campaign ON email_events(campaign_id, at);
+    CREATE INDEX IF NOT EXISTS idx_email_events_event ON email_events(event, at);
+    CREATE TABLE IF NOT EXISTS site_page_views_daily (
+      site_id INTEGER NOT NULL,
+      day TEXT NOT NULL,
+      path TEXT NOT NULL,
+      referrer_domain TEXT NOT NULL DEFAULT '',
+      utm_source TEXT NOT NULL DEFAULT '',
+      views INTEGER NOT NULL DEFAULT 0,
+      uniques INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (site_id, day, path, referrer_domain, utm_source)
+    );
+    CREATE TABLE IF NOT EXISTS site_visitors_daily (
+      site_id INTEGER NOT NULL,
+      day TEXT NOT NULL,
+      uniques INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (site_id, day)
+    );
+    CREATE TABLE IF NOT EXISTS site_visitor_hashes (
+      day TEXT NOT NULL,
+      site_id INTEGER NOT NULL,
+      path TEXT NOT NULL,
+      hash TEXT NOT NULL,
+      PRIMARY KEY (day, site_id, path, hash)
+    );
   `);
 
   // Market Research P2 (Task 3, for Task 5): `ad_angle_json`/`ad_angle_at`
@@ -2563,4 +2628,32 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       applied_at INTEGER NOT NULL
     );
   `);
+
+  // Dashboard slice 2: stamp each event recorder's start date once.
+  try {
+    sqlite.exec(RECORDER_START_SQL);
+  } catch (err) {
+    console.error("[recorders] could not stamp recorder start dates", err);
+  }
+
+  // email_events.provider_event_id: in the CREATE above for new files; added
+  // here for any file that already has the table (dev copies), then indexed.
+  try {
+    const cols = sqlite.prepare("PRAGMA table_info(email_events)").all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === "provider_event_id")) {
+      sqlite.exec("ALTER TABLE email_events ADD COLUMN provider_event_id TEXT");
+    }
+    sqlite.exec(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_email_events_provider ON email_events(provider_event_id) WHERE provider_event_id IS NOT NULL",
+    );
+  } catch (err) {
+    console.error("[recorder:email_events] could not add provider_event_id", err);
+  }
+
+  // Visitor hashes are only ever kept for the current UTC day.
+  try {
+    sqlite.exec("DELETE FROM site_visitor_hashes WHERE day < strftime('%Y-%m-%d','now')");
+  } catch (err) {
+    console.error("[recorder:page_views] could not purge old visitor hashes", err);
+  }
 }

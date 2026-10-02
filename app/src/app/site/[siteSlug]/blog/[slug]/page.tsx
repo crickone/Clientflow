@@ -8,6 +8,7 @@ import { renderMarkdown, excerptFromMarkdown } from "@/lib/cms/markdown";
 import { getSiteChrome, CHROME_CONTENT_CSS } from "@/lib/cms/siteChrome";
 import { siteVerificationMeta } from "@/lib/cms/render";
 import { SiteTracking } from "@/components/cms/SiteTracking";
+import { SiteBeacon } from "@/components/cms/SiteBeacon";
 
 export const dynamic = "force-dynamic";
 
@@ -96,6 +97,7 @@ export default function PublicBlogPost({
         pixelId={resolved.site.metaPixelId}
         googleTagId={resolved.site.googleTagId}
       />
+      <SiteBeacon />
       <div dangerouslySetInnerHTML={{ __html: chrome.head }} />
       <style dangerouslySetInnerHTML={{ __html: CHROME_CONTENT_CSS }} />
       {chrome.header && <div dangerouslySetInnerHTML={{ __html: chrome.header }} />}

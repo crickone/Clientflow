@@ -130,4 +130,39 @@ const flattened = parseMailgunEvent({
 check("flattened (no event-data wrapper) -> parsed", flattened !== null);
 check("flattened -> event", flattened?.event === "opened");
 
+{
+  const ev = parseMailgunEvent({
+    "event-data": {
+      event: "clicked",
+      recipient: "a@b.ie",
+      timestamp: 1759400000.123, id: "evt-1",
+      url: "https://example.ie/offer",
+      message: { headers: { "message-id": "<abc@mg.example>" } },
+      "user-variables": { campaignId: "7", tenantId: "3", contactId: "42" },
+    },
+  });
+  check("click url parsed", ev?.url === "https://example.ie/offer");
+  check("occurredAt parsed to epoch ms", ev?.occurredAt === 1759400000123);
+  check("contactId parsed", ev?.contactId === 42);
+}
+{
+  const ev = parseMailgunEvent({ "event-data": { event: "opened", recipient: "a@b.ie", url: 5, timestamp: "x", message: { headers: { "message-id": "<m>" } } } });
+  check("non-string url ignored", ev?.url === undefined);
+  check("non-numeric timestamp ignored", ev?.occurredAt === undefined);
+}
+
+{
+  const mk = (extra: Record<string, unknown>, uv: Record<string, unknown> = {}) =>
+    parseMailgunEvent({ "event-data": { event: "opened", recipient: "a@b.ie", message: { headers: { "message-id": "<m>" } }, "user-variables": uv, ...extra } });
+  check("timestamp before 2020 rejected", mk({ timestamp: 1000 })?.occurredAt === undefined);
+  check("timestamp far future rejected", mk({ timestamp: Date.now() / 1000 + 10 * 86400 })?.occurredAt === undefined);
+  check("timestamp now accepted", mk({ timestamp: Date.now() / 1000 })?.occurredAt !== undefined);
+  check("contactId 0 rejected", mk({}, { contactId: "0" })?.contactId === undefined);
+  check("contactId negative rejected", mk({}, { contactId: "-3" })?.contactId === undefined);
+  check("contactId fractional rejected", mk({}, { contactId: "1.5" })?.contactId === undefined);
+  check("contactId positive int accepted", mk({}, { contactId: "9" })?.contactId === 9);
+  check("provider event id parsed", mk({ id: "abc123" })?.providerEventId === "abc123");
+  check("non-string event id ignored", mk({ id: 5 })?.providerEventId === undefined);
+}
+
 console.log(`\nmailgun: ${passed} checks passed.`);

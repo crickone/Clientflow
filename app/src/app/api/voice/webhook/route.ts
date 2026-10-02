@@ -149,7 +149,7 @@ export async function POST(req: Request) {
         if (flow.onAnsweredStageRole) {
           try {
             const stage = listStagesOnConn(tdb, leadPipelineIdOnConn(tdb, call.leadId) ?? undefined).find((st) => st.role === flow.onAnsweredStageRole);
-            if (stage) setStageToId(call.leadId, stage.id);
+            if (stage) setStageToId(call.leadId, stage.id, "automation");
           } catch (err) {
             // A stage that has since been renamed or deleted must not cost us
             // the transcript below.

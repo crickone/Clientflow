@@ -8,6 +8,7 @@ import { listPublishedPosts } from "@/lib/cms/blog";
 import { excerptFromMarkdown } from "@/lib/cms/markdown";
 import { getSiteChrome, CHROME_CONTENT_CSS } from "@/lib/cms/siteChrome";
 import { SiteTracking } from "@/components/cms/SiteTracking";
+import { SiteBeacon } from "@/components/cms/SiteBeacon";
 import { siteVerificationMeta, resolvePageContext, studioEditZones } from "@/lib/cms/render";
 
 import PublicSitePage, { generateMetadata as pageMetadata } from "../[...slug]/page";
@@ -107,6 +108,7 @@ export default async function PublicBlogIndex({
         pixelId={resolved.site.metaPixelId}
         googleTagId={resolved.site.googleTagId}
       />
+      <SiteBeacon />
       <div dangerouslySetInnerHTML={{ __html: chrome.head }} />
       <style dangerouslySetInnerHTML={{ __html: CHROME_CONTENT_CSS }} />
       {chrome.header && <div dangerouslySetInnerHTML={{ __html: chrome.header }} />}

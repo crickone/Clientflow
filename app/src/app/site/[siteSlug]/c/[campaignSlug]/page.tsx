@@ -43,6 +43,7 @@ import type { ThemeConfig } from "@/lib/theme";
 import { getBusinessProfile, type BusinessProfile } from "@/lib/businessProfile";
 import { resolveLogoPath } from "@/lib/branding";
 import { CampaignLanding } from "@/components/campaigns/CampaignLanding";
+import { SiteBeacon } from "@/components/cms/SiteBeacon";
 
 export const dynamic = "force-dynamic";
 
@@ -336,13 +337,16 @@ export default function CampaignLandingPage({ params, searchParams }: Props) {
   if (!data) notFound();
 
   return (
-    <CampaignLanding
-      body={data.body}
-      theme={data.theme}
-      fonts={data.fonts}
-      logoSrc={data.logoSrc}
-      business={data.business}
-      signupToken={data.signupToken}
-    />
+    <>
+      {data.campaign.status === "active" && <SiteBeacon />}
+      <CampaignLanding
+        body={data.body}
+        theme={data.theme}
+        fonts={data.fonts}
+        logoSrc={data.logoSrc}
+        business={data.business}
+        signupToken={data.signupToken}
+      />
+    </>
   );
 }

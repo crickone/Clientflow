@@ -365,5 +365,18 @@ export function parseMailgunEvent(payload: unknown): MailgunEvent | null {
   const tenantId = toFiniteNumber(prop(userVars, "tenantId"));
   if (tenantId !== null) result.tenantId = tenantId;
 
+  const urlRaw = prop(data, "url");
+  if (typeof urlRaw === "string" && urlRaw.trim()) result.url = urlRaw.trim().slice(0, 2000);
+  const ts = prop(data, "timestamp");
+  if (typeof ts === "number" && Number.isFinite(ts)) {
+    const ms = Math.round(ts * 1000);
+    // Only a plausible time: not before 2020, not more than a day ahead.
+    if (ms >= Date.UTC(2020, 0, 1) && ms <= Date.now() + 86_400_000) result.occurredAt = ms;
+  }
+  const contactId = toFiniteNumber(prop(userVars, "contactId"));
+  if (contactId !== null && Number.isInteger(contactId) && contactId > 0) result.contactId = contactId;
+  const idRaw = prop(data, "id");
+  if (typeof idRaw === "string" && idRaw.trim()) result.providerEventId = idRaw.trim().slice(0, 200);
+
   return result;
 }
