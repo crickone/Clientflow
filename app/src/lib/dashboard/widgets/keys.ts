@@ -10,3 +10,4 @@ export type FinanceKey = Extract<WidgetKey, `finance.${string}`>;
 export type ContentKey = Extract<WidgetKey, `content.${string}`>;
 export type WebsiteKey = Extract<WidgetKey, `website.${string}`>;
 export type CompetitorsKey = Extract<WidgetKey, `competitors.${string}`>;
+export type AiKey = Extract<WidgetKey, `ai.${string}`>;

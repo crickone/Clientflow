@@ -409,6 +409,34 @@ export const PRESETS: Preset[] = [
       ],
     },
   },
+  {
+    key: "ai",
+    name: "AI & Usage",
+    description: "What AI costs this month and where it goes.",
+    icon: "Cpu",
+    widgets: {
+      clinic: [
+        { key: "ai.spendVsCap", size: "M" },
+        { key: "ai.projected", size: "S" },
+        { key: "ai.agentRuns", size: "S" },
+        { key: "ai.byAgent", size: "M" },
+        { key: "ai.byModel", size: "M" },
+        { key: "ai.dailySpend", size: "XL" },
+        { key: "ai.topDrivers", size: "M" },
+        { key: "ai.mediaSpend", size: "M" },
+      ],
+      gym: [
+        { key: "ai.spendVsCap", size: "M" },
+        { key: "ai.projected", size: "S" },
+        { key: "ai.agentRuns", size: "S" },
+        { key: "ai.byAgent", size: "M" },
+        { key: "ai.byModel", size: "M" },
+        { key: "ai.dailySpend", size: "XL" },
+        { key: "ai.topDrivers", size: "M" },
+        { key: "ai.mediaSpend", size: "M" },
+      ],
+    },
+  },
 ];
 
 export const PRESET_BY_KEY: Map<string, Preset> = new Map(PRESETS.map((p) => [p.key, p]));
