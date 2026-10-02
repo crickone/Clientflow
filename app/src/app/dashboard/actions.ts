@@ -3,21 +3,23 @@
 import { revalidatePath } from "next/cache";
 
 import { getCurrentMembership } from "@/lib/auth";
-import { CATALOG_BY_KEY } from "@/lib/dashboard/catalog";
+import { CATALOG_BY_KEY, MAX_WIDGETS_PER_TAB, validateLayout } from "@/lib/dashboard/catalog";
 import * as tabs from "@/lib/dashboard/tabs";
 import type { Venue } from "@/lib/dashboard/types";
-import { setSensitivityVisibility, setWidgetVisibility } from "@/lib/dashboard/visibilityStore";
+import { isRefVisible, mergeHiddenRefs } from "@/lib/dashboard/visibility";
+import { getVisibilityOverrides, setSensitivityVisibility, setWidgetVisibility } from "@/lib/dashboard/visibilityStore";
 import { getSchedulingMode } from "@/lib/settings";
 
 export type ActionResult = { ok: true; index?: number } | { ok: false; error: string };
 
-function who(): { userId: number; venue: Venue; isAdmin: boolean } {
+function who(): { userId: number; venue: Venue; isAdmin: boolean; role: "admin" | "staff" } {
   const m = getCurrentMembership();
   if (!m) throw new Error("Please sign in again.");
   return {
     userId: m.user.id,
     venue: getSchedulingMode() === "timetable" ? "gym" : "clinic",
     isAdmin: m.role === "admin",
+    role: m.role === "admin" ? "admin" : "staff",
   };
 }
 
@@ -36,7 +38,16 @@ const int = (n: unknown) => (Number.isInteger(n) ? (n as number) : -1);
 export async function saveWidgetsAction(index: number, widgets: unknown): Promise<ActionResult> {
   return run(() => {
     const u = who();
-    tabs.saveTabWidgets(u.userId, u.venue, int(index), widgets);
+    const i = int(index);
+    const submitted = validateLayout(widgets);
+    // Widgets this viewer cannot see were never sent; keep them in the saved tab.
+    const stored = tabs.resolveTabs(u.userId, u.venue).tabs[i]?.widgets ?? [];
+    const opts = { venue: u.venue, role: u.role, overrides: getVisibilityOverrides() };
+    const merged = mergeHiddenRefs(stored, submitted, (ref) => isRefVisible(ref, opts));
+    if (merged.length > MAX_WIDGETS_PER_TAB) {
+      throw new Error(`A tab can hold at most ${MAX_WIDGETS_PER_TAB} widgets.`);
+    }
+    tabs.saveTabWidgets(u.userId, u.venue, i, merged);
   });
 }
 

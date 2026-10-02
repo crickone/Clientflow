@@ -37,7 +37,17 @@ const nextUid = () => `w${++uidSeq}`;
 export function DashboardGrid({ tabIndex, items, catalog }: { tabIndex: number; items: GridItem[]; catalog: CatalogEntry[] }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<Draft[]>(() => items.map((it) => ({ ...it, uid: nextUid() })));
+  const [draft, setDraft] = useState<Draft[]>([]);
+  // Outside edit mode render the live items (they change with the date range);
+  // the draft is seeded from them only when edit mode starts.
+  const view: Draft[] = useMemo(
+    () => (editing ? draft : items.map((it, i) => ({ ...it, uid: `live${i}` }))),
+    [editing, draft, items],
+  );
+  function startEditing() {
+    setDraft(items.map((it) => ({ ...it, uid: nextUid() })));
+    setEditing(true);
+  }
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -49,10 +59,11 @@ export function DashboardGrid({ tabIndex, items, catalog }: { tabIndex: number; 
 
   // Enter edit mode from the TabBar's Customise button.
   useEffect(() => {
-    const on = () => setEditing(true);
+    const on = () => startEditing();
     window.addEventListener("dashboard:customise", on);
     return () => window.removeEventListener("dashboard:customise", on);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
   useEffect(() => {
     window.dispatchEvent(new CustomEvent("dashboard:editing", { detail: editing }));
   }, [editing]);
@@ -83,7 +94,6 @@ export function DashboardGrid({ tabIndex, items, catalog }: { tabIndex: number; 
   }
 
   function cancel() {
-    setDraft(items.map((it) => ({ ...it, uid: nextUid() })));
     setEditing(false);
     setError(null);
   }
@@ -157,13 +167,13 @@ export function DashboardGrid({ tabIndex, items, catalog }: { tabIndex: number; 
       )}
       {error && <div style={{ color: "#ef4444", fontSize: 13, marginBottom: 12 }}>{error}</div>}
 
-      {draft.length === 0 && (
+      {view.length === 0 && (
         <Card style={{ textAlign: "center", padding: 32, marginBottom: 32 }}>
           <div style={{ color: "var(--text-secondary)", fontSize: 14, marginBottom: 12 }}>This tab is empty.</div>
           <Button
             size="sm"
             onClick={() => {
-              setEditing(true);
+              startEditing();
               setAdding(true);
             }}
           >
@@ -173,9 +183,9 @@ export function DashboardGrid({ tabIndex, items, catalog }: { tabIndex: number; 
       )}
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-        <SortableContext items={draft.map((d) => d.uid)} strategy={rectSortingStrategy}>
+        <SortableContext items={view.map((d) => d.uid)} strategy={rectSortingStrategy}>
           <div className="dash-grid">
-            {draft.map((d) => (
+            {view.map((d) => (
               <Tile
                 key={d.uid}
                 item={d}

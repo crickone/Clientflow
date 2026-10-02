@@ -25,12 +25,58 @@ export function appliesToVenue(meta: WidgetMeta, venue: Venue): boolean {
   return meta.venues.includes(venue);
 }
 
-export function visibleRefs(
-  refs: WidgetRef[],
-  opts: { venue: Venue; role: "admin" | "staff"; overrides: VisibilityOverrides },
+type VisOpts = { venue: Venue; role: "admin" | "staff"; overrides: VisibilityOverrides };
+
+export function isRefVisible(ref: WidgetRef, opts: VisOpts): boolean {
+  const meta = CATALOG_BY_KEY.get(ref.key);
+  return !!meta && appliesToVenue(meta, opts.venue) && canSee(meta, opts.role, opts.overrides);
+}
+
+export function visibleRefs(refs: WidgetRef[], opts: VisOpts): WidgetRef[] {
+  return refs.filter((r) => isRefVisible(r, opts));
+}
+
+/**
+ * The submitted list with every stored ref the viewer could not see put back,
+ * so a save from a restricted view never deletes widgets hidden from it. A
+ * hidden ref stays right after the visible stored ref that preceded it (matched
+ * by key and occurrence); leading hidden refs stay first; a hidden ref whose
+ * predecessor was removed goes to the end. Unknown keys are dropped. Pure.
+ */
+export function mergeHiddenRefs(
+  stored: WidgetRef[],
+  submitted: WidgetRef[],
+  isVisible: (ref: WidgetRef) => boolean,
 ): WidgetRef[] {
-  return refs.filter((r) => {
-    const meta = CATALOG_BY_KEY.get(r.key);
-    return !!meta && appliesToVenue(meta, opts.venue) && canSee(meta, opts.role, opts.overrides);
-  });
+  const leading: WidgetRef[] = [];
+  const after = new Map<string, WidgetRef[]>(); // "key#occurrence" -> hidden refs
+  const seen = new Map<string, number>();
+  let anchor: string | null = null;
+  for (const ref of stored) {
+    if (!CATALOG_BY_KEY.has(ref.key)) continue;
+    if (isVisible(ref)) {
+      const n = seen.get(ref.key) ?? 0;
+      seen.set(ref.key, n + 1);
+      anchor = `${ref.key}#${n}`;
+    } else if (anchor === null) {
+      leading.push(ref);
+    } else {
+      after.set(anchor, [...(after.get(anchor) ?? []), ref]);
+    }
+  }
+  const out: WidgetRef[] = [...leading];
+  const counts = new Map<string, number>();
+  for (const ref of submitted) {
+    out.push(ref);
+    const n = counts.get(ref.key) ?? 0;
+    counts.set(ref.key, n + 1);
+    const id = `${ref.key}#${n}`;
+    const hidden = after.get(id);
+    if (hidden) {
+      out.push(...hidden);
+      after.delete(id);
+    }
+  }
+  for (const rest of after.values()) out.push(...rest);
+  return out;
 }
