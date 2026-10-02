@@ -18,6 +18,7 @@ import {
   Megaphone,
   PhoneOutgoing,
   Rocket,
+  LayoutDashboard,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardLabel } from "@/components/ui/Card";
@@ -46,6 +47,12 @@ function buildSections(vocab: ReturnType<typeof getVocab>) {
     icon: Building2,
     title: "Venue type",
     desc: "Switch the app vocabulary between a clinic and a gym. Labels only — data is unchanged.",
+  },
+  {
+    href: "/settings/dashboard",
+    icon: LayoutDashboard,
+    title: "Dashboard widgets",
+    desc: "Choose which dashboard widgets your staff can see, such as revenue and spend.",
   },
   {
     href: "/settings/therapies",
