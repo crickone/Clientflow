@@ -3,7 +3,7 @@
 # here is copied into the build context and can end up baked into an image
 # layer — this keeps tenant data (clinic.db/control.db PII), local
 # node_modules, VCS history, and secrets out of it.
-data/
+/data/
 node_modules/
 .next/
 .git/

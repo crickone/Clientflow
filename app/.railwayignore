@@ -1,6 +1,6 @@
 # Excludes from `railway up` uploads (gitignore syntax).
 # Persistent data lives on the Railway Volume, never in the upload.
-data/
+/data/
 node_modules/
 .next/
 .env
