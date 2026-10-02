@@ -901,13 +901,13 @@ const META = {
     file: "recovery.html",
     title: "Recovery and everyday health | Optimal Health & Recovery at Inspire",
     description:
-      "Recovery sessions in Clonmel for people living busy lives: infrared, hyperbaric oxygen and the HIFEM chair, guided from start to finish.",
+      "Recovery sessions in Clonmel for people living busy lives: infrared, hyperbaric oxygen and HIFEM, guided from start to finish.",
   },
   athletes: {
     file: "athletes.html",
     title: "Athletic performance and recovery | Optimal Health & Recovery at Inspire",
     description:
-      "Recovery between hard sessions, in Clonmel. Infrared, hyperbaric oxygen and the HIFEM chair, around a training week.",
+      "Recovery between hard sessions, in Clonmel. Infrared, hyperbaric oxygen and HIFEM, around a training week.",
   },
   collagen: {
     file: "collagen.html",
@@ -919,7 +919,7 @@ const META = {
     file: "testimonials.html",
     title: "What people say | Optimal Health & Recovery at Inspire",
     description:
-      "Four clients of our Clonmel clinic, filmed in the lounge, on the HIFEM chair and the infrared bed, talking about how they got on.",
+      "Four clients of our Clonmel clinic, filmed in the lounge, on HIFEM and the infrared bed, talking about how they got on.",
   },
   contact: {
     file: "contact.html",
@@ -931,7 +931,7 @@ const META = {
     file: "blog.html",
     title: "The journal | Optimal Health & Recovery at Inspire",
     description:
-      "Plain writing about infrared, hyperbaric oxygen and the HIFEM chair at our Clonmel clinic: what each one is, and what people actually report.",
+      "Plain writing about infrared, hyperbaric oxygen and HIFEM at our Clonmel clinic: what each one is, and what people actually report.",
   },
 };
 
@@ -986,13 +986,13 @@ const POSTS = [
   {
     slug: "the-hifem-chair-and-a-week-sitting-down",
     topic: "HIFEM",
-    title: "The HIFEM chair, and a week spent sitting down",
+    title: "HIFEM, and a week spent sitting down",
     excerpt:
-      "Long sitting leaves some muscle doing almost nothing. The chair asks it to work for twenty to thirty minutes, seated and fully clothed. It's muscle work, so plan it like a gym session.",
+      "Long sitting leaves some muscle doing almost nothing. HIFEM asks it to work for twenty to thirty minutes, seated and fully clothed.",
     photo: "hifem-chair.jpg",
     alt: "The HIFEM chair and its console, empty, a cushion on the seat",
     description:
-      "What the HIFEM chair does after a week at a desk, at our Clonmel clinic: twenty to thirty minutes, seated and fully clothed, planned like a gym session.",
+      "What HIFEM does after a week at a desk, at our Clonmel clinic: twenty to thirty minutes, seated and fully clothed.",
   },
   {
     slug: "infrared-and-everyday-aches",
@@ -1010,11 +1010,11 @@ const POSTS = [
     topic: "Hyperbaric oxygen",
     title: "Where the chamber fits in a training week",
     excerpt:
-      "How you recover is part of the training week, not an afterthought to it. What an hour in the chamber involves, where it sits in the week, and the one therapy here that won't sit anywhere you like.",
+      "Recovery belongs in your training plan. What an hour in the chamber involves, and where it fits in the week.",
     photo: "hbot-chamber-seated.jpg",
     alt: "A client seated in the open hyperbaric chamber, hands on his knees",
     description:
-      "Where an hour in the hyperbaric chamber sits in a training week, at our Clonmel clinic, and the one therapy here that needs planning like a gym session.",
+      "Where an hour in the hyperbaric chamber sits in a training week, at our Clonmel clinic.",
   },
   {
     slug: "panels-lasers-and-the-bed",
