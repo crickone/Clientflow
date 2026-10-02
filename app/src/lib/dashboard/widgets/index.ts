@@ -7,6 +7,7 @@ import { FINANCE_WIDGETS } from "./finance";
 import { FRONTDESK_WIDGETS } from "./frontdesk";
 import { OVERVIEW_WIDGETS } from "./overview";
 import { COMMUNICATION_WIDGETS } from "./communication";
+import { CONTENT_WIDGETS } from "./content";
 import { EMAIL_WIDGETS } from "./email";
 import { MARKETING_WIDGETS } from "./marketing";
 import { SALES_WIDGETS } from "./sales";
@@ -23,5 +24,6 @@ export const WIDGET_IMPLS = {
   ...FRONTDESK_WIDGETS,
   ...CLASSES_WIDGETS,
   ...FINANCE_WIDGETS,
+  ...CONTENT_WIDGETS,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<WidgetKey, WidgetImpl<any>>;

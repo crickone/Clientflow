@@ -313,6 +313,38 @@ export const PRESETS: Preset[] = [
       ],
     },
   },
+  {
+    key: "content",
+    name: "Content & Social",
+    description: "What went out, what is coming, and what failed.",
+    icon: "Images",
+    widgets: {
+      clinic: [
+        { key: "content.published", size: "S" },
+        { key: "content.scheduled", size: "S" },
+        { key: "content.failed", size: "S" },
+        { key: "content.blogPublished", size: "S" },
+        { key: "content.calendar", size: "XL" },
+        { key: "content.byPlatform", size: "M" },
+        { key: "content.failedList", size: "M" },
+        { key: "content.recentDesigns", size: "L" },
+        { key: "content.library", size: "S" },
+        { key: "content.blogPipeline", size: "M" },
+      ],
+      gym: [
+        { key: "content.published", size: "S" },
+        { key: "content.scheduled", size: "S" },
+        { key: "content.failed", size: "S" },
+        { key: "content.blogPublished", size: "S" },
+        { key: "content.calendar", size: "XL" },
+        { key: "content.byPlatform", size: "M" },
+        { key: "content.failedList", size: "M" },
+        { key: "content.recentDesigns", size: "L" },
+        { key: "content.library", size: "S" },
+        { key: "content.blogPipeline", size: "M" },
+      ],
+    },
+  },
 ];
 
 export const PRESET_BY_KEY: Map<string, Preset> = new Map(PRESETS.map((p) => [p.key, p]));
