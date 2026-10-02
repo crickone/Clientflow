@@ -60,9 +60,14 @@ export function mediaBreakdown(rows: UsageRow[]): { label: string; value: number
   return [...by].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value || a.label.localeCompare(b.label));
 }
 
-/** Month-end spend (cents) at the current pace: spent / elapsed Dublin days * days in the month. */
+/**
+ * Month-end spend (cents) at the current pace: spent / elapsed days * days in
+ * the month. Day and month come from the UTC clock, the same one that buckets
+ * the ledger month, so the first hour of a Dublin month cannot divide a new
+ * month's spend by the old month's day count.
+ */
 export function projectedMonthEnd(spentCents: number, nowMs: number): number {
-  const [y, mo, d] = dublinIso(nowMs).split("-").map(Number);
+  const [y, mo, d] = new Date(nowMs).toISOString().slice(0, 10).split("-").map(Number);
   const daysInMonth = new Date(Date.UTC(y, mo, 0)).getUTCDate();
   return (spentCents / d) * daysInMonth;
 }

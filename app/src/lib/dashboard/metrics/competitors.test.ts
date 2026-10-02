@@ -6,6 +6,7 @@ import {
   mergeRatingSeries,
   newestReviews,
   reviewsGained,
+  signedCount,
   starsLabel,
 } from "./competitors";
 
@@ -36,9 +37,23 @@ const hist = [
   { capturedAt: "2026-09-29T00:00:00.000Z", reviewCount: 125 },
   { capturedAt: "2026-09-29T00:00:00.000Z", reviewCount: null },
 ];
-assert.equal(reviewsGained(hist, Date.parse("2026-09-16T00:00:00Z"), Date.parse("2026-09-30T00:00:00Z")), 15);
-assert.equal(reviewsGained(hist, Date.parse("2026-08-01T00:00:00Z"), Date.parse("2026-09-30T00:00:00Z")), null, "no point before start");
+assert.deepEqual(reviewsGained(hist, Date.parse("2026-09-16T00:00:00Z"), Date.parse("2026-09-30T00:00:00Z")), { gained: 15, sinceTracked: false });
+assert.deepEqual(
+  reviewsGained(hist, Date.parse("2026-08-01T00:00:00Z"), Date.parse("2026-09-30T00:00:00Z")),
+  { gained: 25, sinceTracked: true },
+  "no capture before start: earliest in-range capture is the baseline",
+);
+assert.deepEqual(reviewsGained(hist, Date.parse("2026-09-10T00:00:00Z"), Date.parse("2026-09-20T00:00:00Z")), { gained: 10, sinceTracked: false }, "end bound honoured");
+assert.equal(reviewsGained([hist[0]], 0, Date.parse("2026-09-30T00:00:00Z")), null, "one capture is not enough");
+assert.equal(reviewsGained([hist[0], hist[1]], Date.parse("2026-09-10T00:00:00Z"), Date.parse("2026-09-12T00:00:00Z")), null, "one capture in or before the range");
+assert.deepEqual(
+  reviewsGained([{ capturedAt: "2026-09-01T00:00:00.000Z", reviewCount: 50 }, { capturedAt: "2026-09-20T00:00:00.000Z", reviewCount: 47 }], Date.parse("2026-09-10T00:00:00Z"), Date.parse("2026-09-30T00:00:00Z")),
+  { gained: -3, sinceTracked: false },
+);
 assert.equal(reviewsGained([], 0, 1), null);
+assert.equal(signedCount(4), "+4");
+assert.equal(signedCount(0), "+0");
+assert.equal(signedCount(-3), "-3");
 
 // mergeRatingSeries: weekly merge, ascending, self first, other names kept
 const merged = mergeRatingSeries([

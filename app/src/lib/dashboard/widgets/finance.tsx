@@ -6,7 +6,7 @@ import { kpi } from "@/components/dashboard/views/kpi";
 import { RowList } from "@/components/dashboard/views/RowList";
 import { SeriesChart } from "@/components/dashboard/views/SeriesChart";
 import { formatEur } from "@/lib/utils";
-import { churnPct, gainedLostByBucket, methodTotals, revenueByBucket, revenueSummary } from "../metrics/finance";
+import { churnPct, gainedLostByBucket, methodTotals, revenueByBucket, revenueSummary, windowEndIso } from "../metrics/finance";
 import {
   churnCounts,
   membershipEvents,
@@ -200,7 +200,7 @@ export const FINANCE_WIDGETS = {
     href: "/memberships",
     async load(ctx) {
       const from = dublinIso(ctx.now.getTime());
-      const list = await renewalsBetween(from, addDaysIso(from, 14), 10);
+      const list = await renewalsBetween(from, windowEndIso(from, 14), 10);
       return list.map((r) => ({
         id: r.id,
         primary: r.client,

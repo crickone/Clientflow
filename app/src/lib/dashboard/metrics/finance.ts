@@ -2,7 +2,7 @@
  * Finance preset pure helpers (no DB, no server imports; tested in
  * finance.test.ts). The loaders live in financeQueries.ts.
  */
-import { bucketIndex, pct, type Bucket } from "./stats";
+import { addDaysIso, bucketIndex, pct, type Bucket } from "./stats";
 
 export type PaymentMethod = "cash" | "card" | "voucher" | "bank_transfer" | "package";
 
@@ -117,4 +117,9 @@ export function gainedLostByBucket(
     if (i >= 0) out[i].Lost++;
   }
   return out;
+}
+
+/** Last day of a "next N days" window that starts today and counts today as day one. */
+export function windowEndIso(fromIso: string, days: number): string {
+  return addDaysIso(fromIso, days - 1);
 }

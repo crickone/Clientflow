@@ -30,23 +30,38 @@ export function eventsInRange(events: { type: string; occurredAt: string }[], ty
 
 /**
  * Reviews gained across a range: the latest review count at or before `toMs`
- * minus the latest at or before `fromMs`. Null when either bound has no
- * captured count (the competitor was not tracked that early).
+ * minus the baseline. The baseline is the latest count at or before `fromMs`;
+ * when the competitor was not tracked that early, the earliest capture inside
+ * the range stands in and `sinceTracked` is true. Null when fewer than two
+ * captures exist in or before the range.
  */
-export function reviewsGained(history: { capturedAt: string; reviewCount: number | null }[], fromMs: number, toMs: number): number | null {
-  const at = (limit: number): number | null => {
-    let best: { ms: number; n: number } | null = null;
-    for (const h of history) {
-      if (h.reviewCount === null) continue;
-      const ms = Date.parse(h.capturedAt);
-      if (!Number.isFinite(ms) || ms > limit) continue;
-      if (best === null || ms >= best.ms) best = { ms, n: h.reviewCount };
-    }
-    return best === null ? null : best.n;
-  };
-  const end = at(toMs);
-  const start = at(fromMs);
-  return end === null || start === null ? null : end - start;
+export function reviewsGained(
+  history: { capturedAt: string; reviewCount: number | null }[],
+  fromMs: number,
+  toMs: number,
+): { gained: number; sinceTracked: boolean } | null {
+  const pts: { ms: number; n: number }[] = [];
+  for (const h of history) {
+    if (h.reviewCount === null) continue;
+    const ms = Date.parse(h.capturedAt);
+    if (Number.isFinite(ms) && ms <= toMs) pts.push({ ms, n: h.reviewCount });
+  }
+  if (pts.length < 2) return null;
+  pts.sort((a, b) => a.ms - b.ms);
+  const end = pts[pts.length - 1];
+  let startIdx = -1;
+  pts.forEach((p, i) => {
+    if (p.ms <= fromMs) startIdx = i;
+  });
+  const sinceTracked = startIdx === -1;
+  const start = sinceTracked ? pts[0] : pts[startIdx];
+  if (start === end) return null;
+  return { gained: end.n - start.n, sinceTracked };
+}
+
+/** Signed count for display: "+4", "0", "-2". */
+export function signedCount(n: number): string {
+  return n >= 0 ? `+${n}` : String(n);
 }
 
 export type RatingSeries = { name: string; points: { capturedAt: string; rating: number }[] };

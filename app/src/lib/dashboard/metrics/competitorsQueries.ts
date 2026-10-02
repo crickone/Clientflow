@@ -15,7 +15,10 @@ import {
   type StoredReview,
 } from "@/lib/research/store";
 import { getResearchCapCents, researchSpentCents } from "@/lib/research/spend";
-import { averageCount, eventsInRange } from "./competitors";
+import { and, eq, gte, lt, sql } from "drizzle-orm";
+
+import { db, schema } from "@/lib/db";
+import { averageCount } from "./competitors";
 
 export { ratingGap } from "./marketingQueries";
 
@@ -36,7 +39,18 @@ export function reviewGapData(): { hasSelf: boolean; self: number | null; others
 
 /** new_ad events with `occurredAt` in [fromMs, toMs). */
 export function newAdCount(fromMs: number, toMs: number): number {
-  return eventsInRange(listEvents({ limit: 1000 }), "new_ad", fromMs, toMs);
+  const row = db
+    .select({ n: sql<number>`count(*)` })
+    .from(schema.competitorEvents)
+    .where(
+      and(
+        eq(schema.competitorEvents.type, "new_ad"),
+        gte(schema.competitorEvents.occurredAt, new Date(fromMs).toISOString()),
+        lt(schema.competitorEvents.occurredAt, new Date(toMs).toISOString()),
+      ),
+    )
+    .get();
+  return Number(row?.n ?? 0);
 }
 
 export function researchSpend(tenantId: number): { spentCents: number; capCents: number } {

@@ -660,6 +660,8 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       ON session_bookings(session_id, client_id);
     CREATE INDEX IF NOT EXISTS idx_session_bookings_session
       ON session_bookings(session_id);
+    CREATE INDEX IF NOT EXISTS idx_session_bookings_client
+      ON session_bookings(client_id);
 
     CREATE TABLE IF NOT EXISTS membership_plans (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

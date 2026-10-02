@@ -50,9 +50,8 @@ assert.deepEqual(PRESETS.find((p) => p.key === "classes")!.venues, ["gym"]);
 assert.equal(presetWidgets("classes", "gym")!.length, 11, "classes/gym has 11 widgets");
 assert.ok(keys.has("finance"), "finance preset exists");
 assert.equal(PRESETS.find((p) => p.key === "finance")!.venues, undefined, "finance applies to both venues");
-for (const venue of ["clinic", "gym"] as const) {
-  assert.equal(presetWidgets("finance", venue)!.length, 10, `finance/${venue} has 10 widgets`);
-}
+assert.equal(presetWidgets("finance", "clinic")!.length, 10, "finance/clinic has 10 widgets");
+assert.equal(presetWidgets("finance", "gym")!.length, 6, "finance/gym has 6 widgets");
 assert.ok(keys.has("content"), "content preset exists");
 assert.ok(keys.has("website"), "website preset exists");
 for (const venue of ["clinic", "gym"] as const) {

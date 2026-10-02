@@ -22,15 +22,24 @@ import {
   visitorsTotal,
 } from "../metrics/websiteQueries";
 import { deltaPct } from "../range";
-import type { WidgetImpl } from "../types";
+import type { WidgetCtx, WidgetImpl } from "../types";
+import { cached } from "./cache";
 import type { WebsiteKey } from "./keys";
+
+// Each base query runs once per range per request, however many widgets ask.
+const rk = (r: { fromMs: number; toMs: number }) => `${r.fromMs}-${r.toMs}`;
+const visitorsIn = (ctx: WidgetCtx, r: { fromMs: number; toMs: number }) => cached(ctx, `website.visitors.${rk(r)}`, () => visitorsTotal(r.fromMs, r.toMs));
+const submissionsIn = (ctx: WidgetCtx, r: { fromMs: number; toMs: number }) =>
+  cached(ctx, `website.submissions.${rk(r)}`, () => formSubmissionsIn(r.fromMs, r.toMs));
+const viewsSeriesIn = (ctx: WidgetCtx, r: { fromMs: number; toMs: number }) =>
+  cached(ctx, `website.viewsSeries.${rk(r)}`, () => pageViewsSeries(r.fromMs, r.toMs));
 
 export const WEBSITE_WIDGETS = {
   "website.visitors": {
     href: "/cms",
     async load(ctx) {
-      const cur = visitorsTotal(ctx.range.fromMs, ctx.range.toMs);
-      const prev = visitorsTotal(ctx.previous.fromMs, ctx.previous.toMs);
+      const cur = await visitorsIn(ctx, ctx.range);
+      const prev = await visitorsIn(ctx, ctx.previous);
       return { value: String(cur), sub: ctx.range.label, delta: deltaPct(cur, prev), accent: cur > 0 };
     },
     render: kpi,
@@ -47,8 +56,8 @@ export const WEBSITE_WIDGETS = {
   "website.submissions": {
     href: "/forms",
     async load(ctx) {
-      const cur = formSubmissionsIn(ctx.range.fromMs, ctx.range.toMs);
-      const prev = formSubmissionsIn(ctx.previous.fromMs, ctx.previous.toMs);
+      const cur = await submissionsIn(ctx, ctx.range);
+      const prev = await submissionsIn(ctx, ctx.previous);
       return { value: String(cur), sub: ctx.range.label, delta: deltaPct(cur, prev) };
     },
     render: kpi,
@@ -56,10 +65,10 @@ export const WEBSITE_WIDGETS = {
   "website.enquiryRate": {
     href: "/forms",
     async load(ctx) {
-      const visitors = visitorsTotal(ctx.range.fromMs, ctx.range.toMs);
-      const rate = pct(formSubmissionsIn(ctx.range.fromMs, ctx.range.toMs), visitors);
+      const visitors = await visitorsIn(ctx, ctx.range);
+      const rate = pct(await submissionsIn(ctx, ctx.range), visitors);
       if (rate === null) return { value: "No visitors yet", sub: ctx.range.label };
-      const prevRate = pct(formSubmissionsIn(ctx.previous.fromMs, ctx.previous.toMs), visitorsTotal(ctx.previous.fromMs, ctx.previous.toMs));
+      const prevRate = pct(await submissionsIn(ctx, ctx.previous), await visitorsIn(ctx, ctx.previous));
       return {
         value: `${rate}%`,
         sub: `${ctx.range.label}, submissions per visitor`,
@@ -72,7 +81,7 @@ export const WEBSITE_WIDGETS = {
   "website.trafficTrend": {
     href: "/cms",
     async load(ctx) {
-      const views = pageViewsSeries(ctx.range.fromMs, ctx.range.toMs);
+      const views = await viewsSeriesIn(ctx, ctx.range);
       const visitors = visitorsSeries(ctx.range.fromMs, ctx.range.toMs);
       return {
         total: views.total,

@@ -62,9 +62,13 @@ export function quietActiveMembers(nowMs: number, days: number, limit: number): 
       id: schema.clients.id,
       first: schema.clients.firstName,
       last: schema.clients.lastName,
-      lastDate: sql<string | null>`(select max(cs.date) from session_bookings sb join class_sessions cs on cs.id = sb.session_id where sb.client_id = clients.id and sb.status = 'attended')`,
+      lastDate: sql<string | null>`v.last`,
     })
     .from(schema.clients)
+    .leftJoin(
+      sql`(select sb.client_id cid, max(cs.date) last from session_bookings sb join class_sessions cs on cs.id = sb.session_id where sb.status = 'attended' group by sb.client_id) v`,
+      sql`v.cid = clients.id`,
+    )
     .where(sql`exists (select 1 from client_memberships cm where cm.client_id = clients.id and cm.status = 'active')`)
     .all();
   const members: QuietMember[] = rows.map((r) => ({

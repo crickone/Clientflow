@@ -284,7 +284,7 @@ export const PRESETS: Preset[] = [
   {
     key: "finance",
     name: "Finance",
-    description: "Money in, how people pay, and what is owed or coming up.",
+    description: "Money in and what is owed or coming up. Gyms see membership revenue, churn and renewals.",
     icon: "Wallet",
     widgets: {
       clinic: [
@@ -300,13 +300,9 @@ export const PRESETS: Preset[] = [
         { key: "finance.vouchers", size: "M" },
       ],
       gym: [
-        { key: "finance.revenue", size: "S" },
         { key: "overview.mrr", size: "S" },
+        { key: "overview.activeMembers", size: "S" },
         { key: "finance.churn", size: "S" },
-        { key: "finance.avgSpend", size: "S" },
-        { key: "finance.revenueTrend", size: "XL" },
-        { key: "finance.byMethod", size: "M" },
-        { key: "finance.topClients", size: "M" },
         { key: "finance.membersGainedLost", size: "XL" },
         { key: "finance.renewals", size: "M" },
         { key: "finance.vouchers", size: "M" },

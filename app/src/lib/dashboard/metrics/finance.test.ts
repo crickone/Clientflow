@@ -10,6 +10,7 @@ import {
   revenueSummary,
   splitAcrossTherapies,
   topSpenders,
+  windowEndIso,
   wasActiveAt,
   type PaymentRow,
 } from "./finance";
@@ -63,5 +64,8 @@ assert.ok(!wasActiveAt({ createdAtMs: 10, endedAtMs: null }, 10), "created at th
 
 const gl = gainedLostByBucket([1, DAY + 1, DAY + 2], [2 * DAY + 5], buckets);
 assert.deepEqual(gl.map((r) => [r.Gained, r.Lost]), [[1, 0], [2, 0], [0, 1]]);
+
+assert.equal(windowEndIso("2026-10-02", 14), "2026-10-15", "next 14 days inclusive of today is today + 13");
+assert.equal(windowEndIso("2026-10-02", 1), "2026-10-02");
 
 console.log("finance.test.ts: ok");

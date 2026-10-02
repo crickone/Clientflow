@@ -113,7 +113,7 @@ export default async function DashboardPage({
     description: p.description,
     icon: p.icon,
     count: visibleRefs(p.widgets[venue], { venue, role: membership.role, overrides }).length,
-  }));
+  })).filter((p) => p.count > 0);
 
   return (
     <div className="app-page">

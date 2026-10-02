@@ -5,7 +5,7 @@ import { kpi } from "@/components/dashboard/views/kpi";
 import { RowList } from "@/components/dashboard/views/RowList";
 import { SeriesChart } from "@/components/dashboard/views/SeriesChart";
 import { formatEur } from "@/lib/utils";
-import { mergeRatingSeries, newestReviews, reviewsGained, starsLabel } from "../metrics/competitors";
+import { mergeRatingSeries, newestReviews, reviewsGained, signedCount, starsLabel } from "../metrics/competitors";
 import {
   activeAds,
   newAdCount,
@@ -93,8 +93,9 @@ export const COMPETITORS_WIDGETS = {
       const hs = await cached(ctx, "competitors.velocity", () => trendHistories(20, 52));
       return hs
         .flatMap((h) => {
-          const n = reviewsGained(h.history, ctx.range.fromMs, ctx.range.toMs);
-          return n === null ? [] : [{ label: h.name, value: Math.max(0, n), display: `+${n}` }];
+          const g = reviewsGained(h.history, ctx.range.fromMs, ctx.range.toMs);
+          if (g === null) return [];
+          return [{ label: h.name, value: Math.max(0, g.gained), display: `${signedCount(g.gained)}${g.sinceTracked ? " since tracked" : ""}` }];
         })
         .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label));
     },

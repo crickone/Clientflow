@@ -45,6 +45,8 @@ assert.deepEqual(mediaBreakdown([]), []);
 
 // projected: Dublin day-of-month. 10 Oct, 31 days: 1000c spent over 10 days -> 3100
 assert.equal(projectedMonthEnd(1000, Date.parse("2026-10-10T12:00:00Z")), 3100);
+// 2026-10-01 00:30 Dublin (BST) is 2026-09-30 23:30 UTC: ledger month is September, so project on September's clock
+assert.equal(projectedMonthEnd(3000, Date.parse("2026-09-30T23:30:00Z")), 3000);
 assert.equal(projectedMonthEnd(0, Date.parse("2026-10-10T12:00:00Z")), 0);
 // Feb non-leap, 14th: 28 days
 assert.equal(projectedMonthEnd(700, Date.parse("2027-02-14T12:00:00Z")), 1400);
