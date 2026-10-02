@@ -6,6 +6,7 @@ import { db, schema } from "@/lib/db";
 import { logActivity } from "@/lib/queries";
 import { listStages, resolveStageIdByRole, resolveEntryStageId } from "./stageRepo";
 import { leadPipelineId } from "./pipelineRepo";
+import { recordStageEvent, type StageActor } from "./stageEvents";
 import { cancelNurtureForLead } from "@/lib/automations/nurture";
 import { INACTIVE_ROLES } from "./roles";
 import { reopensOnRepeatEnquiry, shouldAdvance, ROLE_TO_LEGACY_KEY, type StageRecord, type StageRole } from "./roles";
@@ -43,7 +44,12 @@ export function currentStageRecord(leadId: number): StageRecord | null {
  * text (from the stage's role → legacy key) so not-yet-migrated readers/tests keep
  * working during the transition. Logs an activity row.
  */
-export function writeStageId(leadId: number, stageId: number, note: string): void {
+export function writeStageId(leadId: number, stageId: number, note: string, actor: StageActor = "system"): void {
+  const before = db
+    .select({ stageId: schema.leads.stageId, pipelineId: schema.leads.pipelineId })
+    .from(schema.leads)
+    .where(eq(schema.leads.id, leadId))
+    .get();
   const pipelineId = leadPipelineId(leadId);
   const stage = pipelineId == null ? undefined : listStages(pipelineId).find((s) => s.id === stageId);
   const legacy = stage?.role ? ROLE_TO_LEGACY_KEY[stage.role] : undefined;
@@ -60,6 +66,9 @@ export function writeStageId(leadId: number, stageId: number, note: string): voi
     .set({ stageId, ...(legacy ? { pipelineStage: legacy as typeof schema.leads.$inferInsert.pipelineStage } : {}), updatedAt: new Date() })
     .where(eq(schema.leads.id, leadId))
     .run();
+  if (before) {
+    recordStageEvent(db, { leadId, pipelineId: before.pipelineId, fromStageId: before.stageId ?? null, toStageId: stageId, actor });
+  }
   void logActivity("pipeline.stage", note, { leadId });
 }
 
@@ -78,7 +87,7 @@ export function advanceStage(leadId: number, role: StageRole): void {
   const candidate = stages.find((s) => s.id === targetId);
   if (!candidate) return;
   if (!shouldAdvance(cur, candidate)) return;
-  writeStageId(leadId, candidate.id, `Lead moved to ${candidate.name}`);
+  writeStageId(leadId, candidate.id, `Lead moved to ${candidate.name}`, "automation");
 }
 
 /**
@@ -116,7 +125,7 @@ export function reopenLostLead(leadId: number, note: string): boolean {
     // An entry stage that IS the lost stage (a one-column board, say) would
     // make this a no-op write and a misleading activity line.
     if (entryId != null && entryId !== cur.id) {
-      writeStageId(leadId, entryId, note);
+      writeStageId(leadId, entryId, note, "system");
       reopened = true;
     }
   }
@@ -131,14 +140,14 @@ export function reopenLostLead(leadId: number, note: string): boolean {
 }
 
 /** Operator override — set ANY stage by id (drag / picker / agent), bypassing forward-only. */
-export function setStageToId(leadId: number, stageId: number): void {
+export function setStageToId(leadId: number, stageId: number, actor: StageActor = "user"): void {
   const exists = db.select({ id: schema.leads.id, pipelineId: schema.leads.pipelineId }).from(schema.leads).where(eq(schema.leads.id, leadId)).get();
   if (!exists) return;
   // A stage from another board is refused, not silently applied: the lead
   // would then show in no column of the board it is on.
   const stage = listStages(exists.pipelineId).find((s) => s.id === stageId);
   if (!stage) return;
-  writeStageId(leadId, stageId, `Lead set to ${stage.name} (manual)`);
+  writeStageId(leadId, stageId, `Lead set to ${stage.name} (manual)`, actor);
 }
 
 export function leadIdForClient(clientId: number): number | null {

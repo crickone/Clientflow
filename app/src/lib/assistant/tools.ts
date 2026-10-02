@@ -111,6 +111,7 @@ import {
   sendClientWhatsappTool,
 } from "@/lib/agents/tools.operations";
 import { resolveEntryStageId } from "@/lib/pipeline/stageRepo";
+import { recordStageEvent } from "@/lib/pipeline/stageEvents";
 
 // `ToolArtifact`/`ToolResult`/`ToolContext` (incl. the `pendingWrites`/
 // `artifacts` bubble-up fields) are defined once, in `@/lib/agents/toolKit`
@@ -1648,8 +1649,11 @@ function createLead(ctx: ToolContext, input: Record<string, unknown>): string {
       notes: str(input.notes),
       stageId: resolveEntryStageId() ?? undefined,
     })
-    .returning({ id: leads.id })
+    .returning({ id: leads.id, pipelineId: leads.pipelineId, stageId: leads.stageId })
     .get();
+  if (row.stageId != null) {
+    recordStageEvent(db, { leadId: row.id, pipelineId: row.pipelineId, fromStageId: null, toStageId: row.stageId, actor: "agent" });
+  }
   return JSON.stringify({ result: `Added lead ${[first, last].filter(Boolean).join(" ") || "(unnamed)"}.`, leadId: row.id });
 }
 

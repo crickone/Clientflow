@@ -2971,3 +2971,21 @@ export const dashboards = sqliteTable(
   }),
 );
 export type DashboardRow = typeof dashboards.$inferSelect;
+
+/** Every move of a lead between pipeline stages (dashboard slice 2 recorder). */
+export const leadStageEvents = sqliteTable(
+  "lead_stage_events",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    leadId: integer("lead_id").notNull(),
+    pipelineId: integer("pipeline_id").notNull(),
+    fromStageId: integer("from_stage_id"),
+    toStageId: integer("to_stage_id").notNull(),
+    actor: text("actor", { enum: ["user", "agent", "automation", "system"] }).notNull(),
+    at: integer("at", { mode: "timestamp_ms" }).notNull().default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => ({
+    byPipeline: index("idx_lead_stage_events_pipeline").on(t.pipelineId, t.at),
+    byLead: index("idx_lead_stage_events_lead").on(t.leadId, t.at),
+  }),
+);

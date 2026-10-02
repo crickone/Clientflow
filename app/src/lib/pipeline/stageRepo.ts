@@ -6,6 +6,7 @@ import { db, schema } from "@/lib/db";
 import type { TenantDb } from "@/lib/db/tenant";
 import { resolveEntryStage, type StageRecord, type StageRole } from "./roles";
 import { defaultPipelineId, defaultPipelineIdOnConn } from "./pipelineRepo";
+import { recordStageEvent } from "./stageEvents";
 
 /**
  * The stages of ONE pipeline.
@@ -112,7 +113,15 @@ export function reorderStages(orderedIds: number[]): void {
 
 export function deleteStageWithMove(id: number, moveToId: number): void {
   db.transaction((tx) => {
+    const moved = tx
+      .select({ id: schema.leads.id, pipelineId: schema.leads.pipelineId })
+      .from(schema.leads)
+      .where(eq(schema.leads.stageId, id))
+      .all();
     tx.update(schema.leads).set({ stageId: moveToId }).where(eq(schema.leads.stageId, id)).run();
     tx.delete(schema.pipelineStages).where(eq(schema.pipelineStages.id, id)).run();
+    for (const l of moved) {
+      recordStageEvent(tx as unknown as TenantDb, { leadId: l.id, pipelineId: l.pipelineId, fromStageId: id, toStageId: moveToId, actor: "user" });
+    }
   });
 }

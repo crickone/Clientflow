@@ -7,6 +7,7 @@ import { openTenantDb, type TenantDb } from "@/lib/db/tenant";
 import { listTenants } from "@/lib/tenants";
 import { resolveStageIdByRoleOnConn, stageIdsByRoleOnConn } from "./stageRepo";
 import { leadPipelineIdOnConn } from "./pipelineRepo";
+import { recordStageEvent } from "./stageEvents";
 import { ROLE_TO_LEGACY_KEY, type StageRole } from "./roles";
 
 const LAPSE_DAYS = 90;
@@ -59,11 +60,19 @@ function writeLapseStage(conn: TenantDb, leadId: number, role: "lapsed" | "won" 
   const pipelineId = leadPipelineIdOnConn(conn, leadId) ?? undefined;
   const stageId = resolveStageIdByRoleOnConn(conn, role, pipelineId);
   if (stageId == null) return; // this board doesn't use this role → skip
+  const before = conn
+    .select({ stageId: schema.leads.stageId, pipelineId: schema.leads.pipelineId })
+    .from(schema.leads)
+    .where(eq(schema.leads.id, leadId))
+    .get();
   conn
     .update(schema.leads)
     .set({ stageId, pipelineStage: ROLE_TO_LEGACY_KEY[role] as typeof schema.leads.$inferInsert.pipelineStage, updatedAt: new Date() })
     .where(eq(schema.leads.id, leadId))
     .run();
+  if (before) {
+    recordStageEvent(conn, { leadId, pipelineId: before.pipelineId, fromStageId: before.stageId ?? null, toStageId: stageId, actor: "system" });
+  }
   conn.insert(schema.activityLog).values({
     type: "pipeline.stage",
     message: `Lead ${role === "lapsed" ? "lapsed" : "re-activated"} (auto)`,
