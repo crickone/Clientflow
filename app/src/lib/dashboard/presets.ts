@@ -26,7 +26,15 @@ export interface Preset {
   name: string;
   description: string;
   icon: PresetIcon;
+  /** Venues this preset applies to; omitted means both. Its list is empty for any other venue. */
+  venues?: readonly Venue[];
   widgets: Record<Venue, WidgetRef[]>;
+}
+
+export const ALL_VENUES: readonly Venue[] = ["clinic", "gym"];
+
+export function presetAppliesTo(p: Preset, venue: Venue): boolean {
+  return (p.venues ?? ALL_VENUES).includes(venue);
 }
 
 export const OVERVIEW_PRESET_KEY = "overview";
@@ -226,6 +234,53 @@ export const PRESETS: Preset[] = [
       ],
     },
   },
+  {
+    key: "frontdesk",
+    name: "Front desk",
+    description: "Today's diary, no-shows, busy times and what needs a nudge.",
+    icon: "CalendarCheck",
+    venues: ["clinic"],
+    widgets: {
+      clinic: [
+        { key: "overview.todaysBookings", size: "S" },
+        { key: "frontdesk.weekBookings", size: "S" },
+        { key: "frontdesk.noShowRate", size: "S" },
+        { key: "frontdesk.cancellationRate", size: "S" },
+        { key: "overview.todaysSchedule", size: "L" },
+        { key: "frontdesk.birthdays", size: "S" },
+        { key: "frontdesk.utilisation", size: "M" },
+        { key: "frontdesk.busiestTimes", size: "M" },
+        { key: "frontdesk.sessionsByService", size: "M" },
+        { key: "frontdesk.newVsReturning", size: "M" },
+        { key: "frontdesk.cancelLeadTime", size: "M" },
+        { key: "frontdesk.creditsExpiring", size: "M" },
+      ],
+      gym: [],
+    },
+  },
+  {
+    key: "classes",
+    name: "Classes",
+    description: "Fill, attendance and who has gone quiet.",
+    icon: "Dumbbell",
+    venues: ["gym"],
+    widgets: {
+      clinic: [],
+      gym: [
+        { key: "overview.classesThisWeek", size: "S" },
+        { key: "classes.avgFill", size: "S" },
+        { key: "classes.attendanceRate", size: "S" },
+        { key: "classes.noShows", size: "S" },
+        { key: "overview.todaysClasses", size: "L" },
+        { key: "classes.newBookings", size: "S" },
+        { key: "classes.fillByType", size: "M" },
+        { key: "classes.fillBySlot", size: "M" },
+        { key: "classes.instructors", size: "M" },
+        { key: "classes.fullClasses", size: "M" },
+        { key: "classes.inactiveMembers", size: "M" },
+      ],
+    },
+  },
 ];
 
 export const PRESET_BY_KEY: Map<string, Preset> = new Map(PRESETS.map((p) => [p.key, p]));
@@ -233,5 +288,5 @@ export const PRESET_BY_KEY: Map<string, Preset> = new Map(PRESETS.map((p) => [p.
 /** A fresh copy of a preset's layout for a venue, or null for an unknown preset. */
 export function presetWidgets(key: string, venue: Venue): WidgetRef[] | null {
   const p = PRESET_BY_KEY.get(key);
-  return p ? p.widgets[venue].map((r) => ({ ...r })) : null;
+  return p && presetAppliesTo(p, venue) ? p.widgets[venue].map((r) => ({ ...r })) : null;
 }

@@ -55,3 +55,12 @@ assert.deepEqual(velocityDays(ev, new Set([12]), t0, t0 + 10 * D).sort(), [1, 5]
 assert.deepEqual(velocityDays(ev, new Set([12]), t0 + 2 * D, t0 + 10 * D), [5], "won move must fall in range");
 
 console.log("stats.test.ts: ok");
+
+import { addDaysIso, dublinIso, weekBounds } from "./stats";
+// 2026-10-04 is a Sunday: its week started Monday the 28th of September.
+assert.deepEqual(weekBounds("2026-10-04"), { mon: "2026-09-28", sun: "2026-10-04" });
+assert.deepEqual(weekBounds("2026-10-05"), { mon: "2026-10-05", sun: "2026-10-11" });
+assert.equal(addDaysIso("2026-12-30", 3), "2027-01-02");
+assert.equal(dublinIso(Date.UTC(2026, 6, 15, 23, 30)), "2026-07-16", "23:30 UTC in summer is already tomorrow in Dublin");
+assert.equal(dublinIso(Date.UTC(2026, 0, 15, 23, 30)), "2026-01-15");
+console.log("stats.test.ts (dates): ok");

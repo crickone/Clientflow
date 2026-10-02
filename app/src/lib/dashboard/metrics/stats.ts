@@ -121,3 +121,30 @@ export function velocityDays(events: StageEv[], wonStageIds: Set<number>, fromMs
   }
   return out;
 }
+
+const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** "2026-10-06" -> "Tue 6 Oct" (calendar date, no timezone involved). */
+export function shortDay(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  return `${WEEKDAY_SHORT[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+}
+
+const dublinDayFmt = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Dublin", year: "numeric", month: "2-digit", day: "2-digit" });
+
+/** The Dublin calendar date ("YYYY-MM-DD") at an instant. */
+export function dublinIso(ms: number): string {
+  return dublinDayFmt.format(new Date(ms));
+}
+
+/** Add whole days to an ISO date. */
+export function addDaysIso(iso: string, n: number): string {
+  return new Date(Date.parse(`${iso}T00:00:00Z`) + n * DAY).toISOString().slice(0, 10);
+}
+
+/** Monday and Sunday (ISO dates) of the week containing `iso`. */
+export function weekBounds(iso: string): { mon: string; sun: string } {
+  const dow = new Date(`${iso}T00:00:00Z`).getUTCDay();
+  const mon = addDaysIso(iso, -((dow + 6) % 7));
+  return { mon, sun: addDaysIso(mon, 6) };
+}
