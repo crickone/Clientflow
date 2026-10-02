@@ -29,6 +29,10 @@ assert.deepEqual(
   [
     "overview.todaysBookings",
     "overview.todaysEarnings",
+    "overview.cashToday",
+    "overview.deferredRevenue",
+    "overview.activeClients",
+    "overview.plansExpiring",
     "overview.newLeads",
     "overview.unreadMessages",
     "overview.needsAttention",

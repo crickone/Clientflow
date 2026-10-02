@@ -201,7 +201,7 @@ export const OVERVIEW_WIDGETS = {
   },
   "overview.recentActivity": {
     async load() {
-      const rows = await recentActivity(8);
+      const rows = await recentActivity(10);
       return rows.map((a) => ({ id: a.id, primary: a.message, meta: relativeTime(a.createdAt) }));
     },
     render: (rows) => <RowList rows={rows} empty="No activity yet." />,

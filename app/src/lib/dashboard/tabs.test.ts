@@ -92,7 +92,7 @@ const requireLocal = createRequire(import.meta.url);
       tabs.deleteTab(ALICE, "clinic", 1);
       assert.throws(() => tabs.deleteTab(ALICE, "clinic", 0), /last tab/);
       tabs.resetTab(ALICE, "clinic", 0);
-      assert.equal(tabs.resolveTabs(ALICE, "clinic").tabs[0].widgets.length, 10, "reset restores the Overview preset");
+      assert.equal(tabs.resolveTabs(ALICE, "clinic").tabs[0].widgets.length, 14, "reset restores the Overview preset");
       assert.throws(() => tabs.renameTab(ALICE, "clinic", 0, "   "), /name/);
       assert.throws(() => tabs.addTab(ALICE, "clinic", { kind: "preset", presetKey: "nope" }), /preset/);
 
