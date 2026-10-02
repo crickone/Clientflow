@@ -4,7 +4,7 @@ import { asc, eq, isNull } from "drizzle-orm";
 
 import { db, schema } from "@/lib/db";
 import { MAX_TABS_PER_USER, validateLayout } from "./catalog";
-import { OVERVIEW_PRESET_KEY, PRESET_BY_KEY, presetWidgets } from "./presets";
+import { OVERVIEW_PRESET_KEY, PRESET_BY_KEY, presetAppliesTo, presetWidgets } from "./presets";
 import { STORED_RANGE_KEYS, type StoredRangeKey } from "./range";
 import type { Venue, WidgetRef } from "./types";
 
@@ -144,6 +144,7 @@ export function addTab(
     if (input.kind === "preset") {
       const p = PRESET_BY_KEY.get(input.presetKey);
       if (!p) throw new Error("Unknown preset.");
+      if (!presetAppliesTo(p, venue)) throw new Error("That preset is not available for this venue.");
       tab = { name: p.name, presetKey: p.key, range: "30d", widgets: presetWidgets(p.key, venue)! };
     } else if (input.kind === "duplicate") {
       const src = rows[input.index];

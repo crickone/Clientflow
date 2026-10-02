@@ -15,7 +15,7 @@ const d = (ms: number) => new Date(ms);
 const dayOf = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 /** Inclusive UTC day strings covering [fromMs, toMs). */
-const dayRange = (fromMs: number, toMs: number) => ({ from: dayOf(fromMs), to: dayOf(Math.max(fromMs, toMs - 1)) });
+export const dayRange = (fromMs: number, toMs: number) => ({ from: dayOf(fromMs), to: dayOf(Math.max(fromMs, toMs - 1)) });
 
 export type CampaignRow = { id: number; name: string; slug: string; status: string; adSpendCents: number };
 

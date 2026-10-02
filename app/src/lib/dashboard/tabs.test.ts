@@ -95,6 +95,10 @@ const requireLocal = createRequire(import.meta.url);
       assert.equal(tabs.resolveTabs(ALICE, "clinic").tabs[0].widgets.length, 14, "reset restores the Overview preset");
       assert.throws(() => tabs.renameTab(ALICE, "clinic", 0, "   "), /name/);
       assert.throws(() => tabs.addTab(ALICE, "clinic", { kind: "preset", presetKey: "nope" }), /preset/);
+      const beforeWrong = tabs.resolveTabs(ALICE, "clinic").tabs.length;
+      assert.throws(() => tabs.addTab(ALICE, "clinic", { kind: "preset", presetKey: "classes" }), /not available for this venue/);
+      assert.throws(() => tabs.addTab(ALICE, "gym", { kind: "preset", presetKey: "frontdesk" }), /not available for this venue/);
+      assert.equal(tabs.resolveTabs(ALICE, "clinic").tabs.length, beforeWrong, "a refused preset adds nothing");
 
       // cap
       for (let i = tabs.resolveTabs(ALICE, "clinic").tabs.length; i < MAX_TABS_PER_USER; i++) {

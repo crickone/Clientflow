@@ -26,7 +26,15 @@ export interface Preset {
   name: string;
   description: string;
   icon: PresetIcon;
+  /** Venues this preset applies to; omitted means both. Its list is empty for any other venue. */
+  venues?: readonly Venue[];
   widgets: Record<Venue, WidgetRef[]>;
+}
+
+export const ALL_VENUES: readonly Venue[] = ["clinic", "gym"];
+
+export function presetAppliesTo(p: Preset, venue: Venue): boolean {
+  return (p.venues ?? ALL_VENUES).includes(venue);
 }
 
 export const OVERVIEW_PRESET_KEY = "overview";
@@ -226,6 +234,205 @@ export const PRESETS: Preset[] = [
       ],
     },
   },
+  {
+    key: "frontdesk",
+    name: "Front desk",
+    description: "Today's diary, no-shows, busy times and what needs a nudge.",
+    icon: "CalendarCheck",
+    venues: ["clinic"],
+    widgets: {
+      clinic: [
+        { key: "overview.todaysBookings", size: "S" },
+        { key: "frontdesk.weekBookings", size: "S" },
+        { key: "frontdesk.noShowRate", size: "S" },
+        { key: "frontdesk.cancellationRate", size: "S" },
+        { key: "overview.todaysSchedule", size: "L" },
+        { key: "frontdesk.birthdays", size: "S" },
+        { key: "frontdesk.utilisation", size: "M" },
+        { key: "frontdesk.busiestTimes", size: "M" },
+        { key: "frontdesk.sessionsByService", size: "M" },
+        { key: "frontdesk.newVsReturning", size: "M" },
+        { key: "frontdesk.cancelLeadTime", size: "M" },
+        { key: "frontdesk.creditsExpiring", size: "M" },
+      ],
+      gym: [],
+    },
+  },
+  {
+    key: "classes",
+    name: "Classes",
+    description: "Fill, attendance and who has gone quiet.",
+    icon: "Dumbbell",
+    venues: ["gym"],
+    widgets: {
+      clinic: [],
+      gym: [
+        { key: "overview.classesThisWeek", size: "S" },
+        { key: "classes.avgFill", size: "S" },
+        { key: "classes.attendanceRate", size: "S" },
+        { key: "classes.noShows", size: "S" },
+        { key: "overview.todaysClasses", size: "L" },
+        { key: "classes.newBookings", size: "S" },
+        { key: "classes.fillByType", size: "M" },
+        { key: "classes.fillBySlot", size: "M" },
+        { key: "classes.instructors", size: "M" },
+        { key: "classes.fullClasses", size: "M" },
+        { key: "classes.inactiveMembers", size: "M" },
+      ],
+    },
+  },
+  {
+    key: "finance",
+    name: "Finance",
+    description: "Money in and what is owed or coming up. Gyms see membership revenue, churn and renewals.",
+    icon: "Wallet",
+    widgets: {
+      clinic: [
+        { key: "finance.revenue", size: "S" },
+        { key: "overview.cashToday", size: "S" },
+        { key: "overview.deferredRevenue", size: "S" },
+        { key: "finance.avgSpend", size: "S" },
+        { key: "finance.revenueTrend", size: "XL" },
+        { key: "finance.byMethod", size: "M" },
+        { key: "finance.byService", size: "M" },
+        { key: "finance.topClients", size: "M" },
+        { key: "finance.packages", size: "M" },
+        { key: "finance.vouchers", size: "M" },
+      ],
+      gym: [
+        { key: "overview.mrr", size: "S" },
+        { key: "overview.activeMembers", size: "S" },
+        { key: "finance.churn", size: "S" },
+        { key: "finance.membersGainedLost", size: "XL" },
+        { key: "finance.renewals", size: "M" },
+        { key: "finance.vouchers", size: "M" },
+      ],
+    },
+  },
+  {
+    key: "content",
+    name: "Content & Social",
+    description: "What went out, what is coming, and what failed.",
+    icon: "Images",
+    widgets: {
+      clinic: [
+        { key: "content.published", size: "S" },
+        { key: "content.scheduled", size: "S" },
+        { key: "content.failed", size: "S" },
+        { key: "content.blogPublished", size: "S" },
+        { key: "content.calendar", size: "XL" },
+        { key: "content.byPlatform", size: "M" },
+        { key: "content.failedList", size: "M" },
+        { key: "content.recentDesigns", size: "L" },
+        { key: "content.library", size: "S" },
+        { key: "content.blogPipeline", size: "M" },
+      ],
+      gym: [
+        { key: "content.published", size: "S" },
+        { key: "content.scheduled", size: "S" },
+        { key: "content.failed", size: "S" },
+        { key: "content.blogPublished", size: "S" },
+        { key: "content.calendar", size: "XL" },
+        { key: "content.byPlatform", size: "M" },
+        { key: "content.failedList", size: "M" },
+        { key: "content.recentDesigns", size: "L" },
+        { key: "content.library", size: "S" },
+        { key: "content.blogPipeline", size: "M" },
+      ],
+    },
+  },
+  {
+    key: "website",
+    name: "Website",
+    description: "Visitors, top pages, sources and enquiries.",
+    icon: "Globe",
+    widgets: {
+      clinic: [
+        { key: "website.visitors", size: "S" },
+        { key: "website.pageViews", size: "S" },
+        { key: "website.submissions", size: "S" },
+        { key: "website.enquiryRate", size: "S" },
+        { key: "website.trafficTrend", size: "XL" },
+        { key: "website.topPages", size: "M" },
+        { key: "website.sources", size: "M" },
+        { key: "website.submissionsByForm", size: "M" },
+        { key: "website.blogViews", size: "M" },
+        { key: "website.recentEdits", size: "L" },
+        { key: "website.requests", size: "S" },
+      ],
+      gym: [
+        { key: "website.visitors", size: "S" },
+        { key: "website.pageViews", size: "S" },
+        { key: "website.submissions", size: "S" },
+        { key: "website.enquiryRate", size: "S" },
+        { key: "website.trafficTrend", size: "XL" },
+        { key: "website.topPages", size: "M" },
+        { key: "website.sources", size: "M" },
+        { key: "website.submissionsByForm", size: "M" },
+        { key: "website.blogViews", size: "M" },
+        { key: "website.recentEdits", size: "L" },
+        { key: "website.requests", size: "S" },
+      ],
+    },
+  },
+  {
+    key: "competitors",
+    name: "Competitors",
+    description: "How you compare locally, and what competitors are doing.",
+    icon: "Binoculars",
+    widgets: {
+      clinic: [
+        { key: "marketing.ratingGap", size: "S" },
+        { key: "competitors.reviewGap", size: "S" },
+        { key: "competitors.newAds", size: "S" },
+        { key: "competitors.researchSpend", size: "S" },
+        { key: "competitors.ratingTrend", size: "XL" },
+        { key: "competitors.reviewVelocity", size: "M" },
+        { key: "competitors.recentReviews", size: "M" },
+        { key: "competitors.activity", size: "XL" },
+        { key: "competitors.activeAds", size: "XL" },
+      ],
+      gym: [
+        { key: "marketing.ratingGap", size: "S" },
+        { key: "competitors.reviewGap", size: "S" },
+        { key: "competitors.newAds", size: "S" },
+        { key: "competitors.researchSpend", size: "S" },
+        { key: "competitors.ratingTrend", size: "XL" },
+        { key: "competitors.reviewVelocity", size: "M" },
+        { key: "competitors.recentReviews", size: "M" },
+        { key: "competitors.activity", size: "XL" },
+        { key: "competitors.activeAds", size: "XL" },
+      ],
+    },
+  },
+  {
+    key: "ai",
+    name: "AI & Usage",
+    description: "What AI costs this month and where it goes.",
+    icon: "Cpu",
+    widgets: {
+      clinic: [
+        { key: "ai.spendVsCap", size: "M" },
+        { key: "ai.projected", size: "S" },
+        { key: "ai.agentRuns", size: "S" },
+        { key: "ai.byAgent", size: "M" },
+        { key: "ai.byModel", size: "M" },
+        { key: "ai.dailySpend", size: "XL" },
+        { key: "ai.topDrivers", size: "M" },
+        { key: "ai.mediaSpend", size: "M" },
+      ],
+      gym: [
+        { key: "ai.spendVsCap", size: "M" },
+        { key: "ai.projected", size: "S" },
+        { key: "ai.agentRuns", size: "S" },
+        { key: "ai.byAgent", size: "M" },
+        { key: "ai.byModel", size: "M" },
+        { key: "ai.dailySpend", size: "XL" },
+        { key: "ai.topDrivers", size: "M" },
+        { key: "ai.mediaSpend", size: "M" },
+      ],
+    },
+  },
 ];
 
 export const PRESET_BY_KEY: Map<string, Preset> = new Map(PRESETS.map((p) => [p.key, p]));
@@ -233,5 +440,5 @@ export const PRESET_BY_KEY: Map<string, Preset> = new Map(PRESETS.map((p) => [p.
 /** A fresh copy of a preset's layout for a venue, or null for an unknown preset. */
 export function presetWidgets(key: string, venue: Venue): WidgetRef[] | null {
   const p = PRESET_BY_KEY.get(key);
-  return p ? p.widgets[venue].map((r) => ({ ...r })) : null;
+  return p && presetAppliesTo(p, venue) ? p.widgets[venue].map((r) => ({ ...r })) : null;
 }

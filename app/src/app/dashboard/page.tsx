@@ -17,7 +17,7 @@ import { WidgetSlot } from "@/components/dashboard/WidgetSlot";
 import { getCurrentMembership } from "@/lib/auth";
 import { isBriefComplete } from "@/lib/businessProfile";
 import { CATALOG, CATALOG_BY_KEY } from "@/lib/dashboard/catalog";
-import { PRESETS } from "@/lib/dashboard/presets";
+import { PRESETS, presetAppliesTo } from "@/lib/dashboard/presets";
 import { parseRangeKey, previousRange, resolveRange, type RangeKey } from "@/lib/dashboard/range";
 import { resolveTabs } from "@/lib/dashboard/tabs";
 import { checkRequirements } from "@/lib/dashboard/requirements";
@@ -107,13 +107,13 @@ export default async function DashboardPage({
       domainLabel: DOMAIN_LABELS[m.domain],
     }));
 
-  const presets = PRESETS.map((p) => ({
+  const presets = PRESETS.filter((p) => presetAppliesTo(p, venue)).map((p) => ({
     key: p.key,
     name: p.name,
     description: p.description,
     icon: p.icon,
     count: visibleRefs(p.widgets[venue], { venue, role: membership.role, overrides }).length,
-  }));
+  })).filter((p) => p.count > 0);
 
   return (
     <div className="app-page">
