@@ -112,6 +112,42 @@ export const PRESETS: Preset[] = [
       ],
     },
   },
+  {
+    key: "marketing",
+    name: "Marketing",
+    description: "Campaign returns, website traffic and what is coming up.",
+    icon: "Megaphone",
+    widgets: {
+      clinic: [
+        { key: "marketing.activeCampaigns", size: "S" },
+        { key: "marketing.campaignLeads", size: "S" },
+        { key: "marketing.blendedCac", size: "S" },
+        { key: "marketing.roas", size: "S" },
+        { key: "marketing.scoreboard", size: "XL" },
+        { key: "marketing.landingFunnel", size: "L" },
+        { key: "marketing.formSubmissions", size: "S" },
+        { key: "marketing.visitorsTrend", size: "L" },
+        { key: "marketing.ratingGap", size: "S" },
+        { key: "marketing.trafficSources", size: "M" },
+        { key: "marketing.upcomingSends", size: "M" },
+        { key: "marketing.seasonalDates", size: "M" },
+      ],
+      gym: [
+        { key: "marketing.activeCampaigns", size: "S" },
+        { key: "marketing.campaignLeads", size: "S" },
+        { key: "marketing.blendedCac", size: "S" },
+        { key: "marketing.roas", size: "S" },
+        { key: "marketing.scoreboard", size: "XL" },
+        { key: "marketing.landingFunnel", size: "L" },
+        { key: "marketing.formSubmissions", size: "S" },
+        { key: "marketing.visitorsTrend", size: "L" },
+        { key: "marketing.ratingGap", size: "S" },
+        { key: "marketing.trafficSources", size: "M" },
+        { key: "marketing.upcomingSends", size: "M" },
+        { key: "marketing.seasonalDates", size: "M" },
+      ],
+    },
+  },
 ];
 
 export const PRESET_BY_KEY: Map<string, Preset> = new Map(PRESETS.map((p) => [p.key, p]));

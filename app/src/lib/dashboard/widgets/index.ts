@@ -3,6 +3,7 @@ import "server-only";
 import type { WidgetKey } from "../catalog";
 import type { WidgetImpl } from "../types";
 import { OVERVIEW_WIDGETS } from "./overview";
+import { MARKETING_WIDGETS } from "./marketing";
 import { SALES_WIDGETS } from "./sales";
 
 export { cached } from "./cache";
@@ -11,5 +12,6 @@ export { cached } from "./cache";
 export const WIDGET_IMPLS = {
   ...OVERVIEW_WIDGETS,
   ...SALES_WIDGETS,
+  ...MARKETING_WIDGETS,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<WidgetKey, WidgetImpl<any>>;
