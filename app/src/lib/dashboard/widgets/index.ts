@@ -3,6 +3,7 @@ import "server-only";
 import type { WidgetKey } from "../catalog";
 import type { WidgetImpl } from "../types";
 import { CLASSES_WIDGETS } from "./classes";
+import { COMPETITORS_WIDGETS } from "./competitors";
 import { FINANCE_WIDGETS } from "./finance";
 import { FRONTDESK_WIDGETS } from "./frontdesk";
 import { OVERVIEW_WIDGETS } from "./overview";
@@ -27,5 +28,6 @@ export const WIDGET_IMPLS = {
   ...FINANCE_WIDGETS,
   ...CONTENT_WIDGETS,
   ...WEBSITE_WIDGETS,
+  ...COMPETITORS_WIDGETS,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<WidgetKey, WidgetImpl<any>>;

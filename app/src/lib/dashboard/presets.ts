@@ -379,6 +379,36 @@ export const PRESETS: Preset[] = [
       ],
     },
   },
+  {
+    key: "competitors",
+    name: "Competitors",
+    description: "How you compare locally, and what competitors are doing.",
+    icon: "Binoculars",
+    widgets: {
+      clinic: [
+        { key: "marketing.ratingGap", size: "S" },
+        { key: "competitors.reviewGap", size: "S" },
+        { key: "competitors.newAds", size: "S" },
+        { key: "competitors.researchSpend", size: "S" },
+        { key: "competitors.ratingTrend", size: "XL" },
+        { key: "competitors.reviewVelocity", size: "M" },
+        { key: "competitors.recentReviews", size: "M" },
+        { key: "competitors.activity", size: "XL" },
+        { key: "competitors.activeAds", size: "XL" },
+      ],
+      gym: [
+        { key: "marketing.ratingGap", size: "S" },
+        { key: "competitors.reviewGap", size: "S" },
+        { key: "competitors.newAds", size: "S" },
+        { key: "competitors.researchSpend", size: "S" },
+        { key: "competitors.ratingTrend", size: "XL" },
+        { key: "competitors.reviewVelocity", size: "M" },
+        { key: "competitors.recentReviews", size: "M" },
+        { key: "competitors.activity", size: "XL" },
+        { key: "competitors.activeAds", size: "XL" },
+      ],
+    },
+  },
 ];
 
 export const PRESET_BY_KEY: Map<string, Preset> = new Map(PRESETS.map((p) => [p.key, p]));

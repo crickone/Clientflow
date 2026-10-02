@@ -59,6 +59,10 @@ for (const venue of ["clinic", "gym"] as const) {
   assert.equal(presetWidgets("content", venue)!.length, 10, `content/${venue} has 10 widgets`);
   assert.equal(presetWidgets("website", venue)!.length, 11, `website/${venue} has 11 widgets`);
 }
+assert.ok(keys.has("competitors"), "competitors preset exists");
+for (const venue of ["clinic", "gym"] as const) {
+  assert.equal(presetWidgets("competitors", venue)!.length, 9, `competitors/${venue} has 9 widgets`);
+}
 for (const p of PRESETS) assert.ok(ALL_VENUES.some((v) => presetAppliesTo(p, v)), `${p.key} applies somewhere`);
 
 const clinic = presetWidgets("overview", "clinic")!;
