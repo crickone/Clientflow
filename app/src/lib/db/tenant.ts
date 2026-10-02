@@ -2455,6 +2455,18 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_competitor_ads_competitor_ad ON competitor_ads(competitor_id, ad_id);
     CREATE INDEX IF NOT EXISTS idx_competitor_ads_competitor ON competitor_ads(competitor_id);
+    CREATE TABLE IF NOT EXISTS dashboards (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER,
+      name TEXT NOT NULL,
+      preset_key TEXT,
+      position INTEGER NOT NULL,
+      range TEXT NOT NULL DEFAULT '30d',
+      widgets TEXT NOT NULL DEFAULT '[]',
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_dashboards_user ON dashboards(user_id, position);
   `);
 
   // Market Research P2 (Task 3, for Task 5): `ad_angle_json`/`ad_angle_at`

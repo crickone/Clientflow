@@ -3,23 +3,11 @@ import { AlertCircle, ArrowRight } from "lucide-react";
 
 import type { AttentionItem } from "@/lib/dashboard";
 
-/** A row of actionable cards — only rendered when there's something to flag. */
+/** A row of actionable cards; the dashboard tile around it supplies the heading. */
 export function NeedsAttention({ items }: { items: AttentionItem[] }) {
   if (items.length === 0) return null;
   return (
-    <div style={{ marginBottom: 20 }}>
-      <div
-        style={{
-          fontFamily: "var(--font-mono), ui-monospace, monospace",
-          fontSize: 11,
-          color: "var(--text-tertiary)",
-          letterSpacing: "0.16em",
-          textTransform: "uppercase",
-          marginBottom: 10,
-        }}
-      >
-        // Needs attention
-      </div>
+    <div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
         {items.map((it) => (
           <Link key={it.key} href={it.href} style={{ textDecoration: "none" }}>

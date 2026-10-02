@@ -2943,3 +2943,31 @@ export const platformAudit = sqliteTable(
   }),
 );
 export type PlatformAuditRow = typeof platformAudit.$inferSelect;
+
+/**
+ * Dashboard tabs. One row per tab. `user_id` is the control-plane users.id
+ * of the owner, or NULL for the tenant's team default set. `widgets` is a
+ * JSON WidgetRef[] (lib/dashboard/types.ts), validated on every write.
+ */
+export const dashboards = sqliteTable(
+  "dashboards",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id"),
+    name: text("name").notNull(),
+    presetKey: text("preset_key"),
+    position: integer("position").notNull(),
+    range: text("range").notNull().default("30d"),
+    widgets: text("widgets").notNull().default("[]"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => ({
+    byUser: index("idx_dashboards_user").on(t.userId, t.position),
+  }),
+);
+export type DashboardRow = typeof dashboards.$inferSelect;
