@@ -977,7 +977,7 @@ const POSTS = [
     topic: "Recovery",
     title: "Stress, sleep, and the twelve minutes after work",
     excerpt:
-      "An evening session gives a busy person one reliable thing: half an hour with the phone somewhere else. Having it in the diary is why you'll actually take it.",
+      "An evening infrared session gives you half an hour to wind down, with your phone put away.",
     photo: "infrared-bed-idle.jpg",
     alt: "The infrared bed closed and waiting in the treatment room, its orange strip lit",
     description:
@@ -999,7 +999,7 @@ const POSTS = [
     topic: "Infrared",
     title: "What infrared light actually does in everyday aches",
     excerpt:
-      "What the bed emits, what the light is understood to do once it's in tissue, and why the honest account of it is written in weeks.",
+      "What the bed emits, what the light is understood to do, and why it works over weeks.",
     photo: "infrared-bed-lit.jpg",
     alt: "The infrared bed running, its red light spilling across the brick wall behind it",
     description:

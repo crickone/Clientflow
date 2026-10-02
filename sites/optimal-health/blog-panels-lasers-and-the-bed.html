@@ -764,7 +764,7 @@ ul.body li + li{margin-top:10px}
 }
 @media (max-width:640px){
 
-  .spread{flex-wrap:wrap;justify-content:flex-start;column-gap:16px;row-gap:6px}
+  .spread{flex-wrap:wrap;justify-content:flex-start;column-gap:12px;row-gap:6px;letter-spacing:.08em}
 
   .rate{text-align:left}
 
@@ -774,6 +774,18 @@ ul.body li + li{margin-top:10px}
   .nav__book,.nav__menu{min-height:40px;display:inline-flex;align-items:center;padding:0 14px}
   .strip__a{padding-block:10px}
   .qa details > summary{padding-block:12px}
+}
+
+@media (hover:none), (max-width:820px){
+  .roll--therapies .roll__head{position:relative;padding-right:36px}
+  .roll--therapies .roll__head::after{
+    content:"";position:absolute;right:6px;top:50%;
+    width:9px;height:9px;
+    border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;
+    transform:translateY(-70%) rotate(45deg);
+    transition:transform .3s cubic-bezier(.3,.9,.2,1);
+  }
+  .roll--therapies .roll__row.is-open .roll__head::after{transform:translateY(-30%) rotate(-135deg)}
 }
 </style>
 </head>
@@ -804,7 +816,7 @@ ul.body li + li{margin-top:10px}
     <div>
       <p class="micro" style="color:var(--sage)">The journal</p>
       <h1 class="post__t" style="margin-top:20px">Panels, lasers, and a bed you lie down in</h1>
-      <p class="lede" style="margin-top:24px">Light therapy isn't one thing. A hand-held laser, a panel on a stand and a full-length bed do different jobs, and the difference is mostly how much of you the light reaches.</p>
+      <p class="lede" style="margin-top:24px">A hand-held laser, a panel and a full-length bed all use light, but they reach very different amounts of you.</p>
       <p class="post__m"><a href="blog.html">All articles</a> &middot; <a href="infrared.html">More on infrared</a></p>
     </div>
     <div class="tile__img"><img src="assets/infrared-session-inside.jpg" alt="Inside the infrared bed, looking along the LED array, a client lying under eye protection" /></div>
@@ -814,24 +826,24 @@ ul.body li + li{margin-top:10px}
 <section class="band">
   <div class="post__body">
     <h2>One idea, three machines</h2>
-    <p>All three work on the same principle. Particular wavelengths of light pass into tissue, cells absorb them, and the working account is that the part of the cell which makes its energy can make more of it when they do. The idea isn't where they part company. They differ in how the light is delivered, how far it carries, and how much of you is in front of it at once.</p>
+    <p>All three work the same way: cells absorb particular wavelengths of light and can make more energy as a result. They differ in power, depth and how much of you the light reaches at once.</p>
 
     <h2>A laser is a spotlight</h2>
-    <p>A high-intensity laser puts a powerful, concentrated beam into a small area. That's useful when there's one specific place to aim at, and a practitioner in a clinical setting generally uses it for exactly that. The power lets the light carry deep; the coverage is a few square centimetres. It's a tool for a target rather than for a body.</p>
+    <p>A high-intensity laser puts a powerful, narrow beam into a small area. It reaches deep but covers only a few square centimetres, so it's used on one specific spot, usually by a clinician.</p>
 
     <h2>A panel is a floodlight</h2>
-    <p>A red-light panel uses an array of LEDs to cast light across a broader area &mdash; a face, a back, a limb. Coverage goes up and the power at any one point goes down. Panels suit surface-level work, skin most of all, and covering more than one part of you means either more sessions or standing there rearranging yourself between them.</p>
+    <p>A red-light panel uses LEDs to cover a wider area, like a face, back or limb, at lower power. It suits surface work such as skin, but covering more of you means more sessions or repositioning.</p>
 
-    <h2>The bed is neither</h2>
-    <p>You lie down in it and the light reaches you head to toe at once, red and near-infrared together. Red does more at the surface; near-infrared carries furthest into tissue. Nothing has to be aimed, nothing has to be repositioned, and no part of you is waiting its turn. The argument for a bed over the other two is about coverage, not power.</p>
-    <p>Coverage only counts where the light meets skin, though, which is why you undress for the bed rather than lie on it in your clothes. Head-to-toe coverage and a jumper cancel each other out. Underwear is fine and plenty of people keep it on; with nothing on, all of you gets the light. You're on your own in the room for it.</p>
+    <h2>The bed covers all of you</h2>
+    <p>You lie in it and the light reaches you head to toe at once. Red works mostly at the surface; near-infrared reaches deeper. Nothing needs aiming or repositioning.</p>
+    <p>The light only works where it meets skin, so you undress for the bed. Underwear is fine, and you're on your own in the room.</p>
 
     <h2>Why twelve minutes</h2>
-    <p>Because that's how long the bed runs. Full-length coverage is why a short session is worth booking at all: there's no sequence of areas to work through, so the session is the same length whether you came in about your shoulders or about your legs. The whole visit sits inside half an hour and there's no downtime afterwards, though you do undress for it, so allow a few minutes either side. It's the easiest thing in the building to fit around a working week, which is most of why people keep coming back to it.</p>
+    <p>Because the whole body is covered at once, there's nothing to work through area by area, so the session stays at twelve minutes. The whole visit takes under half an hour, with no downtime (allow a few minutes to undress).</p>
 
     <h2>Two things it isn't</h2>
-    <p>It's not a sunbed. The bed emits red and near-infrared light at 633, 660, 810, 850 and 940 nm, and no ultraviolet at all, so there's no tanning and no burning.</p>
-    <p>And it isn't a medical treatment. We don't diagnose anything and we make no claim to resolve anything. If you have a diagnosed condition, follow your clinician&rsquo;s advice and tell us about it before you book.</p>
+    <p>It's not a sunbed: there's no ultraviolet, so no tanning and no burning.</p>
+    <p>And it isn't a medical treatment. We don't diagnose or treat anything. If you have a diagnosed condition, follow your doctor's advice and tell us before you book.</p>
   </div>
 </section>
 
@@ -840,7 +852,7 @@ ul.body li + li{margin-top:10px}
     <div class="band__head__l body">
       <p class="title">The session</p>
       <h2 class="lede" style="margin-top:14px">Twelve minutes on the bed, undressed.</h2>
-      <p style="margin-top:22px">&euro;50 a session, &euro;225 for five, &euro;400 for ten. Someone shows you in and sets the bed up for you; you undress, lie down, and that's the whole of it. Underwear is fine, and you're on your own in the room.</p>
+      <p style="margin-top:22px">&euro;50 a session, &euro;225 for five, &euro;400 for ten. We set the bed up, you undress and lie down. Underwear is fine, and you're on your own in the room.</p>
       <p style="margin-top:28px"><a class="btn" href="https://optimalhealthatinspire.simplybook.it/v2">Book a session</a></p>
     </div>
   </div>
@@ -865,7 +877,7 @@ ul.body li + li{margin-top:10px}
         <div class="tile__img"><img src="assets/infrared-bed-idle.jpg" alt="The infrared bed closed and waiting in the treatment room, its orange strip lit" loading="lazy" /></div>
         <p class="tile__n">Recovery</p>
         <h3 class="tile__h">Stress, sleep, and the twelve minutes after work</h3>
-        <p class="tile__m">An evening session gives a busy person one reliable thing: half an hour with the phone somewhere else. Having it in the diary is why you'll actually take it.</p>
+        <p class="tile__m">An evening infrared session gives you half an hour to wind down, with your phone put away.</p>
       </a>
     </div>
   </div>

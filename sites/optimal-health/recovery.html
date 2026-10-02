@@ -764,7 +764,7 @@ ul.body li + li{margin-top:10px}
 }
 @media (max-width:640px){
 
-  .spread{flex-wrap:wrap;justify-content:flex-start;column-gap:16px;row-gap:6px}
+  .spread{flex-wrap:wrap;justify-content:flex-start;column-gap:12px;row-gap:6px;letter-spacing:.08em}
 
   .rate{text-align:left}
 
@@ -774,6 +774,18 @@ ul.body li + li{margin-top:10px}
   .nav__book,.nav__menu{min-height:40px;display:inline-flex;align-items:center;padding:0 14px}
   .strip__a{padding-block:10px}
   .qa details > summary{padding-block:12px}
+}
+
+@media (hover:none), (max-width:820px){
+  .roll--therapies .roll__head{position:relative;padding-right:36px}
+  .roll--therapies .roll__head::after{
+    content:"";position:absolute;right:6px;top:50%;
+    width:9px;height:9px;
+    border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;
+    transform:translateY(-70%) rotate(45deg);
+    transition:transform .3s cubic-bezier(.3,.9,.2,1);
+  }
+  .roll--therapies .roll__row.is-open .roll__head::after{transform:translateY(-30%) rotate(-135deg)}
 }
 </style>
 </head>
@@ -803,7 +815,7 @@ ul.body li + li{margin-top:10px}
   <div class="hero__media shot--room"><img src="assets/reception.jpg" alt="The waiting area at the Clonmel clinic, a low table and bamboo beside the hyperbaric oxygen room door" /></div>
   <div class="hero__inner">
     <h1 class="wordmark hero__mark">Recovery, for an ordinary week.</h1>
-    <p class="lede hero__sub" data-rise>Long working weeks, sleep gone off, stiffness that has quietly become normal. Most of the people who come in aren't athletes, and none of this asks much of you.</p>
+    <p class="lede hero__sub" data-rise>For long working weeks, poor sleep and stiffness that won't shift. You don't need to be an athlete.</p>
     <div class="hero__foot" data-rise>
       <a class="btn" href="https://optimalhealthatinspire.simplybook.it/v2">Book a session</a>
       <a class="explore" href="pricing.html">See pricing</a>
@@ -839,9 +851,9 @@ ul.body li + li{margin-top:10px}
   <div class="says">
     <div class="body">
       <h2 class="lede">Most of the people who come in aren't athletes.</h2>
-      <p style="margin-top:22px">They're working long weeks. They're sleeping badly, or sleeping the whole night and getting up tired anyway. They're stiff in the morning in a way that came on so gradually it now counts as normal, and their energy runs out around four in the afternoon. A fair number are coming back after a stretch of doing very little, and starting again is turning out to be harder than stopping was.</p>
-      <p>You don't need a diagnosis to book a session here, and nobody is going to ask you for one.</p>
-      <p>We run recovery: guided sessions that support circulation, rest and the body's own repair, in a room built to be calm. It isn't medical care. We don't diagnose anything and we don't claim to resolve anything, and if something has been going on a while or is getting worse, your GP comes before we do. That's not us being careful with words. It's the right order to do things in.</p>
+      <p style="margin-top:22px">They're working long weeks, sleeping badly, stiff in the morning or flat by mid-afternoon. Some are getting active again after a long break.</p>
+      <p>You don't need a diagnosis to book.</p>
+      <p>Our guided sessions support circulation, rest and recovery. It isn't medical care: if something has been going on a while or is getting worse, see your GP first.</p>
     </div>
     <div class="tile__img"><img src="assets/room.jpg" alt="The waiting area at the Clonmel clinic" loading="lazy" /></div>
   </div>
@@ -854,7 +866,7 @@ ul.body li + li{margin-top:10px}
         <h2 class="lede">You don't have to know which one you want.</h2>
       </div>
     </div>
-    <p class="body" style="margin-bottom:clamp(24px,3vw,36px)">Most people arrive with one thing they'd like to be different, and that's enough to pick a starting point. This is how we usually match them up. It's a starting point, not a prescription, and nothing stops you trying a different one next week.</p>
+    <p class="body" style="margin-bottom:clamp(24px,3vw,36px)">Pick the thing you'd most like to change. This is how we usually match people up, and you can always try a different one.</p>
     <div class="roll" data-stagger>
       <div class="roll__row">
         <span class="roll__n">Sleep</span>
@@ -897,22 +909,22 @@ ul.body li + li{margin-top:10px}
       <a class="tile" href="infrared.html">
         <div class="tile__img"><img src="assets/infrared.jpg" alt="The infrared therapy bed at the Clonmel clinic" loading="lazy" /></div>
         <h3 class="panel__t" style="text-align:left">Infrared</h3>
-        <p class="tile__m">Deep, gentle warmth from red and near-infrared light. Supports muscle release, joint comfort, circulation and winding down at the end of a day. Twelve minutes on the bed, undressed so the light reaches skin, and most people book it for the evening.</p>
+        <p class="tile__m">Red and near-infrared light that supports muscle release, joint comfort, circulation and winding down. Twelve minutes on the bed, usually booked for the evening.</p>
       </a>
       <a class="tile" href="hbot.html">
         <div class="tile__img"><img src="assets/hbot.jpg" alt="The hyperbaric oxygen chamber at the Clonmel clinic" loading="lazy" /></div>
         <h3 class="panel__t" style="text-align:left">Hyperbaric oxygen</h3>
-        <p class="tile__m">You sit in a pressurised chamber breathing air with more oxygen in it than the room has. Supports steady energy, a clearer head and day-to-day recovery. Forty-five to sixty minutes, and most people rest or doze through it.</p>
+        <p class="tile__m">You breathe extra oxygen in a pressurised chamber. Supports steady energy, a clearer head and day-to-day recovery. Forty-five to sixty minutes.</p>
       </a>
       <a class="tile" href="hifem.html">
         <div class="tile__img"><img src="assets/hifem.jpg" alt="The HIFEM chair at the Clonmel clinic" loading="lazy" /></div>
         <h3 class="panel__t" style="text-align:left">The HIFEM chair</h3>
-        <p class="tile__m">You sit on the chair fully clothed and a focused magnetic field works the muscle underneath you, the pelvic floor included. Supports engagement, everyday movement and hips that have stiffened up. Twenty to thirty minutes.</p>
+        <p class="tile__m">A focused magnetic field works the muscle you sit on, including the pelvic floor, while you stay clothed. Supports everyday movement and stiff hips. Twenty to thirty minutes.</p>
       </a>
       <a class="tile" href="massage.html">
         <div class="tile__img"><img src="assets/massage.jpg" alt="A massage treatment at the Clonmel clinic" loading="lazy" /></div>
         <h3 class="panel__t" style="text-align:left">Massage</h3>
-        <p class="tile__m">Hands-on work from clinical therapists: therapeutic massage, reflexology and lymphatic drainage. Supports the release of held tension, circulation and rest. Thirty to sixty minutes, depending which one you book.</p>
+        <p class="tile__m">Hands-on work from clinical therapists: therapeutic massage, reflexology and lymphatic drainage. Supports the release of held tension, circulation and rest. Thirty to sixty minutes.</p>
       </a>
     </div>
   </div>
@@ -925,41 +937,41 @@ ul.body li + li{margin-top:10px}
         <h2 class="lede">Five times people ring us.</h2>
       </div>
     </div>
-    <p class="body" style="margin-bottom:clamp(24px,3vw,36px)">There's no right moment for this, and nobody here is going to tell you that you've left it too late. These are just the five that come up most often.</p>
+    <p class="body" style="margin-bottom:clamp(24px,3vw,36px)">The five reasons people most often get in touch.</p>
     <ol class="arc" data-stagger>
       <li class="arc__row">
         <p class="arc__k">01</p>
         <div>
           <p class="arc__t">After a stretch of long weeks.</p>
-          <p class="arc__b">The deadline has gone by, or the busy season at work has, and you're still running on whatever got you through it. This is the point where a fortnight of actual sessions beats a fortnight of meaning to book one.</p>
+          <p class="arc__b">A busy stretch at work is over and you're still running on empty. A couple of weeks of regular sessions helps more than meaning to book one.</p>
         </div>
       </li>
       <li class="arc__row">
         <p class="arc__k">02</p>
         <div>
           <p class="arc__t">When sleep has gone off.</p>
-          <p class="arc__b">Not every night. Just enough of them that you've noticed. Most people try the infrared bed in the evening for this, because it's twelve minutes, it asks nothing of you, and it's easy to do at the end of a day when nothing else is.</p>
+          <p class="arc__b">Most people try the infrared bed in the evening for this: twelve minutes, and easy to fit in at the end of the day.</p>
         </div>
       </li>
       <li class="arc__row">
         <p class="arc__k">03</p>
         <div>
           <p class="arc__t">Coming back after time off.</p>
-          <p class="arc__b">After a spell of doing very little, for whatever reason, starting again is harder than stopping was. A session either side of the first few weeks back is the common pattern here, because how the next morning feels usually decides whether anybody goes back a second time.</p>
+          <p class="arc__b">After a long break, getting going again is hard. People often book a session either side of their first few weeks back, because how the next morning feels decides whether they keep going.</p>
         </div>
       </li>
       <li class="arc__row">
         <p class="arc__k">04</p>
         <div>
           <p class="arc__t">Alongside a training habit you want to keep.</p>
-          <p class="arc__b">Most people don't give up training because it stopped working. They give up because everything aches and the week got too full. Infrared, hyperbaric oxygen and bodywork add no training load of their own, so they sit on any day you like. The chair is muscle work, so we place that one the way you'd place a session in the gym.</p>
+          <p class="arc__b">People usually quit training because everything aches and the week fills up. Infrared, hyperbaric oxygen and massage add no training load, so they fit any day. The chair is muscle work, so plan it like a gym session.</p>
         </div>
       </li>
       <li class="arc__row">
         <p class="arc__k">05</p>
         <div>
           <p class="arc__t">When everything is fine and you would like it to stay that way.</p>
-          <p class="arc__b">The least dramatic reason, and the best one. Sleep, energy and how easily you move are far easier to keep than to get back. Keeping them looks like an hour a week in the diary, like anything else you actually mean to do.</p>
+          <p class="arc__b">Sleep, energy and easy movement are easier to keep than to get back. An hour a week in the diary helps keep them.</p>
         </div>
       </li>
     </ol>
@@ -978,41 +990,40 @@ ul.body li + li{margin-top:10px}
         <summary class="qa__q">Which one should I start with?</summary>
         <div class="qa__a">
           <p>Whichever fits the thing you came in about. Sleep and winding down usually means infrared; energy and a clear head, the hyperbaric chamber; a back and hips that have been at a desk all week, the chair; tension you would rather somebody put their hands on, a massage.</p>
-          <p>If none of that quite describes it, ring us on 083 867 2844 and say what your week looks like. We'll tell you honestly which one we'd put you in, including when the answer is that we wouldn't put you in any of them.</p>
+          <p>If none of that fits, ring 083 867 2844 and we'll recommend one.</p>
         </div>
       </details>
       <details class="qa__row">
         <summary class="qa__q">Do I need to know what's wrong first?</summary>
         <div class="qa__a">
-          <p>No, and most people don't. There's no diagnosis to bring, no referral and no letter. Tell us what you'd like to be different and we'll work from that.</p>
-          <p>If you're already under a clinician for something, do say so &mdash; not because it changes what we run, but because each of these therapies has its own safety questions we have to ask before you sit in it. They're set out in plain words on each therapy's own page, and we'd rather you read them before you book than find out at the desk.</p>
+          <p>No. You don't need a diagnosis or a referral. Tell us what you'd like to change.</p>
+          <p>If you're under a doctor's care for anything, tell us. Each therapy has its own safety questions, listed on its page.</p>
         </div>
       </details>
       <details class="qa__row">
         <summary class="qa__q">Is this medical care?</summary>
         <div class="qa__a">
-          <p>No. We run wellness here: comfort, rest, circulation, movement and everyday energy. We don't diagnose anything, we don't claim to resolve anything, and nothing here replaces your GP or the advice of somebody already looking after you.</p>
-          <p>If something is new, persistent, or getting worse, see your GP first. We'd far rather say that plainly than have you spend money here instead.</p>
+          <p>No. It's wellness: comfort, rest, circulation, movement and energy. We don't diagnose or treat anything, and nothing here replaces your GP.</p>
+          <p>If something is new, persistent or getting worse, see your GP first.</p>
         </div>
       </details>
       <details class="qa__row">
         <summary class="qa__q">Do I need to be fit?</summary>
         <div class="qa__a">
-          <p>No. You sit or lie down for all four of them, and none of them ask you to exert yourself. People in their seventies use the clinic, and so do people who haven't exercised in years.</p>
-          <p>If you're wondering whether you might be too unfit, too old or too out of practice for this, you're the person it was built for.</p>
+          <p>No. You sit or lie down for all four, and none of them need any effort. People in their seventies use the clinic, and so do people who haven't exercised in years.</p>
         </div>
       </details>
       <details class="qa__row">
         <summary class="qa__q">How often should I come?</summary>
         <div class="qa__a">
-          <p>It depends which one, and on what you're after. Roughly: people tend to start with one or two hyperbaric sessions a week, or two or three infrared, or two or three on the chair, for the first few weeks, then settle into whatever fits the diary. Massage sits wherever you want it.</p>
-          <p>Most of this is judged over a run of sessions. Better to know that before you book than after. Start with a single session all the same. It tells you whether you get on with the thing, and a block can't answer that.</p>
+          <p>It depends on the therapy. Most people start with one or two hyperbaric sessions a week, or two or three of infrared or the chair, for the first few weeks. Massage whenever suits.</p>
+          <p>These therapies work over a run of sessions, but start with a single one to see how you find it.</p>
         </div>
       </details>
       <details class="qa__row">
         <summary class="qa__q">Can I combine them?</summary>
         <div class="qa__a">
-          <p>Yes, and most regulars do. A common week is hyperbaric oxygen in the morning for a clear head and infrared in the evening for wind-down and sleep, with the chair or a massage placed where they suit you. Tell us what your week looks like and we'll space them sensibly.</p>
+          <p>Yes, and most regulars do. A common week: hyperbaric oxygen in the morning, infrared in the evening, and the chair or a massage where they fit. Tell us your week and we'll space them out.</p>
         </div>
       </details>
     </div>
@@ -1029,7 +1040,7 @@ ul.body li + li{margin-top:10px}
       <p class="title">Getting started</p>
 
       <h2 class="lede" style="margin-top:14px">Start with one and see.</h2>
-      <p style="margin-top:22px">A single session will tell you more than this page can. We'd recommend a block from there, for the reason the questions above give: this is judged over a run of sessions. Nobody here will push you into it on the day, and a session at a time is always there if you'd rather start smaller. If you'd rather talk it through first, ring 083 867 2844 and say what you're hoping for. We'll be straight with you about whether we think it suits.</p>
+      <p style="margin-top:22px">Start with a single session. After that we recommend a block, because these therapies work over a run of sessions. Want to talk it through first? Ring 083 867 2844.</p>
       <div style="display:flex;flex-wrap:wrap;align-items:center;gap:clamp(16px,2vw,28px);margin-top:clamp(28px,3.4vw,40px)">
         <a class="btn" href="https://optimalhealthatinspire.simplybook.it/v2">Book a session</a>
         <a class="explore" href="contact.html">Ring or message us</a>

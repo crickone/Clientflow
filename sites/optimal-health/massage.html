@@ -764,7 +764,7 @@ ul.body li + li{margin-top:10px}
 }
 @media (max-width:640px){
 
-  .spread{flex-wrap:wrap;justify-content:flex-start;column-gap:16px;row-gap:6px}
+  .spread{flex-wrap:wrap;justify-content:flex-start;column-gap:12px;row-gap:6px;letter-spacing:.08em}
 
   .rate{text-align:left}
 
@@ -774,6 +774,18 @@ ul.body li + li{margin-top:10px}
   .nav__book,.nav__menu{min-height:40px;display:inline-flex;align-items:center;padding:0 14px}
   .strip__a{padding-block:10px}
   .qa details > summary{padding-block:12px}
+}
+
+@media (hover:none), (max-width:820px){
+  .roll--therapies .roll__head{position:relative;padding-right:36px}
+  .roll--therapies .roll__head::after{
+    content:"";position:absolute;right:6px;top:50%;
+    width:9px;height:9px;
+    border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;
+    transform:translateY(-70%) rotate(45deg);
+    transition:transform .3s cubic-bezier(.3,.9,.2,1);
+  }
+  .roll--therapies .roll__row.is-open .roll__head::after{transform:translateY(-30%) rotate(-135deg)}
 }
 </style>
 </head>
@@ -837,7 +849,7 @@ ul.body li + li{margin-top:10px}
     <div class="body">
       <h2 class="lede">Ten treatments, and somebody to tell you which one.</h2>
       <p style="margin-top:22px">Every treatment is hands-on, done by a clinical therapist, and priced on its own, so there's no block to buy. Open any of them below to see what it involves.</p>
-      <p>Not sure which to book? Ring us on 083 867 2844 and tell us what the last few weeks have been like. We'll point you to the right one, or to one of the other therapies if that suits you better.</p>
+      <p>Not sure which to book? Ring 083 867 2844 and we'll recommend one.</p>
     </div>
     <div class="tile__img"><img src="assets/massage-lavashell-leg.jpg" alt="A therapist working along a client's calf, a bolster under the knee" loading="lazy" /></div>
   </div>
@@ -876,7 +888,7 @@ ul.body li + li{margin-top:10px}
         <div class="roll__inner">
           <div class="roll__media"><img src="assets/massage-room.jpg" alt="A therapist working a client's back in the olive treatment room" loading="lazy" /></div>
           <div class="roll__copy">
-            <p class="roll__body">Slower, firmer pressure worked into muscle that has tightened, usually through the back, shoulders and hips. It can be uncomfortable at the edges, and it should never be more than that. We agree the pressure with you first and change it the moment you say.</p>
+            <p class="roll__body">Slower, firmer pressure worked into muscle that has tightened, usually through the back, shoulders and hips. It can be a little uncomfortable, never more. We agree the pressure with you and change it whenever you ask.</p>
           </div>
         </div>
       </div>
@@ -921,7 +933,7 @@ ul.body li + li{margin-top:10px}
         <div class="roll__inner">
           <div class="roll__media"><img src="assets/massage-foot.jpg" alt="A therapist's hands working a client's foot and ankle" loading="lazy" /></div>
           <div class="roll__copy">
-            <p class="roll__body">Precise thumb and finger work on the feet, lying down, with only your shoes and socks off. It works from the principle that points on the feet correspond to the rest of the body; what nobody disputes is how calm most people feel afterwards. VHI members may be able to claim some of it back.</p>
+            <p class="roll__body">Precise thumb and finger work on the feet, lying down, with only your shoes and socks off. It's based on the idea that points on the feet link to the rest of the body. Most people find it very calming. VHI members may be able to claim some of it back.</p>
           </div>
         </div>
       </div>
@@ -951,7 +963,7 @@ ul.body li + li{margin-top:10px}
         <div class="roll__inner">
           <div class="roll__media"><img src="assets/corridor-massage-door.jpg" alt="The massage therapy room door at the clinic" loading="lazy" /></div>
           <div class="roll__copy">
-            <p class="roll__body">You stay seated and fully dressed while the therapist works through your scalp, neck and shoulders. Forty minutes and nothing to change out of, so it fits easily into a working day.</p>
+            <p class="roll__body">You stay seated and fully dressed while the therapist works through your scalp, neck and shoulders. Forty minutes, with nothing to change out of.</p>
           </div>
         </div>
       </div>
@@ -996,7 +1008,7 @@ ul.body li + li{margin-top:10px}
         <div class="roll__inner">
           <div class="roll__media"><img src="assets/massage-room.jpg" alt="A therapist working gently across a client's back in the olive treatment room" loading="lazy" /></div>
           <div class="roll__copy">
-            <p class="roll__body">Very light, slow, rhythmic strokes, not much more than the weight of a hand. The lightness is the technique, not the therapist going easy on you. If you've had surgery or are under a consultant's care, check with them before you book.</p>
+            <p class="roll__body">Very light, slow, rhythmic strokes, not much more than the weight of a hand. If you've had surgery or are under a consultant's care, check with them before you book.</p>
           </div>
         </div>
       </div>
@@ -1035,55 +1047,55 @@ ul.body li + li{margin-top:10px}
       <details class="qa__row">
         <summary class="qa__q">Which one should I book?</summary>
         <div class="qa__a">
-          <p>Ring us and say what's been going on &mdash; a heavy training block, a desk and a long commute, a week that won't switch off. We'll say which we think fits. If none of them do, or if one of the other therapies is the better answer, we'll say that instead.</p>
+          <p>Ring us, tell us what's been going on, and we'll recommend one.</p>
         </div>
       </details>
       <details class="qa__row">
         <summary class="qa__q">Do I have to undress?</summary>
         <div class="qa__a">
-          <p>It depends which one you book. For massage you undress to your underwear and stay under towels throughout, with only the area being worked uncovered. For reflexology it's shoes and socks. For Indian head massage you stay seated and dressed. Whichever it is, the therapist tells you before anything starts.</p>
+          <p>For massage you undress to your underwear and stay under towels, with only the area being worked uncovered. For reflexology it's shoes and socks. For Indian head massage you stay dressed. The therapist will tell you before you start.</p>
         </div>
       </details>
       <details class="qa__row">
         <summary class="qa__q">Is it going to hurt?</summary>
         <div class="qa__a">
-          <p>Deep tissue work can be uncomfortable at the edges, and it should never be more than that. We set the pressure with you at the start and change it the moment you say. Nobody here is impressed by how much you can take.</p>
+          <p>Deep tissue can be a little uncomfortable, never more. We set the pressure with you and change it whenever you ask.</p>
         </div>
       </details>
       <details class="qa__row">
         <summary class="qa__q">How often should I come?</summary>
         <div class="qa__a">
-          <p>There's no schedule to keep. Some people book a treatment when a training block has caught up with them, and some keep a standing hour every second week because it's the only one in the fortnight that's theirs. Start with one and see which of those you turn out to be.</p>
+          <p>Whenever suits you. Some people book when a training block catches up with them; others keep a regular slot every two weeks.</p>
         </div>
       </details>
       <details class="qa__row">
         <summary class="qa__q">Can I book it alongside the other therapies?</summary>
         <div class="qa__a">
-          <p>Yes, and plenty of people do. Bodywork sits alongside infrared, hyperbaric oxygen and the HIFEM chair rather than competing with them. Tell us what your week looks like and we'll space them sensibly.</p>
+          <p>Yes, and plenty of people do. Tell us your week and we'll space them out.</p>
         </div>
       </details>
       <details class="qa__row">
         <summary class="qa__q">Is this a medical treatment?</summary>
         <div class="qa__a">
-          <p>No. We offer wellness bodywork, for tension, comfort and rest. We don't diagnose medical conditions and we don't claim to resolve them. If you have a diagnosed condition, or you're under anyone's care, follow their advice and tell us before you book so we can say honestly whether this suits you.</p>
+          <p>No. It's wellness bodywork for tension, comfort and rest. We don't diagnose or treat medical conditions. If you're under anyone's care, follow their advice and tell us before you book.</p>
         </div>
       </details>
       <details class="qa__row">
         <summary class="qa__q">I'm recovering from an operation.</summary>
         <div class="qa__a">
-          <p>Talk to us, and to whoever is looking after your recovery. We'll only go ahead with their agreement, and we'd far rather wait a fortnight than get that one wrong. Tell us about older surgery too, however long ago it was.</p>
+          <p>Talk to us and to whoever is looking after your recovery. We'll only go ahead with their agreement. Tell us about older surgery too.</p>
         </div>
       </details>
       <details class="qa__row">
         <summary class="qa__q">Can I book while pregnant?</summary>
         <div class="qa__a">
-          <p>Tell us when you book. Some of these are suitable with adjustments and some aren't, and if there's any doubt at all we'll ask you to check with your midwife or GP first.</p>
+          <p>Tell us when you book. Some treatments are suitable with adjustments and some aren't; if in doubt, we'll ask you to check with your midwife or GP first.</p>
         </div>
       </details>
       <details class="qa__row">
         <summary class="qa__q">What is the oncology cancer care massage?</summary>
         <div class="qa__a">
-          <p>It's massage adapted for people who are in treatment or have been, carried out by a therapist trained for that work: lighter, slower, planned around you, and adjusted for the day rather than the booking. We're not telling you it does anything about your treatment, because that's not ours to say. Tell us where you're up to when you book, speak to your medical team first, and we'll go ahead with their agreement.</p>
+          <p>Massage adapted for people in or after cancer treatment, by a therapist trained for that work: lighter, slower and adjusted to how you are on the day. Speak to your medical team first, and tell us where you're up to when you book.</p>
         </div>
       </details>
     </div>
@@ -1100,7 +1112,7 @@ ul.body li + li{margin-top:10px}
       <p class="title">Getting started</p>
 
       <h2 class="lede" style="margin-top:14px">Book one and see.</h2>
-      <p style="margin-top:22px">If you're not sure which of the ten you want, ring us on 083 867 2844 and say what the last few weeks have been like. We'll tell you which we think fits, including when the honest answer is one of the other therapies instead.</p>
+      <p style="margin-top:22px">Not sure which you want? Ring 083 867 2844 and we'll recommend one.</p>
       <p style="margin-top:28px"><a class="btn" href="https://optimalhealthatinspire.simplybook.it/v2">Book a session</a></p>
     </div>
   </div>

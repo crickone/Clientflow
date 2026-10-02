@@ -764,7 +764,7 @@ ul.body li + li{margin-top:10px}
 }
 @media (max-width:640px){
 
-  .spread{flex-wrap:wrap;justify-content:flex-start;column-gap:16px;row-gap:6px}
+  .spread{flex-wrap:wrap;justify-content:flex-start;column-gap:12px;row-gap:6px;letter-spacing:.08em}
 
   .rate{text-align:left}
 
@@ -774,6 +774,18 @@ ul.body li + li{margin-top:10px}
   .nav__book,.nav__menu{min-height:40px;display:inline-flex;align-items:center;padding:0 14px}
   .strip__a{padding-block:10px}
   .qa details > summary{padding-block:12px}
+}
+
+@media (hover:none), (max-width:820px){
+  .roll--therapies .roll__head{position:relative;padding-right:36px}
+  .roll--therapies .roll__head::after{
+    content:"";position:absolute;right:6px;top:50%;
+    width:9px;height:9px;
+    border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;
+    transform:translateY(-70%) rotate(45deg);
+    transition:transform .3s cubic-bezier(.3,.9,.2,1);
+  }
+  .roll--therapies .roll__row.is-open .roll__head::after{transform:translateY(-30%) rotate(-135deg)}
 }
 </style>
 </head>
@@ -803,8 +815,8 @@ ul.body li + li{margin-top:10px}
   <div class="hero__media shot--room"><img src="assets/reception.jpg" alt="The waiting area at Optimal Health and Recovery, Ard Gaoithe Business Park, Clonmel, bamboo beside the hyperbaric oxygen room door" /></div>
   <div class="hero__inner">
     <p class="micro" data-rise style="color:var(--sage)">About</p>
-    <h1 class="wordmark hero__mark" style="margin-top:22px">A room built to be calm.</h1>
-    <p class="lede hero__sub" data-rise>Optimal Health &amp; Recovery sits inside Inspire at Ard Gaoithe Business Park in Clonmel. Four recovery therapies, guided sessions, and somewhere pleasant to sit while you wait.</p>
+    <h1 class="wordmark hero__mark" style="margin-top:22px">About the clinic.</h1>
+    <p class="lede hero__sub" data-rise>Optimal Health &amp; Recovery is inside Inspire at Ard Gaoithe Business Park, Clonmel, with four recovery therapies and guided sessions.</p>
     <div class="hero__foot" data-rise>
       <a class="btn" href="https://optimalhealthatinspire.simplybook.it/v2">Book a session</a>
     </div>
@@ -816,8 +828,8 @@ ul.body li + li{margin-top:10px}
     <div>
       <p class="title">Who it is for</p>
 
-      <h2 class="lede">Helping busy bodies feel better every day.</h2>
-      <p style="margin-top:22px">We built this for people training hard, living busy, or simply wanting to move, sleep and feel better again. Our sessions support your body's natural processes, so you can keep up with life rather than slow down.</p>
+      <h2 class="lede">For anyone who wants to move, sleep and feel better.</h2>
+      <p style="margin-top:22px">People who train hard, work long weeks, or want to move and sleep better.</p>
       <p>You don't need to be an athlete, and you don't need to know which therapy you want before you arrive.</p>
     </div>
     <div class="tile__img"><img src="assets/room.jpg" alt="The waiting area at the clinic: a green sofa, bamboo, and the treatment-room doors off it" loading="lazy" /></div>
@@ -835,10 +847,10 @@ ul.body li + li{margin-top:10px}
       <div class="tile__img"><img src="assets/infrared-session-start.jpg" alt="A staff member's hand on the infrared bed's control panel, a client already lying inside the open end" loading="lazy" /></div>
     </div>
     <div class="cols4" data-stagger>
-      <div class="cell"><p class="roll__n">01</p><p class="cell__v">Someone shows you in and sets you up. You're never left to work out the equipment yourself.</p></div>
-      <div class="cell"><p class="roll__n">02</p><p class="cell__v">We stay available for the whole session in case you want anything.</p></div>
+      <div class="cell"><p class="roll__n">01</p><p class="cell__v">Someone shows you in and sets you up.</p></div>
+      <div class="cell"><p class="roll__n">02</p><p class="cell__v">We're there for the whole session.</p></div>
       <div class="cell"><p class="roll__n">03</p><p class="cell__v">If we don't think a therapy suits what you're after, we'll say so.</p></div>
-      <div class="cell"><p class="roll__n">04</p><p class="cell__v">You go straight back to your day; there's nothing to rest off afterwards. The HIFEM chair is the exception. That one's muscle work, so plan it like a gym session.</p></div>
+      <div class="cell"><p class="roll__n">04</p><p class="cell__v">You go straight back to your day afterwards. The HIFEM chair is muscle work, so plan it like a gym session.</p></div>
     </div>
   </div>
 </section>

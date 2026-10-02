@@ -764,7 +764,7 @@ ul.body li + li{margin-top:10px}
 }
 @media (max-width:640px){
 
-  .spread{flex-wrap:wrap;justify-content:flex-start;column-gap:16px;row-gap:6px}
+  .spread{flex-wrap:wrap;justify-content:flex-start;column-gap:12px;row-gap:6px;letter-spacing:.08em}
 
   .rate{text-align:left}
 
@@ -774,6 +774,18 @@ ul.body li + li{margin-top:10px}
   .nav__book,.nav__menu{min-height:40px;display:inline-flex;align-items:center;padding:0 14px}
   .strip__a{padding-block:10px}
   .qa details > summary{padding-block:12px}
+}
+
+@media (hover:none), (max-width:820px){
+  .roll--therapies .roll__head{position:relative;padding-right:36px}
+  .roll--therapies .roll__head::after{
+    content:"";position:absolute;right:6px;top:50%;
+    width:9px;height:9px;
+    border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;
+    transform:translateY(-70%) rotate(45deg);
+    transition:transform .3s cubic-bezier(.3,.9,.2,1);
+  }
+  .roll--therapies .roll__row.is-open .roll__head::after{transform:translateY(-30%) rotate(-135deg)}
 }
 </style>
 </head>
@@ -804,7 +816,7 @@ ul.body li + li{margin-top:10px}
   <div class="hero__inner">
     <p class="micro" data-rise style="color:var(--sage)">Therapy</p>
     <h1 class="wordmark hero__mark" style="margin-top:22px">Infrared.</h1>
-    <p class="lede hero__sub" data-rise>Deep, gentle warmth. You lie down, the bed does the rest, and most people find it the easiest twelve minutes of their week.</p>
+    <p class="lede hero__sub" data-rise>Twelve minutes on a bed of red and near-infrared light. Most people book it to wind down and to ease stiff muscles and joints.</p>
     <div class="hero__foot" data-rise>
       <a class="btn" href="https://optimalhealthatinspire.simplybook.it/v2">Book a session</a>
       <a class="explore" href="pricing.html">See pricing</a>
@@ -848,10 +860,10 @@ ul.body li + li{margin-top:10px}
       <div class="tile__img"><img src="assets/infrared-session-start.jpg" alt="A staff member's hand on the infrared bed's control panel, a client already lying inside the open end" loading="lazy" /></div>
     </div>
     <div class="cols4" data-stagger style="margin-top:clamp(30px,3.8vw,48px)">
-      <div class="cell"><p class="roll__n">01</p><p class="cell__v">Arrive hydrated, and skip a heavy meal right beforehand. That is the whole of the preparation.</p></div>
+      <div class="cell"><p class="roll__n">01</p><p class="cell__v">Arrive hydrated and skip a heavy meal beforehand.</p></div>
       <div class="cell"><p class="roll__n">02</p><p class="cell__v">Someone shows you in, sets the bed up and leaves you to it.</p></div>
       <div class="cell"><p class="roll__n">03</p><p class="cell__v">Twelve minutes on the bed, on your own in the room. Most people close their eyes.</p></div>
-      <div class="cell"><p class="roll__n">04</p><p class="cell__v">A glass of water, and on with the day. Nothing to plan around.</p></div>
+      <div class="cell"><p class="roll__n">04</p><p class="cell__v">A glass of water, and on with your day.</p></div>
     </div>
   </div>
 </section>
@@ -882,9 +894,9 @@ ul.body li + li{margin-top:10px}
     </ul>
     <div class="says">
       <div class="body">
-        <p>Our bed emits red and near-infrared light at five wavelengths: 633, 660, 810, 850 and 940 nm. Those numbers describe the machine, the way a wattage describes a kettle. Red is the part you can see. Near-infrared is the part you can't, and it carries furthest into tissue.</p>
-        <p>As far as anyone understands it, the mechanism runs like this. Light at those wavelengths passes into skin and connective tissue much as sunlight passes through a window, and cells absorb it the way a solar panel absorbs daylight. Inside the cell, the mitochondria are thought to do the absorbing. They're the part that makes the cell's energy, and the working account is that they can make more usable energy when they do.</p>
-        <p>With more of that energy to hand, a cell can do more of its ordinary work. Fibroblasts &mdash; the cells that make collagen &mdash; can lay down more of it. Small blood vessels can open a little wider, so more oxygen and nutrients reach the area being warmed. The signalling that keeps tissue irritated can settle. We say &ldquo;can&rdquo; and not &ldquo;will&rdquo; in every one of those, and we mean it: that's what the process is understood to encourage over a run of sessions, not what one session delivers.</p>
+        <p>The bed gives off red and near-infrared light at five wavelengths: 633, 660, 810, 850 and 940 nm. Red is the light you can see. Near-infrared is invisible and reaches deepest into tissue.</p>
+        <p>Cells absorb this light, mainly in the mitochondria, the part of the cell that makes energy. The current understanding is that they can then make more usable energy.</p>
+        <p>With more energy, cells can do more of their normal work: collagen-making cells can lay down more collagen, small blood vessels can widen to bring in more oxygen and nutrients, and irritated tissue can settle. These changes build over a run of sessions.</p>
       </div>
       <div class="tile__img"><img src="assets/infrared-bed-detail.jpg" alt="Close on the Optimal Health name set into the bed's shell, under a red wash" loading="lazy" /></div>
     </div>
@@ -896,7 +908,7 @@ ul.body li + li{margin-top:10px}
     <div class="band__head__l body">
       <p class="title" style="color:var(--timber)">The bed</p>
       <p class="lede" style="margin-top:20px;color:var(--sage)">633 &middot; 660 &middot; 810 &middot; 850 &middot; 940 nm</p>
-      <p style="margin-top:20px">Five wavelengths, red and near-infrared, and no ultraviolet at all. That's what the machine emits, and it's a fact about the machine and nothing more. What that's worth to you is a different question, and the honest answer is the timeline below rather than a number.</p>
+      <p style="margin-top:20px">Five wavelengths of red and near-infrared light, and no ultraviolet.</p>
     </div>
   </div>
 </section>
@@ -914,15 +926,15 @@ ul.body li + li{margin-top:10px}
         <ul class="body">
           <li>Promotes deep relaxation after a busy or stressful day</li>
           <li>Often used in the evening to support a steadier sleep routine</li>
-          <li>Can nudge the nervous system out of an always-on state</li>
+          <li>Can help you switch off</li>
         </ul>
       </div>
       <div>
         <h3 class="panel__t" style="text-align:left">Muscle and joint comfort</h3>
         <ul class="body">
-          <li>Helps tight muscles let go, particularly through hips, back and shoulders</li>
+          <li>Helps tight muscles relax, especially in the hips, back and shoulders</li>
           <li>Supports joint comfort and easy range of movement</li>
-          <li>Eases the general stiffness that follows sitting, commuting or training</li>
+          <li>Eases stiffness from sitting, commuting or training</li>
         </ul>
       </div>
       <div>
@@ -943,27 +955,27 @@ ul.body li + li{margin-top:10px}
       </div>
     </div>
     <h2 class="lede" style="margin-top:clamp(44px,5vw,68px)">What the first twelve weeks are doing.</h2>
-    <p class="body" style="margin:clamp(20px,2.4vw,28px) 0 clamp(24px,3vw,36px)">This isn't a promise about how you'll look or feel. It's an account of what the process is understood to be doing at each stage, set out so you can judge the rhythm against something honest rather than against a photograph. How red and near-infrared light acts on the body is still being worked out, so read the weeks as the shape the research points to so far, not as a timetable.</p>
+    <p class="body" style="margin:clamp(20px,2.4vw,28px) 0 clamp(24px,3vw,36px)">What the research suggests is happening at each stage. It's still being studied, so treat the weeks as a guide rather than a timetable.</p>
     <ol class="arc" data-stagger>
       <li class="arc__row">
         <p class="arc__k">Weeks 1&ndash;2</p>
         <div>
-          <p class="arc__t">Circulation, not collagen.</p>
-          <p class="arc__b">In the first fortnight the light is thought to act on cellular energy and on microcirculation. Blood flow to the area being warmed can increase, and the inflammatory signalling around it can begin to settle. Tissue often feels calmer and less tight, and people commonly say they look a little fresher. It's worth being plain about what that is. No collagen has been rebuilt at this stage. Whatever you notice in the first two weeks is far more likely to be blood flow, lymphatic drainage and a quieter inflammatory picture than anything structural. It's the groundwork, not the build.</p>
+          <p class="arc__t">Circulation first.</p>
+          <p class="arc__b">In the first two weeks, the light is thought to work on cell energy and circulation. Blood flow can increase and inflammation can settle, so tissue may feel calmer and less tight. No collagen has been rebuilt yet.</p>
         </div>
       </li>
       <li class="arc__row">
         <p class="arc__k">Weeks 4&ndash;6</p>
         <div>
           <p class="arc__t">Fibroblasts get to work.</p>
-          <p class="arc__b">This is when the collagen-making cells can start laying down new procollagen, along with the molecules that hold water in the dermis. Skin can feel springier and hold moisture better; in tendon and ligament, early collagen organisation is thought to begin around here. Any early change in firmness belongs to this stage. Consistency carries it, and so does eating enough protein and vitamin C, because the body builds collagen out of those.</p>
+          <p class="arc__b">Collagen-making cells can start laying down new collagen, along with the molecules that hold water in the skin. Skin can feel springier and better hydrated. Eating enough protein and vitamin C helps, because the body builds collagen from them.</p>
         </div>
       </li>
       <li class="arc__row">
         <p class="arc__k">Weeks 8&ndash;12+</p>
         <div>
-          <p class="arc__t">Reorganising, not just adding.</p>
-          <p class="arc__b">Later on, the working account is that the fibres reorganise and align, with more of the mature Type I collagen forming and the enzymes that break collagen down dialling back. This is the slow half of the work, and the half a fortnight can't reach. Over twelve weeks the useful question is upkeep.</p>
+          <p class="arc__t">Reorganising.</p>
+          <p class="arc__b">Later, the collagen fibres are thought to reorganise and strengthen, while the enzymes that break collagen down slow. After twelve weeks, the aim is keeping it up.</p>
         </div>
       </li>
     </ol>
@@ -981,43 +993,43 @@ ul.body li + li{margin-top:10px}
       <details class="qa__row">
         <summary class="qa__q">Is it a sunbed?</summary>
         <div class="qa__a">
-          <p>No. A sunbed works by emitting ultraviolet light, and this bed emits none. It runs in the red and near-infrared bands &mdash; 633, 660, 810, 850 and 940 nm &mdash; which sit at the far side of visible light from ultraviolet. There's no tanning and no burning, and nothing about a session is meant to change the colour of your skin.</p>
+          <p>No. Sunbeds use ultraviolet light, and this bed uses none. It runs on red and near-infrared light, so there's no tanning and no burning.</p>
         </div>
       </details>
       <details class="qa__row">
         <summary class="qa__q">Is this a medical treatment?</summary>
         <div class="qa__a">
-          <p>No. We run wellness-focused infrared warmth for relaxation, comfort and rest. We don't diagnose medical conditions and we don't claim to resolve them. If you have a diagnosed condition, follow your clinician's advice, and tell us about it before you book so we can say honestly whether this suits you.</p>
+          <p>No. It's a wellness session for relaxation, comfort and rest. We don't diagnose or treat medical conditions. If you have one, follow your doctor's advice and tell us before you book.</p>
         </div>
       </details>
 
       <details class="qa__row">
         <summary class="qa__q">What do I wear, and do I have to undress?</summary>
         <div class="qa__a">
-          <p>You undress for this one. The chair and the chamber you stay dressed for; the bed you don't. Red and near-infrared light has to land on skin to get in, and clothing blocks it, so the less you have on, the more of you the twelve minutes actually reaches. With nothing on, all of you gets the light.</p>
-          <p>Underwear is fine and plenty of people keep it on. It's your call rather than ours, and nobody will push you either way.</p>
-          <p>You're on your own in the room for the session. We set the bed up, check you're comfortable, and leave you to it. If you'd rather ask how that works before you arrive than at the desk, ring 083 867 2844.</p>
-          <p>Otherwise: arrive hydrated and skip a heavy meal immediately beforehand. That's the whole of the preparation.</p>
+          <p>Yes. Clothing blocks the light, so the less you wear, the more of your skin it reaches.</p>
+          <p>Underwear is fine; it's your choice.</p>
+          <p>You're on your own in the room. We set the bed up, check you're comfortable and leave you to it.</p>
+          <p>Arrive hydrated and skip a heavy meal beforehand.</p>
         </div>
       </details>
       <details class="qa__row">
         <summary class="qa__q">Will I sweat?</summary>
         <div class="qa__a">
-          <p>Some people sweat lightly and some don't, and either is normal. This isn't a sweat session. The point is comfortable warmth, and we'd rather keep you comfortable than push you past it. Have a glass of water afterwards either way.</p>
+          <p>A little, or not at all. It's comfortable warmth rather than a sauna. Have a glass of water afterwards.</p>
         </div>
       </details>
       <details class="qa__row">
         <summary class="qa__q">Can I use it on the same day as training?</summary>
         <div class="qa__a">
-          <p>Yes. Plenty of people train earlier in the day and book the bed in the evening to wind down. It adds no training load of its own, which also makes it useful on a rest day when you want recovery without doing any more work.</p>
-          <p>A common week is hyperbaric oxygen in the morning for a clear head and infrared in the evening for sleep, with HIFEM or a massage placed where they suit you. Tell us what your week looks like and we'll space them sensibly.</p>
+          <p>Yes. Many people train earlier and book the bed in the evening to wind down. It adds no training load, so it also suits a rest day.</p>
+          <p>A common week: hyperbaric oxygen in the morning, infrared in the evening, and HIFEM or a massage where they fit. Tell us your week and we'll space them out.</p>
         </div>
       </details>
       <details class="qa__row">
         <summary class="qa__q">Who should check with a GP first?</summary>
         <div class="qa__a">
           <p>Anyone pregnant or trying to conceive, anyone with cardiovascular conditions, heat intolerance or a photosensitive condition.</p>
-          <p>Also anyone taking something that makes them more sensitive to light. That's a longer list than people expect, and it's worth checking rather than assuming: some antibiotics, acne and retinoid medication, some diuretics and anti-inflammatories, and herbal preparations including St John's Wort all carry that warning. If you're on anything at all, read the leaflet or ask your pharmacist, and tell us before you book.</p>
+          <p>Also anyone on medication that increases sensitivity to light, including some antibiotics, acne and retinoid medication, some diuretics and anti-inflammatories, and St John's Wort. If you're on anything, check the leaflet or ask your pharmacist, and tell us before you book.</p>
           <p>If you have skin sensitivities, ask your GP or dermatologist. For teenagers we need guardian consent, and for older adults with health considerations we may ask for GP guidance before going ahead.</p>
         </div>
       </details>
@@ -1063,7 +1075,7 @@ ul.body li + li{margin-top:10px}
       <p class="title">Getting started</p>
 
       <h2 class="lede" style="margin-top:14px">Come and lie on it once.</h2>
-      <p style="margin-top:22px">One session will tell you more about whether you like it than anything on this page can. After that we'd recommend a block, because this is counted in weeks rather than visits. There's no hurry, and nothing about a first session commits you.</p>
+      <p style="margin-top:22px">Try one session first. After that we recommend a block, because it works over a run of sessions.</p>
       <p style="margin-top:28px"><a class="btn" href="https://optimalhealthatinspire.simplybook.it/v2">Book a session</a></p>
     </div>
   </div>

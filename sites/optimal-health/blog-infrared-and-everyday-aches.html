@@ -764,7 +764,7 @@ ul.body li + li{margin-top:10px}
 }
 @media (max-width:640px){
 
-  .spread{flex-wrap:wrap;justify-content:flex-start;column-gap:16px;row-gap:6px}
+  .spread{flex-wrap:wrap;justify-content:flex-start;column-gap:12px;row-gap:6px;letter-spacing:.08em}
 
   .rate{text-align:left}
 
@@ -774,6 +774,18 @@ ul.body li + li{margin-top:10px}
   .nav__book,.nav__menu{min-height:40px;display:inline-flex;align-items:center;padding:0 14px}
   .strip__a{padding-block:10px}
   .qa details > summary{padding-block:12px}
+}
+
+@media (hover:none), (max-width:820px){
+  .roll--therapies .roll__head{position:relative;padding-right:36px}
+  .roll--therapies .roll__head::after{
+    content:"";position:absolute;right:6px;top:50%;
+    width:9px;height:9px;
+    border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;
+    transform:translateY(-70%) rotate(45deg);
+    transition:transform .3s cubic-bezier(.3,.9,.2,1);
+  }
+  .roll--therapies .roll__row.is-open .roll__head::after{transform:translateY(-30%) rotate(-135deg)}
 }
 </style>
 </head>
@@ -813,27 +825,27 @@ ul.body li + li{margin-top:10px}
 
 <section class="band">
   <div class="post__body">
-    <h2>The thing people actually come in about</h2>
-    <p>Shoulders that have set after a week at a desk. Hips that complain after a long drive. A back that is louder some weeks than others, and a stiffness first thing in the morning that wasn't there a few years ago. None of that has to have a name before it's worth doing something about, and most people who book the bed couldn't give you one if you asked.</p>
+    <h2>What people come in about</h2>
+    <p>Shoulders stiff from a week at a desk. Hips sore after a long drive. A back that's worse some weeks than others, and morning stiffness that wasn't there a few years ago.</p>
 
     <h2>What the bed emits</h2>
-    <p>Red and near-infrared light at five wavelengths: 633, 660, 810, 850 and 940 nm, and no ultraviolet at all. Those numbers are a specification of the machine, the way a kettle has a wattage. Red is the part you can see. Near-infrared is the part you can't, and it carries furthest into tissue.</p>
-    <p>It's not a sunbed. A sunbed works by emitting ultraviolet light, and this bed emits none. There's no tanning and no burning, and nothing about a session is meant to change the colour of your skin.</p>
+    <p>Red and near-infrared light at five wavelengths: 633, 660, 810, 850 and 940 nm, and no ultraviolet. Red is the light you can see; near-infrared is invisible and reaches deepest into tissue.</p>
+    <p>It's not a sunbed: there's no ultraviolet, so no tanning and no burning.</p>
 
     <h2>What the light is understood to do</h2>
-    <p>The mechanism, as far as anyone understands it, runs like this. Light at those wavelengths passes into skin and the connective tissue under it much as sunlight passes through a window, and cells absorb it the way a solar panel absorbs daylight. Inside the cell, the mitochondria do the absorbing &mdash; they're the part that makes the cell&rsquo;s energy &mdash; and the working account is that they can make more usable energy when they do.</p>
-    <p>With more of that energy to hand, a cell can do more of its ordinary work. Small blood vessels can open a little wider, so more oxygen and nutrients reach the area being warmed. The cells that make collagen can lay down more of it. The signalling that keeps tissue irritated can settle.</p>
-    <p>Every one of those is a &ldquo;can&rdquo; rather than a &ldquo;will&rdquo;. They're what the process is understood to encourage over a run of sessions, not what one session delivers.</p>
-    <p>One practical thing follows from all of it. Light can't get through clothing, so you undress for the bed. The less you have on, the more of you the twelve minutes reaches, and with nothing on all of you gets the light. Underwear is fine and plenty of people keep it on. You're on your own in the room, and it's your call rather than ours.</p>
+    <p>Cells absorb the light, mainly in the mitochondria, the part of the cell that makes energy. The current understanding is that they can then make more usable energy.</p>
+    <p>With more energy, cells can do more of their normal work: small blood vessels can widen to bring in more oxygen and nutrients, collagen-making cells can lay down more collagen, and irritated tissue can settle.</p>
+    <p>These changes build over a run of sessions.</p>
+    <p>You undress for the bed, because clothing blocks the light. The less you wear, the more of you it reaches; underwear is fine. You're on your own in the room.</p>
 
     <h2>What it feels like</h2>
-    <p>Deep, even warmth that should feel soothing rather than hot. You lie back and the bed warms up gradually. There's little sweating to speak of, no effort, and nothing to recover from afterwards. If it ever feels too warm, say so &mdash; we can turn it down or stop.</p>
+    <p>Even warmth that builds gradually. You barely sweat and there's nothing to recover from. If it feels too warm, tell us and we'll turn it down.</p>
 
     <h2>What people say afterwards</h2>
-    <p>Looser through the hips, back and shoulders, and warm for a while after. People often say the stiffness that follows sitting or training is easier the next morning, and a good number say they slept better the night of a session. That's what clients report, not what we can promise.</p>
+    <p>People say they feel looser through the hips, back and shoulders, that next-morning stiffness is easier, and that they sleep better that night. That's what clients report, not a promise.</p>
 
     <h2>What it isn't</h2>
-    <p>It's not a medical treatment. We run wellness-focused infrared warmth for relaxation, comfort and rest. We don't diagnose anything and we make no claim to resolve anything. If you have a diagnosed condition, follow your clinician&rsquo;s advice, and tell us about it before you book so we can say honestly whether this suits you.</p>
+    <p>It's not a medical treatment, and we don't diagnose or treat anything. If you have a diagnosed condition, follow your doctor's advice and tell us before you book.</p>
   </div>
 </section>
 
@@ -842,7 +854,7 @@ ul.body li + li{margin-top:10px}
     <div class="band__head__l body">
       <p class="title">The session</p>
       <h2 class="lede" style="margin-top:14px">The bed runs twelve minutes. The visit sits inside half an hour.</h2>
-      <p style="margin-top:22px">&euro;50 a session, &euro;225 for five, &euro;400 for ten. Most people start with two or three a week for a fortnight, then settle into whatever fits their evenings and their training.</p>
+      <p style="margin-top:22px">&euro;50 a session, &euro;225 for five, &euro;400 for ten. Most people start with two or three a week for two weeks, then settle into a routine.</p>
       <p style="margin-top:28px"><a class="btn" href="https://optimalhealthatinspire.simplybook.it/v2">Book a session</a></p>
     </div>
   </div>
