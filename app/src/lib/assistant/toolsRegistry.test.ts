@@ -66,9 +66,9 @@ function ok(name: string, cond: boolean) {
 
   // 1. WRITE_TOOLS membership + order frozen.
   assert.deepStrictEqual([...WRITE_TOOLS], fixture.frozenWriteTools,
-    "WRITE_TOOLS drifted from the frozen 41 (membership or order changed)");
+    "WRITE_TOOLS drifted from the frozen 43 (membership or order changed)");
   passed++;
-  ok("WRITE_TOOLS has exactly 41 entries", WRITE_TOOLS.size === 41);
+  ok("WRITE_TOOLS has exactly 43 entries", WRITE_TOOLS.size === 43);
 
   // 2. isWriteTool agrees with WRITE_TOOLS, and stays false for read tools.
   for (const n of fixture.frozenWriteTools) ok(`isWriteTool("${n}") is true`, isWriteTool(n) === true);

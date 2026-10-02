@@ -45,9 +45,11 @@ const MARKETING_TOOLS = [
   // schedule itself.
   "schedule_social_post", "schedule_email_campaign", "schedule_blog_post",
   "cancel_scheduled_item", "list_schedule",
-  // The client's own website: read a page, change wording, swap a picture.
+  // The client's own website: read a page, change wording, swap a picture,
+  // add a page as a copy of an existing one, put a page live.
   "list_website_pages", "read_website_page", "list_website_images",
   "edit_website_text", "replace_website_image",
+  "create_website_page", "publish_website_page",
 ] as const;
 
 const OPS_TOOLS = [

@@ -316,6 +316,96 @@ const TAIL = `<script src="https://cdn.example/gsap.min.js"></script><script>con
         }),
       );
       assert.match(video.error as string, /video, not an image/, "a video is refused");
+
+      // ── A NEW PAGE, MADE BY COPYING ONE ─────────────────────────────────
+      // The operator asked for a new page and was told it could not be done.
+      // A new page is a copy of an existing one with the same text and image
+      // swaps the edit tools make, so every tag on it was written by whoever
+      // built the site, never by the model.
+      const pageCount = () => (sqlite.prepare("SELECT count(*) c FROM pages WHERE site_id=?").get(sid) as { c: number }).c;
+      const before = pageCount();
+      const sourceBefore = bodyNow();
+      const good = {
+        copyFrom: "/",
+        path: "/gift-vouchers",
+        title: "Gift vouchers",
+        description: "Give someone a session.",
+        textChanges: [
+          { find: "Clonmel's toughest gym", replace: "Gift vouchers" },
+          { find: "Open seven days a week.", replace: "Any amount, any session. $& stays literal." },
+        ],
+      };
+
+      for (const [bad, why] of [
+        [{ ...good, path: "/blog/vouchers" }, /used by the platform/],
+        [{ ...good, path: "/c" }, /used by the platform/],
+        [{ ...good, path: "/" }, /home page already exists/],
+        [{ ...good, path: "/Gift Vouchers!" }, /not a usable page address/],
+        [{ ...good, path: "/../etc" }, /not a usable page address/],
+        [{ ...good, copyFrom: "/nope" }, /No page at/],
+        [{ ...good, title: "<b>x</b>" }, /plain text/],
+        [{ ...good, textChanges: [] }, /needs its own wording/],
+        [{ ...good, textChanges: [{ find: "Clonmel", replace: "x" }] }, /appears \d+ times/],
+        [{ ...good, textChanges: [{ find: "Open seven days a week.", replace: "<script>alert(2)</script>" }] }, /plain text/],
+        [{ ...good, imageChanges: [{ currentSrc: "/no/such.jpg", imageId: mineId, source: "website" }] }, /Image change 1/],
+      ] as const) {
+        const r = parse(await web.createWebsitePageTool(ctx, bad as unknown as Record<string, unknown>));
+        assert.match(String(r.error ?? ""), why, `refused: ${JSON.stringify(bad).slice(0, 80)}`);
+      }
+      assert.equal(pageCount(), before, "A REFUSED CHANGE LEAVES NO HALF-MADE PAGE BEHIND");
+
+      const made = parse(await web.createWebsitePageTool(ctx, good));
+      assert.ok(!made.error, `the copy is made: ${made.error ?? ""}`);
+      assert.equal(pageCount(), before + 1, "one new page");
+      assert.match(String(made.result), /not live yet/, "the operator is told it is not live");
+      assert.match(String(made.result), /https?:\/\/\S+\/site\/wt\/gift-vouchers\?preview=1/, "…and given a full preview link they can click");
+
+      const newPage = sqlite
+        .prepare("SELECT id, status, title, template_id t FROM pages WHERE site_id=? AND path='/gift-vouchers'")
+        .get(sid) as { id: number; status: string; title: string; t: string };
+      assert.equal(newPage.status, "draft", "THE NEW PAGE IS NOT PUBLIC until it is published");
+      assert.equal(newPage.title, "Gift vouchers");
+      assert.equal(newPage.t, "clientflow-live", "it renders with the same template as the page it copied");
+
+      const newBody = (
+        sqlite.prepare("SELECT value v, updated_by u FROM content_blocks WHERE site_id=? AND page_id=? AND name='body'").get(sid, newPage.id) as {
+          v: string;
+          u: number | null;
+        }
+      );
+      assert.ok(newBody.v.startsWith(HEAD) && newBody.v.endsWith(TAIL), "THE COPY KEEPS THE DESIGN: same stylesheet, same scripts");
+      assert.ok(newBody.v.includes("<h1>Gift vouchers</h1>"), "the wording changed inside the original markup");
+      assert.ok(newBody.v.includes("$& stays literal."), "replacement text is taken literally, never as a regex pattern");
+      assert.ok(!newBody.v.includes("Clonmel's toughest gym"), "the old heading is gone from the copy");
+      assert.equal(newBody.u, 7, "stamped with the operator, so a deploy never overwrites it");
+      assert.equal(bodyNow(), sourceBefore, "THE PAGE IT WAS COPIED FROM IS UNTOUCHED");
+
+      const seo = sqlite
+        .prepare("SELECT seo_title t, seo_description d, canonical_url c FROM seo_meta WHERE site_id=? AND page_id=?")
+        .get(sid, newPage.id) as { t: string; d: string; c: string | null };
+      assert.equal(seo.t, "Gift vouchers");
+      assert.equal(seo.d, "Give someone a session.");
+      assert.equal(seo.c, null, "the source page's canonical URL is not carried over");
+
+      assert.match(
+        String(parse(await web.createWebsitePageTool(ctx, good)).error),
+        /already a page at/,
+        "the same address cannot be taken twice",
+      );
+
+      // Edits work on the unpublished page, and say so.
+      const draftEdit = parse(web.editWebsiteTextTool(ctx, { path: "/gift-vouchers", find: "Gift vouchers", replace: "Gift cards" }));
+      assert.match(String(draftEdit.result), /not published yet/, "an edit to a draft page does not claim to be live");
+
+      // Publishing.
+      assert.ok(parse(web.publishWebsitePageTool(ctx, { path: "/nope" })).error, "publishing a page that isn't there is refused");
+      const pub = parse(web.publishWebsitePageTool(ctx, { path: "/gift-vouchers" }));
+      assert.match(String(pub.result), /now live/, "the page goes live");
+      assert.equal(
+        (sqlite.prepare("SELECT status s FROM pages WHERE id=?").get(newPage.id) as { s: string }).s,
+        "published",
+        "…and its status says so",
+      );
     });
 
     console.log("tools.website.test.ts: all assertions passed");

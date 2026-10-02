@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 
 type Props = {
   params: { siteSlug: string; slug: string[] };
-  searchParams: { site?: string; cmsedit?: string };
+  searchParams: { site?: string; cmsedit?: string; preview?: string };
 };
 
 export function generateMetadata({ params, searchParams }: Props): Metadata {
@@ -76,6 +76,33 @@ export default async function PublicSitePage({ params, searchParams }: Props) {
     notFound();
   }
   const T = pc.template.Component;
+  // Only reachable through ?preview=1 by an admin of this business (see
+  // draftPageForPreview): label it, and keep the operator out of the pixel.
+  if (pc.page.status !== "published") {
+    return (
+      <>
+        <div
+          style={{
+            position: "fixed",
+            bottom: 16,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 2147483647,
+            padding: "6px 14px",
+            borderRadius: 999,
+            background: "#111",
+            color: "#fff",
+            font: "500 12px/1.4 system-ui, sans-serif",
+            boxShadow: "0 4px 16px rgba(0,0,0,.25)",
+            pointerEvents: "none",
+          }}
+        >
+          Draft preview - not live yet
+        </div>
+        <T ctx={pc.ctx} page={pc.page} />
+      </>
+    );
+  }
   return (
     <>
       {/* Public surface, so the client's pixel belongs here. Deliberately

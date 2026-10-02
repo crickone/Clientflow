@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 
 type Props = {
   params: { siteSlug: string };
-  searchParams: { site?: string; cmsedit?: string };
+  searchParams: { site?: string; cmsedit?: string; preview?: string };
 };
 
 export function generateMetadata({ params, searchParams }: Props): Metadata {

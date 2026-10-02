@@ -68,6 +68,8 @@
     "schedule_email_campaign",
     "edit_website_text",
     "replace_website_image",
+    "create_website_page",
+    "publish_website_page",
     "schedule_blog_post",
     "cancel_scheduled_item",
     "send_client_whatsapp"
@@ -236,6 +238,14 @@
     "book_consultation": [
       "Book Jane Doe in for 2026-09-01 at 10:00",
       "Book lead #? in for a date at a time"
+    ],
+    "create_website_page": [
+      "Create the page (new page) \"Sample Title\" as an unpublished copy of an existing page",
+      "Create the page (new page) as an unpublished copy of an existing page"
+    ],
+    "publish_website_page": [
+      "Put a page live on the website",
+      "Put a page live on the website"
     ]
   },
   "readSamplesAllFalse": [

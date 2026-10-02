@@ -2,13 +2,14 @@ import "server-only";
 
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import { and, eq } from "drizzle-orm";
 
 import { resolvePublicSite, absoluteUrl, siteUrl, type PublicSite } from "@/lib/cms/resolveHost";
 import { getPublishedPageByPath } from "@/lib/cms/pages";
 import { getSeoPublic } from "@/lib/cms/seo";
 import { getTemplate, type TemplateDef } from "@/lib/cms/templates";
 import { getCurrentMembership } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { db, schema } from "@/lib/db";
 import { getSiteBySlug } from "@/lib/cms/sites";
 import { getBlockValue, getBlock } from "@/lib/cms/blocks";
 import {
@@ -43,7 +44,7 @@ function pathFromSlug(slug?: string[]): string {
 
 export function resolvePageContext(
   params: { siteSlug: string; slug?: string[] },
-  searchParams: { site?: string },
+  searchParams: { site?: string; preview?: string },
 ): PageContext | null {
   const host = headers().get("host");
   const resolved = resolvePublicSite({
@@ -53,7 +54,9 @@ export function resolvePageContext(
   if (!resolved) return null;
 
   const path = pathFromSlug(params.slug);
-  const page = getPublishedPageByPath(resolved.db, resolved.site.id, path);
+  const page =
+    getPublishedPageByPath(resolved.db, resolved.site.id, path) ??
+    (searchParams.preview === "1" ? draftPageForPreview(resolved, path) : null);
   if (!page) return null;
 
   const ctx: RenderCtx = {
@@ -66,6 +69,29 @@ export function resolvePageContext(
   return { resolved, page, ctx, template: getTemplate(page.templateId), host, path };
 }
 
+
+/**
+ * An unpublished page, for `?preview=1` — so a page Adonis drafted (or one
+ * unpublished in the CMS) can be looked at before it goes live.
+ *
+ * Only an admin of the tenant that OWNS the resolved site gets it. The site
+ * here was resolved by host or slug, not by session, so the tenant check is
+ * what stops an admin of one business previewing another business's drafts.
+ * Everyone else gets null and the ordinary 404, revealing nothing. The
+ * session cookie lives on the app host, so in practice this works at
+ * /site/<slug>/<path>?preview=1 there, never on the client's own domain.
+ */
+function draftPageForPreview(resolved: PublicSite, path: string): Page | null {
+  const m = getCurrentMembership();
+  if (m?.role !== "admin" || m.tenant.id !== resolved.tenantId) return null;
+  return (
+    resolved.db
+      .select()
+      .from(schema.pages)
+      .where(and(eq(schema.pages.siteId, resolved.site.id), eq(schema.pages.path, path)))
+      .get() ?? null
+  );
+}
 
 /**
  * The Studio canvas's view of a page: its three zones (see lib/cms/pageBody),
@@ -200,7 +226,8 @@ export function buildPageMetadata(pc: PageContext): Metadata {
     description,
     alternates: { canonical },
     verification: siteVerificationMeta(pc.resolved.site),
-    robots: seo?.robots || undefined,
+    // A draft preview must never be indexed, whatever the page's own setting.
+    robots: pc.page.status !== "published" ? "noindex,nofollow" : seo?.robots || undefined,
     openGraph: {
       title,
       description,
