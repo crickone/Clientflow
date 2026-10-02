@@ -26,8 +26,8 @@ import { ModelPicker } from "./ModelPicker";
  * while empty, then scrolling up with the conversation once it starts (it's
  * part of the scroll content, not pinned chrome). The window mark is a
  * theme-specific asset (`Logo.tsx`-independent, /adonis only) — see the
- * `.adonis-hero-*` swap in globals.css: the pure-black variant shows on dark,
- * the ink variant on light.
+ * `.adonis-hero-*` swap in globals.css: the white variant shows on dark, the
+ * ink variant on light.
  */
 export function AdonisView({
   tenantId,
@@ -51,10 +51,7 @@ export function AdonisView({
   // The Adonis window mark + tagline — rendered at the top of the chat's
   // scroll area (see AssistantChat `heroSlot`). Two theme-specific <img>s,
   // one shown per active theme via the `.adonis-hero-logo--*` CSS in
-  // globals.css. Dark theme: a pure-black mark, darker than the charcoal
-  // canvas, so it reads as pressed into the page (operator's pick,
-  // 2026-10-02; the white original is still public/adonis-window-dark.svg).
-  // Light theme: the ink mark.
+  // globals.css (dark=white mark, light=ink mark).
   // Big centered mark, capped by viewport height so it never overflows on a
   // short screen. No tagline — the mark owns the centre; the prompt + chips
   // live down by the input (AssistantChat renders them in `bare` mode).
@@ -78,7 +75,7 @@ export function AdonisView({
       }}
     >
       <img
-        src="/adonis-window-black.svg"
+        src="/adonis-window-dark.svg"
         alt="Adonis Agent"
         className="adonis-hero-logo adonis-hero-logo--dark"
         style={{ height: logoHeight, width: "auto" }}
