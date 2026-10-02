@@ -64,6 +64,12 @@ export interface MailgunEvent {
   severity?: "temporary" | "permanent";
   campaignId?: number;
   tenantId?: number;
+  /** Clicked link (only meaningful on a "clicked" event). */
+  url?: string;
+  /** When the event happened, epoch ms (from the webhook's own timestamp). */
+  occurredAt?: number;
+  /** Contact id echoed back from the `v:contactId` user variable. */
+  contactId?: number;
 }
 
 /**

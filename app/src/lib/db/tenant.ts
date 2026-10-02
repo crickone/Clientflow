@@ -2479,6 +2479,17 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     );
     CREATE INDEX IF NOT EXISTS idx_lead_stage_events_pipeline ON lead_stage_events(pipeline_id, at);
     CREATE INDEX IF NOT EXISTS idx_lead_stage_events_lead ON lead_stage_events(lead_id, at);
+    CREATE TABLE IF NOT EXISTS email_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      campaign_id INTEGER NOT NULL,
+      send_id INTEGER,
+      contact_id INTEGER,
+      event TEXT NOT NULL,
+      url TEXT,
+      at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_email_events_campaign ON email_events(campaign_id, at);
+    CREATE INDEX IF NOT EXISTS idx_email_events_event ON email_events(event, at);
   `);
 
   // Market Research P2 (Task 3, for Task 5): `ad_angle_json`/`ad_angle_at`

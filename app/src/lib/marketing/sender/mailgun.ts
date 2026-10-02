@@ -365,5 +365,12 @@ export function parseMailgunEvent(payload: unknown): MailgunEvent | null {
   const tenantId = toFiniteNumber(prop(userVars, "tenantId"));
   if (tenantId !== null) result.tenantId = tenantId;
 
+  const urlRaw = prop(data, "url");
+  if (typeof urlRaw === "string" && urlRaw.trim()) result.url = urlRaw.trim().slice(0, 2000);
+  const ts = prop(data, "timestamp");
+  if (typeof ts === "number" && Number.isFinite(ts)) result.occurredAt = Math.round(ts * 1000);
+  const contactId = toFiniteNumber(prop(userVars, "contactId"));
+  if (contactId !== null) result.contactId = contactId;
+
   return result;
 }

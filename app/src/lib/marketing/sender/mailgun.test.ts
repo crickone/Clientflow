@@ -130,4 +130,25 @@ const flattened = parseMailgunEvent({
 check("flattened (no event-data wrapper) -> parsed", flattened !== null);
 check("flattened -> event", flattened?.event === "opened");
 
+{
+  const ev = parseMailgunEvent({
+    "event-data": {
+      event: "clicked",
+      recipient: "a@b.ie",
+      timestamp: 1759400000.123,
+      url: "https://example.ie/offer",
+      message: { headers: { "message-id": "<abc@mg.example>" } },
+      "user-variables": { campaignId: "7", tenantId: "3", contactId: "42" },
+    },
+  });
+  check("click url parsed", ev?.url === "https://example.ie/offer");
+  check("occurredAt parsed to epoch ms", ev?.occurredAt === 1759400000123);
+  check("contactId parsed", ev?.contactId === 42);
+}
+{
+  const ev = parseMailgunEvent({ "event-data": { event: "opened", recipient: "a@b.ie", url: 5, timestamp: "x", message: { headers: { "message-id": "<m>" } } } });
+  check("non-string url ignored", ev?.url === undefined);
+  check("non-numeric timestamp ignored", ev?.occurredAt === undefined);
+}
+
 console.log(`\nmailgun: ${passed} checks passed.`);

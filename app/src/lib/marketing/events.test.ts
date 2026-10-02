@@ -86,7 +86,7 @@ import type { MailgunEvent } from "./sender/types";
 (async () => {
   const { controlSqlite } = requireLocal("../db/control") as typeof import("../db/control");
   const { getTenantDbById } = requireLocal("../db/tenant") as typeof import("../db/tenant");
-  const { contacts, suppressions, sendingDomains, emailCampaigns, campaignSends } =
+  const { contacts, suppressions, sendingDomains, emailCampaigns, campaignSends, emailEvents } =
     requireLocal("../db/schema") as typeof import("../db/schema");
   const { normalizeMessageId } = requireLocal("./send") as typeof import("./send");
   const {
@@ -446,6 +446,46 @@ import type { MailgunEvent } from "./sender/types";
       .prepare("SELECT * FROM billing_events WHERE tenant_id = ? AND type = ?")
       .all(tid, "marketing_paused") as unknown[];
     assert.equal(pausedEventsAfter2nd.length, 1, "no duplicate marketing_paused log once nothing is left 'sending'");
+
+    // ── 12. email_events recorder: one append-only row per webhook call that
+    // matched a campaign_sends row. Replays append again on purpose (it is an
+    // event log; dedupe is not this recorder's job). Uses a fresh campaign so
+    // the stats/guard assertions above are unaffected. ──
+    {
+      const cLog = makeCampaign("draft");
+      const gwen = tdb.insert(contacts).values({ email: "gwen@example.com", status: "subscribed" }).returning().get();
+      const gwenSend = tdb.insert(campaignSends).values({
+        campaignId: cLog.id, contactId: gwen.id, email: gwen.email,
+        providerMessageId: "evt-gwen-msg@mail.example.com", status: "sent",
+      }).returning().get();
+      const logRows = () =>
+        tdb.select().from(emailEvents).where(eq(emailEvents.campaignId, cLog.id)).orderBy(emailEvents.id).all();
+
+      applyEvent(tid, { event: "opened", recipient: gwen.email, messageId: "<evt-gwen-msg@mail.example.com>" });
+      applyEvent(tid, {
+        event: "clicked", recipient: gwen.email, messageId: "<evt-gwen-msg@mail.example.com>",
+        url: "https://example.ie/offer", occurredAt: 1759400000123,
+      });
+      const rows = logRows();
+      assert.equal(rows.length, 2);
+      assert.equal(rows[0].event, "opened");
+      assert.equal(rows[0].url, null);
+      assert.equal(rows[0].sendId, gwenSend.id);
+      assert.equal(rows[0].contactId, gwen.id);
+      assert.equal(rows[1].event, "clicked");
+      assert.equal(rows[1].url, "https://example.ie/offer");
+      assert.equal(rows[1].campaignId, cLog.id);
+      assert.equal(rows[1].at.getTime(), 1759400000123, "at is the webhook's own event time when given");
+
+      // Replay appends again (event log, not deduped).
+      applyEvent(tid, { event: "opened", recipient: gwen.email, messageId: "<evt-gwen-msg@mail.example.com>" });
+      assert.equal(logRows().length, 3);
+
+      // No matching send: no row, no throw.
+      const before = tdb.select().from(emailEvents).all().length;
+      applyEvent(tid, { event: "opened", recipient: "nobody@example.com", messageId: "no-such-send@mail.example.com" });
+      assert.equal(tdb.select().from(emailEvents).all().length, before, "unmatched event writes no email_events row");
+    }
 
     console.log("events.test.ts: applyEvent + resolution + reputation-guard assertions passed");
   } finally {

@@ -4,7 +4,7 @@ import { desc, eq, sql } from "drizzle-orm";
 
 import { getTenantById, getTenantDbById, type TenantDb } from "@/lib/db/tenant";
 import { controlDb } from "@/lib/db/control";
-import { campaignSends, emailCampaigns, tenants, type CampaignSend } from "@/lib/db/schema";
+import { campaignSends, emailCampaigns, emailEvents, tenants, type CampaignSend } from "@/lib/db/schema";
 import { logEvent } from "@/lib/billing/engine";
 import { normalizeMessageId } from "@/lib/marketing/send";
 import { suppress, type SuppressionReason } from "@/lib/marketing/suppress";
@@ -364,6 +364,18 @@ export function applyEvent(tenantId: number, event: MailgunEvent): void {
         .set({ status: mapped.status, updatedAt: new Date() })
         .where(eq(campaignSends.id, row.id))
         .run();
+    }
+    try {
+      tdb.insert(emailEvents).values({
+        campaignId: row.campaignId,
+        sendId: row.id,
+        contactId: row.contactId ?? event.contactId ?? null,
+        event: event.event,
+        url: event.event === "clicked" ? event.url ?? null : null,
+        at: new Date(event.occurredAt ?? Date.now()),
+      }).run();
+    } catch (err) {
+      console.error("[recorder:email_events] could not record email event", err);
     }
     // Always recompute (not just on a status change) — a pure aggregate of
     // current rows, so a same-value replay is a correct no-op, not a skip.

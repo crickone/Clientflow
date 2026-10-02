@@ -2989,3 +2989,21 @@ export const leadStageEvents = sqliteTable(
     byLead: index("idx_lead_stage_events_lead").on(t.leadId, t.at),
   }),
 );
+
+/** Every Mailgun engagement event, append-only (dashboard slice 2 recorder). */
+export const emailEvents = sqliteTable(
+  "email_events",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    campaignId: integer("campaign_id").notNull(),
+    sendId: integer("send_id"),
+    contactId: integer("contact_id"),
+    event: text("event").notNull(),
+    url: text("url"),
+    at: integer("at", { mode: "timestamp_ms" }).notNull().default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => ({
+    byCampaign: index("idx_email_events_campaign").on(t.campaignId, t.at),
+    byEvent: index("idx_email_events_event").on(t.event, t.at),
+  }),
+);
