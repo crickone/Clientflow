@@ -281,6 +281,38 @@ export const PRESETS: Preset[] = [
       ],
     },
   },
+  {
+    key: "finance",
+    name: "Finance",
+    description: "Money in, how people pay, and what is owed or coming up.",
+    icon: "Wallet",
+    widgets: {
+      clinic: [
+        { key: "finance.revenue", size: "S" },
+        { key: "overview.cashToday", size: "S" },
+        { key: "overview.deferredRevenue", size: "S" },
+        { key: "finance.avgSpend", size: "S" },
+        { key: "finance.revenueTrend", size: "XL" },
+        { key: "finance.byMethod", size: "M" },
+        { key: "finance.byService", size: "M" },
+        { key: "finance.topClients", size: "M" },
+        { key: "finance.packages", size: "M" },
+        { key: "finance.vouchers", size: "M" },
+      ],
+      gym: [
+        { key: "finance.revenue", size: "S" },
+        { key: "overview.mrr", size: "S" },
+        { key: "finance.churn", size: "S" },
+        { key: "finance.avgSpend", size: "S" },
+        { key: "finance.revenueTrend", size: "XL" },
+        { key: "finance.byMethod", size: "M" },
+        { key: "finance.topClients", size: "M" },
+        { key: "finance.membersGainedLost", size: "XL" },
+        { key: "finance.renewals", size: "M" },
+        { key: "finance.vouchers", size: "M" },
+      ],
+    },
+  },
 ];
 
 export const PRESET_BY_KEY: Map<string, Preset> = new Map(PRESETS.map((p) => [p.key, p]));
