@@ -22,6 +22,22 @@ for (const p of PRESETS) {
 }
 assert.ok(keys.has(OVERVIEW_PRESET_KEY), "overview preset exists");
 assert.equal(presetWidgets("nope", "clinic"), null);
+assert.ok(keys.has("sales"), "sales preset exists");
+for (const venue of ["clinic", "gym"] as const) {
+  assert.equal(presetWidgets("sales", venue)!.length, 15, `sales/${venue} has 15 widgets`);
+}
+assert.ok(keys.has("marketing"), "marketing preset exists");
+for (const venue of ["clinic", "gym"] as const) {
+  assert.equal(presetWidgets("marketing", venue)!.length, 12, `marketing/${venue} has 12 widgets`);
+}
+assert.ok(keys.has("email"), "email preset exists");
+for (const venue of ["clinic", "gym"] as const) {
+  assert.equal(presetWidgets("email", venue)!.length, 14, `email/${venue} has 14 widgets`);
+}
+assert.ok(keys.has("communication"), "communication preset exists");
+for (const venue of ["clinic", "gym"] as const) {
+  assert.equal(presetWidgets("communication", venue)!.length, 13, `communication/${venue} has 13 widgets`);
+}
 
 const clinic = presetWidgets("overview", "clinic")!;
 assert.deepEqual(
