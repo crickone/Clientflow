@@ -35,6 +35,11 @@ export const DOMAIN_LABELS: Record<Domain, string> = {
   ai: "AI & Usage",
 };
 
+/** Something a tenant must have set up before a widget can show data. */
+export type Requirement = "site" | "sendingDomain" | "competitors";
+export type { RecorderKey } from "@/lib/recorders/started";
+import type { RecorderKey } from "@/lib/recorders/started";
+
 export type Sensitivity = "general" | "financial" | "spend";
 export type Venue = "clinic" | "gym";
 /** tab = follows the tab range; pinned = always `pinnedRange`; none = not time-based. */
@@ -51,6 +56,10 @@ export interface WidgetMeta {
   sensitivity: Sensitivity;
   rangeMode: RangeMode;
   pinnedRange?: StoredRangeKey;
+  /** Unmet requirement renders a call-to-action instead of loading the widget. */
+  requires?: readonly Requirement[];
+  /** Event recorder backing this widget; drives the "Collecting since" note. */
+  recorder?: RecorderKey;
 }
 
 /** One widget as saved on a tab. */
@@ -67,6 +76,9 @@ export interface WidgetCtx {
   range: ResolvedRange;
   previous: ResolvedRange;
   now: Date;
+  tenantId: number;
+  /** When the given recorder started collecting for this tenant, or null. */
+  recorderStart: (key: RecorderKey) => Date | null;
   /** Per-request memo shared by every widget on the page. */
   cache: Map<string, Promise<unknown>>;
 }

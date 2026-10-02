@@ -12,6 +12,7 @@ import { SetupProgressCard } from "@/components/dashboard/SetupProgressCard";
 import { DashboardGrid, type CatalogEntry, type GridItem } from "@/components/dashboard/DashboardGrid";
 import { TabBar } from "@/components/dashboard/TabBar";
 import { WidgetErrorBoundary } from "@/components/dashboard/WidgetErrorBoundary";
+import { RequirementCta } from "@/components/dashboard/views/RequirementCta";
 import { WidgetSlot } from "@/components/dashboard/WidgetSlot";
 import { getCurrentMembership } from "@/lib/auth";
 import { isBriefComplete } from "@/lib/businessProfile";
@@ -19,11 +20,13 @@ import { CATALOG, CATALOG_BY_KEY } from "@/lib/dashboard/catalog";
 import { PRESETS } from "@/lib/dashboard/presets";
 import { parseRangeKey, previousRange, resolveRange, type RangeKey } from "@/lib/dashboard/range";
 import { resolveTabs } from "@/lib/dashboard/tabs";
-import { DOMAIN_LABELS, type Venue, type WidgetCtx, type WidgetMeta } from "@/lib/dashboard/types";
+import { checkRequirements } from "@/lib/dashboard/requirements";
+import { DOMAIN_LABELS, type RecorderKey, type Requirement, type Venue, type WidgetCtx, type WidgetMeta } from "@/lib/dashboard/types";
 import { appliesToVenue, canSee, visibleRefs } from "@/lib/dashboard/visibility";
 import { getVisibilityOverrides } from "@/lib/dashboard/visibilityStore";
 import { WIDGET_IMPLS } from "@/lib/dashboard/widgets";
 import { getCurrentTenant } from "@/lib/db/tenant";
+import { getRecorderStart } from "@/lib/recorders/startedStore";
 import { getSchedulingMode, getVenueType } from "@/lib/settings";
 import { getSetupSummary, isSetupDismissed, setSetupDismissed } from "@/lib/setup/steps";
 import { getVocab } from "@/lib/vocabulary";
@@ -57,6 +60,12 @@ export default async function DashboardPage({
   const overrides = getVisibilityOverrides();
   const refs = visibleRefs(tab.widgets, { venue, role: membership.role, overrides });
   const cache = new Map<string, Promise<unknown>>();
+  const startMemo = new Map<RecorderKey, Date | null>();
+  const recorderStart = (key: RecorderKey): Date | null => {
+    if (!startMemo.has(key)) startMemo.set(key, getRecorderStart(key));
+    return startMemo.get(key) ?? null;
+  };
+  const reqs = await checkRequirements(tenantId);
 
   const items: GridItem[] = refs.map((ref) => {
     const meta = CATALOG_BY_KEY.get(ref.key)!;
@@ -66,13 +75,16 @@ export default async function DashboardPage({
         : ref.range
           ? resolveRange(ref.range, now)
           : tabRange;
-    const ctx: WidgetCtx = { venue, vocab, range, previous: previousRange(range), now, cache };
+    const ctx: WidgetCtx = { venue, vocab, range, previous: previousRange(range), now, cache, tenantId, recorderStart };
+    const unmet = (meta.requires as readonly Requirement[] | undefined)?.find((r) => !reqs[r]);
     const impl = (WIDGET_IMPLS as Record<string, { label?: (c: WidgetCtx) => string; href?: string }>)[ref.key];
     return {
       ref,
       title: impl?.label?.(ctx) ?? meta.title,
       href: impl?.href,
-      node: (
+      node: unmet ? (
+        <RequirementCta requirement={unmet} />
+      ) : (
         <WidgetErrorBoundary>
           <Suspense fallback={<Skeleton height={ref.size === "L" || ref.size === "XL" ? 120 : 48} />}>
             <WidgetSlot widgetKey={ref.key} ctx={ctx} tenantId={tenantId} />

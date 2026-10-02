@@ -5,6 +5,7 @@ import { and, asc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { RevenueBars } from "@/components/charts/RevenueBars";
 import { NeedsAttention } from "@/components/dashboard/NeedsAttention";
 import { KpiTile } from "@/components/dashboard/views/KpiTile";
+import { kpi } from "@/components/dashboard/views/kpi";
 import { RowList } from "@/components/dashboard/views/RowList";
 import { StageBars } from "@/components/dashboard/views/StageBars";
 import { TodaysClassesView } from "@/components/dashboard/views/TodaysClassesView";
@@ -39,9 +40,6 @@ function countLeads(fromMs: number, toMs: number): number {
     .get();
   return Number(row?.n ?? 0);
 }
-
-type Kpi = { value: string; sub?: string; delta?: number | null; accent?: boolean };
-const kpi = (d: Kpi) => <KpiTile value={d.value} sub={d.sub} delta={d.delta} accent={d.accent} />;
 
 export const OVERVIEW_WIDGETS = {
   "overview.todaysBookings": {
