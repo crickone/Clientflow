@@ -2508,6 +2508,29 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     );
     CREATE INDEX IF NOT EXISTS idx_email_events_campaign ON email_events(campaign_id, at);
     CREATE INDEX IF NOT EXISTS idx_email_events_event ON email_events(event, at);
+    CREATE TABLE IF NOT EXISTS site_page_views_daily (
+      site_id INTEGER NOT NULL,
+      day TEXT NOT NULL,
+      path TEXT NOT NULL,
+      referrer_domain TEXT NOT NULL DEFAULT '',
+      utm_source TEXT NOT NULL DEFAULT '',
+      views INTEGER NOT NULL DEFAULT 0,
+      uniques INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (site_id, day, path, referrer_domain, utm_source)
+    );
+    CREATE TABLE IF NOT EXISTS site_visitors_daily (
+      site_id INTEGER NOT NULL,
+      day TEXT NOT NULL,
+      uniques INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (site_id, day)
+    );
+    CREATE TABLE IF NOT EXISTS site_visitor_hashes (
+      day TEXT NOT NULL,
+      site_id INTEGER NOT NULL,
+      path TEXT NOT NULL,
+      hash TEXT NOT NULL,
+      PRIMARY KEY (day, site_id, path, hash)
+    );
   `);
 
   // Market Research P2 (Task 3, for Task 5): `ad_angle_json`/`ad_angle_at`

@@ -25,6 +25,7 @@ const PUBLIC_API_PREFIXES = [
   "/api/voice/webhook", // ElevenLabs post-call webhook — server-to-server, HMAC-verified inside the route handler
   "/api/cron/", // self-authorizes via CRON_SECRET or an admin session
   "/api/platform/", // self-authorizes: service key + platform-admin session
+  "/api/site-events", // public first-party page-view beacon (cookieless, rate-limited, host-verified, always 204)
   "/api/health", // unauthenticated liveness probe (control-DB ping; leaks nothing) — must not 307→/login for uptime monitors
 ];
 

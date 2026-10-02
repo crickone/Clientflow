@@ -3013,3 +3013,41 @@ export const emailEvents = sqliteTable(
     byEvent: index("idx_email_events_event").on(t.event, t.at),
   }),
 );
+
+/** Per-day website page views, aggregated (dashboard slice 2 recorder). No visitor identifiers. */
+export const sitePageViewsDaily = sqliteTable(
+  "site_page_views_daily",
+  {
+    siteId: integer("site_id").notNull(),
+    day: text("day").notNull(),
+    path: text("path").notNull(),
+    referrerDomain: text("referrer_domain").notNull().default(""),
+    utmSource: text("utm_source").notNull().default(""),
+    views: integer("views").notNull().default(0),
+    uniques: integer("uniques").notNull().default(0),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.siteId, t.day, t.path, t.referrerDomain, t.utmSource] }) }),
+);
+
+/** Per-day unique visitors for a whole site. */
+export const siteVisitorsDaily = sqliteTable(
+  "site_visitors_daily",
+  {
+    siteId: integer("site_id").notNull(),
+    day: text("day").notNull(),
+    uniques: integer("uniques").notNull().default(0),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.siteId, t.day] }) }),
+);
+
+/** Salted daily visitor hashes, kept only for the current UTC day; path '' = site-level. */
+export const siteVisitorHashes = sqliteTable(
+  "site_visitor_hashes",
+  {
+    day: text("day").notNull(),
+    siteId: integer("site_id").notNull(),
+    path: text("path").notNull(),
+    hash: text("hash").notNull(),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.day, t.siteId, t.path, t.hash] }) }),
+);

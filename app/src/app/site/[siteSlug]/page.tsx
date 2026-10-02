@@ -12,6 +12,7 @@ import { studioEditability } from "@/lib/cms/pageBody";
 import { StudioCanvas } from "@/components/cms/StudioCanvas";
 import { StudioUneditablePanel } from "@/components/cms/StudioUneditablePanel";
 import { SiteTracking } from "@/components/cms/SiteTracking";
+import { SiteBeacon } from "@/components/cms/SiteBeacon";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +61,7 @@ export default async function PublicSiteHome({ params, searchParams }: Props) {
           pixelId={pc.resolved.site.metaPixelId}
           googleTagId={pc.resolved.site.googleTagId}
         />
+        <SiteBeacon />
         <T ctx={pc.ctx} page={pc.page} />
       </>
     );

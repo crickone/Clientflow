@@ -13,6 +13,7 @@ import { resolvePublicSite } from "@/lib/cms/resolveHost";
 import { getPublishedPostBySlug } from "@/lib/cms/blog";
 import { resolveSiteRedirect } from "@/lib/cms/siteRedirects";
 import { SiteTracking } from "@/components/cms/SiteTracking";
+import { SiteBeacon } from "@/components/cms/SiteBeacon";
 import { StudioCanvas } from "@/components/cms/StudioCanvas";
 import { StudioUneditablePanel } from "@/components/cms/StudioUneditablePanel";
 
@@ -114,6 +115,7 @@ export default async function PublicSitePage({ params, searchParams }: Props) {
         pixelId={pc.resolved.site.metaPixelId}
         googleTagId={pc.resolved.site.googleTagId}
       />
+      <SiteBeacon />
       <T ctx={pc.ctx} page={pc.page} />
     </>
   );
