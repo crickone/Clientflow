@@ -1,5 +1,7 @@
 import { getCurrentTenant } from "@/lib/db/tenant";
 import { getCurrentMembership } from "@/lib/auth";
+import { getAgent } from "@/lib/agents/registry";
+import { MODEL_CATALOG } from "@/lib/ai/modelCatalog";
 import { AdonisView } from "@/components/adonis/AdonisView";
 import { transcribeConfigured } from "@/lib/ai/voiceTranscribe";
 import { campaignSeedStarterMessage } from "@/components/marketing/buildCampaignSeed";
@@ -27,6 +29,10 @@ export default async function AdonisPage({
   // read) and passed down as a plain boolean — AdonisView/AssistantChat are
   // client components and must never read process.env themselves.
   const voiceEnabled = transcribeConfigured();
+  // The model chip under the compose box (ModelPicker). Same source the chat
+  // route reads (`agents.model`), so the label is what the next turn runs on.
+  const model = getAgent(tenantId, "orchestrator")?.model ?? MODEL_CATALOG[0].id;
+  const openRouterConfigured = !!process.env.OPENROUTER_API_KEY;
   // Campaign Engine "Build campaign" seed: a link from the seasonal calendar,
   // the campaign hub, or a research gap lands here with the 5 seed params (see
   // buildCampaignSeedHref, @/components/marketing/buildCampaignSeed). Decode
@@ -46,6 +52,8 @@ export default async function AdonisPage({
       isAdmin={isAdmin}
       voiceEnabled={voiceEnabled}
       initialInput={initialInput}
+      model={model}
+      openRouterConfigured={openRouterConfigured}
     />
   );
 }

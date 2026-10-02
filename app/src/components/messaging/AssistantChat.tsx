@@ -185,6 +185,7 @@ export function AssistantChat({
   heroSlot,
   voiceEnabled = false,
   controlsContainer,
+  composeFooter,
 }: {
   tenantId: number;
   height?: string;
@@ -262,6 +263,11 @@ export function AssistantChat({
    * client never reads `process.env` itself.
    */
   voiceEnabled?: boolean;
+  /**
+   * Optional row rendered directly under the compose box, left-aligned — used
+   * by /adonis for its model chip (ModelPicker). Omitted → nothing renders.
+   */
+  composeFooter?: ReactNode;
 }) {
   // Per-account chat HISTORY in localStorage (survives browser close). Each entry
   // is a saved conversation; "New chat" opens a fresh one and keeps the old ones.
@@ -1337,6 +1343,11 @@ export function AssistantChat({
           {busy ? <Loader2 size={15} className="spin" /> : <Send size={15} strokeWidth={2} />}
         </Button>
       </div>
+      {composeFooter && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: bare ? "8px 0 0" : "0 12px 10px" }}>
+          {composeFooter}
+        </div>
+      )}
     </div>
   );
 }

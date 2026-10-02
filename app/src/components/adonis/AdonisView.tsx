@@ -6,6 +6,7 @@ import { Settings } from "lucide-react";
 
 import { AssistantChat } from "@/components/messaging/AssistantChat";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { ModelPicker } from "./ModelPicker";
 
 /**
  * The Hermes-template flagship view (`/adonis`): a full-height, minimal home
@@ -33,9 +34,15 @@ export function AdonisView({
   isAdmin,
   voiceEnabled,
   initialInput,
+  model,
+  openRouterConfigured,
 }: {
   tenantId: number;
   isAdmin: boolean;
+  /** Adonis's current `agents.model`, shown (and, for an admin, switchable) under the compose box. */
+  model: string;
+  /** Server-computed: whether the open (non-Claude) models can run. Locks them in the picker otherwise. */
+  openRouterConfigured: boolean;
   /** Voice T2: see AssistantChat's `voiceEnabled` doc — computed server-side (page.tsx) via `transcribeConfigured()` and threaded straight through. */
   voiceEnabled: boolean;
   /** Campaign Engine "Build campaign" seed → a pre-filled compose starter (see app/adonis/page.tsx). Undefined for a normal visit. Threaded to AssistantChat's `initialInput`. */
@@ -171,6 +178,14 @@ export function AdonisView({
             voiceEnabled={voiceEnabled}
             initialInput={initialInput}
             controlsContainer={controlsEl}
+            composeFooter={
+              <ModelPicker
+                agentKey="orchestrator"
+                initialModel={model}
+                canEdit={isAdmin}
+                openRouterConfigured={openRouterConfigured}
+              />
+            }
           />
         </div>
       </div>
