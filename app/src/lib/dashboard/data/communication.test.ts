@@ -1,6 +1,6 @@
 // Run: npm test -- src/lib/dashboard/data/communication.test.ts
 import assert from "node:assert/strict";
-import { categoryLabel, channelLabel, channelOf, countByChannel, formatDuration, responseStats, truncate, type MsgRow } from "./communication";
+import { categoryLabel, channelLabel, triagedPool, channelOf, countByChannel, formatDuration, responseStats, truncate, type MsgRow } from "./communication";
 
 assert.equal(formatDuration(0.4), "1 min");
 assert.equal(formatDuration(42), "42 min");
@@ -28,6 +28,7 @@ assert.ok(truncate("x".repeat(100), 80).endsWith("..."));
 const H = 3_600_000;
 const t0 = Date.UTC(2026, 9, 1, 9);
 const row = (convo: string, direction: "inbound" | "outbound", atMs: number, channel: string | null): MsgRow => ({
+  source: convo.startsWith("thread:") ? "gmail" : "lead",
   convo, direction, atMs, channel, aiCategory: null, aiPriority: null, autoReplyStatus: null, triagedAtMs: null,
 });
 const rows = [
@@ -51,5 +52,9 @@ assert.deepEqual(
   ],
   "sorted by total desc, ties by in-range order; null channel is other",
 );
+
+const pool = triagedPool([...rows, row("thread:y", "inbound", t0 + H, "email")], t0, t0 + 24 * H);
+assert.deepEqual(pool.map((r) => r.convo).sort(), ["client:2"], "gmail and outbound excluded; pre-range excluded");
+assert.equal(categoryLabel(pool[0].aiCategory), "Not triaged", "untriaged lead/client row counts as Not triaged");
 
 console.log("communication.test.ts: ok");

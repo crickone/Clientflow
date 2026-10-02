@@ -26,8 +26,9 @@ type Triaged = {
   triagedAt: Date | null;
 };
 
-function toRow(convo: string, r: Triaged): MsgRow {
+function toRow(source: "lead" | "client", convo: string, r: Triaged): MsgRow {
   return {
+    source,
     convo,
     direction: r.direction === "inbound" ? "inbound" : "outbound",
     atMs: Number(r.at),
@@ -69,7 +70,7 @@ export function loadMessages(fromMs: number, toMs: number): MsgRow[] {
       ),
     )
     .all();
-  for (const r of leadRows) out.push(toRow(`lead:${r.leadId}`, r));
+  for (const r of leadRows) out.push(toRow("lead", `lead:${r.leadId}`, r));
 
   const clientAt = sql<number>`coalesce(${schema.clientMessages.sentAt}, ${schema.clientMessages.createdAt})`;
   const clientRows = db
@@ -93,7 +94,7 @@ export function loadMessages(fromMs: number, toMs: number): MsgRow[] {
       ),
     )
     .all();
-  for (const r of clientRows) out.push(toRow(`client:${r.clientId}`, r));
+  for (const r of clientRows) out.push(toRow("client", `client:${r.clientId}`, r));
 
   const mailRows = db
     .select({
@@ -107,6 +108,8 @@ export function loadMessages(fromMs: number, toMs: number): MsgRow[] {
     .all();
   for (const r of mailRows) {
     out.push({
+      source: "gmail",
+      // No thread id: treat the message as its own standalone conversation.
       convo: r.threadId ? `thread:${r.threadId}` : `email:${r.id}`,
       direction: r.direction === "in" ? "inbound" : "outbound",
       atMs: (r.at as Date).getTime(),

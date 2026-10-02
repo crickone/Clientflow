@@ -7,7 +7,7 @@ import { kpi } from "@/components/dashboard/views/kpi";
 import { RowList } from "@/components/dashboard/views/RowList";
 import { SeriesChart } from "@/components/dashboard/views/SeriesChart";
 import { listConversations } from "@/lib/conversations";
-import { categoryLabel, channelLabel, countByChannel, formatDuration, responseStats, truncate, type MsgRow } from "../data/communication";
+import { categoryLabel, channelLabel, countByChannel, formatDuration, responseStats, triagedPool, truncate, type MsgRow } from "../data/communication";
 import { automationCounts, loadMessages, topTags, triageReplyCounts, unreadEmails } from "../data/communicationQueries";
 import { bucketIndex, seriesBuckets, weekdayHourGrid } from "../data/stats";
 import { deltaPct } from "../range";
@@ -147,7 +147,7 @@ export const COMMUNICATION_WIDGETS = {
     href: "/communication",
     async load(ctx) {
       const counts = new Map<string, number>();
-      for (const r of inboundIn(await messages(ctx), ctx.range.fromMs, ctx.range.toMs)) {
+      for (const r of triagedPool(await messages(ctx), ctx.range.fromMs, ctx.range.toMs)) {
         const label = categoryLabel(r.aiCategory);
         counts.set(label, (counts.get(label) ?? 0) + 1);
       }
@@ -159,7 +159,7 @@ export const COMMUNICATION_WIDGETS = {
     href: "/communication",
     async load(ctx) {
       const c = { high: 0, normal: 0, low: 0 };
-      for (const r of inboundIn(await messages(ctx), ctx.range.fromMs, ctx.range.toMs)) {
+      for (const r of triagedPool(await messages(ctx), ctx.range.fromMs, ctx.range.toMs)) {
         if ((PRIORITIES as readonly string[]).includes(r.aiPriority ?? "")) c[r.aiPriority as (typeof PRIORITIES)[number]] += 1;
       }
       return {

@@ -6,6 +6,8 @@ import { firstResponseTimes, median, type Msg } from "./stats";
 
 /** One message (lead, client or Gmail) reduced to what the widgets need. */
 export type MsgRow = {
+  /** Where the row came from; only lead/client messages are AI-triaged. */
+  source: "lead" | "client" | "gmail";
   /** `lead:<id>`, `client:<id>` or `thread:<gmailThreadId>`. */
   convo: string;
   direction: "inbound" | "outbound";
@@ -80,4 +82,9 @@ export function countByChannel(rows: MsgRow[], fromMs: number, toMs: number) {
     out.set(c, e);
   }
   return [...out.values()].sort((a, b) => b.inbound + b.outbound - (a.inbound + a.outbound));
+}
+
+/** Inbound lead/client messages in [fromMs, toMs): the only rows AI triage runs on. */
+export function triagedPool(rows: MsgRow[], fromMs: number, toMs: number): MsgRow[] {
+  return rows.filter((r) => r.source !== "gmail" && r.direction === "inbound" && r.atMs >= fromMs && r.atMs < toMs);
 }
