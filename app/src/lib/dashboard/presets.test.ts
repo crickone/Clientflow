@@ -30,6 +30,10 @@ assert.ok(keys.has("marketing"), "marketing preset exists");
 for (const venue of ["clinic", "gym"] as const) {
   assert.equal(presetWidgets("marketing", venue)!.length, 12, `marketing/${venue} has 12 widgets`);
 }
+assert.ok(keys.has("email"), "email preset exists");
+for (const venue of ["clinic", "gym"] as const) {
+  assert.equal(presetWidgets("email", venue)!.length, 14, `email/${venue} has 14 widgets`);
+}
 
 const clinic = presetWidgets("overview", "clinic")!;
 assert.deepEqual(
