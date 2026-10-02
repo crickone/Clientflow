@@ -2181,6 +2181,24 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     }
   }
 
+  // Dashboard status_dates recorder: when appointments were cancelled and
+  // memberships ended. Must exist before the 0010 backfill migration runs.
+  for (const [table, defs] of [
+    ["appointments", [["cancelled_at", "cancelled_at INTEGER"], ["cancelled_at_approx", "cancelled_at_approx INTEGER NOT NULL DEFAULT 0"]]],
+    ["client_memberships", [["ended_at", "ended_at INTEGER"]]],
+  ] as Array<[string, Array<[string, string]>]>) {
+    try {
+      const cols = sqlite.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+      for (const [name, ddl] of defs) {
+        if (cols.length > 0 && !cols.find((c) => c.name === name)) {
+          sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+        }
+      }
+    } catch (err) {
+      console.error(`[tenant] ${table} status-date columns`, err);
+    }
+  }
+
   // Venue-neutral: plan type + recurring fields on packages and templates.
   for (const table of ["packages", "package_templates"]) {
     try {

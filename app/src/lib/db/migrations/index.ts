@@ -326,6 +326,18 @@ export const TENANT_MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    id: "0010-appointment-cancelled-at-backfill",
+    description:
+      "Dashboard slice 2: approximate cancelled_at for existing cancelled/no-show appointments from updated_at, flagged cancelled_at_approx = 1. Historic memberships are not backfilled (no reliable date).",
+    up: (sqlite) => {
+      sqlite.exec(`
+        UPDATE appointments
+        SET cancelled_at = updated_at, cancelled_at_approx = 1
+        WHERE status IN ('cancelled', 'no_show') AND cancelled_at IS NULL
+      `);
+    },
+  },
 ];
 
 /**

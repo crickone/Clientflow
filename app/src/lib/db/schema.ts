@@ -180,6 +180,10 @@ export const appointments = sqliteTable("appointments", {
   updatedAt: integer("updated_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),
+  /** When it became cancelled/no_show (status_dates recorder); null otherwise. */
+  cancelledAt: integer("cancelled_at", { mode: "timestamp_ms" }),
+  /** True when cancelledAt was backfilled from updated_at, not recorded live. */
+  cancelledAtApprox: integer("cancelled_at_approx", { mode: "boolean" }).notNull().default(false),
 });
 
 export const sessions = sqliteTable("sessions", {
@@ -1981,6 +1985,8 @@ export const clientMemberships = sqliteTable(
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
+    /** When it left active (status_dates recorder); null while active. */
+    endedAt: integer("ended_at", { mode: "timestamp_ms" }),
   },
   (t) => ({
     byClient: index("idx_client_memberships_client").on(t.clientId),

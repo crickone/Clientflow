@@ -1,4 +1,5 @@
 import "server-only";
+import { membershipStatusDates } from "@/lib/statusDates";
 
 import { and, desc, eq, gte, lt, ne, sql } from "drizzle-orm";
 
@@ -193,7 +194,11 @@ export function setClientMembershipStatus(
   id: number,
   status: "active" | "expired" | "cancelled",
 ) {
-  db.update(clientMemberships).set({ status }).where(eq(clientMemberships.id, id)).run();
+  const prev = db.select({ status: clientMemberships.status }).from(clientMemberships).where(eq(clientMemberships.id, id)).get();
+  db.update(clientMemberships)
+    .set({ status, ...membershipStatusDates(prev?.status ?? null, status, new Date()) })
+    .where(eq(clientMemberships.id, id))
+    .run();
 }
 
 // ── purchased membership detail ───────────────────────────────────────────────

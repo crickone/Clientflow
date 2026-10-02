@@ -112,6 +112,7 @@ import {
 } from "@/lib/agents/tools.operations";
 import { resolveEntryStageId } from "@/lib/pipeline/stageRepo";
 import { recordStageEvent } from "@/lib/pipeline/stageEvents";
+import { appointmentStatusDates, membershipStatusDates } from "@/lib/statusDates";
 
 // `ToolArtifact`/`ToolResult`/`ToolContext` (incl. the `pendingWrites`/
 // `artifacts` bubble-up fields) are defined once, in `@/lib/agents/toolKit`
@@ -1338,7 +1339,7 @@ function createAppointment(ctx: ToolContext, input: Record<string, unknown>): st
   const endRaw = String(input.endTime || "");
   const end = /^\d{2}:\d{2}$/.test(endRaw) ? endRaw : start;
   db.insert(appointments)
-    .values({ clientId: c.id, date, startTime: start, endTime: end, notes: input.notes ? String(input.notes) : null })
+    .values({ clientId: c.id, date, startTime: start, endTime: end, notes: input.notes ? String(input.notes) : null, ...appointmentStatusDates(null, "scheduled", new Date()) })
     .run();
   return JSON.stringify({ result: `Booked ${c.name} on ${date} at ${start}.` });
 }
@@ -1814,7 +1815,10 @@ function cancelAppointment(ctx: ToolContext, input: Record<string, unknown>): st
   const found = findClientAppointment(db, c.id, date, input.startTime ? String(input.startTime) : undefined);
   if (found.length === 0) return JSON.stringify({ error: `No appointment for ${c.name} on ${date}.` });
   if (found.length > 1) return JSON.stringify({ error: `${c.name} has several appointments on ${date} (${found.map((a) => a.startTime).join(", ")}). Specify the time.` });
-  db.update(appointments).set({ status: "cancelled" }).where(eq(appointments.id, found[0].id)).run();
+  db.update(appointments)
+    .set({ status: "cancelled", updatedAt: new Date(), ...appointmentStatusDates(found[0].status, "cancelled", new Date()) })
+    .where(eq(appointments.id, found[0].id))
+    .run();
   return JSON.stringify({ result: `Cancelled ${c.name}'s appointment on ${date} at ${found[0].startTime}.` });
 }
 
@@ -1889,7 +1893,10 @@ function cancelMembership(ctx: ToolContext, input: Record<string, unknown>): str
   const active = db.select().from(clientMemberships).where(and(...conds)).all();
   if (active.length === 0) return JSON.stringify({ error: `${c.name} has no active membership${term ? ` matching "${term}"` : ""}.` });
   if (active.length > 1) return JSON.stringify({ error: `${c.name} has several active memberships (${active.map((m) => m.membershipName).join(", ")}). Which one?` });
-  db.update(clientMemberships).set({ status: "cancelled" }).where(eq(clientMemberships.id, active[0].id)).run();
+  db.update(clientMemberships)
+    .set({ status: "cancelled", ...membershipStatusDates(active[0].status, "cancelled", new Date()) })
+    .where(eq(clientMemberships.id, active[0].id))
+    .run();
   return JSON.stringify({ result: `Cancelled ${c.name}'s "${active[0].membershipName}" membership.` });
 }
 
