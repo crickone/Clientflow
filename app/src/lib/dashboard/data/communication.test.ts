@@ -9,6 +9,7 @@ assert.equal(formatDuration(210), "3.5 h");
 assert.equal(formatDuration(180), "3 h");
 assert.equal(formatDuration(2.1 * 1440), "2.1 days");
 assert.equal(formatDuration(1440), "1 day");
+assert.equal(formatDuration(131.3 * 1440), "131 days", "whole days past a week");
 
 assert.equal(channelOf({ channel: "whatsapp" }), "whatsapp");
 assert.equal(channelOf({ channel: null }), "other");

@@ -18,9 +18,16 @@ export function KpiTile({
 }) {
   const up = (delta ?? 0) >= 0;
   const good = goodWhen === "down" ? (delta ?? 0) <= 0 : up;
+  // A tile with no figure yet ("No wins yet") reads as a sentence, not as a
+  // giant uppercase number.
+  const isFigure = /\d/.test(value);
   return (
     <>
-      <CardValue style={{ color: accent ? "var(--accent)" : undefined }}>{value}</CardValue>
+      {isFigure ? (
+        <CardValue style={{ color: accent ? "var(--accent)" : undefined }}>{value}</CardValue>
+      ) : (
+        <div style={{ color: "var(--text-secondary)", fontSize: 15, fontWeight: 500, padding: "6px 0 2px" }}>{value}</div>
+      )}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
         {delta != null && (
           <span

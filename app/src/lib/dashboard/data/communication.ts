@@ -25,7 +25,9 @@ export function formatDuration(minutes: number): string {
   if (minutes < 59.5) return `${Math.max(1, Math.round(minutes))} min`;
   const hours = minutes / 60;
   if (hours < 23.95) return `${trim(hours)} h`;
-  const days = Math.round((minutes / 1440) * 10) / 10;
+  const raw = minutes / 1440;
+  // One decimal while it still matters (under a week), whole days after.
+  const days = raw < 7 ? Math.round(raw * 10) / 10 : Math.round(raw);
   return days === 1 ? "1 day" : `${days} days`;
 }
 
