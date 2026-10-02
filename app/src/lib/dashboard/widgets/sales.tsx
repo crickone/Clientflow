@@ -56,7 +56,8 @@ export const SALES_WIDGETS = {
   "sales.conversionRate": {
     href: "/leads",
     async load(ctx) {
-      const cur = conversionIn(ctx.range.fromMs, ctx.range.toMs);
+      const rows = await created(ctx);
+      const cur = { total: rows.length, won: rows.filter((r) => isWon(r.role)).length };
       const prev = conversionIn(ctx.previous.fromMs, ctx.previous.toMs);
       const p = pct(cur.won, cur.total);
       const pp = pct(prev.won, prev.total);

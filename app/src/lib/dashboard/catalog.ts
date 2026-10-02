@@ -279,7 +279,7 @@ export const CATALOG = [
   {
     key: "sales.funnel",
     title: "Funnel by stage",
-    description: "Distinct leads that entered each stage of the default pipeline during the period.",
+    description: "Distinct leads that entered each stage of the default pipeline during the period (lost, lapsed and no-show are not steps).",
     domain: "sales",
     sizes: ["L", "XL"],
     defaultSize: "XL",

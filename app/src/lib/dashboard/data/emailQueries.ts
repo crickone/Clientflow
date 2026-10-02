@@ -3,7 +3,7 @@ import "server-only";
 import { and, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
 
 import { db, schema } from "@/lib/db";
-import { toRecord } from "@/lib/marketing/campaigns";
+import { parseStats } from "@/lib/marketing/campaigns";
 import { countsFromStats, linkGroup, type SendCounts } from "./email";
 import { bucketIndex, seriesBuckets } from "./stats";
 
@@ -72,25 +72,45 @@ export type SentCampaign = { id: number; name: string; sentAtMs: number; counts:
 /** Campaigns whose sentAt falls in range, newest first. */
 export function campaignsSentIn(fromMs: number, toMs: number): SentCampaign[] {
   return db
-    .select()
+    .select({
+      id: schema.emailCampaigns.id,
+      name: schema.emailCampaigns.name,
+      sentAt: schema.emailCampaigns.sentAt,
+      stats: schema.emailCampaigns.stats,
+    })
     .from(schema.emailCampaigns)
     .where(and(isNotNull(schema.emailCampaigns.sentAt), gte(schema.emailCampaigns.sentAt, d(fromMs)), lt(schema.emailCampaigns.sentAt, d(toMs))))
     .all()
-    .map(toRecord)
-    .map((c) => ({ id: c.id, name: c.name, sentAtMs: c.sentAt as number, counts: countsFromStats(c.stats) }))
+    .map((c) => ({ id: c.id, name: c.name, sentAtMs: (c.sentAt as Date).getTime(), counts: countsFromStats(parseStats(c.stats)) }))
     .sort((a, b) => b.sentAtMs - a.sentAtMs);
 }
 
-function eventsIn(event: string, fromMs: number, toMs: number) {
+export type EmailEventRow = { sendId: number | null; url: string | null; at: Date };
+
+/** Events of one kind in range; the url is read only for clicks. */
+export function eventsIn(event: "opened" | "clicked", fromMs: number, toMs: number): EmailEventRow[] {
+  const where = and(eq(schema.emailEvents.event, event), gte(schema.emailEvents.at, d(fromMs)), lt(schema.emailEvents.at, d(toMs)));
+  if (event === "clicked") {
+    return db
+      .select({ sendId: schema.emailEvents.sendId, url: schema.emailEvents.url, at: schema.emailEvents.at })
+      .from(schema.emailEvents)
+      .where(where)
+      .all();
+  }
   return db
-    .select({ sendId: schema.emailEvents.sendId, url: schema.emailEvents.url, at: schema.emailEvents.at })
+    .select({ sendId: schema.emailEvents.sendId, at: schema.emailEvents.at })
     .from(schema.emailEvents)
-    .where(and(eq(schema.emailEvents.event, event), gte(schema.emailEvents.at, d(fromMs)), lt(schema.emailEvents.at, d(toMs))))
-    .all();
+    .where(where)
+    .all()
+    .map((r) => ({ ...r, url: null }));
 }
 
 /** Opens and clicks per bucket, total and unique by send id. */
-export function engagementSeries(fromMs: number, toMs: number) {
+export function engagementSeries(
+  fromMs: number,
+  toMs: number,
+  events: { opened: EmailEventRow[]; clicked: EmailEventRow[] } = { opened: eventsIn("opened", fromMs, toMs), clicked: eventsIn("clicked", fromMs, toMs) },
+) {
   const buckets = seriesBuckets(fromMs, toMs);
   const rows = buckets.map((b) => ({ label: b.label, Opens: 0, "Unique opens": 0, Clicks: 0, "Unique clicks": 0 }));
   const seen = buckets.map(() => ({ opened: new Set<number>(), clicked: new Set<number>() }));
@@ -98,7 +118,7 @@ export function engagementSeries(fromMs: number, toMs: number) {
     ["opened", "Opens", "Unique opens"],
     ["clicked", "Clicks", "Unique clicks"],
   ] as const) {
-    for (const e of eventsIn(event, fromMs, toMs)) {
+    for (const e of events[event]) {
       const i = bucketIndex(buckets, e.at.getTime());
       if (i < 0) continue;
       rows[i][total] += 1;
@@ -114,9 +134,14 @@ export function engagementSeries(fromMs: number, toMs: number) {
 }
 
 /** Clicked links grouped by URL without query string, most clicked first. */
-export function topLinks(fromMs: number, toMs: number, limit: number): { url: string; clicks: number; uniques: number }[] {
+export function topLinks(
+  fromMs: number,
+  toMs: number,
+  limit: number,
+  clicks: EmailEventRow[] = eventsIn("clicked", fromMs, toMs),
+): { url: string; clicks: number; uniques: number }[] {
   const groups = new Map<string, { clicks: number; sends: Set<number> }>();
-  for (const e of eventsIn("clicked", fromMs, toMs)) {
+  for (const e of clicks) {
     if (!e.url) continue;
     const k = linkGroup(e.url);
     const g = groups.get(k) ?? { clicks: 0, sends: new Set<number>() };
@@ -130,8 +155,8 @@ export function topLinks(fromMs: number, toMs: number, limit: number): { url: st
     .slice(0, limit);
 }
 
-export function openTimes(fromMs: number, toMs: number): number[] {
-  return eventsIn("opened", fromMs, toMs).map((e) => e.at.getTime());
+export function openTimes(fromMs: number, toMs: number, opens: EmailEventRow[] = eventsIn("opened", fromMs, toMs)): number[] {
+  return opens.map((e) => e.at.getTime());
 }
 
 export function suppressionCounts(): { label: string; value: number }[] {

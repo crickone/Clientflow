@@ -89,6 +89,18 @@ const requireLocal = createRequire(import.meta.url);
       assert.ok(rows.some((r) => r.convo === `lead:${lead.id}` && r.channel === null));
       assert.ok(rows.every((r) => typeof r.atMs === "number"));
 
+      const answered = db.insert(schema.leads).values({ firstName: "Answered" }).returning().get();
+      db.insert(schema.leadMessages).values([
+        { leadId: answered.id, direction: "inbound", channel: "sms", content: "q", createdAt: at(now - 2 * H) },
+        { leadId: answered.id, direction: "outbound", channel: "sms", content: "a", createdAt: at(now - H), sentAt: at(now - H) },
+      ]).run();
+      const waiting = q.awaitingReply(10);
+      assert.deepEqual(waiting.map((w) => [w.kind, w.name, w.href]), [
+        ["client", "Client One", `/clients/${client.id}`],
+        ["lead", "Lead One", `/leads/${lead.id}`],
+      ], "oldest wait first; answered and note/system-only excluded");
+      assert.equal(q.awaitingReply(1).length, 1);
+
       assert.deepEqual(q.triageReplyCounts(from, to), { triaged: 2, autoSent: 1, forReview: 1 });
       assert.deepEqual(q.topTags(from, to, 8), [{ label: "Pricing", value: 2 }]);
       assert.deepEqual(q.automationCounts(from, to), { sent: 1, failed: 1, queued: 1 });

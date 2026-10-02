@@ -6,9 +6,8 @@ import { HeatmapView } from "@/components/dashboard/views/HeatmapView";
 import { kpi } from "@/components/dashboard/views/kpi";
 import { RowList } from "@/components/dashboard/views/RowList";
 import { SeriesChart } from "@/components/dashboard/views/SeriesChart";
-import { listConversations } from "@/lib/conversations";
 import { categoryLabel, channelLabel, countByChannel, formatDuration, responseStats, triagedPool, truncate, type MsgRow } from "../data/communication";
-import { automationCounts, loadMessages, topTags, triageReplyCounts, unreadEmails } from "../data/communicationQueries";
+import { automationCounts, awaitingReply, loadMessages, topTags, triageReplyCounts, unreadEmails } from "../data/communicationQueries";
 import { bucketIndex, seriesBuckets, weekdayHourGrid } from "../data/stats";
 import { deltaPct } from "../range";
 import type { WidgetCtx, WidgetImpl } from "../types";
@@ -63,11 +62,12 @@ export const COMMUNICATION_WIDGETS = {
       const rows = await messages(ctx);
       const cur = responseStats(rows, ctx.range.fromMs, ctx.range.toMs);
       const prev = responseStats(rows, ctx.previous.fromMs, ctx.previous.toMs);
-      if (cur.medianMinutes === null) return { value: "No data", sub: "No answered conversations in this period" };
+      if (cur.medianMinutes === null) return { value: "No replies yet", sub: "No answered conversations in this period" };
       return {
         value: formatDuration(cur.medianMinutes),
         sub: `median, ${cur.conversations} ${cur.conversations === 1 ? "conversation" : "conversations"}`,
         delta: prev.medianMinutes === null ? null : deltaPct(cur.medianMinutes, prev.medianMinutes),
+        goodWhen: "down" as const,
       };
     },
     render: kpi,
@@ -77,7 +77,7 @@ export const COMMUNICATION_WIDGETS = {
     async load(ctx) {
       const cur = triageReplyCounts(ctx.range.fromMs, ctx.range.toMs);
       const prev = triageReplyCounts(ctx.previous.fromMs, ctx.previous.toMs);
-      if (cur.triaged === 0) return { value: "No data", sub: "No triaged messages in this period" };
+      if (cur.triaged === 0) return { value: "No triaged messages", sub: "Nothing was triaged in this period" };
       const rate = Math.round((cur.autoSent / cur.triaged) * 100);
       const prevRate = prev.triaged === 0 ? null : Math.round((prev.autoSent / prev.triaged) * 100);
       return {
@@ -140,7 +140,7 @@ export const COMMUNICATION_WIDGETS = {
         .map((c) => ({ label: channelLabel(c.channel), value: c.medianMinutes, display: formatDuration(c.medianMinutes) }));
     },
     render: (rows: { label: string; value: number; display: string }[]) => (
-      <BarListView rows={rows} empty="No answered conversations in this period." />
+      <BarListView rows={rows} empty="No replies yet." />
     ),
   },
   "communication.triageCategories": {
@@ -181,19 +181,14 @@ export const COMMUNICATION_WIDGETS = {
   "communication.awaitingReply": {
     href: "/communication",
     async load(ctx) {
-      const now = Date.now();
-      const all = await cached(ctx, "communication.conversations", () => listConversations());
-      return all
-        .filter((c) => c.lastDirection === "inbound")
-        .sort((a, b) => a.lastAt.getTime() - b.lastAt.getTime())
-        .slice(0, 10)
-        .map((c) => ({
-          id: `${c.kind}:${c.contactId}`,
-          primary: c.name,
-          secondary: [channelLabel(c.channel ?? "other"), c.aiSummary ? truncate(c.aiSummary, 80) : null].filter(Boolean).join(" - "),
-          meta: `waiting ${formatDuration(Math.max(0, now - c.lastAt.getTime()) / 60_000)}`,
-          href: c.href,
-        }));
+      const now = ctx.now.getTime();
+      return awaitingReply(10).map((c) => ({
+        id: `${c.kind}:${c.contactId}`,
+        primary: c.name,
+        secondary: [channelLabel(c.channel ?? "other"), c.aiSummary ? truncate(c.aiSummary, 80) : null].filter(Boolean).join(" - "),
+        meta: `waiting ${formatDuration(Math.max(0, now - c.atMs) / 60_000)}`,
+        href: c.href,
+      }));
     },
     render: (rows: { id: string; primary: string; secondary: string; meta: string; href: string }[]) => (
       <RowList rows={rows} empty="Nothing is waiting for a reply." />

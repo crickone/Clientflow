@@ -20,7 +20,7 @@ export async function WidgetSlot({ widgetKey, ctx, tenantId }: { widgetKey: stri
     const collecting = meta?.recorder && (!started || started.getTime() > ctx.range.fromMs);
     return (
       <>
-        {collecting && <CollectingNote since={started ?? ctx.now} />}
+        {collecting && <CollectingNote since={started ?? null} />}
         {impl.render(data, ctx)}
       </>
     );

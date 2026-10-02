@@ -6,14 +6,18 @@ export function KpiTile({
   sub,
   delta,
   accent,
+  goodWhen = "up",
 }: {
   value: string;
   sub?: string;
   /** Percentage change vs the previous period; null hides the chip. */
   delta?: number | null;
   accent?: boolean;
+  /** Which direction of change is good; lower-is-better metrics pass "down". */
+  goodWhen?: "up" | "down";
 }) {
   const up = (delta ?? 0) >= 0;
+  const good = goodWhen === "down" ? (delta ?? 0) <= 0 : up;
   return (
     <>
       <CardValue style={{ color: accent ? "var(--accent)" : undefined }}>{value}</CardValue>
@@ -26,7 +30,7 @@ export function KpiTile({
               gap: 2,
               fontSize: 12,
               fontWeight: 600,
-              color: up ? "#22c55e" : "#ef4444",
+              color: good ? "#22c55e" : "#ef4444",
             }}
           >
             {up ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}

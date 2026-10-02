@@ -75,7 +75,7 @@ export function parseCampaignAudience(raw: string): CampaignAudience {
   return { kind: "all_subscribed" };
 }
 
-function parseStats(raw: string | null): Record<string, unknown> | null {
+export function parseStats(raw: string | null): Record<string, unknown> | null {
   if (!raw) return null;
   try {
     const v: unknown = JSON.parse(raw);

@@ -2,7 +2,7 @@
  * Sales preset pure helpers (no DB, no server imports; tested in
  * sales.test.ts). The loaders live in salesQueries.ts.
  */
-import { pct } from "./stats";
+import { bucketIndex, pct, type Bucket } from "./stats";
 
 // ---------- pure helpers ----------
 
@@ -38,4 +38,36 @@ export function singular(word: string): string {
   if (/ies$/.test(w)) return w.replace(/ies$/, "y");
   if (/(s|x|ch|sh)es$/.test(w)) return w.replace(/es$/, "");
   return w.replace(/s$/, "");
+}
+
+/**
+ * Won/lost counts per bucket from stage events. Consistent with the won tile:
+ * a move that starts in a won stage (won to repeat) is not a new win, and each
+ * lead counts at most once per bucket per series.
+ */
+export function wonLostCounts(
+  events: { leadId: number; fromStageId: number | null; toStageId: number; atMs: number }[],
+  wonIds: Set<number>,
+  lostIds: Set<number>,
+  buckets: Bucket[],
+): { label: string; Won: number; Lost: number }[] {
+  const out = buckets.map((b) => ({ label: b.label, Won: 0, Lost: 0 }));
+  const seen = buckets.map(() => ({ won: new Set<number>(), lost: new Set<number>() }));
+  for (const e of events) {
+    const i = bucketIndex(buckets, e.atMs);
+    if (i < 0) continue;
+    if (wonIds.has(e.toStageId)) {
+      if (e.fromStageId != null && wonIds.has(e.fromStageId)) continue;
+      if (!seen[i].won.has(e.leadId)) {
+        seen[i].won.add(e.leadId);
+        out[i].Won++;
+      }
+    } else if (lostIds.has(e.toStageId)) {
+      if (!seen[i].lost.has(e.leadId)) {
+        seen[i].lost.add(e.leadId);
+        out[i].Lost++;
+      }
+    }
+  }
+  return out;
 }

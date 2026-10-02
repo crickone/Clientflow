@@ -65,7 +65,8 @@ export default async function DashboardPage({
     if (!startMemo.has(key)) startMemo.set(key, getRecorderStart(key));
     return startMemo.get(key) ?? null;
   };
-  const reqs = await checkRequirements(tenantId);
+  const needsReqs = refs.some((r) => (CATALOG_BY_KEY.get(r.key)?.requires?.length ?? 0) > 0);
+  const reqs = needsReqs ? await checkRequirements(tenantId) : ({} as Awaited<ReturnType<typeof checkRequirements>>);
 
   const items: GridItem[] = refs.map((ref) => {
     const meta = CATALOG_BY_KEY.get(ref.key)!;

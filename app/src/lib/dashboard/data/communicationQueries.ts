@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, gte, isNotNull, lt, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
 
 import { db, schema } from "@/lib/db";
 import type { MsgRow } from "./communication";
@@ -171,4 +171,101 @@ export function automationCounts(fromMs: number, toMs: number): { sent: number; 
         .get()?.n ?? 0,
     );
   return { sent: count("sent", q.sentAt), failed: count("failed", q.dueAt), queued: count("queued", q.dueAt) };
+}
+
+export type AwaitingReply = {
+  kind: "lead" | "client";
+  contactId: number;
+  name: string;
+  href: string;
+  channel: string | null;
+  atMs: number;
+  aiSummary: string | null;
+};
+
+type LatestRow = { contactId: number; messageId: number; channel: string | null; at: number };
+
+/**
+ * Conversations whose latest real message is inbound, longest-waiting first.
+ * One windowed query per source picks each contact's latest non-note,
+ * non-manual/system message; only the winners' names and summaries are then read.
+ */
+export function awaitingReply(limit = 10): AwaitingReply[] {
+  const latestInbound = (table: "lead_messages" | "client_messages", ownerCol: "lead_id" | "client_id"): LatestRow[] =>
+    db
+      .all<{ contactId: number; messageId: number; channel: string | null; at: number }>(
+        sql.raw(`
+          SELECT contact_id AS contactId, id AS messageId, channel, at FROM (
+            SELECT ${ownerCol} AS contact_id, id, channel, direction,
+                   coalesce(sent_at, created_at) AS at,
+                   row_number() OVER (PARTITION BY ${ownerCol} ORDER BY coalesce(sent_at, created_at) DESC, id DESC) AS rn
+            FROM ${table}
+            WHERE direction != 'note' AND (channel IS NULL OR channel NOT IN ('manual', 'system'))
+          ) WHERE rn = 1 AND direction = 'inbound'
+          ORDER BY at ASC
+          LIMIT ${Math.max(1, Math.floor(limit))}
+        `),
+      )
+      .map((r) => ({ contactId: Number(r.contactId), messageId: Number(r.messageId), channel: r.channel, at: Number(r.at) }));
+
+  const leadRows = latestInbound("lead_messages", "lead_id");
+  const clientRows = latestInbound("client_messages", "client_id");
+  const top = [
+    ...leadRows.map((r) => ({ kind: "lead" as const, ...r })),
+    ...clientRows.map((r) => ({ kind: "client" as const, ...r })),
+  ]
+    .sort((a, b) => a.at - b.at)
+    .slice(0, limit);
+
+  const ids = (kind: "lead" | "client") => top.filter((t) => t.kind === kind);
+  const leadTop = ids("lead");
+  const clientTop = ids("client");
+
+  const leadsById = new Map(
+    (leadTop.length
+      ? db.select().from(schema.leads).where(inArray(schema.leads.id, leadTop.map((t) => t.contactId))).all()
+      : []
+    ).map((l) => [l.id, l]),
+  );
+  const clientsById = new Map(
+    (clientTop.length
+      ? db.select().from(schema.clients).where(inArray(schema.clients.id, clientTop.map((t) => t.contactId))).all()
+      : []
+    ).map((c) => [c.id, c]),
+  );
+  const leadSummary = new Map(
+    (leadTop.length
+      ? db
+          .select({ id: schema.leadMessages.id, s: schema.leadMessages.aiSummary })
+          .from(schema.leadMessages)
+          .where(inArray(schema.leadMessages.id, leadTop.map((t) => t.messageId)))
+          .all()
+      : []
+    ).map((r) => [r.id, r.s]),
+  );
+  const clientSummary = new Map(
+    (clientTop.length
+      ? db
+          .select({ id: schema.clientMessages.id, s: schema.clientMessages.aiSummary })
+          .from(schema.clientMessages)
+          .where(inArray(schema.clientMessages.id, clientTop.map((t) => t.messageId)))
+          .all()
+      : []
+    ).map((r) => [r.id, r.s]),
+  );
+
+  const out: AwaitingReply[] = [];
+  for (const t of top) {
+    if (t.kind === "lead") {
+      const l = leadsById.get(t.contactId);
+      if (!l) continue;
+      const name = [l.firstName, l.lastName].filter(Boolean).join(" ").trim() || l.phone || l.email || "Lead";
+      out.push({ kind: "lead", contactId: t.contactId, name, href: `/leads/${t.contactId}`, channel: t.channel, atMs: t.at, aiSummary: leadSummary.get(t.messageId) ?? null });
+    } else {
+      const c = clientsById.get(t.contactId);
+      if (!c) continue;
+      out.push({ kind: "client", contactId: t.contactId, name: `${c.firstName} ${c.lastName}`.trim(), href: `/clients/${t.contactId}`, channel: t.channel, atMs: t.at, aiSummary: clientSummary.get(t.messageId) ?? null });
+    }
+  }
+  return out;
 }

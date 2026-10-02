@@ -14,6 +14,7 @@ import {
   campaignsSentIn,
   contactSourceCounts,
   engagementSeries,
+  eventsIn,
   listChange,
   listGrowthSeries,
   openTimes,
@@ -32,13 +33,16 @@ import type { EmailKey } from "./keys";
 const sentIn = (ctx: WidgetCtx) => cached(ctx, "email.sentCampaigns", () => campaignsSentIn(ctx.range.fromMs, ctx.range.toMs));
 const sentPrev = (ctx: WidgetCtx) => cached(ctx, "email.sentCampaignsPrev", () => campaignsSentIn(ctx.previous.fromMs, ctx.previous.toMs));
 
+const events = (ctx: WidgetCtx, event: "opened" | "clicked") =>
+  cached(ctx, `email.events:${event}:${ctx.range.fromMs}:${ctx.range.toMs}`, () => eventsIn(event, ctx.range.fromMs, ctx.range.toMs));
+
 const rates = (cs: { counts: Record<string, number> }[]) => campaignRates(sumCounts(cs.map((c) => c.counts)));
 const fmtPct = (v: number | null) => (v === null ? null : `${v}%`);
 const num = (n: number) => n.toLocaleString("en-IE");
 const dubDate = (ms: number) =>
   new Date(ms).toLocaleDateString("en-IE", { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Dublin" });
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-const EMPTY_PERIOD = "No campaigns were sent in this period.";
+const EMPTY_PERIOD = "No campaigns sent in this period.";
 
 const rateTile = (pick: (r: ReturnType<typeof campaignRates>) => number | null, label: string) => ({
   href: "/campaigns",
@@ -47,7 +51,7 @@ const rateTile = (pick: (r: ReturnType<typeof campaignRates>) => number | null, 
     const r = rates(cur);
     const v = pick(r);
     const p = pick(rates(prev));
-    if (v === null) return { value: "No data", sub: `${label}, ${cur.length === 0 ? "no campaigns sent" : "no delivered email yet"}` };
+    if (v === null) return { value: cur.length === 0 ? "No campaigns" : "No delivered email", sub: `${label}, ${cur.length === 0 ? "none sent in this period" : "nothing delivered yet"}` };
     return { value: `${v}%`, sub: `${label}, ${ctx.range.label}`, delta: p === null ? null : deltaPct(v, p) };
   },
   render: kpi,
@@ -142,14 +146,15 @@ export const EMAIL_WIDGETS = {
           { key: "Unsubscribe", label: "Unsubscribe %", align: "right" },
         ]}
         rows={rows}
-        empty={EMPTY_PERIOD}
+        empty="No campaigns sent in this period."
       />
     ),
   },
   "email.engagementTrend": {
     href: "/campaigns",
     async load(ctx) {
-      return engagementSeries(ctx.range.fromMs, ctx.range.toMs);
+      const [opened, clicked] = await Promise.all([events(ctx, "opened"), events(ctx, "clicked")]);
+      return engagementSeries(ctx.range.fromMs, ctx.range.toMs, { opened, clicked });
     },
     render: (data: Record<string, string | number>[]) =>
       data.every((r) => r.Opens === 0 && r.Clicks === 0) ? (
@@ -170,20 +175,20 @@ export const EMAIL_WIDGETS = {
   "email.topLinks": {
     href: "/campaigns",
     async load(ctx) {
-      return topLinks(ctx.range.fromMs, ctx.range.toMs, 8).map((l) => ({
+      return topLinks(ctx.range.fromMs, ctx.range.toMs, 8, await events(ctx, "clicked")).map((l) => ({
         label: linkLabel(l.url),
         value: l.clicks,
         sub: `${l.uniques} unique ${l.uniques === 1 ? "send" : "sends"}`,
       }));
     },
-    render: (rows: { label: string; value: number; sub: string }[]) => <BarListView rows={rows} empty="No link clicks recorded in this period." />,
+    render: (rows: { label: string; value: number; sub: string }[]) => <BarListView rows={rows} empty="No clicks yet." />,
   },
   "email.sendTimeHeatmap": {
     href: "/campaigns",
     async load(ctx) {
-      return weekdayHourGrid(openTimes(ctx.range.fromMs, ctx.range.toMs), "Europe/Dublin");
+      return weekdayHourGrid(openTimes(ctx.range.fromMs, ctx.range.toMs, await events(ctx, "opened")), "Europe/Dublin");
     },
-    render: (grid: number[][]) => <HeatmapView grid={grid} empty="No opens recorded in this period." />,
+    render: (grid: number[][]) => <HeatmapView grid={grid} empty="No opens yet." />,
   },
   "email.deliverability": {
     href: "/campaigns",

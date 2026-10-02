@@ -3,11 +3,11 @@ import "server-only";
 import { and, asc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 
 import { db, schema } from "@/lib/db";
-import { listLeadsForBoard } from "@/lib/leads";
-import { slaTone, STALE_MS } from "@/lib/pipeline/boardMetrics";
+import { SLA_RED_MS, STALE_MS } from "@/lib/pipeline/boardMetrics";
 import { defaultPipelineId, listPipelines } from "@/lib/pipeline/pipelineRepo";
+import { wonLostCounts } from "./sales";
 import { WON_ROLES, type StageRole } from "@/lib/pipeline/roles";
-import { bucketIndex, median, seriesBuckets, timeInStage, velocityDays, type StageEv } from "./stats";
+import { median, seriesBuckets, timeInStage, velocityDays, type StageEv } from "./stats";
 
 const d = (ms: number) => new Date(ms);
 const isWon = (role: string | null) => role != null && WON_ROLES.has(role as StageRole);
@@ -111,7 +111,8 @@ export function funnelSteps(fromMs: number, toMs: number): { label: string; valu
   const by = new Map(rows.map((r) => [r.toStageId, Number(r.n)]));
   return stages.map((s) => ({ label: s.name, value: by.get(s.id) ?? 0 }));
 }
-const CLOSED_OUT = new Set(["lost", "lapsed"]);
+/** Side branches and closed-out stages are not funnel steps. */
+const CLOSED_OUT = new Set(["lost", "lapsed", "no_show"]);
 
 export function stageDistribution(): { label: string; value: number }[] {
   const pid = defaultPipelineId();
@@ -206,11 +207,15 @@ export function wonLostSeries(fromMs: number, toMs: number): Record<string, stri
   const wonIds = new Set(stageIdsWithRole(stages, (r) => WON_ROLES.has(r as StageRole)));
   const lostIds = new Set(stageIdsWithRole(stages, (r) => r === "lost"));
   const buckets = seriesBuckets(fromMs, toMs);
-  const out = buckets.map((b) => ({ label: b.label, Won: 0, Lost: 0 }));
   const ids = [...wonIds, ...lostIds];
-  if (ids.length === 0) return out;
+  if (ids.length === 0) return wonLostCounts([], wonIds, lostIds, buckets);
   const rows = db
-    .select({ to: schema.leadStageEvents.toStageId, at: schema.leadStageEvents.at })
+    .select({
+      leadId: schema.leadStageEvents.leadId,
+      fromStageId: schema.leadStageEvents.fromStageId,
+      toStageId: schema.leadStageEvents.toStageId,
+      at: schema.leadStageEvents.at,
+    })
     .from(schema.leadStageEvents)
     .where(
       and(
@@ -220,13 +225,12 @@ export function wonLostSeries(fromMs: number, toMs: number): Record<string, stri
       ),
     )
     .all();
-  for (const r of rows) {
-    const i = bucketIndex(buckets, r.at.getTime());
-    if (i < 0) continue;
-    if (wonIds.has(r.to)) out[i].Won++;
-    else out[i].Lost++;
-  }
-  return out;
+  return wonLostCounts(
+    rows.map((r) => ({ leadId: r.leadId, fromStageId: r.fromStageId, toStageId: r.toStageId, atMs: r.at.getTime() })),
+    wonIds,
+    lostIds,
+    buckets,
+  );
 }
 
 export function staleLeads(nowMs: number, limit = 10) {
@@ -244,7 +248,7 @@ export function staleLeads(nowMs: number, limit = 10) {
     .where(
       and(
         lt(schema.leads.updatedAt, d(nowMs - STALE_MS)),
-        sql`(${schema.pipelineStages.role} IS NULL OR ${schema.pipelineStages.role} NOT IN ('won','repeat','lost'))`,
+        sql`(${schema.pipelineStages.role} IS NULL OR ${schema.pipelineStages.role} NOT IN ('won','repeat','lost','lapsed'))`,
       ),
     )
     .orderBy(asc(schema.leads.updatedAt))
@@ -254,12 +258,19 @@ export function staleLeads(nowMs: number, limit = 10) {
 
 /** Uncontacted entry-stage leads that have waited past the red SLA threshold. */
 export function slaBreachCount(nowMs: number): number {
-  return listLeadsForBoard().filter(
-    (l) =>
-      l.firstOutboundAt === null &&
-      (l.stage?.role == null || l.stage.role === "new") &&
-      slaTone(nowMs - l.createdAt.getTime()) === "red",
-  ).length;
+  const row = db
+    .select({ n: sql<number>`count(*)` })
+    .from(schema.leads)
+    .leftJoin(schema.pipelineStages, eq(schema.pipelineStages.id, schema.leads.stageId))
+    .where(
+      and(
+        sql`(${schema.pipelineStages.role} IS NULL OR ${schema.pipelineStages.role} = 'new')`,
+        lt(schema.leads.createdAt, d(nowMs - SLA_RED_MS)),
+        sql`NOT EXISTS (SELECT 1 FROM ${schema.leadMessages} WHERE ${schema.leadMessages.leadId} = ${schema.leads.id} AND ${schema.leadMessages.direction} = 'outbound' AND ${schema.leadMessages.sentAt} IS NOT NULL)`,
+      ),
+    )
+    .get();
+  return Number(row?.n ?? 0);
 }
 
 export { isWon };
