@@ -6,7 +6,7 @@ import { RowList } from "@/components/dashboard/views/RowList";
 import { SeriesChart } from "@/components/dashboard/views/SeriesChart";
 import { TableView } from "@/components/dashboard/views/TableView";
 import { formatEur } from "@/lib/utils";
-import { cacCents, roasRatio, sourceLabel } from "../data/marketing";
+import { blendedTotals, cacCents, roasRatio, sourceLabel } from "../data/marketing";
 import {
   campaignLeadCountsIn,
   campaignsByStatus,
@@ -53,26 +53,21 @@ export const MARKETING_WIDGETS = {
   "marketing.blendedCac": {
     href: "/marketing/campaigns",
     async load(ctx) {
-      const set = await scores(ctx);
-      const spend = set.reduce((s, x) => s + x.score.adSpendCents, 0);
-      const converts = set.reduce((s, x) => s + x.score.converts, 0);
-      const cac = cacCents(spend, converts);
-      return cac === null
-        ? { value: "No customers yet", sub: `All time, ${plural(set.length, "campaign", "campaigns")}` }
-        : { value: eur(cac), sub: `All time, ${plural(set.length, "campaign", "campaigns")}` };
+      const t = blendedTotals((await scores(ctx)).map((x) => x.score));
+      const sub = `All time, ${plural(t.campaigns, "campaign", "campaigns")} with ad spend`;
+      const cac = cacCents(t.spendCents, t.converts);
+      return cac === null ? { value: "No customers yet", sub } : { value: eur(cac), sub };
     },
     render: kpi,
   },
   "marketing.roas": {
     href: "/marketing/campaigns",
     async load(ctx) {
-      const set = await scores(ctx);
-      const spend = set.reduce((s, x) => s + x.score.adSpendCents, 0);
-      const revenue = set.reduce((s, x) => s + x.score.upfrontCashCents + x.score.mrrCents, 0);
-      const r = roasRatio(revenue, spend);
+      const t = blendedTotals((await scores(ctx)).map((x) => x.score));
+      const r = roasRatio(t.revenueCents, t.spendCents);
       return r === null
         ? { value: "No ad spend recorded", sub: "All time" }
-        : { value: `${r}x`, sub: `All time, ${eur(revenue)} from ${eur(spend)} spent` };
+        : { value: `${r}x`, sub: `All time, ${eur(t.revenueCents)} from ${eur(t.spendCents)} spent` };
     },
     render: kpi,
   },
@@ -87,7 +82,7 @@ export const MARKETING_WIDGETS = {
         Customers: s.converts,
         Conversion: s.conversionRatePct === null ? null : `${Math.round(s.conversionRatePct * 10) / 10}%`,
         "Cost per customer": s.cacCents === null ? null : eur(s.cacCents),
-        ROAS: s.roas === null ? null : `${Math.round(s.roas * 10) / 10}x`,
+        ROAS: (r => (r === null ? null : `${r}x`))(roasRatio(s.upfrontCashCents + s.mrrCents, s.adSpendCents)),
       }));
     },
     render: (rows: Record<string, string | number | null>[]) => (

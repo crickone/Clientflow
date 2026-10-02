@@ -33,3 +33,24 @@ export function mergeUpcoming(
     .sort((a, b) => a.atMs - b.atMs)
     .slice(0, limit);
 }
+
+export type MoneyScore = { adSpendCents: number; converts: number; upfrontCashCents: number; mrrCents: number };
+
+/**
+ * Totals for the blended CAC and ROAS tiles. Only campaigns with recorded ad
+ * spend count, so customers from an unspent campaign do not dilute either.
+ */
+export function blendedTotals(scores: MoneyScore[]): {
+  spendCents: number;
+  converts: number;
+  revenueCents: number;
+  campaigns: number;
+} {
+  const paid = scores.filter((s) => s.adSpendCents > 0);
+  return {
+    spendCents: paid.reduce((a, s) => a + s.adSpendCents, 0),
+    converts: paid.reduce((a, s) => a + s.converts, 0),
+    revenueCents: paid.reduce((a, s) => a + s.upfrontCashCents + s.mrrCents, 0),
+    campaigns: paid.length,
+  };
+}
