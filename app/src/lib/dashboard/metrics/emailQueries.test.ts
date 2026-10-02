@@ -1,4 +1,4 @@
-// Run: npm test -- src/lib/dashboard/data/emailQueries.test.ts
+// Run: npm test -- src/lib/dashboard/metrics/emailQueries.test.ts
 //
 // Smoke test: every emailQueries loader once against a scratch tenant with a
 // little seeded data, plus the control-plane readers the widgets call.

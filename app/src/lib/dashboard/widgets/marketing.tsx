@@ -6,7 +6,7 @@ import { RowList } from "@/components/dashboard/views/RowList";
 import { SeriesChart } from "@/components/dashboard/views/SeriesChart";
 import { TableView } from "@/components/dashboard/views/TableView";
 import { formatEur } from "@/lib/utils";
-import { blendedTotals, cacCents, roasRatio, sourceLabel } from "../data/marketing";
+import { blendedTotals, cacCents, roasRatio, sourceLabel } from "../metrics/marketing";
 import {
   campaignLeadCountsIn,
   campaignsByStatus,
@@ -19,9 +19,9 @@ import {
   trafficRows,
   upcomingSendItems,
   visitorsSeries,
-} from "../data/marketingQueries";
-import { topNWithOther } from "../data/sales";
-import { pct } from "../data/stats";
+} from "../metrics/marketingQueries";
+import { topNWithOther } from "../metrics/sales";
+import { pct } from "../metrics/stats";
 import { deltaPct } from "../range";
 import type { WidgetCtx, WidgetImpl } from "../types";
 import { cached } from "./cache";

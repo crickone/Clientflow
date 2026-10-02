@@ -1,4 +1,4 @@
-// Run: npm test -- src/lib/dashboard/data/marketingQueries.test.ts
+// Run: npm test -- src/lib/dashboard/metrics/marketingQueries.test.ts
 //
 // Smoke test: every marketingQueries loader once against a scratch tenant
 // with a little seeded data. Shape plus at least one non-trivial value each.

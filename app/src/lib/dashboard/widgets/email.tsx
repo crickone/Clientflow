@@ -9,7 +9,7 @@ import { TableView } from "@/components/dashboard/views/TableView";
 import { getEmailBalanceCents, isMarketingSuspended } from "@/lib/email/credits";
 import { getSentThisMonth, getTenantIncludedSends } from "@/lib/email/included";
 import { formatEur } from "@/lib/utils";
-import { campaignRates, linkLabel, netDeltaPct, sumCounts } from "../data/email";
+import { campaignRates, linkLabel, netDeltaPct, sumCounts } from "../metrics/email";
 import {
   campaignsSentIn,
   contactSourceCounts,
@@ -22,9 +22,9 @@ import {
   subscribedNow,
   suppressionCounts,
   topLinks,
-} from "../data/emailQueries";
-import { topNWithOther } from "../data/sales";
-import { weekdayHourGrid } from "../data/stats";
+} from "../metrics/emailQueries";
+import { topNWithOther } from "../metrics/sales";
+import { weekdayHourGrid } from "../metrics/stats";
 import { deltaPct } from "../range";
 import type { WidgetCtx, WidgetImpl } from "../types";
 import { cached } from "./cache";

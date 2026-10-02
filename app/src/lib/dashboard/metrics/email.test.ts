@@ -1,4 +1,4 @@
-// Run: npm test -- src/lib/dashboard/data/email.test.ts
+// Run: npm test -- src/lib/dashboard/metrics/email.test.ts
 import assert from "node:assert/strict";
 import { campaignRates, countsFromStats, linkGroup, linkLabel, netDeltaPct, sumCounts } from "./email";
 

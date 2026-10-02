@@ -5,7 +5,7 @@ import { FunnelView } from "@/components/dashboard/views/FunnelView";
 import { kpi } from "@/components/dashboard/views/kpi";
 import { RowList } from "@/components/dashboard/views/RowList";
 import { SeriesChart } from "@/components/dashboard/views/SeriesChart";
-import { conversionByGroup, singular, topNWithOther } from "../data/sales";
+import { conversionByGroup, singular, topNWithOther } from "../metrics/sales";
 import {
   avgTimeInStageDays,
   conversionIn,
@@ -20,8 +20,8 @@ import {
   staleLeads,
   wonLeadsIn,
   wonLostSeries,
-} from "../data/salesQueries";
-import { pct } from "../data/stats";
+} from "../metrics/salesQueries";
+import { pct } from "../metrics/stats";
 import { deltaPct } from "../range";
 import type { WidgetCtx, WidgetImpl } from "../types";
 import { cached } from "./cache";

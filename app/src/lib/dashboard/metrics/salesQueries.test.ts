@@ -1,4 +1,4 @@
-// Run: npm test -- src/lib/dashboard/data/salesQueries.test.ts
+// Run: npm test -- src/lib/dashboard/metrics/salesQueries.test.ts
 //
 // Smoke test: every salesQueries loader once against a scratch tenant
 // with a little seeded data. Shape plus at least one non-trivial value each.

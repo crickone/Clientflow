@@ -1,4 +1,4 @@
-// Run: npm test -- src/lib/dashboard/data/sales.test.ts
+// Run: npm test -- src/lib/dashboard/metrics/sales.test.ts
 import assert from "node:assert/strict";
 import { conversionByGroup, topNWithOther, wonLostCounts } from "./sales";
 import { seriesBuckets } from "./stats";

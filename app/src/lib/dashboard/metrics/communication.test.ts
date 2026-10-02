@@ -1,4 +1,4 @@
-// Run: npm test -- src/lib/dashboard/data/communication.test.ts
+// Run: npm test -- src/lib/dashboard/metrics/communication.test.ts
 import assert from "node:assert/strict";
 import { categoryLabel, channelLabel, triagedPool, channelOf, countByChannel, formatDuration, responseStats, truncate, type MsgRow } from "./communication";
 

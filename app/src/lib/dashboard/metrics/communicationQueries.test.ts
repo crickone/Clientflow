@@ -1,4 +1,4 @@
-// Run: npm test -- src/lib/dashboard/data/communicationQueries.test.ts
+// Run: npm test -- src/lib/dashboard/metrics/communicationQueries.test.ts
 //
 // Smoke test: every communicationQueries loader once against a scratch tenant
 // with a little seeded data.

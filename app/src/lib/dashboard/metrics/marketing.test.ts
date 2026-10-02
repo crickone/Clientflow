@@ -1,4 +1,4 @@
-// Run: npm test -- src/lib/dashboard/data/marketing.test.ts
+// Run: npm test -- src/lib/dashboard/metrics/marketing.test.ts
 import assert from "node:assert/strict";
 import { blendedTotals, cacCents, mergeUpcoming, roasRatio, sourceLabel } from "./marketing";
 
