@@ -93,7 +93,6 @@ export const OVERVIEW_WIDGETS = {
     render: kpi,
   },
   "overview.todaysSchedule": {
-    label: (ctx) => `Today's ${ctx.vocab.bookings.toLowerCase()}`,
     href: "/appointments/new",
     async load(ctx) {
       const today = ctx.now.toISOString().slice(0, 10);
