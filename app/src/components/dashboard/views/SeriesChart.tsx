@@ -15,11 +15,15 @@ const FALLBACK = ["var(--accent)", "var(--text-tertiary)"];
 
 export function SeriesChart({ data, xKey, series, kind = "line", stacked, height = 220 }: Props) {
   const colour = (i: number, c?: string) => c ?? FALLBACK[i % FALLBACK.length];
+  // Whole-number ticks flatten small values (euro amounts under a few euro);
+  // allow decimals whenever the largest value is small.
+  const maxValue = Math.max(0, ...data.flatMap((row) => series.map((s) => Number(row[s.key]) || 0)));
+  const decimals = maxValue < 5;
   const common = (
     <>
       <CartesianGrid strokeDasharray="3 3" stroke="var(--hairline)" />
       <XAxis dataKey={xKey} tick={{ fontSize: 11, fill: "var(--text-tertiary)" }} axisLine={false} tickLine={false} minTickGap={16} />
-      <YAxis tick={{ fontSize: 11, fill: "var(--text-tertiary)" }} axisLine={false} tickLine={false} width={40} allowDecimals={false} />
+      <YAxis tick={{ fontSize: 11, fill: "var(--text-tertiary)" }} axisLine={false} tickLine={false} width={40} allowDecimals={decimals} />
       <Tooltip
         cursor={kind === "bar" ? { fill: "var(--text-tertiary)", fillOpacity: 0.2 } : undefined}
         contentStyle={{ background: "var(--bg)", border: "1px solid var(--hairline)", borderRadius: 10, fontSize: 12 }}

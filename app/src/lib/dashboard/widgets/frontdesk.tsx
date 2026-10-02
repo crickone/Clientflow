@@ -91,7 +91,7 @@ export const FRONTDESK_WIDGETS = {
             {d.capped ? `, last ${d.shown} days of the period` : ""}
           </div>
           <BarListView
-            rows={open.map((r) => ({ label: r.label, value: r.pct ?? 0, display: `${r.label} ${Math.round(r.pct ?? 0)}%` }))}
+            rows={open.map((r) => ({ label: r.label, value: r.pct ?? 0, display: `${Math.round(r.pct ?? 0)}%` }))}
             max={100}
             empty="No opening hours fall in this period."
           />
