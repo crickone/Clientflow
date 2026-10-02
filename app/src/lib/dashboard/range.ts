@@ -32,6 +32,9 @@ export interface ResolvedRange {
   days: number;
 }
 
+/** Longest custom window accepted, in whole days. */
+export const MAX_CUSTOM_RANGE_DAYS = 366;
+
 const DAY = 86_400_000;
 const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -82,7 +85,14 @@ export function resolveRange(
       if (from && to && ISO_RE.test(from) && ISO_RE.test(to)) {
         const f = Date.parse(`${from}T00:00:00Z`);
         const t = Date.parse(`${to}T00:00:00Z`);
-        if (Number.isFinite(f) && Number.isFinite(t) && f <= t) {
+        if (
+          Number.isFinite(f) &&
+          Number.isFinite(t) &&
+          isoOf(f) === from &&
+          isoOf(t) === to &&
+          f <= t &&
+          t - f + DAY <= MAX_CUSTOM_RANGE_DAYS * DAY
+        ) {
           return build("custom", `${shortDate(from)} - ${shortDate(to)}`, f, t + DAY);
         }
       }

@@ -122,8 +122,7 @@ export function TabBar({ tabs, active, rangeKey, isAdmin, source, presets, custo
 
   function pickRange(key: string) {
     if (key === "custom") return setCustomOpen(true);
-    go({ range: null, from: null, to: null });
-    act(() => setRangeAction(active, key));
+    act(() => setRangeAction(active, key), () => go({ range: null, from: null, to: null }));
   }
 
   async function remove(index: number) {
@@ -182,7 +181,12 @@ export function TabBar({ tabs, active, rangeKey, isAdmin, source, presets, custo
                       </DropdownMenuItem>
                     )}
                     {t.presetKey && (
-                      <DropdownMenuItem onSelect={() => act(() => resetTabAction(i))}>
+                      <DropdownMenuItem
+                        onSelect={async () => {
+                          const ok = await confirm({ title: "Reset this tab to default?", body: "Your changes to this tab's widgets will be discarded.", destructive: true, confirmLabel: "Reset" });
+                          if (ok) act(() => resetTabAction(i));
+                        }}
+                      >
                         <RotateCcw size={14} /> Reset to default
                       </DropdownMenuItem>
                     )}
@@ -202,7 +206,12 @@ export function TabBar({ tabs, active, rangeKey, isAdmin, source, presets, custo
                           <Users size={14} /> Make team default
                         </DropdownMenuItem>
                         {source !== "platform" && (
-                          <DropdownMenuItem onSelect={() => act(() => clearTeamDefaultAction())}>
+                          <DropdownMenuItem
+                            onSelect={async () => {
+                              const ok = await confirm({ title: "Clear the team default?", body: "People who have not customised their dashboard will go back to the platform default.", destructive: true, confirmLabel: "Clear" });
+                              if (ok) act(() => clearTeamDefaultAction());
+                            }}
+                          >
                             <LayoutTemplate size={14} /> Clear team default
                           </DropdownMenuItem>
                         )}
@@ -262,7 +271,7 @@ export function TabBar({ tabs, active, rangeKey, isAdmin, source, presets, custo
           </div>
         )}
       </div>
-      {error && <div style={{ color: "#ef4444", fontSize: 13, marginTop: 8 }}>{error}</div>}
+      {error && !adding && !renaming && <div style={{ color: "#ef4444", fontSize: 13, marginTop: 8 }}>{error}</div>}
 
       {/* Add a tab */}
       <Dialog open={adding} onOpenChange={setAdding}>
@@ -291,6 +300,7 @@ export function TabBar({ tabs, active, rangeKey, isAdmin, source, presets, custo
               );
             })}
           </div>
+          {error && <div role="alert" style={{ color: "#ef4444", fontSize: 13, marginTop: 12 }}>{error}</div>}
           <div style={{ display: "flex", gap: 8, marginTop: 16, justifyContent: "flex-end" }}>
             <Button
               variant="ghost"
@@ -326,6 +336,7 @@ export function TabBar({ tabs, active, rangeKey, isAdmin, source, presets, custo
               value={renaming?.name ?? ""}
               onChange={(e) => setRenaming((r) => (r ? { ...r, name: e.target.value } : r))}
             />
+            {error && <div role="alert" style={{ color: "#ef4444", fontSize: 13, marginTop: 10 }}>{error}</div>}
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
               <Button type="submit" loading={pending}>Save</Button>
             </div>

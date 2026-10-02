@@ -271,7 +271,7 @@ export const OVERVIEW_WIDGETS = {
       return rows.map((r) => ({
         id: r.id,
         primary: r.name ?? "Untitled post",
-        meta: r.when.toLocaleString("en-IE", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }),
+        meta: r.when.toLocaleString("en-IE", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Dublin" }),
       }));
     },
     render: (rows) => <RowList rows={rows} empty="Nothing scheduled. Plan a post in Content Studio." />,

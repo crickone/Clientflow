@@ -41,7 +41,8 @@ export function visibleRefs(refs: WidgetRef[], opts: VisOpts): WidgetRef[] {
  * so a save from a restricted view never deletes widgets hidden from it. A
  * hidden ref stays right after the visible stored ref that preceded it (matched
  * by key and occurrence); leading hidden refs stay first; a hidden ref whose
- * predecessor was removed goes to the end. Unknown keys are dropped. Pure.
+ * predecessor was removed goes to the end. Unknown keys are dropped; a size the catalog no longer allows is clamped to the
+ * widget's default size. Pure.
  */
 export function mergeHiddenRefs(
   stored: WidgetRef[],
@@ -52,8 +53,10 @@ export function mergeHiddenRefs(
   const after = new Map<string, WidgetRef[]>(); // "key#occurrence" -> hidden refs
   const seen = new Map<string, number>();
   let anchor: string | null = null;
-  for (const ref of stored) {
-    if (!CATALOG_BY_KEY.has(ref.key)) continue;
+  for (const stored0 of stored) {
+    const meta = CATALOG_BY_KEY.get(stored0.key);
+    if (!meta) continue;
+    const ref = meta.sizes.includes(stored0.size) ? stored0 : { ...stored0, size: meta.defaultSize };
     if (isVisible(ref)) {
       const n = seen.get(ref.key) ?? 0;
       seen.set(ref.key, n + 1);

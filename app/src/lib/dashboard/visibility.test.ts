@@ -53,6 +53,10 @@ assert.deepEqual(keys(mergeHiddenRefs([R(A), R(H), R(B)], [R(B)], vis)), [B, H])
 assert.deepEqual(keys(mergeHiddenRefs([R(H), R(A), R(B)], [R(B), R(A)], vis)), [H, B, A]);
 // unknown key dropped
 assert.deepEqual(keys(mergeHiddenRefs([R(A), R("removed.widget")], [R(A)], vis)), [A]);
+// hidden ref whose size left the catalog is clamped to the default size
+assert.deepEqual(mergeHiddenRefs([R(A), R(H, "S")], [R(A)], vis), [R(A), R(H, "XL")]);
+// hidden ref with a valid size is kept as stored
+assert.deepEqual(mergeHiddenRefs([R(A), R(H, "L")], [R(A)], vis), [R(A), R(H, "L")]);
 // admin: exactly the submitted list
 const adminVis = (r: { key: string; size: "S" | "M" | "L" | "XL" }) =>
   isRefVisible(r, { venue: "clinic", role: "admin", overrides: {} });

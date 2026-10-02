@@ -4,7 +4,7 @@
 // toIso inclusive; the previous period is the same length immediately
 // before; a bad custom range falls back to 30 days rather than throwing.
 import assert from "node:assert/strict";
-import { deltaPct, parseRangeKey, previousRange, resolveRange } from "./range";
+import { deltaPct, MAX_CUSTOM_RANGE_DAYS, parseRangeKey, previousRange, resolveRange } from "./range";
 
 const now = new Date("2026-10-02T15:00:00Z");
 
@@ -41,6 +41,17 @@ assert.equal(custom.label, "1 Sep - 10 Sep");
 const badCustom = resolveRange("custom", now, { from: "2026-09-10", to: "2026-09-01" });
 assert.equal(badCustom.key, "30d", "reversed custom range falls back to 30d");
 assert.equal(resolveRange("custom", now, { from: "nope" }).key, "30d");
+assert.equal(MAX_CUSTOM_RANGE_DAYS, 366);
+assert.equal(
+  resolveRange("custom", now, { from: "2026-02-31", to: "2026-03-05" }).key,
+  "30d",
+  "impossible date falls back to 30d",
+);
+assert.equal(resolveRange("custom", now, { from: "0001-01-01", to: "9999-12-31" }).key, "30d");
+const maxSpan = resolveRange("custom", now, { from: "2025-01-01", to: "2026-01-01" });
+assert.equal(maxSpan.key, "custom", "exactly 366 days accepted");
+assert.equal(maxSpan.days, 366);
+assert.equal(resolveRange("custom", now, { from: "2025-01-01", to: "2026-01-02" }).key, "30d", "367 days rejected");
 
 assert.equal(parseRangeKey("7d"), "7d");
 assert.equal(parseRangeKey("custom"), "custom");
