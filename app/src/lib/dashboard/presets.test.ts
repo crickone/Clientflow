@@ -22,6 +22,10 @@ for (const p of PRESETS) {
 }
 assert.ok(keys.has(OVERVIEW_PRESET_KEY), "overview preset exists");
 assert.equal(presetWidgets("nope", "clinic"), null);
+assert.ok(keys.has("sales"), "sales preset exists");
+for (const venue of ["clinic", "gym"] as const) {
+  assert.equal(presetWidgets("sales", venue)!.length, 15, `sales/${venue} has 15 widgets`);
+}
 
 const clinic = presetWidgets("overview", "clinic")!;
 assert.deepEqual(
