@@ -61,7 +61,7 @@ export const OVERVIEW_WIDGETS = {
   "overview.cashToday": {
     async load(ctx) {
       const k = await kpis(ctx);
-      return { value: formatEur(k.todaysCash), sub: "Payments recorded today" };
+      return { value: formatEur(k.todaysCash), sub: "All payments today, including vouchers and packages" };
     },
     render: kpi,
   },

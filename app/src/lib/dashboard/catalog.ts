@@ -41,7 +41,7 @@ export const CATALOG = [
   {
     key: "overview.cashToday",
     title: "Cash today",
-    description: "Payments recorded on the till today.",
+    description: "All payments recorded today, including voucher and package redemptions.",
     domain: "overview",
     sizes: ["S", "M"],
     defaultSize: "S",

@@ -42,7 +42,7 @@ export const FINANCE_WIDGETS = {
       const prev = revenueSummary(await payments(ctx, true));
       return {
         value: formatEur(cur.total),
-        sub: plural(cur.count, "payment", "payments"),
+        sub: `${plural(cur.count, "payment", "payments")}, excluding voucher and package redemptions`,
         delta: deltaPct(cur.total, prev.total),
         accent: cur.total > 0,
       };
