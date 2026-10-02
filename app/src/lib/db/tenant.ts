@@ -15,6 +15,7 @@ import path from "node:path";
 
 import * as schema from "./schema";
 import { runMigrations, TENANT_MIGRATIONS } from "./migrations";
+import { RECORDER_START_SQL } from "@/lib/recorders/started";
 import { CLIENT_SESSION_COOKIE, controlDb, controlSqlite, SESSION_COOKIE } from "./control";
 
 /**
@@ -2563,4 +2564,11 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       applied_at INTEGER NOT NULL
     );
   `);
+
+  // Dashboard slice 2: stamp each event recorder's start date once.
+  try {
+    sqlite.exec(RECORDER_START_SQL);
+  } catch (err) {
+    console.error("[recorders] could not stamp recorder start dates", err);
+  }
 }
