@@ -372,8 +372,9 @@ export function applyEvent(tenantId: number, event: MailgunEvent): void {
         contactId: row.contactId ?? event.contactId ?? null,
         event: event.event,
         url: event.event === "clicked" ? event.url ?? null : null,
+        providerEventId: event.providerEventId ?? null,
         at: new Date(event.occurredAt ?? Date.now()),
-      }).run();
+      }).onConflictDoNothing().run();
     } catch (err) {
       console.error("[recorder:email_events] could not record email event", err);
     }

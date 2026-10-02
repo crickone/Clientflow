@@ -48,6 +48,20 @@ export type PageHit = {
 };
 
 /**
+ * Delete visitor hashes from days before `today` (UTC, YYYY-MM-DD). Fail-soft:
+ * returns the rows deleted, 0 on error. Run daily so a quiet site's hashes do
+ * not outlive their day waiting for another hit.
+ */
+export function purgeOldVisitorHashes(conn: TenantDb, today: string): number {
+  try {
+    return conn.run(sql`DELETE FROM site_visitor_hashes WHERE day < ${today}`).changes;
+  } catch (err) {
+    console.error("[recorder:page_views] could not purge old visitor hashes", err);
+    return 0;
+  }
+}
+
+/**
  * Fail-soft recorder. `uniques` on a path row counts visitors new to that path
  * today, attributed to the referrer/utm row of their first hit on that path.
  * Hashes for earlier days are purged on every write, so only the current UTC

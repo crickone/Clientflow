@@ -2504,6 +2504,7 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       contact_id INTEGER,
       event TEXT NOT NULL,
       url TEXT,
+      provider_event_id TEXT,
       at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
     CREATE INDEX IF NOT EXISTS idx_email_events_campaign ON email_events(campaign_id, at);
@@ -2633,5 +2634,26 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     sqlite.exec(RECORDER_START_SQL);
   } catch (err) {
     console.error("[recorders] could not stamp recorder start dates", err);
+  }
+
+  // email_events.provider_event_id: in the CREATE above for new files; added
+  // here for any file that already has the table (dev copies), then indexed.
+  try {
+    const cols = sqlite.prepare("PRAGMA table_info(email_events)").all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === "provider_event_id")) {
+      sqlite.exec("ALTER TABLE email_events ADD COLUMN provider_event_id TEXT");
+    }
+    sqlite.exec(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_email_events_provider ON email_events(provider_event_id) WHERE provider_event_id IS NOT NULL",
+    );
+  } catch (err) {
+    console.error("[recorder:email_events] could not add provider_event_id", err);
+  }
+
+  // Visitor hashes are only ever kept for the current UTC day.
+  try {
+    sqlite.exec("DELETE FROM site_visitor_hashes WHERE day < strftime('%Y-%m-%d','now')");
+  } catch (err) {
+    console.error("[recorder:page_views] could not purge old visitor hashes", err);
   }
 }

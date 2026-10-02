@@ -70,6 +70,8 @@ export interface MailgunEvent {
   occurredAt?: number;
   /** Contact id echoed back from the `v:contactId` user variable. */
   contactId?: number;
+  /** Mailgun's own event id (`event-data.id`); used to drop webhook retries. */
+  providerEventId?: string;
 }
 
 /**

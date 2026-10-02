@@ -18,6 +18,31 @@ const FALLBACK_SECRET = crypto.randomUUID();
 const SITE_LIMIT_PER_MIN = 600;
 const MAX_BODY_CHARS = 4096;
 
+/** Read the body up to `max` bytes; null when it is larger (the stream is cancelled). */
+async function readBounded(req: Request, max: number): Promise<string | null> {
+  if (!req.body) return "";
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > max) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    chunks.push(value);
+  }
+  const buf = new Uint8Array(total);
+  let off = 0;
+  for (const c of chunks) {
+    buf.set(c, off);
+    off += c.byteLength;
+  }
+  return new TextDecoder().decode(buf);
+}
+
 /**
  * First-party, cookieless page-view beacon for tenant websites (dashboard
  * slice 2). Always 204: a visitor's browser must never see an error from
@@ -36,8 +61,8 @@ export async function POST(req: Request) {
     const site = resolvePublicSite({ host, siteParam: null });
     if (!site || site.resolvedVia !== "host") return NO_CONTENT();
     if (!rateLimit(`site-events:site:${site.site.id}`, SITE_LIMIT_PER_MIN, 60_000).ok) return NO_CONTENT();
-    const text = await req.text();
-    if (text.length > MAX_BODY_CHARS) return NO_CONTENT();
+    const text = await readBounded(req, MAX_BODY_CHARS);
+    if (text === null) return NO_CONTENT();
     let body: { p?: unknown; r?: unknown; u?: unknown } | null = null;
     try {
       body = JSON.parse(text);

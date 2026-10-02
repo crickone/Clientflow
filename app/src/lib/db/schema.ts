@@ -3006,11 +3006,14 @@ export const emailEvents = sqliteTable(
     contactId: integer("contact_id"),
     event: text("event").notNull(),
     url: text("url"),
+    /** Mailgun's event id, so a retried webhook is recorded once. Null for events without one. */
+    providerEventId: text("provider_event_id"),
     at: integer("at", { mode: "timestamp_ms" }).notNull().default(sql`(unixepoch() * 1000)`),
   },
   (t) => ({
     byCampaign: index("idx_email_events_campaign").on(t.campaignId, t.at),
     byEvent: index("idx_email_events_event").on(t.event, t.at),
+    byProvider: uniqueIndex("idx_email_events_provider").on(t.providerEventId).where(sql`provider_event_id IS NOT NULL`),
   }),
 );
 

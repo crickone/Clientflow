@@ -448,8 +448,8 @@ import type { MailgunEvent } from "./sender/types";
     assert.equal(pausedEventsAfter2nd.length, 1, "no duplicate marketing_paused log once nothing is left 'sending'");
 
     // ── 12. email_events recorder: one append-only row per webhook call that
-    // matched a campaign_sends row. Replays append again on purpose (it is an
-    // event log; dedupe is not this recorder's job). Uses a fresh campaign so
+    // matched a campaign_sends row. Replays without a provider id append; a repeated
+    // provider event id is deduped by a partial unique index. Uses a fresh campaign so
     // the stats/guard assertions above are unaffected. ──
     {
       const cLog = makeCampaign("draft");
@@ -477,9 +477,18 @@ import type { MailgunEvent } from "./sender/types";
       assert.equal(rows[1].campaignId, cLog.id);
       assert.equal(rows[1].at.getTime(), 1759400000123, "at is the webhook's own event time when given");
 
-      // Replay appends again (event log, not deduped).
+      // Events without a provider id still append (event log).
       applyEvent(tid, { event: "opened", recipient: gwen.email, messageId: "<evt-gwen-msg@mail.example.com>" });
       assert.equal(logRows().length, 3);
+
+      // A webhook retry carrying the same provider event id appends nothing.
+      const withId = { event: "opened" as const, recipient: gwen.email, messageId: "<evt-gwen-msg@mail.example.com>", providerEventId: "mg-evt-1" };
+      applyEvent(tid, withId);
+      assert.equal(logRows().length, 4);
+      applyEvent(tid, withId);
+      assert.equal(logRows().length, 4, "replay with the same providerEventId appends nothing");
+      applyEvent(tid, { ...withId, providerEventId: "mg-evt-2" });
+      assert.equal(logRows().length, 5, "a different id appends");
 
       // No matching send: no row, no throw.
       const before = tdb.select().from(emailEvents).all().length;

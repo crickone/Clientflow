@@ -338,7 +338,7 @@ export default function CampaignLandingPage({ params, searchParams }: Props) {
 
   return (
     <>
-      <SiteBeacon />
+      {data.campaign.status === "active" && <SiteBeacon />}
       <CampaignLanding
         body={data.body}
         theme={data.theme}

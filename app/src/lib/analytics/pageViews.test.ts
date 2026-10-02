@@ -14,10 +14,11 @@ mod._load = function (this: unknown, request: string, ...rest: unknown[]) {
   return realLoad.call(this, request, ...rest);
 };
 
+const { sql } = createRequire(import.meta.url)("drizzle-orm") as typeof import("drizzle-orm");
 const requireLocal = createRequire(import.meta.url);
 
 (async () => {
-  const { isBot, referrerDomain, cleanPath, cleanUtm, visitorHash, recordPageView, MAX_PATHS_PER_SITE_DAY } =
+  const { isBot, referrerDomain, cleanPath, cleanUtm, visitorHash, recordPageView, purgeOldVisitorHashes, MAX_PATHS_PER_SITE_DAY } =
     requireLocal("./pageViews") as typeof import("./pageViews");
 
   assert.equal(isBot("Mozilla/5.0 (compatible; Googlebot/2.1)"), true);
@@ -91,6 +92,13 @@ const requireLocal = createRequire(import.meta.url);
     const other = rows.find((r) => r.path === "/other");
     assert.equal(other.referrer_domain, "google.com");
     assert.equal(other.utm_source, "fb");
+
+    // Daily purge: quiet-site hashes from earlier days go without a new hit.
+    conn.run(sql`INSERT INTO site_visitor_hashes (day, site_id, path, hash) VALUES ('2026-10-01', 1, '/q', 'old'), ('2026-10-02', 1, '/q', 'today')`);
+    assert.equal(purgeOldVisitorHashes(conn, "2026-10-02"), 1, "one old row deleted");
+    assert.equal(raw("SELECT * FROM site_visitor_hashes WHERE hash = 'old'").length, 0);
+    assert.equal(raw("SELECT * FROM site_visitor_hashes WHERE hash = 'today'").length, 1, "today kept");
+    assert.equal(purgeOldVisitorHashes(null as never, "2026-10-02"), 0, "fail-soft");
   } finally {
     cleanup();
   }
