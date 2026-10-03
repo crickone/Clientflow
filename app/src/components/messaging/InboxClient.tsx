@@ -14,6 +14,7 @@ import {
 import { toast } from "sonner";
 
 import { Avatar } from "@/components/ui/Avatar";
+import { ChannelIcon } from "./ChannelIcon";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { ConversationThread, type ThreadMessage } from "./ConversationThread";
@@ -341,6 +342,8 @@ export function InboxClient({
                         }}
                       >
                         <PriorityDot priority={c.aiPriority} />
+                        {/* Which app they last wrote on: WhatsApp, Messenger and Instagram share this list. */}
+                        <ChannelIcon channel={c.channel === "messenger" || c.channel === "instagram" ? c.channel : "whatsapp"} size={16} />
                         <span
                           style={{
                             color: "var(--text-primary)",
@@ -388,10 +391,6 @@ export function InboxClient({
                       }}
                     >
                       <Badge>{c.kind === "client" ? memberLabel : "Lead"}</Badge>
-                      {/* Which app they last wrote on: WhatsApp, Messenger or Instagram share this list. */}
-                      <Badge>
-                        {c.channel === "messenger" || c.channel === "instagram" ? CHANNEL_LABELS[c.channel] : "WhatsApp"}
-                      </Badge>
                       {cat && <Badge colour={cat.color}>{cat.label}</Badge>}
                     </div>
 

@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { Mail, MessageCircle } from "lucide-react";
 
 import { Card } from "@/components/ui/Card";
+import { ChannelIcon } from "./ChannelIcon";
 import type { CombinedItem } from "@/lib/combined";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -40,11 +40,7 @@ export function CombinedFeed({ items }: { items: CombinedItem[] }) {
                 {it.unread && (
                   <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--accent)", flexShrink: 0 }} />
                 )}
-                {it.kind === "email" ? (
-                  <Mail size={13} strokeWidth={1.75} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
-                ) : (
-                  <MessageCircle size={13} strokeWidth={1.75} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
-                )}
+                <ChannelIcon channel={it.kind} size={16} />
                 <span style={{ fontSize: 13, color: "var(--text-primary)", fontWeight: it.unread ? 700 : 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {it.title}
                 </span>
