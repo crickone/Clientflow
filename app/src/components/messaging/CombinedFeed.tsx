@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 
 import { Card } from "@/components/ui/Card";
@@ -14,7 +16,7 @@ function fmt(ts: number): string {
 }
 
 /** Read-only merged activity feed (emails + WhatsApp / Messenger / Instagram), newest first. */
-export function CombinedFeed({ items }: { items: CombinedItem[] }) {
+export function CombinedFeed({ items, onOpen }: { items: CombinedItem[]; onOpen?: (conversationKey: string) => void }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <div
@@ -56,6 +58,20 @@ export function CombinedFeed({ items }: { items: CombinedItem[] }) {
               </div>
             </Card>
           );
+          // A conversation opens its chat in place (the Messages tab), no navigation.
+          if (it.conversationKey && onOpen) {
+            const key = it.conversationKey;
+            return (
+              <button
+                key={it.id}
+                type="button"
+                onClick={() => onOpen(key)}
+                style={{ all: "unset", display: "block", cursor: "pointer" }}
+              >
+                {inner}
+              </button>
+            );
+          }
           return it.href ? (
             <Link key={it.id} href={it.href} style={{ textDecoration: "none" }}>
               {inner}

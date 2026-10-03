@@ -5,10 +5,8 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Card } from "@/components/ui/Card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/Tabs";
-import { InboxClient } from "@/components/messaging/InboxClient";
 import { EmailInbox } from "@/components/messaging/EmailInbox";
-import { CombinedFeed } from "@/components/messaging/CombinedFeed";
+import { CommunicationTabs } from "@/components/messaging/CommunicationTabs";
 import { requireUserPage, getCurrentMembership } from "@/lib/auth";
 import { listConversations } from "@/lib/conversations";
 import { listRecentClientEmails } from "@/lib/clientEmail";
@@ -50,35 +48,20 @@ export default async function CommunicationPage({ searchParams }: { searchParams
         subtitle="All your conversations in one place: WhatsApp, Messenger, Instagram and email."
       />
 
-      {/* Keyed on the chosen conversation: a Combined item links to this same
-          page with ?c=, and an uncontrolled Tabs/inbox only read their defaults
-          on mount, so without a remount the click changed nothing visible. */}
-      <Tabs key={searchParams?.c ?? "none"} defaultValue={searchParams?.c ? "whatsapp" : "combined"}>
-        <TabsList>
-          <TabsTrigger value="combined">Combined</TabsTrigger>
-          <TabsTrigger value="whatsapp">Messages ({conversations.length})</TabsTrigger>
-          <TabsTrigger value="email">Email ({emailCount})</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="combined">
-          <div style={{ maxWidth: 640 }}>
-            <CombinedFeed items={combined} />
-          </div>
-        </TabsContent>
-
-        <TabsContent value="whatsapp">
-          {conversations.length === 0 ? (
-            <EmptyState
-              icon={<MessageCircle size={32} strokeWidth={1.4} />}
-              title="No conversations yet"
-              message="WhatsApp messages and Facebook and Instagram DMs you send or receive appear here, one conversation per person."
-            />
-          ) : (
-            <InboxClient conversations={conversations} memberLabel={vocab.member} initialKey={searchParams?.c ?? null} />
-          )}
-        </TabsContent>
-
-        <TabsContent value="email">
+      <CommunicationTabs
+        combined={combined}
+        conversations={conversations}
+        memberLabel={vocab.member}
+        initialKey={searchParams?.c ?? null}
+        emailCount={emailCount}
+        emptyMessages={
+          <EmptyState
+            icon={<MessageCircle size={32} strokeWidth={1.4} />}
+            title="No conversations yet"
+            message="WhatsApp messages and Facebook and Instagram DMs you send or receive appear here, one conversation per person."
+          />
+        }
+        emailPanel={<>
           {emailConn ? (
             <EmailInbox threads={threads} connectedEmail={emailConn.email} />
           ) : emails.length === 0 ? (
@@ -116,8 +99,8 @@ export default async function CommunicationPage({ searchParams }: { searchParams
               ))}
             </div>
           )}
-        </TabsContent>
-      </Tabs>
+</>}
+      />
     </div>
   );
 }

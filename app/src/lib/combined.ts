@@ -12,6 +12,8 @@ export type CombinedItem = {
   snippet: string;
   at: number;
   href: string | null;
+  /** For a WhatsApp/Messenger/Instagram conversation: its inbox key, "<kind>-<contactId>". */
+  conversationKey?: string;
   unread: boolean;
   direction: string;
 };
@@ -50,6 +52,7 @@ export function listCombinedFeed(): CombinedItem[] {
       at: c.lastAt.getTime(),
       // Open the conversation itself (the chat view), not the contact's record.
       href: `/communication?c=${encodeURIComponent(`${c.kind}-${c.contactId}`)}`,
+      conversationKey: `${c.kind}-${c.contactId}`,
       unread: c.needsAttention,
       direction: c.lastDirection,
     });
