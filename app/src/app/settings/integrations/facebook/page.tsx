@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { requireAdminPage, getCurrentMembership } from "@/lib/auth";
 import { facebookConfigured, getRedirectUri } from "@/lib/facebook/oauth";
 import { listFacebookPages } from "@/lib/facebook/pages";
+import { getMetaConnectionForTenant } from "@/lib/social/publisher";
 import { getAppBaseUrl } from "@/lib/appUrl";
 import { FacebookConnectCard } from "@/components/settings/FacebookConnectCard";
 
@@ -20,7 +21,7 @@ export default async function FacebookSettingsPage() {
       <PageHeader
         eyebrow="Integrations"
         title="Facebook"
-        subtitle="Connect a Facebook Page to pull in its Lead Ads leads the instant they're submitted — native, no Zapier/Make in the middle."
+        subtitle="Connect your Facebook Page so scheduled posts go out to it and its linked Instagram account, and Lead Ads leads land in Leads the moment they are submitted."
         actions={
           <Link href="/settings">
             <Button variant="outline">
@@ -33,6 +34,7 @@ export default async function FacebookSettingsPage() {
       <FacebookConnectCard
         configured={facebookConfigured()}
         pages={listFacebookPages(tenantId)}
+        postingPageId={getMetaConnectionForTenant(tenantId)?.pageId ?? null}
         redirectUri={getRedirectUri()}
         webhookUrl={`${getAppBaseUrl()}/api/integrations/facebook/leadgen`}
       />

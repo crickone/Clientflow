@@ -951,6 +951,17 @@ export function ensureControlTables() {
     );
   }
 
+  // Social posting (2026-10-03): the Instagram professional account linked to
+  // each connected Page, read at connect time so the publisher can post to it
+  // with the same Page token. Additive + PRAGMA-guarded like the rest.
+  try {
+    const cols = controlSqlite.prepare("PRAGMA table_info(facebook_pages)").all() as Array<{ name: string }>;
+    if (!cols.find((c) => c.name === "ig_user_id")) controlSqlite.exec("ALTER TABLE facebook_pages ADD COLUMN ig_user_id TEXT");
+    if (!cols.find((c) => c.name === "ig_username")) controlSqlite.exec("ALTER TABLE facebook_pages ADD COLUMN ig_username TEXT");
+  } catch (err) {
+    console.error("[control] facebook_pages instagram columns migration failed:", err);
+  }
+
   // Batch 6b (improvement-plan-2026-08.md Theme E1): tracking table for the
   // versioned migration runner (./migrations) — separate from everything
   // above, which is the additive bootstrap. Created here too (in addition to

@@ -27,7 +27,7 @@ export type ScheduledPostStatus = "scheduled" | "posting" | "posted" | "failed" 
 
 export const ALL_CHANNELS: SocialChannel[] = ["facebook", "instagram"];
 
-export const NOT_CONNECTED_MESSAGE = "Waiting for the Facebook connection (Meta app review in progress).";
+export const NOT_CONNECTED_MESSAGE = "Waiting for a Facebook Page to be connected (Settings > Integrations > Facebook).";
 export const PLATFORM_PAUSED_MESSAGE = "Posting is paused across the platform; this will go out when it resumes.";
 
 const MIN_LEAD_MS = 60_000;

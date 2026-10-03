@@ -1,18 +1,18 @@
 import "server-only";
 
 import { readKeyForTenant, setKey } from "@/lib/settings";
+import { getPostingPage } from "@/lib/facebook/pages";
 
 /**
  * Posting to social, behind one interface.
  *
  * The scheduler (./schedule.ts) never talks to Meta; it asks for the tenant's
- * publisher and hands it a caption and image URLs. Today that publisher is
- * null for everyone -- Meta App Review for the posting permissions is in
- * progress -- so due posts wait, honestly labelled, and nothing is claimed.
- * The moment a page connection is stored under META_CONNECTION_KEY the same
- * scheduler starts posting through MetaGraphPublisher below, which is written
- * against the Graph API as documented so the connection flow is the only
- * thing left to build when the review lands.
+ * publisher and hands it a caption and image URLs. The publisher exists once
+ * the tenant has connected a Facebook Page (Settings > Integrations >
+ * Facebook, stored control-plane in facebook_pages with its Page token and
+ * linked Instagram account); until then it is null and due posts wait,
+ * honestly labelled. The tenant setting under META_CONNECTION_KEY only records
+ * WHICH connected Page to post from; no token lives in tenant settings.
  */
 
 export type SocialChannel = "facebook" | "instagram";
@@ -34,7 +34,7 @@ export interface SocialPublisher {
 
 export const META_CONNECTION_KEY = "meta_connection";
 
-/** What the Facebook connection flow will store, once App Review allows it. */
+/** The Page a tenant posts through, resolved with its token (server-only). */
 export interface MetaConnection {
   pageId: string;
   pageName?: string | null;
@@ -44,22 +44,21 @@ export interface MetaConnection {
   igUserId?: string | null;
 }
 
-export function getMetaConnectionForTenant(tenantId: number): MetaConnection | null {
+/** The tenant's chosen posting Page id, or null when none was picked. */
+export function getPreferredPostingPageId(tenantId: number): string | null {
   const raw = readKeyForTenant<unknown>(tenantId, META_CONNECTION_KEY, null);
   if (!raw || typeof raw !== "object") return null;
-  const c = raw as Record<string, unknown>;
-  if (typeof c.pageId !== "string" || !c.pageId || typeof c.pageAccessToken !== "string" || !c.pageAccessToken) return null;
-  return {
-    pageId: c.pageId,
-    pageName: typeof c.pageName === "string" ? c.pageName : null,
-    pageAccessToken: c.pageAccessToken,
-    igUserId: typeof c.igUserId === "string" && c.igUserId ? c.igUserId : null,
-  };
+  const pageId = (raw as Record<string, unknown>).pageId;
+  return typeof pageId === "string" && pageId ? pageId : null;
 }
 
-/** Store (or clear, with null) the page connection for the ambient tenant. */
-export function setMetaConnection(connection: MetaConnection | null): void {
-  setKey(META_CONNECTION_KEY, connection);
+export function getMetaConnectionForTenant(tenantId: number): MetaConnection | null {
+  return getPostingPage(tenantId, getPreferredPostingPageId(tenantId));
+}
+
+/** Pick which connected Page the ambient tenant posts from (null = the default). */
+export function setPostingPage(pageId: string | null): void {
+  setKey(META_CONNECTION_KEY, pageId ? { pageId } : null);
 }
 
 export function isMetaConnected(tenantId: number): boolean {

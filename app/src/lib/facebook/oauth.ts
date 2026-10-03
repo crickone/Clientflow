@@ -12,9 +12,10 @@ import { getAppBaseUrl } from "@/lib/appUrl";
  *
  * Scopes: pages_show_list (list the user's Pages), pages_read_engagement +
  * pages_manage_metadata (subscribe a Page to our webhook), leads_retrieval (read
- * a lead's field data), business_management (Business-managed Pages). All require
- * Meta App Review + Business Verification to work in production for Pages the app
- * admin doesn't personally own.
+ * a lead's field data), business_management (Business-managed Pages), and for
+ * scheduled posting pages_manage_posts + instagram_basic +
+ * instagram_content_publish (lib/social/publisher.ts). All require Meta App
+ * Review (Advanced Access) to work for Pages the app's own roles don't manage.
  */
 
 const GRAPH_VERSION = "v21.0";
@@ -22,11 +23,16 @@ export const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`;
 const OAUTH_DIALOG = `https://www.facebook.com/${GRAPH_VERSION}/dialog/oauth`;
 
 export const FACEBOOK_SCOPES = [
+  // Pages + lead ads
   "pages_show_list",
   "pages_read_engagement",
   "pages_manage_metadata",
   "leads_retrieval",
   "business_management",
+  // Posting to the Page and its linked Instagram account
+  "pages_manage_posts",
+  "instagram_basic",
+  "instagram_content_publish",
 ].join(",");
 
 export function facebookConfigured(): boolean {
@@ -42,9 +48,18 @@ export function buildAuthUrl(state: string): string {
     client_id: process.env.FACEBOOK_APP_ID ?? "",
     redirect_uri: getRedirectUri(),
     response_type: "code",
-    scope: FACEBOOK_SCOPES,
     state,
   });
+  // A Business-type app on Facebook Login for Business asks for a configuration
+  // (set up in the app dashboard, holding the permissions above) rather than a
+  // raw scope list. Fall back to `scope` until one is configured.
+  const configId = process.env.FACEBOOK_LOGIN_CONFIG_ID;
+  if (configId) {
+    params.set("config_id", configId);
+    params.set("override_default_response_type", "true");
+  } else {
+    params.set("scope", FACEBOOK_SCOPES);
+  }
   return `${OAUTH_DIALOG}?${params.toString()}`;
 }
 

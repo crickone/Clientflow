@@ -121,7 +121,8 @@ export function ScheduleBoard({
       {!postingConnected && (
         <Card style={{ padding: 16, borderColor: "var(--warning, #d29922)" }}>
           <div style={{ fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
-            <strong style={{ color: "var(--text-primary)" }}>Facebook is not connected yet.</strong> Meta&rsquo;s app review is in progress. Posts you schedule now wait here and go out automatically the moment the connection is live; nothing needs re-booking.
+            <strong style={{ color: "var(--text-primary)" }}>Facebook is not connected yet.</strong> Posts you schedule now wait here and go out automatically once you{" "}
+            <Link href="/settings/integrations/facebook" style={{ color: "var(--accent)" }}>connect your Facebook Page</Link>; nothing needs re-booking.
           </div>
         </Card>
       )}

@@ -92,7 +92,7 @@ export const SCHEDULE_TOOLS: Anthropic.Tool[] = [
   {
     name: "schedule_social_post",
     description:
-      "Book a finished Content Studio post (from create_social_post / list_social_posts) to go out on Facebook and/or Instagram at a date and time. The post is published automatically at that time once the Facebook connection is live; until Meta's app review completes it waits in the schedule, clearly labelled, and goes out the moment the connection exists. Only schedule posts the operator has approved the time for.",
+      "Book a finished Content Studio post (from create_social_post / list_social_posts) to go out on Facebook and/or Instagram at a date and time. The post is published automatically at that time through the business's connected Facebook Page (and its linked Instagram account); if no Page is connected yet it waits in the schedule, clearly labelled, and goes out once one is connected in Settings > Integrations > Facebook. Only schedule posts the operator has approved the time for.",
     input_schema: {
       type: "object",
       properties: {
@@ -176,7 +176,7 @@ export function scheduleSocialPostTool(ctx: ToolContext, input: Record<string, u
   const connected = isMetaConnected(ctx.tenantId);
   return {
     text: JSON.stringify({
-      result: `Scheduled "${res.post.designName}" for ${formatDublin(res.post.scheduledFor)} on ${res.post.channels.join(" and ")}.${connected ? "" : " Facebook is not connected yet (Meta app review in progress): the post waits in the schedule and goes out automatically once it is."}`,
+      result: `Scheduled "${res.post.designName}" for ${formatDublin(res.post.scheduledFor)} on ${res.post.channels.join(" and ")}.${connected ? "" : " No Facebook Page is connected yet: the post waits in the schedule and goes out automatically once one is connected in Settings > Integrations > Facebook."}`,
       scheduledPostId: res.post.id,
       postId,
       scheduledFor: new Date(res.post.scheduledFor).toISOString(),

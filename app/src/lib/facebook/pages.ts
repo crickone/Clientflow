@@ -18,6 +18,8 @@ interface GraphPage {
   id: string;
   name?: string;
   access_token?: string;
+  /** The Instagram professional account linked to the Page (needs instagram_basic). */
+  instagram_business_account?: { id?: string; username?: string };
 }
 
 /**
@@ -34,7 +36,7 @@ export async function saveConnectedPages(
 ): Promise<string[]> {
   const res = await fetch(
     `${GRAPH_BASE}/me/accounts?` +
-      new URLSearchParams({ fields: "id,name,access_token", access_token: longLivedUserToken, limit: "100" }),
+      new URLSearchParams({ fields: "id,name,access_token,instagram_business_account{id,username}", access_token: longLivedUserToken, limit: "100" }),
   );
   if (!res.ok) throw new Error(`Facebook /me/accounts failed (${res.status})`);
   const body = (await res.json()) as { data?: GraphPage[] };
@@ -42,12 +44,12 @@ export async function saveConnectedPages(
 
   const findExisting = controlSqlite.prepare("SELECT id FROM facebook_pages WHERE page_id = ?");
   const insert = controlSqlite.prepare(
-    `INSERT INTO facebook_pages (tenant_id, page_id, page_name, page_access_token, connected_by_user_id, subscribed_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO facebook_pages (tenant_id, page_id, page_name, page_access_token, connected_by_user_id, subscribed_at, ig_user_id, ig_username)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   const update = controlSqlite.prepare(
     `UPDATE facebook_pages SET tenant_id = ?, page_name = ?, page_access_token = ?,
-       connected_by_user_id = ?, subscribed_at = ?, revoked_at = NULL WHERE id = ?`,
+       connected_by_user_id = ?, subscribed_at = ?, ig_user_id = ?, ig_username = ?, revoked_at = NULL WHERE id = ?`,
   );
 
   const names: string[] = [];
@@ -59,11 +61,13 @@ export async function saveConnectedPages(
       // best-effort: store the connection even if subscribe hiccups — it can be
       // retried, and the webhook still resolves the Page by page_id.
     }
+    const igUserId = page.instagram_business_account?.id ?? null;
+    const igUsername = page.instagram_business_account?.username ?? null;
     const existing = findExisting.get(page.id) as { id: number } | undefined;
     if (existing) {
-      update.run(tenantId, page.name ?? null, page.access_token, connectedByUserId, subscribedAt, existing.id);
+      update.run(tenantId, page.name ?? null, page.access_token, connectedByUserId, subscribedAt, igUserId, igUsername, existing.id);
     } else {
-      insert.run(tenantId, page.id, page.name ?? null, page.access_token, connectedByUserId, subscribedAt);
+      insert.run(tenantId, page.id, page.name ?? null, page.access_token, connectedByUserId, subscribedAt, igUserId, igUsername);
     }
     names.push(page.name ?? page.id);
   }
@@ -102,21 +106,46 @@ export interface FacebookPageRow {
   pageName: string | null;
   subscribedAt: number | null;
   createdAt: number;
+  igUsername: string | null;
 }
 
 /** List a tenant's connected Pages for the settings UI — WITHOUT the token. */
 export function listFacebookPages(tenantId: number): FacebookPageRow[] {
   const rows = controlSqlite
     .prepare(
-      "SELECT page_id, page_name, subscribed_at, created_at FROM facebook_pages WHERE tenant_id = ? AND revoked_at IS NULL ORDER BY created_at DESC",
+      "SELECT page_id, page_name, subscribed_at, created_at, ig_username FROM facebook_pages WHERE tenant_id = ? AND revoked_at IS NULL ORDER BY created_at DESC",
     )
-    .all(tenantId) as Array<{ page_id: string; page_name: string | null; subscribed_at: number | null; created_at: number }>;
+    .all(tenantId) as Array<{ page_id: string; page_name: string | null; subscribed_at: number | null; created_at: number; ig_username: string | null }>;
   return rows.map((r) => ({
     pageId: r.page_id,
     pageName: r.page_name,
     subscribedAt: r.subscribed_at,
     createdAt: r.created_at,
+    igUsername: r.ig_username,
   }));
+}
+
+export interface PostingPage {
+  pageId: string;
+  pageName: string | null;
+  pageAccessToken: string;
+  igUserId: string | null;
+}
+
+/**
+ * The Page a tenant posts from, with its token: `preferredPageId` when that
+ * Page is still connected to this tenant, else the earliest-connected live Page.
+ * Null when the tenant has no live connection. Server-side only (token).
+ */
+export function getPostingPage(tenantId: number, preferredPageId: string | null): PostingPage | null {
+  const rows = controlSqlite
+    .prepare(
+      "SELECT page_id, page_name, page_access_token, ig_user_id FROM facebook_pages WHERE tenant_id = ? AND revoked_at IS NULL AND page_access_token != '' ORDER BY created_at ASC",
+    )
+    .all(tenantId) as Array<{ page_id: string; page_name: string | null; page_access_token: string; ig_user_id: string | null }>;
+  const row = rows.find((r) => r.page_id === preferredPageId) ?? rows[0];
+  if (!row) return null;
+  return { pageId: row.page_id, pageName: row.page_name, pageAccessToken: row.page_access_token, igUserId: row.ig_user_id };
 }
 
 /** Disconnect (revoke) one of a tenant's Pages; best-effort unsubscribe from Graph. */

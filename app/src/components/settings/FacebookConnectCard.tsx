@@ -2,21 +2,22 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Megaphone, Plug, Unplug, CheckCircle2 } from "lucide-react";
+import { Megaphone, Plug, Unplug, CheckCircle2, Camera, Send } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-import { disconnectFacebookPageAction } from "@/app/settings/integrations/facebook/actions";
+import { disconnectFacebookPageAction, setPostingPageAction } from "@/app/settings/integrations/facebook/actions";
 // Type-only — lib/facebook/pages.ts is `server-only`; importing just the type
 // keeps it out of this client bundle (mirrors ImapConnectCard / DomainConnectCard).
 import type { FacebookPageRow } from "@/lib/facebook/pages";
 
 /**
- * "Connect Facebook" — the client OAuth-connects their Page(s) so Lead Ads flow
- * straight into Leads. Connect is a redirect (GET /api/facebook/connect), so
+ * "Connect Facebook" — the client OAuth-connects their Page(s) so scheduled
+ * posts go out to the Page (and its linked Instagram) and Lead Ads flow
+ * straight into Leads. One connected Page is the posting Page. Connect is a redirect (GET /api/facebook/connect), so
  * it's a plain link; disconnect is a server action (useTransition + toast +
  * refresh), same shape as the other connector cards. Fail-closed: when the Meta
  * app isn't configured the card just explains what to set.
@@ -24,24 +25,39 @@ import type { FacebookPageRow } from "@/lib/facebook/pages";
 export function FacebookConnectCard({
   configured,
   pages,
+  postingPageId,
   redirectUri,
   webhookUrl,
 }: {
   configured: boolean;
   pages: FacebookPageRow[];
+  postingPageId: string | null;
   redirectUri: string;
   webhookUrl: string;
 }) {
   const router = useRouter();
   const confirm = useConfirm();
   const [disconnecting, startDisconnect] = useTransition();
+  const [choosing, startChoose] = useTransition();
+
+  function postFrom(pageId: string) {
+    startChoose(async () => {
+      const res = await setPostingPageAction(pageId);
+      if (!res.ok) {
+        toast.error(res.error ?? "Couldn't change the posting Page.");
+        return;
+      }
+      toast.success("Scheduled posts will go out from this Page");
+      router.refresh();
+    });
+  }
 
   async function disconnect(pageId: string) {
     const page = pages.find((p) => p.pageId === pageId);
     if (
       !(await confirm({
         title: "Disconnect this Page?",
-        body: `Leads from ${page?.pageName ?? "this Page"} will stop flowing into Leads until you reconnect it.`,
+        body: `${page?.pageName ?? "This Page"} will stop receiving scheduled posts and its leads will stop flowing into Leads until you reconnect it.`,
         confirmLabel: "Disconnect",
         destructive: true,
       }))
@@ -63,7 +79,7 @@ export function FacebookConnectCard({
     <Card style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <Megaphone size={16} strokeWidth={1.75} />
-        <strong style={{ fontSize: 14, color: "var(--text-primary)" }}>Facebook Lead Ads</strong>
+        <strong style={{ fontSize: 14, color: "var(--text-primary)" }}>Facebook and Instagram</strong>
         <span style={{ marginLeft: "auto" }}>
           <Badge tone={pages.length ? "green" : configured ? "neutral" : "amber"}>
             {pages.length ? `${pages.length} connected` : configured ? "Not connected" : "Not configured"}
@@ -80,8 +96,8 @@ export function FacebookConnectCard({
         <>
           <div style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.55 }}>
             {pages.length
-              ? "Leads from these Pages flow straight into Leads the moment they're submitted."
-              : "Connect your Facebook account and pick the Page whose Lead Ads should land in this account."}
+              ? "Scheduled posts go out from the posting Page and its linked Instagram account. Leads from every connected Page flow straight into Leads."
+              : "Connect your Facebook account and choose your business's Page. Link your Instagram professional account to that Page first if you want posts to go to Instagram too."}
           </div>
 
           {pages.length > 0 && (
@@ -113,7 +129,18 @@ export function FacebookConnectCard({
                         "Not subscribed — reconnect to fix"
                       )}
                     </span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 5, color: "var(--text-tertiary)", fontSize: 12, marginTop: 2 }}>
+                      <Camera size={12} />
+                      {p.igUsername ? `@${p.igUsername}` : "No Instagram account linked to this Page"}
+                    </span>
                   </span>
+                  {p.pageId === postingPageId ? (
+                    <Badge tone="green">Posting</Badge>
+                  ) : (
+                    <Button variant="outline" onClick={() => postFrom(p.pageId)} disabled={choosing}>
+                      <Send size={14} /> Post from here
+                    </Button>
+                  )}
                   <Button variant="ghost" onClick={() => disconnect(p.pageId)} disabled={disconnecting}>
                     <Unplug size={14} /> Disconnect
                   </Button>

@@ -7,7 +7,6 @@ import { listFacebookPages, disconnectFacebookPage } from "@/lib/facebook/pages"
 import { listApiKeys, revokeApiKey } from "@/lib/apiKeys";
 import { getSendingDomain, refreshDomainStatus, disconnectDomain } from "@/lib/marketing/domains";
 import { getMetaConnectionForTenant } from "@/lib/social/publisher";
-import { runWithTenant } from "@/lib/db/tenant";
 
 /**
  * Every outside connection a business has, on one board.
@@ -162,7 +161,7 @@ export function listTenantIntegrations(tenantId: number): TenantIntegrations {
       ? meta.igUserId
         ? "Facebook and Instagram"
         : "Facebook only — no Instagram account linked"
-      : "Scheduled posts wait until this is connected (Meta app review pending)",
+      : "Scheduled posts wait until this is connected (connect a Facebook Page)",
     connectedAt: null,
     lastUsedAt: null,
     actions: meta ? ["disconnect"] : [],
@@ -235,11 +234,12 @@ export async function disconnectIntegration(tenantId: number, key: string): Prom
     return { ok: true, note: "Facebook page disconnected. New lead ads will not reach the pipeline." };
   }
   if (key === "meta_posting") {
-    if (!getMetaConnectionForTenant(tenantId)) return { ok: false, error: "Social posting is not connected." };
-    // setMetaConnection writes through the ambient tenant's settings.
-    const { setMetaConnection } = await import("@/lib/social/publisher");
-    runWithTenant(tenantId, () => setMetaConnection(null));
-    return { ok: true, note: "Social posting disconnected. Scheduled posts will wait rather than go out." };
+    const meta = getMetaConnectionForTenant(tenantId);
+    if (!meta) return { ok: false, error: "Social posting is not connected." };
+    // Posting rides on the Page connection, so stopping it means disconnecting
+    // that Page (which also stops its lead ads).
+    await disconnectFacebookPage(tenantId, meta.pageId);
+    return { ok: true, note: "Facebook page disconnected. Scheduled posts will wait rather than go out." };
   }
   return { ok: false, error: "That connection cannot be disconnected from here." };
 }
