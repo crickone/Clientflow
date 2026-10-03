@@ -182,11 +182,13 @@ export function AdCampaignBuilder({
   }
 
   // The URL carries the draft and the step, so a refresh reopens exactly here.
-  // history.replaceState, not router.replace: a navigation would remount the
-  // builder and throw away what is on screen.
+  // Through the router: a bare history.replaceState was overwritten by Next's
+  // own URL after the next server action, so a refresh landed on /new again.
+  // Same route + new ?step= keeps this component (and what is on screen);
+  // /new -> /<id> loads the draft that was just saved.
   function syncUrl(draftId: number | null, n: number) {
     const path = draftId ? `/marketing/ads/${draftId}` : "/marketing/ads/new";
-    window.history.replaceState(window.history.state, "", `${path}?step=${n + 1}`);
+    router.replace(`${path}?step=${n + 1}`, { scroll: false });
   }
 
   async function save(opts: { quiet?: boolean; urlStep?: number } = {}): Promise<number | null> {
