@@ -79,13 +79,20 @@ function PriorityDot({ priority }: { priority: string | null }) {
 export function InboxClient({
   conversations,
   memberLabel,
+  initialKey = null,
 }: {
   conversations: ConversationSummary[];
   memberLabel: string;
+  /** "<kind>-<contactId>" to open first (from /communication?c=), else the newest. */
+  initialKey?: string | null;
 }) {
   const [items, setItems] = useState<ConversationSummary[]>(conversations);
   const [selectedKey, setSelectedKey] = useState<string | null>(
-    conversations[0] ? keyOf(conversations[0]) : null,
+    initialKey && conversations.some((c) => keyOf(c) === initialKey)
+      ? initialKey
+      : conversations[0]
+        ? keyOf(conversations[0])
+        : null,
   );
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
   const [loadingThread, setLoadingThread] = useState(false);

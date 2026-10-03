@@ -28,7 +28,7 @@ function fmt(ts: number): string {
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}, ${hh}:${mm}`;
 }
 
-export default async function CommunicationPage() {
+export default async function CommunicationPage({ searchParams }: { searchParams?: { c?: string } }) {
   await requireUserPage();
   const vocab = getVocab(getVenueType());
   const conversations = listConversations();
@@ -50,7 +50,7 @@ export default async function CommunicationPage() {
         subtitle="All your conversations in one place: WhatsApp, Messenger, Instagram and email."
       />
 
-      <Tabs defaultValue="combined">
+      <Tabs defaultValue={searchParams?.c ? "whatsapp" : "combined"}>
         <TabsList>
           <TabsTrigger value="combined">Combined</TabsTrigger>
           <TabsTrigger value="whatsapp">Messages ({conversations.length})</TabsTrigger>
@@ -71,7 +71,7 @@ export default async function CommunicationPage() {
               message="WhatsApp messages and Facebook and Instagram DMs you send or receive appear here, one conversation per person."
             />
           ) : (
-            <InboxClient conversations={conversations} memberLabel={vocab.member} />
+            <InboxClient conversations={conversations} memberLabel={vocab.member} initialKey={searchParams?.c ?? null} />
           )}
         </TabsContent>
 

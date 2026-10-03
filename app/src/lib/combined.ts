@@ -48,7 +48,8 @@ export function listCombinedFeed(): CombinedItem[] {
       subtitle: CHANNEL_SUBTITLE[kind],
       snippet: c.lastMessage,
       at: c.lastAt.getTime(),
-      href: c.href,
+      // Open the conversation itself (the chat view), not the contact's record.
+      href: `/communication?c=${encodeURIComponent(`${c.kind}-${c.contactId}`)}`,
       unread: c.needsAttention,
       direction: c.lastDirection,
     });

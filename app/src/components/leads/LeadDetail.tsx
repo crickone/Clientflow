@@ -10,6 +10,7 @@ import {
   PhoneOutgoing,
   Mail,
   MessageSquare,
+  MessagesSquare,
   Phone,
   Send,
   Sparkles,
@@ -358,13 +359,22 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
             <PhoneOutgoing size={14} />
             {calling ? "Calling…" : "Call"}
           </Button>
+          {messages.length > 0 && (
+            <Link href={`/communication?c=${encodeURIComponent(`lead-${lead.id}`)}`}>
+              <Button variant="outline">
+                <MessagesSquare size={14} />
+                Open chat
+              </Button>
+            </Link>
+          )}
           <Button
-            variant="outline"
+            variant="ghost"
             onClick={() => setReplyOpen(true)}
             disabled={pending}
+            title="Record a reply they gave somewhere AdonisAgent can't see, like a phone call or your personal email"
           >
             <MessageSquare size={14} />
-            Log reply
+            Log outside reply
           </Button>
           <Button
             variant="ghost"
@@ -589,7 +599,7 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
 
           {replyOpen && (
             <Card>
-              <CardLabel>Log inbound reply</CardLabel>
+              <CardLabel>Log a reply from outside AdonisAgent</CardLabel>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
                 {(["email", "sms", "whatsapp", "call", "manual"] as const).map((c) => (
                   <button
