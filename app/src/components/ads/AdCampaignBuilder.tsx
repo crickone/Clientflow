@@ -115,14 +115,15 @@ export function AdCampaignBuilder({
   designs,
 }: {
   campaignId: number | null;
-  initialSpec: CampaignSpec;
+  /** null for a new campaign: the blank spec is built here, on the client. */
+  initialSpec: CampaignSpec | null;
   initialAdAccountId: string;
   adAccounts: BuilderAdAccount[];
   designs: BuilderDesign[];
 }) {
   const router = useRouter();
   const confirm = useConfirm();
-  const [spec, setSpec] = useState<CampaignSpec>(initialSpec);
+  const [spec, setSpec] = useState<CampaignSpec>(() => initialSpec ?? blankSpec(designs));
   const [adAccountId, setAdAccountId] = useState(initialAdAccountId);
   const [id, setId] = useState<number | null>(campaignId);
   const [busy, start] = useTransition();

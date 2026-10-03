@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { PageHeader } from "@/components/layout/PageHeader";
-import { AdCampaignBuilder, blankSpec } from "@/components/ads/AdCampaignBuilder";
+import { AdCampaignBuilder } from "@/components/ads/AdCampaignBuilder";
 import { requireAdminPage } from "@/lib/auth";
 import { builderData } from "@/lib/ads/pageData";
 
@@ -14,7 +14,10 @@ export default async function NewAdCampaignPage() {
   return (
     <div className="app-page" style={{ maxWidth: 900 }}>
       <PageHeader eyebrow="Ads" title="New campaign" subtitle="Saved as a draft until you launch it." />
-      <AdCampaignBuilder campaignId={null} initialSpec={blankSpec(designs)} initialAdAccountId={adAccounts[0].adAccountId} adAccounts={adAccounts} designs={designs} />
+      {/* initialSpec null: the builder makes the blank spec itself. Calling
+          blankSpec here crashed the page -- it is exported from a "use client"
+          module, so on the server it is a client reference, not a function. */}
+      <AdCampaignBuilder campaignId={null} initialSpec={null} initialAdAccountId={adAccounts[0].adAccountId} adAccounts={adAccounts} designs={designs} />
     </div>
   );
 }
