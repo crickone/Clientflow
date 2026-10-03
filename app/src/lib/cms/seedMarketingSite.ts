@@ -44,7 +44,9 @@ const SITE_NAME = "AdonisAgent";
 //   carried the redesign up from an uncommitted working tree BEFORE the copy
 //   pass, so the stored rev is already 4 and a rev-4 build republishes
 //   nothing. A new number is the only way the new copy reaches the site.
-const MARKETING_SITE_REV = 5;
+// rev 6 (2026-10-03): footer names Vantaige Limited and its registered office
+//   (Meta business verification links the brand to the legal entity).
+const MARKETING_SITE_REV = 6;
 const REV_KEY = "marketing_site_rev";
 
 export function seedMarketingSite(): void {
