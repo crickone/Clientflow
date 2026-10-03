@@ -14,12 +14,14 @@ import { getAppBaseUrl } from "@/lib/appUrl";
  * pages_manage_metadata (subscribe a Page to our webhook), leads_retrieval (read
  * a lead's field data), business_management (Business-managed Pages), and for
  * scheduled posting pages_manage_posts + instagram_basic +
- * instagram_content_publish (lib/social/publisher.ts). All require Meta App
+ * instagram_content_publish (lib/social/publisher.ts), DMs pages_messaging +
+ * instagram_manage_messages, and ads ads_management + ads_read +
+ * pages_manage_ads (lib/facebook/grants.ts holds the token those use). All require Meta App
  * Review (Advanced Access) to work for Pages the app's own roles don't manage.
  */
 
-const GRAPH_VERSION = "v21.0";
-export const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`;
+import { GRAPH_BASE, GRAPH_VERSION } from "./graph";
+export { GRAPH_BASE };
 const OAUTH_DIALOG = `https://www.facebook.com/${GRAPH_VERSION}/dialog/oauth`;
 
 export const FACEBOOK_SCOPES = [
@@ -33,6 +35,13 @@ export const FACEBOOK_SCOPES = [
   "pages_manage_posts",
   "instagram_basic",
   "instagram_content_publish",
+  // Messenger + Instagram DMs
+  "pages_messaging",
+  "instagram_manage_messages",
+  // Running ads on the business's own ad account
+  "ads_management",
+  "ads_read",
+  "pages_manage_ads",
 ].join(",");
 
 export function facebookConfigured(): boolean {
@@ -63,38 +72,52 @@ export function buildAuthUrl(state: string): string {
   return `${OAUTH_DIALOG}?${params.toString()}`;
 }
 
-/**
- * OAuth code → SHORT-lived user token → LONG-lived user token (~60 days). The
- * long-lived user token enumerates Pages; each Page then yields its own
- * long-lived Page token (which doesn't expire while the user's grant stands).
- * Throws on any failure — the callback catches + redirects with an error, like
- * the Gmail callback. The app secret never appears in a thrown message.
- */
-export async function exchangeCodeForLongLivedUserToken(code: string): Promise<string> {
-  const shortRes = await fetch(
-    `${GRAPH_BASE}/oauth/access_token?` +
-      new URLSearchParams({
-        client_id: process.env.FACEBOOK_APP_ID ?? "",
-        client_secret: process.env.FACEBOOK_APP_SECRET ?? "",
-        redirect_uri: getRedirectUri(),
-        code,
-      }),
-  );
-  if (!shortRes.ok) throw new Error(`Facebook code exchange failed (${shortRes.status})`);
-  const short = (await shortRes.json()) as { access_token?: string };
-  if (!short.access_token) throw new Error("Facebook code exchange returned no token");
+export interface ExchangedToken {
+  token: string;
+  kind: "system_user" | "user";
+  /** Epoch ms, or null when the token never expires (a system-user token). */
+  expiresAt: number | null;
+}
 
-  const longRes = await fetch(
+async function tokenRequest(params: Record<string, string>): Promise<string> {
+  const res = await fetch(
     `${GRAPH_BASE}/oauth/access_token?` +
       new URLSearchParams({
-        grant_type: "fb_exchange_token",
         client_id: process.env.FACEBOOK_APP_ID ?? "",
         client_secret: process.env.FACEBOOK_APP_SECRET ?? "",
-        fb_exchange_token: short.access_token,
+        ...params,
       }),
   );
-  if (!longRes.ok) throw new Error(`Facebook long-lived token exchange failed (${longRes.status})`);
-  const long = (await longRes.json()) as { access_token?: string };
-  if (!long.access_token) throw new Error("Facebook long-lived exchange returned no token");
-  return long.access_token;
+  // Never put the response body in the error: it can echo request parameters.
+  if (!res.ok) throw new Error(`Facebook token exchange failed (${res.status})`);
+  const body = (await res.json()) as { access_token?: string };
+  if (!body.access_token) throw new Error("Facebook token exchange returned no token");
+  return body.access_token;
+}
+
+/**
+ * OAuth code -> the tenant's grant token. With a Login for Business
+ * configuration set to "System-user access token" the code yields a
+ * business-integration system-user token that never expires. Otherwise it is a
+ * short-lived user token, swapped for a long-lived one (~60 days). debug_token
+ * tells the two apart and gives the expiry. Throws on any failure (the callback
+ * catches); the app secret never appears in a thrown message.
+ */
+export async function exchangeCode(code: string): Promise<ExchangedToken> {
+  let token = await tokenRequest({ redirect_uri: getRedirectUri(), code });
+  const info = await inspectToken(token);
+  if (info.type !== "SYSTEM_USER") {
+    token = await tokenRequest({ grant_type: "fb_exchange_token", fb_exchange_token: token });
+    const longInfo = await inspectToken(token);
+    return { token, kind: "user", expiresAt: longInfo.expiresAt };
+  }
+  return { token, kind: "system_user", expiresAt: info.expiresAt };
+}
+
+async function inspectToken(token: string): Promise<{ type: string; expiresAt: number | null }> {
+  const appToken = `${process.env.FACEBOOK_APP_ID ?? ""}|${process.env.FACEBOOK_APP_SECRET ?? ""}`;
+  const res = await fetch(`${GRAPH_BASE}/debug_token?` + new URLSearchParams({ input_token: token, access_token: appToken }));
+  const body = (await res.json().catch(() => ({}))) as { data?: { type?: string; expires_at?: number } };
+  const exp = body.data?.expires_at;
+  return { type: body.data?.type ?? "USER", expiresAt: exp ? exp * 1000 : null };
 }

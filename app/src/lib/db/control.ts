@@ -962,6 +962,36 @@ export function ensureControlTables() {
     console.error("[control] facebook_pages instagram columns migration failed:", err);
   }
 
+  // Meta grant + ad accounts (2026-10-03). The Facebook Login for Business
+  // connect yields ONE token per tenant (a never-expiring business-integration
+  // system-user token, or a 60-day user token without a config): it lists the
+  // granted Pages/ad accounts and drives the Marketing API. Stored encrypted
+  // (lib/google/tokenCrypto). Ad accounts are the client's own; Meta bills them.
+  controlSqlite.exec(`
+    CREATE TABLE IF NOT EXISTS meta_grants (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id INTEGER NOT NULL UNIQUE REFERENCES tenants(id) ON DELETE CASCADE,
+      token_enc TEXT NOT NULL,
+      token_kind TEXT NOT NULL,
+      expires_at INTEGER,
+      granted_by_user_id INTEGER,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch()*1000),
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch()*1000)
+    );
+    CREATE TABLE IF NOT EXISTS facebook_ad_accounts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      ad_account_id TEXT NOT NULL,
+      name TEXT,
+      currency TEXT,
+      timezone TEXT,
+      account_status INTEGER,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch()*1000),
+      revoked_at INTEGER,
+      UNIQUE(tenant_id, ad_account_id)
+    );
+  `);
+
   // Batch 6b (improvement-plan-2026-08.md Theme E1): tracking table for the
   // versioned migration runner (./migrations) — separate from everything
   // above, which is the additive bootstrap. Created here too (in addition to

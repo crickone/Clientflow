@@ -161,7 +161,7 @@ async function withApiKey<T>(value: string | undefined, fn: () => Promise<T>): P
         // ── request shape ──
         const call = calls[0];
         const [base, query] = call.url.split("?");
-        check("searchCompetitorAds: hits the ads_archive endpoint", base === "https://graph.facebook.com/v21.0/ads_archive");
+        check("searchCompetitorAds: hits the ads_archive endpoint", base === "https://graph.facebook.com/v26.0/ads_archive");
         check("searchCompetitorAds: GET (no method override)", call.init?.method === undefined);
         check("searchCompetitorAds: ad_type=ALL", query.includes("ad_type=ALL"));
         check(
@@ -309,7 +309,7 @@ async function withApiKey<T>(value: string | undefined, fn: () => Promise<T>): P
         const [base, query] = call.url.split("?");
         check(
           "searchCompetitorAdsByPageId: hits the ads_archive endpoint",
-          base === "https://graph.facebook.com/v21.0/ads_archive",
+          base === "https://graph.facebook.com/v26.0/ads_archive",
         );
         check("searchCompetitorAdsByPageId: ad_type=ALL", query.includes("ad_type=ALL"));
         check(

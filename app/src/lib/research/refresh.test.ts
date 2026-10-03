@@ -122,7 +122,7 @@ async function withAdLibraryToken<T>(value: string | undefined, fn: () => Promis
 const DETAILS_URL = (placeId: string) => `https://places.googleapis.com/v1/places/${placeId}`;
 const NEARBY_URL = "https://places.googleapis.com/v1/places:searchNearby";
 const GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json";
-const AD_LIBRARY_URL_BASE = "https://graph.facebook.com/v21.0/ads_archive";
+const AD_LIBRARY_URL_BASE = "https://graph.facebook.com/v26.0/ads_archive";
 
 /** Matches an ads_archive mock-fetch URL to the competitor `name` it was searched for (via the `search_terms` query param), mirroring adLibrary.test.ts's own request-shape checks. */
 function isAdLibraryCallFor(url: string, name: string): boolean {

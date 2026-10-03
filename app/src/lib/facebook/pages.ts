@@ -2,7 +2,8 @@ import "server-only";
 
 import { controlSqlite } from "@/lib/db/control";
 import { splitFullName } from "@/lib/humanName";
-import { GRAPH_BASE } from "./oauth";
+import { GRAPH_BASE } from "./graph";
+import type { GraphPage } from "./grants";
 import type { NormalizedLeadInput } from "@/lib/leads";
 
 /**
@@ -14,34 +15,18 @@ import type { NormalizedLeadInput } from "@/lib/leads";
  * put in a thrown/logged string.
  */
 
-interface GraphPage {
-  id: string;
-  name?: string;
-  access_token?: string;
-  /** The Instagram professional account linked to the Page (needs instagram_basic). */
-  instagram_business_account?: { id?: string; username?: string };
-}
 
 /**
- * After OAuth: fetch the user's Pages (with per-Page tokens), store each
- * connection for `tenantId`, and subscribe each Page to our `leadgen` webhook.
- * Returns the connected Page names (for the settings redirect). Throws on the
- * /me/accounts Graph failure (the callback catches); the per-Page subscribe is
- * best-effort. Re-connecting a Page updates its one row (page_id unique).
+ * After OAuth: store each granted Page (with its Page token and linked
+ * Instagram account) for `tenantId`, and subscribe each Page to our webhook
+ * (leads + messages). Returns the connected Page names. The per-Page subscribe
+ * is best-effort. Re-connecting a Page updates its one row (page_id unique).
  */
 export async function saveConnectedPages(
   tenantId: number,
-  longLivedUserToken: string,
+  pages: GraphPage[],
   connectedByUserId: number,
 ): Promise<string[]> {
-  const res = await fetch(
-    `${GRAPH_BASE}/me/accounts?` +
-      new URLSearchParams({ fields: "id,name,access_token,instagram_business_account{id,username}", access_token: longLivedUserToken, limit: "100" }),
-  );
-  if (!res.ok) throw new Error(`Facebook /me/accounts failed (${res.status})`);
-  const body = (await res.json()) as { data?: GraphPage[] };
-  const pages = (body.data ?? []).filter((p) => Boolean(p.id && p.access_token));
-
   const findExisting = controlSqlite.prepare("SELECT id FROM facebook_pages WHERE page_id = ?");
   const insert = controlSqlite.prepare(
     `INSERT INTO facebook_pages (tenant_id, page_id, page_name, page_access_token, connected_by_user_id, subscribed_at, ig_user_id, ig_username)
@@ -56,7 +41,7 @@ export async function saveConnectedPages(
   for (const page of pages) {
     let subscribedAt: number | null = null;
     try {
-      if (await subscribePageToLeadgen(page.id, page.access_token!)) subscribedAt = Date.now();
+      if (await subscribePageToWebhook(page.id, page.access_token!)) subscribedAt = Date.now();
     } catch {
       // best-effort: store the connection even if subscribe hiccups — it can be
       // retried, and the webhook still resolves the Page by page_id.
@@ -74,16 +59,26 @@ export async function saveConnectedPages(
   return names;
 }
 
-/** Subscribe a Page to the app's `leadgen` webhook field. Returns whether Graph confirmed it. */
-export async function subscribePageToLeadgen(pageId: string, pageAccessToken: string): Promise<boolean> {
-  const res = await fetch(`${GRAPH_BASE}/${encodeURIComponent(pageId)}/subscribed_apps`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ subscribed_fields: "leadgen", access_token: pageAccessToken }),
-  });
-  if (!res.ok) return false;
-  const body = (await res.json().catch(() => ({}))) as { success?: boolean };
-  return body.success !== false;
+/** The Page webhook fields we use: lead ads, then Messenger (which also carries Instagram DMs). */
+const PAGE_FIELDS_FULL = "leadgen,messages,messaging_postbacks,message_echoes";
+
+/**
+ * Subscribe a Page to the app's webhook. Messaging fields need pages_messaging;
+ * if the grant lacks it the whole call fails, so fall back to leads alone
+ * rather than leave the Page unsubscribed. Returns whether Graph confirmed it.
+ */
+export async function subscribePageToWebhook(pageId: string, pageAccessToken: string): Promise<boolean> {
+  for (const fields of [PAGE_FIELDS_FULL, "leadgen"]) {
+    const res = await fetch(`${GRAPH_BASE}/${encodeURIComponent(pageId)}/subscribed_apps`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ subscribed_fields: fields, access_token: pageAccessToken }),
+    });
+    if (!res.ok) continue;
+    const body = (await res.json().catch(() => ({}))) as { success?: boolean };
+    if (body.success !== false) return true;
+  }
+  return false;
 }
 
 export interface ResolvedPage {

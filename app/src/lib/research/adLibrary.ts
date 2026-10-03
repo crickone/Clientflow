@@ -1,5 +1,7 @@
 import "server-only";
 
+import { GRAPH_BASE } from "@/lib/facebook/graph";
+
 /**
  * Meta Ad Library (`ads_archive`) client — Task 1 of Market Research P2
  * (competitor ads). This is the FOUNDATION file every later P2 task builds
@@ -61,7 +63,7 @@ import "server-only";
  * unchanged by this refactor.
  */
 
-const AD_LIBRARY_ENDPOINT = "https://graph.facebook.com/v21.0/ads_archive";
+const AD_LIBRARY_ENDPOINT = `${GRAPH_BASE}/ads_archive`;
 
 const NOT_CONFIGURED_ERROR = "not_configured";
 

@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { requireAdmin, getCurrentMembership } from "@/lib/auth";
-import { exchangeCodeForLongLivedUserToken } from "@/lib/facebook/oauth";
+import { exchangeCode } from "@/lib/facebook/oauth";
+import { discoverAssets, saveGrant, saveAdAccounts } from "@/lib/facebook/grants";
 import { saveConnectedPages } from "@/lib/facebook/pages";
 import { getAppBaseUrl } from "@/lib/appUrl";
 
@@ -14,8 +15,8 @@ function back(params: string) {
 
 /**
  * Facebook OAuth callback — mirrors api/google/callback. Validate state, swap the
- * code for a long-lived user token, store + subscribe the user's Pages, redirect
- * back to the integration page.
+ * code for the tenant's grant token, store it with the Pages and ad accounts it
+ * was granted, subscribe the Pages to our webhook, redirect back.
  */
 export async function GET(req: NextRequest) {
   const me = await requireAdmin();
@@ -40,8 +41,12 @@ export async function GET(req: NextRequest) {
   if (state.n !== cookieNonce || state.t !== membership.tenant.id) return back("error=state_mismatch");
 
   try {
-    const userToken = await exchangeCodeForLongLivedUserToken(code);
-    const names = await saveConnectedPages(membership.tenant.id, userToken, me.id);
+    const tenantId = membership.tenant.id;
+    const grant = await exchangeCode(code);
+    const assets = await discoverAssets(grant.token);
+    saveGrant(tenantId, grant.token, grant.kind, grant.expiresAt, me.id);
+    saveAdAccounts(tenantId, assets.adAccounts);
+    const names = await saveConnectedPages(tenantId, assets.pages, me.id);
     if (names.length === 0) return back("error=no_pages");
     const res = back(`connected=${encodeURIComponent(String(names.length))}`);
     res.cookies.delete("fb_oauth_state");

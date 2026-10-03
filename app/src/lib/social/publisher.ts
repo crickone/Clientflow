@@ -2,6 +2,7 @@ import "server-only";
 
 import { readKeyForTenant, setKey } from "@/lib/settings";
 import { getPostingPage } from "@/lib/facebook/pages";
+import { GRAPH_BASE } from "@/lib/facebook/graph";
 
 /**
  * Posting to social, behind one interface.
@@ -74,7 +75,7 @@ export function getSocialPublisher(tenantId: number): SocialPublisher | null {
 
 // ─── Meta Graph API ──────────────────────────────────────────────────────────
 
-const GRAPH = "https://graph.facebook.com/v21.0";
+const GRAPH = GRAPH_BASE;
 
 async function graph<T = Record<string, unknown>>(
   path: string,
