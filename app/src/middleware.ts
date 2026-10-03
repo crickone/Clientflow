@@ -82,6 +82,10 @@ export function middleware(req: NextRequest) {
   ) {
     const url = req.nextUrl.clone();
     url.pathname = `/site/${mappedSlug}${pathname === "/" ? "" : pathname}`;
+    // The root layout reads x-pathname to pick the bare public-site render; with
+    // the ORIGINAL path ("/privacy") it took the admin branch and sent every
+    // signed-out visitor on a mapped domain to /login. Hand it the rewritten one.
+    requestHeaders.set("x-pathname", url.pathname);
     return NextResponse.rewrite(url, { request: { headers: requestHeaders } });
   }
 
