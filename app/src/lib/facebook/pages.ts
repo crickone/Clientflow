@@ -42,9 +42,10 @@ export async function saveConnectedPages(
     let subscribedAt: number | null = null;
     try {
       if (await subscribePageToWebhook(page.id, page.access_token!)) subscribedAt = Date.now();
-    } catch {
+    } catch (err) {
       // best-effort: store the connection even if subscribe hiccups — it can be
       // retried, and the webhook still resolves the Page by page_id.
+      console.error(`[facebook] Page ${page.id} subscribe threw:`, err);
     }
     const igUserId = page.instagram_business_account?.id ?? null;
     const igUsername = page.instagram_business_account?.username ?? null;
@@ -68,15 +69,23 @@ const PAGE_FIELDS_FULL = "leadgen,messages,messaging_postbacks,message_echoes";
  * rather than leave the Page unsubscribed. Returns whether Graph confirmed it.
  */
 export async function subscribePageToWebhook(pageId: string, pageAccessToken: string): Promise<boolean> {
+  // True only when MESSAGES are subscribed. If Meta refuses the full set, fall
+  // back to leadgen so lead ads still arrive, but report false: this used to
+  // count a leadgen-only subscription as success, so Settings ticked "Messages
+  // and lead ads" for a Page that would never deliver a DM. Meta's reason is
+  // logged either way (never the token).
   for (const fields of [PAGE_FIELDS_FULL, "leadgen"]) {
     const res = await fetch(`${GRAPH_BASE}/${encodeURIComponent(pageId)}/subscribed_apps`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ subscribed_fields: fields, access_token: pageAccessToken }),
     });
-    if (!res.ok) continue;
-    const body = (await res.json().catch(() => ({}))) as { success?: boolean };
-    if (body.success !== false) return true;
+    const body = (await res.json().catch(() => ({}))) as { success?: boolean; error?: { message?: string } };
+    if (res.ok && body.success !== false) {
+      console.log(`[facebook] Page ${pageId} subscribed to ${fields}`);
+      return fields === PAGE_FIELDS_FULL;
+    }
+    console.error(`[facebook] Page ${pageId} subscribe to ${fields} failed (${res.status}): ${body.error?.message ?? "no reason given"}`);
   }
   return false;
 }
