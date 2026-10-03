@@ -7,7 +7,7 @@ import { builderData } from "@/lib/ads/pageData";
 
 export const dynamic = "force-dynamic";
 
-export default async function NewAdCampaignPage() {
+export default async function NewAdCampaignPage({ searchParams }: { searchParams?: { step?: string } }) {
   await requireAdminPage();
   const { adAccounts, designs } = builderData();
   if (adAccounts.length === 0) redirect("/marketing/ads");
@@ -17,7 +17,7 @@ export default async function NewAdCampaignPage() {
       {/* initialSpec null: the builder makes the blank spec itself. Calling
           blankSpec here crashed the page -- it is exported from a "use client"
           module, so on the server it is a client reference, not a function. */}
-      <AdCampaignBuilder campaignId={null} initialSpec={null} initialAdAccountId={adAccounts[0].adAccountId} adAccounts={adAccounts} designs={designs} />
+      <AdCampaignBuilder campaignId={null} initialSpec={null} initialStep={searchParams?.step ? Number(searchParams.step) - 1 : undefined} initialAdAccountId={adAccounts[0].adAccountId} adAccounts={adAccounts} designs={designs} />
     </div>
   );
 }

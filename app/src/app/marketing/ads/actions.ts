@@ -46,7 +46,8 @@ export async function saveAdDraftAction(id: number | null, adAccountId: string, 
     const me = await requireAdmin();
     const row = id ? updateAdDraft(id, { adAccountId, spec }) : createAdDraft({ adAccountId, spec, createdBy: me.email ?? String(me.id) });
     return { id: row.id };
-  });
+    // Drafts autosave as the operator types; the ads pages render fresh anyway.
+  }, { revalidate: false });
 }
 
 export async function deleteAdDraftAction(id: number): Promise<AdsResult> {

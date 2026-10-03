@@ -121,8 +121,11 @@ export function AdCampaignBuilder({
   initialAdAccountId,
   adAccounts,
   designs,
+  initialStep,
 }: {
   campaignId: number | null;
+  /** Step to open on (from ?step= in the URL), so a refresh lands where you were. */
+  initialStep?: number;
   /** null for a new campaign: the blank spec is built here, on the client. */
   initialSpec: CampaignSpec | null;
   initialAdAccountId: string;
@@ -137,7 +140,11 @@ export function AdCampaignBuilder({
   const [busy, start] = useTransition();
   // One step per screen: Goal, Audience, Budget, Ads, Review. A saved draft
   // reopens on Review, where everything is summarised with Edit links.
-  const [step, setStep] = useState(campaignId ? 4 : 0);
+  const [step, setStep] = useState(() =>
+    initialStep != null && initialStep >= 0 && initialStep < STEPS.length ? initialStep : campaignId ? 4 : 0,
+  );
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const idRef = useRef<number | null>(campaignId);
   const [activeSet, setActiveSet] = useState(0);
   const currency = adAccounts.find((a) => a.adAccountId === adAccountId)?.currency ?? "EUR";
   const problems = validateSpec(spec);
@@ -174,25 +181,49 @@ export function AdCampaignBuilder({
     });
   }
 
-  async function save(): Promise<number | null> {
-    const res = await saveAdDraftAction(id, adAccountId, spec);
+  // The URL carries the draft and the step, so a refresh reopens exactly here.
+  // history.replaceState, not router.replace: a navigation would remount the
+  // builder and throw away what is on screen.
+  function syncUrl(draftId: number | null, n: number) {
+    const path = draftId ? `/marketing/ads/${draftId}` : "/marketing/ads/new";
+    window.history.replaceState(window.history.state, "", `${path}?step=${n + 1}`);
+  }
+
+  async function save(opts: { quiet?: boolean; urlStep?: number } = {}): Promise<number | null> {
+    setSaveState("saving");
+    const res = await saveAdDraftAction(idRef.current, adAccountId, spec);
     if (!res.ok) {
-      toast.error(res.error);
+      setSaveState("error");
+      if (!opts.quiet) toast.error(res.error);
       return null;
     }
+    const created = idRef.current == null;
+    idRef.current = res.data.id;
     setId(res.data.id);
+    setSaveState("saved");
+    if (created) syncUrl(res.data.id, opts.urlStep ?? step);
     return res.data.id;
   }
 
   function onSave() {
     start(async () => {
-      const saved = await save();
-      if (saved) {
-        toast.success("Draft saved");
-        if (!id) router.replace(`/marketing/ads/${saved}`);
-      }
+      if (await save()) toast.success("Draft saved");
     });
   }
+
+  // Autosave: once the draft exists, every change is saved a moment after the
+  // last edit. (A new campaign becomes a draft the first time Next is pressed.)
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    if (idRef.current == null) return;
+    const t = setTimeout(() => void save({ quiet: true }), 1500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- save reads the latest spec through closure on each run
+  }, [spec, adAccountId]);
 
   async function onLaunch() {
     const total = totalDailyBudget(spec);
@@ -233,7 +264,11 @@ export function AdCampaignBuilder({
   const designName = (id: number) => designs.find((d) => d.id === id)?.name ?? "No design chosen";
   const go = (n: number) => {
     setStep(n);
+    syncUrl(idRef.current, n);
     window.scrollTo({ top: 0, behavior: "smooth" });
+    // Moving on is when a new campaign becomes a saved draft, so a refresh
+    // from here on loses nothing.
+    if (idRef.current == null && n > 0) void save({ quiet: true, urlStep: n });
   };
 
   // Ad set switcher for the per-ad-set steps. Hidden when there is only one.
@@ -622,7 +657,10 @@ export function AdCampaignBuilder({
         <Button variant="ghost" onClick={onDelete} disabled={busy}>
           <Trash2 size={15} /> {id ? "Delete draft" : "Cancel"}
         </Button>
-        <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+        <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+          <span aria-live="polite" style={{ fontSize: 12.5, color: saveState === "error" ? "var(--danger)" : "var(--text-tertiary)", marginRight: 4 }}>
+            {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved" : saveState === "error" ? "Not saved" : ""}
+          </span>
           <Button variant="outline" onClick={onSave} disabled={busy}>
             <Save size={15} /> Save draft
           </Button>
