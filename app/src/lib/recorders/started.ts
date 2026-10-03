@@ -9,7 +9,7 @@
  * ./startedStore.
  */
 
-export const RECORDER_KEYS = ["stage_history", "page_views", "email_events", "status_dates"] as const;
+export const RECORDER_KEYS = ["stage_history", "page_views", "email_events", "status_dates", "social_followers"] as const;
 export type RecorderKey = (typeof RECORDER_KEYS)[number];
 
 export function recorderSettingKey(key: RecorderKey): string {

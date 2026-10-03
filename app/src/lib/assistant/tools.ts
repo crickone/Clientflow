@@ -97,6 +97,7 @@ import {
   setAdBudgetTool,
   setAdCampaignStatusTool,
 } from "@/lib/agents/tools.ads";
+import { SOCIAL_METRICS_TOOLS, getSocialMetricsTool } from "@/lib/agents/tools.social";
 import {
   WEBSITE_TOOLS,
   listWebsitePagesTool,
@@ -824,6 +825,7 @@ export const TOOLS: Anthropic.Tool[] = [
 
   // ── Ads manager: Facebook/Instagram ads on the business's own ad account. ──
   ...ADS_TOOLS,
+  ...SOCIAL_METRICS_TOOLS,
 
   // ── Operations agent (Operations Task 1): no-show + lapsed-member tools ──
   ...OPERATIONS_TOOLS,
@@ -992,6 +994,8 @@ export async function executeTool(
         return cancelScheduledItemTool(ctx, input);
       case "list_schedule":
         return listScheduleTool(ctx, input);
+      case "get_social_metrics":
+        return await getSocialMetricsTool(ctx, input);
       case "list_ad_campaigns":
         return listAdCampaignsTool(ctx);
       case "search_ad_audience":

@@ -2117,6 +2117,16 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     console.error("[db] lead_messages whatsapp-cols migration failed:", err);
   }
 
+  // Daily follower snapshots for the Social dashboard (schema.ts socialFollowersDaily).
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS social_followers_daily (
+      day TEXT NOT NULL,
+      channel TEXT NOT NULL,
+      followers INTEGER NOT NULL,
+      PRIMARY KEY (day, channel)
+    );
+  `);
+
   // Meta ad campaigns from the ads manager (schema.ts adCampaigns). Additive.
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS ad_campaigns (

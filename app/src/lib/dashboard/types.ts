@@ -18,6 +18,7 @@ export type Domain =
   | "content"
   | "website"
   | "competitors"
+  | "social"
   | "ai";
 
 export const DOMAIN_LABELS: Record<Domain, string> = {
@@ -32,11 +33,12 @@ export const DOMAIN_LABELS: Record<Domain, string> = {
   content: "Content & Social",
   website: "Website",
   competitors: "Competitors",
+  social: "Social",
   ai: "AI & Usage",
 };
 
 /** Something a tenant must have set up before a widget can show data. */
-export type Requirement = "site" | "sendingDomain" | "competitors";
+export type Requirement = "site" | "sendingDomain" | "competitors" | "social";
 export type { RecorderKey } from "@/lib/recorders/started";
 import type { RecorderKey } from "@/lib/recorders/started";
 

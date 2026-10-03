@@ -19,7 +19,8 @@ export type PresetIcon =
   | "Images"
   | "Globe"
   | "Binoculars"
-  | "Cpu";
+  | "Cpu"
+  | "Heart";
 
 export interface Preset {
   key: string;
@@ -402,6 +403,34 @@ export const PRESETS: Preset[] = [
         { key: "competitors.recentReviews", size: "M" },
         { key: "competitors.activity", size: "XL" },
         { key: "competitors.activeAds", size: "XL" },
+      ],
+    },
+  },
+  {
+    key: "social",
+    name: "Social",
+    description: "Facebook and Instagram: followers, reach, engagement and your best posts.",
+    icon: "Heart",
+    widgets: {
+      clinic: [
+        { key: "social.fbFollowers", size: "S" },
+        { key: "social.igFollowers", size: "S" },
+        { key: "social.igReach", size: "S" },
+        { key: "social.engagement", size: "S" },
+        { key: "social.followerTrend", size: "XL" },
+        { key: "social.topPosts", size: "L" },
+        { key: "social.fbViews", size: "S" },
+        { key: "social.byChannel", size: "M" },
+      ],
+      gym: [
+        { key: "social.fbFollowers", size: "S" },
+        { key: "social.igFollowers", size: "S" },
+        { key: "social.igReach", size: "S" },
+        { key: "social.engagement", size: "S" },
+        { key: "social.followerTrend", size: "XL" },
+        { key: "social.topPosts", size: "L" },
+        { key: "social.fbViews", size: "S" },
+        { key: "social.byChannel", size: "M" },
       ],
     },
   },

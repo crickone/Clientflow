@@ -556,6 +556,22 @@ export const adCampaigns = sqliteTable(
   (t) => ({ byStatus: index("idx_ad_campaigns_status").on(t.status) }),
 );
 
+/**
+ * One follower count per day per channel ("facebook" | "instagram"), taken by
+ * the daily job and on dashboard load. Meta only reports today's count, so
+ * this is how follower growth over time exists at all (recorder
+ * "social_followers").
+ */
+export const socialFollowersDaily = sqliteTable(
+  "social_followers_daily",
+  {
+    day: text("day").notNull(),
+    channel: text("channel").notNull(),
+    followers: integer("followers").notNull(),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.day, t.channel] }) }),
+);
+
 /** Conversation messages for clients/members (mirrors lead_messages). */
 export const clientMessages = sqliteTable(
   "client_messages",

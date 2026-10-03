@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import Database from "better-sqlite3";
 import { RECORDER_KEYS, RECORDER_START_SQL, parseRecorderStart, recorderSettingKey } from "./started";
 
-assert.deepEqual([...RECORDER_KEYS], ["stage_history", "page_views", "email_events", "status_dates"]);
+assert.deepEqual([...RECORDER_KEYS], ["stage_history", "page_views", "email_events", "status_dates", "social_followers"]);
 assert.equal(recorderSettingKey("page_views"), "recorder_started:page_views");
 
 assert.equal(parseRecorderStart(null), null);
@@ -19,7 +19,7 @@ const sqlite = new Database(":memory:");
 sqlite.exec("CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
 sqlite.exec(RECORDER_START_SQL);
 const first = sqlite.prepare("SELECT key, value FROM settings ORDER BY key").all() as { key: string; value: string }[];
-assert.equal(first.length, 4);
+assert.equal(first.length, 5);
 for (const r of first) assert.ok(parseRecorderStart(r.value), `${r.key} parses`);
 sqlite.prepare("UPDATE settings SET value = ? WHERE key = ?").run('"2020-01-01T00:00:00.000Z"', "recorder_started:page_views");
 sqlite.exec(RECORDER_START_SQL);

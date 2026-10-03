@@ -14,6 +14,7 @@ import { EMAIL_WIDGETS } from "./email";
 import { MARKETING_WIDGETS } from "./marketing";
 import { SALES_WIDGETS } from "./sales";
 import { WEBSITE_WIDGETS } from "./website";
+import { SOCIAL_WIDGETS } from "./social";
 
 export { cached } from "./cache";
 
@@ -30,6 +31,7 @@ export const WIDGET_IMPLS = {
   ...CONTENT_WIDGETS,
   ...WEBSITE_WIDGETS,
   ...COMPETITORS_WIDGETS,
+  ...SOCIAL_WIDGETS,
   ...AI_WIDGETS,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<WidgetKey, WidgetImpl<any>>;

@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Binoculars,
+  Heart,
   CalendarCheck,
   Copy,
   Cpu,
@@ -79,6 +80,7 @@ const ICONS: Record<PresetIcon, LucideIcon> = {
   Globe,
   Binoculars,
   Cpu,
+  Heart,
 };
 
 export function TabBar({ tabs, active, rangeKey, isAdmin, source, presets, custom }: TabBarProps) {

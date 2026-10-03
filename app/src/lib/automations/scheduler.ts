@@ -5,6 +5,7 @@ import { and, asc, eq, gte } from "drizzle-orm";
 import { claimDailyRun, controlDb, getCronState, isWeeklyDue, resetDailyClaim, setCronState } from "@/lib/db/control";
 import { purgeOldVisitorHashes } from "@/lib/analytics/pageViews";
 import { checkpointAllOpenConnections, getTenantDbById, runWithTenant } from "@/lib/db/tenant";
+import { hasSocialConnection, recordFollowerSnapshot } from "@/lib/social/metrics";
 import { automationLog, automationMessages, automationTriggers, clients, tenants } from "@/lib/db/schema";
 import { applyShortcodes, DEFAULT_MESSAGES, isMessageLive, type Channel } from "@/lib/automationModel";
 import { getBusinessProfileForTenant } from "@/lib/businessProfile";
@@ -251,6 +252,16 @@ export async function runDailyAutomations(): Promise<{ tenants: number; birthday
       postsPublished += published;
     } catch (err) {
       console.error(`[blog-schedule] tenant ${t.id} failed (will retry next daily tick):`, err);
+    }
+  }
+
+  // Daily follower snapshot for the Social dashboard (recorder
+  // social_followers). Only tenants with a connected Page; fail-soft per tenant.
+  for (const t of list) {
+    try {
+      if (hasSocialConnection(t.id)) await runWithTenant(t.id, () => recordFollowerSnapshot(t.id));
+    } catch (err) {
+      console.error(`[recorder:social_followers] snapshot failed for tenant ${t.id}:`, err);
     }
   }
 
