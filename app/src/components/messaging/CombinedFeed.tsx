@@ -30,7 +30,7 @@ export function CombinedFeed({ items }: { items: CombinedItem[] }) {
       </div>
       {items.length === 0 ? (
         <Card style={{ padding: 16, fontSize: 13, color: "var(--text-tertiary)" }}>
-          Nothing yet. Connect Gmail and refresh the Email tab to see messages here.
+          Nothing yet. WhatsApp messages, Facebook and Instagram DMs and emails appear here as they arrive.
         </Card>
       ) : (
         items.slice(0, 60).map((it) => {

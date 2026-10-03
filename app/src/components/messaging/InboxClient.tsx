@@ -388,6 +388,10 @@ export function InboxClient({
                       }}
                     >
                       <Badge>{c.kind === "client" ? memberLabel : "Lead"}</Badge>
+                      {/* Which app they last wrote on: WhatsApp, Messenger or Instagram share this list. */}
+                      <Badge>
+                        {c.channel === "messenger" || c.channel === "instagram" ? CHANNEL_LABELS[c.channel] : "WhatsApp"}
+                      </Badge>
                       {cat && <Badge colour={cat.color}>{cat.label}</Badge>}
                     </div>
 

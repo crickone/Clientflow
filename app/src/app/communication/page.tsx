@@ -47,13 +47,13 @@ export default async function CommunicationPage() {
       <PageHeader
         eyebrow="Inbox"
         title="Communication"
-        subtitle="All your conversations in one place — WhatsApp and email."
+        subtitle="All your conversations in one place: WhatsApp, Messenger, Instagram and email."
       />
 
       <Tabs defaultValue="combined">
         <TabsList>
           <TabsTrigger value="combined">Combined</TabsTrigger>
-          <TabsTrigger value="whatsapp">WhatsApp ({conversations.length})</TabsTrigger>
+          <TabsTrigger value="whatsapp">Messages ({conversations.length})</TabsTrigger>
           <TabsTrigger value="email">Email ({emailCount})</TabsTrigger>
         </TabsList>
 
@@ -68,7 +68,7 @@ export default async function CommunicationPage() {
             <EmptyState
               icon={<MessageCircle size={32} strokeWidth={1.4} />}
               title="No conversations yet"
-              message="Messages you send or receive over WhatsApp will appear here."
+              message="WhatsApp messages and Facebook and Instagram DMs you send or receive appear here, one conversation per person."
             />
           ) : (
             <InboxClient conversations={conversations} memberLabel={vocab.member} />
