@@ -49,7 +49,9 @@ const SITE_NAME = "AdonisAgent";
 // rev 7 (2026-10-03): footer drops the registered-office address and links
 //   the new /privacy page (Meta App Review needs a privacy + data-deletion URL).
 //   First multi-page rev: the seeder now creates/updates every page in PAGES.
-const MARKETING_SITE_REV = 7;
+// rev 8 (2026-10-03): /data-deletion page (Meta rejects a deletion URL equal
+//   to the privacy policy URL).
+const MARKETING_SITE_REV = 8;
 const REV_KEY = "marketing_site_rev";
 
 /**
@@ -60,6 +62,7 @@ const REV_KEY = "marketing_site_rev";
 const PAGES = [
   { key: "index", path: "/", file: "index.html" },
   { key: "privacy", path: "/privacy", file: "privacy.html" },
+  { key: "data-deletion", path: "/data-deletion", file: "data-deletion.html" },
 ] as const;
 
 type Sqlite = ReturnType<typeof openTenantDb>["sqlite"];
