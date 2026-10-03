@@ -54,11 +54,21 @@ export async function POST(req: Request) {
     return Response.json({ ok: true, ignored: "unparseable" });
   }
 
+  // One line per delivery, so a test DM or lead can be traced in the logs.
+  // Counts and object type only: never message text or a person's id.
+  const leadEvents = parseLeadgenEvents(payload);
+  const dmEvents = parseMessagingEvents(payload);
+  const object = (payload as { object?: unknown } | null)?.object;
+  console.log(`[meta webhook] ${String(object ?? "unknown")}: ${leadEvents.length} lead(s), ${dmEvents.length} message event(s)`);
+
   // ── Lead ads ──
-  for (const ev of parseLeadgenEvents(payload)) {
+  for (const ev of leadEvents) {
     try {
       const page = getFacebookPageByPageId(ev.pageId);
-      if (!page) continue;
+      if (!page) {
+        console.log(`[meta webhook] lead for Page ${ev.pageId}: no connected Page matches, ignored`);
+        continue;
+      }
       const input = await fetchLeadAsInput(ev.leadgenId, page.pageAccessToken);
       await runWithTenant(page.tenantId, async () => {
         const { lead, created } = upsertLead(input);
@@ -73,10 +83,13 @@ export async function POST(req: Request) {
   }
 
   // ── Messenger + Instagram DMs ──
-  for (const ev of parseMessagingEvents(payload)) {
+  for (const ev of dmEvents) {
     try {
       const page = getPageForMessagingAccount(ev.channel, ev.accountId);
-      if (!page) continue;
+      if (!page) {
+        console.log(`[meta webhook] ${ev.channel} message for account ${ev.accountId}: no connected Page matches, ignored`);
+        continue;
+      }
       await runWithTenant(page.tenantId, async () => {
         const inbound = await recordDmEvent(ev, page);
         if (!inbound) return;
