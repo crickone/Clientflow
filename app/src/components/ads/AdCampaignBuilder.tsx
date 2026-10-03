@@ -181,15 +181,29 @@ export function AdCampaignBuilder({
     });
   }
 
-  // The URL carries the draft and the step, so a refresh reopens exactly here.
-  // Through the router: a bare history.replaceState was overwritten by Next's
-  // own URL after the next server action, so a refresh landed on /new again.
-  // Same route + new ?step= keeps this component (and what is on screen);
-  // /new -> /<id> loads the draft that was just saved.
-  function syncUrl(draftId: number | null, n: number) {
-    const path = draftId ? `/marketing/ads/${draftId}` : "/marketing/ads/new";
-    router.replace(`${path}?step=${n + 1}`, { scroll: false });
+  // A refresh reopens the same draft on the same step. The draft is in the URL
+  // (set once, when it is first saved); the step is remembered in this browser.
+  // The step is deliberately NOT a ?step= search param: Next keys the page on
+  // its search params, so changing one remounted the builder from the last
+  // saved copy and threw away edits made since (a new ad set, a gender).
+  const stepKey = (draftId: number | null) => `ads-builder-step:${draftId ?? "new"}`;
+  function rememberStep(draftId: number | null, n: number) {
+    try {
+      window.localStorage.setItem(stepKey(draftId), String(n));
+    } catch {
+      // storage blocked: a refresh just opens on the default step
+    }
   }
+  useEffect(() => {
+    if (initialStep != null) return;
+    try {
+      const saved = Number(window.localStorage.getItem(stepKey(campaignId)));
+      if (Number.isInteger(saved) && saved > 0 && saved < STEPS.length) setStep(saved);
+    } catch {
+      // storage blocked
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
+  }, []);
 
   async function save(opts: { quiet?: boolean; urlStep?: number } = {}): Promise<number | null> {
     setSaveState("saving");
@@ -203,7 +217,11 @@ export function AdCampaignBuilder({
     idRef.current = res.data.id;
     setId(res.data.id);
     setSaveState("saved");
-    if (created) syncUrl(res.data.id, opts.urlStep ?? step);
+    if (created) {
+      // The one navigation: /new -> /<id>, which reloads what was just saved.
+      rememberStep(res.data.id, opts.urlStep ?? step);
+      router.replace(`/marketing/ads/${res.data.id}`, { scroll: false });
+    }
     return res.data.id;
   }
 
@@ -266,11 +284,11 @@ export function AdCampaignBuilder({
   const designName = (id: number) => designs.find((d) => d.id === id)?.name ?? "No design chosen";
   const go = (n: number) => {
     setStep(n);
-    syncUrl(idRef.current, n);
+    rememberStep(idRef.current, n);
     window.scrollTo({ top: 0, behavior: "smooth" });
-    // Moving on is when a new campaign becomes a saved draft, so a refresh
-    // from here on loses nothing.
-    if (idRef.current == null && n > 0) void save({ quiet: true, urlStep: n });
+    // Every step change saves at once (no autosave delay). For a new campaign
+    // this is when it becomes a draft, so a refresh from here loses nothing.
+    if (idRef.current != null || n > 0) void save({ quiet: true, urlStep: n });
   };
 
   // Ad set switcher for the per-ad-set steps. Hidden when there is only one.

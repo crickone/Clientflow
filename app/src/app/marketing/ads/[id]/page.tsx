@@ -10,7 +10,7 @@ import { builderData } from "@/lib/ads/pageData";
 export const dynamic = "force-dynamic";
 
 /** A draft opens in the builder; a launched campaign shows its results and controls. */
-export default async function AdCampaignPage({ params, searchParams }: { params: { id: string }; searchParams?: { step?: string } }) {
+export default async function AdCampaignPage({ params }: { params: { id: string } }) {
   await requireAdminPage();
   const campaign = getAdCampaign(Number(params.id));
   if (!campaign) notFound();
@@ -27,7 +27,7 @@ export default async function AdCampaignPage({ params, searchParams }: { params:
         </div>
       )}
       {editable ? (
-        <AdCampaignBuilder campaignId={campaign.id} initialStep={searchParams?.step ? Number(searchParams.step) - 1 : undefined} initialSpec={campaign.spec} initialAdAccountId={campaign.adAccountId} adAccounts={adAccounts} designs={designs} />
+        <AdCampaignBuilder campaignId={campaign.id} initialSpec={campaign.spec} initialAdAccountId={campaign.adAccountId} adAccounts={adAccounts} designs={designs} />
       ) : (
         <AdCampaignDetail
           id={campaign.id}
