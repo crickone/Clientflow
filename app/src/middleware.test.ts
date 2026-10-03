@@ -22,7 +22,13 @@ async function main() {
     assert.ok(res.headers.get("x-middleware-rewrite")?.endsWith(expected), `${path}: rewritten to ${expected}`);
     assert.equal(res.headers.get("x-middleware-request-x-pathname"), expected, `${path}: x-pathname is the rewritten path`);
   }
-  console.log("middleware: mapped-domain rewrite checks passed.");
+  // Meta fetches post images without a session. Redirecting it to /login
+  // handed Meta an HTML page: "The image format is not supported" (2026-10-03).
+  for (const path of ["/api/social/render/sometoken", "/api/integrations/meta/webhook", "/api/integrations/meta/data-deletion"]) {
+    const res = middleware(new NextRequest(`https://app.adonisagent.ie${path}`, { headers: { host: "app.adonisagent.ie" } }));
+    assert.equal(res?.headers.get("location") ?? null, null, `${path}: reachable without a session`);
+  }
+  console.log("middleware: mapped-domain rewrite and public-route checks passed.");
 }
 
 main().catch((err) => {
