@@ -101,6 +101,7 @@ import {
   type SlideIntent,
 } from "@/lib/content-studio/slideIntent";
 import { EditorSection } from "./EditorSection";
+import { SchedulePostButton, type DesignBooking } from "./SchedulePostButton";
 import { PostIdeas } from "./PostIdeas";
 
 /**
@@ -170,6 +171,8 @@ interface Props {
   initialGenerationStatus?: string | null;
   initialGenerationError?: string | null;
   initialGenerationStage?: string | null;
+  /** Posting from the editor: whether a Page is connected, and this design's bookings. */
+  schedule?: { connected: boolean; bookings: DesignBooking[] } | null;
 }
 
 /**
@@ -368,6 +371,7 @@ export function ImageDesigner({
   initialGenerationStatus = null,
   initialGenerationError = null,
   initialGenerationStage = null,
+  schedule = null,
 }: Props) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -384,6 +388,10 @@ export function ImageDesigner({
     }),
   );
   const { slides, activeIdx, activeSlot, rephotographing } = design;
+  // What the publisher would post: the carousel slot if there is one, and only
+  // slides rendered on the server (the same rule as postableRenders).
+  const postSlides = slides.some((s) => isCarouselSlot(s.slotKey)) ? slides.filter((s) => isCarouselSlot(s.slotKey)) : slides;
+  const postable = postSlides.some((s) => Boolean(s.renderFilename));
   const [library, setLibrary] = useState<ImageLibraryAsset[]>(initialLibrary);
   // Backgrounds can only be images — videos in the shared library are excluded
   // from the picker (they live in the Library tab and the video editor).
@@ -1945,6 +1953,14 @@ export function ImageDesigner({
                   <Download size={14} />
                   Export PNG
                 </Button>
+                {schedule && (
+                  <SchedulePostButton
+                    designId={designId}
+                    postable={postable && !writing}
+                    connected={schedule.connected}
+                    bookings={schedule.bookings}
+                  />
+                )}
               </div>
             )}
           </div>

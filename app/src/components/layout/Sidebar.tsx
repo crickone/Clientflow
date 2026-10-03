@@ -217,7 +217,6 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/marketing/calendar", label: "Seasonal calendar", icon: Calendar, adminOnly: true },
       // Everything booked for a time: scheduled posts, scheduled email sends,
       // and the nurture queue. Admin-only like the rest of this group.
-      { href: "/marketing/schedule", label: "Schedule", icon: CalendarClock, adminOnly: true },
       // Market Research P1 (Task 10): the competitor-tracking dashboard —
       // ranked list, rating/review trends, a change feed, per-competitor
       // detail. Admin-gated (requireAdminPage) for the same reason as the

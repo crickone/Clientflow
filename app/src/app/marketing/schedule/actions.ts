@@ -2,8 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requireAdmin } from "@/lib/auth";
-import { cancelScheduledPost, normalizeChannels, schedulePost } from "@/lib/social/schedule";
+import { getCurrentMembership, requireAdmin } from "@/lib/auth";
+import { getAppBaseUrl } from "@/lib/appUrl";
+import { cancelScheduledPost, normalizeChannels, publishPostNow, schedulePost } from "@/lib/social/schedule";
 import { unscheduleEmailCampaign } from "@/lib/marketing/schedule";
 
 /**
@@ -16,6 +17,7 @@ export type ScheduleActionResult = { ok: true } | { ok: false; error: string };
 function revalidate() {
   revalidatePath("/marketing/schedule");
   revalidatePath("/campaigns");
+  revalidatePath("/content-studio/images/[id]", "page");
 }
 
 export async function schedulePostAction(input: {
@@ -32,6 +34,23 @@ export async function schedulePostAction(input: {
   if (!res.ok) return res;
   revalidate();
   return { ok: true };
+}
+
+/** Post a design to Facebook and/or Instagram now. Admin-only, tenant-scoped. */
+export async function publishPostNowAction(input: { designId: number; channels: string[] }): Promise<ScheduleActionResult> {
+  await requireAdmin();
+  const membership = getCurrentMembership();
+  if (!membership) return { ok: false, error: "No account in context." };
+  const designId = Number(input?.designId);
+  if (!Number.isInteger(designId) || designId <= 0) return { ok: false, error: "Pick a design." };
+  const res = await publishPostNow({
+    tenantId: membership.tenant.id,
+    carouselSetId: designId,
+    channels: normalizeChannels(input?.channels),
+    baseUrl: getAppBaseUrl(),
+  });
+  revalidate();
+  return res.ok ? { ok: true } : { ok: false, error: res.error };
 }
 
 export async function cancelPostAction(id: number): Promise<ScheduleActionResult> {

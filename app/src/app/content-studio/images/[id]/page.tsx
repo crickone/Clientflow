@@ -9,6 +9,9 @@ import { isImageGenConfigured } from "@/lib/ai/image/falClient";
 import { isImageEditConfigured } from "@/lib/ai/image/openaiImageClient";
 import { ImageDesigner } from "@/components/content-studio/ImageDesigner";
 import { getDesignSystem } from "@/lib/design/system";
+import { getCurrentMembership } from "@/lib/auth";
+import { listScheduledPosts } from "@/lib/social/schedule";
+import { isMetaConnected } from "@/lib/social/publisher";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +32,19 @@ export default function ImageDesignPage({
     location: bp.location,
     phone: bp.phone,
   };
+
+  // Scheduling is admin-only (the actions require it), so staff don't see it.
+  const membership = getCurrentMembership();
+  const tenantId = membership?.role === "admin" ? membership.tenant.id : null;
+  const schedule =
+    tenantId != null
+      ? {
+          connected: isMetaConnected(tenantId),
+          bookings: listScheduledPosts({ includeDone: true })
+            .filter((p) => p.carouselSetId === design.id)
+            .map((p) => ({ id: p.id, scheduledFor: p.scheduledFor, status: p.status, error: p.error, channels: p.channels })),
+        }
+      : null;
 
   const slideCount = design.slides.length;
   const subtitle =
@@ -66,6 +82,7 @@ export default function ImageDesignPage({
         initialGenerationStatus={design.generationStatus}
         initialGenerationError={design.generationError}
         initialGenerationStage={design.generationStage}
+        schedule={schedule}
       />
     </>
   );
