@@ -29,7 +29,7 @@ import { conciergeToolSlice } from "@/lib/assistant/tools";
  */
 const LEAD_TOOLS = [
   "list_leads", "get_lead_health", "get_client",
-  "draft_lead_reply", "send_client_email", "send_whatsapp",
+  "draft_lead_reply", "send_client_email", "send_whatsapp", "send_dm_reply",
   "set_lead_stage", "log_lead_touch", "create_calendar_event",
 ] as const;
 

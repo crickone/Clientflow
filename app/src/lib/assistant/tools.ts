@@ -57,6 +57,7 @@ import {
   listLeadsTool,
   logLeadTouchTool,
   sendWhatsappTool,
+  sendDmReplyTool,
   offerSlotsTool,
   bookConsultationTool,
   setLeadStageTool,
@@ -180,6 +181,7 @@ const WRITE_TOOL_META: Record<string, WriteToolMeta> = {
   // auto-execute; deferred to the Approve card like every other write above.
   // The 3 read tools (list_leads, get_lead_health, draft_lead_reply) are absent.
   send_whatsapp: { label: "Send WhatsApp", summarize: ({ v, who }) => `Send a WhatsApp to ${who || `lead #${v("leadId") || "?"}`}${v("text") ? ` — “${v("text")}”` : ""}` },
+  send_dm_reply: { label: "Send DM reply", summarize: ({ v }) => `Reply on Messenger/Instagram to ${v("contactType") || "contact"} #${v("contactId") || "?"}${v("text") ? ` — “${v("text")}”` : ""}` },
   set_lead_stage: { label: "Change lead stage", summarize: ({ v, who }) => `Move ${who || `lead #${v("leadId") || "?"}`} to "${v("stage") || "a new stage"}"` },
   log_lead_touch: { label: "Log lead touch", summarize: ({ v, who }) => `Log a touch for ${who || `lead #${v("leadId") || "?"}`}` },
   // Booking writes an appointment and converts the lead to a client, so it is
@@ -922,6 +924,8 @@ export async function executeTool(
         return await draftLeadReplyTool(ctx, input);
       case "send_whatsapp":
         return await sendWhatsappTool(ctx, input);
+      case "send_dm_reply":
+        return await sendDmReplyTool(ctx, input);
       case "set_lead_stage":
         return setLeadStageTool(ctx, input);
       case "log_lead_touch":

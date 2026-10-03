@@ -9,7 +9,7 @@ import {
   type ConversationDetail,
 } from "@/lib/conversations";
 import { setLeadStatus } from "@/lib/leads";
-import { sendWhatsApp } from "@/lib/whatsapp/send";
+import { sendReply, type ReplyChannel } from "@/lib/messaging/reply";
 import {
   clearConversationDraft,
   retriageConversation,
@@ -141,15 +141,15 @@ export async function loadThreadAction(
   }
 }
 
-/** Send a WhatsApp reply from the inbox to a lead or client. */
+/** Send a reply from the inbox on the channel the contact last wrote on (WhatsApp, Messenger or Instagram). */
 export async function sendInboxMessageAction(
   kind: Kind,
   contactId: number,
   text: string,
-): Promise<{ ok: true; messageId: number } | { ok: false; error: string }> {
+): Promise<{ ok: true; messageId: number; channel: ReplyChannel } | { ok: false; error: string }> {
   try {
     await requireUser();
-    const { messageId } = await sendWhatsApp({
+    const { messageId, channel } = await sendReply({
       subjectType: kind,
       subjectId: contactId,
       text,
@@ -167,11 +167,11 @@ export async function sendInboxMessageAction(
       revalidatePath(`/clients/${contactId}`);
     }
     revalidatePath("/communication");
-    return { ok: true, messageId };
+    return { ok: true, messageId, channel };
   } catch (err) {
     return {
       ok: false,
-      error: err instanceof Error ? err.message : "WhatsApp send failed.",
+      error: err instanceof Error ? err.message : "Send failed.",
     };
   }
 }

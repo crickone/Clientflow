@@ -476,7 +476,7 @@ export const leadMessages = sqliteTable(
       enum: ["outbound", "inbound", "note"],
     }).notNull(),
     channel: text("channel", {
-      enum: ["email", "sms", "whatsapp", "call", "manual", "system"],
+      enum: ["email", "sms", "whatsapp", "messenger", "instagram", "call", "manual", "system"],
     }),
     content: text("content").notNull(),
     aiGenerated: integer("ai_generated", { mode: "boolean" })
@@ -496,6 +496,36 @@ export const leadMessages = sqliteTable(
   (t) => ({ byLead: index("idx_lead_messages_lead").on(t.leadId) }),
 );
 
+/**
+ * A Messenger or Instagram DM sender, linked to the lead or client their
+ * messages thread under. DM senders have no phone or email, so this is how an
+ * inbound DM finds its conversation and how a reply finds its recipient.
+ * `externalId` is Meta's page-scoped id (PSID for Messenger, IGSID for
+ * Instagram), unique per (channel, page). `lastInboundAt` drives Meta's reply
+ * window (24h standard, 7 days for a human reply).
+ */
+export const socialContacts = sqliteTable(
+  "social_contacts",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    channel: text("channel", { enum: ["messenger", "instagram"] }).notNull(),
+    externalId: text("external_id").notNull(),
+    pageId: text("page_id").notNull(),
+    ownerType: text("owner_type", { enum: ["lead", "client"] }).notNull(),
+    ownerId: integer("owner_id").notNull(),
+    name: text("name"),
+    username: text("username"),
+    lastInboundAt: integer("last_inbound_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" })
+      .notNull()
+      .default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => ({
+    byExternal: uniqueIndex("ux_social_contacts_external").on(t.channel, t.externalId, t.pageId),
+    byOwner: index("idx_social_contacts_owner").on(t.ownerType, t.ownerId),
+  }),
+);
+
 /** Conversation messages for clients/members (mirrors lead_messages). */
 export const clientMessages = sqliteTable(
   "client_messages",
@@ -509,7 +539,7 @@ export const clientMessages = sqliteTable(
       enum: ["outbound", "inbound", "note"],
     }).notNull(),
     channel: text("channel", {
-      enum: ["email", "sms", "whatsapp", "call", "manual", "system"],
+      enum: ["email", "sms", "whatsapp", "messenger", "instagram", "call", "manual", "system"],
     }),
     content: text("content").notNull(),
     aiGenerated: integer("ai_generated", { mode: "boolean" })

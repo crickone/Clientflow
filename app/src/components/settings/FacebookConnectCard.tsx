@@ -13,6 +13,7 @@ import { disconnectFacebookPageAction, setPostingPageAction } from "@/app/settin
 // Type-only — lib/facebook/pages.ts is `server-only`; importing just the type
 // keeps it out of this client bundle (mirrors ImapConnectCard / DomainConnectCard).
 import type { FacebookPageRow } from "@/lib/facebook/pages";
+import type { AdAccountRow, GrantInfo } from "@/lib/facebook/grants";
 
 /**
  * "Connect Facebook" — the client OAuth-connects their Page(s) so scheduled
@@ -26,12 +27,16 @@ export function FacebookConnectCard({
   configured,
   pages,
   postingPageId,
+  adAccounts,
+  grant,
   redirectUri,
   webhookUrl,
 }: {
   configured: boolean;
   pages: FacebookPageRow[];
   postingPageId: string | null;
+  adAccounts: AdAccountRow[];
+  grant: GrantInfo | null;
   redirectUri: string;
   webhookUrl: string;
 }) {
@@ -149,6 +154,26 @@ export function FacebookConnectCard({
             </div>
           )}
 
+          {pages.length > 0 && (
+            <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6 }}>
+              <strong style={{ color: "var(--text-primary)" }}>Ad accounts: </strong>
+              {adAccounts.length
+                ? adAccounts
+                    .map((a) => `${a.name ?? a.adAccountId}${a.currency ? ` (${a.currency})` : ""}${a.accountStatus !== null && a.accountStatus !== 1 ? " (needs attention in Ads Manager)" : ""}`)
+                    .join(", ")
+                : "none granted. Reconnect and tick your ad account to run ads from here."}
+              {grant && (
+                <div style={{ color: "var(--text-tertiary)", fontSize: 12 }}>
+                  {grant.kind === "system_user"
+                    ? "Connection does not expire."
+                    : grant.expiresAt
+                      ? `Connection expires ${new Date(grant.expiresAt).toLocaleDateString("en-IE")}; reconnect before then.`
+                      : null}
+                </div>
+              )}
+            </div>
+          )}
+
           <div>
             {/* OAuth redirect — a plain anchor, not a fetch. */}
             <a href="/api/facebook/connect">
@@ -173,7 +198,7 @@ export function FacebookConnectCard({
         <strong style={{ color: "var(--text-secondary)" }}>Meta app config</strong> (one-time, agency side):
         <div style={{ marginTop: 6 }}>OAuth redirect URI:</div>
         <code style={{ wordBreak: "break-all" }}>{redirectUri}</code>
-        <div style={{ marginTop: 6 }}>Leadgen webhook URL:</div>
+        <div style={{ marginTop: 6 }}>Webhook callback URL (Page and Instagram objects):</div>
         <code style={{ wordBreak: "break-all" }}>{webhookUrl}</code>
         <div style={{ marginTop: 6 }}>
           Verify token: the <code>FACEBOOK_WEBHOOK_VERIFY_TOKEN</code> you set on the deploy.

@@ -9,6 +9,7 @@ import { currentStageRecord, setStageToId } from "@/lib/pipeline/stage";
 import { listStages, listAllStagesOnConn } from "@/lib/pipeline/stageRepo";
 import { leadPipelineId } from "@/lib/pipeline/pipelineRepo";
 import { sendWhatsApp } from "@/lib/whatsapp/send";
+import { sendDm } from "@/lib/social/dm";
 import { draftFollowup } from "@/lib/ai/draftFollowup";
 import { offerableSlots } from "@/lib/scheduling/availability";
 import { bookConsultation } from "@/lib/scheduling/bookConsultation";
@@ -86,6 +87,20 @@ export const SALES_TOOLS: Anthropic.Tool[] = [
         text: { type: "string", description: "The message body to send, exactly as it will be sent." },
       },
       required: ["leadId", "text"],
+    },
+  },
+  {
+    name: "send_dm_reply",
+    description:
+      "Reply to a lead's or client's Facebook Messenger or Instagram DM conversation (whichever they last wrote on). Meta only allows replies: within 24 hours of their last message, or up to 7 days for a reply a person has approved; after that it fails until they write again. ONLY call this when the user has explicitly asked to SEND, with the exact text shown first.",
+    input_schema: {
+      type: "object",
+      properties: {
+        contactType: { type: "string", enum: ["lead", "client"], description: "Whether the contact is a lead or a client." },
+        contactId: { type: "integer", description: "The lead's or client's id." },
+        text: { type: "string", description: "The message body to send, exactly as it will be sent." },
+      },
+      required: ["contactType", "contactId", "text"],
     },
   },
   {
@@ -306,6 +321,21 @@ export async function sendWhatsappTool(ctx: ToolContext, input: Record<string, u
   try {
     await sendWhatsApp({ subjectType: "lead", subjectId: leadId, text, aiGenerated: true });
     return { text: JSON.stringify({ result: "WhatsApp message sent." }) };
+  } catch (e) { return { text: JSON.stringify({ error: e instanceof Error ? e.message : "Send failed." }) }; }
+}
+
+/**
+ * WRITE — reply on the contact's Messenger / Instagram conversation. Runs only
+ * after the operator approved the exact text, so it counts as a person's reply
+ * for Meta's 7-day human-agent window.
+ */
+export async function sendDmReplyTool(ctx: ToolContext, input: Record<string, unknown>): Promise<ToolResult> {
+  const contactType = input.contactType === "client" ? "client" : "lead";
+  const contactId = Number(input.contactId), text = String(input.text || "").trim();
+  if (!contactId || !text) return { text: JSON.stringify({ error: "contactId and text are required." }) };
+  try {
+    const sent = await sendDm({ subjectType: contactType, subjectId: contactId, text });
+    return { text: JSON.stringify({ result: `${sent.channel === "messenger" ? "Messenger" : "Instagram"} reply sent.` }) };
   } catch (e) { return { text: JSON.stringify({ error: e instanceof Error ? e.message : "Send failed." }) }; }
 }
 

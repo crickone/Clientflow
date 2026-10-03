@@ -33,6 +33,8 @@ export function ConversationThread({
   onSend,
   emptyHint = "No messages yet.",
   seedText,
+  channelLabel = "WhatsApp",
+  note,
 }: {
   messages: ThreadMessage[];
   canSend: boolean;
@@ -40,6 +42,10 @@ export function ConversationThread({
   onSend: (text: string) => void;
   emptyHint?: string;
   seedText?: string;
+  /** The channel the reply goes out on, for the placeholder and button. */
+  channelLabel?: string;
+  /** Shown under the composer: why sending is off, or a channel caveat. */
+  note?: string | null;
 }) {
   const [text, setText] = useState("");
   // Lets the parent drop an AI draft into the composer ("Edit" on the draft banner).
@@ -136,14 +142,17 @@ export function ConversationThread({
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder={
-            canSend ? "Type a WhatsApp message…" : "No phone number on file."
+            canSend ? `Type a ${channelLabel} message…` : note ?? "No phone number on file."
           }
           disabled={!canSend}
         />
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 12, marginTop: 10 }}>
+          {note && (
+            <span style={{ marginRight: "auto", fontSize: 12.5, color: "var(--text-tertiary)", lineHeight: 1.5 }}>{note}</span>
+          )}
           <Button onClick={send} disabled={!canSend || sending || !text.trim()}>
             <Send size={14} />
-            {sending ? "Sending…" : "Send WhatsApp"}
+            {sending ? "Sending…" : `Send ${channelLabel}`}
           </Button>
         </div>
       </Card>

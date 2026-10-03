@@ -30,7 +30,7 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
   {
     key: "messaging",
     label: "Messaging",
-    tools: ["list_recent_messages", "search_messages", "send_client_email", "send_whatsapp", "send_client_whatsapp"],
+    tools: ["list_recent_messages", "search_messages", "send_client_email", "send_whatsapp", "send_client_whatsapp", "send_dm_reply"],
   },
   {
     key: "clients",

@@ -13,7 +13,7 @@ function fmt(ts: number): string {
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}, ${hh}:${mm}`;
 }
 
-/** Read-only merged activity feed (emails + WhatsApp), newest first. */
+/** Read-only merged activity feed (emails + WhatsApp / Messenger / Instagram), newest first. */
 export function CombinedFeed({ items }: { items: CombinedItem[] }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

@@ -96,6 +96,34 @@ export function getFacebookPageByPageId(pageId: string): ResolvedPage | null {
   return { tenantId: row.tenant_id, pageAccessToken: row.page_access_token, pageName: row.page_name };
 }
 
+export interface MessagingPage {
+  tenantId: number;
+  pageId: string;
+  pageAccessToken: string;
+}
+
+/**
+ * Webhook resolution for a DM: Messenger events name the Page, Instagram events
+ * name the Instagram account linked to a Page. Live connections only.
+ */
+export function getPageForMessagingAccount(channel: "messenger" | "instagram", accountId: string): MessagingPage | null {
+  const column = channel === "messenger" ? "page_id" : "ig_user_id";
+  const row = controlSqlite
+    .prepare(
+      `SELECT tenant_id, page_id, page_access_token FROM facebook_pages WHERE ${column} = ? AND revoked_at IS NULL AND page_access_token != ''`,
+    )
+    .get(accountId) as { tenant_id: number; page_id: string; page_access_token: string } | undefined;
+  return row ? { tenantId: row.tenant_id, pageId: row.page_id, pageAccessToken: row.page_access_token } : null;
+}
+
+/** A connected Page's token for sending a DM, scoped to the tenant (server-only). */
+export function getPageTokenForTenant(tenantId: number, pageId: string): string | null {
+  const row = controlSqlite
+    .prepare("SELECT page_access_token FROM facebook_pages WHERE tenant_id = ? AND page_id = ? AND revoked_at IS NULL AND page_access_token != ''")
+    .get(tenantId, pageId) as { page_access_token: string } | undefined;
+  return row?.page_access_token ?? null;
+}
+
 export interface FacebookPageRow {
   pageId: string;
   pageName: string | null;

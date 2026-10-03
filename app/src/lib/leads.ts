@@ -194,7 +194,7 @@ export function getLeadMessages(leadId: number): LeadMessage[] {
 export function addMessage(input: {
   leadId: number;
   direction: "outbound" | "inbound" | "note";
-  channel?: "email" | "sms" | "whatsapp" | "call" | "manual" | "system" | null;
+  channel?: "email" | "sms" | "whatsapp" | "messenger" | "instagram" | "call" | "manual" | "system" | null;
   content: string;
   aiGenerated?: boolean;
   providerMessageId?: string | null;

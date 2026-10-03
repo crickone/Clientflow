@@ -6,7 +6,7 @@ import { listConversations } from "@/lib/conversations";
 
 export type CombinedItem = {
   id: string;
-  kind: "email" | "whatsapp";
+  kind: "email" | "whatsapp" | "messenger" | "instagram";
   title: string;
   subtitle: string;
   snippet: string;
@@ -16,7 +16,9 @@ export type CombinedItem = {
   direction: string;
 };
 
-/** Emails (if Gmail connected) + WhatsApp conversations, merged newest-first. */
+const CHANNEL_SUBTITLE = { whatsapp: "WhatsApp", messenger: "Messenger", instagram: "Instagram" } as const;
+
+/** Emails (if Gmail connected) + WhatsApp / Messenger / Instagram conversations, merged newest-first. */
 export function listCombinedFeed(): CombinedItem[] {
   const items: CombinedItem[] = [];
   const gmail = getGmailConnection(getCurrentTenant().id);
@@ -38,11 +40,12 @@ export function listCombinedFeed(): CombinedItem[] {
   }
 
   for (const c of listConversations()) {
+    const kind = c.channel === "messenger" || c.channel === "instagram" ? c.channel : "whatsapp";
     items.push({
       id: `wa-${c.kind}-${c.contactId}`,
-      kind: "whatsapp",
+      kind,
       title: c.name,
-      subtitle: "WhatsApp",
+      subtitle: CHANNEL_SUBTITLE[kind],
       snippet: c.lastMessage,
       at: c.lastAt.getTime(),
       href: c.href,

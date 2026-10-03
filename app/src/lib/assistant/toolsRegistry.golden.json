@@ -55,6 +55,7 @@
     "create_form",
     "upload_invoices_to_drive",
     "send_whatsapp",
+    "send_dm_reply",
     "set_lead_stage",
     "log_lead_touch",
     "book_consultation",
@@ -246,6 +247,10 @@
     "publish_website_page": [
       "Put a page live on the website",
       "Put a page live on the website"
+    ],
+    "send_dm_reply": [
+      "Reply on Messenger/Instagram to contact #? — “Hi there”",
+      "Reply on Messenger/Instagram to contact #?"
     ]
   },
   "readSamplesAllFalse": [

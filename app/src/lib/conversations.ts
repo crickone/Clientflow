@@ -10,6 +10,8 @@ import {
   conversationTags,
 } from "./db/schema";
 import type { ThreadMessage } from "@/components/messaging/ConversationThread";
+import { lastInboundChannel, type ReplyChannel } from "@/lib/messaging/reply";
+import { getDmTarget } from "@/lib/social/dm";
 
 export interface ConvTag {
   label: string;
@@ -186,6 +188,37 @@ export function listConversations(): ConversationSummary[] {
   return out;
 }
 
+/** Which channel a reply would use and whether Meta / the bridge would allow it now. */
+function replyState(
+  kind: "lead" | "client",
+  contactId: number,
+  hasPhone: boolean,
+): Pick<ConversationDetail, "replyChannel" | "canReply" | "replyNote"> {
+  const channel = lastInboundChannel(kind, contactId);
+  if (channel === "messenger" || channel === "instagram") {
+    const target = getDmTarget(kind, contactId);
+    const label = channel === "messenger" ? "Messenger" : "Instagram";
+    if (!target || target.window === "closed") {
+      return {
+        replyChannel: channel,
+        canReply: false,
+        replyNote: `${label} only allows replies within 7 days of the customer's last message. You can reply once they write again.`,
+      };
+    }
+    return {
+      replyChannel: channel,
+      canReply: true,
+      replyNote:
+        target.window === "human_only"
+          ? `More than 24 hours since their last message: ${label} allows a reply from a person for up to 7 days, but no automatic replies.`
+          : null,
+    };
+  }
+  return hasPhone
+    ? { replyChannel: "whatsapp", canReply: true, replyNote: null }
+    : { replyChannel: null, canReply: false, replyNote: "No phone number on file for this contact." };
+}
+
 export interface ConversationDetail {
   kind: "lead" | "client";
   contactId: number;
@@ -193,6 +226,12 @@ export interface ConversationDetail {
   href: string;
   phone: string | null;
   hasPhone: boolean;
+  /** The channel a reply goes out on (the one the contact last wrote on), or null when there is none. */
+  replyChannel: ReplyChannel | null;
+  /** Whether a reply can be sent right now. */
+  canReply: boolean;
+  /** Why not, or a caveat (e.g. Meta's reply window), shown under the composer. */
+  replyNote: string | null;
   messages: ThreadMessage[];
   /** Triage of the latest inbound message — drives the pane header. */
   aiCategory: string | null;
@@ -285,6 +324,7 @@ export function getConversationThread(
       href: `/leads/${contactId}`,
       phone: lead.phone,
       hasPhone: !!lead.phone,
+      ...replyState(kind, contactId, !!lead.phone),
       messages: toThread(rows),
       ...triageOf(rows),
     };
@@ -305,6 +345,7 @@ export function getConversationThread(
     href: `/clients/${contactId}`,
     phone: client.phone,
     hasPhone: !!client.phone,
+    ...replyState(kind, contactId, !!client.phone),
     messages: toThread(rows),
     ...triageOf(rows),
   };

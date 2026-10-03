@@ -28,6 +28,12 @@ import type {
 } from "@/lib/conversations";
 import { relativeTime, initialsOf } from "@/lib/utils";
 
+const CHANNEL_LABELS: Record<"whatsapp" | "messenger" | "instagram", string> = {
+  whatsapp: "WhatsApp",
+  messenger: "Messenger",
+  instagram: "Instagram",
+};
+
 const CATEGORY_META: Record<string, { label: string; color: string }> = {
   new_lead: { label: "New lead", color: "#3fb950" },
   booking: { label: "Booking", color: "#58a6ff" },
@@ -154,7 +160,7 @@ export function InboxClient({
       const sent: ThreadMessage = {
         id: res.messageId,
         direction: "outbound",
-        channel: "whatsapp",
+        channel: res.channel,
         content: text,
         status: "sent",
         sentAt: now,
@@ -174,13 +180,13 @@ export function InboxClient({
                 lastMessage: text,
                 lastDirection: "outbound" as const,
                 lastAt: now,
-                channel: "whatsapp",
+                channel: res.channel,
                 needsAttention: false,
               }
             : c,
         ),
       );
-      toast.success(fromDraft ? "AI reply approved & sent." : "Sent via WhatsApp.");
+      toast.success(fromDraft ? "AI reply approved & sent." : `Sent via ${CHANNEL_LABELS[res.channel]}.`);
     });
   }
 
@@ -665,7 +671,7 @@ export function InboxClient({
                         >
                           <Button
                             size="sm"
-                            disabled={!detail.hasPhone || sending}
+                            disabled={!detail.canReply || sending}
                             onClick={() => handleSend(detail.draft!.text, true)}
                           >
                             <Check size={14} /> Approve &amp; send
@@ -693,14 +699,16 @@ export function InboxClient({
 
                     <ConversationThread
                       messages={detail.messages}
-                      canSend={detail.hasPhone}
+                      canSend={detail.canReply}
                       sending={sending}
                       onSend={handleSend}
                       seedText={seedText}
+                      channelLabel={detail.replyChannel ? CHANNEL_LABELS[detail.replyChannel] : "WhatsApp"}
+                      note={detail.replyNote}
                       emptyHint={
-                        detail.hasPhone
-                          ? "No messages yet. Send a WhatsApp to start the conversation."
-                          : "No messages yet. No phone number on file for this contact."
+                        detail.canReply
+                          ? `No messages yet. Send a ${detail.replyChannel ? CHANNEL_LABELS[detail.replyChannel] : "WhatsApp"} to start the conversation.`
+                          : `No messages yet. ${detail.replyNote ?? ""}`.trim()
                       }
                     />
                   </div>

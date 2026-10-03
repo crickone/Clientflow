@@ -8,7 +8,7 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
 
-import { verifyFacebookSignature, parseLeadgenEvents } from "./webhook";
+import { verifyFacebookSignature, parseLeadgenEvents, parseMessagingEvents } from "./webhook";
 
 let passed = 0;
 function check(name: string, cond: boolean) {
@@ -69,5 +69,33 @@ check(
 check("null payload -> []", parseLeadgenEvents(null).length === 0);
 check("no entry array -> []", parseLeadgenEvents({}).length === 0);
 check("entry not an array -> []", parseLeadgenEvents({ entry: "nope" }).length === 0);
+
+// ── parseMessagingEvents (Messenger + Instagram DMs) ──
+{
+  const messenger = parseMessagingEvents({
+    object: "page",
+    entry: [{ id: "PAGE1", messaging: [
+      { sender: { id: "PSID1" }, recipient: { id: "PAGE1" }, timestamp: 1700000000000, message: { mid: "m1", text: " Hi there " } },
+      { sender: { id: "PAGE1" }, recipient: { id: "PSID1" }, timestamp: 1700000001000, message: { mid: "m2", text: "Reply", is_echo: true } },
+      { sender: { id: "PSID1" }, recipient: { id: "PAGE1" }, timestamp: 1700000002000, read: { watermark: 1 } },
+      { sender: { id: "PSID1" }, recipient: { id: "PAGE1" }, timestamp: 1700000003000, message: { mid: "m3", attachments: [{ type: "image" }] } },
+    ] }],
+  });
+  check("messenger: reads are skipped, 3 messages kept", messenger.length === 3);
+  check("messenger: channel + account + customer", messenger[0].channel === "messenger" && messenger[0].accountId === "PAGE1" && messenger[0].customerId === "PSID1");
+  check("messenger: text is trimmed", messenger[0].text === "Hi there");
+  check("echo: customer is the recipient", messenger[1].isEcho && messenger[1].customerId === "PSID1");
+  check("attachment-only message gets a placeholder", messenger[2].text === "[Photo]");
+
+  const ig = parseMessagingEvents({
+    object: "instagram",
+    entry: [{ id: "IG1", messaging: [{ sender: { id: "IGSID1" }, recipient: { id: "IG1" }, timestamp: 5, message: { mid: "i1", text: "yo" } }] }],
+  });
+  check("instagram: channel + account", ig.length === 1 && ig[0].channel === "instagram" && ig[0].accountId === "IG1");
+  check("deleted message is skipped", parseMessagingEvents({ object: "instagram", entry: [{ id: "IG1", messaging: [{ sender: { id: "a" }, message: { mid: "x", is_deleted: true } }] }] }).length === 0);
+  check("leadgen payload yields no messages", parseMessagingEvents({ object: "page", entry: [{ id: "P", changes: [{ field: "leadgen" }] }] }).length === 0);
+  check("unknown object -> []", parseMessagingEvents({ object: "user", entry: [] }).length === 0);
+  check("garbage never throws", parseMessagingEvents("nope").length === 0 && parseMessagingEvents(null).length === 0);
+}
 
 console.log(`\nfacebook/webhook.test.ts: ${passed} checks passed.`);

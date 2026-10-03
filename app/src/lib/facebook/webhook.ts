@@ -67,6 +67,67 @@ export function parseLeadgenEvents(payload: unknown): LeadgenChange[] {
   return out;
 }
 
+export interface MessagingEvent {
+  /** "messenger" for a Page conversation, "instagram" for an Instagram DM. */
+  channel: "messenger" | "instagram";
+  /** entry.id: the Page id (Messenger) or the Instagram account id (Instagram). */
+  accountId: string;
+  /** The customer's page-scoped id (PSID / IGSID). For an echo, the recipient. */
+  customerId: string;
+  /** True when the business sent it (our API, Business Suite, the Instagram app). */
+  isEcho: boolean;
+  messageId: string;
+  text: string;
+  timestamp: number;
+}
+
+/**
+ * Parse Messenger / Instagram messaging webhooks: `{ object: "page"|"instagram",
+ * entry: [{ id, messaging: [{ sender:{id}, recipient:{id}, timestamp,
+ * message:{ mid, text, is_echo, attachments } }] }] }`. A message with no text
+ * (a photo, a sticker, a story reply) becomes a short placeholder so the
+ * conversation still shows something arrived. Reactions, reads and deliveries
+ * carry no `message` and are skipped. Never throws.
+ */
+export function parseMessagingEvents(payload: unknown): MessagingEvent[] {
+  const out: MessagingEvent[] = [];
+  const object = prop(payload, "object");
+  if (object !== "page" && object !== "instagram") return out;
+  const channel = object === "page" ? "messenger" : "instagram";
+  const entries = prop(payload, "entry");
+  if (!Array.isArray(entries)) return out;
+  for (const entry of entries) {
+    const accountId = str(prop(entry, "id"));
+    const messaging = prop(entry, "messaging");
+    if (!accountId || !Array.isArray(messaging)) continue;
+    for (const ev of messaging) {
+      const message = prop(ev, "message");
+      if (!message || typeof message !== "object") continue;
+      const messageId = str(prop(message, "mid"));
+      if (!messageId || prop(message, "is_deleted") === true) continue;
+      const isEcho = prop(message, "is_echo") === true;
+      const customerId = str(prop(isEcho ? prop(ev, "recipient") : prop(ev, "sender"), "id"));
+      if (!customerId) continue;
+      let text = str(prop(message, "text")).trim();
+      if (!text) {
+        const attachments = prop(message, "attachments");
+        const type = Array.isArray(attachments) ? str(prop(attachments[0], "type")) : "";
+        text = type ? `[${type === "image" ? "Photo" : type.charAt(0).toUpperCase() + type.slice(1)}]` : "[Attachment]";
+      }
+      out.push({
+        channel,
+        accountId,
+        customerId,
+        isEcho,
+        messageId,
+        text,
+        timestamp: toFiniteNumber(prop(ev, "timestamp")) ?? Date.now(),
+      });
+    }
+  }
+  return out;
+}
+
 // ── tiny unknown-payload guards (mirror mailgun.ts / whapi.ts) ──
 function prop(obj: unknown, key: string): unknown {
   return obj && typeof obj === "object" ? (obj as Record<string, unknown>)[key] : undefined;

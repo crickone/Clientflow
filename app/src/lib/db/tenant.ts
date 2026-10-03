@@ -2117,6 +2117,25 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     console.error("[db] lead_messages whatsapp-cols migration failed:", err);
   }
 
+  // Messenger / Instagram DM senders -> the lead or client they thread under
+  // (schema.ts socialContacts). Additive; idempotent.
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS social_contacts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      channel TEXT NOT NULL,
+      external_id TEXT NOT NULL,
+      page_id TEXT NOT NULL,
+      owner_type TEXT NOT NULL,
+      owner_id INTEGER NOT NULL,
+      name TEXT,
+      username TEXT,
+      last_inbound_at INTEGER,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS ux_social_contacts_external ON social_contacts(channel, external_id, page_id);
+    CREATE INDEX IF NOT EXISTS idx_social_contacts_owner ON social_contacts(owner_type, owner_id);
+  `);
+
   // Conversation messages for clients (mirrors lead_messages).
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS client_messages (

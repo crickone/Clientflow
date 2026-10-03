@@ -22,7 +22,7 @@ import {
   decideAutoReply,
   type AutoReplyDecision,
 } from "@/lib/inbox/autoReplyDecision";
-import { sendWhatsApp } from "@/lib/whatsapp/send";
+import { sendReply } from "@/lib/messaging/reply";
 import { logActivity } from "@/lib/queries";
 
 export type OwnerType = "lead" | "client";
@@ -247,12 +247,13 @@ async function runTriageBound(
 
   applyTags(ownerType, ownerId, triage.tags);
 
-  // Auto-send path: send the grounded reply now. sendWhatsApp throws on any
+  // Auto-send path: send the grounded reply now, on the channel the contact
+  // wrote on (lib/messaging/reply). It throws on any
   // failure (no phone, bridge down, provider reject) — in that case we leave the
   // message as a draft so nothing is lost and the operator can send manually.
   if (decision === "auto_send" && triage.suggestedReply) {
     try {
-      await sendWhatsApp({
+      await sendReply({
         subjectType: ownerType,
         subjectId: ownerId,
         text: triage.suggestedReply,
