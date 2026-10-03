@@ -207,47 +207,96 @@ export async function dispatchDueScheduledPosts(tenantId: number, baseUrl: strin
 
   let posted = 0;
   for (const row of due) {
-    tdb.update(schema.scheduledPosts)
-      .set({ status: "posting", lastAttemptAt: new Date(now), error: null })
-      .where(eq(schema.scheduledPosts.id, row.id))
-      .run();
-
-    const { filenames, caption } = postableRenders(row.carouselSetId);
-    if (filenames.length === 0) {
-      tdb.update(schema.scheduledPosts)
-        .set({ status: "failed", error: "This design has no rendered slides to post (open it in Content Studio and generate it)." })
-        .where(eq(schema.scheduledPosts.id, row.id))
-        .run();
-      continue;
-    }
-    if (!renderTokensConfigured()) {
-      tdb.update(schema.scheduledPosts)
-        .set({ status: "failed", error: "Posting is not configured on the server (SOCIAL_TOKEN_SECRET or EMAIL_TOKEN_SECRET missing)." })
-        .where(eq(schema.scheduledPosts.id, row.id))
-        .run();
-      continue;
-    }
-    const imageUrls = filenames.map((f) => `${baseUrl}/api/social/render/${encodeURIComponent(signRenderToken({ tenantId, filename: f })!)}`);
-
-    let result;
-    try {
-      result = await publisher.publish({ channels: parseChannels(row.channels), caption, imageUrls });
-    } catch (err) {
-      result = { ok: false as const, error: err instanceof Error ? err.message : "Posting failed." };
-    }
-
-    if (result.ok) {
-      tdb.update(schema.scheduledPosts)
-        .set({ status: "posted", postedAt: new Date(), externalRefs: JSON.stringify(result.refs), error: result.warning ?? null })
-        .where(eq(schema.scheduledPosts.id, row.id))
-        .run();
-      posted++;
-    } else {
-      tdb.update(schema.scheduledPosts)
-        .set({ status: "failed", error: result.error })
-        .where(eq(schema.scheduledPosts.id, row.id))
-        .run();
-    }
+    if ((await publishRow(tdb, row, tenantId, baseUrl, publisher, now)).ok) posted++;
   }
   return posted;
+}
+
+type Publisher = NonNullable<ReturnType<typeof getSocialPublisher>>;
+type TenantDb = ReturnType<typeof getTenantDbById>;
+
+/**
+ * Post one scheduled_posts row through the publisher and record the outcome on
+ * it. Shared by the minute ticker and publish-now, so a post sent from the chat
+ * takes exactly the path a scheduled one does and lands in the same history.
+ */
+async function publishRow(
+  tdb: TenantDb,
+  row: schema.ScheduledPost,
+  tenantId: number,
+  baseUrl: string,
+  publisher: Publisher,
+  now: number,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  tdb.update(schema.scheduledPosts)
+    .set({ status: "posting", lastAttemptAt: new Date(now), error: null })
+    .where(eq(schema.scheduledPosts.id, row.id))
+    .run();
+
+  const fail = (error: string) => {
+    tdb.update(schema.scheduledPosts).set({ status: "failed", error }).where(eq(schema.scheduledPosts.id, row.id)).run();
+    return { ok: false as const, error };
+  };
+
+  const { filenames, caption } = postableRenders(row.carouselSetId);
+  if (filenames.length === 0) return fail("This design has no rendered slides to post (open it in Content Studio and generate it).");
+  if (!renderTokensConfigured()) return fail("Posting is not configured on the server (SOCIAL_TOKEN_SECRET or EMAIL_TOKEN_SECRET missing).");
+  const imageUrls = filenames.map((f) => `${baseUrl}/api/social/render/${encodeURIComponent(signRenderToken({ tenantId, filename: f })!)}`);
+
+  let result;
+  try {
+    result = await publisher.publish({ channels: parseChannels(row.channels), caption, imageUrls });
+  } catch (err) {
+    result = { ok: false as const, error: err instanceof Error ? err.message : "Posting failed." };
+  }
+  if (!result.ok) return fail(result.error);
+
+  tdb.update(schema.scheduledPosts)
+    .set({ status: "posted", postedAt: new Date(), externalRefs: JSON.stringify(result.refs), error: result.warning ?? null })
+    .where(eq(schema.scheduledPosts.id, row.id))
+    .run();
+  return { ok: true };
+}
+
+/**
+ * Publish a finished design to Facebook and/or Instagram NOW, for the ambient
+ * tenant (runs inside runWithTenant). Recorded as a scheduled_posts row due
+ * this minute, so it shows in the Schedule history with its outcome like any
+ * other post. Refuses up front, with the reason, whatever the ticker would
+ * only discover later: no design, still writing, nothing rendered, posting
+ * stopped, no connected Page.
+ */
+export async function publishPostNow(input: {
+  tenantId: number;
+  carouselSetId: number;
+  channels?: SocialChannel[];
+  campaignId?: number | null;
+  baseUrl: string;
+}): Promise<ScheduleResult> {
+  const carousel = getCarousel(input.carouselSetId);
+  if (!carousel) return { ok: false, error: "No design with that id." };
+  if (carousel.generationStatus === "writing") return { ok: false, error: "This design is still being written. Publish it once it is ready." };
+  if (postableRenders(input.carouselSetId).filenames.length === 0) {
+    return { ok: false, error: "This design has no rendered slides, so it can't be posted automatically. Make the post with Adonis, or export it and post it yourself." };
+  }
+  if (isStopped("posting")) return { ok: false, error: PLATFORM_PAUSED_MESSAGE };
+  const publisher = getSocialPublisher(input.tenantId);
+  if (!publisher) return { ok: false, error: NOT_CONNECTED_MESSAGE };
+
+  const tdb = getTenantDbById(input.tenantId);
+  const now = Date.now();
+  const row = tdb
+    .insert(schema.scheduledPosts)
+    .values({
+      carouselSetId: input.carouselSetId,
+      campaignId: input.campaignId ?? null,
+      channels: JSON.stringify(input.channels?.length ? input.channels : ALL_CHANNELS),
+      scheduledFor: new Date(now),
+    })
+    .returning()
+    .get();
+  const out = await publishRow(tdb, row, input.tenantId, input.baseUrl, publisher, now);
+  const after = tdb.select().from(schema.scheduledPosts).where(eq(schema.scheduledPosts.id, row.id)).get() ?? row;
+  const view = toView(after, carousel.name, carousel.slides.length);
+  return out.ok ? { ok: true, post: view } : { ok: false, error: out.error };
 }

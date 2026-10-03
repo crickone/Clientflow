@@ -66,6 +66,7 @@
     "launch_campaign",
     "create_social_post",
     "schedule_social_post",
+    "publish_social_post",
     "schedule_email_campaign",
     "edit_website_text",
     "replace_website_image",
@@ -271,6 +272,10 @@
     "set_ad_budget": [
       "Set ad set 1 of ad campaign #4 to ? a day",
       "Set ad set 1 of ad campaign #? to ? a day"
+    ],
+    "publish_social_post": [
+      "Post \"Sample Name\" to social now",
+      "Post design #? to social now"
     ]
   },
   "readSamplesAllFalse": [

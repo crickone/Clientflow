@@ -6,7 +6,8 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getCampaign as getEmailCampaign, listCampaigns as listEmailCampaigns } from "@/lib/marketing/campaigns";
 import { scheduleEmailCampaign, unscheduleEmailCampaign, listScheduledEmailCampaigns } from "@/lib/marketing/schedule";
-import { cancelScheduledPost, listScheduledPosts, normalizeChannels, schedulePost } from "@/lib/social/schedule";
+import { cancelScheduledPost, listScheduledPosts, normalizeChannels, publishPostNow, schedulePost } from "@/lib/social/schedule";
+import { getAppBaseUrl } from "@/lib/appUrl";
 import { isMetaConnected } from "@/lib/social/publisher";
 import { getCarousel } from "@/lib/image/carousels";
 import { getSiteBlogPost, listSiteBlogPosts, setPublishState } from "@/lib/cms/blog";
@@ -18,6 +19,7 @@ import type { ToolContext, ToolResult } from "@/lib/agents/toolKit";
  * operator approved, see what is booked, cancel a booking.
  *
  *   schedule_social_post    WRITE  a Content Studio design -> scheduled_posts
+ *   publish_social_post     WRITE  the same, posted NOW (recorded in the schedule history)
  *                                  (lib/social/schedule). Posts when the Meta
  *                                  connection exists; waits, labelled, until
  *                                  then.
@@ -106,6 +108,21 @@ export const SCHEDULE_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "publish_social_post",
+    description:
+      "Post a finished Content Studio post (from create_social_post / list_social_posts) to Facebook and/or Instagram RIGHT NOW through the business's connected Page and its linked Instagram. Use it only when the operator asks for the post to go out now; for any later time use schedule_social_post. The post must show postable: true in list_social_posts. The result says whether it went out; it is recorded in the schedule history either way.",
+    input_schema: {
+      type: "object",
+      properties: {
+        postId: { type: "integer", description: "The design's id (list_social_posts / create_social_post)." },
+        channels: { type: "array", items: { type: "string", enum: ["facebook", "instagram"] }, description: "Default both." },
+        campaignId: { type: "integer", description: "Optional: the campaign this post belongs to." },
+        name: { type: "string", description: "Optional: the post's name, purely for the approval card." },
+      },
+      required: ["postId"],
+    },
+  },
+  {
     name: "schedule_email_campaign",
     description:
       "Book an email campaign draft (e.g. one of a launched campaign kit's three emails, ids from launch_campaign; or any draft in Email campaigns) to send at a date and time. At that time the real send runs with its usual checks (verified sending domain, credits, audience); if a check fails the campaign goes back to draft with the reason recorded. Only schedule a send the operator has approved the time for.",
@@ -182,6 +199,30 @@ export function scheduleSocialPostTool(ctx: ToolContext, input: Record<string, u
       scheduledFor: new Date(res.post.scheduledFor).toISOString(),
       channels: res.post.channels,
       postingConnected: connected,
+    }),
+  };
+}
+
+/** WRITE -- post a finished design now. Approve-gated. */
+export async function publishSocialPostTool(ctx: ToolContext, input: Record<string, unknown>): Promise<ToolResult> {
+  const postId = Number(input.postId);
+  if (!postId) return { text: JSON.stringify({ error: "postId is required." }) };
+  const campaignIdArg = Number(input.campaignId);
+  const res = await publishPostNow({
+    tenantId: ctx.tenantId,
+    carouselSetId: postId,
+    channels: normalizeChannels(input.channels),
+    campaignId: Number.isInteger(campaignIdArg) && campaignIdArg > 0 ? campaignIdArg : null,
+    baseUrl: getAppBaseUrl(),
+  });
+  if (!res.ok) return { text: JSON.stringify({ error: `Not posted: ${res.error}` }) };
+  return {
+    text: JSON.stringify({
+      result: `Posted "${res.post.designName}" to ${res.post.channels.join(" and ")}.${res.post.error ? ` Note: ${res.post.error}` : ""}`,
+      scheduledPostId: res.post.id,
+      postId,
+      channels: res.post.channels,
+      status: res.post.status,
     }),
   };
 }

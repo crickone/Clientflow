@@ -86,6 +86,7 @@ import {
   scheduleEmailCampaignTool,
   scheduleBlogPostTool,
   scheduleSocialPostTool,
+  publishSocialPostTool,
 } from "@/lib/agents/tools.schedule";
 import {
   ADS_TOOLS,
@@ -230,6 +231,7 @@ const WRITE_TOOL_META: Record<string, WriteToolMeta> = {
   // business to a time, and cancelling undoes a commitment, so all three are
   // gated. list_schedule is a read.
   schedule_social_post: { label: "Schedule social post", summarize: ({ v }) => { const when = parseWhen(v("when")); return `Schedule ${v("name") ? `"${v("name")}"` : `post #${v("postId") || "?"}`} to go out${when ? ` on ${formatDublin(when.getTime())}` : " on social"}`; } },
+  publish_social_post: { label: "Publish social post now", summarize: ({ v }) => `Post ${v("name") ? `"${v("name")}"` : `design #${v("postId") || "?"}`} to social now` },
   schedule_email_campaign: { label: "Schedule email send", summarize: ({ v }) => { const when = parseWhen(v("when")); return `Send ${v("name") ? `"${v("name")}"` : `email campaign #${v("emailCampaignId") || "?"}`}${when ? ` on ${formatDublin(when.getTime())}` : " at the scheduled time"}`; } },
   edit_website_text: { label: "Edit website text", summarize: ({ v }) => `Change wording on ${v("path") || "a page"}: "${(v("find") || "").slice(0, 40)}" -> "${(v("replace") || "").slice(0, 40)}"` },
   replace_website_image: { label: "Replace website image", summarize: ({ v }) => `Replace an image on ${v("path") || "a page"} with ${v("source") === "content-studio" ? "Content Studio" : "website"} image #${v("imageId") || "?"}` },
@@ -986,6 +988,8 @@ export async function executeTool(
         return await exportSocialPostsTool(ctx, input);
       case "schedule_social_post":
         return scheduleSocialPostTool(ctx, input);
+      case "publish_social_post":
+        return await publishSocialPostTool(ctx, input);
       case "schedule_email_campaign":
         return scheduleEmailCampaignTool(ctx, input);
       case "schedule_blog_post":

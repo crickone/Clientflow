@@ -10,6 +10,7 @@ import { createCarousel, getCarousel, listCarousels, type CarouselWithSlides } f
 import { enqueueCarouselGeneration } from "@/lib/image/carouselGeneration";
 import { renderFilePath } from "@/lib/image/renderStore";
 import { DEFAULT_CAROUSEL_SLOT, DEFAULT_SLOT, isCarouselSlot } from "@/lib/image/slots";
+import { getDesignSystem } from "@/lib/design/system";
 import type { ToolContext, ToolResult } from "@/lib/agents/toolKit";
 
 /**
@@ -190,6 +191,9 @@ function summarise(carousel: CarouselWithSlides) {
     slideCount: carousel.slides.length,
     renderedSlides: rendered,
     exportable: status === "ready" && rendered > 0,
+    // Same test the publisher applies: only server-rendered slides can be
+    // posted. A template design (no design system) is never postable.
+    postable: status === "ready" && rendered > 0,
     editorUrl: editorUrl(carousel.id),
     updatedAt: carousel.updatedAt ? new Date(carousel.updatedAt).toISOString() : null,
   };
@@ -226,6 +230,11 @@ export function createSocialPostTool(ctx: ToolContext, input: Record<string, unk
     throw err;
   }
 
+  // Without a design system the post is laid out on templates, which are drawn
+  // in the browser and never rendered on the server: it can be edited and
+  // exported from Content Studio but not scheduled or published from here.
+  const designed = getDesignSystem() !== null;
+
   const carousel = createCarousel({ name });
   enqueueCarouselGeneration({
     tenantId: ctx.tenantId,
@@ -245,6 +254,13 @@ export function createSocialPostTool(ctx: ToolContext, input: Record<string, unk
       format,
       slideCount,
       editorUrl: editorUrl(carousel.id),
+      willBePostable: designed,
+      ...(designed
+        ? {}
+        : {
+            warning:
+              "This business has no design system, so the post is laid out on templates and can't be scheduled or published automatically. Tell the operator, and suggest choosing a design direction in Settings > Design (/settings/design) so future posts can go out on their own.",
+          }),
     }),
   };
 }
@@ -264,7 +280,7 @@ export function listSocialPostsTool(_ctx: ToolContext, input: Record<string, unk
     text: JSON.stringify({
       count: posts.length,
       posts,
-      note: "A post is exportable once status is \"ready\" and renderedSlides > 0. \"writing\" posts are still being designed; call again in a minute or two.",
+      note: "A post can be exported, scheduled or published once status is \"ready\" and postable is true. \"writing\" posts are still being designed; call again in a minute or two. A ready post with postable false was made from templates and cannot be posted automatically.",
     }),
   };
 }

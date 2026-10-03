@@ -74,7 +74,7 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
       "list_blog_posts", "draft_blog_post", "save_blog_post", "publish_blog_post", "draft_carousel",
       "plan_campaign", "create_campaign", "draft_campaign_asset", "approve_campaign_asset", "launch_campaign",
       "create_social_post", "list_social_posts", "export_social_posts",
-      "schedule_social_post", "schedule_email_campaign", "schedule_blog_post", "cancel_scheduled_item", "list_schedule",
+      "schedule_social_post", "publish_social_post", "schedule_email_campaign", "schedule_blog_post", "cancel_scheduled_item", "list_schedule",
       "list_website_pages", "read_website_page", "list_website_images", "edit_website_text", "replace_website_image",
       "create_website_page", "publish_website_page",
     ],
