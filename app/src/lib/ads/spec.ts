@@ -32,7 +32,9 @@ export interface InterestRef {
 /** A city (Meta location key) with a radius, or a whole country. */
 export type LocationRef =
   | { kind: "city"; key: string; name: string; radiusKm: number }
-  | { kind: "country"; code: string; name: string };
+  | { kind: "country"; code: string; name: string }
+  /** A pin dropped on the map with a radius: Meta's custom_locations. */
+  | { kind: "point"; lat: number; lng: number; name: string; radiusKm: number };
 
 export interface AudienceSpec {
   locations: LocationRef[];
@@ -139,7 +141,8 @@ export function validateSpec(spec: CampaignSpec): string[] {
     if (!a?.locations?.length) errors.push(`${where} needs at least one location.`);
     if (!(a?.ageMin >= 18 && a?.ageMax <= 65 && a.ageMin <= a.ageMax)) errors.push(`${where}: ages must be between 18 and 65, youngest first.`);
     for (const loc of a?.locations ?? []) {
-      if (loc.kind === "city" && !(loc.radiusKm >= 1 && loc.radiusKm <= 80)) errors.push(`${where}: a radius around ${loc.name} must be 1 to 80 km.`);
+      if ((loc.kind === "city" || loc.kind === "point") && !(loc.radiusKm >= 1 && loc.radiusKm <= 80)) errors.push(`${where}: a radius around ${loc.name} must be 1 to 80 km.`);
+      if (loc.kind === "point" && !(Math.abs(loc.lat) <= 90 && Math.abs(loc.lng) <= 180)) errors.push(`${where}: the pin "${loc.name}" is not a real place.`);
     }
     if (!set.ads?.length) errors.push(`${where} needs at least one ad.`);
     if (set.ads?.length > MAX_ADS_PER_SET) errors.push(`${where}: at most ${MAX_ADS_PER_SET} ads per ad set.`);
@@ -198,6 +201,15 @@ export function buildTargeting(a: AudienceSpec): Record<string, unknown> {
   const geo: Record<string, unknown> = {};
   if (cities.length) geo.cities = cities.map((c) => ({ key: c.key, radius: c.radiusKm, distance_unit: "kilometer" }));
   if (countries.length) geo.countries = countries.map((c) => c.code);
+  const points = a.locations.filter((l): l is Extract<LocationRef, { kind: "point" }> => l.kind === "point");
+  if (points.length) {
+    geo.custom_locations = points.map((p) => ({
+      latitude: Number(p.lat.toFixed(6)),
+      longitude: Number(p.lng.toFixed(6)),
+      radius: p.radiusKm,
+      distance_unit: "kilometer",
+    }));
+  }
   const t: Record<string, unknown> = {
     geo_locations: geo,
     age_min: a.ageMin,

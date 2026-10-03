@@ -54,6 +54,12 @@ check("traffic ad set has no promoted page", set.promoted_object === undefined);
 
 const t = buildTargeting(base().adSets[0].audience) as { geo_locations: { cities: Array<{ radius: number; distance_unit: string }> }; genders?: number[]; flexible_spec: unknown[]; targeting_automation: { advantage_audience: number } };
 check("city radius in km", t.geo_locations.cities[0].radius === 25 && t.geo_locations.cities[0].distance_unit === "kilometer");
+
+// Map pins: Meta custom_locations with a km radius; out-of-range radius refused.
+const pinAudience = { ...base().adSets[0].audience, locations: [{ kind: "point" as const, lat: 52.355, lng: -7.7039, name: "Clonmel", radiusKm: 12 }] };
+const pt = buildTargeting(pinAudience) as { geo_locations: { custom_locations: Array<{ latitude: number; longitude: number; radius: number; distance_unit: string }> } };
+check("pin becomes a custom location", pt.geo_locations.custom_locations[0].latitude === 52.355 && pt.geo_locations.custom_locations[0].longitude === -7.7039 && pt.geo_locations.custom_locations[0].radius === 12 && pt.geo_locations.custom_locations[0].distance_unit === "kilometer");
+check("pin radius over 80km is rejected", validateSpec(base({ adSets: [{ ...base().adSets[0], audience: { ...pinAudience, locations: [{ kind: "point", lat: 52, lng: -7, name: "Far", radiusKm: 90 }] } }] })).some((e) => e.includes("1 to 80")));
 check("no gender filter when both", t.genders === undefined);
 check("interests in flexible_spec", t.flexible_spec.length === 1);
 check("advantage audience flag explicit", t.targeting_automation.advantage_audience === 1);

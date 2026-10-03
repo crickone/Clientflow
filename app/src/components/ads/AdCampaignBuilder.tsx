@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Plus, Rocket, Save, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
@@ -14,8 +15,8 @@ import {
   deleteAdDraftAction,
   launchAdCampaignAction,
   saveAdDraftAction,
-  searchCitiesAction,
   searchInterestsAction,
+  searchPlacesAction,
 } from "@/app/marketing/ads/actions";
 import {
   CTAS,
@@ -32,6 +33,12 @@ import {
   type Objective,
 } from "@/lib/ads/spec";
 import { money } from "./status";
+
+// Leaflet needs window, so the map only ever renders in the browser.
+const AudienceMap = dynamic(() => import("./AudienceMap"), {
+  ssr: false,
+  loading: () => <div style={{ height: 320, borderRadius: "var(--radius)", border: "1px solid var(--hairline)", background: "var(--surface-1)" }} />,
+});
 
 /**
  * Build or edit a draft ad campaign: the campaign, its instant form (leads),
@@ -407,7 +414,7 @@ export function AdCampaignBuilder({
       {/* ── 2. Audience ── */}
       {step === 1 && (
         <Card style={{ padding: 22, display: "grid", gap: 16 }}>
-          <StepHead title="Who should see the ads?" hint="Where they live, their age, and optionally what they are into." />
+          <StepHead title="Who should see the ads?" hint="Drop a pin with a radius around your business, then set the ages and, if you like, interests." />
           {setTabs}
           <AudienceEditor key={si} index={si} audience={set.audience} onChange={(p) => patchAudience(si, p)} />
         </Card>
@@ -574,7 +581,7 @@ export function AdCampaignBuilder({
             <div key={j} style={{ display: "grid", gap: 10 }}>
               {spec.adSets.length > 1 && <div style={subLabel}>{x.name || `Ad set ${j + 1}`}</div>}
               <ReviewRow label="Audience" onEdit={() => (setActiveSet(j), go(1))}>
-                {x.audience.locations.map((l) => l.name).join(", ") || "No location"} · ages {x.audience.ageMin}–{x.audience.ageMax === 65 ? "65+" : x.audience.ageMax}
+                {x.audience.locations.map((l) => (l.kind === "country" ? l.name : `${l.name} + ${l.radiusKm} km`)).join(", ") || "No location"} · ages {x.audience.ageMin}–{x.audience.ageMax === 65 ? "65+" : x.audience.ageMax}
                 {x.audience.interests.length ? ` · ${x.audience.interests.length} interest${x.audience.interests.length === 1 ? "" : "s"}` : ""}
               </ReviewRow>
               <ReviewRow label="Budget" onEdit={() => (setActiveSet(j), go(2))}>
@@ -678,16 +685,18 @@ function AudienceEditor({
   onChange: (p: Partial<AdSetSpec["audience"]>) => void;
 }) {
   const [cityQ, setCityQ] = useState("");
-  const [cities, setCities] = useState<Array<{ key: string; name: string; region: string | null }>>([]);
+  const [places, setPlaces] = useState<Array<{ name: string; label: string; lat: number; lng: number }>>([]);
+  const [newRadius, setNewRadius] = useState(10);
   const [interestQ, setInterestQ] = useState("");
   const [interests, setInterests] = useState<InterestRef[]>([]);
   const [searching, start] = useTransition();
 
-  function findCities() {
+  function findPlaces() {
     start(async () => {
-      const r = await searchCitiesAction(cityQ);
+      const r = await searchPlacesAction(cityQ);
       if (!r.ok) return void toast.error(r.error);
-      setCities(r.data);
+      if (r.data.length === 0) toast.error("No place found by that name. Try a nearby town, or click the map.");
+      setPlaces(r.data);
     });
   }
   function findInterests() {
@@ -698,6 +707,17 @@ function AudienceEditor({
     });
   }
   const setLocations = (locations: LocationRef[]) => onChange({ locations });
+  // A pin replaces the country-wide default: "Ireland" plus a 10 km circle would
+  // just be Ireland.
+  function addPin(lat: number, lng: number, name: string) {
+    const kept = audience.locations.filter((l) => l.kind !== "country");
+    setLocations([...kept, { kind: "point", lat, lng, name, radiusKm: newRadius }]);
+    setPlaces([]);
+    setCityQ("");
+  }
+  const pins = audience.locations
+    .filter((l): l is Extract<LocationRef, { kind: "point" }> => l.kind === "point")
+    .map((l) => ({ lat: l.lat, lng: l.lng, radiusKm: l.radiusKm, name: l.name }));
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
@@ -705,7 +725,7 @@ function AudienceEditor({
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {audience.locations.map((l, j) => (
           <span key={j} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 8px", border: "1px solid var(--hairline)", borderRadius: 999, fontSize: 12.5, color: "var(--text-secondary)" }}>
-            {l.kind === "city" ? (
+            {l.kind === "city" || l.kind === "point" ? (
               <>
                 {l.name} +
                 <input
@@ -714,7 +734,7 @@ function AudienceEditor({
                   min={1}
                   max={80}
                   value={l.radiusKm}
-                  onChange={(e) => setLocations(audience.locations.map((x, m) => (m === j && x.kind === "city" ? { ...x, radiusKm: Number(e.target.value) } : x)))}
+                  onChange={(e) => setLocations(audience.locations.map((x, m) => (m === j && (x.kind === "city" || x.kind === "point") ? { ...x, radiusKm: Number(e.target.value) } : x)))}
                   style={{ width: 46, background: "transparent", border: "none", color: "var(--text-primary)", fontSize: 12.5 }}
                 />
                 km
@@ -729,31 +749,33 @@ function AudienceEditor({
         ))}
       </div>
       <div style={{ display: "flex", gap: 8 }}>
-        <Input aria-label="Search a town or city" placeholder="Add a town or city (e.g. Clonmel)" value={cityQ} onChange={(e) => setCityQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), findCities())} />
-        <Button variant="outline" onClick={findCities} disabled={searching || !cityQ.trim()}>
+        <Input
+          aria-label="Search a place"
+          placeholder="Search a town, area or address (e.g. Clonmel)"
+          value={cityQ}
+          onChange={(e) => setCityQ(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), findPlaces())}
+        />
+        <Button variant="outline" onClick={findPlaces} disabled={searching || !cityQ.trim()} aria-label="Search">
           <Search size={14} />
         </Button>
       </div>
-      {cities.length > 0 && (
+      {places.length > 0 && (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {cities.map((c) => (
-            <Button
-              key={c.key}
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                const withoutCountry = audience.locations.filter((l) => l.kind === "city");
-                setLocations([...withoutCountry, { kind: "city", key: c.key, name: c.name, radiusKm: 25 }]);
-                setCities([]);
-                setCityQ("");
-              }}
-            >
-              {c.name}
-              {c.region ? `, ${c.region}` : ""}
+          {places.map((p, j) => (
+            <Button key={j} size="sm" variant="outline" onClick={() => addPin(p.lat, p.lng, p.name)} title={p.label}>
+              {p.label || p.name}
             </Button>
           ))}
         </div>
       )}
+      <AudienceMap pins={pins} onPick={(lat, lng) => addPin(lat, lng, `Pin ${lat.toFixed(3)}, ${lng.toFixed(3)}`)} />
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", fontSize: 13, color: "var(--text-secondary)" }}>
+        <label htmlFor={`radius-${index}`}>Radius for new pins</label>
+        <input id={`radius-${index}`} type="range" min={1} max={80} value={newRadius} onChange={(e) => setNewRadius(Number(e.target.value))} style={{ flex: "1 1 160px", maxWidth: 280, accentColor: "var(--accent)" }} />
+        <span style={{ minWidth: 48, color: "var(--text-primary)" }}>{newRadius} km</span>
+        <span style={{ color: "var(--text-tertiary)" }}>Click the map to drop a pin, or search above.</span>
+      </div>
 
       <div style={{ ...subLabel, marginTop: 8 }}>Age and gender</div>
       <div style={grid2}>

@@ -1,5 +1,6 @@
 "use server";
 
+import { searchPlaces } from "@/lib/ads/geocode";
 import { revalidatePath } from "next/cache";
 
 import { requireAdmin } from "@/lib/auth";
@@ -73,4 +74,9 @@ export async function searchInterestsAction(q: string) {
 
 export async function searchCitiesAction(q: string) {
   return run(() => searchAdCities(String(q ?? "")));
+}
+
+/** Place search for the audience map (OpenStreetMap). Admin-only like the rest. */
+export async function searchPlacesAction(q: string) {
+  return run(() => searchPlaces(String(q ?? "")));
 }

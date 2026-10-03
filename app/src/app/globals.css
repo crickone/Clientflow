@@ -2654,3 +2654,10 @@ a {
 }
 .dash-tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
 .dash-tabs::-webkit-scrollbar { display: none; }
+
+/* Ad audience map (components/ads/AudienceMap): OpenStreetMap's tiles are
+   light, so on the default dark theme they are inverted to sit on the dark
+   surface; the light theme shows them as they are. */
+.audience-map-tiles { filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.88); }
+:root[data-theme="light"] .audience-map-tiles { filter: none; }
+.leaflet-container { background: var(--surface-1); font-family: inherit; }
