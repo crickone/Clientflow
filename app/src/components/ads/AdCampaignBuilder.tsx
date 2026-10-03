@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Plus, Rocket, Save, Search, Trash2, X } from "lucide-react";
@@ -16,7 +16,8 @@ import {
   launchAdCampaignAction,
   saveAdDraftAction,
   searchInterestsAction,
-  searchPlacesAction,
+  resolvePlaceAction,
+  suggestPlacesAction,
 } from "@/app/marketing/ads/actions";
 import {
   CTAS,
@@ -685,20 +686,41 @@ function AudienceEditor({
   onChange: (p: Partial<AdSetSpec["audience"]>) => void;
 }) {
   const [cityQ, setCityQ] = useState("");
-  const [places, setPlaces] = useState<Array<{ name: string; label: string; lat: number; lng: number }>>([]);
+  const [places, setPlaces] = useState<Array<{ name: string; label: string; lat?: number; lng?: number }>>([]);
+  const [highlight, setHighlight] = useState(0);
+  const [placing, setPlacing] = useState(false);
+  const lastQuery = useRef("");
+
+  // Suggestions as you type: 250 ms after the last keystroke, latest query wins.
+  useEffect(() => {
+    const q = cityQ.trim();
+    if (q.length < 2) {
+      setPlaces([]);
+      return;
+    }
+    const t = setTimeout(async () => {
+      lastQuery.current = q;
+      const r = await suggestPlacesAction(q);
+      if (lastQuery.current !== q) return;
+      setPlaces(r.ok ? r.data : []);
+      setHighlight(0);
+    }, 250);
+    return () => clearTimeout(t);
+  }, [cityQ]);
+
+  async function pickPlace(p: { name: string; label: string; lat?: number; lng?: number }) {
+    if (p.lat != null && p.lng != null) return addPin(p.lat, p.lng, p.name);
+    setPlacing(true);
+    const r = await resolvePlaceAction(p.label);
+    setPlacing(false);
+    if (!r.ok || !r.data) return void toast.error(`Couldn't find ${p.name} on the map. Click the map to drop the pin instead.`);
+    addPin(r.data.lat, r.data.lng, p.name);
+  }
   const [newRadius, setNewRadius] = useState(10);
   const [interestQ, setInterestQ] = useState("");
   const [interests, setInterests] = useState<InterestRef[]>([]);
   const [searching, start] = useTransition();
 
-  function findPlaces() {
-    start(async () => {
-      const r = await searchPlacesAction(cityQ);
-      if (!r.ok) return void toast.error(r.error);
-      if (r.data.length === 0) toast.error("No place found by that name. Try a nearby town, or click the map.");
-      setPlaces(r.data);
-    });
-  }
   function findInterests() {
     start(async () => {
       const r = await searchInterestsAction(interestQ);
@@ -748,33 +770,73 @@ function AudienceEditor({
           </span>
         ))}
       </div>
-      <div style={{ display: "flex", gap: 8 }}>
+      <div style={{ position: "relative" }}>
         <Input
           aria-label="Search a place"
-          placeholder="Search a town, area or address (e.g. Clonmel)"
+          role="combobox"
+          aria-expanded={places.length > 0}
+          aria-controls={`place-list-${index}`}
+          aria-autocomplete="list"
+          placeholder="Start typing a town or area (e.g. Clonmel)"
           value={cityQ}
+          disabled={placing}
           onChange={(e) => setCityQ(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), findPlaces())}
+          onKeyDown={(e) => {
+            if (!places.length) return;
+            if (e.key === "ArrowDown") (e.preventDefault(), setHighlight((h) => Math.min(places.length - 1, h + 1)));
+            else if (e.key === "ArrowUp") (e.preventDefault(), setHighlight((h) => Math.max(0, h - 1)));
+            else if (e.key === "Enter") (e.preventDefault(), void pickPlace(places[highlight]));
+            else if (e.key === "Escape") setPlaces([]);
+          }}
         />
-        <Button variant="outline" onClick={findPlaces} disabled={searching || !cityQ.trim()} aria-label="Search">
-          <Search size={14} />
-        </Button>
+        {places.length > 0 && (
+          <ul
+            id={`place-list-${index}`}
+            role="listbox"
+            style={{
+              position: "absolute",
+              zIndex: 1000,
+              top: "calc(100% + 4px)",
+              left: 0,
+              right: 0,
+              margin: 0,
+              padding: 4,
+              listStyle: "none",
+              background: "var(--surface-2)",
+              border: "1px solid var(--hairline)",
+              borderRadius: "var(--radius)",
+              boxShadow: "0 12px 32px rgba(0,0,0,0.35)",
+            }}
+          >
+            {places.map((p, j) => (
+              <li
+                key={`${p.label}-${j}`}
+                role="option"
+                aria-selected={j === highlight}
+                onMouseEnter={() => setHighlight(j)}
+                onMouseDown={(e) => (e.preventDefault(), void pickPlace(p))}
+                style={{
+                  padding: "8px 10px",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  fontSize: 13.5,
+                  background: j === highlight ? "var(--surface-3)" : "transparent",
+                  color: "var(--text-primary)",
+                }}
+              >
+                {p.name}
+                <span style={{ color: "var(--text-tertiary)" }}>{p.label.slice(p.name.length)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
-      {places.length > 0 && (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {places.map((p, j) => (
-            <Button key={j} size="sm" variant="outline" onClick={() => addPin(p.lat, p.lng, p.name)} title={p.label}>
-              {p.label || p.name}
-            </Button>
-          ))}
-        </div>
-      )}
       <AudienceMap pins={pins} onPick={(lat, lng) => addPin(lat, lng, `Pin ${lat.toFixed(3)}, ${lng.toFixed(3)}`)} />
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", fontSize: 13, color: "var(--text-secondary)" }}>
         <label htmlFor={`radius-${index}`}>Radius for new pins</label>
         <input id={`radius-${index}`} type="range" min={1} max={80} value={newRadius} onChange={(e) => setNewRadius(Number(e.target.value))} style={{ flex: "1 1 160px", maxWidth: 280, accentColor: "var(--accent)" }} />
         <span style={{ minWidth: 48, color: "var(--text-primary)" }}>{newRadius} km</span>
-        <span style={{ color: "var(--text-tertiary)" }}>Click the map to drop a pin, or search above.</span>
+        <span style={{ color: "var(--text-tertiary)" }}>{placing ? "Finding it on the map…" : "Type a place above, or click the map to drop a pin."}</span>
       </div>
 
       <div style={{ ...subLabel, marginTop: 8 }}>Age and gender</div>

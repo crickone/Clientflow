@@ -1,6 +1,6 @@
 "use server";
 
-import { searchPlaces } from "@/lib/ads/geocode";
+import { resolvePlace, suggestPlaces } from "@/lib/ads/geocode";
 import { revalidatePath } from "next/cache";
 
 import { requireAdmin } from "@/lib/auth";
@@ -25,11 +25,12 @@ import type { CampaignSpec } from "@/lib/ads/spec";
  */
 export type AdsResult<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
 
-async function run<T>(fn: () => Promise<T> | T): Promise<AdsResult<T>> {
+async function run<T>(fn: () => Promise<T> | T, opts: { revalidate?: boolean } = {}): Promise<AdsResult<T>> {
   try {
     await requireAdmin();
     const data = await fn();
-    revalidatePath("/marketing/ads");
+    // Lookups (place suggestions on every keystroke) change nothing: skip it.
+    if (opts.revalidate !== false) revalidatePath("/marketing/ads");
     return { ok: true, data };
   } catch (err) {
     if (err instanceof AdsError) return { ok: false, error: err.message };
@@ -76,7 +77,12 @@ export async function searchCitiesAction(q: string) {
   return run(() => searchAdCities(String(q ?? "")));
 }
 
-/** Place search for the audience map (OpenStreetMap). Admin-only like the rest. */
-export async function searchPlacesAction(q: string) {
-  return run(() => searchPlaces(String(q ?? "")));
+/** Place suggestions as the operator types, for the audience map. Admin-only like the rest. */
+export async function suggestPlacesAction(q: string) {
+  return run(() => suggestPlaces(String(q ?? "")), { revalidate: false });
+}
+
+/** Coordinates for a picked suggestion that came without them. */
+export async function resolvePlaceAction(label: string) {
+  return run(() => resolvePlace(String(label ?? "")), { revalidate: false });
 }
