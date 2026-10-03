@@ -72,6 +72,10 @@
     "create_website_page",
     "publish_website_page",
     "schedule_blog_post",
+    "draft_ad_campaign",
+    "launch_ad_campaign",
+    "set_ad_campaign_status",
+    "set_ad_budget",
     "cancel_scheduled_item",
     "send_client_whatsapp"
   ],
@@ -251,6 +255,22 @@
     "send_dm_reply": [
       "Reply on Messenger/Instagram to contact #? — “Hi there”",
       "Reply on Messenger/Instagram to contact #?"
+    ],
+    "draft_ad_campaign": [
+      "Save the ad campaign draft #4",
+      "Save the ad campaign draft (untitled)"
+    ],
+    "launch_ad_campaign": [
+      "Launch ad campaign #4 on Facebook and Instagram (starts spending)",
+      "Launch ad campaign #? on Facebook and Instagram (starts spending)"
+    ],
+    "set_ad_campaign_status": [
+      "Pause ad campaign #4",
+      "Pause ad campaign #?"
+    ],
+    "set_ad_budget": [
+      "Set ad set 1 of ad campaign #4 to ? a day",
+      "Set ad set 1 of ad campaign #? to ? a day"
     ]
   },
   "readSamplesAllFalse": [

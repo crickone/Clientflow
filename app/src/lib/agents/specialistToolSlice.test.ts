@@ -20,7 +20,8 @@
 // Adonis's toolNames union is a SUPERSET of each domain group, so "Adonis can
 // still do everything the specialists could" holds by name, not by faith. Also
 // pinned: Adonis carries every honesty line the specialists used to (never
-// writes itself, can't auto-post social, one campaign-asset at a time, doesn't
+// writes itself, never claims a post went out early, never launches ads unasked,
+// one campaign-asset at a time, doesn't
 // mark attendance), and — the security-relevant property — ZERO delegate_to_*
 // tools anywhere.
 //
@@ -153,7 +154,8 @@ const requireLocal = createRequire(import.meta.url);
   for (const [what, line] of [
     ["never executes a write itself", "you never send or save it yourself"],
     ["states its direct-work / no-routing framing up front", "you're the whole team in one"],
-    ["can't auto-post or schedule social", "You can't auto-post or schedule social yet"],
+    ["never claims a post went out before it did", "never imply a post went out before list_schedule shows it posted"],
+    ["never launches ads unasked", "Only call launch_ad_campaign when the operator explicitly says launch"],
     ["one campaign-asset at a time", "Never draft or approve more than one asset per turn"],
     ["doesn't mark attendance itself", "you don't mark attendance yourself"],
   ] as const) {

@@ -526,6 +526,36 @@ export const socialContacts = sqliteTable(
   }),
 );
 
+/**
+ * Meta ad campaigns built in the ads manager (lib/ads). The plan is kept as
+ * JSON (`spec`, lib/ads/spec.ts CampaignSpec) because it is one tree edited as
+ * a whole; `metaIds` records what Meta created for it (campaign, form, ad sets,
+ * ads) so pause/resume/budget/results can address it. Ads run on the
+ * business's OWN ad account; Meta bills them. Status: draft -> launching ->
+ * active | paused, or error (what went wrong in `error`), archived when done.
+ */
+export const adCampaigns = sqliteTable(
+  "ad_campaigns",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    adAccountId: text("ad_account_id").notNull(),
+    pageId: text("page_id"),
+    name: text("name").notNull(),
+    objective: text("objective").notNull(),
+    status: text("status", { enum: ["draft", "launching", "active", "paused", "error", "archived"] }).notNull().default("draft"),
+    spec: text("spec").notNull(),
+    metaIds: text("meta_ids"),
+    error: text("error"),
+    insights: text("insights"),
+    insightsAt: integer("insights_at", { mode: "timestamp_ms" }),
+    launchedAt: integer("launched_at", { mode: "timestamp_ms" }),
+    createdBy: text("created_by"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().default(sql`(unixepoch() * 1000)`),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull().default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => ({ byStatus: index("idx_ad_campaigns_status").on(t.status) }),
+);
+
 /** Conversation messages for clients/members (mirrors lead_messages). */
 export const clientMessages = sqliteTable(
   "client_messages",

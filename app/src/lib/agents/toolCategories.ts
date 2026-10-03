@@ -33,6 +33,11 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
     tools: ["list_recent_messages", "search_messages", "send_client_email", "send_whatsapp", "send_client_whatsapp", "send_dm_reply"],
   },
   {
+    key: "ads",
+    label: "Ads",
+    tools: ["list_ad_campaigns", "search_ad_audience", "get_ad_results", "draft_ad_campaign", "launch_ad_campaign", "set_ad_campaign_status", "set_ad_budget"],
+  },
+  {
     key: "clients",
     label: "Clients",
     tools: ["get_client", "create_client", "update_client"],

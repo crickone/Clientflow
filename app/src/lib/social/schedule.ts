@@ -139,7 +139,7 @@ function toView(row: schema.ScheduledPost, designName: string, slideCount: numbe
 }
 
 /** The slides that would be posted, in order: the carousel slot if there is one, with a render on disk. */
-function postableRenders(carouselId: number): { filenames: string[]; caption: string } {
+export function postableRenders(carouselId: number): { filenames: string[]; caption: string } {
   const carousel = getCarousel(carouselId);
   if (!carousel) return { filenames: [], caption: "" };
   const inCarousel = carousel.slides.filter((s) => isCarouselSlot(s.slotKey));

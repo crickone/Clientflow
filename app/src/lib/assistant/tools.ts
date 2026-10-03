@@ -88,6 +88,16 @@ import {
   scheduleSocialPostTool,
 } from "@/lib/agents/tools.schedule";
 import {
+  ADS_TOOLS,
+  draftAdCampaignTool,
+  getAdResultsTool,
+  launchAdCampaignTool,
+  listAdCampaignsTool,
+  searchAdAudienceTool,
+  setAdBudgetTool,
+  setAdCampaignStatusTool,
+} from "@/lib/agents/tools.ads";
+import {
   WEBSITE_TOOLS,
   listWebsitePagesTool,
   readWebsitePageTool,
@@ -228,6 +238,13 @@ const WRITE_TOOL_META: Record<string, WriteToolMeta> = {
   create_website_page: { label: "Create website page", summarize: ({ v, input }) => { const n = Array.isArray(input.textChanges) ? input.textChanges.length : 0; const m = Array.isArray(input.imageChanges) ? input.imageChanges.length : 0; return `Create the page ${v("path") || "(new page)"}${v("title") ? ` "${v("title")}"` : ""} as an unpublished copy of ${v("copyFrom") || "an existing page"}${n ? `, ${n} wording change${n === 1 ? "" : "s"}` : ""}${m ? `, ${m} new image${m === 1 ? "" : "s"}` : ""}`; } },
   publish_website_page: { label: "Publish website page", summarize: ({ v }) => `Put ${v("path") || "a page"} live on the website` },
   schedule_blog_post: { label: "Schedule blog post", summarize: ({ v }) => { const when = parseWhen(v("when")); return `Put blog post #${v("postId") || "?"} live${when ? ` on ${formatDublin(when.getTime())}` : " at the scheduled time"}`; } },
+  // Ads manager (tools.ads.ts): saving a draft leaves a row; launching,
+  // resuming and budget changes spend the business's own ad money. The 3
+  // reads (list_ad_campaigns, search_ad_audience, get_ad_results) are absent.
+  draft_ad_campaign: { label: "Save ad campaign draft", summarize: ({ v, input }) => { const spec = (input.spec ?? {}) as { name?: string; objective?: string; adSets?: Array<{ dailyBudget?: number }> }; const total = (spec.adSets ?? []).reduce((s, a) => s + (Number(a.dailyBudget) || 0), 0); return `Save the ad campaign draft ${spec.name ? `"${spec.name}"` : v("campaignId") ? `#${v("campaignId")}` : "(untitled)"}${spec.objective ? ` (${spec.objective})` : ""}${total ? `, ${total} a day once launched` : ""}`; } },
+  launch_ad_campaign: { label: "Launch ad campaign", summarize: ({ v }) => `Launch ad campaign #${v("campaignId") || "?"} on Facebook and Instagram (starts spending)` },
+  set_ad_campaign_status: { label: "Change ad campaign status", summarize: ({ v }) => `${v("status") === "active" ? "Resume (starts spending)" : v("status") === "archived" ? "Archive" : "Pause"} ad campaign #${v("campaignId") || "?"}` },
+  set_ad_budget: { label: "Change ad budget", summarize: ({ v }) => `Set ad set ${Number(v("adSetIndex") || 0) + 1} of ad campaign #${v("campaignId") || "?"} to ${v("dailyBudget") || "?"} a day` },
   cancel_scheduled_item: { label: "Cancel scheduled item", summarize: ({ v }) => `Cancel the scheduled ${v("kind") || "item"}${v("name") ? ` "${v("name")}"` : ""}` },
 
   // Operations agent (Operations Task 1): WhatsApp send to a CLIENT (distinct
@@ -805,6 +822,9 @@ export const TOOLS: Anthropic.Tool[] = [
   ...SCHEDULE_TOOLS,
   ...WEBSITE_TOOLS,
 
+  // ── Ads manager: Facebook/Instagram ads on the business's own ad account. ──
+  ...ADS_TOOLS,
+
   // ── Operations agent (Operations Task 1): no-show + lapsed-member tools ──
   ...OPERATIONS_TOOLS,
 
@@ -972,6 +992,20 @@ export async function executeTool(
         return cancelScheduledItemTool(ctx, input);
       case "list_schedule":
         return listScheduleTool(ctx, input);
+      case "list_ad_campaigns":
+        return listAdCampaignsTool(ctx);
+      case "search_ad_audience":
+        return await searchAdAudienceTool(ctx, input);
+      case "get_ad_results":
+        return await getAdResultsTool(ctx, input);
+      case "draft_ad_campaign":
+        return draftAdCampaignTool(ctx, input);
+      case "launch_ad_campaign":
+        return await launchAdCampaignTool(ctx, input);
+      case "set_ad_campaign_status":
+        return await setAdCampaignStatusTool(ctx, input);
+      case "set_ad_budget":
+        return await setAdBudgetTool(ctx, input);
       case "list_website_pages":
         return listWebsitePagesTool(ctx, input);
       case "read_website_page":

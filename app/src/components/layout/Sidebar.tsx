@@ -19,6 +19,7 @@ import {
 import {
   BarChart3,
   Binoculars,
+  Target,
   Bot,
   Calendar,
   CalendarClock,
@@ -221,6 +222,9 @@ export const NAV_GROUPS: NavGroup[] = [
       // ranked list, rating/review trends, a change feed, per-competitor
       // detail. Admin-gated (requireAdminPage) for the same reason as the
       // two Campaign Engine links above — keep the nav consistent.
+      // Facebook + Instagram ads on the business's own ad account (lib/ads).
+      // Admin-only: launching and budgets spend real money.
+      { href: "/marketing/ads", label: "Ads", icon: Target, adminOnly: true },
       { href: "/marketing/research", label: "Research", icon: Binoculars, adminOnly: true },
       { href: "/cms", label: "Sites", icon: Globe, adminOnly: true },
       { href: "/content-studio", label: "Content Studio", icon: Clapperboard },
