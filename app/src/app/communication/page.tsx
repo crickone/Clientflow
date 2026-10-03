@@ -50,7 +50,10 @@ export default async function CommunicationPage({ searchParams }: { searchParams
         subtitle="All your conversations in one place: WhatsApp, Messenger, Instagram and email."
       />
 
-      <Tabs defaultValue={searchParams?.c ? "whatsapp" : "combined"}>
+      {/* Keyed on the chosen conversation: a Combined item links to this same
+          page with ?c=, and an uncontrolled Tabs/inbox only read their defaults
+          on mount, so without a remount the click changed nothing visible. */}
+      <Tabs key={searchParams?.c ?? "none"} defaultValue={searchParams?.c ? "whatsapp" : "combined"}>
         <TabsList>
           <TabsTrigger value="combined">Combined</TabsTrigger>
           <TabsTrigger value="whatsapp">Messages ({conversations.length})</TabsTrigger>
