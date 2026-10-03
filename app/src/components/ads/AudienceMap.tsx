@@ -22,12 +22,18 @@ const IRELAND: L.LatLngTuple = [53.4, -8.0];
 
 export default function AudienceMap({
   pins,
+  selected = -1,
   onPick,
+  onSelect,
   height = 320,
 }: {
   pins: MapPin[];
+  /** Index of the pin the radius slider is editing; drawn emphasised. */
+  selected?: number;
   /** A click on the map, to drop a pin there. */
   onPick: (lat: number, lng: number) => void;
+  /** A click on an existing pin. */
+  onSelect?: (index: number) => void;
   height?: number;
 }) {
   const host = useRef<HTMLDivElement>(null);
@@ -35,6 +41,13 @@ export default function AudienceMap({
   const layer = useRef<L.LayerGroup | null>(null);
   const pick = useRef(onPick);
   pick.current = onPick;
+  const select = useRef(onSelect);
+  select.current = onSelect;
+  // Where the pins are (not how big): the map re-frames only when this changes,
+  // so dragging the radius slider visibly grows the circle instead of the map
+  // zooming out to keep it the same size on screen.
+  const placesKey = pins.map((p) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join("|");
+  const framed = useRef("");
 
   // Create the map once.
   useEffect(() => {
@@ -54,7 +67,8 @@ export default function AudienceMap({
     };
   }, []);
 
-  // Redraw the pins and frame them whenever they change.
+  // Redraw the pins whenever they change; re-frame only when one is added,
+  // moved or removed.
   useEffect(() => {
     const m = map.current;
     const g = layer.current;
@@ -62,18 +76,31 @@ export default function AudienceMap({
     g.clearLayers();
     const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#ff6a32";
     const bounds: L.LatLngBounds[] = [];
-    for (const p of pins) {
-      const circle = L.circle([p.lat, p.lng], { radius: p.radiusKm * 1000, color: accent, weight: 2, fillColor: accent, fillOpacity: 0.15 }).addTo(g);
-      L.circleMarker([p.lat, p.lng], { radius: 6, color: "#fff", weight: 2, fillColor: accent, fillOpacity: 1 })
+    pins.forEach((p, i) => {
+      const on = i === selected;
+      const circle = L.circle([p.lat, p.lng], {
+        radius: p.radiusKm * 1000,
+        color: accent,
+        weight: on ? 3 : 1.5,
+        fillColor: accent,
+        fillOpacity: on ? 0.2 : 0.1,
+        bubblingMouseEvents: false,
+      }).addTo(g);
+      circle.on("click", () => select.current?.(i));
+      L.circleMarker([p.lat, p.lng], { radius: on ? 7 : 5, color: "#fff", weight: 2, fillColor: accent, fillOpacity: 1, bubblingMouseEvents: false })
         .bindTooltip(`${p.name} + ${p.radiusKm} km`)
+        .on("click", () => select.current?.(i))
         .addTo(g);
       bounds.push(circle.getBounds());
-    }
-    if (bounds.length) {
+    });
+    if (bounds.length && framed.current !== placesKey) {
+      framed.current = placesKey;
       const all = bounds.reduce((acc, b) => acc.extend(b), L.latLngBounds(bounds[0].getSouthWest(), bounds[0].getNorthEast()));
-      m.fitBounds(all, { padding: [24, 24], maxZoom: 12 });
+      // Room for the circle to grow to the 80 km limit without leaving the view.
+      m.fitBounds(all.pad(0.6), { maxZoom: 11 });
     }
-  }, [pins]);
+    if (!bounds.length) framed.current = "";
+  }, [pins, selected, placesKey]);
 
   return (
     <div

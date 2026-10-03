@@ -717,6 +717,8 @@ function AudienceEditor({
     addPin(r.data.lat, r.data.lng, p.name);
   }
   const [newRadius, setNewRadius] = useState(10);
+  // The pin the radius slider edits (an index into pins); -1 = none yet.
+  const [selectedPin, setSelectedPin] = useState(-1);
   const [interestQ, setInterestQ] = useState("");
   const [interests, setInterests] = useState<InterestRef[]>([]);
   const [searching, start] = useTransition();
@@ -734,19 +736,46 @@ function AudienceEditor({
   function addPin(lat: number, lng: number, name: string) {
     const kept = audience.locations.filter((l) => l.kind !== "country");
     setLocations([...kept, { kind: "point", lat, lng, name, radiusKm: newRadius }]);
+    setSelectedPin(kept.filter((l) => l.kind === "point").length);
     setPlaces([]);
     setCityQ("");
   }
   const pins = audience.locations
     .filter((l): l is Extract<LocationRef, { kind: "point" }> => l.kind === "point")
     .map((l) => ({ lat: l.lat, lng: l.lng, radiusKm: l.radiusKm, name: l.name }));
+  // Default to the newest pin, so a just-added pin is the one being sized.
+  const activePin = pins.length ? (selectedPin >= 0 && selectedPin < pins.length ? selectedPin : pins.length - 1) : -1;
+  const sliderValue = activePin >= 0 ? pins[activePin].radiusKm : newRadius;
+  function setRadius(km: number) {
+    setNewRadius(km);
+    if (activePin < 0) return;
+    let n = -1;
+    setLocations(audience.locations.map((l) => (l.kind === "point" && ++n === activePin ? { ...l, radiusKm: km } : l)));
+  }
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
       <div style={subLabel}>Where</div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {audience.locations.map((l, j) => (
-          <span key={j} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 8px", border: "1px solid var(--hairline)", borderRadius: 999, fontSize: 12.5, color: "var(--text-secondary)" }}>
+          <span
+            key={j}
+            onClick={() => {
+              if (l.kind !== "point") return;
+              setSelectedPin(audience.locations.slice(0, j).filter((x) => x.kind === "point").length);
+            }}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "4px 8px",
+              border: `1px solid ${l.kind === "point" && audience.locations.slice(0, j).filter((x) => x.kind === "point").length === activePin ? "var(--accent)" : "var(--hairline)"}`,
+              borderRadius: 999,
+              fontSize: 12.5,
+              color: "var(--text-secondary)",
+              cursor: l.kind === "point" ? "pointer" : "default",
+            }}
+          >
             {l.kind === "city" || l.kind === "point" ? (
               <>
                 {l.name} +
@@ -831,12 +860,17 @@ function AudienceEditor({
           </ul>
         )}
       </div>
-      <AudienceMap pins={pins} onPick={(lat, lng) => addPin(lat, lng, `Pin ${lat.toFixed(3)}, ${lng.toFixed(3)}`)} />
+      <AudienceMap
+        pins={pins}
+        selected={activePin}
+        onSelect={setSelectedPin}
+        onPick={(lat, lng) => addPin(lat, lng, `Pin ${lat.toFixed(3)}, ${lng.toFixed(3)}`)}
+      />
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", fontSize: 13, color: "var(--text-secondary)" }}>
-        <label htmlFor={`radius-${index}`}>Radius for new pins</label>
-        <input id={`radius-${index}`} type="range" min={1} max={80} value={newRadius} onChange={(e) => setNewRadius(Number(e.target.value))} style={{ flex: "1 1 160px", maxWidth: 280, accentColor: "var(--accent)" }} />
-        <span style={{ minWidth: 48, color: "var(--text-primary)" }}>{newRadius} km</span>
-        <span style={{ color: "var(--text-tertiary)" }}>{placing ? "Finding it on the map…" : "Type a place above, or click the map to drop a pin."}</span>
+        <label htmlFor={`radius-${index}`}>{activePin >= 0 ? `Radius around ${pins[activePin].name}` : "Radius"}</label>
+        <input id={`radius-${index}`} type="range" min={1} max={80} value={sliderValue} onChange={(e) => setRadius(Number(e.target.value))} style={{ flex: "1 1 160px", maxWidth: 280, accentColor: "var(--accent)" }} />
+        <span style={{ minWidth: 48, color: "var(--text-primary)" }}>{sliderValue} km</span>
+        <span style={{ color: "var(--text-tertiary)" }}>{placing ? "Finding it on the map…" : pins.length > 1 ? "Click a circle to resize that one." : "Type a place above, or click the map to drop a pin."}</span>
       </div>
 
       <div style={{ ...subLabel, marginTop: 8 }}>Age and gender</div>
