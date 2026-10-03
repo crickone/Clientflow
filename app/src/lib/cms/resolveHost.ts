@@ -1,4 +1,5 @@
 import "server-only";
+import { envSiteSlugForHost } from "./siteHostsEnv";
 
 import { eq } from "drizzle-orm";
 
@@ -151,4 +152,21 @@ export function siteUrl(
   const proto = LOCAL_HOSTS.has(host) ? "http" : "https";
   const base = `/site/${publicSite.site.slug}`;
   return `${proto}://${host}${base}${clean === "/" ? "" : clean}`;
+}
+
+/**
+ * resolvePublicSite for robots.txt / sitemap.xml: a host mapped in
+ * CMS_SITE_HOSTS but not (yet) verified under the site's Domains still
+ * resolves to its site, with that host as the public origin, exactly as the
+ * middleware already serves its pages. Without this the crawler files told
+ * every crawler (Google, Meta's URL checks) to stay off a live site.
+ */
+export function resolvePublicSiteForCrawlers(opts: { host?: string | null; siteParam?: string | null }): PublicSite | null {
+  const direct = resolvePublicSite(opts);
+  if (direct) return direct;
+  const slug = envSiteSlugForHost(opts.host);
+  if (!slug) return null;
+  const viaSlug = resolvePublicSite({ siteParam: slug });
+  if (!viaSlug) return null;
+  return { ...viaSlug, primaryHost: viaSlug.site.primaryHost ?? normalizeHost(opts.host) ?? null };
 }

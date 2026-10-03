@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { parseSiteHosts } from "@/lib/cms/siteHostsEnv";
 
 // "/open" is the platform "Open business" token handoff: pre-session (no
 // cookie yet when it's first hit) but does nothing without a valid one-time
@@ -34,16 +35,8 @@ const PUBLIC_API_PREFIXES = [
 // edge runtime can't read SQLite, so production host routing uses this env var
 // (the Domains admin tells you what to set), e.g.
 // CMS_SITE_HOSTS="renovacellular.ie=renova,www.renovacellular.ie=renova"
-function parseSiteHosts(v?: string): Record<string, string> {
-  const out: Record<string, string> = {};
-  if (!v) return out;
-  for (const pair of v.split(",")) {
-    const [h, s] = pair.split("=");
-    if (h && s) out[h.trim().toLowerCase()] = s.trim();
-  }
-  return out;
-}
 const SITE_HOSTS = parseSiteHosts(process.env.CMS_SITE_HOSTS);
+
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

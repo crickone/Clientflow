@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 
-import { resolvePublicSite, siteUrl } from "@/lib/cms/resolveHost";
+import { resolvePublicSiteForCrawlers as resolvePublicSite, siteUrl } from "@/lib/cms/resolveHost";
 import { listPublishedPagesForSitemap } from "@/lib/cms/pages";
 import { listPublishedPosts } from "@/lib/cms/blog";
 

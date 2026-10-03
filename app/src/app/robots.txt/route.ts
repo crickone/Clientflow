@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 
-import { resolvePublicSite, absoluteUrl } from "@/lib/cms/resolveHost";
+import { resolvePublicSiteForCrawlers as resolvePublicSite, absoluteUrl } from "@/lib/cms/resolveHost";
 
 export const dynamic = "force-dynamic";
 
