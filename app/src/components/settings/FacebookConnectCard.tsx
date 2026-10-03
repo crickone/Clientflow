@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-import { disconnectFacebookPageAction, refreshAdAccountsAction, setPostingPageAction } from "@/app/settings/integrations/facebook/actions";
+import { disconnectFacebookPageAction, refreshAdAccountsAction, setAdAccountInUseAction, setPostingPageAction } from "@/app/settings/integrations/facebook/actions";
 // Type-only — lib/facebook/{pages,grants}.ts are `server-only`.
 import type { FacebookPageRow } from "@/lib/facebook/pages";
 import type { AdAccountRow, GrantInfo } from "@/lib/facebook/grants";
@@ -94,6 +94,16 @@ export function FacebookConnectCard({
     });
   }
 
+  function chooseAdAccount(adAccountId: string, inUse: boolean) {
+    if (!adAccountId) return;
+    start(async () => {
+      const res = await setAdAccountInUseAction(adAccountId, inUse);
+      if (!res.ok) return void toast.error(res.error ?? "Couldn't change the ad account.");
+      toast.success(inUse ? "Ads will run from this account" : "Ad account removed");
+      router.refresh();
+    });
+  }
+
   // ── Not connected ────────────────────────────────────────────────────────
   if (pages.length === 0) {
     return (
@@ -124,11 +134,17 @@ export function FacebookConnectCard({
 
   // ── Connected ────────────────────────────────────────────────────────────
   const posting = pages.find((p) => p.pageId === postingPageId) ?? pages[pages.length - 1];
+  const inUse = adAccounts.filter((a) => a.inUse);
+  const available = adAccounts.filter((a) => !a.inUse);
   const ready: Array<{ ok: boolean; label: string; retry?: boolean }> = [
     { ok: true, label: "Posting to Facebook" },
     { ok: Boolean(posting.igUsername), label: posting.igUsername ? "Posting to Instagram" : "Instagram: link an Instagram account to your Page, then reconnect" },
     { ok: Boolean(posting.subscribedAt), label: posting.subscribedAt ? "Messages and lead ads" : "Messages and lead ads: reconnect to switch these on" },
-    { ok: adAccounts.length > 0, label: adAccounts.length ? "Ads" : "Ads: no ad account found yet", retry: adAccounts.length === 0 },
+    {
+      ok: inUse.length > 0,
+      label: inUse.length ? "Ads" : adAccounts.length ? "Ads: choose the ad account above" : "Ads: no ad account found yet",
+      retry: adAccounts.length === 0,
+    },
   ];
 
   return (
@@ -161,15 +177,50 @@ export function FacebookConnectCard({
         {adAccounts.length > 0 && (
           <>
             <div style={{ borderTop: "1px solid var(--hairline)" }} />
-            <div style={sectionLabel}>{adAccounts.length === 1 ? "Ad account" : "Ad accounts"}</div>
-            {adAccounts.map((a) => (
-              <div key={a.adAccountId} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={sectionLabel}>{inUse.length > 1 ? "Ad accounts" : "Ad account"}</div>
+            {inUse.length === 0 && (
+              <div style={muted}>
+                {adAccounts.length === 1 ? "Facebook shared one ad account." : `Facebook shared ${adAccounts.length} ad accounts.`} Choose the one this business advertises
+                from. Ads are billed to it by Meta.
+              </div>
+            )}
+            {inUse.map((a) => (
+              <div key={a.adAccountId} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <Megaphone size={15} strokeWidth={1.75} style={{ color: "var(--text-tertiary)" }} />
                 <span style={{ fontSize: 14, color: "var(--text-primary)" }}>{a.name ?? a.adAccountId}</span>
                 {a.currency && <span style={muted}>{a.currency}</span>}
                 {a.accountStatus !== null && a.accountStatus !== 1 && <Badge tone="warning">Check in Ads Manager</Badge>}
+                <Button variant="ghost" size="sm" onClick={() => chooseAdAccount(a.adAccountId, false)} disabled={busy} style={{ marginLeft: "auto" }}>
+                  Remove
+                </Button>
               </div>
             ))}
+            {available.length > 0 && (
+              <select
+                aria-label="Choose an ad account"
+                value=""
+                disabled={busy}
+                onChange={(e) => chooseAdAccount(e.target.value, true)}
+                style={{
+                  height: 38,
+                  maxWidth: 360,
+                  padding: "0 12px",
+                  borderRadius: "var(--radius)",
+                  border: "1px solid var(--hairline)",
+                  background: "var(--surface-2)",
+                  color: "var(--text-primary)",
+                  fontSize: 14,
+                }}
+              >
+                <option value="">{inUse.length ? "Add another ad account" : "Choose an ad account"}</option>
+                {available.map((a) => (
+                  <option key={a.adAccountId} value={a.adAccountId}>
+                    {a.name ?? a.adAccountId}
+                    {a.currency ? ` (${a.currency})` : ""}
+                  </option>
+                ))}
+              </select>
+            )}
           </>
         )}
       </Card>

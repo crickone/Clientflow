@@ -9,7 +9,7 @@ export function AdsNotConnected({ hasPage, hasAdAccount }: { hasPage: boolean; h
   const message = !hasPage
     ? "Ads run from your Facebook Page and are paid from your own ad account. Connect Facebook and tick both your Page and your ad account."
     : !hasAdAccount
-      ? "Your Page is connected but no ad account was shared. Reconnect Facebook and tick your ad account when Facebook asks which assets to share."
+      ? "Your Page is connected but no ad account is chosen. In Facebook settings, choose the ad account this business advertises from."
       : "Reconnect Facebook so AdonisAgent can manage ads on your ad account.";
   return (
     <EmptyState

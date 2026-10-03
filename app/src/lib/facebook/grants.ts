@@ -138,6 +138,24 @@ export async function discoverAdAccounts(token: string): Promise<GraphAdAccount[
     }
   }
 
+  // A user token lists every ad account the person can reach. When the token's
+  // granular scopes name specific ad accounts (the ones ticked in the login),
+  // keep only those.
+  if (found.size > 1) {
+    try {
+      const { ids } = await grantedTargetIds(token, ["ads_management", "ads_read"]);
+      const ticked = new Set(ids.map((id) => (id.startsWith("act_") ? id : `act_${id}`)));
+      if (ticked.size) {
+        for (const id of [...found.keys()]) if (!ticked.has(id)) found.delete(id);
+        notes.push(`kept ${found.size} ticked`);
+      } else {
+        notes.push("no ticked ids in token");
+      }
+    } catch (e) {
+      notes.push(`debug_token failed: ${errText(e)}`);
+    }
+  }
+
   console.log(`[facebook] ad account discovery: found ${found.size}; ${notes.join("; ")}`);
   return [...found.values()];
 }
@@ -217,8 +235,12 @@ export function saveAdAccounts(tenantId: number, accounts: GraphAdAccount[]): vo
     const live = controlSqlite
       .prepare("SELECT ad_account_id FROM facebook_ad_accounts WHERE tenant_id = ? AND revoked_at IS NULL")
       .all(tenantId) as Array<{ ad_account_id: string }>;
-    const revoke = controlSqlite.prepare("UPDATE facebook_ad_accounts SET revoked_at = ? WHERE tenant_id = ? AND ad_account_id = ?");
+    const revoke = controlSqlite.prepare("UPDATE facebook_ad_accounts SET revoked_at = ?, in_use = 0 WHERE tenant_id = ? AND ad_account_id = ?");
     for (const r of live) if (!keep.has(r.ad_account_id)) revoke.run(now, tenantId, r.ad_account_id);
+    // One account granted: that is the one. Several: the business chooses.
+    if (accounts.length === 1) {
+      controlSqlite.prepare("UPDATE facebook_ad_accounts SET in_use = 1 WHERE tenant_id = ? AND ad_account_id = ?").run(tenantId, accounts[0].id);
+    }
   })();
 }
 
@@ -229,19 +251,35 @@ export interface AdAccountRow {
   timezone: string | null;
   /** Meta's account_status: 1 = active; anything else needs attention in Ads Manager. */
   accountStatus: number | null;
+  /** Chosen in Settings as an account this business advertises from. */
+  inUse: boolean;
 }
 
-export function listAdAccounts(tenantId: number): AdAccountRow[] {
+/**
+ * The ad accounts this business advertises from (chosen in Settings). With
+ * `{ granted: true }`, every ad account the grant reaches, chosen or not.
+ */
+export function listAdAccounts(tenantId: number, opts: { granted?: boolean } = {}): AdAccountRow[] {
   const rows = controlSqlite
     .prepare(
-      "SELECT ad_account_id, name, currency, timezone, account_status FROM facebook_ad_accounts WHERE tenant_id = ? AND revoked_at IS NULL ORDER BY name",
+      `SELECT ad_account_id, name, currency, timezone, account_status, in_use FROM facebook_ad_accounts
+       WHERE tenant_id = ? AND revoked_at IS NULL ${opts.granted ? "" : "AND in_use = 1"} ORDER BY name COLLATE NOCASE`,
     )
-    .all(tenantId) as Array<{ ad_account_id: string; name: string | null; currency: string | null; timezone: string | null; account_status: number | null }>;
+    .all(tenantId) as Array<{ ad_account_id: string; name: string | null; currency: string | null; timezone: string | null; account_status: number | null; in_use: number }>;
   return rows.map((r) => ({
     adAccountId: r.ad_account_id,
     name: r.name,
     currency: r.currency,
     timezone: r.timezone,
     accountStatus: r.account_status,
+    inUse: r.in_use === 1,
   }));
+}
+
+/** Choose (or stop using) one of the granted ad accounts. False when the grant does not reach it. */
+export function setAdAccountInUse(tenantId: number, adAccountId: string, inUse: boolean): boolean {
+  const res = controlSqlite
+    .prepare("UPDATE facebook_ad_accounts SET in_use = ? WHERE tenant_id = ? AND ad_account_id = ? AND revoked_at IS NULL")
+    .run(inUse ? 1 : 0, tenantId, adAccountId);
+  return res.changes > 0;
 }

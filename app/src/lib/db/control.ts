@@ -992,6 +992,16 @@ export function ensureControlTables() {
     );
   `);
 
+  // Which granted ad accounts the business actually advertises from. A user
+  // token lists every ad account the connecting person can reach (an agency
+  // owner's clients included), so nothing is used until it is chosen.
+  try {
+    const cols = controlSqlite.prepare("PRAGMA table_info(facebook_ad_accounts)").all() as Array<{ name: string }>;
+    if (!cols.find((c) => c.name === "in_use")) controlSqlite.exec("ALTER TABLE facebook_ad_accounts ADD COLUMN in_use INTEGER NOT NULL DEFAULT 0");
+  } catch (err) {
+    console.error("[control] facebook_ad_accounts in_use migration failed:", err);
+  }
+
   // Batch 6b (improvement-plan-2026-08.md Theme E1): tracking table for the
   // versioned migration runner (./migrations) — separate from everything
   // above, which is the additive bootstrap. Created here too (in addition to

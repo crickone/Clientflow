@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin, getCurrentMembership } from "@/lib/auth";
 import { disconnectFacebookPage, listFacebookPages } from "@/lib/facebook/pages";
 import { setPostingPage } from "@/lib/social/publisher";
-import { discoverAdAccounts, getGrantToken, saveAdAccounts } from "@/lib/facebook/grants";
+import { discoverAdAccounts, getGrantToken, saveAdAccounts, setAdAccountInUse } from "@/lib/facebook/grants";
 
 /** Disconnect (revoke) one of the current tenant's connected Pages. Admin-only, tenant-scoped. */
 export async function disconnectFacebookPageAction(pageId: string): Promise<{ ok: boolean; error?: string }> {
@@ -48,4 +48,17 @@ export async function refreshAdAccountsAction(): Promise<{ ok: boolean; found?: 
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Couldn't reach Facebook." };
   }
+}
+
+/** Choose, or stop using, an ad account the connection reaches. Admin-only, tenant-scoped. */
+export async function setAdAccountInUseAction(adAccountId: string, inUse: boolean): Promise<{ ok: boolean; error?: string }> {
+  await requireAdmin();
+  const membership = getCurrentMembership();
+  if (!membership) return { ok: false, error: "No tenant in context." };
+  if (!setAdAccountInUse(membership.tenant.id, adAccountId, inUse)) {
+    return { ok: false, error: "That ad account is not part of this connection." };
+  }
+  revalidatePath("/settings/integrations/facebook");
+  revalidatePath("/marketing/ads");
+  return { ok: true };
 }

@@ -35,7 +35,7 @@ export default async function FacebookSettingsPage() {
         configured={facebookConfigured()}
         pages={listFacebookPages(tenantId)}
         postingPageId={getMetaConnectionForTenant(tenantId)?.pageId ?? null}
-        adAccounts={listAdAccounts(tenantId)}
+        adAccounts={listAdAccounts(tenantId, { granted: true })}
         grant={getGrantInfo(tenantId)}
       />
     </div>
