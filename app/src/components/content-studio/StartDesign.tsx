@@ -32,6 +32,9 @@ type Kind = "carousel" | "single";
  * the container mid-request is the usual one).
  */
 const GENERATE_TIMEOUT_MS = 30_000;
+// Writing a single post happens inside the request (one short model call), so
+// it gets longer than starting a carousel run does.
+const WRITE_SINGLE_TIMEOUT_MS = 120_000;
 
 /**
  * The carousel slot generated slides land in. Matches the fallback the editor's
@@ -127,10 +130,28 @@ export function StartDesign() {
       setBusy(null);
       return;
     }
-    // A single post is one slide, so there's no series to write — the editor's
-    // Refresh copy writes it from the business context. Only a carousel goes
-    // through the series generator.
+    // A single post is one slide, so there's no series to write: its copy is
+    // written from the brief by the same route as the editor's Refresh copy.
+    // This used to open the editor on the blank template and leave the brief
+    // behind, so "Generate with AI" on a single post generated nothing.
     if (kind === "single") {
+      let out: { ok?: boolean; error?: string } | null = null;
+      try {
+        const res = await fetch(`/api/content-studio/carousels/${id}/refresh`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ slotKey: DEFAULT_SLOT, brief: topic.trim() }),
+          signal: AbortSignal.timeout(WRITE_SINGLE_TIMEOUT_MS),
+        });
+        out = await res.json().catch(() => ({ ok: false, error: `The writer failed (HTTP ${res.status}).` }));
+      } catch {
+        out = { ok: false, error: "Lost contact with the server while writing the post." };
+      }
+      if (!out?.ok) {
+        setError(`${out?.error ?? "Couldn't write the post."} Your draft was saved — you can open it and press Refresh copy.`);
+        setBusy(null);
+        return;
+      }
       router.push(`/content-studio/images/${id}`);
       return;
     }
@@ -282,7 +303,7 @@ export function StartDesign() {
         )}
         <Button onClick={startWithAi} loading={working}>
           {busy === "ai" ? <Loader2 size={15} className="spin" /> : <Sparkles size={15} />}
-          {busy === "ai" ? "Starting…" : "Write it with Adonis"}
+          {busy === "ai" ? (kind === "single" ? "Writing…" : "Starting…") : "Write it with Adonis"}
         </Button>
         <Button variant="ghost" onClick={startManually} disabled={working}>
           <PenLine size={15} />
@@ -292,6 +313,11 @@ export function StartDesign() {
 
       {error && (
         <div style={{ marginTop: 12, fontSize: 13, color: "var(--danger)" }}>{error}</div>
+      )}
+      {busy === "ai" && kind === "single" && (
+        <div style={{ marginTop: 12, fontSize: 12.5, color: "var(--text-tertiary)" }}>
+          Adonis is writing the post. It opens in a few seconds.
+        </div>
       )}
       {busy === "ai" && kind === "carousel" && (
         <div style={{ marginTop: 12, fontSize: 12.5, color: "var(--text-tertiary)" }}>

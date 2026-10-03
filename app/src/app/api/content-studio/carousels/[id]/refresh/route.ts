@@ -50,6 +50,7 @@ export async function POST(
     : null;
   const tone = body?.tone ? String(body.tone).trim() : null;
   const captionOnly = body?.captionOnly === true;
+  const brief = body?.brief ? String(body.brief).trim().slice(0, 2000) : null;
 
   // A DESIGNED slide's copy lives inside design_html, not in heading/body --
   // it is created with both empty. Refreshing one sent "" and "" to the model
@@ -139,6 +140,7 @@ export async function POST(
       })),
       designName: carousel.name,
       tone,
+      brief,
       tenantId,
     });
   } catch (err) {

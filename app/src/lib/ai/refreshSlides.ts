@@ -57,6 +57,12 @@ export interface RefreshInput {
   designName?: string | null;
   /** Optional tone override */
   tone?: string | null;
+  /**
+   * What the post should say, in the operator's words (the AI start screen's
+   * brief). When present the slides are written FROM it, not reworded from
+   * what is on them -- a fresh single post is a blank template.
+   */
+  brief?: string | null;
   /** The real current tenant — required so the €25/month AI cap is checked and metered against the right gym. */
   tenantId: number;
 }
@@ -85,6 +91,12 @@ function buildUserPrompt(input: RefreshInput): string {
   if (input.tone && input.tone.trim()) {
     lines.push(`Tone notes: ${input.tone.trim()}`);
   }
+  const brief = input.brief?.trim();
+  if (brief) {
+    lines.push("What this post is about (write it from this brief):");
+    lines.push(brief);
+    lines.push("");
+  }
   lines.push(`Number of slides to rewrite: ${input.slides.length}`);
   lines.push("");
   lines.push("Existing slides (rewrite each with FRESH wording):");
@@ -96,7 +108,9 @@ function buildUserPrompt(input: RefreshInput): string {
   });
   lines.push("");
   lines.push(
-    `Rewrite EVERY slide. Keep the same topic as slide 1, but produce new wording that's clearly different from what's there now. Each slide must vary from the others. Return ONLY the JSON in <slides>...</slides>.`,
+    brief
+      ? `Write EVERY slide from the brief above, ignoring any placeholder wording currently on them. Each slide must vary from the others. Return ONLY the JSON in <slides>...</slides>.`
+      : `Rewrite EVERY slide. Keep the same topic as slide 1, but produce new wording that's clearly different from what's there now. Each slide must vary from the others. Return ONLY the JSON in <slides>...</slides>.`,
   );
   return lines.join("\n");
 }
