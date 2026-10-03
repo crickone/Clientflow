@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-import { disconnectFacebookPageAction, setPostingPageAction } from "@/app/settings/integrations/facebook/actions";
+import { disconnectFacebookPageAction, refreshAdAccountsAction, setPostingPageAction } from "@/app/settings/integrations/facebook/actions";
 // Type-only — lib/facebook/{pages,grants}.ts are `server-only`.
 import type { FacebookPageRow } from "@/lib/facebook/pages";
 import type { AdAccountRow, GrantInfo } from "@/lib/facebook/grants";
@@ -84,6 +84,16 @@ export function FacebookConnectCard({
     });
   }
 
+  function findAdAccounts() {
+    start(async () => {
+      const res = await refreshAdAccountsAction();
+      if (!res.ok) return void toast.error(res.error ?? "Couldn't reach Facebook.");
+      if (!res.found) return void toast.error("Facebook still lists no ad account. Reconnect and tick it on the ad accounts step.");
+      toast.success(res.found === 1 ? "Ad account found" : `${res.found} ad accounts found`);
+      router.refresh();
+    });
+  }
+
   // ── Not connected ────────────────────────────────────────────────────────
   if (pages.length === 0) {
     return (
@@ -114,11 +124,11 @@ export function FacebookConnectCard({
 
   // ── Connected ────────────────────────────────────────────────────────────
   const posting = pages.find((p) => p.pageId === postingPageId) ?? pages[pages.length - 1];
-  const ready = [
+  const ready: Array<{ ok: boolean; label: string; retry?: boolean }> = [
     { ok: true, label: "Posting to Facebook" },
     { ok: Boolean(posting.igUsername), label: posting.igUsername ? "Posting to Instagram" : "Instagram: link an Instagram account to your Page, then reconnect" },
     { ok: Boolean(posting.subscribedAt), label: posting.subscribedAt ? "Messages and lead ads" : "Messages and lead ads: reconnect to switch these on" },
-    { ok: adAccounts.length > 0, label: adAccounts.length ? "Ads" : "Ads: reconnect and tick your ad account" },
+    { ok: adAccounts.length > 0, label: adAccounts.length ? "Ads" : "Ads: no ad account found yet", retry: adAccounts.length === 0 },
   ];
 
   return (
@@ -184,6 +194,11 @@ export function FacebookConnectCard({
               {r.ok && <Check size={12} strokeWidth={3} />}
             </span>
             {r.label}
+            {r.retry && (
+              <Button variant="ghost" size="sm" onClick={findAdAccounts} disabled={busy} style={{ marginLeft: "auto" }}>
+                Check again
+              </Button>
+            )}
           </div>
         ))}
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", marginTop: 8 }}>

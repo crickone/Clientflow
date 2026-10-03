@@ -60,41 +60,99 @@ async function listAll<T>(path: string, token: string, fields: string): Promise<
 
 /**
  * The asset ids a token was granted, per permission, from debug_token's
- * granular_scopes. The fallback when /me/accounts or /me/adaccounts comes back
- * empty for a system-user token.
+ * granular_scopes. A fallback when the /me edges come back empty for a
+ * system-user token.
  */
-async function grantedTargetIds(token: string, scope: string): Promise<string[]> {
+async function grantedTargetIds(token: string, scopes: string[]): Promise<{ ids: string[]; granted: string[] }> {
   const appToken = `${process.env.FACEBOOK_APP_ID ?? ""}|${process.env.FACEBOOK_APP_SECRET ?? ""}`;
-  const body = await getJson<{ data?: { granular_scopes?: Array<{ scope: string; target_ids?: string[] }> } }>(
+  const body = await getJson<{ data?: { scopes?: string[]; granular_scopes?: Array<{ scope: string; target_ids?: string[] }> } }>(
     "debug_token",
     appToken,
     { input_token: token },
   );
-  return body.data?.granular_scopes?.find((g) => g.scope === scope)?.target_ids ?? [];
+  const ids = (body.data?.granular_scopes ?? []).filter((g) => scopes.includes(g.scope)).flatMap((g) => g.target_ids ?? []);
+  return { ids: [...new Set(ids)], granted: body.data?.scopes ?? [] };
+}
+
+const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+/**
+ * The ad accounts a token can run ads on. Meta does not list them the same way
+ * for every token, so try, in order: /me/adaccounts, the ad-account ids in the
+ * token's granular scopes, then the ad accounts of the businesses the token can
+ * see (owned and client). Every candidate is read back with the token, so only
+ * accounts it can actually reach are kept. Logs which route worked and why the
+ * others did not (never the token), so an empty result is diagnosable.
+ */
+export async function discoverAdAccounts(token: string): Promise<GraphAdAccount[]> {
+  const notes: string[] = [];
+  const found = new Map<string, GraphAdAccount>();
+  const add = (list: GraphAdAccount[], via: string) => {
+    for (const a of list) if (a?.id && !found.has(a.id)) found.set(a.id, a);
+    notes.push(`${via}=${list.length}`);
+  };
+
+  try {
+    add(await listAll<GraphAdAccount>("me/adaccounts", token, AD_ACCOUNT_FIELDS), "me/adaccounts");
+  } catch (e) {
+    notes.push(`me/adaccounts failed: ${errText(e)}`);
+  }
+
+  if (found.size === 0) {
+    try {
+      const { ids, granted } = await grantedTargetIds(token, ["ads_management", "ads_read"]);
+      notes.push(`scopes=${granted.join(",")}`);
+      const read = await Promise.all(
+        ids.map((id) =>
+          getJson<GraphAdAccount>(id.startsWith("act_") ? id : `act_${id}`, token, { fields: AD_ACCOUNT_FIELDS }).catch((e) => {
+            notes.push(`act_${id.replace(/^act_/, "")} failed: ${errText(e)}`);
+            return null;
+          }),
+        ),
+      );
+      add(read.filter((a): a is GraphAdAccount => a !== null), "granular");
+    } catch (e) {
+      notes.push(`debug_token failed: ${errText(e)}`);
+    }
+  }
+
+  if (found.size === 0) {
+    try {
+      const businesses = await listAll<{ id: string; name?: string }>("me/businesses", token, "id,name");
+      notes.push(`businesses=${businesses.length}`);
+      for (const b of businesses) {
+        for (const edge of ["owned_ad_accounts", "client_ad_accounts"]) {
+          try {
+            const listed = await listAll<GraphAdAccount>(`${b.id}/${edge}`, token, AD_ACCOUNT_FIELDS);
+            const reachable = await Promise.all(
+              listed.map((a) => getJson<GraphAdAccount>(a.id, token, { fields: AD_ACCOUNT_FIELDS }).catch(() => null)),
+            );
+            add(reachable.filter((a): a is GraphAdAccount => a !== null), `${edge}`);
+          } catch (e) {
+            notes.push(`${edge} failed: ${errText(e)}`);
+          }
+        }
+      }
+    } catch (e) {
+      notes.push(`me/businesses failed: ${errText(e)}`);
+    }
+  }
+
+  console.log(`[facebook] ad account discovery: found ${found.size}; ${notes.join("; ")}`);
+  return [...found.values()];
 }
 
 /** The Pages (with Page tokens + linked Instagram) and ad accounts a token was granted. */
 export async function discoverAssets(token: string): Promise<{ pages: GraphPage[]; adAccounts: GraphAdAccount[] }> {
   let pages = await listAll<GraphPage>("me/accounts", token, PAGE_FIELDS);
   if (pages.length === 0) {
-    const ids = await grantedTargetIds(token, "pages_show_list").catch(() => []);
+    const { ids } = await grantedTargetIds(token, ["pages_show_list"]).catch(() => ({ ids: [] as string[] }));
     pages = (
       await Promise.all(ids.map((id) => getJson<GraphPage>(id, token, { fields: PAGE_FIELDS }).catch(() => null)))
     ).filter((p): p is GraphPage => p !== null);
   }
 
-  let adAccounts = await listAll<GraphAdAccount>("me/adaccounts", token, AD_ACCOUNT_FIELDS).catch(() => []);
-  if (adAccounts.length === 0) {
-    const ids = await grantedTargetIds(token, "ads_management").catch(() => []);
-    adAccounts = (
-      await Promise.all(
-        ids.map((id) =>
-          getJson<GraphAdAccount>(id.startsWith("act_") ? id : `act_${id}`, token, { fields: AD_ACCOUNT_FIELDS }).catch(() => null),
-        ),
-      )
-    ).filter((a): a is GraphAdAccount => a !== null);
-  }
-
+  const adAccounts = await discoverAdAccounts(token);
   return { pages: pages.filter((p) => Boolean(p.id && p.access_token)), adAccounts };
 }
 
