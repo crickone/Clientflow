@@ -76,6 +76,15 @@ export function schedulePost(input: {
   if (input.scheduledFor.getTime() < Date.now() + MIN_LEAD_MS) return { ok: false, error: "Pick a time in the future." };
   if (carousel.generationStatus === "writing") return { ok: false, error: "This design is still being written. Schedule it once it is ready." };
   if (carousel.slides.length === 0) return { ok: false, error: "This design has no slides yet." };
+  // Only server-rendered (AI-designed) slides have an image the publisher can
+  // send. Template slides are drawn in the browser and never stored, so a
+  // template design used to book fine and then fail at its posting time.
+  if (postableRenders(input.carouselSetId).filenames.length === 0) {
+    return {
+      ok: false,
+      error: "This design is made from a template, which can't be posted automatically yet. Make the post with Adonis, or export it as a PNG and post it yourself.",
+    };
+  }
 
   const row = db
     .insert(schema.scheduledPosts)

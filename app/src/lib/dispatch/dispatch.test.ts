@@ -49,6 +49,7 @@ const requireLocal = createRequire(import.meta.url);
   const { eq } = requireLocal("drizzle-orm") as typeof import("drizzle-orm");
   const { createCarousel, addSlide } = requireLocal("../image/carousels") as typeof import("../image/carousels");
   const social = requireLocal("../social/schedule") as typeof import("../social/schedule");
+  const { saveRender, deleteRender } = requireLocal("../image/renderStore") as typeof import("../image/renderStore");
   const email = requireLocal("../marketing/schedule") as typeof import("../marketing/schedule");
   const { createCampaign: createEmailCampaign, getCampaign: getEmailCampaign } =
     requireLocal("../marketing/campaigns") as typeof import("../marketing/campaigns");
@@ -65,7 +66,9 @@ const requireLocal = createRequire(import.meta.url);
     .prepare("INSERT INTO tenants (slug, name, db_file, is_active) VALUES (?, ?, ?, 1) RETURNING id")
     .get(slug, "Dispatch Test", dbFile) as { id: number };
   const tid = t.id;
+  let render: string | null = null;
   const cleanup = () => {
+    deleteRender(render);
     controlSqlite.prepare("DELETE FROM tenants WHERE id = ?").run(tid);
     try {
       fs.rmSync(path.join(process.cwd(), "data", "tenants", slug), { recursive: true, force: true });
@@ -89,10 +92,15 @@ const requireLocal = createRequire(import.meta.url);
       // ── social posts ──
       const design = createCarousel({ name: "Mon post" });
       const empty = createCarousel({ name: "Empty" });
-      addSlide({ carouselSetId: design.id, slotKey: "carousel-content", templateId: "carousel-cover", aspectRatio: "1:1", caption: "cap" });
+      // A real render on disk: only server-rendered slides can be posted.
+      render = saveRender(Buffer.from("png"));
+      addSlide({ carouselSetId: design.id, slotKey: "carousel-content", templateId: "carousel-cover", aspectRatio: "1:1", caption: "cap", renderFilename: render });
+      const templateOnly = createCarousel({ name: "Template only" });
+      addSlide({ carouselSetId: templateOnly.id, slotKey: "carousel-content", templateId: "carousel-cover", aspectRatio: "1:1", caption: "cap" });
       const soon = new Date(Date.now() + 2 * HOUR);
       assert.equal(social.schedulePost({ carouselSetId: 999_999, scheduledFor: soon }).ok, false, "unknown design refused");
       assert.equal(social.schedulePost({ carouselSetId: empty.id, scheduledFor: soon }).ok, false, "a design with no slides refused");
+      assert.equal(social.schedulePost({ carouselSetId: templateOnly.id, scheduledFor: soon }).ok, false, "a template design with no render refused");
       assert.equal(social.schedulePost({ carouselSetId: design.id, scheduledFor: new Date(Date.now() - HOUR) }).ok, false, "a past time refused");
       const booked = social.schedulePost({ carouselSetId: design.id, scheduledFor: soon, channels: ["instagram"] });
       assert.ok(booked.ok, "a future time on a real design books");

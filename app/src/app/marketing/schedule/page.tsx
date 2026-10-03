@@ -7,7 +7,7 @@ import { db, schema } from "@/lib/db";
 import { listCarousels } from "@/lib/image/carousels";
 import { listScheduledEmailCampaigns } from "@/lib/marketing/schedule";
 import { isMetaConnected } from "@/lib/social/publisher";
-import { listScheduledPosts } from "@/lib/social/schedule";
+import { listScheduledPosts, postableRenders } from "@/lib/social/schedule";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +44,8 @@ export default async function SchedulePage() {
   }));
 
   const designs = listCarousels()
-    .filter((c) => c.generationStatus == null && c.slideCount > 0)
+    // Only designs with server-rendered slides can actually be posted.
+    .filter((c) => c.generationStatus == null && c.slideCount > 0 && postableRenders(c.id).filenames.length > 0)
     .map((c) => ({ id: c.id, name: c.name }));
 
   const nurtureQueued =
