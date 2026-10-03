@@ -104,8 +104,15 @@ function newAdSet(designs: BuilderDesign[], n: number): AdSetSpec {
   };
 }
 
+function blankLeadForm(campaignName: string): NonNullable<CampaignSpec["leadForm"]> {
+  return { name: `${campaignName || "Campaign"} form`, headline: "", fields: ["FULL_NAME", "EMAIL", "PHONE"], privacyPolicyUrl: "", thankYouUrl: "" };
+}
+
 export function blankSpec(designs: BuilderDesign[]): CampaignSpec {
-  return { name: "", objective: "leads", adSets: [newAdSet(designs, 1)], leadForm: null, messageDestination: "messenger" };
+  // Starts on Leads, so it starts with the instant form a leads campaign
+  // needs. It used to start with none, and the form card (shown only when one
+  // exists) never appeared while Review demanded it.
+  return { name: "", objective: "leads", adSets: [newAdSet(designs, 1)], leadForm: blankLeadForm(""), messageDestination: "messenger" };
 }
 
 function toLocalInput(iso: string | null | undefined): string {
@@ -134,14 +141,18 @@ export function AdCampaignBuilder({
 }) {
   const router = useRouter();
   const confirm = useConfirm();
-  const [spec, setSpec] = useState<CampaignSpec>(() => initialSpec ?? blankSpec(designs));
+  const [spec, setSpec] = useState<CampaignSpec>(() => {
+    const s = initialSpec ?? blankSpec(designs);
+    // A leads draft saved before it had a form gets a blank one to fill in.
+    return s.objective === "leads" && !s.leadForm ? { ...s, leadForm: blankLeadForm(s.name) } : s;
+  });
   const [adAccountId, setAdAccountId] = useState(initialAdAccountId);
   const [id, setId] = useState<number | null>(campaignId);
   const [busy, start] = useTransition();
   // One step per screen: Goal, Audience, Budget, Ads, Review. A saved draft
   // reopens on Review, where everything is summarised with Edit links.
   const [step, setStep] = useState(() =>
-    initialStep != null && initialStep >= 0 && initialStep < STEPS.length ? initialStep : campaignId ? 4 : 0,
+    initialStep != null && initialStep >= 0 && initialStep < STEPS.length ? initialStep : campaignId ? STEPS.length - 1 : 0,
   );
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const idRef = useRef<number | null>(campaignId);
@@ -176,7 +187,7 @@ export function AdCampaignBuilder({
       objective,
       leadForm:
         objective === "leads"
-          ? spec.leadForm ?? { name: `${spec.name || "Campaign"} form`, headline: "", fields: ["FULL_NAME", "EMAIL", "PHONE"], privacyPolicyUrl: "", thankYouUrl: "" }
+          ? spec.leadForm ?? blankLeadForm(spec.name)
           : null,
     });
   }
@@ -291,30 +302,39 @@ export function AdCampaignBuilder({
     if (idRef.current != null || n > 0) void save({ quiet: true, urlStep: n });
   };
 
-  // Ad set switcher for the per-ad-set steps. Hidden when there is only one.
-  const setTabs =
-    spec.adSets.length > 1 ? (
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        {spec.adSets.map((x, j) => (
-          <button
-            key={j}
-            type="button"
-            onClick={() => setActiveSet(j)}
-            style={{
-              padding: "6px 12px",
-              borderRadius: 999,
-              border: `1px solid ${j === si ? "var(--accent)" : "var(--hairline)"}`,
-              background: j === si ? "var(--accent-soft)" : "transparent",
-              color: j === si ? "var(--text-primary)" : "var(--text-secondary)",
-              fontSize: 13,
-              cursor: "pointer",
-            }}
-          >
-            {x.name || `Ad set ${j + 1}`}
-          </button>
-        ))}
-      </div>
-    ) : null;
+  function addAdSet() {
+    patch({ adSets: [...spec.adSets, newAdSet(designs, spec.adSets.length + 1)] });
+    setActiveSet(spec.adSets.length);
+  }
+
+  // The campaign's ad sets, as in Ads Manager: pick one to edit, add another.
+  const setTabs = (withAdd: boolean) => (
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+      {spec.adSets.map((x, j) => (
+        <button
+          key={j}
+          type="button"
+          onClick={() => setActiveSet(j)}
+          style={{
+            padding: "6px 12px",
+            borderRadius: 999,
+            border: `1px solid ${j === si ? "var(--accent)" : "var(--hairline)"}`,
+            background: j === si ? "var(--accent-soft)" : "transparent",
+            color: j === si ? "var(--text-primary)" : "var(--text-secondary)",
+            fontSize: 13,
+            cursor: "pointer",
+          }}
+        >
+          {x.name || `Ad set ${j + 1}`}
+        </button>
+      ))}
+      {withAdd && (
+        <Button variant="ghost" size="sm" onClick={addAdSet}>
+          <Plus size={14} /> Add ad set
+        </Button>
+      )}
+    </div>
+  );
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
@@ -365,7 +385,7 @@ export function AdCampaignBuilder({
         })}
       </nav>
 
-      {/* ── 1. Goal ── */}
+      {/* ── 1. Campaign ── */}
       {step === 0 && (
         <>
           <Card style={{ padding: 22, display: "grid", gap: 18 }}>
@@ -467,79 +487,72 @@ export function AdCampaignBuilder({
         </>
       )}
 
-      {/* ── 2. Audience ── */}
+      {/* ── 2. Ad sets: who sees it, budget and schedule (Ads Manager's ad set level) ── */}
       {step === 1 && (
-        <Card style={{ padding: 22, display: "grid", gap: 16 }}>
-          <StepHead title="Who should see the ads?" hint="Drop a pin with a radius around your business, then set the ages and, if you like, interests." />
-          {setTabs}
-          <AudienceEditor key={si} index={si} audience={set.audience} onChange={(p) => patchAudience(si, p)} />
-        </Card>
-      )}
-
-      {/* ── 3. Budget & schedule ── */}
-      {step === 2 && (
-        <Card style={{ padding: 22, display: "grid", gap: 16 }}>
-          <StepHead title="How much, and for how long?" hint="Meta never spends more than the daily budget. Leave the dates blank to start at launch and run until you pause." />
-          {setTabs}
-          <div style={grid2}>
-            <div>
-              <Label htmlFor={`as-budget-${si}`}>Daily budget ({currency})</Label>
-              <Input id={`as-budget-${si}`} type="number" min={1} step={1} value={String(set.dailyBudget)} onChange={(e) => patchSet(si, { dailyBudget: Number(e.target.value) })} />
-            </div>
-            <div>
-              <Label htmlFor={`as-start-${si}`}>Start (blank = at launch)</Label>
-              <Input id={`as-start-${si}`} type="datetime-local" value={toLocalInput(set.startAt)} onChange={(e) => patchSet(si, { startAt: e.target.value ? new Date(e.target.value).toISOString() : null })} />
-            </div>
-            <div>
-              <Label htmlFor={`as-end-${si}`}>End (blank = until paused)</Label>
-              <Input id={`as-end-${si}`} type="datetime-local" value={toLocalInput(set.endAt)} onChange={(e) => patchSet(si, { endAt: e.target.value ? new Date(e.target.value).toISOString() : null })} />
-            </div>
-          </div>
-          <details style={{ borderTop: "1px solid var(--hairline)", paddingTop: 14 }}>
-            <summary style={{ cursor: "pointer", fontSize: 13, color: "var(--text-secondary)" }}>Advanced: split into ad sets</summary>
-            <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
-              <div style={{ fontSize: 12.5, color: "var(--text-tertiary)", lineHeight: 1.5 }}>
-                Each ad set has its own audience, budget and ads, for example one per town. Most campaigns need just one.
-              </div>
-              <div style={{ maxWidth: 360 }}>
-                <Label htmlFor={`as-name-${si}`}>This ad set&rsquo;s name</Label>
-                <Input id={`as-name-${si}`} value={set.name} onChange={(e) => patchSet(si, { name: e.target.value })} />
-              </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    patch({ adSets: [...spec.adSets, newAdSet(designs, spec.adSets.length + 1)] });
-                    setActiveSet(spec.adSets.length);
-                  }}
-                >
-                  <Plus size={14} /> Add an ad set
-                </Button>
-                {spec.adSets.length > 1 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      patch({ adSets: spec.adSets.filter((_, j) => j !== si) });
-                      setActiveSet(0);
-                    }}
-                  >
-                    <Trash2 size={14} /> Remove {set.name || "this ad set"}
-                  </Button>
-                )}
-              </div>
-            </div>
-          </details>
-        </Card>
-      )}
-
-      {/* ── 4. Ads ── */}
-      {step === 3 && (
         <>
           <Card style={{ padding: "18px 22px", display: "grid", gap: 12 }}>
-            <StepHead title="What the ads say" hint="A Content Studio design plus the words around it. Add a second ad to let Meta test which works better." />
-            {setTabs}
+            <StepHead
+              title="Ad sets"
+              hint="An ad set is who sees the ads, how much to spend and when. Most campaigns need one; add another to target a different area or group with its own budget."
+            />
+            {setTabs(true)}
+          </Card>
+
+          <Card key={si} style={{ padding: 22, display: "grid", gap: 18 }}>
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 12, flexWrap: "wrap" }}>
+              <div style={{ flex: "1 1 260px", maxWidth: 420 }}>
+                <Label htmlFor={`as-name-${si}`}>Ad set name</Label>
+                <Input id={`as-name-${si}`} value={set.name} onChange={(e) => patchSet(si, { name: e.target.value })} />
+              </div>
+              {spec.adSets.length > 1 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    patch({ adSets: spec.adSets.filter((_, j) => j !== si) });
+                    setActiveSet(0);
+                  }}
+                >
+                  <Trash2 size={14} /> Remove this ad set
+                </Button>
+              )}
+            </div>
+
+            <div style={{ borderTop: "1px solid var(--hairline)", paddingTop: 16 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", marginBottom: 12 }}>Audience</div>
+              <AudienceEditor key={si} index={si} audience={set.audience} onChange={(p) => patchAudience(si, p)} />
+            </div>
+
+            <div style={{ borderTop: "1px solid var(--hairline)", paddingTop: 16, display: "grid", gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>Budget and schedule</div>
+                <div style={{ fontSize: 12.5, color: "var(--text-tertiary)", marginTop: 3 }}>Meta never spends more than the daily budget. Leave the dates blank to start at launch and run until you pause.</div>
+              </div>
+              <div style={grid2}>
+                <div>
+                  <Label htmlFor={`as-budget-${si}`}>Daily budget ({currency})</Label>
+                  <Input id={`as-budget-${si}`} type="number" min={1} step={1} value={String(set.dailyBudget)} onChange={(e) => patchSet(si, { dailyBudget: Number(e.target.value) })} />
+                </div>
+                <div>
+                  <Label htmlFor={`as-start-${si}`}>Start (blank = at launch)</Label>
+                  <Input id={`as-start-${si}`} type="datetime-local" value={toLocalInput(set.startAt)} onChange={(e) => patchSet(si, { startAt: e.target.value ? new Date(e.target.value).toISOString() : null })} />
+                </div>
+                <div>
+                  <Label htmlFor={`as-end-${si}`}>End (blank = until paused)</Label>
+                  <Input id={`as-end-${si}`} type="datetime-local" value={toLocalInput(set.endAt)} onChange={(e) => patchSet(si, { endAt: e.target.value ? new Date(e.target.value).toISOString() : null })} />
+                </div>
+              </div>
+            </div>
+          </Card>
+        </>
+      )}
+
+      {/* ── 3. Ads (per ad set) ── */}
+      {step === 2 && (
+        <>
+          <Card style={{ padding: "18px 22px", display: "grid", gap: 12 }}>
+            <StepHead title="Ads" hint="What people see: a Content Studio design plus the words around it. Each ad set has its own ads; add a second ad to let Meta test which works better." />
+            {spec.adSets.length > 1 && setTabs(false)}
           </Card>
           {set.ads.map((ad, k) => (
             <Card key={`${si}-${k}`} style={{ padding: 22, display: "grid", gap: 14 }}>
@@ -625,11 +638,11 @@ export function AdCampaignBuilder({
         </>
       )}
 
-      {/* ── 5. Review ── */}
-      {step === 4 && (
+      {/* ── 4. Review ── */}
+      {step === 3 && (
         <Card style={{ padding: 22, display: "grid", gap: 18 }}>
           <StepHead title="Check and launch" hint="Nothing goes to Meta until you press Launch. Save it as a draft to come back later." />
-          <ReviewRow label="Goal" onEdit={() => go(0)}>
+          <ReviewRow label="Campaign" onEdit={() => go(0)}>
             {splitLabel(OBJECTIVE_LABEL[spec.objective])[0]}
             {spec.name ? ` · ${spec.name}` : ""}
           </ReviewRow>
@@ -637,14 +650,15 @@ export function AdCampaignBuilder({
             <div key={j} style={{ display: "grid", gap: 10 }}>
               {spec.adSets.length > 1 && <div style={subLabel}>{x.name || `Ad set ${j + 1}`}</div>}
               <ReviewRow label="Audience" onEdit={() => (setActiveSet(j), go(1))}>
-                {x.audience.locations.map((l) => (l.kind === "country" ? l.name : `${l.name} + ${l.radiusKm} km`)).join(", ") || "No location"} · ages {x.audience.ageMin}–{x.audience.ageMax === 65 ? "65+" : x.audience.ageMax}
+                {x.audience.locations.map((l) => (l.kind === "country" ? l.name : `${l.name} + ${l.radiusKm} km`)).join(", ") || "No location"} ·{" "}
+                {x.audience.genders.length === 1 ? (x.audience.genders[0] === "female" ? "women" : "men") : "everyone"} aged {x.audience.ageMin}–{x.audience.ageMax === 65 ? "65+" : x.audience.ageMax}
                 {x.audience.interests.length ? ` · ${x.audience.interests.length} interest${x.audience.interests.length === 1 ? "" : "s"}` : ""}
               </ReviewRow>
-              <ReviewRow label="Budget" onEdit={() => (setActiveSet(j), go(2))}>
+              <ReviewRow label="Budget" onEdit={() => (setActiveSet(j), go(1))}>
                 {money(x.dailyBudget, currency)} a day · {x.startAt ? `from ${new Date(x.startAt).toLocaleDateString("en-IE")}` : "starts at launch"} ·{" "}
                 {x.endAt ? `until ${new Date(x.endAt).toLocaleDateString("en-IE")}` : "runs until paused"}
               </ReviewRow>
-              <ReviewRow label="Ads" onEdit={() => (setActiveSet(j), go(3))}>
+              <ReviewRow label="Ads" onEdit={() => (setActiveSet(j), go(2))}>
                 {x.ads.map((a) => `${designName(a.creative.designId)}${a.creative.headline ? `: "${a.creative.headline}"` : ""}`).join(" · ")}
               </ReviewRow>
             </div>
@@ -699,7 +713,7 @@ export function AdCampaignBuilder({
   );
 }
 
-const STEPS = ["Goal", "Audience", "Budget", "Ads", "Review"] as const;
+const STEPS = ["Campaign", "Ad sets", "Ads", "Review"] as const;
 
 const subLabel: React.CSSProperties = { fontSize: 11.5, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-tertiary)" };
 
