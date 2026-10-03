@@ -137,6 +137,11 @@ export async function disconnectFacebookPage(tenantId: number, pageId: string): 
     } catch {
       // best-effort — the row is already revoked, so the webhook ignores this Page.
     }
+    // The privacy policy promises disconnecting deletes the stored token, so
+    // wipe it once the unsubscribe call no longer needs it (column is NOT NULL).
+    controlSqlite
+      .prepare("UPDATE facebook_pages SET page_access_token = '' WHERE tenant_id = ? AND page_id = ? AND revoked_at IS NOT NULL")
+      .run(tenantId, pageId);
   }
 }
 

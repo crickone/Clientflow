@@ -18,11 +18,15 @@ for (const [source, target] of [
 }
 copyFileSync(resolve(here, '../../brand/favicon.svg'), join(assets, 'favicon.svg'));
 copyFileSync(join(assets, 'favicon.svg'), join(output, 'assets/favicon.svg'));
-let html = readFileSync(join(here, 'index.html'), 'utf8');
 const css = readFileSync(join(assets, 'site.css'), 'utf8');
 const script = readFileSync(join(assets, 'site.js'), 'utf8');
 if (/<\/script/i.test(script) || /<\/style/i.test(css)) throw new Error('Unsafe closing tag in inline asset');
-html = html.replace(/<link[^>]*data-adonis-style>/, () => `<style data-adonis-style>\n${css}\n</style>`);
-html = html.replace(/<script[^>]*data-adonis-script><\/script>/, () => `<script data-adonis-script>\n${script}\n</script>`);
-writeFileSync(join(output, 'index.html'), html);
-console.log(`Built ${html.length.toLocaleString()} characters → app/public/sites/adonisagent/index.html`);
+// Every page shares site.css; only pages that carry the script tag get site.js
+// (the privacy page has none of the homepage's interactive elements).
+for (const page of ['index.html', 'privacy.html']) {
+  let html = readFileSync(join(here, page), 'utf8');
+  html = html.replace(/<link[^>]*data-adonis-style>/, () => `<style data-adonis-style>\n${css}\n</style>`);
+  html = html.replace(/<script[^>]*data-adonis-script><\/script>/, () => `<script data-adonis-script>\n${script}\n</script>`);
+  writeFileSync(join(output, page), html);
+  console.log(`Built ${html.length.toLocaleString()} characters → app/public/sites/adonisagent/${page}`);
+}
