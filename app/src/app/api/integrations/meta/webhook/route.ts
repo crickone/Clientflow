@@ -44,6 +44,8 @@ function logTriageOutcome(context: string, err: unknown): void {
 export async function POST(req: Request) {
   const rawBody = await req.text();
   if (!verifyFacebookSignature(rawBody, req.headers.get("x-hub-signature-256"), process.env.FACEBOOK_APP_SECRET)) {
+    // Logged so a delivery Meta made but we refused is visible, not silent.
+    console.warn(`[meta webhook] rejected: bad or missing signature (${rawBody.length} bytes, header ${req.headers.get("x-hub-signature-256") ? "present" : "absent"})`);
     return Response.json({ ok: false }, { status: 401 });
   }
 
