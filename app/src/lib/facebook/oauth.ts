@@ -42,6 +42,9 @@ export const FACEBOOK_SCOPES = [
   "ads_management",
   "ads_read",
   "pages_manage_ads",
+  // Page + Instagram metrics for the Social dashboard
+  "read_insights",
+  "instagram_manage_insights",
 ].join(",");
 
 export function facebookConfigured(): boolean {
