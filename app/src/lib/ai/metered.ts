@@ -71,8 +71,11 @@ export async function meteredCreate(
   buildParams: () => Anthropic.MessageCreateParamsNonStreaming,
 ): Promise<Anthropic.Message> {
   assertAiAllowed(meter.tenantId);
-  const params = buildParams();
+  const params = withThinkingHeadroom(buildParams());
   const message = await getAnthropic().messages.create(params);
+  if (message.stop_reason === "max_tokens" && !message.content.some((b) => b.type === "text" && b.text.trim())) {
+    console.warn(`[ai] ${params.model} used all ${params.max_tokens} tokens without writing an answer (${meter.agentKey})`);
+  }
   meterAndCharge(meter.tenantId, meter.agentKey, params.model, usageFromMessage(message.usage));
   return message;
 }
@@ -194,4 +197,27 @@ export async function meteredCreateFailSoft<T>(
     console.error(`[${logTag}] fallback:`, err);
     return fallback;
   }
+}
+
+/**
+ * Sonnet 5.5 and Opus 5.5 always think, and thinking spends the same
+ * max_tokens as the answer. Call sites written for earlier models set
+ * max_tokens for the ANSWER alone and no effort, so Sonnet 5.5 (default effort
+ * high) could think through the whole allowance and return no text at all --
+ * post ideas did exactly that: 72 s, 8,000 tokens, an empty reply. Where a
+ * call site has not chosen an effort, pick one from the size of the job
+ * (short answers are simple jobs) and add room for the thinking on top of the
+ * answer. max_tokens is a ceiling, not a charge: usage is metered on what was
+ * actually generated.
+ */
+export function withThinkingHeadroom<T extends Anthropic.MessageCreateParamsNonStreaming>(params: T): T {
+  if (!/^claude-(sonnet|opus)-5-5/.test(String(params.model))) return params;
+  const p = params as T & { output_config?: { effort?: string } };
+  if (p.output_config?.effort) return params;
+  const answer = params.max_tokens;
+  return {
+    ...params,
+    output_config: { ...(p.output_config ?? {}), effort: answer <= 2000 ? "low" : "medium" },
+    max_tokens: Math.min(answer + (answer <= 2000 ? 4000 : 8000), 32000),
+  };
 }
