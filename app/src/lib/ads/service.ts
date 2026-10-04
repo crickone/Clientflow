@@ -130,7 +130,7 @@ async function graph<T = Record<string, unknown>>(method: "GET" | "POST" | "DELE
       ? await fetch(`${GRAPH_BASE}/${path}?${qs}`)
       : await fetch(`${GRAPH_BASE}/${path}`, { method, body: qs });
   const json = (await res.json().catch(() => ({}))) as T & {
-    error?: { message?: string; error_user_msg?: string; error_user_title?: string; code?: number; error_subcode?: number; fbtrace_id?: string };
+    error?: { message?: string; error_user_msg?: string; error_user_title?: string; code?: number; error_subcode?: number; fbtrace_id?: string; error_data?: unknown };
   };
   if (!res.ok || json.error) {
     const e = json.error;
@@ -139,6 +139,14 @@ async function graph<T = Record<string, unknown>>(method: "GET" | "POST" | "DELE
     // with the endpoint (never the token) so a refusal can be diagnosed.
     const where = path.replace(/^act_\d+\//, "act_*/");
     console.error(`[ads] Meta refused ${method} ${where}: code ${e?.code ?? "?"}/${e?.error_subcode ?? "?"} "${e?.error_user_title ?? ""}" ${e?.message ?? ""} (trace ${e?.fbtrace_id ?? "?"})`);
+    // error_data names the offending field (blame_field_specs); the request's
+    // own parameter NAMES and the targeting (no token, no ids beyond Meta's)
+    // show what was sent.
+    if (e?.error_data) console.error(`[ads]   error_data: ${JSON.stringify(e.error_data).slice(0, 800)}`);
+    if (method !== "GET" && path.endsWith("/adsets")) {
+      const sent = { ...params } as Record<string, unknown>;
+      console.error(`[ads]   sent: ${JSON.stringify({ keys: Object.keys(sent), targeting: sent.targeting, optimization_goal: sent.optimization_goal, billing_event: sent.billing_event, destination_type: sent.destination_type, promoted_object: sent.promoted_object }).slice(0, 1500)}`);
+    }
     throw new AdsError(e?.error_user_msg || e?.message || `Meta ${path} failed (${res.status}).`);
   }
   return json;
