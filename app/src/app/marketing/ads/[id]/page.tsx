@@ -24,6 +24,21 @@ export default async function AdCampaignPage({ params }: { params: { id: string 
       {campaign.status === "error" && campaign.error && (
         <div style={{ marginBottom: 16, padding: 14, border: "1px solid var(--danger)", borderRadius: "var(--radius)", fontSize: 13.5, color: "var(--text-secondary)" }}>
           <strong style={{ color: "var(--text-primary)" }}>The last launch did not go through.</strong> Meta said: {campaign.error} Nothing was left running. Fix the plan below and launch again.
+          {/* Every Page accepts Meta's lead ads terms once before its first lead
+              ad; Meta's message names the problem but not where to fix it. */}
+          {/Lead Generation Terms/i.test(campaign.error) && campaign.pageId && (
+            <div style={{ marginTop: 10 }}>
+              <a
+                href={`https://www.facebook.com/ads/leadgen/tos?page_id=${encodeURIComponent(campaign.pageId)}`}
+                target="_blank"
+                rel="noreferrer"
+                style={{ color: "var(--accent)", fontWeight: 600 }}
+              >
+                Accept the lead ads terms for your Page
+              </a>{" "}
+              (one time, as a Page admin), then press Launch again.
+            </div>
+          )}
         </div>
       )}
       {editable ? (
