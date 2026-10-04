@@ -323,14 +323,21 @@ export async function generatePostIdeas(
         },
       ],
     }),
-    (text) =>
-      dedupeIdeas(
-        extractIdeaObjects(text)
-          .map((r) => coerce(r))
-          .filter((x): x is PostIdea => x !== null),
-        avoid,
-        n,
-      ),
+    (text) => {
+      const parsed = extractIdeaObjects(text)
+        .map((r) => coerce(r))
+        .filter((x): x is PostIdea => x !== null);
+      const kept = dedupeIdeas(parsed, avoid, n);
+      // An empty batch reaches the operator as "No ideas came back" with no
+      // reason; say which step lost them (no reply text, unparseable reply, or
+      // every idea filtered as a repeat of the avoid list).
+      if (kept.length === 0) {
+        console.warn(
+          `[post-ideas] empty batch for tenant ${tenantId}: reply ${text.length} chars, ${parsed.length} parsed, ${avoid.length} hooks to avoid; reply starts: ${JSON.stringify(text.slice(0, 200))}`,
+        );
+      }
+      return kept;
+    },
     [],
     "post-ideas",
   );
