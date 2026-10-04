@@ -9,6 +9,7 @@ import {
   createAdDraft,
   deleteAdDraft,
   launchAdCampaign,
+  listLeadForms,
   refreshAdInsights,
   searchAdCities,
   searchAdInterests,
@@ -86,4 +87,9 @@ export async function suggestPlacesAction(q: string) {
 /** Coordinates for a picked suggestion that came without them. */
 export async function resolvePlaceAction(label: string) {
   return run(() => resolvePlace(String(label ?? "")), { revalidate: false });
+}
+
+/** The Page's own instant forms, for a leads campaign to reuse. */
+export async function listLeadFormsAction() {
+  return run(() => listLeadForms(), { revalidate: false });
 }

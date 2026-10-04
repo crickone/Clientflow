@@ -77,6 +77,11 @@ export interface AdSetSpec {
 }
 
 export interface LeadFormSpec {
+  /**
+   * An instant form that already exists on the Page (made in Meta), by id.
+   * When set, the ads use it as it is and the fields below are ignored.
+   */
+  existingFormId?: string | null;
   name: string;
   /** The intro shown at the top of the form. */
   headline: string;
@@ -122,7 +127,9 @@ export function validateSpec(spec: CampaignSpec): string[] {
   if (spec.objective === "leads") {
     const f = spec.leadForm;
     if (!f) errors.push("A leads campaign needs an instant form.");
-    else {
+    else if (f.existingFormId !== undefined && f.existingFormId !== null) {
+      if (!String(f.existingFormId).trim()) errors.push("Pick the instant form from your Page.");
+    } else {
       if (!f.name?.trim()) errors.push("The instant form needs a name.");
       if (!f.fields?.length) errors.push("The instant form needs at least one field.");
       if (!isHttpsUrl(f.privacyPolicyUrl)) errors.push("The instant form needs your privacy policy link (https).");
@@ -276,7 +283,9 @@ export function buildCreativeParams(spec: CampaignSpec, ad: AdSpec, ctx: Creativ
   let link = c.linkUrl ?? "";
   let callToAction: Record<string, unknown> = { type: c.cta, value: { link } };
   if (spec.objective === "leads") {
-    link = c.linkUrl || spec.leadForm?.thankYouUrl || "";
+    // Meta needs a link on a lead ad even though the button opens the form;
+    // fb.me is Meta's own placeholder for exactly this.
+    link = c.linkUrl || spec.leadForm?.thankYouUrl || "https://fb.me/";
     callToAction = { type: c.cta === "MESSAGE_PAGE" ? "SIGN_UP" : c.cta, value: { lead_gen_form_id: ctx.leadFormId } };
   } else if (spec.objective === "messages") {
     link = MESSENGER_LINK;

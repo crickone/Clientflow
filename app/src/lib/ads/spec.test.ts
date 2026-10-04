@@ -85,4 +85,12 @@ check("carousel ad has one card per slide and no single image", carousel.object_
 const form = buildLeadFormParams(leads.leadForm!) as { questions: Array<{ type: string }>; privacy_policy: { url: string } };
 check("lead form asks the chosen fields with the privacy link", form.questions.length === 3 && form.privacy_policy.url === "https://x.ie/privacy");
 
+
+// An existing Page form: only the choice is needed, and lead ads get Meta's placeholder link.
+{
+  const withForm = base({ objective: "leads", leadForm: { existingFormId: "999", name: "", headline: "", fields: [], privacyPolicyUrl: "", thankYouUrl: "" } });
+  check("existing form needs no links", !validateSpec(withForm).some((e) => e.includes("instant form")));
+  check("blank existing form id is refused", validateSpec(base({ objective: "leads", leadForm: { existingFormId: "", name: "", headline: "", fields: [], privacyPolicyUrl: "", thankYouUrl: "" } })).some((e) => e.includes("Pick the instant form")));
+}
+
 console.log(`ads/spec.test.ts: ${passed} checks passed.`);

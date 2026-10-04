@@ -229,7 +229,9 @@ export async function launchAdCampaign(id: number): Promise<AdCampaignRow> {
     update(id, { metaIds: JSON.stringify(ids) });
 
     if (spec.objective === "leads" && spec.leadForm) {
-      ids.leadFormId = (await graph<{ id: string }>("POST", `${page.pageId}/leadgen_forms`, page.pageToken, buildLeadFormParams(spec.leadForm))).id;
+      ids.leadFormId = spec.leadForm.existingFormId
+        ? spec.leadForm.existingFormId
+        : (await graph<{ id: string }>("POST", `${page.pageId}/leadgen_forms`, page.pageToken, buildLeadFormParams(spec.leadForm))).id;
     }
 
     const images = new Map<number, string[]>();
@@ -370,4 +372,14 @@ export async function searchAdCities(q: string): Promise<Array<{ key: string; na
     limit: "10",
   });
   return (r.data ?? []).map((c) => ({ key: c.key, name: c.name, region: c.region ?? null, country: c.country_name ?? null }));
+}
+
+/** The Page's active instant forms (made in Meta), for a leads campaign to reuse. */
+export async function listLeadForms(): Promise<Array<{ id: string; name: string }>> {
+  const page = adsPage();
+  const r = await graph<{ data?: Array<{ id: string; name?: string; status?: string }> }>("GET", `${page.pageId}/leadgen_forms`, page.pageToken, {
+    fields: "id,name,status",
+    limit: "100",
+  });
+  return (r.data ?? []).filter((f) => !f.status || f.status === "ACTIVE").map((f) => ({ id: f.id, name: f.name || `Form ${f.id}` }));
 }

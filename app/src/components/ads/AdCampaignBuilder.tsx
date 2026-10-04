@@ -16,6 +16,7 @@ import {
   launchAdCampaignAction,
   saveAdDraftAction,
   searchInterestsAction,
+  listLeadFormsAction,
   resolvePlaceAction,
   suggestPlacesAction,
 } from "@/app/marketing/ads/actions";
@@ -157,6 +158,21 @@ export function AdCampaignBuilder({
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const idRef = useRef<number | null>(campaignId);
   const [activeSet, setActiveSet] = useState(0);
+  // The Page's existing instant forms (made in Meta), loaded once for Leads.
+  const [pageForms, setPageForms] = useState<Array<{ id: string; name: string }> | null>(null);
+  useEffect(() => {
+    if (spec.objective !== "leads" || pageForms !== null) return;
+    void listLeadFormsAction().then((r) => {
+      const forms = r.ok ? r.data : [];
+      setPageForms(forms);
+      // A new campaign on a Page that already has forms starts on "use one".
+      setSpec((s) =>
+        s.objective === "leads" && s.leadForm && s.leadForm.existingFormId === undefined && !s.leadForm.headline && !s.leadForm.privacyPolicyUrl && forms.length
+          ? { ...s, leadForm: { ...s.leadForm, existingFormId: forms[0].id } }
+          : s,
+      );
+    });
+  }, [spec.objective, pageForms]);
   const currency = adAccounts.find((a) => a.adAccountId === adAccountId)?.currency ?? "EUR";
   const problems = validateSpec(spec);
 
@@ -446,6 +462,68 @@ export function AdCampaignBuilder({
           {spec.objective === "leads" && spec.leadForm && (
             <Card style={{ padding: 22, display: "grid", gap: 14 }}>
               <StepHead title="Instant form" hint="People fill this in without leaving Facebook or Instagram. Each one lands in Leads straight away." />
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {[
+                  { key: "existing", label: "Use a form from your Page" },
+                  { key: "new", label: "Create a new form here" },
+                ].map((o) => {
+                  const on = (o.key === "existing") === (spec.leadForm?.existingFormId != null);
+                  return (
+                    <button
+                      key={o.key}
+                      type="button"
+                      onClick={() =>
+                        patch({
+                          leadForm: { ...spec.leadForm!, existingFormId: o.key === "existing" ? (spec.leadForm!.existingFormId ?? pageForms?.[0]?.id ?? "") : null },
+                        })
+                      }
+                      style={{
+                        padding: "7px 14px",
+                        borderRadius: 999,
+                        border: `1px solid ${on ? "var(--accent)" : "var(--hairline)"}`,
+                        background: on ? "var(--accent-soft)" : "transparent",
+                        color: on ? "var(--text-primary)" : "var(--text-secondary)",
+                        fontSize: 13,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {o.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {spec.leadForm.existingFormId != null ? (
+                <div style={{ maxWidth: 420 }}>
+                  <Label htmlFor="lf-existing">Instant form</Label>
+                  {pageForms === null ? (
+                    <div style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Loading your Page&rsquo;s forms…</div>
+                  ) : pageForms.length === 0 ? (
+                    <div style={{ fontSize: 13, color: "var(--text-tertiary)", lineHeight: 1.5 }}>
+                      Your Page has no instant forms yet. Make one in Meta, or create one here instead.
+                    </div>
+                  ) : (
+                    <>
+                      <select
+                        id="lf-existing"
+                        style={selectStyle}
+                        value={spec.leadForm.existingFormId}
+                        onChange={(e) => patch({ leadForm: { ...spec.leadForm!, existingFormId: e.target.value } })}
+                      >
+                        {!pageForms.some((f) => f.id === spec.leadForm!.existingFormId) && <option value="">Choose a form</option>}
+                        {pageForms.map((f) => (
+                          <option key={f.id} value={f.id}>
+                            {f.name}
+                          </option>
+                        ))}
+                      </select>
+                      <div style={{ fontSize: 12.5, color: "var(--text-tertiary)", marginTop: 6 }}>
+                        Its questions, privacy policy and thank-you screen are used exactly as you set them up in Meta.
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : (
+              <>
               <div style={grid2}>
                 <div>
                   <Label htmlFor="lf-head">Intro line</Label>
@@ -482,6 +560,8 @@ export function AdCampaignBuilder({
                   ))}
                 </div>
               </div>
+              </>
+              )}
             </Card>
           )}
         </>
