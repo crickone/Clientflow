@@ -132,4 +132,13 @@ check("lead form asks the chosen fields with the privacy link", form.questions.l
   check("fallback splits into one ad per option, cycling", parts.length === 3 && parts[1].ad.creative.primaryText === "B" && parts[1].ad.creative.headline === "H2" && parts[2].imageHashes[0] === "h1");
   check("empty text option is refused", validateSpec(base({ adSets: [{ ...base().adSets[0], ads: [{ ...ad0, creative: { ...ad0.creative, extraTexts: [" "] } }] }] })).some((e) => e.includes("empty text option")));
 }
+
+// Advantage+ audience: ages are a suggestion; hard limits stay wide.
+{
+  const aud = base().adSets[0].audience;
+  const adv = buildTargeting({ ...aud, ageMin: 30, ageMax: 60, advantageAudience: true }) as Record<string, unknown>;
+  check("Advantage+ narrow ages go as a suggested range", adv.age_min === 25 && adv.age_max === 65 && JSON.stringify(adv.age_range) === "[30,60]");
+  const strict = buildTargeting({ ...aud, ageMin: 30, ageMax: 60, advantageAudience: false }) as Record<string, unknown>;
+  check("without Advantage+ ages are a hard limit", strict.age_min === 30 && strict.age_max === 60 && strict.age_range === undefined);
+}
 console.log(`ads/spec.test.ts: ${passed} checks passed.`);

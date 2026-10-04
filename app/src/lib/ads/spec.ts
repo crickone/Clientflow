@@ -249,6 +249,15 @@ export function buildTargeting(a: AudienceSpec): Record<string, unknown> {
     age_max: a.ageMax,
     targeting_automation: { advantage_audience: a.advantageAudience ? 1 : 0 },
   };
+  // With Advantage+ audience, Meta treats ages as a SUGGESTION: the hard
+  // limits must stay wide (minimum no higher than 25, maximum 65+) and the
+  // preferred range goes in age_range. A narrower hard range is refused with
+  // "This ad set can't be published" (code 100 / subcode 3858196).
+  if (a.advantageAudience && (a.ageMin > 25 || a.ageMax < 65)) {
+    t.age_min = Math.min(a.ageMin, 25);
+    t.age_max = 65;
+    t.age_range = [a.ageMin, a.ageMax];
+  }
   if (a.genders.length === 1) t.genders = [a.genders[0] === "male" ? 1 : 2];
   if (a.interests.length) t.flexible_spec = [{ interests: a.interests.map((i) => ({ id: i.id, name: i.name })) }];
   return t;

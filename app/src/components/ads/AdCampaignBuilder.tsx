@@ -1226,6 +1226,9 @@ function AudienceEditor({
         <div style={{ display: "grid", gap: 6 }}>
           <div className="adb-hint" style={{ fontWeight: 600, color: "var(--text-secondary)" }}>Age</div>
           <AgeRange id={`age-${index}`} min={audience.ageMin} max={audience.ageMax} onChange={(ageMin, ageMax) => onChange({ ageMin, ageMax })} />
+          {audience.advantageAudience && (audience.ageMin > 25 || audience.ageMax < 65) && (
+            <span className="adb-hint">With Advantage+ audience on, Meta treats these ages as a suggestion and may reach a little outside them. Turn it off below for a strict range.</span>
+          )}
         </div>
         <div style={{ display: "grid", gap: 6 }}>
           <div className="adb-hint" style={{ fontWeight: 600, color: "var(--text-secondary)" }}>Gender</div>
