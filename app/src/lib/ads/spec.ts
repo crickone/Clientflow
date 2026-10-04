@@ -98,6 +98,11 @@ export interface CampaignSpec {
   adSets: AdSetSpec[];
   /** Required when objective is "leads". */
   leadForm?: LeadFormSpec | null;
+  /**
+   * Who the ads promote and who pays, shown to people in the EU (Digital
+   * Services Act; Meta's dsa_beneficiary / dsa_payor). Blank = the Page name.
+   */
+  advertiser?: string | null;
   /** For "messages": which inbox the ad opens. */
   messageDestination?: "messenger" | "instagram";
 }
@@ -231,6 +236,8 @@ export function buildTargeting(a: AudienceSpec): Record<string, unknown> {
 export interface AdSetContext {
   campaignId: string;
   pageId: string;
+  /** Fallback for spec.advertiser: the Page (or business) name. */
+  advertiser?: string | null;
 }
 
 /** POST /act_<id>/adsets parameters for one ad set (its campaign is the on/off switch). */
@@ -250,6 +257,14 @@ export function buildAdSetParams(spec: CampaignSpec, set: AdSetSpec, ctx: AdSetC
   };
   if (o.destinationType) params.destination_type = o.destinationType;
   if (o.needsPagePromotedObject) params.promoted_object = { page_id: ctx.pageId };
+  // EU Digital Services Act: every ad set says who it promotes and who paid.
+  // Meta refuses EU-targeted ad sets without them ("Enter the person or
+  // organization being promoted by an ad").
+  const advertiser = (spec.advertiser ?? "").trim() || (ctx.advertiser ?? "").trim();
+  if (advertiser) {
+    params.dsa_beneficiary = advertiser;
+    params.dsa_payor = advertiser;
+  }
   if (set.startAt) params.start_time = new Date(set.startAt).toISOString();
   if (set.endAt) params.end_time = new Date(set.endAt).toISOString();
   return params;

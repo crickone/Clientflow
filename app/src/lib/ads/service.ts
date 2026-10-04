@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getBusinessProfile } from "@/lib/businessProfile";
 import fs from "node:fs";
 import { desc, eq } from "drizzle-orm";
 
@@ -133,11 +134,11 @@ async function graph<T = Record<string, unknown>>(method: "GET" | "POST" | "DELE
 }
 
 /** The Page (and its Instagram account) ads run from: the business's posting Page. */
-function adsPage(): { pageId: string; pageToken: string; igUserId: string | null } {
+function adsPage(): { pageId: string; pageToken: string; igUserId: string | null; pageName: string | null } {
   const tenantId = getCurrentTenant().id;
   const page = getPostingPage(tenantId, getPreferredPostingPageId(tenantId));
   if (!page) throw new AdsError("No Facebook Page is connected. Ads run from your Page, so connect it first.");
-  return { pageId: page.pageId, pageToken: page.pageAccessToken, igUserId: page.igUserId ?? null };
+  return { pageId: page.pageId, pageToken: page.pageAccessToken, igUserId: page.igUserId ?? null, pageName: page.pageName ?? null };
 }
 
 async function uploadDesignImages(adAccountId: string, token: string, designId: number, cache: Map<number, string[]>): Promise<string[]> {
@@ -236,7 +237,7 @@ export async function launchAdCampaign(id: number): Promise<AdCampaignRow> {
 
     const images = new Map<number, string[]>();
     for (const set of spec.adSets) {
-      const adSetId = (await graph<{ id: string }>("POST", `${acct}/adsets`, token, buildAdSetParams(spec, set, { campaignId: ids.campaignId, pageId: page.pageId }))).id;
+      const adSetId = (await graph<{ id: string }>("POST", `${acct}/adsets`, token, buildAdSetParams(spec, set, { campaignId: ids.campaignId, pageId: page.pageId, advertiser: page.pageName ?? getBusinessProfile().businessName }))).id;
       const entry = { adSetId, adIds: [] as string[] };
       ids.adSets!.push(entry);
       for (const ad of set.ads) {

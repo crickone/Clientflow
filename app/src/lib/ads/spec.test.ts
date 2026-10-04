@@ -93,4 +93,12 @@ check("lead form asks the chosen fields with the privacy link", form.questions.l
   check("blank existing form id is refused", validateSpec(base({ objective: "leads", leadForm: { existingFormId: "", name: "", headline: "", fields: [], privacyPolicyUrl: "", thankYouUrl: "" } })).some((e) => e.includes("Pick the instant form")));
 }
 
+
+// EU DSA: beneficiary and payer on every ad set, the plan's advertiser or the Page name.
+{
+  const dsa = buildAdSetParams(base(), base().adSets[0], { campaignId: "c", pageId: "p", advertiser: "Adonis Agent" }) as Record<string, unknown>;
+  check("DSA beneficiary and payer default to the Page name", dsa.dsa_beneficiary === "Adonis Agent" && dsa.dsa_payor === "Adonis Agent");
+  const own = buildAdSetParams(base({ advertiser: "Vantaige Limited" }), base().adSets[0], { campaignId: "c", pageId: "p", advertiser: "Adonis Agent" }) as Record<string, unknown>;
+  check("the plan's advertiser wins", own.dsa_beneficiary === "Vantaige Limited" && own.dsa_payor === "Vantaige Limited");
+}
 console.log(`ads/spec.test.ts: ${passed} checks passed.`);

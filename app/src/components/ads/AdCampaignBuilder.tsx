@@ -447,6 +447,10 @@ export function AdCampaignBuilder({
                 <Input id="ad-name" value={spec.name} onChange={(e) => patch({ name: e.target.value })} placeholder="e.g. Autumn intro offer" />
               </div>
               <div>
+                <Label htmlFor="ad-advertiser">Advertiser name (EU rule: who the ad is for and who paid)</Label>
+                <Input id="ad-advertiser" value={spec.advertiser ?? ""} onChange={(e) => patch({ advertiser: e.target.value })} placeholder="Leave blank to use your Facebook Page name" />
+              </div>
+              <div>
                 <Label htmlFor="ad-account">Ad account (Meta bills this)</Label>
                 <select id="ad-account" style={selectStyle} value={adAccountId} onChange={(e) => setAdAccountId(e.target.value)}>
                   {adAccounts.map((a) => (
