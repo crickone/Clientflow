@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Plus, Rocket, Save, Search, Trash2, Upload, X } from "lucide-react";
+import { AdPreview } from "./builder/AdPreview";
+import { AgeRange, BudgetStepper, DateChoice, ObjectiveCards, Segmented } from "./builder/controls";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
@@ -66,6 +68,15 @@ export interface BuilderDesign {
   id: number;
   name: string;
   slideCount: number;
+  /** Rendered slide image URLs, for the picker and the live preview. */
+  images: string[];
+}
+
+/** The Page identity the live preview shows. */
+export interface BuilderBrand {
+  pageName: string;
+  instagramHandle: string | null;
+  logoUrl: string | null;
 }
 
 const CTA_LABEL: Record<Cta, string> = {
@@ -136,6 +147,7 @@ export function AdCampaignBuilder({
   adAccounts,
   designs,
   photos: initialPhotos = [],
+  brand = null,
   initialStep,
 }: {
   campaignId: number | null;
@@ -148,6 +160,7 @@ export function AdCampaignBuilder({
   designs: BuilderDesign[];
   /** Photos in the Content Studio library, for ads that use the business's own pictures. */
   photos?: BuilderPhoto[];
+  brand?: BuilderBrand | null;
 }) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -322,7 +335,7 @@ export function AdCampaignBuilder({
         return;
       }
       toast.success("Campaign launched");
-      router.replace(`/marketing/ads/${saved}`);
+      router.replace(`/marketing/ads/${saved}?launched=1`);
       router.refresh();
     });
   }
@@ -355,607 +368,551 @@ export function AdCampaignBuilder({
     setActiveSet(spec.adSets.length);
   }
 
-  // The campaign's ad sets, as in Ads Manager: pick one to edit, add another.
-  const setTabs = (withAdd: boolean) => (
-    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-      {spec.adSets.map((x, j) => (
-        <button
-          key={j}
-          type="button"
-          onClick={() => setActiveSet(j)}
-          style={{
-            padding: "6px 12px",
-            borderRadius: 999,
-            border: `1px solid ${j === si ? "var(--accent)" : "var(--hairline)"}`,
-            background: j === si ? "var(--accent-soft)" : "transparent",
-            color: j === si ? "var(--text-primary)" : "var(--text-secondary)",
-            fontSize: 13,
-            cursor: "pointer",
-          }}
-        >
-          {x.name || `Ad set ${j + 1}`}
-        </button>
-      ))}
-      {withAdd && (
-        <Button variant="ghost" size="sm" onClick={addAdSet}>
-          <Plus size={14} /> Add ad set
-        </Button>
+  const [activeAd, setActiveAd] = useState(0);
+  const ad = set.ads[Math.min(activeAd, set.ads.length - 1)] ?? set.ads[0];
+  const objectiveOptions = OBJECTIVES.map((o) => {
+    const [title, desc] = splitLabel(OBJECTIVE_LABEL[o]);
+    return { key: o, title, desc };
+  });
+
+  // What the preview shows: the ad being edited, with its real pictures.
+  const imagesFor = (c: AdSpec["creative"]): string[] => {
+    if (c.source === "library") {
+      return (c.imageAssetIds ?? [])
+        .map((pid) => photos.find((p) => p.id === pid))
+        .filter((p): p is BuilderPhoto => !!p)
+        .map((p) => `/api/content-studio/image-library/file/${encodeURIComponent(p.filename)}`);
+    }
+    const imgs = designs.find((d) => d.id === c.designId)?.images ?? [];
+    return c.format === "carousel" ? imgs : imgs.slice(0, 1);
+  };
+  const hostOf = (url?: string) => {
+    try {
+      return url ? new URL(url).host.replace(/^www\./, "") : null;
+    } catch {
+      return null;
+    }
+  };
+  const previewAd = ad
+    ? {
+        pageName: brand?.pageName ?? "Your Page",
+        instagramHandle: brand?.instagramHandle ?? null,
+        logoUrl: brand?.logoUrl ?? null,
+        primaryText: ad.creative.primaryText,
+        headline: ad.creative.headline,
+        description: ad.creative.description,
+        ctaLabel: spec.objective === "messages" ? "Send message" : CTA_LABEL[ad.creative.cta],
+        images: imagesFor(ad.creative),
+        linkHost: spec.objective === "leads" || spec.objective === "messages" ? null : hostOf(ad.creative.linkUrl),
+      }
+    : null;
+
+  const whereOf = (x: AdSetSpec) => {
+    const places = x.audience.locations.map((l) => (l.kind === "country" ? l.name : `${l.name} + ${l.radiusKm} km`)).join(", ") || "Nowhere yet";
+    const who = x.audience.genders.length === 1 ? (x.audience.genders[0] === "female" ? "Women" : "Men") : "Everyone";
+    return `${places} · ${who} ${x.audience.ageMin}–${x.audience.ageMax >= 65 ? "65+" : x.audience.ageMax}`;
+  };
+  const day = (iso: string) => new Date(iso).toLocaleDateString("en-IE", { day: "numeric", month: "short" });
+  const runsOf = (x: AdSetSpec) =>
+    `${x.startAt ? `Starts ${day(x.startAt)}` : "Starts at launch"}, ${x.endAt ? `ends ${day(x.endAt)}` : "runs until paused"}`;
+  const adCount = spec.adSets.reduce((n, x) => n + x.ads.length, 0);
+
+  // ── The rail: live preview + the plan so far ──
+  const rail = (
+    <aside className="adb-rail" aria-label="Preview and plan">
+      {previewAd && (
+        <div className="adb-rail-card">
+          <div className="adb-rail-label">
+            Preview{spec.adSets.length > 1 || set.ads.length > 1 ? ` · ${set.name || `Ad set ${si + 1}`}, ${ad.name || `Ad ${activeAd + 1}`}` : ""}
+          </div>
+          <AdPreview ad={previewAd} />
+        </div>
       )}
-    </div>
+      <div className="adb-rail-card">
+        <div className="adb-rail-label">Your plan</div>
+        <dl className="adb-plan">
+          <div className="adb-plan-row">
+            <dt>Goal</dt>
+            <dd>{splitLabel(OBJECTIVE_LABEL[spec.objective])[0]}</dd>
+            <button type="button" className="adb-plan-edit" onClick={() => go(0)}>Edit</button>
+          </div>
+          {spec.adSets.map((x, j) => (
+            <div className="adb-plan-row" key={j}>
+              <dt>{spec.adSets.length > 1 ? x.name || `Ad set ${j + 1}` : "Who"}</dt>
+              <dd>
+                {whereOf(x)}
+                <br />
+                <span style={{ color: "var(--text-tertiary)" }}>{money(x.dailyBudget, currency)} a day · {runsOf(x)}</span>
+              </dd>
+              <button type="button" className="adb-plan-edit" onClick={() => (setActiveSet(j), go(1))}>Edit</button>
+            </div>
+          ))}
+          <div className="adb-plan-row">
+            <dt>Ads</dt>
+            <dd>{adCount === 1 ? "1 ad" : `${adCount} ads`}</dd>
+            <button type="button" className="adb-plan-edit" onClick={() => go(2)}>Edit</button>
+          </div>
+        </dl>
+        <div className="adb-spend">
+          <span className="adb-hint">Most it can spend</span>
+          <strong>
+            {money(totalDailyBudget(spec), currency)}
+            <span style={{ fontSize: 13, fontWeight: 400, color: "var(--text-tertiary)" }}> a day</span>
+          </strong>
+        </div>
+        {problems.length === 0 ? (
+          <Badge tone="success" dot>
+            Ready to launch
+          </Badge>
+        ) : (
+          <ul className="adb-todo" aria-label="Still to do">
+            {problems.slice(0, 5).map((p) => (
+              <li key={p}>{tidyProblem(p)}</li>
+            ))}
+            {problems.length > 5 && <li>and {problems.length - 5} more</li>}
+          </ul>
+        )}
+      </div>
+    </aside>
   );
 
+  const adSetTabs = (withAdd: boolean) =>
+    spec.adSets.length > 1 || withAdd ? (
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        {spec.adSets.length > 1 && (
+          <Segmented
+            label="Ad set"
+            value={String(si)}
+            onChange={(v) => (setActiveSet(Number(v)), setActiveAd(0))}
+            options={spec.adSets.map((x, j) => ({ key: String(j), label: x.name || `Ad set ${j + 1}` }))}
+          />
+        )}
+        {withAdd && (
+          <Button variant="ghost" size="sm" onClick={addAdSet}>
+            <Plus size={14} /> Add ad set
+          </Button>
+        )}
+      </div>
+    ) : null;
+
   return (
-    <div style={{ display: "grid", gap: 16 }}>
-      {/* ── Step bar ── */}
-      <nav aria-label="Campaign steps" style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-        {STEPS.map((label, n) => {
-          const active = n === step;
-          const done = n < step;
-          return (
-            <button
-              key={label}
-              type="button"
-              onClick={() => go(n)}
-              aria-current={active ? "step" : undefined}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "8px 12px",
-                borderRadius: "var(--radius)",
-                border: "none",
-                background: active ? "var(--surface-2)" : "transparent",
-                color: active ? "var(--text-primary)" : "var(--text-tertiary)",
-                fontSize: 13.5,
-                fontWeight: active ? 600 : 500,
-                cursor: "pointer",
-              }}
-            >
-              <span
-                style={{
-                  width: 22,
-                  height: 22,
-                  borderRadius: 999,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 12,
-                  background: active || done ? "var(--accent)" : "transparent",
-                  color: active || done ? "var(--accent-contrast)" : "var(--text-tertiary)",
-                  border: active || done ? "none" : "1px solid var(--hairline)",
-                }}
-              >
-                {done ? <Check size={12} strokeWidth={3} /> : n + 1}
-              </span>
+    <div style={{ display: "grid", gap: 18 }}>
+      <nav aria-label="Campaign steps" className="adb-steps">
+        {STEPS.map((label, n) => (
+          <span key={label} style={{ display: "contents" }}>
+            {n > 0 && <span className="adb-step-line" aria-hidden />}
+            <button type="button" className="adb-step" data-on={n === step} data-done={n < step} aria-current={n === step ? "step" : undefined} onClick={() => go(n)}>
+              <span className="adb-step-num">{n < step ? <Check size={12} strokeWidth={3} /> : n + 1}</span>
               {label}
             </button>
-          );
-        })}
+          </span>
+        ))}
       </nav>
 
-      {/* ── 1. Campaign ── */}
-      {step === 0 && (
-        <>
-          <Card style={{ padding: 22, display: "grid", gap: 18 }}>
-            <StepHead title="What should these ads do?" hint="Pick one goal. Meta shows the ads to the people most likely to do it." />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 10 }}>
-              {OBJECTIVES.map((o) => {
-                const [title, desc] = splitLabel(OBJECTIVE_LABEL[o]);
-                const on = spec.objective === o;
-                return (
-                  <button
-                    key={o}
-                    type="button"
-                    onClick={() => setObjective(o)}
-                    style={{
-                      textAlign: "left",
-                      padding: 14,
-                      borderRadius: "var(--radius)",
-                      border: `1px solid ${on ? "var(--accent)" : "var(--hairline)"}`,
-                      background: on ? "var(--accent-soft)" : "transparent",
-                      cursor: "pointer",
-                      display: "grid",
-                      gap: 3,
-                    }}
-                  >
-                    <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{title}</span>
-                    <span style={{ fontSize: 12.5, color: "var(--text-tertiary)", lineHeight: 1.45 }}>{desc}</span>
-                  </button>
-                );
-              })}
-            </div>
-            {spec.objective === "messages" && (
-              <div style={{ maxWidth: 320 }}>
-                <Label htmlFor="ad-dest">Open a chat in</Label>
-                <select id="ad-dest" style={selectStyle} value={spec.messageDestination ?? "messenger"} onChange={(e) => patch({ messageDestination: e.target.value as "messenger" | "instagram" })}>
-                  <option value="messenger">Messenger</option>
-                  <option value="instagram">Instagram</option>
-                </select>
-              </div>
-            )}
-            <div style={grid2}>
-              <div>
-                <Label htmlFor="ad-name">Campaign name (only you see it)</Label>
-                <Input id="ad-name" value={spec.name} onChange={(e) => patch({ name: e.target.value })} placeholder="e.g. Autumn intro offer" />
-              </div>
-              <div>
-                <Label htmlFor="ad-advertiser">Advertiser name (EU rule: who the ad is for and who paid)</Label>
-                <Input id="ad-advertiser" value={spec.advertiser ?? ""} onChange={(e) => patch({ advertiser: e.target.value })} placeholder="Leave blank to use your Facebook Page name" />
-              </div>
-              <div>
-                <Label htmlFor="ad-account">Ad account (Meta bills this)</Label>
-                <select id="ad-account" style={selectStyle} value={adAccountId} onChange={(e) => setAdAccountId(e.target.value)}>
-                  {adAccounts.map((a) => (
-                    <option key={a.adAccountId} value={a.adAccountId}>
-                      {a.name ?? a.adAccountId} {a.currency ? `(${a.currency})` : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </Card>
+      <div className="adb">
+        <div className="adb-main">
+          <div key={step} className="adb-step-anim" style={{ display: "grid", gap: 16 }}>
+            {/* ── 1. Campaign ── */}
+            {step === 0 && (
+              <section className="adb-panel">
+                <header className="adb-panel-head">
+                  <h2>What should these ads do?</h2>
+                  <p>Pick one goal. Meta shows the ads to the people most likely to do it.</p>
+                </header>
+                <ObjectiveCards options={objectiveOptions} value={spec.objective} onChange={setObjective} />
+                {spec.objective === "messages" && (
+                  <div style={{ display: "grid", gap: 8 }}>
+                    <span className="adb-hint">Open the chat in</span>
+                    <Segmented
+                      label="Open the chat in"
+                      value={spec.messageDestination ?? "messenger"}
+                      onChange={(v) => patch({ messageDestination: v })}
+                      options={[
+                        { key: "messenger", label: "Messenger" },
+                        { key: "instagram", label: "Instagram" },
+                      ]}
+                    />
+                  </div>
+                )}
 
-          {spec.objective === "leads" && spec.leadForm && (
-            <Card style={{ padding: 22, display: "grid", gap: 14 }}>
-              <StepHead title="Instant form" hint="People fill this in without leaving Facebook or Instagram. Each one lands in Leads straight away." />
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {[
-                  { key: "existing", label: "Use a form from your Page" },
-                  { key: "new", label: "Create a new form here" },
-                ].map((o) => {
-                  const on = (o.key === "existing") === (spec.leadForm?.existingFormId != null);
-                  return (
-                    <button
-                      key={o.key}
-                      type="button"
-                      onClick={() =>
+                {spec.objective === "leads" && spec.leadForm && (
+                  <div className="adb-section">
+                    <h3>Instant form <small>People fill it in without leaving Facebook or Instagram; each one lands in Leads.</small></h3>
+                    <Segmented
+                      label="Instant form"
+                      value={spec.leadForm.existingFormId != null ? "existing" : "new"}
+                      onChange={(v) =>
                         patch({
-                          leadForm: { ...spec.leadForm!, existingFormId: o.key === "existing" ? (spec.leadForm!.existingFormId ?? pageForms?.[0]?.id ?? "") : null },
+                          leadForm: { ...spec.leadForm!, existingFormId: v === "existing" ? (spec.leadForm!.existingFormId ?? pageForms?.[0]?.id ?? "") : null },
                         })
                       }
-                      style={{
-                        padding: "7px 14px",
-                        borderRadius: 999,
-                        border: `1px solid ${on ? "var(--accent)" : "var(--hairline)"}`,
-                        background: on ? "var(--accent-soft)" : "transparent",
-                        color: on ? "var(--text-primary)" : "var(--text-secondary)",
-                        fontSize: 13,
-                        cursor: "pointer",
-                      }}
-                    >
-                      {o.label}
-                    </button>
-                  );
-                })}
-              </div>
-              {spec.leadForm.existingFormId != null ? (
-                <div style={{ maxWidth: 420 }}>
-                  <Label htmlFor="lf-existing">Instant form</Label>
-                  {pageForms === null ? (
-                    <div style={{ fontSize: 13, color: "var(--text-tertiary)" }}>Loading your Page&rsquo;s forms…</div>
-                  ) : pageForms.length === 0 ? (
-                    <div style={{ fontSize: 13, color: "var(--text-tertiary)", lineHeight: 1.5 }}>
-                      Your Page has no instant forms yet. Make one in Meta, or create one here instead.
+                      options={[
+                        { key: "existing", label: "Use a form from your Page" },
+                        { key: "new", label: "Create one here" },
+                      ]}
+                    />
+                    {spec.leadForm.existingFormId != null ? (
+                      pageForms === null ? (
+                        <span className="adb-hint">Loading your Page&rsquo;s forms…</span>
+                      ) : pageForms.length === 0 ? (
+                        <span className="adb-hint">Your Page has no instant forms yet. Make one in Meta, or create one here.</span>
+                      ) : (
+                        <div style={{ maxWidth: 420, display: "grid", gap: 6 }}>
+                          <select aria-label="Instant form" style={selectStyle} value={spec.leadForm.existingFormId} onChange={(e) => patch({ leadForm: { ...spec.leadForm!, existingFormId: e.target.value } })}>
+                            {!pageForms.some((f) => f.id === spec.leadForm!.existingFormId) && <option value="">Choose a form</option>}
+                            {pageForms.map((f) => (
+                              <option key={f.id} value={f.id}>
+                                {f.name}
+                              </option>
+                            ))}
+                          </select>
+                          <span className="adb-hint">Its questions, privacy policy and thank-you screen are used exactly as set up in Meta.</span>
+                        </div>
+                      )
+                    ) : (
+                      <div style={{ display: "grid", gap: 12 }}>
+                        <div className="adb-grid">
+                          <div>
+                            <Label htmlFor="lf-head">Intro line</Label>
+                            <Input id="lf-head" value={spec.leadForm.headline} placeholder="Leave your details and we will call you" onChange={(e) => patch({ leadForm: { ...spec.leadForm!, headline: e.target.value } })} />
+                          </div>
+                          <div>
+                            <Label htmlFor="lf-name">Form name (only you see it)</Label>
+                            <Input id="lf-name" value={spec.leadForm.name} onChange={(e) => patch({ leadForm: { ...spec.leadForm!, name: e.target.value } })} />
+                          </div>
+                          <div>
+                            <Label htmlFor="lf-priv">Privacy policy link</Label>
+                            <Input id="lf-priv" value={spec.leadForm.privacyPolicyUrl} placeholder="https://yoursite.ie/privacy" onChange={(e) => patch({ leadForm: { ...spec.leadForm!, privacyPolicyUrl: e.target.value } })} />
+                          </div>
+                          <div>
+                            <Label htmlFor="lf-ty">Link after they submit</Label>
+                            <Input id="lf-ty" value={spec.leadForm.thankYouUrl} placeholder="https://yoursite.ie" onChange={(e) => patch({ leadForm: { ...spec.leadForm!, thankYouUrl: e.target.value } })} />
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", fontSize: 13.5, color: "var(--text-secondary)" }}>
+                          <span className="adb-hint">Ask for</span>
+                          {(["FULL_NAME", "EMAIL", "PHONE"] as const).map((f) => (
+                            <label key={f} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <input
+                                type="checkbox"
+                                checked={spec.leadForm!.fields.includes(f)}
+                                onChange={(e) => {
+                                  const fields = e.target.checked ? [...spec.leadForm!.fields, f] : spec.leadForm!.fields.filter((x) => x !== f);
+                                  patch({ leadForm: { ...spec.leadForm!, fields } });
+                                }}
+                              />
+                              {f === "FULL_NAME" ? "Name" : f === "EMAIL" ? "Email" : "Phone"}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="adb-section">
+                  <h3>Details</h3>
+                  <div className="adb-grid">
+                    <div>
+                      <Label htmlFor="ad-name">Campaign name (only you see it)</Label>
+                      <Input id="ad-name" value={spec.name} onChange={(e) => patch({ name: e.target.value })} placeholder="Autumn intro offer" />
                     </div>
-                  ) : (
-                    <>
-                      <select
-                        id="lf-existing"
-                        style={selectStyle}
-                        value={spec.leadForm.existingFormId}
-                        onChange={(e) => patch({ leadForm: { ...spec.leadForm!, existingFormId: e.target.value } })}
-                      >
-                        {!pageForms.some((f) => f.id === spec.leadForm!.existingFormId) && <option value="">Choose a form</option>}
-                        {pageForms.map((f) => (
-                          <option key={f.id} value={f.id}>
-                            {f.name}
+                    <div>
+                      <Label htmlFor="ad-account">Ad account (Meta bills it)</Label>
+                      <select id="ad-account" style={selectStyle} value={adAccountId} onChange={(e) => setAdAccountId(e.target.value)}>
+                        {adAccounts.map((a) => (
+                          <option key={a.adAccountId} value={a.adAccountId}>
+                            {a.name ?? a.adAccountId} {a.currency ? `(${a.currency})` : ""}
                           </option>
                         ))}
                       </select>
-                      <div style={{ fontSize: 12.5, color: "var(--text-tertiary)", marginTop: 6 }}>
-                        Its questions, privacy policy and thank-you screen are used exactly as you set them up in Meta.
-                      </div>
-                    </>
+                    </div>
+                    <div>
+                      <Label htmlFor="ad-advertiser">Advertiser shown in the EU</Label>
+                      <Input id="ad-advertiser" value={spec.advertiser ?? ""} onChange={(e) => patch({ advertiser: e.target.value })} placeholder={brand?.pageName ?? "Your Page name"} />
+                    </div>
+                  </div>
+                  <span className="adb-hint">EU rules show people who the ad is for and who paid. Leave it blank to use your Page name.</span>
+                </div>
+              </section>
+            )}
+
+            {/* ── 2. Ad sets ── */}
+            {step === 1 && (
+              <section className="adb-panel">
+                <header className="adb-panel-head">
+                  <h2>Who sees it, and for how much</h2>
+                  <p>This is an ad set: an audience with its own budget and dates. Most campaigns need one; add another to reach a different area or group.</p>
+                </header>
+                {adSetTabs(true)}
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 12, flexWrap: "wrap" }}>
+                  <div style={{ flex: "1 1 260px", maxWidth: 420 }}>
+                    <Label htmlFor={`as-name-${si}`}>Ad set name (only you see it)</Label>
+                    <Input id={`as-name-${si}`} value={set.name} onChange={(e) => patchSet(si, { name: e.target.value })} />
+                  </div>
+                  {spec.adSets.length > 1 && (
+                    <Button variant="ghost" size="sm" onClick={() => (patch({ adSets: spec.adSets.filter((_, j) => j !== si) }), setActiveSet(0))}>
+                      <Trash2 size={14} /> Remove this ad set
+                    </Button>
                   )}
                 </div>
-              ) : (
-              <>
-              <div style={grid2}>
-                <div>
-                  <Label htmlFor="lf-head">Intro line</Label>
-                  <Input id="lf-head" value={spec.leadForm.headline} placeholder="e.g. Leave your details and we will call you" onChange={(e) => patch({ leadForm: { ...spec.leadForm!, headline: e.target.value } })} />
-                </div>
-                <div>
-                  <Label htmlFor="lf-name">Form name (only you see it)</Label>
-                  <Input id="lf-name" value={spec.leadForm.name} onChange={(e) => patch({ leadForm: { ...spec.leadForm!, name: e.target.value } })} />
-                </div>
-                <div>
-                  <Label htmlFor="lf-priv">Your privacy policy link</Label>
-                  <Input id="lf-priv" value={spec.leadForm.privacyPolicyUrl} placeholder="https://yoursite.ie/privacy" onChange={(e) => patch({ leadForm: { ...spec.leadForm!, privacyPolicyUrl: e.target.value } })} />
-                </div>
-                <div>
-                  <Label htmlFor="lf-ty">Website link after they submit</Label>
-                  <Input id="lf-ty" value={spec.leadForm.thankYouUrl} placeholder="https://yoursite.ie" onChange={(e) => patch({ leadForm: { ...spec.leadForm!, thankYouUrl: e.target.value } })} />
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: 12.5, color: "var(--text-tertiary)", marginBottom: 6 }}>Ask for</div>
-                <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 13.5 }}>
-                  {(["FULL_NAME", "EMAIL", "PHONE"] as const).map((f) => (
-                    <label key={f} style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--text-secondary)" }}>
-                      <input
-                        type="checkbox"
-                        checked={spec.leadForm!.fields.includes(f)}
-                        onChange={(e) => {
-                          const fields = e.target.checked ? [...spec.leadForm!.fields, f] : spec.leadForm!.fields.filter((x) => x !== f);
-                          patch({ leadForm: { ...spec.leadForm!, fields } });
-                        }}
-                      />
-                      {f === "FULL_NAME" ? "Name" : f === "EMAIL" ? "Email" : "Phone"}
-                    </label>
-                  ))}
-                </div>
-              </div>
-              </>
-              )}
-            </Card>
-          )}
-        </>
-      )}
 
-      {/* ── 2. Ad sets: who sees it, budget and schedule (Ads Manager's ad set level) ── */}
-      {step === 1 && (
-        <>
-          <Card style={{ padding: "18px 22px", display: "grid", gap: 12 }}>
-            <StepHead
-              title="Ad sets"
-              hint="An ad set is who sees the ads, how much to spend and when. Most campaigns need one; add another to target a different area or group with its own budget."
-            />
-            {setTabs(true)}
-          </Card>
-
-          <Card key={si} style={{ padding: 22, display: "grid", gap: 18 }}>
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 12, flexWrap: "wrap" }}>
-              <div style={{ flex: "1 1 260px", maxWidth: 420 }}>
-                <Label htmlFor={`as-name-${si}`}>Ad set name</Label>
-                <Input id={`as-name-${si}`} value={set.name} onChange={(e) => patchSet(si, { name: e.target.value })} />
-              </div>
-              {spec.adSets.length > 1 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    patch({ adSets: spec.adSets.filter((_, j) => j !== si) });
-                    setActiveSet(0);
-                  }}
-                >
-                  <Trash2 size={14} /> Remove this ad set
-                </Button>
-              )}
-            </div>
-
-            <div style={{ borderTop: "1px solid var(--hairline)", paddingTop: 16 }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", marginBottom: 12 }}>Audience</div>
-              <AudienceEditor key={si} index={si} audience={set.audience} onChange={(p) => patchAudience(si, p)} />
-            </div>
-
-            <div style={{ borderTop: "1px solid var(--hairline)", paddingTop: 16, display: "grid", gap: 12 }}>
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>Budget and schedule</div>
-                <div style={{ fontSize: 12.5, color: "var(--text-tertiary)", marginTop: 3 }}>Meta never spends more than the daily budget. Leave the dates blank to start at launch and run until you pause.</div>
-              </div>
-              <div style={grid2}>
-                <div>
-                  <Label htmlFor={`as-budget-${si}`}>Daily budget ({currency})</Label>
-                  <Input id={`as-budget-${si}`} type="number" min={1} step={1} value={String(set.dailyBudget)} onChange={(e) => patchSet(si, { dailyBudget: Number(e.target.value) })} />
+                <div className="adb-section">
+                  <h3>Audience</h3>
+                  <AudienceEditor key={si} index={si} audience={set.audience} onChange={(p) => patchAudience(si, p)} />
                 </div>
-                <div>
-                  <Label htmlFor={`as-start-${si}`}>Start (blank = at launch)</Label>
-                  <Input id={`as-start-${si}`} type="datetime-local" value={toLocalInput(set.startAt)} onChange={(e) => patchSet(si, { startAt: e.target.value ? new Date(e.target.value).toISOString() : null })} />
-                </div>
-                <div>
-                  <Label htmlFor={`as-end-${si}`}>End (blank = until paused)</Label>
-                  <Input id={`as-end-${si}`} type="datetime-local" value={toLocalInput(set.endAt)} onChange={(e) => patchSet(si, { endAt: e.target.value ? new Date(e.target.value).toISOString() : null })} />
-                </div>
-              </div>
-            </div>
-          </Card>
-        </>
-      )}
 
-      {/* ── 3. Ads (per ad set) ── */}
-      {step === 2 && (
-        <>
-          <Card style={{ padding: "18px 22px", display: "grid", gap: 12 }}>
-            <StepHead title="Ads" hint="What people see: a Content Studio design or your own photos, plus the words around them. Each ad set has its own ads; add a second ad to let Meta test which works better." />
-            {spec.adSets.length > 1 && setTabs(false)}
-          </Card>
-          {set.ads.map((ad, k) => (
-            <Card key={`${si}-${k}`} style={{ padding: 22, display: "grid", gap: 14 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{ad.name || `Ad ${k + 1}`}</span>
+                <div className="adb-section">
+                  <h3>Daily budget <small>Meta never spends more than this in a day.</small></h3>
+                  <BudgetStepper id={`as-budget-${si}`} value={set.dailyBudget} currency={currency} onChange={(n) => patchSet(si, { dailyBudget: n })} />
+                </div>
+
+                <div className="adb-section">
+                  <h3>Schedule</h3>
+                  <div className="adb-grid">
+                    <div style={{ display: "grid", gap: 6 }}>
+                      <span className="adb-hint">Starts</span>
+                      <DateChoice id={`as-start-${si}`} value={set.startAt} onChange={(v) => patchSet(si, { startAt: v })} openLabel="At launch" dateLabel="On a date" />
+                    </div>
+                    <div style={{ display: "grid", gap: 6 }}>
+                      <span className="adb-hint">Ends</span>
+                      <DateChoice id={`as-end-${si}`} value={set.endAt} onChange={(v) => patchSet(si, { endAt: v })} openLabel="When I pause it" dateLabel="On a date" />
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* ── 3. Ads ── */}
+            {step === 2 && (
+              <section className="adb-panel">
+                <header className="adb-panel-head">
+                  <h2>The ads</h2>
+                  <p>A picture and the words around it. Add a second ad to let Meta test which one works better.</p>
+                </header>
+                {adSetTabs(false)}
                 {set.ads.length > 1 && (
-                  <Button variant="ghost" size="sm" style={{ marginLeft: "auto" }} onClick={() => patchSet(si, { ads: set.ads.filter((_, m) => m !== k) })}>
-                    <X size={14} /> Remove
-                  </Button>
+                  <Segmented
+                    label="Ad"
+                    value={String(Math.min(activeAd, set.ads.length - 1))}
+                    onChange={(v) => setActiveAd(Number(v))}
+                    options={set.ads.map((a, m) => ({ key: String(m), label: a.name || `Ad ${m + 1}` }))}
+                  />
                 )}
-              </div>
-
-              <div style={subLabel}>Picture</div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {[
-                  { key: "design", label: "Content Studio design" },
-                  { key: "library", label: "Your photos" },
-                ].map((o) => {
-                  const on = (ad.creative.source ?? "design") === o.key;
+                {(() => {
+                  const k = Math.min(activeAd, set.ads.length - 1);
+                  const a = set.ads[k];
+                  const source = a.creative.source ?? "design";
+                  const chosen = a.creative.imageAssetIds ?? [];
+                  const design = designs.find((d) => d.id === a.creative.designId);
                   return (
-                    <button
-                      key={o.key}
-                      type="button"
-                      onClick={() => patchAd(si, k, { source: o.key as "design" | "library" })}
-                      style={{
-                        padding: "6px 12px",
-                        borderRadius: 999,
-                        border: `1px solid ${on ? "var(--accent)" : "var(--hairline)"}`,
-                        background: on ? "var(--accent-soft)" : "transparent",
-                        color: on ? "var(--text-primary)" : "var(--text-secondary)",
-                        fontSize: 13,
-                        cursor: "pointer",
-                      }}
-                    >
-                      {o.label}
-                    </button>
-                  );
-                })}
-              </div>
-              {(ad.creative.source ?? "design") === "design" ? (
-                <div style={grid2}>
-                  <div>
-                    <Label htmlFor={`ad-d-${si}-${k}`}>Content Studio design</Label>
-                    <select id={`ad-d-${si}-${k}`} style={selectStyle} value={ad.creative.designId} onChange={(e) => patchAd(si, k, { designId: Number(e.target.value) })}>
-                      {designs.length === 0 && <option value={0}>No finished designs yet: make one in Content Studio</option>}
-                      {designs.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.name} ({d.slideCount} {d.slideCount === 1 ? "image" : "images"})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <Label htmlFor={`ad-f-${si}-${k}`}>Format</Label>
-                    <select id={`ad-f-${si}-${k}`} style={selectStyle} value={ad.creative.format} onChange={(e) => patchAd(si, k, { format: e.target.value as "single" | "carousel" })}>
-                      <option value="single">Single image (first slide)</option>
-                      <option value="carousel">Carousel (every slide)</option>
-                    </select>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ display: "grid", gap: 10 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                    <label
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 6,
-                        padding: "7px 12px",
-                        borderRadius: "var(--radius)",
-                        border: "1px solid var(--hairline)",
-                        fontSize: 13,
-                        color: "var(--text-primary)",
-                        cursor: uploading ? "wait" : "pointer",
-                        opacity: uploading ? 0.6 : 1,
-                      }}
-                    >
-                      <Upload size={14} /> {uploading ? "Uploading…" : "Upload photos"}
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp"
-                        multiple
-                        disabled={uploading}
-                        style={{ display: "none" }}
-                        onChange={(e) => {
-                          void uploadPhotos(si, k, e.target.files);
-                          e.target.value = "";
-                        }}
-                      />
-                    </label>
-                    <span style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>
-                      Pick one for a single image, or several (up to 10, in order) for a carousel. Uploads are saved to your Content Studio library.
-                    </span>
-                  </div>
-                  {photos.length === 0 ? (
-                    <div style={{ fontSize: 13, color: "var(--text-tertiary)" }}>No photos in your library yet. Upload some above.</div>
-                  ) : (
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))", gap: 8, maxHeight: 320, overflowY: "auto" }}>
-                      {photos.map((ph) => {
-                        const chosen = ad.creative.imageAssetIds ?? [];
-                        const pos = chosen.indexOf(ph.id);
-                        return (
-                          <button
-                            key={ph.id}
-                            type="button"
-                            title={ph.name}
-                            onClick={() =>
-                              patchAd(si, k, {
-                                imageAssetIds: pos >= 0 ? chosen.filter((x) => x !== ph.id) : [...chosen, ph.id].slice(0, 10),
-                              })
-                            }
-                            style={{
-                              position: "relative",
-                              padding: 0,
-                              aspectRatio: "1 / 1",
-                              borderRadius: 8,
-                              overflow: "hidden",
-                              border: `2px solid ${pos >= 0 ? "var(--accent)" : "transparent"}`,
-                              background: "var(--surface-2)",
-                              cursor: "pointer",
-                            }}
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element -- library thumbnails served by our own route */}
-                            <img src={`/api/content-studio/image-library/file/${encodeURIComponent(ph.filename)}`} alt={ph.name} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                            {pos >= 0 && (
-                              <span
-                                style={{
-                                  position: "absolute",
-                                  top: 6,
-                                  right: 6,
-                                  width: 22,
-                                  height: 22,
-                                  borderRadius: 999,
-                                  background: "var(--accent)",
-                                  color: "var(--accent-contrast)",
-                                  fontSize: 12,
-                                  fontWeight: 700,
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                }}
-                              >
-                                {pos + 1}
-                              </span>
+                    <>
+                      <div className="adb-section" style={{ borderTop: "none", paddingTop: 0 }}>
+                        <h3>Picture</h3>
+                        <Segmented
+                          label="Picture source"
+                          value={source}
+                          onChange={(v) => patchAd(si, k, { source: v })}
+                          options={[
+                            { key: "design", label: "Content Studio design" },
+                            { key: "library", label: "Your photos" },
+                          ]}
+                        />
+                        {source === "design" ? (
+                          designs.length === 0 ? (
+                            <span className="adb-hint">No finished designs yet. Make one in Content Studio, or use your photos.</span>
+                          ) : (
+                            <>
+                              <div className="adb-designs" role="radiogroup" aria-label="Design">
+                                {designs.map((d) => (
+                                  <button key={d.id} type="button" role="radio" aria-checked={d.id === a.creative.designId} className="adb-design" data-on={d.id === a.creative.designId} onClick={() => patchAd(si, k, { designId: d.id })}>
+                                    <span className="adb-design-img">
+                                      {/* eslint-disable-next-line @next/next/no-img-element -- our own render route */}
+                                      {d.images[0] && <img src={d.images[0]} alt="" loading="lazy" />}
+                                    </span>
+                                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.name}</span>
+                                  </button>
+                                ))}
+                              </div>
+                              {design && design.slideCount > 1 && (
+                                <Segmented
+                                  label="Format"
+                                  value={a.creative.format}
+                                  onChange={(v) => patchAd(si, k, { format: v })}
+                                  options={[
+                                    { key: "single", label: "Single image" },
+                                    { key: "carousel", label: `Carousel (${design.slideCount} slides)` },
+                                  ]}
+                                />
+                              )}
+                            </>
+                          )
+                        ) : (
+                          <>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                              <label className="adb-seg-btn" style={{ border: "1px solid var(--hairline)", display: "inline-flex", alignItems: "center", gap: 6, cursor: uploading ? "wait" : "pointer", opacity: uploading ? 0.6 : 1 }}>
+                                <Upload size={14} /> {uploading ? "Uploading…" : "Upload photos"}
+                                <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={uploading} style={{ display: "none" }} onChange={(e) => (void uploadPhotos(si, k, e.target.files), (e.target.value = ""))} />
+                              </label>
+                              <span className="adb-hint">One photo for a single image, or several (up to 10) for a carousel, in the order you pick them.</span>
+                            </div>
+                            {photos.length === 0 ? (
+                              <span className="adb-hint">No photos in your library yet.</span>
+                            ) : (
+                              <div className="adb-photos">
+                                {photos.map((ph) => {
+                                  const pos = chosen.indexOf(ph.id);
+                                  return (
+                                    <button key={ph.id} type="button" title={ph.name} aria-pressed={pos >= 0} className="adb-photo" data-on={pos >= 0} onClick={() => patchAd(si, k, { imageAssetIds: pos >= 0 ? chosen.filter((x) => x !== ph.id) : [...chosen, ph.id].slice(0, 10) })}>
+                                      {/* eslint-disable-next-line @next/next/no-img-element -- library thumbnails from our own route */}
+                                      <img src={`/api/content-studio/image-library/file/${encodeURIComponent(ph.filename)}`} alt={ph.name} loading="lazy" />
+                                      {pos >= 0 && <span className="adb-photo-n">{pos + 1}</span>}
+                                    </button>
+                                  );
+                                })}
+                              </div>
                             )}
+                          </>
+                        )}
+                      </div>
+
+                      <div className="adb-section">
+                        <h3>Words</h3>
+                        <div>
+                          <Label htmlFor={`ad-t-${si}-${k}`}>Main text (above the picture)</Label>
+                          <Textarea id={`ad-t-${si}-${k}`} rows={4} value={a.creative.primaryText} onChange={(e) => patchAd(si, k, { primaryText: e.target.value })} />
+                        </div>
+                        <div className="adb-grid">
+                          <div>
+                            <Label htmlFor={`ad-h-${si}-${k}`}>Headline (below the picture)</Label>
+                            <Input id={`ad-h-${si}-${k}`} value={a.creative.headline} onChange={(e) => patchAd(si, k, { headline: e.target.value })} />
+                          </div>
+                          <div>
+                            <Label htmlFor={`ad-ds-${si}-${k}`}>Description (optional)</Label>
+                            <Input id={`ad-ds-${si}-${k}`} value={a.creative.description ?? ""} onChange={(e) => patchAd(si, k, { description: e.target.value })} />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="adb-section">
+                        <h3>Button</h3>
+                        <div className="adb-grid">
+                          <div>
+                            <Label htmlFor={`ad-c-${si}-${k}`}>Button text</Label>
+                            <select id={`ad-c-${si}-${k}`} style={selectStyle} value={a.creative.cta} onChange={(e) => patchAd(si, k, { cta: e.target.value as Cta })} disabled={spec.objective === "messages"}>
+                              {CTAS.map((c) => (
+                                <option key={c} value={c}>
+                                  {CTA_LABEL[c]}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          {spec.objective !== "messages" && (
+                            <div>
+                              <Label htmlFor={`ad-l-${si}-${k}`}>Website link{spec.objective === "leads" ? " (optional)" : ""}</Label>
+                              <Input id={`ad-l-${si}-${k}`} value={a.creative.linkUrl ?? ""} placeholder="https://" onChange={(e) => patchAd(si, k, { linkUrl: e.target.value })} />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", paddingTop: 4, borderTop: "1px solid var(--hairline)" }}>
+                        <Button variant="outline" size="sm" onClick={() => (patchSet(si, { ads: [...set.ads, newAd(designs, set.ads.length + 1)] }), setActiveAd(set.ads.length))}>
+                          <Plus size={14} /> Add another ad
+                        </Button>
+                        {set.ads.length > 1 && (
+                          <Button variant="ghost" size="sm" onClick={() => (patchSet(si, { ads: set.ads.filter((_, m) => m !== k) }), setActiveAd(0))}>
+                            <X size={14} /> Remove this ad
+                          </Button>
+                        )}
+                        <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
+                          <Label htmlFor={`ad-n-${si}-${k}`}>Ad name</Label>
+                          <Input id={`ad-n-${si}-${k}`} value={a.name} onChange={(e) => patchAd(si, k, { name: e.target.value })} style={{ width: 160 }} />
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
+              </section>
+            )}
+
+            {/* ── 4. Review ── */}
+            {step === 3 && (
+              <section className="adb-panel">
+                <header className="adb-panel-head">
+                  <h2>Check it, then launch</h2>
+                  <p>Nothing reaches Meta until you press Launch. It goes live after Meta&rsquo;s own review, usually within a few hours.</p>
+                </header>
+                {problems.length > 0 && (
+                  <div style={{ display: "grid", gap: 8, padding: 14, borderRadius: "var(--radius)", background: "var(--warning-soft)" }}>
+                    <strong style={{ fontSize: 13.5, color: "var(--text-primary)" }}>Before you can launch</strong>
+                    <ul className="adb-todo">
+                      {problems.map((p) => (
+                        <li key={p}>{tidyProblem(p)}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {spec.adSets.map((x, j) => (
+                  <div key={j} className="adb-section" style={j === 0 && problems.length === 0 ? { borderTop: "none", paddingTop: 0 } : undefined}>
+                    <h3>
+                      {spec.adSets.length > 1 ? x.name || `Ad set ${j + 1}` : splitLabel(OBJECTIVE_LABEL[spec.objective])[0]}
+                      <small>{whereOf(x)}</small>
+                    </h3>
+                    <div className="adb-hint">
+                      {money(x.dailyBudget, currency)} a day · {runsOf(x)}
+                    </div>
+                    <div className="adb-designs">
+                      {x.ads.map((a, m) => {
+                        const img = imagesFor(a.creative)[0];
+                        return (
+                          <button key={m} type="button" className="adb-design" onClick={() => (setActiveSet(j), setActiveAd(m), go(2))} title="Edit this ad">
+                            <span className="adb-design-img">
+                              {/* eslint-disable-next-line @next/next/no-img-element -- our own image routes */}
+                              {img && <img src={img} alt="" loading="lazy" />}
+                            </span>
+                            <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>{a.creative.headline || a.name}</span>
+                            <span>{CTA_LABEL[a.creative.cta]}</span>
                           </button>
                         );
                       })}
                     </div>
-                  )}
-                  {(ad.creative.imageAssetIds?.length ?? 0) > 0 && (
-                    <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-                      {ad.creative.imageAssetIds!.length === 1 ? "1 photo: a single-image ad." : `${ad.creative.imageAssetIds!.length} photos: a carousel, in the order shown.`}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div style={subLabel}>Words</div>
-              <div>
-                <Label htmlFor={`ad-t-${si}-${k}`}>Main text (above the picture)</Label>
-                <Textarea id={`ad-t-${si}-${k}`} rows={3} value={ad.creative.primaryText} onChange={(e) => patchAd(si, k, { primaryText: e.target.value })} />
-              </div>
-              <div style={grid2}>
-                <div>
-                  <Label htmlFor={`ad-h-${si}-${k}`}>Headline (below the picture)</Label>
-                  <Input id={`ad-h-${si}-${k}`} value={ad.creative.headline} onChange={(e) => patchAd(si, k, { headline: e.target.value })} />
-                </div>
-                <div>
-                  <Label htmlFor={`ad-ds-${si}-${k}`}>Description (optional)</Label>
-                  <Input id={`ad-ds-${si}-${k}`} value={ad.creative.description ?? ""} onChange={(e) => patchAd(si, k, { description: e.target.value })} />
-                </div>
-              </div>
-
-              <div style={subLabel}>Button</div>
-              <div style={grid2}>
-                <div>
-                  <Label htmlFor={`ad-c-${si}-${k}`}>Button text</Label>
-                  <select id={`ad-c-${si}-${k}`} style={selectStyle} value={ad.creative.cta} onChange={(e) => patchAd(si, k, { cta: e.target.value as Cta })} disabled={spec.objective === "messages"}>
-                    {CTAS.map((c) => (
-                      <option key={c} value={c}>
-                        {CTA_LABEL[c]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {spec.objective !== "messages" && (
-                  <div>
-                    <Label htmlFor={`ad-l-${si}-${k}`}>Website link{spec.objective === "leads" ? " (optional)" : ""}</Label>
-                    <Input id={`ad-l-${si}-${k}`} value={ad.creative.linkUrl ?? ""} placeholder="https://" onChange={(e) => patchAd(si, k, { linkUrl: e.target.value })} />
                   </div>
-                )}
-              </div>
-              <details>
-                <summary style={{ cursor: "pointer", fontSize: 12.5, color: "var(--text-tertiary)" }}>Rename this ad</summary>
-                <div style={{ maxWidth: 360, marginTop: 8 }}>
-                  <Input aria-label="Ad name" value={ad.name} onChange={(e) => patchAd(si, k, { name: e.target.value })} />
-                </div>
-              </details>
-            </Card>
-          ))}
-          <div>
-            <Button variant="outline" size="sm" onClick={() => patchSet(si, { ads: [...set.ads, newAd(designs, set.ads.length + 1)] })}>
-              <Plus size={14} /> Add another ad
-            </Button>
-          </div>
-        </>
-      )}
-
-      {/* ── 4. Review ── */}
-      {step === 3 && (
-        <Card style={{ padding: 22, display: "grid", gap: 18 }}>
-          <StepHead title="Check and launch" hint="Nothing goes to Meta until you press Launch. Save it as a draft to come back later." />
-          <ReviewRow label="Campaign" onEdit={() => go(0)}>
-            {splitLabel(OBJECTIVE_LABEL[spec.objective])[0]}
-            {spec.name ? ` · ${spec.name}` : ""}
-          </ReviewRow>
-          {spec.adSets.map((x, j) => (
-            <div key={j} style={{ display: "grid", gap: 10 }}>
-              {spec.adSets.length > 1 && <div style={subLabel}>{x.name || `Ad set ${j + 1}`}</div>}
-              <ReviewRow label="Audience" onEdit={() => (setActiveSet(j), go(1))}>
-                {x.audience.locations.map((l) => (l.kind === "country" ? l.name : `${l.name} + ${l.radiusKm} km`)).join(", ") || "No location"} ·{" "}
-                {x.audience.genders.length === 1 ? (x.audience.genders[0] === "female" ? "women" : "men") : "everyone"} aged {x.audience.ageMin}–{x.audience.ageMax === 65 ? "65+" : x.audience.ageMax}
-                {x.audience.interests.length ? ` · ${x.audience.interests.length} interest${x.audience.interests.length === 1 ? "" : "s"}` : ""}
-              </ReviewRow>
-              <ReviewRow label="Budget" onEdit={() => (setActiveSet(j), go(1))}>
-                {money(x.dailyBudget, currency)} a day · {x.startAt ? `from ${new Date(x.startAt).toLocaleDateString("en-IE")}` : "starts at launch"} ·{" "}
-                {x.endAt ? `until ${new Date(x.endAt).toLocaleDateString("en-IE")}` : "runs until paused"}
-              </ReviewRow>
-              <ReviewRow label="Ads" onEdit={() => (setActiveSet(j), go(2))}>
-                {x.ads
-                  .map((a) => {
-                    const pic =
-                      a.creative.source === "library"
-                        ? `${a.creative.imageAssetIds?.length ?? 0} ${(a.creative.imageAssetIds?.length ?? 0) === 1 ? "photo" : "photos"}`
-                        : designName(a.creative.designId);
-                    return `${pic}${a.creative.headline ? `: "${a.creative.headline}"` : ""}`;
-                  })
-                  .join(" · ")}
-              </ReviewRow>
-            </div>
-          ))}
-          <div style={{ borderTop: "1px solid var(--hairline)", paddingTop: 16, display: "grid", gap: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 15, color: "var(--text-primary)" }}>
-                Up to <strong>{money(totalDailyBudget(spec), currency)}</strong> a day
-              </span>
-              {problems.length === 0 ? <Badge tone="success">Ready to launch</Badge> : <Badge tone="warning">{problems.length} to fix</Badge>}
-            </div>
-            {problems.length > 0 && (
-              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: "var(--text-secondary)", display: "grid", gap: 4 }}>
-                {problems.slice(0, 8).map((p) => (
-                  <li key={p}>{p}</li>
                 ))}
-              </ul>
+              </section>
             )}
           </div>
-        </Card>
-      )}
 
-      {/* ── Footer ── */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        {step > 0 && (
-          <Button variant="ghost" onClick={() => go(step - 1)} disabled={busy}>
-            <ArrowLeft size={15} /> Back
-          </Button>
-        )}
-        <Button variant="ghost" onClick={onDelete} disabled={busy}>
-          <Trash2 size={15} /> {id ? "Delete draft" : "Cancel"}
-        </Button>
-        <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
-          <span aria-live="polite" style={{ fontSize: 12.5, color: saveState === "error" ? "var(--danger)" : "var(--text-tertiary)", marginRight: 4 }}>
-            {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved" : saveState === "error" ? "Not saved" : ""}
-          </span>
-          <Button variant="outline" onClick={onSave} disabled={busy}>
-            <Save size={15} /> Save draft
-          </Button>
-          {step < STEPS.length - 1 ? (
-            <Button onClick={() => go(step + 1)}>
-              Next: {STEPS[step + 1]} <ArrowRight size={15} />
+          <div className="adb-footer">
+            {step > 0 && (
+              <Button variant="ghost" onClick={() => go(step - 1)} disabled={busy}>
+                <ArrowLeft size={15} /> Back
+              </Button>
+            )}
+            <Button variant="ghost" onClick={onDelete} disabled={busy}>
+              <Trash2 size={15} /> {id ? "Delete draft" : "Cancel"}
             </Button>
-          ) : (
-            <Button onClick={onLaunch} disabled={busy || problems.length > 0}>
-              <Rocket size={15} /> Launch
-            </Button>
-          )}
-        </span>
+            <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+              <span aria-live="polite" className="adb-saved" style={saveState === "error" ? { color: "var(--danger)" } : undefined}>
+                {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved" : saveState === "error" ? "Not saved" : ""}
+              </span>
+              <Button variant="outline" onClick={onSave} disabled={busy}>
+                <Save size={15} /> Save draft
+              </Button>
+              {step < STEPS.length - 1 ? (
+                <Button onClick={() => go(step + 1)}>
+                  Next: {STEPS[step + 1]} <ArrowRight size={15} />
+                </Button>
+              ) : (
+                <Button onClick={onLaunch} disabled={busy || problems.length > 0}>
+                  <Rocket size={15} /> Launch for {money(totalDailyBudget(spec), currency)} a day
+                </Button>
+              )}
+            </span>
+          </div>
+        </div>
+
+        {rail}
       </div>
     </div>
   );
@@ -963,7 +920,11 @@ export function AdCampaignBuilder({
 
 const STEPS = ["Campaign", "Ad sets", "Ads", "Review"] as const;
 
-const subLabel: React.CSSProperties = { fontSize: 11.5, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-tertiary)" };
+/** With one ad set, "Ad set 1 ("Ad set 1"), ad 1 needs..." says nothing the screen doesn't. */
+function tidyProblem(p: string): string {
+  const t = p.replace(/^Ad set 1 \("Ad set 1"\), /, "");
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
 
 /** "Leads (an instant form; ...)" -> ["Leads", "An instant form; ..."] */
 function splitLabel(label: string): [string, string] {
@@ -971,27 +932,6 @@ function splitLabel(label: string): [string, string] {
   if (!m) return [label, ""];
   const desc = m[2].trim();
   return [m[1].trim(), desc.charAt(0).toUpperCase() + desc.slice(1)];
-}
-
-function StepHead({ title, hint }: { title: string; hint: string }) {
-  return (
-    <div>
-      <div style={{ fontSize: 17, fontWeight: 600, color: "var(--text-primary)" }}>{title}</div>
-      <div style={{ fontSize: 13, color: "var(--text-tertiary)", marginTop: 4, lineHeight: 1.5 }}>{hint}</div>
-    </div>
-  );
-}
-
-function ReviewRow({ label, onEdit, children }: { label: string; onEdit: () => void; children: React.ReactNode }) {
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "96px 1fr auto", gap: 12, alignItems: "baseline" }}>
-      <span style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>{label}</span>
-      <span style={{ fontSize: 14, color: "var(--text-primary)", lineHeight: 1.5 }}>{children}</span>
-      <Button variant="ghost" size="sm" onClick={onEdit}>
-        Edit
-      </Button>
-    </div>
-  );
 }
 
 // ── Audience ──────────────────────────────────────────────────────────────
@@ -1075,7 +1015,7 @@ function AudienceEditor({
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
-      <div style={subLabel}>Where</div>
+      <div className="adb-hint" style={{ fontWeight: 600, color: "var(--text-secondary)" }}>Where</div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {audience.locations.map((l, j) => (
           <span
@@ -1193,32 +1133,29 @@ function AudienceEditor({
         <span style={{ color: "var(--text-tertiary)" }}>{placing ? "Finding it on the map…" : pins.length > 1 ? "Click a circle to resize that one." : "Type a place above, or click the map to drop a pin."}</span>
       </div>
 
-      <div style={{ ...subLabel, marginTop: 8 }}>Age and gender</div>
-      <div style={grid2}>
-        <div>
-          <Label htmlFor={`age-min-${index}`}>Youngest age</Label>
-          <Input id={`age-min-${index}`} type="number" min={18} max={65} value={String(audience.ageMin)} onChange={(e) => onChange({ ageMin: Number(e.target.value) })} />
+      <div className="adb-grid" style={{ marginTop: 10, alignItems: "end" }}>
+        <div style={{ display: "grid", gap: 6 }}>
+          <div className="adb-hint" style={{ fontWeight: 600, color: "var(--text-secondary)" }}>Age</div>
+          <AgeRange id={`age-${index}`} min={audience.ageMin} max={audience.ageMax} onChange={(ageMin, ageMax) => onChange({ ageMin, ageMax })} />
         </div>
-        <div>
-          <Label htmlFor={`age-max-${index}`}>Oldest age (65 = 65+)</Label>
-          <Input id={`age-max-${index}`} type="number" min={18} max={65} value={String(audience.ageMax)} onChange={(e) => onChange({ ageMax: Number(e.target.value) })} />
-        </div>
-        <div>
-          <Label htmlFor={`gender-${index}`}>Gender</Label>
-          <select
-            id={`gender-${index}`}
-            style={selectStyle}
+        <div style={{ display: "grid", gap: 6 }}>
+          <div className="adb-hint" style={{ fontWeight: 600, color: "var(--text-secondary)" }}>Gender</div>
+          <Segmented
+            label="Gender"
             value={audience.genders.length === 1 ? audience.genders[0] : "all"}
-            onChange={(e) => onChange({ genders: e.target.value === "all" ? [] : [e.target.value as "male" | "female"] })}
-          >
-            <option value="all">Everyone</option>
-            <option value="female">Women</option>
-            <option value="male">Men</option>
-          </select>
+            onChange={(v) => onChange({ genders: v === "all" ? [] : [v] })}
+            options={[
+              { key: "all", label: "Everyone" },
+              { key: "female", label: "Women" },
+              { key: "male", label: "Men" },
+            ]}
+          />
         </div>
       </div>
 
-      <div style={{ ...subLabel, marginTop: 8 }}>Interests (optional)</div>
+      <div className="adb-hint" style={{ fontWeight: 600, color: "var(--text-secondary)", marginTop: 10 }}>
+        Interests <span style={{ fontWeight: 400, color: "var(--text-tertiary)" }}>(optional)</span>
+      </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {audience.interests.map((it) => (
           <Badge key={it.id}>

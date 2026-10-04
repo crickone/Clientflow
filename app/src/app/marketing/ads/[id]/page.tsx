@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { Rocket } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/PageHeader";
 import { AdCampaignBuilder } from "@/components/ads/AdCampaignBuilder";
@@ -10,16 +11,16 @@ import { builderData } from "@/lib/ads/pageData";
 export const dynamic = "force-dynamic";
 
 /** A draft opens in the builder; a launched campaign shows its results and controls. */
-export default async function AdCampaignPage({ params }: { params: { id: string } }) {
+export default async function AdCampaignPage({ params, searchParams }: { params: { id: string }; searchParams?: { launched?: string } }) {
   await requireAdminPage();
   const campaign = getAdCampaign(Number(params.id));
   if (!campaign) notFound();
-  const { adAccounts, designs, photos } = builderData();
+  const { adAccounts, designs, photos, brand } = builderData();
   const editable = campaign.status === "draft" || campaign.status === "error";
   const currency = adAccounts.find((a) => a.adAccountId === campaign.adAccountId)?.currency ?? "EUR";
 
   return (
-    <div className="app-page" style={{ maxWidth: 900 }}>
+    <div className="app-page" style={{ maxWidth: 1280 }}>
       <PageHeader eyebrow="Ads" title={campaign.name} subtitle={editable ? "Draft: nothing is live until you launch it." : undefined} />
       {campaign.status === "error" && campaign.error && (
         <div style={{ marginBottom: 16, padding: 14, border: "1px solid var(--danger)", borderRadius: "var(--radius)", fontSize: 13.5, color: "var(--text-secondary)" }}>
@@ -41,8 +42,21 @@ export default async function AdCampaignPage({ params }: { params: { id: string 
           )}
         </div>
       )}
+      {/* Straight after a launch: say what happens next, once. */}
+      {!editable && searchParams?.launched && (
+        <div className="adb-launched" style={{ marginBottom: 20 }}>
+          <span className="adb-launched-mark">
+            <Rocket size={24} />
+          </span>
+          <h2>Your campaign is on its way</h2>
+          <p>
+            Meta checks every new ad before it runs, usually within a few hours. Once approved it starts spending up to the daily budget, and results
+            appear here. You can pause it at any time.
+          </p>
+        </div>
+      )}
       {editable ? (
-        <AdCampaignBuilder campaignId={campaign.id} initialSpec={campaign.spec} initialAdAccountId={campaign.adAccountId} adAccounts={adAccounts} designs={designs} photos={photos} />
+        <AdCampaignBuilder campaignId={campaign.id} initialSpec={campaign.spec} initialAdAccountId={campaign.adAccountId} adAccounts={adAccounts} designs={designs} photos={photos} brand={brand} />
       ) : (
         <AdCampaignDetail
           id={campaign.id}

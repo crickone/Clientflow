@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { Megaphone } from "lucide-react";
+import { Eye, Heart, Megaphone, MessageCircle, MousePointerClick, UserPlus } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
-import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { AD_STATUS, money } from "./status";
 
@@ -19,6 +18,8 @@ export interface AdCampaignListItem {
   error: string | null;
 }
 
+const OBJECTIVE_ICON: Record<string, typeof Megaphone> = { awareness: Eye, traffic: MousePointerClick, engagement: Heart, leads: UserPlus, messages: MessageCircle };
+
 export function AdCampaignList({ campaigns }: { campaigns: AdCampaignListItem[] }) {
   if (campaigns.length === 0) {
     return (
@@ -30,35 +31,41 @@ export function AdCampaignList({ campaigns }: { campaigns: AdCampaignListItem[] 
     );
   }
   return (
-    <div style={{ display: "grid", gap: 10 }}>
+    <div className="adc-grid">
       {campaigns.map((c) => {
         const st = AD_STATUS[c.status] ?? AD_STATUS.draft;
+        const Icon = OBJECTIVE_ICON[c.objective] ?? Megaphone;
         return (
-          <Link key={c.id} href={`/marketing/ads/${c.id}`} style={{ textDecoration: "none" }}>
-            <Card style={{ padding: 16, display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-              <div style={{ flex: "1 1 240px", minWidth: 0 }}>
-                <div style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: 14 }}>{c.name}</div>
-                <div style={{ color: "var(--text-tertiary)", fontSize: 12.5, marginTop: 2, textTransform: "capitalize" }}>
+          <Link key={c.id} href={`/marketing/ads/${c.id}`} className="adc-card">
+            <div className="adc-card-top">
+              <span className="adc-card-icon">
+                <Icon size={17} strokeWidth={1.9} />
+              </span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="adc-card-name">{c.name}</div>
+                <div className="adc-card-sub" style={{ textTransform: "capitalize" }}>
                   {c.objective} · {money(c.dailyBudget, c.currency)} a day
                 </div>
-                {c.error && <div style={{ color: "var(--danger)", fontSize: 12.5, marginTop: 4 }}>{c.error}</div>}
-              </div>
-              <div style={{ fontSize: 13, color: "var(--text-secondary)", textAlign: "right" }}>
-                {c.spend != null ? (
-                  <>
-                    <div>{money(c.spend, c.currency)} spent</div>
-                    <div style={{ color: "var(--text-tertiary)" }}>
-                      {c.results ?? 0} {c.resultLabel?.toLowerCase()}
-                    </div>
-                  </>
-                ) : (
-                  <span style={{ color: "var(--text-tertiary)" }}>No results yet</span>
-                )}
               </div>
               <Badge tone={st.tone} dot>
                 {st.label}
               </Badge>
-            </Card>
+            </div>
+            {c.error && <div style={{ color: "var(--danger)", fontSize: 12.5, lineHeight: 1.45 }}>{c.error}</div>}
+            <dl className="adc-stats">
+              <div className="adc-stat">
+                <dt>Spent</dt>
+                <dd>{c.spend != null ? money(c.spend, c.currency) : "–"}</dd>
+              </div>
+              <div className="adc-stat">
+                <dt>{c.resultLabel ?? "Results"}</dt>
+                <dd>{c.spend != null ? (c.results ?? 0) : "–"}</dd>
+              </div>
+              <div className="adc-stat">
+                <dt>Per result</dt>
+                <dd>{c.spend != null && c.results ? money(c.spend / c.results, c.currency) : "–"}</dd>
+              </div>
+            </dl>
           </Link>
         );
       })}
