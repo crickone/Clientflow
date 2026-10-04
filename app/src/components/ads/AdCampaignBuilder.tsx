@@ -118,7 +118,7 @@ function newAdSet(designs: BuilderDesign[], n: number): AdSetSpec {
     dailyBudget: 10,
     startAt: null,
     endAt: null,
-    audience: { locations: [{ kind: "country", code: "IE", name: "Ireland" }], ageMin: 18, ageMax: 65, genders: [], interests: [], advantageAudience: true },
+    audience: { locations: [{ kind: "country", code: "IE", name: "Ireland" }], ageMin: 18, ageMax: 65, genders: [], interests: [], advantageAudience: false },
     ads: [newAd(designs, 1)],
   };
 }

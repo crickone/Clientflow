@@ -77,7 +77,10 @@ const SPEC_SCHEMA = {
               ageMax: { type: "integer" },
               genders: { type: "array", items: { type: "string", enum: ["male", "female"] } },
               interests: { type: "array", items: { type: "object", properties: { id: { type: "string" }, name: { type: "string" } }, required: ["id", "name"] } },
-              advantageAudience: { type: "boolean" },
+              advantageAudience: {
+                type: "boolean",
+                description: "Advantage+ audience lets Meta reach beyond the ages and interests set. Default false: these are local businesses that want their area and age range kept strict. True only if the operator asks for it.",
+              },
             },
             required: ["locations", "ageMin", "ageMax", "genders", "interests", "advantageAudience"],
           },
