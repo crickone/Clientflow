@@ -20,6 +20,13 @@ export interface AdCampaignListItem {
 
 const OBJECTIVE_ICON: Record<string, typeof Megaphone> = { awareness: Eye, traffic: MousePointerClick, engagement: Heart, leads: UserPlus, messages: MessageCircle };
 
+const OBJECTIVE_NAME: Record<string, string> = { awareness: "Awareness", traffic: "Traffic", engagement: "Engagement", leads: "Leads", messages: "Messages" };
+
+/** The card's one-line reason: Meta's message without its help links (the campaign page has them). */
+function shortError(e: string): string {
+  return e.replace(/\s*(Learn (more|how)[^:]*:)?\s*https?:\/\/\S+/gi, "").replace(/\s+/g, " ").trim() || "Meta did not accept the launch.";
+}
+
 export function AdCampaignList({ campaigns }: { campaigns: AdCampaignListItem[] }) {
   if (campaigns.length === 0) {
     return (
@@ -43,15 +50,17 @@ export function AdCampaignList({ campaigns }: { campaigns: AdCampaignListItem[] 
               </span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="adc-card-name">{c.name}</div>
-                <div className="adc-card-sub" style={{ textTransform: "capitalize" }}>
-                  {c.objective} · {money(c.dailyBudget, c.currency)} a day
+                <div className="adc-card-sub">
+                  {OBJECTIVE_NAME[c.objective] ?? c.objective} · {money(c.dailyBudget, c.currency)} a day
                 </div>
               </div>
-              <Badge tone={st.tone} dot>
-                {st.label}
-              </Badge>
+              <span style={{ flexShrink: 0 }}>
+                <Badge tone={st.tone} dot>
+                  {st.label}
+                </Badge>
+              </span>
             </div>
-            {c.error && <div style={{ color: "var(--danger)", fontSize: 12.5, lineHeight: 1.45 }}>{c.error}</div>}
+            {c.error && <div className="adc-card-error">{shortError(c.error)}</div>}
             <dl className="adc-stats">
               <div className="adc-stat">
                 <dt>Spent</dt>
