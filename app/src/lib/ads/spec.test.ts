@@ -101,4 +101,15 @@ check("lead form asks the chosen fields with the privacy link", form.questions.l
   const own = buildAdSetParams(base({ advertiser: "Vantaige Limited" }), base().adSets[0], { campaignId: "c", pageId: "p", advertiser: "Adonis Agent" }) as Record<string, unknown>;
   check("the plan's advertiser wins", own.dsa_beneficiary === "Vantaige Limited" && own.dsa_payor === "Vantaige Limited");
 }
+
+// Library photos: needs at least one; several go out as a carousel.
+{
+  const ad0 = base().adSets[0].ads[0];
+  const lib = (ids: number[]) => base({ adSets: [{ ...base().adSets[0], ads: [{ ...ad0, creative: { ...ad0.creative, source: "library" as const, designId: 0, imageAssetIds: ids } }] }] });
+  check("library ad with no photos is refused", validateSpec(lib([])).some((e) => e.includes("at least one photo")));
+  check("library ad needs no design", !validateSpec(lib([5])).some((e) => e.includes("Content Studio design")));
+  const two = lib([5, 6]);
+  const cp = buildCreativeParams(two, two.adSets[0].ads[0], { pageId: "p", instagramUserId: null, imageHashes: ["h1", "h2"], leadFormId: null }) as { object_story_spec: { link_data: { child_attachments?: unknown[] } } };
+  check("two library photos make a carousel", (cp.object_story_spec.link_data.child_attachments ?? []).length === 2);
+}
 console.log(`ads/spec.test.ts: ${passed} checks passed.`);

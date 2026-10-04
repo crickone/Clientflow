@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Check, Plus, Rocket, Save, Search, Trash2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Plus, Rocket, Save, Search, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
@@ -54,6 +54,12 @@ export interface BuilderAdAccount {
   adAccountId: string;
   name: string | null;
   currency: string | null;
+}
+
+export interface BuilderPhoto {
+  id: number;
+  filename: string;
+  name: string;
 }
 
 export interface BuilderDesign {
@@ -129,6 +135,7 @@ export function AdCampaignBuilder({
   initialAdAccountId,
   adAccounts,
   designs,
+  photos: initialPhotos = [],
   initialStep,
 }: {
   campaignId: number | null;
@@ -139,6 +146,8 @@ export function AdCampaignBuilder({
   initialAdAccountId: string;
   adAccounts: BuilderAdAccount[];
   designs: BuilderDesign[];
+  /** Photos in the Content Studio library, for ads that use the business's own pictures. */
+  photos?: BuilderPhoto[];
 }) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -158,6 +167,29 @@ export function AdCampaignBuilder({
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const idRef = useRef<number | null>(campaignId);
   const [activeSet, setActiveSet] = useState(0);
+  const [photos, setPhotos] = useState<BuilderPhoto[]>(initialPhotos);
+  const [uploading, setUploading] = useState(false);
+
+  // Upload into the Content Studio library (so the photo can be reused), then
+  // add it to this ad's pictures.
+  async function uploadPhotos(i: number, k: number, files: FileList | null) {
+    if (!files?.length) return;
+    setUploading(true);
+    try {
+      const form = new FormData();
+      for (const f of Array.from(files)) form.append("file", f);
+      const res = await fetch("/api/content-studio/image-library", { method: "POST", body: form });
+      const d = (await res.json().catch(() => null)) as { ok?: boolean; error?: string; assets?: Array<{ id: number; filename: string; originalName?: string | null; kind?: string | null }> } | null;
+      if (!res.ok || !d?.ok) return void toast.error(d?.error ?? "Upload failed.");
+      const added = (d.assets ?? []).filter((a) => a.kind !== "video" && a.kind !== "file").map((a) => ({ id: a.id, filename: a.filename, name: a.originalName || `Photo ${a.id}` }));
+      if (!added.length) return void toast.error("Upload photos (JPEG, PNG or WebP). Video ads are coming next.");
+      setPhotos((p) => [...added, ...p]);
+      const current = spec.adSets[i]?.ads[k]?.creative.imageAssetIds ?? [];
+      patchAd(i, k, { source: "library", imageAssetIds: [...current, ...added.map((a) => a.id)].slice(0, 10) });
+    } finally {
+      setUploading(false);
+    }
+  }
   // The Page's existing instant forms (made in Meta), loaded once for Leads.
   const [pageForms, setPageForms] = useState<Array<{ id: string; name: string }> | null>(null);
   useEffect(() => {
@@ -635,7 +667,7 @@ export function AdCampaignBuilder({
       {step === 2 && (
         <>
           <Card style={{ padding: "18px 22px", display: "grid", gap: 12 }}>
-            <StepHead title="Ads" hint="What people see: a Content Studio design plus the words around it. Each ad set has its own ads; add a second ad to let Meta test which works better." />
+            <StepHead title="Ads" hint="What people see: a Content Studio design or your own photos, plus the words around them. Each ad set has its own ads; add a second ad to let Meta test which works better." />
             {spec.adSets.length > 1 && setTabs(false)}
           </Card>
           {set.ads.map((ad, k) => (
@@ -650,26 +682,150 @@ export function AdCampaignBuilder({
               </div>
 
               <div style={subLabel}>Picture</div>
-              <div style={grid2}>
-                <div>
-                  <Label htmlFor={`ad-d-${si}-${k}`}>Content Studio design</Label>
-                  <select id={`ad-d-${si}-${k}`} style={selectStyle} value={ad.creative.designId} onChange={(e) => patchAd(si, k, { designId: Number(e.target.value) })}>
-                    {designs.length === 0 && <option value={0}>No designs yet: make one in Content Studio</option>}
-                    {designs.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name} ({d.slideCount} {d.slideCount === 1 ? "image" : "images"})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <Label htmlFor={`ad-f-${si}-${k}`}>Format</Label>
-                  <select id={`ad-f-${si}-${k}`} style={selectStyle} value={ad.creative.format} onChange={(e) => patchAd(si, k, { format: e.target.value as "single" | "carousel" })}>
-                    <option value="single">Single image (first slide)</option>
-                    <option value="carousel">Carousel (every slide)</option>
-                  </select>
-                </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {[
+                  { key: "design", label: "Content Studio design" },
+                  { key: "library", label: "Your photos" },
+                ].map((o) => {
+                  const on = (ad.creative.source ?? "design") === o.key;
+                  return (
+                    <button
+                      key={o.key}
+                      type="button"
+                      onClick={() => patchAd(si, k, { source: o.key as "design" | "library" })}
+                      style={{
+                        padding: "6px 12px",
+                        borderRadius: 999,
+                        border: `1px solid ${on ? "var(--accent)" : "var(--hairline)"}`,
+                        background: on ? "var(--accent-soft)" : "transparent",
+                        color: on ? "var(--text-primary)" : "var(--text-secondary)",
+                        fontSize: 13,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {o.label}
+                    </button>
+                  );
+                })}
               </div>
+              {(ad.creative.source ?? "design") === "design" ? (
+                <div style={grid2}>
+                  <div>
+                    <Label htmlFor={`ad-d-${si}-${k}`}>Content Studio design</Label>
+                    <select id={`ad-d-${si}-${k}`} style={selectStyle} value={ad.creative.designId} onChange={(e) => patchAd(si, k, { designId: Number(e.target.value) })}>
+                      {designs.length === 0 && <option value={0}>No finished designs yet: make one in Content Studio</option>}
+                      {designs.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name} ({d.slideCount} {d.slideCount === 1 ? "image" : "images"})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <Label htmlFor={`ad-f-${si}-${k}`}>Format</Label>
+                    <select id={`ad-f-${si}-${k}`} style={selectStyle} value={ad.creative.format} onChange={(e) => patchAd(si, k, { format: e.target.value as "single" | "carousel" })}>
+                      <option value="single">Single image (first slide)</option>
+                      <option value="carousel">Carousel (every slide)</option>
+                    </select>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "grid", gap: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <label
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        padding: "7px 12px",
+                        borderRadius: "var(--radius)",
+                        border: "1px solid var(--hairline)",
+                        fontSize: 13,
+                        color: "var(--text-primary)",
+                        cursor: uploading ? "wait" : "pointer",
+                        opacity: uploading ? 0.6 : 1,
+                      }}
+                    >
+                      <Upload size={14} /> {uploading ? "Uploading…" : "Upload photos"}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        multiple
+                        disabled={uploading}
+                        style={{ display: "none" }}
+                        onChange={(e) => {
+                          void uploadPhotos(si, k, e.target.files);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                    <span style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>
+                      Pick one for a single image, or several (up to 10, in order) for a carousel. Uploads are saved to your Content Studio library.
+                    </span>
+                  </div>
+                  {photos.length === 0 ? (
+                    <div style={{ fontSize: 13, color: "var(--text-tertiary)" }}>No photos in your library yet. Upload some above.</div>
+                  ) : (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(96px, 1fr))", gap: 8, maxHeight: 320, overflowY: "auto" }}>
+                      {photos.map((ph) => {
+                        const chosen = ad.creative.imageAssetIds ?? [];
+                        const pos = chosen.indexOf(ph.id);
+                        return (
+                          <button
+                            key={ph.id}
+                            type="button"
+                            title={ph.name}
+                            onClick={() =>
+                              patchAd(si, k, {
+                                imageAssetIds: pos >= 0 ? chosen.filter((x) => x !== ph.id) : [...chosen, ph.id].slice(0, 10),
+                              })
+                            }
+                            style={{
+                              position: "relative",
+                              padding: 0,
+                              aspectRatio: "1 / 1",
+                              borderRadius: 8,
+                              overflow: "hidden",
+                              border: `2px solid ${pos >= 0 ? "var(--accent)" : "transparent"}`,
+                              background: "var(--surface-2)",
+                              cursor: "pointer",
+                            }}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element -- library thumbnails served by our own route */}
+                            <img src={`/api/content-studio/image-library/file/${encodeURIComponent(ph.filename)}`} alt={ph.name} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                            {pos >= 0 && (
+                              <span
+                                style={{
+                                  position: "absolute",
+                                  top: 6,
+                                  right: 6,
+                                  width: 22,
+                                  height: 22,
+                                  borderRadius: 999,
+                                  background: "var(--accent)",
+                                  color: "var(--accent-contrast)",
+                                  fontSize: 12,
+                                  fontWeight: 700,
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                }}
+                              >
+                                {pos + 1}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {(ad.creative.imageAssetIds?.length ?? 0) > 0 && (
+                    <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
+                      {ad.creative.imageAssetIds!.length === 1 ? "1 photo: a single-image ad." : `${ad.creative.imageAssetIds!.length} photos: a carousel, in the order shown.`}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div style={subLabel}>Words</div>
               <div>
@@ -743,7 +899,15 @@ export function AdCampaignBuilder({
                 {x.endAt ? `until ${new Date(x.endAt).toLocaleDateString("en-IE")}` : "runs until paused"}
               </ReviewRow>
               <ReviewRow label="Ads" onEdit={() => (setActiveSet(j), go(2))}>
-                {x.ads.map((a) => `${designName(a.creative.designId)}${a.creative.headline ? `: "${a.creative.headline}"` : ""}`).join(" · ")}
+                {x.ads
+                  .map((a) => {
+                    const pic =
+                      a.creative.source === "library"
+                        ? `${a.creative.imageAssetIds?.length ?? 0} ${(a.creative.imageAssetIds?.length ?? 0) === 1 ? "photo" : "photos"}`
+                        : designName(a.creative.designId);
+                    return `${pic}${a.creative.headline ? `: "${a.creative.headline}"` : ""}`;
+                  })
+                  .join(" · ")}
               </ReviewRow>
             </div>
           ))}

@@ -14,7 +14,7 @@ export default async function AdCampaignPage({ params }: { params: { id: string 
   await requireAdminPage();
   const campaign = getAdCampaign(Number(params.id));
   if (!campaign) notFound();
-  const { adAccounts, designs } = builderData();
+  const { adAccounts, designs, photos } = builderData();
   const editable = campaign.status === "draft" || campaign.status === "error";
   const currency = adAccounts.find((a) => a.adAccountId === campaign.adAccountId)?.currency ?? "EUR";
 
@@ -42,7 +42,7 @@ export default async function AdCampaignPage({ params }: { params: { id: string 
         </div>
       )}
       {editable ? (
-        <AdCampaignBuilder campaignId={campaign.id} initialSpec={campaign.spec} initialAdAccountId={campaign.adAccountId} adAccounts={adAccounts} designs={designs} />
+        <AdCampaignBuilder campaignId={campaign.id} initialSpec={campaign.spec} initialAdAccountId={campaign.adAccountId} adAccounts={adAccounts} designs={designs} photos={photos} />
       ) : (
         <AdCampaignDetail
           id={campaign.id}

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getLibraryAsset, libraryFilePath } from "@/lib/image/library";
 import { getBusinessProfile } from "@/lib/businessProfile";
 import fs from "node:fs";
 import { desc, eq } from "drizzle-orm";
@@ -158,6 +159,29 @@ async function uploadDesignImages(adAccountId: string, token: string, designId: 
   return hashes;
 }
 
+/** Upload library photos (in order) to the ad account; their image hashes. */
+async function uploadLibraryImages(adAccountId: string, token: string, assetIds: number[], cache: Map<string, string>): Promise<string[]> {
+  const hashes: string[] = [];
+  for (const id of assetIds.slice(0, 10)) {
+    const key = `lib:${id}`;
+    const hit = cache.get(key);
+    if (hit) {
+      hashes.push(hit);
+      continue;
+    }
+    const asset = getLibraryAsset(id);
+    if (!asset || asset.kind === "video" || asset.kind === "file") throw new AdsError(`Photo #${id} is no longer in your library. Pick another.`);
+    const file = libraryFilePath(asset.filename);
+    if (!fs.existsSync(file)) throw new AdsError(`Photo "${asset.originalName ?? id}" is missing its file. Upload it again.`);
+    const r = await graph<{ images?: Record<string, { hash: string }> }>("POST", `${adAccountId}/adimages`, token, { bytes: fs.readFileSync(file).toString("base64") });
+    const first = r.images ? Object.values(r.images)[0] : undefined;
+    if (!first?.hash) throw new AdsError("Meta did not accept one of the photos.");
+    cache.set(key, first.hash);
+    hashes.push(first.hash);
+  }
+  return hashes;
+}
+
 // ── Drafts ────────────────────────────────────────────────────────────────
 
 export function createAdDraft(input: { adAccountId: string; spec: CampaignSpec; createdBy: string }): AdCampaignRow {
@@ -236,17 +260,23 @@ export async function launchAdCampaign(id: number): Promise<AdCampaignRow> {
     }
 
     const images = new Map<number, string[]>();
+    const libraryImages = new Map<string, string>();
     for (const set of spec.adSets) {
       const adSetId = (await graph<{ id: string }>("POST", `${acct}/adsets`, token, buildAdSetParams(spec, set, { campaignId: ids.campaignId, pageId: page.pageId, advertiser: page.pageName ?? getBusinessProfile().businessName }))).id;
       const entry = { adSetId, adIds: [] as string[] };
       ids.adSets!.push(entry);
       for (const ad of set.ads) {
-        const hashes = await uploadDesignImages(acct, token, ad.creative.designId, images);
+        const hashes =
+          ad.creative.source === "library"
+            ? await uploadLibraryImages(acct, token, ad.creative.imageAssetIds ?? [], libraryImages)
+            : await uploadDesignImages(acct, token, ad.creative.designId, images);
         const creativeId = (
           await graph<{ id: string }>("POST", `${acct}/adcreatives`, token, buildCreativeParams(spec, ad, {
             pageId: page.pageId,
             instagramUserId: page.igUserId,
-            imageHashes: ad.creative.format === "carousel" ? hashes : hashes.slice(0, 1),
+            // Library photos: one = single image, several = carousel. A design
+            // follows its chosen format.
+            imageHashes: (ad.creative.source === "library" ? hashes.length > 1 : ad.creative.format === "carousel") ? hashes : hashes.slice(0, 1),
             leadFormId: ids.leadFormId ?? null,
           }))
         ).id;

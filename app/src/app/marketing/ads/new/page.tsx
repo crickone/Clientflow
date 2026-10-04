@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function NewAdCampaignPage() {
   await requireAdminPage();
-  const { adAccounts, designs } = builderData();
+  const { adAccounts, designs, photos } = builderData();
   if (adAccounts.length === 0) redirect("/marketing/ads");
   return (
     <div className="app-page" style={{ maxWidth: 900 }}>
@@ -17,7 +17,7 @@ export default async function NewAdCampaignPage() {
       {/* initialSpec null: the builder makes the blank spec itself. Calling
           blankSpec here crashed the page -- it is exported from a "use client"
           module, so on the server it is a client reference, not a function. */}
-      <AdCampaignBuilder campaignId={null} initialSpec={null} initialAdAccountId={adAccounts[0].adAccountId} adAccounts={adAccounts} designs={designs} />
+      <AdCampaignBuilder campaignId={null} initialSpec={null} initialAdAccountId={adAccounts[0].adAccountId} adAccounts={adAccounts} designs={designs} photos={photos} />
     </div>
   );
 }

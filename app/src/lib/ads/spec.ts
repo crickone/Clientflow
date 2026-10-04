@@ -48,8 +48,15 @@ export interface AudienceSpec {
 }
 
 export interface AdCreativeSpec {
+  /**
+   * Where the picture comes from: a Content Studio design's rendered slides
+   * (the default), or photos from the Content Studio library (uploads).
+   */
+  source?: "design" | "library";
   /** Content Studio design (carousel set) whose rendered slides are the images. */
   designId: number;
+  /** source "library": the photos, in order. One = single image, more = carousel. */
+  imageAssetIds?: number[];
   /** "single" uses the first slide; "carousel" uses every slide as a carousel card. */
   format: "single" | "carousel";
   primaryText: string;
@@ -162,7 +169,11 @@ export function validateSpec(spec: CampaignSpec): string[] {
       const at = `${where}, ad ${j + 1}`;
       const c = ad.creative;
       if (!ad.name?.trim()) errors.push(`${at} needs a name.`);
-      if (!c?.designId) errors.push(`${at} needs a Content Studio design.`);
+      if (c?.source === "library") {
+        const n = c.imageAssetIds?.length ?? 0;
+        if (n === 0) errors.push(`${at} needs at least one photo.`);
+        if (n > 10) errors.push(`${at}: at most 10 photos in one ad.`);
+      } else if (!c?.designId) errors.push(`${at} needs a Content Studio design.`);
       if (!c?.primaryText?.trim()) errors.push(`${at} needs its main text.`);
       if (!c?.headline?.trim()) errors.push(`${at} needs a headline.`);
       if ((spec.objective === "traffic" || spec.objective === "awareness" || spec.objective === "engagement") && !isHttpsUrl(c?.linkUrl)) {
@@ -315,7 +326,8 @@ export function buildCreativeParams(spec: CampaignSpec, ad: AdSpec, ctx: Creativ
     message: c.primaryText,
     call_to_action: callToAction,
   };
-  if (c.format === "carousel" && ctx.imageHashes.length > 1) {
+  // Library photos: several make a carousel. A design follows its format.
+  if ((c.source === "library" || c.format === "carousel") && ctx.imageHashes.length > 1) {
     linkData.child_attachments = ctx.imageHashes.slice(0, 10).map((hash) => ({
       image_hash: hash,
       link,
