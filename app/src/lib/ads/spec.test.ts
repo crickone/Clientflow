@@ -5,6 +5,10 @@
 import assert from "node:assert/strict";
 
 import {
+  buildAssetFeedCreativeParams,
+  hasVariants,
+  splitVariants,
+  textOptions,
   validateSpec,
   buildCampaignParams,
   buildAdSetParams,
@@ -111,5 +115,21 @@ check("lead form asks the chosen fields with the privacy link", form.questions.l
   const two = lib([5, 6]);
   const cp = buildCreativeParams(two, two.adSets[0].ads[0], { pageId: "p", instagramUserId: null, imageHashes: ["h1", "h2"], leadFormId: null }) as { object_story_spec: { link_data: { child_attachments?: unknown[] } } };
   check("two library photos make a carousel", (cp.object_story_spec.link_data.child_attachments ?? []).length === 2);
+}
+
+// Text and image options (Ads Manager's multiple texts / media).
+{
+  const ad0 = base().adSets[0].ads[0];
+  const withOpts = { ...ad0, creative: { ...ad0.creative, primaryText: "A", extraTexts: ["B", "C"], headline: "H1", extraHeadlines: ["H2"] } };
+  check("text options collect main + extras", textOptions(withOpts.creative).texts.join() === "A,B,C" && textOptions(withOpts.creative).headlines.join() === "H1,H2");
+  check("no extras and one image is not a variant ad", !hasVariants(ad0.creative, 1));
+  check("extra texts make a variant ad", hasVariants(withOpts.creative, 1));
+  check("image options make a variant ad", hasVariants({ ...ad0.creative, format: "options" }, 3));
+  const feed = buildAssetFeedCreativeParams(base(), withOpts, { pageId: "p", instagramUserId: "ig", imageHashes: ["h1", "h2"], leadFormId: null }) as { object_story_spec: Record<string, unknown>; asset_feed_spec: { bodies: unknown[]; titles: unknown[]; images: unknown[]; optimization_type: string; link_urls: Array<{ website_url: string }> } };
+  check("asset feed lists every text, headline and image", feed.asset_feed_spec.bodies.length === 3 && feed.asset_feed_spec.titles.length === 2 && feed.asset_feed_spec.images.length === 2);
+  check("asset feed is Meta's degrees-of-freedom kind", feed.asset_feed_spec.optimization_type === "DEGREES_OF_FREEDOM" && !("link_data" in feed.object_story_spec));
+  const parts = splitVariants({ ...withOpts, creative: { ...withOpts.creative, format: "options" } }, ["h1", "h2"]);
+  check("fallback splits into one ad per option, cycling", parts.length === 3 && parts[1].ad.creative.primaryText === "B" && parts[1].ad.creative.headline === "H2" && parts[2].imageHashes[0] === "h1");
+  check("empty text option is refused", validateSpec(base({ adSets: [{ ...base().adSets[0], ads: [{ ...ad0, creative: { ...ad0.creative, extraTexts: [" "] } }] }] })).some((e) => e.includes("empty text option")));
 }
 console.log(`ads/spec.test.ts: ${passed} checks passed.`);

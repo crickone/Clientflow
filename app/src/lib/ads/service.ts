@@ -20,6 +20,9 @@ import {
   buildCampaignParams,
   buildCreativeParams,
   buildLeadFormParams,
+  buildAssetFeedCreativeParams,
+  hasVariants,
+  splitVariants,
   toMinorUnits,
   validateSpec,
   type CampaignSpec,
@@ -270,17 +273,33 @@ export async function launchAdCampaign(id: number): Promise<AdCampaignRow> {
           ad.creative.source === "library"
             ? await uploadLibraryImages(acct, token, ad.creative.imageAssetIds ?? [], libraryImages)
             : await uploadDesignImages(acct, token, ad.creative.designId, images);
-        const creativeId = (
-          await graph<{ id: string }>("POST", `${acct}/adcreatives`, token, buildCreativeParams(spec, ad, {
-            pageId: page.pageId,
-            instagramUserId: page.igUserId,
-            // Library photos: one = single image, several = carousel. A design
-            // follows its chosen format.
-            imageHashes: (ad.creative.source === "library" ? hashes.length > 1 : ad.creative.format === "carousel") ? hashes : hashes.slice(0, 1),
-            leadFormId: ids.leadFormId ?? null,
-          }))
-        ).id;
-        entry.adIds.push((await graph<{ id: string }>("POST", `${acct}/ads`, token, { name: ad.name, adset_id: adSetId, creative: { creative_id: creativeId }, status: "ACTIVE" })).id);
+        const ctxFor = (imageHashes: string[]) => ({ pageId: page.pageId, instagramUserId: page.igUserId, imageHashes, leadFormId: ids.leadFormId ?? null });
+        // Which images this ad uses: a single-image ad its first, a carousel or
+        // image options all of them.
+        // (Several library photos are always used: a carousel unless "Let Meta
+        // choose" is on. A design's own format decides for its slides.)
+        const multi = ad.creative.source === "library" ? hashes.length > 1 : ad.creative.format !== "single";
+        const adHashes = multi ? hashes : hashes.slice(0, 1);
+        const createAd = async (name: string, params: Record<string, unknown>) => {
+          const creativeId = (await graph<{ id: string }>("POST", `${acct}/adcreatives`, token, params)).id;
+          entry.adIds.push((await graph<{ id: string }>("POST", `${acct}/ads`, token, { name, adset_id: adSetId, creative: { creative_id: creativeId }, status: "ACTIVE" })).id);
+        };
+
+        if (!hasVariants(ad.creative, adHashes.length)) {
+          await createAd(ad.name, buildCreativeParams(spec, ad, ctxFor(adHashes)));
+          continue;
+        }
+        // Text options / image options: one creative that lists them, as Ads
+        // Manager does. Meta does not take this for every kind of ad (its docs
+        // say nothing of lead forms), so if it refuses, the same choices go out
+        // as separate ads that Meta tests against each other.
+        try {
+          await createAd(ad.name, buildAssetFeedCreativeParams(spec, ad, ctxFor(adHashes)));
+        } catch (err) {
+          if (!(err instanceof AdsError)) throw err;
+          console.warn(`[ads] text/image options refused for "${ad.name}", sending as separate ads: ${err.message}`);
+          for (const v of splitVariants(ad, adHashes)) await createAd(v.ad.name, buildCreativeParams(spec, v.ad, ctxFor(v.imageHashes)));
+        }
       }
       update(id, { metaIds: JSON.stringify(ids) });
     }

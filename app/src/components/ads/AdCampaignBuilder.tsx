@@ -26,6 +26,7 @@ import {
   CTAS,
   OBJECTIVES,
   OBJECTIVE_LABEL,
+  textOptions,
   totalDailyBudget,
   validateSpec,
   type AdSetSpec,
@@ -384,7 +385,7 @@ export function AdCampaignBuilder({
         .map((p) => `/api/content-studio/image-library/file/${encodeURIComponent(p.filename)}`);
     }
     const imgs = designs.find((d) => d.id === c.designId)?.images ?? [];
-    return c.format === "carousel" ? imgs : imgs.slice(0, 1);
+    return c.format === "single" ? imgs.slice(0, 1) : imgs;
   };
   const hostOf = (url?: string) => {
     try {
@@ -393,16 +394,23 @@ export function AdCampaignBuilder({
       return null;
     }
   };
+  // Which version the preview shows, when the ad has text or image options.
+  const [pv, setPv] = useState(0);
+  const pvTexts = ad ? textOptions(ad.creative) : { texts: [], headlines: [] };
+  const pvImages = ad ? imagesFor(ad.creative) : [];
+  const pvOptionImages = ad?.creative.format === "options" && pvImages.length > 1 ? pvImages : [];
+  const pvCount = Math.max(1, pvTexts.texts.length, pvTexts.headlines.length, pvOptionImages.length);
+  const pvi = pv % pvCount;
   const previewAd = ad
     ? {
         pageName: brand?.pageName ?? "Your Page",
         instagramHandle: brand?.instagramHandle ?? null,
         logoUrl: brand?.logoUrl ?? null,
-        primaryText: ad.creative.primaryText,
-        headline: ad.creative.headline,
+        primaryText: pvTexts.texts.length ? pvTexts.texts[pvi % pvTexts.texts.length] : ad.creative.primaryText,
+        headline: pvTexts.headlines.length ? pvTexts.headlines[pvi % pvTexts.headlines.length] : ad.creative.headline,
         description: ad.creative.description,
         ctaLabel: spec.objective === "messages" ? "Send message" : CTA_LABEL[ad.creative.cta],
-        images: imagesFor(ad.creative),
+        images: pvOptionImages.length ? [pvOptionImages[pvi % pvOptionImages.length]] : pvImages,
         linkHost: spec.objective === "leads" || spec.objective === "messages" ? null : hostOf(ad.creative.linkUrl),
       }
     : null;
@@ -425,6 +433,17 @@ export function AdCampaignBuilder({
           <div className="adb-rail-label">
             Preview{spec.adSets.length > 1 || set.ads.length > 1 ? ` · ${set.name || `Ad set ${si + 1}`}, ${ad.name || `Ad ${activeAd + 1}`}` : ""}
           </div>
+          {pvCount > 1 && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, fontSize: 12.5, color: "var(--text-secondary)" }}>
+              <button type="button" className="adb-budget-btn" style={{ width: 28, height: 28 }} aria-label="Previous version" onClick={() => setPv((pvi + pvCount - 1) % pvCount)}>
+                <ArrowLeft size={13} />
+              </button>
+              Version {pvi + 1} of {pvCount}
+              <button type="button" className="adb-budget-btn" style={{ width: 28, height: 28 }} aria-label="Next version" onClick={() => setPv((pvi + 1) % pvCount)}>
+                <ArrowRight size={13} />
+              </button>
+            </div>
+          )}
           <AdPreview ad={previewAd} />
         </div>
       )}
@@ -740,8 +759,9 @@ export function AdCampaignBuilder({
                                   value={a.creative.format}
                                   onChange={(v) => patchAd(si, k, { format: v })}
                                   options={[
-                                    { key: "single", label: "Single image" },
+                                    { key: "single", label: "First slide only" },
                                     { key: "carousel", label: `Carousel (${design.slideCount} slides)` },
+                                    { key: "options", label: "Let Meta choose a slide" },
                                   ]}
                                 />
                               )}
@@ -754,7 +774,7 @@ export function AdCampaignBuilder({
                                 <Upload size={14} /> {uploading ? "Uploading…" : "Upload photos"}
                                 <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={uploading} style={{ display: "none" }} onChange={(e) => (void uploadPhotos(si, k, e.target.files), (e.target.value = ""))} />
                               </label>
-                              <span className="adb-hint">One photo for a single image, or several (up to 10) for a carousel, in the order you pick them.</span>
+                              <span className="adb-hint">Pick one photo, or several (up to 10) for a carousel or for Meta to choose from.</span>
                             </div>
                             {photos.length === 0 ? (
                               <span className="adb-hint">No photos in your library yet.</span>
@@ -772,26 +792,50 @@ export function AdCampaignBuilder({
                                 })}
                               </div>
                             )}
+                            {chosen.length > 1 && (
+                              <Segmented
+                                label="How to show the photos"
+                                value={a.creative.format === "options" ? "options" : "carousel"}
+                                onChange={(v) => patchAd(si, k, { format: v })}
+                                options={[
+                                  { key: "carousel", label: "Carousel, in this order" },
+                                  { key: "options", label: "Let Meta choose a photo" },
+                                ]}
+                              />
+                            )}
                           </>
+                        )}
+                        {a.creative.format === "options" && (
+                          <span className="adb-hint">Meta shows each person the picture it expects to work best, and learns which wins.</span>
                         )}
                       </div>
 
                       <div className="adb-section">
                         <h3>Words</h3>
-                        <div>
-                          <Label htmlFor={`ad-t-${si}-${k}`}>Main text (above the picture)</Label>
-                          <Textarea id={`ad-t-${si}-${k}`} rows={4} value={a.creative.primaryText} onChange={(e) => patchAd(si, k, { primaryText: e.target.value })} />
+                        <TextOptions
+                          id={`ad-t-${si}-${k}`}
+                          label="Main text (above the picture)"
+                          multiline
+                          first={a.creative.primaryText}
+                          extras={a.creative.extraTexts ?? []}
+                          onFirst={(v) => patchAd(si, k, { primaryText: v })}
+                          onExtras={(v) => patchAd(si, k, { extraTexts: v })}
+                        />
+                        <TextOptions
+                          id={`ad-h-${si}-${k}`}
+                          label="Headline (below the picture)"
+                          first={a.creative.headline}
+                          extras={a.creative.extraHeadlines ?? []}
+                          onFirst={(v) => patchAd(si, k, { headline: v })}
+                          onExtras={(v) => patchAd(si, k, { extraHeadlines: v })}
+                        />
+                        <div style={{ maxWidth: 520 }}>
+                          <Label htmlFor={`ad-ds-${si}-${k}`}>Description (optional)</Label>
+                          <Input id={`ad-ds-${si}-${k}`} value={a.creative.description ?? ""} onChange={(e) => patchAd(si, k, { description: e.target.value })} />
                         </div>
-                        <div className="adb-grid">
-                          <div>
-                            <Label htmlFor={`ad-h-${si}-${k}`}>Headline (below the picture)</Label>
-                            <Input id={`ad-h-${si}-${k}`} value={a.creative.headline} onChange={(e) => patchAd(si, k, { headline: e.target.value })} />
-                          </div>
-                          <div>
-                            <Label htmlFor={`ad-ds-${si}-${k}`}>Description (optional)</Label>
-                            <Input id={`ad-ds-${si}-${k}`} value={a.creative.description ?? ""} onChange={(e) => patchAd(si, k, { description: e.target.value })} />
-                          </div>
-                        </div>
+                        {((a.creative.extraTexts?.length ?? 0) > 0 || (a.creative.extraHeadlines?.length ?? 0) > 0) && (
+                          <span className="adb-hint">Meta mixes these and shows each person the combination it expects to work best. Step through them in the preview.</span>
+                        )}
                       </div>
 
                       <div className="adb-section">
@@ -919,6 +963,51 @@ export function AdCampaignBuilder({
 }
 
 const STEPS = ["Campaign", "Ad sets", "Ads", "Review"] as const;
+
+/** One text field plus up to 4 more versions of it, as in Ads Manager. */
+function TextOptions({
+  id,
+  label,
+  first,
+  extras,
+  onFirst,
+  onExtras,
+  multiline = false,
+}: {
+  id: string;
+  label: string;
+  first: string;
+  extras: string[];
+  onFirst: (v: string) => void;
+  onExtras: (v: string[]) => void;
+  multiline?: boolean;
+}) {
+  const field = (value: string, onChange: (v: string) => void, fid: string, aria?: string) =>
+    multiline ? (
+      <Textarea id={fid} aria-label={aria} rows={3} value={value} onChange={(e) => onChange(e.target.value)} style={{ flex: 1 }} />
+    ) : (
+      <Input id={fid} aria-label={aria} value={value} onChange={(e) => onChange(e.target.value)} style={{ flex: 1 }} />
+    );
+  return (
+    <div style={{ display: "grid", gap: 8 }}>
+      <Label htmlFor={id}>{label}</Label>
+      {field(first, onFirst, id)}
+      {extras.map((t, n) => (
+        <div key={n} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+          {field(t, (v) => onExtras(extras.map((x, m) => (m === n ? v : x))), `${id}-${n + 2}`, `${label}, version ${n + 2}`)}
+          <Button variant="ghost" size="sm" aria-label={`Remove version ${n + 2}`} onClick={() => onExtras(extras.filter((_, m) => m !== n))}>
+            <X size={14} />
+          </Button>
+        </div>
+      ))}
+      {extras.length < 4 && (
+        <button type="button" className="adb-plan-edit" style={{ justifySelf: "start", display: "inline-flex", alignItems: "center", gap: 4 }} onClick={() => onExtras([...extras, ""])}>
+          <Plus size={13} /> Add another version ({extras.length + 1}/5)
+        </button>
+      )}
+    </div>
+  );
+}
 
 /** With one ad set, "Ad set 1 ("Ad set 1"), ad 1 needs..." says nothing the screen doesn't. */
 function tidyProblem(p: string): string {

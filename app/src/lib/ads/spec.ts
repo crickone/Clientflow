@@ -57,10 +57,17 @@ export interface AdCreativeSpec {
   designId: number;
   /** source "library": the photos, in order. One = single image, more = carousel. */
   imageAssetIds?: number[];
-  /** "single" uses the first slide; "carousel" uses every slide as a carousel card. */
-  format: "single" | "carousel";
+  /**
+   * With several images: "single" uses the first only; "carousel" shows them
+   * all, in order, as carousel cards; "options" gives Meta every image to
+   * pick the best one per person (Ads Manager's multiple media).
+   */
+  format: "single" | "carousel" | "options";
   primaryText: string;
   headline: string;
+  /** Up to 4 more main texts and headlines for Meta to test (Ads Manager's text options). */
+  extraTexts?: string[];
+  extraHeadlines?: string[];
   description?: string;
   cta: Cta;
   /** Website link for traffic / awareness / engagement ads. */
@@ -174,6 +181,9 @@ export function validateSpec(spec: CampaignSpec): string[] {
         if (n === 0) errors.push(`${at} needs at least one photo.`);
         if (n > 10) errors.push(`${at}: at most 10 photos in one ad.`);
       } else if (!c?.designId) errors.push(`${at} needs a Content Studio design.`);
+      if ((c?.extraTexts?.length ?? 0) > 4) errors.push(`${at}: at most 5 main texts.`);
+      if ((c?.extraHeadlines?.length ?? 0) > 4) errors.push(`${at}: at most 5 headlines.`);
+      if (c?.extraTexts?.some((t) => !t.trim()) || c?.extraHeadlines?.some((t) => !t.trim())) errors.push(`${at} has an empty text option: fill it in or remove it.`);
       if (!c?.primaryText?.trim()) errors.push(`${at} needs its main text.`);
       if (!c?.headline?.trim()) errors.push(`${at} needs a headline.`);
       if ((spec.objective === "traffic" || spec.objective === "awareness" || spec.objective === "engagement") && !isHttpsUrl(c?.linkUrl)) {
@@ -327,7 +337,7 @@ export function buildCreativeParams(spec: CampaignSpec, ad: AdSpec, ctx: Creativ
     call_to_action: callToAction,
   };
   // Library photos: several make a carousel. A design follows its format.
-  if ((c.source === "library" || c.format === "carousel") && ctx.imageHashes.length > 1) {
+  if (c.format !== "options" && (c.source === "library" || c.format === "carousel") && ctx.imageHashes.length > 1) {
     linkData.child_attachments = ctx.imageHashes.slice(0, 10).map((hash) => ({
       image_hash: hash,
       link,
@@ -348,6 +358,74 @@ export function buildCreativeParams(spec: CampaignSpec, ad: AdSpec, ctx: Creativ
 }
 
 /** POST /<page-id>/leadgen_forms parameters for the campaign's instant form. */
+/** The ad's main texts and headlines, the first being the one shown by default. */
+export function textOptions(c: AdCreativeSpec): { texts: string[]; headlines: string[] } {
+  const clean = (a: Array<string | undefined>) => a.map((t) => (t ?? "").trim()).filter(Boolean).slice(0, 5);
+  return { texts: clean([c.primaryText, ...(c.extraTexts ?? [])]), headlines: clean([c.headline, ...(c.extraHeadlines ?? [])]) };
+}
+
+/** Whether Meta gets choices to test: several texts, headlines, or images as options. */
+export function hasVariants(c: AdCreativeSpec, imageCount: number): boolean {
+  const { texts, headlines } = textOptions(c);
+  return texts.length > 1 || headlines.length > 1 || (c.format === "options" && imageCount > 1);
+}
+
+/**
+ * The creative as Ads Manager builds it when you add text options or several
+ * images: one creative whose asset_feed_spec lists the choices, and Meta
+ * picks the best combination per person (optimization_type
+ * DEGREES_OF_FREEDOM; up to 5 texts, 5 headlines, 10 images).
+ */
+export function buildAssetFeedCreativeParams(spec: CampaignSpec, ad: AdSpec, ctx: CreativeContext): Record<string, unknown> {
+  const c = ad.creative;
+  const { texts, headlines } = textOptions(c);
+  const base = buildCreativeParams(spec, ad, ctx) as { object_story_spec: { link_data: { link: string; call_to_action: { type: string; value: Record<string, unknown> } } } };
+  const ld = base.object_story_spec.link_data;
+  const storySpec: Record<string, unknown> = { page_id: ctx.pageId };
+  if (ctx.instagramUserId) storySpec.instagram_user_id = ctx.instagramUserId;
+  const feed: Record<string, unknown> = {
+    images: ctx.imageHashes.slice(0, 10).map((hash) => ({ hash })),
+    bodies: texts.map((text) => ({ text })),
+    titles: headlines.map((text) => ({ text })),
+    link_urls: [{ website_url: ld.link }],
+    call_to_action_types: [ld.call_to_action.type],
+    ad_formats: [ctx.imageHashes.length > 1 && c.format === "carousel" ? "CAROUSEL_IMAGE" : "SINGLE_IMAGE"],
+    optimization_type: "DEGREES_OF_FREEDOM",
+  };
+  if (c.description) feed.descriptions = [{ text: c.description }];
+  // Lead form / chat destination travel with the call to action.
+  if (Object.keys(ld.call_to_action.value ?? {}).some((k) => k !== "link")) {
+    feed.call_to_actions = [{ type: ld.call_to_action.type, value: ld.call_to_action.value }];
+  }
+  return { name: ad.name, object_story_spec: storySpec, asset_feed_spec: feed };
+}
+
+/**
+ * The fallback when Meta will not take an asset feed for this kind of ad:
+ * the same choices as separate ads (text i with headline i and image i,
+ * cycling), which Meta then tests against each other. At most 5.
+ */
+export function splitVariants(ad: AdSpec, imageHashes: string[]): Array<{ ad: AdSpec; imageHashes: string[] }> {
+  const c = ad.creative;
+  const { texts, headlines } = textOptions(c);
+  const imgOptions = c.format === "options" && imageHashes.length > 1 ? imageHashes : [];
+  const n = Math.min(5, Math.max(texts.length, headlines.length, imgOptions.length, 1));
+  return Array.from({ length: n }, (_, i) => ({
+    ad: {
+      name: n > 1 ? `${ad.name} · version ${i + 1}` : ad.name,
+      creative: {
+        ...c,
+        primaryText: texts[i % texts.length] ?? c.primaryText,
+        headline: headlines[i % headlines.length] ?? c.headline,
+        extraTexts: [],
+        extraHeadlines: [],
+        format: c.format === "options" ? "single" : c.format,
+      },
+    },
+    imageHashes: imgOptions.length ? [imgOptions[i % imgOptions.length]] : imageHashes,
+  }));
+}
+
 export function buildLeadFormParams(form: LeadFormSpec): Record<string, unknown> {
   return {
     name: form.name,
