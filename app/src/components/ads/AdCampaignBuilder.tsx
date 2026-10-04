@@ -261,6 +261,9 @@ export function AdCampaignBuilder({
   // saved copy and threw away edits made since (a new ad set, a gender).
   const stepKey = (draftId: number | null) => `ads-builder-step:${draftId ?? "new"}`;
   function rememberStep(draftId: number | null, n: number) {
+    // Only a saved draft has a step to come back to. A shared "new" slot made
+    // every new campaign open on whatever step the last one reached.
+    if (draftId == null) return;
     try {
       window.localStorage.setItem(stepKey(draftId), String(n));
     } catch {
@@ -268,8 +271,9 @@ export function AdCampaignBuilder({
     }
   }
   useEffect(() => {
-    if (initialStep != null) return;
+    if (initialStep != null || campaignId == null) return;
     try {
+      window.localStorage.removeItem(stepKey(null)); // leftovers from before this fix
       const saved = Number(window.localStorage.getItem(stepKey(campaignId)));
       if (Number.isInteger(saved) && saved > 0 && saved < STEPS.length) setStep(saved);
     } catch {
