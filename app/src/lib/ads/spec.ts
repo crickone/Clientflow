@@ -266,8 +266,10 @@ export function buildTargeting(a: AudienceSpec): Record<string, unknown> {
 export interface AdSetContext {
   campaignId: string;
   pageId: string;
-  /** Fallback for spec.advertiser: the Page (or business) name. */
+  /** Fallback for spec.advertiser: the ad account's registered beneficiary, or the Page name. */
   advertiser?: string | null;
+  /** Who pays, when the ad account registers a different payer. Defaults to the advertiser. */
+  payor?: string | null;
 }
 
 /** POST /act_<id>/adsets parameters for one ad set (its campaign is the on/off switch). */
@@ -293,7 +295,7 @@ export function buildAdSetParams(spec: CampaignSpec, set: AdSetSpec, ctx: AdSetC
   const advertiser = (spec.advertiser ?? "").trim() || (ctx.advertiser ?? "").trim();
   if (advertiser) {
     params.dsa_beneficiary = advertiser;
-    params.dsa_payor = advertiser;
+    params.dsa_payor = (spec.advertiser ?? "").trim() || (ctx.payor ?? "").trim() || advertiser;
   }
   if (set.startAt) params.start_time = new Date(set.startAt).toISOString();
   if (set.endAt) params.end_time = new Date(set.endAt).toISOString();

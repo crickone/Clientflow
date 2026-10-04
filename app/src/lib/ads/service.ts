@@ -147,6 +147,11 @@ async function graph<T = Record<string, unknown>>(method: "GET" | "POST" | "DELE
       const sent = { ...params } as Record<string, unknown>;
       console.error(`[ads]   sent: ${JSON.stringify({ keys: Object.keys(sent), targeting: sent.targeting, optimization_goal: sent.optimization_goal, billing_event: sent.billing_event, destination_type: sent.destination_type, promoted_object: sent.promoted_object }).slice(0, 1500)}`);
     }
+    if (/dsa_(beneficiary|payor)/.test(JSON.stringify(e?.error_data ?? ""))) {
+      throw new AdsError(
+        "Meta did not accept the advertiser name shown in the EU (who the ad is for and who paid). In Meta Ads Manager open the ad account's settings, set its beneficiary and payer, then launch again, or type that exact name in the Advertiser field on the Campaign step.",
+      );
+    }
     throw new AdsError(e?.error_user_msg || e?.message || `Meta ${path} failed (${res.status}).`);
   }
   return json;
@@ -175,6 +180,34 @@ async function uploadDesignImages(adAccountId: string, token: string, designId: 
   }
   cache.set(designId, hashes);
   return hashes;
+}
+
+/**
+ * The EU beneficiary and payer names Meta will accept for this ad account:
+ * its saved defaults (set in Ads Manager), else Meta's recommendations, else
+ * the Page name. Fail-soft: lookups that error fall through to the next.
+ */
+async function dsaNames(adAccountId: string, token: string, fallback: string): Promise<{ beneficiary: string; payor: string }> {
+  let beneficiary = "";
+  let payor = "";
+  try {
+    const acct = await graph<{ default_dsa_beneficiary?: string; default_dsa_payor?: string }>("GET", adAccountId, token, { fields: "default_dsa_beneficiary,default_dsa_payor" });
+    beneficiary = acct.default_dsa_beneficiary ?? "";
+    payor = acct.default_dsa_payor ?? "";
+  } catch {
+    // fall through
+  }
+  if (!beneficiary) {
+    try {
+      const rec = await graph<{ data?: Array<{ recommendations?: string[] }> }>("GET", `${adAccountId}/dsa_recommendations`, token);
+      beneficiary = rec.data?.[0]?.recommendations?.[0] ?? "";
+    } catch {
+      // fall through
+    }
+  }
+  console.log(`[ads] DSA names: beneficiary ${beneficiary ? "from ad account" : "from Page name"}, payor ${payor ? "from ad account" : "same as beneficiary"}`);
+  beneficiary = beneficiary || fallback;
+  return { beneficiary, payor: payor || beneficiary };
 }
 
 /** Upload library photos (in order) to the ad account; their image hashes. */
@@ -277,10 +310,14 @@ export async function launchAdCampaign(id: number): Promise<AdCampaignRow> {
         : (await graph<{ id: string }>("POST", `${page.pageId}/leadgen_forms`, page.pageToken, buildLeadFormParams(spec.leadForm))).id;
     }
 
+    // EU DSA names: Meta checks them against what the ad account has
+    // registered (its default beneficiary/payer, or its recommendations); a
+    // free-typed Page name was refused (blame dsa_beneficiary).
+    const dsa = await dsaNames(acct, token, page.pageName ?? getBusinessProfile().businessName);
     const images = new Map<number, string[]>();
     const libraryImages = new Map<string, string>();
     for (const set of spec.adSets) {
-      const adSetId = (await graph<{ id: string }>("POST", `${acct}/adsets`, token, buildAdSetParams(spec, set, { campaignId: ids.campaignId, pageId: page.pageId, advertiser: page.pageName ?? getBusinessProfile().businessName }))).id;
+      const adSetId = (await graph<{ id: string }>("POST", `${acct}/adsets`, token, buildAdSetParams(spec, set, { campaignId: ids.campaignId, pageId: page.pageId, advertiser: dsa.beneficiary, payor: dsa.payor }))).id;
       const entry = { adSetId, adIds: [] as string[] };
       ids.adSets!.push(entry);
       for (const ad of set.ads) {
