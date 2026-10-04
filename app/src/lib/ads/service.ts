@@ -129,9 +129,16 @@ async function graph<T = Record<string, unknown>>(method: "GET" | "POST" | "DELE
     method === "GET"
       ? await fetch(`${GRAPH_BASE}/${path}?${qs}`)
       : await fetch(`${GRAPH_BASE}/${path}`, { method, body: qs });
-  const json = (await res.json().catch(() => ({}))) as T & { error?: { message?: string; error_user_msg?: string; error_user_title?: string } };
+  const json = (await res.json().catch(() => ({}))) as T & {
+    error?: { message?: string; error_user_msg?: string; error_user_title?: string; code?: number; error_subcode?: number; fbtrace_id?: string };
+  };
   if (!res.ok || json.error) {
     const e = json.error;
+    // Meta's user message often hides the reason ("There's an issue publishing
+    // this ad set"); the codes say which rule or restriction it was. Logged
+    // with the endpoint (never the token) so a refusal can be diagnosed.
+    const where = path.replace(/^act_\d+\//, "act_*/");
+    console.error(`[ads] Meta refused ${method} ${where}: code ${e?.code ?? "?"}/${e?.error_subcode ?? "?"} "${e?.error_user_title ?? ""}" ${e?.message ?? ""} (trace ${e?.fbtrace_id ?? "?"})`);
     throw new AdsError(e?.error_user_msg || e?.message || `Meta ${path} failed (${res.status}).`);
   }
   return json;
