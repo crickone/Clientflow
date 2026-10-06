@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Megaphone, Radar } from "lucide-react";
+import { ChevronLeft, ChevronRight, Megaphone, Radar } from "lucide-react";
 
 import { Card } from "@/components/ui/Card";
 import { MonthNote } from "@/components/marketing/PlanNotes";
@@ -11,8 +11,8 @@ import { BuildCampaignLink } from "./BuildCampaignLink";
 import { AddCalendarDate, RemoveCalendarDate } from "./CalendarDates";
 
 interface Props {
-  /** A calendar year, or null for the next twelve months from today. */
-  year: number | null;
+  /** The calendar year shown, January to December. */
+  year: number;
   todayIso: string;
   view: MonthView[];
   radar: RadarSuggestion[];
@@ -62,8 +62,7 @@ const KIND_LABEL: Record<CalEntry["kind"], string> = {
 
 /**
  * The seasonal calendar: the radar's "coming up" panel above twelve month
- * cards. By default the twelve months start at this one; ?year= shows a
- * calendar year. Each date says whether a campaign covers it (and how that
+ * cards, January to December of one year (this year unless ?year= says). Each date says whether a campaign covers it (and how that
  * went), or when one would need to start. Clicking a date opens its campaign,
  * or Adonis with the campaign brief filled in.
  */
@@ -74,16 +73,15 @@ export function SeasonalCalendar({ year, todayIso, view, radar }: Props) {
       <ComingUpRail radar={radar} todayIso={todayIso} />
 
       <div className="szn-bar">
-        <nav className="szn-views" aria-label="Which months">
-          <Link href="/marketing/calendar" className={year === null ? "is-on" : undefined} aria-current={year === null ? "page" : undefined}>
-            Next 12 months
+        <nav className="szn-views" aria-label="Year">
+          <Link href={`/marketing/calendar?year=${year - 1}`} aria-label="Previous year">
+            <ChevronLeft size={15} />
           </Link>
-          {[thisYear, thisYear + 1].map((y) => (
-            <Link key={y} href={`/marketing/calendar?year=${y}`} className={year === y ? "is-on" : undefined} aria-current={year === y ? "page" : undefined}>
-              {y}
-            </Link>
-          ))}
-          {year !== null && year !== thisYear && year !== thisYear + 1 && <span className="is-on">{year}</span>}
+          <span className="is-on">{year}</span>
+          <Link href={`/marketing/calendar?year=${year + 1}`} aria-label="Next year">
+            <ChevronRight size={15} />
+          </Link>
+          {year !== thisYear && <Link href="/marketing/calendar">This year</Link>}
         </nav>
         <AddCalendarDate />
       </div>
@@ -103,7 +101,7 @@ export function SeasonalCalendar({ year, todayIso, view, radar }: Props) {
 
       <div className="szn-grid">
         {view.map((m) => (
-          <MonthCard key={`${m.year}-${m.month}`} m={m} showYear={m.year !== thisYear || m.month === 1} />
+          <MonthCard key={`${m.year}-${m.month}`} m={m} showYear={false} />
         ))}
       </div>
     </div>
