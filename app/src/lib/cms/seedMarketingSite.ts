@@ -51,7 +51,7 @@ const SITE_NAME = "AdonisAgent";
 //   First multi-page rev: the seeder now creates/updates every page in PAGES.
 // rev 8 (2026-10-03): /data-deletion page (Meta rejects a deletion URL equal
 //   to the privacy policy URL).
-const MARKETING_SITE_REV = 8;
+const MARKETING_SITE_REV = 9;
 const REV_KEY = "marketing_site_rev";
 
 /**
