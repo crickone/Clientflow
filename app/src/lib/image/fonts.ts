@@ -75,7 +75,7 @@ export const FONT_OPTIONS: FontOption[] = [
   {
     id: "hanken-grotesk",
     name: "Hanken Grotesk",
-    cssVar: "--font-body",
+    cssVar: "--font-hanken",
     fallback: "system-ui, sans-serif",
     group: "sans",
     forHeading: true,

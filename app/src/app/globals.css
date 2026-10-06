@@ -7,6 +7,12 @@
 /* ----------------------------------------------------------------------- */
 
 :root {
+  /* App text faces. Body: San Francisco, Apple's system font (it cannot be
+     shipped as a web font; this stack renders it on Apple devices and the
+     platform UI font elsewhere). Heading: Helvetica Now where installed or
+     once licensed web files are added (app/src/app/fonts), else Helvetica. */
+  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-helvetica-now: "Helvetica Now Display", "Helvetica Now Text", "Helvetica Now", "Helvetica Neue", Helvetica, Arial, sans-serif;
   /* Dark premium theme — charcoal canvas, elevated glass surfaces, glowing
      orange accent. Token-driven so the whole admin re-skins from here. */
   --bg: #0c0d10;                /* charcoal page canvas */
@@ -130,7 +136,13 @@ a {
    chat's compose box lands just below the fold (you'd have to scroll to it).
    --app-topbar-h is the single source of truth, enforced on .app-topbar's own
    height in the mobile media query below so the subtraction is exact. */
-:root { --app-topbar-h: 56px; }
+:root {
+  /* App text faces. Body: San Francisco, Apple's system font (it cannot be
+     shipped as a web font; this stack renders it on Apple devices and the
+     platform UI font elsewhere). Heading: Helvetica Now where installed or
+     once licensed web files are added (app/src/app/fonts), else Helvetica. */
+  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-helvetica-now: "Helvetica Now Display", "Helvetica Now Text", "Helvetica Now", "Helvetica Neue", Helvetica, Arial, sans-serif; --app-topbar-h: 56px; }
 .adonis-shell { height: 100dvh; }
 @media (max-width: 900px) {
   .adonis-shell { height: calc(100dvh - var(--app-topbar-h)); }
@@ -1098,6 +1110,12 @@ a {
    second set of rules. (The ADMIN accent is monochrome by design, so it
    cannot carry this: see the hologram note below.) */
 :root {
+  /* App text faces. Body: San Francisco, Apple's system font (it cannot be
+     shipped as a web font; this stack renders it on Apple devices and the
+     platform UI font elsewhere). Heading: Helvetica Now where installed or
+     once licensed web files are added (app/src/app/fonts), else Helvetica. */
+  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-helvetica-now: "Helvetica Now Display", "Helvetica Now Text", "Helvetica Now", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --writing-ink-4: color-mix(in srgb, var(--text-primary) 4%, transparent);
   --writing-ink-7: color-mix(in srgb, var(--text-primary) 7%, transparent);
   --writing-ink-9: color-mix(in srgb, var(--text-primary) 9%, transparent);
@@ -1279,6 +1297,12 @@ a {
    dark surface and does nothing on a near-white one, so on light the layers
    switch to multiply and the pools carry the colour themselves. */
 :root {
+  /* App text faces. Body: San Francisco, Apple's system font (it cannot be
+     shipped as a web font; this stack renders it on Apple devices and the
+     platform UI font elsewhere). Heading: Helvetica Now where installed or
+     once licensed web files are added (app/src/app/fonts), else Helvetica. */
+  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-helvetica-now: "Helvetica Now Display", "Helvetica Now Text", "Helvetica Now", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --holo-a: #a86bff; /* violet */
   --holo-b: #3fd2ff; /* cyan */
   --holo-c: #ff6ad5; /* magenta */
@@ -2294,7 +2318,7 @@ a {
   /* The BRAND face, not var(--font-heading): a tenant's display face (Bebas,
      Clash) is chosen for dashboards, and "Welcome back" in condensed all-caps
      is not a welcome. */
-  font-family: var(--font-preon), var(--font-space-grotesk), var(--font-body), system-ui, sans-serif;
+  font-family: var(--font-helvetica-now);
   font-size: clamp(28px, 4vw, 36px);
   font-weight: 500;
   letter-spacing: -0.02em;

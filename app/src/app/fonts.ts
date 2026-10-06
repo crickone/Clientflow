@@ -10,12 +10,13 @@ import {
 } from "next/font/google";
 import localFont from "next/font/local";
 
-// Primary body font — Renova brand baseline.
+// Hanken Grotesk: a Content Studio design font (lib/image/fonts). The app's
+// body text is San Francisco via --font-body in globals.css.
 export const body = Hanken_Grotesk({
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700"],
   display: "swap",
-  variable: "--font-body",
+  variable: "--font-hanken",
 });
 
 // Technical monospace — labels, eyebrows, metadata, badges, nav.
