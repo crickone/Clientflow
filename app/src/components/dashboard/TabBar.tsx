@@ -43,6 +43,7 @@ import {
 } from "@/app/dashboard/actions";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import {
@@ -53,7 +54,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/DropdownMenu";
 import type { PresetIcon } from "@/lib/dashboard/presets";
-import { RANGE_LABELS, STORED_RANGE_KEYS, type RangeKey } from "@/lib/dashboard/range";
+import { MAX_CUSTOM_RANGE_DAYS, RANGE_LABELS, STORED_RANGE_KEYS, type RangeKey } from "@/lib/dashboard/range";
 import type { TabSource } from "@/lib/dashboard/tabs";
 
 export type TabBarProps = {
@@ -83,7 +84,7 @@ const ICONS: Record<PresetIcon, LucideIcon> = {
   Heart,
 };
 
-export function TabBar({ tabs, active, rangeKey, isAdmin, source, presets, custom }: TabBarProps) {
+export function TabBar({ tabs, active, rangeKey, rangeLabel, isAdmin, source, presets, custom }: TabBarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -91,9 +92,6 @@ export function TabBar({ tabs, active, rangeKey, isAdmin, source, presets, custo
   const [editing, setEditing] = useState(false);
   const [adding, setAdding] = useState(false);
   const [renaming, setRenaming] = useState<{ index: number; name: string } | null>(null);
-  const [customOpen, setCustomOpen] = useState(false);
-  const [from, setFrom] = useState(custom?.from ?? "");
-  const [to, setTo] = useState(custom?.to ?? "");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -123,7 +121,6 @@ export function TabBar({ tabs, active, rangeKey, isAdmin, source, presets, custo
   }
 
   function pickRange(key: string) {
-    if (key === "custom") return setCustomOpen(true);
     act(() => setRangeAction(active, key), () => go({ range: null, from: null, to: null }));
   }
 
@@ -245,28 +242,16 @@ export function TabBar({ tabs, active, rangeKey, isAdmin, source, presets, custo
 
         {!editing && (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <select
-              aria-label="Date range"
-              value={rangeKey}
-              onChange={(e) => pickRange(e.target.value)}
+            <DateRangePicker
+              presets={STORED_RANGE_KEYS.map((k) => ({ key: k, label: RANGE_LABELS[k] }))}
+              activeKey={rangeKey}
+              label={rangeLabel}
+              custom={custom}
               disabled={pending}
-              style={{
-                height: 36,
-                padding: "0 36px 0 14px",
-                borderRadius: "var(--radius)",
-                border: "1px solid var(--hairline)",
-                background: "var(--surface-1)",
-                color: "var(--text-primary)",
-                fontSize: 13,
-              }}
-            >
-              {STORED_RANGE_KEYS.map((k) => (
-                <option key={k} value={k}>
-                  {RANGE_LABELS[k]}
-                </option>
-              ))}
-              <option value="custom">{rangeKey === "custom" && custom ? `${custom.from} to ${custom.to}` : "Custom..."}</option>
-            </select>
+              maxDays={MAX_CUSTOM_RANGE_DAYS}
+              onPreset={pickRange}
+              onCustom={(f, t) => go({ range: "custom", from: f, to: t })}
+            />
             <Button variant="ghost" size="sm" onClick={() => window.dispatchEvent(new Event("dashboard:customise"))}>
               <Settings2 size={14} /> Customise
             </Button>
@@ -346,32 +331,6 @@ export function TabBar({ tabs, active, rangeKey, isAdmin, source, presets, custo
         </DialogContent>
       </Dialog>
 
-      {/* Custom range */}
-      <Dialog open={customOpen} onOpenChange={setCustomOpen}>
-        <DialogContent title="Custom range" width={420}>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!from || !to) return;
-              setCustomOpen(false);
-              go({ range: "custom", from, to });
-            }}
-            style={{ display: "flex", flexDirection: "column", gap: 12 }}
-          >
-            <label style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-              From
-              <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={{ marginTop: 4 }} />
-            </label>
-            <label style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-              To
-              <Input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} style={{ marginTop: 4 }} />
-            </label>
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
-              <Button type="submit">Apply</Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
