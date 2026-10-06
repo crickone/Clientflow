@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
     const tenantId = membership.tenant.id;
     const grant = await exchangeCode(code);
     const assets = await discoverAssets(grant.token);
-    saveGrant(tenantId, grant.token, grant.kind, grant.expiresAt, me.id);
+    saveGrant(tenantId, grant.token, grant.kind, grant.expiresAt, me.id, grant.fbUserId);
     saveAdAccounts(tenantId, assets.adAccounts);
     const names = await saveConnectedPages(tenantId, assets.pages, me.id);
     if (names.length === 0) return back("error=no_pages");

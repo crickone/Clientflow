@@ -175,15 +175,21 @@ export async function discoverAssets(token: string): Promise<{ pages: GraphPage[
 }
 
 /** Store (or replace) the tenant's grant token, encrypted. */
-export function saveGrant(tenantId: number, token: string, kind: TokenKind, expiresAt: number | null, userId: number): void {
+export function saveGrant(tenantId: number, token: string, kind: TokenKind, expiresAt: number | null, userId: number, fbUserId: string | null = null): void {
   controlSqlite
     .prepare(
-      `INSERT INTO meta_grants (tenant_id, token_enc, token_kind, expires_at, granted_by_user_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO meta_grants (tenant_id, token_enc, token_kind, expires_at, granted_by_user_id, fb_user_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(tenant_id) DO UPDATE SET token_enc = excluded.token_enc, token_kind = excluded.token_kind,
-         expires_at = excluded.expires_at, granted_by_user_id = excluded.granted_by_user_id, updated_at = excluded.updated_at`,
+         expires_at = excluded.expires_at, granted_by_user_id = excluded.granted_by_user_id,
+         fb_user_id = COALESCE(excluded.fb_user_id, meta_grants.fb_user_id), updated_at = excluded.updated_at`,
     )
-    .run(tenantId, encryptToken(token), kind, expiresAt, userId, Date.now(), Date.now());
+    .run(tenantId, encryptToken(token), kind, expiresAt, userId, fbUserId, Date.now(), Date.now());
+}
+
+/** Tenants whose Facebook connection was made by this Facebook user (app-scoped id). */
+export function tenantsConnectedBy(fbUserId: string): number[] {
+  return (controlSqlite.prepare("SELECT tenant_id FROM meta_grants WHERE fb_user_id = ?").all(fbUserId) as Array<{ tenant_id: number }>).map((r) => r.tenant_id);
 }
 
 export interface GrantInfo {

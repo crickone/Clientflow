@@ -80,6 +80,11 @@ export interface ExchangedToken {
   kind: "system_user" | "user";
   /** Epoch ms, or null when the token never expires (a system-user token). */
   expiresAt: number | null;
+  /**
+   * The Facebook user (app-scoped id) who made the connection: what Meta's
+   * data deletion callback names when that person removes the app.
+   */
+  fbUserId: string | null;
 }
 
 async function tokenRequest(params: Record<string, string>): Promise<string> {
@@ -112,15 +117,15 @@ export async function exchangeCode(code: string): Promise<ExchangedToken> {
   if (info.type !== "SYSTEM_USER") {
     token = await tokenRequest({ grant_type: "fb_exchange_token", fb_exchange_token: token });
     const longInfo = await inspectToken(token);
-    return { token, kind: "user", expiresAt: longInfo.expiresAt };
+    return { token, kind: "user", expiresAt: longInfo.expiresAt, fbUserId: info.userId };
   }
-  return { token, kind: "system_user", expiresAt: info.expiresAt };
+  return { token, kind: "system_user", expiresAt: info.expiresAt, fbUserId: info.userId };
 }
 
-async function inspectToken(token: string): Promise<{ type: string; expiresAt: number | null }> {
+async function inspectToken(token: string): Promise<{ type: string; expiresAt: number | null; userId: string | null }> {
   const appToken = `${process.env.FACEBOOK_APP_ID ?? ""}|${process.env.FACEBOOK_APP_SECRET ?? ""}`;
   const res = await fetch(`${GRAPH_BASE}/debug_token?` + new URLSearchParams({ input_token: token, access_token: appToken }));
-  const body = (await res.json().catch(() => ({}))) as { data?: { type?: string; expires_at?: number } };
+  const body = (await res.json().catch(() => ({}))) as { data?: { type?: string; expires_at?: number; user_id?: string } };
   const exp = body.data?.expires_at;
-  return { type: body.data?.type ?? "USER", expiresAt: exp ? exp * 1000 : null };
+  return { type: body.data?.type ?? "USER", expiresAt: exp ? exp * 1000 : null, userId: body.data?.user_id ?? null };
 }

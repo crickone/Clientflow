@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { controlSqlite } from "@/lib/db/control";
 import { parseSignedRequest } from "@/lib/facebook/signedRequest";
+import { deleteMetaDataForUser } from "@/lib/facebook/dataDeletion";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +12,9 @@ export const dynamic = "force-dynamic";
  * When someone removes the Adonis Agent app from their Facebook account, Meta
  * POSTs a signed_request naming their app-scoped user id. We verify it with the
  * app secret, record the request, and answer with a confirmation code and a
- * status URL (GET on this same route), as Meta requires. Requests are processed
- * by the team within 30 days, as the privacy policy says (lib + table below).
+ * status URL (GET on this same route), as Meta requires. The connection data is
+ * deleted at once (lib/facebook/dataDeletion); a failure leaves the request
+ * 'received' for the team to finish within the 30 days the privacy policy gives.
  * Public: middleware lets /api/integrations/meta/ through; the signature is the auth.
  */
 
@@ -42,6 +44,19 @@ export async function POST(req: NextRequest) {
     .prepare("INSERT INTO meta_deletion_requests (confirmation_code, fb_user_id, received_at) VALUES (?, ?, ?)")
     .run(code, String(payload.user_id), Date.now());
   console.log(`[meta] data deletion request received: code ${code}`);
+
+  // Done straight away: the connection data is removed and the request marked
+  // completed, so the status page Meta links to can say so.
+  try {
+    const tenants = await deleteMetaDataForUser(String(payload.user_id));
+    controlSqlite
+      .prepare("UPDATE meta_deletion_requests SET status = 'completed', completed_at = ? WHERE confirmation_code = ?")
+      .run(Date.now(), code);
+    console.log(`[meta] data deletion ${code}: completed (${tenants.length} connection(s) removed)`);
+  } catch (err) {
+    // Left as 'received' so it is visible and can be finished by hand.
+    console.error(`[meta] data deletion ${code} failed:`, err);
+  }
 
   return NextResponse.json({ url: `${STATUS_BASE}?code=${code}`, confirmation_code: code });
 }

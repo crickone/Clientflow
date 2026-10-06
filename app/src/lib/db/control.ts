@@ -1002,6 +1002,15 @@ export function ensureControlTables() {
     console.error("[control] facebook_ad_accounts in_use migration failed:", err);
   }
 
+  // Which Facebook user made each connection, so a data deletion request from
+  // Meta (it names that user) can find what to delete.
+  try {
+    const cols = controlSqlite.prepare("PRAGMA table_info(meta_grants)").all() as Array<{ name: string }>;
+    if (!cols.find((c) => c.name === "fb_user_id")) controlSqlite.exec("ALTER TABLE meta_grants ADD COLUMN fb_user_id TEXT");
+  } catch (err) {
+    console.error("[control] meta_grants fb_user_id migration failed:", err);
+  }
+
   // Batch 6b (improvement-plan-2026-08.md Theme E1): tracking table for the
   // versioned migration runner (./migrations) — separate from everything
   // above, which is the additive bootstrap. Created here too (in addition to
