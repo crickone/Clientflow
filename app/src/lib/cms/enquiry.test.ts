@@ -19,13 +19,13 @@ function check(name: string, cond: boolean) {
   console.log("  ✓", name);
 }
 
-const good = validateEnquiry({ name: "  Mary Byrne ", phone: "086 123 4567", programme: "vitality", about: "Had a stent in March." });
+const good = validateEnquiry({ name: "  Mary Byrne ", phone: "086 123 4567", programme: "studio60", about: "Had a stent in March." });
 check("valid -> ok", good.ok);
 if (good.ok) {
   check("name trimmed", good.data.name === "Mary Byrne");
   check("email null when blank", good.data.email === null);
-  check("programme kept", good.data.programme === "vitality");
-  check("notes carry programme label and about", enquiryNotes(good.data) === "Programme: Vitality 60+\nAbout: Had a stent in March.");
+  check("programme kept", good.data.programme === "studio60");
+  check("notes carry programme label and about", enquiryNotes(good.data) === "Programme: Studio 60\nAbout: Had a stent in March.");
 }
 // Flipped when programmes became per-site: a non-empty programme the site could
 // not have offered is now refused rather than rewritten to "unsure", so that a
@@ -68,7 +68,7 @@ const sameList = (a: readonly string[], b: readonly string[]) =>
 
 check(
   "a site's programme set is its own",
-  sameList(programmesForSite("healthwise"), ["livewell", "vitality", "heartwise", "unsure"]) &&
+  sameList(programmesForSite("healthwise"), ["livewell", "studio60", "heartwise", "unsure"]) &&
     sameList(programmesForSite("optimal-health"), ["hbot", "infrared", "hifem", "massage", "unsure"]),
 );
 check("an unknown site falls back to the one neutral option", sameList(programmesForSite("nobody"), ["unsure"]));
@@ -89,7 +89,7 @@ check(
 check(
   "healthwise still validates with no slug passed",
   (() => {
-    const r = validateEnquiry({ name: "Aoife", phone: "0838672844", programme: "vitality" });
+    const r = validateEnquiry({ name: "Aoife", phone: "0838672844", programme: "studio60" });
     return r.ok;
   })(),
 );

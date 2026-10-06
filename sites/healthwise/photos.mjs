@@ -31,7 +31,7 @@ const STYLE =
 
 const SHOTS = [
   { name: "hero-portrait", w: 1152, h: 1440, brief: "A woman in her mid-forties and a man in his sixties on neighbouring resistance machines, both mid-effort, a coach's arm reaching in from the side to adjust a setting; the younger person nearer the camera. Waist-up, three-quarter view." },
-  { name: "livewell", w: 1440, h: 1088, brief: "A woman around fifty resting a kettlebell at her side between sets, breathing, focused, looking down. Three-quarter length." },
+  { name: "livewell", w: 1440, h: 1088, brief: "A fit woman around forty, no grey hair, resting a kettlebell at her side between sets, breathing, focused, looking down. Three-quarter length." },
   { name: "vitality", w: 1440, h: 1088, brief: "Three people over sixty-five seated on white resistance machines, a coach in a plain navy t-shirt standing beside one of them, talking. Wide shot." },
   { name: "studio60", w: 1440, h: 1088, brief: "Two people in their sixties working with free weights in the studio, one mid-press with a dumbbell in each hand, the other steady on a bench alongside; both capable and unhurried, no coach in frame. Three-quarter length." },
   { name: "studio60-hero", w: 1440, h: 960, brief: "A man and a woman in their late sixties training side by side with barbells and dumbbells in the free-weight corner, moving confidently, a coach watching from a few steps back. Wide shot." },
@@ -39,7 +39,7 @@ const SHOTS = [
   { name: "livewell-hero", w: 1440, h: 960, brief: "A small group of four adults between forty-five and sixty working through a circuit with resistance bands, spaced across the room. Wide shot." },
   { name: "vitality-hero", w: 1440, h: 960, brief: "A woman around seventy on a seated leg press, smiling at a coach who is crouched beside the machine. Medium shot." },
   { name: "heartwise-hero", w: 1440, h: 960, brief: "A man in his mid-sixties on a recumbent bike, glancing down at a chest-strap heart monitor display, composed and unhurried. Medium shot." },
-  { name: "classes-hero", w: 1440, h: 960, brief: "The room mid-morning: four people moving between stations, one on a rower, one with light dumbbells, sunlight across the floor. Wide shot from the doorway." },
+  { name: "classes-hero", w: 1440, h: 960, brief: "The room mid-morning: four adults aged thirty-five to forty-five, all with dark or brown hair and no grey at all, moving between stations, one on a rower, one with light dumbbells, sunlight across the floor. Wide shot from the doorway." },
   { name: "detail-hands", w: 1152, h: 1152, brief: "Close-up of an older person's hands adjusting a light dumbbell on a rack. Square." },
   { name: "detail-band", w: 1152, h: 1152, brief: "Close-up of a resistance band around two ankles in trainers on the grey rubber floor. Square." },
   { name: "detail-chat", w: 1152, h: 1152, brief: "Two women in their sixties talking after a class, water bottles in hand, one laughing, machines soft in the background. Square, medium shot." },

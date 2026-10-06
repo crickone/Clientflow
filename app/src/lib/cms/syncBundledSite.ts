@@ -277,6 +277,8 @@ function syncOne(siteSlug: string): void {
     return;
   }
 
+  retireBundledPages(siteSlug, served.dbFile, served.siteId);
+
   // Guard 1: nothing changed since the last applied bundle. The marker is
   // the content hash AND the tenant it was applied to, because those are two
   // independent ways for the live pages to be out of date. Recording the hash
@@ -434,4 +436,36 @@ function syncOne(siteSlug: string): void {
       (merged.length ? `, ${merged.length} merged with a human's edits: ${merged.join(", ")}` : "") +
       (skipped.length ? `, ${skipped.length} left alone: ${skipped.join(", ")}` : ""),
   );
+}
+
+/**
+ * Pages a bespoke site has dropped. The sync only ever adds and updates, so a
+ * page removed from `sites/<slug>/` would otherwise stay live from the
+ * database forever, and the redirect meant to replace it (_redirects.json)
+ * never fires, because redirects only run when no published page exists.
+ * `public/sites/<slug>/_retired.json` lists those paths; each is set back to
+ * draft (not deleted: its content and history stay, and it can be
+ * republished from the CMS). Idempotent and cheap, so it runs on every boot,
+ * before the unchanged-bundle guard.
+ */
+function retireBundledPages(siteSlug: string, dbFile: string, siteId: number): void {
+  const file = path.join(process.cwd(), "public", "sites", siteSlug, "_retired.json");
+  if (!fs.existsSync(file)) return;
+  let paths: unknown;
+  try {
+    paths = JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch {
+    console.warn(`[syncBundledSite] '${siteSlug}' _retired.json is not valid JSON; ignored.`);
+    return;
+  }
+  if (!Array.isArray(paths)) return;
+  const { sqlite } = openTenantDb(dbFile);
+  const retire = sqlite.prepare(
+    "UPDATE pages SET status = 'draft', updated_at = ? WHERE site_id = ? AND path = ? AND status = 'published'",
+  );
+  for (const p of paths) {
+    if (typeof p !== "string" || !p.startsWith("/")) continue;
+    const r = retire.run(Date.now(), siteId, p);
+    if (r.changes) console.log(`[syncBundledSite] '${siteSlug}' retired ${p} (now draft).`);
+  }
 }

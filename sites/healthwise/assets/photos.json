@@ -7,9 +7,9 @@
     "height": 1440
   },
   "livewell": {
-    "candidate": 3,
-    "prompt": "A woman around fifty resting a kettlebell at her side between sets, breathing, focused, looking down. Three-quarter length. Realistic Irish adults, ordinary gym clothes (plain t-shirts, leggings, trainers), natural skin, grey and white hair where the age calls for it, no stock smile, caught mid-movement or mid-conversation. Setting: a small bright exercise studio in Ireland; pale blue-grey painted walls; white and maroon resistance machines; black treadmills and recumbent bikes; a thin blue LED strip along one wall; a drop ceiling; large front windows with soft daylight; grey rubber floor. Documentary photograph, 35mm lens, natural window light, shallow depth of field, muted colour, quiet composition. No text, no logos, no signage, no watermark.",
-    "seed": 1993395966,
+    "candidate": 4,
+    "prompt": "A fit woman around forty, no grey hair, resting a kettlebell at her side between sets, breathing, focused, looking down. Three-quarter length. Realistic Irish adults, ordinary gym clothes (plain t-shirts, leggings, trainers), natural skin, grey and white hair where the age calls for it, no stock smile, caught mid-movement or mid-conversation. Setting: a small bright exercise studio in Ireland; pale blue-grey painted walls; white and maroon resistance machines; black treadmills and recumbent bikes; a thin blue LED strip along one wall; a drop ceiling; large front windows with soft daylight; grey rubber floor. Documentary photograph, 35mm lens, natural window light, shallow depth of field, muted colour, quiet composition. No text, no logos, no signage, no watermark.",
+    "seed": 1840712455,
     "width": 1440,
     "height": 1088
   },
@@ -50,8 +50,8 @@
   },
   "classes-hero": {
     "candidate": 1,
-    "prompt": "The room mid-morning: four people moving between stations, one on a rower, one with light dumbbells, sunlight across the floor. Wide shot from the doorway. Realistic Irish adults, ordinary gym clothes (plain t-shirts, leggings, trainers), natural skin, grey and white hair where the age calls for it, no stock smile, caught mid-movement or mid-conversation. Setting: a small bright exercise studio in Ireland; pale blue-grey painted walls; white and maroon resistance machines; black treadmills and recumbent bikes; a thin blue LED strip along one wall; a drop ceiling; large front windows with soft daylight; grey rubber floor. Documentary photograph, 35mm lens, natural window light, shallow depth of field, muted colour, quiet composition. No text, no logos, no signage, no watermark.",
-    "seed": 995932985,
+    "prompt": "The room mid-morning: four adults aged thirty-five to forty-five, all with dark or brown hair and no grey at all, moving between stations, one on a rower, one with light dumbbells, sunlight across the floor. Wide shot from the doorway. Realistic Irish adults, ordinary gym clothes (plain t-shirts, leggings, trainers), natural skin, grey and white hair where the age calls for it, no stock smile, caught mid-movement or mid-conversation. Setting: a small bright exercise studio in Ireland; pale blue-grey painted walls; white and maroon resistance machines; black treadmills and recumbent bikes; a thin blue LED strip along one wall; a drop ceiling; large front windows with soft daylight; grey rubber floor. Documentary photograph, 35mm lens, natural window light, shallow depth of field, muted colour, quiet composition. No text, no logos, no signage, no watermark.",
+    "seed": 619300291,
     "width": 1440,
     "height": 960
   },

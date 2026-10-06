@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Healthwise Clonmel | Coached exercise for over 40s, over 60s and after a cardiac event</title>
-<meta name="description" content="Coached group exercise in Clonmel for adults over 40, over 60, and after a cardiac event. Livewell, Vitality, Studio 60 and Heartwise, since 2011." />
+<meta name="description" content="Coached group exercise in Clonmel for adults over 40, over 60, and after a cardiac event. Livewell, Studio 60 and Heartwise, since 2011." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@700;800&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet" />
@@ -159,8 +159,8 @@ ul,ol{padding:0;list-style:none}
 .sec__head .lead{margin-top:16px}
 
 /* ---- programmes: four doors ---- */
-.doors{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(20px,2.4vw,32px)}
-@media (max-width:1100px){.doors{grid-template-columns:repeat(2,1fr);gap:clamp(24px,3vw,40px)}}
+.doors{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(20px,2.4vw,32px)}
+@media (max-width:1100px){.doors{gap:clamp(18px,2.4vw,28px)}}
 .door{border-top:1.5px solid var(--navy);padding-top:18px;display:flex;flex-direction:column}
 .door--red{border-top-color:var(--red)}
 .door .d{font-size:40px;margin:10px 0 12px}
@@ -327,7 +327,6 @@ html.js [data-stagger]>*{opacity:0;transform:translateY(14px)}
         <button class="nav__grouptop" type="button" aria-expanded="false" aria-controls="nav-programmes">Programmes</button>
         <div class="nav__sub" id="nav-programmes">
           <a href="livewell.html">Livewell 40–60</a>
-          <a href="vitality.html">Vitality 60+</a>
           <a href="studio60.html">Studio 60</a>
           <a href="heartwise.html">Heartwise</a>
         </div>
@@ -367,33 +366,26 @@ html.js [data-stagger]>*{opacity:0;transform:translateY(14px)}
 
 <!-- No credentials strip here (client decision 2026-09-28): the hero speaks to every adult the studio serves; the credentials live on About. -->
 
-<!-- Four programmes, four doors. -->
+<!-- Three programmes, three doors. -->
 <section class="sec" id="programmes">
   <div class="wrap">
     <div class="sec__head">
       <svg class="pulse pulse--rule" viewBox="0 0 1200 20" preserveAspectRatio="none" aria-hidden="true"><path d="M0 10 H140 L148 3 L156 17 L164 10 H1200"/></svg>
-      <p class="eyebrow">Four programmes</p>
-      <h2 class="d h2">Four programmes, each for a different point in life.</h2>
+      <p class="eyebrow">Three programmes</p>
+      <h2 class="d h2">Three programmes, each for a different point in life.</h2>
     </div>
     <div class="doors" data-stagger>
       <article class="door">
         <p class="eyebrow">40 to 60</p>
         <h3 class="d">Livewell</h3>
         <p>Strength, mobility and cardio for people with a job and a family. Five coached classes a week, mornings and evenings.</p>
-        <img src="assets/livewell.jpg" alt="A woman around fifty resting a kettlebell at her side between sets" width="1440" height="1088" />
+        <img src="assets/livewell.jpg" alt="A woman around forty holding a kettlebell between sets" width="1440" height="1088" />
         <a class="link" href="livewell.html">Livewell 40–60</a>
       </article>
       <article class="door door--red">
         <p class="eyebrow">60 and over</p>
-        <h3 class="d">Vitality</h3>
-        <p>Gentle group exercise to keep you strong, steady on your feet and independent. For beginners, and for people coming back.</p>
-        <img src="assets/vitality.jpg" alt="Three people over sixty-five on the studio's resistance machines with the coach beside them" width="1440" height="1088" />
-        <a class="link" href="vitality.html">Vitality 60+</a>
-      </article>
-      <article class="door">
-        <p class="eyebrow">Already active, 60+</p>
         <h3 class="d">Studio 60</h3>
-        <p>Coached strength and conditioning for people over 60 who are already moving well and want to train properly.</p>
+        <p>Coached strength and conditioning for people over 60, at a level that suits you.</p>
         <img src="assets/studio60.jpg" alt="A woman in her sixties pressing a pair of dumbbells, seated, mid-set" width="1440" height="1088" />
         <a class="link" href="studio60.html">Studio 60</a>
       </article>
@@ -433,7 +425,7 @@ html.js [data-stagger]>*{opacity:0;transform:translateY(14px)}
       <h2 class="d h2">Built for coached training.</h2>
       <div class="body">
         <p>Healthwise opened in 2011 as an exercise and lifestyle management studio, and has run the same way since: coached group sessions, a coach watching throughout, and a programme written for the person rather than for the class.</p>
-        <p>Behind it is thirty years of coaching — An Garda Síochána and the Garda College, an MSc in Performance Coaching, certification in cardiac rehabilitation, and squads at Munster Rugby and Clonmel Commercials — pointed at ordinary people rather than at athletes.</p>
+        <p>Behind it is thirty years of coaching: An Garda Síochána and the Garda College, an MSc in Performance Coaching, and certification in cardiac rehabilitation.</p>
       </div>
       <a class="link" href="about.html">More about Healthwise</a>
     </div>
@@ -483,7 +475,6 @@ html.js [data-stagger]>*{opacity:0;transform:translateY(14px)}
       <div class="foot__links">
         <b>Programmes</b>
         <a href="livewell.html">Livewell 40–60</a>
-        <a href="vitality.html">Vitality 60+</a>
         <a href="studio60.html">Studio 60</a>
         <a href="heartwise.html">Heartwise</a>
         <a href="drivewise.html">Drivewise for companies</a>

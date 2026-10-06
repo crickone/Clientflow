@@ -85,7 +85,7 @@ process.env.EMAIL_TOKEN_SECRET = SECRET;
 
     // 1. a signed token puts the lead in ITS tenant
     assert.equal(leadCount(), 0);
-    const r1 = await post({ name: " Mary Byrne ", phone: "086 123 4567", programme: "vitality", about: "Had a stent in March.", token });
+    const r1 = await post({ name: " Mary Byrne ", phone: "086 123 4567", programme: "studio60", about: "Had a stent in March.", token });
     assert.equal(r1.status, 200);
     const b1 = (await r1.json()) as { ok: boolean; created: boolean };
     assert.equal(b1.ok, true);
@@ -96,7 +96,7 @@ process.env.EMAIL_TOKEN_SECRET = SECRET;
     assert.equal(lead?.firstName, "Mary");
     assert.equal(lead?.lastName, "Byrne");
     assert.equal(lead?.campaign, "Website enquiry");
-    assert.match(lead?.notes ?? "", /Programme: Vitality 60\+/);
+    assert.match(lead?.notes ?? "", /Programme: Studio 60/);
     assert.match(lead?.notes ?? "", /Had a stent/);
 
     // 2. a repeat from the same contact dedupes to the same lead, and its
@@ -113,7 +113,7 @@ process.env.EMAIL_TOKEN_SECRET = SECRET;
     assert.equal(b2.created, false, "same phone -> existing lead, not a duplicate");
     assert.equal(leadCount(), 1);
     const leadAfterRepeat = tdb.select().from(leads).get();
-    assert.match(leadAfterRepeat?.notes ?? "", /Programme: Vitality 60\+/, "the first enquiry's programme survives");
+    assert.match(leadAfterRepeat?.notes ?? "", /Programme: Studio 60/, "the first enquiry's programme survives");
     assert.match(leadAfterRepeat?.notes ?? "", /Had a stent/, "the first enquiry's message survives");
     assert.match(leadAfterRepeat?.notes ?? "", /Repeat enquiry/, "the repeat is appended, not silently dropped");
     assert.match(leadAfterRepeat?.notes ?? "", /Programme: Heartwise/, "the repeat's new programme is recorded");
@@ -134,7 +134,7 @@ process.env.EMAIL_TOKEN_SECRET = SECRET;
     assert.equal(lostLead?.stageId, lostStage!.id, "setup: the lead really is in Lost");
 
     const r2b = await post(
-      { name: "Mary Byrne", phone: "086 123 4567", programme: "vitality", about: "Changed my mind.", token },
+      { name: "Mary Byrne", phone: "086 123 4567", programme: "studio60", about: "Changed my mind.", token },
       "10.77.0.9",
     );
     assert.equal(r2b.status, 200);

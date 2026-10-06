@@ -15,7 +15,7 @@ import { PUBLIC_FORM_HONEYPOT_FIELD } from "@/lib/publicFormExchange";
 const SITE_PROGRAMMES: Record<string, Record<string, string>> = {
   healthwise: {
     livewell: "Livewell 40–60",
-    vitality: "Vitality 60+",
+    studio60: "Studio 60",
     heartwise: "Heartwise",
     unsure: "Not sure yet",
   },

@@ -11,7 +11,7 @@
 // Partials in pages/ may use these substitutions:
 //   {{PULSE}}            the hero pulse line (draws on with JS)
 //   {{RULE}}             a full-width pulse rule before a section title
-//   {{STRIP:vitality}}   the booking block, programme carried into the form
+//   {{STRIP:<slug>}}     the booking block, programme carried into the form
 //   {{FORM}}             the enquiry form on its own (contact page)
 //   {{TOKEN}}            the literal enquiry-token placeholder
 //   {{MAPS}}             the Google Maps link for the studio
@@ -30,13 +30,12 @@ const PHONE_DISPLAY = "086 242 2388";
 const PHONE_TEL = "+353862422388";
 const EMAIL = "dj@healthwiseclonmel.ie";
 
-// Four programmes would make seven top-level nav items, which crowds the row
+// Three programmes plus the rest would crowd top-level nav items, which crowds the row
 // long before the mobile menu takes over, so they live under one "Programmes"
 // disclosure. It opens on hover and on focus in CSS, so it works with no
 // JavaScript at all; the tail script only adds click, Escape and click-away.
 const PROGRAMMES = [
   ["livewell.html", "Livewell 40–60", "livewell"],
-  ["vitality.html", "Vitality 60+", "vitality"],
   ["studio60.html", "Studio 60", "studio60"],
   ["heartwise.html", "Heartwise", "heartwise"],
 ];
@@ -90,7 +89,6 @@ const footer = () => `<footer class="foot">
       <div class="foot__links">
         <b>Programmes</b>
         <a href="livewell.html">Livewell 40–60</a>
-        <a href="vitality.html">Vitality 60+</a>
         <a href="studio60.html">Studio 60</a>
         <a href="heartwise.html">Heartwise</a>
         <a href="drivewise.html">Drivewise for companies</a>
@@ -126,7 +124,6 @@ const GHL_FORM_ID = "deWzd4mniNdSM7H84TiJ";
 // string. The visitor can edit it; DJ still sees which page they came from.
 const PROGRAMME_LABEL = {
   livewell: "Livewell, 40 to 60",
-  vitality: "Vitality, 60 and over",
   studio60: "Studio 60, 60 and over",
   heartwise: "Heartwise, after a cardiac event",
 };
@@ -347,19 +344,17 @@ ${body.includes("leadconnectorhq") ? `<script src="https://link.msgsndr.com/js/f
 
 const META = {
   home: { file: "index.html", title: "Healthwise Clonmel | Coached exercise for over 40s, over 60s and after a cardiac event",
-    description: "Coached group exercise in Clonmel for adults over 40, over 60, and after a cardiac event. Livewell, Vitality, Studio 60 and Heartwise, since 2011." },
+    description: "Coached group exercise in Clonmel for adults over 40, over 60, and after a cardiac event. Livewell, Studio 60 and Heartwise, since 2011." },
   livewell: { file: "livewell.html", title: "Livewell 40–60 | Strength, mobility and cardio classes in Clonmel | Healthwise",
     description: "Five coached classes a week for adults aged 40 to 60: Women's Cardio Tone, MoveWell Strength, Men's Gym, MoveWell Mobility and Women's Circuit, at Healthwise in Clonmel." },
-  vitality: { file: "vitality.html", title: "Vitality 60+ | Gentle group exercise for over 60s in Clonmel | Healthwise",
-    description: "Gentle, coached group exercise for men and women over 60 in Clonmel. For beginners, limited mobility, and anyone coming back after a health event. Morning and afternoon classes." },
-  studio60: { file: "studio60.html", title: "Studio 60 | Coached strength training for active over 60s | Healthwise Clonmel",
-    description: "Coached strength and conditioning in Clonmel for men and women over 60 who are already active. Free weights, machines and conditioning work in a coached group, with the load progressed as you get stronger." },
+  studio60: { file: "studio60.html", title: "Studio 60 | Coached strength training for over 60s | Healthwise Clonmel",
+    description: "Coached strength and conditioning in Clonmel for men and women over 60, whether you train already or are starting out. Free weights, machines and conditioning work in a coached group, with the load progressed as you get stronger." },
   heartwise: { file: "heartwise.html", title: "Heartwise | Supervised exercise after a cardiac event | Healthwise Clonmel",
     description: "Supervised exercise and lifestyle coaching in Clonmel for people who have had a cardiac procedure, and for managing type 2 diabetes, blood pressure and weight. BACPR-certified, since 2013." },
   classes: { file: "classes.html", title: "Classes and timetable | Healthwise Clonmel",
     description: "Every Healthwise class described, who it is for, and the live timetable. Classes from 7am, mornings and evenings, at Ard Gaoithe Business Park, Clonmel." },
   about: { file: "about.html", title: "About Healthwise | Exercise and lifestyle studio, Clonmel",
-    description: "Healthwise is an exercise and lifestyle management studio in Clonmel, open since 2011: four coached programmes and coaching built on an MSc in Performance Coaching and BACPR cardiac rehabilitation." },
+    description: "Healthwise is an exercise and lifestyle management studio in Clonmel, open since 2011: three coached programmes and coaching built on an MSc in Performance Coaching and BACPR cardiac rehabilitation." },
   contact: { file: "contact.html", title: "Book a consultation | Healthwise Clonmel",
     description: "Book a consultation at Healthwise, Unit 12E Ard Gaoithe Business Park, Clonmel. Ring 086 242 2388 or send your details and we'll be in touch." },
   drivewise: { file: "drivewise.html", title: "Drivewise | Driver safety and wellness for companies | Healthwise",
