@@ -150,7 +150,7 @@ export function DashboardGrid({ tabIndex, items, catalog }: { tabIndex: number; 
           }}
         >
           <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
-            Drag tiles to reorder. Change a tile&rsquo;s size or remove it from its header.
+            Drag any tile to move it. Change a tile&rsquo;s size or remove it from its header.
           </span>
           <div style={{ display: "flex", gap: 8 }}>
             <Button variant="ghost" size="sm" onClick={() => setAdding(true)}>
@@ -226,9 +226,22 @@ function Tile({
     transition,
     zIndex: isDragging ? 30 : undefined,
     opacity: isDragging ? 0.85 : 1,
+    cursor: editing ? (isDragging ? "grabbing" : "grab") : undefined,
+    userSelect: editing ? "none" : undefined,
+    touchAction: editing ? "manipulation" : undefined,
   };
+  // While customising, the whole tile is the drag handle: the pointer sensor
+  // only starts a drag after 6px of movement, so a click on the size or remove
+  // buttons inside still lands as a click. The grip keeps the keyboard side
+  // (focus + arrow keys), which is why onKeyDown stays off the tile.
+  const { onKeyDown: keyDrag, ...pointerDrag } = (listeners ?? {}) as Record<string, (e: unknown) => void>;
   return (
-    <div ref={setNodeRef} style={style} className={`dash-tile dash-span-${SPAN[item.ref.size]}`}>
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`dash-tile dash-span-${SPAN[item.ref.size]}`}
+      {...(editing ? pointerDrag : {})}
+    >
       <Card className={editing && !isDragging ? "dash-wobble" : undefined} style={{ height: "100%" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
           {editing && (
@@ -236,7 +249,7 @@ function Tile({
               type="button"
               aria-label={`Move ${item.title}`}
               {...attributes}
-              {...listeners}
+              onKeyDown={keyDrag}
               style={{ cursor: "grab", color: "var(--text-tertiary)", background: "none", border: 0, padding: 0, display: "flex" }}
             >
               <GripVertical size={15} />
