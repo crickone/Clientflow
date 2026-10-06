@@ -191,6 +191,13 @@ product (`lib/marketing` + `lib/email`). They are different stores.
 
 1. **Create the site:** CMS → Sites → **Add site** (admin), or fulfil a **Request**.
 2. **Build the design** (bespoke) in `sites/<slug>/` as static HTML/assets.
+   **Run the `seo-audit` skill while building, not after** — every page needs
+   a unique title of 50-60 chars with the service + town in it and the brand
+   shortened at the end (e.g. "Infrared Light Therapy Clonmel | Optimal
+   Health"), and a unique 140-160 char description that names the service +
+   town, states facts from the client, and ends with an action ("Book online
+   or call ..."). Plus one H1 per page, alt text on every image, and
+   LocalBusiness data. Same plain-copy rules as the page text.
 3. **Import it:** `node tools/import-site.cjs --slug <slug> --name "<Name>"`
    (defaults to `sites/<slug>/`; copies assets to `app/public/sites/<slug>/`,
    rewrites links/asset URLs, keeps scripts, maps title/meta → SEO, publishes).

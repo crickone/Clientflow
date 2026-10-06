@@ -851,87 +851,87 @@ ${scripts()}
 const META = {
   home: {
     file: "index.html",
-    title: "Optimal Health & Recovery at Inspire | Infrared, HBOT & HIFEM, Clonmel",
+    title: "HBOT, Infrared & HIFEM in Clonmel | Optimal Health",
     description:
-      "A recovery clinic in Clonmel. Infrared, hyperbaric oxygen, HIFEM and massage, guided from start to finish, in a room built to be calm.",
+      "Recovery clinic inside Inspire, Clonmel. Hyperbaric oxygen, infrared, HIFEM and massage, with sessions from 12 minutes. Book online or call 083 867 2844.",
   },
   therapies: {
     file: "therapies.html",
-    title: "The four therapies | Optimal Health & Recovery at Inspire",
+    title: "Recovery Therapies in Clonmel | Optimal Health",
     description:
-      "Hyperbaric oxygen, infrared, HIFEM and massage at our Clonmel clinic. What each one is, what it supports, and how long a session takes.",
+      "Hyperbaric oxygen, infrared, HIFEM and massage at our Clonmel clinic. What each treatment is for and how long a session takes. Book your first session online.",
   },
   hbot: {
     file: "hbot.html",
-    title: "Hyperbaric oxygen therapy | Optimal Health & Recovery at Inspire",
+    title: "Hyperbaric Oxygen Therapy (HBOT) Clonmel | Optimal Health",
     description:
-      "Hyperbaric oxygen sessions in Clonmel. Higher oxygen levels to support recovery, mental clarity and steady daily energy.",
+      "Hyperbaric oxygen therapy at our clinic inside Inspire, Clonmel. Sessions last 45 to 60 minutes in a pressurised chamber. Book online or call 083 867 2844.",
   },
   infrared: {
     file: "infrared.html",
-    title: "Infrared therapy | Optimal Health & Recovery at Inspire",
+    title: "Infrared Light Therapy Clonmel | Optimal Health",
     description:
-      "Infrared sessions in Clonmel. Deep, gentle warmth to support muscle release, joint comfort, circulation and rest.",
+      "Red and near-infrared light therapy in Clonmel. A 12-minute session on a full-length bed, on your own in the room. Book online or call 083 867 2844.",
   },
   hifem: {
     file: "hifem.html",
-    title: "HIFEM therapy | Optimal Health & Recovery at Inspire",
+    title: "HIFEM & Pelvic Floor Treatment Clonmel | Optimal Health",
     description:
-      "HIFEM sessions in Clonmel, including pelvic floor support. Seated, fully clothed, twenty to thirty minutes.",
+      "HIFEM treatment in Clonmel, including pelvic floor. You sit fully clothed for 20 to 30 minutes while the chair contracts the muscles. Book online today.",
   },
   pricing: {
     file: "pricing.html",
-    title: "Pricing | Optimal Health & Recovery at Inspire",
+    title: "Prices & Memberships | Optimal Health Clonmel",
     description:
-      "Session and block pricing for infrared, hyperbaric oxygen and HIFEM at our Clonmel clinic.",
+      "Prices for hyperbaric oxygen, infrared and HIFEM at our Clonmel clinic: single sessions, blocks and monthly memberships. Book online or call 083 867 2844.",
   },
   about: {
     file: "about.html",
-    title: "About the clinic | Optimal Health & Recovery at Inspire",
+    title: "About Us & Our Team | Optimal Health Clonmel",
     description:
-      "Who we are, where we are, and what a session at our Clonmel recovery clinic is actually like.",
+      "Optimal Health & Recovery is a clinic inside Inspire, Ard Gaoithe Business Park, Clonmel. Meet our therapists and see what happens on your first visit.",
   },
   massage: {
     file: "massage.html",
-    title: "Massage, reflexology and lymphatic drainage | Optimal Health & Recovery at Inspire",
+    title: "Massage & Reflexology Clonmel | Optimal Health",
     description:
-      "Hands-on bodywork from clinical therapists in Clonmel: therapeutic massage, reflexology and lymphatic drainage.",
+      "Massage, reflexology and lymphatic drainage in Clonmel from clinical therapists. Ten treatments, 30 minutes to an hour. Book online or call 083 867 2844.",
   },
   recovery: {
     file: "recovery.html",
-    title: "Recovery and everyday health | Optimal Health & Recovery at Inspire",
+    title: "Recovery & Everyday Health Clinic Clonmel | Optimal Health",
     description:
-      "Recovery sessions in Clonmel for people living busy lives: infrared, hyperbaric oxygen and HIFEM, guided from start to finish.",
+      "For long working weeks, poor sleep and stiffness. Infrared, hyperbaric oxygen and HIFEM at our Clonmel clinic, no diagnosis needed. Book your first session.",
   },
   athletes: {
     file: "athletes.html",
-    title: "Athletic performance and recovery | Optimal Health & Recovery at Inspire",
+    title: "Sports Recovery Clonmel | Optimal Health",
     description:
-      "Recovery between hard sessions, in Clonmel. Infrared, hyperbaric oxygen and HIFEM, around a training week.",
+      "Sports recovery in Clonmel. Infrared, hyperbaric oxygen, HIFEM and massage, and how each one fits into a training week. Book online or call 083 867 2844.",
   },
   collagen: {
     file: "collagen.html",
-    title: "Skin and collagen | Optimal Health & Recovery at Inspire",
+    title: "Infrared for Skin & Collagen Clonmel | Optimal Health",
     description:
-      "Infrared light for skin and connective tissue at our Clonmel clinic. What collagen is, what the bed does, and what the first twelve weeks look like.",
+      "Infrared light for skin at our Clonmel clinic. What collagen is, what a 12-minute session involves and what to expect over the first twelve weeks. Book online.",
   },
   testimonials: {
     file: "testimonials.html",
-    title: "What people say | Optimal Health & Recovery at Inspire",
+    title: "Client Reviews | Optimal Health Clonmel",
     description:
-      "Four clients of our Clonmel clinic, filmed in the lounge, on HIFEM and the infrared bed, talking about how they got on.",
+      "Clients of our Clonmel clinic talk on camera about HIFEM and the infrared bed, and how they got on. Watch the videos, then book your first session online.",
   },
   contact: {
     file: "contact.html",
-    title: "Contact | Optimal Health & Recovery at Inspire",
+    title: "Contact & Directions | Optimal Health Clonmel",
     description:
-      "Find us at Ard Gaoithe Business Park, Clonmel. Call 083 867 2844 or send us a message.",
+      "Optimal Health & Recovery, inside Inspire, Ard Gaoithe Business Park, Clonmel. Call 083 867 2844, send us a message or book a session online.",
   },
   blog: {
     file: "blog.html",
-    title: "The journal | Optimal Health & Recovery at Inspire",
+    title: "Blog | Optimal Health Clonmel",
     description:
-      "Plain writing about infrared, hyperbaric oxygen and HIFEM at our Clonmel clinic: what each one is, and what people actually report.",
+      "Articles from our Clonmel clinic on hyperbaric oxygen, infrared and HIFEM: what each treatment is, how a session works and what clients report.",
   },
 };
 
@@ -981,7 +981,7 @@ const POSTS = [
     photo: "infrared-bed-idle.jpg",
     alt: "The infrared bed closed and waiting in the treatment room, its orange strip lit",
     description:
-      "An evening infrared session at our Clonmel clinic: twelve minutes under the light, and half an hour nobody can reach you in.",
+      "How an evening infrared session works at our Clonmel clinic: 12 minutes under red and near-infrared light, on your own in the room. Book online or call us.",
   },
   {
     slug: "the-hifem-chair-and-a-week-sitting-down",
@@ -992,7 +992,7 @@ const POSTS = [
     photo: "hifem-chair.jpg",
     alt: "The HIFEM chair and its console, empty, a cushion on the seat",
     description:
-      "What HIFEM does after a week at a desk, at our Clonmel clinic: twenty to thirty minutes, seated and fully clothed.",
+      "What HIFEM does for muscles that barely work during a week at a desk. Sessions at our Clonmel clinic take 20 to 30 minutes, seated and fully clothed.",
   },
   {
     slug: "infrared-and-everyday-aches",
@@ -1003,7 +1003,7 @@ const POSTS = [
     photo: "infrared-bed-lit.jpg",
     alt: "The infrared bed running, its red light spilling across the brick wall behind it",
     description:
-      "Twelve minutes of red and near-infrared light at our Clonmel clinic: what the bed emits, what the light is understood to do, and what people say they notice afterwards.",
+      "What the infrared bed at our Clonmel clinic gives off, what red and near-infrared light is understood to do, and what clients notice after 12 minutes.",
   },
   {
     slug: "between-hard-sessions",
@@ -1014,7 +1014,7 @@ const POSTS = [
     photo: "hbot-chamber-seated.jpg",
     alt: "A client seated in the open hyperbaric chamber, hands on his knees",
     description:
-      "Where an hour in the hyperbaric chamber sits in a training week, at our Clonmel clinic.",
+      "When to book hyperbaric oxygen in a training week, and what an hour in the chamber at our Clonmel clinic involves. Book online or call 083 867 2844.",
   },
   {
     slug: "panels-lasers-and-the-bed",
@@ -1025,7 +1025,7 @@ const POSTS = [
     photo: "infrared-bed-open.jpg",
     alt: "Close along the shell of the infrared bed, its orange strip lit against black brick",
     description:
-      "How a full-length infrared bed differs from a laser or a panel, and why a session at our Clonmel clinic runs twelve minutes.",
+      "How a full-length infrared bed differs from a hand-held laser or a light panel, and why a session at our Clonmel clinic takes 12 minutes. Book online.",
   },
   {
     slug: "hyperbaric-oxygen-and-mental-clarity",
@@ -1036,7 +1036,7 @@ const POSTS = [
     photo: "hbot-session-mask.jpg",
     alt: "A client seated in the open hyperbaric chamber holding the oxygen mask",
     description:
-      "What an hour in the hyperbaric chamber at our Clonmel clinic is actually like, why the pressure matters, and what people say after a run of sessions.",
+      "What happens during a hyperbaric oxygen session at our Clonmel clinic, why the chamber is pressurised and what clients report after a run of sessions.",
   },
 ];
 
