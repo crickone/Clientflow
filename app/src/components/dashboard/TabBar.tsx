@@ -155,10 +155,19 @@ export function TabBar({ tabs, active, rangeKey, rangeLabel, isAdmin, source, pr
               >
                 {t.name}
               </button>
-              {i === active && !editing && (
+            </div>
+          ))}
+          {!editing && tabs[active] && (() => {
+            const i = active;
+            const t = tabs[active];
+            return (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button aria-label={`${t.name} options`} style={{ background: "none", border: 0, color: "var(--text-tertiary)", cursor: "pointer", display: "flex", padding: 4 }}>
+                    <button
+                      aria-label={`${t.name} tab options`}
+                      title={`${t.name} tab options`}
+                      style={{ background: "none", border: 0, color: "var(--text-tertiary)", cursor: "pointer", display: "flex", padding: "8px 8px", borderRadius: "var(--radius)" }}
+                    >
                       <MoreHorizontal size={15} />
                     </button>
                   </DropdownMenuTrigger>
@@ -226,9 +235,8 @@ export function TabBar({ tabs, active, rangeKey, rangeLabel, isAdmin, source, pr
                     )}
                   </DropdownMenuContent>
                 </DropdownMenu>
-              )}
-            </div>
-          ))}
+            );
+          })()}
           {!editing && (
             <button
               aria-label="Add a tab"
