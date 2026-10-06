@@ -3,14 +3,13 @@ import "server-only";
 import { and, asc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 
 import { RevenueBars } from "@/components/charts/RevenueBars";
-import { NeedsAttention } from "@/components/dashboard/NeedsAttention";
 import { KpiTile } from "@/components/dashboard/views/KpiTile";
 import { kpi } from "@/components/dashboard/views/kpi";
 import { RowList } from "@/components/dashboard/views/RowList";
 import { StageBars } from "@/components/dashboard/views/StageBars";
 import { TodaysClassesView } from "@/components/dashboard/views/TodaysClassesView";
 import { TodaysScheduleView } from "@/components/dashboard/views/TodaysScheduleView";
-import { getGymDashboard, getNeedsAttention } from "@/lib/dashboard";
+import { getGymDashboard } from "@/lib/dashboard";
 import { db, schema } from "@/lib/db";
 import { defaultPipelineId } from "@/lib/pipeline/pipelineRepo";
 import {
@@ -184,17 +183,6 @@ export const OVERVIEW_WIDGETS = {
       return { value: String(n), sub: n === 1 ? "Unread email" : "Unread emails", accent: n > 0 };
     },
     render: kpi,
-  },
-  "overview.needsAttention": {
-    async load() {
-      return getNeedsAttention();
-    },
-    render: (items) =>
-      items.length === 0 ? (
-        <div style={{ color: "var(--text-tertiary)", fontSize: 14 }}>Nothing needs your attention right now.</div>
-      ) : (
-        <NeedsAttention items={items} />
-      ),
   },
   "overview.recentActivity": {
     async load() {

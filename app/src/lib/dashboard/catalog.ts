@@ -176,17 +176,6 @@ export const CATALOG = [
     rangeMode: "none",
   },
   {
-    key: "overview.needsAttention",
-    title: "Needs attention",
-    description: "Unread email and leads waiting for a first follow-up.",
-    domain: "overview",
-    sizes: ["L", "XL"],
-    defaultSize: "XL",
-    venues: ["clinic", "gym"],
-    sensitivity: "general",
-    rangeMode: "none",
-  },
-  {
     key: "overview.recentActivity",
     title: "Recent activity",
     description: "The latest things that happened across the account.",

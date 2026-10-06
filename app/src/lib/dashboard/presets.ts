@@ -44,7 +44,7 @@ export const PRESETS: Preset[] = [
   {
     key: OVERVIEW_PRESET_KEY,
     name: "Overview",
-    description: "Today at a glance: bookings, leads, messages, revenue and what needs attention.",
+    description: "Today at a glance: bookings, leads, messages, revenue.",
     icon: "LayoutDashboard",
     widgets: {
       clinic: [
@@ -56,7 +56,6 @@ export const PRESETS: Preset[] = [
         { key: "overview.plansExpiring", size: "S" },
         { key: "overview.newLeads", size: "S" },
         { key: "overview.unreadMessages", size: "S" },
-        { key: "overview.needsAttention", size: "XL" },
         { key: "overview.todaysSchedule", size: "L" },
         { key: "overview.recentActivity", size: "S" },
         { key: "overview.revenueTrend", size: "XL" },
@@ -71,7 +70,6 @@ export const PRESETS: Preset[] = [
         { key: "overview.newLeads", size: "S" },
         { key: "overview.unreadMessages", size: "S" },
         { key: "overview.pipelineSnapshot", size: "M" },
-        { key: "overview.needsAttention", size: "XL" },
         { key: "overview.todaysClasses", size: "L" },
         { key: "overview.recentActivity", size: "S" },
         { key: "overview.revenueTrend", size: "XL" },

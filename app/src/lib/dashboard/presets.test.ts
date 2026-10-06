@@ -78,7 +78,6 @@ assert.deepEqual(
     "overview.plansExpiring",
     "overview.newLeads",
     "overview.unreadMessages",
-    "overview.needsAttention",
     "overview.todaysSchedule",
     "overview.recentActivity",
     "overview.revenueTrend",
