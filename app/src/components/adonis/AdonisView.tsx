@@ -6,6 +6,7 @@ import { Settings } from "lucide-react";
 
 import { AssistantChat } from "@/components/messaging/AssistantChat";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { ADONIS_LOGO_ASPECT, ADONIS_LOGO_PATH, ADONIS_LOGO_VIEWBOX } from "@/components/ui/adonisLogoPath";
 import { ModelPicker } from "./ModelPicker";
 
 /**
@@ -48,12 +49,8 @@ export function AdonisView({
   /** Campaign Engine "Build campaign" seed → a pre-filled compose starter (see app/adonis/page.tsx). Undefined for a normal visit. Threaded to AssistantChat's `initialInput`. */
   initialInput?: string;
 }) {
-  // The Adonis window mark + tagline — rendered at the top of the chat's
-  // scroll area (see AssistantChat `heroSlot`). Two theme-specific <img>s,
-  // one shown per active theme via the `.adonis-hero-logo--*` CSS in
-  // globals.css (dark=white mark, light=ink mark).
-  // Big centered mark, capped by viewport height so it never overflows on a
-  // short screen. No tagline — the mark owns the centre; the prompt + chips
+  // The ADONIS wordmark at the top of the chat's scroll area (see
+  // AssistantChat `heroSlot`). No tagline — the mark owns the centre; the prompt + chips
   // live down by the input (AssistantChat renders them in `bare` mode).
   // /adonis renders AssistantChat's History + New-chat controls in the top bar
   // (top-left) instead of inside the chat: AssistantChat PORTALS them into this
@@ -62,31 +59,25 @@ export function AdonisView({
   // target is available on the render right after this div mounts.
   const [controlsEl, setControlsEl] = useState<HTMLDivElement | null>(null);
 
-  const logoHeight = "min(clamp(220px, 34vw, 460px), 48vh)";
+  // The ADONIS wordmark in the theme's text colour, so one drawing serves
+  // light and dark (the old "Adonis Agent" window art needed a file per theme).
   const hero = (
     <div
       style={{
         flexShrink: 0,
         display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        textAlign: "center",
+        justifyContent: "center",
         padding: "8px 16px 0",
       }}
     >
-      <img
-        src="/adonis-window-dark.svg"
-        alt="Adonis Agent"
-        className="adonis-hero-logo adonis-hero-logo--dark"
-        style={{ height: logoHeight, width: "auto" }}
-      />
-      <img
-        src="/adonis-window-light.svg"
-        alt=""
-        aria-hidden
-        className="adonis-hero-logo adonis-hero-logo--light"
-        style={{ height: logoHeight, width: "auto" }}
-      />
+      <svg
+        role="img"
+        aria-label="Adonis"
+        viewBox={ADONIS_LOGO_VIEWBOX}
+        style={{ width: "min(560px, 78vw)", aspectRatio: String(ADONIS_LOGO_ASPECT), height: "auto", color: "var(--text-primary)", display: "block" }}
+      >
+        <path d={ADONIS_LOGO_PATH} fill="currentColor" />
+      </svg>
     </div>
   );
 
