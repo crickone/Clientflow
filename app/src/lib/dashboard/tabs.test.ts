@@ -64,8 +64,28 @@ const requireLocal = createRequire(import.meta.url);
       assert.equal(first.tabs.length, 1);
       assert.equal(first.tabs[0].name, "Overview");
       assert.equal(first.tabs[0].presetKey, "overview");
-      assert.equal(first.tabs[0].widgets[0].key, "overview.todaysBookings");
+      assert.equal(first.tabs[0].widgets[0].key, "overview.todaysSchedule");
       assert.equal(rowCount(), 0, "resolveTabs never writes");
+
+      // An Overview tab saved with the pre-redesign set (plus the retired
+      // needsAttention) is moved onto the current preset; a customised one
+      // is left alone.
+      const legacy = [
+        "overview.todaysBookings", "overview.todaysEarnings", "overview.cashToday", "overview.deferredRevenue",
+        "overview.activeClients", "overview.plansExpiring", "overview.newLeads", "overview.unreadMessages",
+        "overview.needsAttention", "overview.todaysSchedule", "overview.recentActivity", "overview.revenueTrend",
+        "overview.pipelineSnapshot", "overview.upcomingPosts",
+      ].map((key) => ({ key, size: "S" }));
+      const insertTab = (userId: number, widgets: unknown) =>
+        getTenantDbById(tid)
+          .insert(schema.dashboards)
+          .values({ userId, name: "Overview", presetKey: "overview", position: 0, range: "30d", widgets: JSON.stringify(widgets) })
+          .run();
+      insertTab(901, legacy);
+      assert.equal(tabs.resolveTabs(901, "clinic").tabs[0].widgets[0].key, "overview.todaysSchedule", "an untouched legacy Overview is upgraded");
+      insertTab(902, legacy.slice(1));
+      assert.equal(tabs.resolveTabs(902, "clinic").tabs[0].widgets[0].key, "overview.todaysEarnings", "a customised Overview is not");
+      getTenantDbById(tid).delete(schema.dashboards).run();
 
       // 3: first edit materialises the user's own rows.
       tabs.saveTabWidgets(ALICE, "clinic", 0, [{ key: "overview.newLeads", size: "M" }]);
@@ -92,7 +112,7 @@ const requireLocal = createRequire(import.meta.url);
       tabs.deleteTab(ALICE, "clinic", 1);
       assert.throws(() => tabs.deleteTab(ALICE, "clinic", 0), /last tab/);
       tabs.resetTab(ALICE, "clinic", 0);
-      assert.equal(tabs.resolveTabs(ALICE, "clinic").tabs[0].widgets.length, 13, "reset restores the Overview preset");
+      assert.equal(tabs.resolveTabs(ALICE, "clinic").tabs[0].widgets.length, 7, "reset restores the Overview preset");
       assert.throws(() => tabs.renameTab(ALICE, "clinic", 0, "   "), /name/);
       assert.throws(() => tabs.addTab(ALICE, "clinic", { kind: "preset", presetKey: "nope" }), /preset/);
       const beforeWrong = tabs.resolveTabs(ALICE, "clinic").tabs.length;

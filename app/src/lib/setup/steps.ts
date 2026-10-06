@@ -24,7 +24,7 @@ export interface SetupStepStatus extends SetupStepDef { done: boolean; skipped: 
 export interface SetupSummary {
   steps: SetupStepStatus[];
   requiredDone: number; requiredTotal: number; resolved: number; total: number;
-  allResolved: boolean; nextHref: string | null;
+  allResolved: boolean; nextHref: string | null; nextTitle: string | null;
 }
 
 export const SETUP_STEPS: SetupStepDef[] = [
@@ -90,6 +90,7 @@ export function summarizeSetup(
     resolved, total: steps.length,
     allResolved: firstUnresolved === undefined,
     nextHref,
+    nextTitle: firstUnresolved?.title ?? null,
   };
 }
 

@@ -11,32 +11,61 @@ export interface ScheduleItem {
   therapies: { id: number; name: string; colourHex: string }[];
 }
 
-export function TodaysScheduleView({ items, empty }: { items: ScheduleItem[]; empty: string }) {
+const FINISHED = new Set(["completed", "cancelled", "no_show"]);
+
+/**
+ * Today's diary in time order. The next booking still to come is picked out,
+ * finished ones fade back, and an empty day says so in one line with a way
+ * to book rather than a big zero.
+ */
+export function TodaysScheduleView({
+  items,
+  empty,
+  nowHHMM,
+  book,
+}: {
+  items: ScheduleItem[];
+  empty: string;
+  /** Current Irish time, "HH:MM", to find the next booking. */
+  nowHHMM: string;
+  book: { href: string; label: string };
+}) {
   if (items.length === 0) {
-    return <div style={{ padding: "24px 0", color: "var(--text-tertiary)", fontSize: 14 }}>{empty}</div>;
-  }
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {items.map((a) => (
-        <Link
-          key={a.id}
-          href={`/appointments/${a.id}`}
-          style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 14px", borderRadius: "var(--radius)", border: "1px solid var(--hairline)" }}
-        >
-          <div style={{ fontFamily: "var(--font-heading)", fontSize: 16, color: "var(--text-primary)", minWidth: 70 }}>{formatTime(a.startTime)}</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ color: "var(--text-primary)", fontSize: 14, fontWeight: 500 }}>{a.clientName}</div>
-            <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
-              {a.therapies.map((t) => (
-                <Badge key={t.id} colour={t.colourHex}>
-                  {t.name}
-                </Badge>
-              ))}
-            </div>
-          </div>
-          <StatusBadge status={a.status} />
+    return (
+      <div className="sched-empty">
+        <div>
+          <div className="sched-empty-title">{empty}</div>
+          <div className="sched-empty-sub">Bookings you add appear here in time order.</div>
+        </div>
+        <Link href={book.href} className="btn btn--outline btn--md">
+          {book.label}
         </Link>
-      ))}
+      </div>
+    );
+  }
+  const next = items.find((a) => !FINISHED.has(a.status) && a.startTime.slice(0, 5) >= nowHHMM);
+  return (
+    <div className="sched">
+      {items.map((a) => {
+        const cls = a.id === next?.id ? "sched-row sched-row--next" : FINISHED.has(a.status) ? "sched-row sched-row--done" : "sched-row";
+        return (
+          <Link key={a.id} href={`/appointments/${a.id}`} className={cls}>
+            <span className="sched-time">{formatTime(a.startTime)}</span>
+            <span className="sched-bar" aria-hidden />
+            <span className="sched-who">
+              <span className="sched-name">{a.clientName}</span>
+              <span className="sched-what">
+                {a.therapies.map((t) => (
+                  <Badge key={t.id} colour={t.colourHex}>
+                    {t.name}
+                  </Badge>
+                ))}
+              </span>
+            </span>
+            {a.id === next?.id ? <span className="sched-next">Next</span> : <StatusBadge status={a.status} />}
+          </Link>
+        );
+      })}
     </div>
   );
 }

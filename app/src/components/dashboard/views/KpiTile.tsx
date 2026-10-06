@@ -21,10 +21,12 @@ export function KpiTile({
   // A tile with no figure yet ("No wins yet") reads as a sentence, not as a
   // giant uppercase number.
   const isFigure = /\d/.test(value);
+  // A zero is greyed out so the figures that matter stand out on the grid.
+  const isZero = /^[^\d]*0(?:[.,]0+)?%?$/.test(value.trim());
   return (
     <>
       {isFigure ? (
-        <CardValue style={{ color: accent ? "var(--accent)" : undefined }}>{value}</CardValue>
+        <CardValue style={{ color: isZero ? "var(--text-tertiary)" : accent ? "var(--accent)" : undefined }}>{value}</CardValue>
       ) : (
         <div style={{ color: "var(--text-secondary)", fontSize: 15, fontWeight: 500, padding: "6px 0 2px" }}>{value}</div>
       )}

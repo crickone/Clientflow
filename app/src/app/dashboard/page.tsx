@@ -1,12 +1,9 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { CalendarPlus, ChevronRight, Plus, Sparkles } from "lucide-react";
+import { CalendarPlus, Plus } from "lucide-react";
 
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { Reveal } from "@/components/motion/Reveal";
 import { DailyBrief } from "@/components/dashboard/DailyBrief";
 import { SetupProgressCard } from "@/components/dashboard/SetupProgressCard";
 import { DashboardGrid, type CatalogEntry, type GridItem } from "@/components/dashboard/DashboardGrid";
@@ -115,18 +112,21 @@ export default async function DashboardPage({
     count: visibleRefs(p.widgets[venue], { venue, role: membership.role, overrides }).length,
   })).filter((p) => p.count > 0);
 
+  const showNeedsAbove = !refs.some((r) => r.key === "overview.needsYou");
+  const dateLine = now.toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Dublin" });
+
   return (
     <div className="app-page">
-      {setup && !setup.allResolved && (
-        <Reveal>
-          <SetupProgressCard requiredDone={setup.requiredDone} requiredTotal={setup.requiredTotal} nextHref={setup.nextHref} />
-        </Reveal>
-      )}
-      <PageHeader
-        eyebrow={now.toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Dublin" })}
-        title={greeting(now, membership.user.name)}
-        actions={
-          venue === "gym" ? (
+      <header className="dash-head">
+        <div style={{ minWidth: 0 }}>
+          <div className="dash-date">{dateLine}</div>
+          <h1 className="dash-greeting">{greeting(now, membership.user.name)}</h1>
+        </div>
+        <div className="dash-head-actions">
+          <Link href="/adonis">
+            <Button variant="outline">Ask Adonis</Button>
+          </Link>
+          {venue === "gym" ? (
             <Link href="/clients/new">
               <Button>
                 <Plus size={15} /> Add member
@@ -138,28 +138,18 @@ export default async function DashboardPage({
                 <CalendarPlus size={15} /> {vocab.bookCta}
               </Button>
             </Link>
-          )
-        }
-      />
+          )}
+        </div>
+      </header>
 
-      <DailyBrief tenantId={tenantId} />
-
-      {!briefComplete && (
-        <Reveal>
-          <Link href="/settings/business">
-            <Card style={{ marginBottom: 16, borderColor: "var(--accent)", display: "flex", alignItems: "center", gap: 14, padding: 18 }}>
-              <Sparkles size={20} color="var(--accent)" />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: "var(--text-primary)", fontWeight: 500, fontSize: 15 }}>Complete your business brief</div>
-                <div style={{ color: "var(--text-secondary)", fontSize: 13, marginTop: 2 }}>
-                  Add your overview, policies, and FAQs so the AI can triage and reply accurately.
-                </div>
-              </div>
-              <ChevronRight size={18} color="var(--text-tertiary)" />
-            </Card>
-          </Link>
-        </Reveal>
+      {((setup && !setup.allResolved) || (isAdmin && !briefComplete)) && (
+        <SetupProgressCard
+          setup={setup && !setup.allResolved ? { requiredDone: setup.requiredDone, requiredTotal: setup.requiredTotal, nextHref: setup.nextHref, nextTitle: setup.nextTitle } : null}
+          briefMissing={isAdmin && !briefComplete}
+        />
       )}
+
+      {showNeedsAbove && <DailyBrief tenantId={tenantId} />}
 
       <TabBar
         tabs={tabs.map((t) => ({ name: t.name, presetKey: t.presetKey }))}

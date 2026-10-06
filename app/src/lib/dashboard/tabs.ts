@@ -4,7 +4,7 @@ import { asc, eq, isNull } from "drizzle-orm";
 
 import { db, schema } from "@/lib/db";
 import { MAX_TABS_PER_USER, validateLayout } from "./catalog";
-import { OVERVIEW_PRESET_KEY, PRESET_BY_KEY, presetAppliesTo, presetWidgets } from "./presets";
+import { LEGACY_OVERVIEW_KEYS, OVERVIEW_PRESET_KEY, PRESET_BY_KEY, presetAppliesTo, presetWidgets } from "./presets";
 import { STORED_RANGE_KEYS, type StoredRangeKey } from "./range";
 import type { Venue, WidgetRef } from "./types";
 
@@ -13,7 +13,9 @@ import type { Venue, WidgetRef } from "./types";
  *   1. their own rows (user_id = them);
  *   2. the tenant's team default rows (user_id IS NULL);
  *   3. the platform Overview preset for the venue (in memory).
- * Reading never writes. Every mutation first materialises the resolved set
+ * Reading never writes, with one exception: an Overview tab still holding a
+ * pre-redesign widget set nobody changed is moved onto the current preset
+ * (upgradeLegacyOverview), once. Every mutation first materialises the resolved set
  * into the user's own rows (`ownRows`), then applies the change, so the
  * first edit is what forks a user off the team default.
  *
@@ -62,11 +64,34 @@ function platformTabs(venue: Venue): DashboardTab[] {
   return [{ name: p.name, presetKey: p.key, range: "30d", widgets: presetWidgets(p.key, venue)! }];
 }
 
+/** Retired widget keys a legacy tab may still carry; ignored when matching. */
+const RETIRED_KEYS = new Set(["overview.needsAttention"]);
+
+/**
+ * An Overview tab whose widgets are exactly an old preset's (order and sizes
+ * aside) was never customised: give it the current preset. A tab anyone has
+ * added to or removed from is theirs and stays as it is.
+ */
+function upgradeLegacyOverview(rows: schema.DashboardRow[], venue: Venue): schema.DashboardRow[] {
+  return rows.map((r) => {
+    if (r.presetKey !== OVERVIEW_PRESET_KEY) return r;
+    const keys = [...new Set(parseWidgets(r.widgets).map((w) => w.key).filter((k) => !RETIRED_KEYS.has(k)))].sort();
+    const legacy = LEGACY_OVERVIEW_KEYS[venue].some((set) => {
+      const want = [...set].sort();
+      return want.length === keys.length && want.every((k, i) => k === keys[i]);
+    });
+    if (!legacy) return r;
+    const widgets = JSON.stringify(presetWidgets(OVERVIEW_PRESET_KEY, venue) ?? []);
+    touch(r.id, { widgets });
+    return { ...r, widgets };
+  });
+}
+
 export function resolveTabs(userId: number, venue: Venue): { tabs: DashboardTab[]; source: TabSource } {
   const own = rowsFor(userId);
-  if (own.length) return { tabs: own.map(toTab), source: "own" };
+  if (own.length) return { tabs: upgradeLegacyOverview(own, venue).map(toTab), source: "own" };
   const team = rowsFor(null);
-  if (team.length) return { tabs: team.map(toTab), source: "team" };
+  if (team.length) return { tabs: upgradeLegacyOverview(team, venue).map(toTab), source: "team" };
   return { tabs: platformTabs(venue), source: "platform" };
 }
 

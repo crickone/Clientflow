@@ -6,6 +6,8 @@ import { RevenueBars } from "@/components/charts/RevenueBars";
 import { KpiTile } from "@/components/dashboard/views/KpiTile";
 import { kpi } from "@/components/dashboard/views/kpi";
 import { RowList } from "@/components/dashboard/views/RowList";
+import { StatList, type StatRow } from "@/components/dashboard/views/StatList";
+import { DailyBrief } from "@/components/dashboard/DailyBrief";
 import { StageBars } from "@/components/dashboard/views/StageBars";
 import { TodaysClassesView } from "@/components/dashboard/views/TodaysClassesView";
 import { TodaysScheduleView } from "@/components/dashboard/views/TodaysScheduleView";
@@ -36,6 +38,15 @@ function countLeads(fromMs: number, toMs: number): number {
     .select({ n: sql<number>`count(*)` })
     .from(schema.leads)
     .where(and(gte(schema.leads.createdAt, new Date(fromMs)), lt(schema.leads.createdAt, new Date(toMs))))
+    .get();
+  return Number(row?.n ?? 0);
+}
+
+function countUnread(): number {
+  const row = db
+    .select({ n: sql<number>`count(*)` })
+    .from(schema.emailMessages)
+    .where(and(eq(schema.emailMessages.direction, "in"), eq(schema.emailMessages.isRead, false)))
     .get();
   return Number(row?.n ?? 0);
 }
@@ -120,8 +131,43 @@ export const OVERVIEW_WIDGETS = {
       });
     },
     render: (items, ctx) => (
-      <TodaysScheduleView items={items} empty={`No ${ctx.vocab.bookings.toLowerCase()} today.`} />
+      <TodaysScheduleView
+        items={items}
+        empty="Nothing booked today"
+        nowHHMM={new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Europe/Dublin" }).format(ctx.now)}
+        book={{ href: "/appointments/new", label: ctx.vocab.bookCta }}
+      />
     ),
+  },
+  "overview.money": {
+    href: "/reports",
+    async load(ctx): Promise<StatRow[]> {
+      const k = await kpis(ctx);
+      return [
+        { label: "Earnings", sub: "Sessions completed today", value: formatEur(k.todaysEarnings) },
+        { label: "Cash taken", sub: "Today, incl. vouchers and packages", value: formatEur(k.todaysCash) },
+        { label: "Deferred revenue", sub: "Unused credits and open vouchers", value: formatEur(k.deferredRevenue) },
+      ];
+    },
+    render: (rows) => <StatList rows={rows} />,
+  },
+  "overview.people": {
+    async load(ctx): Promise<StatRow[]> {
+      const k = await kpis(ctx);
+      return [
+        { label: "New leads", sub: ctx.range.label, value: String(countLeads(ctx.range.fromMs, ctx.range.toMs)), href: "/leads" },
+        { label: `Active ${ctx.vocab.members.toLowerCase()}`, sub: "Visited in the last 90 days", value: String(k.activeClients), href: "/clients" },
+        { label: "Unread messages", sub: "Email inbox", value: String(countUnread()), href: "/communication" },
+        { label: `${ctx.vocab.plans} expiring`, sub: "Next 30 days", value: String(k.expiringSoon), href: "/packages" },
+      ];
+    },
+    render: (rows) => <StatList rows={rows} />,
+  },
+  "overview.needsYou": {
+    async load(ctx) {
+      return ctx.tenantId;
+    },
+    render: (tenantId) => <DailyBrief tenantId={tenantId} bare />,
   },
   "overview.activeMembers": {
     href: "/memberships",
@@ -174,12 +220,7 @@ export const OVERVIEW_WIDGETS = {
   "overview.unreadMessages": {
     href: "/communication",
     async load() {
-      const row = db
-        .select({ n: sql<number>`count(*)` })
-        .from(schema.emailMessages)
-        .where(and(eq(schema.emailMessages.direction, "in"), eq(schema.emailMessages.isRead, false)))
-        .get();
-      const n = Number(row?.n ?? 0);
+      const n = countUnread();
       return { value: String(n), sub: n === 1 ? "Unread email" : "Unread emails", accent: n > 0 };
     },
     render: kpi,

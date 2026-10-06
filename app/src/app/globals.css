@@ -2843,5 +2843,72 @@ a {
 .prio-card--ghost { animation: none; }
 .prio-ghost { display: block; height: 14px; border-radius: 6px; background: var(--surface-2); }
 .prio-ghost--icon { width: 34px; height: 34px; border-radius: 10px; margin-bottom: 6px; }
+
+/* ---- Dashboard (2026-10 redesign) --------------------------------------
+   One colour for "needs you" (--attn), used nowhere else on the page. Plain
+   sentence-case labels; a zero is greyed out so real figures stand out. */
+:root { --attn: #E8B04B; --attn-soft: rgba(232, 176, 75, 0.14); --attn-ink: #F0C470; }
+:root[data-theme="light"] { --attn: #C98A1E; --attn-soft: rgba(201, 138, 30, 0.12); --attn-ink: #8A5A10; }
+
+.dash-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; margin: 4px 0 20px; }
+.dash-date { font-size: 13px; color: var(--text-tertiary); margin-bottom: 6px; }
+.dash-greeting { margin: 0; font-family: var(--font-heading), sans-serif; font-size: clamp(24px, 3vw, 32px); font-weight: 600; letter-spacing: -0.01em; text-transform: none; line-height: 1.15; color: var(--text-primary); }
+.dash-head-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.dash-setup { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 8px 8px 8px 16px; margin-bottom: 20px; border-radius: 14px; background: var(--surface-1); border: 1px solid var(--hairline); font-size: 13.5px; }
+.dash-setup-bar { width: 110px; height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; flex-shrink: 0; }
+.dash-setup-bar > div { height: 100%; background: var(--attn); }
+.dash-setup-count { color: var(--text-secondary); white-space: nowrap; }
+.dash-setup-next { color: var(--text-primary); flex: 1 1 260px; min-width: 0; }
+.dash-setup-go { font-weight: 600; color: var(--text-primary); padding: 10px 8px; }
+.dash-setup-go:hover { color: var(--attn-ink); }
+.dash-setup-x { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 10px; background: none; color: var(--text-tertiary); cursor: pointer; }
+.dash-setup-x:hover { background: var(--surface-2); color: var(--text-primary); }
+
+.dash-tile-title { margin: 0; flex: 1; min-width: 0; font-family: var(--font-heading), sans-serif; font-size: 16px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.needs-card { margin-bottom: 20px; padding: 18px 22px 8px; border-radius: var(--radius-lg); border: 1px solid var(--hairline); background: var(--surface-1); }
+.needs-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+.needs-heading { margin: 0; font-family: var(--font-heading), sans-serif; font-size: 16px; font-weight: 600; text-transform: none; color: var(--text-primary); }
+.needs-row { display: flex; align-items: center; gap: 14px; padding: 13px 0; border-top: 1px solid var(--hairline); color: inherit; text-decoration: none; }
+.needs-row:first-child { border-top: 0; }
+.needs-row:hover .needs-action { color: var(--attn-ink); }
+.needs-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+.needs-dot { width: 8px; height: 8px; border-radius: 4px; background: var(--attn); flex-shrink: 0; }
+.needs-dot--ghost { background: var(--surface-2); }
+.needs-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.needs-title { font-size: 14.5px; font-weight: 600; color: var(--text-primary); }
+.needs-detail { font-size: 13px; color: var(--text-secondary); }
+.needs-action { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 600; color: var(--text-primary); white-space: nowrap; }
+.needs-quiet { margin: 0; padding: 10px 0 14px; font-size: 14px; color: var(--text-secondary); }
+.needs-foot { display: flex; justify-content: flex-end; }
+
+.stat-list { display: flex; flex-direction: column; }
+.stat-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 11px 0; border-top: 1px solid var(--hairline); color: inherit; text-decoration: none; }
+.stat-row:first-child { border-top: 0; padding-top: 2px; }
+a.stat-row:hover .stat-label { color: var(--text-primary); }
+.stat-text { display: flex; flex-direction: column; min-width: 0; }
+.stat-label { font-size: 14px; color: var(--text-secondary); }
+.stat-sub { font-size: 12px; color: var(--text-tertiary); }
+.stat-value { font-family: var(--font-heading), sans-serif; font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-primary); white-space: nowrap; }
+.stat-value--zero { color: var(--text-tertiary); font-weight: 500; }
+
+.sched { display: flex; flex-direction: column; }
+.sched-row { display: flex; align-items: center; gap: 14px; padding: 11px 12px; margin: 0 -12px; border-radius: 12px; color: inherit; text-decoration: none; border-top: 1px solid var(--hairline); }
+.sched-row:first-child { border-top-color: transparent; }
+.sched-row:hover { background: var(--surface-2); }
+.sched-row--next { background: var(--surface-2); border-top-color: transparent; }
+.sched-row--next + .sched-row { border-top-color: transparent; }
+.sched-row--done { opacity: 0.55; }
+.sched-time { width: 52px; flex-shrink: 0; font-variant-numeric: tabular-nums; font-weight: 500; color: var(--text-secondary); }
+.sched-bar { width: 3px; align-self: stretch; border-radius: 2px; background: var(--hairline-strong); flex-shrink: 0; }
+.sched-row--next .sched-bar { background: var(--attn); }
+.sched-who { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.sched-name { font-size: 14.5px; font-weight: 600; color: var(--text-primary); }
+.sched-what { display: flex; gap: 6px; flex-wrap: wrap; }
+.sched-next { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--attn-soft); color: var(--attn-ink); }
+.sched-empty { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; padding: 18px; border-radius: 12px; border: 1px dashed var(--hairline-strong); }
+.sched-empty-title { font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+.sched-empty-sub { font-size: 13px; color: var(--text-secondary); }
 @keyframes prio-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .prio-card { animation: none; } .prio-card:hover { transform: none; } }

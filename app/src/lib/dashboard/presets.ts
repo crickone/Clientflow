@@ -40,6 +40,29 @@ export function presetAppliesTo(p: Preset, venue: Venue): boolean {
 
 export const OVERVIEW_PRESET_KEY = "overview";
 
+/**
+ * The Overview widget sets before the 2026-10 dashboard redesign. A saved
+ * Overview tab still holding exactly one of these (order and sizes aside) was
+ * never customised, so it is moved onto the current preset (see tabs.ts).
+ */
+export const LEGACY_OVERVIEW_KEYS: Record<Venue, readonly (readonly string[])[]> = {
+  clinic: [
+    [
+      "overview.todaysBookings", "overview.todaysEarnings", "overview.cashToday", "overview.deferredRevenue",
+      "overview.activeClients", "overview.plansExpiring", "overview.newLeads", "overview.unreadMessages",
+      "overview.todaysSchedule", "overview.recentActivity", "overview.revenueTrend", "overview.pipelineSnapshot",
+      "overview.upcomingPosts",
+    ],
+  ],
+  gym: [
+    [
+      "overview.activeMembers", "overview.mrr", "overview.classesThisWeek", "overview.attendance",
+      "overview.newLeads", "overview.unreadMessages", "overview.pipelineSnapshot", "overview.todaysClasses",
+      "overview.recentActivity", "overview.revenueTrend", "overview.upcomingPosts",
+    ],
+  ],
+};
+
 export const PRESETS: Preset[] = [
   {
     key: OVERVIEW_PRESET_KEY,
@@ -47,17 +70,13 @@ export const PRESETS: Preset[] = [
     description: "Today at a glance: bookings, leads, messages, revenue.",
     icon: "LayoutDashboard",
     widgets: {
+      // Two columns on a wide screen: the day and what needs doing on the
+      // left (L = 3 of 4 tracks), the figures grouped on the right (S).
       clinic: [
-        { key: "overview.todaysBookings", size: "S" },
-        { key: "overview.todaysEarnings", size: "S" },
-        { key: "overview.cashToday", size: "S" },
-        { key: "overview.deferredRevenue", size: "S" },
-        { key: "overview.activeClients", size: "S" },
-        { key: "overview.plansExpiring", size: "S" },
-        { key: "overview.newLeads", size: "S" },
-        { key: "overview.unreadMessages", size: "S" },
         { key: "overview.todaysSchedule", size: "L" },
-        { key: "overview.recentActivity", size: "S" },
+        { key: "overview.money", size: "S" },
+        { key: "overview.needsYou", size: "L" },
+        { key: "overview.people", size: "S" },
         { key: "overview.revenueTrend", size: "XL" },
         { key: "overview.pipelineSnapshot", size: "M" },
         { key: "overview.upcomingPosts", size: "M" },
@@ -67,6 +86,7 @@ export const PRESETS: Preset[] = [
         { key: "overview.mrr", size: "S" },
         { key: "overview.classesThisWeek", size: "S" },
         { key: "overview.attendance", size: "S" },
+        { key: "overview.needsYou", size: "L" },
         { key: "overview.newLeads", size: "S" },
         { key: "overview.unreadMessages", size: "S" },
         { key: "overview.pipelineSnapshot", size: "M" },

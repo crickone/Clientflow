@@ -70,16 +70,10 @@ const clinic = presetWidgets("overview", "clinic")!;
 assert.deepEqual(
   clinic.map((r) => r.key),
   [
-    "overview.todaysBookings",
-    "overview.todaysEarnings",
-    "overview.cashToday",
-    "overview.deferredRevenue",
-    "overview.activeClients",
-    "overview.plansExpiring",
-    "overview.newLeads",
-    "overview.unreadMessages",
     "overview.todaysSchedule",
-    "overview.recentActivity",
+    "overview.money",
+    "overview.needsYou",
+    "overview.people",
     "overview.revenueTrend",
     "overview.pipelineSnapshot",
     "overview.upcomingPosts",
@@ -87,6 +81,6 @@ assert.deepEqual(
 );
 // presetWidgets returns a copy: mutating it must not change the preset.
 clinic[0].size = "M";
-assert.equal(presetWidgets("overview", "clinic")![0].size, "S");
+assert.equal(presetWidgets("overview", "clinic")![0].size, "L");
 
 console.log("presets.test.ts: ok");

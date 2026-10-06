@@ -19,7 +19,7 @@ import { ChevronRight, GripVertical, Plus, Search, X } from "lucide-react";
 import { saveWidgetsAction } from "@/app/dashboard/actions";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Card, CardLabel } from "@/components/ui/Card";
+import { Card } from "@/components/ui/Card";
 import { Sheet, SheetContent } from "@/components/ui/Sheet";
 import { SIZE_ORDER, type WidgetMeta, type WidgetRef, type WidgetSize } from "@/lib/dashboard/types";
 
@@ -242,7 +242,7 @@ function Tile({
               <GripVertical size={15} />
             </button>
           )}
-          <CardLabel style={{ marginBottom: 0, flex: 1, minWidth: 0 }}>{item.title}</CardLabel>
+          <h2 className="dash-tile-title">{item.title}</h2>
           {editing ? (
             <>
               <div role="group" aria-label="Tile size" style={{ display: "flex", gap: 2 }}>
