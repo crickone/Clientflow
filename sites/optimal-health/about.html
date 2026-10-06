@@ -787,6 +787,16 @@ ul.body li + li{margin-top:10px}
   }
   .roll--therapies .roll__row.is-open .roll__head::after{transform:translateY(-30%) rotate(-135deg)}
 }
+
+.team{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:clamp(24px,4vw,56px)}
+.team__card p{margin:0}
+.team__card p + p{margin-top:12px}
+.team__img{aspect-ratio:4/5;overflow:hidden;background:var(--ink);margin-bottom:20px}
+.team__img img{width:100%;height:100%;object-fit:cover;object-position:50% 25%}
+.team__img--empty{display:flex;align-items:center;justify-content:center;background:var(--sage)}
+.team__mono{font-size:clamp(64px,8vw,120px);line-height:1;color:var(--ink);opacity:.55}
+.team__name{font-size:clamp(22px,2vw,28px);letter-spacing:-.01em}
+.team .team__role{margin-top:4px;margin-bottom:14px;font-size:13px;letter-spacing:.04em;text-transform:uppercase;opacity:.7}
 </style>
 </head>
 <body>
@@ -851,6 +861,33 @@ ul.body li + li{margin-top:10px}
       <div class="cell"><p class="roll__n">02</p><p class="cell__v">We're there for the whole session.</p></div>
       <div class="cell"><p class="roll__n">03</p><p class="cell__v">If we don't think a therapy suits what you're after, we'll say so.</p></div>
       <div class="cell"><p class="roll__n">04</p><p class="cell__v">You go straight back to your day afterwards.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div>
+    <div class="band__head">
+      <div class="band__head__l">
+        <p class="title">The team</p>
+        <h2 class="lede">Who'll look after you.</h2>
+      </div>
+    </div>
+    <div class="team">
+      <article class="team__card">
+        <div class="team__img"><img src="assets/team-sandra.jpg" alt="Sandra, clinic manager at Optimal Health and Recovery, smiling in a blue therapist's tunic in front of bamboo" loading="lazy" /></div>
+        <p class="team__name">Sandra</p>
+        <p class="team__role">Clinic manager · Massage and neuromuscular therapist</p>
+        <p>Sandra has been a massage therapist since 2016 and is qualified in both massage and neuromuscular therapy. Before Optimal Health, she spent four years at the five-star Cashel Palace Hotel, first as a spa therapist and then as spa assistant manager.</p>
+        <p>She runs the clinic day to day, and she loves putting what she knows to work for each client: every treatment shaped around you, and how you want to feel when you leave.</p>
+      </article>
+      <article class="team__card">
+        <div class="team__img team__img--empty"><span class="team__mono" aria-hidden="true">C</span></div>
+        <p class="team__name">Caitriona</p>
+        <p class="team__role">Massage therapist</p>
+        <p>Caitriona has eight years' experience in massage, after many years in the hair and beauty industry.</p>
+        <p>That background in looking after people, hands-on, carries into every treatment she gives.</p>
+      </article>
     </div>
   </div>
 </section>

@@ -787,6 +787,16 @@ ul.body li + li{margin-top:10px}
   }
   .roll--therapies .roll__row.is-open .roll__head::after{transform:translateY(-30%) rotate(-135deg)}
 }
+
+.team{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:clamp(24px,4vw,56px)}
+.team__card p{margin:0}
+.team__card p + p{margin-top:12px}
+.team__img{aspect-ratio:4/5;overflow:hidden;background:var(--ink);margin-bottom:20px}
+.team__img img{width:100%;height:100%;object-fit:cover;object-position:50% 25%}
+.team__img--empty{display:flex;align-items:center;justify-content:center;background:var(--sage)}
+.team__mono{font-size:clamp(64px,8vw,120px);line-height:1;color:var(--ink);opacity:.55}
+.team__name{font-size:clamp(22px,2vw,28px);letter-spacing:-.01em}
+.team .team__role{margin-top:4px;margin-bottom:14px;font-size:13px;letter-spacing:.04em;text-transform:uppercase;opacity:.7}
 </style>
 </head>
 <body>
@@ -831,7 +841,8 @@ ul.body li + li{margin-top:10px}
     <nav class="rail__nav">
       <a class="rail__a" href="#s01" data-rail="s01"><span class="rail__n">01</span><span class="rail__l">What it's like</span></a>
       <a class="rail__a" href="#s02" data-rail="s02"><span class="rail__n">02</span><span class="rail__l">Treatments</span></a>
-      <a class="rail__a" href="#s03" data-rail="s03"><span class="rail__n">03</span><span class="rail__l">Questions</span></a>
+      <a class="rail__a" href="#s03" data-rail="s03"><span class="rail__n">03</span><span class="rail__l">Therapists</span></a>
+      <a class="rail__a" href="#s04" data-rail="s04"><span class="rail__n">04</span><span class="rail__l">Questions</span></a>
     </nav>
     <a class="btn btn--rail" href="https://optimalhealthatinspire.simplybook.it/v2">Book a session</a>
   </div>
@@ -841,7 +852,8 @@ ul.body li + li{margin-top:10px}
   <div class="strip__nav">
     <a class="strip__a" href="#s01" data-rail="s01"><span class="rail__n">01</span> What it's like</a>
     <a class="strip__a" href="#s02" data-rail="s02"><span class="rail__n">02</span> Treatments</a>
-    <a class="strip__a" href="#s03" data-rail="s03"><span class="rail__n">03</span> Questions</a>
+    <a class="strip__a" href="#s03" data-rail="s03"><span class="rail__n">03</span> Therapists</a>
+    <a class="strip__a" href="#s04" data-rail="s04"><span class="rail__n">04</span> Questions</a>
   </div>
 </nav>
 <section class="band band--sage" data-chapter="What it's like" id="s01" aria-label="What it's like">
@@ -1036,7 +1048,19 @@ ul.body li + li{margin-top:10px}
   </div>
 </section>
 
-<section class="band band--sage" data-chapter="Questions" id="s03" aria-label="Questions">
+<section class="band" data-chapter="Therapists" id="s03" aria-label="Therapists">
+  <div class="says">
+    <div class="band__head__l">
+      <h2 class="lede">Treated by people who do this every day.</h2>
+      <p style="margin-top:22px"><strong>Sandra</strong> has been massaging since 2016, is qualified in massage and neuromuscular therapy, and spent four years in the spa at the five-star Cashel Palace Hotel before managing the clinic.</p>
+      <p style="margin-top:12px"><strong>Caitriona</strong> brings eight years in massage and many years in hair and beauty before that.</p>
+      <p style="margin-top:28px"><a class="explore" href="about.html">Meet the team</a></p>
+    </div>
+    <div class="tile__img"><img src="assets/team-sandra.jpg" alt="Sandra, massage and neuromuscular therapist at Optimal Health and Recovery" loading="lazy" style="object-position:50% 30%" /></div>
+  </div>
+</section>
+
+<section class="band band--sage" data-chapter="Questions" id="s04" aria-label="Questions">
   <div>
     <div class="band__head">
       <div class="band__head__l">
