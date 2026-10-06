@@ -16,6 +16,7 @@ export interface ThemeConfig {
  * repoints `--font-heading`, so every heading across the app follows.
  */
 export const HEADING_FONTS: { id: string; label: string; cssVar: string }[] = [
+  { id: "preon", label: "Preon (Adonis)", cssVar: "--font-preon" },
   { id: "space-grotesk", label: "Space Grotesk", cssVar: "--font-space-grotesk" },
   { id: "familjen", label: "Familjen Grotesk", cssVar: "--font-familjen" },
   { id: "bebas", label: "Bebas Neue", cssVar: "--font-bebas" },
@@ -25,7 +26,7 @@ export const HEADING_FONTS: { id: string; label: string; cssVar: string }[] = [
   { id: "manrope", label: "Manrope", cssVar: "--font-manrope" },
   { id: "inter", label: "Inter", cssVar: "--font-inter" },
 ];
-export const DEFAULT_HEADING_FONT = "space-grotesk";
+export const DEFAULT_HEADING_FONT = "preon";
 
 function headingCssVar(id: string): string {
   const f = HEADING_FONTS.find((x) => x.id === id) ?? HEADING_FONTS[0];
@@ -177,7 +178,9 @@ export function resolveThemeVars(cfg: ThemeConfig): Array<[string, string]> {
     ["--accent-soft", rgba(accent, 0.14)],
     ["--accent-glow", `0 0 0 1px ${rgba(accent, 0.4)}, 0 6px 24px -6px ${rgba(accent, 0.5)}`],
     ["--glass", rgba(surface1, 0.72)],
-    ["--font-heading", `var(${headingCssVar(cfg.headingFont ?? DEFAULT_HEADING_FONT)})`],
+    // Space Grotesk behind every heading face: Preon (the default) has no
+    // punctuation, so "Book now." or a € sign falls through to it per character.
+    ["--font-heading", `var(${headingCssVar(cfg.headingFont ?? DEFAULT_HEADING_FONT)}), var(--font-space-grotesk)`],
     ["color-scheme", dark ? "dark" : "light"],
   ];
 }

@@ -2294,7 +2294,7 @@ a {
   /* The BRAND face, not var(--font-heading): a tenant's display face (Bebas,
      Clash) is chosen for dashboards, and "Welcome back" in condensed all-caps
      is not a welcome. */
-  font-family: var(--font-space-grotesk), var(--font-body), system-ui, sans-serif;
+  font-family: var(--font-preon), var(--font-space-grotesk), var(--font-body), system-ui, sans-serif;
   font-size: clamp(28px, 4vw, 36px);
   font-weight: 500;
   letter-spacing: -0.02em;

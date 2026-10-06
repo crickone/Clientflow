@@ -45,7 +45,10 @@ export function PageHeader({ eyebrow, title, subtitle, actions, flush }: Props) 
         <h1
           style={{
             fontFamily: "var(--font-heading), sans-serif",
-            fontSize: "clamp(32px, 4vw, 44px)",
+            // Preon (the default heading face) is wide: scale with the
+            // viewport so a long title ("Communication") fits on a phone.
+            fontSize: "clamp(24px, 6.2vw, 44px)",
+            overflowWrap: "anywhere",
             fontWeight: 400,
             letterSpacing: "-0.005em",
             color: "var(--text-primary)",
