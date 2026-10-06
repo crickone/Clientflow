@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireAdmin } from "@/lib/auth";
 import { setMonthNote } from "@/lib/marketing/calendarNotes";
+import { addCustomDate, removeCustomDate } from "@/lib/marketing/calendarView";
 
 /**
  * Save the operator's marketing direction from the seasonal calendar. Guarded
@@ -23,6 +24,25 @@ export async function saveMonthNoteAction(year: number, month: number, note: str
     return { ok: false as const, error: "Invalid month." };
   }
   setMonthNote(y, m, String(note ?? ""));
+  revalidatePath("/marketing/calendar");
+  return { ok: true as const };
+}
+
+/** Add one of the business's own dates (an open day, an anniversary, a launch). */
+export async function addCustomDateAction(name: string, iso: string) {
+  await requireAdmin();
+  try {
+    addCustomDate(String(name ?? ""), String(iso ?? ""));
+  } catch (err) {
+    return { ok: false as const, error: err instanceof Error ? err.message : "Couldn't add the date." };
+  }
+  revalidatePath("/marketing/calendar");
+  return { ok: true as const };
+}
+
+export async function removeCustomDateAction(id: string) {
+  await requireAdmin();
+  removeCustomDate(String(id ?? ""));
   revalidatePath("/marketing/calendar");
   return { ok: true as const };
 }

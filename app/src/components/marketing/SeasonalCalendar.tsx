@@ -1,21 +1,21 @@
 import Link from "next/link";
-import { Radar, Megaphone } from "lucide-react";
+import { Megaphone, Radar } from "lucide-react";
 
-import { Card, CardLabel } from "@/components/ui/Card";
-import type { Campaign } from "@/lib/campaigns/store";
-import type { CalendarNotes } from "@/lib/marketing/calendarNotes";
+import { Card } from "@/components/ui/Card";
 import { MonthNote } from "@/components/marketing/PlanNotes";
 import type { RadarSuggestion } from "@/lib/marketing/campaignRadar";
-import { seasonForMonth, type CalDate, type Season, type SeasonBand } from "@/lib/marketing/seasonalCalendar";
+import { startBy } from "@/lib/marketing/calendarRules";
+import type { CalEntry, MonthView } from "@/lib/marketing/calendarView";
+import { seasonForMonth, type Season } from "@/lib/marketing/seasonalCalendar";
 import { BuildCampaignLink } from "./BuildCampaignLink";
+import { AddCalendarDate, RemoveCalendarDate } from "./CalendarDates";
 
 interface Props {
-  year: number;
-  dates: CalDate[];
-  seasons: SeasonBand[];
-  campaigns: Campaign[];
+  /** A calendar year, or null for the next twelve months from today. */
+  year: number | null;
+  todayIso: string;
+  view: MonthView[];
   radar: RadarSuggestion[];
-  notes: CalendarNotes;
 }
 
 const MONTH_NAMES = [
@@ -26,11 +26,8 @@ const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Se
 
 const SEASON_LABEL: Record<Season, string> = { spring: "Spring", summer: "Summer", autumn: "Autumn", winter: "Winter" };
 // Inline tint recipe (bg alpha ~0.1 over the dark surface, a bright fg ink,
-// a slightly stronger border alpha for the cell outline) mirrors Badge.tsx's
-// "inks brightened for the dark surface" tone map — there's no dedicated
-// season token in globals.css (the existing --accent-hbot/-ir/-pemf trio is
-// Renova-therapy-specific, not something a multi-tenant page should key
-// off), so these 4 are defined here, once, for this component only.
+// a slightly stronger border alpha for the cell outline). Defined here, once,
+// for this component only: no season token exists in globals.css.
 const SEASON_TINT: Record<Season, { bg: string; border: string; fg: string }> = {
   spring: { bg: "rgba(134, 239, 172, 0.09)", border: "rgba(134, 239, 172, 0.28)", fg: "#86efac" },
   summer: { bg: "rgba(253, 224, 71, 0.09)", border: "rgba(253, 224, 71, 0.28)", fg: "#fde047" },
@@ -40,58 +37,14 @@ const SEASON_TINT: Record<Season, { bg: string; border: string; fg: string }> = 
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-/** TZ-safe ISO ("YYYY-MM-DD") -> "16 Feb": string-split, never routes through
- *  `new Date(iso)` + locale formatting, which can roll a date-only string
- *  back a day when the server's local timezone is behind UTC — the same
- *  reason seasonalCalendar.ts does all its own math in explicit UTC. */
+/** TZ-safe ISO ("YYYY-MM-DD") -> "16 Feb": string-split, never through `new Date(iso)` + locale formatting. */
 function fmtIso(iso: string): string {
   const [, m, d] = iso.split("-");
-  const mi = Number(m) - 1;
-  return `${Number(d)} ${MONTH_SHORT[mi] ?? m}`;
+  return `${Number(d)} ${MONTH_SHORT[Number(m) - 1] ?? m}`;
 }
 
 function daysInMonth(year: number, month: number): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
-}
-
-function monthRange(year: number, month: number): { start: string; end: string } {
-  return { start: `${year}-${pad(month)}-01`, end: `${year}-${pad(month)}-${pad(daysInMonth(year, month))}` };
-}
-
-/** Catalog dates that fall in this month, chronological. */
-function datesInMonth(dates: CalDate[], month: number): CalDate[] {
-  return dates
-    .filter((d) => Number(d.iso.slice(5, 7)) === month)
-    .sort((a, b) => (a.iso < b.iso ? -1 : a.iso > b.iso ? 1 : 0));
-}
-
-/** Campaigns whose explicit startsOn..endsOn range overlaps this month, or —
- *  for a campaign with no dates at all — whose `season` matches the month's
- *  season. ISO "YYYY-MM-DD" strings compare lexically = chronologically, so
- *  plain string comparison is enough (no Date parsing, no TZ risk). */
-function campaignsInMonth(campaigns: Campaign[], year: number, month: number): Campaign[] {
-  const { start, end } = monthRange(year, month);
-  const season = seasonForMonth(month);
-  return campaigns.filter((c) => {
-    if (c.startsOn && c.endsOn) return c.startsOn <= end && c.endsOn >= start;
-    if (c.startsOn) return c.startsOn >= start && c.startsOn <= end;
-    if (c.season) return c.season.toLowerCase() === season;
-    return false;
-  });
-}
-
-/** Whether some campaign already targets this exact catalog date (an exact
- *  startsOn match, or falling inside a startsOn..endsOn range) — gates the
- *  per-date "Build campaign" affordance so an occasion that already has a
- *  campaign doesn't also prompt to build another one. Deliberately does NOT
- *  count a season-only campaign (no dates) as "covering" a specific date —
- *  that match is too loose to suppress a date-specific suggestion. */
-function dateHasCampaign(campaigns: Campaign[], iso: string): boolean {
-  return campaigns.some((c) => {
-    if (!c.startsOn) return false;
-    if (c.endsOn) return c.startsOn <= iso && c.endsOn >= iso;
-    return c.startsOn === iso;
-  });
 }
 
 function daysAwayLabel(daysAway: number): string {
@@ -100,266 +53,156 @@ function daysAwayLabel(daysAway: number): string {
   return `in ${daysAway} days`;
 }
 
+const KIND_LABEL: Record<CalEntry["kind"], string> = {
+  "public-holiday": "Bank holiday",
+  "awareness-day": "Awareness day",
+  school: "School date",
+  custom: "Your date",
+};
+
 /**
- * Campaign Engine Slice 3 (Task 3): the visible seasonal calendar — a
- * radar-driven "coming up" rail above a 12-month year grid of Irish
- * holidays/awareness days/seasons overlaid with the tenant's real campaigns.
- * Presentational + server-rendered (no client JS): every interactive bit is
- * a plain `<Link>`, either into an existing campaign
- * (/marketing/campaigns/[id]) or into the Marketing agent chat pre-seeded
- * via BuildCampaignLink.
+ * The seasonal calendar: the radar's "coming up" panel above twelve month
+ * cards. By default the twelve months start at this one; ?year= shows a
+ * calendar year. Each date says whether a campaign covers it (and how that
+ * went), or when one would need to start. Clicking a date opens its campaign,
+ * or Adonis with the campaign brief filled in.
  */
-export function SeasonalCalendar({ year, dates, seasons, campaigns, radar, notes }: Props) {
+export function SeasonalCalendar({ year, todayIso, view, radar }: Props) {
+  const thisYear = Number(todayIso.slice(0, 4));
   return (
     <div>
-      <ComingUpRail radar={radar} />
+      <ComingUpRail radar={radar} todayIso={todayIso} />
 
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 16,
-          flexWrap: "wrap",
-          gap: 12,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <YearNavLink year={year - 1} label="Previous year">
-            ‹
-          </YearNavLink>
-          <span
-            style={{
-              fontFamily: "var(--font-heading), sans-serif",
-              fontSize: 20,
-              color: "var(--text-primary)",
-              textTransform: "uppercase",
-              minWidth: 68,
-              textAlign: "center",
-            }}
-          >
-            {year}
-          </span>
-          <YearNavLink year={year + 1} label="Next year">
-            ›
-          </YearNavLink>
-        </div>
-        <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-          {seasons.map((s) => (
-            <span key={s.season} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--text-tertiary)" }}>
-              <span style={{ width: 8, height: 8, borderRadius: 999, background: SEASON_TINT[s.season].fg, flexShrink: 0 }} aria-hidden />
-              {SEASON_LABEL[s.season]}
-            </span>
+      <div className="szn-bar">
+        <nav className="szn-views" aria-label="Which months">
+          <Link href="/marketing/calendar" className={year === null ? "is-on" : undefined} aria-current={year === null ? "page" : undefined}>
+            Next 12 months
+          </Link>
+          {[thisYear, thisYear + 1].map((y) => (
+            <Link key={y} href={`/marketing/calendar?year=${y}`} className={year === y ? "is-on" : undefined} aria-current={year === y ? "page" : undefined}>
+              {y}
+            </Link>
           ))}
-        </div>
+          {year !== null && year !== thisYear && year !== thisYear + 1 && <span className="is-on">{year}</span>}
+        </nav>
+        <AddCalendarDate />
       </div>
 
-      <div className="szncal-scroll">
-        <div className="szncal-grid">
-          {MONTH_NAMES.map((name, i) => {
-            const month = i + 1;
-            const season = seasonForMonth(month);
-            const tint = SEASON_TINT[season];
-            const monthDates = datesInMonth(dates, month);
-            const monthCampaigns = campaignsInMonth(campaigns, year, month);
-            const empty = monthDates.length === 0 && monthCampaigns.length === 0;
-
-            return (
-              <div key={month} className="szncal-month" style={{ background: tint.bg, borderColor: tint.border }}>
-                <div className="szncal-month-head" style={{ color: tint.fg }}>
-                  {name}
-                </div>
-
-                {empty ? (
-                  <div className="szncal-empty">
-                    <span>No dates this month.</span>
-                    <BuildCampaignLink season={season} startsOn={`${year}-${pad(month)}-01`} compact>
-                      + Build
-                    </BuildCampaignLink>
-                  </div>
-                ) : (
-                  <div className="szncal-month-body">
-                    {monthDates.map((d) => {
-                      const covered = dateHasCampaign(campaigns, d.iso);
-                      return (
-                        <div
-                          key={d.id}
-                          className={`szncal-date ${d.kind === "public-holiday" ? "szncal-date--holiday" : "szncal-date--awareness"}`}
-                        >
-                          <span className="szncal-date-dot" aria-hidden />
-                          <span className="szncal-date-name">{d.name}</span>
-                          <span className="szncal-date-day">{fmtIso(d.iso)}</span>
-                          {!covered && (
-                            <BuildCampaignLink seedName={d.name} season={season} startsOn={d.iso} angle={d.angle} iconOnly compact />
-                          )}
-                        </div>
-                      );
-                    })}
-                    {monthCampaigns.map((c) => (
-                      <Link key={c.id} href={`/marketing/campaigns/${c.id}`} className="szncal-chip">
-                        {c.name}
-                      </Link>
-                    ))}
-                  </div>
-                )}
-                {(notes.campaignNotes[String(month)] ?? []).map((line, i) => (
-                  <div key={i} className="szncal-auto-note" title="Recorded when this campaign was created">
-                    <Megaphone size={10} style={{ flexShrink: 0, marginTop: 2 }} />
-                    <span>{line}</span>
-                  </div>
-                ))}
-                <MonthNote
-                  year={year}
-                  month={month}
-                  initialNote={notes.months[String(month)] ?? ""}
-                />
-              </div>
-            );
-          })}
-        </div>
+      <div className="szn-key">
+        <span><i className="szn-dot k-public-holiday" aria-hidden /> Bank holiday</span>
+        <span><i className="szn-dot k-awareness-day" aria-hidden /> Awareness day</span>
+        <span><i className="szn-dot k-school" aria-hidden /> School date (typical, check your local schools)</span>
+        <span><i className="szn-dot k-custom" aria-hidden /> Your date</span>
+        <span className="szn-key-gap" />
+        {(["spring", "summer", "autumn", "winter"] as Season[]).map((s) => (
+          <span key={s}>
+            <i className="szn-swatch" style={{ background: SEASON_TINT[s].fg }} aria-hidden /> {SEASON_LABEL[s]}
+          </span>
+        ))}
       </div>
 
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-            .szncal-scroll { overflow-x: auto; padding-bottom: 6px; }
-            .szncal-note,
-            .szncal-note-add {
-              display: flex;
-              align-items: flex-start;
-              gap: 6px;
-              width: 100%;
-              margin-top: 8px;
-              padding: 7px 9px;
-              border-radius: var(--radius-sm);
-              border: 1px dashed var(--hairline);
-              background: rgba(255, 255, 255, 0.03);
-              color: var(--text-secondary);
-              font-family: inherit;
-              font-size: 11.5px;
-              line-height: 1.45;
-              text-align: left;
-              cursor: pointer;
-              transition: border-color 0.15s var(--ease), color 0.15s var(--ease);
-            }
-            .szncal-note:hover,
-            .szncal-note-add:hover {
-              border-color: var(--hairline-strong);
-              color: var(--text-primary);
-            }
-            .szncal-note-add { align-items: center; color: var(--text-tertiary); font-size: 11px; }
-            /* Campaign lines the app recorded — read-only, so they read as a
-               record rather than an editable note. */
-            .szncal-auto-note {
-              display: flex;
-              align-items: flex-start;
-              gap: 6px;
-              margin-top: 8px;
-              padding: 6px 9px;
-              border-radius: var(--radius-sm);
-              border: 1px solid var(--grid);
-              background: var(--surface-2);
-              color: var(--text-secondary);
-              font-size: 11px;
-              line-height: 1.4;
-            }
-            .szncal-grid {
-              display: grid;
-              grid-template-columns: repeat(4, minmax(210px, 1fr));
-              gap: 12px;
-              min-width: 880px;
-            }
-            .szncal-month {
-              border: 1px solid var(--hairline);
-              border-radius: var(--radius);
-              padding: 14px;
-              display: flex;
-              flex-direction: column;
-              gap: 10px;
-              min-height: 108px;
-            }
-            .szncal-month-head {
-              font-family: var(--font-mono), ui-monospace, monospace;
-              font-size: 11px;
-              font-weight: 600;
-              letter-spacing: 0.08em;
-              text-transform: uppercase;
-            }
-            .szncal-month-body { display: flex; flex-direction: column; gap: 7px; }
-            .szncal-empty {
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-              gap: 10px;
-              flex: 1;
-              font-size: 12px;
-              color: var(--text-tertiary);
-            }
-            .szncal-date {
-              display: flex;
-              align-items: center;
-              gap: 7px;
-              font-size: 12.5px;
-              color: var(--text-secondary);
-            }
-            .szncal-date-dot { width: 7px; height: 7px; border-radius: 999px; flex-shrink: 0; }
-            .szncal-date--holiday .szncal-date-dot { background: var(--text-primary); }
-            .szncal-date--holiday .szncal-date-name { font-weight: 600; color: var(--text-primary); }
-            .szncal-date--awareness .szncal-date-dot { background: transparent; border: 1.5px solid var(--text-tertiary); }
-            .szncal-date-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-            .szncal-date-day {
-              font-family: var(--font-mono), ui-monospace, monospace;
-              color: var(--text-tertiary);
-              font-size: 10.5px;
-              flex-shrink: 0;
-            }
-            .szncal-chip {
-              display: inline-flex;
-              align-items: center;
-              align-self: flex-start;
-              font-size: 11.5px;
-              font-weight: 600;
-              color: var(--accent-ink);
-              background: var(--accent-soft);
-              border: 1px solid var(--accent);
-              border-radius: var(--radius);
-              padding: 4px 9px;
-              text-decoration: none;
-              max-width: 100%;
-              overflow: hidden;
-              text-overflow: ellipsis;
-              white-space: nowrap;
-            }
-            @media (max-width: 760px) {
-              .szncal-grid { grid-template-columns: 1fr; min-width: 0; }
-            }
-          `,
-        }}
-      />
+      <div className="szn-grid">
+        {view.map((m) => (
+          <MonthCard key={`${m.year}-${m.month}`} m={m} showYear={m.year !== thisYear || m.month === 1} />
+        ))}
+      </div>
     </div>
   );
 }
 
-function YearNavLink({ year, label, children }: { year: number; label: string; children: string }) {
+function MonthCard({ m, showYear }: { m: MonthView; showYear: boolean }) {
+  const tint = SEASON_TINT[m.season];
+  const { posts, emails } = m.activity;
+  const sent = m.past;
+  const activity =
+    posts + emails > 0
+      ? `${posts ? `${posts} post${posts === 1 ? "" : "s"}` : ""}${posts && emails ? " and " : ""}${emails ? `${emails} email${emails === 1 ? "" : "s"}` : ""} ${sent ? "sent" : "scheduled"}`
+      : m.past
+        ? null
+        : "Nothing scheduled yet";
   return (
-    <Link
-      href={`/marketing/calendar?year=${year}`}
-      aria-label={label}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: 28,
-        height: 28,
-        borderRadius: "var(--radius)",
-        border: "1px solid var(--hairline)",
-        color: "var(--text-secondary)",
-        textDecoration: "none",
-        fontSize: 16,
-      }}
+    <section
+      className={`szn-month${m.past ? " is-past" : ""}${m.current ? " is-now" : ""}`}
+      style={{ background: tint.bg, borderColor: m.current ? tint.fg : tint.border }}
+      aria-label={`${MONTH_NAMES[m.month - 1]} ${m.year}`}
     >
-      {children}
-    </Link>
+      <header className="szn-month-head">
+        <h3 style={{ color: tint.fg }}>
+          {MONTH_NAMES[m.month - 1]}
+          {showYear && <span className="szn-month-year"> {m.year}</span>}
+        </h3>
+        {m.current && <span className="szn-now">This month</span>}
+      </header>
+
+      {m.entries.length === 0 && m.campaigns.length === 0 ? (
+        <div className="szn-empty">
+          <span>No dates this month.</span>
+          {!m.past && (
+            <BuildCampaignLink season={m.season} startsOn={`${m.year}-${pad(m.month)}-01`} compact>
+              Plan something
+            </BuildCampaignLink>
+          )}
+        </div>
+      ) : (
+        <ul className="szn-list">
+          {m.entries.map((e) => (
+            <EntryRow key={e.key} e={e} />
+          ))}
+          {m.campaigns.map((c) => (
+            <li key={`c${c.id}`} className="szn-row">
+              <Link href={`/marketing/campaigns/${c.id}`} className="szn-row-link">
+                <Megaphone size={12} className="szn-row-icon" aria-hidden />
+                <span className="szn-row-main">
+                  <span className="szn-row-name">{c.name}</span>
+                  {c.result && <span className="szn-row-sub">{c.result}</span>}
+                </span>
+                {c.status && <span className={`szn-status t-${c.status.tone}`}>{c.status.label}</span>}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {m.campaignNotes.map((line, i) => (
+        <div key={i} className="szncal-auto-note" title="Recorded when this campaign was created">
+          <Megaphone size={10} style={{ flexShrink: 0, marginTop: 2 }} />
+          <span>{line}</span>
+        </div>
+      ))}
+
+      <footer className="szn-month-foot">
+        {activity && <span className={posts + emails > 0 ? "szn-activity" : "szn-activity is-quiet"}>{activity}</span>}
+        <MonthNote year={m.year} month={m.month} initialNote={m.note} />
+      </footer>
+    </section>
+  );
+}
+
+function EntryRow({ e }: { e: CalEntry }) {
+  const note = e.covered?.result ?? e.lastTime;
+  return (
+    <li className={`szn-row k-${e.kind}${e.past ? " is-past" : ""}`}>
+      <Link href={e.href} className="szn-row-link" title={KIND_LABEL[e.kind]}>
+        <i className={`szn-dot k-${e.kind}`} aria-hidden />
+        <span className="szn-row-main">
+          <span className="szn-row-name">{e.name}</span>
+          {e.start && !e.covered ? (
+            <span className={`szn-row-sub szn-start t-${e.start.tone}`}>
+              {e.start.tone === "late" ? "Start now" : `Start by ${fmtIso(e.start.iso)}`}
+              {note ? ` · ${note}` : ""}
+            </span>
+          ) : (
+            note && <span className="szn-row-sub">{note}</span>
+          )}
+        </span>
+        <span className="szn-row-end">
+          {e.covered && <span className={`szn-status t-${e.covered.tone}`}>{e.covered.label}</span>}
+          <span className="szn-row-day">{fmtIso(e.iso)}</span>
+          {!e.covered && !e.past && <span className="szn-build">Build</span>}
+        </span>
+      </Link>
+      {e.customId && <RemoveCalendarDate id={e.customId} name={e.name} />}
+    </li>
   );
 }
 
@@ -441,10 +284,7 @@ function Runway({ todayIso, radar }: { todayIso: string; radar: RadarSuggestion[
                   borderRadius: 5,
                   background: tint.bg,
                   border: `1px solid ${tint.border}`,
-                  fontFamily: "var(--font-mono), ui-monospace, monospace",
-                  fontSize: 9.5,
-                  letterSpacing: "0.14em",
-                  textTransform: "uppercase",
+                  fontSize: 11.5,
                   color: "var(--text-tertiary)",
                   whiteSpace: "nowrap",
                 }}
@@ -478,15 +318,12 @@ function Runway({ todayIso, radar }: { todayIso: string; radar: RadarSuggestion[
           display: "flex",
           justifyContent: "space-between",
           marginTop: 8,
-          fontFamily: "var(--font-mono), ui-monospace, monospace",
-          fontSize: 10,
-          letterSpacing: "0.14em",
-          textTransform: "uppercase",
+          fontSize: 11.5,
           color: "var(--text-tertiary)",
         }}
       >
         <span>Today</span>
-        <span>+60 days</span>
+        <span>In 60 days</span>
       </div>
     </div>
   );
@@ -512,7 +349,6 @@ function Countdown({ daysAway }: { daysAway: number }) {
           style={{
             fontFamily: "var(--font-heading), sans-serif",
             fontSize: 20,
-            textTransform: "uppercase",
             letterSpacing: "-0.01em",
             color: colour,
             lineHeight: 1,
@@ -537,15 +373,12 @@ function Countdown({ daysAway }: { daysAway: number }) {
           </div>
           <div
             style={{
-              fontFamily: "var(--font-mono), ui-monospace, monospace",
-              fontSize: 9.5,
-              letterSpacing: "0.16em",
-              textTransform: "uppercase",
+              fontSize: 11.5,
               color: "var(--text-tertiary)",
               marginTop: 7,
             }}
           >
-            Days away
+            days away
           </div>
         </>
       )}
@@ -567,14 +400,13 @@ function Countdown({ daysAway }: { daysAway: number }) {
  * line below rather than a second row of equal weight. Hierarchy by
  * urgency, which is the only ordering a radar has.
  */
-function ComingUpRail({ radar }: { radar: RadarSuggestion[] }) {
+function ComingUpRail({ radar, todayIso: pageToday }: { radar: RadarSuggestion[]; todayIso: string }) {
   if (radar.length === 0) {
     return (
       <Card style={{ marginBottom: 28 }}>
-        <CardLabel style={{ marginBottom: 0 }}>
-          <Radar size={11} style={{ display: "inline", verticalAlign: -1, marginRight: 6 }} />
-          Coming up
-        </CardLabel>
+        <h2 className="szn-rail-title">
+          <Radar size={15} aria-hidden /> Coming up
+        </h2>
         <p style={{ fontSize: 13, color: "var(--text-tertiary)", margin: "12px 0 0", lineHeight: 1.5 }}>
           Nothing on the radar in the next 60 days. Browse the year below for what&apos;s further out.
         </p>
@@ -590,10 +422,9 @@ function ComingUpRail({ radar }: { radar: RadarSuggestion[] }) {
 
   return (
     <Card style={{ marginBottom: 28 }}>
-      <CardLabel style={{ marginBottom: 0 }}>
-        <Radar size={11} style={{ display: "inline", verticalAlign: -1, marginRight: 6 }} />
-        Coming up
-      </CardLabel>
+      <h2 className="szn-rail-title">
+        <Radar size={15} aria-hidden /> Coming up
+      </h2>
 
       <Runway todayIso={todayIso} radar={radar} />
 
@@ -603,10 +434,7 @@ function ComingUpRail({ radar }: { radar: RadarSuggestion[] }) {
         <div style={{ flex: "1 1 260px", minWidth: 0 }}>
           <div
             style={{
-              fontFamily: "var(--font-mono), ui-monospace, monospace",
-              fontSize: 10.5,
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
+              fontSize: 13,
               color: "var(--text-tertiary)",
               marginBottom: 7,
             }}
@@ -629,6 +457,7 @@ function ComingUpRail({ radar }: { radar: RadarSuggestion[] }) {
           >
             {lead.suggestionHook}
           </p>
+          <LeadStart dateIso={lead.dateIso} todayIso={pageToday} />
         </div>
 
         <div style={{ flexShrink: 0 }}>
@@ -640,15 +469,12 @@ function ComingUpRail({ radar }: { radar: RadarSuggestion[] }) {
         <div style={{ marginTop: 20, borderTop: "1px solid var(--hairline)", paddingTop: 14 }}>
           <div
             style={{
-              fontFamily: "var(--font-mono), ui-monospace, monospace",
-              fontSize: 9.5,
-              letterSpacing: "0.16em",
-              textTransform: "uppercase",
+              fontSize: 11.5,
               color: "var(--text-tertiary)",
               marginBottom: 10,
             }}
           >
-            Then
+            After that
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
             {rest.map((r) => {
@@ -660,7 +486,6 @@ function ComingUpRail({ radar }: { radar: RadarSuggestion[] }) {
                       flexShrink: 0,
                       width: 92,
                       textAlign: "center",
-                      fontFamily: "var(--font-mono), ui-monospace, monospace",
                       fontSize: 11,
                       color: tint.fg,
                       fontVariantNumeric: "tabular-nums",
@@ -689,4 +514,15 @@ function ComingUpRail({ radar }: { radar: RadarSuggestion[] }) {
       )}
     </Card>
   );
+}
+
+/** When the lead occasion's campaign has to start, in words. */
+function LeadStart({ dateIso, todayIso }: { dateIso: string; todayIso: string }) {
+  const s = startBy(dateIso, todayIso);
+  if (!s) return null;
+  const text =
+    s.tone === "late"
+      ? `Start now: the three-week run-up began on ${fmtIsoLong(s.iso)}.`
+      : `Start by ${fmtIsoLong(s.iso)} to give it a three-week run-up.`;
+  return <p className={`szn-lead-start t-${s.tone}`}>{text}</p>;
 }

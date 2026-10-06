@@ -2933,6 +2933,96 @@ a.stat-row:hover .stat-label { color: var(--text-primary); }
 .sched-empty-title { font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
 .sched-empty-sub { font-size: 13px; color: var(--text-secondary); }
 
+/* ---- Seasonal calendar (components/marketing/SeasonalCalendar) ----------- */
+.szn-rail-title { display: flex; align-items: center; gap: 8px; margin: 0; font-family: var(--font-heading), sans-serif; font-size: 16px; font-weight: 600; text-transform: none; color: var(--text-primary); }
+.szn-rail-title svg { color: var(--text-tertiary); }
+.szn-lead-start { margin: 10px 0 0; font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.szn-lead-start.t-soon { color: var(--attn-ink); }
+.szn-lead-start.t-late { color: #f87171; }
+:root[data-theme="light"] .szn-lead-start.t-late { color: #b91c1c; }
+
+.szn-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.szn-views { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--surface-1); border: 1px solid var(--hairline); }
+.szn-views a, .szn-views span { padding: 7px 14px; border-radius: 999px; font-size: 13.5px; color: var(--text-secondary); text-decoration: none; }
+.szn-views a:hover { color: var(--text-primary); }
+.szn-views .is-on { background: var(--surface-2); color: var(--text-primary); font-weight: 600; }
+.szn-add { position: absolute; right: 0; top: calc(100% + 8px); z-index: 60; width: 300px; display: grid; gap: 10px; padding: 14px; border-radius: 16px; border: 1px solid var(--hairline-strong); background: var(--surface-1); box-shadow: var(--shadow-2); }
+
+.szn-key { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin-bottom: 16px; font-size: 12px; color: var(--text-tertiary); }
+.szn-key span { display: inline-flex; align-items: center; gap: 7px; }
+.szn-key-gap { flex: 1 1 0; }
+.szn-swatch { width: 8px; height: 8px; border-radius: 999px; display: inline-block; }
+
+.szn-dot { display: inline-block; width: 8px; height: 8px; flex-shrink: 0; border-radius: 999px; }
+.szn-dot.k-public-holiday { background: var(--text-primary); }
+.szn-dot.k-awareness-day { border: 1.5px solid var(--text-tertiary); }
+.szn-dot.k-school { border-radius: 2px; background: var(--text-tertiary); }
+.szn-dot.k-custom { border-radius: 1px; transform: rotate(45deg) scale(0.9); background: var(--attn); }
+
+.szn-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 1180px) { .szn-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 900px) { .szn-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .szn-grid { grid-template-columns: minmax(0, 1fr); } }
+
+.szn-month { display: flex; flex-direction: column; gap: 10px; padding: 14px 14px 12px; border: 1px solid var(--hairline); border-radius: var(--radius-lg); min-height: 150px; }
+.szn-month.is-past { opacity: 0.55; }
+.szn-month.is-past:hover { opacity: 0.9; }
+.szn-month-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.szn-month-head h3 { margin: 0; font-family: var(--font-heading), sans-serif; font-size: 15px; font-weight: 600; text-transform: none; letter-spacing: 0; }
+.szn-month-year { color: var(--text-tertiary); font-weight: 500; }
+.szn-now { font-size: 11.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: var(--attn-soft); color: var(--attn-ink); }
+
+.szn-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.szn-row { position: relative; display: flex; align-items: center; }
+.szn-row-link { flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px; padding: 6px 8px; margin: 0 -8px; border-radius: 9px; color: inherit; text-decoration: none; }
+.szn-row-link:hover { background: rgba(255, 255, 255, 0.05); }
+:root[data-theme="light"] .szn-row-link:hover { background: rgba(0, 0, 0, 0.04); }
+.szn-row-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.szn-row-icon { color: var(--text-tertiary); flex-shrink: 0; }
+.szn-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.szn-row-name { font-size: 13px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.szn-row.k-public-holiday .szn-row-name, .szn-row.k-custom .szn-row-name { color: var(--text-primary); font-weight: 600; }
+.szn-row-sub { font-size: 11.5px; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.szn-row-end { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.szn-row-day { font-size: 12px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; min-width: 40px; text-align: right; }
+.szn-row.is-past .szn-row-name { color: var(--text-tertiary); font-weight: 400; }
+
+.szn-status { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.szn-status.t-neutral { background: var(--surface-2); color: var(--text-secondary); }
+.szn-status.t-ready { background: rgba(141, 186, 242, 0.16); color: #8dbaf2; }
+.szn-status.t-live { background: rgba(74, 222, 128, 0.16); color: #4ade80; }
+.szn-status.t-done { background: var(--surface-2); color: var(--text-tertiary); }
+:root[data-theme="light"] .szn-status.t-ready { color: #1d4ed8; }
+:root[data-theme="light"] .szn-status.t-live { color: #15803d; }
+
+.szn-start { color: var(--text-tertiary); }
+.szn-start.t-soon { color: var(--attn-ink); font-weight: 600; }
+.szn-start.t-late { color: #f87171; font-weight: 600; }
+:root[data-theme="light"] .szn-start.t-late { color: #b91c1c; }
+.szn-build { display: none; font-size: 11.5px; font-weight: 700; color: var(--text-primary); }
+.szn-row-link:hover .szn-build, .szn-row-link:focus-visible .szn-build { display: inline; }
+.szn-row-link:hover .szn-build ~ *, .szn-row-link:hover .szn-row-day:has(+ .szn-build) { display: none; }
+
+.szn-remove { width: 26px; height: 26px; margin-left: 2px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 8px; background: none; color: var(--text-tertiary); cursor: pointer; opacity: 0; }
+.szn-row:hover .szn-remove, .szn-remove:focus-visible { opacity: 1; }
+.szn-remove:hover { background: var(--surface-2); color: var(--text-primary); }
+
+.szn-empty { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; flex: 1; font-size: 12.5px; color: var(--text-tertiary); }
+
+.szn-month-foot { margin-top: auto; display: flex; flex-direction: column; gap: 4px; }
+.szn-activity { font-size: 11.5px; color: var(--text-secondary); }
+.szn-activity.is-quiet { color: var(--text-tertiary); }
+
+/* Month notes (PlanNotes.MonthNote) and the lines the app records. The
+   empty "+ Add note" only appears on hover, so twelve empty boxes don't
+   fill the page; on touch screens it always shows. */
+.szncal-note, .szncal-note-add { display: flex; align-items: flex-start; gap: 6px; width: 100%; margin-top: 4px; padding: 7px 9px; border-radius: var(--radius-sm); border: 1px dashed var(--hairline); background: rgba(255, 255, 255, 0.03); color: var(--text-secondary); font-family: inherit; font-size: 12px; line-height: 1.45; text-align: left; cursor: pointer; transition: border-color 0.15s var(--ease), color 0.15s var(--ease), opacity 0.15s var(--ease); }
+.szncal-note:hover, .szncal-note-add:hover { border-color: var(--hairline-strong); color: var(--text-primary); }
+.szncal-note-add { align-items: center; width: auto; align-self: flex-start; border-color: transparent; background: none; padding: 4px 6px; margin-left: -6px; color: var(--text-tertiary); font-size: 11.5px; opacity: 0; }
+.szn-month:hover .szncal-note-add, .szncal-note-add:focus-visible { opacity: 1; }
+@media (hover: none) { .szncal-note-add { opacity: 1; } }
+.szncal-auto-note { display: flex; align-items: flex-start; gap: 6px; padding: 6px 9px; border-radius: var(--radius-sm); border: 1px solid var(--hairline); background: var(--surface-2); color: var(--text-secondary); font-size: 11.5px; line-height: 1.4; }
+
 /* ---- Date range picker (components/ui/DateRangePicker) ------------------ */
 .drp { position: relative; }
 .drp-trigger { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px 0 14px; border-radius: 999px; border: 1px solid var(--hairline); background: var(--surface-1); color: var(--text-primary); font: inherit; font-size: 13.5px; font-weight: 500; cursor: pointer; transition: border-color 0.15s var(--ease), background 0.15s var(--ease); }

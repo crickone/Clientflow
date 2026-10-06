@@ -1,8 +1,8 @@
 import { requireAdminPage, getCurrentMembership } from "@/lib/auth";
 import { listCampaigns } from "@/lib/campaigns/store";
 import { getCampaignRadar } from "@/lib/marketing/campaignRadar";
-import { catalogForYear } from "@/lib/marketing/seasonalCalendar";
-import { getCalendarNotes } from "@/lib/marketing/calendarNotes";
+import { monthsToShow } from "@/lib/marketing/calendarRules";
+import { buildCalendarView } from "@/lib/marketing/calendarView";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { SeasonalCalendar } from "@/components/marketing/SeasonalCalendar";
 
@@ -31,27 +31,24 @@ export default async function MarketingCalendarPage({
   // own tenant — never a URL/query value.
   const tenantId = getCurrentMembership()!.tenant.id;
 
-  // Number(undefined) / Number("") is NaN (falsy) -> current year, matching
-  // the brief's `Number(searchParams.year) || currentYear` exactly for every
-  // absent/empty/non-numeric case; Math.trunc + a sane range additionally
-  // guards a fractional or wildly out-of-range value (e.g. `?year=2026.5`)
-  // from reaching catalogForYear's date math.
+  // No ?year= -> the next twelve months from this one, which is what anyone
+  // planning wants; ?year=2027 -> that calendar year, January to December.
+  const todayIso = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Dublin" }).format(new Date());
   const parsedYear = Math.trunc(Number(searchParams.year));
-  const year = Number.isFinite(parsedYear) && parsedYear > 1900 && parsedYear < 2200 ? parsedYear : new Date().getUTCFullYear();
+  const year = Number.isFinite(parsedYear) && parsedYear > 1900 && parsedYear < 2200 ? parsedYear : null;
+  const months = year ? monthsToShow({ year }) : monthsToShow({ rollingFrom: todayIso });
 
-  const { dates, seasons } = catalogForYear(year);
   const campaigns = listCampaigns();
-  const radar = await getCampaignRadar(tenantId);
-  const notes = getCalendarNotes(year);
+  const [radar, view] = await Promise.all([getCampaignRadar(tenantId), buildCalendarView(months, campaigns, todayIso)]);
 
   return (
     <div className="app-page">
       <PageHeader
         eyebrow="Marketing"
         title="Seasonal calendar"
-        subtitle="Irish holidays, awareness days and seasons for the year, overlaid with your campaigns — plus what's coming up next."
+        subtitle="Irish holidays, school dates and your own dates, with the campaigns you have for each."
       />
-      <SeasonalCalendar year={year} dates={dates} seasons={seasons} campaigns={campaigns} radar={radar} notes={notes} />
+      <SeasonalCalendar year={year} todayIso={todayIso} view={view} radar={radar} />
     </div>
   );
 }

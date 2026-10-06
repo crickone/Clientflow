@@ -157,5 +157,20 @@ export function getPlanBriefing(today: Date = new Date()): string {
     );
   }
 
+  // The business's own dates from the calendar (open days, launches), the
+  // next six months of them. Read by key rather than through calendarView,
+  // which imports this module.
+  const todayIso = today.toISOString().slice(0, 10);
+  const horizon = new Date(today.getTime() + 183 * 86400000).toISOString().slice(0, 10);
+  const own = readKey<unknown>("marketing_calendar_custom_dates", []);
+  const ownLines = (Array.isArray(own) ? own : [])
+    .filter((d): d is { name: string; iso: string } => !!d && typeof d.name === "string" && typeof d.iso === "string")
+    .filter((d) => d.iso >= todayIso && d.iso <= horizon)
+    .sort((a, b) => (a.iso < b.iso ? -1 : 1))
+    .map((d) => `${d.iso}: ${brief(d.name)}`);
+  if (ownLines.length > 0) {
+    parts.push(...(parts.length ? [""] : []), "The business's own dates coming up:", ...ownLines);
+  }
+
   return parts.join("\n");
 }
