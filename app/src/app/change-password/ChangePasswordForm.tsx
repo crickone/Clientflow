@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/Button";
-import { Input, Label } from "@/components/ui/Input";
+import { Input, Label, PasswordInput } from "@/components/ui/Input";
 
 export function ChangePasswordForm({ forced }: { forced: boolean }) {
   const router = useRouter();
@@ -89,9 +89,8 @@ export function ChangePasswordForm({ forced }: { forced: boolean }) {
         <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
             <Label htmlFor="current" srOnly>Current password</Label>
-            <Input
+            <PasswordInput
               id="current"
-              type="password"
               autoComplete="current-password"
               required
               placeholder="Current password"
@@ -102,9 +101,8 @@ export function ChangePasswordForm({ forced }: { forced: boolean }) {
           </div>
           <div>
             <Label htmlFor="next" srOnly>New password</Label>
-            <Input
+            <PasswordInput
               id="next"
-              type="password"
               autoComplete="new-password"
               required
               placeholder="New password"
@@ -115,9 +113,8 @@ export function ChangePasswordForm({ forced }: { forced: boolean }) {
           </div>
           <div>
             <Label htmlFor="confirm" srOnly>Confirm new password</Label>
-            <Input
+            <PasswordInput
               id="confirm"
-              type="password"
               autoComplete="new-password"
               required
               placeholder="Confirm new password"

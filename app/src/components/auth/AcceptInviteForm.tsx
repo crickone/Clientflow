@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
-import { Input, Label } from "@/components/ui/Input";
+import { Input, Label, PasswordInput } from "@/components/ui/Input";
 import { Logo } from "@/components/ui/Logo";
 import { acceptInviteAction } from "@/app/accept-invite/actions";
 
@@ -111,9 +111,8 @@ export function AcceptInviteForm({
           </div>
           <div>
             <Label htmlFor="inv-pw" srOnly>Password</Label>
-            <Input
+            <PasswordInput
               id="inv-pw"
-              type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="new-password"
@@ -124,9 +123,8 @@ export function AcceptInviteForm({
           </div>
           <div>
             <Label htmlFor="inv-confirm" srOnly>Confirm password</Label>
-            <Input
+            <PasswordInput
               id="inv-confirm"
-              type="password"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               placeholder="Confirm password"

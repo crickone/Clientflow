@@ -8,7 +8,7 @@ import { toast } from "sonner";
 
 import { Logo } from "@/components/ui/Logo";
 import { Button } from "@/components/ui/Button";
-import { Input, Label } from "@/components/ui/Input";
+import { Input, Label, PasswordInput } from "@/components/ui/Input";
 import { completeClientResetAction } from "@/app/app/reset/actions";
 
 const shell: React.CSSProperties = {
@@ -76,9 +76,8 @@ export function ClientResetForm({
       <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <div>
           <Label htmlFor="rs-pass" srOnly>New password</Label>
-          <Input
+          <PasswordInput
             id="rs-pass"
-            type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="New password"
@@ -88,9 +87,8 @@ export function ClientResetForm({
         </div>
         <div>
           <Label htmlFor="rs-confirm" srOnly>Confirm password</Label>
-          <Input
+          <PasswordInput
             id="rs-confirm"
-            type="password"
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
             placeholder="Confirm password"

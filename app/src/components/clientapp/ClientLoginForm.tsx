@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react";
 
 import { Logo } from "@/components/ui/Logo";
 import { Button } from "@/components/ui/Button";
-import { Input, Label } from "@/components/ui/Input";
+import { Input, Label, PasswordInput } from "@/components/ui/Input";
 import { requestClientResetAction } from "@/app/app/reset/actions";
 
 export function ClientLoginForm({ logoSrc, businessName }: { logoSrc: string | null; businessName: string }) {
@@ -106,7 +106,7 @@ export function ClientLoginForm({ logoSrc, businessName }: { logoSrc: string | n
         </div>
         <div>
           <Label htmlFor="cl-pass" srOnly>Password</Label>
-          <Input id="cl-pass" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" autoComplete="current-password" />
+          <PasswordInput id="cl-pass" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" autoComplete="current-password" />
         </div>
         {error && <div style={{ color: "#f87171", fontSize: 13 }}>{error}</div>}
         <Button type="submit" loading={busy} style={{ justifyContent: "center", height: 46, marginTop: 4 }}>

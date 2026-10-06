@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 import { AuthLayout } from "@/components/auth/AuthLayout";
+import { PasswordInput } from "@/components/ui/Input";
 
 import { completePasswordResetAction } from "./actions";
 
@@ -39,10 +40,10 @@ export function ResetPasswordForm({ token, email }: { token: string; email: stri
   return (
     <AuthLayout title="Set a new password" lede={`For ${email}.`}>
       <form onSubmit={onSubmit}>
-        <input
+        <PasswordInput
+          plain
           className="auth-field"
           id="rp-pass"
-          type="password"
           autoComplete="new-password"
           aria-label="New password"
           required
@@ -52,10 +53,10 @@ export function ResetPasswordForm({ token, email }: { token: string; email: stri
           onChange={(e) => setPassword(e.target.value)}
           disabled={busy}
         />
-        <input
+        <PasswordInput
+          plain
           className="auth-field"
           id="rp-confirm"
-          type="password"
           autoComplete="new-password"
           aria-label="Confirm new password"
           required

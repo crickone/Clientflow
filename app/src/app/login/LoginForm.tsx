@@ -5,6 +5,7 @@ import { useState } from "react";
 import Link from "next/link";
 
 import { AuthLayout } from "@/components/auth/AuthLayout";
+import { PasswordInput } from "@/components/ui/Input";
 
 
 export function LoginForm({
@@ -74,10 +75,10 @@ export function LoginForm({
           onChange={(e) => setEmail(e.target.value)}
           disabled={busy}
         />
-        <input
+        <PasswordInput
+          plain
           className="auth-field"
           id="password"
-          type="password"
           autoComplete="current-password"
           aria-label="Password"
           required
