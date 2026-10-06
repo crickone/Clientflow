@@ -95,7 +95,7 @@ const page = (key: string, body: string) => ({
     const tenantId = tenant.id;
     assert.equal(
       getPlatformSetting("site_bundle_rev_inspire"),
-      `${tenantId}:rev-one`,
+      `${tenantId}:rev-one:v2`,
       "the marker records the hash AND the tenant it was applied to",
     );
 
@@ -117,6 +117,34 @@ const page = (key: string, body: string) => ({
     syncBundledSites();
     assert.deepEqual([stampOf("/"), stampOf("/about")], before, "a redeploy with an unchanged bundle is INERT");
 
+    // ── Titles and descriptions sync on their own ────────────────────────
+    const seoOf = (p: string) =>
+      sqlite
+        .prepare(
+          "SELECT seo_title t, seo_description d FROM seo_meta s JOIN pages p ON p.id = s.page_id WHERE p.site_id = ? AND p.path = ?",
+        )
+        .get(sid, p) as { t: string; d: string };
+    writeBundle("rev-seo", [
+      { ...page("index", "<p>home one</p>"), title: "Home | Clonmel", desc: "A new description." },
+      page("about", "<p>about one</p>"),
+    ]);
+    syncBundledSites();
+    assert.deepEqual(
+      seoOf("/"),
+      { t: "Home | Clonmel", d: "A new description." },
+      "an SEO-only change publishes even though no body changed",
+    );
+
+    sqlite
+      .prepare("UPDATE seo_meta SET seo_title = 'Typed in the CMS' WHERE site_id = ? AND page_id = (SELECT id FROM pages WHERE site_id = ? AND path = '/')")
+      .run(sid, sid);
+    writeBundle("rev-seo-2", [
+      { ...page("index", "<p>home one</p>"), title: "Home again | Clonmel", desc: "Another." },
+      page("about", "<p>about one</p>"),
+    ]);
+    syncBundledSites();
+    assert.equal(seoOf("/").t, "Typed in the CMS", "a title someone changed in the CMS is not overwritten");
+
     // ── GUARD 2: a Studio edit outranks the file on disk ─────────────────
     const aboutId = (
       sqlite.prepare("SELECT id FROM pages WHERE site_id = ? AND path = '/about'").get(sid) as { id: number }
@@ -131,7 +159,7 @@ const page = (key: string, body: string) => ({
 
     assert.equal(bodyOf("/about"), byHand, "THE STUDIO EDIT IS NOT OVERWRITTEN");
     assert.equal(bodyOf("/"), "<p>home two</p>", "…and the pages around it still publish");
-    assert.equal(getPlatformSetting("site_bundle_rev_inspire"), `${tenantId}:rev-two`, "the new rev is recorded");
+    assert.equal(getPlatformSetting("site_bundle_rev_inspire"), `${tenantId}:rev-two:v2`, "the new rev is recorded");
 
     // Recording the rev even when a page was skipped is what stops the sync
     // reopening the same transaction on every single boot.
@@ -166,7 +194,7 @@ const page = (key: string, body: string) => ({
     assert.equal(shadowPages.c, 0, "…and writes NOTHING into the shadowed copy");
     assert.equal(
       getPlatformSetting("site_bundle_rev_inspire"),
-      `${tenantId}:rev-three`,
+      `${tenantId}:rev-three:v2`,
       "the marker still names the tenant actually written to",
     );
 

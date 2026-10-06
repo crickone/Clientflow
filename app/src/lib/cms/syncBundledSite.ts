@@ -245,6 +245,9 @@ function seedBundledPosts(siteSlug: string): void {
   );
 }
 
+/** 2: titles and descriptions sync on their own, not only with a body change. */
+const SYNC_VERSION = 2;
+
 function syncOne(siteSlug: string): void {
   const bundlePath = path.join(process.cwd(), "public", "sites", siteSlug, "_pages.json");
   if (!fs.existsSync(bundlePath)) return;
@@ -285,7 +288,9 @@ function syncOne(siteSlug: string): void {
   // alone once let a bundle applied to a shadowed copy of the site mark
   // itself done, so the boot after the target was corrected skipped the work
   // it existed to do.
-  const applied = `${served.tenantId}:${bundle.rev}`;
+  // SYNC_VERSION is bumped when the sync itself learns to write something it
+  // used to skip, so bundles it already marked done are looked at once more.
+  const applied = `${served.tenantId}:${bundle.rev}:v${SYNC_VERSION}`;
   if (getPlatformSetting(revKey(siteSlug)) === applied) return;
 
   const { sqlite } = openTenantDb(served.dbFile);
@@ -351,9 +356,15 @@ function syncOne(siteSlug: string): void {
      ON CONFLICT(site_id, page_id, name) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
   );
 
+  const SEO_BASE_BLOCK = "seo:repo-base";
+  const findSeo = sqlite.prepare(
+    "SELECT seo_title, seo_description FROM seo_meta WHERE site_id = ? AND page_id = ?",
+  );
+
   const skipped: string[] = [];
   const merged: string[] = [];
   let written = 0;
+  let seoWritten = 0;
 
   // One transaction: a half-published site is worse than an out-of-date one.
   const apply = sqlite.transaction(() => {
@@ -419,8 +430,37 @@ function syncOne(siteSlug: string): void {
       // it records what the repo published, which is what the next deploy
       // must diff against to find its own change.
       upBase.run(sid, pid, BASE_BLOCK, page.body, now, now);
-      upSeo.run(sid, pid, page.title, page.desc, now, now);
       written++;
+    }
+
+    // Titles and descriptions, on their own pass. They live outside the body,
+    // so a deploy that changes only them (an SEO pass) leaves every body
+    // "already current" -- tying them to the body write meant such a deploy
+    // published nothing. Same ours-vs-theirs rule as the body, keyed on the
+    // last pair this sync wrote: a pair someone has changed in the CMS since
+    // is theirs and stays.
+    for (const page of bundle.pages) {
+      const row = findPage.get(sid, page.path) as { id: number } | undefined;
+      if (!row) continue;
+      const want = JSON.stringify([page.title, page.desc ?? null]);
+      const cur = findSeo.get(sid, row.id) as { seo_title: string | null; seo_description: string | null } | undefined;
+      const live = cur ? JSON.stringify([cur.seo_title, cur.seo_description]) : null;
+      const now = Date.now();
+      if (live !== want) {
+        const base = (findBase.get(sid, row.id, SEO_BASE_BLOCK) as { value: string | null } | undefined)?.value;
+        // No record of what we last wrote: theirs only if a person has
+        // edited the page, the same caution the body takes.
+        const ours = base
+          ? live === null || live === base
+          : (findBlock.get(sid, row.id) as { updated_by: number | null } | undefined)?.updated_by == null;
+        if (!ours) {
+          skipped.push(`${page.path} (title/description edited in the CMS)`);
+          continue;
+        }
+        upSeo.run(sid, row.id, page.title, page.desc, now, now);
+        seoWritten++;
+      }
+      upBase.run(sid, row.id, SEO_BASE_BLOCK, want, now, now);
     }
   });
   apply();
@@ -432,7 +472,7 @@ function syncOne(siteSlug: string): void {
 
   console.log(
     `[syncBundledSite] '${siteSlug}' rev ${bundle.rev} -> tenant ${served.tenantSlug}#${served.tenantId} ` +
-      `site #${sid}: ${written} page(s) published` +
+      `site #${sid}: ${written} page(s) published, ${seoWritten} title/description(s) updated` +
       (merged.length ? `, ${merged.length} merged with a human's edits: ${merged.join(", ")}` : "") +
       (skipped.length ? `, ${skipped.length} left alone: ${skipped.join(", ")}` : ""),
   );
