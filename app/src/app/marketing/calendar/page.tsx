@@ -31,12 +31,12 @@ export default async function MarketingCalendarPage({
   // own tenant — never a URL/query value.
   const tenantId = getCurrentMembership()!.tenant.id;
 
-  // Always a calendar year, January to December, so everyone sees the same
-  // calendar: this year by default, ?year=2027 for another.
+  // No ?year= -> the next twelve months from this one, which is what anyone
+  // planning wants; ?year=2027 -> that calendar year, January to December.
   const todayIso = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Dublin" }).format(new Date());
   const parsedYear = Math.trunc(Number(searchParams.year));
-  const year = Number.isFinite(parsedYear) && parsedYear > 1900 && parsedYear < 2200 ? parsedYear : Number(todayIso.slice(0, 4));
-  const months = monthsToShow({ year });
+  const year = Number.isFinite(parsedYear) && parsedYear > 1900 && parsedYear < 2200 ? parsedYear : null;
+  const months = year ? monthsToShow({ year }) : monthsToShow({ rollingFrom: todayIso });
 
   const campaigns = listCampaigns();
   const [radar, view] = await Promise.all([getCampaignRadar(tenantId), buildCalendarView(months, campaigns, todayIso)]);
