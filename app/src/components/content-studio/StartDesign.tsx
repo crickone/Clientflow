@@ -271,8 +271,8 @@ export function StartDesign(props: StartDesignProps) {
               <button type="button" className="nc-self" onClick={startManually} disabled={working}>
                 <PenLine size={14} /> I&rsquo;ll write it myself
               </button>
-              <button type="button" className="btn btn--primary btn--md nc-go" onClick={startWithAi} disabled={working || !ready} title={ready ? "Press Enter to write" : "Say what the post is about first"}>
-                <Sparkles size={15} /> Write it with Adonis
+              <button type="button" className="btn btn--primary btn--md nc-go" onClick={startWithAi} disabled={working || !ready} title={ready ? "Press Enter to create" : "Say what the post is about first"}>
+                <Sparkles size={15} /> Create it with Adonis
               </button>
             </div>
           </section>
