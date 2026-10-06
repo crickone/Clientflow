@@ -10,7 +10,9 @@ import { rateLimit, resetRateLimit, clientIp } from "@/lib/rateLimit";
 export const dynamic = "force-dynamic";
 
 const schema = z.object({
-  email: z.string().email(),
+  // Trimmed BEFORE the format check: autofill and phone keyboards often add a
+  // trailing space, which failed .email() and read as a wrong password.
+  email: z.string().trim().email(),
   password: z.string().min(1),
 });
 
