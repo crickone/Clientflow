@@ -1188,6 +1188,8 @@ export const carouselSlides = sqliteTable("carousel_slides", {
    * is how preview equals export for a designed slide.
    */
   renderFilename: text("render_filename"),
+  /** A template slide as the editor drew it, saved for posting (see tenant.ts). */
+  snapshotFilename: text("snapshot_filename"),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),

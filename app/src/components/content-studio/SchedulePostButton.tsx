@@ -38,6 +38,7 @@ export function SchedulePostButton({
   postable,
   connected,
   bookings,
+  prepare,
 }: {
   designId: number;
   /** The design has server-rendered slides, so it can go out on its own. */
@@ -45,6 +46,11 @@ export function SchedulePostButton({
   /** A Facebook Page is connected for this business. */
   connected: boolean;
   bookings: DesignBooking[];
+  /**
+   * Runs before a schedule or a post: saves pictures of any template slides
+   * so the publisher has images to send. Resolves to an error message, or null.
+   */
+  prepare?: () => Promise<string | null>;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -60,6 +66,8 @@ export function SchedulePostButton({
   function run(fn: () => Promise<{ ok: true } | { ok: false; error: string }>, done: string) {
     if (channels.length === 0) return void toast.error("Pick Facebook, Instagram or both.");
     start(async () => {
+      const failed = prepare ? await prepare() : null;
+      if (failed) return void toast.error(failed);
       const res = await fn();
       if (!res.ok) return void toast.error(res.error);
       toast.success(done);
@@ -84,7 +92,7 @@ export function SchedulePostButton({
   }
 
   const blocked = !postable
-    ? "This post is laid out on templates, so it can't go out on its own yet. Make it with Adonis, or export it and post it yourself."
+    ? "This post isn't ready to go out yet. Wait for its slides to finish, then try again."
     : !connected
       ? "Connect your Facebook Page first, in Settings > Integrations > Facebook."
       : null;

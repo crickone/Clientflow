@@ -92,9 +92,10 @@ const requireLocal = createRequire(import.meta.url);
       // ── social posts ──
       const design = createCarousel({ name: "Mon post" });
       const empty = createCarousel({ name: "Empty" });
-      // A real render on disk: only server-rendered slides can be posted.
+      // A designed slide with its render on disk. (A template slide posts its
+      // editor snapshot instead, and has none here, so it is refused below.)
       render = saveRender(Buffer.from("png"));
-      addSlide({ carouselSetId: design.id, slotKey: "carousel-content", templateId: "carousel-cover", aspectRatio: "1:1", caption: "cap", renderFilename: render });
+      addSlide({ carouselSetId: design.id, slotKey: "carousel-content", templateId: "designed", aspectRatio: "1:1", caption: "cap", renderFilename: render });
       const templateOnly = createCarousel({ name: "Template only" });
       addSlide({ carouselSetId: templateOnly.id, slotKey: "carousel-content", templateId: "carousel-cover", aspectRatio: "1:1", caption: "cap" });
       const soon = new Date(Date.now() + 2 * HOUR);

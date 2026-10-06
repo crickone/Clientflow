@@ -259,7 +259,7 @@ export function createSocialPostTool(ctx: ToolContext, input: Record<string, unk
         ? {}
         : {
             warning:
-              "This business has no design system, so the post is laid out on templates and can't be scheduled or published automatically. Tell the operator, and suggest choosing a design direction in Settings > Design (/settings/design) so future posts can go out on their own.",
+              "This business has no design system, so the post is laid out on a template. You can't schedule or publish it from the chat: the operator opens it in Content Studio and uses Schedule there, which saves its slides as pictures. Tell them, and suggest choosing a design direction in Settings > Design (/settings/design) so future posts are designed and can go out from the chat.",
           }),
     }),
   };

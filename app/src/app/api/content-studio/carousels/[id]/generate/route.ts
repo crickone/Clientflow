@@ -67,9 +67,11 @@ export async function POST(
       { status: 400 },
     );
   }
-  if (!Number.isFinite(slideCount) || slideCount < 2 || slideCount > 10) {
+  // 1 = a single-image post: designed when the tenant has a design system,
+  // otherwise written onto the default template (carouselGeneration).
+  if (!Number.isFinite(slideCount) || slideCount < 1 || slideCount > 10) {
     return NextResponse.json(
-      { ok: false, error: "Slide count must be between 2 and 10." },
+      { ok: false, error: "Slide count must be between 1 and 10." },
       { status: 400 },
     );
   }

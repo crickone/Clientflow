@@ -8,6 +8,7 @@ import { getTenantDbById } from "@/lib/db/tenant";
 import { getCarousel } from "@/lib/image/carousels";
 import { renderFilePath } from "@/lib/image/renderStore";
 import { isCarouselSlot } from "@/lib/image/slots";
+import { DESIGNED_TEMPLATE_ID } from "@/lib/image/paintSlide";
 import { getSocialPublisher, type SocialChannel } from "./publisher";
 import { renderTokensConfigured, signRenderToken } from "./renderToken";
 import { isStopped } from "@/lib/platform/killSwitch";
@@ -76,13 +77,13 @@ export function schedulePost(input: {
   if (input.scheduledFor.getTime() < Date.now() + MIN_LEAD_MS) return { ok: false, error: "Pick a time in the future." };
   if (carousel.generationStatus === "writing") return { ok: false, error: "This design is still being written. Schedule it once it is ready." };
   if (carousel.slides.length === 0) return { ok: false, error: "This design has no slides yet." };
-  // Only server-rendered (AI-designed) slides have an image the publisher can
-  // send. Template slides are drawn in the browser and never stored, so a
-  // template design used to book fine and then fail at its posting time.
+  // The publisher needs a stored image per slide: a designed slide's render,
+  // or the picture the editor saves of a template slide when it is scheduled
+  // from Content Studio. Without one, refuse now rather than fail at posting time.
   if (postableRenders(input.carouselSetId).filenames.length === 0) {
     return {
       ok: false,
-      error: "This design is made from a template, which can't be posted automatically yet. Make the post with Adonis, or export it as a PNG and post it yourself.",
+      error: "This post's slides haven't been saved as pictures yet. Open it in Content Studio and schedule it from there.",
     };
   }
 
@@ -147,14 +148,18 @@ function toView(row: schema.ScheduledPost, designName: string, slideCount: numbe
   };
 }
 
-/** The slides that would be posted, in order: the carousel slot if there is one, with a render on disk. */
+/**
+ * The slides that would be posted, in order: the carousel slot if there is
+ * one. A designed slide posts its server render; a template slide posts the
+ * snapshot the editor saved of it. A slide with neither on disk is skipped.
+ */
 export function postableRenders(carouselId: number): { filenames: string[]; caption: string } {
   const carousel = getCarousel(carouselId);
   if (!carousel) return { filenames: [], caption: "" };
   const inCarousel = carousel.slides.filter((s) => isCarouselSlot(s.slotKey));
   const slides = (inCarousel.length ? inCarousel : carousel.slides).slice().sort((a, b) => a.slideOrder - b.slideOrder);
   const filenames = slides
-    .map((s) => s.renderFilename)
+    .map((s) => (s.templateId === DESIGNED_TEMPLATE_ID ? s.renderFilename : s.snapshotFilename))
     .filter((f): f is string => !!f && fs.existsSync(renderFilePath(f)));
   return { filenames, caption: slides[0]?.caption ?? "" };
 }
@@ -277,7 +282,7 @@ export async function publishPostNow(input: {
   if (!carousel) return { ok: false, error: "No design with that id." };
   if (carousel.generationStatus === "writing") return { ok: false, error: "This design is still being written. Publish it once it is ready." };
   if (postableRenders(input.carouselSetId).filenames.length === 0) {
-    return { ok: false, error: "This design has no rendered slides, so it can't be posted automatically. Make the post with Adonis, or export it and post it yourself." };
+    return { ok: false, error: "This post's slides haven't been saved as pictures yet. Open it in Content Studio and post it from there." };
   }
   if (isStopped("posting")) return { ok: false, error: PLATFORM_PAUSED_MESSAGE };
   const publisher = getSocialPublisher(input.tenantId);

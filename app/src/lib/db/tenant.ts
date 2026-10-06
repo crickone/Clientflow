@@ -1764,6 +1764,13 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     if (designCols.length > 0 && !designCols.some((c) => c.name === "photo_scenes")) {
       sqlite.exec("ALTER TABLE carousel_slides ADD COLUMN photo_scenes TEXT");
     }
+    // A template slide's picture as the editor last drew it, saved when it is
+    // scheduled or posted: template slides are painted in the browser, so the
+    // publisher has no other image to send. Separate from render_filename,
+    // which belongs to designed slides (and outlives a switch to a template).
+    if (designCols.length > 0 && !designCols.some((c) => c.name === "snapshot_filename")) {
+      sqlite.exec("ALTER TABLE carousel_slides ADD COLUMN snapshot_filename TEXT");
+    }
   } catch (err) {
     console.error("[db] carousel_slides design columns migration failed:", err);
   }

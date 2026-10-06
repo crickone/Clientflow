@@ -391,7 +391,11 @@ export function ImageDesigner({
   // What the publisher would post: the carousel slot if there is one, and only
   // slides rendered on the server (the same rule as postableRenders).
   const postSlides = slides.some((s) => isCarouselSlot(s.slotKey)) ? slides.filter((s) => isCarouselSlot(s.slotKey)) : slides;
-  const postable = postSlides.some((s) => Boolean(s.renderFilename));
+  // Designed slides post their server render; template slides post a picture
+  // the editor saves at schedule time (snapshotForPosting), so they are
+  // postable as soon as they exist.
+  const postable =
+    postSlides.length > 0 && postSlides.every((s) => s.templateId !== DESIGNED_TEMPLATE_ID || Boolean(s.renderFilename));
   const [library, setLibrary] = useState<ImageLibraryAsset[]>(initialLibrary);
   // Backgrounds can only be images — videos in the shared library are excluded
   // from the picker (they live in the Library tab and the video editor).
@@ -1174,6 +1178,44 @@ export function ImageDesigner({
       setActionError(err instanceof Error ? err.message : "Couldn't delete.");
     }
   }
+
+  /**
+   * Save a picture of every template slide in the post, drawn exactly as the
+   * editor shows it, so the scheduler has images to publish. Designed slides
+   * already have a server render and are skipped. Null when done, else why not.
+   */
+  async function snapshotForPosting(): Promise<string | null> {
+    const templates = postSlides.filter((s) => s.templateId !== DESIGNED_TEMPLATE_ID);
+    if (templates.length === 0) return null;
+    if (!fontsReady) return "The fonts are still loading. Try again in a moment.";
+    const form = new FormData();
+    for (const s of templates) {
+      const i = postSlides.indexOf(s);
+      const blob = await slideToBlob(s, i, postSlides.length, library, slideFonts(s), brand, showLogo ? logoImg : null, designSystem);
+      if (!blob) return "One of the slides couldn't be drawn. Open it, check it looks right, and try again.";
+      form.append("slideId", String(s.id));
+      form.append("file", blob, `slide-${s.id}.png`);
+    }
+    try {
+      const res = await fetch(`/api/content-studio/carousels/${designId}/snapshots`, { method: "POST", body: form });
+      const d = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      return res.ok && d?.ok ? null : (d?.error ?? "Couldn't save the slide pictures.");
+    } catch {
+      return "Couldn't reach the server to save the slide pictures.";
+    }
+  }
+
+  // A design already booked to go out keeps its saved pictures in step with
+  // edits: a few seconds after the slides change, they are saved again.
+  const hasUpcomingBooking = Boolean(schedule?.bookings.some((b) => b.status === "scheduled"));
+  const slidesSig = JSON.stringify(postSlides.map((s) => [s.id, s.templateId, s.headingText, s.bodyText, s.accentColor, s.backgroundColor, s.backgroundAssetId, s.headingFont, s.bodyFont, s.layoutJson]));
+  const firstSig = useRef(slidesSig);
+  useEffect(() => {
+    if (!hasUpcomingBooking || slidesSig === firstSig.current) return;
+    const t = setTimeout(() => void snapshotForPosting(), 3000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-run on what is drawn, not on the function identity
+  }, [slidesSig, hasUpcomingBooking]);
 
   async function exportCurrentSlide() {
     if (!activeSlide || !fontsReady) return;
@@ -1959,6 +2001,7 @@ export function ImageDesigner({
                     postable={postable && !writing}
                     connected={schedule.connected}
                     bookings={schedule.bookings}
+                    prepare={snapshotForPosting}
                   />
                 )}
               </div>
