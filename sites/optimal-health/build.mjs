@@ -78,7 +78,7 @@ ${NAV_LINKS.map(([h, t]) => `    <a href="${h}">${t}</a>`).join("\n")}
 
 const footer = () => `<footer class="foot on-ink">
   <div class="foot__top">
-    <p class="foot__say">Recovery you can fit around a working week.</p>
+    <p class="foot__say">A recovery clinic inside Inspire, Clonmel.</p>
     <div>
       <p class="foot__k">Find us</p>
       <p class="foot__v">Unit 12m, Ard Gaoithe Business Park,<br />Clonmel, Co. Tipperary, E91 E049</p>
@@ -975,9 +975,9 @@ const POSTS = [
   {
     slug: "stress-sleep-and-the-evening-session",
     topic: "Recovery",
-    title: "Stress, sleep, and the twelve minutes after work",
+    title: "Stress, sleep and an evening infrared session",
     excerpt:
-      "An evening infrared session gives you half an hour to wind down, with your phone put away.",
+      "An evening infrared session gives you half an hour to wind down with your phone put away.",
     photo: "infrared-bed-idle.jpg",
     alt: "The infrared bed closed and waiting in the treatment room, its orange strip lit",
     description:
@@ -986,9 +986,9 @@ const POSTS = [
   {
     slug: "the-hifem-chair-and-a-week-sitting-down",
     topic: "HIFEM",
-    title: "HIFEM, and a week spent sitting down",
+    title: "HIFEM after a week of sitting down",
     excerpt:
-      "Long sitting leaves some muscle doing almost nothing. HIFEM asks it to work for twenty to thirty minutes, seated and fully clothed.",
+      "When you sit all day, some muscles do almost no work. HIFEM makes them contract. A session is twenty to thirty minutes, seated and fully clothed.",
     photo: "hifem-chair.jpg",
     alt: "The HIFEM chair and its console, empty, a cushion on the seat",
     description:
@@ -997,9 +997,9 @@ const POSTS = [
   {
     slug: "infrared-and-everyday-aches",
     topic: "Infrared",
-    title: "What infrared light actually does in everyday aches",
+    title: "Infrared light and everyday aches",
     excerpt:
-      "What the bed emits, what the light is understood to do, and why it works over weeks.",
+      "What the infrared bed gives off, what the light is understood to do, and why the changes build over a course of sessions.",
     photo: "infrared-bed-lit.jpg",
     alt: "The infrared bed running, its red light spilling across the brick wall behind it",
     description:
@@ -1008,9 +1008,9 @@ const POSTS = [
   {
     slug: "between-hard-sessions",
     topic: "Hyperbaric oxygen",
-    title: "Where the chamber fits in a training week",
+    title: "Where hyperbaric oxygen fits in a training week",
     excerpt:
-      "Recovery belongs in your training plan. What an hour in the chamber involves, and where it fits in the week.",
+      "What an hour in the hyperbaric chamber involves, and when to book it in your training week.",
     photo: "hbot-chamber-seated.jpg",
     alt: "A client seated in the open hyperbaric chamber, hands on his knees",
     description:
@@ -1019,9 +1019,9 @@ const POSTS = [
   {
     slug: "panels-lasers-and-the-bed",
     topic: "Infrared",
-    title: "Panels, lasers, and a bed you lie down in",
+    title: "Lasers, panels and infrared beds compared",
     excerpt:
-      "Light therapy isn't one thing. A hand-held laser, a panel on a stand and a full-length bed do different jobs, and the difference is mostly how much of you the light reaches.",
+      "A hand-held laser, a light panel and a full-length bed all use light. The main difference is how much of your body the light reaches.",
     photo: "infrared-bed-open.jpg",
     alt: "Close along the shell of the infrared bed, its orange strip lit against black brick",
     description:
@@ -1030,9 +1030,9 @@ const POSTS = [
   {
     slug: "hyperbaric-oxygen-and-mental-clarity",
     topic: "Hyperbaric oxygen",
-    title: "Hyperbaric oxygen and mental clarity after a hard week",
+    title: "Hyperbaric oxygen and mental clarity",
     excerpt:
-      "Forty-five to sixty minutes in a pressurised chamber, breathing air with more oxygen in it than the room has. What the hour feels like, and what people report afterwards.",
+      "A session is forty-five to sixty minutes in a pressurised chamber, breathing air with more oxygen in it than the air in the room. What a session is like, and what people tell us afterwards.",
     photo: "hbot-session-mask.jpg",
     alt: "A client seated in the open hyperbaric chamber holding the oxygen mask",
     description:
