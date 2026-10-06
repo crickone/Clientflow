@@ -2,11 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Loader2, Sparkles, PenLine } from "lucide-react";
+import { Check, GalleryHorizontal, PenLine, Sparkles, Square } from "lucide-react";
 
-import { Button } from "@/components/ui/Button";
-import { Label, Textarea } from "@/components/ui/Input";
+import type { ImageLibraryAsset } from "@/lib/db/schema";
+import type { BrandLabels } from "@/lib/image/paintSlide";
 import { PostIdeas } from "./PostIdeas";
+import { PostPreview } from "./PostPreview";
+import { TemplateGallery } from "./TemplateGallery";
 import { DEFAULT_CAROUSEL_SLOT, DEFAULT_SLOT } from "@/lib/image/slots";
 import { titleFrom } from "@/lib/content-studio/title";
 import { watchGeneration } from "./GenerationWatcher";
@@ -39,8 +41,26 @@ const GENERATE_TIMEOUT_MS = 30_000;
  */
 const CAROUSEL_SLOT = DEFAULT_CAROUSEL_SLOT;
 
-export function StartDesign() {
+export interface StartDesignProps {
+  library: ImageLibraryAsset[];
+  brand?: BrandLabels;
+  defaultHeadingFontId: string;
+  defaultBodyFontId: string;
+  logoUrl: string | null;
+  accentColor?: string;
+}
+
+/** What the Write button is doing, shown as steps in place of the composer. */
+type Phase = "saving" | "starting" | "opening";
+const PHASES: { id: Phase; label: string }[] = [
+  { id: "saving", label: "Saving the draft" },
+  { id: "starting", label: "Handing the brief to Adonis" },
+  { id: "opening", label: "Opening the editor, where the slides arrive" },
+];
+
+export function StartDesign(props: StartDesignProps) {
   const router = useRouter();
+  const [phase, setPhase] = useState<Phase | null>(null);
   const [topic, setTopic] = useState("");
   const [kind, setKind] = useState<Kind>("carousel");
   const [slides, setSlides] = useState(5);
@@ -114,19 +134,23 @@ export function StartDesign() {
   }
 
   async function startWithAi() {
+    if (busy) return;
     if (!topic.trim()) {
       setError("Tell Adonis what the post is about first.");
       return;
     }
     setBusy("ai");
+    setPhase("saving");
     setError(null);
     // One seed slide only: generation replaces the whole slot, so seeding the
     // full count here would just be deleted a second later.
     const id = await createDesign(1);
     if (!id) {
       setBusy(null);
+      setPhase(null);
       return;
     }
+    setPhase("starting");
     // Only STARTS the run. The slides are written by a detached continuation on
     // the server, and the editor shows them arriving -- so the operator is free
     // to navigate anywhere from here, which is the whole point: this used to be
@@ -169,8 +193,10 @@ export function StartDesign() {
         `${gen?.error ?? "Couldn't start writing the slides."} Your draft was saved — you can open it and generate again from there.`,
       );
       setBusy(null);
+      setPhase(null);
       return;
     }
+    setPhase("opening");
     // The run is detached and the operator is free to leave the editor it is
     // about to land in -- so register the watch that notifies them when the
     // slides are done, wherever they have got to by then. Same click that
@@ -180,126 +206,111 @@ export function StartDesign() {
   }
 
   const working = busy !== null;
+  const carousel = kind === "carousel";
+  const ready = topic.trim().length > 0;
 
   return (
-    <div style={{ maxWidth: 720 }}>
-      <div style={{ marginBottom: 22 }}>
-        <Label htmlFor="topic" srOnly>
-          What&rsquo;s this post about?
-        </Label>
-        <h2 style={{ margin: "0 0 12px", fontSize: 19, fontWeight: 600, letterSpacing: "-0.01em" }}>
-          What&rsquo;s this post about?
-        </h2>
-        <Textarea
-          id="topic"
-          value={topic}
-          onChange={(e) => setTopic(e.target.value)}
-          placeholder="e.g. why over-35s should lift weights, for people who think it's too late to start"
-          style={{ minHeight: 84 }}
-        />
-        <PostIdeas onPick={(topic) => setTopic(topic)} />
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
-        {(
-          [
-            { id: "carousel", title: "Carousel", blurb: "A set of slides people swipe through. Best for teaching something.", bars: 5 },
-            { id: "single", title: "Single post", blurb: "One image. Best for a statement, an offer or a quote.", bars: 1 },
-          ] as const
-        ).map((o) => (
-          <button
-            key={o.id}
-            type="button"
-            onClick={() => setKind(o.id)}
-            aria-pressed={kind === o.id}
-            style={{
-              textAlign: "left",
-              background: kind === o.id ? "var(--surface-2)" : "var(--surface-1)",
-              border: `1px solid ${kind === o.id ? "var(--text-primary)" : "var(--hairline)"}`,
-              borderRadius: "var(--radius)",
-              padding: 16,
-              cursor: "pointer",
-              fontFamily: "inherit",
-              color: "inherit",
-            }}
-          >
-            <span style={{ display: "block", fontSize: 14, fontWeight: 600, marginBottom: 3 }}>
-              {o.title}
-            </span>
-            <span style={{ display: "block", fontSize: 12.5, color: "var(--text-tertiary)" }}>
-              {o.blurb}
-            </span>
-            <span style={{ display: "flex", gap: 4, marginTop: 10 }} aria-hidden>
-              {Array.from({ length: o.bars }, (_, i) => (
-                <span
-                  key={i}
-                  style={{
-                    width: 15,
-                    height: 19,
-                    borderRadius: 2,
-                    background: kind === o.id ? "var(--hairline-strong)" : "var(--surface-3)",
-                  }}
-                />
-              ))}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        {kind === "carousel" && (
-          <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Label htmlFor="slides" srOnly>
-              Number of slides
-            </Label>
-            <span style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>Slides</span>
-            <select
-              id="slides"
-              value={slides}
-              onChange={(e) => setSlides(Number(e.target.value))}
-              style={{
-                background: "var(--field-bg)",
-                border: "1px solid transparent",
-                borderRadius: "var(--radius-field)",
-                padding: "11px 14px",
-                color: "var(--text-primary)",
-                fontSize: 14,
-                fontFamily: "inherit",
-                cursor: "pointer",
+    <div className="nc">
+      <div className="nc-main">
+        {phase ? (
+          <section className="nc-card nc-progress" aria-live="polite">
+            <div className="nc-progress-kicker">{carousel ? `Adonis is making your ${slides}-slide carousel` : "Adonis is making your post"}</div>
+            <h2 className="nc-progress-title">{titleFrom(topic, 120)}</h2>
+            <ol className="nc-steps">
+              {PHASES.map((p, i) => {
+                const at = PHASES.findIndex((x) => x.id === phase);
+                const state = i < at ? "done" : i === at ? "active" : "todo";
+                return (
+                  <li key={p.id} className={`nc-step is-${state}`}>
+                    <span className="nc-step-mark">{state === "done" && <Check size={13} strokeWidth={3} />}</span>
+                    {p.label}
+                  </li>
+                );
+              })}
+            </ol>
+            <p className="nc-progress-note">Adonis keeps going if you leave the editor. You get a notification when the {carousel ? "slides are" : "post is"} ready.</p>
+          </section>
+        ) : (
+          <section className="nc-card">
+            <label htmlFor="topic" className="nc-label">
+              What&rsquo;s this post about?
+            </label>
+            <textarea
+              id="topic"
+              className="nc-input"
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  void startWithAi();
+                }
               }}
-            >
-              {[3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </span>
+              rows={3}
+              placeholder="e.g. why over-35s should lift weights, for people who think it's too late to start"
+            />
+            <div className="nc-bar">
+              <div className="nc-format" role="group" aria-label="Format">
+                <button type="button" aria-pressed={carousel} className={carousel ? "is-on" : undefined} onClick={() => setKind("carousel")}>
+                  <GalleryHorizontal size={15} /> Carousel
+                </button>
+                <button type="button" aria-pressed={!carousel} className={!carousel ? "is-on" : undefined} onClick={() => setKind("single")}>
+                  <Square size={15} /> Single post
+                </button>
+              </div>
+              {carousel && (
+                <select aria-label="Number of slides" className="nc-slides" value={slides} onChange={(e) => setSlides(Number(e.target.value))}>
+                  {[3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                    <option key={n} value={n}>
+                      {n} slides
+                    </option>
+                  ))}
+                </select>
+              )}
+              <span className="nc-bar-gap" />
+              <button type="button" className="nc-self" onClick={startManually} disabled={working}>
+                <PenLine size={14} /> I&rsquo;ll write it myself
+              </button>
+              <button type="button" className="btn btn--primary btn--md nc-go" onClick={startWithAi} disabled={working || !ready} title={ready ? "Press Enter to write" : "Say what the post is about first"}>
+                <Sparkles size={15} /> Write it with Adonis
+              </button>
+            </div>
+          </section>
         )}
-        <Button onClick={startWithAi} loading={working}>
-          {busy === "ai" ? <Loader2 size={15} className="spin" /> : <Sparkles size={15} />}
-          {busy === "ai" ? "Starting…" : "Write it with Adonis"}
-        </Button>
-        <Button variant="ghost" onClick={startManually} disabled={working}>
-          <PenLine size={15} />
-          I&rsquo;ll write it myself
-        </Button>
+
+        {error && <div className="nc-error" role="alert">{error}</div>}
+
+        {!phase && (
+          <>
+            <PostIdeas onPick={(t) => setTopic(t)} />
+            <section className="nc-section">
+              <h2 className="nc-h2">Or start from a template</h2>
+              <TemplateGallery
+                previewCount={4}
+                library={props.library}
+                brand={props.brand}
+                defaultHeadingFontId={props.defaultHeadingFontId}
+                defaultBodyFontId={props.defaultBodyFontId}
+                logoUrl={props.logoUrl}
+                accentColor={props.accentColor}
+              />
+            </section>
+          </>
+        )}
       </div>
 
-      {error && (
-        <div style={{ marginTop: 12, fontSize: 13, color: "var(--danger)" }}>{error}</div>
-      )}
-      {busy === "ai" && kind === "single" && (
-        <div style={{ marginTop: 12, fontSize: 12.5, color: "var(--text-tertiary)" }}>
-          Opening the design. Adonis designs the post there, and keeps going if you go elsewhere in the app.
-        </div>
-      )}
-      {busy === "ai" && kind === "carousel" && (
-        <div style={{ marginTop: 12, fontSize: 12.5, color: "var(--text-tertiary)" }}>
-          Opening the design — Adonis writes the {slides} slides there, and keeps
-          going if you go elsewhere in the app.
-        </div>
-      )}
+      <PostPreview
+        topic={topic}
+        carousel={carousel}
+        slides={slides}
+        library={props.library}
+        brand={props.brand}
+        businessName={props.brand?.businessName ?? ""}
+        defaultHeadingFontId={props.defaultHeadingFontId}
+        defaultBodyFontId={props.defaultBodyFontId}
+        logoUrl={props.logoUrl}
+        accentColor={props.accentColor}
+      />
     </div>
   );
 }

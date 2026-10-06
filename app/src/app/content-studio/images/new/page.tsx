@@ -1,5 +1,4 @@
-import { PageHeader } from "@/components/layout/PageHeader";
-import { StartTabs } from "@/components/content-studio/StartTabs";
+import { StartDesign } from "@/components/content-studio/StartDesign";
 import { listLibraryAssets } from "@/lib/image/library";
 import { getBrandFontIds, getTheme } from "@/lib/settings";
 import { getBusinessProfile } from "@/lib/businessProfile";
@@ -8,14 +7,10 @@ import { getChromeLogoSrc } from "@/lib/branding";
 export const dynamic = "force-dynamic";
 
 /**
- * Step 1 of the image flow. This page used to create a design silently and
- * redirect straight into the editor, where the first thing you were shown was a
- * 32-template grid — asking for a styling decision before you'd said what the
- * post was about. Then it asked that first instead.
- *
- * It now offers both, as tabs: AI generation (say what it's about) and
- * Templates (pick a look, write it yourself). The route is unchanged, so every
- * existing link and deep link still lands here.
+ * Step 1 of the image flow: one composer. Say what the post is about (or pick
+ * an idea, or a template below), choose carousel or single, and see the shape
+ * of it in the preview beside the box before Adonis writes it. The route is
+ * unchanged, so every existing link still lands here.
  */
 export default function NewImagePage() {
   const library = listLibraryAssets();
@@ -23,12 +18,10 @@ export default function NewImagePage() {
   const bp = getBusinessProfile();
   return (
     <>
-      <PageHeader
-        eyebrow="New design"
-        title="Start a post"
-        subtitle="Say what it's about, or pick a template and write it yourself."
-      />
-      <StartTabs
+      <header className="nc-head">
+        <h1 className="nc-title">New post</h1>
+      </header>
+      <StartDesign
         library={library}
         brand={{
           businessName: bp.businessName,

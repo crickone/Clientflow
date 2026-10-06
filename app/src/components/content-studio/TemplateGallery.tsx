@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 import type { CarouselSlide, ImageLibraryAsset } from "@/lib/db/schema";
 import {
   CATEGORIES,
+  TEMPLATES,
   templatesByCategory,
   type Template,
   type TemplateCategory,
@@ -80,7 +81,12 @@ export function TemplateGallery({
   defaultBodyFontId,
   logoUrl,
   accentColor = SAMPLE.accentColor,
+  previewCount,
 }: {
+  /** Show only this many, one from each category in turn, with a button to
+   *  open the full gallery: the "Or start from a template" row under the
+   *  new-post composer. */
+  previewCount?: number;
   library: ImageLibraryAsset[];
   brand?: BrandLabels;
   defaultHeadingFontId: string;
@@ -94,6 +100,7 @@ export function TemplateGallery({
   const logo = useLogoImage(logoUrl);
   const [starting, setStarting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   // One photograph, reused across every template that shows one, so the
   // gallery reads as one set rather than a scrapbook.
@@ -126,6 +133,38 @@ export function TemplateGallery({
       return;
     }
     router.push(`/content-studio/images/${d.carouselId}`);
+  }
+
+  const shared = {
+    library,
+    brand,
+    defaultHeadingFontId,
+    defaultBodyFontId,
+    fontsReady,
+    logo,
+    sampleAssetId,
+    accentColor,
+    starting,
+    onStart: startFrom,
+  };
+
+  if (previewCount && !expanded) {
+    // One from each category in turn, so the row shows the range.
+    // Feed shapes only: a 9:16 story would make the row ragged.
+    const lists = CATEGORIES.map((c) => templatesByCategory(c.id).filter((t) => t.aspectRatio !== "9:16"));
+    const picks: Template[] = [];
+    for (let i = 0; picks.length < previewCount && i < 20; i++) {
+      for (const l of lists) if (l[i] && picks.length < previewCount) picks.push(l[i]);
+    }
+    return (
+      <div>
+        {error && <div style={{ marginBottom: 12, fontSize: 13, color: "var(--danger)" }}>{error}</div>}
+        <Category id={CATEGORIES[0].id} label="" blurb="" templates={picks} {...shared} />
+        <button type="button" className="btn btn--outline btn--sm" onClick={() => setExpanded(true)} style={{ marginTop: -12 }}>
+          See all {TEMPLATES.length} templates
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -184,7 +223,10 @@ function Category({
   accentColor,
   starting,
   onStart,
+  templates: only,
 }: {
+  /** A fixed list in place of the category's own, shown without a heading. */
+  templates?: Template[];
   id: TemplateCategory;
   label: string;
   blurb: string;
@@ -199,10 +241,12 @@ function Category({
   starting: string | null;
   onStart: (template: Template) => void;
 }) {
-  const templates = templatesByCategory(id);
+  const templates = only ?? templatesByCategory(id);
   if (templates.length === 0) return null;
   return (
     <section style={{ marginBottom: 34 }}>
+      {!only && (
+      <>
       <h2
         style={{
           margin: "0 0 2px",
@@ -222,10 +266,12 @@ function Category({
       >
         {blurb} · {templates.length} template{templates.length === 1 ? "" : "s"}
       </p>
+      </>
+      )}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))",
+          gridTemplateColumns: only ? "repeat(auto-fill, minmax(150px, 1fr))" : "repeat(auto-fill, minmax(190px, 1fr))",
           gap: 16,
           alignItems: "start",
         }}
