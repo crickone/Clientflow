@@ -251,8 +251,8 @@ export function TabBar({ tabs, active, rangeKey, isAdmin, source, presets, custo
               onChange={(e) => pickRange(e.target.value)}
               disabled={pending}
               style={{
-                height: 34,
-                padding: "0 10px",
+                height: 36,
+                padding: "0 36px 0 14px",
                 borderRadius: "var(--radius)",
                 border: "1px solid var(--hairline)",
                 background: "var(--surface-1)",
