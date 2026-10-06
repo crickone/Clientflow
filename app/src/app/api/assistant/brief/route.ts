@@ -14,32 +14,36 @@ import { getCampaignRadar } from "@/lib/marketing/campaignRadar";
 import { MODELS } from "@/lib/ai/client";
 import { assertAiAllowed, AiCapError } from "@/lib/ai/usage";
 import { meteredCreate } from "@/lib/ai/metered";
+import { parseBriefItems } from "@/lib/dashboard/briefItems";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-/** A short AI-written "morning brief" for the dashboard, from live data. */
+/**
+ * Today's priorities for the dashboard: up to three action items chosen and
+ * worded by the model from live data. Returns { items } (lib/dashboard/
+ * briefItems decides each item's link) and, when AI is unavailable, { message }.
+ */
 export async function GET() {
   await requireUser();
   const membership = getCurrentMembership();
-  if (!membership) return Response.json({ brief: "" });
+  if (!membership) return Response.json({ items: [] });
   const tenantId = membership.tenant.id;
   if (!process.env.ANTHROPIC_API_KEY) {
-    return Response.json({ brief: "" });
+    return Response.json({ items: [] });
   }
 
   // Checked before doing any of the (best-effort) Gmail sync / dashboard
   // aggregation work below — this route runs on every dashboard load, so a
   // blocked tenant (free tranche used up + no AI credits) must fail fast and
   // cleanly rather than paying for all that work only to then also fail the
-  // model call. DailyBrief.tsx renders `data.brief` verbatim as the widget's
-  // content regardless of HTTP status (it never checks res.ok), so returning
-  // AiCapError's own friendly message here IS the clean, non-500 surface.
+  // model call. DailyBrief.tsx shows `data.message` in place of the cards
+  // whatever the HTTP status, so AiCapError's own message is the clean surface.
   try {
     assertAiAllowed(tenantId);
   } catch (e) {
     if (e instanceof AiCapError) {
-      return Response.json({ brief: e.message }, { status: 429 });
+      return Response.json({ items: [], message: e.message }, { status: 429 });
     }
     throw e;
   }
@@ -121,23 +125,25 @@ export async function GET() {
     // sync + dashboard aggregation for an already-capped tenant.
     const res = await meteredCreate({ tenantId, agentKey: "brief" }, () => ({
       model: MODELS.opus,
-      // Five bullets. Thinking is always on with Opus 5.5 and counts against
-      // max_tokens, so 500 -- sized for the bullets alone -- could cut the
-      // brief off; and a summary of numbers already in hand is `low` work.
+      // Up to three short items. Thinking is always on with Opus 5.5 and counts
+      // against max_tokens, so leave room; choosing from numbers in hand is `low` work.
       // Set explicitly: Opus 5.5 would otherwise default to `medium`.
       max_tokens: 2000,
       output_config: { effort: "low" },
-      system: `You write a short, friendly MORNING BRIEF for the owner of ${business}, a ${mode === "timetable" ? "gym/studio" : "clinic"}, shown at the top of their dashboard.
-- 3 to 5 short bullet points, Irish English.
-- Lead with anything that needs ACTION (unanswered messages, new leads), then today's schedule/classes, then a quick members/money line, then (if present) the nearest upcoming marketing opportunity.
-- Be specific with the numbers you're given. NEVER invent data. If a value is 0 or empty, don't dwell on it.
-- If there's genuinely nothing to flag, say it's a quiet day and suggest one useful thing to do.
-- Output ONLY the bullet points (each starting with "- "), no preamble or sign-off.`,
+      system: `You pick TODAY'S PRIORITIES for the owner of ${business}, a ${mode === "timetable" ? "gym/studio" : "clinic"}: what is worth acting on today, shown as cards on their dashboard.
+Return ONLY a JSON array of 0 to 3 items, most important first:
+[{"kind": "...", "title": "...", "detail": "..."}]
+- kind is one of: "leads" (new leads to contact), "messages" (unread or unanswered messages), "schedule" (today's or this week's bookings/classes), "members" (members to check on), "money" (revenue or payments), "campaign" (an upcoming date to promote).
+- title: at most 6 words, usually a number and a noun, e.g. "10 new leads", "Bank holiday in 20 days", "3 classes today".
+- detail: one plain sentence of at most 8 words that adds something the title doesn't say, e.g. "Not contacted yet.", "Autumn Reset offer is ready to promote." Never restate the title. If there is nothing to add, use "".
+- Only include something the owner can act on today. Use only the numbers given; never invent data. Skip anything that is 0 or empty.
+- Plain words. No advice phrases ("it's a good time to", "will go a long way", "worth a look"), no exclamation marks, no emoji.
+- If nothing needs action, return [].`,
       messages: [{ role: "user", content: `Today's live data:\n${JSON.stringify(data, null, 2)}` }],
     }));
-    const brief = res.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim();
-    return Response.json({ brief });
+    const text = res.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim();
+    return Response.json({ items: parseBriefItems(text, mode === "timetable" ? "timetable" : "appointments") });
   } catch {
-    return Response.json({ brief: "" });
+    return Response.json({ items: [] });
   }
 }

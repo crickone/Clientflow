@@ -1,55 +1,64 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Sparkles, RefreshCw } from "lucide-react";
-import { Tooltip } from "@/components/ui/Tooltip";
+import Link from "next/link";
+import { ArrowRight, CalendarDays, Coins, Inbox, Megaphone, RefreshCw, UserPlus, Users, type LucideIcon } from "lucide-react";
 
-const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-const BRIEF_TTL_MS = 10 * 60 * 1000; // 10 minutes
-function heading(): string {
-  const d = new Date();
-  const h = d.getHours();
-  const part = h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
-  return `${part} — ${d.getDate()} ${MONTHS[d.getMonth()]}`;
-}
+import type { BriefItem, BriefKind } from "@/lib/dashboard/briefItems";
+
+/**
+ * Today's priorities: up to three action cards the AI picks from live data
+ * (/api/assistant/brief), each one line plus a button to the page that does
+ * the job. Cached for ten minutes per tab so dashboard reloads don't re-ask.
+ * A quiet day is one short line, not filler.
+ */
+
+const TTL_MS = 10 * 60 * 1000;
+const ICON: Record<BriefKind, LucideIcon> = {
+  leads: UserPlus,
+  messages: Inbox,
+  schedule: CalendarDays,
+  members: Users,
+  money: Coins,
+  campaign: Megaphone,
+};
+
+type State = { items: BriefItem[]; message?: string; at: number };
 
 export function DailyBrief({ tenantId }: { tenantId: number }) {
-  const storeKey = `cf_brief_${tenantId}`;
-  const [brief, setBrief] = useState<string | null>(null);
+  const storeKey = `cf_priorities_${tenantId}`;
+  const [state, setState] = useState<State | null>(null);
   const [loading, setLoading] = useState(true);
 
   async function load(force = false) {
     setLoading(true);
     if (!force) {
       try {
-        const raw = sessionStorage.getItem(storeKey);
-        if (raw) {
-          const parsed = JSON.parse(raw) as { ts: number; brief: string };
-          if (Date.now() - parsed.ts < BRIEF_TTL_MS) {
-            setBrief(parsed.brief);
-            setLoading(false);
-            return;
-          }
+        const cached = JSON.parse(sessionStorage.getItem(storeKey) ?? "null") as State | null;
+        if (cached && Date.now() - cached.at < TTL_MS && Array.isArray(cached.items)) {
+          setState(cached);
+          setLoading(false);
+          return;
         }
       } catch {
-        /* ignore */
+        /* storage blocked or stale shape */
       }
     }
+    let next: State = { items: [], at: Date.now() };
     try {
       const res = await fetch("/api/assistant/brief", { cache: "no-store" });
-      const data = (await res.json()) as { brief?: string };
-      const b = data.brief ?? "";
-      setBrief(b);
+      const data = (await res.json()) as { items?: BriefItem[]; message?: string };
+      next = { items: Array.isArray(data.items) ? data.items : [], message: data.message, at: Date.now() };
       try {
-        sessionStorage.setItem(storeKey, JSON.stringify({ ts: Date.now(), brief: b }));
+        sessionStorage.setItem(storeKey, JSON.stringify(next));
       } catch {
         /* ignore */
       }
     } catch {
-      setBrief("");
-    } finally {
-      setLoading(false);
+      /* network: show the quiet line */
     }
+    setState(next);
+    setLoading(false);
   }
 
   useEffect(() => {
@@ -57,64 +66,51 @@ export function DailyBrief({ tenantId }: { tenantId: number }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId]);
 
-  // Nothing to show (AI off / no data) — hide entirely.
-  if (!loading && !brief) return null;
+  const time = state ? new Date(state.at).toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit" }) : "";
 
   return (
-    <div
-      style={{
-        border: "1px solid var(--hairline)",
-        borderRadius: "var(--radius)",
-        background: "linear-gradient(180deg, var(--surface-2), var(--surface-1))",
-        padding: "16px 18px",
-        marginBottom: 16,
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        <Sparkles size={15} strokeWidth={1.75} style={{ color: "var(--accent)" }} />
-        <strong style={{ fontSize: 13.5, color: "var(--text-primary)" }}>{heading()}</strong>
-        <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>· your brief</span>
-        <Tooltip label="Refresh brief">
-          <button
-            onClick={() => load(true)}
-            disabled={loading}
-            aria-label="Refresh brief"
-            style={{ marginLeft: "auto", background: "transparent", border: "none", color: "var(--text-tertiary)", cursor: "pointer", display: "inline-flex", padding: 2 }}
-          >
-            <RefreshCw size={14} className={loading ? "spin" : undefined} />
-          </button>
-        </Tooltip>
+    <section className="prio" aria-label="Today's priorities" aria-busy={loading}>
+      <div className="prio-head">
+        <h2 className="prio-title">Today&rsquo;s priorities</h2>
+        <button type="button" className="prio-refresh" onClick={() => load(true)} disabled={loading} aria-label="Refresh priorities">
+          {loading ? "Updating" : `Updated ${time}`}
+          <RefreshCw size={12} className={loading ? "spin" : undefined} />
+        </button>
       </div>
+
       {loading ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {[92, 78, 85].map((w, i) => (
-            <div key={i} style={{ height: 11, width: `${w}%`, borderRadius: 6, background: "var(--surface-2)", opacity: 0.7 }} />
+        <div className="prio-grid">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="prio-card prio-card--ghost" aria-hidden>
+              <span className="prio-ghost prio-ghost--icon" />
+              <span className="prio-ghost" style={{ width: "62%" }} />
+              <span className="prio-ghost" style={{ width: "84%", height: 10 }} />
+            </div>
           ))}
         </div>
+      ) : state?.message ? (
+        <p className="prio-quiet">{state.message}</p>
+      ) : !state?.items.length ? (
+        <p className="prio-quiet">Nothing urgent today.</p>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {(brief ?? "").split("\n").map((line, i) => {
-            const t = line.trim().replace(/^[-*•]\s*/, "");
-            if (!t) return null;
+        <div className="prio-grid">
+          {state.items.map((item, i) => {
+            const Icon = ICON[item.kind] ?? Megaphone;
             return (
-              <div key={i} style={{ display: "flex", gap: 8, fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
-                <span style={{ color: "var(--accent)", flexShrink: 0 }}>•</span>
-                <span>{renderBold(t)}</span>
-              </div>
+              <Link key={item.kind} href={item.href} className="prio-card" style={{ animationDelay: `${i * 70}ms` }}>
+                <span className="prio-icon">
+                  <Icon size={17} strokeWidth={1.9} />
+                </span>
+                <span className="prio-card-title">{item.title}</span>
+                {item.detail && <span className="prio-card-detail">{item.detail}</span>}
+                <span className="prio-action">
+                  {item.action} <ArrowRight size={13} />
+                </span>
+              </Link>
             );
           })}
         </div>
       )}
-    </div>
-  );
-}
-
-function renderBold(text: string): React.ReactNode[] {
-  return text.split(/(\*\*[^*]+\*\*)/g).map((seg, i) =>
-    /^\*\*[^*]+\*\*$/.test(seg) ? (
-      <strong key={i} style={{ color: "var(--text-primary)" }}>{seg.slice(2, -2)}</strong>
-    ) : (
-      <span key={i}>{seg}</span>
-    ),
+    </section>
   );
 }

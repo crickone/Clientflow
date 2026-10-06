@@ -123,9 +123,8 @@ export default async function DashboardPage({
         </Reveal>
       )}
       <PageHeader
-        eyebrow="Today"
-        title="Dashboard"
-        subtitle={now.toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+        eyebrow={now.toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Dublin" })}
+        title={greeting(now, membership.user.name)}
         actions={
           venue === "gym" ? (
             <Link href="/clients/new">
@@ -176,4 +175,12 @@ export default async function DashboardPage({
       <DashboardGrid key={`${active}:${tab.widgets.map((w) => w.key + w.size).join(",")}`} tabIndex={active} items={items} catalog={catalog} />
     </div>
   );
+}
+
+/** "Good afternoon, Christopher" in Irish time; the first name only, or none. */
+function greeting(now: Date, name: string | null | undefined): string {
+  const hour = Number(new Intl.DateTimeFormat("en-IE", { hour: "numeric", hourCycle: "h23", timeZone: "Europe/Dublin" }).format(now));
+  const part = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const first = (name ?? "").trim().split(/\s+/)[0];
+  return first ? `${part}, ${first}` : part;
 }
