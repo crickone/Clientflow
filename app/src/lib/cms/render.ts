@@ -220,7 +220,10 @@ export function buildPageMetadata(pc: PageContext): Metadata {
     // Suffix the site name only when the title doesn't already carry it —
     // imported pages often brand their own <title> ("Pricing … | AdonisAgent"),
     // and a blind suffix would double-brand ("… | AdonisAgent — AdonisAgent").
-    title: title.toLowerCase().includes(pc.resolved.site.name.toLowerCase())
+    // A " | " also means the page brands itself, often with a shortened name
+    // to keep the title inside Google's ~60 characters ("… Clonmel | Optimal
+    // Health" on a site called "Optimal Health & Recovery at Inspire").
+    title: title.includes(" | ") || title.toLowerCase().includes(pc.resolved.site.name.toLowerCase())
       ? title
       : `${title} — ${pc.resolved.site.name}`,
     description,

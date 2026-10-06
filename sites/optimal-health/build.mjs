@@ -976,6 +976,7 @@ const POSTS = [
     slug: "stress-sleep-and-the-evening-session",
     topic: "Recovery",
     title: "Stress, sleep and an evening infrared session",
+    seoTitle: "Evening Infrared for Stress and Sleep",
     excerpt:
       "An evening infrared session gives you half an hour to wind down with your phone put away.",
     photo: "infrared-bed-idle.jpg",
@@ -1009,6 +1010,7 @@ const POSTS = [
     slug: "between-hard-sessions",
     topic: "Hyperbaric oxygen",
     title: "Where hyperbaric oxygen fits in a training week",
+    seoTitle: "Hyperbaric Oxygen in a Training Week",
     excerpt:
       "What an hour in the hyperbaric chamber involves, and when to book it in your training week.",
     photo: "hbot-chamber-seated.jpg",
@@ -1117,7 +1119,7 @@ for (const post of POSTS) {
     file: `blog-${post.slug}.html`,
     chars: body.length,
     html: shell({
-      title: `${post.title} | Optimal Health & Recovery at Inspire`,
+      title: `${post.seoTitle ?? post.title} | Optimal Health`,
       description: post.description,
       body,
     }),
