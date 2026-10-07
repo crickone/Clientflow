@@ -3438,3 +3438,17 @@ a.stat-row:hover .stat-label { color: var(--text-primary); }
   .spark-line { animation: none; stroke-dashoffset: 0; }
   .bar-grow, .needs-dot, .skeleton, .prio-ghost { animation: none !important; }
 }
+
+/* /leads with no leads yet: a one-line hint above the (empty) board. */
+.leads-empty-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 11px 14px;
+  border-radius: var(--radius);
+  border: 1px dashed var(--hairline);
+  color: var(--text-secondary);
+  font-size: 13.5px;
+}
+.leads-empty-hint svg { flex-shrink: 0; color: var(--text-tertiary); }

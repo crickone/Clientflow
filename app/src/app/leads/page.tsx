@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Plus, Sparkles } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { PipelineBoard } from "@/components/pipeline/PipelineBoard";
 import { listLeadsForBoard } from "@/lib/leads";
 import { listStages } from "@/lib/pipeline/stageRepo";
@@ -40,23 +39,18 @@ export default async function LeadsPage({ searchParams }: { searchParams?: { pip
         }
       />
 
-      {leads.length === 0 && pipelines.length <= 1 ? (
-        <EmptyState
-          icon={<Sparkles size={32} strokeWidth={1.4} />}
-          title="No leads yet"
-          message="Facebook Lead Ads flow in automatically once a Page is connected, or add a lead manually to test the flow."
-          action={
-            <Link href="/leads/new">
-              <Button>
-                <Plus size={15} />
-                Add lead manually
-              </Button>
-            </Link>
-          }
-        />
-      ) : (
-        <PipelineBoard leads={leads} stages={stages} canManageStages={canManageStages} pipelines={pipelines} activePipelineId={activePipelineId} />
+      {/* The stages always show, so an account with no leads yet still sees
+          the funnel its leads will move through. */}
+      {leads.length === 0 && (
+        <div className="leads-empty-hint">
+          <Sparkles size={15} strokeWidth={1.75} />
+          <span>
+            No leads yet. Facebook Lead Ads land in the first column once a Page is connected, or add one manually to
+            test the flow.
+          </span>
+        </div>
       )}
+      <PipelineBoard leads={leads} stages={stages} canManageStages={canManageStages} pipelines={pipelines} activePipelineId={activePipelineId} />
     </div>
   );
 }
