@@ -20,6 +20,7 @@ import {
   Pencil,
   Plus,
   RotateCcw,
+  Search,
   Settings2,
   Trash2,
   TrendingUp,
@@ -82,6 +83,7 @@ const ICONS: Record<PresetIcon, LucideIcon> = {
   Binoculars,
   Cpu,
   Heart,
+  Search,
 };
 
 export function TabBar({ tabs, active, rangeKey, rangeLabel, isAdmin, source, presets, custom }: TabBarProps) {

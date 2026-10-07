@@ -2689,6 +2689,26 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     );
   `);
 
+  // Google reviews synced from the Business Profile (lib/google/business).
+  // Drizzle mirror in schema.ts.
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS google_reviews (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      review_name TEXT NOT NULL UNIQUE,
+      reviewer TEXT NOT NULL,
+      photo_url TEXT,
+      rating INTEGER NOT NULL,
+      comment TEXT NOT NULL DEFAULT '',
+      reviewed_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      reply TEXT,
+      replied_at INTEGER,
+      is_read INTEGER NOT NULL DEFAULT 0,
+      synced_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_google_reviews_updated ON google_reviews(updated_at);
+  `);
+
   // Dashboard slice 2: stamp each event recorder's start date once.
   try {
     sqlite.exec(RECORDER_START_SQL);

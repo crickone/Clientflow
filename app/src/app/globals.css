@@ -3671,3 +3671,13 @@ a.stat-row:hover .stat-label { color: var(--text-primary); }
   .inbox-list-connect { display: grid; gap: 2px; padding: 6px 8px; border-top: 1px solid var(--grid); }
 }
 .inbox-rail-connect .inbox-rail-label-text { white-space: normal; line-height: 1.3; }
+
+/* Inbox: Google reviews. */
+.inbox-stars { display: inline-flex; align-items: center; gap: 1px; color: #e3a92b; }
+.inbox-stars.is-low { color: var(--warning); }
+.inbox-row-chips .inbox-stars { height: 18px; }
+.inbox-review { padding: 18px; border-radius: 12px; border: 1px solid var(--card-border); background: var(--surface-1); box-shadow: var(--edge-light), var(--shadow-1); }
+.inbox-review-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.inbox-review-text { margin: 12px 0 0; font-size: 15px; line-height: 1.6; color: var(--text-primary); white-space: pre-wrap; word-break: break-word; }
+.inbox-review-reply { margin-top: 12px; margin-left: 28px; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--hairline); background: var(--surface-2); }
+.inbox-review-reply .inbox-review-text { font-size: 14px; color: var(--text-secondary); }

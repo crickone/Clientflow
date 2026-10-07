@@ -10,6 +10,7 @@ import { dispatchDueEmailCampaigns } from "@/lib/marketing/schedule";
 import { dispatchDueScheduledPosts } from "@/lib/social/schedule";
 import { dispatchDueAutomationQueue } from "@/lib/automations/nurture";
 import { publishDueScheduledPosts } from "@/lib/cms/blog";
+import { syncGoogleReviewsIfStale } from "@/lib/google/business";
 
 /**
  * The dispatch ticker: everything that was booked for a time, sent when that
@@ -75,6 +76,9 @@ async function runTenant(tenantId: number, baseUrl: string, summary: DispatchSum
     } catch (err) {
       console.error(`[dispatch] tenant ${tenantId} scheduled posts failed:`, err);
     }
+    // New Google reviews, at most every half hour per tenant (a no-op for a
+    // tenant without a Google listing).
+    await syncGoogleReviewsIfStale(tenantId, 15_000).catch(() => undefined);
     // Scheduled blog posts. The machinery has existed since the schema
     // gained publishState "scheduled", but the only caller was the DAILY
     // scheduler, which runs once a day and not before 08:00 UTC — so a post

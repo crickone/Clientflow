@@ -35,7 +35,7 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
   {
     key: "ads",
     label: "Ads & social numbers",
-    tools: ["get_social_metrics", "list_ad_campaigns", "search_ad_audience", "get_ad_results", "draft_ad_campaign", "launch_ad_campaign", "set_ad_campaign_status", "set_ad_budget"],
+    tools: ["get_social_metrics", "get_google_metrics", "list_google_reviews", "reply_to_google_review", "list_ad_campaigns", "search_ad_audience", "get_ad_results", "draft_ad_campaign", "launch_ad_campaign", "set_ad_campaign_status", "set_ad_budget"],
   },
   {
     key: "clients",

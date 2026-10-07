@@ -29,12 +29,13 @@ export function getRedirectUri(): string {
   return process.env.GOOGLE_REDIRECT_URI || `${getAppBaseUrl()}/api/google/callback`;
 }
 
-export function buildAuthUrl(state: string): string {
+/** `scopes` defaults to the inbox (Gmail + Drive); Google Business passes its own. */
+export function buildAuthUrl(state: string, scopes: string = GMAIL_SCOPES): string {
   const params = new URLSearchParams({
     client_id: process.env.GOOGLE_CLIENT_ID ?? "",
     redirect_uri: getRedirectUri(),
     response_type: "code",
-    scope: GMAIL_SCOPES,
+    scope: scopes,
     access_type: "offline",
     prompt: "consent",
     include_granted_scopes: "true",

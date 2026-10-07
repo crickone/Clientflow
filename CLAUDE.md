@@ -157,6 +157,21 @@ guarantees, no free consults, no pricing, no fabricated claims.
   progress so a client that disconnects mid-run can reconnect instead of
   losing it.
 
+## Google (in `app/src/lib/google`)
+
+- **One Google Business connection per tenant** (control table
+  `google_business_connections`, tokens encrypted), separate from the Gmail
+  inbox connection. Connected at `/settings/integrations/google`; the sign-in
+  reuses `/api/google/callback` (state `p:"business"`) so no new redirect URI.
+- **Business Profile:** posts are a `google` channel on the social publisher
+  (`lib/social/publisher.ts`, opt-in next to Facebook/Instagram); reviews are
+  synced into the tenant table `google_reviews` (ticker, every 30 min) and
+  answered from the inbox; profile metrics + search terms feed the dashboard's
+  Google tab. **Search Console** and **GA4** come from the same sign-in.
+- Raw REST, request/parse logic pure + tested in `businessApi.ts`. Every call is
+  fail-soft with a readable reason: Google must approve Business Profile API
+  access for the Cloud project before those calls return data.
+
 ## Email marketing (bulk send)
 
 Note the two "campaigns": `/marketing/campaigns` is the campaign-engine kit

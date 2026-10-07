@@ -5,12 +5,13 @@ import { isWhatsAppConfigured } from "@/lib/whatsapp/config";
 import { getGmailConnection } from "@/lib/gmail";
 import { getImapConnection } from "@/lib/imapEmail";
 import { listInboxItems } from "@/lib/inbox/unified";
+import { isGoogleProfileConnected, syncGoogleReviewsIfStale } from "@/lib/google/business";
 import { getVenueType } from "@/lib/settings";
 import { getVocab } from "@/lib/vocabulary";
 
 export const dynamic = "force-dynamic";
 
-export default async function CommunicationPage({ searchParams }: { searchParams?: { c?: string; open?: string } }) {
+export default async function CommunicationPage({ searchParams }: { searchParams?: { c?: string; open?: string; view?: string } }) {
   await requireUserPage();
   const vocab = getVocab(getVenueType());
   const membership = getCurrentMembership()!;
@@ -18,7 +19,9 @@ export default async function CommunicationPage({ searchParams }: { searchParams
   // With Gmail or IMAP connected the inbox is two-way; otherwise email is the
   // log of what was sent from client profiles.
   const emailConn = getGmailConnection(tenantId) ?? getImapConnection(tenantId);
-  const items = listInboxItems(emailConn ? "two-way" : "sent-log");
+  // Fresh Google reviews first, but never hold the page up for long (4s cap).
+  await syncGoogleReviewsIfStale(tenantId);
+  const items = listInboxItems(emailConn ? "two-way" : "sent-log", tenantId);
   // ?c=<kind>-<id> is the older link to a conversation (a lead's "Open chat").
   const initialOpen = searchParams?.open ?? (searchParams?.c ? `conv:${searchParams.c}` : null);
 
@@ -26,7 +29,7 @@ export default async function CommunicationPage({ searchParams }: { searchParams
     <div className="app-page inbox-page">
       <header className="inbox-page-head">
         <h1 className="dash-greeting">Communication</h1>
-        <p className="inbox-page-sub">Email, WhatsApp, Messenger and Instagram in one place.</p>
+        <p className="inbox-page-sub">Email, WhatsApp, Messenger, Instagram and Google reviews in one place.</p>
       </header>
       <UnifiedInbox
         items={items}
@@ -34,7 +37,8 @@ export default async function CommunicationPage({ searchParams }: { searchParams
         connectedEmail={emailConn?.email ?? null}
         emailMode={emailConn ? "two-way" : "sent-log"}
         initialOpen={initialOpen}
-        connected={{ whatsapp: isWhatsAppConfigured(), meta: listFacebookPages(tenantId).length > 0 }}
+        initialView={searchParams?.view ?? null}
+        connected={{ whatsapp: isWhatsAppConfigured(), meta: listFacebookPages(tenantId).length > 0, google: isGoogleProfileConnected(tenantId) }}
         isAdmin={membership.role === "admin"}
       />
     </div>

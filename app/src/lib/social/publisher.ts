@@ -3,6 +3,7 @@ import "server-only";
 import { readKeyForTenant, setKey } from "@/lib/settings";
 import { getPostingPage } from "@/lib/facebook/pages";
 import { GRAPH_BASE } from "@/lib/facebook/graph";
+import { isGoogleProfileConnected, postToGoogle } from "@/lib/google/business";
 
 /**
  * Posting to social, behind one interface.
@@ -16,7 +17,7 @@ import { GRAPH_BASE } from "@/lib/facebook/graph";
  * WHICH connected Page to post from; no token lives in tenant settings.
  */
 
-export type SocialChannel = "facebook" | "instagram";
+export type SocialChannel = "facebook" | "instagram" | "google";
 
 export interface PublishInput {
   channels: SocialChannel[];
@@ -66,11 +67,72 @@ export function isMetaConnected(tenantId: number): boolean {
   return getMetaConnectionForTenant(tenantId) !== null;
 }
 
-/** The publisher for a tenant, or null while there is nothing to publish through. */
+export const META_NOT_CONNECTED = "Waiting for a Facebook Page to be connected (Settings > Integrations > Facebook).";
+export const GOOGLE_NOT_CONNECTED = "Waiting for a Google Business Profile to be connected (Settings > Integrations > Google).";
+
+/**
+ * Why a post on these channels cannot go out yet, or null when every channel
+ * it needs is connected. A post missing a connection WAITS (it is not failed),
+ * and goes out once the connection exists.
+ */
+export function missingConnection(tenantId: number, channels: SocialChannel[]): string | null {
+  if ((channels.includes("facebook") || channels.includes("instagram")) && !getMetaConnectionForTenant(tenantId)) return META_NOT_CONNECTED;
+  if (channels.includes("google") && !isGoogleProfileConnected(tenantId)) return GOOGLE_NOT_CONNECTED;
+  return null;
+}
+
+/**
+ * The publisher for a tenant, or null while there is nothing to publish
+ * through. Facebook and Instagram go through the Meta Graph API; Google
+ * through the Business Profile. One post can go to all three.
+ */
 export function getSocialPublisher(tenantId: number): SocialPublisher | null {
-  const connection = getMetaConnectionForTenant(tenantId);
-  if (!connection) return null;
-  return new MetaGraphPublisher(connection);
+  const meta = getMetaConnectionForTenant(tenantId);
+  const google = isGoogleProfileConnected(tenantId);
+  if (!meta && !google) return null;
+  return new CompositePublisher(meta ? new MetaGraphPublisher(meta) : null, google ? new GoogleBusinessPublisher(tenantId) : null);
+}
+
+class CompositePublisher implements SocialPublisher {
+  constructor(
+    private readonly meta: SocialPublisher | null,
+    private readonly google: SocialPublisher | null,
+  ) {}
+
+  async publish(input: PublishInput): Promise<PublishResult> {
+    const metaChannels = input.channels.filter((c) => c !== "google");
+    const parts: PublishResult[] = [];
+    if (metaChannels.length) {
+      parts.push(this.meta ? await this.meta.publish({ ...input, channels: metaChannels }) : { ok: false, error: META_NOT_CONNECTED });
+    }
+    if (input.channels.includes("google")) {
+      parts.push(this.google ? await this.google.publish({ ...input, channels: ["google"] }) : { ok: false, error: GOOGLE_NOT_CONNECTED });
+    }
+    const refs: Partial<Record<SocialChannel, string>> = {};
+    const problems: string[] = [];
+    for (const p of parts) {
+      if (p.ok) {
+        Object.assign(refs, p.refs);
+        if (p.warning) problems.push(p.warning);
+      } else problems.push(p.error);
+    }
+    if (Object.keys(refs).length === 0) return { ok: false, error: problems.join(" ") || "No channel selected." };
+    return problems.length ? { ok: true, refs, warning: problems.join(" ") } : { ok: true, refs };
+  }
+}
+
+/** A Google post: the caption and the first slide as its photo. */
+class GoogleBusinessPublisher implements SocialPublisher {
+  constructor(private readonly tenantId: number) {}
+
+  async publish(input: PublishInput): Promise<PublishResult> {
+    try {
+      const ref = await postToGoogle(this.tenantId, { caption: input.caption, imageUrl: input.imageUrls[0] ?? null });
+      return { ok: true, refs: { google: ref } };
+    } catch (err) {
+      return { ok: false, error: `Google: ${err instanceof Error ? err.message : String(err)}` };
+    }
+  }
 }
 
 // ─── Meta Graph API ──────────────────────────────────────────────────────────

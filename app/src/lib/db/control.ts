@@ -288,6 +288,30 @@ export function ensureControlTables() {
       created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
 
+    -- A tenant's connected Google Business Profile (and, from the same Google
+    -- sign-in, Search Console and Analytics). Separate from gmail_connections:
+    -- the Google login that manages a business listing is often not the
+    -- inbox's. Tokens stored ENCRYPTED; the chosen listing / site / property
+    -- live beside them.
+    CREATE TABLE IF NOT EXISTS google_business_connections (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id INTEGER NOT NULL UNIQUE REFERENCES tenants(id) ON DELETE CASCADE,
+      email TEXT NOT NULL,
+      refresh_token TEXT NOT NULL,
+      access_token TEXT,
+      token_expiry INTEGER,
+      scope TEXT,
+      account_name TEXT,
+      location_name TEXT,
+      location_title TEXT,
+      search_console_site TEXT,
+      ga4_property TEXT,
+      ga4_property_name TEXT,
+      reviews_synced_at INTEGER,
+      connected_by_user_id INTEGER REFERENCES users(id),
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+
     -- A tenant's connected IMAP/SMTP mailbox (generic, non-Gmail). Password
     -- stored ENCRYPTED. Parallels gmail_connections above for businesses on a
     -- non-Google mailbox (e.g. Microsoft 365, cPanel/Hostinger hosted email).

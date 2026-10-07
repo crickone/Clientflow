@@ -12,6 +12,7 @@ import { getDesignSystem } from "@/lib/design/system";
 import { getCurrentMembership } from "@/lib/auth";
 import { listScheduledPosts } from "@/lib/social/schedule";
 import { isMetaConnected } from "@/lib/social/publisher";
+import { isGoogleProfileConnected } from "@/lib/google/business";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,7 @@ export default function ImageDesignPage({
     tenantId != null
       ? {
           connected: isMetaConnected(tenantId),
+          googleConnected: isGoogleProfileConnected(tenantId),
           bookings: listScheduledPosts({ includeDone: true })
             .filter((p) => p.carouselSetId === design.id)
             .map((p) => ({ id: p.id, scheduledFor: p.scheduledFor, status: p.status, error: p.error, channels: p.channels })),

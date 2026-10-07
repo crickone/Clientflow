@@ -55,6 +55,7 @@
     "create_form",
     "upload_invoices_to_drive",
     "send_whatsapp",
+    "reply_to_google_review",
     "send_dm_reply",
     "set_lead_stage",
     "log_lead_touch",
@@ -276,6 +277,10 @@
     "publish_social_post": [
       "Post \"Sample Name\" to social now",
       "Post design #? to social now"
+    ],
+    "reply_to_google_review": [
+      "Post a public reply on Google to review #? — “Hi there”",
+      "Post a public reply on Google to review #?"
     ]
   },
   "readSamplesAllFalse": [

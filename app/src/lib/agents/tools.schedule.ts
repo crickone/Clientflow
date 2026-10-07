@@ -8,7 +8,7 @@ import { getCampaign as getEmailCampaign, listCampaigns as listEmailCampaigns } 
 import { scheduleEmailCampaign, unscheduleEmailCampaign, listScheduledEmailCampaigns } from "@/lib/marketing/schedule";
 import { cancelScheduledPost, listScheduledPosts, normalizeChannels, publishPostNow, schedulePost } from "@/lib/social/schedule";
 import { getAppBaseUrl } from "@/lib/appUrl";
-import { isMetaConnected } from "@/lib/social/publisher";
+import { isMetaConnected, missingConnection } from "@/lib/social/publisher";
 import { getCarousel } from "@/lib/image/carousels";
 import { getSiteBlogPost, listSiteBlogPosts, setPublishState } from "@/lib/cms/blog";
 import { resolveSite } from "@/lib/agents/tools.marketing";
@@ -100,7 +100,7 @@ export const SCHEDULE_TOOLS: Anthropic.Tool[] = [
       properties: {
         postId: { type: "integer", description: "The design's id (list_social_posts / create_social_post)." },
         when: { type: "string", description: "When to post: YYYY-MM-DDTHH:mm in Irish local time (e.g. 2026-10-03T12:00), or a full ISO timestamp." },
-        channels: { type: "array", items: { type: "string", enum: ["facebook", "instagram"] }, description: "Default both." },
+        channels: { type: "array", items: { type: "string", enum: ["facebook", "instagram", "google"] }, description: "Default facebook + instagram. Add google to also post it to the Google Business Profile (first slide as the photo)." },
         campaignId: { type: "integer", description: "Optional: the campaign this post belongs to." },
         name: { type: "string", description: "Optional: the post's name, purely for the approval card." },
       },
@@ -115,7 +115,7 @@ export const SCHEDULE_TOOLS: Anthropic.Tool[] = [
       type: "object",
       properties: {
         postId: { type: "integer", description: "The design's id (list_social_posts / create_social_post)." },
-        channels: { type: "array", items: { type: "string", enum: ["facebook", "instagram"] }, description: "Default both." },
+        channels: { type: "array", items: { type: "string", enum: ["facebook", "instagram", "google"] }, description: "Default facebook + instagram. Add google to also post it to the Google Business Profile (first slide as the photo)." },
         campaignId: { type: "integer", description: "Optional: the campaign this post belongs to." },
         name: { type: "string", description: "Optional: the post's name, purely for the approval card." },
       },
@@ -190,10 +190,11 @@ export function scheduleSocialPostTool(ctx: ToolContext, input: Record<string, u
   });
   if (!res.ok) return { text: JSON.stringify({ error: res.error }) };
 
-  const connected = isMetaConnected(ctx.tenantId);
+  const missing = missingConnection(ctx.tenantId, res.post.channels);
+  const connected = !missing;
   return {
     text: JSON.stringify({
-      result: `Scheduled "${res.post.designName}" for ${formatDublin(res.post.scheduledFor)} on ${res.post.channels.join(" and ")}.${connected ? "" : " No Facebook Page is connected yet: the post waits in the schedule and goes out automatically once one is connected in Settings > Integrations > Facebook."}`,
+      result: `Scheduled "${res.post.designName}" for ${formatDublin(res.post.scheduledFor)} on ${res.post.channels.join(" and ")}.${missing ? ` ${missing} It goes out automatically once that is connected.` : ""}`,
       scheduledPostId: res.post.id,
       postId,
       scheduledFor: new Date(res.post.scheduledFor).toISOString(),

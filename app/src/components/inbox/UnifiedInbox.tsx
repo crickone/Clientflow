@@ -26,14 +26,17 @@ import { Button } from "@/components/ui/Button";
 import { ChannelIcon } from "@/components/messaging/ChannelIcon";
 import {
   contactContextAction,
+  markReviewReadAction,
   markThreadsReadAction,
   refreshInboxAction,
+  syncReviewsAction,
   type ContactContext,
 } from "@/app/communication/actions";
 import type { InboxChannel, InboxItem } from "@/lib/inbox/unified";
 import { ContactPanel, ContactStrip, InboxAvatar } from "./ContactCard";
 import { ConversationReader } from "./ConversationReader";
 import { EmailReader } from "./EmailReader";
+import { ReviewReader, Stars } from "./ReviewReader";
 import { dayGroup, fullTime, listTime, type DayGroup } from "./format";
 
 /**
@@ -72,6 +75,7 @@ const CHANNEL_VIEWS: View[] = (
     ["whatsapp", "WhatsApp"],
     ["messenger", "Messenger"],
     ["instagram", "Instagram"],
+    ["google", "Google reviews"],
   ] as const
 ).map(([channel, label]) => ({
   key: channel,
@@ -82,7 +86,7 @@ const CHANNEL_VIEWS: View[] = (
 }));
 const ALL_VIEWS = [...PRIMARY, ...SORTED, ...CHANNEL_VIEWS];
 
-const CHANNEL_NAME: Record<InboxChannel, string> = { email: "Email", whatsapp: "WhatsApp", messenger: "Messenger", instagram: "Instagram" };
+const CHANNEL_NAME: Record<InboxChannel, string> = { email: "Email", whatsapp: "WhatsApp", messenger: "Messenger", instagram: "Instagram", google: "Google review" };
 
 const GROUP_ORDER: DayGroup[] = ["Today", "Yesterday", "This week", "Earlier"];
 
@@ -104,6 +108,7 @@ export function UnifiedInbox({
   connectedEmail,
   emailMode,
   initialOpen,
+  initialView = null,
   connected,
   isAdmin,
 }: {
@@ -112,8 +117,10 @@ export function UnifiedInbox({
   connectedEmail: string | null;
   emailMode: "two-way" | "sent-log";
   initialOpen: string | null;
+  /** A view to start on (?view=google from the dashboard's rating tile). */
+  initialView?: string | null;
   /** Which messaging channels this account has set up. */
-  connected: { whatsapp: boolean; meta: boolean };
+  connected: { whatsapp: boolean; meta: boolean; google: boolean };
   isAdmin: boolean;
 }) {
   const router = useRouter();
@@ -122,6 +129,7 @@ export function UnifiedInbox({
   useEffect(() => setItems(initialItems), [initialItems]);
 
   const [viewKey, setViewKey] = useState(() => {
+    if (initialView && ALL_VIEWS.some((v) => v.key === initialView)) return initialView;
     const open = initialItems.find((i) => i.key === initialOpen);
     return open && open.bucket !== "people" ? open.bucket : "inbox";
   });
@@ -162,11 +170,13 @@ export function UnifiedInbox({
       set.add("messenger");
       set.add("instagram");
     }
+    if (connected.google) set.add("google");
     return set;
   }, [items, emailMode, connected]);
   const connectLinks = [
     !connected.whatsapp && { href: "/settings/integrations/whatsapp", label: "Connect WhatsApp", channels: ["whatsapp"] as InboxChannel[] },
     !connected.meta && { href: "/settings/integrations/facebook", label: "Connect Facebook and Instagram", channels: ["messenger", "instagram"] as InboxChannel[] },
+    !connected.google && { href: "/settings/integrations/google", label: "Connect Google reviews", channels: ["google"] as InboxChannel[] },
   ].filter(Boolean) as { href: string; label: string; channels: InboxChannel[] }[];
 
   const patch = useCallback((key: string, p: Partial<InboxItem>) => {
@@ -200,7 +210,7 @@ export function UnifiedInbox({
 
   // Who the open person is, for the side card.
   useEffect(() => {
-    if (!openItem) {
+    if (!openItem || openItem.type === "review") {
       setCtx(null);
       return;
     }
@@ -226,13 +236,12 @@ export function UnifiedInbox({
 
   function refresh() {
     startRefresh(async () => {
-      const res = await refreshInboxAction();
-      if (!res.ok) {
-        toast.error(res.error);
-        return;
-      }
+      const [res, reviews] = await Promise.all([refreshInboxAction(), syncReviewsAction()]);
+      if (!res.ok) toast.error(res.error);
+      if (!reviews.ok) toast.error(reviews.error);
       router.refresh();
-      toast.success(res.synced > 0 ? `${res.synced} new message${res.synced === 1 ? "" : "s"}` : "Up to date");
+      const fresh = (res.ok ? res.synced : 0) + (reviews.ok ? reviews.fresh : 0);
+      toast.success(fresh > 0 ? `${fresh} new` : "Up to date");
     });
   }
 
@@ -346,9 +355,16 @@ export function UnifiedInbox({
               </button>
             </>
           ) : (
-            <Link href="/settings/email" className="inbox-link">
-              Connect your email <ArrowUpRight size={13} />
-            </Link>
+            <>
+              <Link href="/settings/email" className="inbox-link" style={{ flex: 1 }}>
+                Connect your email <ArrowUpRight size={13} />
+              </Link>
+              {connected.google && (
+                <button type="button" className="inbox-icon-btn" onClick={refresh} disabled={refreshing} aria-label="Check for new reviews">
+                  <RefreshCw size={14} className={refreshing ? "spin" : undefined} />
+                </button>
+              )}
+            </>
           )}
         </div>
       </nav>
@@ -474,9 +490,9 @@ export function UnifiedInbox({
             {connectLinks.length > 0 && (
               <div className="inbox-connect-cta">
                 <p>
-                  {connectLinks.length === 2
-                    ? "Connect WhatsApp, Facebook and Instagram to answer every message here."
-                    : `${connectLinks[0].label} to answer those messages here too.`}
+                  {connectLinks.length > 1
+                    ? "Connect your other channels to answer every message and review here."
+                    : `${connectLinks[0].label} to answer those here too.`}
                 </p>
                 {isAdmin ? (
                   <div className="inbox-connect-cta-buttons">
@@ -518,7 +534,7 @@ export function UnifiedInbox({
                   <X size={16} />
                 </button>
               </header>
-              <ContactStrip
+              {openItem.type !== "review" && <ContactStrip
                 ctx={ctx}
                 memberLabel={memberLabel}
                 canAddLead={openItem.bucket === "people"}
@@ -526,8 +542,29 @@ export function UnifiedInbox({
                   patch(openItem.key, { contact: { type: "lead", id: leadId } });
                   contactContextAction({ contact: { type: "lead", id: leadId }, name: openItem.name, email: openItem.address }).then(setCtx);
                 }}
-              />
-              {openItem.type === "email" && openItem.threadId ? (
+              />}
+              {openItem.type === "review" && openItem.review ? (
+                <ReviewReader
+                  review={openItem.review}
+                  reviewer={openItem.name}
+                  at={openItem.at}
+                  focusReplyToken={replyToken}
+                  onOpened={() => {
+                    if (openItem.unread) {
+                      patch(openItem.key, { unread: false });
+                      markReviewReadAction([openItem.review!.id]);
+                    }
+                  }}
+                  onReplied={(text) =>
+                    patch(openItem.key, {
+                      needsReply: false,
+                      outbound: true,
+                      snippet: `You replied: ${text}`,
+                      review: { ...openItem.review!, reply: text, repliedAt: Date.now() },
+                    })
+                  }
+                />
+              ) : openItem.type === "email" && openItem.threadId ? (
                 <EmailReader
                   threadId={openItem.threadId}
                   expectReply={openItem.bucket === "people"}
@@ -547,7 +584,7 @@ export function UnifiedInbox({
                 <SentEmail item={openItem} />
               )}
             </div>
-            <ContactPanel
+            {openItem.type !== "review" && <ContactPanel
               ctx={ctx}
               memberLabel={memberLabel}
               canAddLead={openItem.bucket === "people"}
@@ -555,7 +592,7 @@ export function UnifiedInbox({
                 patch(openItem.key, { contact: { type: "lead", id: leadId } });
                 contactContextAction({ contact: { type: "lead", id: leadId }, name: openItem.name, email: openItem.address }).then(setCtx);
               }}
-            />
+            />}
           </div>
         )}
       </section>
@@ -637,10 +674,11 @@ function Row({
         </span>
         {i.subject && <span className="inbox-row-subject">{i.subject}</span>}
         <span className="inbox-row-snippet">{i.snippet || " "}</span>
-        {(i.contact || i.failed || i.conv?.aiPriority === "high") && (
+        {(i.contact || i.failed || i.conv?.aiPriority === "high" || i.review) && (
           <span className="inbox-row-chips">
             {i.contact && <span className={`inbox-pill inbox-pill--${i.contact.type}`}>{i.contact.type === "client" ? memberLabel : "Lead"}</span>}
             {i.conv?.aiPriority === "high" && <span className="inbox-pill inbox-pill--urgent">Urgent</span>}
+            {i.review && <Stars rating={i.review.rating} size={11} />}
             {i.failed && <span className="inbox-pill inbox-pill--urgent">Not sent</span>}
           </span>
         )}

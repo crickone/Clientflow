@@ -172,7 +172,7 @@ interface Props {
   initialGenerationError?: string | null;
   initialGenerationStage?: string | null;
   /** Posting from the editor: whether a Page is connected, and this design's bookings. */
-  schedule?: { connected: boolean; bookings: DesignBooking[] } | null;
+  schedule?: { connected: boolean; googleConnected?: boolean; bookings: DesignBooking[] } | null;
 }
 
 /**
@@ -2000,6 +2000,7 @@ export function ImageDesigner({
                     designId={designId}
                     postable={postable && !writing}
                     connected={schedule.connected}
+                    googleConnected={schedule.googleConnected ?? false}
                     bookings={schedule.bookings}
                     prepare={snapshotForPosting}
                   />

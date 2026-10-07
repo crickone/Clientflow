@@ -37,6 +37,7 @@ export function SchedulePostButton({
   designId,
   postable,
   connected,
+  googleConnected = false,
   bookings,
   prepare,
 }: {
@@ -45,6 +46,8 @@ export function SchedulePostButton({
   postable: boolean;
   /** A Facebook Page is connected for this business. */
   connected: boolean;
+  /** A Google Business Profile listing is connected. */
+  googleConnected?: boolean;
   bookings: DesignBooking[];
   /**
    * Runs before a schedule or a post: saves pictures of any template slides
@@ -56,15 +59,18 @@ export function SchedulePostButton({
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const [at, setAt] = useState("");
-  const [facebook, setFacebook] = useState(true);
-  const [instagram, setInstagram] = useState(true);
+  const [facebook, setFacebook] = useState(connected);
+  const [instagram, setInstagram] = useState(connected);
+  // Opt-in: a Google post is a different kind of thing (one photo, a call
+  // button, shown on the listing), so it is ticked deliberately.
+  const [google, setGoogle] = useState(false);
 
   const upcoming = bookings.filter((b) => b.status === "scheduled").sort((a, b) => a.scheduledFor - b.scheduledFor)[0];
   const shown = bookings.filter((b) => b.status !== "cancelled").sort((a, b) => b.scheduledFor - a.scheduledFor).slice(0, 5);
-  const channels = [facebook ? "facebook" : null, instagram ? "instagram" : null].filter((c): c is string => !!c);
+  const channels = [facebook ? "facebook" : null, instagram ? "instagram" : null, google ? "google" : null].filter((c): c is string => !!c);
 
   function run(fn: () => Promise<{ ok: true } | { ok: false; error: string }>, done: string) {
-    if (channels.length === 0) return void toast.error("Pick Facebook, Instagram or both.");
+    if (channels.length === 0) return void toast.error("Pick at least one place to post.");
     start(async () => {
       const failed = prepare ? await prepare() : null;
       if (failed) return void toast.error(failed);
@@ -93,8 +99,8 @@ export function SchedulePostButton({
 
   const blocked = !postable
     ? "This post isn't ready to go out yet. Wait for its slides to finish, then try again."
-    : !connected
-      ? "Connect your Facebook Page first, in Settings > Integrations > Facebook."
+    : !connected && !googleConnected
+      ? "Connect your Facebook Page or your Google Business Profile first, in Settings > Integrations."
       : null;
 
   return (
@@ -110,7 +116,7 @@ export function SchedulePostButton({
           {blocked ? (
             <div style={{ fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.55 }}>
               {blocked}
-              {!connected && postable && (
+              {!connected && !googleConnected && postable && (
                 <>
                   {" "}
                   <Link href="/settings/integrations/facebook" style={{ color: "var(--accent)" }}>
@@ -126,12 +132,21 @@ export function SchedulePostButton({
                 <Input id="post-at" type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} disabled={pending} />
               </div>
               <div style={{ display: "flex", gap: 18, fontSize: 13.5, color: "var(--text-secondary)" }}>
-                <label style={{ display: "flex", gap: 7, alignItems: "center" }}>
-                  <input type="checkbox" checked={facebook} onChange={(e) => setFacebook(e.target.checked)} disabled={pending} /> Facebook
-                </label>
-                <label style={{ display: "flex", gap: 7, alignItems: "center" }}>
-                  <input type="checkbox" checked={instagram} onChange={(e) => setInstagram(e.target.checked)} disabled={pending} /> Instagram
-                </label>
+                {connected && (
+                  <>
+                    <label style={{ display: "flex", gap: 7, alignItems: "center" }}>
+                      <input type="checkbox" checked={facebook} onChange={(e) => setFacebook(e.target.checked)} disabled={pending} /> Facebook
+                    </label>
+                    <label style={{ display: "flex", gap: 7, alignItems: "center" }}>
+                      <input type="checkbox" checked={instagram} onChange={(e) => setInstagram(e.target.checked)} disabled={pending} /> Instagram
+                    </label>
+                  </>
+                )}
+                {googleConnected && (
+                  <label style={{ display: "flex", gap: 7, alignItems: "center" }}>
+                    <input type="checkbox" checked={google} onChange={(e) => setGoogle(e.target.checked)} disabled={pending} /> Google
+                  </label>
+                )}
               </div>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                 <Button onClick={schedule} loading={pending}>

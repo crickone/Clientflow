@@ -9,7 +9,7 @@ import { getCarousel } from "@/lib/image/carousels";
 import { renderFilePath } from "@/lib/image/renderStore";
 import { isCarouselSlot } from "@/lib/image/slots";
 import { DESIGNED_TEMPLATE_ID } from "@/lib/image/paintSlide";
-import { getSocialPublisher, type SocialChannel } from "./publisher";
+import { getSocialPublisher, missingConnection, type SocialChannel } from "./publisher";
 import { renderTokensConfigured, signRenderToken } from "./renderToken";
 import { isStopped } from "@/lib/platform/killSwitch";
 
@@ -50,7 +50,7 @@ export function parseChannels(raw: string | null | undefined): SocialChannel[] {
   try {
     const parsed = JSON.parse(raw ?? "[]");
     if (!Array.isArray(parsed)) return ALL_CHANNELS;
-    const out = parsed.filter((c): c is SocialChannel => c === "facebook" || c === "instagram");
+    const out = parsed.filter((c): c is SocialChannel => c === "facebook" || c === "instagram" || c === "google");
     return out.length ? out : ALL_CHANNELS;
   } catch {
     return ALL_CHANNELS;
@@ -59,7 +59,7 @@ export function parseChannels(raw: string | null | undefined): SocialChannel[] {
 
 export function normalizeChannels(input: unknown): SocialChannel[] {
   const list = Array.isArray(input) ? input : typeof input === "string" ? input.split(",") : [];
-  const out = [...new Set(list.map((c) => String(c).trim().toLowerCase()).filter((c): c is SocialChannel => c === "facebook" || c === "instagram"))];
+  const out = [...new Set(list.map((c) => String(c).trim().toLowerCase()).filter((c): c is SocialChannel => c === "facebook" || c === "instagram" || c === "google"))];
   return out.length ? out : ALL_CHANNELS;
 }
 
@@ -212,6 +212,15 @@ export async function dispatchDueScheduledPosts(tenantId: number, baseUrl: strin
 
   let posted = 0;
   for (const row of due) {
+    // A post for a channel that is not connected yet waits, labelled, rather
+    // than failing; it goes out once the connection exists.
+    const missing = missingConnection(tenantId, parseChannels(row.channels));
+    if (missing) {
+      if (row.error !== missing) {
+        tdb.update(schema.scheduledPosts).set({ error: missing, lastAttemptAt: new Date(now) }).where(eq(schema.scheduledPosts.id, row.id)).run();
+      }
+      continue;
+    }
     if ((await publishRow(tdb, row, tenantId, baseUrl, publisher, now)).ok) posted++;
   }
   return posted;
@@ -285,6 +294,8 @@ export async function publishPostNow(input: {
     return { ok: false, error: "This post's slides haven't been saved as pictures yet. Open it in Content Studio and post it from there." };
   }
   if (isStopped("posting")) return { ok: false, error: PLATFORM_PAUSED_MESSAGE };
+  const missing = missingConnection(input.tenantId, input.channels?.length ? input.channels : ALL_CHANNELS);
+  if (missing) return { ok: false, error: missing };
   const publisher = getSocialPublisher(input.tenantId);
   if (!publisher) return { ok: false, error: NOT_CONNECTED_MESSAGE };
 

@@ -99,6 +99,7 @@ import {
   setAdCampaignStatusTool,
 } from "@/lib/agents/tools.ads";
 import { SOCIAL_METRICS_TOOLS, getSocialMetricsTool } from "@/lib/agents/tools.social";
+import { GOOGLE_TOOLS, getGoogleMetricsTool, listGoogleReviewsTool, replyToGoogleReviewTool } from "@/lib/agents/tools.google";
 import {
   WEBSITE_TOOLS,
   listWebsitePagesTool,
@@ -193,6 +194,7 @@ const WRITE_TOOL_META: Record<string, WriteToolMeta> = {
   // auto-execute; deferred to the Approve card like every other write above.
   // The 3 read tools (list_leads, get_lead_health, draft_lead_reply) are absent.
   send_whatsapp: { label: "Send WhatsApp", summarize: ({ v, who }) => `Send a WhatsApp to ${who || `lead #${v("leadId") || "?"}`}${v("text") ? ` — “${v("text")}”` : ""}` },
+  reply_to_google_review: { label: "Reply to Google review", summarize: ({ v }) => `Post a public reply on Google${v("reviewer") ? ` to ${v("reviewer")}'s review` : ` to review #${v("reviewId") || "?"}`}${v("text") ? ` — “${v("text").slice(0, 120)}”` : ""}` },
   send_dm_reply: { label: "Send DM reply", summarize: ({ v }) => `Reply on Messenger/Instagram to ${v("contactType") || "contact"} #${v("contactId") || "?"}${v("text") ? ` — “${v("text")}”` : ""}` },
   set_lead_stage: { label: "Change lead stage", summarize: ({ v, who }) => `Move ${who || `lead #${v("leadId") || "?"}`} to "${v("stage") || "a new stage"}"` },
   log_lead_touch: { label: "Log lead touch", summarize: ({ v, who }) => `Log a touch for ${who || `lead #${v("leadId") || "?"}`}` },
@@ -827,6 +829,7 @@ export const TOOLS: Anthropic.Tool[] = [
 
   // ── Ads manager: Facebook/Instagram ads on the business's own ad account. ──
   ...ADS_TOOLS,
+  ...GOOGLE_TOOLS,
   ...SOCIAL_METRICS_TOOLS,
 
   // ── Operations agent (Operations Task 1): no-show + lapsed-member tools ──
@@ -1000,6 +1003,12 @@ export async function executeTool(
         return listScheduleTool(ctx, input);
       case "get_social_metrics":
         return await getSocialMetricsTool(ctx, input);
+      case "get_google_metrics":
+        return await getGoogleMetricsTool(ctx, input);
+      case "list_google_reviews":
+        return await listGoogleReviewsTool(ctx, input);
+      case "reply_to_google_review":
+        return await replyToGoogleReviewTool(ctx, input);
       case "list_ad_campaigns":
         return listAdCampaignsTool(ctx);
       case "search_ad_audience":

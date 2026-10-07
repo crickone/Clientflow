@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  MapPin,
   CalendarClock,
   Ban,
   Building2,
@@ -124,6 +125,12 @@ function buildSections(vocab: ReturnType<typeof getVocab>) {
     icon: Megaphone,
     title: "Facebook",
     desc: "Connect a Facebook Page to pull in Lead Ads leads instantly — native, no Zapier/Make needed.",
+  },
+  {
+    href: "/settings/integrations/google",
+    icon: MapPin,
+    title: "Google",
+    desc: "Your Business Profile, Search Console and Analytics: post to Google, answer reviews and see how people find you.",
   },
   {
     href: "/settings/inbox-ai",

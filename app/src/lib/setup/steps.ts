@@ -7,6 +7,7 @@ import { getBusinessProfile, isBriefComplete } from "@/lib/businessProfile";
 import { isEmailConfigured } from "@/lib/email";
 import { isWhatsAppConfigured } from "@/lib/whatsapp/config";
 import { listFacebookPages } from "@/lib/facebook/pages";
+import { isGoogleProfileConnected } from "@/lib/google/business";
 import { getSendingDomain } from "@/lib/marketing/domains";
 import { getVocab, type Vocab } from "@/lib/vocabulary";
 
@@ -53,6 +54,9 @@ export const SETUP_STEPS: SetupStepDef[] = [
     blurb: "Pull Lead Ads leads in automatically once your Page is connected.",
     agencyNote: "Client Pages need our Meta app approved — your account manager connects this with you.",
     action: { kind: "link", href: "/settings/integrations/facebook" } },
+  { id: "google", group: "channels", title: "Google Business Profile", optional: true,
+    blurb: "Post to Google, answer your reviews and see how people find you in Search and Maps.",
+    action: { kind: "link", href: "/settings/integrations/google" } },
   { id: "domain", group: "channels", title: "Campaign sending domain", optional: true,
     blurb: "Verify a domain to send bulk email campaigns at scale.",
     agencyNote: "Agency-managed — only needed for bulk email marketing.",
@@ -118,6 +122,7 @@ export function getSetupSummary(): SetupSummary {
     email: isEmailConfigured(),
     whatsapp: isWhatsAppConfigured(),
     facebook: listFacebookPages(tenantId).length > 0,
+    google: isGoogleProfileConnected(tenantId),
     domain: getSendingDomain(tenantId)?.state === "verified",
     clients: clientCount() > 0,
     team: membershipCount(tenantId) > 1,

@@ -9,6 +9,7 @@ import type { Venue, WidgetRef } from "./types";
 
 export type PresetIcon =
   | "LayoutDashboard"
+  | "Search"
   | "TrendingUp"
   | "Megaphone"
   | "Mail"
@@ -421,6 +422,48 @@ export const PRESETS: Preset[] = [
         { key: "competitors.recentReviews", size: "M" },
         { key: "competitors.activity", size: "XL" },
         { key: "competitors.activeAds", size: "XL" },
+      ],
+    },
+  },
+  {
+    key: "google",
+    name: "Google",
+    description: "Your Google listing, reviews, the searches that find you, and visits to your website.",
+    icon: "Search",
+    widgets: {
+      clinic: [
+        { key: "google.profileViews", size: "S" },
+        { key: "google.calls", size: "S" },
+        { key: "google.websiteClicks", size: "S" },
+        { key: "google.rating", size: "S" },
+        { key: "google.viewsTrend", size: "XL" },
+        { key: "google.actions", size: "M" },
+        { key: "google.searchTerms", size: "M" },
+        { key: "google.reviewsToAnswer", size: "S" },
+        { key: "google.directions", size: "S" },
+        { key: "google.recentReviews", size: "M" },
+        { key: "google.searchClicks", size: "S" },
+        { key: "google.siteSessions", size: "S" },
+        { key: "google.searchQueries", size: "L" },
+        { key: "google.siteChannels", size: "M" },
+        { key: "google.siteTrend", size: "XL" },
+      ],
+      gym: [
+        { key: "google.profileViews", size: "S" },
+        { key: "google.calls", size: "S" },
+        { key: "google.websiteClicks", size: "S" },
+        { key: "google.rating", size: "S" },
+        { key: "google.viewsTrend", size: "XL" },
+        { key: "google.actions", size: "M" },
+        { key: "google.searchTerms", size: "M" },
+        { key: "google.reviewsToAnswer", size: "S" },
+        { key: "google.directions", size: "S" },
+        { key: "google.recentReviews", size: "M" },
+        { key: "google.searchClicks", size: "S" },
+        { key: "google.siteSessions", size: "S" },
+        { key: "google.searchQueries", size: "L" },
+        { key: "google.siteChannels", size: "M" },
+        { key: "google.siteTrend", size: "XL" },
       ],
     },
   },

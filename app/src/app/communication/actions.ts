@@ -31,6 +31,15 @@ import { emailMessages } from "@/lib/db/schema";
 import { upsertLead } from "@/lib/leads";
 import { draftEmailReply } from "@/lib/ai/draftEmailReply";
 import { AiCapError } from "@/lib/ai/usage";
+import { draftReviewReply } from "@/lib/ai/draftReviewReply";
+import {
+  GoogleApiError,
+  isGoogleProfileConnected,
+  markReviewsRead,
+  replyToGoogleReview,
+  syncGoogleReviews,
+} from "@/lib/google/business";
+import { googleReviews } from "@/lib/db/schema";
 import { displaySender, htmlToText } from "@/lib/inbox/emailDisplay";
 import { logActivity } from "@/lib/queries";
 
@@ -345,6 +354,50 @@ export async function draftEmailReplyAction(
         at: m.internalDate,
       })),
     });
+    if (!text) return { ok: false, error: "Adonis could not write a draft. Try again." };
+    return { ok: true, text };
+  } catch (err) {
+    return { ok: false, error: err instanceof AiCapError ? err.message : "Adonis could not write a draft right now." };
+  }
+}
+
+/** Pull the latest Google reviews now (the inbox's refresh). */
+export async function syncReviewsAction(): Promise<{ ok: true; fresh: number } | { ok: false; error: string }> {
+  await requireUser();
+  const tenantId = currentTenantId();
+  if (!isGoogleProfileConnected(tenantId)) return { ok: true, fresh: 0 };
+  try {
+    return { ok: true, fresh: await syncGoogleReviews(tenantId) };
+  } catch (err) {
+    return { ok: false, error: err instanceof GoogleApiError ? err.message : "Google did not answer. Try again in a minute." };
+  }
+}
+
+export async function markReviewReadAction(reviewIds: number[]): Promise<{ ok: true }> {
+  await requireUser();
+  markReviewsRead(currentTenantId(), z.array(z.number().int()).max(500).parse(reviewIds));
+  return { ok: true };
+}
+
+/** Post the business's public reply to a Google review. */
+export async function replyToReviewAction(reviewId: number, text: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireUser();
+  try {
+    await replyToGoogleReview(currentTenantId(), reviewId, text);
+    revalidatePath("/communication");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof GoogleApiError ? err.message : "The reply did not post. Try again." };
+  }
+}
+
+/** Adonis drafts a reply to a review; it lands in the reply box, never posted from here. */
+export async function draftReviewReplyAction(reviewId: number): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+  await requireUser();
+  const row = db.select().from(googleReviews).where(eq(googleReviews.id, reviewId)).get();
+  if (!row) return { ok: false, error: "Review not found." };
+  try {
+    const text = await draftReviewReply({ tenantId: currentTenantId(), reviewer: row.reviewer, rating: row.rating, comment: row.comment });
     if (!text) return { ok: false, error: "Adonis could not write a draft. Try again." };
     return { ok: true, text };
   } catch (err) {

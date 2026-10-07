@@ -6,6 +6,7 @@ import { db, schema } from "@/lib/db";
 import { emailMessages } from "@/lib/db/schema";
 import { listConversations, type ConvTag } from "@/lib/conversations";
 import { listRecentClientEmails } from "@/lib/clientEmail";
+import { listStoredReviews } from "@/lib/google/business";
 import { classifyEmail, cleanSnippet, decodeEntities, displaySender, type InboxBucket } from "./emailDisplay";
 
 /**
@@ -15,12 +16,12 @@ import { classifyEmail, cleanSnippet, decodeEntities, displaySender, type InboxB
  * loads a thread when it is opened.
  */
 
-export type InboxChannel = "email" | "whatsapp" | "messenger" | "instagram";
+export type InboxChannel = "email" | "whatsapp" | "messenger" | "instagram" | "google";
 
 export type InboxItem = {
-  /** "email:<thread>", "conv:<kind>-<id>" or "sent:<id>". */
+  /** "email:<thread>", "conv:<kind>-<id>", "sent:<id>" or "review:<id>". */
   key: string;
-  type: "email" | "conversation" | "sent";
+  type: "email" | "conversation" | "sent" | "review";
   channel: InboxChannel;
   name: string;
   address: string | null;
@@ -47,6 +48,8 @@ export type InboxItem = {
   failed?: boolean;
   /** Sent-log entries only: the full text we sent. */
   body?: string;
+  /** Google reviews only. */
+  review?: { id: number; rating: number; comment: string; reply: string | null; repliedAt: number | null };
 };
 
 export type EmailMode = "two-way" | "sent-log";
@@ -193,10 +196,34 @@ function conversationItems(): InboxItem[] {
   });
 }
 
-export function listInboxItems(emailMode: EmailMode): InboxItem[] {
+/** Google reviews copied in by lib/google/business (never fetched here). */
+function reviewItems(tenantId: number): InboxItem[] {
+  return listStoredReviews(tenantId).map((r) => ({
+    key: `review:${r.id}`,
+    type: "review" as const,
+    channel: "google" as const,
+    name: r.reviewer,
+    address: null,
+    subject: `${r.rating}-star review`,
+    snippet: r.reply ? `You replied: ${cleanSnippet(r.reply)}` : cleanSnippet(r.comment) || "Left a rating without a written review.",
+    at: r.updatedAt.getTime(),
+    unread: !r.isRead,
+    needsReply: !r.reply,
+    bucket: "people" as const,
+    outbound: !!r.reply,
+    messageCount: 0,
+    threadId: null,
+    contact: null,
+    conv: null,
+    review: { id: r.id, rating: r.rating, comment: r.comment, reply: r.reply, repliedAt: r.repliedAt ? r.repliedAt.getTime() : null },
+  }));
+}
+
+export function listInboxItems(emailMode: EmailMode, tenantId?: number): InboxItem[] {
   const items = [
     ...(emailMode === "two-way" ? emailItems(contactIndex(), 300) : sentLogItems()),
     ...conversationItems(),
+    ...(tenantId ? reviewItems(tenantId) : []),
   ];
   items.sort((a, b) => b.at - a.at);
   return items;

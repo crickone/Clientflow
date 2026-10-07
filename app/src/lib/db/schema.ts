@@ -823,6 +823,51 @@ export const gmailConnections = sqliteTable("gmail_connections", {
     .default(sql`(unixepoch() * 1000)`),
 });
 
+// A tenant's connected Google Business Profile, plus Search Console and
+// Analytics from the same sign-in (lib/google/business). Control plane, one
+// per tenant, tokens ENCRYPTED. Mirrors the DDL in lib/db/control.ts.
+export const googleBusinessConnections = sqliteTable("google_business_connections", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  tenantId: integer("tenant_id")
+    .notNull()
+    .unique()
+    .references(() => tenants.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  accessToken: text("access_token"),
+  tokenExpiry: integer("token_expiry", { mode: "timestamp_ms" }),
+  scope: text("scope"),
+  accountName: text("account_name"),
+  locationName: text("location_name"),
+  locationTitle: text("location_title"),
+  searchConsoleSite: text("search_console_site"),
+  ga4Property: text("ga4_property"),
+  ga4PropertyName: text("ga4_property_name"),
+  reviewsSyncedAt: integer("reviews_synced_at", { mode: "timestamp_ms" }),
+  connectedByUserId: integer("connected_by_user_id").references(() => users.id),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
+// Google reviews of the business, synced from its Business Profile (tenant
+// plane). review_name is Google's id ("accounts/1/locations/2/reviews/x").
+export const googleReviews = sqliteTable("google_reviews", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  reviewName: text("review_name").notNull().unique(),
+  reviewer: text("reviewer").notNull(),
+  photoUrl: text("photo_url"),
+  rating: integer("rating").notNull(),
+  comment: text("comment").notNull().default(""),
+  reviewedAt: integer("reviewed_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  reply: text("reply"),
+  repliedAt: integer("replied_at", { mode: "timestamp_ms" }),
+  isRead: integer("is_read", { mode: "boolean" }).notNull().default(false),
+  syncedAt: integer("synced_at", { mode: "timestamp_ms" }).notNull(),
+});
+export type GoogleReview = typeof googleReviews.$inferSelect;
+
 // A tenant's connected IMAP/SMTP mailbox (generic, non-Gmail) — the "bring
 // your own mailbox" alternative to gmail_connections above, for businesses on
 // e.g. Microsoft 365 or cPanel/Hostinger hosted email. One per tenant. The
