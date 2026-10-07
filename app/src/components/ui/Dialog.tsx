@@ -43,7 +43,7 @@ export const DialogContent = React.forwardRef<
         background: "var(--bg)",
         border: "1px solid var(--hairline)",
         borderRadius: "var(--radius)",
-        boxShadow: "var(--shadow-2)",
+        boxShadow: "var(--shadow-3)",
         zIndex: 70,
         padding: 28,
       }}

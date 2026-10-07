@@ -4,32 +4,33 @@ import * as React from "react";
 import { motion } from "motion/react";
 
 import { DUR, EASE } from "@/lib/motion";
+import { cn } from "@/lib/utils";
 
-const baseStyle: React.CSSProperties = {
-  background: "var(--surface-1)",
-  border: "1px solid var(--grid)",
-  borderRadius: "var(--radius)",
-  padding: 24,
-  boxShadow: "var(--shadow-1)",
-};
-
+/**
+ * The look lives in CSS (`.ui-card` in globals.css): the surface sheen, the
+ * top-edge highlight, the elevation shadows and the cursor spotlight are
+ * layered backgrounds and :hover states that inline styles can't express. A
+ * caller's `style` still wins, since inline beats the class.
+ */
 export const Card = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement> & { interactive?: boolean }
->(({ children, style, interactive, ...rest }, ref) => {
+>(({ children, className, interactive, ...rest }, ref) => {
   if (!interactive) {
     return (
-      <div ref={ref} style={{ ...baseStyle, ...style }} {...rest}>
+      <div ref={ref} className={cn("ui-card", className)} {...rest}>
         {children}
       </div>
     );
   }
+  // Framer owns the transform (lift + press); the shadow and border shift on
+  // hover are CSS transitions on .ui-card--interactive, so the two never fight.
   return (
     <motion.div
       ref={ref}
-      style={{ ...baseStyle, cursor: "pointer", ...style }}
-      whileHover={{ y: -2, boxShadow: "var(--shadow-2)", borderColor: "var(--hairline-strong)" }}
-      whileTap={{ y: 1 }}
+      className={cn("ui-card ui-card--interactive", className)}
+      whileHover={{ y: -2 }}
+      whileTap={{ y: 0, scale: 0.995 }}
       transition={{ duration: DUR.fast, ease: [...EASE] }}
       {...(rest as React.ComponentProps<typeof motion.div>)}
     >

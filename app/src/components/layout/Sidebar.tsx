@@ -325,6 +325,9 @@ export function Sidebar({
   const [now, setNow] = useState<Date | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  // Which row the pointer is over. One shared pill slides between rows
+  // (layoutId) instead of each row flashing its own background on.
+  const [hoverKey, setHoverKey] = useState<string | null>(null);
 
   useEffect(() => {
     setNow(new Date());
@@ -366,6 +369,9 @@ export function Sidebar({
 
   const navRowStyle: CSSProperties = {
     position: "relative",
+    // Own stacking context, so the hover pill (z-index -1) sits behind the
+    // icon and label but stays inside the row.
+    isolation: "isolate",
     display: "flex",
     alignItems: "center",
     gap: 11,
@@ -378,6 +384,16 @@ export function Sidebar({
     letterSpacing: "0",
     transition: "background 0.15s var(--ease), color 0.15s var(--ease)",
   };
+
+  const hoverPill = (key: string, show = true) =>
+    show && hoverKey === key ? (
+      <motion.span
+        layoutId="nav-hover-pill"
+        aria-hidden
+        className="nav-hover-pill"
+        transition={{ duration: DUR.base, ease: [...EASE] }}
+      />
+    ) : null;
 
   /** Left indent scales with nesting depth (0 = top level, matches the old indent/no-indent split at depth 1). */
   const indentFor = (depth: number) => 13 + depth * 21;
@@ -399,12 +415,14 @@ export function Sidebar({
       <Link
         key={item.href}
         href={item.href}
-        className={cn("nav-link", active && "nav-link--active")}
+        className={cn("nav-link nav-link--slide", active && "nav-link--active")}
         style={{
           ...navRowStyle,
           ...rowPadding(depth),
         }}
+        onMouseEnter={() => setHoverKey(item.href)}
       >
+        {hoverPill(item.href, !active)}
         {active && (
           <motion.span
             layoutId="nav-active-bar"
@@ -474,7 +492,8 @@ export function Sidebar({
       <Link
         key={item.href}
         href={item.href}
-        className="nav-link"
+        className="nav-link nav-link--slide"
+        onMouseEnter={() => setHoverKey(item.href)}
         style={{
           ...navRowStyle,
           paddingLeft: indentFor(0),
@@ -493,6 +512,7 @@ export function Sidebar({
             transition={{ duration: DUR.base, ease: [...EASE] }}
           />
         )}
+        {hoverPill(item.href, !active)}
         <Icon size={18} strokeWidth={2} />
         <span className="nav-label">{item.label}</span>
       </Link>
@@ -538,7 +558,8 @@ export function Sidebar({
               return next;
             });
           }}
-          className="nav-link"
+          className="nav-link nav-link--slide"
+          onMouseEnter={() => setHoverKey(`group:${entry.label}`)}
           style={{
             ...navRowStyle,
             width: "100%",
@@ -548,6 +569,7 @@ export function Sidebar({
             ...(childActive ? { color: "var(--text-primary)" } : {}),
           }}
         >
+          {hoverPill(`group:${entry.label}`)}
           <Icon size={depth === 0 ? 16 : 15} strokeWidth={1.75} />
           <span className="nav-label" style={{ flex: 1, textAlign: "left" }}>
             {entry.label}
@@ -615,20 +637,21 @@ export function Sidebar({
           )}
         </div>
         {onToggleCollapsed && (
-          <button
-            type="button"
-            className="app-sidebar-toggle"
-            onClick={onToggleCollapsed}
-            aria-label={collapsed ? "Expand menu" : "Collapse menu"}
-            aria-expanded={!collapsed}
-            title={collapsed ? "Expand menu" : "Collapse menu"}
-          >
-            <PanelLeftClose size={15} strokeWidth={1.9} />
-          </button>
+          <Tooltip label={collapsed ? "Expand menu" : "Collapse menu"} side="right">
+            <button
+              type="button"
+              className="app-sidebar-toggle"
+              onClick={onToggleCollapsed}
+              aria-label={collapsed ? "Expand menu" : "Collapse menu"}
+              aria-expanded={!collapsed}
+            >
+              <PanelLeftClose size={15} strokeWidth={1.9} />
+            </button>
+          </Tooltip>
         )}
       </div>
 
-      <nav style={{ padding: "8px 8px 12px", flex: 1, overflowY: "auto" }}>
+      <nav style={{ padding: "8px 8px 12px", flex: 1, overflowY: "auto" }} onMouseLeave={() => setHoverKey(null)}>
         {(showAdonis || showDashboard) && (
           <div
             style={{

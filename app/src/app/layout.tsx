@@ -8,6 +8,7 @@ import { isBarePath } from "@/lib/barePaths";
 import { ClientAppFrame } from "@/components/clientapp/ClientAppFrame";
 import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
 import { TooltipProvider } from "@/components/ui/Tooltip";
+import { SpotlightTracker } from "@/components/motion/SpotlightTracker";
 import { MotionRoot } from "@/components/motion/MotionRoot";
 import {
   getCurrentMembership,
@@ -227,6 +228,7 @@ export default async function RootLayout({
         <body>
           <style id="tenant-theme" dangerouslySetInnerHTML={{ __html: clientThemeStyle }} />
           <MotionRoot>
+            <SpotlightTracker />
             <ConfirmProvider>
               <ClientAppFrame logoSrc={clientLogo} businessName={clientBusiness}>
                 {children}
@@ -348,6 +350,7 @@ export default async function RootLayout({
         <TenantTabGuard tenantId={activeTenantId} />
         <div className="grain" aria-hidden />
         <MotionRoot>
+          <SpotlightTracker />
           <TooltipProvider delayDuration={300}>
             <ConfirmProvider>
               <AppShell

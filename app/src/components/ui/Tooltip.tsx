@@ -34,10 +34,11 @@ export function Tooltip({
             fontSize: 12,
             padding: "5px 9px",
             borderRadius: "var(--radius-sm)",
-            boxShadow: "var(--shadow-1)",
+            boxShadow: "var(--shadow-3)",
             zIndex: 95,
             maxWidth: 240,
-            animation: "fade-up 0.12s var(--ease)",
+            transformOrigin: "var(--radix-tooltip-content-transform-origin)",
+            animation: "pop-in 0.12s var(--ease)",
           }}
         >
           {label}

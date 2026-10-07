@@ -1,6 +1,7 @@
 import "server-only";
 
 import { and, asc, eq, gte, inArray, lt, sql } from "drizzle-orm";
+import { Activity, CalendarClock, Euro, Workflow } from "lucide-react";
 
 import { RevenueBars } from "@/components/charts/RevenueBars";
 import { KpiTile } from "@/components/dashboard/views/KpiTile";
@@ -9,6 +10,7 @@ import { RowList } from "@/components/dashboard/views/RowList";
 import { StatList, type StatRow } from "@/components/dashboard/views/StatList";
 import { DailyBrief } from "@/components/dashboard/DailyBrief";
 import { StageBars } from "@/components/dashboard/views/StageBars";
+import { WidgetEmpty } from "@/components/dashboard/views/WidgetEmpty";
 import { TodaysClassesView } from "@/components/dashboard/views/TodaysClassesView";
 import { TodaysScheduleView } from "@/components/dashboard/views/TodaysScheduleView";
 import { getGymDashboard } from "@/lib/dashboard";
@@ -26,6 +28,7 @@ import type { OverviewKey } from "./keys";
 import { cached } from "./cache";
 import { deltaPct } from "../range";
 import { fillDays } from "../series";
+import { bucketIndex, seriesBuckets } from "../metrics/stats";
 import type { WidgetCtx, WidgetImpl } from "../types";
 
 export { fillDays };
@@ -40,6 +43,22 @@ function countLeads(fromMs: number, toMs: number): number {
     .where(and(gte(schema.leads.createdAt, new Date(fromMs)), lt(schema.leads.createdAt, new Date(toMs))))
     .get();
   return Number(row?.n ?? 0);
+}
+
+/** New leads per bucket across the range, for the tile's sparkline. */
+function leadSpark(fromMs: number, toMs: number): number[] {
+  const buckets = seriesBuckets(fromMs, toMs);
+  const out = new Array<number>(buckets.length).fill(0);
+  const rows = db
+    .select({ at: schema.leads.createdAt })
+    .from(schema.leads)
+    .where(and(gte(schema.leads.createdAt, new Date(fromMs)), lt(schema.leads.createdAt, new Date(toMs))))
+    .all();
+  for (const r of rows) {
+    const i = r.at ? bucketIndex(buckets, r.at.getTime()) : -1;
+    if (i >= 0) out[i]++;
+  }
+  return out;
 }
 
 function countUnread(): number {
@@ -213,7 +232,13 @@ export const OVERVIEW_WIDGETS = {
     async load(ctx) {
       const cur = countLeads(ctx.range.fromMs, ctx.range.toMs);
       const prev = countLeads(ctx.previous.fromMs, ctx.previous.toMs);
-      return { value: String(cur), sub: ctx.range.label, delta: deltaPct(cur, prev), accent: cur > 0 };
+      return {
+        value: String(cur),
+        sub: ctx.range.label,
+        delta: deltaPct(cur, prev),
+        accent: cur > 0,
+        spark: leadSpark(ctx.range.fromMs, ctx.range.toMs),
+      };
     },
     render: kpi,
   },
@@ -230,7 +255,7 @@ export const OVERVIEW_WIDGETS = {
       const rows = await recentActivity(10);
       return rows.map((a) => ({ id: a.id, primary: a.message, meta: relativeTime(a.createdAt) }));
     },
-    render: (rows) => <RowList rows={rows} empty="No activity yet." />,
+    render: (rows) => <RowList rows={rows} empty="No activity yet." emptyIcon={Activity} />,
   },
   "overview.revenueTrend": {
     href: "/reports",
@@ -246,9 +271,7 @@ export const OVERVIEW_WIDGETS = {
     },
     render: (d, ctx) =>
       d.total === 0 ? (
-        <div style={{ padding: 32, color: "var(--text-tertiary)", fontSize: 14, textAlign: "center" }}>
-          No revenue recorded in this period.
-        </div>
+        <WidgetEmpty text="No revenue recorded in this period." icon={Euro} />
       ) : (
         <>
           <KpiTile value={formatEur(d.total)} sub={ctx.range.label} delta={d.delta} />
@@ -277,7 +300,14 @@ export const OVERVIEW_WIDGETS = {
       const byStage = new Map(counts.map((c) => [c.stageId, Number(c.n)]));
       return stages.map((s) => ({ id: s.id, name: s.name, count: byStage.get(s.id) ?? 0 }));
     },
-    render: (stages) => <StageBars stages={stages} empty="No leads in the pipeline yet." />,
+    render: (stages) => (
+      <StageBars
+        stages={stages}
+        empty="No leads in the pipeline yet."
+        emptyIcon={Workflow}
+        emptyAction={{ href: "/leads", label: "Open the pipeline" }}
+      />
+    ),
   },
   "overview.upcomingPosts": {
     href: "/content-studio",
@@ -300,7 +330,14 @@ export const OVERVIEW_WIDGETS = {
         meta: r.when.toLocaleString("en-IE", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Dublin" }),
       }));
     },
-    render: (rows) => <RowList rows={rows} empty="Nothing scheduled. Plan a post in Content Studio." />,
+    render: (rows) => (
+      <RowList
+        rows={rows}
+        empty="Nothing scheduled."
+        emptyIcon={CalendarClock}
+        emptyAction={{ href: "/content-studio", label: "Plan a post" }}
+      />
+    ),
   },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } satisfies Record<OverviewKey, WidgetImpl<any>>;

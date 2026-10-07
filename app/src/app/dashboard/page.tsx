@@ -3,7 +3,7 @@ import Link from "next/link";
 import { CalendarPlus, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { WidgetSkeleton } from "@/components/ui/Skeleton";
 import { DailyBrief } from "@/components/dashboard/DailyBrief";
 import { SetupProgressCard } from "@/components/dashboard/SetupProgressCard";
 import { DashboardGrid, type CatalogEntry, type GridItem } from "@/components/dashboard/DashboardGrid";
@@ -84,7 +84,7 @@ export default async function DashboardPage({
         <RequirementCta requirement={unmet} />
       ) : (
         <WidgetErrorBoundary>
-          <Suspense fallback={<Skeleton height={ref.size === "L" || ref.size === "XL" ? 120 : 48} />}>
+          <Suspense fallback={<WidgetSkeleton rows={ref.size !== "S"} />}>
             <WidgetSlot widgetKey={ref.key} ctx={ctx} tenantId={tenantId} />
           </Suspense>
         </WidgetErrorBoundary>

@@ -1,10 +1,12 @@
 import Link from "next/link";
 import type { TodayClass } from "@/lib/dashboard";
+import { CalendarDays } from "lucide-react";
 import { formatTime } from "@/lib/utils";
+import { WidgetEmpty } from "./WidgetEmpty";
 
 export function TodaysClassesView({ classes }: { classes: TodayClass[] }) {
   if (classes.length === 0) {
-    return <div style={{ padding: "24px 0", color: "var(--text-tertiary)", fontSize: 14 }}>No classes scheduled today.</div>;
+    return <WidgetEmpty text="No classes scheduled today." icon={CalendarDays} action={{ href: "/timetable", label: "Open timetable" }} />;
   }
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -15,6 +17,7 @@ export function TodaysClassesView({ classes }: { classes: TodayClass[] }) {
           <Link
             key={c.id}
             href="/timetable"
+            className="dash-row-card"
             style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 14px", borderRadius: "var(--radius)", border: "1px solid var(--hairline)" }}
           >
             <div style={{ fontFamily: "var(--font-heading)", fontSize: 16, color: "var(--text-primary)", minWidth: 62 }}>{formatTime(c.time)}</div>

@@ -16,13 +16,16 @@ export const DropdownMenuContent = React.forwardRef<
       sideOffset={sideOffset}
       style={{
         minWidth: 200,
-        background: "var(--surface-1)",
+        background: "var(--glass)",
+        backdropFilter: "blur(18px) saturate(150%)",
+        WebkitBackdropFilter: "blur(18px) saturate(150%)",
         border: "1px solid var(--hairline)",
         borderRadius: "var(--radius)",
-        boxShadow: "var(--shadow-2)",
+        boxShadow: "var(--shadow-3)",
         padding: 6,
         zIndex: 90,
-        animation: "fade-up 0.14s var(--ease)",
+        transformOrigin: "var(--radix-dropdown-menu-content-transform-origin)",
+        animation: "pop-in 0.14s var(--ease)",
         ...style,
       }}
       {...props}

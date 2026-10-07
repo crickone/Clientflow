@@ -1,3 +1,5 @@
+import { WidgetEmpty } from "./WidgetEmpty";
+
 export function TableView({
   columns,
   rows,
@@ -8,7 +10,7 @@ export function TableView({
   empty: string;
 }) {
   if (rows.length === 0) {
-    return <div style={{ padding: "16px 0", color: "var(--text-tertiary)", fontSize: 14 }}>{empty}</div>;
+    return <WidgetEmpty text={empty} />;
   }
   return (
     <div style={{ overflowX: "auto" }}>

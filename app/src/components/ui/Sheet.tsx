@@ -40,7 +40,7 @@ export const SheetContent = React.forwardRef<
         width: `min(96vw, ${width}px)`,
         background: "var(--surface-1)",
         borderLeft: "1px solid var(--hairline)",
-        boxShadow: "var(--shadow-2)",
+        boxShadow: "var(--shadow-3)",
         zIndex: 70,
         display: "flex",
         flexDirection: "column",

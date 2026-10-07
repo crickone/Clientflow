@@ -1,10 +1,12 @@
 import Link from "next/link";
 
+import { WidgetEmpty } from "./WidgetEmpty";
+
 export type BarRow = { label: string; value: number; display?: string; sub?: string; href?: string };
 
 export function BarListView({ rows, empty, max }: { rows: BarRow[]; empty: string; max?: number }) {
   if (rows.length === 0) {
-    return <div style={{ padding: "16px 0", color: "var(--text-tertiary)", fontSize: 14 }}>{empty}</div>;
+    return <WidgetEmpty text={empty} />;
   }
   const top = max ?? Math.max(1, ...rows.map((r) => r.value));
   return (

@@ -1,4 +1,7 @@
 import Link from "next/link";
+import type { LucideIcon } from "lucide-react";
+
+import { WidgetEmpty } from "./WidgetEmpty";
 
 export interface Row {
   id: string | number;
@@ -8,9 +11,19 @@ export interface Row {
   href?: string;
 }
 
-export function RowList({ rows, empty }: { rows: Row[]; empty: string }) {
+export function RowList({
+  rows,
+  empty,
+  emptyIcon,
+  emptyAction,
+}: {
+  rows: Row[];
+  empty: string;
+  emptyIcon?: LucideIcon;
+  emptyAction?: { href: string; label: string };
+}) {
   if (rows.length === 0) {
-    return <div style={{ padding: "16px 0", color: "var(--text-tertiary)", fontSize: 14 }}>{empty}</div>;
+    return <WidgetEmpty text={empty} icon={emptyIcon} action={emptyAction} />;
   }
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -27,7 +40,7 @@ export function RowList({ rows, empty }: { rows: Row[]; empty: string }) {
           </div>
         );
         return r.href ? (
-          <Link key={r.id} href={r.href}>
+          <Link key={r.id} href={r.href} className="dash-row-link">
             {body}
           </Link>
         ) : (

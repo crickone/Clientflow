@@ -134,6 +134,7 @@ export function DashboardGrid({ tabIndex, items, catalog }: { tabIndex: number; 
     <>
       {editing && (
         <div
+          className="dash-edit-bar"
           style={{
             position: "sticky",
             top: 8,
@@ -235,6 +236,18 @@ function Tile({
   // buttons inside still lands as a click. The grip keeps the keyboard side
   // (focus + arrow keys), which is why onKeyDown stays off the tile.
   const { onKeyDown: keyDrag, ...pointerDrag } = (listeners ?? {}) as Record<string, (e: unknown) => void>;
+  const router = useRouter();
+  // Outside edit mode a tile with a page behind it is clickable anywhere, not
+  // just on its chevron. Clicks on a control inside the tile (a row link, a
+  // refresh button) keep their own meaning. Keyboard users still have the
+  // chevron link, so the tile itself stays out of the tab order.
+  const clickable = !editing && !!item.href;
+  const onTileClick = (e: React.MouseEvent) => {
+    if (!clickable) return;
+    if ((e.target as Element).closest("a, button, input, select, textarea, label, [role='button']")) return;
+    if (window.getSelection()?.toString()) return;
+    router.push(item.href!);
+  };
   return (
     <div
       ref={setNodeRef}
@@ -242,7 +255,12 @@ function Tile({
       className={`dash-tile dash-span-${SPAN[item.ref.size]}`}
       {...(editing ? pointerDrag : {})}
     >
-      <Card className={editing && !isDragging ? "dash-wobble" : undefined} style={{ height: "100%" }}>
+      <Card
+        interactive={clickable}
+        onClick={clickable ? onTileClick : undefined}
+        className={editing && !isDragging ? "dash-wobble" : undefined}
+        style={{ height: "100%" }}
+      >
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
           {editing && (
             <button
@@ -291,7 +309,7 @@ function Tile({
             </>
           ) : (
             item.href && (
-              <Link href={item.href} aria-label={`Open ${item.title}`} style={{ color: "var(--text-tertiary)", display: "flex" }}>
+              <Link href={item.href} aria-label={`Open ${item.title}`} className="dash-tile-go">
                 <ChevronRight size={16} />
               </Link>
             )
