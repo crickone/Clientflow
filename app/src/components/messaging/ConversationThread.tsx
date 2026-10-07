@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type Ref } from "react";
 import { Send } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
@@ -46,6 +46,8 @@ export function ConversationThread({
   seedText,
   channelLabel = "WhatsApp",
   note,
+  fill = false,
+  composerRef,
 }: {
   messages: ThreadMessage[];
   canSend: boolean;
@@ -57,6 +59,10 @@ export function ConversationThread({
   channelLabel?: string;
   /** Shown under the composer: why sending is off, or a channel caveat. */
   note?: string | null;
+  /** Fill the parent's height (the inbox reading pane) instead of capping at 62vh. */
+  fill?: boolean;
+  /** Lets the inbox focus the composer from a keyboard shortcut. */
+  composerRef?: Ref<HTMLTextAreaElement>;
 }) {
   const [text, setText] = useState("");
   const scroller = useRef<HTMLDivElement>(null);
@@ -80,10 +86,25 @@ export function ConversationThread({
   let lastDay = "";
 
   return (
-    <Card style={{ padding: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <Card
+      style={{
+        padding: 0,
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        ...(fill ? { flex: 1, minHeight: 0, border: 0, borderRadius: 0, boxShadow: "none", background: "transparent" } : {}),
+      }}
+    >
       <div
         ref={scroller}
-        style={{ maxHeight: "min(62vh, 640px)", minHeight: 240, overflowY: "auto", padding: "18px 18px 8px", display: "flex", flexDirection: "column", gap: 4 }}
+        style={{
+          ...(fill ? { flex: 1, minHeight: 0 } : { maxHeight: "min(62vh, 640px)", minHeight: 240 }),
+          overflowY: "auto",
+          padding: "18px 18px 8px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 4,
+        }}
       >
         {messages.length === 0 ? (
           <div style={{ margin: "auto", color: "var(--text-tertiary)", fontSize: 14 }}>{emptyHint}</div>
@@ -142,6 +163,7 @@ export function ConversationThread({
       <div style={{ borderTop: "1px solid var(--hairline)", padding: 12, display: "grid", gap: 8 }}>
         <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
           <Textarea
+            ref={composerRef}
             rows={2}
             value={text}
             onChange={(e) => setText(e.target.value)}

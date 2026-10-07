@@ -2,6 +2,8 @@ import "server-only";
 
 import { and, desc, eq, inArray } from "drizzle-orm";
 
+import { splitAddress } from "@/lib/inbox/emailDisplay";
+
 import { authDb } from "@/lib/db/control";
 import { db } from "@/lib/db";
 import { clients, emailMessages, gmailConnections } from "@/lib/db/schema";
@@ -284,11 +286,9 @@ function extractBody(payload: GmailPart | undefined): { html: string; text: stri
 }
 
 /** Parse "Name <addr@x>" → {name, email}. */
-function parseAddress(raw: string): { name: string; email: string } {
-  const m = raw.match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/);
-  if (m) return { name: m[1].trim(), email: m[2].trim().toLowerCase() };
-  return { name: "", email: raw.trim().toLowerCase() };
-}
+// The LAST "<...>" is the address: a display name may contain brackets of its
+// own ("noreply - legitfit < >"), which the old single regex choked on.
+const parseAddress = splitAddress;
 
 /**
  * Bounded concurrency for the per-message Gmail fetch during a sync — avoids
