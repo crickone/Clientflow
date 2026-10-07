@@ -20,9 +20,8 @@ import {
  * On click it (1) writes the `ui-theme` cookie so the server injects the
  * matching palette on the next load, and (2) applies the new palette INSTANTLY
  * by setting the derived vars inline on <html> (inline wins over the injected
- * <style>) + flipping `data-theme` — the same mechanism AppearanceView uses for
- * its live preview. `--font-heading` is deliberately skipped so the tenant's
- * chosen heading font is never clobbered (it's mode-independent).
+ * <style>) + flipping `data-theme`. `--font-heading` is skipped: the font
+ * does not change with the mode.
  */
 export function ThemeToggle({ initialMode }: { initialMode: ThemeMode }) {
   const [mode, setMode] = useState<ThemeMode>(initialMode);
@@ -31,7 +30,7 @@ export function ThemeToggle({ initialMode }: { initialMode: ThemeMode }) {
   function flip() {
     const root = document.documentElement;
     for (const [k, v] of resolveThemeVars(themeForMode(next))) {
-      if (k === "--font-heading") continue; // mode-independent; keep tenant's font
+      if (k === "--font-heading") continue; // mode-independent
       if (k === "color-scheme") root.style.colorScheme = v;
       else root.style.setProperty(k, v);
     }

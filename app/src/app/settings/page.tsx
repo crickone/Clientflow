@@ -9,7 +9,6 @@ import {
   ChevronRight,
   UserCog,
   Image as ImageIcon,
-  Palette,
   LayoutTemplate,
   MessageCircle,
   Mail,
@@ -89,12 +88,6 @@ function buildSections(vocab: ReturnType<typeof getVocab>) {
     icon: KeyRound,
     title: "API keys",
     desc: "Per-tenant keys for inbound integrations (Zapier, Make, Facebook lead-gen) that post leads into this account.",
-  },
-  {
-    href: "/settings/appearance",
-    icon: Palette,
-    title: "Appearance",
-    desc: "Theme the whole app — background & accent colour — and pick the heading font.",
   },
   {
     href: "/settings/branding",

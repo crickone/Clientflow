@@ -169,7 +169,11 @@ export default async function RootLayout({
     // pins the tenant). Logged out (/app/login, /app/reset) there is NO tenant
     // to brand for — render neutral chrome rather than any tenant's.
     const clientTenant = resolveCurrentTenant();
-    const clientThemeStyle = themeCss(clientTenant ? getTheme() : DEFAULT_THEME);
+    // Brand colours stay per tenant (this is what their customers see); the
+    // heading font is the platform default everywhere.
+    const clientThemeStyle = themeCss(
+      clientTenant ? { ...getTheme(), headingFont: DEFAULT_HEADING_FONT } : DEFAULT_THEME,
+    );
     const clientLogo = clientTenant ? getChromeLogoSrc() : null;
     const clientBusiness = clientTenant ? getBusinessProfile().businessName : "";
 
@@ -313,13 +317,12 @@ export default async function RootLayout({
   const logoSrc = current ? getChromeLogoSrc() : null;
   const businessName = current ? getBusinessProfile().businessName : "";
   // App light/dark mode — a per-browser choice (the `ui-theme` cookie), read
-  // here so the SSR'd palette matches from the first paint (no flash). The
-  // tenant's chosen heading font is carried through; bg/accent come from the
-  // mode preset, not per-tenant settings (the colour picker was retired).
+  // here so the SSR'd palette matches from the first paint (no flash). Every
+  // account looks the same: colours come from the mode preset and the heading
+  // font is the platform default (per-tenant appearance settings were removed
+  // 2026-10-07).
   const themeMode = coerceThemeMode(cookies().get(THEME_MODE_COOKIE)?.value);
-  const themeStyle = themeCss(
-    themeForMode(themeMode, current ? getTheme().headingFont : DEFAULT_HEADING_FONT),
-  );
+  const themeStyle = themeCss(themeForMode(themeMode));
   const tenantSlug = current ? current.tenant.slug : "";
   const schedulingMode = current ? getSchedulingMode() : "appointments";
   // Single cheap KV read (never the full getSetupSummary()) — safe to run on

@@ -54,7 +54,7 @@ export function Soundwave({ stream }: { stream: MediaStream }) {
 
       // One-time read — getComputedStyle is too costly to call every
       // animation frame. --accent inherits from whatever ancestor sets it
-      // (tenant theming, see /settings/appearance), so this stays
+      // (the light/dark theme tokens), so this stays
       // theme-aware without any extra light/dark branching.
       const accent = getComputedStyle(canvas).getPropertyValue("--accent").trim() || FALLBACK_ACCENT;
 

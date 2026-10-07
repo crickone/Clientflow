@@ -74,7 +74,7 @@ The CRM is a wide set of modules, most gated per tenant by venue type
   (bulk email), `/content-studio`, `/adonis`.
 - **Programmes:** `/nutrition`, `/workout`, `/forms`, `/automations`, `/training`
   (sales-training programme, `optimal-health` + `renova` only).
-- **Platform:** `/settings` (incl. `/settings/appearance`, `/settings/design`),
+- **Platform:** `/settings` (incl. `/settings/design`),
   `/setup` (self-onboarding checklist), `/cms`, `/communication` (combined inbox),
   `/billing`.
 - **Client-facing:** `/app` — the branded client mobile app with its own login
@@ -236,10 +236,12 @@ with `tools/push-site-to-prod.cjs`.
 - `cd app && npm run dev` → http://localhost:3000 (Node at `/usr/local/bin`).
 - Public site dev preview: `http://localhost:3000/site/<slug>`.
 - Theme is **dark premium** by default (a light mode exists, per-viewer via the
-  `data-theme` cookie), token-driven in `src/app/globals.css` (`--bg`,
-  `--surface-*`, `--accent`) via `src/lib/theme.ts`, with a per-tenant palette
-  layered on top from `/settings/appearance` (injected in the root layout).
-  Admin heading font is Space Grotesk; Nebula is brand/marketing assets only.
+  `ui-theme` cookie), token-driven in `src/app/globals.css` (`--bg`,
+  `--surface-*`, `--accent`) via `src/lib/theme.ts`. EVERY account looks the
+  same: per-tenant appearance settings (colours, heading font) were removed
+  2026-10-07 — the light/dark toggle is the only choice. Don't reintroduce a
+  per-tenant admin theme. The client mobile app (`/app`) still uses the
+  tenant's brand colours. Nebula is brand/marketing assets only.
   Public client sites keep their own styles, independent of the admin theme.
 
 ## Deployment
