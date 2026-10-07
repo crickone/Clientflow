@@ -112,7 +112,7 @@ export default async function DashboardPage({
     count: visibleRefs(p.widgets[venue], { venue, role: membership.role, overrides }).length,
   })).filter((p) => p.count > 0);
 
-  const showNeedsAbove = !refs.some((r) => r.key === "overview.needsYou");
+  const showNeedsCard = !refs.some((r) => r.key === "overview.needsYou");
   const dateLine = now.toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Dublin" });
 
   return (
@@ -149,8 +149,6 @@ export default async function DashboardPage({
         />
       )}
 
-      {showNeedsAbove && <DailyBrief tenantId={tenantId} />}
-
       <TabBar
         tabs={tabs.map((t) => ({ name: t.name, presetKey: t.presetKey }))}
         active={active}
@@ -161,6 +159,10 @@ export default async function DashboardPage({
         presets={presets}
         custom={tabRange.key === "custom" ? { from: tabRange.fromIso, to: tabRange.toIso } : undefined}
       />
+
+      {/* Below the tab bar, so the bar sits in the same place on every tab
+          whether or not that tab has its own Needs you tile. */}
+      {showNeedsCard && <DailyBrief tenantId={tenantId} />}
 
       <DashboardGrid key={`${active}:${tab.widgets.map((w) => w.key + w.size).join(",")}`} tabIndex={active} items={items} catalog={catalog} />
     </div>
