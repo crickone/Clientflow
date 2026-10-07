@@ -15,10 +15,10 @@
  * eye hits first — and the model still composes the slide. It names a
  * starting point, not a structure.
  *
- * Consecutive posts are GUARANTEED to differ rather than merely likely to: the
- * last move used is remembered per tenant and excluded from the next pick. A
- * random choice from eight lands on the same one about one time in eight,
- * which is often enough to be noticed and complained about.
+ * Recent posts are GUARANTEED to differ rather than merely likely to: the last
+ * few moves used are remembered per tenant and excluded from the next pick.
+ * Excluding only the previous one still let a feed of nine posts show the same
+ * cover several times; the client noticed.
  *
  * Pure — the caller owns reading and writing the "last used" value.
  */
@@ -35,6 +35,9 @@ export interface OpeningMove {
   needsPhoto: boolean;
 }
 
+/** How many recent openings are kept out of the next pick. */
+export const RECENT_OPENINGS = 3;
+
 export const OPENING_MOVES: OpeningMove[] = [
   {
     key: "photo-overlap",
@@ -46,6 +49,12 @@ export const OPENING_MOVES: OpeningMove[] = [
     key: "photo-band",
     directive:
       "the photograph as a band across part of the canvas rather than the whole frame, with the heading on flat ground beyond it",
+    needsPhoto: true,
+  },
+  {
+    key: "photo-inset",
+    directive:
+      "a photograph set as a framed inset, not full-bleed, with the heading on flat ground beside or above it",
     needsPhoto: true,
   },
   {
@@ -91,8 +100,8 @@ export const OPENING_MOVE_KEYS = OPENING_MOVES.map((m) => m.key);
 /**
  * Choose the opening move for this generation.
  *
- * `lastKey` is the move the previous post used — excluded so consecutive posts
- * cannot open the same way. `hasPhoto` filters out the moves that need a
+ * `recent` is the moves the last few posts used (newest first), or just the
+ * previous one — all excluded so recent posts cannot open the same way. `hasPhoto` filters out the moves that need a
  * photograph, since a tenant without one is told not to write an <img> at all
  * and a directive asking for a full-bleed image would put the model in direct
  * conflict with that rule.
@@ -100,15 +109,21 @@ export const OPENING_MOVE_KEYS = OPENING_MOVES.map((m) => m.key);
  * `random` is injected so a test can pin the choice; callers use Math.random.
  */
 export function pickOpeningMove(
-  lastKey: string | null,
+  recent: string | readonly string[] | null,
   hasPhoto: boolean,
   random: () => number = Math.random,
 ): OpeningMove {
+  const exclude = new Set(recent == null ? [] : typeof recent === "string" ? [recent] : recent.slice(0, RECENT_OPENINGS));
   const usable = OPENING_MOVES.filter((m) => hasPhoto || !m.needsPhoto);
-  const candidates = usable.filter((m) => m.key !== lastKey);
+  const candidates = usable.filter((m) => !exclude.has(m.key));
   // Falling back to `usable` matters when exclusion empties the list — a
   // single-move set would otherwise have nothing to return.
   const pool = candidates.length > 0 ? candidates : usable;
   const i = Math.min(pool.length - 1, Math.floor(random() * pool.length));
   return pool[i];
+}
+
+/** The recent list after using `key`: newest first, capped. */
+export function rememberRecent(recent: readonly string[], key: string, keep: number): string[] {
+  return [key, ...recent.filter((k) => k !== key)].slice(0, keep);
 }

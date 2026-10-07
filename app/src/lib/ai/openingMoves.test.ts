@@ -11,7 +11,7 @@
 //     differently and a sentence would read wrong in one of them.
 import assert from "node:assert/strict";
 
-import { OPENING_MOVES, OPENING_MOVE_KEYS, pickOpeningMove } from "./openingMoves";
+import { OPENING_MOVES, OPENING_MOVE_KEYS, RECENT_OPENINGS, pickOpeningMove, rememberRecent } from "./openingMoves";
 
 let passed = 0;
 function check(name: string, cond: boolean) {
@@ -49,6 +49,19 @@ check("across the whole random range the excluded move never comes back", true);
 check(
   "a random value at the very top of the range still returns a move",
   !!pickOpeningMove(null, true, () => 0.999999),
+);
+
+// ── a few recent openings are all kept out, not just the last ──
+const recent = OPENING_MOVES.slice(0, RECENT_OPENINGS).map((m) => m.key);
+for (let r = 0; r < 1; r += 0.011) {
+  const picked = pickOpeningMove(recent, true, () => r);
+  assert.ok(!recent.includes(picked.key), `r=${r} reused a recent opening ${picked.key}`);
+}
+check(`none of the last ${RECENT_OPENINGS} openings comes back`, true);
+check(
+  "rememberRecent keeps newest first, without duplicates, capped",
+  JSON.stringify(rememberRecent(["a", "b", "c"], "b", 3)) === JSON.stringify(["b", "a", "c"]) &&
+    rememberRecent(["a", "b", "c"], "d", 3).length === 3,
 );
 
 // ── photography ──

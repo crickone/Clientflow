@@ -35,7 +35,13 @@ import {
   renderDesignedSlide,
 } from "@/lib/design/renderDesignedSlide";
 import { getDesignSystem } from "@/lib/design/system";
-import { pickOpeningMove } from "@/lib/ai/openingMoves";
+import { RECENT_OPENINGS, pickOpeningMove, rememberRecent } from "@/lib/ai/openingMoves";
+import {
+  RECENT_TREATMENTS,
+  directionProblems,
+  pickTreatment,
+  treatmentPhotoLine,
+} from "@/lib/ai/postTreatments";
 import { readKey, setKey } from "@/lib/settings";
 import type { DesignSystem } from "@/lib/design/parse";
 
@@ -56,8 +62,17 @@ import type { DesignSystem } from "@/lib/design/parse";
  */
 const DESIGN_MAX_TOKENS = 32000;
 
-/** Settings key holding the opening move the LAST post used, so the next one can't repeat it. */
+/** Settings key holding the opening move the LAST post used (kept for the redesign path). */
 const LAST_OPENING_MOVE_KEY = "last_opening_move";
+/** The last few opening moves and post treatments, newest first, so recent posts can't repeat them. */
+const RECENT_OPENING_MOVES_KEY = "recent_opening_moves";
+const RECENT_TREATMENTS_KEY = "recent_post_treatments";
+
+function recentList(key: string, fallback: string | null): string[] {
+  const list = readKey<unknown>(key, null);
+  if (Array.isArray(list)) return list.filter((k): k is string => typeof k === "string");
+  return fallback ? [fallback] : [];
+}
 
 export type { PhotoChoice };
 
@@ -260,9 +275,17 @@ export async function designPost(
   // so it settles on its favourite composition and posts start to resemble
   // each other even though each SET is varied internally. See ./openingMoves
   // for why this is a direction rather than a layout to fill in.
-  const lastMove = readKey<string | null>(LAST_OPENING_MOVE_KEY, null);
-  const move = pickOpeningMove(lastMove, hasPhotography);
+  const recentMoves = recentList(RECENT_OPENING_MOVES_KEY, readKey<string | null>(LAST_OPENING_MOVE_KEY, null));
+  const move = pickOpeningMove(recentMoves, hasPhotography);
   setKey(LAST_OPENING_MOVE_KEY, move.key);
+  setKey(RECENT_OPENING_MOVES_KEY, rememberRecent(recentMoves, move.key, RECENT_OPENINGS));
+
+  // And one approach for the whole set, rotated the same way. Covers alone did
+  // not stop posts looking alike: everything after slide one was built from
+  // the same small kit each time. See ./postTreatments.
+  const recentTreatments = recentList(RECENT_TREATMENTS_KEY, null);
+  const treatment = pickTreatment(recentTreatments, hasPhotography);
+  setKey(RECENT_TREATMENTS_KEY, rememberRecent(recentTreatments, treatment.key, RECENT_TREATMENTS));
 
   const userPrompt = [
     `Topic: ${input.topic}`,
@@ -272,7 +295,10 @@ export async function designPost(
     `The canvas for every slide is EXACTLY ${width}x${height} pixels.`,
     `Design ${input.slideCount} slide${input.slideCount === 1 ? "" : "s"} as ONE set: different compositions, one visual world. Rotate the grounds within the budgets above.`,
     "",
-    `THE OPENING SLIDE: open on ${move.directive}. That is a starting point, not a template -- compose it yourself, and let the slides after it move away from that shape.`,
+    `THIS POST'S APPROACH: ${treatment.directive}. Build the whole set around it, inside the brand's colours, type and grounds. It replaces the habit of a small label over a heading, a rule and a list on every slide: use those only where this approach calls for them.`,
+    treatmentPhotoLine(treatment),
+    "",
+    `THE COVER (slide one) MUST open on ${move.directive}.${move.needsPhoto ? "" : " No photograph on the cover."} Compose it yourself, and let the slides after it move away from that shape.`,
     "",
     "Return ONLY the JSON in <design>...</design>.",
   ]
@@ -426,6 +452,9 @@ export async function designPost(
           : design.violations,
       });
     }
+    // Held to the cover and photograph parts of the direction: a direction
+    // the model may ignore is how every cover ended up the same.
+    problems.push(...directionProblems(checked.designs.map((d) => d.html), move, treatment));
     return { slides: rendered, problems };
   }
 
@@ -553,7 +582,7 @@ export async function redesignSlide(
   const askFor = `Topic: ${input.topic}\n\nDesign ONE slide on a ${width}x${height} canvas. Return ONLY the JSON in <design>...</design>, with exactly one entry in "slides".`;
 
   const redesignMove = pickOpeningMove(
-    readKey<string | null>(LAST_OPENING_MOVE_KEY, null),
+    recentList(RECENT_OPENING_MOVES_KEY, readKey<string | null>(LAST_OPENING_MOVE_KEY, null)),
     hasPhotography,
   );
 
