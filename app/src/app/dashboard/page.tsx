@@ -28,6 +28,8 @@ import { getSchedulingMode, getVenueType } from "@/lib/settings";
 import { getSetupSummary, isSetupDismissed, setSetupDismissed } from "@/lib/setup/steps";
 import { getVocab } from "@/lib/vocabulary";
 
+const NEEDS_YOU_KEY = "overview.needsYou";
+
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage({
@@ -55,7 +57,12 @@ export default async function DashboardPage({
   const custom = { from: searchParams.from, to: searchParams.to };
   const tabRange = resolveRange(rangeKey, now, custom);
   const overrides = getVisibilityOverrides();
-  const refs = visibleRefs(tab.widgets, { venue, role: membership.role, overrides });
+  // Needs you is always the full-width card at the top of every tab (rendered
+  // below), never a tile in the grid, so it sits in the same place whichever
+  // tab is open. Older saved tabs and presets still list it; skip it here.
+  const refs = visibleRefs(tab.widgets, { venue, role: membership.role, overrides }).filter(
+    (r) => r.key !== NEEDS_YOU_KEY,
+  );
   const cache = new Map<string, Promise<unknown>>();
   const startMemo = new Map<RecorderKey, Date | null>();
   const recorderStart = (key: RecorderKey): Date | null => {
@@ -93,7 +100,7 @@ export default async function DashboardPage({
   });
 
   const catalog: CatalogEntry[] = (CATALOG as readonly WidgetMeta[])
-    .filter((m) => appliesToVenue(m, venue) && canSee(m, membership.role, overrides))
+    .filter((m) => m.key !== NEEDS_YOU_KEY && appliesToVenue(m, venue) && canSee(m, membership.role, overrides))
     .map((m) => ({
       key: m.key,
       title: m.title,
@@ -112,7 +119,6 @@ export default async function DashboardPage({
     count: visibleRefs(p.widgets[venue], { venue, role: membership.role, overrides }).length,
   })).filter((p) => p.count > 0);
 
-  const showNeedsCard = !refs.some((r) => r.key === "overview.needsYou");
   const dateLine = now.toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Dublin" });
 
   return (
@@ -160,9 +166,8 @@ export default async function DashboardPage({
         custom={tabRange.key === "custom" ? { from: tabRange.fromIso, to: tabRange.toIso } : undefined}
       />
 
-      {/* Below the tab bar, so the bar sits in the same place on every tab
-          whether or not that tab has its own Needs you tile. */}
-      {showNeedsCard && <DailyBrief tenantId={tenantId} />}
+      {/* Below the tab bar, the same on every tab. */}
+      <DailyBrief tenantId={tenantId} />
 
       <DashboardGrid key={`${active}:${tab.widgets.map((w) => w.key + w.size).join(",")}`} tabIndex={active} items={items} catalog={catalog} />
     </div>
