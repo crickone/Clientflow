@@ -3652,3 +3652,22 @@ a.stat-row:hover .stat-label { color: var(--text-primary); }
   .inbox-keys, .inbox-composer-hint { display: none; }
   .inbox-msg-snippet, .inbox-msg-text { padding-left: 14px; }
 }
+
+/* Inbox: channels this account has not connected yet. */
+.inbox-rail-connect { color: var(--text-tertiary); }
+.inbox-rail-connect .inbox-connect-icons { opacity: 0.55; transition: opacity 0.15s var(--ease); }
+.inbox-rail-connect:hover .inbox-connect-icons { opacity: 1; }
+.inbox-rail-connect.is-static { cursor: default; }
+.inbox-rail-connect.is-static:hover { background: transparent; color: var(--text-tertiary); }
+.inbox-connect-plus { flex-shrink: 0; opacity: 0.7; }
+.inbox-connect-icons { display: inline-flex; align-items: center; flex-shrink: 0; }
+.inbox-connect-icons > * + * { margin-left: -4px; box-shadow: 0 0 0 2px var(--surface-1); border-radius: 50%; }
+.inbox-connect-cta { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--grid); display: grid; justify-items: center; gap: 10px; max-width: 360px; }
+.inbox-connect-cta p { margin: 0; font-size: 13px; color: var(--text-tertiary); }
+.inbox-connect-cta-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.inbox-connect-note { font-size: 12px; }
+.inbox-list-connect { display: none; }
+@media (max-width: 1100px) {
+  .inbox-list-connect { display: grid; gap: 2px; padding: 6px 8px; border-top: 1px solid var(--grid); }
+}
+.inbox-rail-connect .inbox-rail-label-text { white-space: normal; line-height: 1.3; }

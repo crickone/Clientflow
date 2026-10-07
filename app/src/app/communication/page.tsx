@@ -1,5 +1,7 @@
 import { UnifiedInbox } from "@/components/inbox/UnifiedInbox";
 import { requireUserPage, getCurrentMembership } from "@/lib/auth";
+import { listFacebookPages } from "@/lib/facebook/pages";
+import { isWhatsAppConfigured } from "@/lib/whatsapp/config";
 import { getGmailConnection } from "@/lib/gmail";
 import { getImapConnection } from "@/lib/imapEmail";
 import { listInboxItems } from "@/lib/inbox/unified";
@@ -11,7 +13,8 @@ export const dynamic = "force-dynamic";
 export default async function CommunicationPage({ searchParams }: { searchParams?: { c?: string; open?: string } }) {
   await requireUserPage();
   const vocab = getVocab(getVenueType());
-  const tenantId = getCurrentMembership()!.tenant.id;
+  const membership = getCurrentMembership()!;
+  const tenantId = membership.tenant.id;
   // With Gmail or IMAP connected the inbox is two-way; otherwise email is the
   // log of what was sent from client profiles.
   const emailConn = getGmailConnection(tenantId) ?? getImapConnection(tenantId);
@@ -31,6 +34,8 @@ export default async function CommunicationPage({ searchParams }: { searchParams
         connectedEmail={emailConn?.email ?? null}
         emailMode={emailConn ? "two-way" : "sent-log"}
         initialOpen={initialOpen}
+        connected={{ whatsapp: isWhatsAppConfigured(), meta: listFacebookPages(tenantId).length > 0 }}
+        isAdmin={membership.role === "admin"}
       />
     </div>
   );

@@ -13,6 +13,7 @@ import {
   Layers,
   Mail,
   MailOpen,
+  Plus,
   RefreshCw,
   Search,
   Tag,
@@ -103,12 +104,17 @@ export function UnifiedInbox({
   connectedEmail,
   emailMode,
   initialOpen,
+  connected,
+  isAdmin,
 }: {
   items: InboxItem[];
   memberLabel: string;
   connectedEmail: string | null;
   emailMode: "two-way" | "sent-log";
   initialOpen: string | null;
+  /** Which messaging channels this account has set up. */
+  connected: { whatsapp: boolean; meta: boolean };
+  isAdmin: boolean;
 }) {
   const router = useRouter();
   const [items, setItems] = useState(initialItems);
@@ -146,7 +152,22 @@ export function UnifiedInbox({
     }
     return out;
   }, [items]);
-  const presentChannels = useMemo(() => new Set(items.map((i) => i.channel)), [items]);
+  // A channel gets a row once it has a conversation or is connected (so a
+  // connected but quiet WhatsApp still shows, at zero).
+  const presentChannels = useMemo(() => {
+    const set = new Set(items.map((i) => i.channel));
+    if (emailMode === "two-way") set.add("email");
+    if (connected.whatsapp) set.add("whatsapp");
+    if (connected.meta) {
+      set.add("messenger");
+      set.add("instagram");
+    }
+    return set;
+  }, [items, emailMode, connected]);
+  const connectLinks = [
+    !connected.whatsapp && { href: "/settings/integrations/whatsapp", label: "Connect WhatsApp", channels: ["whatsapp"] as InboxChannel[] },
+    !connected.meta && { href: "/settings/integrations/facebook", label: "Connect Facebook and Instagram", channels: ["messenger", "instagram"] as InboxChannel[] },
+  ].filter(Boolean) as { href: string; label: string; channels: InboxChannel[] }[];
 
   const patch = useCallback((key: string, p: Partial<InboxItem>) => {
     setItems((all) => all.map((i) => (i.key === key ? { ...i, ...p } : i)));
@@ -311,8 +332,11 @@ export function UnifiedInbox({
         {PRIMARY.map(railItem)}
         <div className="inbox-rail-heading">Sorted for you</div>
         {SORTED.map(railItem)}
-        {CHANNEL_VIEWS.some((v) => presentChannels.has(v.channel!)) && <div className="inbox-rail-heading">Channels</div>}
+        <div className="inbox-rail-heading">Channels</div>
         {CHANNEL_VIEWS.filter((v) => presentChannels.has(v.channel!)).map(railItem)}
+        {connectLinks.map((c) => (
+          <ConnectLink key={c.href} {...c} isAdmin={isAdmin} />
+        ))}
         <div className="inbox-rail-foot">
           {emailMode === "two-way" && connectedEmail ? (
             <>
@@ -411,6 +435,14 @@ export function UnifiedInbox({
             ))
           )}
         </div>
+        {/* Phones and tablets have no rail, so the connect links sit here. */}
+        {connectLinks.length > 0 && (
+          <div className="inbox-list-connect">
+            {connectLinks.map((c) => (
+              <ConnectLink key={c.href} {...c} isAdmin={isAdmin} />
+            ))}
+          </div>
+        )}
         <div className="inbox-keys" aria-hidden>
           <kbd>j</kbd>
           <kbd>k</kbd> move <kbd>r</kbd> reply <kbd>e</kbd> mark read <kbd>/</kbd> search
@@ -438,6 +470,33 @@ export function UnifiedInbox({
               <Button size="sm" variant="outline" onClick={() => setView("needs")}>
                 <CornerDownLeft size={14} /> Show what needs a reply
               </Button>
+            )}
+            {connectLinks.length > 0 && (
+              <div className="inbox-connect-cta">
+                <p>
+                  {connectLinks.length === 2
+                    ? "Connect WhatsApp, Facebook and Instagram to answer every message here."
+                    : `${connectLinks[0].label} to answer those messages here too.`}
+                </p>
+                {isAdmin ? (
+                  <div className="inbox-connect-cta-buttons">
+                    {connectLinks.map((c) => (
+                      <Link key={c.href} href={c.href}>
+                        <Button size="sm" variant="outline">
+                          <span className="inbox-connect-icons">
+                            {c.channels.map((ch) => (
+                              <ChannelIcon key={ch} channel={ch} size={15} />
+                            ))}
+                          </span>
+                          {c.label}
+                        </Button>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="inbox-connect-note">An admin on this account can connect them in Settings.</p>
+                )}
+              </div>
             )}
           </div>
         ) : (
@@ -501,6 +560,30 @@ export function UnifiedInbox({
         )}
       </section>
     </div>
+  );
+}
+
+/** A rail row for a channel this account has not set up yet. */
+function ConnectLink({ href, label, channels, isAdmin }: { href: string; label: string; channels: InboxChannel[]; isAdmin: boolean }) {
+  const inner = (
+    <>
+      <span className="inbox-connect-icons">
+        {channels.map((ch) => (
+          <ChannelIcon key={ch} channel={ch} size={16} />
+        ))}
+      </span>
+      <span className="inbox-rail-label-text">{label}</span>
+      {isAdmin && <Plus size={14} className="inbox-connect-plus" />}
+    </>
+  );
+  return isAdmin ? (
+    <Link href={href} className="inbox-rail-item inbox-rail-connect">
+      {inner}
+    </Link>
+  ) : (
+    <span className="inbox-rail-item inbox-rail-connect is-static" title="An admin can connect this in Settings">
+      {inner}
+    </span>
   );
 }
 
