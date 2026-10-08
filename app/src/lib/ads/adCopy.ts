@@ -15,6 +15,15 @@ export const AD_GOAL_LABEL: Record<AdGoal, string> = {
   awareness: "Get known locally",
 };
 
+/** The button words a goal's default call to action shows (client-safe). */
+export const GOAL_BUTTON: Record<AdGoal, string> = {
+  bookings: "Book now",
+  leads: "Sign up",
+  messages: "Send message",
+  website: "Learn more",
+  awareness: "Learn more",
+};
+
 /** The Meta campaign objective an ad's goal runs under in the Ads manager. */
 export const GOAL_OBJECTIVE: Record<AdGoal, Objective> = {
   bookings: "traffic",
