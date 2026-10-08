@@ -52,6 +52,13 @@ export interface StartDesignProps {
 
 /** What the Write button is doing, shown as steps in place of the composer. */
 type Phase = "saving" | "starting" | "opening";
+/** How long each progress step stays on screen at least, and the pause on the last one before the editor opens. */
+const STEP_MIN_MS = 800;
+const OPEN_HOLD_MS = 900;
+/** Wait out whatever is left of `ms` since `since`; no wait when the real work already took longer. */
+const holdFor = (since: number, ms: number) =>
+  new Promise<void>((r) => setTimeout(r, Math.max(0, ms - (Date.now() - since))));
+
 const PHASES: { id: Phase; label: string }[] = [
   { id: "saving", label: "Saving the draft" },
   { id: "starting", label: "Handing the brief to Adonis" },
@@ -142,6 +149,7 @@ export function StartDesign(props: StartDesignProps) {
     setBusy("ai");
     setPhase("saving");
     setError(null);
+    const savingShown = Date.now();
     // One seed slide only: generation replaces the whole slot, so seeding the
     // full count here would just be deleted a second later.
     const id = await createDesign(1);
@@ -150,7 +158,11 @@ export function StartDesign(props: StartDesignProps) {
       setPhase(null);
       return;
     }
+    // Each step stays up long enough to read: on a fast connection the whole
+    // checklist used to flash past in a blink, which read as a glitch.
+    await holdFor(savingShown, STEP_MIN_MS);
     setPhase("starting");
+    const startingShown = Date.now();
     // Only STARTS the run. The slides are written by a detached continuation on
     // the server, and the editor shows them arriving -- so the operator is free
     // to navigate anywhere from here, which is the whole point: this used to be
@@ -196,12 +208,14 @@ export function StartDesign(props: StartDesignProps) {
       setPhase(null);
       return;
     }
+    await holdFor(startingShown, STEP_MIN_MS);
     setPhase("opening");
     // The run is detached and the operator is free to leave the editor it is
     // about to land in -- so register the watch that notifies them when the
     // slides are done, wherever they have got to by then. Same click that
     // justifies asking for notification permission.
     watchGeneration(id, titleFrom(topic, 80) || "Untitled design");
+    await holdFor(Date.now(), OPEN_HOLD_MS);
     router.push(`/content-studio/images/${id}`);
   }
 
