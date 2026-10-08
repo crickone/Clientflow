@@ -3,7 +3,9 @@ import "server-only";
 import fs from "node:fs";
 import path from "node:path";
 import { db, schema } from "@/lib/db";
-import { getCurrentTenant, runWithTenant } from "@/lib/db/tenant";
+import { getCurrentTenant, getTenantDbById, runWithTenant, type TenantDb } from "@/lib/db/tenant";
+import { adoptLegacyFiles, legacyProjectDir, projectDirFor } from "@/lib/video/uploadPaths";
+import { referencedProjectFiles } from "@/lib/video/uploadSweep";
 import { eq, desc } from "drizzle-orm";
 import { probe } from "@/lib/video/ffmpeg";
 import { transcribeVideo, type Transcript } from "@/lib/ai/transcribe";
@@ -29,10 +31,31 @@ function logPlanOutcome(projectId: number, err: unknown): void {
   }
 }
 
-const UPLOAD_ROOT = path.join(process.cwd(), "data", "uploads");
+const adopted = new Set<string>();
 
-export function uploadDir(projectId: number): string {
-  return path.join(UPLOAD_ROOT, String(projectId));
+/**
+ * A project's folder, inside its tenant's: data/uploads/t<tenant>/<project>
+ * (see ./uploadPaths for why). The tenant is the current one unless given
+ * (the signed public video route has no session). The first time a project
+ * is touched in this process, any of its files still in the old shared
+ * location are moved across, so nothing goes missing in the moments after a
+ * deploy, before the background sweep has reached it.
+ */
+export function uploadDir(projectId: number, tenantId?: number): string {
+  const tid = tenantId ?? getCurrentTenant().id;
+  const key = `${tid}:${projectId}`;
+  if (!adopted.has(key)) {
+    adopted.add(key);
+    if (fs.existsSync(legacyProjectDir(projectId))) {
+      try {
+        const tdb = tenantId != null ? getTenantDbById(tenantId) : (db as unknown as TenantDb);
+        adoptLegacyFiles(tid, projectId, referencedProjectFiles(tdb, projectId));
+      } catch (err) {
+        console.error(`[uploads] could not move project ${projectId} for tenant ${tid}:`, err);
+      }
+    }
+  }
+  return projectDirFor(tid, projectId);
 }
 
 export function ensureUploadDir(projectId: number): string {

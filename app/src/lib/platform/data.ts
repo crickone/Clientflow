@@ -1,4 +1,5 @@
 import "server-only";
+import { tenantUploadRoot } from "@/lib/video/uploadPaths";
 
 import fs from "node:fs";
 import path from "node:path";
@@ -83,12 +84,13 @@ export function getTenantData(tenantId: number): TenantDataSummary {
   const file = dbFileFor(tenantId);
   const dbBytes = file && fs.existsSync(file.absPath) ? fs.statSync(file.absPath).size : 0;
 
-  // Uploads are namespaced per tenant on disk. The image library and the
+  // Video uploads are namespaced per tenant on disk (data/uploads/t<id>,
+  // lib/video/uploadPaths). The image library and the
   // renders are single flat folders shared by every tenant, so their per-
   // tenant size has to be summed from THIS tenant's own rows -- see the
   // storage note in the console scope.
   const dataDir = path.join(process.cwd(), "data");
-  const uploadsDir = path.join(dataDir, "uploads", String(tenantId));
+  const uploadsDir = tenantUploadRoot(tenantId);
   const libraryBytes = sumLibraryBytes(raw);
 
   return {

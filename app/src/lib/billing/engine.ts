@@ -1,4 +1,6 @@
 import "server-only";
+import { tenantUploadRoot } from "@/lib/video/uploadPaths";
+import { sweepLegacyUploads } from "@/lib/video/uploadSweep";
 
 import fs from "node:fs";
 import path from "node:path";
@@ -545,6 +547,17 @@ export function offboardTenant(tenantId: number, actor: string): { archiveDir: s
       2,
     ),
   );
+
+  // 2b) The business's video files go into the archive with it: first any
+  // still in the old shared folders (moved by name from its own records,
+  // never another tenant's), then its whole uploads folder.
+  try {
+    sweepLegacyUploads([tenantId]);
+    const uploads = tenantUploadRoot(tenantId);
+    if (fs.existsSync(uploads)) fs.renameSync(uploads, path.join(archiveDir, "uploads"));
+  } catch (err) {
+    console.error(`[billing] offboardTenant: could not archive tenant ${tenantId}'s uploads:`, err);
+  }
 
   // 3) Log before deleting.
   logEvent(tenantId, "offboarded", { archiveDir, memberCount: members.length }, actor);

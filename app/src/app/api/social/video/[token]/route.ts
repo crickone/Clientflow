@@ -17,7 +17,7 @@ export async function GET(_req: Request, { params }: { params: { token: string }
   const claim = verifyRenderToken(decodeURIComponent(params.token));
   const m = claim ? /^v\/(\d+)\/(ad-(?:9x16|1x1)-\d+\.mp4)$/.exec(claim.filename) : null;
   if (!m) return NextResponse.json({ ok: false, error: "Not found." }, { status: 404 });
-  const file = path.join(uploadDir(Number(m[1])), m[2]);
+  const file = path.join(uploadDir(Number(m[1]), claim!.tenantId), m[2]);
   if (!fs.existsSync(file)) return NextResponse.json({ ok: false, error: "Not found." }, { status: 404 });
   const stat = fs.statSync(file);
   return new Response(fs.createReadStream(file) as unknown as BodyInit, {

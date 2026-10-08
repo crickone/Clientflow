@@ -11,6 +11,8 @@ import { dispatchDueScheduledPosts } from "@/lib/social/schedule";
 import { dispatchDueAutomationQueue } from "@/lib/automations/nurture";
 import { publishDueScheduledPosts } from "@/lib/cms/blog";
 import { syncGoogleReviewsIfStale } from "@/lib/google/business";
+import { sweepLegacyUploads } from "@/lib/video/uploadSweep";
+import { listTenants } from "@/lib/tenants";
 
 /**
  * The dispatch ticker: everything that was booked for a time, sent when that
@@ -142,6 +144,16 @@ export function startDispatchTicker(): void {
   // this file would never exit, which is exactly what happened when a test
   // first reached for runDispatchForTenant.
   setTimeout(() => void tick(), 75_000).unref();
+  // Once per process: move any video files still in the old shared uploads
+  // folders into their tenants' own (lib/video/uploadPaths). Idempotent.
+  setTimeout(() => {
+    try {
+      const moved = sweepLegacyUploads(listTenants().map((t) => t.id));
+      if (moved) console.log(`[uploads] moved ${moved} file(s) into tenant folders`);
+    } catch (err) {
+      console.error("[uploads] sweep failed:", err);
+    }
+  }, 45_000).unref();
   setInterval(() => void tick(), TICK_MS).unref();
 }
 
