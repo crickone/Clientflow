@@ -15,6 +15,8 @@ import { buildImagePrompt, defaultImageStyle } from "@/lib/ai/image/prompt";
 import { isImageGenConfigured } from "@/lib/ai/image/falClient";
 import { generatePostImage } from "@/lib/ai/image/generatePostImage";
 import { libraryFilePath, photoChoices } from "@/lib/image/library";
+import { pickAdPhotos } from "./pickAdPhotos";
+import { planAdPhotos } from "./adPhotoPicks";
 import { getDesignSystem } from "@/lib/design/system";
 import { DESIGNED_TEMPLATE_ID } from "@/lib/image/paintSlide";
 import { addSlide, createCarousel, deleteCarousel } from "@/lib/image/carousels";
@@ -209,11 +211,19 @@ async function runImageAd(tenantId: number, adId: number): Promise<void> {
   const copies = await writeAdCopy(tenantId, brief);
 
   // 2. The feed versions, designed together so they differ from each other.
-  setState(adId, { stage: "Designing the feed versions" });
   const imageGen = isImageGenConfigured();
   const houseStyle = imageGen ? (getBrandImageStyle() ?? defaultImageStyle(getBusinessProfile())) : null;
+  // The business's own photographs first: an ad that shows the real premises
+  // and equipment is honest and recognisable, and a generated "chamber" may
+  // not look like theirs. The library is a blind rotation to the design
+  // engine, so the pictures are CHOSEN by looking at them (./pickAdPhotos);
+  // a version with nothing fitting is generated to the design's own brief.
+  setState(adId, { stage: "Choosing the photographs" });
+  const picks = await pickAdPhotos(meter, brief.offer, copies, photoChoices().filter((p): p is { id: number; path: string } => p.id != null));
+  const plan = planAdPhotos(picks, !!(imageGen && houseStyle));
+  const ownPhotos = plan.photos;
   const makePhoto =
-    imageGen && houseStyle
+    plan.generate && imageGen && houseStyle
       ? async (scene: string) => {
           try {
             const asset = await generatePostImage(
@@ -228,13 +238,14 @@ async function runImageAd(tenantId: number, adId: number): Promise<void> {
         }
       : undefined;
   const logoPath = resolveLogoPath();
+  setState(adId, { stage: "Designing the feed versions" });
   const result = await designPost(
     { topic: brief.offer, slideCount: copies.length, tone: null },
     meter,
     undefined,
     {
       aspectRatio: "4:5",
-      photos: photoChoices(),
+      photos: ownPhotos,
       makePhoto,
       logoPath,
       onProgress: (stage) => setState(adId, { stage: `Feed versions: ${stage.toLowerCase()}` }),
@@ -276,7 +287,7 @@ async function runImageAd(tenantId: number, adId: number): Promise<void> {
         {
           topic: brief.offer,
           previousHtml: feed.html,
-          note: `Adapt THIS ad to a ${width}x${height} canvas (${AD_SIZE_LABEL[size]}). Keep exactly the same words, the same photograph, colours and type; recompose only for the new shape. Keep the hook dominant and the button near the bottom${size === "9:16" ? ", and keep the top and bottom 250px clear of text (Stories and Reels cover them)" : ""}.`,
+          note: `Adapt THIS ad to a ${width}x${height} canvas (${AD_SIZE_LABEL[size]}). Keep exactly the same words, the same photograph, colours and type; recompose only for the new shape. Keep the hook dominant and the photograph large; no painted button${size === "9:16" ? ", and keep the top and bottom 250px clear of text (Stories and Reels cover them)" : ""}.`,
           aspectRatio: size,
           photo,
           photoLibrary: library,
@@ -332,7 +343,7 @@ export async function redesignAdImage(tenantId: number, adId: number, slideId: n
     {
       topic: ad.brief.offer,
       previousHtml: slide.designHtml,
-      note: note?.trim() || "Design this ad again, differently: same words, a different composition.",
+      note: note?.trim() || "Design this ad again, differently: same words, a different photograph-led composition, the hook at display size, no painted button and no decorative shapes.",
       aspectRatio: slide.aspectRatio as AdSize,
       photo,
       photoLibrary: library,

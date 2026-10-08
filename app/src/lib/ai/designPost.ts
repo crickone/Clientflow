@@ -27,7 +27,7 @@ import {
 import { meteredCreateStreamed, type MeterContext } from "@/lib/ai/metered";
 import { logoBox } from "@/lib/design/renderDesign";
 import { collisionViolation } from "@/lib/design/layoutBoxes";
-import { MAX_PHOTO_SLOTS, photoSlotsUsed } from "@/lib/design/photoSlots";
+import { MAX_PHOTO_SLOTS, PHOTO_TOKEN, photoSlotsUsed } from "@/lib/design/photoSlots";
 import { choosePhotos } from "@/lib/design/choosePhotos";
 import {
   canvasFor,
@@ -191,30 +191,52 @@ function sameAssetIds(a: (number | null)[], b: (number | null)[]): boolean {
  * words. An ad is read in a second at thumbnail size between other people's
  * posts, so it is one message, large, with the button's words on it.
  */
+/**
+ * The ad layouts, one per version. An ad stops a thumb with a PICTURE and one
+ * line of type; the first ad prompt let the model pick a flat ground, and all
+ * three versions came back as colour blocks with decorative rectangles and
+ * nothing to look at. Each version now gets a different photograph-led
+ * composition, so the three are worth testing against each other.
+ */
+export const AD_LAYOUTS: readonly string[] = [
+  "the photograph full-bleed across the whole canvas, a dark scrim rising from the bottom, the hook set large over the lower third",
+  "the photograph filling the top 60 percent edge to edge, a solid band of a brand colour below it holding the hook at display size",
+  "the hook set very large on a brand ground across the top, the photograph filling the bottom half and bleeding off three edges",
+  "the photograph full-bleed, the hook inside a solid brand-colour panel anchored to the bottom-left corner, the panel flush with the canvas edges",
+  "the photograph full-bleed, the hook across the top on a scrim falling from the top edge, the lower part of the picture left clear",
+];
+
 function adUserPrompt(
   topic: string,
   versions: { hook: string; support: string; button: string; angle: string }[],
   width: number,
   height: number,
+  rand: () => number = Math.random,
 ): string {
+  const offset = Math.floor(rand() * AD_LAYOUTS.length);
   return [
     `These are PAID ADS for: ${topic}`,
     `Slides: ${versions.length} -- each slide is a SEPARATE version of the ad, tested against the others, not a sequence.`,
     "",
     `The canvas for every slide is EXACTLY ${width}x${height} pixels.`,
     "",
-    "What makes an ad different from a post:",
-    "- ONE message per slide. The hook is the biggest thing on it, readable at thumbnail size; nothing competes with it.",
-    "- The words on each slide are EXACTLY the ones given below. Do not add, reword or invent text, prices, offers or claims.",
-    "- Put the button's words on the slide as a clear button-like shape near the bottom, so the slide works on its own.",
-    "- Keep text to the hook, the support line and the button: well under a quarter of the canvas. The rest is image or ground.",
-    "- Strong contrast. Each version uses a DIFFERENT composition, so the three are worth testing against each other.",
+    "AN AD IS NOT A POST. Ignore the guidance above about teaching, paragraphs and body copy: an ad carries the hook and, at most, one short support line. It is seen for under a second between other people's photos, so it has to stop the thumb.",
+    "",
+    "What every version must do:",
+    `- BUILT ON A PHOTOGRAPH. Every slide uses ${PHOTO_TOKEN}, and the photograph takes at least half of the canvas. It is the reason anyone stops. A slide on a flat ground is not an ad.`,
+    "- The photograph's scene shows the service or the person it is for, specific to this version's angle: real people in a real setting, natural light, shot like a professional campaign. Name subject, setting, light and framing. No text, signage or screens in shot.",
+    "- The HOOK is the biggest thing on the slide by far: display size, at least 84px on this canvas, heavy weight, tight leading, never more than four lines. The support line, if there is one, is small and sits right under it.",
+    "- Words on the slide are EXACTLY the hook and support given below. Do not add, reword or invent text, prices, offers or claims.",
+    "- NO BUTTON. Do not draw a button, a pill or a 'Book now' shape: Meta puts the real button under the image, and a painted one looks fake.",
+    "- NO DECORATION. No empty coloured blocks, rows of squares, stripes, frames or shapes that carry nothing. Colour comes in as a solid band or panel behind the type, or not at all.",
+    "- Type over a photograph always sits on a scrim (an rgba gradient) or a solid panel, so it reads at thumbnail size.",
+    "- Keep the logo's reserved corner clear.",
     "",
     ...versions.flatMap((v, i) => [
       `SLIDE ${i + 1} (angle: ${v.angle || "-"})`,
+      `  layout: ${AD_LAYOUTS[(offset + i) % AD_LAYOUTS.length]}`,
       `  hook: ${v.hook}`,
       v.support ? `  support: ${v.support}` : "  support: (none)",
-      `  button: ${v.button}`,
     ]),
     "",
     'Leave "caption" empty: the ad copy is written separately.',
