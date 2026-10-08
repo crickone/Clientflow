@@ -3748,3 +3748,86 @@ a.stat-row:hover .stat-label { color: var(--text-primary); }
 .ad-video--9x16 video { width: 270px; aspect-ratio: 9 / 16; }
 .ad-video--1x1 video { width: 360px; aspect-ratio: 1 / 1; }
 .ad-video figcaption { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--text-tertiary); }
+
+/* Ad preview: Stories and Reels (9:16) in a phone frame. */
+.adb-story { position: relative; width: min(100%, 300px); margin: 0 auto; aspect-ratio: 9 / 16; border-radius: 22px; overflow: hidden; background: #000; box-shadow: 0 0 0 6px #111, 0 0 0 7px #2a2a2a, var(--shadow-2); }
+.adb-story-media { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.adb-story-top { position: absolute; top: 0; left: 0; right: 0; padding: 10px 12px 28px; display: grid; gap: 10px; background: linear-gradient(rgba(0,0,0,0.45), transparent); }
+.adb-story-bars { height: 2px; border-radius: 2px; background: rgba(255,255,255,0.35); overflow: hidden; }
+.adb-story-bars span { display: block; width: 38%; height: 100%; background: #fff; }
+.adb-story-cta { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); display: grid; justify-items: center; gap: 2px; color: #fff; font-size: 13px; font-weight: 600; }
+.adb-story-cta span { padding: 7px 16px; border-radius: 999px; background: rgba(255,255,255,0.95); color: #111; }
+
+/* ----------------------------------------------------------------------- */
+/*  Run this ad (/marketing/ads/use/[adId])                                 */
+/* ----------------------------------------------------------------------- */
+.use-ad { display: grid; gap: 22px; }
+.use-ad-back { display: inline-flex; align-items: center; gap: 6px; justify-self: start; font-size: 13px; color: var(--text-tertiary); transition: color 0.15s var(--ease); }
+.use-ad-back:hover { color: var(--text-primary); }
+.use-ad-head h1 { margin: 0; font-family: var(--font-heading), sans-serif; font-size: clamp(26px, 3vw, 34px); font-weight: 600; letter-spacing: -0.015em; text-transform: none; line-height: 1.1; color: var(--text-primary); }
+.use-ad-head p { margin: 8px 0 0; font-size: 14px; color: var(--text-tertiary); }
+.use-ad-head strong { color: var(--text-secondary); font-weight: 600; }
+.use-ad-wait { padding: 22px; font-size: 14px; color: var(--text-secondary); }
+
+.use-ad-grid { display: grid; grid-template-columns: minmax(300px, 400px) minmax(0, 1fr); gap: 28px; align-items: start; }
+.use-ad-preview { position: sticky; top: 24px; display: grid; gap: 14px; }
+.use-ad-versions { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+.use-ad-versions button {
+  display: grid; gap: 2px; text-align: left; padding: 9px 12px; border-radius: 12px; cursor: pointer;
+  border: 1px solid var(--card-border); background: var(--surface-1); color: var(--text-secondary);
+  transition: border-color 0.15s var(--ease), background-color 0.15s var(--ease), color 0.15s var(--ease);
+}
+.use-ad-versions button:hover { border-color: var(--card-border-hover); color: var(--text-primary); }
+.use-ad-versions button[data-on="true"] { border-color: var(--accent); background: var(--surface-2); color: var(--text-primary); box-shadow: 0 0 0 3px var(--accent-soft); }
+.use-ad-versions span { font-size: 13px; font-weight: 600; }
+.use-ad-versions em { font-style: normal; font-size: 11.5px; color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.use-ad-paths { display: grid; gap: 16px; }
+.use-ad-path { padding: 22px; display: grid; gap: 18px; }
+.use-ad-path-head { display: flex; gap: 14px; align-items: flex-start; }
+.use-ad-path-ic { flex-shrink: 0; width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; background: var(--surface-2); color: var(--text-primary); box-shadow: var(--edge-light); }
+.use-ad-path h2 { margin: 2px 0 4px; font-size: 17px; font-weight: 600; text-transform: none; letter-spacing: -0.005em; color: var(--text-primary); }
+.use-ad-path p { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--text-tertiary); }
+.use-ad-path-cta { justify-self: start; }
+.use-ad-empty { padding: 14px; border-radius: 12px; border: 1px dashed var(--hairline); }
+
+.use-ad-campaigns { display: grid; gap: 8px; }
+.use-ad-campaign {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 12px 14px; border-radius: 12px; cursor: pointer;
+  border: 1px solid var(--card-border); background: var(--surface-1); color: inherit;
+  transition: border-color 0.15s var(--ease), background-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
+}
+.use-ad-campaign:hover { border-color: var(--card-border-hover); background: var(--surface-2); }
+.use-ad-campaign[data-on="true"] { border-color: var(--accent); background: var(--surface-2); box-shadow: 0 0 0 3px var(--accent-soft); }
+.use-ad-radio { flex-shrink: 0; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; border: 1.5px solid var(--hairline-strong); color: var(--accent-contrast); transition: background-color 0.15s var(--ease), border-color 0.15s var(--ease); }
+.use-ad-campaign[data-on="true"] .use-ad-radio { background: var(--accent); border-color: var(--accent); }
+.use-ad-campaign-main { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.use-ad-campaign-name { font-size: 14px; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.use-ad-campaign-meta { font-size: 12.5px; color: var(--text-tertiary); }
+.use-ad-status { flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; }
+.use-ad-status.is-draft { background: var(--surface-3); color: var(--text-secondary); }
+.use-ad-status.is-live { background: var(--success-soft); color: var(--success); }
+.use-ad-status.is-paused { background: var(--warning-soft); color: var(--warning); }
+
+.use-ad-sets { display: grid; gap: 8px; padding: 14px; border-radius: 12px; background: var(--surface-2); box-shadow: var(--edge-light); }
+.use-ad-sets-label { font-size: 12px; font-weight: 600; color: var(--text-tertiary); }
+.use-ad-sets-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.use-ad-sets-row button {
+  display: grid; gap: 1px; text-align: left; padding: 8px 14px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--hairline); background: var(--surface-1); color: var(--text-secondary);
+  transition: border-color 0.15s var(--ease), color 0.15s var(--ease);
+}
+.use-ad-sets-row button:hover { color: var(--text-primary); border-color: var(--hairline-strong); }
+.use-ad-sets-row button[data-on="true"] { border-color: var(--accent); color: var(--text-primary); }
+.use-ad-sets-row button[data-full="true"] em { color: var(--warning); }
+.use-ad-sets-row span { font-size: 13px; font-weight: 600; }
+.use-ad-sets-row em { font-style: normal; font-size: 11.5px; color: var(--text-tertiary); }
+.use-ad-note { margin: 2px 0 0; font-size: 12.5px; color: var(--text-tertiary); }
+.use-ad-note.is-warn { color: var(--warning); }
+.use-ad-foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; padding-top: 4px; }
+.use-ad-foot > span { font-size: 13px; color: var(--text-secondary); min-width: 0; flex: 1 1 240px; }
+
+@media (max-width: 960px) {
+  .use-ad-grid { grid-template-columns: minmax(0, 1fr); }
+  .use-ad-preview { position: static; max-width: 420px; }
+}

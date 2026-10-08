@@ -28,6 +28,7 @@ import {
   splitVariants,
   toMinorUnits,
   validateSpec,
+  type AdSpec,
   type CampaignSpec,
   type InterestRef,
   type Objective,
@@ -350,6 +351,103 @@ export function deleteAdDraft(id: number): void {
  * half-way never spends: the half-built campaign is deleted and the row goes
  * to `error` with Meta's reason, ready to fix and launch again.
  */
+type LaunchCaches = {
+  images: Map<number, string[]>;
+  libraryImages: Map<string, string>;
+  adVideos: Map<number, { feed: VideoAsset; tall: VideoAsset }>;
+};
+const newCaches = (): LaunchCaches => ({ images: new Map(), libraryImages: new Map(), adVideos: new Map() });
+
+/**
+ * Create these ads on Meta inside one ad set: upload their pictures or
+ * videos, build each creative (placement sizes, text options, or the plain
+ * fallback), and record the new ad ids on `entry`. Shared by a full launch
+ * and by adding a Content Studio ad to a campaign that is already running.
+ */
+async function createAdsInAdSet(
+  c: {
+    acct: string;
+    token: string;
+    page: { pageId: string; igUserId: string | null };
+    spec: CampaignSpec;
+    adSetId: string;
+    leadFormId: string | null;
+    entry: { adSetId: string; adIds: string[] };
+    caches: LaunchCaches;
+  },
+  ads: AdSpec[],
+): Promise<void> {
+  const { acct, token, page, spec, adSetId, leadFormId, entry, caches } = c;
+  for (const ad of ads) {
+    // A Content Studio video ad: the square video in feeds, the 9:16 one
+    // in Stories and Reels, text options carried along. If Meta will not
+    // take the placement creative, the square video runs everywhere.
+    if (ad.creative.source === "video") {
+      const vids = await uploadAdVideos(acct, token, ad.creative.adCreativeId!, caches.adVideos);
+      const vctx = { pageId: page.pageId, instagramUserId: page.igUserId, imageHashes: [], leadFormId };
+      const createVideoAd = async (params: Record<string, unknown>) => {
+        const creativeId = (await graph<{ id: string }>("POST", `${acct}/adcreatives`, token, params)).id;
+        entry.adIds.push((await graph<{ id: string }>("POST", `${acct}/ads`, token, { name: ad.name, adset_id: adSetId, creative: { creative_id: creativeId }, status: "ACTIVE" })).id);
+      };
+      try {
+        await createVideoAd(buildPlacementVideoParams(spec, ad, vctx, vids));
+      } catch (err) {
+        if (!(err instanceof AdsError)) throw err;
+        console.warn(`[ads] placement video refused for "${ad.name}", running the square video everywhere: ${err.message}`);
+        await createVideoAd(buildSingleVideoParams(spec, ad, vctx, vids.feed));
+      }
+      continue;
+    }
+    const hashes =
+      ad.creative.source === "library"
+        ? await uploadLibraryImages(acct, token, ad.creative.imageAssetIds ?? [], caches.libraryImages)
+        : await uploadDesignImages(acct, token, ad.creative.designId, caches.images);
+    const ctxFor = (imageHashes: string[]) => ({ pageId: page.pageId, instagramUserId: page.igUserId, imageHashes, leadFormId });
+    // Which images this ad uses: a single-image ad its first, a carousel or
+    // image options all of them.
+    // (Several library photos are always used: a carousel unless "Let Meta
+    // choose" is on. A design's own format decides for its slides.)
+    const multi = ad.creative.source === "library" ? hashes.length > 1 : ad.creative.format !== "single";
+    const adHashes = multi ? hashes : hashes.slice(0, 1);
+    const createAd = async (name: string, params: Record<string, unknown>) => {
+      const creativeId = (await graph<{ id: string }>("POST", `${acct}/adcreatives`, token, params)).id;
+      entry.adIds.push((await graph<{ id: string }>("POST", `${acct}/ads`, token, { name, adset_id: adSetId, creative: { creative_id: creativeId }, status: "ACTIVE" })).id);
+    };
+
+    // A version of a Content Studio ad: its feed image in feeds and its
+    // 9:16 image in Stories and Reels. Falls through to the plain ad below
+    // if Meta refuses it.
+    const sizes = ad.creative.source !== "library" && ad.creative.format === "single" ? adVersionSizes(ad.creative.designId) : null;
+    const feedAt = sizes ? sizes.findIndex((z) => z === "4:5") : -1;
+    const tallAt = sizes ? sizes.indexOf("9:16") : -1;
+    if (sizes && feedAt >= 0 && tallAt >= 0 && hashes[feedAt] && hashes[tallAt]) {
+      try {
+        await createAd(ad.name, buildPlacementImageParams(spec, ad, ctxFor([hashes[feedAt]]), { feed: hashes[feedAt], tall: hashes[tallAt] }));
+        continue;
+      } catch (err) {
+        if (!(err instanceof AdsError)) throw err;
+        console.warn(`[ads] placement images refused for "${ad.name}", using the feed image everywhere: ${err.message}`);
+      }
+    }
+
+    if (!hasVariants(ad.creative, adHashes.length)) {
+      await createAd(ad.name, buildCreativeParams(spec, ad, ctxFor(adHashes)));
+      continue;
+    }
+    // Text options / image options: one creative that lists them, as Ads
+    // Manager does. Meta does not take this for every kind of ad (its docs
+    // say nothing of lead forms), so if it refuses, the same choices go out
+    // as separate ads that Meta tests against each other.
+    try {
+      await createAd(ad.name, buildAssetFeedCreativeParams(spec, ad, ctxFor(adHashes)));
+    } catch (err) {
+      if (!(err instanceof AdsError)) throw err;
+      console.warn(`[ads] text/image options refused for "${ad.name}", sending as separate ads: ${err.message}`);
+      for (const v of splitVariants(ad, adHashes)) await createAd(v.ad.name, buildCreativeParams(spec, v.ad, ctxFor(v.imageHashes)));
+    }
+    }
+}
+
 export async function launchAdCampaign(id: number): Promise<AdCampaignRow> {
   const current = getAdCampaign(id);
   if (!current) throw new AdsError("Campaign not found.");
@@ -379,81 +477,12 @@ export async function launchAdCampaign(id: number): Promise<AdCampaignRow> {
     // registered (its default beneficiary/payer, or its recommendations); a
     // free-typed Page name was refused (blame dsa_beneficiary).
     const dsa = await dsaNames(acct, token, page.pageName ?? getBusinessProfile().businessName);
-    const images = new Map<number, string[]>();
-    const libraryImages = new Map<string, string>();
-    const adVideos = new Map<number, { feed: VideoAsset; tall: VideoAsset }>();
+    const caches = newCaches();
     for (const set of spec.adSets) {
       const adSetId = (await graph<{ id: string }>("POST", `${acct}/adsets`, token, buildAdSetParams(spec, set, { campaignId: ids.campaignId, pageId: page.pageId, advertiser: dsa.beneficiary, payor: dsa.payor }))).id;
       const entry = { adSetId, adIds: [] as string[] };
       ids.adSets!.push(entry);
-      for (const ad of set.ads) {
-        // A Content Studio video ad: the square video in feeds, the 9:16 one
-        // in Stories and Reels, text options carried along. If Meta will not
-        // take the placement creative, the square video runs everywhere.
-        if (ad.creative.source === "video") {
-          const vids = await uploadAdVideos(acct, token, ad.creative.adCreativeId!, adVideos);
-          const vctx = { pageId: page.pageId, instagramUserId: page.igUserId, imageHashes: [], leadFormId: ids.leadFormId ?? null };
-          const createVideoAd = async (params: Record<string, unknown>) => {
-            const creativeId = (await graph<{ id: string }>("POST", `${acct}/adcreatives`, token, params)).id;
-            entry.adIds.push((await graph<{ id: string }>("POST", `${acct}/ads`, token, { name: ad.name, adset_id: adSetId, creative: { creative_id: creativeId }, status: "ACTIVE" })).id);
-          };
-          try {
-            await createVideoAd(buildPlacementVideoParams(spec, ad, vctx, vids));
-          } catch (err) {
-            if (!(err instanceof AdsError)) throw err;
-            console.warn(`[ads] placement video refused for "${ad.name}", running the square video everywhere: ${err.message}`);
-            await createVideoAd(buildSingleVideoParams(spec, ad, vctx, vids.feed));
-          }
-          continue;
-        }
-        const hashes =
-          ad.creative.source === "library"
-            ? await uploadLibraryImages(acct, token, ad.creative.imageAssetIds ?? [], libraryImages)
-            : await uploadDesignImages(acct, token, ad.creative.designId, images);
-        const ctxFor = (imageHashes: string[]) => ({ pageId: page.pageId, instagramUserId: page.igUserId, imageHashes, leadFormId: ids.leadFormId ?? null });
-        // Which images this ad uses: a single-image ad its first, a carousel or
-        // image options all of them.
-        // (Several library photos are always used: a carousel unless "Let Meta
-        // choose" is on. A design's own format decides for its slides.)
-        const multi = ad.creative.source === "library" ? hashes.length > 1 : ad.creative.format !== "single";
-        const adHashes = multi ? hashes : hashes.slice(0, 1);
-        const createAd = async (name: string, params: Record<string, unknown>) => {
-          const creativeId = (await graph<{ id: string }>("POST", `${acct}/adcreatives`, token, params)).id;
-          entry.adIds.push((await graph<{ id: string }>("POST", `${acct}/ads`, token, { name, adset_id: adSetId, creative: { creative_id: creativeId }, status: "ACTIVE" })).id);
-        };
-
-        // A version of a Content Studio ad: its feed image in feeds and its
-        // 9:16 image in Stories and Reels. Falls through to the plain ad below
-        // if Meta refuses it.
-        const sizes = ad.creative.source !== "library" && ad.creative.format === "single" ? adVersionSizes(ad.creative.designId) : null;
-        const feedAt = sizes ? sizes.findIndex((z) => z === "4:5") : -1;
-        const tallAt = sizes ? sizes.indexOf("9:16") : -1;
-        if (sizes && feedAt >= 0 && tallAt >= 0 && hashes[feedAt] && hashes[tallAt]) {
-          try {
-            await createAd(ad.name, buildPlacementImageParams(spec, ad, ctxFor([hashes[feedAt]]), { feed: hashes[feedAt], tall: hashes[tallAt] }));
-            continue;
-          } catch (err) {
-            if (!(err instanceof AdsError)) throw err;
-            console.warn(`[ads] placement images refused for "${ad.name}", using the feed image everywhere: ${err.message}`);
-          }
-        }
-
-        if (!hasVariants(ad.creative, adHashes.length)) {
-          await createAd(ad.name, buildCreativeParams(spec, ad, ctxFor(adHashes)));
-          continue;
-        }
-        // Text options / image options: one creative that lists them, as Ads
-        // Manager does. Meta does not take this for every kind of ad (its docs
-        // say nothing of lead forms), so if it refuses, the same choices go out
-        // as separate ads that Meta tests against each other.
-        try {
-          await createAd(ad.name, buildAssetFeedCreativeParams(spec, ad, ctxFor(adHashes)));
-        } catch (err) {
-          if (!(err instanceof AdsError)) throw err;
-          console.warn(`[ads] text/image options refused for "${ad.name}", sending as separate ads: ${err.message}`);
-          for (const v of splitVariants(ad, adHashes)) await createAd(v.ad.name, buildCreativeParams(spec, v.ad, ctxFor(v.imageHashes)));
-        }
-      }
+      await createAdsInAdSet({ acct, token, page, spec, adSetId, leadFormId: ids.leadFormId ?? null, entry, caches }, set.ads);
       update(id, { metaIds: JSON.stringify(ids) });
     }
 
@@ -471,6 +500,56 @@ export async function launchAdCampaign(id: number): Promise<AdCampaignRow> {
     update(id, { status: "error", error: message, metaIds: null });
     throw new AdsError(message);
   }
+}
+
+/**
+ * Add ads to one ad set of an existing campaign. A draft just gains them in
+ * its plan. A campaign already on Meta gets them created inside that ad set
+ * straight away (spending from its existing budget), through the same path a
+ * launch uses, and its plan and Meta ids are updated to match.
+ */
+export async function addAdsToCampaign(id: number, adSetIndex: number, ads: AdSpec[]): Promise<AdCampaignRow> {
+  const current = getAdCampaign(id);
+  if (!current) throw new AdsError("Campaign not found.");
+  const set = current.spec.adSets[adSetIndex];
+  if (!set) throw new AdsError("That ad set is not in this campaign.");
+  if (ads.length === 0) throw new AdsError("There is nothing to add.");
+  if (set.ads.length + ads.length > 6) {
+    throw new AdsError(`"${set.name}" already has ${set.ads.length} ad${set.ads.length === 1 ? "" : "s"}; an ad set takes at most 6. Pick another ad set or start a new campaign.`);
+  }
+  const names = new Set(set.ads.map((a) => a.name));
+  const fresh = ads.map((a) => {
+    let name = a.name;
+    for (let n = 2; names.has(name); n++) name = `${a.name} (${n})`;
+    names.add(name);
+    return { ...a, name };
+  });
+  const spec: CampaignSpec = {
+    ...current.spec,
+    adSets: current.spec.adSets.map((s, i) => (i === adSetIndex ? { ...s, ads: [...s.ads, ...fresh] } : s)),
+  };
+  const errors = validateSpec(spec);
+  if (errors.length) throw new AdsError(errors.join(" "));
+
+  if (current.status === "draft" || current.status === "error") {
+    return updateAdDraft(id, { spec });
+  }
+  if (current.status !== "active" && current.status !== "paused") {
+    throw new AdsError("This campaign cannot take new ads right now.");
+  }
+  const ids = current.metaIds;
+  const entry = ids.adSets?.[adSetIndex];
+  if (!ids.campaignId || !entry) throw new AdsError("This campaign's ad set could not be found on Meta.");
+  const token = requireToken();
+  requireAdAccount(current.adAccountId);
+  const page = adsPage();
+  await createAdsInAdSet(
+    { acct: current.adAccountId, token, page, spec, adSetId: entry.adSetId, leadFormId: ids.leadFormId ?? null, entry, caches: newCaches() },
+    fresh,
+  );
+  update(id, { spec: JSON.stringify(spec), metaIds: JSON.stringify(ids) });
+  await logActivity("ads.added", `Added ${fresh.length} ad${fresh.length === 1 ? "" : "s"} to "${current.name}"`, { adCampaignId: id });
+  return getAdCampaign(id)!;
 }
 
 // ── Running campaigns ─────────────────────────────────────────────────────

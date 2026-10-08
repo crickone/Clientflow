@@ -4,8 +4,12 @@ import { resolvePlace, suggestPlaces } from "@/lib/ads/geocode";
 import { revalidatePath } from "next/cache";
 
 import { requireAdmin } from "@/lib/auth";
+import { getAdCreative } from "@/lib/ads/creatives";
+import { adSpecsFromCreative } from "@/lib/ads/fromCreative";
+import { getBusinessProfile } from "@/lib/businessProfile";
 import {
   AdsError,
+  addAdsToCampaign,
   createAdDraft,
   deleteAdDraft,
   launchAdCampaign,
@@ -92,4 +96,16 @@ export async function resolvePlaceAction(label: string) {
 /** The Page's own instant forms, for a leads campaign to reuse. */
 export async function listLeadFormsAction() {
   return run(() => listLeadForms(), { revalidate: false });
+}
+
+/** Add a Content Studio ad to one ad set of an existing campaign. */
+export async function addCreativeToCampaignAction(adId: number, campaignId: number, adSetIndex: number): Promise<AdsResult<{ added: number; live: boolean }>> {
+  return run(async () => {
+    const ad = getAdCreative(adId);
+    if (!ad) throw new AdsError("That ad is no longer in Content Studio.");
+    const ads = adSpecsFromCreative(ad, getBusinessProfile().website);
+    if (ads.length === 0) throw new AdsError("This ad has not finished being made yet.");
+    const row = await addAdsToCampaign(campaignId, adSetIndex, ads);
+    return { added: ads.length, live: row.status === "active" || row.status === "paused" };
+  });
 }

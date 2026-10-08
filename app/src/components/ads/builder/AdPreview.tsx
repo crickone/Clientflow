@@ -21,6 +21,10 @@ export interface PreviewAd {
   /** Image URLs in order; more than one renders as a swipeable carousel. */
   images: string[];
   linkHost: string | null;
+  /** A video ad's feed video, shown in place of the images. */
+  video?: string | null;
+  /** The 9:16 picture or video for Stories and Reels; adds a Stories view. */
+  story?: { kind: "image" | "video"; url: string } | null;
 }
 
 const SYS = '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif';
@@ -36,8 +40,15 @@ function Avatar({ logoUrl, name, size }: { logoUrl: string | null; name: string;
   );
 }
 
-function Picture({ images, ratio = "1 / 1" }: { images: string[]; ratio?: string }) {
+function Picture({ images, ratio = "1 / 1", video }: { images: string[]; ratio?: string; video?: string | null }) {
   const [i, setI] = useState(0);
+  if (video) {
+    return (
+      <div style={{ position: "relative", aspectRatio: ratio, background: "#000", overflow: "hidden" }}>
+        <video src={video} muted loop autoPlay playsInline style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+      </div>
+    );
+  }
   const idx = Math.min(i, Math.max(0, images.length - 1));
   if (images.length === 0) {
     return (
@@ -89,7 +100,7 @@ function Facebook({ ad }: { ad: PreviewAd }) {
       <div style={{ padding: "0 12px 10px", fontSize: 14, lineHeight: 1.4, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
         {ad.primaryText || <span style={{ color: "#8a8d91" }}>Your main text appears here.</span>}
       </div>
-      <Picture images={ad.images} />
+      <Picture images={ad.images} video={ad.video} ratio={ad.story && !ad.video ? "4 / 5" : "1 / 1"} />
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "#3a3b3c" }}>
         <div style={{ minWidth: 0, flex: 1 }}>
           {ad.linkHost && <div style={{ fontSize: 11.5, color: "#b0b3b8", textTransform: "uppercase", letterSpacing: "0.02em" }}>{ad.linkHost}</div>}
@@ -121,7 +132,7 @@ function Instagram({ ad }: { ad: PreviewAd }) {
         </div>
         <MoreHorizontal size={18} />
       </div>
-      <Picture images={ad.images} ratio="4 / 5" />
+      <Picture images={ad.images} video={ad.video} ratio={ad.video ? "1 / 1" : "4 / 5"} />
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 12px", background: "#0095f6", color: "#fff", fontSize: 14, fontWeight: 600 }}>
         {ad.ctaLabel}
         <ChevronRight size={16} />
@@ -140,18 +151,49 @@ function Instagram({ ad }: { ad: PreviewAd }) {
   );
 }
 
+/** Stories and Reels: the 9:16 version full-screen in a phone frame, the button pinned low. */
+function Story({ ad }: { ad: PreviewAd }) {
+  const story = ad.story!;
+  return (
+    <div className="adb-story" style={{ fontFamily: SYS }}>
+      {story.kind === "video" ? (
+        <video src={story.url} muted loop autoPlay playsInline className="adb-story-media" />
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element -- our own render route
+        <img src={story.url} alt="" className="adb-story-media" />
+      )}
+      <div className="adb-story-top">
+        <div className="adb-story-bars"><span /></div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Avatar logoUrl={ad.logoUrl} name={ad.pageName} size={28} />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{ad.instagramHandle || ad.pageName}</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.8)" }}>Sponsored</div>
+          </div>
+        </div>
+      </div>
+      <div className="adb-story-cta">
+        <ChevronRight size={14} style={{ transform: "rotate(-90deg)" }} />
+        <span>{ad.ctaLabel}</span>
+      </div>
+    </div>
+  );
+}
+
 export function AdPreview({ ad }: { ad: PreviewAd }) {
-  const [placement, setPlacement] = useState<"facebook" | "instagram">("facebook");
+  const [placement, setPlacement] = useState<"facebook" | "instagram" | "story">("facebook");
+  const tabs = (["facebook", "instagram", ...(ad.story ? (["story"] as const) : [])] as const).slice() as Array<"facebook" | "instagram" | "story">;
+  const shown = placement === "story" && !ad.story ? "facebook" : placement;
   return (
     <div className="adb-preview">
       <div className="adb-seg" role="tablist" aria-label="Where the ad appears">
-        {(["facebook", "instagram"] as const).map((p) => (
-          <button key={p} type="button" role="tab" aria-selected={placement === p} className="adb-seg-btn" data-on={placement === p} onClick={() => setPlacement(p)}>
-            {p === "facebook" ? "Facebook feed" : "Instagram feed"}
+        {tabs.map((p) => (
+          <button key={p} type="button" role="tab" aria-selected={shown === p} className="adb-seg-btn" data-on={shown === p} onClick={() => setPlacement(p)}>
+            {p === "facebook" ? "Facebook feed" : p === "instagram" ? "Instagram feed" : "Stories and Reels"}
           </button>
         ))}
       </div>
-      <div className="adb-device">{placement === "facebook" ? <Facebook ad={ad} /> : <Instagram ad={ad} />}</div>
+      <div className="adb-device">{shown === "facebook" ? <Facebook ad={ad} /> : shown === "instagram" ? <Instagram ad={ad} /> : <Story ad={ad} />}</div>
     </div>
   );
 }
