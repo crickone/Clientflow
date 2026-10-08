@@ -143,6 +143,14 @@ function Thumb({
     );
   }
   if (item.kind === "ad") {
+    if (item.videoPosterUrl) {
+      return (
+        <>
+          <video src={`${item.videoPosterUrl}#t=0.5`} preload="metadata" muted playsInline />
+          <div className="cs-play"><span><Play size={17} fill="currentColor" /></span></div>
+        </>
+      );
+    }
     if (item.imageUrl) {
       // eslint-disable-next-line @next/next/no-img-element
       return <img src={item.imageUrl} alt="" style={{ objectFit: "cover", objectPosition: "top" }} />;

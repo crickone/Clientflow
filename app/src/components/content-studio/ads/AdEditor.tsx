@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Download, Megaphone, RefreshCw, Sparkles, Trash2 } from "lucide-react";
+import { Download, Megaphone, RefreshCw, Scissors, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
@@ -14,6 +14,7 @@ import {
   redesignAdImageAction,
   retryAdAction,
   saveAdCopyAction,
+  saveVideoAdCopyAction,
 } from "@/app/content-studio/ads/actions";
 import { AD_GOAL_LABEL, AD_SIZES, AD_SIZE_LABEL, LIMITS, type AdCopy } from "@/lib/ads/adCopy";
 import { CTAS } from "@/lib/ads/spec";
@@ -72,19 +73,26 @@ export function AdEditor({ initial, isAdmin }: { initial: AdCreativeView; isAdmi
     router.push("/content-studio");
   }
 
-  const ready = ad.status !== "writing" && ad.versions.length > 0;
+  const ready = ad.status !== "writing" && (ad.kind === "video" ? !!ad.videoUrls["9:16"] : ad.versions.length > 0);
 
   return (
     <div className="ad-page">
       <header className="ad-head">
         <div style={{ minWidth: 0 }}>
           <div className="ad-eyebrow">
-            <Megaphone size={13} /> Image ad · {AD_GOAL_LABEL[ad.brief.goal]}
+            <Megaphone size={13} /> {ad.kind === "video" ? "Video ad" : "Image ad"} · {AD_GOAL_LABEL[ad.brief.goal]}
           </div>
           <h1 className="ad-title">{ad.name}</h1>
         </div>
         <div className="ad-head-actions">
-          {ready && isAdmin && (
+          {ready && ad.kind === "video" && ad.videoProjectId && (
+            <Link href={`/content-studio/videos/${ad.videoProjectId}`}>
+              <Button variant="outline">
+                <Scissors size={15} /> Adjust the cut
+              </Button>
+            </Link>
+          )}
+          {ready && isAdmin && ad.kind === "image" && (
             <Link href={`/marketing/ads/new?fromAd=${ad.id}`}>
               <Button>
                 <Megaphone size={15} /> Create a campaign with it
@@ -93,7 +101,7 @@ export function AdEditor({ initial, isAdmin }: { initial: AdCreativeView; isAdmi
           )}
           {ad.status !== "writing" && (
             <Button variant="outline" onClick={retry} loading={pending}>
-              <Sparkles size={15} /> {ad.versions.length ? "Make it again" : "Try again"}
+              <Sparkles size={15} /> {ready ? "Make it again" : "Try again"}
             </Button>
           )}
           <Button variant="ghost" onClick={remove} aria-label="Delete ad">
@@ -120,6 +128,42 @@ export function AdEditor({ initial, isAdmin }: { initial: AdCreativeView; isAdmi
         </section>
       )}
 
+      {ad.kind === "video" && ready && (
+        <section className="nc-card ad-version">
+          <div className="ad-video-row">
+            {(["9:16", "1:1"] as const).map((size) =>
+              ad.videoUrls[size] ? (
+                <figure key={size} className={`ad-video ad-video--${size.replace(":", "x")}`}>
+                  <video src={ad.videoUrls[size]} controls playsInline preload="metadata" />
+                  <figcaption>
+                    <span>{size === "9:16" ? "Stories and Reels (9:16)" : "Feed (square)"}</span>
+                    <a className="inbox-icon-btn" href={`${ad.videoUrls[size]}&download=1`} aria-label="Download">
+                      <Download size={14} />
+                    </a>
+                  </figcaption>
+                </figure>
+              ) : null,
+            )}
+          </div>
+          <p className="ad-hint">Opens on the strongest line, captioned, ending on your button. Adjust the cut in the video editor if you want a different take.</p>
+        </section>
+      )}
+      {ad.kind === "video" &&
+        ad.videoCopies.map((c, i) => (
+          <section key={i} className="nc-card ad-version">
+            <div className="ad-version-head">
+              <h2>Ad text, version {i + 1}</h2>
+              {c.angle && <span className="inbox-pill">{c.angle}</span>}
+            </div>
+            <CopyEditor
+              initial={c}
+              hint="Meta tests these text versions against each other on the same video."
+              onSave={(copy) => saveVideoAdCopyAction(ad.id, i, copy)}
+              onSaved={refresh}
+            />
+          </section>
+        ))}
+
       {ad.versions.map((v) => (
         <VersionCard key={v.designId} adId={ad.id} version={v} onChanged={refresh} />
       ))}
@@ -128,20 +172,7 @@ export function AdEditor({ initial, isAdmin }: { initial: AdCreativeView; isAdmi
 }
 
 function VersionCard({ adId, version, onChanged }: { adId: number; version: AdVersion; onChanged: () => void }) {
-  const [copy, setCopy] = useState<AdCopy | null>(version.copy);
-  const [saving, startSave] = useTransition();
   const [busySlide, setBusySlide] = useState<number | null>(null);
-  const dirty = JSON.stringify(copy) !== JSON.stringify(version.copy);
-
-  function save() {
-    if (!copy) return;
-    startSave(async () => {
-      const res = await saveAdCopyAction(adId, version.designId, copy);
-      if (!res.ok) return void toast.error(res.error);
-      toast.success("Ad text saved");
-      onChanged();
-    });
-  }
 
   async function redesign(slideId: number) {
     setBusySlide(slideId);
@@ -151,13 +182,11 @@ function VersionCard({ adId, version, onChanged }: { adId: number; version: AdVe
     onChanged();
   }
 
-  const set = (k: keyof AdCopy) => (e: { target: { value: string } }) => setCopy((c) => (c ? { ...c, [k]: e.target.value } : c));
-
   return (
     <section className="nc-card ad-version">
       <div className="ad-version-head">
         <h2>Version {version.variant}</h2>
-        {copy?.angle && <span className="inbox-pill">{copy.angle}</span>}
+        {version.copy?.angle && <span className="inbox-pill">{version.copy.angle}</span>}
       </div>
 
       <div className="ad-sizes">
@@ -192,42 +221,78 @@ function VersionCard({ adId, version, onChanged }: { adId: number; version: AdVe
         })}
       </div>
 
-      {copy && (
-        <div className="ad-copy">
-          <label className="nc-label">
-            Main text <span className="ad-count">{copy.primaryText.length}/{LIMITS.primaryText}</span>
-          </label>
-          <textarea className="nc-input" rows={4} value={copy.primaryText} onChange={set("primaryText")} maxLength={LIMITS.primaryText} />
-          <div className="ad-grid">
-            <div>
-              <label className="nc-label">
-                Headline <span className="ad-count">{copy.headline.length}/{LIMITS.headline}</span>
-              </label>
-              <input className="field" value={copy.headline} onChange={set("headline")} maxLength={LIMITS.headline} />
-            </div>
-            <div>
-              <label className="nc-label">
-                Description <span className="ad-count">{copy.description.length}/{LIMITS.description}</span>
-              </label>
-              <input className="field" value={copy.description} onChange={set("description")} maxLength={LIMITS.description} />
-            </div>
-            <div>
-              <label className="nc-label">Button</label>
-              <select className="field" value={copy.cta} onChange={set("cta")}>
-                {CTAS.map((c) => (
-                  <option key={c} value={c}>{CTA_LABEL[c]}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="ad-actions">
-            <span className="ad-hint">The words on the image are part of the design; use the redesign button to change them.</span>
-            <Button size="sm" onClick={save} loading={saving} disabled={!dirty}>
-              Save text
-            </Button>
-          </div>
-        </div>
+      {version.copy && (
+        <CopyEditor
+          initial={version.copy}
+          hint="The words on the image are part of the design; use the redesign button to change them."
+          onSave={(copy) => saveAdCopyAction(adId, version.designId, copy)}
+          onSaved={onChanged}
+        />
       )}
     </section>
+  );
+}
+
+/** Meta's text fields for one version, saved on demand. */
+function CopyEditor({
+  initial,
+  hint,
+  onSave,
+  onSaved,
+}: {
+  initial: AdCopy;
+  hint: string;
+  onSave: (copy: AdCopy) => Promise<{ ok: true } | { ok: false; error: string }>;
+  onSaved: () => void;
+}) {
+  const [copy, setCopy] = useState<AdCopy>(initial);
+  const [saving, startSave] = useTransition();
+  const dirty = JSON.stringify(copy) !== JSON.stringify(initial);
+  const set = (k: keyof AdCopy) => (e: { target: { value: string } }) => setCopy((c) => ({ ...c, [k]: e.target.value }));
+
+  function save() {
+    startSave(async () => {
+      const res = await onSave(copy);
+      if (!res.ok) return void toast.error(res.error);
+      toast.success("Ad text saved");
+      onSaved();
+    });
+  }
+
+  return (
+    <div className="ad-copy">
+      <label className="nc-label">
+        Main text <span className="ad-count">{copy.primaryText.length}/{LIMITS.primaryText}</span>
+      </label>
+      <textarea className="nc-input" rows={4} value={copy.primaryText} onChange={set("primaryText")} maxLength={LIMITS.primaryText} />
+      <div className="ad-grid">
+        <div>
+          <label className="nc-label">
+            Headline <span className="ad-count">{copy.headline.length}/{LIMITS.headline}</span>
+          </label>
+          <input className="field" value={copy.headline} onChange={set("headline")} maxLength={LIMITS.headline} />
+        </div>
+        <div>
+          <label className="nc-label">
+            Description <span className="ad-count">{copy.description.length}/{LIMITS.description}</span>
+          </label>
+          <input className="field" value={copy.description} onChange={set("description")} maxLength={LIMITS.description} />
+        </div>
+        <div>
+          <label className="nc-label">Button</label>
+          <select className="field" value={copy.cta} onChange={set("cta")}>
+            {CTAS.map((c) => (
+              <option key={c} value={c}>{CTA_LABEL[c]}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="ad-actions">
+        <span className="ad-hint">{hint}</span>
+        <Button size="sm" onClick={save} loading={saving} disabled={!dirty}>
+          Save text
+        </Button>
+      </div>
+    </div>
   );
 }

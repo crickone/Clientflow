@@ -20,7 +20,12 @@ export async function GET(
       { status: 404 },
     );
   }
-  const filePath = path.join(uploadDir(id), project.outputFilename);
+  // A video ad renders more than one size; ?file= names one of them. Only
+  // the ad output names are accepted, so this cannot read anything else in
+  // the folder.
+  const asked = new URL(req.url).searchParams.get("file");
+  const name = asked && /^ad-(9x16|1x1)-\d+\.mp4$/.test(asked) ? asked : project.outputFilename;
+  const filePath = path.join(uploadDir(id), name);
   if (!fs.existsSync(filePath)) {
     return NextResponse.json(
       { ok: false, error: "Output file missing on disk." },

@@ -117,6 +117,19 @@ function blogToItem(b: BlogRow): ContentItem {
 
 function adToItem(a: AdCreativeView): ContentItem {
   const feed = a.versions[0]?.images["4:5"]?.renderFilename ?? null;
+  if (a.kind === "video") {
+    return {
+      kind: "ad",
+      id: a.id,
+      title: titleFrom(a.name),
+      href: `/content-studio/ads/${a.id}`,
+      updatedAt: new Date(a.updatedAt),
+      status: a.status === "writing" ? { label: "Making", tone: "info" } : a.status === "failed" ? { label: "Failed", tone: "danger" } : { label: "Ad", tone: "neutral" },
+      meta: "Video ad · 9:16 and square",
+      aspectRatio: "9:16",
+      videoPosterUrl: a.videoUrls["9:16"] ?? null,
+    };
+  }
   const status: ContentStatus =
     a.status === "writing"
       ? { label: "Making", tone: "info" }
@@ -130,7 +143,7 @@ function adToItem(a: AdCreativeView): ContentItem {
     href: `/content-studio/ads/${a.id}`,
     updatedAt: new Date(a.updatedAt),
     status,
-    meta: `${a.kind === "video" ? "Video ad" : "Image ad"} · ${a.versions.length || 3} versions`,
+    meta: `Image ad · ${a.versions.length || 3} versions`,
     aspectRatio: "4:5",
     imageUrl: feed ? renderFileUrl(feed) : null,
   };
@@ -138,11 +151,14 @@ function adToItem(a: AdCreativeView): ContentItem {
 
 /** Every piece of content across the tools, newest-updated first. */
 export function listRecentWork(): ContentItem[] {
+  const ads = listAdCreatives();
+  // A video ad's clip lives in a video project; it shows as the ad, not twice.
+  const adProjects = new Set(ads.map((a) => a.videoProjectId).filter((id): id is number => id != null));
   const items: ContentItem[] = [
-    ...listProjects().map(videoToItem),
+    ...listProjects().filter((p) => !adProjects.has(p.id)).map(videoToItem),
     ...listCarousels().map(carouselToItem),
     ...listBlogPosts().map(blogToItem),
-    ...listAdCreatives().map(adToItem),
+    ...ads.map(adToItem),
   ];
   return items.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
 }

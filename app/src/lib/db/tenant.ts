@@ -2714,10 +2714,21 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       error TEXT,
       started_at INTEGER,
       video_project_id INTEGER,
+      copy TEXT,
+      video_outputs TEXT,
       created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
       updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
   `);
+  // Added after the table first shipped (video ads): the ad text for a video
+  // ad, and its rendered files per size.
+  try {
+    const adCols = sqlite.prepare("PRAGMA table_info(ad_creatives)").all() as Array<{ name: string }>;
+    if (!adCols.some((c) => c.name === "copy")) sqlite.exec("ALTER TABLE ad_creatives ADD COLUMN copy TEXT");
+    if (!adCols.some((c) => c.name === "video_outputs")) sqlite.exec("ALTER TABLE ad_creatives ADD COLUMN video_outputs TEXT");
+  } catch (err) {
+    console.error("[db] ad_creatives columns failed:", err);
+  }
 
   // Google reviews synced from the Business Profile (lib/google/business).
   // Drizzle mirror in schema.ts.

@@ -865,6 +865,10 @@ export const adCreatives = sqliteTable("ad_creatives", {
   error: text("error"),
   startedAt: integer("started_at", { mode: "timestamp_ms" }),
   videoProjectId: integer("video_project_id"),
+  /** Video ads: JSON AdCopy[] (image ads keep copy per version design). */
+  copy: text("copy"),
+  /** Video ads: JSON { "9:16"?: filename, "1:1"?: filename } in the project's folder. */
+  videoOutputs: text("video_outputs"),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),

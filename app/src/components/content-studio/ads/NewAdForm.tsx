@@ -23,9 +23,40 @@ export function NewAdForm({ website, hasDesignSystem }: { website: string; hasDe
   const [linkUrl, setLinkUrl] = useState(website && /^https:\/\//.test(website) ? website : "");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const [clip, setClip] = useState<File | null>(null);
+  const [broll, setBroll] = useState<File[]>([]);
+  const [seconds, setSeconds] = useState(25);
+  const [uploading, setUploading] = useState(false);
   const needsLink = goal === "website" || goal === "bookings";
 
+  async function submitVideo() {
+    if (!clip) return void setError("Choose the clip for the ad.");
+    setError(null);
+    setUploading(true);
+    const form = new FormData();
+    form.set("offer", offer);
+    form.set("audience", audience);
+    form.set("goal", goal);
+    form.set("linkUrl", needsLink ? linkUrl : "");
+    form.set("seconds", String(seconds));
+    form.set("main", clip);
+    for (const f of broll) form.append("broll", f);
+    try {
+      const res = await fetch("/api/content-studio/ads/video", { method: "POST", body: form });
+      const data = (await res.json()) as { ok: boolean; id?: number; error?: string };
+      if (!data.ok || !data.id) {
+        setUploading(false);
+        return void setError(data.error ?? "The upload failed. Try again.");
+      }
+      router.push(`/content-studio/ads/${data.id}`);
+    } catch {
+      setUploading(false);
+      setError("The upload failed. Check the connection and try again.");
+    }
+  }
+
   function submit() {
+    if (kind === "video") return void submitVideo();
     setError(null);
     start(async () => {
       const res = await createImageAdAction({ offer, audience, goal, linkUrl: needsLink ? linkUrl : "" });
@@ -53,13 +84,9 @@ export function NewAdForm({ website, hasDesignSystem }: { website: string; hasDe
         </button>
       </div>
 
-      {kind === "video" ? (
+      {(
         <section className="nc-card ad-form">
-          <p className="ad-hint">Video ads arrive in the next update: upload a clip and Adonis cuts it as an ad, ready for the Ads manager.</p>
-        </section>
-      ) : (
-        <section className="nc-card ad-form">
-          {!hasDesignSystem && (
+          {kind === "image" && !hasDesignSystem && (
             <p className="ad-warn">
               Image ads are designed in your brand&rsquo;s style. Pick one in{" "}
               <Link href="/settings/design" className="inbox-link">Settings &gt; Design direction</Link> first.
@@ -94,13 +121,40 @@ export function NewAdForm({ website, hasDesignSystem }: { website: string; hasDe
               <input id="ad-link" className="field" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://" />
             </div>
           )}
+          {kind === "video" && (
+            <div className="ad-grid">
+              <div>
+                <label className="nc-label" htmlFor="ad-clip">The clip (someone talking to camera works best)</label>
+                <input id="ad-clip" className="field" type="file" accept="video/*" onChange={(e) => setClip(e.target.files?.[0] ?? null)} />
+              </div>
+              <div>
+                <label className="nc-label" htmlFor="ad-broll">B-roll (optional)</label>
+                <input id="ad-broll" className="field" type="file" accept="video/*" multiple onChange={(e) => setBroll(Array.from(e.target.files ?? []))} />
+              </div>
+              <div>
+                <label className="nc-label" htmlFor="ad-len">Length</label>
+                <select id="ad-len" className="field" value={seconds} onChange={(e) => setSeconds(Number(e.target.value))}>
+                  <option value={15}>Up to 15 seconds</option>
+                  <option value={25}>Up to 25 seconds</option>
+                  <option value={40}>Up to 40 seconds</option>
+                </select>
+              </div>
+            </div>
+          )}
           {error && <p className="ad-warn">{error}</p>}
           <div className="ad-actions">
             <span className="ad-hint">
-              <Megaphone size={14} /> Three versions, nine images. Adonis writes the ad text for each, ready for the Ads manager.
+              <Megaphone size={14} />{" "}
+              {kind === "image"
+                ? "Three versions, nine images. Adonis writes the ad text for each, ready for the Ads manager."
+                : "Adonis opens on the strongest line, cuts it short, captions it and ends on your button. Stories and square versions."}
             </span>
-            <Button onClick={submit} loading={pending} disabled={!offer.trim() || !hasDesignSystem}>
-              <Sparkles size={15} /> Create the ad
+            <Button
+              onClick={submit}
+              loading={pending || uploading}
+              disabled={!offer.trim() || (kind === "image" ? !hasDesignSystem : !clip)}
+            >
+              <Sparkles size={15} /> {uploading ? "Uploading the clip" : "Create the ad"}
             </Button>
           </div>
         </section>

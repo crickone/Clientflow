@@ -21,7 +21,7 @@ import { addSlide, createCarousel, deleteCarousel } from "@/lib/image/carousels"
 import { serialisePhotoAssetIds } from "@/lib/image/photoAssetIds";
 import { serialisePhotoScenes } from "@/lib/image/photoScenes";
 import { canvasFor } from "@/lib/design/renderDesignedSlide";
-import { AD_SIZES, AD_SIZE_LABEL, parseBrief, parseStoredCopy, type AdBrief, type AdCopy, type AdSize } from "./adCopy";
+import { AD_SIZES, AD_SIZE_LABEL, coerceCopy, parseBrief, parseStoredCopy, type AdBrief, type AdCopy, type AdSize } from "./adCopy";
 
 /**
  * Ads made in Content Studio.
@@ -70,6 +70,9 @@ export interface AdCreativeView {
   videoProjectId: number | null;
   updatedAt: number;
   versions: AdVersion[];
+  /** Video ads: the ad text versions, and the rendered file URL per size. */
+  videoCopies: AdCopy[];
+  videoUrls: Partial<Record<"9:16" | "1:1", string>>;
 }
 
 const STALE_MS = 20 * 60 * 1000;
@@ -109,7 +112,15 @@ function toView(r: AdCreative): AdCreativeView {
     error: honestStatus(r) === "failed" ? r.error ?? "The run stopped before it finished. Try again." : null,
     videoProjectId: r.videoProjectId,
     updatedAt: r.updatedAt.getTime(),
-    versions: versionsOf(r.id, brief.goal),
+    versions: r.kind === "image" ? versionsOf(r.id, brief.goal) : [],
+    videoCopies: (Array.isArray(safeJson(r.copy)) ? (safeJson(r.copy) as unknown[]) : [])
+      .map((c) => coerceCopy(c, brief.goal))
+      .filter((c): c is AdCopy => c !== null),
+    videoUrls: Object.fromEntries(
+      Object.entries((safeJson(r.videoOutputs) ?? {}) as Record<string, string>)
+        .filter(([, f]) => typeof f === "string" && /^ad-(9x16|1x1)-\d+\.mp4$/.test(f))
+        .map(([size, f]) => [size, `/api/content-studio/projects/${r.videoProjectId}/output?file=${encodeURIComponent(f)}`]),
+    ) as AdCreativeView["videoUrls"],
   };
 }
 
@@ -146,6 +157,15 @@ export function deleteAdCreative(id: number): void {
 
 export function renameAdCreative(id: number, name: string): void {
   db.update(adCreatives).set({ name: name.slice(0, 200), updatedAt: new Date() }).where(eq(adCreatives.id, id)).run();
+}
+
+/** Video ads keep their text versions on the ad row. */
+export function saveVideoCopy(adId: number, index: number, copy: AdCopy): void {
+  const r = db.select({ copy: adCreatives.copy }).from(adCreatives).where(eq(adCreatives.id, adId)).get();
+  const list = Array.isArray(safeJson(r?.copy ?? null)) ? (safeJson(r!.copy) as unknown[]) : [];
+  if (index < 0 || index >= list.length) return;
+  list[index] = copy;
+  db.update(adCreatives).set({ copy: JSON.stringify(list), updatedAt: new Date() }).where(eq(adCreatives.id, adId)).run();
 }
 
 export function saveVersionCopy(designId: number, copy: AdCopy): void {

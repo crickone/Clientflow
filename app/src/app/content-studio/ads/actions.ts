@@ -13,11 +13,13 @@ import {
   getAdCreative,
   queueImageAd,
   redesignAdImage,
+  saveVideoCopy,
   renameAdCreative,
   saveVersionCopy,
   type AdCreativeView,
 } from "@/lib/ads/creatives";
 import { titleFrom } from "@/lib/content-studio/title";
+import { queueVideoAd } from "@/lib/ads/videoAds";
 
 type Fail = { ok: false; error: string };
 const tenantId = () => getCurrentMembership()!.tenant.id;
@@ -62,7 +64,8 @@ export async function retryAdAction(id: number): Promise<{ ok: true } | Fail> {
   } catch (err) {
     return { ok: false, error: err instanceof AiCapError ? err.message : "AI is not available right now." };
   }
-  queueImageAd(tenantId(), id);
+  if (ad.kind === "video") queueVideoAd(tenantId(), id);
+  else queueImageAd(tenantId(), id);
   return { ok: true };
 }
 
@@ -86,6 +89,19 @@ export async function saveAdCopyAction(adId: number, designId: number, copy: AdC
   const clean = coerceCopy(parsed.data, ad.brief.goal);
   if (!clean) return { ok: false, error: "The headline and main text are needed." };
   saveVersionCopy(designId, clean);
+  return { ok: true };
+}
+
+/** Save one of a video ad's text versions. */
+export async function saveVideoAdCopyAction(adId: number, index: number, copy: AdCopy): Promise<{ ok: true } | Fail> {
+  await requireUser();
+  const ad = getAdCreative(adId);
+  if (!ad || ad.kind !== "video" || !ad.videoCopies[index]) return { ok: false, error: "That version is gone." };
+  const parsed = copySchema.safeParse(copy);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Check the text." };
+  const clean = coerceCopy(parsed.data, ad.brief.goal);
+  if (!clean) return { ok: false, error: "The headline and main text are needed." };
+  saveVideoCopy(adId, index, clean);
   return { ok: true };
 }
 
