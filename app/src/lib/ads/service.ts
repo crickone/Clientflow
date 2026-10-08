@@ -21,6 +21,9 @@ import {
   buildCreativeParams,
   buildLeadFormParams,
   buildAssetFeedCreativeParams,
+  buildPlacementImageParams,
+  buildPlacementVideoParams,
+  buildSingleVideoParams,
   hasVariants,
   splitVariants,
   toMinorUnits,
@@ -28,7 +31,17 @@ import {
   type CampaignSpec,
   type InterestRef,
   type Objective,
+  type VideoAsset,
 } from "./spec";
+import path from "node:path";
+import os from "node:os";
+import { spawnSync } from "node:child_process";
+import ffmpegStatic from "ffmpeg-static";
+import { adVersionSizes, getAdCreative } from "./creatives";
+import { signRenderToken, renderTokensConfigured } from "@/lib/social/renderToken";
+import { getAppBaseUrl } from "@/lib/appUrl";
+import { getProject, uploadDir } from "@/lib/video/projects";
+import { adCreatives } from "@/lib/db/schema";
 
 /**
  * The ads manager's side effects: Meta Marketing API calls with the tenant's
@@ -210,6 +223,58 @@ async function dsaNames(adAccountId: string, token: string, fallback: string): P
   return { beneficiary, payor: payor || beneficiary };
 }
 
+/**
+ * Upload a Content Studio video ad's two renders to the ad account: each by
+ * a signed link Meta fetches itself, with a still from the video uploaded as
+ * its thumbnail. Waits for Meta to finish processing (a creative made on an
+ * unprocessed video is refused). Returns the feed (square) and tall (9:16).
+ */
+async function uploadAdVideos(adAccountId: string, token: string, adCreativeId: number, cache: Map<number, { feed: VideoAsset; tall: VideoAsset }>) {
+  const hit = cache.get(adCreativeId);
+  if (hit) return hit;
+  const ad = getAdCreative(adCreativeId);
+  if (!ad || ad.kind !== "video" || !ad.videoProjectId) throw new AdsError("That video ad is no longer in Content Studio.");
+  const row = db.select({ outputs: adCreatives.videoOutputs }).from(adCreatives).where(eq(adCreatives.id, adCreativeId)).get();
+  const outputs = (row?.outputs ? JSON.parse(row.outputs) : {}) as Record<string, string>;
+  if (!outputs["9:16"] || !outputs["1:1"]) throw new AdsError(`The video ad "${ad.name}" has not finished rendering. Open it in Content Studio.`);
+  if (!renderTokensConfigured()) throw new AdsError("Video upload is not configured on the server (SOCIAL_TOKEN_SECRET or EMAIL_TOKEN_SECRET missing).");
+  if (!getProject(ad.videoProjectId)) throw new AdsError("The clip behind this video ad is gone.");
+  const dir = uploadDir(ad.videoProjectId);
+  const tenantId = getCurrentTenant().id;
+
+  const one = async (file: string): Promise<VideoAsset> => {
+    const local = path.join(dir, file);
+    if (!fs.existsSync(local)) throw new AdsError(`The video file for "${ad.name}" is missing. Make the ad again in Content Studio.`);
+    const signed = signRenderToken({ tenantId, filename: `v/${ad.videoProjectId}/${file}` }, 6 * 60 * 60 * 1000);
+    const url = `${getAppBaseUrl()}/api/social/video/${encodeURIComponent(signed!)}`;
+    const up = await graph<{ id: string }>("POST", `${adAccountId}/advideos`, token, { file_url: url, name: `${ad.name} ${file}` });
+
+    // A still from one second in, as the thumbnail.
+    const still = path.join(os.tmpdir(), `adthumb-${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`);
+    spawnSync((ffmpegStatic as unknown as string) || "ffmpeg", ["-y", "-ss", "1", "-i", local, "-frames:v", "1", "-update", "1", "-q:v", "3", still]);
+    if (!fs.existsSync(still)) throw new AdsError("Could not take a still from the video for its thumbnail.");
+    const img = await graph<{ images?: Record<string, { hash: string }> }>("POST", `${adAccountId}/adimages`, token, { bytes: fs.readFileSync(still).toString("base64") });
+    fs.rmSync(still, { force: true });
+    const thumb = img.images ? Object.values(img.images)[0]?.hash : undefined;
+    if (!thumb) throw new AdsError("Meta did not accept the video's thumbnail.");
+
+    // Meta processes the upload before a creative can use it.
+    for (let i = 0; i < 60; i++) {
+      const st = await graph<{ status?: { video_status?: string } }>("GET", up.id, token, { fields: "status" });
+      const v = st.status?.video_status;
+      if (v === "ready") break;
+      if (v === "error") throw new AdsError(`Meta could not process the video for "${ad.name}".`);
+      if (i === 59) throw new AdsError("Meta is still processing the video. Try launching again in a few minutes.");
+      await new Promise((r) => setTimeout(r, 5000));
+    }
+    return { videoId: up.id, thumbnailHash: thumb };
+  };
+
+  const result = { feed: await one(outputs["1:1"]), tall: await one(outputs["9:16"]) };
+  cache.set(adCreativeId, result);
+  return result;
+}
+
 /** Upload library photos (in order) to the ad account; their image hashes. */
 async function uploadLibraryImages(adAccountId: string, token: string, assetIds: number[], cache: Map<string, string>): Promise<string[]> {
   const hashes: string[] = [];
@@ -316,11 +381,31 @@ export async function launchAdCampaign(id: number): Promise<AdCampaignRow> {
     const dsa = await dsaNames(acct, token, page.pageName ?? getBusinessProfile().businessName);
     const images = new Map<number, string[]>();
     const libraryImages = new Map<string, string>();
+    const adVideos = new Map<number, { feed: VideoAsset; tall: VideoAsset }>();
     for (const set of spec.adSets) {
       const adSetId = (await graph<{ id: string }>("POST", `${acct}/adsets`, token, buildAdSetParams(spec, set, { campaignId: ids.campaignId, pageId: page.pageId, advertiser: dsa.beneficiary, payor: dsa.payor }))).id;
       const entry = { adSetId, adIds: [] as string[] };
       ids.adSets!.push(entry);
       for (const ad of set.ads) {
+        // A Content Studio video ad: the square video in feeds, the 9:16 one
+        // in Stories and Reels, text options carried along. If Meta will not
+        // take the placement creative, the square video runs everywhere.
+        if (ad.creative.source === "video") {
+          const vids = await uploadAdVideos(acct, token, ad.creative.adCreativeId!, adVideos);
+          const vctx = { pageId: page.pageId, instagramUserId: page.igUserId, imageHashes: [], leadFormId: ids.leadFormId ?? null };
+          const createVideoAd = async (params: Record<string, unknown>) => {
+            const creativeId = (await graph<{ id: string }>("POST", `${acct}/adcreatives`, token, params)).id;
+            entry.adIds.push((await graph<{ id: string }>("POST", `${acct}/ads`, token, { name: ad.name, adset_id: adSetId, creative: { creative_id: creativeId }, status: "ACTIVE" })).id);
+          };
+          try {
+            await createVideoAd(buildPlacementVideoParams(spec, ad, vctx, vids));
+          } catch (err) {
+            if (!(err instanceof AdsError)) throw err;
+            console.warn(`[ads] placement video refused for "${ad.name}", running the square video everywhere: ${err.message}`);
+            await createVideoAd(buildSingleVideoParams(spec, ad, vctx, vids.feed));
+          }
+          continue;
+        }
         const hashes =
           ad.creative.source === "library"
             ? await uploadLibraryImages(acct, token, ad.creative.imageAssetIds ?? [], libraryImages)
@@ -336,6 +421,22 @@ export async function launchAdCampaign(id: number): Promise<AdCampaignRow> {
           const creativeId = (await graph<{ id: string }>("POST", `${acct}/adcreatives`, token, params)).id;
           entry.adIds.push((await graph<{ id: string }>("POST", `${acct}/ads`, token, { name, adset_id: adSetId, creative: { creative_id: creativeId }, status: "ACTIVE" })).id);
         };
+
+        // A version of a Content Studio ad: its feed image in feeds and its
+        // 9:16 image in Stories and Reels. Falls through to the plain ad below
+        // if Meta refuses it.
+        const sizes = ad.creative.source !== "library" && ad.creative.format === "single" ? adVersionSizes(ad.creative.designId) : null;
+        const feedAt = sizes ? sizes.findIndex((z) => z === "4:5") : -1;
+        const tallAt = sizes ? sizes.indexOf("9:16") : -1;
+        if (sizes && feedAt >= 0 && tallAt >= 0 && hashes[feedAt] && hashes[tallAt]) {
+          try {
+            await createAd(ad.name, buildPlacementImageParams(spec, ad, ctxFor([hashes[feedAt]]), { feed: hashes[feedAt], tall: hashes[tallAt] }));
+            continue;
+          } catch (err) {
+            if (!(err instanceof AdsError)) throw err;
+            console.warn(`[ads] placement images refused for "${ad.name}", using the feed image everywhere: ${err.message}`);
+          }
+        }
 
         if (!hasVariants(ad.creative, adHashes.length)) {
           await createAd(ad.name, buildCreativeParams(spec, ad, ctxFor(adHashes)));

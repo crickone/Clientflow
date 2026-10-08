@@ -65,6 +65,14 @@ export interface BuilderPhoto {
   name: string;
 }
 
+/** A finished Content Studio video ad. */
+export interface BuilderVideoAd {
+  id: number;
+  name: string;
+  /** The 9:16 render, for the picker. */
+  videoUrl: string;
+}
+
 export interface BuilderDesign {
   id: number;
   name: string;
@@ -150,6 +158,7 @@ export function AdCampaignBuilder({
   photos: initialPhotos = [],
   brand = null,
   initialStep,
+  videoAds = [],
 }: {
   campaignId: number | null;
   /** Step to open on (from ?step= in the URL), so a refresh lands where you were. */
@@ -162,6 +171,8 @@ export function AdCampaignBuilder({
   /** Photos in the Content Studio library, for ads that use the business's own pictures. */
   photos?: BuilderPhoto[];
   brand?: BuilderBrand | null;
+  /** Finished video ads from Content Studio. */
+  videoAds?: BuilderVideoAd[];
 }) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -382,6 +393,7 @@ export function AdCampaignBuilder({
 
   // What the preview shows: the ad being edited, with its real pictures.
   const imagesFor = (c: AdSpec["creative"]): string[] => {
+    if (c.source === "video") return [];
     if (c.source === "library") {
       return (c.imageAssetIds ?? [])
         .map((pid) => photos.find((p) => p.id === pid))
@@ -739,9 +751,24 @@ export function AdCampaignBuilder({
                           options={[
                             { key: "design", label: "Content Studio design" },
                             { key: "library", label: "Your photos" },
+                            ...(videoAds.length ? [{ key: "video" as const, label: "Video ad" }] : []),
                           ]}
                         />
-                        {source === "design" ? (
+                        {source === "video" ? (
+                          <>
+                            <div className="adb-designs" role="radiogroup" aria-label="Video ad">
+                              {videoAds.map((v) => (
+                                <button key={v.id} type="button" role="radio" aria-checked={v.id === a.creative.adCreativeId} className="adb-design" data-on={v.id === a.creative.adCreativeId} onClick={() => patchAd(si, k, { adCreativeId: v.id })}>
+                                  <span className="adb-design-img">
+                                    <video src={`${v.videoUrl}#t=0.5`} preload="metadata" muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                  </span>
+                                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.name}</span>
+                                </button>
+                              ))}
+                            </div>
+                            <span className="adb-hint">The square video runs in feeds and the 9:16 one in Stories and Reels.</span>
+                          </>
+                        ) : source === "design" ? (
                           designs.length === 0 ? (
                             <span className="adb-hint">No finished designs yet. Make one in Content Studio, or use your photos.</span>
                           ) : (

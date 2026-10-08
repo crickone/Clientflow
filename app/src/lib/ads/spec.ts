@@ -52,11 +52,13 @@ export interface AdCreativeSpec {
    * Where the picture comes from: a Content Studio design's rendered slides
    * (the default), or photos from the Content Studio library (uploads).
    */
-  source?: "design" | "library";
+  source?: "design" | "library" | "video";
   /** Content Studio design (carousel set) whose rendered slides are the images. */
   designId: number;
   /** source "library": the photos, in order. One = single image, more = carousel. */
   imageAssetIds?: number[];
+  /** source "video": the Content Studio video ad (ad_creatives id) whose renders run. */
+  adCreativeId?: number;
   /**
    * With several images: "single" uses the first only; "carousel" shows them
    * all, in order, as carousel cards; "options" gives Meta every image to
@@ -180,6 +182,8 @@ export function validateSpec(spec: CampaignSpec): string[] {
         const n = c.imageAssetIds?.length ?? 0;
         if (n === 0) errors.push(`${at} needs at least one photo.`);
         if (n > 10) errors.push(`${at}: at most 10 photos in one ad.`);
+      } else if (c?.source === "video") {
+        if (!c.adCreativeId) errors.push(`${at} needs a video ad from Content Studio.`);
       } else if (!c?.designId) errors.push(`${at} needs a Content Studio design.`);
       if ((c?.extraTexts?.length ?? 0) > 4) errors.push(`${at}: at most 5 main texts.`);
       if ((c?.extraHeadlines?.length ?? 0) > 4) errors.push(`${at}: at most 5 headlines.`);
@@ -457,4 +461,100 @@ export function buildLeadFormParams(form: LeadFormSpec): Record<string, unknown>
 /** Total daily spend across a plan's ad sets, for the confirm-before-launch line. */
 export function totalDailyBudget(spec: CampaignSpec): number {
   return (spec.adSets ?? []).reduce((sum, s) => sum + (Number(s.dailyBudget) || 0), 0);
+}
+
+// ── Placement sizes ───────────────────────────────────────────────────────
+//
+// An ad made in Content Studio comes in a feed size and a 9:16 size. Meta's
+// placement asset customization shows each where it fits: the feed size in
+// feeds, the tall one in Stories and Reels. Built as an asset_feed_spec with
+// labelled media and one rule per group of placements. If Meta refuses it,
+// the launcher falls back to a plain single-image or single-video ad.
+
+const FEED_POSITIONS = {
+  publisher_platforms: ["facebook", "instagram"],
+  facebook_positions: ["feed", "marketplace", "video_feeds", "search", "profile_feed"],
+  instagram_positions: ["stream", "explore", "explore_home", "profile_feed"],
+};
+const TALL_POSITIONS = {
+  publisher_platforms: ["facebook", "instagram"],
+  facebook_positions: ["story", "facebook_reels"],
+  instagram_positions: ["story", "reels"],
+};
+
+function placementFeed(spec: CampaignSpec, ad: AdSpec, ctx: CreativeContext) {
+  const c = ad.creative;
+  const { texts, headlines } = textOptions(c);
+  const base = buildCreativeParams(spec, ad, { ...ctx, imageHashes: ctx.imageHashes.length ? ctx.imageHashes : ["x"] }) as {
+    object_story_spec: { link_data: { link: string; call_to_action: { type: string; value: Record<string, unknown> } } };
+  };
+  const ld = base.object_story_spec.link_data;
+  const feed: Record<string, unknown> = {
+    bodies: texts.map((text) => ({ text })),
+    titles: headlines.map((text) => ({ text })),
+    link_urls: [{ website_url: ld.link }],
+    call_to_action_types: [ld.call_to_action.type],
+  };
+  if (c.description) feed.descriptions = [{ text: c.description }];
+  if (Object.keys(ld.call_to_action.value ?? {}).some((k) => k !== "link")) {
+    feed.call_to_actions = [{ type: ld.call_to_action.type, value: ld.call_to_action.value }];
+  }
+  const storySpec: Record<string, unknown> = { page_id: ctx.pageId };
+  if (ctx.instagramUserId) storySpec.instagram_user_id = ctx.instagramUserId;
+  return { feed, storySpec };
+}
+
+/** One image ad, the feed image in feeds and the 9:16 image in Stories and Reels. */
+export function buildPlacementImageParams(spec: CampaignSpec, ad: AdSpec, ctx: CreativeContext, hashes: { feed: string; tall: string }): Record<string, unknown> {
+  const { feed, storySpec } = placementFeed(spec, ad, ctx);
+  feed.images = [
+    { hash: hashes.feed, adlabels: [{ name: "feed_image" }] },
+    { hash: hashes.tall, adlabels: [{ name: "tall_image" }] },
+  ];
+  feed.ad_formats = ["SINGLE_IMAGE"];
+  feed.asset_customization_rules = [
+    { customization_spec: FEED_POSITIONS, image_label: { name: "feed_image" }, priority: 1 },
+    { customization_spec: TALL_POSITIONS, image_label: { name: "tall_image" }, priority: 2 },
+  ];
+  return { name: ad.name, object_story_spec: storySpec, asset_feed_spec: feed };
+}
+
+export interface VideoAsset {
+  videoId: string;
+  /** A still from the video, uploaded as an ad image. */
+  thumbnailHash: string;
+}
+
+/** One video ad, the square video in feeds and the 9:16 one in Stories and Reels. */
+export function buildPlacementVideoParams(spec: CampaignSpec, ad: AdSpec, ctx: CreativeContext, videos: { feed: VideoAsset; tall: VideoAsset }): Record<string, unknown> {
+  const { feed, storySpec } = placementFeed(spec, ad, ctx);
+  feed.videos = [
+    { video_id: videos.feed.videoId, thumbnail_hash: videos.feed.thumbnailHash, adlabels: [{ name: "feed_video" }] },
+    { video_id: videos.tall.videoId, thumbnail_hash: videos.tall.thumbnailHash, adlabels: [{ name: "tall_video" }] },
+  ];
+  feed.ad_formats = ["SINGLE_VIDEO"];
+  feed.asset_customization_rules = [
+    { customization_spec: FEED_POSITIONS, video_label: { name: "feed_video" }, priority: 1 },
+    { customization_spec: TALL_POSITIONS, video_label: { name: "tall_video" }, priority: 2 },
+  ];
+  return { name: ad.name, object_story_spec: storySpec, asset_feed_spec: feed };
+}
+
+/** The fallback: one video everywhere, as a plain video ad. */
+export function buildSingleVideoParams(spec: CampaignSpec, ad: AdSpec, ctx: CreativeContext, video: VideoAsset): Record<string, unknown> {
+  const base = buildCreativeParams(spec, ad, { ...ctx, imageHashes: ["x"] }) as {
+    object_story_spec: { link_data: { link: string; message: string; name: string; description?: string; call_to_action: Record<string, unknown> } };
+  };
+  const ld = base.object_story_spec.link_data;
+  const videoData: Record<string, unknown> = {
+    video_id: video.videoId,
+    image_hash: video.thumbnailHash,
+    message: ld.message,
+    title: ad.creative.headline,
+    call_to_action: ld.call_to_action,
+  };
+  if (ad.creative.description) videoData.link_description = ad.creative.description;
+  const storySpec: Record<string, unknown> = { page_id: ctx.pageId, video_data: videoData };
+  if (ctx.instagramUserId) storySpec.instagram_user_id = ctx.instagramUserId;
+  return { name: ad.name, object_story_spec: storySpec };
 }

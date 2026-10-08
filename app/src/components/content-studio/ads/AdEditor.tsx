@@ -92,7 +92,7 @@ export function AdEditor({ initial, isAdmin }: { initial: AdCreativeView; isAdmi
               </Button>
             </Link>
           )}
-          {ready && isAdmin && ad.kind === "image" && (
+          {ready && isAdmin && (
             <Link href={`/marketing/ads/new?fromAd=${ad.id}`}>
               <Button>
                 <Megaphone size={15} /> Create a campaign with it

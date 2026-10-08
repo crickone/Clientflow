@@ -303,6 +303,24 @@ async function runImageAd(tenantId: number, adId: number): Promise<void> {
   }
 }
 
+/**
+ * For a design that is a version of an ad: the size of each rendered image,
+ * in the order the Ads manager uploads them (slide order, files that exist).
+ * Null for an ordinary design.
+ */
+export function adVersionSizes(designId: number): string[] | null {
+  const set = db.select({ adCreativeId: carouselSets.adCreativeId }).from(carouselSets).where(eq(carouselSets.id, designId)).get();
+  if (!set?.adCreativeId) return null;
+  return db
+    .select()
+    .from(schema.carouselSlides)
+    .where(eq(schema.carouselSlides.carouselSetId, designId))
+    .orderBy(asc(schema.carouselSlides.slideOrder))
+    .all()
+    .filter((s) => !!s.renderFilename)
+    .map((s) => s.aspectRatio);
+}
+
 /** Redesign one size of one version (the editor's "Try another design"). */
 export async function redesignAdImage(tenantId: number, adId: number, slideId: number, note: string | null): Promise<void> {
   const ad = getAdCreative(adId);

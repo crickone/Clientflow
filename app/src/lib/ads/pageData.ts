@@ -10,7 +10,8 @@ import { listLibraryAssets } from "@/lib/image/library";
 import { renderFileUrl } from "@/lib/image/renderStore.client";
 import { postableRenders } from "@/lib/social/schedule";
 import { getPreferredPostingPageId } from "@/lib/social/publisher";
-import type { BuilderAdAccount, BuilderBrand, BuilderDesign, BuilderPhoto } from "@/components/ads/AdCampaignBuilder";
+import type { BuilderAdAccount, BuilderBrand, BuilderDesign, BuilderPhoto, BuilderVideoAd } from "@/components/ads/AdCampaignBuilder";
+import { listAdCreatives } from "@/lib/ads/creatives";
 
 /**
  * What the builder needs: the tenant's ad accounts, the Content Studio designs
@@ -18,7 +19,7 @@ import type { BuilderAdAccount, BuilderBrand, BuilderDesign, BuilderPhoto } from
  * launch, so it is not offered) with their image URLs for the live preview,
  * the photos in the library, and the Page identity the preview shows.
  */
-export function builderData(): { adAccounts: BuilderAdAccount[]; designs: BuilderDesign[]; photos: BuilderPhoto[]; brand: BuilderBrand } {
+export function builderData(): { adAccounts: BuilderAdAccount[]; designs: BuilderDesign[]; photos: BuilderPhoto[]; brand: BuilderBrand; videoAds: BuilderVideoAd[] } {
   const tenantId = getCurrentMembership()!.tenant.id;
   const page = getPostingPage(tenantId, getPreferredPostingPageId(tenantId));
   return {
@@ -35,6 +36,9 @@ export function builderData(): { adAccounts: BuilderAdAccount[]; designs: Builde
         filename: a.filename,
         name: a.label || a.originalName || `Photo ${a.id}`,
       })),
+    videoAds: listAdCreatives()
+      .filter((a) => a.kind === "video" && a.status == null && a.videoUrls["9:16"] && a.videoUrls["1:1"])
+      .map((a) => ({ id: a.id, name: a.name, videoUrl: a.videoUrls["9:16"]! })),
     brand: {
       pageName: page?.pageName || getBusinessProfile().businessName || "Your Page",
       instagramHandle: listFacebookPages(tenantId).find((p) => p.pageId === page?.pageId)?.igUsername ?? null,
