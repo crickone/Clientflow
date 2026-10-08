@@ -46,8 +46,23 @@ export interface Skill {
  * Seeded but NOT switched on: a skill that turned itself on for every agent
  * the moment it appeared would rewrite prompts nobody asked it to.
  */
+/**
+ * Built-in skills that were renamed: old name -> new name. Applied before
+ * seeding, so a tenant that already had the old copy keeps it (with any edits
+ * and its on/off toggles, which are by id) under the new name, instead of
+ * getting a second copy alongside it.
+ */
+const RENAMED_DEFAULTS: Record<string, string> = {
+  "Money models": "Offer design",
+};
+
 function seedDefaults(tenantId: number): void {
   const db = getTenantDbById(tenantId);
+  for (const [from, to] of Object.entries(RENAMED_DEFAULTS)) {
+    const old = db.select({ id: schema.skills.id }).from(schema.skills).where(eq(schema.skills.name, from)).get();
+    const taken = db.select({ id: schema.skills.id }).from(schema.skills).where(eq(schema.skills.name, to)).get();
+    if (old && !taken) db.update(schema.skills).set({ name: to }).where(eq(schema.skills.id, old.id)).run();
+  }
   const have = new Set(
     db.select({ name: schema.skills.name }).from(schema.skills).all().map((r) => r.name),
   );
