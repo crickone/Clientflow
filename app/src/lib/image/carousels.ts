@@ -98,12 +98,18 @@ export interface CarouselSummary extends CarouselSet {
   firstSlide: CarouselSlide | null;
 }
 
-export function listCarousels(): CarouselSummary[] {
+/**
+ * Every design, newest first. Versions of an ad (ad_creative_id set) are left
+ * out unless asked for: Content Studio shows an ad once, as the ad, and only
+ * the Ads manager's picture picker wants its versions as designs.
+ */
+export function listCarousels(opts: { includeAdVersions?: boolean } = {}): CarouselSummary[] {
   const sets = db
     .select()
     .from(schema.carouselSets)
     .orderBy(desc(schema.carouselSets.updatedAt))
-    .all();
+    .all()
+    .filter((s) => opts.includeAdVersions || s.adCreativeId == null);
   return sets.map((s) => {
     const slides = db
       .select()

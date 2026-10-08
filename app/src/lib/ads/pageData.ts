@@ -23,7 +23,7 @@ export function builderData(): { adAccounts: BuilderAdAccount[]; designs: Builde
   const page = getPostingPage(tenantId, getPreferredPostingPageId(tenantId));
   return {
     adAccounts: listAdAccounts(tenantId).map((a) => ({ adAccountId: a.adAccountId, name: a.name, currency: a.currency })),
-    designs: listCarousels()
+    designs: listCarousels({ includeAdVersions: true })
       .filter((c) => c.generationStatus == null && c.slideCount > 0)
       .map((c) => ({ c, files: postableRenders(c.id).filenames }))
       .filter(({ files }) => files.length > 0)

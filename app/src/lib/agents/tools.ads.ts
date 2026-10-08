@@ -192,7 +192,7 @@ export function listAdCampaignsTool(ctx: ToolContext): ToolResult {
     error: c.error,
   }));
   const adAccounts = listAdAccounts(ctx.tenantId).map((a) => ({ adAccountId: a.adAccountId, name: a.name, currency: a.currency, active: a.accountStatus === 1 }));
-  const designs = listCarousels()
+  const designs = listCarousels({ includeAdVersions: true })
     .filter((c) => c.generationStatus == null && c.slideCount > 0)
     .slice(0, 30)
     .map((c) => ({ designId: c.id, name: c.name, images: c.slideCount }));

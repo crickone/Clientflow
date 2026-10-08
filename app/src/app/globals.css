@@ -341,7 +341,8 @@ a {
 .tab-trigger:hover { color: var(--text-primary); }
 
 /* ── Content Studio home (hub: create tiles + unified work grid) ─────────── */
-.cs-create { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 30px; }
+.cs-create { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 30px; }
+@media (max-width: 1280px) { .cs-create { grid-template-columns: repeat(2, 1fr); } }
 .cs-tile { display: flex; align-items: center; gap: 14px; padding: 18px; background: var(--surface-1); border: 1px solid var(--hairline); border-radius: var(--radius); color: inherit; text-decoration: none; transition: transform 0.16s var(--ease), border-color 0.16s var(--ease), background 0.16s var(--ease); }
 .cs-tile:hover { transform: translateY(-2px); border-color: var(--hairline-strong); background: var(--surface-2); }
 .cs-tile:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
@@ -3681,3 +3682,63 @@ a.stat-row:hover .stat-label { color: var(--text-primary); }
 .inbox-review-text { margin: 12px 0 0; font-size: 15px; line-height: 1.6; color: var(--text-primary); white-space: pre-wrap; word-break: break-word; }
 .inbox-review-reply { margin-top: 12px; margin-left: 28px; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--hairline); background: var(--surface-2); }
 .inbox-review-reply .inbox-review-text { font-size: 14px; color: var(--text-secondary); }
+
+/* ----------------------------------------------------------------------- */
+/*  Content Studio ads (/content-studio/ads)                                */
+/* ----------------------------------------------------------------------- */
+.ad-new { display: grid; gap: 16px; max-width: 860px; }
+.ad-kind { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.ad-kind-opt {
+  display: flex; gap: 14px; align-items: flex-start; text-align: left; padding: 18px;
+  border-radius: var(--radius-lg); border: 1px solid var(--card-border); background: var(--card-sheen), var(--surface-1);
+  box-shadow: var(--edge-light), var(--shadow-1); color: var(--text-secondary); cursor: pointer;
+  transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
+}
+.ad-kind-opt:hover { border-color: var(--card-border-hover); }
+.ad-kind-opt[aria-checked="true"] { border-color: var(--accent); box-shadow: var(--edge-light), 0 0 0 3px var(--accent-soft); color: var(--text-primary); }
+.ad-kind-opt > span { display: grid; gap: 4px; }
+.ad-kind-opt strong { font-size: 15px; color: var(--text-primary); }
+.ad-kind-opt span span { font-size: 13px; line-height: 1.45; color: var(--text-tertiary); }
+.ad-form { display: grid; gap: 14px; }
+.ad-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.ad-grid .field, .ad-form .field { width: 100%; }
+.ad-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.ad-hint { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-size: 12.5px; color: var(--text-tertiary); }
+.ad-warn { margin: 0; font-size: 13px; color: var(--warning); }
+.ad-count { margin-left: 6px; font-weight: 400; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+
+.ad-page { display: grid; gap: 18px; }
+.ad-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.ad-eyebrow { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 12.5px; color: var(--text-tertiary); }
+.ad-title { margin: 0; font-family: var(--font-heading), sans-serif; font-size: clamp(22px, 2.6vw, 30px); font-weight: 600; text-transform: none; letter-spacing: -0.01em; line-height: 1.2; color: var(--text-primary); }
+.ad-head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.ad-progress { display: flex; gap: 12px; align-items: flex-start; }
+.ad-progress > div { display: grid; gap: 3px; font-size: 13.5px; color: var(--text-secondary); }
+.ad-progress strong { color: var(--text-primary); }
+.ad-progress.is-failed { border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
+.ad-version { display: grid; gap: 16px; }
+.ad-version-head { display: flex; align-items: center; gap: 10px; }
+.ad-version-head h2 { margin: 0; font-size: 16px; font-weight: 600; text-transform: none; color: var(--text-primary); }
+.ad-sizes { display: grid; grid-template-columns: 4fr 4fr 2.6fr; gap: 14px; align-items: end; }
+.ad-size { margin: 0; display: grid; gap: 8px; }
+.ad-size-frame { position: relative; overflow: hidden; border-radius: 10px; background: var(--surface-2); box-shadow: var(--edge-light), var(--shadow-1); }
+.ad-size--4x5 .ad-size-frame { aspect-ratio: 4 / 5; }
+.ad-size--1x1 .ad-size-frame { aspect-ratio: 1 / 1; }
+.ad-size--9x16 .ad-size-frame { aspect-ratio: 9 / 16; }
+.ad-size-frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.ad-size-busy { position: absolute; inset: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 55%, transparent); color: var(--text-primary); }
+.ad-size figcaption { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 12px; color: var(--text-tertiary); }
+.ad-size-actions { display: inline-flex; gap: 2px; }
+.ad-copy { display: grid; gap: 10px; padding-top: 14px; border-top: 1px solid var(--grid); }
+@media (max-width: 760px) {
+  .ad-kind { grid-template-columns: 1fr; }
+  .ad-sizes { grid-template-columns: 1fr 1fr; }
+}
+/* The new-post composer's card and label styles, tightened for forms. */
+.ad-form, .ad-version, .ad-progress { padding: 18px 20px; border-radius: var(--radius-lg); }
+.ad-form .nc-label, .ad-copy .nc-label { padding: 0 0 6px; }
+.ad-form .nc-input, .ad-copy .nc-input {
+  min-height: 84px; padding: 12px 14px; font-size: 15px; border-radius: var(--radius-field);
+  background: var(--field-bg); transition: background-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
+}
+.ad-form .nc-input:focus, .ad-copy .nc-input:focus { background: var(--field-bg-focus); box-shadow: 0 0 0 3px var(--accent-soft); }

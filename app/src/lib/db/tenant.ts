@@ -1975,6 +1975,17 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     if (!setCols.find((c) => c.name === "generation_stage")) {
       sqlite.exec("ALTER TABLE carousel_sets ADD COLUMN generation_stage TEXT");
     }
+    // Ads (Content Studio > New ad): a design that is one version of an ad
+    // carries the ad's id, its position, and that version's ad copy.
+    if (!setCols.find((c) => c.name === "ad_creative_id")) {
+      sqlite.exec("ALTER TABLE carousel_sets ADD COLUMN ad_creative_id INTEGER");
+    }
+    if (!setCols.find((c) => c.name === "ad_variant")) {
+      sqlite.exec("ALTER TABLE carousel_sets ADD COLUMN ad_variant INTEGER");
+    }
+    if (!setCols.find((c) => c.name === "ad_copy")) {
+      sqlite.exec("ALTER TABLE carousel_sets ADD COLUMN ad_copy TEXT");
+    }
   } catch (err) {
     console.error("[db] carousel imagery migration failed:", err);
   }
@@ -2686,6 +2697,25 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     CREATE TABLE IF NOT EXISTS schema_migrations (
       id TEXT PRIMARY KEY,
       applied_at INTEGER NOT NULL
+    );
+  `);
+
+  // Ads made in Content Studio (lib/ads/creatives). An image ad's versions
+  // are carousel_sets rows pointing back here (ad_creative_id); a video ad
+  // points at its video project. Drizzle mirror in schema.ts.
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS ad_creatives (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'image',
+      brief TEXT NOT NULL DEFAULT '{}',
+      status TEXT,
+      stage TEXT,
+      error TEXT,
+      started_at INTEGER,
+      video_project_id INTEGER,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
   `);
 

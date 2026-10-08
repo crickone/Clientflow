@@ -186,6 +186,42 @@ function sameAssetIds(a: (number | null)[], b: (number | null)[]): boolean {
   return a.length === b.length && a.every((id, i) => id === b[i]);
 }
 
+/**
+ * The brief for an ad set: one slide per version, each built around its own
+ * words. An ad is read in a second at thumbnail size between other people's
+ * posts, so it is one message, large, with the button's words on it.
+ */
+function adUserPrompt(
+  topic: string,
+  versions: { hook: string; support: string; button: string; angle: string }[],
+  width: number,
+  height: number,
+): string {
+  return [
+    `These are PAID ADS for: ${topic}`,
+    `Slides: ${versions.length} -- each slide is a SEPARATE version of the ad, tested against the others, not a sequence.`,
+    "",
+    `The canvas for every slide is EXACTLY ${width}x${height} pixels.`,
+    "",
+    "What makes an ad different from a post:",
+    "- ONE message per slide. The hook is the biggest thing on it, readable at thumbnail size; nothing competes with it.",
+    "- The words on each slide are EXACTLY the ones given below. Do not add, reword or invent text, prices, offers or claims.",
+    "- Put the button's words on the slide as a clear button-like shape near the bottom, so the slide works on its own.",
+    "- Keep text to the hook, the support line and the button: well under a quarter of the canvas. The rest is image or ground.",
+    "- Strong contrast. Each version uses a DIFFERENT composition, so the three are worth testing against each other.",
+    "",
+    ...versions.flatMap((v, i) => [
+      `SLIDE ${i + 1} (angle: ${v.angle || "-"})`,
+      `  hook: ${v.hook}`,
+      v.support ? `  support: ${v.support}` : "  support: (none)",
+      `  button: ${v.button}`,
+    ]),
+    "",
+    'Leave "caption" empty: the ad copy is written separately.',
+    "Return ONLY the JSON in <design>...</design>.",
+  ].join("\n");
+}
+
 export async function designPost(
   input: GenerateInput,
   meter: MeterContext,
@@ -223,6 +259,12 @@ export async function designPost(
      * reported as a hang when it accounted for none of that.
      */
     onProgress?: (stage: string) => void;
+    /**
+     * Design ADS rather than a post: one slide per version, each carrying
+     * exactly its own words. Skips the post rotation (opening moves and
+     * treatments), which is about organic feeds looking varied.
+     */
+    ad?: { versions: { hook: string; support: string; button: string; angle: string }[] };
   } = {},
 ): Promise<DesignPostOutcome> {
   const system = getDesignSystem();
@@ -275,19 +317,22 @@ export async function designPost(
   // so it settles on its favourite composition and posts start to resemble
   // each other even though each SET is varied internally. See ./openingMoves
   // for why this is a direction rather than a layout to fill in.
+  const ad = options.ad ?? null;
   const recentMoves = recentList(RECENT_OPENING_MOVES_KEY, readKey<string | null>(LAST_OPENING_MOVE_KEY, null));
   const move = pickOpeningMove(recentMoves, hasPhotography);
-  setKey(LAST_OPENING_MOVE_KEY, move.key);
-  setKey(RECENT_OPENING_MOVES_KEY, rememberRecent(recentMoves, move.key, RECENT_OPENINGS));
+  if (!ad) {
+    setKey(LAST_OPENING_MOVE_KEY, move.key);
+    setKey(RECENT_OPENING_MOVES_KEY, rememberRecent(recentMoves, move.key, RECENT_OPENINGS));
+  }
 
   // And one approach for the whole set, rotated the same way. Covers alone did
   // not stop posts looking alike: everything after slide one was built from
   // the same small kit each time. See ./postTreatments.
   const recentTreatments = recentList(RECENT_TREATMENTS_KEY, null);
   const treatment = pickTreatment(recentTreatments, hasPhotography);
-  setKey(RECENT_TREATMENTS_KEY, rememberRecent(recentTreatments, treatment.key, RECENT_TREATMENTS));
+  if (!ad) setKey(RECENT_TREATMENTS_KEY, rememberRecent(recentTreatments, treatment.key, RECENT_TREATMENTS));
 
-  const userPrompt = [
+  const userPrompt = ad ? adUserPrompt(input.topic, ad.versions, width, height) : [
     `Topic: ${input.topic}`,
     `Slides: ${input.slideCount}`,
     input.tone ? `Tone: ${input.tone}` : null,
@@ -454,7 +499,7 @@ export async function designPost(
     }
     // Held to the cover and photograph parts of the direction: a direction
     // the model may ignore is how every cover ended up the same.
-    problems.push(...directionProblems(checked.designs.map((d) => d.html), move, treatment));
+    if (!ad) problems.push(...directionProblems(checked.designs.map((d) => d.html), move, treatment));
     return { slides: rendered, problems };
   }
 

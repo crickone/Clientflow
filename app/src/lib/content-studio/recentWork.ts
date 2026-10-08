@@ -3,6 +3,8 @@ import { listProjects } from "@/lib/video/projects";
 import { listCarousels, type CarouselSummary } from "@/lib/image/carousels";
 import { listBlogPosts } from "@/lib/blog/posts";
 import { titleFrom } from "./title";
+import { listAdCreatives, type AdCreativeView } from "@/lib/ads/creatives";
+import { renderFileUrl } from "@/lib/image/renderStore.client";
 
 /**
  * The Content Studio home shows every video, carousel and blog in ONE grid,
@@ -11,7 +13,7 @@ import { titleFrom } from "./title";
  * render without knowing the per-type quirks. Server-only (ambient tenant db).
  */
 
-export type ContentKind = "video" | "image" | "blog";
+export type ContentKind = "video" | "image" | "blog" | "ad";
 export type ContentTone = "neutral" | "info" | "success" | "warning" | "danger";
 export interface ContentStatus {
   label: string;
@@ -39,6 +41,8 @@ export interface ContentItem {
   coverImageUrl?: string | null;
   /** video: same-origin URL of the rendered output (posters the card), else null. */
   videoPosterUrl?: string | null;
+  /** ad: the first version's feed image, already rendered. */
+  imageUrl?: string | null;
 }
 
 const VIDEO_STATUS: Record<VideoProject["status"], ContentStatus> = {
@@ -111,12 +115,34 @@ function blogToItem(b: BlogRow): ContentItem {
   };
 }
 
-/** Every piece of content across the three tools, newest-updated first. */
+function adToItem(a: AdCreativeView): ContentItem {
+  const feed = a.versions[0]?.images["4:5"]?.renderFilename ?? null;
+  const status: ContentStatus =
+    a.status === "writing"
+      ? { label: "Making", tone: "info" }
+      : a.status === "failed"
+        ? { label: "Failed", tone: "danger" }
+        : { label: "Ad", tone: "neutral" };
+  return {
+    kind: "ad",
+    id: a.id,
+    title: titleFrom(a.name),
+    href: `/content-studio/ads/${a.id}`,
+    updatedAt: new Date(a.updatedAt),
+    status,
+    meta: `${a.kind === "video" ? "Video ad" : "Image ad"} · ${a.versions.length || 3} versions`,
+    aspectRatio: "4:5",
+    imageUrl: feed ? renderFileUrl(feed) : null,
+  };
+}
+
+/** Every piece of content across the tools, newest-updated first. */
 export function listRecentWork(): ContentItem[] {
   const items: ContentItem[] = [
     ...listProjects().map(videoToItem),
     ...listCarousels().map(carouselToItem),
     ...listBlogPosts().map(blogToItem),
+    ...listAdCreatives().map(adToItem),
   ];
   return items.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
 }
@@ -127,5 +153,6 @@ export function countByKind(items: ContentItem[]): Record<ContentKind, number> {
     video: items.filter((i) => i.kind === "video").length,
     image: items.filter((i) => i.kind === "image").length,
     blog: items.filter((i) => i.kind === "blog").length,
+    ad: items.filter((i) => i.kind === "ad").length,
   };
 }

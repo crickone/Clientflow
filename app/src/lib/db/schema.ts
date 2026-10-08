@@ -850,6 +850,30 @@ export const googleBusinessConnections = sqliteTable("google_business_connection
     .default(sql`(unixepoch() * 1000)`),
 });
 
+// An ad made in Content Studio: an image ad (three versions, each a
+// carousel_sets row in three sizes) or a video ad (a video project cut as an
+// ad). Tenant plane; mirrors the DDL in lib/db/tenant.ts.
+export const adCreatives = sqliteTable("ad_creatives", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  kind: text("kind", { enum: ["image", "video"] }).notNull().default("image"),
+  /** JSON AdBrief. */
+  brief: text("brief").notNull().default("{}"),
+  /** 'writing' | 'failed' | null, like carousel_sets.generation_status. */
+  status: text("status"),
+  stage: text("stage"),
+  error: text("error"),
+  startedAt: integer("started_at", { mode: "timestamp_ms" }),
+  videoProjectId: integer("video_project_id"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+export type AdCreative = typeof adCreatives.$inferSelect;
+
 // Google reviews of the business, synced from its Business Profile (tenant
 // plane). review_name is Google's id ("accounts/1/locations/2/reviews/x").
 export const googleReviews = sqliteTable("google_reviews", {
@@ -1124,6 +1148,12 @@ export const carouselSets = sqliteTable("carousel_sets", {
    *  two-to-four-minute wait with no account of itself reads as a hang -- it
    *  was reported as one. Cleared when the run ends. */
   generationStage: text("generation_stage"),
+  /** Set when this design is one version of an ad (lib/ads/creatives). */
+  adCreativeId: integer("ad_creative_id"),
+  /** Which version of the ad (1-3). */
+  adVariant: integer("ad_variant"),
+  /** JSON AdCopy: that version's angle, primary text, headline, description, button. */
+  adCopy: text("ad_copy"),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),

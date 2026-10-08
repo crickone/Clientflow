@@ -7,6 +7,7 @@ import {
   FolderOpen,
   Image as ImageIcon,
   Layers,
+  Megaphone,
   Play,
   Plus,
   Video,
@@ -51,6 +52,7 @@ const KIND_ICON: Record<ContentKind, { Icon: LucideIcon; label: string }> = {
   video: { Icon: Video, label: "Reel" },
   image: { Icon: Layers, label: "Carousel" },
   blog: { Icon: FileText, label: "Blog" },
+  ad: { Icon: Megaphone, label: "Ad" },
 };
 
 function KindIcon({ kind }: { kind: ContentKind }) {
@@ -62,6 +64,7 @@ const CREATE = [
   { href: "/content-studio/videos/new", Icon: Video, title: "New video", sub: "Upload a clip → auto-captioned reel" },
   { href: "/content-studio/images/new", Icon: ImageIcon, title: "New image", sub: "Pick a template, build a carousel" },
   { href: "/content-studio/blogs/new", Icon: FileText, title: "New blog", sub: "Draft a post from a prompt" },
+  { href: "/content-studio/ads/new", Icon: Megaphone, title: "New ad", sub: "Image or video, three versions to test" },
 ] as const;
 
 const TONE_COLOR: Record<ContentTone, string> = {
@@ -139,6 +142,17 @@ function Thumb({
       </LazyMount>
     );
   }
+  if (item.kind === "ad") {
+    if (item.imageUrl) {
+      // eslint-disable-next-line @next/next/no-img-element
+      return <img src={item.imageUrl} alt="" style={{ objectFit: "cover", objectPosition: "top" }} />;
+    }
+    return (
+      <div className="cs-ph" style={{ background: "linear-gradient(150deg, var(--surface-2), var(--surface-3))" }}>
+        <div className="cs-ph-t">{item.title}</div>
+      </div>
+    );
+  }
   if (item.kind === "video") {
     if (item.videoPosterUrl) {
       return (
@@ -191,6 +205,7 @@ export function ContentStudioHome({
     { key: "video", label: "Videos", n: counts.video },
     { key: "image", label: "Images", n: counts.image },
     { key: "blog", label: "Blogs", n: counts.blog },
+    { key: "ad", label: "Ads", n: counts.ad },
   ];
 
   return (
@@ -198,7 +213,7 @@ export function ContentStudioHome({
       <PageHeader
         eyebrow="Content Studio"
         title="Content Studio"
-        subtitle="Make a reel, a carousel, or a blog — then find everything you've made in one place."
+        subtitle="Make a reel, a carousel, a blog or an ad, then find everything you've made in one place."
       />
 
       <div className="cs-create">
