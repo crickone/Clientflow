@@ -881,9 +881,9 @@ const META = {
   },
   pricing: {
     file: "pricing.html",
-    title: "Prices & Memberships | Optimal Health Clonmel",
+    title: "HBOT, Infrared & Massage Prices Clonmel | Optimal Health",
     description:
-      "Prices for hyperbaric oxygen, infrared and HIFEM at our Clonmel clinic: single sessions, blocks and monthly memberships. Book online or call 083 867 2844.",
+      "Prices for hyperbaric oxygen, infrared, HIFEM and massage at our Clonmel clinic, from single sessions to blocks of ten. Book online or call 083 867 2844.",
   },
   about: {
     file: "about.html",
@@ -895,7 +895,7 @@ const META = {
     file: "massage.html",
     title: "Massage & Reflexology Clonmel | Optimal Health",
     description:
-      "Massage, reflexology and lymphatic drainage in Clonmel from clinical therapists. Ten treatments, 30 minutes to an hour. Book online or call 083 867 2844.",
+      "Massage, reflexology and lymphatic drainage in Clonmel from clinical therapists. Eleven treatments, 30 to 90 minutes. Book online or call 083 867 2844.",
   },
   recovery: {
     file: "recovery.html",
