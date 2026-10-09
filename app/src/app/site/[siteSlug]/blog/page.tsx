@@ -97,7 +97,7 @@ export default async function PublicBlogIndex({
 
   const { db, site } = resolved;
   const posts = listPublishedPosts(db, site.id);
-  const chrome = getSiteChrome(db, site.id);
+  const chrome = getSiteChrome(db, site.id, resolved.resolvedVia === "host" ? site.slug : null);
   // A mapped domain serves the site at its root; everything else at the mount.
   const base = resolved.resolvedVia === "host" ? "" : `/site/${site.slug}`;
 

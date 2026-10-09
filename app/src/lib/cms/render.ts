@@ -65,6 +65,7 @@ export function resolvePageContext(
     siteId: resolved.site.id,
     siteSlug: resolved.site.slug,
     pageId: page.id,
+    onOwnDomain: resolved.resolvedVia === "host",
   };
   return { resolved, page, ctx, template: getTemplate(page.templateId), host, path };
 }

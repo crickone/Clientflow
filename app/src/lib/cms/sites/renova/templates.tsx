@@ -4,6 +4,7 @@ import { registerTemplate } from "@/lib/cms/templates";
 import { getBlockValue } from "@/lib/cms/blocks";
 import { sanitizeHtmlKeepStyles } from "@/lib/cms/html";
 import { injectEnquiryToken, signSiteEnquiryToken } from "@/lib/cms/enquiryToken";
+import { stripSiteMount } from "@/lib/cms/siteMount";
 
 /**
  * Bespoke-site templates (controlled-HTML bridge) — shared by every imported
@@ -25,7 +26,8 @@ registerTemplate({
   blocks: [{ name: "body", kind: "html", label: "Page HTML", fallback: "" }],
   Component: ({ ctx }) => {
     const row = getBlockValue(ctx.db, ctx.siteId, ctx.pageId, "body");
-    return <div dangerouslySetInnerHTML={{ __html: sanitizeHtmlKeepStyles(row?.value ?? "") }} />;
+    const html = sanitizeHtmlKeepStyles(row?.value ?? "");
+    return <div dangerouslySetInnerHTML={{ __html: ctx.onOwnDomain ? stripSiteMount(html, ctx.siteSlug) : html }} />;
   },
 });
 
@@ -45,7 +47,7 @@ registerTemplate({
     const html = injectEnquiryToken(row?.value ?? "", () =>
       signSiteEnquiryToken({ tenantId: ctx.tenantId, siteId: ctx.siteId }),
     );
-    return <div dangerouslySetInnerHTML={{ __html: html }} />;
+    return <div dangerouslySetInnerHTML={{ __html: ctx.onOwnDomain ? stripSiteMount(html, ctx.siteSlug) : html }} />;
   },
 });
 

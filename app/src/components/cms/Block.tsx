@@ -13,6 +13,8 @@ export interface RenderCtx {
   siteId: number;
   siteSlug: string;
   pageId: number;
+  /** Served on the site's own verified domain: links come off the /site/<slug> mount (lib/cms/siteMount). */
+  onOwnDomain?: boolean;
 }
 
 /** Public rendering of a single editable content slot. Server component. */

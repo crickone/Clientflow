@@ -86,7 +86,7 @@ export default function PublicBlogPost({
     publisher: { "@type": "Organization", name: resolved.site.name },
   };
 
-  const chrome = getSiteChrome(resolved.db, resolved.site.id);
+  const chrome = getSiteChrome(resolved.db, resolved.site.id, resolved.resolvedVia === "host" ? resolved.site.slug : null);
   // A mapped domain serves the site at its root; everything else at the mount.
   const base = resolved.resolvedVia === "host" ? "" : `/site/${resolved.site.slug}`;
 

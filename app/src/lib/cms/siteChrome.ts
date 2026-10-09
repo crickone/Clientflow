@@ -5,6 +5,7 @@ import { getBlockValue } from "@/lib/cms/blocks";
 import { splitPageBody } from "@/lib/cms/pageBody";
 import { pages } from "@/lib/db/schema";
 import { and, asc, eq } from "drizzle-orm";
+import { stripSiteMount } from "./siteMount";
 
 /**
  * The client's own site furniture — stylesheet, navbar, footer — so pages the
@@ -70,7 +71,7 @@ function extractElement(html: string, tag: "header" | "footer"): string {
  * when there is nothing to take: a blog that renders plain is a worse page,
  * not a broken one, and it must never take the route down with it.
  */
-export function getSiteChrome(db: TenantDb, siteId: number): SiteChrome {
+export function getSiteChrome(db: TenantDb, siteId: number, ownDomainSlug: string | null = null): SiteChrome {
   try {
     // The home page is the most likely to carry the full navbar and footer;
     // any published page will do if there isn't one.
@@ -87,11 +88,13 @@ export function getSiteChrome(db: TenantDb, siteId: number): SiteChrome {
     if (!block?.value) return EMPTY;
 
     const zones = splitPageBody(block.value);
+    // On the site's own domain, links come off the /site/<slug> mount.
+    const fix = (h: string) => (ownDomainSlug ? stripSiteMount(h, ownDomainSlug) : h);
     return {
-      head: zones.head,
-      header: extractElement(zones.content, "header"),
-      footer: extractElement(zones.content, "footer"),
-      tail: zones.tail,
+      head: fix(zones.head),
+      header: fix(extractElement(zones.content, "header")),
+      footer: fix(extractElement(zones.content, "footer")),
+      tail: fix(zones.tail),
     };
   } catch {
     return EMPTY;

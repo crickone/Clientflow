@@ -88,6 +88,7 @@ export function middleware(req: NextRequest) {
     mappedSlug &&
     !pathname.startsWith("/site/") &&
     !pathname.startsWith("/site-media/") &&
+    !pathname.startsWith("/library-media/") && // shared media library images used inside site pages
     !pathname.startsWith("/api/") &&
     !pathname.startsWith("/_next") &&
     !pathname.startsWith("/f/") && // public form share links must resolve on a client's own mapped domain too

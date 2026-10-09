@@ -44,6 +44,17 @@ async function main() {
     assert.equal(res.headers.get("x-middleware-request-x-adonis-proxy-key"), null, "proxied: the secret goes no further");
   }
   {
+    // Library images inside a page load on the client's domain too (the
+    // InBody photo on Inspire 404'd the day it went live).
+    const res = middleware(
+      new NextRequest(`${railway}/library-media/2`, {
+        headers: { host: "clientflow-production-ee94.up.railway.app", "x-adonis-site-host": "www.inspirehealthandfitness.ie", "x-adonis-proxy-key": "a-test-secret-of-some-length" },
+      }),
+    );
+    assert.equal(res.headers.get("x-middleware-rewrite"), null, "library media: not rewritten into the site");
+    assert.equal(res.headers.get("location"), null, "library media: no login redirect");
+  }
+  {
     // A forged header without the secret is stripped and changes nothing.
     const res = middleware(
       new NextRequest(`${railway}/site/x`, {
