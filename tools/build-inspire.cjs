@@ -11,6 +11,10 @@
  *   2. NO "free first class / free trial" claim (the live sign-up FAQ mentions it;
  *      the client confirmed it does not exist), so that FAQ answer is dropped.
  *
+ * WARNING (2026-10-09): sites/inspire/*.html were hand-edited after this last ran
+ * (sign-up page rebuilt around the enquiry form, membership wording, the LegitFit
+ * timetable). Re-running this overwrites those edits: diff first.
+ *
  * Then run: node tools/import-site.cjs --slug inspire --name "Inspire Health & Fitness"
  */
 const fs = require("fs");
@@ -138,6 +142,7 @@ h1,h2,h3,h4{font-family:"Bebas Neue",sans-serif;font-weight:400;letter-spacing:.
 .contact{display:grid;grid-template-columns:1fr 1fr;gap:50px;align-items:start}
 .info{display:grid;gap:16px}.info .row{display:grid;grid-template-columns:120px 1fr;gap:16px;padding-bottom:16px;border-bottom:1px solid var(--line)}
 .info .k{color:var(--ink-faint);text-transform:uppercase;letter-spacing:.14em;font-size:12px}.info .v{font-size:16px}.info .v a:hover{color:var(--gold)}
+.lf-frame{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff}.lf-frame iframe{display:block;width:100%;height:clamp(640px,80vh,900px);border:0}.lf-note{margin-top:14px;font-size:14px;color:var(--ink-dim)}
 .mapwrap{border:1px solid var(--line);border-radius:8px;overflow:hidden;aspect-ratio:16/10}
 .mapwrap iframe{width:100%;height:100%;border:0;filter:grayscale(.4) invert(.92) contrast(.9)}
 @media(max-width:880px){.contact{grid-template-columns:1fr;gap:30px}}
@@ -282,7 +287,7 @@ function splitRow(eyebrow, h2, bodyHtml, img, alt, reverse) {
 const SIGNUP_FAQ = faq([
   [
     "What membership options do you offer?",
-    "We offer various membership options including Monthly, Student, Off-Peak, and Couple plans. Each option provides unlimited class access and gym facilities. Choose the one that best fits your lifestyle.",
+    "We offer Monthly, Student and Couple memberships. Leave your details or call us on 083 889 7736, and we&rsquo;ll go through what each one includes and which suits you best.",
   ],
   [
     "Is there a joining fee?",
@@ -610,10 +615,17 @@ const TIMETABLE =
       <div class="cls"><div class="k">Mobility</div><p>Flexibility &amp; movement</p></div>
       <div class="cls"><div class="k">Circuit</div><p>Full-body sessions</p></div>
     </div>
-    <p class="prose" data-rise style="color:var(--ink-dim);margin-top:24px">Times vary through the week — message us on Instagram or call for the current schedule and to book in.</p>
+    <p class="prose" data-rise style="color:var(--ink-dim);margin-top:24px">Every class and time is on the live timetable below, where you can book your place.</p>
     <div style="margin-top:20px;display:flex;gap:12px;flex-wrap:wrap" data-rise><a class="btn btn--gold" href="sign-up.html"><span>Sign Up</span><span class="arw">→</span></a><a class="btn" href="https://instagram.com/inspireclonmel"><span>DM @inspireclonmel</span><span class="arw">↗</span></a></div>
   </div>
   </div>
+</div></section>
+<section class="section" style="padding-top:0"><div class="shell">
+  <div class="sec-head"><div><span class="eyebrow" data-rise>Book a class</span><h2 class="display" data-rise style="margin-top:14px">The live<br/>timetable.</h2></div><p data-rise>This week&rsquo;s classes, straight from our booking system. Pick a class to see the time and book your place.</p></div>
+  <div class="lf-frame" data-rise>
+    <iframe src="https://legitfit.com/p/timetable/inspireclonmel?isIframe=true" title="Inspire Health &amp; Fitness class timetable and booking" loading="lazy" width="100%" height="900"></iframe>
+  </div>
+  <p class="lf-note" data-rise>Timetable not showing? <a class="gold" href="https://legitfit.com/p/timetable/inspireclonmel" target="_blank" rel="noopener">Open it on LegitFit</a>.</p>
 </div></section>
 ${ctaBand(
   "Find Your<br/>Perfect Workout",
@@ -630,10 +642,10 @@ const SIGNUP =
   ) +
   `
 <section class="section"><div class="shell">
-  <div class="sec-head"><div><span class="eyebrow" data-rise>Get Started</span><h2 class="display" data-rise style="margin-top:14px">Pick your<br/>plan.</h2></div><p data-rise>Sign up today to begin your fitness journey! We offer various membership options including Monthly, Student, Off-Peak, and Couple plans — each with unlimited class access and gym facilities.</p></div>
+  <div class="sec-head"><div><span class="eyebrow" data-rise>Get Started</span><h2 class="display" data-rise style="margin-top:14px">Pick your<br/>plan.</h2></div><p data-rise>Sign up today to begin your fitness journey! We offer Monthly, Student and Couple memberships. Get in touch to find out what each one includes.</p></div>
   <div class="plans" data-stagger>
-    <div class="plan"><h4>Monthly</h4><div class="price">Contact for pricing</div><ul><li>Unlimited class access</li><li>Full gym facilities</li><li>Community &amp; support</li></ul><a class="btn btn--gold" href="tel:0838897736"><span>Get started</span><span class="arw">→</span></a></div>
-    <div class="plan"><h4>Student</h4><div class="price">Contact for pricing</div><ul><li>Unlimited class access</li><li>Full gym facilities</li><li>Student rate</li></ul><a class="btn" href="tel:0838897736"><span>Get started</span><span class="arw">→</span></a></div>
+    <div class="plan"><h4>Monthly</h4><div class="price">Contact for pricing</div><ul><li>Coach-led classes</li><li>Gym facilities</li><li>Community &amp; support</li></ul><a class="btn btn--gold" href="tel:0838897736"><span>Get started</span><span class="arw">→</span></a></div>
+    <div class="plan"><h4>Student</h4><div class="price">Contact for pricing</div><ul><li>Coach-led classes</li><li>Gym facilities</li><li>Student rate</li></ul><a class="btn" href="tel:0838897736"><span>Get started</span><span class="arw">→</span></a></div>
     <div class="plan"><h4>Off-Peak</h4><div class="price">Contact for pricing</div><ul><li>Off-peak access</li><li>Unlimited class access</li><li>Great value</li></ul><a class="btn" href="tel:0838897736"><span>Get started</span><span class="arw">→</span></a></div>
     <div class="plan"><h4>Couple</h4><div class="price">Contact for pricing</div><ul><li>Two memberships</li><li>Train together</li><li>Shared rate</li></ul><a class="btn" href="tel:0838897736"><span>Get started</span><span class="arw">→</span></a></div>
   </div>
@@ -741,7 +753,7 @@ const PAGES = {
   ],
   "sign-up.html": [
     "Sign Up — Inspire Health & Fitness, Clonmel",
-    "Join Inspire now. Monthly, Student, Off-Peak and Couple memberships with unlimited class access and gym facilities. No joining fee for new members.",
+    "Join Inspire Health &amp; Fitness in Clonmel. Monthly, Student and Couple memberships, with no joining fee for new members. Sign up online or call 083 889 7736.",
     SIGNUP,
   ],
   "referral-program.html": [
