@@ -6,7 +6,7 @@ import { z } from "zod";
 import { requireUser, getCurrentMembership } from "@/lib/auth";
 import { AiCapError, assertAiAllowed } from "@/lib/ai/usage";
 import { CTAS } from "@/lib/ads/spec";
-import { AD_GOALS, coerceCopy, parseBrief, type AdCopy } from "@/lib/ads/adCopy";
+import { AD_GOALS, LIMITS, coerceCopy, parseBrief, type AdCopy } from "@/lib/ads/adCopy";
 import {
   createAdCreative,
   deleteAdCreative,
@@ -76,7 +76,7 @@ const copySchema = z.object({
   angle: z.string().max(60),
   hook: z.string().max(60),
   support: z.string().max(110),
-  primaryText: z.string().trim().min(1, "The main text cannot be empty.").max(300),
+  primaryText: z.string().trim().min(1, "The main text cannot be empty.").max(LIMITS.primaryText),
   headline: z.string().trim().min(1, "The headline cannot be empty.").max(40),
   description: z.string().max(30),
   cta: z.enum(CTAS),

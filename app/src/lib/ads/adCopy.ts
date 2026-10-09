@@ -60,7 +60,7 @@ export interface AdCopy {
 }
 
 /** Meta's recommended lengths (longer text is cut off in the feed). */
-export const LIMITS = { hook: 60, support: 110, primaryText: 300, headline: 40, description: 30 } as const;
+export const LIMITS = { hook: 60, support: 110, primaryText: 1200, headline: 40, description: 30 } as const;
 
 export const DEFAULT_CTA: Record<AdGoal, Cta> = {
   bookings: "BOOK_NOW",

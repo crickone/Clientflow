@@ -9,7 +9,7 @@ import type { AdSpec, CampaignSpec } from "./spec";
  * version (its own picture and text); a video ad becomes ONE ad carrying the
  * two renders and its text versions as Meta's text options.
  */
-export function adSpecsFromCreative(ad: AdCreativeView, website: string): AdSpec[] {
+export function adSpecsFromCreative(ad: AdCreativeView, website: string, variants?: readonly number[] | null): AdSpec[] {
   const link = ad.brief.linkUrl || (/^https:\/\//.test(website) ? website : "");
   if (ad.kind === "video") {
     const [first, ...rest] = ad.videoCopies;
@@ -33,7 +33,10 @@ export function adSpecsFromCreative(ad: AdCreativeView, website: string): AdSpec
       },
     ];
   }
-  return ad.versions.map((v) => ({
+  // Only the versions the operator chose to run; all of them when no choice
+  // was made (or the choice names none that exist).
+  const chosen = variants?.length ? ad.versions.filter((v) => variants.includes(v.variant)) : [];
+  return (chosen.length ? chosen : ad.versions).map((v) => ({
     name: `${ad.name} · Version ${v.variant}${v.copy?.angle ? ` (${v.copy.angle})` : ""}`.slice(0, 120),
     creative: {
       source: "design" as const,
@@ -49,10 +52,10 @@ export function adSpecsFromCreative(ad: AdCreativeView, website: string): AdSpec
 }
 
 /** A whole new campaign around the ad: one ad set, the ad's goal as the objective. */
-export function campaignSpecFromCreative(adId: number, website: string): CampaignSpec | null {
+export function campaignSpecFromCreative(adId: number, website: string, variants?: readonly number[] | null): CampaignSpec | null {
   const ad = getAdCreative(adId);
   if (!ad) return null;
-  const ads = adSpecsFromCreative(ad, website);
+  const ads = adSpecsFromCreative(ad, website, variants);
   if (!ads.length) return null;
   const objective = GOAL_OBJECTIVE[ad.brief.goal];
   return {
@@ -73,4 +76,12 @@ export function campaignSpecFromCreative(adId: number, website: string): Campaig
         ? { name: `${ad.name} form`, headline: "", fields: ["FULL_NAME", "EMAIL", "PHONE"], privacyPolicyUrl: "", thankYouUrl: /^https:\/\//.test(website) ? website : "" }
         : null,
   };
+}
+
+/** "1,3" from a URL into version numbers; junk is dropped. */
+export function parseVariants(raw: string | null | undefined): number[] {
+  return (raw ?? "")
+    .split(",")
+    .map((x) => Number(x.trim()))
+    .filter((n) => Number.isInteger(n) && n > 0 && n < 100);
 }

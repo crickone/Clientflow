@@ -99,11 +99,16 @@ export async function listLeadFormsAction() {
 }
 
 /** Add a Content Studio ad to one ad set of an existing campaign. */
-export async function addCreativeToCampaignAction(adId: number, campaignId: number, adSetIndex: number): Promise<AdsResult<{ added: number; live: boolean }>> {
+export async function addCreativeToCampaignAction(
+  adId: number,
+  campaignId: number,
+  adSetIndex: number,
+  variants?: number[] | null,
+): Promise<AdsResult<{ added: number; live: boolean }>> {
   return run(async () => {
     const ad = getAdCreative(adId);
     if (!ad) throw new AdsError("That ad is no longer in Content Studio.");
-    const ads = adSpecsFromCreative(ad, getBusinessProfile().website);
+    const ads = adSpecsFromCreative(ad, getBusinessProfile().website, Array.isArray(variants) ? variants.filter((n) => Number.isInteger(n)) : null);
     if (ads.length === 0) throw new AdsError("This ad has not finished being made yet.");
     const row = await addAdsToCampaign(campaignId, adSetIndex, ads);
     return { added: ads.length, live: row.status === "active" || row.status === "paused" };

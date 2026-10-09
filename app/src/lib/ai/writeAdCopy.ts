@@ -22,7 +22,18 @@ For each version:
 - angle: the idea it tests, 2 to 5 words.
 - hook: the words ON the image. Short, concrete, readable at thumbnail size. At most ${LIMITS.hook} characters. No question about a personal characteristic or condition ("Are you overweight?", "Do you have back pain?") -- Meta rejects those.
 - support: an optional second line on the image, at most ${LIMITS.support} characters. Empty is fine.
-- primaryText: the text above the image. Lead with the hook idea in the first line (only ~125 characters show before "See more"), then one or two short lines of plain fact, then the next step. At most ${LIMITS.primaryText} characters. No hashtags.
+- primaryText: the text above the image, and the part that does the selling. It must make someone who has never heard of the business want to book. 700 to 1100 characters, in short paragraphs separated by blank lines, built in this order:
+  1. THE HOOK LINE. One line, under 125 characters (only that much shows before "See more"), saying the version's idea plainly and specifically. It must make the right person stop.
+  2. WHAT THEY WANT. One or two sentences on the reader's real situation and the result they are working towards (recovering between training sessions, sleeping better, easing stiffness, having an hour that is theirs), in their words, so they recognise themselves. Describe the goal; never promise the service delivers it.
+  3. WHAT THEY GET, AND WHY IT MATTERS. A stacked list of 4 to 6 lines, each starting with "• ". Every line pairs a concrete fact with what it means for the reader ("60 minutes in the chamber, so you have time to settle in and simply breathe"; "Our team talks you through each step first, so you know exactly what to expect"). Build the stack from the four things that make an offer worth taking:
+     - the result they are after (what the session is for, and how it works: a plain fact about the mechanism is fine, e.g. under pressure more oxygen dissolves into the blood plasma),
+     - why they can trust it will suit them (who guides them, the equipment, the experience, the plan for their block),
+     - how soon and how often (session length, how a block fits a week),
+     - how little effort it takes (what they actually do, booking, parking, what to bring).
+     Every fact comes from the business details or the brief. A line that only restates the offer ("Each session lasts 60 minutes") without saying what it means for them is not good enough.
+  4. WHY HERE. One or two sentences giving a specific reason to choose this business over trying it somewhere else or not at all: a fact about the team, the equipment, the experience or the place, taken from the business details. Not a list of their other services.
+  5. THE NEXT STEP. One line telling them exactly what to do and how ("Tap Book now to pick a time that suits you." / "Send us a message and we'll answer your questions first."). Include the phone number only if it is in the business details.
+  No hashtags. Plain, short sentences.
 - headline: under the image beside the button, at most ${LIMITS.headline} characters.
 - description: at most ${LIMITS.description} characters, often the town or a short fact. Empty is fine.
 - cta: one of ${CTAS.join(", ")}.
@@ -32,6 +43,10 @@ Rules that always apply:
 - No prices, discounts, free sessions, free consultations or money-back guarantees UNLESS the brief itself states them.
 - For a clinic, therapy or wellness business: never say a service cures, treats or fixes a condition, and never promise a result. Describing what the service is and how it works is fine.
 - Plain, confident, specific. No hype words, no exclamation marks, no emojis. Irish English.
+- Every sentence states a fact the reader can use. Banned: "X rather than Y", "not just X", "more than just", poetic or abstract lines, warm filler about how a room feels. If a sentence says nothing concrete, cut it.
+- Never say what clients find, feel, report or usually do ("many clients find", "people often visit us when") unless the business details say it: that is an invented testimonial. Describe the reader's situation in the second person instead.
+- Describe the mechanism, never the benefit as a claim: "more oxygen dissolves into the blood plasma" is a fact; "used for cellular recovery", "boosts healing" or "reduces inflammation" are claims and are banned.
+- Persuade with specifics, never with invented urgency: no "limited spots", "only this week" or countdowns unless the brief states them.
 
 Return ONLY JSON: {"versions":[{"angle":"","hook":"","support":"","primaryText":"","headline":"","description":"","cta":""}, ...three]}`;
 

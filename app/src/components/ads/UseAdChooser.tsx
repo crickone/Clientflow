@@ -13,6 +13,8 @@ import { addCreativeToCampaignAction } from "@/app/marketing/ads/actions";
 import type { Objective } from "@/lib/ads/spec";
 
 export interface ChooserVersion {
+  /** The version number (1-based) the server knows it by; 0 for a video ad's text options. */
+  variant: number;
   label: string;
   angle: string;
   primaryText: string;
@@ -66,8 +68,11 @@ export function UseAdChooser({
   versions,
   brand,
   campaigns,
+  initialRun,
 }: {
   ad: { id: number; name: string; kind: "image" | "video"; goalObjective: Objective; finished: boolean };
+  /** Versions to start ticked, from "Run only this version" on the ad page. All when empty. */
+  initialRun?: number[];
   versions: ChooserVersion[];
   brand: { pageName: string; instagramHandle: string | null; logoUrl: string | null; linkHost: string | null };
   campaigns: ChooserCampaign[];
@@ -79,7 +84,17 @@ export function UseAdChooser({
   const [setIndex, setSetIndex] = useState(0);
   const [pending, start] = useTransition();
   const version = versions[Math.min(v, versions.length - 1)];
-  const adCount = ad.kind === "video" ? 1 : versions.length;
+  const all = versions.map((x) => x.variant);
+  const [run, setRun] = useState<number[]>(() => {
+    const picked = (initialRun ?? []).filter((n) => all.includes(n));
+    return picked.length ? picked : all;
+  });
+  const choosing = ad.kind === "image" && versions.length > 1;
+  const adCount = ad.kind === "video" ? 1 : run.length;
+  const variants = ad.kind === "image" && run.length < versions.length ? [...run].sort((a, b) => a - b) : null;
+  function toggleRun(n: number) {
+    setRun((r) => (r.includes(n) ? (r.length > 1 ? r.filter((x) => x !== n) : r) : [...r, n]));
+  }
   const campaign = campaigns.find((c) => c.id === campaignId) ?? null;
   const set = campaign?.adSets[setIndex] ?? null;
   const live = campaign?.status === "active" || campaign?.status === "paused";
@@ -105,7 +120,7 @@ export function UseAdChooser({
       if (!ok) return;
     }
     start(async () => {
-      const res = await addCreativeToCampaignAction(ad.id, campaign.id, setIndex);
+      const res = await addCreativeToCampaignAction(ad.id, campaign.id, setIndex, variants);
       if (!res.ok) return void toast.error(res.error);
       toast.success(res.data.live ? "Added and sent to Meta for review" : "Added to the campaign");
       router.push(`/marketing/ads/${campaign.id}`);
@@ -157,17 +172,61 @@ export function UseAdChooser({
           </aside>
 
           <div className="use-ad-paths">
+            {choosing && (
+              <section className="ui-card use-ad-run" aria-labelledby="use-ad-run-h">
+                <div className="use-ad-run-head">
+                  <h2 id="use-ad-run-h">Which versions to run</h2>
+                  <span>{run.length} of {versions.length}</span>
+                </div>
+                <p>Run one, or several to test them against each other. With more than one, Meta shares the budget and puts more behind the version that works best.</p>
+                <div className="use-ad-run-list">
+                  {versions.map((x, i) => {
+                    const on = run.includes(x.variant);
+                    const last = on && run.length === 1;
+                    return (
+                      <div key={x.variant} className="use-ad-run-row" data-on={on} data-viewing={i === v}>
+                        <button type="button" className="use-ad-run-view" onClick={() => setV(i)} aria-label={`Preview ${x.label}`}>
+                          {x.images[0] ? (
+                            // eslint-disable-next-line @next/next/no-img-element -- our own render route
+                            <img src={x.images[0]} alt="" />
+                          ) : (
+                            <span />
+                          )}
+                        </button>
+                        <button type="button" className="use-ad-run-text" onClick={() => setV(i)}>
+                          <strong>{x.label}</strong>
+                          {x.angle && <em>{x.angle}</em>}
+                        </button>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={on}
+                          aria-label={`Run ${x.label}`}
+                          className="use-ad-run-toggle"
+                          onClick={() => toggleRun(x.variant)}
+                          disabled={last}
+                          title={last ? "At least one version has to run" : on ? "Leave this version out" : "Run this version"}
+                        >
+                          {on && <Check size={13} strokeWidth={3} />}
+                          {on ? "Running" : "Run"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
             <section className="ui-card use-ad-path">
               <div className="use-ad-path-head">
                 <span className="use-ad-path-ic"><Plus size={17} /></span>
                 <div>
                   <h2>Start a new campaign</h2>
                   <p>
-                    Built around this ad: {adCount === 1 ? "the ad" : `all ${adCount} versions`} in one ad set, aimed at {OBJECTIVE_SHORT[ad.goalObjective].toLowerCase()}. You choose the audience, budget and dates before anything goes live.
+                    Built around this ad: {ad.kind === "video" ? "the ad" : adCount === versions.length && adCount > 1 ? `all ${adCount} versions` : adCount === 1 ? `version ${run[0]}` : `versions ${[...run].sort((a, b) => a - b).join(" and ")}`} in one ad set, aimed at {OBJECTIVE_SHORT[ad.goalObjective].toLowerCase()}. You choose the audience, budget and dates before anything goes live.
                   </p>
                 </div>
               </div>
-              <Link href={`/marketing/ads/new?fromAd=${ad.id}`} className="use-ad-path-cta">
+              <Link href={`/marketing/ads/new?fromAd=${ad.id}${variants ? `&versions=${variants.join(",")}` : ""}`} className="use-ad-path-cta">
                 <Button>
                   Start a new campaign <ArrowRight size={15} />
                 </Button>
@@ -179,7 +238,7 @@ export function UseAdChooser({
                 <span className="use-ad-path-ic"><Layers size={17} /></span>
                 <div>
                   <h2>Add to a campaign</h2>
-                  <p>Put {adCount === 1 ? "it" : "the versions"} into an ad set you already run, alongside the ads there.</p>
+                  <p>Put {adCount === 1 ? "it" : `the ${adCount} versions`} into an ad set you already run, alongside the ads there.</p>
                 </div>
               </div>
 

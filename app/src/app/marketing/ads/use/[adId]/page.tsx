@@ -11,6 +11,7 @@ import { isMetaConnected } from "@/lib/social/publisher";
 import { getBusinessProfile } from "@/lib/businessProfile";
 import { renderFileUrl } from "@/lib/image/renderStore.client";
 import { GOAL_OBJECTIVE } from "@/lib/ads/adCopy";
+import { parseVariants } from "@/lib/ads/fromCreative";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ export const dynamic = "force-dynamic";
  * with it or add it to one that exists. Content Studio makes the ad; this is
  * where it goes to work.
  */
-export default async function UseAdPage({ params }: { params: { adId: string } }) {
+export default async function UseAdPage({ params, searchParams }: { params: { adId: string }; searchParams?: { only?: string } }) {
   await requireAdminPage();
   const ad = getAdCreative(Number(params.adId));
   if (!ad) notFound();
@@ -38,6 +39,7 @@ export default async function UseAdPage({ params }: { params: { adId: string } }
   const versions: ChooserVersion[] =
     ad.kind === "video"
       ? ad.videoCopies.map((c, i) => ({
+          variant: 0,
           label: `Text ${i + 1}`,
           angle: c.angle,
           primaryText: c.primaryText,
@@ -52,6 +54,7 @@ export default async function UseAdPage({ params }: { params: { adId: string } }
           const feed = v.images["4:5"]?.renderFilename ?? v.images["1:1"]?.renderFilename ?? null;
           const tall = v.images["9:16"]?.renderFilename ?? null;
           return {
+            variant: v.variant,
             label: `Version ${v.variant}`,
             angle: v.copy?.angle ?? "",
             primaryText: v.copy?.primaryText ?? "",
@@ -87,6 +90,7 @@ export default async function UseAdPage({ params }: { params: { adId: string } }
           versions={versions}
           brand={{ ...brand, linkHost }}
           campaigns={campaigns}
+          initialRun={parseVariants(searchParams?.only)}
         />
       ) : (
         <AdsNotConnected hasPage={isMetaConnected(tenantId)} hasAdAccount={adAccounts.length > 0} />

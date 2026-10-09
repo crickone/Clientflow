@@ -188,13 +188,13 @@ export function AdEditor({ initial, isAdmin }: { initial: AdCreativeView; isAdmi
         ))}
 
       {ad.versions.map((v) => (
-        <VersionCard key={v.designId} adId={ad.id} version={v} onChanged={refresh} />
+        <VersionCard key={v.designId} adId={ad.id} version={v} onChanged={refresh} canRun={ready && isAdmin && ad.versions.length > 1} />
       ))}
     </div>
   );
 }
 
-function VersionCard({ adId, version, onChanged }: { adId: number; version: AdVersion; onChanged: () => void }) {
+function VersionCard({ adId, version, onChanged, canRun }: { adId: number; version: AdVersion; onChanged: () => void; canRun: boolean }) {
   const [busySlide, setBusySlide] = useState<number | null>(null);
   const [photoOpen, setPhotoOpen] = useState(false);
   const rendered = AD_SIZES.some((s) => version.images[s]?.renderFilename);
@@ -213,9 +213,18 @@ function VersionCard({ adId, version, onChanged }: { adId: number; version: AdVe
         <h2>Version {version.variant}</h2>
         {version.copy?.angle && <span className="inbox-pill">{version.copy.angle}</span>}
         {rendered && (
-          <Button variant="outline" size="sm" className="ad-version-photo" onClick={() => setPhotoOpen(true)} disabled={busySlide !== null}>
-            <ImageIcon size={14} /> Change photo
-          </Button>
+          <span className="ad-version-photo">
+            <Button variant="outline" size="sm" onClick={() => setPhotoOpen(true)} disabled={busySlide !== null}>
+              <ImageIcon size={14} /> Change photo
+            </Button>
+            {canRun && (
+              <Link href={`/marketing/ads/use/${adId}?only=${version.variant}`}>
+                <Button variant="outline" size="sm">
+                  <Megaphone size={14} /> Run only this one
+                </Button>
+              </Link>
+            )}
+          </span>
         )}
       </div>
       <AdPhotoDialog open={photoOpen} onOpenChange={setPhotoOpen} version={version} onApplied={onChanged} />
@@ -295,7 +304,7 @@ function CopyEditor({
       <label className="nc-label">
         Main text <span className="ad-count">{copy.primaryText.length}/{LIMITS.primaryText}</span>
       </label>
-      <textarea className="nc-input" rows={4} value={copy.primaryText} onChange={set("primaryText")} maxLength={LIMITS.primaryText} />
+      <textarea className="nc-input" rows={9} value={copy.primaryText} onChange={set("primaryText")} maxLength={LIMITS.primaryText} />
       <div className="ad-grid">
         <div>
           <label className="nc-label">
