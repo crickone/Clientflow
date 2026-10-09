@@ -3,6 +3,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { resolvePublicSite } from "@/lib/cms/resolveHost";
 import { getPublishedPostBySlug } from "@/lib/cms/blog";
 import { siteRequestHost } from "@/lib/cms/requestHost";
+import { resolveSiteRedirect } from "@/lib/cms/siteRedirects";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +56,14 @@ export default function LegacyBlogPostUrl({
   if (!resolved) notFound();
 
   const post = getPublishedPostBySlug(resolved.db, resolved.site.id, params.slug);
-  if (!post) notFound();
+  if (!post) {
+    // An old article that was deliberately not carried over can still be
+    // sent somewhere useful by the site's _redirects.json (lib/cms/siteRedirects).
+    const hit = resolveSiteRedirect(resolved.site.slug, `/blog-posts/${params.slug}`);
+    if (hit?.kind === "external") permanentRedirect(hit.target);
+    if (hit) permanentRedirect(`${resolved.resolvedVia === "host" ? "" : `/site/${resolved.site.slug}`}${hit.target}`);
+    notFound();
+  }
 
   // A root-relative target keeps the browser on whatever host it is already
   // talking to. `resolvedVia` says which shape that host expects: a mapped
