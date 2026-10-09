@@ -11,6 +11,8 @@
  *   2. NO "free first class / free trial" claim (the live sign-up FAQ mentions it;
  *      the client confirmed it does not exist), so that FAQ answer is dropped.
  *
+ * 2026-10-09: the referral page was taken off the site (retired to draft, /referral-program
+ * redirects to /sign-up, footer link removed); a proper one is to be built later.
  * WARNING (2026-10-09): sites/inspire/*.html were hand-edited after this last ran
  * (sign-up page rebuilt around the enquiry form, membership wording, the LegitFit
  * timetable). Re-running this overwrites those edits: diff first.
