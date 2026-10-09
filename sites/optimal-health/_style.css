@@ -1527,6 +1527,7 @@ ul.body li + li{margin-top:10px}
 /* Team cards (About). Portrait 4:5; a card without a portrait yet shows the
    person's initial on sage rather than a stock silhouette. */
 .team{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:clamp(24px,4vw,56px)}
+.team--solo{grid-template-columns:minmax(0,460px)}
 .team__card p{margin:0}
 .team__card p + p{margin-top:12px}
 .team__img{aspect-ratio:4/5;overflow:hidden;background:var(--ink);margin-bottom:20px}

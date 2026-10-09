@@ -789,6 +789,7 @@ ul.body li + li{margin-top:10px}
 }
 
 .team{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:clamp(24px,4vw,56px)}
+.team--solo{grid-template-columns:minmax(0,460px)}
 .team__card p{margin:0}
 .team__card p + p{margin-top:12px}
 .team__img{aspect-ratio:4/5;overflow:hidden;background:var(--ink);margin-bottom:20px}
@@ -854,21 +855,15 @@ ul.body li + li{margin-top:10px}
         <h2 class="lede">Our team.</h2>
       </div>
     </div>
-    <div class="team">
+    <div class="team team--solo">
       <article class="team__card">
         <div class="team__img"><img src="assets/team-sandra.jpg" alt="Sandra, clinic manager at Optimal Health and Recovery, smiling in a blue therapist's tunic in front of bamboo" loading="lazy" /></div>
         <p class="team__name">Sandra</p>
-        <p class="team__role">Clinic manager · Massage and neuromuscular therapist</p>
-        <p>Sandra manages the clinic. She has worked as a massage therapist since 2016 and is qualified in massage and neuromuscular therapy.</p>
+        <p class="team__role">Clinic manager · Massage, reflexology and neuromuscular therapist</p>
+        <p>Sandra manages the clinic. She has worked as a massage therapist since 2016 and is qualified in massage, reflexology and neuromuscular therapy.</p>
         <p>Before joining Optimal Health, she worked for four years in the spa at the five-star Cashel Palace Hotel, as a therapist and then as spa assistant manager. She tailors each treatment to the client to get the best result for them.</p>
       </article>
-      <article class="team__card">
-        <div class="team__img team__img--empty"><span class="team__mono" aria-hidden="true">C</span></div>
-        <p class="team__name">Caitriona</p>
-        <p class="team__role">Massage therapist</p>
-        <p>Caitriona has eight years' experience as a massage therapist.</p>
-        <p>Before that, she worked in the hair and beauty industry for many years.</p>
-      </article>
+
     </div>
   </div>
 </section>
@@ -895,7 +890,7 @@ ul.body li + li{margin-top:10px}
       <a class="tile" href="massage.html">
         <div class="tile__img"><img src="assets/massage.jpg" alt="A massage treatment at the clinic" loading="lazy" /></div>
         <h3 class="panel__t" style="text-align:left">Massage</h3>
-        <p class="tile__m">Massage, reflexology and lymphatic drainage, with Sandra and Caitriona.</p>
+        <p class="tile__m">Massage, reflexology and lymphatic drainage, with Sandra.</p>
       </a>
       <a class="tile" href="hifem.html">
         <div class="tile__img"><img src="assets/hifem.jpg" alt="The HIFEM therapy equipment" loading="lazy" /></div>
