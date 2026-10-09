@@ -96,7 +96,7 @@ const footer = () => `<footer class="foot">
       </div>
       <div class="foot__links">
         <b>Also at Ard Gaoithe</b>
-        <a href="https://inspirehealthandfitness.ie" rel="noopener">Inspire Health &amp; Fitness</a>
+        <a href="https://www.inspirehealthandfitness.ie" rel="noopener">Inspire Health &amp; Fitness</a>
         <a href="https://bodegacafeatinspire.ie" rel="noopener">Bodega Cafe at Inspire</a>
         <b style="margin-top:16px">Follow</b>
         <a href="https://www.facebook.com/healthwiseclonmel/" rel="noopener">Facebook</a>
