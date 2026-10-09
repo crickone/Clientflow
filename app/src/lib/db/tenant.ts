@@ -2716,6 +2716,7 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       video_project_id INTEGER,
       copy TEXT,
       video_outputs TEXT,
+      saved_at INTEGER,
       created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
       updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
@@ -2726,6 +2727,8 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     const adCols = sqlite.prepare("PRAGMA table_info(ad_creatives)").all() as Array<{ name: string }>;
     if (!adCols.some((c) => c.name === "copy")) sqlite.exec("ALTER TABLE ad_creatives ADD COLUMN copy TEXT");
     if (!adCols.some((c) => c.name === "video_outputs")) sqlite.exec("ALTER TABLE ad_creatives ADD COLUMN video_outputs TEXT");
+    // When the operator kept it in the ad library; null means not saved.
+    if (!adCols.some((c) => c.name === "saved_at")) sqlite.exec("ALTER TABLE ad_creatives ADD COLUMN saved_at INTEGER");
   } catch (err) {
     console.error("[db] ad_creatives columns failed:", err);
   }

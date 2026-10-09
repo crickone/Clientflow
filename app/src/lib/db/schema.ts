@@ -869,6 +869,8 @@ export const adCreatives = sqliteTable("ad_creatives", {
   copy: text("copy"),
   /** Video ads: JSON { "9:16"?: filename, "1:1"?: filename } in the project's folder. */
   videoOutputs: text("video_outputs"),
+  /** When the operator saved it to the ad library; null when not saved. */
+  savedAt: integer("saved_at", { mode: "timestamp_ms" }),
   createdAt: integer("created_at", { mode: "timestamp_ms" })
     .notNull()
     .default(sql`(unixepoch() * 1000)`),

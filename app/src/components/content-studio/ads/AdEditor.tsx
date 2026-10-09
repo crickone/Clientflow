@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Download, Megaphone, RefreshCw, Scissors, Sparkles, Trash2 } from "lucide-react";
+import { Bookmark, BookmarkCheck, Download, ImageIcon, Library, Megaphone, RefreshCw, Scissors, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
@@ -15,7 +15,9 @@ import {
   retryAdAction,
   saveAdCopyAction,
   saveVideoAdCopyAction,
+  setAdSavedAction,
 } from "@/app/content-studio/ads/actions";
+import { AdPhotoDialog } from "./AdPhotoDialog";
 import { AD_GOAL_LABEL, AD_SIZES, AD_SIZE_LABEL, LIMITS, type AdCopy } from "@/lib/ads/adCopy";
 import { CTAS } from "@/lib/ads/spec";
 import type { AdCreativeView, AdVersion } from "@/lib/ads/creatives";
@@ -74,6 +76,18 @@ export function AdEditor({ initial, isAdmin }: { initial: AdCreativeView; isAdmi
   }
 
   const ready = ad.status !== "writing" && (ad.kind === "video" ? !!ad.videoUrls["9:16"] : ad.versions.length > 0);
+  const [saving, startSaving] = useTransition();
+
+  function toggleSaved() {
+    const next = ad.savedAt == null;
+    startSaving(async () => {
+      await setAdSavedAction(ad.id, next);
+      setAd((a) => ({ ...a, savedAt: next ? Date.now() : null }));
+      toast.success(next ? "Saved to your ad library" : "Removed from your ad library", {
+        action: next ? { label: "Open library", onClick: () => router.push("/content-studio/ads") } : undefined,
+      });
+    });
+  }
 
   return (
     <div className="ad-page">
@@ -81,6 +95,10 @@ export function AdEditor({ initial, isAdmin }: { initial: AdCreativeView; isAdmi
         <div style={{ minWidth: 0 }}>
           <div className="ad-eyebrow">
             <Megaphone size={13} /> {ad.kind === "video" ? "Video ad" : "Image ad"} · {AD_GOAL_LABEL[ad.brief.goal]}
+            <span aria-hidden>·</span>
+            <Link href="/content-studio/ads" className="ad-eyebrow-link">
+              <Library size={13} /> Ad library
+            </Link>
           </div>
           <h1 className="ad-title">{ad.name}</h1>
         </div>
@@ -98,6 +116,11 @@ export function AdEditor({ initial, isAdmin }: { initial: AdCreativeView; isAdmi
                 <Megaphone size={15} /> Use in a campaign
               </Button>
             </Link>
+          )}
+          {ready && (
+            <Button variant={ad.savedAt ? "secondary" : "outline"} onClick={toggleSaved} loading={saving} aria-pressed={ad.savedAt != null}>
+              {ad.savedAt ? <BookmarkCheck size={15} /> : <Bookmark size={15} />} {ad.savedAt ? "Saved" : "Save to ad library"}
+            </Button>
           )}
           {ad.status !== "writing" && (
             <Button variant="outline" onClick={retry} loading={pending}>
@@ -173,6 +196,8 @@ export function AdEditor({ initial, isAdmin }: { initial: AdCreativeView; isAdmi
 
 function VersionCard({ adId, version, onChanged }: { adId: number; version: AdVersion; onChanged: () => void }) {
   const [busySlide, setBusySlide] = useState<number | null>(null);
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const rendered = AD_SIZES.some((s) => version.images[s]?.renderFilename);
 
   async function redesign(slideId: number) {
     setBusySlide(slideId);
@@ -187,7 +212,13 @@ function VersionCard({ adId, version, onChanged }: { adId: number; version: AdVe
       <div className="ad-version-head">
         <h2>Version {version.variant}</h2>
         {version.copy?.angle && <span className="inbox-pill">{version.copy.angle}</span>}
+        {rendered && (
+          <Button variant="outline" size="sm" className="ad-version-photo" onClick={() => setPhotoOpen(true)} disabled={busySlide !== null}>
+            <ImageIcon size={14} /> Change photo
+          </Button>
+        )}
       </div>
+      <AdPhotoDialog open={photoOpen} onOpenChange={setPhotoOpen} version={version} onApplied={onChanged} />
 
       <div className="ad-sizes">
         {AD_SIZES.map((size) => {
@@ -224,7 +255,7 @@ function VersionCard({ adId, version, onChanged }: { adId: number; version: AdVe
       {version.copy && (
         <CopyEditor
           initial={version.copy}
-          hint="The words on the image are part of the design; use the redesign button to change them."
+          hint="Changing the button here changes it on the images too. The other words on the image are part of the design; use the redesign button to change them."
           onSave={(copy) => saveAdCopyAction(adId, version.designId, copy)}
           onSaved={onChanged}
         />

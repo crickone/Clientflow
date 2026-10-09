@@ -14,6 +14,9 @@ import {
   queueImageAd,
   redesignAdImage,
   saveVideoCopy,
+  setAdSaved,
+  relabelAdButton,
+  ctaWords,
   renameAdCreative,
   saveVersionCopy,
   type AdCreativeView,
@@ -88,7 +91,18 @@ export async function saveAdCopyAction(adId: number, designId: number, copy: AdC
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Check the text." };
   const clean = coerceCopy(parsed.data, ad.brief.goal);
   if (!clean) return { ok: false, error: "The headline and main text are needed." };
+  const before = ad.versions.find((v) => v.designId === designId)?.copy ?? null;
   saveVersionCopy(designId, clean);
+  // The image carries the button too; keep it saying the same thing.
+  if (before && before.cta !== clean.cta) {
+    try {
+      await relabelAdButton(designId, ctaWords(before.cta), ctaWords(clean.cta));
+    } catch (err) {
+      console.error("[ads] button relabel failed:", err);
+      return { ok: false, error: "The text was saved, but the button on the images could not be updated. Try another design for each size." };
+    }
+  }
+  revalidatePath(`/content-studio/ads/${adId}`);
   return { ok: true };
 }
 
@@ -119,6 +133,13 @@ export async function redesignAdImageAction(adId: number, slideId: number, note:
 export async function renameAdAction(id: number, name: string): Promise<{ ok: true }> {
   await requireUser();
   renameAdCreative(id, name.trim() || "Untitled ad");
+  return { ok: true };
+}
+
+export async function setAdSavedAction(id: number, saved: boolean): Promise<{ ok: true }> {
+  await requireUser();
+  setAdSaved(id, saved);
+  revalidatePath("/content-studio/ads");
   return { ok: true };
 }
 

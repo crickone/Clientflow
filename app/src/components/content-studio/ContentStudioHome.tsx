@@ -256,6 +256,10 @@ export function ContentStudioHome({
             place — the photographs and clips you uploaded, rather than the
             work you made from them. It was already built and reachable only
             by typing the URL. */}
+        <Link href="/content-studio/ads" className="cs-libref">
+          <Megaphone size={14} strokeWidth={1.8} />
+          Ad library
+        </Link>
         <Link href="/content-studio/library" className="cs-libref">
           <FolderOpen size={14} strokeWidth={1.8} />
           Library

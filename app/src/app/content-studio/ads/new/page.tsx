@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { Library } from "lucide-react";
 import { NewAdForm } from "@/components/content-studio/ads/NewAdForm";
 import { getBusinessProfile } from "@/lib/businessProfile";
 import { getDesignSystem } from "@/lib/design/system";
@@ -17,8 +19,11 @@ export default function NewAdPage() {
   const photo = listLibraryAssets().find((a) => a.kind === "image");
   return (
     <>
-      <header className="nc-head">
+      <header className="nc-head adl-newhead">
         <h1 className="nc-title">New ad</h1>
+        <Link href="/content-studio/ads" className="cs-libref">
+          <Library size={14} strokeWidth={1.8} /> Ad library
+        </Link>
       </header>
       <NewAdForm
         website={bp.website}
