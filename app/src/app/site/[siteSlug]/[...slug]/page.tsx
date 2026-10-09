@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { notFound, permanentRedirect } from "next/navigation";
 
 import {
@@ -16,6 +15,7 @@ import { SiteTracking } from "@/components/cms/SiteTracking";
 import { SiteBeacon } from "@/components/cms/SiteBeacon";
 import { StudioCanvas } from "@/components/cms/StudioCanvas";
 import { StudioUneditablePanel } from "@/components/cms/StudioUneditablePanel";
+import { siteRequestHost } from "@/lib/cms/requestHost";
 
 export const dynamic = "force-dynamic";
 
@@ -57,7 +57,7 @@ export default async function PublicSitePage({ params, searchParams }: Props) {
     // A page row with no template already resolved the site; only a missing
     // page needs the lookup done again.
     const resolved =
-      pc?.resolved ?? resolvePublicSite({ host: headers().get("host"), siteParam: searchParams.site ?? params.siteSlug });
+      pc?.resolved ?? resolvePublicSite({ host: siteRequestHost(), siteParam: searchParams.site ?? params.siteSlug });
     if (resolved) {
       const hit = resolveSiteRedirect(resolved.site.slug, pathFromSlugParam(params.slug));
       if (hit) {

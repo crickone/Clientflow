@@ -1,9 +1,9 @@
 import crypto from "node:crypto";
-import { headers } from "next/headers";
 import { runWithTenant } from "@/lib/db/tenant";
 import { resolvePublicSite, normalizeHost } from "@/lib/cms/resolveHost";
 import { clientIp, rateLimit } from "@/lib/rateLimit";
 import { cleanPath, cleanUtm, isBot, recordPageView, referrerDomain, visitorHash } from "@/lib/analytics/pageViews";
+import { siteRequestHost } from "@/lib/cms/requestHost";
 
 export const dynamic = "force-dynamic";
 
@@ -57,7 +57,7 @@ export async function POST(req: Request) {
     if (declared > MAX_BODY_CHARS) return NO_CONTENT();
     const ua = req.headers.get("user-agent");
     if (isBot(ua)) return NO_CONTENT();
-    const host = headers().get("host");
+    const host = siteRequestHost();
     const site = resolvePublicSite({ host, siteParam: null });
     if (!site || site.resolvedVia !== "host") return NO_CONTENT();
     if (!rateLimit(`site-events:site:${site.site.id}`, SITE_LIMIT_PER_MIN, 60_000).ok) return NO_CONTENT();

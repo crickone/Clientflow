@@ -1,8 +1,8 @@
-import { headers } from "next/headers";
 import { notFound, permanentRedirect } from "next/navigation";
 
 import { resolvePublicSite } from "@/lib/cms/resolveHost";
 import { getPublishedPostBySlug } from "@/lib/cms/blog";
+import { siteRequestHost } from "@/lib/cms/requestHost";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +47,7 @@ export default function LegacyBlogPostUrl({
   params: { siteSlug: string; slug: string };
   searchParams: { site?: string };
 }) {
-  const host = headers().get("host");
+  const host = siteRequestHost();
   const resolved = resolvePublicSite({
     host,
     siteParam: searchParams.site ?? params.siteSlug,

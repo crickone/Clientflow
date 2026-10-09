@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { resolvePublicSite } from "@/lib/cms/resolveHost";
@@ -13,6 +12,7 @@ import { StudioCanvas } from "@/components/cms/StudioCanvas";
 import { StudioUneditablePanel } from "@/components/cms/StudioUneditablePanel";
 import { SiteTracking } from "@/components/cms/SiteTracking";
 import { SiteBeacon } from "@/components/cms/SiteBeacon";
+import { siteRequestHost } from "@/lib/cms/requestHost";
 
 export const dynamic = "force-dynamic";
 
@@ -68,7 +68,7 @@ export default async function PublicSiteHome({ params, searchParams }: Props) {
   }
 
   // No home page yet — show a minimal holding screen if the site exists.
-  const host = headers().get("host");
+  const host = siteRequestHost();
   const resolved = resolvePublicSite({
     host,
     siteParam: searchParams.site ?? params.siteSlug,

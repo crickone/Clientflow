@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import fs from "node:fs";
-import { headers } from "next/headers";
 
 import { resolvePublicSite } from "@/lib/cms/resolveHost";
 import { getMediaAssetPublic, mediaFilePath } from "@/lib/cms/media";
 import { mediaSecurityHeaders } from "@/lib/api/mediaSecurityHeaders";
+import { siteRequestHost } from "@/lib/cms/requestHost";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ export async function GET(
   _req: Request,
   { params }: { params: { siteSlug: string; id: string } },
 ) {
-  const host = headers().get("host");
+  const host = siteRequestHost();
   const resolved = resolvePublicSite({ host, siteParam: params.siteSlug });
   if (!resolved) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

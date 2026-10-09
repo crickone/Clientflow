@@ -1,11 +1,11 @@
-import { headers } from "next/headers";
 
 import { resolvePublicSiteForCrawlers as resolvePublicSite, absoluteUrl } from "@/lib/cms/resolveHost";
+import { siteRequestHost } from "@/lib/cms/requestHost";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
-  const host = headers().get("host");
+  const host = siteRequestHost();
   const url = new URL(req.url);
   const resolved = resolvePublicSite({
     host,

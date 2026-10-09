@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { resolvePublicSite, siteUrl } from "@/lib/cms/resolveHost";
@@ -12,6 +11,7 @@ import { SiteBeacon } from "@/components/cms/SiteBeacon";
 import { siteVerificationMeta, resolvePageContext, studioEditZones } from "@/lib/cms/render";
 
 import PublicSitePage, { generateMetadata as pageMetadata } from "../[...slug]/page";
+import { siteRequestHost } from "@/lib/cms/requestHost";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +62,7 @@ export function generateMetadata({
   if (ownsBlogPage(params.siteSlug, searchParams)) {
     return pageMetadata({ params: { siteSlug: params.siteSlug, slug: BLOG_PATH }, searchParams });
   }
-  const host = headers().get("host");
+  const host = siteRequestHost();
   const resolved = resolvePublicSite({ host, siteParam: searchParams.site ?? params.siteSlug });
   if (!resolved) return { title: "Not found" };
   return {
@@ -88,7 +88,7 @@ export default async function PublicBlogIndex({
     return PublicSitePage({ params: { siteSlug: params.siteSlug, slug: BLOG_PATH }, searchParams });
   }
 
-  const host = headers().get("host");
+  const host = siteRequestHost();
   const resolved = resolvePublicSite({
     host,
     siteParam: searchParams.site ?? params.siteSlug,

@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { parseSiteHosts } from "@/lib/cms/siteHostsEnv";
+import { PROXIED_SITE_SLUG, PROXY_KEY_HEADER, SITE_HOST_HEADER, trustedProxyHost } from "@/lib/cms/proxyHost";
 
 // "/open" is the platform "Open business" token handoff: pre-session (no
 // cookie yet when it's first hit) but does nothing without a valid one-time
@@ -39,6 +40,9 @@ const PUBLIC_API_PREFIXES = [
 // (the Domains admin tells you what to set), e.g.
 // CMS_SITE_HOSTS="renovacellular.ie=renova,www.renovacellular.ie=renova"
 const SITE_HOSTS = parseSiteHosts(process.env.CMS_SITE_HOSTS);
+// Shared with the Cloudflare Worker that fronts every client domain; see
+// lib/cms/proxyHost.ts.
+const PROXY_SECRET = process.env.SITES_PROXY_SECRET;
 
 
 export function middleware(req: NextRequest) {
@@ -49,6 +53,15 @@ export function middleware(req: NextRequest) {
   // so precise host→site resolution happens server-side in resolveHost).
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("x-pathname", pathname);
+
+  // A client domain arriving through the Cloudflare Worker. The site-host
+  // header is trusted ONLY with the Worker's secret, and stripped otherwise
+  // (and the secret never travels further than this function), so a page
+  // reading it can rely on it. See lib/cms/proxyHost.ts.
+  const proxiedHost = trustedProxyHost((n) => req.headers.get(n), PROXY_SECRET);
+  requestHeaders.delete(SITE_HOST_HEADER);
+  requestHeaders.delete(PROXY_KEY_HEADER);
+  if (proxiedHost) requestHeaders.set(SITE_HOST_HEADER, proxiedHost);
   const pass = () => NextResponse.next({ request: { headers: requestHeaders } });
 
   // Static assets, Next internals, favicon, public files — always allowed.
@@ -60,12 +73,17 @@ export function middleware(req: NextRequest) {
     pathname === "/favicon.ico" ||
     /\.(png|jpe?g|svg|ico|webp|gif|mp4|webm|mov|otf|ttf|woff2?|css|js)$/i.test(pathname)
   ) {
-    return NextResponse.next();
+    // pass(), not a bare next(): some of these paths reach a route that reads
+    // the site host, and the untrusted copy must be gone by then.
+    return pass();
   }
 
   // Mapped public domain → rewrite host-root requests to the site mount.
-  const host = (req.headers.get("host") || "").split(":")[0].toLowerCase();
-  const mappedSlug = SITE_HOSTS[host];
+  // A host in CMS_SITE_HOSTS names its site directly. A client domain through
+  // the Worker does not need to be listed anywhere: it is rewritten under a
+  // placeholder slug and the page resolves the site from the verified domain.
+  const host = proxiedHost ?? (req.headers.get("host") || "").split(":")[0].toLowerCase();
+  const mappedSlug = SITE_HOSTS[host] ?? (proxiedHost ? PROXIED_SITE_SLUG : undefined);
   if (
     mappedSlug &&
     !pathname.startsWith("/site/") &&

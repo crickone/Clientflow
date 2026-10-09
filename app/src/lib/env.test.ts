@@ -18,6 +18,9 @@ const FULL_ENV: Record<string, string> = {
   OPENROUTER_API_KEY: "or_x",
   ALERT_EMAIL: "ops@example.com",
   CMS_SITE_HOSTS: "example.com=slug",
+  SITES_PROXY_SECRET: "x",
+  CLOUDFLARE_API_TOKEN: "x",
+  CLOUDFLARE_ZONE_ID: "x",
   MAILGUN_API_KEY: "key-x",
   MAILGUN_WEBHOOK_SIGNING_KEY: "whsec_x",
   FACEBOOK_APP_ID: "fb-app-id",
@@ -73,11 +76,11 @@ assert.deepEqual(checkEnv(FULL_ENV, true), { missingRequired: [], missingRecomme
 }
 
 // Empty env entirely -> every required + recommended var missing, plus the
-// backup group (14 named recommended vars + 1 backup group = 15).
+// backup group (17 named recommended vars + 1 backup group = 18).
 {
   const result = checkEnv({}, false);
   assert.deepEqual(result.missingRequired, ["ANTHROPIC_API_KEY"]);
-  assert.equal(result.missingRecommended.length, 15);
+  assert.equal(result.missingRecommended.length, 18);
 }
 
 console.log("env.test.ts: all assertions passed");

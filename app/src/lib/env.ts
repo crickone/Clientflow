@@ -35,6 +35,9 @@ const RECOMMENDED_VARS = [
   "OPENROUTER_API_KEY", // non-Anthropic model fallback in the AI provider registry
   "ALERT_EMAIL", // opt-in ops alerting (crash-survived + backup-failure emails)
   "CMS_SITE_HOSTS", // public multi-site host→tenant routing (see middleware.ts)
+  "SITES_PROXY_SECRET", // trusts the client-domain Cloudflare Worker (lib/cms/proxyHost.ts) — unset = no client domain is served through it
+  "CLOUDFLARE_API_TOKEN", // registers client domains as Cloudflare custom hostnames (lib/cms/customHostnames.ts)
+  "CLOUDFLARE_ZONE_ID", // the adonisagent.ie zone those hostnames live on
   "MAILGUN_API_KEY", // email marketing sends (lib/marketing/sender/mailgun.ts) — unset = every send fails closed
   "MAILGUN_WEBHOOK_SIGNING_KEY", // verifies inbound Mailgun webhook signatures — unset = every webhook rejected (fails closed, never accepts unsigned events)
   "FACEBOOK_APP_ID", // native Facebook lead-gen connect flow — unset = facebookConfigured() is false, so "Connect Facebook" stays disabled

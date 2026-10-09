@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { resolvePublicSite, siteUrl } from "@/lib/cms/resolveHost";
@@ -9,6 +8,7 @@ import { getSiteChrome, CHROME_CONTENT_CSS } from "@/lib/cms/siteChrome";
 import { siteVerificationMeta } from "@/lib/cms/render";
 import { SiteTracking } from "@/components/cms/SiteTracking";
 import { SiteBeacon } from "@/components/cms/SiteBeacon";
+import { siteRequestHost } from "@/lib/cms/requestHost";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +16,7 @@ type Params = { siteSlug: string; slug: string };
 type Search = { site?: string };
 
 function resolve(params: Params, searchParams: Search) {
-  const host = headers().get("host");
+  const host = siteRequestHost();
   const resolved = resolvePublicSite({
     host,
     siteParam: searchParams.site ?? params.siteSlug,

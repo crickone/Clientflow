@@ -79,9 +79,12 @@ Admin console → the tenant's detail page → **Grant credits**:
 - **AI credits** (agents + Content Studio) — €25/mo free tranche is built in; top-up beyond that.
 
 ### 1.6 Go live on their domain
-1. CMS → the site → **Domains** → add the client's public hostname.
-2. Verify **DNS-TXT ownership** (the platform requires it before a hostname serves).
-3. Set **`CMS_SITE_HOSTS`** on the deploy (`host=slug,…`) and point the client's DNS at Railway.
+Client domains go through Cloudflare for SaaS, not Railway: no per-client Railway domain, no env change, no redeploy. Full detail and the one-time platform setup: **[client-domains.md](client-domains.md)**.
+1. CMS → the site → **Domains** → add `www.<their domain>` as the main address.
+2. At their DNS host: the `_adonisagent-verify` TXT and `www` CNAME `sites.adonisagent.ie` (the page shows both, with copy buttons). Leave MX alone.
+3. Forward the bare domain to `https://www.<their domain>` at the registrar.
+4. **Verify**, then **Check again** until all three steps read Done. Only then switch the old site off.
+`CMS_SITE_HOSTS` is now only for the platform's own sites (adonisagent.ie).
 
 ---
 
@@ -92,7 +95,7 @@ Admin console → tenant detail → Grant credits (email or AI). Suspending a te
 
 ### 2.2 Connect a domain / edit DNS
 - Sending domains: §1.3. Public site domains: §1.6.
-- **Hosting Ireland** (`clients.hostingireland.ie`): names are **fully-qualified** (`mg.<domain>`); no quotes on TXT values.
+- **Hosting Ireland** (`clients.hostingireland.ie`): names are **fully-qualified** (`mg.<domain>`); no quotes on TXT values. Also the registrar for optimalhealthatinspire.ie (its email MX is there too; never touch MX when pointing www).
 
 ### 2.3 Generate / revoke API keys
 Tenant → **Settings → API keys**. Keys are `cf_live_…`, scoped (default `leads`), shown once, revocable. Only the sha256 hash is stored.

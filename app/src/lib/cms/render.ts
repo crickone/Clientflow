@@ -1,7 +1,6 @@
 import "server-only";
 
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { and, eq } from "drizzle-orm";
 
 import { resolvePublicSite, absoluteUrl, siteUrl, type PublicSite } from "@/lib/cms/resolveHost";
@@ -22,6 +21,7 @@ import type { RenderCtx } from "@/components/cms/Block";
 import type { Page } from "@/lib/db/schema";
 // Side-effect import: registers site-specific templates (Renova etc.).
 import "@/lib/cms/registerTemplates";
+import { siteRequestHost } from "@/lib/cms/requestHost";
 
 export interface PageContext {
   resolved: PublicSite;
@@ -46,7 +46,7 @@ export function resolvePageContext(
   params: { siteSlug: string; slug?: string[] },
   searchParams: { site?: string; preview?: string },
 ): PageContext | null {
-  const host = headers().get("host");
+  const host = siteRequestHost();
   const resolved = resolvePublicSite({
     host,
     siteParam: searchParams.site ?? params.siteSlug,

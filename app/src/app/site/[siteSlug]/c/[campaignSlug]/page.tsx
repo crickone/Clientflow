@@ -23,7 +23,6 @@
 import type { Metadata } from "next";
 import fs from "node:fs";
 import path from "node:path";
-import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { resolvePublicSite, siteUrl, type PublicSite } from "@/lib/cms/resolveHost";
@@ -44,6 +43,7 @@ import { getBusinessProfile, type BusinessProfile } from "@/lib/businessProfile"
 import { resolveLogoPath } from "@/lib/branding";
 import { CampaignLanding } from "@/components/campaigns/CampaignLanding";
 import { SiteBeacon } from "@/components/cms/SiteBeacon";
+import { siteRequestHost } from "@/lib/cms/requestHost";
 
 export const dynamic = "force-dynamic";
 
@@ -190,7 +190,7 @@ function resolveCampaignLanding(
   searchParams: Props["searchParams"],
   opts?: { countView?: boolean },
 ): Resolved | null {
-  const host = headers().get("host");
+  const host = siteRequestHost();
   const resolved = resolvePublicSite({
     host,
     siteParam: searchParams.site ?? params.siteSlug,

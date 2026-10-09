@@ -1,8 +1,8 @@
-import { headers } from "next/headers";
 
 import { resolvePublicSiteForCrawlers as resolvePublicSite, siteUrl } from "@/lib/cms/resolveHost";
 import { listPublishedPagesForSitemap } from "@/lib/cms/pages";
 import { listPublishedPosts } from "@/lib/cms/blog";
+import { siteRequestHost } from "@/lib/cms/requestHost";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  * the site's canonical (primary) host for <loc>.
  */
 export async function GET(req: Request) {
-  const host = headers().get("host");
+  const host = siteRequestHost();
   const url = new URL(req.url);
   const resolved = resolvePublicSite({
     host,

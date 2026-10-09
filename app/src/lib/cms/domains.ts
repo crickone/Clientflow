@@ -1,7 +1,7 @@
 import "server-only";
 
 import crypto from "node:crypto";
-import { resolveTxt } from "node:dns/promises";
+import { resolveCname, resolveTxt } from "node:dns/promises";
 import { and, eq } from "drizzle-orm";
 
 import { controlDb } from "@/lib/db/control";
@@ -174,4 +174,28 @@ function setSitePrimaryHost(siteId: number, host: string): void {
     .set({ primaryHost: host, updatedAt: new Date() })
     .where(eq(schema.sites.id, siteId))
     .run();
+}
+
+/**
+ * A bare domain ("example.ie", "example.co.uk") rather than a subdomain.
+ * Most registrars cannot put a CNAME on one, so the Domains page tells the
+ * operator to point www instead and forward the bare name to it.
+ */
+export function isApexHost(host: string): boolean {
+  const labels = host.split(".");
+  if (labels.length <= 2) return true;
+  return labels.length === 3 && /^(co|com|org|net|gov|ac|ltd|plc)$/.test(labels[1]!);
+}
+
+/**
+ * Whether `host` already CNAMEs to the platform's target. null when DNS gave
+ * no answer at all (common for a bare domain, which has A records instead).
+ */
+export async function pointsAt(host: string, target: string): Promise<boolean | null> {
+  try {
+    const names = await resolveCname(host);
+    return names.some((n) => n.toLowerCase().replace(/\.$/, "") === target);
+  } catch {
+    return null;
+  }
 }
