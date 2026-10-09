@@ -26,7 +26,7 @@ import {
 } from "@/lib/ai/generateCarousel";
 import { meteredCreateStreamed, type MeterContext } from "@/lib/ai/metered";
 import { logoBox } from "@/lib/design/renderDesign";
-import { collisionViolation } from "@/lib/design/layoutBoxes";
+import { collisionViolation, logoViolation } from "@/lib/design/layoutBoxes";
 import { MAX_PHOTO_SLOTS, PHOTO_TOKEN, photoSlotsUsed } from "@/lib/design/photoSlots";
 import { choosePhotos } from "@/lib/design/choosePhotos";
 import {
@@ -157,6 +157,9 @@ async function renderOne(
         ? overflowViolation(render.overflowPx, render.width, render.height)
         : null,
       render.collisions.length > 0 ? collisionViolation(render.collisions) : null,
+      render.underLogo.length > 0 && render.logo
+        ? logoViolation(render.underLogo, render.logo, Math.round(render.width * 0.02))
+        : null,
     ].filter((v): v is string => v !== null);
 
     return {
@@ -231,7 +234,7 @@ function adUserPrompt(
     "- LEGIBILITY IS NOT OPTIONAL. Every piece of text needs strong contrast against what is directly behind it (WCAG 4.5:1 at least). Text never sits straight on a photograph: put it on a solid panel or band, or on a dark scrim of at least rgba(0,0,0,0.7) where the text sits, fading out beyond it. Pale text on a pale ground and dark text on a mid-tone ground are both failures.",
     "- Words on the slide are EXACTLY the hook, support and button given below. Do not add, reword or invent text, prices, offers or claims.",
     "- NO DECORATION. No empty coloured blocks, rows of squares, stripes, frames or shapes that carry nothing. Colour comes in as a solid band or panel behind the type, or not at all.",
-    "- Keep the logo's reserved corner clear.",
+    "- Keep the logo's box in the top-left corner clear of all text, the button included.",
     "",
     ...versions.flatMap((v, i) => [
       `SLIDE ${i + 1} (angle: ${v.angle || "-"})`,

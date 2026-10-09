@@ -131,14 +131,16 @@ async function main() {
   // ────────────────────────────────────────────────────────────────────────
   //
   // Geometry pinned against the constants renderDesign.ts documents:
-  //   LOGO_MARGIN_FRACTION = 0.07, LOGO_WIDTH_FRACTION = 0.19
+  //   LOGO_MARGIN_FRACTION = 0.07, LOGO_WIDTH_FRACTION = 0.25,
+  //   LOGO_MAX_HEIGHT_FRACTION = 0.11, box in the TOP-LEFT corner
   // These are re-derived here from the doc comment, not imported (they are
   // not exported) -- that is the point: this test must notice if the private
   // constants drift, not silently track them.
   const CANVAS_W = 600;
   const CANVAS_H = 600;
   const LOGO_MARGIN_FRACTION = 0.07;
-  const LOGO_WIDTH_FRACTION = 0.19;
+  const LOGO_WIDTH_FRACTION = 0.25;
+  const LOGO_MAX_HEIGHT_FRACTION = 0.11;
 
   const LOGO_SRC_W = 300;
   const LOGO_SRC_H = 150; // 2:1 -- exercises logoBox's aspect-ratio math, not a square coincidence
@@ -158,9 +160,14 @@ async function main() {
   check("the stamped output differs from the unstamped input", Buffer.compare(stamped1, lightSlide) !== 0);
 
   const margin = Math.round(CANVAS_W * LOGO_MARGIN_FRACTION);
-  const logoW = Math.round(CANVAS_W * LOGO_WIDTH_FRACTION);
-  const logoH = Math.round((LOGO_SRC_H * logoW) / LOGO_SRC_W);
-  const boxLeft = CANVAS_W - margin - logoW;
+  let logoW = Math.round(CANVAS_W * LOGO_WIDTH_FRACTION);
+  let logoH = Math.round((LOGO_SRC_H * logoW) / LOGO_SRC_W);
+  const maxH = Math.round(CANVAS_W * LOGO_MAX_HEIGHT_FRACTION);
+  if (logoH > maxH) {
+    logoH = maxH;
+    logoW = Math.round(logoH / (LOGO_SRC_H / LOGO_SRC_W));
+  }
+  const boxLeft = margin;
   const boxTop = margin;
 
   const rawStamped = await sharp(stamped1).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
@@ -186,10 +193,11 @@ async function main() {
     Math.abs(centerPixel[0] - 0x0b) <= 4 && Math.abs(centerPixel[1] - 0x0b) <= 4 && Math.abs(centerPixel[2] - 0x0b) <= 4,
   );
 
-  // Far outside the box -- top-left corner and bottom-right corner -- must be
+  // Far outside the box -- the canvas corners and the bottom edge -- must be
   // untouched. The background is flat, so this can be an exact match.
   const farCorners: Array<[number, number]> = [
     [2, 2],
+    [CANVAS_W - 3, 2],
     [2, CANVAS_H - 3],
     [Math.floor(CANVAS_W / 2), CANVAS_H - 3],
   ];

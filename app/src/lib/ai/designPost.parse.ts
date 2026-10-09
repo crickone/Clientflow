@@ -317,14 +317,14 @@ export function logoReserveRule(
   height: number,
 ): string {
   if (!box) {
-    return "NO LOGO IS STAMPED on these slides, so the top-right corner is yours to compose into. Do not draw a logo, a wordmark or the business name yourself -- this post simply carries none.";
+    return "NO LOGO IS STAMPED on these slides, so the top-left corner is yours to compose into. Do not draw a logo, a wordmark or the business name yourself -- this post simply carries none.";
   }
-  const fromRight = width - box.left;
+  const right = box.left + box.width;
   const bottom = box.top + box.height;
   const gap = Math.round(width * 0.02);
-  return `KEEP THE LOGO'S BOX CLEAR. After you design a slide, the business's logo is composited into a box ${box.width}px wide and ${box.height}px tall, its top-left corner at x=${box.left}, y=${box.top} on the ${width}x${height} canvas -- ${fromRight}px in from the right edge, and reaching ${bottom}px down from the top.
+  return `KEEP THE LOGO'S BOX CLEAR. After you design a slide, the business's logo is composited into the TOP-LEFT corner: a box ${box.width}px wide and ${box.height}px tall, its top-left corner at x=${box.left}, y=${box.top} on the ${width}x${height} canvas, reaching ${right}px across and ${bottom}px down.
 
-Nothing you draw may enter that box: no text, no rule, no figure, no block of colour. A running head, a slide counter, a kicker or anything else along the top must sit either entirely LEFT of x=${box.left - gap}, or entirely BELOW y=${bottom + gap}. A rule that spans the full width belongs below y=${bottom + gap}, otherwise it cuts straight through the mark.
+Nothing you draw may enter that box: no text, no button, no rule, no figure, no block of colour. Your text starts BELOW y=${bottom + gap}, or sits entirely RIGHT of x=${right + gap} (a running head or slide counter along the top goes there). A rule that spans the full width belongs below y=${bottom + gap}, otherwise it cuts straight through the mark. This is measured after rendering: text found inside the box is sent back to be moved.
 
 A full-bleed photograph MAY pass under the box -- the logo is recoloured for whatever it lands on -- but keep the busiest part of the picture out of it.
 

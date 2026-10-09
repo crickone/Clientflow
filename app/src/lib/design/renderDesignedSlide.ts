@@ -8,9 +8,11 @@ import type { TextCollision } from "@/lib/design/layoutBoxes";
 import { fillPhotoSlots, photoSlotBoxes, photoSlotsUsed } from "./photoSlots";
 import {
   gradedPhotoDataUri,
+  logoBox,
   measureLayout,
   renderDesignToPng,
   stampLogo,
+  type LogoBox,
 } from "./renderDesign";
 
 /**
@@ -82,6 +84,10 @@ export interface RenderDesignedSlideInput {
 }
 
 export interface DesignedSlideRender {
+  /** Text the stamped logo covers; empty when none (or no logo). */
+  underLogo: string[];
+  /** Where the logo was stamped, or null. */
+  logo: LogoBox | null;
   /** The stored PNG's filename. The store is content-addressed, so identical
    *  inputs overwrite rather than accumulate. */
   filename: string;
@@ -328,6 +334,7 @@ export async function renderDesignedSlide(
     input.system.altFont,
   );
   let png = await renderDesignToPng(html, width, height, fonts);
+  const logo = input.logoPath ? await logoBox(input.logoPath, width) : null;
   if (input.logoPath) {
     // Stamped after the design, never asked for in the markup -- placement and
     // size are brand rules, not something to leave to a model.
@@ -349,17 +356,19 @@ export async function renderDesignedSlide(
   // for the stand-in. Paying two minutes per keystroke-save to compute a
   // number is not a trade worth making, and it would have blown through the
   // editor's own 180s client timeout on a slide with a large photograph.
-  const { overflowPx, collisions } = await measureLayout(
+  const { overflowPx, collisions, underLogo } = await measureLayout(
     await measurementHtmlFor(html, width, height, boxes),
     width,
     height,
     fonts,
+    undefined,
+    logo,
   );
 
   // The render is kept even when it overflows: a clipped slide the operator
   // can see beats no slide at all, and the measurement is what puts it in
   // front of whatever can fix it.
-  return { filename: saveRender(png), width, height, overflowPx, collisions };
+  return { filename: saveRender(png), width, height, overflowPx, collisions, underLogo, logo };
 }
 
 /**

@@ -15,8 +15,10 @@ import { loadDesignFonts } from "./fonts";
 import {
   collisionViolation,
   laidOutBoxes,
+  logoViolation,
   textBlocks,
   textCollisions,
+  textUnder,
 } from "./layoutBoxes";
 import { renderDesignToSvg } from "./renderDesign";
 
@@ -184,6 +186,20 @@ const SLIDE_62 =
     "the same content in a flowed column does not collide, whatever it wraps to",
     textCollisions(fixed.svg, textBlocks(fixed.nodes)).length === 0,
   );
+
+  // Text under the logo. The logo is stamped top-left AFTER rendering, so a
+  // heading placed there is covered; this is what catches it.
+  const LOGO = { left: 76, top: 76, width: 270, height: 60 };
+  const UNDER =
+    '<div style="width:1080px;height:1080px;display:flex;position:relative;font-family:Inter;background:#f2f3ed">' +
+    '<div style="position:absolute;top:80px;left:76px;width:900px;font-size:64px;color:#24231f">Heading under the logo</div>' +
+    '<div style="position:absolute;top:700px;left:76px;width:900px;font-size:30px;color:#24231f">Clear of it</div>' +
+    "</div>";
+  const under = await renderDesignToSvg(UNDER, 1080, 1080, fonts);
+  const covered = textUnder(under.svg, textBlocks(under.nodes), LOGO);
+  check("text placed in the logo's box is caught", covered.length === 1 && covered[0] === "Heading under the logo");
+  check("text clear of it is not", !covered.includes("Clear of it"));
+  check("and the violation says where to move it", logoViolation(covered, LOGO, 22).includes("below y=158"));
 
   console.log(`\nlayoutBoxes: ${passed} checks passed`);
 })();

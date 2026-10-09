@@ -22,7 +22,7 @@ import { contrastRatio, defaultTypeValue } from "./validate";
 const W = 1080;
 const H = 1080;
 
-/** The top-right corner the logo is stamped into after rendering. Sized from
+/** Room kept beside the logo on these samples (the preview itself stamps no logo). Sized from
  *  stampLogo's own geometry (a 7% margin and a 19% logo width, see
  *  renderDesign.ts) plus a small gap, so no text block can touch the logo's
  *  real box whatever the direction's margin. */

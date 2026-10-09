@@ -3,7 +3,7 @@ import { decodeHTML } from "entities";
 import sharp from "sharp";
 
 import type { DesignFont } from "./fonts";
-import { textBlocks, textCollisions, type TextCollision } from "./layoutBoxes";
+import { textBlocks, textCollisions, textUnder, type TextCollision } from "./layoutBoxes";
 
 /**
  * satori and satori-html are loaded LAZILY, for two reasons.
@@ -124,7 +124,8 @@ export async function measureLayout(
   height: number,
   fonts: DesignFont[],
   slack = 500,
-): Promise<{ overflowPx: number; collisions: TextCollision[] }> {
+  avoid: LogoBox | null = null,
+): Promise<{ overflowPx: number; collisions: TextCollision[]; underLogo: string[] }> {
   const { svg, nodes } = await renderDesignToSvg(html, width, height + slack, fonts);
 
   // Free, and the reason it lives here rather than in a pass of its own: this
@@ -136,7 +137,11 @@ export async function measureLayout(
   //
   // The slack height changes nothing here: these designs position their blocks
   // absolutely from the top, and the root carries an explicit height.
-  const collisions = textCollisions(svg, textBlocks(nodes));
+  const blocks = textBlocks(nodes);
+  const collisions = textCollisions(svg, blocks);
+  // Text the logo will be stamped over. Measured, not trusted: the prompt
+  // reserves the box, and this is how a design that ignored it is caught.
+  const underLogo = avoid ? textUnder(svg, blocks, avoid) : [];
 
   const { data, info } = await sharp(Buffer.from(svg))
     .ensureAlpha()
@@ -160,7 +165,7 @@ export async function measureLayout(
   // edge, not a cut-off sentence. Requiring a real cluster keeps the repair
   // loop from being triggered by a rounding artefact.
   const overflowPx = painted < 32 || lowest < 0 ? 0 : lowest - height + 1;
-  return { overflowPx, collisions };
+  return { overflowPx, collisions, underLogo };
 }
 
 /**
@@ -301,8 +306,12 @@ export async function gradedPhotoDataUri(
 // The brand document sets clear space at the height of the dot cluster and a
 // minimum width; on a 1080 field this reads as roughly a fifth of the width,
 // inset by the grid margin.
+// 2026-10-09: the operator asked for a bigger mark on the LEFT. A quarter of
+// the width reads at feed size; the height cap stops a square or stacked logo
+// from taking a quarter of the HEIGHT as well.
 const LOGO_MARGIN_FRACTION = 0.07;
-const LOGO_WIDTH_FRACTION = 0.19;
+const LOGO_WIDTH_FRACTION = 0.25;
+const LOGO_MAX_HEIGHT_FRACTION = 0.11;
 
 /** Where the logo lands on a slide, in canvas pixels. */
 export interface LogoBox {
@@ -326,13 +335,19 @@ export interface LogoBox {
  */
 export async function logoBox(logoPath: string, width: number): Promise<LogoBox> {
   const margin = Math.round(width * LOGO_MARGIN_FRACTION);
-  const w = Math.round(width * LOGO_WIDTH_FRACTION);
+  let w = Math.round(width * LOGO_WIDTH_FRACTION);
+  const maxH = Math.round(width * LOGO_MAX_HEIGHT_FRACTION);
   const meta = await sharp(logoPath).metadata();
   // A logo with no readable dimensions is reserved as a square: too much space
   // held back is a composition constraint, too little is a logo on top of type.
-  const h =
-    meta.width && meta.height ? Math.round((meta.height * w) / meta.width) : w;
-  return { left: width - margin - w, top: margin, width: w, height: h };
+  const aspect = meta.width && meta.height ? meta.height / meta.width : 1;
+  let h = Math.round(w * aspect);
+  if (h > maxH) {
+    h = maxH;
+    w = Math.round(h / aspect);
+  }
+  // Top LEFT, inset by the grid margin.
+  return { left: margin, top: margin, width: w, height: h };
 }
 
 /**
@@ -392,17 +407,16 @@ export async function stampLogo(
   height: number,
   marks: LogoMarks = DEFAULT_LOGO_MARKS,
 ): Promise<Buffer> {
-  const margin = Math.round(width * LOGO_MARGIN_FRACTION);
-  const logoW = Math.round(width * LOGO_WIDTH_FRACTION);
-
-  const logo = sharp(logoPath).resize({ width: logoW });
+  // The same box the prompt reserves and the layout check measures against.
+  const box = await logoBox(logoPath, width);
+  const logo = sharp(logoPath).resize({ width: box.width, height: box.height, fit: "fill" });
   const { data: logoData, info } = await logo
     .ensureAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
 
-  const left = width - margin - info.width;
-  const top = margin;
+  const left = box.left;
+  const top = box.top;
 
   // Mean brightness of the pixels the logo will actually cover.
   const patch = await sharp(slidePng)

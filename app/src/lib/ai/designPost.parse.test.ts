@@ -324,23 +324,23 @@ const TWO_ACCENTS = {
 }
 
 // -- The logo's box -------------------------------------------------------
-// A real 1080 canvas with a squarish mark: 7% margin, 19% width, so the box is
-// 205px wide at x=799, and 205px TALL -- reaching 281px down the canvas, not
-// the 108px the old "a tenth of the height" wording promised.
+// A real 1080 canvas: the mark sits TOP-LEFT at the 7% margin. A capped
+// squarish mark is 119px tall, so the box reaches 195px down the canvas.
 {
-  const r = logoReserveRule({ left: 799, top: 76, width: 205, height: 205 }, 1080, 1080);
-  check("the box is given in exact pixels, not a fraction", r.includes("205px wide and 205px tall"));
-  check("with its origin on the canvas", r.includes("x=799, y=76"));
-  check("and how far down it actually reaches", r.includes("281px down from the top"));
-  check("a running head is told where it may go instead", r.includes("entirely LEFT of x=777") && r.includes("entirely BELOW y=303"));
-  check("a full-width rule is told the same", r.includes("belongs below y=303"));
+  const r = logoReserveRule({ left: 76, top: 76, width: 119, height: 119 }, 1080, 1080);
+  check("the box is given in exact pixels, not a fraction", r.includes("119px wide and 119px tall"));
+  check("with its origin on the canvas", r.includes("x=76, y=76"));
+  check("in the top-left corner", r.includes("TOP-LEFT corner"));
+  check("and how far it actually reaches", r.includes("reaching 195px across and 195px down"));
+  check("text is told where it may go instead", r.includes("BELOW y=217") && r.includes("RIGHT of x=217"));
+  check("a full-width rule is told the same", r.includes("belongs below y=217"));
   check("a photograph may still pass under it", r.includes("MAY pass under the box"));
   check("and the model still never draws the mark itself", r.includes("Do not draw a logo, a wordmark or the business name yourself"));
 
-  // A tall mark reserves more height than a wide one -- the whole point of
-  // computing this from the file rather than stating a fraction.
-  const wide = logoReserveRule({ left: 799, top: 76, width: 205, height: 60 }, 1080, 1080);
-  check("a wide mark reserves less height", wide.includes("205px wide and 60px tall") && wide.includes("136px down from the top"));
+  // A wide mark reserves less height -- the point of computing this from the
+  // file rather than stating a fraction.
+  const wide = logoReserveRule({ left: 76, top: 76, width: 270, height: 60 }, 1080, 1080);
+  check("a wide mark reserves less height", wide.includes("270px wide and 60px tall") && wide.includes("136px down"));
 
   const none = logoReserveRule(null, 1080, 1080);
   check("with no logo the corner is released", none.includes("NO LOGO IS STAMPED"));

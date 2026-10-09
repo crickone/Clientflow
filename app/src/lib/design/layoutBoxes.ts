@@ -202,3 +202,40 @@ export function collisionViolation(collisions: TextCollision[]): string {
 function clip(text: string, max = 40): string {
   return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
 }
+
+/**
+ * Text blocks that land inside a region -- the logo's box. The logo is stamped
+ * after the design, so text under it is covered, not visible; both axes must
+ * overlap by more than `minPx`, the same antialiasing guard as above.
+ */
+export function textUnder(
+  svg: string,
+  blocks: TextBlock[],
+  region: { left: number; top: number; width: number; height: number },
+  minPx = 3,
+): string[] {
+  const boxes = laidOutBoxes(svg);
+  const out: string[] = [];
+  for (const b of blocks) {
+    const box = boxes.get(b.path);
+    if (!box) continue;
+    const h = Math.min(box.x + box.width, region.left + region.width) - Math.max(box.x, region.left);
+    const v = Math.min(box.y + box.height, region.top + region.height) - Math.max(box.y, region.top);
+    if (h >= minPx && v >= minPx) out.push(b.text);
+  }
+  return out;
+}
+
+/** The repair loop's words for text under the logo. */
+export function logoViolation(
+  texts: string[],
+  region: { left: number; top: number; width: number; height: number },
+  gap: number,
+): string {
+  const first = texts[0].length > 60 ? `${texts[0].slice(0, 57)}...` : texts[0];
+  return (
+    `Text sits under the logo: "${first}"${texts.length > 1 ? ` and ${texts.length - 1} more` : ""} enters the logo's box ` +
+    `(x=${region.left} to ${region.left + region.width}, y=${region.top} to ${region.top + region.height}), so the logo will cover it. ` +
+    `Move that text entirely below y=${region.top + region.height + gap} or entirely right of x=${region.left + region.width + gap}.`
+  );
+}
