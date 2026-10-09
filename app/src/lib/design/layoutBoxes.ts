@@ -239,3 +239,29 @@ export function logoViolation(
     `Move that text entirely below y=${region.top + region.height + gap} or entirely right of x=${region.left + region.width + gap}.`
   );
 }
+
+/**
+ * Text blocks that reach outside a region -- the safe zone, where Instagram
+ * and Facebook draw their own interface over the image. `tolerancePx` absorbs
+ * rounding, so a block that touches the line is not sent back for nothing.
+ */
+export function textOutside(
+  svg: string,
+  blocks: TextBlock[],
+  region: { left: number; top: number; width: number; height: number },
+  tolerancePx = 4,
+): string[] {
+  const boxes = laidOutBoxes(svg);
+  const out: string[] = [];
+  for (const b of blocks) {
+    const box = boxes.get(b.path);
+    if (!box || box.width <= 0 || box.height <= 0) continue;
+    const outside =
+      box.x < region.left - tolerancePx ||
+      box.y < region.top - tolerancePx ||
+      box.x + box.width > region.left + region.width + tolerancePx ||
+      box.y + box.height > region.top + region.height + tolerancePx;
+    if (outside) out.push(b.text);
+  }
+  return out;
+}

@@ -333,7 +333,7 @@ async function runImageAd(tenantId: number, adId: number): Promise<void> {
         {
           topic: brief.offer,
           previousHtml: feed.html,
-          note: `Adapt THIS ad to a ${width}x${height} canvas (${AD_SIZE_LABEL[size]}). Keep exactly the same words, the same photograph, colours and type; recompose only for the new shape. Keep the hook dominant, the photograph large, the button with the same words close under the text, and every line legible on a solid panel or a dark scrim. NEVER shrink the type for the new shape: the hook stays at least 84px, the support line and the button text at least 34px, and the button keeps its full padding${size === "9:16" ? ", and keep the top and bottom 250px clear of text (Stories and Reels cover them)" : ""}.`,
+          note: `Adapt THIS ad to a ${width}x${height} canvas (${AD_SIZE_LABEL[size]}). Keep exactly the same words, the same photograph, colours and type; recompose only for the new shape. Keep the hook dominant, the photograph large, the button with the same words close under the text, and every line legible on a solid panel or a dark scrim. NEVER shrink the type for the new shape: the hook stays at least 84px, the support line and the button text at least 34px, and the button keeps its full padding${size === "9:16" ? ", and keep every line and the button inside the Stories and Reels safe zone given above (the top 14% and bottom 35% are covered by the app)" : ""}.`,
           aspectRatio: size,
           photo,
           photoLibrary: library,

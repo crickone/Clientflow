@@ -18,6 +18,7 @@ import {
   logoViolation,
   textBlocks,
   textCollisions,
+  textOutside,
   textUnder,
 } from "./layoutBoxes";
 import { renderDesignToSvg } from "./renderDesign";
@@ -200,6 +201,19 @@ const SLIDE_62 =
   check("text placed in the logo's box is caught", covered.length === 1 && covered[0] === "Heading under the logo");
   check("text clear of it is not", !covered.includes("Clear of it"));
   check("and the violation says where to move it", logoViolation(covered, LOGO, 22).includes("below y=158"));
+
+  // Text outside the safe zone: a Stories canvas with a line in the bottom
+  // band the app covers with its caption and button.
+  const SAFE = { left: 65, top: 269, width: 950, height: 979 };
+  const STORY =
+    '<div style="width:1080px;height:1920px;display:flex;position:relative;font-family:Inter;background:#111">' +
+    '<div style="position:absolute;top:600px;left:80px;width:900px;font-size:64px;color:#fff">Inside the safe zone</div>' +
+    '<div style="position:absolute;top:1700px;left:80px;width:900px;font-size:40px;color:#fff">Under the caption</div>' +
+    "</div>";
+  const story = await renderDesignToSvg(STORY, 1080, 1920, fonts);
+  const outside = textOutside(story.svg, textBlocks(story.nodes), SAFE);
+  check("text in the covered bottom band is caught", outside.includes("Under the caption"));
+  check("text inside the safe zone is not", !outside.includes("Inside the safe zone"));
 
   console.log(`\nlayoutBoxes: ${passed} checks passed`);
 })();

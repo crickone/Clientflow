@@ -3,7 +3,8 @@ import { decodeHTML } from "entities";
 import sharp from "sharp";
 
 import type { DesignFont } from "./fonts";
-import { textBlocks, textCollisions, textUnder, type TextCollision } from "./layoutBoxes";
+import { textBlocks, textCollisions, textOutside, textUnder, type TextCollision } from "./layoutBoxes";
+import { safeZone } from "./safeZones";
 
 /**
  * satori and satori-html are loaded LAZILY, for two reasons.
@@ -125,7 +126,8 @@ export async function measureLayout(
   fonts: DesignFont[],
   slack = 500,
   avoid: LogoBox | null = null,
-): Promise<{ overflowPx: number; collisions: TextCollision[]; underLogo: string[] }> {
+  safe: { left: number; top: number; width: number; height: number } | null = null,
+): Promise<{ overflowPx: number; collisions: TextCollision[]; underLogo: string[]; outsideSafe: string[] }> {
   const { svg, nodes } = await renderDesignToSvg(html, width, height + slack, fonts);
 
   // Free, and the reason it lives here rather than in a pass of its own: this
@@ -142,6 +144,7 @@ export async function measureLayout(
   // Text the logo will be stamped over. Measured, not trusted: the prompt
   // reserves the box, and this is how a design that ignored it is caught.
   const underLogo = avoid ? textUnder(svg, blocks, avoid) : [];
+  const outsideSafe = safe ? textOutside(svg, blocks, safe) : [];
 
   const { data, info } = await sharp(Buffer.from(svg))
     .ensureAlpha()
@@ -165,7 +168,7 @@ export async function measureLayout(
   // edge, not a cut-off sentence. Requiring a real cluster keeps the repair
   // loop from being triggered by a rounding artefact.
   const overflowPx = painted < 32 || lowest < 0 ? 0 : lowest - height + 1;
-  return { overflowPx, collisions, underLogo };
+  return { overflowPx, collisions, underLogo, outsideSafe };
 }
 
 /**
@@ -333,8 +336,11 @@ export interface LogoBox {
  * and its slide counter, in the carousel that exposed this) was told it had
  * room and then had the logo composited straight over it.
  */
-export async function logoBox(logoPath: string, width: number): Promise<LogoBox> {
+export async function logoBox(logoPath: string, width: number, height: number = width): Promise<LogoBox> {
   const margin = Math.round(width * LOGO_MARGIN_FRACTION);
+  // Inside the platforms' safe zone as well as the margin: on a Stories or
+  // Reels canvas the top 14% is under the profile name and progress bar.
+  const zone = safeZone(width, height);
   let w = Math.round(width * LOGO_WIDTH_FRACTION);
   const maxH = Math.round(width * LOGO_MAX_HEIGHT_FRACTION);
   const meta = await sharp(logoPath).metadata();
@@ -346,8 +352,8 @@ export async function logoBox(logoPath: string, width: number): Promise<LogoBox>
     h = maxH;
     w = Math.round(h / aspect);
   }
-  // Top LEFT, inset by the grid margin.
-  return { left: margin, top: margin, width: w, height: h };
+  // Top LEFT, inset by the grid margin or the safe zone, whichever is deeper.
+  return { left: Math.max(margin, zone.left), top: Math.max(margin, zone.top), width: w, height: h };
 }
 
 /**
@@ -408,7 +414,7 @@ export async function stampLogo(
   marks: LogoMarks = DEFAULT_LOGO_MARKS,
 ): Promise<Buffer> {
   // The same box the prompt reserves and the layout check measures against.
-  const box = await logoBox(logoPath, width);
+  const box = await logoBox(logoPath, width, height);
   const logo = sharp(logoPath).resize({ width: box.width, height: box.height, fit: "fill" });
   const { data: logoData, info } = await logo
     .ensureAlpha()

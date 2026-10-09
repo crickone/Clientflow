@@ -27,6 +27,7 @@ import {
 import { meteredCreateStreamed, type MeterContext } from "@/lib/ai/metered";
 import { logoBox } from "@/lib/design/renderDesign";
 import { collisionViolation, logoViolation } from "@/lib/design/layoutBoxes";
+import { safeZoneRule, safeZoneViolation } from "@/lib/design/safeZones";
 import { MAX_PHOTO_SLOTS, PHOTO_TOKEN, photoSlotsUsed } from "@/lib/design/photoSlots";
 import { choosePhotos } from "@/lib/design/choosePhotos";
 import {
@@ -157,6 +158,7 @@ async function renderOne(
         ? overflowViolation(render.overflowPx, render.width, render.height)
         : null,
       render.collisions.length > 0 ? collisionViolation(render.collisions) : null,
+      render.outsideSafe.length > 0 ? safeZoneViolation(render.outsideSafe, render.width, render.height) : null,
       render.underLogo.length > 0 && render.logo
         ? logoViolation(render.underLogo, render.logo, Math.round(render.width * 0.02))
         : null,
@@ -322,13 +324,14 @@ export async function designPost(
   // Computed from the real logo file, not stated as a fraction: its height is
   // its own aspect ratio at the stamped width, which no fixed phrasing can
   // stand in for. See logoReserveRule.
-  const reserve = options.logoPath ? await logoBox(options.logoPath, width) : null;
+  const reserve = options.logoPath ? await logoBox(options.logoPath, width, height) : null;
 
   const systemPrompt = [
     getBusinessContext(),
     describeSystemForDesign(system),
     DESIGN_RULES,
     logoReserveRule(reserve, width, height),
+    safeZoneRule(width, height),
     // From the COUNT, not just "any at all": the rotation below hands the same
     // choice to both slots of a two-slot slide whenever the library holds one
     // photograph, so a library of one that was invited to design a comparison
@@ -630,13 +633,14 @@ export async function redesignSlide(
   // Computed from the real logo file, not stated as a fraction: its height is
   // its own aspect ratio at the stamped width, which no fixed phrasing can
   // stand in for. See logoReserveRule.
-  const reserve = input.logoPath ? await logoBox(input.logoPath, width) : null;
+  const reserve = input.logoPath ? await logoBox(input.logoPath, width, height) : null;
 
   const systemPrompt = [
     getBusinessContext(),
     describeSystemForDesign(system),
     DESIGN_RULES,
     logoReserveRule(reserve, width, height),
+    safeZoneRule(width, height),
     // Counted over what a redesign can ACTUALLY fill: the slide's own
     // photograph plus the library behind it. It used to be `input.photo ? 1 :
     // 0`, which is the count that makes photographyRuleFor emit "do NOT write

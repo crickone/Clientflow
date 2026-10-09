@@ -14,6 +14,7 @@ import {
   stampLogo,
   type LogoBox,
 } from "./renderDesign";
+import { safeRect } from "./safeZones";
 
 /**
  * THE recipe for turning a designed slide's markup into the PNG an operator
@@ -84,6 +85,8 @@ export interface RenderDesignedSlideInput {
 }
 
 export interface DesignedSlideRender {
+  /** Text reaching outside the Instagram/Facebook safe zone; empty when none. */
+  outsideSafe: string[];
   /** Text the stamped logo covers; empty when none (or no logo). */
   underLogo: string[];
   /** Where the logo was stamped, or null. */
@@ -334,7 +337,7 @@ export async function renderDesignedSlide(
     input.system.altFont,
   );
   let png = await renderDesignToPng(html, width, height, fonts);
-  const logo = input.logoPath ? await logoBox(input.logoPath, width) : null;
+  const logo = input.logoPath ? await logoBox(input.logoPath, width, height) : null;
   if (input.logoPath) {
     // Stamped after the design, never asked for in the markup -- placement and
     // size are brand rules, not something to leave to a model.
@@ -356,19 +359,20 @@ export async function renderDesignedSlide(
   // for the stand-in. Paying two minutes per keystroke-save to compute a
   // number is not a trade worth making, and it would have blown through the
   // editor's own 180s client timeout on a slide with a large photograph.
-  const { overflowPx, collisions, underLogo } = await measureLayout(
+  const { overflowPx, collisions, underLogo, outsideSafe } = await measureLayout(
     await measurementHtmlFor(html, width, height, boxes),
     width,
     height,
     fonts,
     undefined,
     logo,
+    safeRect(width, height),
   );
 
   // The render is kept even when it overflows: a clipped slide the operator
   // can see beats no slide at all, and the measurement is what puts it in
   // front of whatever can fix it.
-  return { filename: saveRender(png), width, height, overflowPx, collisions, underLogo, logo };
+  return { filename: saveRender(png), width, height, overflowPx, collisions, underLogo, outsideSafe, logo };
 }
 
 /**
