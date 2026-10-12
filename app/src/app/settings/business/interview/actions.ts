@@ -82,6 +82,7 @@ export async function applyBrandDraftAction(input: ApplyInput): Promise<{ ok: tr
   if (voice !== undefined) next.voiceNotes = voice;
   if (brain !== undefined) next.marketingBrain = brain;
   setBusinessProfile(next);
+  console.log(`[brand-interview] applied: ${Object.keys(input ?? {}).map((k) => `${k}=${String((input as Record<string, unknown>)[k] ?? "").length}`).join(",") || "(nothing)"}`);
   const style = take(input.imageStyle, 600);
   if (style !== undefined) {
     if (style) setKey("brand_image_style", style);

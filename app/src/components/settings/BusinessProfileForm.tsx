@@ -63,8 +63,8 @@ export function BusinessProfileForm({ initial }: { initial: BusinessProfile }) {
         if (JSON.stringify(next[k]) !== JSON.stringify(base[k])) (patch as Record<string, unknown>)[k] = next[k];
       }
       if (Object.keys(patch).length === 0) return;
-      const res = await updateBusinessProfile(patch);
-      if (!res.ok) throw new Error("Couldn't save — please try again.");
+      const res = await updateBusinessProfile(patch, { patchOnly: true });
+      if (!res.ok) throw new Error(("error" in res && res.error) || "Couldn't save — please try again.");
       baseRef.current = next;
     },
   });

@@ -17,8 +17,17 @@ import { getBusinessProfile, setBusinessProfile, type BusinessProfile } from "@/
  * straight over the ones just saved. A patch can't clobber a field it
  * didn't touch.
  */
-export async function updateBusinessProfile(patch: Partial<BusinessProfile>) {
+export async function updateBusinessProfile(patch: Partial<BusinessProfile>, opts?: { patchOnly?: boolean }) {
   await requireAdmin();
+  // An out-of-date copy of the page (loaded before the patch form shipped)
+  // sends the whole profile with no marker. Refuse it rather than let it write
+  // old empty fields over newer ones; the page shows the error and a reload
+  // fixes it.
+  if (!opts?.patchOnly) {
+    console.warn("[business-profile] refused a whole-profile save from an out-of-date page");
+    return { ok: false as const, error: "This page is out of date. Reload it and make your change again." };
+  }
+  console.log(`[business-profile] patch: ${Object.keys(patch).join(",") || "(none)"}`);
   const current = getBusinessProfile();
   const str = (k: keyof BusinessProfile) => (typeof patch[k] === "string" ? (patch[k] as string).trim() : (current[k] as string));
   const clean: BusinessProfile = {
