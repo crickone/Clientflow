@@ -3612,7 +3612,7 @@ function RedesignSlideButton({
 
           {scene && (
             <div style={{ fontSize: 12.5, color: "var(--text-tertiary)", lineHeight: 1.5 }}>
-              This slide asked for: {scene}
+              {hasPhotoSlot ? "This slide asked for:" : "Suggested photo for this slide:"} {scene}
             </div>
           )}
 

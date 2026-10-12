@@ -8,7 +8,7 @@
 // that predates it.
 import assert from "node:assert/strict";
 
-import { parsePhotoScenes, sceneForSlot, serialisePhotoScenes } from "./photoScenes";
+import { cleanScene, parsePhotoScenes, sceneForSlot, serialisePhotoScenes } from "./photoScenes";
 
 let passed = 0;
 function check(name: string, cond: boolean) {
@@ -92,5 +92,17 @@ check(
   "a slide with no scene at all resolves to nothing, so the caller reaches for the slide's copy",
   sceneForSlot(null, null, 1) === "",
 );
+
+check(
+  "the model's 'not used on this slide' preface is stripped, leaving the scene",
+  cleanScene("Not used on this slide; if a photograph is wanted, a therapist and client at a reception desk") ===
+    "a therapist and client at a reception desk",
+);
+check(
+  "the same preface is stripped where the editor and the image model read it",
+  sceneForSlot(null, "Not used on the cover; if a photo is wanted, a glass of water on a table", 1) ===
+    "a glass of water on a table",
+);
+check("a plain scene is left alone", cleanScene("Notebook on a desk by a window") === "Notebook on a desk by a window");
 
 console.log(`\nphotoScenes: ${passed} checks passed`);

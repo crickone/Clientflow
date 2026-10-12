@@ -72,5 +72,19 @@ export function sceneForSlot(
   slot: number,
 ): string {
   const scenes = parsePhotoScenes(stored, imagePrompt);
-  return scenes[slot - 1]?.trim() || scenes[0]?.trim() || "";
+  return cleanScene(scenes[slot - 1] ?? "") || cleanScene(scenes[0] ?? "");
+}
+
+/**
+ * The scene alone, without the model's commentary on it. A slide designed on a
+ * flat ground still has to name a photograph, and the model sometimes prefaced
+ * it with "Not used on this slide; if a photograph is wanted, ..." -- which the
+ * editor then showed as "This slide asked for: Not used on this slide" on a
+ * cover, and which went to the image model as part of the prompt.
+ */
+export function cleanScene(scene: string): string {
+  let s = (scene ?? "").trim();
+  s = s.replace(/^(?:not used|unused|no photo(?:graph)?|none)\b[^;:]*?(?:[;:]|\.\s|,\s|\s[-\u2013\u2014]\s)\s*/i, "");
+  s = s.replace(/^(?:but\s+)?(?:if|should|where)\s+(?:a|one)\s+(?:photo(?:graph)?|picture|image)\s+(?:is|were|be)\s+(?:wanted|needed|added|used)\s*[,:;-]?\s*/i, "");
+  return s;
 }
