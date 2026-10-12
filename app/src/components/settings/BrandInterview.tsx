@@ -81,7 +81,6 @@ export function BrandInterview({
     const picks = a.picks ?? [];
     if (q.kind === "single") return set({ picks: picks[0] === opt ? [] : [opt] });
     if (picks.includes(opt)) return set({ picks: picks.filter((p) => p !== opt) });
-    if (q.max && picks.length >= q.max) return set({ picks: [...picks.slice(1), opt] });
     set({ picks: [...picks, opt] });
   }
 
@@ -200,7 +199,6 @@ export function BrandInterview({
                   placeholder={q.placeholder}
                   onChange={(e) => set({ text: e.target.value })}
                   onKeyDown={(e) => e.key === "Enter" && go(1)}
-                  maxLength={300}
                 />
               ) : q.kind === "long" ? (
                 <textarea
@@ -212,7 +210,6 @@ export function BrandInterview({
                   rows={4}
                   onChange={(e) => set({ text: e.target.value })}
                   onKeyDown={(e) => e.key === "Enter" && (e.metaKey || e.ctrlKey) && go(1)}
-                  maxLength={2000}
                 />
               ) : q.kind === "chips" ? (
                 <input
@@ -222,7 +219,6 @@ export function BrandInterview({
                   placeholder="Anything else? Type it here"
                   onChange={(e) => set({ text: e.target.value })}
                   onKeyDown={(e) => e.key === "Enter" && go(1)}
-                  maxLength={300}
                 />
               ) : null}
 

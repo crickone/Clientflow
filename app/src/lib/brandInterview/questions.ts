@@ -21,8 +21,6 @@ export interface Question {
   kind: QuestionKind;
   placeholder?: string;
   options?: string[];
-  /** Chips: how many may be picked (default unlimited). */
-  max?: number;
 }
 
 export type Answers = Record<string, { text?: string; picks?: string[] }>;
@@ -143,9 +141,8 @@ export function interviewQuestions(venue: Venue, ctx: { name: string; town: stri
     {
       id: "tone",
       section: "How you sound",
-      title: "Pick up to three words for how you want to sound.",
+      title: "Pick the words for how you want to sound.",
       kind: "chips",
-      max: 3,
       options: ["Friendly", "Motivating", "No-nonsense", "Expert", "Warm", "Calm", "Fun", "Premium", "Down to earth", "Encouraging", "Straight-talking"],
     },
     {
@@ -179,7 +176,6 @@ export function interviewQuestions(venue: Venue, ctx: { name: string; town: stri
       title: "What should your photos feel like?",
       help: "This becomes the style for every AI-made image.",
       kind: "chips",
-      max: 3,
       options: gym
         ? ["Dark and moody", "Bright and energetic", "Gritty and real", "Clean and modern", "Warm and welcoming", "Black and gold", "Outdoors and natural light"]
         : ["Calm and bright", "Clean and clinical", "Warm and natural", "Spa-like", "Modern and premium", "Soft daylight", "Earthy tones"],

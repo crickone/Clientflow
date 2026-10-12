@@ -17,8 +17,8 @@ function clean(answers: Answers): Answers {
   const out: Answers = {};
   for (const [id, a] of Object.entries(answers ?? {})) {
     if (!/^[a-zA-Z]{1,30}$/.test(id) || !a || typeof a !== "object") continue;
-    const text = typeof a.text === "string" ? a.text.slice(0, 2000) : undefined;
-    const picks = Array.isArray(a.picks) ? a.picks.filter((p) => typeof p === "string").map((p) => p.slice(0, 80)).slice(0, 20) : undefined;
+    const text = typeof a.text === "string" ? a.text.slice(0, 20000) : undefined;
+    const picks = Array.isArray(a.picks) ? a.picks.filter((p) => typeof p === "string").map((p) => p.slice(0, 500)).slice(0, 100) : undefined;
     out[id] = { ...(text !== undefined ? { text } : {}), ...(picks ? { picks } : {}) };
   }
   return out;
