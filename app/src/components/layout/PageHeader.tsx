@@ -17,66 +17,18 @@ interface Props {
 }
 
 export function PageHeader({ eyebrow, title, subtitle, actions, flush }: Props) {
+  // Vercel-style: a plain sentence-case title, a quiet line under it, and a
+  // hairline dividing the header from the page. (Was big uppercase display
+  // type with a "// EYEBROW" mono label.)
   return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "flex-end",
-        gap: 24,
-        flexWrap: "wrap",
-        marginBottom: flush ? 0 : 32,
-      }}
-    >
-      <div>
+    <div className={`page-head${flush ? " is-flush" : ""}`}>
+      <div className="page-head-text">
         <SettingsBack />
-        {eyebrow && (
-          <div
-            style={{
-              fontFamily: "var(--font-mono), ui-monospace, monospace",
-              fontSize: 11,
-              color: "var(--accent)",
-              letterSpacing: "0.14em",
-              textTransform: "uppercase",
-              marginBottom: 12,
-              fontWeight: 400,
-            }}
-          >
-            // {eyebrow}
-          </div>
-        )}
-        <h1
-          style={{
-            fontFamily: "var(--font-heading), sans-serif",
-            // Preon (the default heading face) is wide: scale with the
-            // viewport so a long title ("Communication") fits on a phone.
-            fontSize: "clamp(24px, 6.2vw, 44px)",
-            overflowWrap: "anywhere",
-            fontWeight: 400,
-            letterSpacing: "-0.005em",
-            color: "var(--text-primary)",
-            lineHeight: 1.05,
-            textTransform: "uppercase",
-          }}
-        >
-          {title}
-        </h1>
-        {subtitle && (
-          <p
-            style={{
-              fontFamily: "var(--font-body), sans-serif",
-              color: "var(--text-secondary)",
-              fontSize: 14,
-              lineHeight: 1.5,
-              marginTop: 12,
-              maxWidth: 640,
-            }}
-          >
-            {subtitle}
-          </p>
-        )}
+        {eyebrow && <div className="page-head-eyebrow">{eyebrow}</div>}
+        <h1 className="page-head-title">{title}</h1>
+        {subtitle && <p className="page-head-sub">{subtitle}</p>}
       </div>
-      {actions && <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{actions}</div>}
+      {actions && <div className="page-head-actions">{actions}</div>}
     </div>
   );
 }

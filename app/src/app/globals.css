@@ -4172,3 +4172,21 @@ a.stat-row:hover .stat-label { color: var(--text-primary); }
 }
 @media (max-width: 640px) { .bp-grid { grid-template-columns: 1fr; } .bp-section { padding: 18px; } }
 .bp-sblock ul { list-style: disc; } .bp-sblock li::marker { color: var(--text-tertiary); }
+
+/* ---- Sidebar drill-in panels (Sidebar.tsx renderPanel) ---- */
+.nav-panel-back { display: flex; align-items: center; gap: 8px; width: 100%; margin: 0 0 8px; padding: 9px 10px; border: 0; border-radius: var(--radius); background: transparent; color: var(--text-primary); font: inherit; font-size: 14px; font-weight: 600; text-align: left; cursor: pointer; }
+.nav-panel-back:hover { background: var(--surface-2); }
+.nav-panel-back svg { color: var(--text-secondary); }
+.nav-panel-group { margin-top: 14px; }
+.nav-panel-heading { padding: 0 13px 6px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-tertiary); }
+
+/* ---- Full-width pages and Vercel-style page headers (2026-10-12) ---- */
+.app-page { max-width: none !important; margin: 0; padding: 28px clamp(20px, 3vw, 44px) 88px; }
+.page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap; margin: 0 0 28px; padding-bottom: 22px; border-bottom: 1px solid var(--hairline); }
+.page-head.is-flush { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
+.page-head-text { min-width: 0; }
+.page-head-eyebrow { margin: 0 0 6px; font-size: 12.5px; font-weight: 500; color: var(--text-tertiary); }
+.page-head-title { margin: 0; font-family: var(--font-body), sans-serif; font-size: clamp(24px, 2.4vw, 30px); font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; text-transform: none; color: var(--text-primary); overflow-wrap: anywhere; }
+.page-head-sub { margin: 8px 0 0; max-width: 72ch; font-size: 14px; line-height: 1.5; color: var(--text-secondary); }
+.page-head-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+@media (max-width: 640px) { .app-page { padding: 20px 16px 72px; } }

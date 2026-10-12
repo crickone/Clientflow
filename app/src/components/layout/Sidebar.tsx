@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { type CSSProperties, useEffect, useState, useTransition } from "react";
-import { motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { EASE, DUR } from "@/lib/motion";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -27,6 +27,8 @@ import {
   CalendarRange,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ClipboardCheck,
   ClipboardList,
   ChevronsUpDown,
@@ -325,6 +327,15 @@ export function Sidebar({
   const [now, setNow] = useState<Date | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  // Drill-in navigation (like Vercel): the root menu lists the sections, and
+  // choosing one slides the whole menu to that section with a back arrow.
+  // undefined = follow the current route (open the section the page is in);
+  // null = the root menu chosen explicitly; a label = that section.
+  const [panelChoice, setPanelChoice] = useState<string | null | undefined>(undefined);
+  const [panelDir, setPanelDir] = useState(1);
+  const reduceMotion = useReducedMotion();
+  // A route change re-follows the route.
+  useEffect(() => setPanelChoice(undefined), [pathname]);
   // Which row the pointer is over. One shared pill slides between rows
   // (layoutId) instead of each row flashing its own background on.
   const [hoverKey, setHoverKey] = useState<string | null>(null);
@@ -360,6 +371,41 @@ export function Sidebar({
     (g): g is NavGroup => g !== null
   );
 
+  const routeGroup = visibleGroups.find((g) => groupHasActiveDescendant(g, pathname))?.label ?? null;
+  const panelLabel = collapsed ? null : panelChoice === undefined ? routeGroup : panelChoice;
+  const panelGroup = panelLabel ? visibleGroups.find((g) => g.label === panelLabel) ?? null : null;
+  const openPanel = (label: string | null) => {
+    setPanelDir(label ? 1 : -1);
+    setPanelChoice(label);
+  };
+
+  /** A section's panel: its links, with any sub-group as a small heading over its own links. */
+  function renderPanel(group: NavGroup) {
+    return (
+      <>
+        <button
+          type="button"
+          className="nav-panel-back"
+          onClick={() => openPanel(null)}
+          onMouseEnter={() => setHoverKey(null)}
+        >
+          <ChevronLeft size={16} strokeWidth={2} />
+          <span>{group.label}</span>
+        </button>
+        {group.children.map((c) =>
+          isGroup(c) ? (
+            <div key={c.label} className="nav-panel-group">
+              <div className="nav-panel-heading">{c.label}</div>
+              {c.children.map((cc) => (isGroup(cc) ? cc.children.filter((x): x is NavLink => !isGroup(x)).map((x) => renderLink(x, 0)) : renderLink(cc, 0)))}
+            </div>
+          ) : (
+            renderLink(c, 0)
+          ),
+        )}
+      </>
+    );
+  }
+
   async function signOut() {
     setSigningOut(true);
     await fetch("/api/auth/logout", { method: "POST" });
@@ -379,9 +425,9 @@ export function Sidebar({
     margin: "1px 0",
     borderRadius: "var(--radius)",
     fontFamily: "var(--font-body), sans-serif",
-    fontSize: 13,
-    fontWeight: 700,
-    letterSpacing: "0",
+    fontSize: 14,
+    fontWeight: 500,
+    letterSpacing: "-0.005em",
     transition: "background 0.15s var(--ease), color 0.15s var(--ease)",
   };
 
@@ -664,7 +710,45 @@ export function Sidebar({
             {showDashboard && renderLink(DASHBOARD_LINK)}
           </div>
         )}
-        {visibleGroups.map((group) => renderEntry(group, 0))}
+        {collapsed ? (
+          visibleGroups.map((group) => renderEntry(group, 0))
+        ) : (
+          <AnimatePresence mode="wait" initial={false} custom={panelDir}>
+            <motion.div
+              key={panelGroup?.label ?? "root"}
+              initial={reduceMotion ? { opacity: 0 } : { opacity: 0, x: panelDir * 18 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: panelDir * -18 }}
+              transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+            >
+              {panelGroup ? (
+                renderPanel(panelGroup)
+              ) : (
+                visibleGroups.map((group) => {
+                  const Icon = group.icon;
+                  const childActive = groupHasActiveDescendant(group, pathname);
+                  return (
+                    <button
+                      key={group.label}
+                      type="button"
+                      onClick={() => openPanel(group.label)}
+                      className="nav-link nav-link--slide"
+                      onMouseEnter={() => setHoverKey(`group:${group.label}`)}
+                      style={{ ...navRowStyle, width: "100%", border: "none", cursor: "pointer", paddingLeft: indentFor(0), ...(childActive ? { color: "var(--text-primary)" } : {}) }}
+                    >
+                      {hoverPill(`group:${group.label}`)}
+                      <Icon size={16} strokeWidth={1.75} />
+                      <span className="nav-label" style={{ flex: 1, textAlign: "left" }}>
+                        {group.label}
+                      </span>
+                      <ChevronRight size={14} className="nav-chevron" style={{ opacity: 0.55 }} />
+                    </button>
+                  );
+                })
+              )}
+            </motion.div>
+          </AnimatePresence>
+        )}
       </nav>
 
       <div
