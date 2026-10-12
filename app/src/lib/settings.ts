@@ -136,11 +136,13 @@ export function setSchedulingMode(m: SchedulingMode) {
  * without an explicit override render with these. Stored as font option ids
  * (see src/lib/image/fonts.ts); fall back to the global defaults when unset.
  */
+/**
+ * The fonts new Content Studio designs and campaign landing pages start in.
+ * Fixed for every account since 2026-10-12 (operator: no per-account font
+ * choice). Any stored brand_heading_font / brand_body_font is ignored.
+ */
 export function getBrandFontIds(): { heading: string; body: string } {
-  return {
-    heading: readKey<string>("brand_heading_font", DEFAULT_HEADING_FONT_ID),
-    body: readKey<string>("brand_body_font", DEFAULT_BODY_FONT_ID),
-  };
+  return { heading: DEFAULT_HEADING_FONT_ID, body: DEFAULT_BODY_FONT_ID };
 }
 
 export function setBrandFontIds(input: { heading: string; body: string }) {
