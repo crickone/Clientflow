@@ -1,55 +1,18 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Plus, Sparkles, Trash2 } from "lucide-react";
+import { ArrowRight, Check, Circle, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
-import { useConfirm } from "@/components/ui/ConfirmDialog";
-import { Card, CardLabel } from "@/components/ui/Card";
-import { Input, Label, Textarea } from "@/components/ui/Input";
+import { Input, Label } from "@/components/ui/Input";
 import { updateBusinessProfile } from "@/app/settings/business/actions";
 import type { BusinessProfile } from "@/lib/businessProfile";
 import { SaveStatus } from "./SaveStatus";
 import { useAutosave } from "./useAutosave";
 
-const MARKETING_BRAIN_PLACEHOLDER = `Industry: e.g. Strength & conditioning gym
-Audience: who you serve and their goals
-Content pillars: the topics to write about
-Tone: how it should sound
-Always / Never: guardrails`;
-
-const MARKETING_BRAIN_TEMPLATE = `You are the marketing voice for a strength & conditioning gym.
-
-Industry & focus:
-- A community gym offering coach-led strength, conditioning, mobility and circuit training, plus practical nutrition coaching.
-
-Who we serve:
-- Men and women of all levels, from complete beginners to experienced lifters, who want real results in a supportive, no-ego environment.
-
-Content pillars (write about these):
-- Strength training and programming
-- Conditioning, fat loss and building endurance
-- Practical, sustainable nutrition (protein, balanced eating, habits)
-- Recovery, mobility and consistency
-- Member motivation, community and accountability
-
-Tone:
-- Irish English (analyse, organise, behaviour) — never American spellings.
-- Energetic and motivational, but grounded and real. Speak to results, consistency and community.
-
-Always:
-- Be encouraging and practical; give specific, useful tips.
-- Keep it inclusive and welcoming to beginners.
-
-Never:
-- Promise guaranteed results, use body-shaming, or make medical/therapeutic claims.
-- Mention recovery clinics, HBOT, infrared, PEMF or any wellness-clinic therapies.
-- Use hype words ("revolutionary", "miracle", "unlock", "game-changer").`;
-
-export function BusinessProfileForm({ initial }: { initial: BusinessProfile }) {
+export function BusinessProfileForm({ initial, imageStyle = "" }: { initial: BusinessProfile; imageStyle?: string }) {
   const [profile, setProfile] = useState<BusinessProfile>(initial);
-  const confirm = useConfirm();
   // What the server last had from this form: each save sends only the fields
   // that differ from it, so nothing this form didn't change is overwritten.
   const baseRef = useRef<BusinessProfile>(initial);
@@ -86,191 +49,294 @@ export function BusinessProfileForm({ initial }: { initial: BusinessProfile }) {
     setProfile((p) => ({ ...p, faqs: p.faqs.filter((_, idx) => idx !== i) }));
   }
 
+  const sections: { id: string; label: string; done: boolean }[] = [
+    { id: "bp-identity", label: "Identity", done: !!(profile.businessName && profile.phone) },
+    { id: "bp-brief", label: "Brief", done: !!profile.brief.trim() },
+    { id: "bp-voice", label: "Tone", done: !!profile.voiceNotes.trim() },
+    { id: "bp-brain", label: "Marketing brain", done: !!profile.marketingBrain.trim() },
+    { id: "bp-photo", label: "Photo style", done: !!imageStyle.trim() },
+    { id: "bp-policies", label: "Policies and FAQs", done: !!profile.policies.trim() || profile.faqs.length > 0 },
+    { id: "bp-data", label: "Services and hours", done: true },
+  ];
+  const built = !!(profile.brief.trim() && profile.marketingBrain.trim());
+  const place = profile.location.split(",").map((x) => x.trim()).filter(Boolean).slice(-2).join(", ");
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      <Card>
-        <CardLabel>Identity</CardLabel>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-          <Field label="Business name" value={profile.businessName} onChange={(v) => set("businessName", v)} />
-          <Field label="Tagline" value={profile.tagline} onChange={(v) => set("tagline", v)} />
-          <div style={{ gridColumn: "1 / -1" }}>
-            <Field label="Location" value={profile.location} onChange={(v) => set("location", v)} />
+    <div className="bp">
+      <nav className="bp-nav" aria-label="Sections">
+        {sections.map((x) => (
+          <a key={x.id} href={`#${x.id}`} className="bp-nav-link">
+            <span className={`bp-nav-dot${x.done ? " is-done" : ""}`} aria-hidden>
+              {x.done && <Check size={10} strokeWidth={3.5} />}
+            </span>
+            {x.label}
+          </a>
+        ))}
+      </nav>
+
+      <div className="bp-main">
+        <section className="bp-hero ui-card">
+          <div className="bp-hero-text">
+            <h2 className="bp-hero-name">{profile.businessName || "Your business"}</h2>
+            <p className="bp-hero-meta">{[profile.tagline, place].filter(Boolean).join(" \u00b7 ") || "Add your details below."}</p>
+            <div className="bp-chips">
+              {sections.slice(1, 5).map((x) => (
+                <span key={x.id} className={`bp-chip${x.done ? " is-done" : ""}`}>
+                  {x.done ? <Check size={12} strokeWidth={3} /> : <Circle size={10} />}
+                  {x.label}
+                </span>
+              ))}
+            </div>
           </div>
-          <Field label="Phone" value={profile.phone} onChange={(v) => set("phone", v)} />
-          <Field label="Website" value={profile.website} onChange={(v) => set("website", v)} />
-          <Field
-            label="Sign-up page URL"
-            value={profile.signupUrl}
-            onChange={(v) => set("signupUrl", v)}
+          <Link href="/settings/business/interview" className={`btn ${built ? "btn--secondary" : "btn--primary"} btn--md bp-hero-cta`}>
+            <Sparkles size={15} /> {built ? "Rebuild with Adonis" : "Build your brand with Adonis"}
+          </Link>
+        </section>
+
+        <section id="bp-identity" className="bp-section">
+          <SectionHead title="Identity" desc="Shown across the app and used in everything Adonis writes." />
+          <div className="bp-grid">
+            <Field label="Business name" value={profile.businessName} onChange={(v) => set("businessName", v)} />
+            <Field label="Tagline (optional)" value={profile.tagline} onChange={(v) => set("tagline", v)} />
+            <div className="bp-span">
+              <Field label="Address" value={profile.location} onChange={(v) => set("location", v)} />
+            </div>
+            <Field label="Phone" value={profile.phone} onChange={(v) => set("phone", v)} />
+            <Field label="Email" value={profile.email} onChange={(v) => set("email", v)} type="email" />
+            <Field label="Website" value={profile.website} onChange={(v) => set("website", v)} />
+            <Field label="Sign-up page link" value={profile.signupUrl} onChange={(v) => set("signupUrl", v)} />
+          </div>
+        </section>
+
+        <section id="bp-brief" className="bp-section">
+          <TextBlock
+            title="Brief"
+            desc="What the business is, who it serves and what makes it different. Every piece of content starts from this."
+            value={profile.brief}
+            onChange={(v) => set("brief", v)}
+            emptyHint="No brief yet. Build your brand with Adonis, or write one."
           />
-          <Field label="Email" value={profile.email} onChange={(v) => set("email", v)} type="email" />
-        </div>
-      </Card>
+        </section>
 
-      <Link href="/settings/business/interview" className="bi-entry ui-card">
-        <span className="bi-entry-icon" aria-hidden>
-          <Sparkles size={18} />
-        </span>
-        <span className="bi-entry-text">
-          <span className="bi-entry-title">Build your brand with Adonis</span>
-          <span className="bi-entry-sub">
-            Answer a few questions about your business and Adonis writes your brief, marketing brain, tone and photo style.
-          </span>
-        </span>
-        <ArrowRight size={16} className="bi-entry-arrow" aria-hidden />
-      </Link>
-
-      <Card>
-        <CardLabel>Brief</CardLabel>
-        <Label htmlFor="brief" srOnly>What the business does, who it serves, what makes it distinctive</Label>
-        <Textarea
-          id="brief"
-          rows={5}
-          value={profile.brief}
-          onChange={(e) => set("brief", e.target.value)}
-          placeholder="What the business does, who it serves, what makes it distinctive"
-        />
-        <div style={{ marginTop: 16 }}>
-          <Label htmlFor="voiceNotes" srOnly>Tone notes (optional)</Label>
-          <Textarea
-            id="voiceNotes"
-            rows={2}
+        <section id="bp-voice" className="bp-section">
+          <TextBlock
+            title="Tone"
+            desc="How your content should sound."
             value={profile.voiceNotes}
-            onChange={(e) => set("voiceNotes", e.target.value)}
-            placeholder="Tone notes (optional)"
+            onChange={(v) => set("voiceNotes", v)}
+            emptyHint="No tone notes yet."
+            lines
           />
-        </div>
-      </Card>
+        </section>
 
-      <Card>
-        <CardLabel>Marketing brain</CardLabel>
-        <Label htmlFor="marketingBrain">
-          Master prompt — dictates the industry, subject matter and tone for ALL
-          AI content (blogs, carousels, captions)
-        </Label>
-        <p style={{ color: "var(--text-secondary)", fontSize: 13, margin: "4px 0 8px" }}>
-          When filled in, this overrides the generic voice so your content stays
-          on-brand and on-topic. Be specific: who you are, who you serve, what to
-          write about, the tone, and what to avoid.
-        </p>
-        <Textarea
-          id="marketingBrain"
-          rows={12}
-          value={profile.marketingBrain}
-          onChange={(e) => set("marketingBrain", e.target.value)}
-          placeholder={MARKETING_BRAIN_PLACEHOLDER}
-        />
-        <div style={{ marginTop: 10 }}>
-          <Button
-            variant="outline"
-            onClick={async () => {
-              if (
-                profile.marketingBrain.trim() &&
-                !(await confirm({ title: "Replace the marketing brain?", body: "This overwrites your current marketing brain with the starter template.", confirmLabel: "Replace" }))
-              )
-                return;
-              set("marketingBrain", MARKETING_BRAIN_TEMPLATE);
-            }}
-          >
-            Insert starter template
-          </Button>
-        </div>
-      </Card>
+        <section id="bp-brain" className="bp-section">
+          <TextBlock
+            title="Marketing brain"
+            desc="The master instructions for all AI content: who you serve, what to teach, how to sound, what never to say."
+            value={profile.marketingBrain}
+            onChange={(v) => set("marketingBrain", v)}
+            emptyHint="No marketing brain yet. Build your brand with Adonis and it writes one from your answers."
+            structured
+          />
+        </section>
 
-      <Card>
-        <CardLabel>Policies &amp; FAQs</CardLabel>
-        <Label htmlFor="policies" srOnly>Policies (cancellation, payment, etc.)</Label>
-        <Textarea
-          id="policies"
-          rows={3}
-          value={profile.policies}
-          onChange={(e) => set("policies", e.target.value)}
-          placeholder="Policies (cancellation, payment, etc.)"
-        />
-        <div style={{ marginTop: 20 }}>
-          <Label>Key FAQs — the AI answers these directly</Label>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-              marginTop: 8,
-            }}
-          >
-            {profile.faqs.length === 0 && (
-              <p
-                style={{
-                  color: "var(--text-tertiary)",
-                  fontSize: 13,
-                  margin: 0,
-                }}
-              >
-                No FAQs yet. Add the questions people ask most — opening hours,
-                parking, what to wear, how to book…
-              </p>
-            )}
+        <section id="bp-photo" className="bp-section">
+          <SectionHead
+            title="Photo style"
+            desc="The look of every photo Adonis makes for your posts and ads."
+            action={
+              <Link href="/settings/branding" className="bp-edit">
+                <Pencil size={14} /> Edit in Branding
+              </Link>
+            }
+          />
+          {imageStyle.trim() ? <p className="bp-read">{imageStyle}</p> : <p className="bp-empty">Using the default style. Build your brand with Adonis to set one.</p>}
+        </section>
+
+        <section id="bp-policies" className="bp-section">
+          <TextBlock
+            title="Policies"
+            desc="Cancellations, payments, what to bring. Adonis uses these when it answers messages."
+            value={profile.policies}
+            onChange={(v) => set("policies", v)}
+            emptyHint="No policies yet."
+            lines
+          />
+          <div className="bp-faqs">
+            <SectionHead title="Questions people ask" desc="Adonis answers these directly in your inbox." />
+            {profile.faqs.length === 0 && <p className="bp-empty">None yet. Add the ones you hear most: parking, what to wear, how to book.</p>}
             {profile.faqs.map((f, i) => (
-              <div
-                key={i}
-                style={{ display: "flex", gap: 8, alignItems: "flex-start" }}
-              >
-                <div
-                  style={{
-                    flex: 1,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 6,
-                  }}
-                >
-                  <Input
-                    value={f.q}
-                    placeholder="Question"
-                    onChange={(e) => setFaq(i, "q", e.target.value)}
-                  />
-                  <Textarea
-                    rows={2}
-                    value={f.a}
-                    placeholder="Answer"
-                    onChange={(e) => setFaq(i, "a", e.target.value)}
-                  />
+              <div key={i} className="bp-faq">
+                <div className="bp-faq-fields">
+                  <Input value={f.q} placeholder="Question" onChange={(e) => setFaq(i, "q", e.target.value)} />
+                  <AutoTextarea value={f.a} placeholder="Answer" onChange={(v) => setFaq(i, "a", v)} minRows={2} />
                 </div>
-                <Button variant="outline" onClick={() => removeFaq(i)}>
+                <button type="button" className="bp-icon-btn" aria-label="Remove this question" onClick={() => removeFaq(i)}>
                   <Trash2 size={15} />
-                </Button>
+                </button>
               </div>
             ))}
             <div>
               <Button variant="outline" onClick={addFaq}>
-                <Plus size={15} /> Add FAQ
+                <Plus size={15} /> Add a question
               </Button>
             </div>
           </div>
-        </div>
-      </Card>
+        </section>
 
-      <Card>
-        <CardLabel>Connected business data</CardLabel>
-        <p
-          style={{
-            color: "var(--text-secondary)",
-            fontSize: 13,
-            marginTop: 0,
-          }}
-        >
-          Your services, prices, and opening hours feed the AI automatically.
-          Manage them here:
-        </p>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <Link href="/settings/therapies">
-            <Button variant="outline">Services &amp; prices</Button>
-          </Link>
-          <Link href="/settings/schedule">
-            <Button variant="outline">Opening hours</Button>
-          </Link>
-        </div>
-      </Card>
+        <section id="bp-data" className="bp-section">
+          <SectionHead title="Services and hours" desc="Your services, prices and opening hours feed Adonis automatically." />
+          <div className="bp-links">
+            <Link href="/settings/therapies" className="bp-link ui-card">
+              Services and prices <ArrowRight size={15} />
+            </Link>
+            <Link href="/settings/schedule" className="bp-link ui-card">
+              Opening hours <ArrowRight size={15} />
+            </Link>
+          </div>
+        </section>
 
-      <SaveStatus autosave={autosave} />
+        <SaveStatus autosave={autosave} />
+      </div>
+    </div>
+  );
+}
+
+function SectionHead({ title, desc, action }: { title: string; desc?: string; action?: React.ReactNode }) {
+  return (
+    <div className="bp-head">
+      <div>
+        <h3 className="bp-title">{title}</h3>
+        {desc && <p className="bp-desc">{desc}</p>}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+/** A textarea that grows with its content instead of scrolling inside a small box. */
+function AutoTextarea({
+  value,
+  onChange,
+  placeholder,
+  minRows = 3,
+  autoFocus,
+  id,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  minRows?: number;
+  autoFocus?: boolean;
+  id?: string;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight + 2}px`;
+  }, [value]);
+  return (
+    <textarea
+      id={id}
+      ref={ref}
+      className="bp-textarea"
+      rows={minRows}
+      value={value}
+      placeholder={placeholder}
+      autoFocus={autoFocus}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  );
+}
+
+/**
+ * A long text shown as readable text, with Edit switching to a growing text
+ * box. `structured` reads "Heading:" lines and "- " lines as headings and
+ * bullets (the marketing brain's own format); `lines` keeps line breaks.
+ */
+function TextBlock({
+  title,
+  desc,
+  value,
+  onChange,
+  emptyHint,
+  structured,
+  lines,
+}: {
+  title: string;
+  desc: string;
+  value: string;
+  onChange: (v: string) => void;
+  emptyHint: string;
+  structured?: boolean;
+  lines?: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const id = useId();
+  return (
+    <>
+      <SectionHead
+        title={title}
+        desc={desc}
+        action={
+          <button type="button" className="bp-edit" onClick={() => setEditing((e) => !e)} aria-expanded={editing}>
+            {editing ? (
+              <>
+                <Check size={14} /> Done
+              </>
+            ) : (
+              <>
+                <Pencil size={14} /> {value.trim() ? "Edit" : "Write"}
+              </>
+            )}
+          </button>
+        }
+      />
+      {editing ? (
+        <AutoTextarea id={id} value={value} onChange={onChange} minRows={structured ? 12 : 4} autoFocus />
+      ) : !value.trim() ? (
+        <p className="bp-empty">{emptyHint}</p>
+      ) : structured ? (
+        <StructuredText text={value} />
+      ) : (
+        <p className={`bp-read${lines ? " is-lines" : ""}`}>{value}</p>
+      )}
+    </>
+  );
+}
+
+function StructuredText({ text }: { text: string }) {
+  const blocks: { head?: string; items: string[]; para: string[] }[] = [];
+  let cur: { head?: string; items: string[]; para: string[] } = { items: [], para: [] };
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (/^[-\u2022*]\s+/.test(line)) cur.items.push(line.replace(/^[-\u2022*]\s+/, ""));
+    else if (/:$/.test(line) && line.length < 80) {
+      if (cur.head || cur.items.length || cur.para.length) blocks.push(cur);
+      cur = { head: line.replace(/:$/, ""), items: [], para: [] };
+    } else cur.para.push(line);
+  }
+  if (cur.head || cur.items.length || cur.para.length) blocks.push(cur);
+  return (
+    <div className="bp-structured">
+      {blocks.map((b, i) => (
+        <div key={i} className={b.head ? "bp-sblock" : "bp-sintro"}>
+          {b.head && <h4 className="bp-shead">{b.head}</h4>}
+          {b.para.map((p, j) => (
+            <p key={j}>{p}</p>
+          ))}
+          {b.items.length > 0 && (
+            <ul>
+              {b.items.map((it, j) => (
+                <li key={j}>{it}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

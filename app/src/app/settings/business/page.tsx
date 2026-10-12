@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { requireAdminPage } from "@/lib/auth";
 import { getBusinessProfile } from "@/lib/businessProfile";
+import { getBrandImageStyle } from "@/lib/settings";
 import { BusinessProfileForm } from "@/components/settings/BusinessProfileForm";
 
 export const dynamic = "force-dynamic";
@@ -14,13 +15,13 @@ export default async function BusinessProfileSettingsPage() {
   const profile = getBusinessProfile();
 
   return (
-    <div className="app-page" style={{ maxWidth: 720 }}>
+    <div className="app-page" style={{ maxWidth: 1080 }}>
       <PageHeader
         eyebrow="Settings"
         title="Business profile"
-        subtitle="Your business identity and brief. Used to generate content and shown across the app."
+        subtitle="Who you are and how you sound. Adonis reads all of this before it writes anything for you."
       />
-      <BusinessProfileForm initial={profile} />
+      <BusinessProfileForm initial={profile} imageStyle={getBrandImageStyle() ?? ""} />
     </div>
   );
 }
