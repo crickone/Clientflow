@@ -110,11 +110,8 @@ export const FONT_OPTIONS: FontOption[] = [
   },
 ];
 
-/** One pair for every account since 2026-10-12 (the per-account picker was
- *  removed): Inter, which reads like Apple's San Francisco / Helvetica and,
- *  unlike them, is free and bundled, so a post looks the same on any computer. */
-export const DEFAULT_HEADING_FONT_ID = "inter";
-export const DEFAULT_BODY_FONT_ID = "inter";
+export const DEFAULT_HEADING_FONT_ID = "nebula";
+export const DEFAULT_BODY_FONT_ID = "hanken-grotesk";
 
 export function getFontOption(
   id: string | null | undefined,

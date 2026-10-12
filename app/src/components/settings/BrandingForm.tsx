@@ -5,18 +5,23 @@ import { useRouter } from "next/navigation";
 import { Upload, Trash2, ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/Input";
-import { saveBrandImageStyleAction } from "@/app/settings/branding/actions";
+import { FONT_OPTIONS } from "@/lib/image/fonts";
+import { saveBrandFontsAction, saveBrandImageStyleAction } from "@/app/settings/branding/actions";
 import { SaveStatus } from "./SaveStatus";
 import { useAutosave } from "./useAutosave";
 
 export function BrandingForm({
   hasLogo,
   filename,
+  headingFontId,
+  bodyFontId,
   imageStyle,
   imageStyleDefault,
 }: {
   hasLogo: boolean;
   filename: string | null;
+  headingFontId: string;
+  bodyFontId: string;
   imageStyle: string;
   imageStyleDefault: string;
 }) {
@@ -24,7 +29,19 @@ export function BrandingForm({
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [heading, setHeading] = useState(headingFontId);
+  const [body, setBody] = useState(bodyFontId);
   const [style, setStyle] = useState(imageStyle);
+
+  // Fonts and the image-style prompt save independently — they are separate
+  // settings with separate failure modes, so they get their own status.
+  const fontsAutosave = useAutosave({
+    values: { heading, body },
+    save: async (v) => {
+      const res = await saveBrandFontsAction(v);
+      if (!res.ok) throw new Error(res.error);
+    },
+  });
 
   const styleAutosave = useAutosave({
     values: style,
@@ -184,6 +201,43 @@ export function BrandingForm({
         </div>
       </Section>
 
+      <Section title="Content fonts">
+        <div style={{ display: "grid", gap: 16 }}>
+          <div
+            style={{
+              fontSize: 13,
+              color: "var(--text-secondary)",
+              lineHeight: 1.6,
+            }}
+          >
+            The default heading and body fonts for your Content Studio designs.
+            New designs use these, and you can still override the font on any
+            individual slide.
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <div>
+              <Label htmlFor="brand-heading-font">Heading font</Label>
+              <FontSelect
+                id="brand-heading-font"
+                value={heading}
+                onChange={setHeading}
+                options={FONT_OPTIONS.filter((f) => f.forHeading !== false)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="brand-body-font">Body font</Label>
+              <FontSelect
+                id="brand-body-font"
+                value={body}
+                onChange={setBody}
+                options={FONT_OPTIONS.filter((f) => f.forBody !== false)}
+              />
+            </div>
+          </div>
+          <SaveStatus autosave={fontsAutosave} sticky={false} />
+        </div>
+      </Section>
+
       <Section title="AI image style">
         <div style={{ display: "grid", gap: 8 }}>
           <Label htmlFor="brand-image-style">Style prompt</Label>
@@ -215,6 +269,43 @@ export function BrandingForm({
         </div>
       </Section>
     </div>
+  );
+}
+
+function FontSelect({
+  id,
+  value,
+  onChange,
+  options,
+}: {
+  id: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { id: string; name: string }[];
+}) {
+  return (
+    <select
+      id={id}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      style={{
+        width: "100%",
+        background: "var(--bg)",
+        border: "1px solid var(--hairline)",
+        borderRadius: "var(--radius)",
+        padding: "10px 14px",
+        color: "var(--text-primary)",
+        fontSize: 14,
+        fontFamily: "inherit",
+        cursor: "pointer",
+      }}
+    >
+      {options.map((opt) => (
+        <option key={opt.id} value={opt.id}>
+          {opt.name}
+        </option>
+      ))}
+    </select>
   );
 }
 

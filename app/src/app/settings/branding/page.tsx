@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { requireAdminPage } from "@/lib/auth";
-import { getBrandingLogoFilename, getBrandImageStyle } from "@/lib/settings";
+import { getBrandingLogoFilename, getBrandFontIds, getBrandImageStyle } from "@/lib/settings";
 import { resolveLogoPath } from "@/lib/branding";
 import { getBusinessProfile } from "@/lib/businessProfile";
 import { defaultImageStyle } from "@/lib/ai/image/prompt";
@@ -16,6 +16,7 @@ export default async function BrandingSettingsPage() {
   await requireAdminPage();
   const filename = getBrandingLogoFilename();
   const hasLogo = filename !== null && resolveLogoPath() !== null;
+  const brandFonts = getBrandFontIds();
   const imageStyle = getBrandImageStyle() ?? "";
   const imageStyleDefault = defaultImageStyle(getBusinessProfile());
 
@@ -24,11 +25,13 @@ export default async function BrandingSettingsPage() {
       <PageHeader
         eyebrow="Settings"
         title="Branding"
-        subtitle="Your business logo, and the photographic style Adonis uses for AI-generated post images."
+        subtitle="Your business logo, content fonts, and the AI image style used for AI-generated post imagery. (The app chrome shows the AdonisAgent wordmark for now.)"
       />
       <BrandingForm
         hasLogo={hasLogo}
         filename={filename ?? null}
+        headingFontId={brandFonts.heading}
+        bodyFontId={brandFonts.body}
         imageStyle={imageStyle}
         imageStyleDefault={imageStyleDefault}
       />
