@@ -64,10 +64,10 @@ export function PageHeader({ eyebrow, title, subtitle, actions, flush }: Props) 
         {subtitle && (
           <p
             style={{
-              fontFamily: "var(--font-mono), ui-monospace, monospace",
-              color: "var(--text-tertiary)",
-              fontSize: 12,
-              letterSpacing: "0.01em",
+              fontFamily: "var(--font-body), sans-serif",
+              color: "var(--text-secondary)",
+              fontSize: 14,
+              lineHeight: 1.5,
               marginTop: 12,
               maxWidth: 640,
             }}

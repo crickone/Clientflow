@@ -10,7 +10,12 @@ import {
   YAxis,
 } from "recharts";
 
+import { ChartEmpty } from "./ChartEmpty";
+
 export function RevenueLine({ data, height = 260 }: { data: { day: string; total: number }[]; height?: number }) {
+  if (!data.some((d) => d.total > 0)) {
+    return <ChartEmpty height={height} title="No revenue in this period" body="Payments recorded against sessions, packages and memberships show here." />;
+  }
   return (
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={data} margin={{ top: 8, left: 0, right: 8, bottom: 0 }}>

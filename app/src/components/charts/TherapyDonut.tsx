@@ -8,6 +8,8 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
+import { ChartEmpty } from "./ChartEmpty";
+import { ChartPie } from "lucide-react";
 
 interface Slice {
   name: string;
@@ -17,20 +19,7 @@ interface Slice {
 
 export function TherapyDonut({ data, height = 240 }: { data: Slice[]; height?: number }) {
   if (data.length === 0) {
-    return (
-      <div
-        style={{
-          height,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "var(--text-tertiary)",
-          fontSize: 14,
-        }}
-      >
-        No sessions in range.
-      </div>
-    );
+    return <ChartEmpty height={height} title="No sessions in this period" body="Completed sessions show here, split by what was booked." icon={<ChartPie size={18} />} />;
   }
   return (
     <ResponsiveContainer width="100%" height={height}>

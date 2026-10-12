@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getSessionUser, listActiveMemberships } from "@/lib/auth";
 import { Logo } from "@/components/ui/Logo";
 import { AccountSelector } from "./AccountSelector";
+import { tenantLogoThumb } from "@/lib/tenantLogoThumb";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,9 @@ export default async function SelectAccountPage() {
   if (user.mustChangePassword) redirect("/change-password");
 
   const memberships = await listActiveMemberships(user.id);
+  const logos = Object.fromEntries(
+    await Promise.all(memberships.map(async (m) => [m.tenantId, await tenantLogoThumb(m.tenantId)] as const)),
+  ) as Record<number, string | null>;
 
   return (
     <div
@@ -82,7 +86,7 @@ export default async function SelectAccountPage() {
             you, then sign in again.
           </p>
         ) : (
-          <AccountSelector memberships={memberships} />
+          <AccountSelector memberships={memberships} logos={logos} />
         )}
       </div>
     </div>

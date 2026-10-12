@@ -10,6 +10,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { ChartEmpty } from "./ChartEmpty";
+import { Users } from "lucide-react";
 
 interface Bucket {
   month: string;
@@ -19,20 +21,7 @@ interface Bucket {
 
 export function StackedClients({ data }: { data: Bucket[] }) {
   if (data.length === 0) {
-    return (
-      <div
-        style={{
-          height: 260,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "var(--text-tertiary)",
-          fontSize: 14,
-        }}
-      >
-        No client activity in range.
-      </div>
-    );
+    return <ChartEmpty height={260} title="No client visits in this period" body="New and returning clients show here once sessions are logged." icon={<Users size={18} />} />;
   }
   return (
     <ResponsiveContainer width="100%" height={260}>

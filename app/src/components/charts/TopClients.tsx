@@ -9,6 +9,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { ChartEmpty } from "./ChartEmpty";
+import { Trophy } from "lucide-react";
 
 interface Row {
   name: string;
@@ -17,20 +19,7 @@ interface Row {
 
 export function TopClients({ data }: { data: Row[] }) {
   if (data.length === 0) {
-    return (
-      <div
-        style={{
-          height: 260,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "var(--text-tertiary)",
-          fontSize: 14,
-        }}
-      >
-        No spend in range.
-      </div>
-    );
+    return <ChartEmpty height={260} title="No spending in this period" body="Your top-spending clients show here once payments are recorded." icon={<Trophy size={18} />} />;
   }
   return (
     <ResponsiveContainer width="100%" height={Math.max(260, data.length * 28)}>

@@ -4021,3 +4021,17 @@ a.stat-row:hover .stat-label { color: var(--text-primary); }
 .set-status.is-not-connected { background: var(--surface-2); color: var(--text-tertiary); }
 .set-chev { flex: none; color: var(--text-tertiary); transition: transform .15s var(--ease), color .15s var(--ease); }
 .set-card:hover .set-chev { color: var(--text-primary); transform: translateX(2px); }
+
+/* ---- Empty chart (components/charts/ChartEmpty) ---- */
+.chart-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 16px; border-radius: 12px; }
+.chart-empty-icon { width: 40px; height: 40px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; background: var(--surface-2); border: 1px solid var(--hairline); color: var(--text-secondary); margin-bottom: 4px; }
+.chart-empty-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.chart-empty-body { margin: 0; max-width: 300px; font-size: 13px; line-height: 1.45; color: var(--text-secondary); }
+
+/* ---- Empty state (components/ui/EmptyState) ---- */
+.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 8px; padding: 64px 24px; border-radius: var(--radius-lg, 18px); border: 1px dashed var(--hairline-strong); background: radial-gradient(60% 80% at 50% 0%, color-mix(in srgb, var(--text-primary) 4%, transparent), transparent 70%), var(--surface-1); }
+.empty-state-icon { width: 56px; height: 56px; border-radius: 18px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 8px; background: var(--surface-2); border: 1px solid var(--hairline); color: var(--text-primary); box-shadow: 0 0 0 6px color-mix(in srgb, var(--surface-2) 45%, transparent), var(--edge-light, none); }
+.empty-state-icon svg { width: 24px; height: 24px; stroke-width: 1.6; }
+.empty-state-title { font-family: var(--font-body), sans-serif; font-size: 17px; font-weight: 600; letter-spacing: -0.005em; text-transform: none; color: var(--text-primary); }
+.empty-state-body { margin: 0; max-width: 420px; font-size: 14px; line-height: 1.55; color: var(--text-secondary); }
+.empty-state-action { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }

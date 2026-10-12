@@ -7,39 +7,23 @@ interface Props {
   action?: ReactNode;
 }
 
+/**
+ * An empty list or section. The icon sits on a soft tile with a faint ring,
+ * the title is a sentence rather than shouted display caps, and the action
+ * is the obvious next step. Shared by every list in the app, so one change
+ * here restyles all of them.
+ */
 export function EmptyState({ title, message, icon, action }: Props) {
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "72px 24px",
-        background: "var(--surface-1)",
-        border: "1px dashed var(--hairline)",
-        borderRadius: "var(--radius)",
-        textAlign: "center",
-        gap: 14,
-      }}
-    >
-      {icon && <div style={{ color: "var(--text-tertiary)" }}>{icon}</div>}
-      <div
-        style={{
-          fontFamily: "var(--font-heading), sans-serif",
-          fontSize: 22,
-          color: "var(--text-primary)",
-          textTransform: "uppercase",
-        }}
-      >
-        {title}
-      </div>
-      {message && (
-        <div style={{ color: "var(--text-secondary)", fontSize: 14, maxWidth: 480 }}>
-          {message}
-        </div>
-      )}
-      {action}
+    <div className="empty-state">
+      {icon ? (
+        <span className="empty-state-icon" aria-hidden>
+          {icon}
+        </span>
+      ) : null}
+      <div className="empty-state-title">{title}</div>
+      {message ? <p className="empty-state-body">{message}</p> : null}
+      {action ? <div className="empty-state-action">{action}</div> : null}
     </div>
   );
 }

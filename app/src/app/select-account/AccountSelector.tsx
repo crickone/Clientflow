@@ -11,8 +11,11 @@ import { LogoLoader, finishSwitchLoader } from "@/components/ui/LogoLoader";
 
 export function AccountSelector({
   memberships,
+  logos = {},
 }: {
   memberships: MembershipOption[];
+  /** Small inline logo per business; missing ones show the initial. */
+  logos?: Record<number, string | null>;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -67,10 +70,11 @@ export function AccountSelector({
           >
             <span
               style={{
-                width: 36,
-                height: 36,
-                borderRadius: "var(--radius)",
+                width: 40,
+                height: 40,
+                borderRadius: 12,
                 background: "var(--bg)",
+                overflow: "hidden",
                 border: "1px solid var(--hairline)",
                 display: "inline-flex",
                 alignItems: "center",
@@ -81,7 +85,12 @@ export function AccountSelector({
                 flexShrink: 0,
               }}
             >
-              {m.name[0]?.toUpperCase() ?? "?"}
+              {logos[m.tenantId] ? (
+                // eslint-disable-next-line @next/next/no-img-element -- inline data URI, already sized
+                <img src={logos[m.tenantId]!} alt="" width={28} height={28} style={{ width: 28, height: 28, objectFit: "contain" }} />
+              ) : (
+                m.name[0]?.toUpperCase() ?? "?"
+              )}
             </span>
             <span style={{ flex: 1, minWidth: 0 }}>
               <span
