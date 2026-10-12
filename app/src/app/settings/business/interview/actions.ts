@@ -24,10 +24,13 @@ function clean(answers: Answers): Answers {
   return out;
 }
 
+type Stored = { answers?: Answers; draft?: BrandDraft | null; updatedAt?: number };
+const readStored = () => readKey<Stored>(KEY, {});
+
 /** Saved as the owner goes, so the interview can be left and picked up again. */
 export async function saveInterviewAction(answers: Answers): Promise<{ ok: true }> {
   await requireAdmin();
-  setKey(KEY, { answers: clean(answers), updatedAt: Date.now() });
+  setKey(KEY, { ...readStored(), answers: clean(answers), updatedAt: Date.now() });
   return { ok: true };
 }
 
@@ -35,7 +38,7 @@ export async function writeBrandDraftAction(answers: Answers): Promise<{ ok: tru
   await requireAdmin();
   const tenantId = getCurrentMembership()!.tenant.id;
   const a = clean(answers);
-  setKey(KEY, { answers: a, updatedAt: Date.now() });
+  setKey(KEY, { ...readStored(), answers: a, updatedAt: Date.now() });
   if (answeredCount(a) < 3) return { ok: false, error: "Answer at least a few questions so Adonis has something to work from." };
   try {
     assertAiAllowed(tenantId);
@@ -53,6 +56,9 @@ export async function writeBrandDraftAction(answers: Answers): Promise<{ ok: tru
       location: profile.location,
       answers: answersAsText(questions, a),
     });
+    // Kept on the server the moment it exists: the review screen is the only
+    // other copy, and a deploy or a closed tab used to lose a paid write.
+    setKey(KEY, { ...readStored(), answers: a, draft, updatedAt: Date.now() });
     return { ok: true, draft };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Couldn't write it. Try again." };
@@ -81,12 +87,17 @@ export async function applyBrandDraftAction(input: ApplyInput): Promise<{ ok: tr
     if (style) setKey("brand_image_style", style);
     else deleteKey("brand_image_style");
   }
+  // Applied: the draft is no longer pending.
+  setKey(KEY, { ...readStored(), draft: null, updatedAt: Date.now() });
   revalidatePath("/settings/business");
   revalidatePath("/settings/branding");
   return { ok: true };
 }
 
-export async function readInterview(): Promise<Answers> {
+export async function readInterview(): Promise<{ answers: Answers; draft: BrandDraft | null }> {
   await requireAdmin();
-  return clean(readKey<{ answers?: Answers }>(KEY, {}).answers ?? {});
+  const s = readStored();
+  const d = s.draft;
+  const draft = d && typeof d === "object" && typeof d.brief === "string" ? d : null;
+  return { answers: clean(s.answers ?? {}), draft };
 }

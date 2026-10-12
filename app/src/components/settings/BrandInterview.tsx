@@ -32,20 +32,23 @@ export function BrandInterview({
   businessName,
   questions,
   initialAnswers,
+  pendingDraft = null,
   current,
 }: {
   businessName: string;
   questions: Question[];
   initialAnswers: Answers;
+  /** A written brand that hasn't been saved to the profile yet: reopen on it. */
+  pendingDraft?: BrandDraft | null;
   current: BrandDraft;
 }) {
   const router = useRouter();
   const reduce = useReducedMotion();
-  const [stage, setStage] = useState<Stage>("intro");
+  const [stage, setStage] = useState<Stage>(pendingDraft ? "review" : "intro");
   const [i, setI] = useState(0);
   const [dir, setDir] = useState(1);
   const [answers, setAnswers] = useState<Answers>(initialAnswers);
-  const [draft, setDraft] = useState<BrandDraft | null>(null);
+  const [draft, setDraft] = useState<BrandDraft | null>(pendingDraft);
   const [keep, setKeep] = useState<Record<FieldKey, boolean>>({ tagline: true, brief: true, voiceNotes: true, marketingBrain: true, imageStyle: true });
   const [writingStep, setWritingStep] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -95,7 +98,10 @@ export function BrandInterview({
     setError(null);
     setWritingStep(0);
     setStage("writing");
-    const res = await writeBrandDraftAction(answers).catch(() => ({ ok: false as const, error: "Couldn't reach Adonis. Check your connection and try again." }));
+    const res = await writeBrandDraftAction(answers).catch(() => ({
+      ok: false as const,
+      error: "Lost contact with the server while Adonis was writing. If it finished, reopen this page and it will be waiting; otherwise press Write my brand again.",
+    }));
     if (!res.ok) {
       setError(res.error);
       setStage("ask");
@@ -109,9 +115,12 @@ export function BrandInterview({
     if (!draft) return;
     setSaving(true);
     const input = Object.fromEntries(FIELDS.filter((f) => keep[f.key]).map((f) => [f.key, draft[f.key]]));
-    const res = await applyBrandDraftAction(input).catch(() => ({ ok: false as const, error: "Couldn't save. Try again." }));
+    const res = await applyBrandDraftAction(input).catch(() => ({
+      ok: false as const,
+      error: "Couldn't reach the server, so nothing was saved yet. Your brand is still here: press Save again.",
+    }));
     setSaving(false);
-    if (!res.ok) return void toast.error(res.error);
+    if (!res.ok) return void toast.error(res.error, { duration: 10000 });
     toast.success("Saved. Adonis will write from this from now on.");
     router.push("/settings/business");
   }

@@ -21,7 +21,7 @@ export default async function BrandInterviewPage() {
   const town = parts.find((x) => /^[A-Z][a-z]+$/.test(x) && !/^Co\b/.test(x)) ?? "";
   const services = (await listTherapies()).map((t) => t.name);
   const questions = interviewQuestions(venue, { name: profile.businessName, town, services });
-  const answers = await readInterview();
+  const { answers, draft } = await readInterview();
   // The one-liner starts from the tagline the account already has.
   if (!answers.oneLiner?.text && profile.tagline) answers.oneLiner = { text: profile.tagline };
   return (
@@ -29,6 +29,7 @@ export default async function BrandInterviewPage() {
       businessName={profile.businessName}
       questions={questions}
       initialAnswers={answers}
+      pendingDraft={draft}
       current={{
         tagline: profile.tagline,
         brief: profile.brief,
