@@ -148,14 +148,9 @@ export default async function RootLayout({
             />
           ) : null}
           <Toaster
-            richColors
             position="top-right"
-            toastOptions={{
-              style: {
-                fontFamily: "var(--font-body), sans-serif",
-                border: "1px solid var(--hairline)",
-              },
-            }}
+            closeButton
+            toastOptions={{ className: "ui-toast" }}
           />
         </body>
       </html>
@@ -239,7 +234,7 @@ export default async function RootLayout({
               </ClientAppFrame>
             </ConfirmProvider>
           </MotionRoot>
-          <Toaster richColors position="top-center" toastOptions={{ style: { fontFamily: "var(--font-body), sans-serif", border: "1px solid var(--hairline)" } }} />
+          <Toaster position="top-center" toastOptions={{ className: "ui-toast" }} />
         </body>
       </html>
     );
@@ -391,16 +386,7 @@ export default async function RootLayout({
             </ConfirmProvider>
           </TooltipProvider>
         </MotionRoot>
-        <Toaster
-          richColors
-          position="top-right"
-          toastOptions={{
-            style: {
-              fontFamily: "var(--font-body), sans-serif",
-              border: "1px solid var(--hairline)",
-            },
-          }}
-        />
+        <Toaster position="top-right" closeButton toastOptions={{ className: "ui-toast" }} />
       </body>
     </html>
   );

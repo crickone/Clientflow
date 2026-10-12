@@ -36,7 +36,7 @@ export function LoginForm({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error ?? "Sign-in failed");
+        setError(data.error === "Invalid credentials" ? "That email and password don\u2019t match. Check them and try again." : (data.error ?? "Sign-in failed. Try again."));
         setBusy(false);
         return;
       }
@@ -46,7 +46,7 @@ export function LoginForm({
       );
       router.refresh();
     } catch (err) {
-      setError("Network error");
+      setError("Couldn\u2019t reach AdonisAgent. Check your connection and try again.");
       setBusy(false);
     }
   }
