@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import Link from "next/link";
-import { Plus, Trash2 } from "lucide-react";
+import { ArrowRight, Plus, Sparkles, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
@@ -96,6 +96,19 @@ export function BusinessProfileForm({ initial }: { initial: BusinessProfile }) {
           <Field label="Email" value={profile.email} onChange={(v) => set("email", v)} type="email" />
         </div>
       </Card>
+
+      <Link href="/settings/business/interview" className="bi-entry ui-card">
+        <span className="bi-entry-icon" aria-hidden>
+          <Sparkles size={18} />
+        </span>
+        <span className="bi-entry-text">
+          <span className="bi-entry-title">Build your brand with Adonis</span>
+          <span className="bi-entry-sub">
+            Answer a few questions about your business and Adonis writes your brief, marketing brain, tone and photo style.
+          </span>
+        </span>
+        <ArrowRight size={16} className="bi-entry-arrow" aria-hidden />
+      </Link>
 
       <Card>
         <CardLabel>Brief</CardLabel>
