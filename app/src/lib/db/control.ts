@@ -333,6 +333,26 @@ export function ensureControlTables() {
       created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
 
+    -- A tenant's InBody (LookinBody Web) connection, for body-composition
+    -- scans (lib/inbody). The API key is stored ENCRYPTED. webhook_secret is
+    -- the unguessable path segment InBody posts new scans to, which is how the
+    -- public webhook finds the tenant with one indexed lookup.
+    CREATE TABLE IF NOT EXISTS inbody_connections (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id INTEGER NOT NULL UNIQUE REFERENCES tenants(id) ON DELETE CASCADE,
+      account TEXT NOT NULL DEFAULT '',
+      api_key_enc TEXT,
+      region TEXT NOT NULL DEFAULT 'eur',
+      webhook_secret TEXT NOT NULL UNIQUE,
+      last_test_at INTEGER,
+      last_test_ok INTEGER,
+      last_error TEXT,
+      last_webhook_at INTEGER,
+      last_sync_at INTEGER,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+      updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+
     -- ── Platform billing (spec 2026-07-21) ────────────────────────────────
     -- One row per tenant that participates in billing. Legacy tenants without
     -- a row are NOT gated. billing_exempt=1 → agency-run tenant: shown as

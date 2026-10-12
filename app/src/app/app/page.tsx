@@ -1,14 +1,19 @@
 import Link from "next/link";
-import { CalendarRange, ChevronRight, CreditCard, Dumbbell, Salad } from "lucide-react";
+import { CalendarRange, ChevronRight, CreditCard, Dumbbell, Salad, ScanLine } from "lucide-react";
 
 import { requireClientPage } from "@/lib/clientAuth";
 import { clientDashboard, clientUpcoming } from "@/lib/clientApp";
 import { Card, dayLabel, euros, SectionTitle } from "@/components/clientapp/ui";
+import { bodyScansEnabled, getScanProfile, listClientScans } from "@/lib/inbody/scans";
+import { formatMetric } from "@/lib/inbody/metrics";
 
 export const dynamic = "force-dynamic";
 
 export default async function ClientHome() {
-  const { clientId, client } = requireClientPage();
+  const { clientId, client, tenantId } = requireClientPage();
+  const scansOn = bodyScansEnabled(tenantId);
+  const scanConsent = scansOn ? getScanProfile(clientId).consentAt !== null : false;
+  const latestScan = scanConsent ? listClientScans(clientId).find((s) => Object.keys(s.metrics).length > 0) : undefined;
   const d = clientDashboard(clientId);
   const upcoming = clientUpcoming(clientId, 3);
   const pct = d.weekBooked > 0 ? Math.round((d.weekAttended / d.weekBooked) * 100) : 0;
@@ -80,6 +85,28 @@ export default async function ClientHome() {
           </div>
         </Card>
       </Link>
+
+      {/* body scans */}
+      {scansOn && (
+        <Link href="/app/body">
+          <Card>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={iconBox}><ScanLine size={18} /></span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Body scans</div>
+                <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
+                  {latestScan
+                    ? `${formatMetric("weight", latestScan.metrics.weight)} · ${formatMetric("smm", latestScan.metrics.smm)} muscle · ${formatMetric("pbf", latestScan.metrics.pbf)} body fat`
+                    : scanConsent
+                      ? "Your InBody results will show here"
+                      : "See your InBody results here"}
+                </div>
+              </div>
+              <ChevronRight size={18} style={{ color: "var(--text-tertiary)" }} />
+            </div>
+          </Card>
+        </Link>
+      )}
 
       {/* upcoming list */}
       {upcoming.length > 0 && (

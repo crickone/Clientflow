@@ -2753,6 +2753,40 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     CREATE INDEX IF NOT EXISTS idx_google_reviews_updated ON google_reviews(updated_at);
   `);
 
+  // Body-composition scans (InBody) and each client's InBody identity +
+  // consent to see them in the client app (lib/inbody). Drizzle mirror in
+  // schema.ts. measured_at is unique: the gym's scanner cannot take two
+  // scans in the same second, and it lets the webhook, the hourly pull and a
+  // CSV import of the same scan land on one row.
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS body_scans (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL,
+      measured_at INTEGER NOT NULL UNIQUE,
+      source TEXT NOT NULL DEFAULT 'inbody',
+      inbody_user_id TEXT,
+      phone TEXT,
+      name TEXT,
+      equipment TEXT,
+      match_status TEXT NOT NULL DEFAULT 'unmatched',
+      result_status TEXT NOT NULL DEFAULT 'pending',
+      metrics_json TEXT NOT NULL DEFAULT '{}',
+      raw_json TEXT,
+      error TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_body_scans_client ON body_scans(client_id, measured_at);
+    CREATE INDEX IF NOT EXISTS idx_body_scans_match ON body_scans(match_status);
+    CREATE TABLE IF NOT EXISTS body_scan_profiles (
+      client_id INTEGER PRIMARY KEY REFERENCES clients(id) ON DELETE CASCADE,
+      inbody_user_id TEXT,
+      consent_at INTEGER,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_body_scan_profiles_inbody ON body_scan_profiles(inbody_user_id);
+  `);
+
   // Dashboard slice 2: stamp each event recorder's start date once.
   try {
     sqlite.exec(RECORDER_START_SQL);

@@ -11,6 +11,7 @@ import { dispatchDueScheduledPosts } from "@/lib/social/schedule";
 import { dispatchDueAutomationQueue } from "@/lib/automations/nurture";
 import { publishDueScheduledPosts } from "@/lib/cms/blog";
 import { syncGoogleReviewsIfStale } from "@/lib/google/business";
+import { syncInBodyIfStale } from "@/lib/inbody/scans";
 import { sweepLegacyUploads } from "@/lib/video/uploadSweep";
 import { listTenants } from "@/lib/tenants";
 
@@ -81,6 +82,9 @@ async function runTenant(tenantId: number, baseUrl: string, summary: DispatchSum
     // New Google reviews, at most every half hour per tenant (a no-op for a
     // tenant without a Google listing).
     await syncGoogleReviewsIfStale(tenantId, 15_000).catch(() => undefined);
+    // InBody scans the webhook missed, and results still waiting, at most
+    // hourly (a no-op for a tenant without an InBody connection).
+    await syncInBodyIfStale(tenantId).catch((err) => console.error(`[dispatch] tenant ${tenantId} inbody sync failed:`, err));
     // Scheduled blog posts. The machinery has existed since the schema
     // gained publishState "scheduled", but the only caller was the DAILY
     // scheduler, which runs once a day and not before 08:00 UTC — so a post

@@ -3213,3 +3213,31 @@ export const siteVisitorHashes = sqliteTable(
   },
   (t) => ({ pk: primaryKey({ columns: [t.day, t.siteId, t.path, t.hash] }) }),
 );
+
+// Body-composition scans (InBody), tenant DB. See lib/inbody and the CREATE in
+// lib/db/tenant.ts. client_id is null until the scan is matched to a client.
+export const bodyScans = sqliteTable("body_scans", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  clientId: integer("client_id").references(() => clients.id, { onDelete: "set null" }),
+  measuredAt: integer("measured_at").notNull().unique(),
+  source: text("source", { enum: ["inbody", "csv"] }).notNull().default("inbody"),
+  inbodyUserId: text("inbody_user_id"),
+  phone: text("phone"),
+  name: text("name"),
+  equipment: text("equipment"),
+  matchStatus: text("match_status", { enum: ["auto", "manual", "unmatched", "ambiguous"] }).notNull().default("unmatched"),
+  resultStatus: text("result_status", { enum: ["fetched", "pending", "error"] }).notNull().default("pending"),
+  metricsJson: text("metrics_json").notNull().default("{}"),
+  rawJson: text("raw_json"),
+  error: text("error"),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+export type BodyScan = typeof bodyScans.$inferSelect;
+
+export const bodyScanProfiles = sqliteTable("body_scan_profiles", {
+  clientId: integer("client_id").primaryKey().references(() => clients.id, { onDelete: "cascade" }),
+  inbodyUserId: text("inbody_user_id"),
+  consentAt: integer("consent_at"),
+  updatedAt: integer("updated_at").notNull(),
+});

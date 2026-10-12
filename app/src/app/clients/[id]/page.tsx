@@ -45,6 +45,9 @@ import { ClientAppAccess } from "@/components/clients/ClientAppAccess";
 import { ClientEmailPanel } from "@/components/clients/ClientEmailPanel";
 import { listClientEmails } from "@/lib/clientEmail";
 import { isEmailConfigured } from "@/lib/email";
+import { getCurrentMembership } from "@/lib/auth";
+import { bodyScansEnabled, getScanProfile, listClientScans } from "@/lib/inbody/scans";
+import { ClientBodyScans } from "@/components/clients/ClientBodyScans";
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +77,10 @@ export default async function ClientProfile({
   const availNut = availableNutrition();
   const assignedWk = assignedWorkouts(id);
   const availWk = availableWorkouts();
+  const membership = getCurrentMembership();
+  const showScans = membership ? bodyScansEnabled(membership.tenant.id) : false;
+  const scans = showScans ? listClientScans(id) : [];
+  const scanProfile = showScans ? getScanProfile(id) : null;
 
   return (
     <div className="app-page">
@@ -173,7 +180,20 @@ export default async function ClientProfile({
             Email ({clientEmailHistory.length})
           </TabsTrigger>
           <TabsTrigger value="app">App &amp; Plans</TabsTrigger>
+          {showScans && <TabsTrigger value="scans">Body scans ({scans.length})</TabsTrigger>}
         </TabsList>
+
+        {showScans && scanProfile && (
+          <TabsContent value="scans">
+            <ClientBodyScans
+              clientId={id}
+              scans={scans}
+              inbodyUserId={scanProfile.inbodyUserId}
+              consentAt={scanProfile.consentAt}
+              isAdmin={membership?.role === "admin"}
+            />
+          </TabsContent>
+        )}
 
         <TabsContent value="overview">
           <div
