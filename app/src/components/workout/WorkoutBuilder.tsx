@@ -288,6 +288,20 @@ function ChooseExerciseSheet({
             {matches.map((e) => (
               <div
                 key={e.id}
+                role="button"
+                tabIndex={0}
+                className="pick-row"
+                onClick={() => {
+                  onPick(e);
+                  toast.success(`${e.name} added`);
+                }}
+                onKeyDown={(ev) => {
+                  if (ev.key === "Enter" || ev.key === " ") {
+                    ev.preventDefault();
+                    onPick(e);
+                    toast.success(`${e.name} added`);
+                  }
+                }}
                 style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: 8, border: "1px solid var(--hairline)", borderRadius: "var(--radius)" }}
               >
                 <Thumb url={e.imageUrl} />
@@ -313,17 +327,6 @@ function ChooseExerciseSheet({
                       </Button>
                     </Tooltip>
                   )}
-                  <Button
-                    size="sm"
-                    aria-label={`Add ${e.name}`}
-                    onClick={(ev) => {
-                      ev.stopPropagation();
-                      onPick(e);
-                      toast.success(`${e.name} added`);
-                    }}
-                  >
-                    <Plus size={14} /> Add
-                  </Button>
                 </div>
               </div>
             ))}

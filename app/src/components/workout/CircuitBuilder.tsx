@@ -221,7 +221,21 @@ function ChooseExerciseSheet({
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
             {matches.length === 0 && <div style={{ fontSize: 13, color: "var(--text-tertiary)", padding: "8px 0" }}>No exercises found.</div>}
             {matches.map((e) => (
-              <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: 8, border: "1px solid var(--hairline)", borderRadius: "var(--radius)" }}>
+              <div key={e.id}
+                role="button"
+                tabIndex={0}
+                className="pick-row"
+                onClick={() => {
+                  onPick(e);
+                  toast.success(`${e.name} added`);
+                }}
+                onKeyDown={(ev) => {
+                  if (ev.key === "Enter" || ev.key === " ") {
+                    ev.preventDefault();
+                    onPick(e);
+                    toast.success(`${e.name} added`);
+                  }
+                }} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: 8, border: "1px solid var(--hairline)", borderRadius: "var(--radius)" }}>
                 <Thumb url={e.imageUrl} />
                 <span style={{ minWidth: 0, flex: 1 }}>
                   <span style={{ display: "block", fontSize: 13.5, color: "var(--text-primary)", fontWeight: 500 }}>{e.name}</span>
@@ -243,17 +257,6 @@ function ChooseExerciseSheet({
                       </Button>
                     </Tooltip>
                   )}
-                  <Button
-                    size="sm"
-                    aria-label={`Add ${e.name}`}
-                    onClick={(ev) => {
-                      ev.stopPropagation();
-                      onPick(e);
-                      toast.success(`${e.name} added`);
-                    }}
-                  >
-                    <Plus size={14} /> Add
-                  </Button>
                 </div>
               </div>
             ))}

@@ -4384,3 +4384,7 @@ a.stat-row:hover .stat-label { color: var(--text-primary); }
    whole row opens the item, so it looks and feels clickable. */
 .list-row-click { cursor: pointer; transition: background .15s var(--ease); }
 .list-row-click:hover { background: var(--surface-2); }
+
+/* Exercise pickers: the whole row adds the exercise (no separate Add button). */
+.pick-row { cursor: pointer; transition: background .12s var(--ease); }
+.pick-row:hover, .pick-row:focus-visible { background: var(--surface-2); outline: none; }

@@ -310,7 +310,20 @@ function ExerciseRow({
           {focused && matches.length > 0 && (
             <div style={dropdown}>
               {matches.map((m) => (
-                <div key={m.id} style={dropItem}>
+                <div
+                  key={m.id}
+                  role="option"
+                  aria-selected={false}
+                  className="pick-row"
+                  style={dropItem}
+                  // The whole row picks the exercise. onMouseDown + preventDefault
+                  // keeps the name input focused (its onBlur would otherwise
+                  // close this list before the pick lands).
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    onPatch({ name: m.name, exerciseId: m.id, muscleGroups: m.muscleGroups });
+                  }}
+                >
                   <span style={{ minWidth: 0, flex: 1, overflow: "hidden" }}>
                     <span style={{ fontSize: 13, color: "var(--text-primary)" }}>{m.name}</span>
                     {m.muscleGroups.length > 0 && (
@@ -340,16 +353,6 @@ function ExerciseRow({
                         </Button>
                       </Tooltip>
                     )}
-                    <Button
-                      size="sm"
-                      aria-label={`Add ${m.name}`}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        onPatch({ name: m.name, exerciseId: m.id, muscleGroups: m.muscleGroups });
-                      }}
-                    >
-                      <Plus size={13} /> Add
-                    </Button>
                   </div>
                 </div>
               ))}
