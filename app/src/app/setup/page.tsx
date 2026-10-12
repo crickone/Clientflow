@@ -13,11 +13,11 @@ export default function SetupPage() {
   const profile = getBusinessProfile();
 
   return (
-    <div className="app-page" style={{ maxWidth: 860 }}>
+    <div className="app-page">
       <PageHeader
         eyebrow="Get started"
         title="Set up your account"
-        subtitle={`${summary.requiredDone}/${summary.requiredTotal} essentials done — work through the list to get fully up and running.`}
+        subtitle="Everything the account needs to run fully. Each step ticks itself off once it is done."
       />
       <SetupChecklist
         summary={summary}

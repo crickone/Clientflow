@@ -3,12 +3,10 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check } from "lucide-react";
+import { ArrowRight, Check, Minus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
-import { Card, CardLabel } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
 import { Dialog, DialogClose, DialogContent, DialogTrigger } from "@/components/ui/Dialog";
 import { Input, Label } from "@/components/ui/Input";
 import type { SetupAction, SetupGroup, SetupStepStatus, SetupSummary } from "@/lib/setup/steps";
@@ -66,94 +64,147 @@ export function SetupChecklist({ summary, isAdmin, venue, scheduling, businessDe
     });
   }
 
-  return (
-    <div style={{ display: "grid", gap: 36 }}>
-      {GROUP_ORDER.map((group) => {
-        const rows = summary.steps.filter((s) => s.group === group);
-        if (rows.length === 0) return null;
-        return (
-          <section key={group} style={{ display: "grid", gap: 12 }}>
-            <CardLabel style={{ marginBottom: 0 }}>{GROUP_LABELS[group]}</CardLabel>
-            <div style={{ display: "grid", gap: 12 }}>
-              {rows.map((step) => (
-                <StepRow
-                  key={step.id}
-                  step={step}
-                  isAdmin={isAdmin}
-                  venue={venue}
-                  scheduling={scheduling}
-                  businessDefaults={businessDefaults}
-                />
-              ))}
-            </div>
-          </section>
-        );
-      })}
+  const next = summary.steps.find((s) => !s.done && !s.skipped) ?? null;
+  const pct = summary.total ? Math.round((summary.resolved / summary.total) * 100) : 0;
 
-      {isAdmin && summary.allResolved && (
-        <div style={{ display: "flex", justifyContent: "center", padding: "16px 0 4px" }}>
-          <Button size="lg" onClick={dismiss} loading={dismissing}>
-            You&rsquo;re all set — Dismiss this guide
-          </Button>
+  return (
+    <div className="su-layout">
+      <aside className="su-side">
+        <div className="su-progress">
+          <div className="su-progress-num">
+            <span>{summary.resolved}</span>
+            <span className="su-progress-of">of {summary.total} done</span>
+          </div>
+          <div className="su-segments" aria-hidden>
+            {summary.steps.map((s) => (
+              <span key={s.id} className={s.done ? "is-done" : s.skipped ? "is-skipped" : ""} />
+            ))}
+          </div>
+          <p className="su-progress-note">
+            {summary.requiredDone}/{summary.requiredTotal} essentials, {pct}% overall
+          </p>
+          {next ? (
+            <div className="su-next">
+              <span className="su-next-label">Next up</span>
+              <span className="su-next-title">{next.title}</span>
+              <a href={`#step-${next.id}`} className="su-next-go">
+                Go to step <ArrowRight size={14} aria-hidden />
+              </a>
+            </div>
+          ) : isAdmin ? (
+            <div className="su-next">
+              <span className="su-next-title">Everything is set up.</span>
+              <Button size="sm" onClick={dismiss} loading={dismissing}>
+                Hide this guide
+              </Button>
+            </div>
+          ) : null}
         </div>
-      )}
+        <nav className="su-groupnav" aria-label="Sections">
+          {GROUP_ORDER.map((group) => {
+            const rows = summary.steps.filter((s) => s.group === group);
+            if (rows.length === 0) return null;
+            const doneCount = rows.filter((r) => r.done || r.skipped).length;
+            return (
+              <a key={group} href={`#group-${group}`} className="su-groupnav-link">
+                <span>{GROUP_LABELS[group]}</span>
+                <span className={doneCount === rows.length ? "su-count is-full" : "su-count"}>
+                  {doneCount}/{rows.length}
+                </span>
+              </a>
+            );
+          })}
+        </nav>
+      </aside>
+
+      <div className="su-main">
+        {GROUP_ORDER.map((group) => {
+          const rows = summary.steps.filter((s) => s.group === group);
+          if (rows.length === 0) return null;
+          const doneCount = rows.filter((r) => r.done || r.skipped).length;
+          return (
+            <section key={group} id={`group-${group}`} className="su-group" aria-labelledby={`group-${group}-title`}>
+              <header className="su-group-head">
+                <h2 id={`group-${group}-title`}>{GROUP_LABELS[group]}</h2>
+                <span className="su-count">{doneCount} of {rows.length}</span>
+              </header>
+              <ol className="su-list">
+                {rows.map((step) => (
+                  <StepRow
+                    key={step.id}
+                    step={step}
+                    isNext={next?.id === step.id}
+                    isAdmin={isAdmin}
+                    venue={venue}
+                    scheduling={scheduling}
+                    businessDefaults={businessDefaults}
+                  />
+                ))}
+              </ol>
+            </section>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
 function StepRow({
   step,
+  isNext,
   isAdmin,
   venue,
   scheduling,
   businessDefaults,
 }: {
   step: SetupStepStatus;
+  isNext: boolean;
   isAdmin: boolean;
   venue: VenueType;
   scheduling: SchedulingMode;
   businessDefaults: BusinessEssentialsDefaults;
 }) {
   const showSkip = isAdmin && step.optional && !step.done && !step.skipped;
+  const state = step.done ? "is-done" : step.skipped ? "is-skipped" : "is-todo";
+  const wide = step.action.kind === "ack-venue" && !step.done;
   return (
-    <Card style={{ padding: 20, display: "grid", gap: 14 }}>
-      <div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <StatusPill step={step} />
-          <span style={{ fontSize: 15, fontWeight: 500, color: "var(--text-primary)" }}>
-            {step.title}
-          </span>
+    <li id={`step-${step.id}`} className={`su-row ${state}${isNext ? " is-next" : ""}${wide ? " is-wide" : ""}`}>
+      <StatusMark step={step} />
+      <div className="su-row-text">
+        <div className="su-row-title">
+          {step.title}
+          {step.optional && !step.done ? <span className="su-tag">Optional</span> : null}
+          {step.skipped ? <span className="su-tag">Skipped</span> : null}
         </div>
-        <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.5, margin: "6px 0 0" }}>
-          {step.blurb}
-        </p>
-        {isAdmin && step.agencyNote && (
-          <p style={{ fontSize: 11.5, color: "var(--text-tertiary)", lineHeight: 1.5, margin: "4px 0 0" }}>
-            {step.agencyNote}
-          </p>
-        )}
+        {!step.done && <p className="su-row-blurb">{step.blurb}</p>}
+        {isAdmin && step.agencyNote && !step.done && <p className="su-row-note">{step.agencyNote}</p>}
       </div>
       {isAdmin && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <StepActions step={step} venue={venue} scheduling={scheduling} businessDefaults={businessDefaults} />
+        <div className="su-row-actions">
           {showSkip && <SkipButton id={step.id} />}
+          <StepActions step={step} venue={venue} scheduling={scheduling} businessDefaults={businessDefaults} />
         </div>
       )}
-    </Card>
+    </li>
   );
 }
 
-function StatusPill({ step }: { step: SetupStepStatus }) {
+function StatusMark({ step }: { step: SetupStepStatus }) {
   if (step.done) {
     return (
-      <Badge tone="green">
-        <Check size={11} strokeWidth={2.5} />
-        Done
-      </Badge>
+      <span className="su-mark is-done" aria-label="Done">
+        <Check size={12} strokeWidth={3} />
+      </span>
     );
   }
-  if (step.skipped) return <Badge tone="neutral">Skipped</Badge>;
-  return <Badge tone="amber">To do</Badge>;
+  if (step.skipped) {
+    return (
+      <span className="su-mark is-skipped" aria-label="Skipped">
+        <Minus size={12} strokeWidth={3} />
+      </span>
+    );
+  }
+  return <span className="su-mark" aria-label="To do" />;
 }
 
 function StepActions({
@@ -188,7 +239,7 @@ function LinkAction({
     return (
       <Link href={action.href}>
         <Button variant="ghost" size="sm">
-          Review
+          View
         </Button>
       </Link>
     );
@@ -196,7 +247,7 @@ function LinkAction({
   return (
     <>
       <Link href={action.href}>
-        <Button size="sm">Set up →</Button>
+        <Button size="sm">Set up</Button>
       </Link>
       {action.secondaryHref && (
         <Link href={action.secondaryHref}>
@@ -253,7 +304,7 @@ function InlineBusinessAction({ defaults }: { defaults: BusinessEssentialsDefaul
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
-        <Button size="sm">Fill in →</Button>
+        <Button size="sm">Fill in</Button>
       </DialogTrigger>
       <DialogContent
         title="Business essentials"
