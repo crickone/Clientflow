@@ -4,10 +4,10 @@ import { getSiteAvailability } from "@/lib/campaigns/store";
 import { getSendingDomain } from "@/lib/marketing/domains";
 import { listCompetitors } from "@/lib/research/store";
 import { hasSocialConnection } from "@/lib/social/metrics";
-import { isAnalyticsConnected, isGoogleProfileConnected, isSearchConsoleConnected } from "@/lib/google/business";
+import { getGoogleBusinessConnection, isAnalyticsConnected, isGoogleProfileConnected, isSearchConsoleConnected } from "@/lib/google/business";
 import type { Requirement } from "./types";
 
-export const REQUIREMENT_CTA: Record<Requirement, { title: string; body: string; href: string; action: string }> = {
+export const REQUIREMENT_CTA: Record<Requirement | "googleListingPending", { title: string; body: string; href: string; action: string }> = {
   site: {
     title: "Add your website",
     body: "This widget reads your website's data.",
@@ -31,6 +31,18 @@ export const REQUIREMENT_CTA: Record<Requirement, { title: string; body: string;
     body: "Connect your Google Business Profile to see how people find you in Search and Maps.",
     href: "/settings/integrations/google",
     action: "Connect Google",
+  },
+  /**
+   * Google IS connected, but no Business Profile listing could be chosen:
+   * Google only opens the Business Profile API to a project after approving
+   * an access request, and until then the listing step cannot complete. Saying
+   * "Connect Google" to someone who just did read as a bug (2026-10-12).
+   */
+  googleListingPending: {
+    title: "Waiting for Google",
+    body: "Google is connected. Profile views, calls and reviews appear once Google approves Business Profile access and your listing is chosen in Google settings.",
+    href: "/settings/integrations/google",
+    action: "Open Google settings",
   },
   searchConsole: {
     title: "Connect Search Console",
@@ -71,4 +83,13 @@ export async function checkRequirements(tenantId: number): Promise<Record<Requir
     safe(() => isAnalyticsConnected(tenantId)),
   ]);
   return { site, sendingDomain, competitors, social, google, searchConsole, analytics };
+}
+
+/** A Google account is connected for this business (whether or not a listing is chosen). */
+export function hasGoogleAccount(tenantId: number): boolean {
+  try {
+    return getGoogleBusinessConnection(tenantId) !== null;
+  } catch {
+    return false;
+  }
 }

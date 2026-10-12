@@ -2,7 +2,7 @@ import Link from "next/link";
 import { REQUIREMENT_CTA } from "@/lib/dashboard/requirements";
 import type { Requirement } from "@/lib/dashboard/types";
 
-export function RequirementCta({ requirement }: { requirement: Requirement }) {
+export function RequirementCta({ requirement }: { requirement: Requirement | "googleListingPending" }) {
   const c = REQUIREMENT_CTA[requirement];
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-start" }}>

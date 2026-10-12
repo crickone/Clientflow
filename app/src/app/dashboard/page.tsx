@@ -17,7 +17,7 @@ import { CATALOG, CATALOG_BY_KEY } from "@/lib/dashboard/catalog";
 import { PRESETS, presetAppliesTo } from "@/lib/dashboard/presets";
 import { parseRangeKey, previousRange, resolveRange, type RangeKey } from "@/lib/dashboard/range";
 import { resolveTabs } from "@/lib/dashboard/tabs";
-import { checkRequirements } from "@/lib/dashboard/requirements";
+import { hasGoogleAccount, checkRequirements } from "@/lib/dashboard/requirements";
 import { DOMAIN_LABELS, type RecorderKey, type Requirement, type Venue, type WidgetCtx, type WidgetMeta } from "@/lib/dashboard/types";
 import { appliesToVenue, canSee, visibleRefs } from "@/lib/dashboard/visibility";
 import { getVisibilityOverrides } from "@/lib/dashboard/visibilityStore";
@@ -71,6 +71,8 @@ export default async function DashboardPage({
   };
   const needsReqs = refs.some((r) => (CATALOG_BY_KEY.get(r.key)?.requires?.length ?? 0) > 0);
   const reqs = needsReqs ? await checkRequirements(tenantId) : ({} as Awaited<ReturnType<typeof checkRequirements>>);
+  // Connected to Google but no listing yet: say that, not "Connect Google".
+  const googleAccount = needsReqs && !reqs.google ? hasGoogleAccount(tenantId) : false;
 
   const items: GridItem[] = refs.map((ref) => {
     const meta = CATALOG_BY_KEY.get(ref.key)!;
@@ -88,7 +90,7 @@ export default async function DashboardPage({
       title: impl?.label?.(ctx) ?? meta.title,
       href: impl?.href,
       node: unmet ? (
-        <RequirementCta requirement={unmet} />
+        <RequirementCta requirement={unmet === "google" && googleAccount ? "googleListingPending" : unmet} />
       ) : (
         <WidgetErrorBoundary>
           <Suspense fallback={<WidgetSkeleton rows={ref.size !== "S"} />}>
