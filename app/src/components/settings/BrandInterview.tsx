@@ -283,7 +283,7 @@ export function BrandInterview({
             <motion.section key="review" className="bi-review" {...slide} transition={{ duration: 0.35 }}>
               <p className="bi-eyebrow">Review</p>
               <h2 className="bi-h1">Here&rsquo;s your brand.</h2>
-              <p className="bi-lead">Edit anything, untick what you don&rsquo;t want, then save. You can change all of it later in Business profile.</p>
+              <p className="bi-lead">Everything below is switched on and will be saved. Edit anything you like, switch off anything you don&rsquo;t want, then save. You can change all of it later in Business profile.</p>
               <div className="bi-fields">
                 {FIELDS.map((f) => {
                   const replacing = !!current[f.key]?.trim();
@@ -297,16 +297,21 @@ export function BrandInterview({
                             {replacing && keep[f.key] ? " Replaces what you have now." : ""}
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={keep[f.key]}
-                          className={`bi-keep${keep[f.key] ? " is-on" : ""}`}
-                          onClick={() => setKeep((k) => ({ ...k, [f.key]: !k[f.key] }))}
-                        >
-                          {keep[f.key] && <Check size={13} strokeWidth={3} />}
-                          {keep[f.key] ? "Keep" : "Skip"}
-                        </button>
+                        {/* A switch, not a button: the old "Keep" button read as an
+                            action, so pressing it to keep a section switched it
+                            OFF, and a whole brand saved as nothing. */}
+                        <label className="bi-switch">
+                          <span className="bi-switch-text">{keep[f.key] ? "Will be saved" : "Won't be saved"}</span>
+                          <input
+                            type="checkbox"
+                            role="switch"
+                            checked={keep[f.key]}
+                            onChange={() => setKeep((k) => ({ ...k, [f.key]: !k[f.key] }))}
+                          />
+                          <span className="bi-switch-track" aria-hidden>
+                            <span className="bi-switch-knob" />
+                          </span>
+                        </label>
                       </div>
                       <textarea
                         className="bi-field-text"
@@ -320,6 +325,13 @@ export function BrandInterview({
                 })}
               </div>
               <div className="bi-savebar">
+                <span className="bi-saving-list">
+                  {FIELDS.filter((f) => keep[f.key]).length === FIELDS.length
+                    ? "Saving all five"
+                    : FIELDS.some((f) => keep[f.key])
+                      ? `Saving: ${FIELDS.filter((f) => keep[f.key]).map((f) => f.title).join(", ")}`
+                      : "Nothing switched on to save"}
+                </span>
                 <button type="button" className="bi-ghost" onClick={() => { setStage("ask"); setI(0); }}>
                   <ArrowLeft size={15} /> Change my answers
                 </button>
