@@ -17,6 +17,7 @@ import {
   saveVoiceSettingsAction,
 } from "@/app/settings/voice/actions";
 import { formatDateTime } from "@/lib/utils";
+import { SUPPORT_MAILTO, Unavailable } from "./Unavailable";
 
 interface VoiceConfig {
   agentId: string;
@@ -101,13 +102,11 @@ export function VoiceSettingsView({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {!enabled && (
-        <Card style={{ padding: 20 }}>
-          <CardLabel>Not enabled</CardLabel>
-          <p style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.55, margin: "6px 0 0" }}>
-            The Voice Agent add-on isn&apos;t switched on for this account, so no calls can be placed. Talk to us to
-            turn it on — you can try it first on free trial minutes.
-          </p>
-        </Card>
+        <Unavailable
+          title="The voice agent isn't switched on yet"
+          body="It's an add-on: once it's on, it phones new leads for you. You can try it first on free trial minutes. Until then no calls are placed, and you can still set everything up below."
+          action={{ label: "Ask to turn it on", href: SUPPORT_MAILTO }}
+        />
       )}
 
       {/* The call flow lives on its own page — it is the thing an operator

@@ -49,7 +49,7 @@ export async function sendTestEmailAction(to: string): Promise<ActionResult> {
   const addr = z.string().trim().toLowerCase().email().safeParse(to);
   if (!addr.success) return { ok: false, error: "Enter a valid email address" };
   if (!hasEmailApiKey()) {
-    return { ok: false, error: "Missing RESEND_API_KEY on the server." };
+    return { ok: false, error: "Sending from your own domain isn't switched on for this account yet. Contact AdonisAgent support." };
   }
   const sender = getEmailSender();
   if (!sender.fromEmail) return { ok: false, error: "Save a sender address first." };

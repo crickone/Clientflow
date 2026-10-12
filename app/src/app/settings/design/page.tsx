@@ -21,14 +21,6 @@ export default async function DesignDirectionPage() {
         eyebrow="Settings"
         title="Design direction"
         subtitle="The look Adonis composes your posts in: a typeface, a scale, a grid and a rotation of grounds, in your own colours."
-        actions={
-          <Link href="/settings">
-            <Button variant="outline">
-              <ArrowLeft size={15} />
-              All settings
-            </Button>
-          </Link>
-        }
       />
       <DesignDirectionView
         directions={DESIGN_DIRECTIONS.map((d) => ({

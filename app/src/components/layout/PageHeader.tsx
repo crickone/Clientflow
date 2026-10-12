@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { SettingsBack } from "@/components/settings/SettingsBack";
+
 interface Props {
   eyebrow?: string;
   title: string;
@@ -27,6 +29,7 @@ export function PageHeader({ eyebrow, title, subtitle, actions, flush }: Props) 
       }}
     >
       <div>
+        <SettingsBack />
         {eyebrow && (
           <div
             style={{

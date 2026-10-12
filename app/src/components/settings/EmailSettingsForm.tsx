@@ -92,9 +92,8 @@ export function EmailSettingsForm({
         </Banner>
       ) : (
         <Banner tone="warn" icon={<AlertTriangle size={16} />}>
-          Email service isn&apos;t connected yet. Add a <code>RESEND_API_KEY</code>{" "}
-          on the server to enable sending. You can still save your sender details
-          below.
+          Sending from your own domain isn&apos;t switched on for this account yet.
+          You can save your sender details now, and they&apos;ll be used once it is.
         </Banner>
       )}
 

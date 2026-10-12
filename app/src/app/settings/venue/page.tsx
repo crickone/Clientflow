@@ -23,14 +23,6 @@ export default async function VenueTypeSettingsPage() {
         eyebrow="Settings"
         title="Venue type"
         subtitle="Choose the vocabulary used across the app. The underlying data is identical — only the labels change."
-        actions={
-          <Link href="/settings">
-            <Button variant="outline">
-              <ArrowLeft size={15} />
-              All settings
-            </Button>
-          </Link>
-        }
       />
       <Card style={{ padding: 28 }}>
         <VenueTypeForm current={current} />

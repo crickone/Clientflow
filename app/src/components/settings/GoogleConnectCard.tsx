@@ -18,7 +18,7 @@ import type { GoogleBusinessConnection, ListingChoice } from "@/lib/google/busin
 type Choices = Awaited<ReturnType<typeof loadGoogleChoicesAction>>;
 
 const ERRORS: Record<string, string> = {
-  google_not_configured: "Google sign-in is not set up on the server yet (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET).",
+  google_not_configured: "Google sign-in isn't switched on for this platform yet. Contact AdonisAgent support and we'll turn it on.",
   no_refresh_token: "Google did not hand back a lasting sign-in. Remove AdonisAgent from your Google account's third-party access, then connect again.",
   access_denied: "The Google sign-in was cancelled.",
   state_mismatch: "The sign-in expired or came from another tab. Try again.",

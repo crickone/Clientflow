@@ -26,14 +26,6 @@ export default async function WhatsAppSettingsPage() {
         eyebrow="Integrations"
         title="WhatsApp"
         subtitle="Connect a WhatsApp number to message leads and clients from their conversation thread."
-        actions={
-          <Link href="/settings">
-            <Button variant="outline">
-              <ArrowLeft size={15} />
-              All settings
-            </Button>
-          </Link>
-        }
       />
       <WhatsAppConnectForm
         initial={{ token: cfg.token, channel: cfg.channel, baseUrl: cfg.baseUrl }}

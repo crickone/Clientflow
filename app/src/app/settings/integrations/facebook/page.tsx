@@ -22,14 +22,6 @@ export default async function FacebookSettingsPage() {
         eyebrow="Integrations"
         title="Facebook & Instagram"
         subtitle="Post, answer messages, collect leads and run ads, all from AdonisAgent."
-        actions={
-          <Link href="/settings">
-            <Button variant="outline">
-              <ArrowLeft size={15} />
-              All settings
-            </Button>
-          </Link>
-        }
       />
       <FacebookConnectCard
         configured={facebookConfigured()}

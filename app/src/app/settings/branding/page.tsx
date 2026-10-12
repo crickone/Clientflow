@@ -26,14 +26,6 @@ export default async function BrandingSettingsPage() {
         eyebrow="Settings"
         title="Branding"
         subtitle="Your business logo, content fonts, and the AI image style used for AI-generated post imagery. (The app chrome shows the AdonisAgent wordmark for now.)"
-        actions={
-          <Link href="/settings">
-            <Button variant="outline">
-              <ArrowLeft size={15} />
-              All settings
-            </Button>
-          </Link>
-        }
       />
       <BrandingForm
         hasLogo={hasLogo}

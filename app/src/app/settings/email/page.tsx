@@ -36,14 +36,6 @@ export default async function EmailSettingsPage({
         eyebrow="Settings"
         title="Email"
         subtitle="Send staff invites and email your clients — from your own Gmail or your own domain."
-        actions={
-          <Link href="/settings">
-            <Button variant="outline">
-              <ArrowLeft size={15} />
-              All settings
-            </Button>
-          </Link>
-        }
       />
 
       <GmailConnectCard

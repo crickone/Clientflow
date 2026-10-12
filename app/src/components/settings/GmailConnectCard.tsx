@@ -121,8 +121,8 @@ export function GmailConnectCard({
             </a>
           ) : (
             <Banner tone="warn">
-              Gmail sign-in isn&apos;t available yet — the server needs Google OAuth
-              credentials (<code>GOOGLE_CLIENT_ID</code> / <code>GOOGLE_CLIENT_SECRET</code>).
+              Gmail sign-in isn&apos;t switched on for this platform yet. Contact AdonisAgent
+              support and we&apos;ll turn it on.
             </Banner>
           )}
         </>

@@ -16,19 +16,6 @@ export default async function TherapiesSettingsPage() {
   const items = db.select().from(therapies).all();
   return (
     <div className="app-page" style={{ maxWidth: 880 }}>
-      <Link
-        href="/settings"
-        style={{
-          color: "var(--text-tertiary)",
-          fontSize: 13,
-          marginBottom: 24,
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 6,
-        }}
-      >
-        <ArrowLeft size={14} /> Back to settings
-      </Link>
       <PageHeader
         eyebrow="Settings"
         title={vocab.services}

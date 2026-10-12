@@ -3996,3 +3996,28 @@ a.stat-row:hover .stat-label { color: var(--text-primary); }
 [data-sonner-toaster] [data-sonner-toast][data-styled=true].ui-toast [data-button] { background: var(--text-primary); color: var(--bg); border-radius: 999px; font-weight: 600; font-size: 12.5px; height: 30px; padding: 0 14px; }
 [data-sonner-toaster] [data-sonner-toast][data-styled=true].ui-toast [data-close-button] { background: var(--surface-2); border-color: var(--hairline-strong); color: var(--text-secondary); }
 [data-sonner-toaster] [data-sonner-toast][data-styled=true].ui-toast [data-close-button]:hover { background: var(--surface-3, var(--surface-2)); color: var(--text-primary); }
+
+/* ---- Unavailable feature (components/settings/Unavailable) ---- */
+.unavail { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 20px 22px; border-radius: var(--radius-lg, 18px); border: 1px dashed var(--hairline-strong); background: var(--surface-1); }
+.unavail-icon { width: 42px; height: 42px; flex: none; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; background: var(--surface-2); color: var(--text-secondary); }
+.unavail-text { flex: 1 1 280px; min-width: 0; }
+.unavail-title { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+.unavail-body { margin: 4px 0 0; font-size: 13.5px; line-height: 1.55; color: var(--text-secondary); }
+.unavail-action { text-decoration: none; display: inline-flex; align-items: center; }
+.settings-back { display: inline-flex; align-items: center; gap: 4px; margin: 0 0 14px -4px; padding: 4px 8px 4px 4px; border-radius: 8px; font-size: 13px; font-weight: 500; color: var(--text-secondary); text-decoration: none; transition: color .15s var(--ease), background .15s var(--ease); }
+.settings-back:hover { color: var(--text-primary); background: var(--surface-2); }
+
+/* ---- Settings landing (app/settings/page.tsx) ---- */
+.set-groups { display: flex; flex-direction: column; gap: 34px; }
+.set-group-title { margin: 0 0 12px; font-family: var(--font-body), sans-serif; font-size: 13px; font-weight: 600; letter-spacing: 0.02em; text-transform: none; color: var(--text-secondary); }
+.set-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.set-card { display: flex; align-items: center; gap: 14px; padding: 16px 16px 16px 18px; text-decoration: none; color: inherit; min-height: 84px; }
+.set-icon { width: 40px; height: 40px; flex: none; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; background: var(--surface-2); border: 1px solid var(--hairline); color: var(--text-primary); }
+.set-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.set-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 14.5px; font-weight: 600; color: var(--text-primary); }
+.set-desc { font-size: 13px; line-height: 1.45; color: var(--text-secondary); }
+.set-status { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.set-status.is-connected { background: color-mix(in srgb, var(--success, #2fae6b) 16%, transparent); color: var(--success, #2fae6b); }
+.set-status.is-not-connected { background: var(--surface-2); color: var(--text-tertiary); }
+.set-chev { flex: none; color: var(--text-tertiary); transition: transform .15s var(--ease), color .15s var(--ease); }
+.set-card:hover .set-chev { color: var(--text-primary); transform: translateX(2px); }

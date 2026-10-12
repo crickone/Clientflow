@@ -23,14 +23,6 @@ export default async function InboxAiSettingsPage() {
         eyebrow="Settings"
         title="Inbox AI"
         subtitle="Control AI auto-replies and the tag vocabulary used to triage your messages."
-        actions={
-          <Link href="/settings">
-            <Button variant="outline">
-              <ArrowLeft size={15} />
-              All settings
-            </Button>
-          </Link>
-        }
       />
       <InboxAiSettingsForm
         initial={settings}

@@ -19,14 +19,6 @@ export default async function BusinessProfileSettingsPage() {
         eyebrow="Settings"
         title="Business profile"
         subtitle="Your business identity and brief. Used to generate content and shown across the app."
-        actions={
-          <Link href="/settings">
-            <Button variant="outline">
-              <ArrowLeft size={15} />
-              All settings
-            </Button>
-          </Link>
-        }
       />
       <BusinessProfileForm initial={profile} />
     </div>

@@ -34,14 +34,6 @@ export default async function VoiceSettingsPage() {
         eyebrow="Settings"
         title="Voice agent"
         subtitle="The AI that phones your leads — what it says, which number it calls from, and what it has cost this month."
-        actions={
-          <Link href="/settings">
-            <Button variant="outline">
-              <ArrowLeft size={15} />
-              All settings
-            </Button>
-          </Link>
-        }
       />
       <VoiceSettingsView
         config={config}

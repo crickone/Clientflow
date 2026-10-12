@@ -47,21 +47,6 @@ export default async function UsersPage() {
 
   return (
     <div className="app-page" style={{ maxWidth: 1000 }}>
-      <Link
-        href="/settings"
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 6,
-          color: "var(--text-secondary)",
-          fontSize: 13,
-          marginBottom: 14,
-          textDecoration: "none",
-        }}
-      >
-        <ArrowLeft size={14} strokeWidth={1.75} />
-        Back to settings
-      </Link>
       <PageHeader
         eyebrow="Configure"
         title="Users & permissions"

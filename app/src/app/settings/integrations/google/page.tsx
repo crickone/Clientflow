@@ -19,14 +19,6 @@ export default async function GoogleSettingsPage({ searchParams }: { searchParam
         eyebrow="Integrations"
         title="Google"
         subtitle="Your Business Profile, Search Console and Analytics: post to Google, answer reviews and see how people find you."
-        actions={
-          <Link href="/settings">
-            <Button variant="outline">
-              <ArrowLeft size={15} />
-              All settings
-            </Button>
-          </Link>
-        }
       />
       <GoogleConnectCard
         configured={googleConfigured()}

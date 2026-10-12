@@ -13,6 +13,7 @@ import { disconnectFacebookPageAction, refreshAdAccountsAction, setAdAccountInUs
 // Type-only — lib/facebook/{pages,grants}.ts are `server-only`.
 import type { FacebookPageRow } from "@/lib/facebook/pages";
 import type { AdAccountRow, GrantInfo } from "@/lib/facebook/grants";
+import { SUPPORT_MAILTO, Unavailable } from "./Unavailable";
 
 /**
  * Facebook & Instagram connection. Not connected: what connecting turns on,
@@ -52,9 +53,11 @@ export function FacebookConnectCard({
 
   if (!configured) {
     return (
-      <Card style={{ padding: 24 }}>
-        <div style={{ fontSize: 14, color: "var(--text-secondary)" }}>Facebook is not available on this account yet. Contact AdonisAgent support.</div>
-      </Card>
+      <Unavailable
+        title="Facebook and Instagram aren't switched on yet"
+        body="Once they are, you can post, answer messages, collect Lead Ads leads and run ads from here. Ask us and we'll turn them on for this account."
+        action={{ label: "Ask AdonisAgent", href: SUPPORT_MAILTO }}
+      />
     );
   }
 
