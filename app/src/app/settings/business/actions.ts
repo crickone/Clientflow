@@ -6,25 +6,37 @@ import { eq } from "drizzle-orm";
 import { getCurrentMembership, requireAdmin } from "@/lib/auth";
 import { authDb } from "@/lib/db/control";
 import { tenants } from "@/lib/db/schema";
-import { setBusinessProfile, type BusinessProfile } from "@/lib/businessProfile";
+import { getBusinessProfile, setBusinessProfile, type BusinessProfile } from "@/lib/businessProfile";
 
-export async function updateBusinessProfile(profile: BusinessProfile) {
+/**
+ * Save ONLY the fields that changed, merged into what is stored now.
+ *
+ * The form used to send the whole profile, so a stale copy of the page (the
+ * browser's cached one after the brand interview saved, then an autofilled
+ * phone number made it "dirty") wrote its empty brief and marketing brain
+ * straight over the ones just saved. A patch can't clobber a field it
+ * didn't touch.
+ */
+export async function updateBusinessProfile(patch: Partial<BusinessProfile>) {
   await requireAdmin();
+  const current = getBusinessProfile();
+  const str = (k: keyof BusinessProfile) => (typeof patch[k] === "string" ? (patch[k] as string).trim() : (current[k] as string));
   const clean: BusinessProfile = {
-    businessName: profile.businessName.trim(),
-    tagline: profile.tagline.trim(),
-    location: profile.location.trim(),
-    phone: profile.phone.trim(),
-    website: profile.website.trim(),
-    email: profile.email.trim(),
-    signupUrl: (profile.signupUrl ?? "").trim(),
-    brief: profile.brief.trim(),
-    voiceNotes: profile.voiceNotes.trim(),
-    marketingBrain: profile.marketingBrain.trim(),
-    policies: profile.policies.trim(),
-    faqs: (profile.faqs ?? [])
-      .map((f) => ({ q: f.q.trim(), a: f.a.trim() }))
-      .filter((f) => f.q || f.a),
+    ...current,
+    businessName: str("businessName"),
+    tagline: str("tagline"),
+    location: str("location"),
+    phone: str("phone"),
+    website: str("website"),
+    email: str("email"),
+    signupUrl: typeof patch.signupUrl === "string" ? patch.signupUrl.trim() : current.signupUrl ?? "",
+    brief: str("brief"),
+    voiceNotes: str("voiceNotes"),
+    marketingBrain: str("marketingBrain"),
+    policies: str("policies"),
+    faqs: Array.isArray(patch.faqs)
+      ? patch.faqs.map((f) => ({ q: f.q.trim(), a: f.a.trim() })).filter((f) => f.q || f.a)
+      : current.faqs,
   };
   setBusinessProfile(clean);
 

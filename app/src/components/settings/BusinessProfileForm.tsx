@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Plus, Sparkles, Trash2 } from "lucide-react";
 
@@ -50,12 +50,22 @@ Never:
 export function BusinessProfileForm({ initial }: { initial: BusinessProfile }) {
   const [profile, setProfile] = useState<BusinessProfile>(initial);
   const confirm = useConfirm();
+  // What the server last had from this form: each save sends only the fields
+  // that differ from it, so nothing this form didn't change is overwritten.
+  const baseRef = useRef<BusinessProfile>(initial);
 
   const autosave = useAutosave({
     values: profile,
     save: async (next) => {
-      const res = await updateBusinessProfile(next);
+      const base = baseRef.current;
+      const patch: Partial<BusinessProfile> = {};
+      for (const k of Object.keys(next) as (keyof BusinessProfile)[]) {
+        if (JSON.stringify(next[k]) !== JSON.stringify(base[k])) (patch as Record<string, unknown>)[k] = next[k];
+      }
+      if (Object.keys(patch).length === 0) return;
+      const res = await updateBusinessProfile(patch);
       if (!res.ok) throw new Error("Couldn't save — please try again.");
+      baseRef.current = next;
     },
   });
 

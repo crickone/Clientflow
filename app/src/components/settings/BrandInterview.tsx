@@ -122,7 +122,9 @@ export function BrandInterview({
     setSaving(false);
     if (!res.ok) return void toast.error(res.error, { duration: 10000 });
     toast.success("Saved. Adonis will write from this from now on.");
-    router.push("/settings/business");
+    // A full load, never the browser's cached copy of Business profile: the
+    // cached page held the old empty fields (see updateBusinessProfile).
+    setTimeout(() => window.location.assign("/settings/business"), 600);
   }
 
   const answered = useMemo(
