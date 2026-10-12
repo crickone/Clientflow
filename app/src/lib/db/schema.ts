@@ -3241,3 +3241,38 @@ export const bodyScanProfiles = sqliteTable("body_scan_profiles", {
   consentAt: integer("consent_at"),
   updatedAt: integer("updated_at").notNull(),
 });
+
+export const workoutSessions = sqliteTable("workout_sessions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  clientId: integer("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  programId: integer("program_id").references(() => workoutPrograms.id, { onDelete: "set null" }),
+  dayPosition: integer("day_position").notNull().default(0),
+  programTitle: text("program_title").notNull(),
+  dayName: text("day_name").notNull(),
+  startedAt: integer("started_at").notNull(),
+  finishedAt: integer("finished_at"),
+  updatedAt: integer("updated_at").notNull(),
+});
+export type WorkoutSession = typeof workoutSessions.$inferSelect;
+
+export const workoutSessionExercises = sqliteTable("workout_session_exercises", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  sessionId: integer("session_id").notNull().references(() => workoutSessions.id, { onDelete: "cascade" }),
+  position: integer("position").notNull(),
+  section: text("section", { enum: ["warmup", "workout", "cooldown"] }).notNull().default("workout"),
+  exerciseKey: text("exercise_key").notNull(),
+  name: text("name").notNull(),
+  targetSets: integer("target_sets").notNull(),
+  targetReps: text("target_reps"),
+  restSeconds: integer("rest_seconds").notNull().default(0),
+  notes: text("notes"),
+});
+
+export const workoutSetLogs = sqliteTable("workout_set_logs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  sessionExerciseId: integer("session_exercise_id").notNull().references(() => workoutSessionExercises.id, { onDelete: "cascade" }),
+  setNumber: integer("set_number").notNull(),
+  weightKg: real("weight_kg"),
+  reps: integer("reps"),
+  done: integer("done", { mode: "boolean" }).notNull().default(false),
+});

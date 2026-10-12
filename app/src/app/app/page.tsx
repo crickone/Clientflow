@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { CalendarRange, ChevronRight, CreditCard, Dumbbell, Salad, ScanLine } from "lucide-react";
+import { CalendarRange, ChevronRight, CreditCard, Dumbbell, Play, Salad, ScanLine } from "lucide-react";
 
 import { requireClientPage } from "@/lib/clientAuth";
 import { clientDashboard, clientUpcoming } from "@/lib/clientApp";
 import { Card, dayLabel, euros, SectionTitle } from "@/components/clientapp/ui";
 import { bodyScansEnabled, getScanProfile, listClientScans } from "@/lib/inbody/scans";
 import { formatMetric } from "@/lib/inbody/metrics";
+import { openSession, sessionSummary } from "@/lib/workoutLog";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,8 @@ export default async function ClientHome() {
   const latestScan = scanConsent ? listClientScans(clientId).find((s) => Object.keys(s.metrics).length > 0) : undefined;
   const d = clientDashboard(clientId);
   const upcoming = clientUpcoming(clientId, 3);
+  const openWorkout = openSession(clientId);
+  const openSum = openWorkout ? sessionSummary(openWorkout) : null;
   const pct = d.weekBooked > 0 ? Math.round((d.weekAttended / d.weekBooked) * 100) : 0;
 
   return (
@@ -26,6 +29,21 @@ export default async function ClientHome() {
           {client.firstName}
         </h1>
       </div>
+
+      {openWorkout && openSum && (
+        <Link href={`/app/workouts/log/${openWorkout.id}`}>
+          <Card style={{ borderColor: "var(--accent)", background: "var(--accent-soft)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ ...iconBox, background: "var(--accent)", color: "#fff" }}><Play size={17} /></span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Continue {openWorkout.dayName}</div>
+                <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>{openSum.done} of {openSum.total} sets done</div>
+              </div>
+              <ChevronRight size={18} style={{ color: "var(--text-tertiary)" }} />
+            </div>
+          </Card>
+        </Link>
+      )}
 
       {/* week progress */}
       <Card>

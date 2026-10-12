@@ -8,14 +8,20 @@ import { formatMetric, METRIC_BY_KEY, type MetricKey } from "@/lib/inbody/metric
  */
 export function TrendChart({
   metric,
+  label,
+  unit,
   points,
   height = 120,
 }: {
-  metric: MetricKey;
+  /** An InBody measurement, or pass `label` + `unit` for anything else (a lift). */
+  metric?: MetricKey;
+  label?: string;
+  unit?: string;
   points: { at: number; value: number }[];
   height?: number;
 }) {
-  const def = METRIC_BY_KEY[metric];
+  const name = metric ? METRIC_BY_KEY[metric].label : label ?? "Value";
+  const show = (v: number) => (metric ? formatMetric(metric, v) : `${Number(v.toFixed(1))}${unit ? ` ${unit}` : ""}`);
   const sorted = [...points].sort((a, b) => a.at - b.at);
   if (sorted.length === 0) return null;
   const W = 320;
@@ -34,10 +40,10 @@ export function TrendChart({
   const area = `${line} L${x(t1).toFixed(1)},${H - pad.b} L${x(t0).toFixed(1)},${H - pad.b} Z`;
   const fmt = (t: number) => new Date(t).toLocaleDateString("en-IE", { day: "numeric", month: "short", timeZone: "Europe/Dublin" });
   const last = sorted[sorted.length - 1];
-  const gradId = `tc-${metric}`;
+  const gradId = `tc-${(metric ?? name).replace(/[^a-z0-9]/gi, "")}`;
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} role="img" aria-label={`${def.label} over time, latest ${formatMetric(metric, last.value)}`} style={{ display: "block", overflow: "visible" }}>
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} role="img" aria-label={`${name} over time, latest ${show(last.value)}`} style={{ display: "block", overflow: "visible" }}>
       <defs>
         <linearGradient id={gradId} x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.22" />

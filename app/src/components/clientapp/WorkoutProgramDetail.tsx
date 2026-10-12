@@ -1,10 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Play } from "lucide-react";
+import { toast } from "sonner";
 
 import { Card, DocumentCard, PageTitle } from "@/components/clientapp/ui";
 import { DayTabs } from "@/components/clientapp/DayTabs";
 import { ExerciseSections } from "@/components/workout/ExerciseSections";
+import { Button } from "@/components/ui/Button";
+import { startWorkoutAction } from "@/app/app/actions";
 import { PROGRAM_TYPE_LABEL, type ProgramInput } from "@/lib/workoutModel";
 
 /**
@@ -20,12 +26,31 @@ import { PROGRAM_TYPE_LABEL, type ProgramInput } from "@/lib/workoutModel";
 export function WorkoutProgramDetail({
   program,
   media,
+  open,
+  initialDay = 0,
 }: {
   program: ProgramInput;
   media: Record<string, string | null>;
+  /** The member's workout in progress, if any, so this day can offer Continue. */
+  open: { id: number; programId: number | null; dayPosition: number; dayName: string } | null;
+  initialDay?: number;
 }) {
-  const [dayIdx, setDayIdx] = useState(0);
+  const router = useRouter();
+  const [dayIdx, setDayIdx] = useState(Math.min(initialDay, Math.max(0, program.days.length - 1)));
+  const [pending, start] = useTransition();
+  const [blocked, setBlocked] = useState<{ error: string; id?: number } | null>(null);
   const day = program.days[dayIdx];
+  const openHere = open && open.programId === program.id && open.dayPosition === dayIdx ? open : null;
+
+  function startDay() {
+    setBlocked(null);
+    start(async () => {
+      const r = await startWorkoutAction(program.id!, dayIdx);
+      if (r.ok) return router.push(`/app/workouts/log/${r.sessionId}`);
+      if (r.inProgressId) setBlocked({ error: r.error, id: r.inProgressId });
+      else toast.error(r.error);
+    });
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -47,7 +72,25 @@ export function WorkoutProgramDetail({
       ) : (
         <>
           {program.summary && <div style={{ fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>{program.summary}</div>}
-          <DayTabs labels={program.days.map((d, i) => d.name || `Day ${i + 1}`)} active={dayIdx} onChange={setDayIdx} />
+          <DayTabs labels={program.days.map((d, i) => d.name || `Day ${i + 1}`)} active={dayIdx} onChange={(i) => { setDayIdx(i); setBlocked(null); }} />
+          {day && day.exercises.length > 0 && (
+            <div style={{ display: "grid", gap: 8 }}>
+              <Button onClick={startDay} loading={pending} style={{ width: "100%", height: 48, fontSize: 15 }}>
+                {!pending && <Play size={16} />}
+                {openHere ? `Continue ${day.name || `Day ${dayIdx + 1}`}` : `Start ${day.name || `Day ${dayIdx + 1}`}`}
+              </Button>
+              {blocked && (
+                <Card style={{ padding: "12px 14px", fontSize: 13.5, color: "var(--text-secondary)", display: "grid", gap: 6 }}>
+                  {blocked.error}
+                  {blocked.id && (
+                    <Link href={`/app/workouts/log/${blocked.id}`} style={{ color: "var(--accent-ink)", fontWeight: 500 }}>
+                      Open that workout
+                    </Link>
+                  )}
+                </Card>
+              )}
+            </div>
+          )}
           {day && (
             <Card style={{ display: "flex", flexDirection: "column", gap: 18, padding: 22 }}>
               <div style={{ fontFamily: "var(--font-heading), sans-serif", fontSize: 19, color: "var(--text-primary)" }}>{day.name}</div>

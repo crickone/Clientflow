@@ -5,10 +5,11 @@ import { assignedWorkoutProgramDetail } from "@/lib/clientApp";
 import { listExercises } from "@/lib/exerciseLibrary";
 import { buildExerciseMediaMap } from "@/lib/workoutPreviewMedia";
 import { WorkoutProgramDetail } from "@/components/clientapp/WorkoutProgramDetail";
+import { openSession } from "@/lib/workoutLog";
 
 export const dynamic = "force-dynamic";
 
-export default async function ClientWorkoutProgramPage({ params }: { params: { id: string } }) {
+export default async function ClientWorkoutProgramPage({ params, searchParams }: { params: { id: string }; searchParams: { day?: string } }) {
   const { clientId } = requireClientPage();
   const id = Number(params.id);
   if (!Number.isInteger(id) || id <= 0) notFound();
@@ -25,5 +26,16 @@ export default async function ClientWorkoutProgramPage({ params }: { params: { i
   // for "detailed" programs (the only type with exercise rows to enrich).
   const media = program.type === "detailed" ? buildExerciseMediaMap(listExercises()) : {};
 
-  return <WorkoutProgramDetail program={program} media={media} />;
+  const open = openSession(clientId);
+  const day = Number(searchParams.day);
+  const initialDay = Number.isInteger(day) && day >= 0 ? day : open?.programId === id ? open.dayPosition : 0;
+
+  return (
+    <WorkoutProgramDetail
+      program={program}
+      media={media}
+      open={open ? { id: open.id, programId: open.programId, dayPosition: open.dayPosition, dayName: open.dayName } : null}
+      initialDay={initialDay}
+    />
+  );
 }

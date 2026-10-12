@@ -2787,6 +2787,48 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     CREATE INDEX IF NOT EXISTS idx_body_scan_profiles_inbody ON body_scan_profiles(inbody_user_id);
   `);
 
+  // Workout log: a member works through one programme day in the app. The
+  // session snapshots the day's exercises (so a later programme edit never
+  // rewrites history); exercise_key follows a lift across programmes. The day
+  // is kept by position: saveProgram re-creates day rows on every save.
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS workout_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      program_id INTEGER REFERENCES workout_programs(id) ON DELETE SET NULL,
+      day_position INTEGER NOT NULL DEFAULT 0,
+      program_title TEXT NOT NULL,
+      day_name TEXT NOT NULL,
+      started_at INTEGER NOT NULL,
+      finished_at INTEGER,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_workout_sessions_client ON workout_sessions(client_id, started_at);
+    CREATE TABLE IF NOT EXISTS workout_session_exercises (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id INTEGER NOT NULL REFERENCES workout_sessions(id) ON DELETE CASCADE,
+      position INTEGER NOT NULL,
+      section TEXT NOT NULL DEFAULT 'workout',
+      exercise_key TEXT NOT NULL,
+      name TEXT NOT NULL,
+      target_sets INTEGER NOT NULL,
+      target_reps TEXT,
+      rest_seconds INTEGER NOT NULL DEFAULT 0,
+      notes TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_wse_session ON workout_session_exercises(session_id);
+    CREATE INDEX IF NOT EXISTS idx_wse_key ON workout_session_exercises(exercise_key);
+    CREATE TABLE IF NOT EXISTS workout_set_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_exercise_id INTEGER NOT NULL REFERENCES workout_session_exercises(id) ON DELETE CASCADE,
+      set_number INTEGER NOT NULL,
+      weight_kg REAL,
+      reps INTEGER,
+      done INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_wsl_exercise ON workout_set_logs(session_exercise_id, set_number);
+  `);
+
   // Dashboard slice 2: stamp each event recorder's start date once.
   try {
     sqlite.exec(RECORDER_START_SQL);

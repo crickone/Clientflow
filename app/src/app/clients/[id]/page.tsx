@@ -47,6 +47,8 @@ import { listClientEmails } from "@/lib/clientEmail";
 import { isEmailConfigured } from "@/lib/email";
 import { getCurrentMembership } from "@/lib/auth";
 import { bodyScansEnabled, getScanProfile, listClientScans } from "@/lib/inbody/scans";
+import { liftRecords, listSessions, openSession } from "@/lib/workoutLog";
+import { ClientWorkoutLog } from "@/components/clients/ClientWorkoutLog";
 import { ClientBodyScans } from "@/components/clients/ClientBodyScans";
 
 export const dynamic = "force-dynamic";
@@ -81,6 +83,10 @@ export default async function ClientProfile({
   const showScans = membership ? bodyScansEnabled(membership.tenant.id) : false;
   const scans = showScans ? listClientScans(id) : [];
   const scanProfile = showScans ? getScanProfile(id) : null;
+  const workoutSessions = listSessions(id, 60);
+  const openWorkout = openSession(id);
+  const showWorkoutLog = assignedWk.length > 0 || workoutSessions.length > 0 || openWorkout !== null;
+  const lifts = showWorkoutLog ? liftRecords(id) : [];
 
   return (
     <div className="app-page">
@@ -180,8 +186,15 @@ export default async function ClientProfile({
             Email ({clientEmailHistory.length})
           </TabsTrigger>
           <TabsTrigger value="app">App &amp; Plans</TabsTrigger>
+          {showWorkoutLog && <TabsTrigger value="workouts">Workout log ({workoutSessions.length})</TabsTrigger>}
           {showScans && <TabsTrigger value="scans">Body scans ({scans.length})</TabsTrigger>}
         </TabsList>
+
+        {showWorkoutLog && (
+          <TabsContent value="workouts">
+            <ClientWorkoutLog sessions={workoutSessions} records={lifts} open={openWorkout} />
+          </TabsContent>
+        )}
 
         {showScans && scanProfile && (
           <TabsContent value="scans">

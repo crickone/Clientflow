@@ -61,10 +61,14 @@ export function ExerciseSections({
                         <Dumbbell size={20} />
                       </span>
                     )}
-                    <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{ex.name}</span>
-                    <span style={stat}>Sets: {ex.sets}</span>
-                    {ex.reps && <span style={stat}>Reps: {ex.reps}</span>}
-                    {ex.restSeconds > 0 && <span style={stat}>REST: {fmtRest(ex.restSeconds)}</span>}
+                    <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{ex.name}</span>
+                      <span style={{ display: "flex", flexWrap: "wrap", gap: "2px 14px" }}>
+                        <span style={stat}>Sets: {ex.sets}</span>
+                        {ex.reps && <span style={stat}>Reps: {ex.reps}</span>}
+                        {ex.restSeconds > 0 && <span style={stat}>Rest: {fmtRest(ex.restSeconds)}</span>}
+                      </span>
+                    </span>
                   </div>
                 );
               })}
@@ -99,5 +103,4 @@ const exRow: React.CSSProperties = {
 const stat: React.CSSProperties = {
   fontSize: 13,
   color: "var(--text-secondary)",
-  minWidth: 90,
 };
