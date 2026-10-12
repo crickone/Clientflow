@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth";
+import { getCurrentMembership, requireUser } from "@/lib/auth";
 import { blankProgram, type ProgramType } from "@/lib/workoutModel";
 import { listExercises } from "@/lib/exerciseLibrary";
 import { SimpleBuilder } from "@/components/workout/SimpleBuilder";
@@ -29,7 +29,12 @@ export default async function NewProgramPage({ searchParams }: { searchParams: {
   }
   return (
     <div className="app-page">
-      <DetailedBuilder initial={initial} exercises={listExercises()} />
+      <DetailedBuilder initial={initial} exercises={listExercises()} draftKey={`draft:${tenantId()}:program:new`} />
     </div>
   );
+}
+
+/** Drafts are kept per browser, so the key carries the account: two businesses share a browser. */
+function tenantId(): number {
+  return getCurrentMembership()?.tenant.id ?? 0;
 }

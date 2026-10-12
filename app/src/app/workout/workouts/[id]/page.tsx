@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { requireUser } from "@/lib/auth";
+import { getCurrentMembership, requireUser } from "@/lib/auth";
 import { getWorkout } from "@/lib/individualWorkouts";
 import { listExercises } from "@/lib/exerciseLibrary";
 import { WorkoutBuilder } from "@/components/workout/WorkoutBuilder";
@@ -15,7 +15,12 @@ export default async function EditWorkoutPage({ params }: { params: { id: string
   if (!workout) notFound();
   return (
     <div className="app-page">
-      <WorkoutBuilder initial={workout} exercises={listExercises()} />
+      <WorkoutBuilder initial={workout} exercises={listExercises()} draftKey={`draft:${tenantId()}:workout:${id}`} />
     </div>
   );
+}
+
+/** Drafts are kept per browser, so the key carries the account: two businesses share a browser. */
+function tenantId(): number {
+  return getCurrentMembership()?.tenant.id ?? 0;
 }

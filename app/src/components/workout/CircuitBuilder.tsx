@@ -1,6 +1,10 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { ExerciseColumnHeads } from "@/components/workout/ExerciseColumnHeads";
+import { useDraft } from "@/components/workout/useDraft";
+import { DraftNotice, DraftSaved } from "@/components/workout/DraftNotice";
+import { QuickAddExercise } from "@/components/workout/QuickAddExercise";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Dumbbell, Play, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -17,7 +21,7 @@ import { exerciseHasVideo } from "@/lib/youtube";
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-export function CircuitBuilder({ initial, exercises }: { initial: CircuitInput; exercises: ExerciseLibRow[] }) {
+export function CircuitBuilder({ initial, exercises, draftKey }: { initial: CircuitInput; exercises: ExerciseLibRow[]; draftKey?: string }) {
   const router = useRouter();
   const [circuit, setCircuit] = useState<CircuitInput>(initial);
   const [tagsText, setTagsText] = useState(initial.tags.join(", "));
@@ -26,6 +30,13 @@ export function CircuitBuilder({ initial, exercises }: { initial: CircuitInput; 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [preview, setPreview] = useState<ExerciseLibRow | null>(null);
   const [saving, start] = useTransition();
+  const applyDraft = useCallback((d: { circuit: CircuitInput; tagsText: string; restMin: number; restSec: number }) => {
+    setCircuit(d.circuit);
+    setTagsText(d.tagsText);
+    setRestMin(d.restMin);
+    setRestSec(d.restSec);
+  }, []);
+  const draft = useDraft(draftKey ?? null, { circuit, tagsText, restMin, restSec }, applyDraft);
 
   const setExercise = (fi: number, patch: Partial<ExerciseInput>) =>
     setCircuit((c) => ({ ...c, exercises: c.exercises.map((e, j) => (j === fi ? { ...e, ...patch } : e)) }));
@@ -43,6 +54,7 @@ export function CircuitBuilder({ initial, exercises }: { initial: CircuitInput; 
         restBetweenSeconds: restMin * 60 + restSec,
       });
       if (res.ok) {
+        draft.clear();
         toast.success("Circuit saved.");
         if (close) router.push("/workout/circuits");
         else router.replace(`/workout/circuits/${res.id}`);
@@ -53,6 +65,7 @@ export function CircuitBuilder({ initial, exercises }: { initial: CircuitInput; 
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      <DraftNotice restoredAt={draft.restoredAt} onDiscard={draft.discard} />
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <Button variant="ghost" size="icon" onClick={() => router.push("/workout/circuits")} aria-label="Back">
           <ArrowLeft size={16} />
@@ -103,6 +116,7 @@ export function CircuitBuilder({ initial, exercises }: { initial: CircuitInput; 
           // column (same pattern the *View list tables use — grep overflowX).
           <div style={{ overflowX: "auto" }}>
             <div style={{ minWidth: 560, display: "flex", flexDirection: "column", gap: 14 }}>
+                  <ExerciseColumnHeads />
               {circuit.exercises.map((ex, i) => (
                 <ExerciseRow key={i} letter={LETTERS[i] ?? "•"} ex={ex} onPatch={(patch) => setExercise(i, patch)} onRemove={() => removeExercise(i)} />
               ))}
@@ -123,8 +137,9 @@ export function CircuitBuilder({ initial, exercises }: { initial: CircuitInput; 
         </div>
       </div>
 
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-        <Button variant="ghost" onClick={() => router.push("/workout/circuits")} disabled={saving}>Cancel</Button>
+      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <DraftSaved savedAt={draft.savedAt} />
+        <Button variant="ghost" onClick={() => { draft.clear(); router.push("/workout/circuits"); }} disabled={saving}>Cancel</Button>
         <Button variant="outline" onClick={() => submit(false)} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
         <Button onClick={() => submit(true)} disabled={saving}>Save &amp; Close</Button>
       </div>
@@ -174,8 +189,8 @@ function ChooseExerciseSheet({
   onCustom: () => void;
   onPreview: (lib: ExerciseLibRow) => void;
 }) {
-  const router = useRouter();
   const [q, setQ] = useState("");
+  const [adding, setAdding] = useState(false);
   const matches = useMemo(() => {
     const query = q.trim().toLowerCase();
     return (query ? exercises.filter((e) => e.name.toLowerCase().includes(query)) : exercises).slice(0, 60);
@@ -186,7 +201,18 @@ function ChooseExerciseSheet({
       <SheetContent title="Choose Exercise" width={420}>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name…" autoFocus />
-          <button onClick={() => router.push("/workout/exercises")} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: "none", color: "var(--accent-ink)", cursor: "pointer", fontSize: 13, alignSelf: "flex-start" }}>
+          {adding && (
+            <QuickAddExercise
+              initialName={q}
+              onCancel={() => setAdding(false)}
+              onCreated={(lib) => {
+                setAdding(false);
+                setQ("");
+                onPick(lib);
+              }}
+            />
+          )}
+          <button onClick={() => setAdding(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: "none", color: "var(--accent-ink)", cursor: "pointer", fontSize: 13, alignSelf: "flex-start" }}>
             <Plus size={14} /> Add a new exercise to the library
           </button>
           <button onClick={onCustom} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: "none", color: "var(--text-secondary)", cursor: "pointer", fontSize: 13, alignSelf: "flex-start" }}>

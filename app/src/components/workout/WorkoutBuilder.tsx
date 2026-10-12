@@ -1,6 +1,10 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { ExerciseColumnHeads } from "@/components/workout/ExerciseColumnHeads";
+import { useDraft } from "@/components/workout/useDraft";
+import { DraftNotice, DraftSaved } from "@/components/workout/DraftNotice";
+import { QuickAddExercise } from "@/components/workout/QuickAddExercise";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Dumbbell, Play, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -24,7 +28,7 @@ import { exerciseHasVideo } from "@/lib/youtube";
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-export function WorkoutBuilder({ initial, exercises }: { initial: WorkoutInput; exercises: ExerciseLibRow[] }) {
+export function WorkoutBuilder({ initial, exercises, draftKey }: { initial: WorkoutInput; exercises: ExerciseLibRow[]; draftKey?: string }) {
   const router = useRouter();
   const [workout, setWorkout] = useState<WorkoutInput>(initial);
   const [tagsText, setTagsText] = useState(initial.tags.join(", "));
@@ -33,6 +37,11 @@ export function WorkoutBuilder({ initial, exercises }: { initial: WorkoutInput; 
   const [saving, start] = useTransition();
 
   const volume = dayVolume(workout);
+  const applyDraft = useCallback((d: { workout: WorkoutInput; tagsText: string }) => {
+    setWorkout(d.workout);
+    setTagsText(d.tagsText);
+  }, []);
+  const draft = useDraft(draftKey ?? null, { workout, tagsText }, applyDraft);
 
   const setExercise = (fi: number, patch: Partial<ExerciseInput>) =>
     setWorkout((w) => ({ ...w, exercises: w.exercises.map((e, j) => (j === fi ? { ...e, ...patch } : e)) }));
@@ -57,6 +66,7 @@ export function WorkoutBuilder({ initial, exercises }: { initial: WorkoutInput; 
         tags: tagsText.split(",").map((t) => t.trim()).filter(Boolean),
       });
       if (res.ok) {
+        draft.clear();
         toast.success("Workout saved.");
         if (close) router.push("/workout/workouts");
         else router.replace(`/workout/workouts/${res.id}`);
@@ -67,6 +77,7 @@ export function WorkoutBuilder({ initial, exercises }: { initial: WorkoutInput; 
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      <DraftNotice restoredAt={draft.restoredAt} onDiscard={draft.discard} />
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <Button variant="ghost" size="icon" onClick={() => router.push("/workout/workouts")} aria-label="Back">
           <ArrowLeft size={16} />
@@ -119,6 +130,7 @@ export function WorkoutBuilder({ initial, exercises }: { initial: WorkoutInput; 
               // column (same pattern the *View list tables use — grep overflowX).
               <div style={{ overflowX: "auto" }}>
                 <div style={{ minWidth: 560, display: "flex", flexDirection: "column", gap: 14 }}>
+                  <ExerciseColumnHeads />
                   {rows.map(({ ex, i }, li) => (
                     <ExerciseRow
                       key={i}
@@ -147,8 +159,17 @@ export function WorkoutBuilder({ initial, exercises }: { initial: WorkoutInput; 
         </div>
       </div>
 
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-        <Button variant="ghost" onClick={() => router.push("/workout/workouts")} disabled={saving}>
+      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <DraftSaved savedAt={draft.savedAt} />
+        <Button
+          variant="ghost"
+          onClick={() => {
+            // Cancel means "throw this away", so it takes the draft with it.
+            draft.clear();
+            router.push("/workout/workouts");
+          }}
+          disabled={saving}
+        >
           Cancel
         </Button>
         <Button variant="outline" onClick={() => submit(false)} disabled={saving}>
@@ -223,8 +244,8 @@ function ChooseExerciseSheet({
   onCustom: () => void;
   onPreview: (lib: ExerciseLibRow) => void;
 }) {
-  const router = useRouter();
   const [q, setQ] = useState("");
+  const [adding, setAdding] = useState(false);
   const matches = useMemo(() => {
     const query = q.trim().toLowerCase();
     const base = query ? exercises.filter((e) => e.name.toLowerCase().includes(query)) : exercises;
@@ -236,8 +257,19 @@ function ChooseExerciseSheet({
       <SheetContent title="Choose Exercise" width={420}>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name…" autoFocus />
+          {adding && (
+            <QuickAddExercise
+              initialName={q}
+              onCancel={() => setAdding(false)}
+              onCreated={(lib) => {
+                setAdding(false);
+                setQ("");
+                onPick(lib);
+              }}
+            />
+          )}
           <button
-            onClick={() => router.push("/workout/exercises")}
+            onClick={() => setAdding(true)}
             style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: "none", color: "var(--accent-ink)", cursor: "pointer", fontSize: 13, alignSelf: "flex-start" }}
           >
             <Plus size={14} /> Add a new exercise to the library

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { requireUser } from "@/lib/auth";
+import { getCurrentMembership, requireUser } from "@/lib/auth";
 import { getCircuit } from "@/lib/circuits";
 import { listExercises } from "@/lib/exerciseLibrary";
 import { CircuitBuilder } from "@/components/workout/CircuitBuilder";
@@ -15,7 +15,12 @@ export default async function EditCircuitPage({ params }: { params: { id: string
   if (!circuit) notFound();
   return (
     <div className="app-page">
-      <CircuitBuilder initial={circuit} exercises={listExercises()} />
+      <CircuitBuilder initial={circuit} exercises={listExercises()} draftKey={`draft:${tenantId()}:circuit:${id}`} />
     </div>
   );
+}
+
+/** Drafts are kept per browser, so the key carries the account: two businesses share a browser. */
+function tenantId(): number {
+  return getCurrentMembership()?.tenant.id ?? 0;
 }

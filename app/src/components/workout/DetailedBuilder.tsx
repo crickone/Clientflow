@@ -1,6 +1,9 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { ExerciseColumnHeads } from "@/components/workout/ExerciseColumnHeads";
+import { useDraft } from "@/components/workout/useDraft";
+import { DraftNotice, DraftSaved } from "@/components/workout/DraftNotice";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Copy, Play, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
@@ -25,7 +28,7 @@ import { exerciseHasVideo } from "@/lib/youtube";
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-export function DetailedBuilder({ initial, exercises }: { initial: ProgramInput; exercises: ExerciseLibRow[] }) {
+export function DetailedBuilder({ initial, exercises, draftKey }: { initial: ProgramInput; exercises: ExerciseLibRow[]; draftKey?: string }) {
   const router = useRouter();
   const [program, setProgram] = useState<ProgramInput>(initial);
   const [dayIdx, setDayIdx] = useState(0);
@@ -33,6 +36,12 @@ export function DetailedBuilder({ initial, exercises }: { initial: ProgramInput;
   const [focused, setFocused] = useState<number | null>(null); // flat exercise index in the active day
   const [preview, setPreview] = useState<ExerciseLibRow | null>(null);
   const [saving, start] = useTransition();
+
+  const applyDraft = useCallback((d: { program: ProgramInput; tagsText: string }) => {
+    setProgram(d.program);
+    setTagsText(d.tagsText);
+  }, []);
+  const draft = useDraft(draftKey ?? null, { program, tagsText }, applyDraft);
 
   const idx = Math.min(dayIdx, program.days.length - 1);
   const day = program.days[idx];
@@ -76,6 +85,7 @@ export function DetailedBuilder({ initial, exercises }: { initial: ProgramInput;
         tags: tagsText.split(",").map((t) => t.trim()).filter(Boolean),
       });
       if (res.ok) {
+        draft.clear();
         toast.success("Program saved.");
         if (close) router.push("/workout");
         else router.replace(`/workout/${res.id}`);
@@ -86,6 +96,7 @@ export function DetailedBuilder({ initial, exercises }: { initial: ProgramInput;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      <DraftNotice restoredAt={draft.restoredAt} onDiscard={draft.discard} />
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <Button variant="ghost" size="icon" onClick={() => router.push("/workout")} aria-label="Back">
           <ArrowLeft size={16} />
@@ -195,6 +206,7 @@ export function DetailedBuilder({ initial, exercises }: { initial: ProgramInput;
               // would otherwise clip it.
               <div style={{ overflowX: "auto", paddingBottom: 260, marginBottom: -260 }}>
                 <div style={{ minWidth: 560, display: "flex", flexDirection: "column", gap: 14 }}>
+                  <ExerciseColumnHeads />
                   {rows.map(({ ex, i }, li) => (
                     <ExerciseRow
                       key={i}
@@ -229,8 +241,17 @@ export function DetailedBuilder({ initial, exercises }: { initial: ProgramInput;
         </div>
       </div>
 
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-        <Button variant="ghost" onClick={() => router.push("/workout")} disabled={saving}>
+      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <DraftSaved savedAt={draft.savedAt} />
+        <Button
+          variant="ghost"
+          onClick={() => {
+            // Cancel means "throw this away", so it takes the draft with it.
+            draft.clear();
+            router.push("/workout");
+          }}
+          disabled={saving}
+        >
           Cancel
         </Button>
         <Button variant="outline" onClick={() => submit(false)} disabled={saving}>
