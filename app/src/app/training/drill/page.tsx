@@ -2,8 +2,10 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { TrainingNav } from "@/components/training/TrainingNav";
 import { DrillClient } from "./DrillClient";
 import { FLASHCARDS } from "@/lib/training/content";
+import { forClinic } from "@/lib/training/clinic";
 
-export const metadata = { title: "Script Drills — Renova Training" };
+export const dynamic = "force-dynamic";
+export const metadata = { title: "Script Drills" };
 
 export default function DrillPage() {
   return (
@@ -14,7 +16,7 @@ export default function DrillPage() {
         subtitle="Flip, recite, mark mastered. Repeat until the scripts roll off the tongue without thinking."
       />
       <TrainingNav />
-      <DrillClient cards={FLASHCARDS} />
+      <DrillClient cards={forClinic(FLASHCARDS)} />
     </div>
   );
 }

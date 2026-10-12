@@ -2,8 +2,10 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { TrainingNav } from "@/components/training/TrainingNav";
 import { LookupClient } from "./LookupClient";
 import { CONDITIONS, CONDITION_CATEGORIES } from "@/lib/training/content";
+import { forClinic } from "@/lib/training/clinic";
 
-export const metadata = { title: "Condition Lookup — Renova Training" };
+export const dynamic = "force-dynamic";
+export const metadata = { title: "Condition Lookup" };
 
 export default function LookupPage() {
   return (
@@ -14,7 +16,7 @@ export default function LookupPage() {
         subtitle="Search any condition a caller mentions. See the recommended therapy combination and the exact line to lead with."
       />
       <TrainingNav />
-      <LookupClient conditions={CONDITIONS} categories={CONDITION_CATEGORIES} />
+      <LookupClient conditions={forClinic(CONDITIONS)} categories={CONDITION_CATEGORIES} />
     </div>
   );
 }

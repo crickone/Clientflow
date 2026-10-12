@@ -1,16 +1,15 @@
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { TrainingNav } from "@/components/training/TrainingNav";
-import { LESSONS, THERAPIES } from "@/lib/training/content";
+import { LESSONS as BASE_LESSONS, THERAPIES } from "@/lib/training/content";
+import { forClinic } from "@/lib/training/clinic";
 import { ModuleClient } from "./ModuleClient";
 
-export function generateStaticParams() {
-  return LESSONS.map((l) => ({ slug: l.slug }));
-}
-
-export const dynamicParams = false;
+// Rendered per request: the scripts name the signed-in clinic (forClinic).
+export const dynamic = "force-dynamic";
 
 export default function ModulePage({ params }: { params: { slug: string } }) {
+  const LESSONS = forClinic(BASE_LESSONS);
   const lesson = LESSONS.find((l) => l.slug === params.slug);
   if (!lesson) notFound();
 
@@ -19,7 +18,7 @@ export default function ModulePage({ params }: { params: { slug: string } }) {
   const next = idx < LESSONS.length - 1 ? LESSONS[idx + 1] : null;
 
   // Therapies module gets the therapy profiles inlined
-  const therapies = lesson.slug === "therapies" ? THERAPIES : null;
+  const therapies = lesson.slug === "therapies" ? forClinic(THERAPIES) : null;
 
   return (
     <div className="app-page">
