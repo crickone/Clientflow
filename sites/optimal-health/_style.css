@@ -1345,6 +1345,10 @@ body:has(.bookbar) .foot{padding-bottom:calc(66px + env(safe-area-inset-bottom))
 }
 .band--ink .arc__row{border-bottom-color:rgba(242,243,237,.4)}
 @media (min-width:760px){.arc__row{grid-template-columns:minmax(130px,auto) minmax(0,1fr)}}
+/* Labelled rows with long labels ("Fatigue and burnout"): one fixed label
+   column so every title starts on the same line. The auto column above sized
+   itself per row, which is invisible with short numerals but staggered here. */
+@media (min-width:760px){.arc--labels .arc__row{grid-template-columns:200px minmax(0,1fr)}}
 .arc__k{
   font-size:11px;letter-spacing:.15em;text-transform:uppercase;
   color:var(--deep);font-variant-numeric:tabular-nums;
