@@ -10,7 +10,7 @@ export function ExerciseColumnHeads() {
       aria-hidden
       style={{
         display: "grid",
-        gridTemplateColumns: "24px 1fr 70px 90px 90px 30px",
+        gridTemplateColumns: "24px 1fr 70px 140px 90px 30px",
         gap: 8,
         padding: "0 11px",
         marginBottom: -6,

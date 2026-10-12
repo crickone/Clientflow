@@ -165,7 +165,16 @@ function PlanRowItem({ plan, onGo }: { plan: PlanRow; onGo: () => void }) {
     });
 
   return (
-    <div style={{ ...row, opacity: pending ? 0.6 : 1 }}>
+    <div
+      className="list-row-click"
+      style={{ ...row, opacity: pending ? 0.6 : 1 }}
+      // The whole row opens it, not just the name. Clicks on the row's own
+      // buttons and menu (which bubble here from its portal) are left alone.
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest("button, a, input, [role=menu], [role=menuitem], [role=dialog]")) return;
+        onGo();
+      }}
+    >
       <button onClick={onGo} style={titleCell} title="Open plan">
         <span style={{ fontSize: 14, color: "var(--text-primary)", fontWeight: 500 }}>{plan.title}</span>
         <span style={{ fontSize: 12, color: "var(--accent-ink)" }}>

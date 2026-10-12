@@ -4379,3 +4379,8 @@ a.stat-row:hover .stat-label { color: var(--text-primary); }
   .set-row .set-status { grid-column: 2; grid-row: 2; justify-self: start; margin-top: -4px; }
 }
 @media (max-width: 520px) { .set-row .set-status-none { display: none; } }
+
+/* Coaching list rows (programmes, workouts, circuits, nutrition plans): the
+   whole row opens the item, so it looks and feels clickable. */
+.list-row-click { cursor: pointer; transition: background .15s var(--ease); }
+.list-row-click:hover { background: var(--surface-2); }

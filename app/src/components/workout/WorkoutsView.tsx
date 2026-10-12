@@ -113,7 +113,16 @@ function WorkoutRowItem({ workout }: { workout: WorkoutRow }) {
     });
 
   return (
-    <div style={{ ...row, opacity: pending ? 0.6 : 1 }}>
+    <div
+      className="list-row-click"
+      style={{ ...row, opacity: pending ? 0.6 : 1 }}
+      // The whole row opens it, not just the name. Clicks on the row's own
+      // buttons and menu (which bubble here from its portal) are left alone.
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest("button, a, input, [role=menu], [role=menuitem], [role=dialog]")) return;
+        onEdit();
+      }}
+    >
       <button onClick={onEdit} style={titleCell} title="Open workout">
         <span style={{ fontSize: 14, color: "var(--text-primary)", fontWeight: 500 }}>{workout.name}</span>
       </button>

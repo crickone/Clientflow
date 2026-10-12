@@ -296,7 +296,7 @@ function ExerciseRow({
 
   return (
     <div style={{ border: "1px solid var(--hairline)", borderRadius: "var(--radius)", padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "24px 1fr 70px 90px 90px 30px", gap: 8, alignItems: "center" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "24px 1fr 70px 140px 90px 30px", gap: 8, alignItems: "center" }}>
         <span style={{ fontFamily: "var(--font-mono), monospace", fontWeight: 600, color: "var(--text-tertiary)", textAlign: "center" }}>{letter}</span>
         <div style={{ position: "relative" }}>
           <Input

@@ -153,7 +153,7 @@ export function CircuitBuilder({ initial, exercises, draftKey }: { initial: Circ
 function ExerciseRow({ letter, ex, onPatch, onRemove }: { letter: string; ex: ExerciseInput; onPatch: (patch: Partial<ExerciseInput>) => void; onRemove: () => void }) {
   return (
     <div style={{ border: "1px solid var(--hairline)", borderRadius: "var(--radius)", padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "24px 1fr 70px 90px 90px 30px", gap: 8, alignItems: "center" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "24px 1fr 70px 140px 90px 30px", gap: 8, alignItems: "center" }}>
         <span style={{ fontFamily: "var(--font-mono), monospace", fontWeight: 600, color: "var(--text-tertiary)", textAlign: "center" }}>{letter}</span>
         <Input value={ex.name} onChange={(e) => onPatch({ name: e.target.value, exerciseId: null })} placeholder="Exercise name…" style={{ height: 34 }} />
         <NumCell value={ex.sets} onChange={(v) => onPatch({ sets: v })} placeholder="Sets" />
