@@ -135,7 +135,7 @@ export function TabBar({ tabs, active, rangeKey, rangeLabel, isAdmin, source, pr
   return (
     <div style={{ marginBottom: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <div className="dash-tabs" role="tablist" aria-label="Dashboards" style={{ flex: 1, minWidth: 0 }}>
+        <div className="dash-tabs" role="tablist" aria-label="Dashboards" style={{ flex: "1 1 260px", minWidth: 0 }}>
           {tabs.map((t, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center" }}>
               <button

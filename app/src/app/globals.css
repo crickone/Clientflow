@@ -4248,3 +4248,12 @@ a.stat-row:hover .stat-label { color: var(--text-primary); }
   .su-row.is-done { grid-template-columns: 22px minmax(0, 1fr) auto; }
   .su-row.is-done .su-row-actions { grid-column: auto; }
 }
+
+/* ---- Mobile nav drawer tidy (2026-10-12): the close button gets its own
+   space beside the account switcher instead of sitting on top of it. ---- */
+@media (max-width: 900px) {
+  .app-sidebar .sidebar-header { padding: 14px 60px 10px 12px !important; min-height: 64px; }
+  .app-sidebar-close { top: 14px; right: 10px; width: 40px; height: 40px; padding: 0; align-items: center; justify-content: center; border-radius: 10px; }
+  .app-sidebar-close:hover { background: var(--surface-2); color: var(--text-primary); }
+  .app-sidebar .sidebar-clock { display: none; }
+}
