@@ -56,10 +56,11 @@ function safe(fn: () => boolean): Status {
   }
 }
 
-function buildGroups(vocab: ReturnType<typeof getVocab>, tenantId: number): { title: string; items: Item[] }[] {
+function buildGroups(vocab: ReturnType<typeof getVocab>, tenantId: number): { title: string; desc: string; items: Item[] }[] {
   return [
     {
       title: "Your business",
+      desc: "Who you are and how the account is set up.",
       items: [
         { href: "/setup", icon: Rocket, title: "Set-up guide", desc: "Everything you need to get the account fully up and running." },
         { href: "/settings/business", icon: Store, title: "Business profile", desc: "Name, contact details and the brief Adonis writes from." },
@@ -68,6 +69,7 @@ function buildGroups(vocab: ReturnType<typeof getVocab>, tenantId: number): { ti
     },
     {
       title: `${vocab.bookings} and ${vocab.services.toLowerCase()}`,
+      desc: "What you sell, when you're open, and how leads move.",
       items: [
         { href: "/settings/therapies", icon: Sparkles, title: vocab.services, desc: `Add or edit ${vocab.services.toLowerCase()}: durations, prices, colours.` },
         { href: "/settings/schedule", icon: CalendarClock, title: "Opening hours", desc: "Hours per day, slot length, buffers and overlap." },
@@ -78,6 +80,7 @@ function buildGroups(vocab: ReturnType<typeof getVocab>, tenantId: number): { ti
     },
     {
       title: "Brand and content",
+      desc: "How your posts, ads and dashboard look.",
       items: [
         { href: "/settings/branding", icon: ImageIcon, title: "Branding", desc: "Your logo and Content Studio fonts." },
         { href: "/settings/design", icon: LayoutTemplate, title: "Design direction", desc: "The look Adonis designs your posts and ads in." },
@@ -86,6 +89,7 @@ function buildGroups(vocab: ReturnType<typeof getVocab>, tenantId: number): { ti
     },
     {
       title: "Connections",
+      desc: "The other tools and accounts Adonis works with.",
       items: [
         { href: "/settings/integrations/google", icon: MapPin, title: "Google", desc: "Business Profile, reviews, Search Console and Analytics.", status: safe(() => getGoogleBusinessConnection(tenantId) !== null) },
         { href: "/settings/integrations/facebook", icon: Megaphone, title: "Facebook and Instagram", desc: "Posting, messages, Lead Ads and the Ads manager.", status: safe(() => facebookConfigured() && isMetaConnected(tenantId)) },
@@ -99,6 +103,7 @@ function buildGroups(vocab: ReturnType<typeof getVocab>, tenantId: number): { ti
     },
     {
       title: "Team and account",
+      desc: "Who can log in, and your plan.",
       items: [
         { href: "/settings/users", icon: UserCog, title: "Users and permissions", desc: "Staff and admin accounts, invites and passwords." },
         { href: "/settings/billing", icon: CreditCard, title: "Billing", desc: "Your AdonisAgent plan, payment card and invoices." },
@@ -113,38 +118,40 @@ export default async function SettingsIndex() {
   const tenantId = getCurrentMembership()?.tenant.id ?? 0;
   const groups = buildGroups(vocab, tenantId);
   return (
-    <div className="app-page" style={{ maxWidth: 1040 }}>
+    <div className="app-page">
       <PageHeader eyebrow="Configure" title="Settings" subtitle="How your account, bookings, brand and connections are set up." />
       <div className="set-groups">
-        {groups.map((g) => (
-          <section key={g.title} className="set-group" aria-labelledby={`set-${g.title}`}>
-            <h2 className="set-group-title" id={`set-${g.title}`}>
-              {g.title}
-            </h2>
-            <div className="set-grid">
+        {groups.map((g, gi) => (
+          <section key={g.title} className="set-group" aria-labelledby={`set-g${gi}`}>
+            <div className="set-group-head">
+              <h2 className="set-group-title" id={`set-g${gi}`}>
+                {g.title}
+              </h2>
+              <p className="set-group-desc">{g.desc}</p>
+            </div>
+            <ul className="set-list">
               {g.items.map((s) => {
                 const Icon = s.icon;
                 return (
-                  <Link key={s.href} href={s.href} className="set-card ui-card">
-                    <span className="set-icon" aria-hidden>
-                      <Icon size={18} strokeWidth={1.6} />
-                    </span>
-                    <span className="set-text">
-                      <span className="set-title">
-                        {s.title}
-                        {s.status ? (
-                          <span className={`set-status is-${s.status}`}>
-                            {s.status === "connected" ? "Connected" : "Not connected"}
-                          </span>
-                        ) : null}
+                  <li key={s.href}>
+                    <Link href={s.href} className="set-row">
+                      <span className="set-icon" aria-hidden>
+                        <Icon size={17} strokeWidth={1.7} />
                       </span>
-                      <span className="set-desc">{s.desc}</span>
-                    </span>
-                    <ChevronRight size={16} className="set-chev" aria-hidden />
-                  </Link>
+                      <span className="set-text">
+                        <span className="set-title">{s.title}</span>
+                        <span className="set-desc">{s.desc}</span>
+                      </span>
+                      {/* Always rendered so the arrow stays in its column on rows without a status. */}
+                      <span className={s.status ? `set-status is-${s.status}` : "set-status-none"}>
+                        {s.status === "connected" ? "Connected" : s.status === "not-connected" ? "Not connected" : null}
+                      </span>
+                      <ChevronRight size={16} className="set-chev" aria-hidden />
+                    </Link>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           </section>
         ))}
       </div>
