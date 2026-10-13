@@ -22,6 +22,7 @@ import {
   getCampaign,
   isTerminalStatus,
   listAssets,
+  listCampaigns,
   nextPendingAsset,
   setAssetDraft,
   setCampaignStatus,
@@ -203,11 +204,13 @@ export const CAMPAIGN_TOOLS: Anthropic.Tool[] = [
   {
     name: "get_campaign",
     description:
-      "Look up a campaign and every asset in it: status, and what each one says (offer text, landing page headline, email subjects, post captions). Read only. Use it to check the drafts before proposing launch_campaign, or whenever you need to see what a campaign contains.",
+      "Look up a campaign and every asset in it: its id, status, and what each asset says (offer text, landing page headline, email subjects, post captions), with each asset's id. Read only. Find it by id, or by name when you don't have the id (never ask the operator for an id). Use it to check drafts before proposing launch_campaign, or to pick a campaign back up.",
     input_schema: {
       type: "object",
-      properties: { campaignId: { type: "integer" } },
-      required: ["campaignId"],
+      properties: {
+        campaignId: { type: "integer", description: "The campaign's id, if you have it." },
+        name: { type: "string", description: "Or part of the campaign's name, if you don't have the id. Leave both out to list recent campaigns with their ids." },
+      },
     },
   },
   {
@@ -248,8 +251,22 @@ function assetPreview(a: CampaignAsset): string {
 
 /** READ — a campaign and what each of its assets says, so Adonis can check its own drafts. */
 export function getCampaignTool(_ctx: ToolContext, input: Record<string, unknown>): ToolResult {
-  const campaignId = Number(input.campaignId);
-  if (!campaignId) return { text: JSON.stringify({ error: "campaignId is required." }) };
+  let campaignId = Number(input.campaignId);
+  const name = String(input.name ?? "").trim().toLowerCase();
+  if (!campaignId) {
+    const all = listCampaigns();
+    const matches = name ? all.filter((c) => c.name.toLowerCase().includes(name)) : [];
+    if (matches.length === 1) campaignId = matches[0].id;
+    else {
+      const shown = (matches.length ? matches : all).slice(0, 15);
+      return {
+        text: JSON.stringify({
+          result: matches.length > 1 ? `${matches.length} campaigns match "${input.name}". Pick one by id.` : name ? `No campaign matches "${input.name}". These are the recent ones.` : "Recent campaigns.",
+          campaigns: shown.map((c) => ({ id: c.id, name: c.name, status: c.status, startsOn: c.startsOn, endsOn: c.endsOn })),
+        }),
+      };
+    }
+  }
   const campaign = getCampaign(campaignId);
   if (!campaign) return { text: JSON.stringify({ error: `No campaign with id ${campaignId}.` }) };
   const assets = listAssets(campaignId);

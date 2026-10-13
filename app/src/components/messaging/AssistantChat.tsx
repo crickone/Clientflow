@@ -17,6 +17,7 @@ import {
   campaignPlanEventFromActions,
   campaignProgressEventFromResult,
   deriveCampaignProgress,
+  type CampaignProgress,
   type CampaignProgressEvent,
 } from "./campaignProgress";
 import { appendTranscript } from "./voiceInput";
@@ -984,6 +985,10 @@ export function AssistantChat({
   // majority (Sales/Operations/Communication chats, and most Marketing/
   // Orchestrator turns too), so the strip below renders nothing for them.
   const campaignProgress = deriveCampaignProgress(active?.campaignEvents ?? []);
+  let lastAssistantIdx = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === "assistant" && !messages[i].hidden) { lastAssistantIdx = i; break; }
+  }
   let lastUserIdx = -1;
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i].role === "user" && !messages[i].hidden) { lastUserIdx = i; break; }
@@ -1094,55 +1099,6 @@ export function AssistantChat({
         {controlsContainer && createPortal(controlsStrip, controlsContainer)}
       </div>
 
-      {campaignProgress && (
-        <div
-          aria-label={`Campaign progress: ${campaignProgress.assets.filter((a) => a.status === "done").length} of ${campaignProgress.assets.length} approved`}
-          style={{
-            padding: "9px 16px",
-            borderBottom: "1px solid var(--hairline)",
-            background: "var(--surface-2)",
-            display: "flex",
-            alignItems: "baseline",
-            flexWrap: "wrap",
-            gap: "3px 10px",
-          }}
-        >
-          <span
-            style={{
-              fontSize: 10.5,
-              textTransform: "uppercase",
-              letterSpacing: "0.06em",
-              color: "var(--text-tertiary)",
-              fontFamily: "var(--font-mono), monospace",
-              flexShrink: 0,
-            }}
-          >
-            {campaignProgress.name}
-          </span>
-          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", fontSize: 12.5 }}>
-            {campaignProgress.assets.map((a, idx) => (
-              <span key={`${idx}-${a.kind}`} style={{ display: "inline-flex", alignItems: "baseline" }}>
-                {idx > 0 && (
-                  <span style={{ margin: "0 8px", color: "var(--text-tertiary)", opacity: 0.5 }} aria-hidden>
-                    ·
-                  </span>
-                )}
-                <span
-                  style={{
-                    color: a.status === "current" ? "var(--accent)" : "var(--text-tertiary)",
-                    fontWeight: a.status === "current" ? 600 : 400,
-                  }}
-                >
-                  {a.title}
-                  <span style={{ marginLeft: 5 }} aria-hidden>
-                    {a.status === "done" ? <Check size={12} /> : a.status === "current" ? "●" : "…"}
-                  </span>
-                </span>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
       {active?.autopilot && (
         <div className="ai-autopilot" role="status">
           <span>Building every asset without stopping. Adonis will ask before launching, scheduling or sending anything.</span>
@@ -1190,6 +1146,7 @@ export function AssistantChat({
                 onCancel={() => cancelPending(activeId, i)}
                 onGoAgain={(tweak) => m.pending && goAgain(activeId, i, m.pending.actions, tweak)}
               />
+              {campaignProgress && i === lastAssistantIdx && <CampaignChecklist progress={campaignProgress} working={busy || Boolean(active?.autopilot)} />}
             </div>
           ))}
 
@@ -1458,6 +1415,39 @@ export function AssistantChat({
           {composeFooter}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * The campaign being built, as a checklist in the conversation: ticked when
+ * done, spinning on the one Adonis is working on, empty for what's next.
+ * Rendered under the latest reply, so it moves down the chat as work goes on.
+ */
+function CampaignChecklist({ progress, working }: { progress: CampaignProgress; working: boolean }) {
+  const done = progress.assets.filter((a) => a.status === "done").length;
+  const total = progress.assets.length;
+  const finished = done === total;
+  return (
+    <div className="ai-tasks" role="status" aria-label={`${progress.name}: ${done} of ${total} done`}>
+      <div className="ai-tasks-head">
+        <span className="ai-tasks-name">{progress.name}</span>
+        <span className="ai-tasks-count">{finished ? "All done" : `${done} of ${total} done`}</span>
+      </div>
+      <div className="ai-tasks-bar" aria-hidden>
+        <span style={{ width: `${total ? (done / total) * 100 : 0}%` }} />
+      </div>
+      <ol className="ai-tasks-list">
+        {progress.assets.map((a, idx) => (
+          <li key={`${idx}-${a.kind}`} data-status={a.status}>
+            <span className="ai-task-icon" aria-hidden>
+              {a.status === "done" ? <Check size={12} strokeWidth={3} /> : a.status === "current" && working ? <Loader2 size={13} className="spin" /> : null}
+            </span>
+            <span className="ai-task-title">{a.title}</span>
+            {a.status === "current" && <span className="ai-task-now">{working ? "Working on it" : "Next"}</span>}
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }
