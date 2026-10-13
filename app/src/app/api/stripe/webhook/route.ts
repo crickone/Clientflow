@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { verifyStripeSignature } from "@/lib/stripe/encode";
 import { tenantForStripeAccount, updateStripeAccountStatus, removeStripeConnection } from "@/lib/stripe/connection";
-import type { CheckoutSession, StripeAccount } from "@/lib/stripe/api";
+import { stripeEnv, type CheckoutSession, type StripeAccount } from "@/lib/stripe/api";
 import { expireOrder, fulfilCheckout, refundOrder } from "@/lib/offers/fulfil";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,7 @@ const MAX_BODY_BYTES = 512 * 1024;
 export async function POST(req: NextRequest) {
   const raw = await req.text();
   if (raw.length > MAX_BODY_BYTES) return NextResponse.json({ ok: false }, { status: 413 });
-  if (!verifyStripeSignature(raw, req.headers.get("stripe-signature"), process.env.STRIPE_WEBHOOK_SECRET)) {
+  if (!verifyStripeSignature(raw, req.headers.get("stripe-signature"), stripeEnv("STRIPE_WEBHOOK_SECRET"))) {
     return NextResponse.json({ ok: false, error: "Bad signature." }, { status: 400 });
   }
   let event: { type?: string; account?: string; data?: { object?: Record<string, unknown> } };

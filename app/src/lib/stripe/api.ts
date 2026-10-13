@@ -19,15 +19,24 @@ import { formEncode } from "./encode";
 
 export type StripeResult<T> = { ok: true; data: T } | { ok: false; error: string; status?: number };
 
+/**
+ * A Stripe setting from the environment, trimmed: a value pasted into
+ * Railway with a trailing newline (it happened with the webhook secret)
+ * otherwise fails every signature check without a visible difference.
+ */
+export function stripeEnv(name: "STRIPE_SECRET_KEY" | "STRIPE_CONNECT_CLIENT_ID" | "STRIPE_WEBHOOK_SECRET"): string | undefined {
+  return process.env[name]?.trim() || undefined;
+}
+
 export function stripeConfigured(): boolean {
-  return Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_CONNECT_CLIENT_ID);
+  return Boolean(stripeEnv("STRIPE_SECRET_KEY") && stripeEnv("STRIPE_CONNECT_CLIENT_ID"));
 }
 
 async function call<T>(
   url: string,
   opts: { method?: "GET" | "POST" | "DELETE"; params?: Record<string, unknown>; account?: string; idempotencyKey?: string } = {},
 ): Promise<StripeResult<T>> {
-  const key = process.env.STRIPE_SECRET_KEY;
+  const key = stripeEnv("STRIPE_SECRET_KEY");
   if (!key) return { ok: false, error: "Stripe isn't set up on the platform yet." };
   const method = opts.method ?? "GET";
   const body = opts.params ? formEncode(opts.params) : "";
@@ -58,7 +67,7 @@ const CONNECT = process.env.STRIPE_CONNECT_BASE || "https://connect.stripe.com";
 
 /** The page a business owner is sent to, to approve the connection. */
 export function oauthAuthorizeUrl(state: string, redirectUri: string): string | null {
-  const clientId = process.env.STRIPE_CONNECT_CLIENT_ID;
+  const clientId = stripeEnv("STRIPE_CONNECT_CLIENT_ID");
   if (!clientId) return null;
   const q = new URLSearchParams({ response_type: "code", client_id: clientId, scope: "read_write", state, redirect_uri: redirectUri, stripe_landing: "login" });
   return `${CONNECT}/oauth/authorize?${q.toString()}`;
@@ -69,7 +78,7 @@ export function exchangeOAuthCode(code: string): Promise<StripeResult<{ stripe_u
 }
 
 export function deauthorizeAccount(accountId: string): Promise<StripeResult<{ stripe_user_id: string }>> {
-  return call(`${CONNECT}/oauth/deauthorize`, { method: "POST", params: { client_id: process.env.STRIPE_CONNECT_CLIENT_ID, stripe_user_id: accountId } });
+  return call(`${CONNECT}/oauth/deauthorize`, { method: "POST", params: { client_id: stripeEnv("STRIPE_CONNECT_CLIENT_ID"), stripe_user_id: accountId } });
 }
 
 export interface StripeAccount {
