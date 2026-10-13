@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { AVG_TOKENS, estimateCampaignBuildCents, formatCentsEur } from "./costEstimate";
+import { AVG_TOKENS, DESIGN_CENTS, estimateCampaignBuildCents, estimateCampaignTotalCents, formatCentsEur } from "./costEstimate";
 import { estCostCents, MODELS } from "@/lib/ai/client";
 import { ASSET_ORDER } from "@/lib/campaigns/plan";
 
@@ -50,4 +50,18 @@ test("formatCentsEur", () => {
   assert.equal(formatCentsEur(0), "€0.00");
   assert.equal(formatCentsEur(15.12), "€0.15");
   assert.equal(formatCentsEur(4.9), "€0.05");
+});
+
+test("the total adds design for each social post: a carousel costs more than a single", () => {
+  const text = estimateCampaignBuildCents(KIT, MODELS.sonnet);
+  const titled = [
+    { kind: "social" as const, title: "Social post 1 (carousel)" },
+    { kind: "social" as const, title: "Social post 3 (single image)" },
+  ];
+  const total = estimateCampaignTotalCents([...KIT.filter((a) => a.kind !== "social"), ...titled], MODELS.sonnet);
+  assert.ok(total > text, "design must add to the writing cost");
+  assert.equal(
+    estimateCampaignTotalCents([titled[0]], MODELS.sonnet) - estimateCampaignTotalCents([titled[1]], MODELS.sonnet),
+    DESIGN_CENTS.carousel - DESIGN_CENTS.single,
+  );
 });

@@ -17,7 +17,7 @@ import { getCurrentMembership, requireAdminPage } from "@/lib/auth";
 import { findApprovedLandingAsset, getCampaign, getCampaignLandingUrl, listAssets } from "@/lib/campaigns/store";
 import type { CampaignAsset } from "@/lib/campaigns/store";
 import { getCampaignBuildModel, campaignModelLabel } from "@/lib/campaigns/buildModel";
-import { estimateCampaignBuildCents, formatCentsEur } from "@/lib/campaigns/costEstimate";
+import { estimateCampaignTotalCents, formatCentsEur } from "@/lib/campaigns/costEstimate";
 import { getCampaignScoreboard } from "@/lib/campaigns/scoreboardData";
 import { getBlogPost } from "@/lib/blog/posts";
 import { getSiteById } from "@/lib/cms/sites";
@@ -171,7 +171,7 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
   // that case rather than show a meaningless €0.00.
   const buildModel = await getCampaignBuildModel();
   const modelLabel = campaignModelLabel(buildModel);
-  const estimateCents = estimateCampaignBuildCents(assets, buildModel);
+  const estimateCents = estimateCampaignTotalCents(assets, buildModel);
 
   // Scoreboard (Campaign Engine Slice 5, Task 4) — CFA/CAC/ROAS for this
   // campaign's OWN attributed leads/converts, against the ad spend recorded

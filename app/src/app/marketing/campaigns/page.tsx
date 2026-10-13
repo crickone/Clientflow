@@ -6,7 +6,7 @@ import { findApprovedLandingAsset, getCampaignLandingUrl, listAssets, listCampai
 import { getCampaignBuildModel, CAMPAIGN_MODEL_CHOICES } from "@/lib/campaigns/buildModel";
 import { gatherCampaignRevenue } from "@/lib/campaigns/scoreboardData";
 import { computeCampaignScoreboard } from "@/lib/campaigns/scoreboard";
-import { estimateCampaignBuildCents } from "@/lib/campaigns/costEstimate";
+import { estimateCampaignTotalCents } from "@/lib/campaigns/costEstimate";
 import { getCampaignEmailMetrics } from "@/lib/campaigns/emailMetrics";
 import { computePanelMetrics, type CampaignMetrics } from "@/lib/campaigns/panelMetrics";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -63,7 +63,7 @@ export default async function MarketingCampaignsPage() {
   // landingViews counter), its Scoreboard (gatherCampaignRevenue +
   // computeCampaignScoreboard — the same call the original roll-up made),
   // the build-progress tally (approved/total, previously its own separate
-  // sync map), the REAL Slice-4 build estimate (estimateCampaignBuildCents —
+  // sync map), the REAL Slice-4 build estimate (estimateCampaignTotalCents —
   // NOT the Scoreboard's stubbed 0 below), email send/open/click metrics
   // (getCampaignEmailMetrics), a best-effort live landing URL, and the pure
   // derived money math (computePanelMetrics). Computed here, entirely
@@ -100,7 +100,7 @@ export default async function MarketingCampaignsPage() {
         mrrCents: rev.mrrCents,
       });
 
-      const aiBuildCents = estimateCampaignBuildCents(assets, buildModel);
+      const aiBuildCents = estimateCampaignTotalCents(assets, buildModel);
       const email = getCampaignEmailMetrics(assets);
 
       // Landing URL (best-effort): reuses the exact gate + lookup the

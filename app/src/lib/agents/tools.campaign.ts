@@ -8,7 +8,7 @@ import { materialiseAsset } from "@/lib/campaigns/materialise";
 import { launchCampaign, type LaunchItem } from "@/lib/campaigns/launch";
 import { pipelineForCampaign } from "@/lib/pipeline/pipelineRepo";
 import { getCampaignBuildModel, campaignModelLabel } from "@/lib/campaigns/buildModel";
-import { estimateCampaignBuildCents, formatCentsEur } from "@/lib/campaigns/costEstimate";
+import { estimateCampaignTotalCents, formatCentsEur } from "@/lib/campaigns/costEstimate";
 import {
   ASSET_ORDER,
   DEFAULT_ASSET_PLAN,
@@ -301,8 +301,8 @@ export async function planCampaignTool(ctx: ToolContext, input: Record<string, u
 
     const buildModel = await getCampaignBuildModel();
     const modelLabel = campaignModelLabel(buildModel);
-    const estimateCents = estimateCampaignBuildCents(plannedAssets, buildModel);
-    const estimateLine = `Estimated build cost: ${formatCentsEur(estimateCents)} on ${modelLabel} (an estimate — change the campaign model on the campaigns page to lower it).`;
+    const estimateCents = estimateCampaignTotalCents(plannedAssets, buildModel);
+    const estimateLine = `Estimated build cost: about ${formatCentsEur(estimateCents)} — writing every asset on ${modelLabel} plus designing the social posts (a designed carousel is roughly EUR1, a single image roughly EUR0.35); redoing a post or asset adds to it. Your own replies in this chat are metered separately (roughly 10-15c each). Quote this figure and that breakdown; never call it the whole cost.`;
 
     return {
       text: JSON.stringify({
