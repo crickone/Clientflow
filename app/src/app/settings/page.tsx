@@ -34,6 +34,7 @@ import { facebookConfigured } from "@/lib/facebook/oauth";
 import { isWhatsAppConfigured } from "@/lib/whatsapp/config";
 import { isGmailConnected } from "@/lib/gmail";
 import { isInBodyConnected } from "@/lib/inbody/connection";
+import { getStripeConnection } from "@/lib/stripe/connection";
 
 export const dynamic = "force-dynamic";
 
@@ -95,6 +96,7 @@ function buildGroups(vocab: ReturnType<typeof getVocab>, tenantId: number): { ti
         { href: "/settings/integrations/facebook", icon: Megaphone, title: "Facebook and Instagram", desc: "Posting, messages, Lead Ads and the Ads manager.", status: safe(() => facebookConfigured() && isMetaConnected(tenantId)) },
         { href: "/settings/integrations/whatsapp", icon: MessageCircle, title: "WhatsApp", desc: "Message leads and clients from their conversation.", status: safe(() => isWhatsAppConfigured()) },
         { href: "/settings/email", icon: Mail, title: "Email", desc: "Send from your own Gmail or your own domain.", status: safe(() => isGmailConnected(tenantId)) },
+        { href: "/settings/integrations/stripe", icon: CreditCard, title: "Stripe", desc: "Sell offers from your campaign pages, paid into your own Stripe.", status: safe(() => getStripeConnection(tenantId) !== null) },
         { href: "/settings/integrations/inbody", icon: Scale, title: "InBody", desc: "Body-composition scans saved to each client and shown in their app.", status: safe(() => isInBodyConnected(tenantId)) },
         { href: "/settings/voice", icon: PhoneOutgoing, title: "Voice agent", desc: "The AI that phones your new leads." },
         { href: "/settings/inbox-ai", icon: Bot, title: "Inbox AI", desc: "Automatic replies and how messages are sorted." },

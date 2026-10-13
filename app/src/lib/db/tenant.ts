@@ -2827,6 +2827,45 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       done INTEGER NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_wsl_exercise ON workout_set_logs(session_exercise_id, set_number);
+    CREATE TABLE IF NOT EXISTS offers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      campaign_id INTEGER REFERENCES campaigns(id) ON DELETE SET NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      price_cents INTEGER NOT NULL,
+      compare_at_cents INTEGER,
+      currency TEXT NOT NULL DEFAULT 'eur',
+      items_json TEXT NOT NULL DEFAULT '[]',
+      quantity_limit INTEGER,
+      sale_starts_at INTEGER,
+      sale_ends_at INTEGER,
+      use_by_date TEXT NOT NULL,
+      terms TEXT,
+      is_active INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_offers_campaign ON offers(campaign_id);
+    CREATE TABLE IF NOT EXISTS offer_orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      offer_id INTEGER NOT NULL REFERENCES offers(id) ON DELETE CASCADE,
+      stripe_session_id TEXT UNIQUE,
+      stripe_account_id TEXT NOT NULL,
+      payment_intent_id TEXT,
+      amount_cents INTEGER NOT NULL,
+      currency TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      email TEXT,
+      name TEXT,
+      phone TEXT,
+      client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL,
+      package_ids_json TEXT,
+      created_at INTEGER NOT NULL,
+      paid_at INTEGER,
+      refunded_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_offer_orders_offer ON offer_orders(offer_id, status);
+    CREATE INDEX IF NOT EXISTS idx_offer_orders_pi ON offer_orders(payment_intent_id);
     CREATE TABLE IF NOT EXISTS training_plans (
       client_id INTEGER PRIMARY KEY REFERENCES clients(id) ON DELETE CASCADE,
       program_id INTEGER REFERENCES workout_programs(id) ON DELETE SET NULL,

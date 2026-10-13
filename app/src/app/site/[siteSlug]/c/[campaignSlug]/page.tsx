@@ -44,12 +44,19 @@ import { resolveLogoPath } from "@/lib/branding";
 import { CampaignLanding } from "@/components/campaigns/CampaignLanding";
 import { SiteBeacon } from "@/components/cms/SiteBeacon";
 import { siteRequestHost } from "@/lib/cms/requestHost";
+import { SiteTracking } from "@/components/cms/SiteTracking";
+import type { LandingOffer } from "@/components/campaigns/OfferBuyBox";
+import { offerForCampaign, getOrder, getOffer as getOfferById } from "@/lib/offers/store";
+import { signCheckoutToken } from "@/lib/offers/checkoutToken";
+import { fulfilCheckout } from "@/lib/offers/fulfil";
+import { getStripeConnection } from "@/lib/stripe/connection";
+import { getCheckoutSession } from "@/lib/stripe/api";
 
 export const dynamic = "force-dynamic";
 
 type Props = {
   params: { siteSlug: string; campaignSlug: string };
-  searchParams: { site?: string };
+  searchParams: { site?: string; paid?: string; session_id?: string };
 };
 
 const LOGO_MIME_BY_EXT: Record<string, string> = {
@@ -126,6 +133,7 @@ interface Resolved {
   logoSrc: string | null;
   business: BusinessProfile;
   signupToken: string;
+  offer: LandingOffer | null;
   /** The resolved public site (host → tenant/site), kept around so
    *  generateMetadata can build this page's own canonical URL via
    *  siteUrl() — mirrors PageContext.resolved in lib/cms/render.ts. */
@@ -252,9 +260,31 @@ function resolveCampaignLanding(
       campaignId: campaign.id,
     });
 
+    // Something for sale: only with a connected Stripe account, and only an
+    // offer the operator has switched on. The token carries the address
+    // Stripe returns the buyer to, so nothing in the request can choose it.
+    let offer: LandingOffer | null = null;
+    const forSale = offerForCampaign(campaign.id);
+    if (forSale && forSale.isActive && getStripeConnection(resolved.tenantId)) {
+      const returnUrl = landingReturnUrl(resolved, params.campaignSlug, host);
+      offer = {
+        title: forSale.title,
+        priceCents: forSale.priceCents,
+        compareAtCents: forSale.compareAtCents,
+        items: forSale.items.map((i) => ({ name: i.name, sessions: i.sessions })),
+        useByDate: forSale.useByDate,
+        saleEndsAt: forSale.saleEndsAt,
+        terms: forSale.terms,
+        state: forSale.state,
+        left: forSale.left,
+        checkoutToken: signCheckoutToken({ tenantId: resolved.tenantId, campaignId: campaign.id, offerId: forSale.id, returnUrl }),
+      };
+    }
+
     return {
       campaign,
       body,
+      offer,
       theme: getThemeForTenant(resolved.tenantId),
       fonts: getBrandFontIds(),
       logoSrc: logoDataUri(),
@@ -283,6 +313,55 @@ function resolveCampaignLanding(
  * value, so images are left out entirely rather than shipping a broken one.
  * TODO: og:image once a public campaign image URL exists.
  */
+/**
+ * This page's own address, for Stripe to send the buyer back to. On a
+ * connected domain that's https://domain/c/<slug>; on the platform mount it
+ * keeps the request's port, which siteUrl drops (local dev).
+ */
+function landingReturnUrl(site: PublicSite, campaignSlug: string, host: string | null): string {
+  if (!site.primaryHost && host && /:\d+$/.test(host)) {
+    const proto = /^(localhost|127\.0\.0\.1)(:|$)/.test(host) ? "http" : "https";
+    return `${proto}://${host}/site/${site.site.slug}/c/${campaignSlug}`;
+  }
+  return siteUrl(site, `/c/${campaignSlug}`, host);
+}
+
+/**
+ * The buyer back from Stripe (?paid=<order>&session_id=<session>). If the
+ * webhook hasn't landed yet, ask Stripe about the session and fulfil it here
+ * (fulfilCheckout is safe to run twice). Only a session id that matches the
+ * order counts, so a guessed order number shows nothing.
+ */
+async function purchaseState(tenantId: number, searchParams: Props["searchParams"]) {
+  const orderId = Number(searchParams.paid);
+  const sessionId = String(searchParams.session_id ?? "");
+  if (!Number.isInteger(orderId) || orderId <= 0 || !sessionId.startsWith("cs_")) return null;
+  const order = runWithTenant(tenantId, () => getOrder(orderId));
+  if (!order || order.stripeSessionId !== sessionId) return null;
+  let status = order.status;
+  let email = order.email;
+  if (status === "pending" || status === "expired") {
+    const s = await getCheckoutSession(order.stripeAccountId, sessionId);
+    if (s.ok && s.data.client_reference_id === String(order.id)) {
+      const r = await fulfilCheckout(tenantId, order.stripeAccountId, s.data);
+      if (r.status === "fulfilled" || r.status === "already") {
+        status = "paid";
+        email = s.data.customer_details?.email ?? email;
+      }
+    }
+  }
+  if (status !== "paid" && status !== "pending") return null;
+  const title = runWithTenant(tenantId, () => getOfferById(order.offerId)?.title ?? "order");
+  return {
+    status: status === "paid" ? ("paid" as const) : ("processing" as const),
+    email,
+    title,
+    orderId: order.id,
+    amountCents: order.amountCents,
+    currency: order.currency,
+  };
+}
+
 export function generateMetadata({ params, searchParams }: Props): Metadata {
   const data = resolveCampaignLanding(params, searchParams);
   if (!data) return { title: "Campaign" };
@@ -328,18 +407,22 @@ export function generateMetadata({ params, searchParams }: Props): Metadata {
   };
 }
 
-export default function CampaignLandingPage({ params, searchParams }: Props) {
+export default async function CampaignLandingPage({ params, searchParams }: Props) {
   // countView: true — this is the actual page render (as opposed to
   // generateMetadata's separate pass over the same request), so this is the
   // one call site that should count as a view. See resolveCampaignLanding's
   // opts.countView doc for the full reasoning.
   const data = resolveCampaignLanding(params, searchParams, { countView: true });
   if (!data) notFound();
+  const purchase = searchParams.paid ? await purchaseState(data.publicSite.tenantId, searchParams) : null;
 
   return (
     <>
       {data.campaign.status === "active" && <SiteBeacon />}
+      <SiteTracking siteSlug={data.publicSite.site.slug} pixelId={data.publicSite.site.metaPixelId} googleTagId={data.publicSite.site.googleTagId} />
       <CampaignLanding
+        offer={data.offer}
+        purchase={purchase}
         body={data.body}
         theme={data.theme}
         fonts={data.fonts}

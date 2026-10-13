@@ -357,6 +357,20 @@ export function ensureControlTables() {
       updated_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
 
+    -- A business's connected Stripe account (Stripe Connect, Standard). No
+    -- secret is stored: the platform key + account id make every call, and
+    -- the business can revoke us from its own Stripe dashboard (lib/stripe).
+    CREATE TABLE IF NOT EXISTS stripe_connections (
+      tenant_id INTEGER PRIMARY KEY REFERENCES tenants(id) ON DELETE CASCADE,
+      account_id TEXT NOT NULL UNIQUE,
+      livemode INTEGER NOT NULL DEFAULT 0,
+      display_name TEXT,
+      email TEXT,
+      charges_enabled INTEGER NOT NULL DEFAULT 0,
+      connected_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
     -- ── Platform billing (spec 2026-07-21) ────────────────────────────────
     -- One row per tenant that participates in billing. Legacy tenants without
     -- a row are NOT gated. billing_exempt=1 → agency-run tenant: shown as

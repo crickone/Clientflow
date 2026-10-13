@@ -1861,6 +1861,18 @@ export const siteRequests = sqliteTable("site_requests", {
 
 // ============ CMS host routing — control plane ============
 
+/** A business's connected Stripe account (control plane; see lib/stripe/connection.ts). */
+export const stripeConnections = sqliteTable("stripe_connections", {
+  tenantId: integer("tenant_id").primaryKey().references(() => tenants.id, { onDelete: "cascade" }),
+  accountId: text("account_id").notNull().unique(),
+  livemode: integer("livemode", { mode: "boolean" }).notNull().default(false),
+  displayName: text("display_name"),
+  email: text("email"),
+  chargesEnabled: integer("charges_enabled", { mode: "boolean" }).notNull().default(false),
+  connectedAt: integer("connected_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
 export const siteDomains = sqliteTable(
   "site_domains",
   {
@@ -3278,6 +3290,51 @@ export const workoutSetLogs = sqliteTable("workout_set_logs", {
   reps: integer("reps"),
   done: integer("done", { mode: "boolean" }).notNull().default(false),
 });
+
+/**
+ * Something a business sells online from a campaign landing page (Stripe
+ * Checkout). items_json = [{ therapyId, sessions }]: each becomes a session
+ * bundle (packages row) on the buyer's client record when they pay.
+ */
+export const offers = sqliteTable("offers", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  campaignId: integer("campaign_id").references(() => campaigns.id, { onDelete: "set null" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  priceCents: integer("price_cents").notNull(),
+  compareAtCents: integer("compare_at_cents"),
+  currency: text("currency").notNull().default("eur"),
+  itemsJson: text("items_json").notNull().default("[]"),
+  quantityLimit: integer("quantity_limit"),
+  saleStartsAt: integer("sale_starts_at"),
+  saleEndsAt: integer("sale_ends_at"),
+  useByDate: text("use_by_date").notNull(),
+  terms: text("terms"),
+  isActive: integer("is_active", { mode: "boolean" }).notNull().default(false),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+export type Offer = typeof offers.$inferSelect;
+
+export const offerOrders = sqliteTable("offer_orders", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  offerId: integer("offer_id").notNull().references(() => offers.id, { onDelete: "cascade" }),
+  stripeSessionId: text("stripe_session_id").unique(),
+  stripeAccountId: text("stripe_account_id").notNull(),
+  paymentIntentId: text("payment_intent_id"),
+  amountCents: integer("amount_cents").notNull(),
+  currency: text("currency").notNull(),
+  status: text("status", { enum: ["pending", "paid", "expired", "refunded", "failed"] }).notNull().default("pending"),
+  email: text("email"),
+  name: text("name"),
+  phone: text("phone"),
+  clientId: integer("client_id").references(() => clients.id, { onDelete: "set null" }),
+  packageIdsJson: text("package_ids_json"),
+  createdAt: integer("created_at").notNull(),
+  paidAt: integer("paid_at"),
+  refundedAt: integer("refunded_at"),
+});
+export type OfferOrder = typeof offerOrders.$inferSelect;
 
 /** The member's own training days for one assigned programme ("1,3,5" = Mon, Wed, Fri). */
 export const trainingPlans = sqliteTable("training_plans", {

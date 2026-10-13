@@ -5,6 +5,8 @@ import type { BusinessProfile } from "@/lib/businessProfile";
 import { Check } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
 import { SignupForm } from "./SignupForm";
+import { OfferBuyBox, type LandingOffer } from "./OfferBuyBox";
+import { PurchaseEvent } from "./PurchaseEvent";
 
 interface Props {
   body: ParsedLandingBody;
@@ -21,6 +23,10 @@ interface Props {
    *  to <SignupForm>. No siteSlug/campaignSlug prop exists on this
    *  component, deliberately — see lib/campaigns/signupToken.ts. */
   signupToken: string;
+  /** Something for sale on this page (Stripe Checkout), when the campaign has one. */
+  offer?: LandingOffer | null;
+  /** The buyer back from Stripe: paid, or still being confirmed. */
+  purchase?: { status: "paid" | "processing"; email: string | null; title: string; orderId: number; amountCents: number; currency: string } | null;
 }
 
 /** Resolve a Content-Studio font id to a CSS font-family string usable in an
@@ -61,7 +67,7 @@ function resolveFontFamily(id: string, fallbackId: string): string {
  * with no explicit breakpoint needed) — no external stylesheet, no JS
  * required to render correctly at any width.
  */
-export function CampaignLanding({ body, theme, fonts, logoSrc, business, signupToken }: Props) {
+export function CampaignLanding({ body, theme, fonts, logoSrc, business, signupToken, offer, purchase }: Props) {
   const headingFamily = resolveFontFamily(fonts.heading, DEFAULT_HEADING_FONT_ID);
   const bodyFamily = resolveFontFamily(fonts.body, DEFAULT_BODY_FONT_ID);
 
@@ -196,7 +202,29 @@ export function CampaignLanding({ body, theme, fonts, logoSrc, business, signupT
                 padding: "clamp(20px, 4vw, 32px)",
               }}
             >
-              <SignupForm token={signupToken} />
+              {purchase ? (
+                <div className="ob-thanks" role="status">
+                  <h2>{purchase.status === "paid" ? "Thank you" : "Payment received"}</h2>
+                  <p>
+                    {purchase.status === "paid"
+                      ? `Your ${purchase.title} is confirmed.${purchase.email ? ` We've emailed the details to ${purchase.email}.` : ""}`
+                      : "We're confirming your payment with the bank. Your confirmation email will follow shortly."}
+                  </p>
+                  {purchase.status === "paid" && (
+                    <PurchaseEvent eventId={`offer-order-${purchase.orderId}`} valueCents={purchase.amountCents} currency={purchase.currency} />
+                  )}
+                </div>
+              ) : offer ? (
+                <>
+                  <OfferBuyBox offer={offer} />
+                  <details className="ob-question">
+                    <summary>Have a question first? Leave your details</summary>
+                    <SignupForm token={signupToken} />
+                  </details>
+                </>
+              ) : (
+                <SignupForm token={signupToken} />
+              )}
               {telHref && (
                 <p style={{ margin: "16px 0 0", fontSize: 13, color: "var(--text-tertiary)", textAlign: "center" }}>
                   Prefer to talk? Call{" "}

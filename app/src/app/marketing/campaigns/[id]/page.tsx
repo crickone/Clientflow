@@ -13,7 +13,7 @@ import {
   MessageSquarePlus,
 } from "lucide-react";
 
-import { requireAdminPage } from "@/lib/auth";
+import { getCurrentMembership, requireAdminPage } from "@/lib/auth";
 import { findApprovedLandingAsset, getCampaign, getCampaignLandingUrl, listAssets } from "@/lib/campaigns/store";
 import type { CampaignAsset } from "@/lib/campaigns/store";
 import { getCampaignBuildModel, campaignModelLabel } from "@/lib/campaigns/buildModel";
@@ -33,6 +33,12 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { CopyAssetButton } from "@/components/campaigns/CopyAssetButton";
 import { LaunchCampaignButton } from "@/components/campaigns/LaunchCampaignButton";
 import { setCampaignAdSpendAction } from "../actions";
+import { OfferPanel } from "@/components/campaigns/OfferPanel";
+import { listOrders, offerForCampaign, offerTotals } from "@/lib/offers/store";
+import { getStripeConnection } from "@/lib/stripe/connection";
+import { db } from "@/lib/db";
+import { therapies } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -204,6 +210,17 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
   // The campaign's own board (one per campaign, created with it).
   const pipeline = pipelineForCampaign(campaign.id);
 
+  const offer = offerForCampaign(campaign.id);
+  const offerOrders = offer ? listOrders(offer.id) : [];
+  const totals = offer ? offerTotals(offer.id) : null;
+  const services = db
+    .select({ id: therapies.id, name: therapies.name, priceEur: therapies.defaultPriceEur })
+    .from(therapies)
+    .where(eq(therapies.isActive, true))
+    .all()
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const stripeConnected = getStripeConnection(getCurrentMembership()!.tenant.id) !== null;
+
   const dateRange =
     campaign.startsOn || campaign.endsOn
       ? `${campaign.startsOn ?? "?"} → ${campaign.endsOn ?? "?"}`
@@ -316,6 +333,39 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
             </div>
           </div>
         )}
+      </Card>
+
+      <Card style={{ padding: 20, marginBottom: 24 }}>
+        <OfferPanel
+          campaignId={campaign.id}
+          offer={
+            offer && totals
+              ? {
+                  id: offer.id,
+                  title: offer.title,
+                  description: offer.description,
+                  priceCents: offer.priceCents,
+                  compareAtCents: offer.compareAtCents,
+                  items: offer.items.map((i) => ({ therapyId: i.therapyId, sessions: i.sessions })),
+                  quantityLimit: offer.quantityLimit,
+                  saleStartsAt: offer.saleStartsAt,
+                  saleEndsAt: offer.saleEndsAt,
+                  useByDate: offer.useByDate,
+                  terms: offer.terms,
+                  isActive: offer.isActive,
+                  state: offer.state,
+                  sold: totals.sold,
+                  left: offer.left,
+                  revenueCents: totals.revenueCents,
+                  refunded: totals.refunded,
+                }
+              : null
+          }
+          orders={offerOrders.map((o) => ({ id: o.id, createdAt: o.paidAt ?? o.createdAt, name: o.name, email: o.email, phone: o.phone, amountCents: o.amountCents, status: o.status, clientId: o.clientId }))}
+          services={services}
+          stripeConnected={stripeConnected}
+          landingUrl={landingUrl}
+        />
       </Card>
 
       <Card style={{ padding: 20, marginBottom: 24 }}>

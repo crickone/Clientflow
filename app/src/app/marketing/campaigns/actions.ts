@@ -2,9 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requireAdmin } from "@/lib/auth";
+import { eq } from "drizzle-orm";
+
+import { getCurrentMembership, requireAdmin } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { therapies } from "@/lib/db/schema";
+import { parseEuroToCents, validateOffer } from "@/lib/offers/model";
+import { getOffer as getOfferById, saveOffer, setOfferActive } from "@/lib/offers/store";
+import { getStripeConnection } from "@/lib/stripe/connection";
 import { setCampaignBuildModel } from "@/lib/campaigns/buildModel";
-import { setCampaignAdSpend } from "@/lib/campaigns/store";
+import { getCampaign, setCampaignAdSpend } from "@/lib/campaigns/store";
 import { seedTestCampaign, removeTestCampaign } from "@/lib/campaigns/demoSeed";
 
 /**
@@ -90,4 +97,66 @@ export async function removeTestCampaignAction(): Promise<void> {
   await requireAdmin();
   removeTestCampaign();
   revalidatePath("/marketing/campaigns");
+}
+
+// ---- Selling an offer from the campaign's landing page ---------------------
+
+export interface OfferFormInput {
+  offerId: number | null;
+  title: string;
+  description: string;
+  price: string;
+  compareAt: string;
+  items: { therapyId: number; sessions: number }[];
+  quantityLimit: string;
+  saleStartsAt: number | null;
+  saleEndsAt: number | null;
+  useByDate: string;
+  terms: string;
+}
+
+export async function saveOfferAction(campaignId: number, input: OfferFormInput): Promise<{ ok: true; offerId: number } | { ok: false; error: string }> {
+  await requireAdmin();
+  const campaign = getCampaign(Number(campaignId));
+  if (!campaign) return { ok: false, error: "Campaign not found." };
+  const priceCents = parseEuroToCents(String(input.price ?? ""));
+  if (priceCents === null) return { ok: false, error: "Enter the offer price, e.g. 99 or 99.50." };
+  const compareRaw = String(input.compareAt ?? "").trim();
+  const compareAtCents = compareRaw ? parseEuroToCents(compareRaw) : null;
+  if (compareRaw && compareAtCents === null) return { ok: false, error: "The usual price isn't a price. Use e.g. 160, or leave it blank." };
+  const limitRaw = String(input.quantityLimit ?? "").trim();
+  const quantityLimit = limitRaw ? Number(limitRaw) : null;
+  const items = (Array.isArray(input.items) ? input.items : []).map((i) => ({ therapyId: Number(i.therapyId), sessions: Number(i.sessions) }));
+  const active = new Set(db.select({ id: therapies.id }).from(therapies).where(eq(therapies.isActive, true)).all().map((t) => t.id));
+  if (items.some((i) => !active.has(i.therapyId))) return { ok: false, error: "Pick a service for every line." };
+  const v = validateOffer({
+    title: String(input.title ?? ""),
+    description: String(input.description ?? ""),
+    priceCents,
+    compareAtCents,
+    items,
+    quantityLimit,
+    saleStartsAt: Number.isFinite(input.saleStartsAt) ? input.saleStartsAt : null,
+    saleEndsAt: Number.isFinite(input.saleEndsAt) ? input.saleEndsAt : null,
+    useByDate: String(input.useByDate ?? ""),
+    terms: String(input.terms ?? ""),
+  });
+  if (!v.ok) return v;
+  const existing = input.offerId ? getOfferById(Number(input.offerId)) : null;
+  if (input.offerId && (!existing || existing.campaignId !== campaign.id)) return { ok: false, error: "That offer isn't on this campaign." };
+  const offerId = saveOffer(existing ? existing.id : null, campaign.id, v.value);
+  revalidatePath(`/marketing/campaigns/${campaign.id}`);
+  return { ok: true, offerId };
+}
+
+export async function setOfferOnSaleAction(campaignId: number, offerId: number, onSale: boolean): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireAdmin();
+  const offer = getOfferById(Number(offerId));
+  if (!offer || offer.campaignId !== Number(campaignId)) return { ok: false, error: "Offer not found." };
+  if (onSale && !getStripeConnection(getCurrentMembership()!.tenant.id)) {
+    return { ok: false, error: "Connect Stripe first (Settings, Stripe), so buyers can pay." };
+  }
+  setOfferActive(offer.id, onSale === true);
+  revalidatePath(`/marketing/campaigns/${campaignId}`);
+  return { ok: true };
 }
