@@ -143,3 +143,22 @@ export function offerTotals(offerId: number): { sold: number; revenueCents: numb
     .get();
   return { sold: Number(r?.sold ?? 0), revenueCents: Number(r?.revenue ?? 0), refunded: Number(r?.refunded ?? 0) };
 }
+
+/** Offers currently switched on, across every campaign. */
+export function countOffersOnSale(): number {
+  const r = db.select({ n: sql<number>`count(*)` }).from(offers).where(eq(offers.isActive, true)).get();
+  return Number(r?.n ?? 0);
+}
+
+/** The latest paid or refunded orders across all offers, with the offer's name. */
+export function listRecentOrders(limit = 5): (OfferOrder & { offerTitle: string })[] {
+  return db
+    .select({ order: offerOrders, offerTitle: offers.title })
+    .from(offerOrders)
+    .innerJoin(offers, eq(offers.id, offerOrders.offerId))
+    .where(or(eq(offerOrders.status, "paid"), eq(offerOrders.status, "refunded")))
+    .orderBy(desc(offerOrders.createdAt))
+    .limit(limit)
+    .all()
+    .map((r) => ({ ...r.order, offerTitle: r.offerTitle }));
+}

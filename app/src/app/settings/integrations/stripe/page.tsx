@@ -3,6 +3,7 @@ import { StripeSettings } from "@/components/settings/StripeSettings";
 import { getCurrentMembership, requireAdminPage } from "@/lib/auth";
 import { stripeConfigured } from "@/lib/stripe/api";
 import { getStripeConnection } from "@/lib/stripe/connection";
+import { countOffersOnSale, listRecentOrders } from "@/lib/offers/store";
 
 export const dynamic = "force-dynamic";
 
@@ -17,18 +18,17 @@ export default async function StripeSettingsPage({ searchParams }: { searchParam
   await requireAdminPage();
   const tenantId = getCurrentMembership()!.tenant.id;
   const conn = getStripeConnection(tenantId);
-  const flash = searchParams.connected
-    ? { kind: "good" as const, text: "Stripe is connected." }
-    : searchParams.error
-      ? { kind: "bad" as const, text: ERRORS[searchParams.error] ?? `Stripe wasn't connected: ${searchParams.error.slice(0, 200)}` }
-      : null;
+  const error = searchParams.error ? ERRORS[searchParams.error] ?? `Stripe wasn't connected: ${searchParams.error.slice(0, 200)}` : null;
   return (
     <div className="app-page">
       <PageHeader eyebrow="Integrations" title="Stripe" subtitle="Sell offers from your campaign pages and get paid into your own Stripe account." />
       <StripeSettings
         configured={stripeConfigured()}
         connection={conn ? { accountId: conn.accountId, displayName: conn.displayName, email: conn.email, chargesEnabled: conn.chargesEnabled, livemode: conn.livemode, connectedAt: conn.connectedAt } : null}
-        flash={flash}
+        justConnected={searchParams.connected === "1"}
+        error={error}
+        offersOnSale={conn ? countOffersOnSale() : 0}
+        recent={conn ? listRecentOrders(5).map((o) => ({ id: o.id, name: o.name || o.email || "Buyer", offer: o.offerTitle, amountCents: o.amountCents, at: o.paidAt ?? o.createdAt, refunded: o.status === "refunded", clientId: o.clientId })) : []}
       />
     </div>
   );

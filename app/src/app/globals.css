@@ -4516,13 +4516,58 @@ a.stat-row:hover .stat-label { color: var(--text-primary); }
 .td-option-sub { font-size: 12.5px; color: var(--text-tertiary); white-space: nowrap; }
 
 /* Settings: Stripe */
-.st-flash { padding: 12px 16px; border-radius: 10px; font-size: 13.5px; border: 1px solid var(--hairline); }
-.st-flash.is-good { background: var(--success-soft); color: var(--text-primary); }
-.st-flash.is-bad { background: var(--danger-soft); color: var(--text-primary); }
-.st-note { padding: 10px 12px; border-radius: 8px; background: var(--surface-2); }
-.st-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
-.st-confirm { font-size: 13px; color: var(--text-secondary); margin-left: auto; }
-.st-facts { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 8px; font-size: 13px; line-height: 1.5; color: var(--text-secondary); }
+.stp { display: grid; gap: 28px; max-width: 760px; }
+.stp-alert { padding: 12px 16px; border-radius: 10px; font-size: 13.5px; background: var(--danger-soft); color: var(--text-primary); border: 1px solid var(--hairline); }
+.stp-card { padding: 0; overflow: hidden; }
+.stp-mark { width: 44px; height: 44px; flex-shrink: 0; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; background: var(--surface-2); color: var(--text-primary); border: 1px solid var(--hairline); }
+.stp-empty { display: flex; gap: 16px; align-items: flex-start; padding: 24px; }
+.stp-empty h2, .stp-who h2 { margin: 0; font-family: var(--font-body), sans-serif; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; text-transform: none; color: var(--text-primary); }
+.stp-empty p { margin: 6px 0 0; font-size: 14px; line-height: 1.55; color: var(--text-secondary); max-width: 54ch; }
+.stp-connect { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 18px; }
+.stp-connect span { font-size: 12.5px; color: var(--text-tertiary); max-width: 36ch; line-height: 1.45; }
+.stp-head { display: flex; align-items: center; gap: 14px; padding: 22px 24px 18px; }
+.stp-who { flex: 1; min-width: 0; }
+.stp-who p { margin: 3px 0 0; font-size: 13px; color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stp-id { font-family: var(--font-mono), monospace; font-size: 12px; }
+.stp-pill { flex-shrink: 0; font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 999px; }
+.stp-pill.is-good { background: var(--success-soft); color: var(--success); }
+.stp-pill.is-test { background: var(--surface-2); color: var(--text-secondary); border: 1px dashed var(--hairline-strong, var(--text-tertiary)); }
+.stp-pill.is-wait { background: var(--warning-soft, var(--surface-2)); color: var(--warning, var(--text-secondary)); }
+.stp-testnote { margin: -4px 24px 14px 82px; font-size: 12.5px; color: var(--text-tertiary); }
+.stp-steps { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--hairline); }
+.stp-step { display: flex; align-items: center; gap: 14px; padding: 14px 24px; border-bottom: 1px solid var(--hairline); }
+.stp-tick { width: 22px; height: 22px; flex-shrink: 0; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; border: 1.5px dashed var(--text-tertiary); color: #fff; margin-left: 11px; }
+.stp-step[data-done="true"] .stp-tick { border: 0; background: var(--success); }
+.stp-step-text { flex: 1; min-width: 0; display: grid; gap: 2px; padding-left: 9px; }
+.stp-step-title { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+.stp-step[data-done="false"] .stp-step-title { font-weight: 600; }
+.stp-step-detail { font-size: 12.5px; color: var(--text-tertiary); }
+.stp-step-link { flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 500; color: var(--accent); text-decoration: none; padding: 6px 10px; border-radius: 8px; }
+.stp-step-link:hover { background: var(--surface-2); }
+.stp-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 14px 24px; background: var(--surface-1); }
+.stp-foot-gap { flex: 1; }
+.stp-disconnect { border: 0; background: none; font: inherit; font-size: 13px; color: var(--text-tertiary); cursor: pointer; padding: 6px 4px; }
+.stp-disconnect:hover { color: var(--danger); }
+.stp-confirm { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary); flex-wrap: wrap; }
+.stp-section h3 { margin: 0 0 10px; font-family: var(--font-body), sans-serif; font-size: 13px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--text-secondary); }
+.stp-sales { list-style: none; margin: 0; padding: 0; border: 1px solid var(--hairline); border-radius: 12px; overflow: hidden; }
+.stp-sales li { display: flex; align-items: center; gap: 16px; padding: 11px 16px; border-bottom: 1px solid var(--hairline); font-size: 13.5px; }
+.stp-sales li:last-child { border-bottom: 0; }
+.stp-sale-who { flex: 1; min-width: 0; display: grid; gap: 1px; color: var(--text-primary); }
+.stp-sale-who a { color: var(--text-primary); text-decoration: none; }
+.stp-sale-who a:hover { text-decoration: underline; }
+.stp-sale-who span { font-size: 12px; color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stp-sale-amt { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.stp-sale-amt[data-refunded="true"] { font-weight: 500; color: var(--text-tertiary); }
+.stp-sale-at { width: 56px; text-align: right; font-size: 12.5px; color: var(--text-tertiary); }
+.stp-flow { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.stp-flow li { display: grid; gap: 10px; align-content: start; padding: 14px; border-radius: 12px; border: 1px solid var(--hairline); font-size: 13px; line-height: 1.5; color: var(--text-secondary); }
+.stp-num { width: 24px; height: 24px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; background: var(--surface-2); color: var(--text-primary); font-variant-numeric: tabular-nums; }
+@media (max-width: 760px) {
+  .stp-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stp-testnote { margin-left: 24px; }
+  .stp-head { flex-wrap: wrap; }
+}
 
 /* Campaign landing: offer buy box */
 .ob { display: grid; gap: 14px; }
