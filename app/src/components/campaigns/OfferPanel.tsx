@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Percent, Plus, Trash2 } from "lucide-react";
+import { Copy, Lock, Percent, Plus, Trash2, Unlock } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
@@ -12,6 +12,7 @@ import {
   deleteOfferAction,
   saveOfferAction,
   setAllOffersOnSaleAction,
+  setAdOnlyAction,
   setOfferOnSaleAction,
 } from "@/app/marketing/campaigns/actions";
 import { discountedCents, formatEur, OFFER_STATE_LABEL, type OfferState } from "@/lib/offers/model";
@@ -76,6 +77,7 @@ export function OfferPanel({
   services,
   stripeConnected,
   landingUrl,
+  accessKey,
 }: {
   campaignId: number;
   offers: OfferPanelOffer[];
@@ -83,6 +85,7 @@ export function OfferPanel({
   services: Service[];
   stripeConnected: boolean;
   landingUrl: string | null;
+  accessKey: string | null;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -107,6 +110,26 @@ export function OfferPanel({
       router.refresh();
     });
   }
+  const adLink = landingUrl && accessKey ? `${landingUrl}${landingUrl.includes("?") ? "&" : "?"}k=${accessKey}` : null;
+  function adOnly(on: boolean) {
+    start(async () => {
+      const r = await setAdOnlyAction(campaignId, on);
+      if (!r.ok) return void toast.error(r.error);
+      toast.success(on ? "Prices now show only through the ad link" : "Prices now show to everyone on the page");
+      router.refresh();
+    });
+  }
+  async function copyLink() {
+    if (!adLink) return;
+    try {
+      const full = adLink.startsWith("/") ? `${window.location.origin}${adLink}` : adLink;
+      await navigator.clipboard.writeText(full);
+      toast.success("Ad link copied");
+    } catch {
+      toast.error("Couldn't copy. Select the link and copy it instead.");
+    }
+  }
+
   function remove(o: OfferPanelOffer) {
     start(async () => {
       const r = await deleteOfferAction(campaignId, o.id);
@@ -154,6 +177,33 @@ export function OfferPanel({
       )}
       {!landingUrl && offers.length > 0 && <p className="op-warn">Approve this campaign&rsquo;s landing page so there is somewhere to buy.</p>}
 
+      {offers.length > 0 && (
+        <div className="op-access" data-on={Boolean(accessKey)}>
+          <span className="op-access-icon" aria-hidden>
+            {accessKey ? <Lock size={15} /> : <Unlock size={15} />}
+          </span>
+          <div className="op-access-text">
+            <strong>{accessKey ? "Ad-only prices" : "Prices show to everyone on the page"}</strong>
+            <span>
+              {accessKey
+                ? "Only people who arrive through the ad link see the prices and Buy buttons. Anyone else sees the page with the sign-up form. The page is hidden from Google."
+                : "Make it ad-only so the prices show just to people who click your ad."}
+            </span>
+            {adLink && (
+              <span className="op-adlink">
+                <code>{adLink}</code>
+                <button type="button" className="op-copy" onClick={copyLink}>
+                  <Copy size={13} /> Copy ad link
+                </button>
+              </span>
+            )}
+          </div>
+          <Button variant={accessKey ? "ghost" : "secondary"} size="sm" onClick={() => adOnly(!accessKey)} loading={pending}>
+            {accessKey ? "Show to everyone" : "Make ad-only"}
+          </Button>
+        </div>
+      )}
+
       {mode === "discount" && <DiscountForm campaignId={campaignId} services={services} onDone={() => setMode("none")} />}
       {mode === "add" && <OfferForm campaignId={campaignId} offer={null} services={services} onDone={() => setMode("none")} />}
 
@@ -197,7 +247,8 @@ export function OfferPanel({
 
       {offers.length > 0 && onSaleCount > 0 && landingUrl && (
         <p className="op-muted" style={{ margin: 0 }}>
-          The offers on sale are on <a href={landingUrl} target="_blank" rel="noreferrer">the landing page</a>.
+          The offers on sale are on <a href={adLink ?? landingUrl} target="_blank" rel="noreferrer">the landing page</a>
+          {adLink ? " (opened with the ad link, so you see what ad visitors see)." : "."}
         </p>
       )}
 

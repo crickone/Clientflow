@@ -1343,6 +1343,8 @@ export const campaigns = sqliteTable("campaigns", {
    *  lib/campaigns/store.ts) once per genuinely-served render, never on a
    *  404/not-found. Powers the metrics panel's funnel strip + view→lead rate. */
   landingViews: integer("landing_views").notNull().default(0),
+  /** When set, the campaign's offers show only to visitors with ?k=<this> (the ad link). */
+  offerAccessKey: text("offer_access_key"),
   status: text("status", {
     enum: ["building", "ready", "active", "complete", "archived"],
   })

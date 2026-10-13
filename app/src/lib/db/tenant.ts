@@ -1700,6 +1700,15 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     console.error("[db] campaigns ad_spend_cents migration failed:", err);
   }
 
+  // Ad-only offers: when set, a campaign's offers show only to visitors who
+  // arrive with ?k=<key> (the link used in the ads). See lib/offers/access.ts.
+  try {
+    const cols = sqlite.prepare("PRAGMA table_info(campaigns)").all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === "offer_access_key")) sqlite.exec("ALTER TABLE campaigns ADD COLUMN offer_access_key TEXT");
+  } catch (err) {
+    console.error("[db] campaigns offer_access_key migration failed:", err);
+  }
+
   // Campaign Engine (this task): landing-page view counter, bumped by the
   // public campaign landing route once per genuinely-served render. Additive/
   // idempotent like every guard in this block.

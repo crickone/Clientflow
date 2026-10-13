@@ -35,6 +35,7 @@ import { LaunchCampaignButton } from "@/components/campaigns/LaunchCampaignButto
 import { setCampaignAdSpendAction } from "../actions";
 import { OfferPanel } from "@/components/campaigns/OfferPanel";
 import { listCampaignOrders, listOffersForCampaign, offerTotals } from "@/lib/offers/store";
+import { getOfferAccessKey } from "@/lib/offers/access";
 import { getStripeConnection } from "@/lib/stripe/connection";
 import { db } from "@/lib/db";
 import { therapies } from "@/lib/db/schema";
@@ -212,6 +213,7 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
 
   const campaignOffers = listOffersForCampaign(campaign.id);
   const campaignOrders = listCampaignOrders(campaign.id);
+  const accessKey = getOfferAccessKey(campaign.id);
   const services = db
     .select({ id: therapies.id, name: therapies.name, priceEur: therapies.defaultPriceEur })
     .from(therapies)
@@ -359,6 +361,7 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
           services={services}
           stripeConnected={stripeConnected}
           landingUrl={landingUrl}
+          accessKey={accessKey}
         />
       </Card>
 

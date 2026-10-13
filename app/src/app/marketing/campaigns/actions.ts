@@ -8,8 +8,9 @@ import { getCurrentMembership, requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { therapies } from "@/lib/db/schema";
 import { discountedCents, parseEuroToCents, validateOffer } from "@/lib/offers/model";
-import { deleteOffer, getOffer as getOfferById, saveOffer, setCampaignOffersActive, setOfferActive } from "@/lib/offers/store";
+import { deleteOffer, getOffer as getOfferById, listOffersForCampaign, saveOffer, setCampaignOffersActive, setOfferActive } from "@/lib/offers/store";
 import { getStripeConnection } from "@/lib/stripe/connection";
+import { getOfferAccessKey, setOfferAccessKey } from "@/lib/offers/access";
 import { setCampaignBuildModel } from "@/lib/campaigns/buildModel";
 import { getCampaign, setCampaignAdSpend } from "@/lib/campaigns/store";
 import { seedTestCampaign, removeTestCampaign } from "@/lib/campaigns/demoSeed";
@@ -144,7 +145,9 @@ export async function saveOfferAction(campaignId: number, input: OfferFormInput)
   if (!v.ok) return v;
   const existing = input.offerId ? getOfferById(Number(input.offerId)) : null;
   if (input.offerId && (!existing || existing.campaignId !== campaign.id)) return { ok: false, error: "That offer isn't on this campaign." };
+  const firstOffer = !existing && listOffersForCampaign(campaign.id).length === 0;
   const offerId = saveOffer(existing ? existing.id : null, campaign.id, v.value);
+  if (firstOffer && !getOfferAccessKey(campaign.id)) setOfferAccessKey(campaign.id, true);
   revalidatePath(`/marketing/campaigns/${campaign.id}`);
   return { ok: true, offerId };
 }
@@ -211,7 +214,10 @@ export async function createDiscountOffersAction(campaignId: number, input: Disc
     if (!v.ok) return { ok: false, error: `${t.name}: ${v.error}` };
     prepared.push(v.value);
   }
+  const firstOffers = listOffersForCampaign(campaign.id).length === 0;
   for (const v of prepared) saveOffer(null, campaign.id, v);
+  // A campaign's offers start ad-only: they're for the people who click the ad.
+  if (firstOffers && !getOfferAccessKey(campaign.id)) setOfferAccessKey(campaign.id, true);
   revalidatePath(`/marketing/campaigns/${campaign.id}`);
   return { ok: true, created: prepared.length };
 }
@@ -231,4 +237,14 @@ export async function deleteOfferAction(campaignId: number, offerId: number): Pr
   if (!deleteOffer(Number(offerId), Number(campaignId))) return { ok: false, error: "That offer has orders, so it can't be deleted. Take it off sale instead." };
   revalidatePath(`/marketing/campaigns/${campaignId}`);
   return { ok: true };
+}
+
+/** Ad-only on (a new private link code) or off (prices on the plain page). */
+export async function setAdOnlyAction(campaignId: number, on: boolean): Promise<{ ok: true; key: string | null } | { ok: false; error: string }> {
+  await requireAdmin();
+  const campaign = getCampaign(Number(campaignId));
+  if (!campaign) return { ok: false, error: "Campaign not found." };
+  const key = setOfferAccessKey(campaign.id, on === true);
+  revalidatePath(`/marketing/campaigns/${campaign.id}`);
+  return { ok: true, key };
 }

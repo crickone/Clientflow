@@ -27,6 +27,7 @@ const HOUSE_RULES_BANS =
   "Never invent a money-back guarantee or a free consultation/trial";
 
 const campaign: Campaign = {
+  offerAccessKey: null,
   id: 1,
   name: "Summer Shape Up 2026",
   slug: "summer-shape-up-2026",

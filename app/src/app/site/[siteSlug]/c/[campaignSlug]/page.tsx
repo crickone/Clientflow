@@ -51,12 +51,15 @@ import { signCheckoutToken } from "@/lib/offers/checkoutToken";
 import { fulfilCheckout } from "@/lib/offers/fulfil";
 import { getStripeConnection } from "@/lib/stripe/connection";
 import { getCheckoutSession } from "@/lib/stripe/api";
+import { cookies } from "next/headers";
+import { accessCookieName, getOfferAccessKey, hasOfferAccess } from "@/lib/offers/access";
+import { RememberOfferAccess } from "@/components/campaigns/RememberOfferAccess";
 
 export const dynamic = "force-dynamic";
 
 type Props = {
   params: { siteSlug: string; campaignSlug: string };
-  searchParams: { site?: string; paid?: string; session_id?: string };
+  searchParams: { site?: string; paid?: string; session_id?: string; k?: string };
 };
 
 const LOGO_MIME_BY_EXT: Record<string, string> = {
@@ -134,6 +137,9 @@ interface Resolved {
   business: BusinessProfile;
   signupToken: string;
   offers: LandingOffer[];
+  /** Ad-only campaign: the key to remember for this visitor (they arrived with it), and whether the page is ad-only at all. */
+  rememberKey: string | null;
+  adOnly: boolean;
   /** The resolved public site (host → tenant/site), kept around so
    *  generateMetadata can build this page's own canonical URL via
    *  siteUrl() — mirrors PageContext.resolved in lib/cms/render.ts. */
@@ -263,8 +269,21 @@ function resolveCampaignLanding(
     // Something for sale: only with a connected Stripe account, and only an
     // offer the operator has switched on. The token carries the address
     // Stripe returns the buyer to, so nothing in the request can choose it.
+    // Ad-only offers show only to visitors who came through the ad link
+    // (?k=<key>) or did before (cookie). Everyone else gets the page and the
+    // signup form, without prices.
+    const accessKey = getOfferAccessKey(campaign.id);
+    let cookieKey: string | undefined;
+    try {
+      cookieKey = cookies().get(accessCookieName(campaign.id))?.value;
+    } catch {
+      cookieKey = undefined;
+    }
+    const allowed = hasOfferAccess(accessKey, searchParams.k, cookieKey);
+    const rememberKey = accessKey && searchParams.k === accessKey && cookieKey !== accessKey ? accessKey : null;
+
     let offers: LandingOffer[] = [];
-    if (getStripeConnection(resolved.tenantId)) {
+    if (allowed && getStripeConnection(resolved.tenantId)) {
       const returnUrl = landingReturnUrl(resolved, params.campaignSlug, host);
       offers = listOffersForCampaign(campaign.id)
         .filter((o) => o.isActive)
@@ -287,6 +306,8 @@ function resolveCampaignLanding(
       campaign,
       body,
       offers,
+      rememberKey,
+      adOnly: accessKey !== null,
       theme: getThemeForTenant(resolved.tenantId),
       fonts: getBrandFontIds(),
       logoSrc: logoDataUri(),
@@ -386,7 +407,7 @@ export function generateMetadata({ params, searchParams }: Props): Metadata {
   // is a pre-launch preview (findApprovedLandingAsset already gates render
   // to campaign.status in {ready, active}, so this is always one of those
   // two here, never building/complete/archived).
-  const isLive = campaign.status === "active";
+  const isLive = campaign.status === "active" && !data.adOnly;
 
   return {
     title,
@@ -421,6 +442,7 @@ export default async function CampaignLandingPage({ params, searchParams }: Prop
   return (
     <>
       {data.campaign.status === "active" && <SiteBeacon />}
+      {data.rememberKey && <RememberOfferAccess name={`oak_${data.campaign.id}`} value={data.rememberKey} />}
       <SiteTracking siteSlug={data.publicSite.site.slug} pixelId={data.publicSite.site.metaPixelId} googleTagId={data.publicSite.site.googleTagId} />
       <CampaignLanding
         offers={data.offers}

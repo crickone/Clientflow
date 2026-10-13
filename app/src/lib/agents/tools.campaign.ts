@@ -244,6 +244,7 @@ export async function planCampaignTool(ctx: ToolContext, input: Record<string, u
   // never touches.
   const now = new Date();
   const transientCampaign: Campaign = {
+    offerAccessKey: null,
     id: 0,
     name: draftName,
     slug: "",

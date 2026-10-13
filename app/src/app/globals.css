@@ -4669,3 +4669,13 @@ a.stat-row:hover .stat-label { color: var(--text-primary); }
 .om-buy:disabled { cursor: progress; filter: saturate(0.6); }
 .om-closed { font-size: 12.5px; font-weight: 600; color: var(--text-tertiary); text-align: right; }
 .om-error { grid-column: 1 / -1; }
+.op-access { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--hairline); background: var(--surface-2); }
+.op-access[data-on="true"] { border-color: var(--success); background: var(--success-soft); }
+.op-access-icon { width: 30px; height: 30px; flex-shrink: 0; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: var(--surface-1); color: var(--text-secondary); }
+.op-access[data-on="true"] .op-access-icon { color: var(--success); }
+.op-access-text { flex: 1; min-width: 0; display: grid; gap: 4px; font-size: 13px; color: var(--text-secondary); line-height: 1.45; }
+.op-access-text strong { font-size: 13.5px; color: var(--text-primary); font-weight: 600; }
+.op-adlink { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.op-adlink code { font-size: 12px; padding: 4px 8px; border-radius: 6px; background: var(--surface-1); border: 1px solid var(--hairline); color: var(--text-primary); overflow-wrap: anywhere; }
+.op-copy { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 8px; border: 1px solid var(--hairline); background: var(--surface-1); color: var(--text-primary); font: inherit; font-size: 12.5px; cursor: pointer; }
+.op-copy:hover { background: var(--surface-3, var(--surface-2)); }
