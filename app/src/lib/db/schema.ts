@@ -3276,3 +3276,11 @@ export const workoutSetLogs = sqliteTable("workout_set_logs", {
   reps: integer("reps"),
   done: integer("done", { mode: "boolean" }).notNull().default(false),
 });
+
+/** The member's own training days for one assigned programme ("1,3,5" = Mon, Wed, Fri). */
+export const trainingPlans = sqliteTable("training_plans", {
+  clientId: integer("client_id").primaryKey().references(() => clients.id, { onDelete: "cascade" }),
+  programId: integer("program_id").references(() => workoutPrograms.id, { onDelete: "set null" }),
+  weekdays: text("weekdays").notNull().default(""),
+  updatedAt: integer("updated_at").notNull(),
+});

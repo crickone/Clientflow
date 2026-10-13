@@ -28,16 +28,8 @@ export function startSession(clientId: number, program: ProgramInput, dayPositio
   const exercises = day.exercises.filter((e) => e.name.trim());
   if (exercises.length === 0) return { ok: false, error: "This day has no exercises yet." };
 
-  const open = db.select().from(workoutSessions).where(and(eq(workoutSessions.clientId, clientId), isNull(workoutSessions.finishedAt))).all();
-  for (const s of open) {
-    if (s.programId === program.id && s.dayPosition === dayPosition) return { ok: true, sessionId: s.id };
-    const view = getSession(clientId, s.id);
-    if (view && setsDone(view.exercises).done === 0) {
-      db.delete(workoutSessions).where(eq(workoutSessions.id, s.id)).run();
-    } else {
-      return { ok: false, error: `Finish or discard your ${s.dayName} workout first.`, inProgressId: s.id };
-    }
-  }
+  const blocked = clearOpenSessions(clientId, (s) => s.programId === program.id && s.dayPosition === dayPosition);
+  if (blocked) return blocked;
 
   return db.transaction((tx) => {
     const now = Date.now();
@@ -67,6 +59,84 @@ export function startSession(clientId: number, program: ProgramInput, dayPositio
     });
     return { ok: true as const, sessionId: row.id };
   });
+}
+
+/**
+ * Before a new workout: resume one that matches, drop open ones with nothing
+ * ticked, and refuse while one with work in it is still open.
+ */
+function clearOpenSessions(clientId: number, matches: (s: WorkoutSession) => boolean): StartResult | null {
+  const open = db.select().from(workoutSessions).where(and(eq(workoutSessions.clientId, clientId), isNull(workoutSessions.finishedAt))).all();
+  for (const s of open) {
+    if (matches(s)) return { ok: true, sessionId: s.id };
+    const view = getSession(clientId, s.id);
+    if (view && setsDone(view.exercises).done === 0) {
+      db.delete(workoutSessions).where(eq(workoutSessions.id, s.id)).run();
+    } else {
+      return { ok: false, error: `Finish or discard your ${s.dayName} workout first.`, inProgressId: s.id };
+    }
+  }
+  return null;
+}
+
+export const OWN_WORKOUT_TITLE = "Own workout";
+
+/** A workout the member builds as they go, outside any programme. */
+export function startFreeSession(clientId: number): StartResult {
+  const blocked = clearOpenSessions(clientId, (s) => s.programId === null);
+  if (blocked) return blocked;
+  const now = Date.now();
+  const [row] = db
+    .insert(workoutSessions)
+    .values({ clientId, programId: null, dayPosition: 0, programTitle: OWN_WORKOUT_TITLE, dayName: "Workout", startedAt: now, updatedAt: now })
+    .returning({ id: workoutSessions.id })
+    .all();
+  return { ok: true, sessionId: row.id };
+}
+
+/** Add an exercise to the end of a member's session, with `sets` empty sets. */
+export function addSessionExercise(
+  clientId: number,
+  sessionId: number,
+  ex: { exerciseId: number | null; name: string; sets?: number },
+): SessionExercise | null {
+  const session = db.select().from(workoutSessions).where(and(eq(workoutSessions.id, sessionId), eq(workoutSessions.clientId, clientId))).get();
+  const name = ex.name.trim().slice(0, 120);
+  if (!session || !name) return null;
+  const count = db.select({ id: workoutSessionExercises.id }).from(workoutSessionExercises).where(eq(workoutSessionExercises.sessionId, sessionId)).all().length;
+  if (count >= 60) return null;
+  const n = Math.max(1, Math.min(MAX_SETS, ex.sets ?? 3));
+  return db.transaction((tx) => {
+    const [row] = tx
+      .insert(workoutSessionExercises)
+      .values({ sessionId, position: count, section: "workout", exerciseKey: exerciseKey(ex.exerciseId, name), name, targetSets: n, targetReps: null, restSeconds: 90, notes: null })
+      .returning()
+      .all();
+    for (let k = 1; k <= n; k++) tx.insert(workoutSetLogs).values({ sessionExerciseId: row.id, setNumber: k, done: false }).run();
+    tx.update(workoutSessions).set({ updatedAt: Date.now() }).where(eq(workoutSessions.id, sessionId)).run();
+    return {
+      id: row.id,
+      section: "workout" as const,
+      exerciseKey: row.exerciseKey,
+      name: row.name,
+      targetSets: n,
+      targetReps: null,
+      restSeconds: 90,
+      notes: null,
+      sets: Array.from({ length: n }, () => ({ weightKg: null, reps: null, done: false })),
+    };
+  });
+}
+
+export function removeSessionExercise(clientId: number, sessionId: number, sessionExerciseId: number): boolean {
+  const session = db.select().from(workoutSessions).where(and(eq(workoutSessions.id, sessionId), eq(workoutSessions.clientId, clientId))).get();
+  if (!session) return false;
+  return (
+    db
+      .delete(workoutSessionExercises)
+      .where(and(eq(workoutSessionExercises.id, sessionExerciseId), eq(workoutSessionExercises.sessionId, sessionId)))
+      .run().changes > 0
+  );
 }
 
 function assemble(rows: WorkoutSession[]): SessionView[] {

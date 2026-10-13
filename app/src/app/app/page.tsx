@@ -1,12 +1,17 @@
 import Link from "next/link";
-import { CalendarRange, ChevronRight, CreditCard, Dumbbell, Play, Salad, ScanLine } from "lucide-react";
+import { CalendarRange, ChevronRight, CreditCard, Dumbbell, Play, Salad, ScanLine, TrendingUp, Trophy } from "lucide-react";
 
 import { requireClientPage } from "@/lib/clientAuth";
 import { clientDashboard, clientUpcoming } from "@/lib/clientApp";
 import { Card, dayLabel, euros, SectionTitle } from "@/components/clientapp/ui";
 import { bodyScansEnabled, getScanProfile, listClientScans } from "@/lib/inbody/scans";
 import { formatMetric } from "@/lib/inbody/metrics";
-import { openSession, sessionSummary } from "@/lib/workoutLog";
+import { formatChange } from "@/lib/inbody/metrics";
+import { trainingOverview } from "@/lib/trainingOverview";
+import { dateKey, signed } from "@/lib/trainingProgress";
+import { formatSet } from "@/lib/workoutLogModel";
+import { WeekStrip } from "@/components/clientapp/WeekStrip";
+import { StartWorkoutButton } from "@/components/clientapp/StartWorkoutButton";
 
 export const dynamic = "force-dynamic";
 
@@ -14,11 +19,18 @@ export default async function ClientHome() {
   const { clientId, client, tenantId } = requireClientPage();
   const scansOn = bodyScansEnabled(tenantId);
   const scanConsent = scansOn ? getScanProfile(clientId).consentAt !== null : false;
-  const latestScan = scanConsent ? listClientScans(clientId).find((s) => Object.keys(s.metrics).length > 0) : undefined;
+  const scans = scanConsent ? listClientScans(clientId).filter((s) => Object.keys(s.metrics).length > 0) : [];
+  const latestScan = scans[0];
+  const firstScan = scans[scans.length - 1];
   const d = clientDashboard(clientId);
   const upcoming = clientUpcoming(clientId, 3);
-  const openWorkout = openSession(clientId);
-  const openSum = openWorkout ? sessionSummary(openWorkout) : null;
+  const t = trainingOverview(clientId);
+  const today = dateKey(Date.now());
+  const showTraining = t.programs.length > 0 || t.totalWorkouts > 0;
+  const strengthNow = t.strength.length && t.lifts.some((l) => l.sessions > 1) ? t.strength[t.strength.length - 1].value : null;
+  const muscle = latestScan && firstScan && latestScan !== firstScan ? formatChange("smm", latestScan.metrics.smm, firstScan.metrics.smm) : null;
+  const fat = latestScan && firstScan && latestScan !== firstScan ? formatChange("pbf", latestScan.metrics.pbf, firstScan.metrics.pbf) : null;
+  const showProgress = strengthNow !== null || muscle !== null || fat !== null;
   const pct = d.weekBooked > 0 ? Math.round((d.weekAttended / d.weekBooked) * 100) : 0;
 
   return (
@@ -30,16 +42,74 @@ export default async function ClientHome() {
         </h1>
       </div>
 
-      {openWorkout && openSum && (
-        <Link href={`/app/workouts/log/${openWorkout.id}`}>
+      {t.open && (
+        <Link href={`/app/workouts/log/${t.open.id}`}>
           <Card style={{ borderColor: "var(--accent)", background: "var(--accent-soft)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <span style={{ ...iconBox, background: "var(--accent)", color: "#fff" }}><Play size={17} /></span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Continue {openWorkout.dayName}</div>
-                <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>{openSum.done} of {openSum.total} sets done</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Continue {t.open.dayName}</div>
+                <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>{t.open.done} of {t.open.total} sets done</div>
               </div>
               <ChevronRight size={18} style={{ color: "var(--text-tertiary)" }} />
+            </div>
+          </Card>
+        </Link>
+      )}
+
+      {/* training */}
+      {showTraining && (
+        <Card style={{ display: "grid", gap: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Training this week</span>
+            <Link href="/app/workouts" style={{ fontSize: 13, color: "var(--accent-ink)" }}>
+              Workouts
+            </Link>
+          </div>
+          {t.plan && <WeekStrip days={t.plan.days} todayKey={today} />}
+          {t.plan && t.plan.weekdays.length === 0 && (
+            <Link href="/app/workouts/plan" style={{ fontSize: 13, color: "var(--accent-ink)", marginTop: -4 }}>
+              Pick your training days to plan your week
+            </Link>
+          )}
+          {!t.open && t.next && (
+            <div style={{ display: "flex", alignItems: "center", gap: 12, borderTop: "1px solid var(--hairline)", paddingTop: 12 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Next up</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.next.dayName}</div>
+              </div>
+              <div style={{ width: 112, flexShrink: 0 }}>
+                <StartWorkoutButton programId={t.next.programId} dayPosition={t.next.dayPosition} label="Start" size="sm" />
+              </div>
+            </div>
+          )}
+          {t.last && (
+            <div style={{ fontSize: 12.5, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+              Last workout: {t.last.dayName}, {new Date(t.last.finishedAt).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short", timeZone: "Europe/Dublin" })}, {t.last.sets} sets
+            </div>
+          )}
+          {t.latestBest && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--text-secondary)" }}>
+              <Trophy size={14} style={{ color: "var(--accent-ink)", flexShrink: 0 }} />
+              Latest best: {t.latestBest.name} {formatSet(t.latestBest)}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* progress */}
+      {showProgress && (
+        <Link href="/app/progress">
+          <Card style={{ display: "grid", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <TrendingUp size={16} style={{ color: "var(--accent-ink)" }} />
+              <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Your progress</span>
+              <ChevronRight size={18} style={{ color: "var(--text-tertiary)" }} />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+              <MiniStat label="Strength" value={strengthNow !== null ? signed(strengthNow, "%") : "-"} good={strengthNow !== null && strengthNow > 0} />
+              <MiniStat label="Muscle" value={muscle?.text ?? "-"} good={muscle?.tone === "good"} />
+              <MiniStat label="Body fat" value={fat?.text ?? "-"} good={fat?.tone === "good"} />
             </div>
           </Card>
         </Link>
@@ -146,12 +216,21 @@ export default async function ClientHome() {
       )}
 
       {/* quick tiles */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
         <Tile href="/app/timetable" icon={<CalendarRange size={20} />} label="Book a class" />
         <Tile href="/app/nutrition" icon={<Salad size={20} />} label="My nutrition" />
         <Tile href="/app/workouts" icon={<Dumbbell size={20} />} label="My workouts" />
         <Tile href="/app/membership" icon={<CreditCard size={20} />} label="Membership" />
       </div>
+    </div>
+  );
+}
+
+function MiniStat({ label, value, good }: { label: string; value: string; good: boolean }) {
+  return (
+    <div style={{ display: "grid", gap: 2 }}>
+      <span style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>{label}</span>
+      <span style={{ fontSize: 16, fontWeight: 600, color: good ? "var(--success)" : "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>{value}</span>
     </div>
   );
 }

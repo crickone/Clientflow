@@ -3,12 +3,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Minus, Plus, Timer, Trophy } from "lucide-react";
+import { Check, Minus, Plus, Timer, Trash2, Trophy } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
 import { Card, PageTitle, SectionTitle } from "@/components/clientapp/ui";
-import { discardWorkoutAction, finishWorkoutAction, saveWorkoutAction, type FinishResult } from "@/app/app/actions";
+import {
+  addWorkoutExerciseAction,
+  discardWorkoutAction,
+  finishWorkoutAction,
+  removeWorkoutExerciseAction,
+  saveWorkoutAction,
+  type ExerciseHit,
+  type FinishResult,
+} from "@/app/app/actions";
+import { ExercisePicker } from "@/components/clientapp/ExercisePicker";
 import { SECTIONS } from "@/lib/workoutModel";
 import {
   completeSet,
@@ -20,6 +29,7 @@ import {
   targetRepsNumber,
   volumeKg,
   type LoggedSet,
+  type SessionExercise,
   type SessionView,
 } from "@/lib/workoutLogModel";
 
@@ -63,6 +73,10 @@ export function WorkoutLogger({ session, previous }: { session: SessionView; pre
   const [confirm, setConfirm] = useState<"finish" | "discard" | null>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Extract<FinishResult, { ok: true }> | null>(null);
+  const [exercises, setExercises] = useState<SessionExercise[]>(session.exercises);
+  const [prevMap, setPrevMap] = useState(previous);
+  const [picking, setPicking] = useState(false);
+  const [removing, setRemoving] = useState<number | null>(null);
 
   const dirty = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -104,12 +118,13 @@ export function WorkoutLogger({ session, previous }: { session: SessionView; pre
     };
   }, [flush]);
 
-  // One clock for the elapsed time and the rest countdown.
+  // The clock only runs during a rest countdown.
   useEffect(() => {
-    if (finishedAlready || result) return;
+    if (!rest) return;
+    setNow(Date.now());
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
-  }, [finishedAlready, result]);
+  }, [rest]);
 
   useEffect(() => {
     if (rest && now >= rest.until) {
@@ -140,7 +155,29 @@ export function WorkoutLogger({ session, previous }: { session: SessionView; pre
     update(exId, (xs) => xs.map((x) => ({ ...x, done: !allDone })));
   }
 
-  const all = session.exercises.flatMap((e) => draft[e.id] ?? []);
+  async function addExercise(hit: ExerciseHit) {
+    setPicking(false);
+    const r = await addWorkoutExerciseAction(session.id, hit);
+    if (!r.ok) return void toast.error(r.error);
+    setExercises((xs) => [...xs, r.exercise]);
+    setDraft((d) => ({ ...d, [r.exercise.id]: r.exercise.sets.map(toDraft) }));
+    if (r.previous.length) setPrevMap((m) => ({ ...m, [r.exercise.exerciseKey]: r.previous }));
+    setTimeout(() => document.getElementById(`wl-ex-${r.exercise.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+  }
+
+  async function removeExercise(id: number) {
+    setRemoving(null);
+    const r = await removeWorkoutExerciseAction(session.id, id);
+    if (!r.ok) return void toast.error("Couldn't remove that exercise.");
+    setExercises((xs) => xs.filter((x) => x.id !== id));
+    setDraft((d) => {
+      const next = { ...d };
+      delete next[id];
+      return next;
+    });
+  }
+
+  const all = exercises.flatMap((e) => draft[e.id] ?? []);
   const doneCount = all.filter((s) => s.done).length;
   const left = all.length - doneCount;
 
@@ -173,7 +210,7 @@ export function WorkoutLogger({ session, previous }: { session: SessionView; pre
   }
 
   if (result) {
-    const logged = session.exercises.map((e) => ({ sets: (draft[e.id] ?? []).map(toLogged) }));
+    const logged = exercises.map((e) => ({ sets: (draft[e.id] ?? []).map(toLogged) }));
     const vol = volumeKg(logged);
     return (
       <div className="wl">
@@ -219,14 +256,14 @@ export function WorkoutLogger({ session, previous }: { session: SessionView; pre
       <PageTitle sub={sub}>{session.dayName}</PageTitle>
 
       {SECTIONS.map((sec) => {
-        const exercises = session.exercises.filter((e) => e.section === sec.key);
-        if (exercises.length === 0) return null;
+        const inSection = exercises.filter((e) => e.section === sec.key);
+        if (inSection.length === 0) return null;
         return (
           <div key={sec.key} className="wl-section">
-            {SECTIONS.filter((s) => session.exercises.some((e) => e.section === s.key)).length > 1 && <SectionTitle>{sec.label}</SectionTitle>}
-            {exercises.map((ex) => {
+            {SECTIONS.filter((s) => exercises.some((e) => e.section === s.key)).length > 1 && <SectionTitle>{sec.label}</SectionTitle>}
+            {inSection.map((ex) => {
               const sets = draft[ex.id] ?? [];
-              const prev = previous[ex.exerciseKey] ?? [];
+              const prev = prevMap[ex.exerciseKey] ?? [];
               const allDone = sets.length > 0 && sets.every((s) => s.done);
               if (sec.key !== "workout") {
                 return (
@@ -249,7 +286,8 @@ export function WorkoutLogger({ session, previous }: { session: SessionView; pre
                 );
               }
               return (
-                <Card key={ex.id} style={{ padding: "14px 12px 10px" }}>
+                <Card key={ex.id} style={{ padding: "14px 12px 10px", scrollMarginTop: 80 }}>
+                  <span id={`wl-ex-${ex.id}`} />
                   <div className="wl-ex-head">
                     <div className="wl-ex-name" data-done={allDone}>
                       {ex.name}
@@ -315,6 +353,15 @@ export function WorkoutLogger({ session, previous }: { session: SessionView; pre
                         <Minus size={14} /> Remove last set
                       </button>
                     )}
+                    {removing === ex.id ? (
+                      <button type="button" className="wl-link wl-link-danger" style={{ marginLeft: "auto" }} onClick={() => removeExercise(ex.id)}>
+                        Tap again to remove
+                      </button>
+                    ) : (
+                      <button type="button" className="wl-link wl-link-quiet" style={{ marginLeft: "auto" }} aria-label={`Remove ${ex.name}`} onClick={() => setRemoving(ex.id)}>
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </div>
                 </Card>
               );
@@ -322,6 +369,17 @@ export function WorkoutLogger({ session, previous }: { session: SessionView; pre
           </div>
         );
       })}
+
+      {exercises.length === 0 && (
+        <Card style={{ display: "grid", gap: 6, textAlign: "center", padding: "22px 16px" }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>Add your first exercise</div>
+          <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>Search the gym&rsquo;s library or type your own.</div>
+        </Card>
+      )}
+      <Button variant="secondary" onClick={() => setPicking(true)} style={{ width: "100%" }}>
+        <Plus size={16} /> Add exercise
+      </Button>
+      {picking && <ExercisePicker onClose={() => setPicking(false)} onPick={addExercise} />}
 
       <div className="wl-footer">
         {confirm === "finish" ? (
@@ -383,8 +441,7 @@ export function WorkoutLogger({ session, previous }: { session: SessionView; pre
             </>
           ) : (
             <>
-              <span className="wl-bar-main">{clock(now - session.startedAt)}</span>
-              <span className="wl-bar-sub">
+              <span className="wl-bar-main">
                 {doneCount} of {all.length} sets
               </span>
               <span className="wl-bar-save">{saveState === "saving" ? "Saving" : saveState === "error" ? "Not saved yet" : saveState === "saved" ? "Saved" : ""}</span>

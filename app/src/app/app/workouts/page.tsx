@@ -3,8 +3,12 @@ import { ChevronRight, Dumbbell, History, Play, TrendingUp } from "lucide-react"
 
 import { requireClientPage } from "@/lib/clientAuth";
 import { assignedWorkoutPrograms } from "@/lib/clientApp";
-import { listSessions, openSession, sessionSummary } from "@/lib/workoutLog";
+import { listSessions, sessionSummary } from "@/lib/workoutLog";
+import { trainingOverview } from "@/lib/trainingOverview";
+import { dateKey, WEEKDAY_SHORT } from "@/lib/trainingProgress";
 import { Card, PageTitle, SectionTitle } from "@/components/clientapp/ui";
+import { WeekStrip } from "@/components/clientapp/WeekStrip";
+import { StartWorkoutButton } from "@/components/clientapp/StartWorkoutButton";
 
 export const dynamic = "force-dynamic";
 
@@ -17,22 +21,23 @@ function when(ms: number) {
 export default async function ClientWorkoutsPage() {
   const { clientId } = requireClientPage();
   const programs = assignedWorkoutPrograms(clientId);
-  const open = openSession(clientId);
+  const t = trainingOverview(clientId);
   const recent = listSessions(clientId, 3);
-  const openSum = open ? sessionSummary(open) : null;
+  const today = dateKey(Date.now());
+  const plannedToday = t.plan?.days.find((d) => d.date === today && d.status === "today");
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <PageTitle sub="Your training programmes">Workouts</PageTitle>
+      <PageTitle sub="Plan, log and track your training">Workouts</PageTitle>
 
-      {open && openSum && (
-        <Link href={`/app/workouts/log/${open.id}`}>
+      {t.open && (
+        <Link href={`/app/workouts/log/${t.open.id}`}>
           <Card style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderColor: "var(--accent)", background: "var(--accent-soft)" }}>
             <span style={{ ...iconBox, background: "var(--accent)", color: "#fff" }}><Play size={17} /></span>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14.5, fontWeight: 600, color: "var(--text-primary)" }}>Continue {open.dayName}</div>
+              <div style={{ fontSize: 14.5, fontWeight: 600, color: "var(--text-primary)" }}>Continue {t.open.dayName}</div>
               <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
-                {openSum.done} of {openSum.total} sets done · started {new Date(open.startedAt).toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Dublin" })}
+                {t.open.done} of {t.open.total} sets done
               </div>
             </div>
             <ChevronRight size={18} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
@@ -40,17 +45,40 @@ export default async function ClientWorkoutsPage() {
         </Link>
       )}
 
+      {t.plan && t.next && (
+        <Card style={{ display: "grid", gap: 14, padding: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+            <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>This week</span>
+            <Link href="/app/workouts/plan" style={{ fontSize: 13, color: "var(--accent-ink)", whiteSpace: "nowrap" }}>
+              {t.plan.weekdays.length ? t.plan.weekdays.map((d) => WEEKDAY_SHORT[d - 1]).join(", ") : "Set training days"}
+            </Link>
+          </div>
+          <WeekStrip days={t.plan.days} todayKey={today} />
+          {!t.open && (
+            <div style={{ display: "grid", gap: 8, borderTop: "1px solid var(--hairline)", paddingTop: 14 }}>
+              <div style={{ display: "grid", gap: 2 }}>
+                <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{plannedToday ? "Today" : "Next up"}</span>
+                <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>{t.next.dayName}</span>
+                <span style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>{t.next.programTitle}</span>
+              </div>
+              <StartWorkoutButton programId={t.next.programId} dayPosition={t.next.dayPosition} label={`Start ${t.next.dayName}`} />
+            </div>
+          )}
+        </Card>
+      )}
+
       {programs.length === 0 ? (
-        <Card><div style={{ fontSize: 13.5, color: "var(--text-secondary)", textAlign: "center", padding: "16px 0" }}>No workout programme yet. Your coach will add one soon.</div></Card>
+        <Card><div style={{ fontSize: 13.5, color: "var(--text-secondary)", textAlign: "center", padding: "16px 0" }}>No programme yet. Your coach will add one, and you can log your own workouts in the meantime.</div></Card>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ display: "grid", gap: 8 }}>
+          <SectionTitle>Your programmes</SectionTitle>
           {programs.map((p) => (
             <Link key={p.id} href={`/app/workouts/${p.id}`}>
               <Card style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px" }}>
                 <span style={iconBox}><Dumbbell size={18} /></span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14.5, fontWeight: 600, color: "var(--text-primary)" }}>{p.title}</div>
-                  <div style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>{p.type === "detailed" ? "Pick a day to start" : TYPE_LABEL[p.type] ?? p.type}</div>
+                  <div style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>{p.type === "detailed" ? "See every day" : TYPE_LABEL[p.type] ?? p.type}</div>
                 </div>
                 <ChevronRight size={18} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
               </Card>
@@ -59,17 +87,19 @@ export default async function ClientWorkoutsPage() {
         </div>
       )}
 
+      {!t.open && <StartWorkoutButton variant="secondary" label="Log your own workout" />}
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+        <Link href="/app/progress">
+          <Card style={{ display: "flex", flexDirection: "column", gap: 8, padding: 14 }}>
+            <span style={{ color: "var(--accent-ink)" }}><TrendingUp size={20} /></span>
+            <span style={{ fontSize: 13.5, fontWeight: 500, color: "var(--text-primary)" }}>Progress</span>
+          </Card>
+        </Link>
         <Link href="/app/workouts/history">
           <Card style={{ display: "flex", flexDirection: "column", gap: 8, padding: 14 }}>
             <span style={{ color: "var(--accent-ink)" }}><History size={20} /></span>
             <span style={{ fontSize: 13.5, fontWeight: 500, color: "var(--text-primary)" }}>History</span>
-          </Card>
-        </Link>
-        <Link href="/app/workouts/progress">
-          <Card style={{ display: "flex", flexDirection: "column", gap: 8, padding: 14 }}>
-            <span style={{ color: "var(--accent-ink)" }}><TrendingUp size={20} /></span>
-            <span style={{ fontSize: 13.5, fontWeight: 500, color: "var(--text-primary)" }}>My lifts</span>
           </Card>
         </Link>
       </div>

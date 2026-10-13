@@ -1,4 +1,8 @@
 import type { LiftRecord } from "@/lib/workoutLog";
+import type { TrainingOverview } from "@/lib/trainingOverview";
+import { signed, WEEKDAY_SHORT } from "@/lib/trainingProgress";
+import { TrendChart } from "@/components/bodyscans/TrendChart";
+import { WeekBars } from "@/components/progress/WeekBars";
 import { durationLabel, formatSet, setsDone, volumeKg, type SessionView } from "@/lib/workoutLogModel";
 
 function day(ms: number) {
@@ -6,7 +10,17 @@ function day(ms: number) {
 }
 
 /** Staff view of what a member has logged in the app: best lifts, then each session set by set. */
-export function ClientWorkoutLog({ sessions, records, open }: { sessions: SessionView[]; records: LiftRecord[]; open: SessionView | null }) {
+export function ClientWorkoutLog({
+  sessions,
+  records,
+  open,
+  overview,
+}: {
+  sessions: SessionView[];
+  records: LiftRecord[];
+  open: SessionView | null;
+  overview: TrainingOverview;
+}) {
   if (sessions.length === 0 && !open) {
     return (
       <div className="bs-empty">
@@ -16,8 +30,8 @@ export function ClientWorkoutLog({ sessions, records, open }: { sessions: Sessio
     );
   }
   const last = sessions[0];
-  const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
-  const thisWeek = sessions.filter((s) => s.finishedAt! >= weekAgo).length;
+  const tracked = overview.lifts.filter((l) => l.sessions > 1).length;
+  const strengthNow = overview.strength.length && tracked ? overview.strength[overview.strength.length - 1].value : null;
 
   return (
     <div className="wlog">
@@ -27,8 +41,16 @@ export function ClientWorkoutLog({ sessions, records, open }: { sessions: Sessio
           <span className="bs-tile-value">{sessions.length}</span>
         </div>
         <div className="bs-tile">
-          <span className="bs-tile-label">Last 7 days</span>
-          <span className="bs-tile-value">{thisWeek}</span>
+          <span className="bs-tile-label">Last 30 days</span>
+          <span className="bs-tile-value">{overview.workouts30}</span>
+        </div>
+        <div className="bs-tile">
+          <span className="bs-tile-label">Week streak</span>
+          <span className="bs-tile-value">{overview.streak}</span>
+        </div>
+        <div className="bs-tile">
+          <span className="bs-tile-label">Strength</span>
+          <span className="bs-tile-value">{strengthNow !== null ? signed(strengthNow, "%") : "-"}</span>
         </div>
         <div className="bs-tile">
           <span className="bs-tile-label">Last workout</span>
@@ -39,6 +61,29 @@ export function ClientWorkoutLog({ sessions, records, open }: { sessions: Sessio
         <p className="bs-muted" style={{ margin: 0 }}>
           In progress now: {open.dayName}, {setsDone(open.exercises).done} of {setsDone(open.exercises).total} sets ticked.
         </p>
+      )}
+
+      {overview.plan && (
+        <p className="bs-muted" style={{ margin: 0 }}>
+          Follows {overview.plan.programTitle}
+          {overview.plan.weekdays.length ? `, training ${overview.plan.weekdays.map((d) => WEEKDAY_SHORT[d - 1]).join(", ")}` : ", no training days picked yet"}.
+          {overview.next ? ` Next up: ${overview.next.dayName}.` : ""}
+        </p>
+      )}
+
+      {sessions.length > 0 && (
+        <div className="bs-charts">
+          <div className="bs-chart">
+            <div className="bs-chart-label">Workouts each week</div>
+            <WeekBars label="Workouts each week" weeks={overview.weeks.map((w) => ({ weekStart: w.weekStart, value: w.workouts }))} />
+          </div>
+          {overview.strength.length > 1 && tracked > 0 && (
+            <div className="bs-chart">
+              <div className="bs-chart-label">Strength, average change in estimated max</div>
+              <TrendChart label="Strength" unit="%" points={overview.strength} />
+            </div>
+          )}
+        </div>
       )}
 
       {records.length > 0 && (

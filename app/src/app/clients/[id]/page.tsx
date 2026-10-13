@@ -49,6 +49,7 @@ import { getCurrentMembership } from "@/lib/auth";
 import { bodyScansEnabled, getScanProfile, listClientScans } from "@/lib/inbody/scans";
 import { liftRecords, listSessions, openSession } from "@/lib/workoutLog";
 import { ClientWorkoutLog } from "@/components/clients/ClientWorkoutLog";
+import { trainingOverview } from "@/lib/trainingOverview";
 import { ClientBodyScans } from "@/components/clients/ClientBodyScans";
 
 export const dynamic = "force-dynamic";
@@ -87,6 +88,7 @@ export default async function ClientProfile({
   const openWorkout = openSession(id);
   const showWorkoutLog = assignedWk.length > 0 || workoutSessions.length > 0 || openWorkout !== null;
   const lifts = showWorkoutLog ? liftRecords(id) : [];
+  const training = showWorkoutLog ? trainingOverview(id) : null;
 
   return (
     <div className="app-page">
@@ -190,9 +192,9 @@ export default async function ClientProfile({
           {showScans && <TabsTrigger value="scans">Body scans ({scans.length})</TabsTrigger>}
         </TabsList>
 
-        {showWorkoutLog && (
+        {showWorkoutLog && training && (
           <TabsContent value="workouts">
-            <ClientWorkoutLog sessions={workoutSessions} records={lifts} open={openWorkout} />
+            <ClientWorkoutLog sessions={workoutSessions} records={lifts} open={openWorkout} overview={training} />
           </TabsContent>
         )}
 

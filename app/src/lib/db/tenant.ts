@@ -2827,6 +2827,12 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       done INTEGER NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_wsl_exercise ON workout_set_logs(session_exercise_id, set_number);
+    CREATE TABLE IF NOT EXISTS training_plans (
+      client_id INTEGER PRIMARY KEY REFERENCES clients(id) ON DELETE CASCADE,
+      program_id INTEGER REFERENCES workout_programs(id) ON DELETE SET NULL,
+      weekdays TEXT NOT NULL DEFAULT '',
+      updated_at INTEGER NOT NULL
+    );
   `);
 
   // Dashboard slice 2: stamp each event recorder's start date once.

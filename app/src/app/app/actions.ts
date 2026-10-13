@@ -7,7 +7,22 @@ import { requireClient } from "@/lib/clientAuth";
 import { assignedWorkoutProgramDetail, clientMembership } from "@/lib/clientApp";
 import { bookClient, removeBooking } from "@/lib/timetable";
 import { setScanConsent } from "@/lib/inbody/scans";
-import { deleteSession, exerciseHistory, finishSession, getSession, saveSessionSets, startSession, type StartResult } from "@/lib/workoutLog";
+import {
+  addSessionExercise,
+  deleteSession,
+  exerciseHistory,
+  finishSession,
+  getSession,
+  listSessions,
+  removeSessionExercise,
+  saveSessionSets,
+  startFreeSession,
+  startSession,
+  type StartResult,
+} from "@/lib/workoutLog";
+import { listExercises } from "@/lib/exerciseLibrary";
+import { setTrainingPlan } from "@/lib/trainingOverview";
+import type { LoggedSet, SessionExercise } from "@/lib/workoutLogModel";
 import { personalBests } from "@/lib/workoutLogModel";
 
 export type BookResult = { ok: true } | { ok: false; error: string };
@@ -107,4 +122,84 @@ export async function discardWorkoutAction(sessionId: number): Promise<{ ok: boo
   revalidatePath("/app/workouts");
   revalidatePath("/app");
   return { ok };
+}
+
+export async function startOwnWorkoutAction(): Promise<StartResult> {
+  const { clientId } = requireClient();
+  const r = startFreeSession(clientId);
+  revalidatePath("/app/workouts");
+  return r;
+}
+
+export interface ExerciseHit {
+  exerciseId: number | null;
+  name: string;
+  detail: string | null;
+}
+
+/**
+ * Exercises for the member's add-exercise search: the gym's library by name,
+ * or with no search, the ones they've logged lately.
+ */
+export async function searchExercisesAction(query: string): Promise<ExerciseHit[]> {
+  const { clientId } = requireClient();
+  const q = String(query ?? "").trim().toLowerCase().slice(0, 60);
+  if (!q) {
+    const seen = new Map<string, ExerciseHit>();
+    for (const s of listSessions(clientId, 15)) {
+      for (const e of s.exercises) {
+        if (e.section !== "workout" || seen.has(e.exerciseKey)) continue;
+        const id = e.exerciseKey.startsWith("lib:") ? Number(e.exerciseKey.slice(4)) : null;
+        seen.set(e.exerciseKey, { exerciseId: id, name: e.name, detail: "Done before" });
+      }
+    }
+    return [...seen.values()].slice(0, 25);
+  }
+  const words = q.split(/\s+/);
+  return listExercises()
+    .filter((e) => words.every((w) => e.name.toLowerCase().includes(w)))
+    .sort((a, b) => Number(!a.name.toLowerCase().startsWith(q)) - Number(!b.name.toLowerCase().startsWith(q)) || a.name.length - b.name.length)
+    .slice(0, 25)
+    .map((e) => ({ exerciseId: e.id, name: e.name, detail: e.muscleGroups.slice(0, 3).join(", ") || e.category }));
+}
+
+export async function addWorkoutExerciseAction(
+  sessionId: number,
+  exercise: { exerciseId: number | null; name: string },
+): Promise<{ ok: true; exercise: SessionExercise; previous: LoggedSet[] } | { ok: false; error: string }> {
+  const { clientId } = requireClient();
+  const id = idSchema.safeParse(sessionId);
+  const ex = z.object({ exerciseId: z.number().int().positive().nullable(), name: z.string().trim().min(1).max(120) }).safeParse(exercise);
+  if (!id.success || !ex.success) return { ok: false, error: "Couldn't add that exercise." };
+  // A library id must be a real exercise in this gym's library; the name comes from the library, not the request.
+  let name = ex.data.name;
+  if (ex.data.exerciseId !== null) {
+    const lib = listExercises().find((e) => e.id === ex.data.exerciseId);
+    if (!lib) return { ok: false, error: "That exercise isn't in the library." };
+    name = lib.name;
+  }
+  const added = addSessionExercise(clientId, id.data, { exerciseId: ex.data.exerciseId, name });
+  if (!added) return { ok: false, error: "Couldn't add that exercise." };
+  const { previous } = exerciseHistory(clientId, [added.exerciseKey], id.data);
+  return { ok: true, exercise: added, previous: previous[added.exerciseKey] ?? [] };
+}
+
+export async function removeWorkoutExerciseAction(sessionId: number, sessionExerciseId: number): Promise<{ ok: boolean }> {
+  const { clientId } = requireClient();
+  const a = idSchema.safeParse(sessionId);
+  const b = idSchema.safeParse(sessionExerciseId);
+  if (!a.success || !b.success) return { ok: false };
+  return { ok: removeSessionExercise(clientId, a.data, b.data) };
+}
+
+export async function saveTrainingDaysAction(programId: number, weekdays: number[]): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { clientId } = requireClient();
+  const p = idSchema.safeParse(programId);
+  const d = z.array(z.number().int().min(1).max(7)).max(7).safeParse(weekdays);
+  if (!p.success || !d.success) return { ok: false, error: "Couldn't save your training days." };
+  if (!assignedWorkoutProgramDetail(clientId, p.data)) return { ok: false, error: "That programme isn't assigned to you." };
+  setTrainingPlan(clientId, p.data, d.data);
+  revalidatePath("/app/workouts");
+  revalidatePath("/app");
+  return { ok: true };
 }
