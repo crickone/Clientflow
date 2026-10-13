@@ -13,6 +13,6 @@ export default async function WorkoutLogPage({ params }: { params: { id: string 
   // getSession is the ownership check: another member's session id is null.
   const session = getSession(clientId, id);
   if (!session) notFound();
-  const { previous } = exerciseHistory(clientId, session.exercises.map((e) => e.exerciseKey), session.id);
-  return <WorkoutLogger session={session} previous={previous} />;
+  const { previous, previousAt } = exerciseHistory(clientId, session.exercises.map((e) => e.exerciseKey), session.id, session.startedAt);
+  return <WorkoutLogger session={session} previous={previous} previousAt={previousAt} />;
 }

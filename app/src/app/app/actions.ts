@@ -166,7 +166,7 @@ export async function searchExercisesAction(query: string): Promise<ExerciseHit[
 export async function addWorkoutExerciseAction(
   sessionId: number,
   exercise: { exerciseId: number | null; name: string },
-): Promise<{ ok: true; exercise: SessionExercise; previous: LoggedSet[] } | { ok: false; error: string }> {
+): Promise<{ ok: true; exercise: SessionExercise; previous: LoggedSet[]; previousAt: number | null } | { ok: false; error: string }> {
   const { clientId } = requireClient();
   const id = idSchema.safeParse(sessionId);
   const ex = z.object({ exerciseId: z.number().int().positive().nullable(), name: z.string().trim().min(1).max(120) }).safeParse(exercise);
@@ -180,8 +180,8 @@ export async function addWorkoutExerciseAction(
   }
   const added = addSessionExercise(clientId, id.data, { exerciseId: ex.data.exerciseId, name });
   if (!added) return { ok: false, error: "Couldn't add that exercise." };
-  const { previous } = exerciseHistory(clientId, [added.exerciseKey], id.data);
-  return { ok: true, exercise: added, previous: previous[added.exerciseKey] ?? [] };
+  const { previous, previousAt } = exerciseHistory(clientId, [added.exerciseKey], id.data);
+  return { ok: true, exercise: added, previous: previous[added.exerciseKey] ?? [], previousAt: previousAt[added.exerciseKey] ?? null };
 }
 
 export async function removeWorkoutExerciseAction(sessionId: number, sessionExerciseId: number): Promise<{ ok: boolean }> {

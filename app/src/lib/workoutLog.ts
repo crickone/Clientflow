@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, desc, eq, inArray, isNotNull, isNull, ne } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, ne } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { workoutSessionExercises, workoutSessions, workoutSetLogs, type WorkoutSession } from "@/lib/db/schema";
@@ -265,12 +265,16 @@ export function exerciseHistory(
   clientId: number,
   keys: string[],
   excludeSessionId?: number,
-): { previous: Record<string, LoggedSet[]>; best: Record<string, number> } {
+  /** Only sessions finished before this moment (the workout being looked at), so reopening an old workout compares it with the one before it. */
+  before?: number,
+): { previous: Record<string, LoggedSet[]>; previousAt: Record<string, number>; best: Record<string, number> } {
   const previous: Record<string, LoggedSet[]> = {};
+  const previousAt: Record<string, number> = {};
   const best: Record<string, number> = {};
-  if (keys.length === 0) return { previous, best };
+  if (keys.length === 0) return { previous, previousAt, best };
   const conds = [eq(workoutSessions.clientId, clientId), isNotNull(workoutSessions.finishedAt), inArray(workoutSessionExercises.exerciseKey, keys)];
   if (excludeSessionId) conds.push(ne(workoutSessions.id, excludeSessionId));
+  if (before) conds.push(lt(workoutSessions.finishedAt, before));
   const exRows = db
     .select({ id: workoutSessionExercises.id, key: workoutSessionExercises.exerciseKey, finishedAt: workoutSessions.finishedAt })
     .from(workoutSessionExercises)
@@ -278,7 +282,7 @@ export function exerciseHistory(
     .where(and(...conds))
     .orderBy(desc(workoutSessions.finishedAt))
     .all();
-  if (exRows.length === 0) return { previous, best };
+  if (exRows.length === 0) return { previous, previousAt, best };
   const sets = db.select().from(workoutSetLogs).where(inArray(workoutSetLogs.sessionExerciseId, exRows.map((r) => r.id))).orderBy(asc(workoutSetLogs.setNumber)).all();
   const setsBy = new Map<number, LoggedSet[]>();
   for (const s of sets) {
@@ -289,11 +293,14 @@ export function exerciseHistory(
   for (const r of exRows) {
     const list = setsBy.get(r.id) ?? [];
     const done = list.filter((s) => s.done);
-    if (!(r.key in previous) && done.length > 0) previous[r.key] = list;
+    if (!(r.key in previous) && done.length > 0) {
+      previous[r.key] = list;
+      previousAt[r.key] = r.finishedAt!;
+    }
     const b = bestSet(list);
     if (b && (best[r.key] === undefined || b.e1rm > best[r.key])) best[r.key] = b.e1rm;
   }
-  return { previous, best };
+  return { previous, previousAt, best };
 }
 
 export interface LiftRecord {

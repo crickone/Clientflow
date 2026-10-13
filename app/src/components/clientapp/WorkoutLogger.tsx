@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Minus, Plus, Timer, Trash2, Trophy } from "lucide-react";
+import { Check, Minus, Plus, Timer, Trash2, TrendingUp, Trophy } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
@@ -20,6 +20,7 @@ import {
 import { ExercisePicker } from "@/components/clientapp/ExercisePicker";
 import { SECTIONS } from "@/lib/workoutModel";
 import {
+  beatsPrevious,
   completeSet,
   durationLabel,
   formatSet,
@@ -63,7 +64,16 @@ function clock(ms: number) {
  * Every change saves to the server shortly after; a finished workout can be
  * reopened from history and corrected.
  */
-export function WorkoutLogger({ session, previous }: { session: SessionView; previous: Record<string, LoggedSet[]> }) {
+export function WorkoutLogger({
+  session,
+  previous,
+  previousAt = {},
+}: {
+  session: SessionView;
+  previous: Record<string, LoggedSet[]>;
+  /** When each exercise was last done (the session "Last time" comes from). */
+  previousAt?: Record<string, number>;
+}) {
   const router = useRouter();
   const finishedAlready = session.finishedAt !== null;
   const [draft, setDraft] = useState<Draft>(() => Object.fromEntries(session.exercises.map((e) => [e.id, e.sets.map(toDraft)])));
@@ -75,6 +85,7 @@ export function WorkoutLogger({ session, previous }: { session: SessionView; pre
   const [result, setResult] = useState<Extract<FinishResult, { ok: true }> | null>(null);
   const [exercises, setExercises] = useState<SessionExercise[]>(session.exercises);
   const [prevMap, setPrevMap] = useState(previous);
+  const [prevAtMap, setPrevAtMap] = useState(previousAt);
   const [picking, setPicking] = useState(false);
   const [removing, setRemoving] = useState<number | null>(null);
 
@@ -162,6 +173,7 @@ export function WorkoutLogger({ session, previous }: { session: SessionView; pre
     setExercises((xs) => [...xs, r.exercise]);
     setDraft((d) => ({ ...d, [r.exercise.id]: r.exercise.sets.map(toDraft) }));
     if (r.previous.length) setPrevMap((m) => ({ ...m, [r.exercise.exerciseKey]: r.previous }));
+    if (r.previousAt) setPrevAtMap((m) => ({ ...m, [r.exercise.exerciseKey]: r.previousAt! }));
     setTimeout(() => document.getElementById(`wl-ex-${r.exercise.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
   }
 
@@ -298,6 +310,11 @@ export function WorkoutLogger({ session, previous }: { session: SessionView; pre
                       {ex.targetReps ? ` x ${ex.targetReps}` : ""}
                       {ex.restSeconds > 0 ? ` · rest ${restLabel(ex.restSeconds)}` : ""}
                     </div>
+                    {prevAtMap[ex.exerciseKey] && (
+                      <div className="wl-ex-last">
+                        Last time: {new Date(prevAtMap[ex.exerciseKey]).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short", timeZone: "Europe/Dublin" })}
+                      </div>
+                    )}
                     {ex.notes && <div className="wl-ex-notes">{ex.notes}</div>}
                   </div>
 
@@ -309,11 +326,15 @@ export function WorkoutLogger({ session, previous }: { session: SessionView; pre
                     <span />
                   </div>
                   {sets.map((s, i) => {
-                    const p = prev[i];
+                    const p = prev[i] && prev[i].done ? prev[i] : undefined;
+                    const beat = beatsPrevious(toLogged(s), p);
                     return (
-                      <div key={i} className="wl-grid wl-set" data-done={s.done}>
+                      <div key={i} className="wl-grid wl-set" data-done={s.done} data-beat={beat}>
                         <span className="wl-setno">{i + 1}</span>
-                        <span className="wl-prev">{p && (p.weightKg !== null || p.reps !== null) ? formatSet(p) : "-"}</span>
+                        <span className="wl-prev">
+                          {p && (p.weightKg !== null || p.reps !== null) ? formatSet(p) : "-"}
+                          {beat && <TrendingUp size={14} strokeWidth={2.5} aria-label="Beat last time" />}
+                        </span>
                         <input
                           className="wl-input"
                           inputMode="decimal"

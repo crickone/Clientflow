@@ -5,6 +5,7 @@
 import assert from "node:assert/strict";
 
 import {
+  beatsPrevious,
   bestSet,
   completeSet,
   exerciseKey,
@@ -72,5 +73,13 @@ const pbs = personalBests(
   { "lib:1": 110, "lib:2": 80 },
 );
 check("only beaten bests count, first-ever lifts do not", pbs.length === 1 && pbs[0].name === "Squat");
+
+check("more weight beats last time", beatsPrevious({ weightKg: 25, reps: 6, done: true }, { weightKg: 22.5, reps: 7, done: true }));
+check("more reps at the same weight beats it", beatsPrevious({ weightKg: 22.5, reps: 8, done: true }, { weightKg: 22.5, reps: 7, done: true }));
+check("same numbers don't", !beatsPrevious({ weightKg: 22.5, reps: 7, done: true }, { weightKg: 22.5, reps: 7, done: true }));
+check("less weight doesn't, even with more reps", !beatsPrevious({ weightKg: 20, reps: 10, done: true }, { weightKg: 22.5, reps: 7, done: true }));
+check("unticked doesn't count", !beatsPrevious({ weightKg: 30, reps: 7, done: false }, { weightKg: 22.5, reps: 7, done: true }));
+check("nothing last time, nothing to beat", !beatsPrevious({ weightKg: 30, reps: 7, done: true }, undefined));
+check("bodyweight: more reps beats it", beatsPrevious({ weightKg: null, reps: 12, done: true }, { weightKg: null, reps: 10, done: true }));
 
 console.log(`workoutLogModel: ${passed} checks passed`);

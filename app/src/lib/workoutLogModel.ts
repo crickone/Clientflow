@@ -156,3 +156,16 @@ export function restLabel(seconds: number): string {
   const s = seconds % 60;
   return `${m}:${String(s).padStart(2, "0")}`;
 }
+
+/**
+ * Did this ticked set beat the same set last time? More weight, or more reps
+ * at the same weight (or more reps on a bodyweight set). Unticked sets, and
+ * sets with nothing to compare against, don't count.
+ */
+export function beatsPrevious(now: LoggedSet, prev: LoggedSet | undefined): boolean {
+  if (!now.done || !prev || !prev.done) return false;
+  const nw = now.weightKg ?? 0;
+  const pw = prev.weightKg ?? 0;
+  if (nw > pw && (now.reps ?? 0) > 0) return true;
+  return nw === pw && (now.reps ?? 0) > (prev.reps ?? 0);
+}
