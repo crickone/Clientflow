@@ -115,6 +115,7 @@ import {
   approveCampaignAssetTool,
   createCampaignTool,
   draftCampaignAssetTool,
+  getCampaignTool,
   launchCampaignTool,
   planCampaignTool,
 } from "@/lib/agents/tools.campaign";
@@ -977,6 +978,8 @@ export async function executeTool(
         return await createCampaignTool(ctx, input);
       case "draft_campaign_asset":
         return await draftCampaignAssetTool(ctx, input);
+      case "get_campaign":
+        return getCampaignTool(ctx, input);
       case "approve_campaign_asset":
         return approveCampaignAssetTool(ctx, input);
       case "load_skill":

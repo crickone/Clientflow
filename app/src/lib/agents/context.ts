@@ -60,6 +60,11 @@ export function composeAgentSystem(tenantId: number, key: string): string {
     skillText,
     menuText,
     custom ? "\n\n=== OPERATOR INSTRUCTIONS (from the Agents tab) ===\n" + custom : "",
+    // Today's date. Without it the model guessed the year (a "Black Friday
+    // 2025" campaign in 2026). Safety rails stay last, by design.
+    "\n\n=== TODAY ===\n" +
+      new Date().toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Dublin" }) +
+      " (Irish time). Use this for every date and year you write.",
     OUTPUT_STYLE,
     SAFETY_RAILS,
   ].join("");

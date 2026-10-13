@@ -5,6 +5,7 @@ import {
   getSignoffRule,
 } from "@/lib/ai/businessContext";
 import { CONTENT_MODEL } from "@/lib/ai/client";
+import { splitSubjectLine } from "@/lib/ai/subjectLine";
 import { meteredCreate, type MeterContext } from "@/lib/ai/metered";
 
 /**
@@ -52,10 +53,14 @@ export interface CampaignDraftInput {
   /** Free-text description of who this is going to (e.g. "existing clients who haven't booked in 3 months") — helps the model pitch the copy right. Distinct from the campaign's structured audience targeting. */
   audience?: string | null;
   targetWords: number;
+  /** Let the model write the subject line (campaign kits); `subject` is then only an idea to improve on. */
+  writeSubject?: boolean;
 }
 
 export interface CampaignDraftResult {
   content: string;
+  /** The subject the model wrote, when `writeSubject` was set and it gave one. */
+  subject?: string | null;
   usage: {
     inputTokens: number;
     outputTokens: number;
@@ -66,7 +71,14 @@ export interface CampaignDraftResult {
 
 function buildUserPrompt(input: CampaignDraftInput): string {
   const lines: string[] = [];
-  lines.push(`Email subject line (already decided — do not restate it as a heading): ${input.subject}`);
+  if (input.writeSubject) {
+    lines.push(
+      "Start your reply with one line: \"Subject: \" followed by a subject line for this email, under 60 characters, written for the person reading it. Never use an internal campaign name (e.g. one with a year or 'test' in it). Then a blank line, then the email body.",
+    );
+    if (input.subject) lines.push(`A subject idea to improve on (not to copy): ${input.subject}`);
+  } else {
+    lines.push(`Email subject line (already decided — do not restate it as a heading): ${input.subject}`);
+  }
   lines.push(`Topic / what this email is about: ${input.topic}`);
   lines.push(`Target length: roughly ${input.targetWords} words.`);
   if (input.tone && input.tone.trim()) {
@@ -115,14 +127,17 @@ export async function draftCampaignEmail(
     ],
   }));
 
-  const content = message.content
+  const text = message.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
     .map((b) => b.text)
     .join("\n")
     .trim();
+  const split = input.writeSubject ? splitSubjectLine(text) : { subject: null, body: text };
+  const content = split.body;
 
   return {
     content,
+    subject: split.subject,
     usage: {
       inputTokens: message.usage.input_tokens,
       outputTokens: message.usage.output_tokens,

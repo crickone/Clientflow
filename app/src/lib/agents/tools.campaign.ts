@@ -27,6 +27,7 @@ import {
   setCampaignStatus,
 } from "@/lib/campaigns/store";
 import type { AssetDef, AssetKind, Campaign, CampaignAsset } from "@/lib/campaigns/store";
+import { parseEmailBody, parseLandingBody, parseSocialBody } from "@/lib/campaigns/assetBody";
 import type { ToolContext, ToolResult } from "@/lib/agents/toolKit";
 
 /**
@@ -200,6 +201,16 @@ export const CAMPAIGN_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "get_campaign",
+    description:
+      "Look up a campaign and every asset in it: status, and what each one says (offer text, landing page headline, email subjects, post captions). Read only. Use it to check the drafts before proposing launch_campaign, or whenever you need to see what a campaign contains.",
+    input_schema: {
+      type: "object",
+      properties: { campaignId: { type: "integer" } },
+      required: ["campaignId"],
+    },
+  },
+  {
     name: "launch_campaign",
     description:
       "Launch a campaign once every asset is approved (status 'ready'). Only call this when the operator explicitly asks to launch/go live.",
@@ -215,6 +226,40 @@ export const CAMPAIGN_TOOLS: Anthropic.Tool[] = [
 ];
 
 // ─── Executors ───────────────────────────────────────────────────────────────
+
+/** A short, readable line of what an asset says, from its stored draft. */
+function assetPreview(a: CampaignAsset): string {
+  const raw = (a.body ?? "").trim();
+  if (!raw) return "(not drafted yet)";
+  if (a.kind === "landing_page") {
+    const b = parseLandingBody(raw);
+    if (b) return `Headline: ${b.headline}${b.subhead ? ` / Subhead: ${b.subhead}` : ""}${b.bullets.length ? ` / ${b.bullets.length} points: ${b.bullets.slice(0, 5).join("; ")}` : ""}`;
+  }
+  if (a.kind === "email") {
+    const b = parseEmailBody(raw);
+    if (b) return `Subject: ${b.subject} / ${b.content.replace(/\s+/g, " ").slice(0, 400)}`;
+  }
+  if (a.kind === "social") {
+    const b = parseSocialBody(raw);
+    if (b) return `Caption: ${b.caption.replace(/\s+/g, " ").slice(0, 200)} / ${b.slides.length} slides`;
+  }
+  return raw.replace(/\s+/g, " ").slice(0, 500);
+}
+
+/** READ — a campaign and what each of its assets says, so Adonis can check its own drafts. */
+export function getCampaignTool(_ctx: ToolContext, input: Record<string, unknown>): ToolResult {
+  const campaignId = Number(input.campaignId);
+  if (!campaignId) return { text: JSON.stringify({ error: "campaignId is required." }) };
+  const campaign = getCampaign(campaignId);
+  if (!campaign) return { text: JSON.stringify({ error: `No campaign with id ${campaignId}.` }) };
+  const assets = listAssets(campaignId);
+  return {
+    text: JSON.stringify({
+      campaign: { id: campaign.id, name: campaign.name, status: campaign.status, startsOn: campaign.startsOn, endsOn: campaign.endsOn, offer: campaign.offer },
+      assets: assets.map((a) => ({ id: a.id, kind: a.kind, title: a.title, status: a.status, says: assetPreview(a) })),
+    }),
+  };
+}
 
 /**
  * READ — plans a campaign kit from a brief: proposes name/season/dates and
@@ -302,7 +347,7 @@ export async function planCampaignTool(ctx: ToolContext, input: Record<string, u
     const buildModel = await getCampaignBuildModel();
     const modelLabel = campaignModelLabel(buildModel);
     const estimateCents = estimateCampaignTotalCents(plannedAssets, buildModel);
-    const estimateLine = `Estimated build cost: about ${formatCentsEur(estimateCents)} — writing every asset on ${modelLabel} plus designing the social posts (a designed carousel is roughly EUR1, a single image roughly EUR0.35); redoing a post or asset adds to it. Your own replies in this chat are metered separately (roughly 10-15c each). Quote this figure and that breakdown; never call it the whole cost.`;
+    const estimateLine = `Estimated build cost for the full kit of ${plannedAssets.length} assets: about ${formatCentsEur(estimateCents)} (fewer assets cost less) — writing every asset on ${modelLabel} plus designing the social posts (a designed carousel is roughly EUR1, a single image roughly EUR0.35); redoing a post or asset adds to it. Your own replies in this chat are metered separately (roughly 10-15c each). Quote this figure and that breakdown; never call it the whole cost.`;
 
     return {
       text: JSON.stringify({

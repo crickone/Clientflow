@@ -151,7 +151,7 @@ const requireLocal = createRequire(import.meta.url);
     for (const name of ["create_campaign", "approve_campaign_asset", "launch_campaign"]) {
       assert.ok(WRITE_TOOLS.has(name), `${name} is a write tool (requires Approve)`);
     }
-    for (const name of ["plan_campaign", "draft_campaign_asset"]) {
+    for (const name of ["plan_campaign", "draft_campaign_asset", "get_campaign"]) {
       assert.ok(!WRITE_TOOLS.has(name), `${name} is a read tool — must NOT require approval`);
     }
 
@@ -170,8 +170,8 @@ const requireLocal = createRequire(import.meta.url);
     // actually pulls from this module, not a coincidental other registration).
     assert.deepEqual(
       [...CAMPAIGN_TOOLS.map((t) => t.name)].sort(),
-      ["approve_campaign_asset", "create_campaign", "draft_campaign_asset", "launch_campaign", "plan_campaign"],
-      "CAMPAIGN_TOOLS exports exactly the 5 campaign tool schemas",
+      ["approve_campaign_asset", "create_campaign", "draft_campaign_asset", "get_campaign", "launch_campaign", "plan_campaign"],
+      "CAMPAIGN_TOOLS exports exactly the 6 campaign tool schemas",
     );
 
     // ── (b) create_campaign (WRITE) — missing name rejected before any DB

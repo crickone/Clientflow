@@ -327,18 +327,22 @@ export async function generateAsset(
     case "email": {
       const angle = emailAngleFromTitle(asset.title);
       const spec = EMAIL_ANGLE[angle];
-      const subject = spec.subject(campaign);
+      const fallbackSubject = spec.subject(campaign);
 
       const topicLines = [`Campaign offer: ${campaign.offer || "(not yet defined)"}`, spec.topic];
       if (tweak && tweak.trim()) topicLines.push(`Operator tweak: ${tweak.trim()}`);
 
       const draft = await draftCampaignEmail(
         {
-          subject,
+          subject: fallbackSubject,
           topic: topicLines.join("\n"),
           tone: null,
           audience: null,
           targetWords: 150,
+          // The model writes the subject: a fixed "<campaign name> is here"
+          // put internal names ("Black Friday Massage 2025") in customers'
+          // inboxes, and a redraft could never change it.
+          writeSubject: true,
         },
         meter,
         model,
@@ -346,6 +350,7 @@ export async function generateAsset(
       // title stays the stable angle label ("Email — Proof") — emailAngleFromTitle depends on
       // it surviving regeneration; the generated subject lives in body alongside content (mirrors
       // the social branch's body-JSON), and materialise (Task 4) parses {subject, content} from it.
+      const subject = draft.subject || fallbackSubject;
       return { title: asset.title, body: JSON.stringify({ subject, content: draft.content }) };
     }
 
