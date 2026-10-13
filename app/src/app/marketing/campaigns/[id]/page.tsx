@@ -34,7 +34,7 @@ import { CopyAssetButton } from "@/components/campaigns/CopyAssetButton";
 import { LaunchCampaignButton } from "@/components/campaigns/LaunchCampaignButton";
 import { setCampaignAdSpendAction } from "../actions";
 import { OfferPanel } from "@/components/campaigns/OfferPanel";
-import { listOrders, offerForCampaign, offerTotals } from "@/lib/offers/store";
+import { listCampaignOrders, listOffersForCampaign, offerTotals } from "@/lib/offers/store";
 import { getStripeConnection } from "@/lib/stripe/connection";
 import { db } from "@/lib/db";
 import { therapies } from "@/lib/db/schema";
@@ -210,9 +210,8 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
   // The campaign's own board (one per campaign, created with it).
   const pipeline = pipelineForCampaign(campaign.id);
 
-  const offer = offerForCampaign(campaign.id);
-  const offerOrders = offer ? listOrders(offer.id) : [];
-  const totals = offer ? offerTotals(offer.id) : null;
+  const campaignOffers = listOffersForCampaign(campaign.id);
+  const campaignOrders = listCampaignOrders(campaign.id);
   const services = db
     .select({ id: therapies.id, name: therapies.name, priceEur: therapies.defaultPriceEur })
     .from(therapies)
@@ -338,30 +337,25 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
       <Card style={{ padding: 20, marginBottom: 24 }}>
         <OfferPanel
           campaignId={campaign.id}
-          offer={
-            offer && totals
-              ? {
-                  id: offer.id,
-                  title: offer.title,
-                  description: offer.description,
-                  priceCents: offer.priceCents,
-                  compareAtCents: offer.compareAtCents,
-                  items: offer.items.map((i) => ({ therapyId: i.therapyId, sessions: i.sessions })),
-                  quantityLimit: offer.quantityLimit,
-                  saleStartsAt: offer.saleStartsAt,
-                  saleEndsAt: offer.saleEndsAt,
-                  useByDate: offer.useByDate,
-                  terms: offer.terms,
-                  isActive: offer.isActive,
-                  state: offer.state,
-                  sold: totals.sold,
-                  left: offer.left,
-                  revenueCents: totals.revenueCents,
-                  refunded: totals.refunded,
-                }
-              : null
-          }
-          orders={offerOrders.map((o) => ({ id: o.id, createdAt: o.paidAt ?? o.createdAt, name: o.name, email: o.email, phone: o.phone, amountCents: o.amountCents, status: o.status, clientId: o.clientId }))}
+          offers={campaignOffers.map((offer) => ({
+            id: offer.id,
+            title: offer.title,
+            description: offer.description,
+            priceCents: offer.priceCents,
+            compareAtCents: offer.compareAtCents,
+            items: offer.items.map((i) => ({ therapyId: i.therapyId, sessions: i.sessions })),
+            quantityLimit: offer.quantityLimit,
+            saleStartsAt: offer.saleStartsAt,
+            saleEndsAt: offer.saleEndsAt,
+            useByDate: offer.useByDate,
+            terms: offer.terms,
+            isActive: offer.isActive,
+            state: offer.state,
+            sold: offer.sold,
+            left: offer.left,
+            revenueCents: offerTotals(offer.id).revenueCents,
+          }))}
+          orders={campaignOrders.map((o) => ({ id: o.id, createdAt: o.paidAt ?? o.createdAt, name: o.name, email: o.email, phone: o.phone, amountCents: o.amountCents, status: o.status, clientId: o.clientId, offerTitle: o.offerTitle }))}
           services={services}
           stripeConnected={stripeConnected}
           landingUrl={landingUrl}

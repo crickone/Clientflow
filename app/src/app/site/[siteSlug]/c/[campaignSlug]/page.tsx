@@ -46,7 +46,7 @@ import { SiteBeacon } from "@/components/cms/SiteBeacon";
 import { siteRequestHost } from "@/lib/cms/requestHost";
 import { SiteTracking } from "@/components/cms/SiteTracking";
 import type { LandingOffer } from "@/components/campaigns/OfferBuyBox";
-import { offerForCampaign, getOrder, getOffer as getOfferById } from "@/lib/offers/store";
+import { listOffersForCampaign, getOrder, getOffer as getOfferById } from "@/lib/offers/store";
 import { signCheckoutToken } from "@/lib/offers/checkoutToken";
 import { fulfilCheckout } from "@/lib/offers/fulfil";
 import { getStripeConnection } from "@/lib/stripe/connection";
@@ -133,7 +133,7 @@ interface Resolved {
   logoSrc: string | null;
   business: BusinessProfile;
   signupToken: string;
-  offer: LandingOffer | null;
+  offers: LandingOffer[];
   /** The resolved public site (host → tenant/site), kept around so
    *  generateMetadata can build this page's own canonical URL via
    *  siteUrl() — mirrors PageContext.resolved in lib/cms/render.ts. */
@@ -263,28 +263,30 @@ function resolveCampaignLanding(
     // Something for sale: only with a connected Stripe account, and only an
     // offer the operator has switched on. The token carries the address
     // Stripe returns the buyer to, so nothing in the request can choose it.
-    let offer: LandingOffer | null = null;
-    const forSale = offerForCampaign(campaign.id);
-    if (forSale && forSale.isActive && getStripeConnection(resolved.tenantId)) {
+    let offers: LandingOffer[] = [];
+    if (getStripeConnection(resolved.tenantId)) {
       const returnUrl = landingReturnUrl(resolved, params.campaignSlug, host);
-      offer = {
-        title: forSale.title,
-        priceCents: forSale.priceCents,
-        compareAtCents: forSale.compareAtCents,
-        items: forSale.items.map((i) => ({ name: i.name, sessions: i.sessions })),
-        useByDate: forSale.useByDate,
-        saleEndsAt: forSale.saleEndsAt,
-        terms: forSale.terms,
-        state: forSale.state,
-        left: forSale.left,
-        checkoutToken: signCheckoutToken({ tenantId: resolved.tenantId, campaignId: campaign.id, offerId: forSale.id, returnUrl }),
-      };
+      offers = listOffersForCampaign(campaign.id)
+        .filter((o) => o.isActive)
+        .map((o) => ({
+          id: o.id,
+          title: o.title,
+          priceCents: o.priceCents,
+          compareAtCents: o.compareAtCents,
+          items: o.items.map((i) => ({ name: i.name, sessions: i.sessions, durationMinutes: i.durationMinutes })),
+          useByDate: o.useByDate,
+          saleEndsAt: o.saleEndsAt,
+          terms: o.terms,
+          state: o.state,
+          left: o.left,
+          checkoutToken: signCheckoutToken({ tenantId: resolved.tenantId, campaignId: campaign.id, offerId: o.id, returnUrl }),
+        }));
     }
 
     return {
       campaign,
       body,
-      offer,
+      offers,
       theme: getThemeForTenant(resolved.tenantId),
       fonts: getBrandFontIds(),
       logoSrc: logoDataUri(),
@@ -421,7 +423,7 @@ export default async function CampaignLandingPage({ params, searchParams }: Prop
       {data.campaign.status === "active" && <SiteBeacon />}
       <SiteTracking siteSlug={data.publicSite.site.slug} pixelId={data.publicSite.site.metaPixelId} googleTagId={data.publicSite.site.googleTagId} />
       <CampaignLanding
-        offer={data.offer}
+        offers={data.offers}
         purchase={purchase}
         body={data.body}
         theme={data.theme}

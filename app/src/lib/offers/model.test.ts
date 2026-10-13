@@ -4,7 +4,7 @@
 // the operator is allowed to save.
 import assert from "node:assert/strict";
 
-import { formatEur, offerState, parseEuroToCents, parseItems, remaining, savingLabel, splitPrice, validateOffer, type OfferInput } from "./model";
+import { discountedCents, formatEur, offerState, parseEuroToCents, parseItems, remaining, savingLabel, splitPrice, validateOffer, type OfferInput } from "./model";
 
 let passed = 0;
 function check(name: string, cond: boolean) {
@@ -57,5 +57,9 @@ check("no duplicate services", !validateOffer({ ...good, items: [{ therapyId: 1,
 check("price floor", !validateOffer({ ...good, priceCents: 10 }).ok);
 check("end after start", !validateOffer({ ...good, saleStartsAt: now, saleEndsAt: now }).ok);
 check("use-by date required", !validateOffer({ ...good, useByDate: "" }).ok);
+
+check("20% off €80 is €64", discountedCents(8000, 20) === 6400);
+check("20% off €50 is €40", discountedCents(5000, 20) === 4000);
+check("percent is clamped", discountedCents(1000, 150) === 50 && discountedCents(1000, 0) === 990);
 
 console.log(`offers/model: ${passed} checks passed`);

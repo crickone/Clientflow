@@ -5,7 +5,7 @@ import type { BusinessProfile } from "@/lib/businessProfile";
 import { Check } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
 import { SignupForm } from "./SignupForm";
-import { OfferBuyBox, type LandingOffer } from "./OfferBuyBox";
+import { OfferBuyBox, OfferMenu, type LandingOffer } from "./OfferBuyBox";
 import { PurchaseEvent } from "./PurchaseEvent";
 
 interface Props {
@@ -23,8 +23,8 @@ interface Props {
    *  to <SignupForm>. No siteSlug/campaignSlug prop exists on this
    *  component, deliberately — see lib/campaigns/signupToken.ts. */
   signupToken: string;
-  /** Something for sale on this page (Stripe Checkout), when the campaign has one. */
-  offer?: LandingOffer | null;
+  /** What's for sale on this page (Stripe Checkout): none, one, or a menu of several. */
+  offers?: LandingOffer[];
   /** The buyer back from Stripe: paid, or still being confirmed. */
   purchase?: { status: "paid" | "processing"; email: string | null; title: string; orderId: number; amountCents: number; currency: string } | null;
 }
@@ -67,7 +67,7 @@ function resolveFontFamily(id: string, fallbackId: string): string {
  * with no explicit breakpoint needed) — no external stylesheet, no JS
  * required to render correctly at any width.
  */
-export function CampaignLanding({ body, theme, fonts, logoSrc, business, signupToken, offer, purchase }: Props) {
+export function CampaignLanding({ body, theme, fonts, logoSrc, business, signupToken, offers = [], purchase }: Props) {
   const headingFamily = resolveFontFamily(fonts.heading, DEFAULT_HEADING_FONT_ID);
   const bodyFamily = resolveFontFamily(fonts.body, DEFAULT_BODY_FONT_ID);
 
@@ -214,9 +214,9 @@ export function CampaignLanding({ body, theme, fonts, logoSrc, business, signupT
                     <PurchaseEvent eventId={`offer-order-${purchase.orderId}`} valueCents={purchase.amountCents} currency={purchase.currency} />
                   )}
                 </div>
-              ) : offer ? (
+              ) : offers.length > 0 ? (
                 <>
-                  <OfferBuyBox offer={offer} />
+                  {offers.length === 1 ? <OfferBuyBox offer={offers[0]} /> : <OfferMenu offers={offers} />}
                   <details className="ob-question">
                     <summary>Have a question first? Leave your details</summary>
                     <SignupForm token={signupToken} />

@@ -7,8 +7,8 @@ import { eq } from "drizzle-orm";
 import { getCurrentMembership, requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { therapies } from "@/lib/db/schema";
-import { parseEuroToCents, validateOffer } from "@/lib/offers/model";
-import { getOffer as getOfferById, saveOffer, setOfferActive } from "@/lib/offers/store";
+import { discountedCents, parseEuroToCents, validateOffer } from "@/lib/offers/model";
+import { deleteOffer, getOffer as getOfferById, saveOffer, setCampaignOffersActive, setOfferActive } from "@/lib/offers/store";
 import { getStripeConnection } from "@/lib/stripe/connection";
 import { setCampaignBuildModel } from "@/lib/campaigns/buildModel";
 import { getCampaign, setCampaignAdSpend } from "@/lib/campaigns/store";
@@ -157,6 +157,78 @@ export async function setOfferOnSaleAction(campaignId: number, offerId: number, 
     return { ok: false, error: "Connect Stripe first (Settings, Stripe), so buyers can pay." };
   }
   setOfferActive(offer.id, onSale === true);
+  revalidatePath(`/marketing/campaigns/${campaignId}`);
+  return { ok: true };
+}
+
+export interface DiscountOffersInput {
+  therapyIds: number[];
+  percentOff: number;
+  sessions: number;
+  titlePrefix: string;
+  quantityLimit: string;
+  saleStartsAt: number | null;
+  saleEndsAt: number | null;
+  useByDate: string;
+  terms: string;
+}
+
+/**
+ * One offer per ticked service at a percentage off its usual price, e.g.
+ * "Black Friday: Sports massage", €80 -> €64. Created switched off, so the
+ * operator checks the list before putting them on sale.
+ */
+export async function createDiscountOffersAction(campaignId: number, input: DiscountOffersInput): Promise<{ ok: true; created: number } | { ok: false; error: string }> {
+  await requireAdmin();
+  const campaign = getCampaign(Number(campaignId));
+  if (!campaign) return { ok: false, error: "Campaign not found." };
+  const pct = Number(input.percentOff);
+  if (!Number.isFinite(pct) || pct < 1 || pct > 90) return { ok: false, error: "Enter a discount between 1% and 90%." };
+  const ids = [...new Set((Array.isArray(input.therapyIds) ? input.therapyIds : []).map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+  if (ids.length === 0) return { ok: false, error: "Tick at least one service." };
+  if (ids.length > 30) return { ok: false, error: "Up to 30 services at a time." };
+  const sessions = Math.max(1, Math.min(50, Math.round(Number(input.sessions) || 1)));
+  const services = db.select().from(therapies).where(eq(therapies.isActive, true)).all().filter((t) => ids.includes(t.id));
+  if (services.length !== ids.length) return { ok: false, error: "One of those services isn't available any more." };
+  const limitRaw = String(input.quantityLimit ?? "").trim();
+  const prefix = String(input.titlePrefix ?? "").trim().slice(0, 40);
+
+  const prepared = [];
+  for (const t of services) {
+    const usual = Math.round(t.defaultPriceEur * 100) * sessions;
+    const v = validateOffer({
+      title: `${prefix ? `${prefix}: ` : ""}${sessions > 1 ? `${sessions} x ` : ""}${t.name}`,
+      description: null,
+      priceCents: discountedCents(usual, pct),
+      compareAtCents: usual,
+      items: [{ therapyId: t.id, sessions }],
+      quantityLimit: limitRaw ? Number(limitRaw) : null,
+      saleStartsAt: Number.isFinite(input.saleStartsAt) ? input.saleStartsAt : null,
+      saleEndsAt: Number.isFinite(input.saleEndsAt) ? input.saleEndsAt : null,
+      useByDate: String(input.useByDate ?? ""),
+      terms: String(input.terms ?? ""),
+    });
+    if (!v.ok) return { ok: false, error: `${t.name}: ${v.error}` };
+    prepared.push(v.value);
+  }
+  for (const v of prepared) saveOffer(null, campaign.id, v);
+  revalidatePath(`/marketing/campaigns/${campaign.id}`);
+  return { ok: true, created: prepared.length };
+}
+
+export async function setAllOffersOnSaleAction(campaignId: number, onSale: boolean): Promise<{ ok: true; changed: number } | { ok: false; error: string }> {
+  await requireAdmin();
+  const campaign = getCampaign(Number(campaignId));
+  if (!campaign) return { ok: false, error: "Campaign not found." };
+  if (onSale && !getStripeConnection(getCurrentMembership()!.tenant.id)) return { ok: false, error: "Connect Stripe first (Settings, Stripe), so buyers can pay." };
+  const changed = setCampaignOffersActive(campaign.id, onSale === true);
+  revalidatePath(`/marketing/campaigns/${campaign.id}`);
+  return { ok: true, changed };
+}
+
+export async function deleteOfferAction(campaignId: number, offerId: number): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireAdmin();
+  if (!deleteOffer(Number(offerId), Number(campaignId))) return { ok: false, error: "That offer has orders, so it can't be deleted. Take it off sale instead." };
   revalidatePath(`/marketing/campaigns/${campaignId}`);
   return { ok: true };
 }

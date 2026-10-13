@@ -123,3 +123,9 @@ export function validateOffer(input: OfferInput): { ok: true; value: OfferInput 
   if (description && description.length > 500) return { ok: false, error: "Keep the description under 500 characters." };
   return { ok: true, value: { ...input, title, terms, description } };
 }
+
+/** A percentage off a price, to the cent; never below Stripe's 50c floor. */
+export function discountedCents(cents: number, percentOff: number): number {
+  const pct = Math.min(95, Math.max(1, percentOff));
+  return Math.max(MIN_PRICE_CENTS, Math.round((cents * (100 - pct)) / 100));
+}

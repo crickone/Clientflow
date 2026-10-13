@@ -6,10 +6,11 @@ import { Lock } from "lucide-react";
 import { formatEur, savingLabel, type OfferState } from "@/lib/offers/model";
 
 export interface LandingOffer {
+  id: number;
   title: string;
   priceCents: number;
   compareAtCents: number | null;
-  items: { name: string; sessions: number }[];
+  items: { name: string; sessions: number; durationMinutes: number }[];
   useByDate: string;
   saleEndsAt: number | null;
   terms: string | null;
@@ -24,6 +25,25 @@ const CLOSED: Partial<Record<OfferState, string>> = {
   scheduled: "Not on sale yet",
   off: "Not on sale",
 };
+
+/** Ask for a Stripe Checkout page and go there; returns an error message if it can't. */
+async function goToCheckout(token: string): Promise<string | null> {
+  try {
+    const res = await fetch("/api/offers/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token }) });
+    const r = (await res.json().catch(() => null)) as { ok?: boolean; url?: string; error?: string } | null;
+    if (r?.ok && r.url) {
+      window.location.assign(r.url);
+      return null;
+    }
+    return r?.error ?? "Something went wrong. Please try again.";
+  } catch {
+    return "Couldn't reach the payment page. Check your connection and try again.";
+  }
+}
+
+function useByLabel(date: string) {
+  return new Date(`${date}T12:00:00Z`).toLocaleDateString("en-IE", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+}
 
 function longDate(ms: number) {
   return new Date(ms).toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Dublin" });
@@ -41,18 +61,11 @@ export function OfferBuyBox({ offer }: { offer: LandingOffer }) {
     if (!offer.checkoutToken) return;
     setBusy(true);
     setError(null);
-    try {
-      const res = await fetch("/api/offers/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: offer.checkoutToken }) });
-      const r = (await res.json().catch(() => null)) as { ok?: boolean; url?: string; error?: string } | null;
-      if (r?.ok && r.url) {
-        window.location.assign(r.url);
-        return;
-      }
-      setError(r?.error ?? "Something went wrong. Please try again.");
-    } catch {
-      setError("Couldn't reach the payment page. Check your connection and try again.");
+    const err = await goToCheckout(offer.checkoutToken);
+    if (err) {
+      setError(err);
+      setBusy(false);
     }
-    setBusy(false);
   }
 
   return (
@@ -98,6 +111,80 @@ export function OfferBuyBox({ offer }: { offer: LandingOffer }) {
         </p>
       )}
       {offer.terms && <p className="ob-terms">{offer.terms}</p>}
+    </div>
+  );
+}
+
+/**
+ * Several offers on one page (e.g. 20% off each massage): a menu with each
+ * one's price and its own Buy button. The use-by date, end date and terms
+ * are shown once when every offer shares them.
+ */
+export function OfferMenu({ offers }: { offers: LandingOffer[] }) {
+  const [busy, setBusy] = useState<number | null>(null);
+  const [error, setError] = useState<{ id: number; text: string } | null>(null);
+  const same = <T,>(f: (o: LandingOffer) => T) => offers.every((o) => f(o) === f(offers[0]));
+  const shared = { useBy: same((o) => o.useByDate), ends: same((o) => o.saleEndsAt), terms: same((o) => o.terms) };
+  const first = offers[0];
+  const anyLive = offers.some((o) => o.state === "live" && o.checkoutToken);
+
+  async function buy(o: LandingOffer) {
+    if (!o.checkoutToken) return;
+    setBusy(o.id);
+    setError(null);
+    const err = await goToCheckout(o.checkoutToken);
+    if (err) {
+      setError({ id: o.id, text: err });
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="ob">
+      <ul className="om-list">
+        {offers.map((o) => {
+          const item = o.items.length === 1 ? o.items[0] : null;
+          const open = o.state === "live" && o.checkoutToken;
+          return (
+            <li key={o.id} className="om-row">
+              <div className="om-main">
+                <span className="om-name">{item ? `${item.sessions > 1 ? `${item.sessions} x ` : ""}${item.name.replace(/\s*\(\d+\s*min\)\s*$/i, "")}` : o.title}</span>
+                <span className="om-meta">
+                  {item?.durationMinutes ? `${item.durationMinutes} min` : o.items.map((i) => `${i.sessions} x ${i.name}`).join(", ")}
+                  {!shared.useBy && ` · use by ${useByLabel(o.useByDate)}`}
+                  {o.left !== null && o.state === "live" && o.left <= 10 && ` · ${o.left} left`}
+                </span>
+              </div>
+              <span className="om-price">
+                {o.compareAtCents !== null && o.compareAtCents > o.priceCents && <s>{formatEur(o.compareAtCents)}</s>}
+                <strong>{formatEur(o.priceCents)}</strong>
+              </span>
+              {open ? (
+                <button type="button" className="om-buy" onClick={() => buy(o)} disabled={busy !== null} aria-label={`Buy ${o.title} for ${formatEur(o.priceCents)}`}>
+                  {busy === o.id ? "Opening" : "Buy"}
+                </button>
+              ) : (
+                <span className="om-closed">{CLOSED[o.state] ?? "Not on sale"}</span>
+              )}
+              {error?.id === o.id && (
+                <p className="ob-error om-error" role="alert">
+                  {error.text}
+                </p>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      <div className="ob-facts">
+        {shared.useBy && <span>Use by {useByLabel(first.useByDate)}</span>}
+        {shared.ends && first.saleEndsAt !== null && anyLive && <span>Offer ends {longDate(first.saleEndsAt)}</span>}
+      </div>
+      {anyLive && (
+        <p className="ob-secure">
+          <Lock size={13} aria-hidden /> Secure payment by Stripe. You can pay by card, Apple Pay or Google Pay.
+        </p>
+      )}
+      {shared.terms && first.terms && <p className="ob-terms">{first.terms}</p>}
     </div>
   );
 }

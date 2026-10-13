@@ -11,7 +11,7 @@ import { offerState, parseItems, remaining, type OfferInput, type OfferItem, typ
 export const HOLD_MS = 35 * 60 * 1000;
 
 export interface OfferView extends Offer {
-  items: (OfferItem & { name: string; defaultPriceEur: number })[];
+  items: (OfferItem & { name: string; defaultPriceEur: number; durationMinutes: number })[];
   taken: number;
   sold: number;
   state: OfferState;
@@ -21,13 +21,13 @@ export interface OfferView extends Offer {
 function itemsWithNames(items: OfferItem[]): OfferView["items"] {
   if (items.length === 0) return [];
   const rows = db
-    .select({ id: therapies.id, name: therapies.name, price: therapies.defaultPriceEur })
+    .select({ id: therapies.id, name: therapies.name, price: therapies.defaultPriceEur, minutes: therapies.defaultDurationMinutes })
     .from(therapies)
     .where(inArray(therapies.id, items.map((i) => i.therapyId)))
     .all();
   return items.map((i) => {
     const t = rows.find((r) => r.id === i.therapyId);
-    return { ...i, name: t?.name ?? "Service", defaultPriceEur: t?.price ?? 0 };
+    return { ...i, name: t?.name ?? "Service", defaultPriceEur: t?.price ?? 0, durationMinutes: t?.minutes ?? 0 };
   });
 }
 
@@ -59,6 +59,34 @@ export function getOffer(id: number, now = Date.now()): OfferView | null {
 export function offerForCampaign(campaignId: number, now = Date.now()): OfferView | null {
   const o = db.select().from(offers).where(eq(offers.campaignId, campaignId)).orderBy(desc(offers.id)).get();
   return o ? toView(o, now) : null;
+}
+
+/** Every offer on a campaign, oldest first (the order they were added). */
+export function listOffersForCampaign(campaignId: number, now = Date.now()): OfferView[] {
+  return db.select().from(offers).where(eq(offers.campaignId, campaignId)).orderBy(offers.id).all().map((o) => toView(o, now));
+}
+
+/** Paid and refunded orders across a campaign's offers, newest first, with the offer's name. */
+export function listCampaignOrders(campaignId: number): (OfferOrder & { offerTitle: string })[] {
+  return db
+    .select({ order: offerOrders, offerTitle: offers.title })
+    .from(offerOrders)
+    .innerJoin(offers, eq(offers.id, offerOrders.offerId))
+    .where(and(eq(offers.campaignId, campaignId), or(eq(offerOrders.status, "paid"), eq(offerOrders.status, "refunded"))))
+    .orderBy(desc(offerOrders.createdAt))
+    .all()
+    .map((r) => ({ ...r.order, offerTitle: r.offerTitle }));
+}
+
+export function setCampaignOffersActive(campaignId: number, active: boolean): number {
+  return db.update(offers).set({ isActive: active, updatedAt: Date.now() }).where(eq(offers.campaignId, campaignId)).run().changes;
+}
+
+export function deleteOffer(id: number, campaignId: number): boolean {
+  // Never lose a sale: an offer that has orders is switched off instead.
+  const has = db.select({ id: offerOrders.id }).from(offerOrders).where(eq(offerOrders.offerId, id)).get();
+  if (has) return false;
+  return db.delete(offers).where(and(eq(offers.id, id), eq(offers.campaignId, campaignId))).run().changes > 0;
 }
 
 export function saveOffer(id: number | null, campaignId: number, input: OfferInput): number {
