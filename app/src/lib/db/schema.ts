@@ -1878,6 +1878,8 @@ export const siteDomains = sqliteTable(
     // pending (rows predating verification were grandfathered as verified).
     verifyToken: text("verify_token"),
     verifiedAt: integer("verified_at", { mode: "timestamp_ms" }),
+    // Last request for this host through the Cloudflare Worker (domain is live).
+    proxiedSeenAt: integer("proxied_seen_at", { mode: "timestamp_ms" }),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),

@@ -22,6 +22,15 @@ visitor -> www.client.ie (CNAME) -> sites.adonisagent.ie (Cloudflare)
   database; `CMS_SITE_HOSTS` is only for the platform's own sites.
 - **Ownership** is still proved by the client: the `_adonisagent-verify` TXT
   record, before the site will serve on the domain.
+- **The member app rides along.** On a domain that comes through the Worker,
+  `/app` is the business's member app, not part of the website
+  (www.client.ie/app). No extra DNS. The login screen wears the business's
+  logo and name; only that business's members can sign in there (members of
+  any business still sign in at app.adonisagent.ie/app). The middleware sets
+  `x-forwarded-host` to the verified domain, which Next's Server Actions
+  origin check needs behind the Worker. The first request through the Worker
+  stamps `site_domains.proxied_seen_at`; from then on invite and password-reset
+  emails link to the business's domain (`lib/clientAppHost.ts`).
 
 ## One-time setup (done once for the whole platform)
 

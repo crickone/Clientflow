@@ -29,6 +29,7 @@ import {
   textToParagraphs,
 } from "@/lib/email";
 import { getAppBaseUrl } from "@/lib/appUrl";
+import { clientAppBaseUrl } from "@/lib/clientAppHost";
 import { getBusinessProfile } from "@/lib/businessProfile";
 import { getTheme } from "@/lib/settings";
 import { fireTrigger } from "@/lib/automations";
@@ -54,7 +55,8 @@ export async function sendClientLoginEmailAction(clientId: number): Promise<Logi
 
   const business = getBusinessProfile().businessName;
   const accent = getTheme().accent;
-  const link = `${getAppBaseUrl()}/app/login`;
+  const membership = getCurrentMembership();
+  const link = `${membership ? clientAppBaseUrl(membership.tenant.id) : getAppBaseUrl()}/app/login`;
   const bodyHtml = `
     ${textToParagraphs(`Hi, here's your access to the ${business} app — where you'll find your plans, book classes, and track your progress.`)}
     <p style="margin:0 0 22px;">

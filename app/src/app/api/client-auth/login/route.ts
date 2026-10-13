@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { createClientSession, loginClient } from "@/lib/clientAuth";
+import { clientAppHost } from "@/lib/clientAppHost";
 import { rateLimit, resetRateLimit, clientIp } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
@@ -35,8 +36,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Email and password are required." }, { status: 400 });
   }
   const info = loginClient(email, password);
-  if (!info) {
-    return NextResponse.json({ ok: false, error: "Incorrect email or password." }, { status: 401 });
+  // On a business's own domain, only its members sign in. Same answer as a
+  // wrong password, so the form never says which emails exist elsewhere.
+  const onHost = clientAppHost();
+  if (!info || (onHost && info.tenantId !== onHost.tenantId)) {
+    return NextResponse.json(
+      { ok: false, error: onHost ? "Incorrect email or password. Members of another gym sign in through that gym's app." : "Incorrect email or password." },
+      { status: 401 },
+    );
   }
   await createClientSession(info);
   // Successful login — clear this IP's attempt counter so earlier mistyped

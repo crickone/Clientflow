@@ -3,8 +3,8 @@ import "server-only";
 import fs from "node:fs";
 import path from "node:path";
 
-import { getBrandingLogoFilename } from "@/lib/settings";
-import { getCurrentTenant } from "@/lib/db/tenant";
+import { getBrandingLogoFilename, readKeyForTenant } from "@/lib/settings";
+import { getCurrentTenant, getTenantById } from "@/lib/db/tenant";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const ALLOWED_EXT = new Set([".png", ".jpg", ".jpeg", ".webp", ".svg"]);
@@ -45,13 +45,24 @@ export function isAllowedLogoExt(ext: string): boolean {
  * and the preview endpoint.
  */
 export function resolveLogoPath(): string | null {
-  const filename = getBrandingLogoFilename();
+  return findLogo(brandingDir(), getBrandingLogoFilename());
+}
+
+/** resolveLogoPath for an explicit tenant (no session), e.g. the member app on the gym's own domain. */
+export function resolveLogoPathForTenant(tenantId: number): string | null {
+  const tenant = getTenantById(tenantId);
+  if (!tenant) return null;
+  const filename = readKeyForTenant<string | null>(tenantId, "branding_logo_filename", null);
+  return findLogo(path.join(DATA_DIR, "tenants", tenant.slug, "branding"), typeof filename === "string" && filename ? filename : null);
+}
+
+function findLogo(dir: string, filename: string | null): string | null {
   if (!filename) return null;
   const safe = path.basename(filename);
   if (safe !== filename) return null;
   if (!isAllowedLogoExt(path.extname(safe))) return null;
-  for (const dir of [brandingDir(), LEGACY_BRANDING_DIR]) {
-    const full = path.join(dir, safe);
+  for (const d of [dir, LEGACY_BRANDING_DIR]) {
+    const full = path.join(d, safe);
     if (fs.existsSync(full)) return full;
   }
   return null;
@@ -97,6 +108,22 @@ export async function resolveRasterLogoPath(): Promise<string | null> {
 export function getChromeLogoSrc(): string | null {
   if (resolveLogoPath()) return `/api/branding/logo?v=${logoMtime()}`;
   return null;
+}
+
+/**
+ * getChromeLogoSrc for an explicit tenant. The logo route serves it to a
+ * visitor with no session when the request is on that tenant's own domain.
+ */
+export function getChromeLogoSrcForTenant(tenantId: number): string | null {
+  const full = resolveLogoPathForTenant(tenantId);
+  if (!full) return null;
+  let v = 0;
+  try {
+    v = fs.statSync(full).mtimeMs;
+  } catch {
+    return null;
+  }
+  return `/api/branding/logo?v=${v}`;
 }
 
 /**

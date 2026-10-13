@@ -8,6 +8,7 @@ import { eq, lt } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { authDb, CLIENT_SESSION_COOKIE } from "@/lib/db/control";
+import { clientAppHost } from "@/lib/clientAppHost";
 import { clientCredentials, clientSessions, clients, type Client } from "@/lib/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/auth";
 
@@ -84,6 +85,9 @@ export interface CurrentClient {
 export function getCurrentClient(): CurrentClient | null {
   const s = getClientSession();
   if (!s) return null;
+  // On a business's own domain only that business's members are signed in.
+  const onHost = clientAppHost();
+  if (onHost && onHost.tenantId !== s.tenantId) return null;
   const client = db.select().from(clients).where(eq(clients.id, s.clientId)).get();
   if (!client) return null;
   return { clientId: s.clientId, tenantId: s.tenantId, client };

@@ -62,7 +62,14 @@ export function middleware(req: NextRequest) {
   const proxiedHost = trustedProxyHost((n) => req.headers.get(n), PROXY_SECRET);
   requestHeaders.delete(SITE_HOST_HEADER);
   requestHeaders.delete(PROXY_KEY_HEADER);
-  if (proxiedHost) requestHeaders.set(SITE_HOST_HEADER, proxiedHost);
+  if (proxiedHost) {
+    requestHeaders.set(SITE_HOST_HEADER, proxiedHost);
+    // Behind the Worker, Host is the Railway service's own name, so Next's
+    // Server Actions check (Origin must match x-forwarded-host, else Host)
+    // would reject every form on a client domain. The domain is verified
+    // above, so hand Next the domain the visitor is actually on.
+    requestHeaders.set("x-forwarded-host", proxiedHost);
+  }
   const pass = () => NextResponse.next({ request: { headers: requestHeaders } });
 
   // Static assets, Next internals, favicon, public files — always allowed.
@@ -85,8 +92,13 @@ export function middleware(req: NextRequest) {
   // placeholder slug and the page resolves the site from the verified domain.
   const host = proxiedHost ?? (req.headers.get("host") || "").split(":")[0].toLowerCase();
   const mappedSlug = SITE_HOSTS[host] ?? (proxiedHost ? PROXIED_SITE_SLUG : undefined);
+  // The member app runs on a client domain that comes through the Worker
+  // (www.gym.ie/app): it isn't part of the website, so it isn't rewritten.
+  // Hosts named in CMS_SITE_HOSTS keep the website-only behaviour.
+  const memberApp = proxiedHost !== null && (pathname === "/app" || pathname.startsWith("/app/"));
   if (
     mappedSlug &&
+    !memberApp &&
     !pathname.startsWith("/site/") &&
     !pathname.startsWith("/site-media/") &&
     !pathname.startsWith("/library-media/") && // shared media library images used inside site pages
@@ -145,6 +157,7 @@ export function middleware(req: NextRequest) {
   if (
     pathname === "/app/login" ||
     pathname === "/app/reset" ||
+    pathname.startsWith("/app/pwa/") || // "Add to home screen" manifest + icon, read before sign-in
     pathname.startsWith("/api/client-auth/")
   ) {
     return pass();

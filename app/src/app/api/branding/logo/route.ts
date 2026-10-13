@@ -11,7 +11,9 @@ import {
   isAllowedLogoExt,
   LOGO_BASENAME,
   resolveLogoPath,
+  resolveLogoPathForTenant,
 } from "@/lib/branding";
+import { clientAppHost } from "@/lib/clientAppHost";
 import {
   deleteKey,
   getBrandingLogoFilename,
@@ -40,6 +42,12 @@ export async function GET() {
     filePath = resolveLogoPath();
   } catch {
     filePath = null;
+  }
+  // Signed out on a business's own domain (the member app's login screen):
+  // that business's logo.
+  if (!filePath) {
+    const onHost = clientAppHost();
+    if (onHost) filePath = resolveLogoPathForTenant(onHost.tenantId);
   }
   if (!filePath) {
     return NextResponse.json(

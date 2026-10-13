@@ -18,7 +18,7 @@ import {
 import { getClientSession } from "@/lib/clientAuth";
 import type { SidebarAccount } from "@/components/layout/Sidebar";
 import { resolveCurrentTenant } from "@/lib/db/tenant";
-import { getTheme, getVenueType, getSchedulingMode, getFeatureFlags } from "@/lib/settings";
+import { getTheme, getThemeForTenant, getVenueType, getSchedulingMode, getFeatureFlags } from "@/lib/settings";
 import { getVocab } from "@/lib/vocabulary";
 import {
   DEFAULT_HEADING_FONT,
@@ -29,7 +29,10 @@ import {
   THEME_MODE_COOKIE,
 } from "@/lib/theme";
 import { getBusinessProfile } from "@/lib/businessProfile";
-import { getChromeLogoSrc } from "@/lib/branding";
+import { getChromeLogoSrc, getChromeLogoSrcForTenant } from "@/lib/branding";
+import { clientAppHost, noteProxiedHost } from "@/lib/clientAppHost";
+import { getBusinessProfileForTenant } from "@/lib/businessProfile";
+import { Clock3 } from "lucide-react";
 import { isSetupDismissed } from "@/lib/setup/steps";
 import { getBilling } from "@/lib/billing/engine";
 import { countLeadsInEntryStage } from "@/lib/leads";
@@ -101,6 +104,9 @@ export default async function RootLayout({
   // sidebar chrome (and getCurrentTenant() below would resolve the unrelated
   // DEFAULT tenant) instead of seeing a standalone branded form.
   const pathname = headers().get("x-pathname") ?? "";
+  // A business's domain reaching us through the Worker is live; the member
+  // app's emailed links switch to it (lib/clientAppHost.ts).
+  noteProxiedHost();
   // Populated once the active tenant is known (see the module gate below);
   // handed to the sidebar so a switched-off module is not offered either.
   let featureFlags: FeatureFlags = {};
@@ -163,14 +169,37 @@ export default async function RootLayout({
     // Tenant branding only resolves once a member is signed in (their session
     // pins the tenant). Logged out (/app/login, /app/reset) there is NO tenant
     // to brand for — render neutral chrome rather than any tenant's.
-    const clientTenant = resolveCurrentTenant();
+    // On a business's own domain (www.gym.ie/app) the domain names the
+    // business, so even the signed-out login screen wears its brand.
+    const appHost = clientAppHost();
+    const clientTenant = appHost ? null : resolveCurrentTenant();
     // Brand colours stay per tenant (this is what their customers see); the
     // heading font is the platform default everywhere.
     const clientThemeStyle = themeCss(
-      clientTenant ? { ...getTheme(), headingFont: DEFAULT_HEADING_FONT } : DEFAULT_THEME,
+      appHost
+        ? { ...getThemeForTenant(appHost.tenantId), headingFont: DEFAULT_HEADING_FONT }
+        : clientTenant
+          ? { ...getTheme(), headingFont: DEFAULT_HEADING_FONT }
+          : DEFAULT_THEME,
     );
-    const clientLogo = clientTenant ? getChromeLogoSrc() : null;
-    const clientBusiness = clientTenant ? getBusinessProfile().businessName : "";
+    const clientLogo = appHost ? getChromeLogoSrcForTenant(appHost.tenantId) : clientTenant ? getChromeLogoSrc() : null;
+    const clientBusiness = appHost
+      ? getBusinessProfileForTenant(appHost.tenantId).businessName
+      : clientTenant
+        ? getBusinessProfile().businessName
+        : "";
+    const appThemeColor = appHost ? getThemeForTenant(appHost.tenantId).bg : clientTenant ? getTheme().bg : DEFAULT_THEME.bg;
+    const appHead = (
+      <head>
+        <link rel="manifest" href="/app/pwa/manifest" />
+        <link rel="apple-touch-icon" href="/app/pwa/icon" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        {clientBusiness && <meta name="apple-mobile-web-app-title" content={clientBusiness} />}
+        <meta name="theme-color" content={appThemeColor} />
+      </head>
+    );
 
     // Client-app billing gate (spec §6). A member's access follows their gym's
     // billing status, resolved from the CLIENT session's own tenant (never the
@@ -191,6 +220,7 @@ export default async function RootLayout({
         ) {
           return (
             <html lang="en" className={FONT_VARS}>
+              {appHead}
               <body>
                 <style id="tenant-theme" dangerouslySetInnerHTML={{ __html: clientThemeStyle }} />
                 <div
@@ -204,8 +234,8 @@ export default async function RootLayout({
                   }}
                 >
                   <div style={{ maxWidth: 340 }}>
-                    <div style={{ fontSize: 40, marginBottom: 14 }} aria-hidden>
-                      ⏳
+                    <div style={{ marginBottom: 14, color: "var(--text-tertiary)" }} aria-hidden>
+                      <Clock3 size={40} strokeWidth={1.5} />
                     </div>
                     <h1 style={{ fontSize: 20, margin: "0 0 8px", fontFamily: "var(--font-heading), sans-serif" }}>
                       {clientBusiness} is temporarily unavailable
@@ -224,6 +254,7 @@ export default async function RootLayout({
     }
     return (
       <html lang="en" className={FONT_VARS}>
+        {appHead}
         <body>
           <style id="tenant-theme" dangerouslySetInnerHTML={{ __html: clientThemeStyle }} />
           <MotionRoot>

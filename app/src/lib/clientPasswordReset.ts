@@ -6,7 +6,7 @@ import { and, eq, isNull, lt } from "drizzle-orm";
 import { authDb } from "@/lib/db/control";
 import { clientCredentials, clientPasswordResets, clientSessions } from "@/lib/db/schema";
 import { hashPassword } from "@/lib/auth";
-import { getAppBaseUrl } from "@/lib/appUrl";
+import { clientAppBaseUrl } from "@/lib/clientAppHost";
 import {
   renderEmailShell,
   sendEmailForTenant,
@@ -193,7 +193,8 @@ async function sendClientResetEmail(
 ): Promise<SendResult> {
   const business = getBusinessProfileForTenant(tenantId).businessName;
   const accent = getThemeForTenant(tenantId).accent;
-  const link = `${getAppBaseUrl()}/app/reset?token=${encodeURIComponent(token)}`;
+  // The business's own domain once it's live, so members get used to one address.
+  const link = `${clientAppBaseUrl(tenantId)}/app/reset?token=${encodeURIComponent(token)}`;
 
   const heading = mode === "invite" ? `Your ${business} app` : `Reset your password`;
   const intro =

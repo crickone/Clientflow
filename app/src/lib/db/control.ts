@@ -179,6 +179,10 @@ export function ensureControlTables() {
       -- ignored by resolveHost. verified_at IS NULL = pending.
       verify_token TEXT,
       verified_at INTEGER,
+      -- Last time a request for this host came through the Cloudflare Worker:
+      -- proof the domain is pointed at us, so the member app's emailed links
+      -- can use it (lib/clientAppHost.ts).
+      proxied_seen_at INTEGER,
       created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
 
@@ -858,6 +862,15 @@ export function ensureControlTables() {
     }
   } catch (err) {
     console.error("[control] site_domains verification migration failed:", err);
+  }
+
+  try {
+    const cols = controlSqlite.prepare("PRAGMA table_info(site_domains)").all() as Array<{ name: string }>;
+    if (!cols.find((c) => c.name === "proxied_seen_at")) {
+      controlSqlite.exec("ALTER TABLE site_domains ADD COLUMN proxied_seen_at INTEGER");
+    }
+  } catch (err) {
+    console.error("[control] site_domains.proxied_seen_at migration failed:", err);
   }
 
   // Existing control DBs predate auth_sessions.active_tenant_id; the CREATE above
