@@ -26,6 +26,7 @@ import {
   type AutopilotResult,
 } from "@/lib/agents/autopilotModel";
 import {
+  agentErrorText,
   modelHistory,
   normalizeImported,
   type ConvAction,
@@ -429,7 +430,7 @@ async function drive(c: Ctx, kick: Kick): Promise<void> {
       next = continuationMessage(results, { auto: true, autopilot: conv.building });
     }
   } catch (err) {
-    const msg = err instanceof AiCapError ? err.message : "Something went wrong. Say \"carry on\" to try again.";
+    const msg = err instanceof AiCapError ? err.message : agentErrorText(err);
     if (!(err instanceof AiCapError)) console.error(`[adonis ${c.convId}]`, err);
     const last = conv.messages[conv.messages.length - 1];
     if (last?.role === "assistant") last.content = [last.content, `_Error: ${msg}_`].filter(Boolean).join("\n\n");

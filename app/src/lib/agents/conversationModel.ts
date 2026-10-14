@@ -99,3 +99,24 @@ export function normalizeImported(raw: unknown): { id: string; title: string; up
     campaignEvents: Array.isArray(c.campaignEvents) ? (c.campaignEvents as CampaignProgressEvent[]) : [],
   };
 }
+
+/**
+ * What the chat says when a turn fails, in words the operator can act on.
+ * The AI provider's own message is matched for the cases with a known fix
+ * (out of credit, busy, rate-limited); anything else stays generic so no
+ * internal detail reaches the page.
+ */
+export function agentErrorText(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err ?? "");
+  const status = typeof (err as { status?: unknown })?.status === "number" ? (err as { status: number }).status : null;
+  if (/credit balance is too low|insufficient[_ ]?(credit|funds|quota)|billing/i.test(raw)) {
+    return "Adonis can't reach the AI service: the platform's AI account is out of credit. Once it's topped up, use Build the rest or say \"carry on\".";
+  }
+  if (status === 529 || /overloaded/i.test(raw)) {
+    return "The AI service is busy right now. Wait a minute, then say \"carry on\".";
+  }
+  if (status === 429 || /rate.?limit/i.test(raw)) {
+    return "Adonis is being asked too much at once. Wait a minute, then say \"carry on\".";
+  }
+  return "Something went wrong. Say \"carry on\" to try again.";
+}

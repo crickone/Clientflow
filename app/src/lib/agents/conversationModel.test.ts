@@ -5,7 +5,7 @@
 // Adonis is given.
 import assert from "node:assert/strict";
 
-import { modelHistory, normalizeImported, type ConvMessage } from "./conversationModel";
+import { agentErrorText, modelHistory, normalizeImported, type ConvMessage } from "./conversationModel";
 
 let passed = 0;
 function check(name: string, cond: boolean) {
@@ -54,5 +54,11 @@ const h = modelHistory(msgs);
 check("empty replies are left out of the history", h.length === 2);
 check("hidden hand-backs are part of what Adonis reads", h[1].content === "[carry on]");
 check("history is capped at 24", modelHistory(Array.from({ length: 30 }, () => msgs[0])).length === 24);
+
+const credit = Object.assign(new Error('400 {"error":{"message":"Your credit balance is too low to access the Anthropic API."}}'), { status: 400 });
+check("out of credit says so", agentErrorText(credit).includes("out of credit"));
+check("overloaded says busy", agentErrorText(Object.assign(new Error("Overloaded"), { status: 529 })).includes("busy"));
+check("rate limited says wait", agentErrorText(Object.assign(new Error("rate_limit_error"), { status: 429 })).includes("Wait a minute"));
+check("anything else stays generic", agentErrorText(new Error("ENOENT /app/secret/path")) === 'Something went wrong. Say "carry on" to try again.');
 
 console.log(`conversationModel: ${passed} checks passed`);
