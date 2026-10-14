@@ -19,7 +19,7 @@ export interface LandingOffer {
   checkoutToken: string | null;
 }
 
-const CLOSED: Partial<Record<OfferState, string>> = {
+export const CLOSED: Partial<Record<OfferState, string>> = {
   sold_out: "Sold out",
   ended: "This offer has ended",
   scheduled: "Not on sale yet",
@@ -27,7 +27,7 @@ const CLOSED: Partial<Record<OfferState, string>> = {
 };
 
 /** Ask for a Stripe Checkout page and go there; returns an error message if it can't. */
-async function goToCheckout(token: string): Promise<string | null> {
+export async function goToCheckout(token: string): Promise<string | null> {
   try {
     const res = await fetch("/api/offers/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token }) });
     const r = (await res.json().catch(() => null)) as { ok?: boolean; url?: string; error?: string } | null;

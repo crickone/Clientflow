@@ -8,17 +8,14 @@
  * reason). Not a bug — just a reserved-namespace cost worth knowing about if
  * a client ever wants a CMS page at `/c/...`.
  *
- * NO SITE CHROME HERE, DELIBERATELY. The blog routes render inside the
- * tenant's own stylesheet, navbar and footer (lib/cms/siteChrome), because a
- * blog is part of the website and looked like a stranger's page without it.
- * A campaign landing page is not: its single job is the signup form, and
- * every link in a navbar is an exit from it. So this page stays branded from
- * the tenant's theme, fonts and logo and keeps no navigation at all.
- *
- * Decided with the operator on 2026-09-19, after the blog was given chrome
- * and the obvious next step looked like doing the same here. If you are
- * reading this while about to add getSiteChrome to this route: that is the
- * change that was considered and declined, not an oversight.
+ * NO SITE NAVIGATION HERE, DELIBERATELY. The blog routes render inside the
+ * tenant's own navbar and footer (lib/cms/siteChrome), because a blog is part
+ * of the website. A campaign landing page sells one thing, and every link in
+ * a navbar is an exit from it (decided with the operator 2026-09-19). So it
+ * takes the site's DESIGN — its stylesheet and fonts (getSiteChrome().head)
+ * and its own photographs (getSitePhotos) — but not its header or footer.
+ * Since 2026-10-14: the operator found the page built from the app theme
+ * alone looked nothing like their site.
  */
 import type { Metadata } from "next";
 import fs from "node:fs";
@@ -37,7 +34,10 @@ import {
 } from "@/lib/campaigns/store";
 import { parseLandingBody, type ParsedLandingBody } from "@/lib/campaigns/assetBody";
 import { signCampaignSignupToken } from "@/lib/campaigns/signupToken";
-import { getBrandFontIds, getThemeForTenant } from "@/lib/settings";
+import { getThemeForTenant } from "@/lib/settings";
+import { getSiteChrome, headerLogoSrc } from "@/lib/cms/siteChrome";
+import { getSitePhotos } from "@/lib/cms/sitePhotos";
+import { topicWords } from "@/lib/cms/sitePhotosModel";
 import type { ThemeConfig } from "@/lib/theme";
 import { getBusinessProfile, type BusinessProfile } from "@/lib/businessProfile";
 import { resolveLogoPath } from "@/lib/branding";
@@ -132,7 +132,8 @@ interface Resolved {
   campaign: Campaign;
   body: ParsedLandingBody;
   theme: ThemeConfig;
-  fonts: { heading: string; body: string };
+  siteHead: string;
+  photos: string[];
   logoSrc: string | null;
   business: BusinessProfile;
   signupToken: string;
@@ -302,6 +303,13 @@ function resolveCampaignLanding(
         }));
     }
 
+    const chrome = getSiteChrome(resolved.db, resolved.site.id, resolved.resolvedVia === "host" ? resolved.site.slug : null);
+    const siteHead = chrome.head;
+    // The site's own header logo matches its design; the uploaded app logo is the fallback.
+    const siteLogo = headerLogoSrc(chrome.header);
+    const itemNames = listOffersForCampaign(campaign.id).flatMap((o) => o.items.map((i) => i.name));
+    const photos = getSitePhotos(resolved.db, resolved.site.id, topicWords(campaign.name, body.headline, ...itemNames), 4);
+
     return {
       campaign,
       body,
@@ -309,8 +317,9 @@ function resolveCampaignLanding(
       rememberKey,
       adOnly: accessKey !== null,
       theme: getThemeForTenant(resolved.tenantId),
-      fonts: getBrandFontIds(),
-      logoSrc: logoDataUri(),
+      siteHead,
+      photos,
+      logoSrc: siteLogo ?? logoDataUri(),
       business: getBusinessProfile(),
       signupToken,
       publicSite: resolved,
@@ -449,7 +458,9 @@ export default async function CampaignLandingPage({ params, searchParams }: Prop
         purchase={purchase}
         body={data.body}
         theme={data.theme}
-        fonts={data.fonts}
+        siteHead={data.siteHead}
+        photos={data.photos}
+        dates={{ startsOn: data.campaign.startsOn, endsOn: data.campaign.endsOn }}
         logoSrc={data.logoSrc}
         business={data.business}
         signupToken={data.signupToken}

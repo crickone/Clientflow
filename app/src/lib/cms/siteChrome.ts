@@ -173,3 +173,12 @@ export const CHROME_CONTENT_CSS = `
 }
 @media(max-width:600px){.cms-prose{font-size:16px}}
 `;
+
+/**
+ * The logo in the site's own header (the first image there), for pages that
+ * borrow the site's design without its navigation. Null when there isn't one.
+ */
+export function headerLogoSrc(header: string): string | null {
+  const m = /<img\b[^>]*?\bsrc\s*=\s*["']([^"']+)["']/i.exec(header);
+  return m ? m[1] : null;
+}
