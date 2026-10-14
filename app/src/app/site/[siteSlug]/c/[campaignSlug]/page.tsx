@@ -414,11 +414,10 @@ export function generateMetadata({ params, searchParams }: Props): Metadata {
   const title = body.metaTitle.trim() || headlineTitle || campaign.name;
   const description = body.metaDescription.trim() || body.subhead.trim() || campaign.offer || undefined;
   const canonical = siteUrl(publicSite, `/c/${params.campaignSlug}`, host);
-  // Only a LIVE campaign's landing page should be crawled/indexed — "ready"
-  // is a pre-launch preview (findApprovedLandingAsset already gates render
-  // to campaign.status in {ready, active}, so this is always one of those
-  // two here, never building/complete/archived).
-  const isLive = campaign.status === "active" && !data.adOnly;
+  // Campaign pages are never indexed: they're temporary offers reached from
+  // ads, emails and posts, not part of the website (operator, 2026-10-14:
+  // "as long as it's not on the actual website"). Not in the sitemap either.
+  const isLive = false;
 
   return {
     title,

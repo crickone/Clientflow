@@ -145,9 +145,7 @@ export async function saveOfferAction(campaignId: number, input: OfferFormInput)
   if (!v.ok) return v;
   const existing = input.offerId ? getOfferById(Number(input.offerId)) : null;
   if (input.offerId && (!existing || existing.campaignId !== campaign.id)) return { ok: false, error: "That offer isn't on this campaign." };
-  const firstOffer = !existing && listOffersForCampaign(campaign.id).length === 0;
   const offerId = saveOffer(existing ? existing.id : null, campaign.id, v.value);
-  if (firstOffer && !getOfferAccessKey(campaign.id)) setOfferAccessKey(campaign.id, true);
   revalidatePath(`/marketing/campaigns/${campaign.id}`);
   return { ok: true, offerId };
 }
@@ -214,10 +212,7 @@ export async function createDiscountOffersAction(campaignId: number, input: Disc
     if (!v.ok) return { ok: false, error: `${t.name}: ${v.error}` };
     prepared.push(v.value);
   }
-  const firstOffers = listOffersForCampaign(campaign.id).length === 0;
   for (const v of prepared) saveOffer(null, campaign.id, v);
-  // A campaign's offers start ad-only: they're for the people who click the ad.
-  if (firstOffers && !getOfferAccessKey(campaign.id)) setOfferAccessKey(campaign.id, true);
   revalidatePath(`/marketing/campaigns/${campaign.id}`);
   return { ok: true, created: prepared.length };
 }

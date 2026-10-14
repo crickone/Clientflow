@@ -186,8 +186,8 @@ export function OfferPanel({
             <strong>{accessKey ? "Ad-only prices" : "Prices show to everyone on the page"}</strong>
             <span>
               {accessKey
-                ? "Only people who arrive through the ad link see the prices and Buy buttons. Anyone else sees the page with the sign-up form. The page is hidden from Google."
-                : "Make it ad-only so the prices show just to people who click your ad."}
+                ? "Only people who arrive through the ad link see the prices and Buy buttons. Anyone else sees the page with the enquiry form."
+                : "Anyone who opens the campaign page sees the prices. The page isn't in your website's menu or on Google."}
             </span>
             {adLink && (
               <span className="op-adlink">
