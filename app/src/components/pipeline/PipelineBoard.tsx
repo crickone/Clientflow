@@ -278,7 +278,7 @@ export function PipelineBoard({
                   borderRadius: 999,
                   border: `1px solid ${active ? "var(--accent)" : "var(--hairline)"}`,
                   background: active ? "var(--accent)" : "var(--surface-1)",
-                  color: active ? "#fff" : "var(--text-secondary)",
+                  color: active ? "var(--accent-contrast)" : "var(--text-secondary)",
                   fontSize: 13,
                   fontWeight: active ? 600 : 500,
                   textDecoration: "none",
