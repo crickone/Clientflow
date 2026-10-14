@@ -113,6 +113,18 @@ export function saveOffer(id: number | null, campaignId: number, input: OfferInp
   return row.id;
 }
 
+/** One sale window and use-by date for every offer on a campaign ("Change for all"). */
+export function setCampaignOffersSchedule(
+  campaignId: number,
+  v: { saleStartsAt: number | null; saleEndsAt: number | null; useByDate: string },
+): number {
+  return db
+    .update(offers)
+    .set({ saleStartsAt: v.saleStartsAt, saleEndsAt: v.saleEndsAt, useByDate: v.useByDate, updatedAt: Date.now() })
+    .where(eq(offers.campaignId, campaignId))
+    .run().changes;
+}
+
 export function setOfferActive(id: number, active: boolean): void {
   db.update(offers).set({ isActive: active, updatedAt: Date.now() }).where(eq(offers.id, id)).run();
 }

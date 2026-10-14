@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
+  ChevronDown,
   Clapperboard,
   ExternalLink,
   FileText,
@@ -34,6 +35,7 @@ import { CopyAssetButton } from "@/components/campaigns/CopyAssetButton";
 import { LaunchCampaignButton } from "@/components/campaigns/LaunchCampaignButton";
 import { setCampaignAdSpendAction } from "../actions";
 import { OfferPanel } from "@/components/campaigns/OfferPanel";
+import { PriceVisibility } from "@/components/campaigns/PriceVisibility";
 import { listCampaignOrders, listOffersForCampaign, offerTotals } from "@/lib/offers/store";
 import { getOfferAccessKey } from "@/lib/offers/access";
 import { getStripeConnection } from "@/lib/stripe/connection";
@@ -82,6 +84,16 @@ const EXTERNAL_HOME_LABEL: Record<NonNullable<CampaignAsset["externalKind"]>, st
 // separately below, right under the Offer) once the public landing route
 // exists AND the campaign is live (ready/active) — see
 // findApprovedLandingAsset.
+const KIND_NAME: Record<CampaignAsset["kind"], string> = {
+  offer: "Offer",
+  landing_page: "Landing page",
+  blog: "Blog post",
+  social: "Social post",
+  email: "Email",
+  ad_copy: "Ad copy",
+  video_script: "Video script",
+};
+
 const COPYABLE_KINDS = new Set<CampaignAsset["kind"]>(["offer", "ad_copy", "video_script"]);
 
 /**
@@ -228,19 +240,28 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
       : null;
   const subtitle = [campaign.season, dateRange].filter(Boolean).join(" · ") || undefined;
 
+  const orderCount = campaignOrders.filter((o) => o.status === "paid").length;
+  const takenCents = campaignOrders.filter((o) => o.status === "paid").reduce((sum, o) => sum + o.amountCents, 0);
+  const statusLabel = campaign.status.charAt(0).toUpperCase() + campaign.status.slice(1);
+
   return (
-    <div className="app-page" style={{ maxWidth: 900 }}>
+    <div className="app-page ch">
+      <Link href="/marketing/campaigns" className="ch-back">
+        <ArrowLeft size={14} /> Campaigns
+      </Link>
       <PageHeader
-        eyebrow={`Marketing · Campaign · ${campaign.status}`}
+        eyebrow={[campaign.season, statusLabel].filter(Boolean).join(" · ")}
         title={campaign.name}
-        subtitle={subtitle}
+        subtitle={niceRange(campaign.startsOn, campaign.endsOn) ?? undefined}
         actions={
           <>
-            <Link href="/marketing/campaigns">
-              <Button variant="outline">
-                <ArrowLeft size={15} /> All campaigns
-              </Button>
-            </Link>
+            {landingUrl && (
+              <a href={landingUrl} target="_blank" rel="noreferrer">
+                <Button variant="secondary">
+                  <ExternalLink size={15} /> View page
+                </Button>
+              </a>
+            )}
             {campaign.status === "building" && (
               <Link href="/adonis">
                 <Button variant="secondary">
@@ -248,314 +269,226 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
                 </Button>
               </Link>
             )}
-            {campaign.status === "ready" && (
-              <LaunchCampaignButton campaignId={campaign.id} campaignName={campaign.name} />
-            )}
+            {campaign.status === "ready" && <LaunchCampaignButton campaignId={campaign.id} campaignName={campaign.name} />}
           </>
         }
       />
 
-      <Card style={{ padding: 20, marginBottom: 24, display: "flex", flexDirection: "column", gap: 14 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <Badge tone={CAMPAIGN_STATUS_TONE[campaign.status] ?? "neutral"}>{campaign.status}</Badge>
-          <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-            {approvedCount}/{assets.length} assets approved · created {formatDate(campaign.createdAt)}
-            {assets.length > 0 && (
-              <> · Est. build cost ≈ {formatCentsEur(estimateCents)} on {modelLabel}</>
+      <div className="ch-kpis">
+        <Card className="ch-kpi">
+          <CardLabel>Assets approved</CardLabel>
+          <CardValue>
+            {approvedCount}
+            <span className="ch-kpi-of">/{assets.length}</span>
+          </CardValue>
+        </Card>
+        <Card className="ch-kpi">
+          <CardLabel>Page views</CardLabel>
+          <CardValue>{campaign.landingViews}</CardValue>
+        </Card>
+        <Card className="ch-kpi">
+          <CardLabel>Enquiries</CardLabel>
+          <CardValue>{signupCount}</CardValue>
+        </Card>
+        <Card className="ch-kpi">
+          <CardLabel>Sales</CardLabel>
+          <CardValue>
+            {orderCount}
+            <span className="ch-kpi-of"> · {formatCentsEur(takenCents)}</span>
+          </CardValue>
+        </Card>
+      </div>
+
+      <div className="ch-grid">
+        <div className="ch-main">
+          <Card className="ch-card">
+            <OfferPanel
+              campaignId={campaign.id}
+              offers={campaignOffers.map((offer) => ({
+                id: offer.id,
+                title: offer.title,
+                description: offer.description,
+                priceCents: offer.priceCents,
+                compareAtCents: offer.compareAtCents,
+                items: offer.items.map((i) => ({ therapyId: i.therapyId, sessions: i.sessions })),
+                quantityLimit: offer.quantityLimit,
+                saleStartsAt: offer.saleStartsAt,
+                saleEndsAt: offer.saleEndsAt,
+                useByDate: offer.useByDate,
+                terms: offer.terms,
+                isActive: offer.isActive,
+                state: offer.state,
+                sold: offer.sold,
+                left: offer.left,
+                revenueCents: offerTotals(offer.id).revenueCents,
+              }))}
+              orders={campaignOrders.map((o) => ({ id: o.id, createdAt: o.paidAt ?? o.createdAt, name: o.name, email: o.email, phone: o.phone, amountCents: o.amountCents, status: o.status, clientId: o.clientId, offerTitle: o.offerTitle }))}
+              services={services}
+              stripeConnected={stripeConnected}
+              landingUrl={landingUrl}
+            />
+          </Card>
+
+          <section aria-labelledby="ch-assets-h">
+            <div className="ch-section-head">
+              <h2 id="ch-assets-h" className="ch-h">
+                What Adonis made
+              </h2>
+              <span className="ch-muted">
+                {approvedCount} of {assets.length} approved
+              </span>
+            </div>
+            {assets.length === 0 ? (
+              <EmptyState
+                icon={<Megaphone size={32} strokeWidth={1.4} />}
+                title="No assets yet"
+                message="Adonis hasn't drafted anything for this campaign yet. Head to Adonis and continue the conversation to generate the kit."
+                action={
+                  <Link href="/adonis">
+                    <Button variant="secondary">
+                      <MessageSquarePlus size={15} /> Continue building
+                    </Button>
+                  </Link>
+                }
+              />
+            ) : (
+              <div className="ch-assets">
+                {assets.map((asset, i) => {
+                  const Icon = KIND_ICON[asset.kind];
+                  const href = hrefs[i];
+                  const preview = asset.status === "pending" ? "" : previewText(asset);
+                  return (
+                    <details key={asset.id} className="ch-asset" data-empty={!preview}>
+                      <summary>
+                        <span className="ch-asset-icon" aria-hidden>
+                          <Icon size={15} strokeWidth={1.75} />
+                        </span>
+                        <span className="ch-asset-main">
+                          <span className="ch-asset-title">{asset.title}</span>
+                          <span className="ch-asset-kind">{KIND_NAME[asset.kind]}</span>
+                        </span>
+                        <Badge tone={ASSET_STATUS_TONE[asset.status]}>{asset.status === "pending" ? "Not drafted" : asset.status === "drafted" ? "Draft" : "Approved"}</Badge>
+                        {preview && <ChevronDown size={15} className="ch-asset-chev" aria-hidden />}
+                      </summary>
+                      {preview && (
+                        <div className="ch-asset-body">
+                          <div className="ch-asset-text">{preview}</div>
+                          {(href || COPYABLE_KINDS.has(asset.kind)) && (
+                            <div className="ch-asset-actions">
+                              {href && (
+                                <Link href={href}>
+                                  <Button variant="ghost" size="sm">
+                                    <ExternalLink size={13} />
+                                    {asset.externalKind ? EXTERNAL_HOME_LABEL[asset.externalKind] : "View"}
+                                  </Button>
+                                </Link>
+                              )}
+                              {COPYABLE_KINDS.has(asset.kind) && <CopyAssetButton text={asset.body} />}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </details>
+                  );
+                })}
+              </div>
             )}
-          </span>
-        </div>
-        <div>
-          <div
-            style={{
-              fontSize: 11,
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-              color: "var(--text-tertiary)",
-              marginBottom: 6,
-            }}
-          >
-            Offer
-          </div>
-          <p style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
-            {campaign.offer || "Not set yet."}
-          </p>
+          </section>
         </div>
 
-        {landingAsset && (
-          <div>
-            <div
-              style={{
-                fontSize: 11,
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                color: "var(--text-tertiary)",
-                marginBottom: 6,
-              }}
-            >
-              Landing page
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <aside className="ch-side">
+          {landingAsset && (
+            <Card className="ch-card">
+              <span className="ch-label">Landing page</span>
               {landingUrl ? (
                 <>
-                  <code
-                    style={{
-                      fontSize: 12.5,
-                      color: "var(--text-secondary)",
-                      background: "var(--surface-2)",
-                      border: "1px solid var(--hairline)",
-                      borderRadius: "var(--radius)",
-                      padding: "4px 8px",
-                    }}
-                  >
-                    {landingUrl}
-                  </code>
-                  <CopyAssetButton text={landingUrl} />
-                  <a href={landingUrl} target="_blank" rel="noreferrer">
-                    <Button variant="ghost" size="sm">
-                      <ExternalLink size={13} />
-                      View
-                    </Button>
+                  <a className="ch-url" href={landingUrl} target="_blank" rel="noreferrer">
+                    {landingUrl.replace(/^https?:\/\//, "")}
                   </a>
+                  <div className="ch-row">
+                    <CopyAssetButton text={landingUrl} />
+                    {pipeline && (
+                      <Link href={`/leads?pipeline=${pipeline.id}`} className="ch-link">
+                        Enquiries pipeline
+                      </Link>
+                    )}
+                  </div>
+                  {campaignOffers.length > 0 && <PriceVisibility campaignId={campaign.id} landingUrl={landingUrl} accessKey={accessKey} />}
                 </>
               ) : (
-                <span style={{ fontSize: 13, color: "var(--text-tertiary)", fontStyle: "italic" }}>
-                  Add a site to publish the landing page.
-                </span>
+                <p className="ch-note">Add a website under Sites to publish the landing page.</p>
               )}
-            </div>
-            <div style={{ fontSize: 12.5, color: "var(--text-tertiary)", marginTop: 8, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              <span>{signupCount === 1 ? "1 sign-up so far" : `${signupCount} sign-ups so far`}</span>
-              {pipeline && (
-                <Link href={`/leads?pipeline=${pipeline.id}`} style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 500 }}>
-                  Open this campaign&rsquo;s pipeline
-                </Link>
-              )}
-            </div>
-          </div>
-        )}
-      </Card>
-
-      <Card style={{ padding: 20, marginBottom: 24 }}>
-        <OfferPanel
-          campaignId={campaign.id}
-          offers={campaignOffers.map((offer) => ({
-            id: offer.id,
-            title: offer.title,
-            description: offer.description,
-            priceCents: offer.priceCents,
-            compareAtCents: offer.compareAtCents,
-            items: offer.items.map((i) => ({ therapyId: i.therapyId, sessions: i.sessions })),
-            quantityLimit: offer.quantityLimit,
-            saleStartsAt: offer.saleStartsAt,
-            saleEndsAt: offer.saleEndsAt,
-            useByDate: offer.useByDate,
-            terms: offer.terms,
-            isActive: offer.isActive,
-            state: offer.state,
-            sold: offer.sold,
-            left: offer.left,
-            revenueCents: offerTotals(offer.id).revenueCents,
-          }))}
-          orders={campaignOrders.map((o) => ({ id: o.id, createdAt: o.paidAt ?? o.createdAt, name: o.name, email: o.email, phone: o.phone, amountCents: o.amountCents, status: o.status, clientId: o.clientId, offerTitle: o.offerTitle }))}
-          services={services}
-          stripeConnected={stripeConnected}
-          landingUrl={landingUrl}
-          accessKey={accessKey}
-        />
-      </Card>
-
-      <Card style={{ padding: 20, marginBottom: 24 }}>
-        <div
-          style={{
-            fontSize: 11,
-            textTransform: "uppercase",
-            letterSpacing: "0.08em",
-            color: "var(--text-tertiary)",
-            marginBottom: 14,
-          }}
-        >
-          Scoreboard
-        </div>
-
-        {hasConverts ? (
-          <div style={{ fontSize: 15, fontWeight: 500, color: heroColor, marginBottom: 18 }}>{heroText}</div>
-        ) : (
-          <p style={{ fontSize: 13, color: "var(--text-tertiary)", fontStyle: "italic", marginBottom: 18 }}>
-            No conversions attributed yet.
-          </p>
-        )}
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 20 }}>
-          <div>
-            <CardLabel>Leads</CardLabel>
-            <CardValue style={{ fontSize: 22 }}>{scoreboard.leads}</CardValue>
-          </div>
-
-          {hasConverts && (
-            <div>
-              <CardLabel>Converts</CardLabel>
-              <CardValue style={{ fontSize: 22 }}>{scoreboard.converts}</CardValue>
-            </div>
+            </Card>
           )}
 
-          {hasConverts && (
-            <div>
-              <CardLabel>Conv. rate</CardLabel>
-              <CardValue style={{ fontSize: 22 }}>
-                {scoreboard.conversionRatePct === null ? "—" : `${scoreboard.conversionRatePct.toFixed(0)}%`}
-              </CardValue>
-            </div>
-          )}
+          <Card className="ch-card">
+            <span className="ch-label">The offer</span>
+            {campaign.offer ? (
+              <details className="ch-offer">
+                <summary>
+                  <span className="ch-offer-text">{campaign.offer}</span>
+                  <span className="ch-link ch-offer-more">Read all</span>
+                </summary>
+              </details>
+            ) : (
+              <p className="ch-note">Not set yet.</p>
+            )}
+          </Card>
 
-          <div>
-            <CardLabel>Ad spend</CardLabel>
-            {/* Admin-only by construction, not by an extra isAdmin check here:
-                requireAdminPage() at the top of this page already redirects
-                any non-admin away before a single line of this component
-                renders, so this form — like the campaign-build-model selector
-                on the campaigns list page — is admin-only simply because
-                nothing else ever reaches this render. The action itself
-                (setCampaignAdSpendAction) still re-checks requireAdmin() on
-                its own, since a server action is its own reachable POST
-                endpoint regardless of what rendered the form. */}
-            <form action={setCampaignAdSpendAction} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <Card className="ch-card">
+            <span className="ch-label">Scoreboard</span>
+            {hasConverts ? <p className="ch-score-hero" style={{ color: heroColor }}>{heroText}</p> : <p className="ch-note">No sales or sign-ups converted yet.</p>}
+            <div className="ch-score">
+              <div>
+                <CardLabel>Leads</CardLabel>
+                <CardValue style={{ fontSize: 20 }}>{scoreboard.leads}</CardValue>
+              </div>
+              {hasConverts && (
+                <>
+                  <div>
+                    <CardLabel>Converts</CardLabel>
+                    <CardValue style={{ fontSize: 20 }}>{scoreboard.converts}</CardValue>
+                  </div>
+                  <div>
+                    <CardLabel>CAC</CardLabel>
+                    <CardValue style={{ fontSize: 20 }}>{scoreboard.cacCents === null ? "—" : formatCentsEur(scoreboard.cacCents)}</CardValue>
+                  </div>
+                  <div>
+                    <CardLabel>ROAS</CardLabel>
+                    <CardValue style={{ fontSize: 20 }}>{scoreboard.roas === null ? "—" : `${scoreboard.roas.toFixed(1)}×`}</CardValue>
+                  </div>
+                </>
+              )}
+            </div>
+            {/* Admin-only by construction: requireAdminPage() above; the action re-checks too. */}
+            <form action={setCampaignAdSpendAction} className="ch-spend">
               <input type="hidden" name="campaignId" value={campaign.id} />
-              <span style={{ fontSize: 15, color: "var(--text-tertiary)" }}>€</span>
-              <input
-                type="number"
-                name="adSpend"
-                step="0.01"
-                min="0"
-                defaultValue={(campaign.adSpendCents / 100).toFixed(2)}
-                style={{
-                  width: 76,
-                  background: "var(--bg)",
-                  border: "1px solid var(--hairline)",
-                  borderRadius: "var(--radius)",
-                  padding: "5px 7px",
-                  color: "var(--text-primary)",
-                  fontSize: 14,
-                  fontFamily: "inherit",
-                }}
-              />
-              <Button type="submit" size="sm" variant="outline">
+              <label>
+                <span>Ad spend</span>
+                <span className="ch-spend-field">
+                  €
+                  <input type="number" name="adSpend" step="0.01" min="0" defaultValue={(campaign.adSpendCents / 100).toFixed(2)} />
+                </span>
+              </label>
+              <Button type="submit" size="sm" variant="secondary">
                 Save
               </Button>
             </form>
-          </div>
-
-          {hasConverts && (
-            <>
-              <div>
-                <CardLabel>CAC</CardLabel>
-                <CardValue style={{ fontSize: 22 }}>
-                  {scoreboard.cacCents === null ? "—" : formatCentsEur(scoreboard.cacCents)}
-                </CardValue>
-              </div>
-              <div>
-                <CardLabel>Upfront cash</CardLabel>
-                <CardValue style={{ fontSize: 22 }}>{formatCentsEur(scoreboard.upfrontCashCents)}</CardValue>
-              </div>
-              <div>
-                <CardLabel>MRR added</CardLabel>
-                <CardValue style={{ fontSize: 22 }}>{formatCentsEur(scoreboard.mrrCents)}/mo</CardValue>
-              </div>
-              <div>
-                <CardLabel>ROAS</CardLabel>
-                <CardValue style={{ fontSize: 22 }}>
-                  {scoreboard.roas === null ? "—" : `${scoreboard.roas.toFixed(1)}×`}
-                </CardValue>
-              </div>
-            </>
-          )}
-        </div>
-
-        <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 16 }}>
-          AI build cost ≈ {formatCentsEur(scoreboard.aiBuildCents)}
-        </div>
-      </Card>
-
-      {assets.length === 0 ? (
-        <EmptyState
-          icon={<Megaphone size={32} strokeWidth={1.4} />}
-          title="No assets yet"
-          message="Adonis hasn't drafted anything for this campaign yet. Head to Adonis and continue the conversation to generate the kit — offer, blog, social, email, ad copy, video script."
-          action={
-            <Link href="/adonis">
-              <Button variant="secondary">
-                <MessageSquarePlus size={15} /> Continue building
-              </Button>
-            </Link>
-          }
-        />
-      ) : (
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        {assets.map((asset, i) => {
-          const Icon = KIND_ICON[asset.kind];
-          const href = hrefs[i];
-          const preview = previewText(asset);
-
-          return (
-            <Card key={asset.id} style={{ padding: 18 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                <Icon size={16} strokeWidth={1.75} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>{asset.title}</div>
-                  <div
-                    style={{
-                      fontSize: 10.5,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.08em",
-                      color: "var(--text-tertiary)",
-                    }}
-                  >
-                    {asset.kind.replace("_", " ")}
-                  </div>
-                </div>
-                <Badge tone={ASSET_STATUS_TONE[asset.status]}>{asset.status}</Badge>
-              </div>
-
-              {asset.status === "pending" || !preview ? (
-                <p style={{ fontSize: 13, color: "var(--text-tertiary)", fontStyle: "italic" }}>Not drafted yet.</p>
-              ) : (
-                <>
-                  <div
-                    style={{
-                      fontSize: 13,
-                      color: "var(--text-secondary)",
-                      lineHeight: 1.6,
-                      whiteSpace: "pre-wrap",
-                      maxHeight: 220,
-                      overflowY: "auto",
-                      background: "var(--surface-2)",
-                      border: "1px solid var(--hairline)",
-                      borderRadius: "var(--radius)",
-                      padding: "10px 12px",
-                    }}
-                  >
-                    {preview}
-                  </div>
-                  {(href || COPYABLE_KINDS.has(asset.kind)) && (
-                    <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                      {href && (
-                        <Link href={href}>
-                          <Button variant="ghost" size="sm">
-                            <ExternalLink size={13} />
-                            {asset.externalKind ? EXTERNAL_HOME_LABEL[asset.externalKind] : "View"}
-                          </Button>
-                        </Link>
-                      )}
-                      {COPYABLE_KINDS.has(asset.kind) && <CopyAssetButton text={asset.body} />}
-                    </div>
-                  )}
-                </>
-              )}
-            </Card>
-          );
-        })}
+            <p className="ch-note">
+              AI build cost about {formatCentsEur(estimateCents)} on {modelLabel} · created {formatDate(campaign.createdAt)}
+            </p>
+          </Card>
+        </aside>
       </div>
-      )}
     </div>
   );
+}
+
+function niceRange(start: string | null, end: string | null): string | null {
+  const fmt = (iso: string, year: boolean) =>
+    new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-IE", { day: "numeric", month: "short", year: year ? "numeric" : undefined, timeZone: "UTC" });
+  if (start && end) return `${fmt(start, start.slice(0, 4) !== end.slice(0, 4))} – ${fmt(end, true)}`;
+  if (start) return `From ${fmt(start, true)}`;
+  if (end) return `Until ${fmt(end, true)}`;
+  return null;
 }

@@ -8,7 +8,7 @@ import { getCurrentMembership, requireAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { therapies } from "@/lib/db/schema";
 import { discountedCents, parseEuroToCents, validateOffer } from "@/lib/offers/model";
-import { deleteOffer, getOffer as getOfferById, listOffersForCampaign, saveOffer, setCampaignOffersActive, setOfferActive } from "@/lib/offers/store";
+import { deleteOffer, getOffer as getOfferById, listOffersForCampaign, saveOffer, setCampaignOffersActive, setCampaignOffersSchedule, setOfferActive } from "@/lib/offers/store";
 import { getStripeConnection } from "@/lib/stripe/connection";
 import { getOfferAccessKey, setOfferAccessKey } from "@/lib/offers/access";
 import { setCampaignBuildModel } from "@/lib/campaigns/buildModel";
@@ -223,6 +223,24 @@ export async function setAllOffersOnSaleAction(campaignId: number, onSale: boole
   if (!campaign) return { ok: false, error: "Campaign not found." };
   if (onSale && !getStripeConnection(getCurrentMembership()!.tenant.id)) return { ok: false, error: "Connect Stripe first (Settings, Stripe), so buyers can pay." };
   const changed = setCampaignOffersActive(campaign.id, onSale === true);
+  revalidatePath(`/marketing/campaigns/${campaign.id}`);
+  return { ok: true, changed };
+}
+
+/** The same sale window and use-by date on every offer in the campaign. */
+export async function setOffersScheduleAction(
+  campaignId: number,
+  input: { saleStartsAt: number | null; saleEndsAt: number | null; useByDate: string },
+): Promise<{ ok: true; changed: number } | { ok: false; error: string }> {
+  await requireAdmin();
+  const campaign = getCampaign(Number(campaignId));
+  if (!campaign) return { ok: false, error: "Campaign not found." };
+  const starts = Number.isFinite(input.saleStartsAt) ? (input.saleStartsAt as number) : null;
+  const ends = Number.isFinite(input.saleEndsAt) ? (input.saleEndsAt as number) : null;
+  const useBy = String(input.useByDate ?? "");
+  if (starts !== null && ends !== null && ends <= starts) return { ok: false, error: "The sale has to end after it starts." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(useBy)) return { ok: false, error: "Pick the date the sessions must be used by." };
+  const changed = setCampaignOffersSchedule(campaign.id, { saleStartsAt: starts, saleEndsAt: ends, useByDate: useBy });
   revalidatePath(`/marketing/campaigns/${campaign.id}`);
   return { ok: true, changed };
 }
