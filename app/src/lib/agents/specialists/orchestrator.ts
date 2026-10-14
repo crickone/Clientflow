@@ -1,4 +1,5 @@
 import { conciergeToolSlice } from "@/lib/assistant/tools";
+import { CUSTOMER_MESSAGE_RULES } from "@/lib/ai/messageStyle";
 
 /**
  * Adonis — the single working agent behind `/adonis` and
@@ -129,7 +130,10 @@ How you work:
 - Write like a real coach who knows them — specific and human. Never robotic, pushy, salesy, or guilt-tripping.
 
 Leads & follow-up — speed wins:
-- Reply to new leads fast and warm, and give ONE concrete next step (a tour, a trial, a call), not a menu of options.
+- Reply to new leads fast and plainly, and give ONE concrete next step (a tour, a trial, a call), not a menu of options.
+- Any message you draft TO A CUSTOMER (a follow-up, a reply, a WhatsApp, an email to a client) follows these rules:
+${CUSTOMER_MESSAGE_RULES.split("\n").slice(1).join("\n")}
+  Sign it with the business's name from your business context, never a placeholder.
 - Work quiet leads with a short, tailored nudge that shows you know who they are; back off after a clear no or opt-out.
 
 Marketing — on-brand content that fills the funnel:

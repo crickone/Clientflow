@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { tags as tagsTable } from "@/lib/db/schema";
 import { getBusinessName, getInboxBusinessFacts } from "@/lib/ai/businessContext";
 import { MODELS } from "@/lib/ai/client";
+import { CUSTOMER_MESSAGE_RULES } from "@/lib/ai/messageStyle";
 import { meteredCreate } from "@/lib/ai/metered";
 
 export type TriageCategory =
@@ -91,7 +92,8 @@ function buildSystemPrompt(coreTags: string[]): string {
     "Set sensitive=true for anything medical, health-condition-specific, a complaint, distress, legal, or a refund/cancellation dispute. Sensitive messages must NEVER be auto-replied.",
     "",
     "=== SUGGESTED REPLY ===",
-    "Draft a reply the operator can send. Plain text, Irish English (analyse, organise), warm and professional, under 90 words, no markdown or emojis. NEVER make medical or therapeutic claims or promise outcomes. State ONLY facts present in the BUSINESS FACTS above. If the answer is not in those facts, do not invent it — write a brief holding reply (e.g. 'let me check and come back to you') and lower your confidence.",
+    "Draft a reply the operator can send. Plain text, Irish English (analyse, organise), under 90 words, no markdown or emojis. NEVER make medical or therapeutic claims or promise outcomes. State ONLY facts present in the BUSINESS FACTS above. If the answer is not in those facts, do not invent it — write a brief holding reply (e.g. 'let me check and come back to you') and lower your confidence. No sign-off line: it's a chat message.",
+    CUSTOMER_MESSAGE_RULES,
     "",
     "=== CONFIDENCE & AUTO-REPLY ===",
     "confidence (0-1) reflects BOTH your certainty of the category AND that the suggested reply is fully grounded and safe to send unedited.",

@@ -2,6 +2,8 @@ import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Lead, LeadMessage } from "@/lib/db/schema";
 import { getBusinessContext } from "@/lib/ai/businessContext";
+import { getBusinessProfile } from "@/lib/businessProfile";
+import { CUSTOMER_MESSAGE_RULES, signOffRule } from "@/lib/ai/messageStyle";
 import { MODELS } from "@/lib/ai/client";
 import { meteredCreate } from "@/lib/ai/metered";
 
@@ -10,18 +12,16 @@ import { meteredCreate } from "@/lib/ai/metered";
  * brain are supplied per-account by getBusinessContext() and prepended at call
  * time — so a gym's leads get gym messaging, not the wellness-clinic baseline.
  */
-const FOLLOWUP_RULES = `Your job: write short, warm follow-up messages to people who submitted a lead form expressing interest, and convert them into bookings.
+const FOLLOWUP_RULES = `Your job: write short follow-up messages to people who showed interest or bought, and get them booked in.
 
 Voice and constraints:
 - Plain text only. No markdown, no emojis, no formatting.
 - Keep messages under 80 words.
-- Be warm and personal but professional. First name only when greeting.
-- One clear call-to-action: ask if they'd like to book in, and offer 2-3 example times OR direct them to call/email to choose a time. Don't be pushy.
-- Reference the specific service/class they showed interest in (only from the services listed above — never invent one).
-- Never make medical or therapeutic claims or promise outcomes. Describe what the service/class is, not what it cures.
-- If they mentioned a specific concern in the lead form, gently acknowledge it without guarantees ("many people with similar goals have found it helpful").
-- End with the signoff as a placeholder on its own line: "— [Business name]". The operator will personalise it.
-- Do not put the address, phone or website in the message body.
+- One clear call-to-action: ask if they'd like to book in, and offer 2-3 example times OR ask them to reply or call to choose a time. Don't be pushy.
+- Name the service/class they're interested in or bought (only from the services listed above — never invent one), but don't describe it.
+- Never make medical or therapeutic claims or promise outcomes.
+- If they mentioned a specific concern in the lead form, acknowledge it in a few words without guarantees.
+- Do not put the address or website in the message body.
 
 Output:
 - Return ONLY the message text. No preamble, no explanation — just the message body.`;
@@ -32,7 +32,7 @@ Output:
  * repeat drafts. It changes only when the business profile/services change.
  */
 function buildSystemPrompt(): string {
-  return `${getBusinessContext()}\n\n${FOLLOWUP_RULES}`;
+  return `${getBusinessContext()}\n\n${FOLLOWUP_RULES}\n\n${CUSTOMER_MESSAGE_RULES}\n${signOffRule(getBusinessProfile().businessName)}`;
 }
 
 export interface DraftInput {

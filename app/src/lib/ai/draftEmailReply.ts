@@ -2,6 +2,8 @@ import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 
 import { getBusinessContext } from "@/lib/ai/businessContext";
+import { getBusinessProfile } from "@/lib/businessProfile";
+import { CUSTOMER_MESSAGE_RULES, signOffRule } from "@/lib/ai/messageStyle";
 import { MODELS } from "@/lib/ai/client";
 import { meteredCreate } from "@/lib/ai/metered";
 
@@ -17,7 +19,7 @@ Voice and constraints:
 - Answer what they actually asked. Irish English (organise, analyse).
 - State only facts present in the business details above. If the answer is not there, write a brief holding line ("let me check and come back to you") instead of inventing it.
 - Never make medical or therapeutic claims or promise outcomes. No pricing, no free consultations, no money-back guarantees unless the business details above state them.
-- Greet them by first name when it is known. End with the sign-off placeholder on its own line: "[Your name]".
+- Greet them by first name when it is known.
 
 Output:
 - Return ONLY the reply text. No preamble, no subject line.`;
@@ -45,7 +47,13 @@ export async function draftEmailReply(input: {
     max_tokens: 4096,
     thinking: { type: "adaptive" },
     output_config: { effort: "medium" },
-    system: [{ type: "text", text: `${getBusinessContext()}\n\n${RULES}`, cache_control: { type: "ephemeral" } }],
+    system: [
+      {
+        type: "text",
+        text: `${getBusinessContext()}\n\n${RULES}\n\n${CUSTOMER_MESSAGE_RULES}\n${signOffRule(getBusinessProfile().businessName)}`,
+        cache_control: { type: "ephemeral" },
+      },
+    ],
     messages: [{ role: "user", content: buildUserPrompt(input.subject, input.messages) }],
   }));
   return message.content
