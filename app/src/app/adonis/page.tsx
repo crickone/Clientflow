@@ -18,10 +18,13 @@ import { campaignSeedStarterMessage } from "@/components/marketing/buildCampaign
 // render a control that would silently bounce a non-admin.
 export const dynamic = "force-dynamic";
 
+const NEW_CAMPAIGN_STARTER =
+  "Build a campaign for [what it's for, e.g. Black Friday massage], running from [start date] to [end date]. The offer is [what's included and the price].";
+
 export default async function AdonisPage({
   searchParams,
 }: {
-  searchParams: { seedName?: string; season?: string; startsOn?: string; endsOn?: string; angle?: string };
+  searchParams: { seedName?: string; season?: string; startsOn?: string; endsOn?: string; angle?: string; new?: string };
 }) {
   const tenantId = getCurrentTenant().id;
   const isAdmin = getCurrentMembership()?.role === "admin";
@@ -39,7 +42,12 @@ export default async function AdonisPage({
   // them into a pre-filled compose starter (never auto-sent — the operator
   // still reviews + hits send). Null for a bare /adonis visit. This is the one
   // and only agent chat in the app, so it's where "Build campaign" now lands.
-  const initialInput = campaignSeedStarterMessage(searchParams) ?? undefined;
+  // "New campaign" on the campaigns page: a starter with blanks to fill, so
+  // the operator sees what Adonis needs rather than a bare chat box.
+  const initialInput =
+    searchParams.new === "campaign"
+      ? NEW_CAMPAIGN_STARTER
+      : (campaignSeedStarterMessage(searchParams) ?? undefined);
   return (
     // Key on the seed so a second "Build campaign" click with a DIFFERENT seed
     // (client-side nav, same route) remounts AdonisView — AssistantChat applies

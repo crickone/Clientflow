@@ -346,7 +346,9 @@ export function AssistantChat({
       } catch {
         /* ignore */
       }
-      const pick = summaries.find((s) => s.id === last) ?? summaries[0];
+      // A pre-filled starter (New campaign) begins a fresh chat; otherwise
+      // reopen the chat this device had open, or the newest.
+      const pick = initialInput ? undefined : (summaries.find((s) => s.id === last) ?? summaries[0]);
       setActiveId(pick ? pick.id : newId());
       setLoaded(true);
     })();

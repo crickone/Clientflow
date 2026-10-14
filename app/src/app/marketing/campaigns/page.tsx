@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { CampaignRows } from "@/components/campaigns/CampaignRows";
-import { setCampaignBuildModelAction, seedTestCampaignAction, removeTestCampaignAction } from "./actions";
+import { setCampaignBuildModelAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -154,7 +154,7 @@ export default async function MarketingCampaignsPage() {
         title="Campaigns"
         subtitle="Seasonal campaign kits — offer, blog, social posts, emails, ad copy and a video script, drafted by Adonis and approved one asset at a time."
         actions={
-          <Link href="/adonis">
+          <Link href="/adonis?new=campaign">
             <Button size="sm">
               <Plus size={14} /> New campaign
             </Button>
@@ -210,51 +210,15 @@ export default async function MarketingCampaignsPage() {
         </form>
       </Card>
 
-      {/* Demo data (admin-only page): seed a fully-populated "Test Campaign"
-          to preview how a live campaign renders, then remove it. Adds a few
-          clearly-marked demo leads/clients so the Performance columns light
-          up; "Remove" pulls it all back out. */}
-      <Card
-        style={{
-          padding: 16,
-          marginBottom: 24,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 16,
-          flexWrap: "wrap",
-        }}
-      >
-        <div>
-          <div style={{ fontSize: 13.5, fontWeight: 500, color: "var(--text-primary)" }}>Demo data</div>
-          <div style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 2, maxWidth: 560, lineHeight: 1.5 }}>
-            Seed a fully-populated &ldquo;Test Campaign&rdquo; to preview this page — adds a few clearly-marked demo
-            leads &amp; clients so leads/converts/ROAS show. &ldquo;Remove&rdquo; deletes it and the demo records.
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-          <form action={seedTestCampaignAction}>
-            <Button type="submit" size="sm" variant="outline">
-              Seed test campaign
-            </Button>
-          </form>
-          <form action={removeTestCampaignAction}>
-            <Button type="submit" size="sm" variant="outline">
-              Remove
-            </Button>
-          </form>
-        </div>
-      </Card>
-
       {campaigns.length === 0 ? (
         <EmptyState
           icon={<Megaphone size={32} strokeWidth={1.4} />}
           title="No campaigns yet"
-          message="Ask Adonis to build a campaign — open Adonis and describe a season, offer or promotion. It drafts the whole kit (offer, blog, social, email, ad copy, video script) for your approval, one asset at a time."
+          message="Tell Adonis what the campaign is for, when it runs and what's on offer. It drafts the whole kit (offer, landing page, blog, social posts, emails, ad copy, video script) for you to approve one asset at a time, or all at once."
           action={
-            <Link href="/adonis">
+            <Link href="/adonis?new=campaign">
               <Button>
-                <Plus size={15} /> Ask Adonis
+                <Plus size={15} /> New campaign
               </Button>
             </Link>
           }
