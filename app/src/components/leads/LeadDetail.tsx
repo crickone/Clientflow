@@ -4,8 +4,12 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import {
   ArrowLeft,
-  Bot,
   Check,
+  ChevronDown,
+  Copy,
+  MoreHorizontal,
+  Pencil,
+  ShoppingBag,
   PhoneOff,
   PhoneOutgoing,
   Mail,
@@ -22,8 +26,8 @@ import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Card, CardLabel } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/DropdownMenu";
 import { Textarea } from "@/components/ui/Input";
-import { StageChip } from "@/components/pipeline/StageChip";
 import type { StageRecord } from "@/lib/pipeline/roles";
 import {
   callLeadAction,
@@ -34,7 +38,7 @@ import {
   setLeadDoNotCallAction,
   setLeadStageAction,
 } from "@/app/leads/actions";
-import { formatDate, formatDateTime, relativeTime } from "@/lib/utils";
+import { formatDateTime, relativeTime } from "@/lib/utils";
 import { describeArrival, parseArrival } from "@/lib/arrival";
 
 interface Props {
@@ -267,92 +271,114 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
   const lastOutbound = messages.findLast?.((m) => m.direction === "outbound");
   const hasUnsentDraft =
     lastOutbound && lastOutbound.aiGenerated && !lastOutbound.sentAt;
+  const initials = fullName
+    .split(/\s+/)
+    .map((w) => w[0] ?? "")
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  const arrival = lead.arrival ? describeArrival(parseArrival(lead.arrival)) : null;
+  const origin = [SOURCE_NAME[lead.source] ?? lead.source, lead.campaign].filter(Boolean).join(" · ");
+  // An online purchase's note is written by the system; it reads as an event, not a message from them.
+  const systemNote = lead.source === "offer";
+
+  function draftActions(m: LeadMessage, text: string) {
+    return (
+      <div className="ld-draft-actions">
+        <Button variant="ghost" size="sm" onClick={() => copyToClipboard(text)}>
+          <Copy size={13} /> Copy
+        </Button>
+        {editingId !== m.id && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setEditingId(m.id);
+              setEditText(m.content);
+            }}
+          >
+            <Pencil size={13} /> Edit
+          </Button>
+        )}
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={pending}
+          onClick={() => {
+            if (editingId !== m.id) setEditText(m.content);
+            markSent(m.id);
+          }}
+          title="You sent it yourself (email, text); record it here"
+        >
+          <Check size={13} /> Mark sent
+        </Button>
+        {lead.phone && (
+          <Button size="sm" loading={pending} onClick={() => sendViaWhatsApp(m.id, text)}>
+            <Send size={13} /> Send WhatsApp
+          </Button>
+        )}
+      </div>
+    );
+  }
 
   return (
-    <>
-      <Link
-        href="/leads"
-        style={{
-          display: "inline-flex",
-          gap: 6,
-          alignItems: "center",
-          color: "var(--text-tertiary)",
-          fontSize: 13,
-          marginBottom: 24,
-        }}
-      >
-        <ArrowLeft size={14} />
-        Back to leads
+    <div className="ld">
+      <Link href="/leads" className="ld-back">
+        <ArrowLeft size={14} /> Leads
       </Link>
 
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          gap: 24,
-          marginBottom: 32,
-          flexWrap: "wrap",
-        }}
-      >
-        <div>
-          <div
-            style={{
-              fontSize: 11,
-              color: "var(--text-tertiary)",
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-              marginBottom: 8,
-              fontWeight: 500,
-            }}
-          >
-            Lead · {lead.source}
-          </div>
-          <h1
-            style={{
-              fontFamily: "var(--font-heading), sans-serif",
-              fontSize: "clamp(28px, 3.5vw, 40px)",
-              fontWeight: 400,
-              textTransform: "uppercase",
-              color: "var(--text-primary)",
-              lineHeight: 1.05,
-            }}
-          >
-            {fullName}
-          </h1>
-          <div
-            style={{
-              display: "flex",
-              gap: 16,
-              marginTop: 12,
-              color: "var(--text-secondary)",
-              fontSize: 14,
-              flexWrap: "wrap",
-            }}
-          >
-            {lead.email && (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                <Mail size={14} /> {lead.email}
-              </span>
-            )}
-            {lead.phone && (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                <Phone size={14} /> {lead.phone}
-              </span>
-            )}
-            {lead.doNotCall && <Badge>Do not call</Badge>}
-            <StageChip stage={stage} />
-            {lead.therapyInterest && <Badge>{lead.therapyInterest}</Badge>}
-            {lead.campaign && <Badge>{lead.campaign}</Badge>}
+      <header className="ld-head">
+        <div className="ld-who">
+          <span className="ld-avatar" aria-hidden>
+            {initials || "?"}
+          </span>
+          <div className="ld-who-text">
+            <h1 className="ld-name">{fullName}</h1>
+            <p className="ld-origin">
+              {origin}
+              {arrival && <span> · arrived from {arrival}</span>}
+            </p>
+            <div className="ld-contact">
+              {lead.phone && (
+                <a href={`tel:${lead.phone.replace(/[^\d+]/g, "")}`}>
+                  <Phone size={13} /> {lead.phone}
+                </a>
+              )}
+              {lead.email && (
+                <a href={`mailto:${lead.email}`}>
+                  <Mail size={13} /> {lead.email}
+                </a>
+              )}
+              {lead.doNotCall && <Badge tone="red">Do not call</Badge>}
+            </div>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+
+        <div className="ld-actions">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" className="ld-stage" disabled={pending}>
+                <span className="ld-stage-dot" style={{ background: stage?.colour ?? "var(--text-tertiary)" }} />
+                {stage?.name ?? "No stage"}
+                <ChevronDown size={14} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {stages.map((s) => (
+                <DropdownMenuItem key={s.id} onSelect={() => s.id !== lead.stageId && setStage(s.id)}>
+                  <span className="ld-stage-dot" style={{ background: s.colour }} />
+                  {s.name}
+                  {s.id === lead.stageId && <Check size={13} style={{ marginLeft: "auto" }} />}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button onClick={generateDraft} disabled={drafting || pending}>
             <Sparkles size={15} />
-            {drafting ? "Drafting…" : hasUnsentDraft ? "Regenerate draft" : "AI draft"}
+            {drafting ? "Drafting…" : hasUnsentDraft ? "Redo the draft" : "Draft a message"}
           </Button>
           <Button
-            variant="outline"
+            variant="secondary"
             onClick={placeCall}
             disabled={calling || pending || !!callBlockedReason}
             title={callBlockedReason ?? "Have the voice agent phone this lead now"}
@@ -362,276 +388,113 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
           </Button>
           {messages.length > 0 && (
             <Link href={`/communication?c=${encodeURIComponent(`lead-${lead.id}`)}`}>
-              <Button variant="outline">
-                <MessagesSquare size={14} />
-                Open chat
+              <Button variant="secondary">
+                <MessagesSquare size={14} /> Open chat
               </Button>
             </Link>
           )}
-          <Button
-            variant="ghost"
-            onClick={() => setReplyOpen(true)}
-            disabled={pending}
-            title="Record a reply they gave somewhere AdonisAgent can't see, like a phone call or your personal email"
-          >
-            <MessageSquare size={14} />
-            Log outside reply
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={toggleDoNotCall}
-            disabled={pending}
-            title={lead.doNotCall ? "Allow calls to this lead again" : "Never phone this lead"}
-          >
-            <PhoneOff size={14} />
-            {lead.doNotCall ? "Allow calls" : "Do not call"}
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" className="ld-more" aria-label="More actions">
+                <MoreHorizontal size={17} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => setReplyOpen(true)}>
+                <MessageSquare size={14} /> Log a reply they gave elsewhere
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void toggleDoNotCall()}>
+                <PhoneOff size={14} /> {lead.doNotCall ? "Allow calls again" : "Mark do not call"}
+              </DropdownMenuItem>
+              <DropdownMenuItem destructive onSelect={() => void remove()}>
+                <Trash2 size={14} /> Delete lead
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-      </div>
+      </header>
 
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 20 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {lead.notes && (
-            <Card>
-              <CardLabel>From the form</CardLabel>
-              <div style={{ color: "var(--text-secondary)", whiteSpace: "pre-wrap" }}>
-                {lead.notes}
-              </div>
-            </Card>
+      <div className="ld-grid">
+        <section className="ld-thread" aria-label="Conversation">
+          {lead.notes && systemNote && (
+            <div className="ld-event">
+              <ShoppingBag size={13} /> {lead.notes}
+              <span>{formatDateTime(lead.createdAt)}</span>
+            </div>
+          )}
+          {lead.notes && !systemNote && (
+            <div className="ld-msg" data-side="them">
+              <div className="ld-msg-meta">From the form · {formatDateTime(lead.createdAt)}</div>
+              <div className="ld-bubble">{lead.notes}</div>
+            </div>
           )}
 
-          {messages.length === 0 ? (
-            <Card>
-              <div
-                style={{
-                  padding: "32px 0",
-                  textAlign: "center",
-                  color: "var(--text-tertiary)",
-                  fontSize: 14,
-                }}
-              >
-                No messages yet. Click <b>AI draft</b> to generate the first
-                follow-up.
-              </div>
-            </Card>
-          ) : (
-            messages.map((m) => {
-              const isOutbound = m.direction === "outbound";
-              const isInbound = m.direction === "inbound";
-              const isDraft = isOutbound && m.aiGenerated && !m.sentAt;
-              const isEditing = editingId === m.id;
-              return (
-                <Card
-                  key={m.id}
-                  style={{
-                    borderLeft: `3px solid ${
-                      isInbound
-                        ? "var(--accent-pemf)"
-                        : isOutbound
-                          ? "var(--accent-hbot)"
-                          : "var(--hairline)"
-                    }`,
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginBottom: 10,
-                      flexWrap: "wrap",
-                      gap: 6,
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 500,
-                          color: "var(--text-tertiary)",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.08em",
+          {messages.length === 0 && (
+            <div className="ld-empty">
+              <p>No messages yet.</p>
+              <Button onClick={generateDraft} disabled={drafting || pending}>
+                <Sparkles size={15} /> {drafting ? "Drafting…" : "Draft a first message"}
+              </Button>
+            </div>
+          )}
+
+          {messages.map((m) => {
+            const isOutbound = m.direction === "outbound";
+            const isInbound = m.direction === "inbound";
+            const isDraft = isOutbound && m.aiGenerated && !m.sentAt;
+            const isEditing = editingId === m.id;
+            const side = isInbound ? "them" : isOutbound ? "us" : "note";
+            return (
+              <div key={m.id} className="ld-msg" data-side={side} data-draft={isDraft}>
+                <div className="ld-msg-meta">
+                  {isInbound ? "They replied" : isOutbound ? (isDraft ? "Draft, not sent" : "You") : "Note"}
+                  {m.channel && ` · ${CHANNEL_NAME[m.channel] ?? m.channel}`}
+                  {m.aiGenerated && " · written by Adonis"}
+                  {" · "}
+                  {m.sentAt ? relativeTime(m.sentAt) : relativeTime(m.createdAt)}
+                </div>
+                {isEditing ? (
+                  <div className="ld-edit">
+                    <Textarea value={editText} onChange={(e) => setEditText(e.target.value)} rows={6} />
+                    <div className="ld-draft-actions">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setEditingId(null);
+                          setEditText("");
                         }}
                       >
-                        {isInbound ? "Lead replied" : isOutbound ? "Outbound" : "Note"}
-                      </span>
-                      {m.channel && <Badge>{m.channel}</Badge>}
-                      {m.aiGenerated && (
-                        <Badge tone="amber">
-                          <Bot size={11} style={{ marginRight: 4 }} />
-                          AI
-                        </Badge>
-                      )}
-                      {isDraft && <Badge tone="amber">Draft — not sent</Badge>}
+                        Cancel
+                      </Button>
+                      {draftActions(m, editText)}
                     </div>
-                    <span style={{ color: "var(--text-tertiary)", fontSize: 11 }}>
-                      {m.sentAt
-                        ? `Sent ${relativeTime(m.sentAt)}`
-                        : `Drafted ${relativeTime(m.createdAt)}`}
-                    </span>
                   </div>
-                  {isEditing ? (
-                    <>
-                      <Textarea
-                        value={editText}
-                        onChange={(e) => setEditText(e.target.value)}
-                        rows={6}
-                      />
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: 8,
-                          marginTop: 10,
-                          justifyContent: "flex-end",
-                        }}
-                      >
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setEditingId(null);
-                            setEditText("");
-                          }}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => copyToClipboard(editText)}
-                        >
-                          Copy
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={pending}
-                          onClick={() => markSent(m.id)}
-                        >
-                          <Check size={13} />
-                          Mark sent
-                        </Button>
-                        {lead.phone && (
-                          <Button
-                            size="sm"
-                            loading={pending}
-                            onClick={() => sendViaWhatsApp(m.id, editText)}
-                          >
-                            <Send size={13} />
-                            Send WhatsApp
-                          </Button>
-                        )}
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div
-                        style={{
-                          color: "var(--text-primary)",
-                          fontSize: 14,
-                          lineHeight: 1.6,
-                          whiteSpace: "pre-wrap",
-                        }}
-                      >
-                        {m.content}
-                      </div>
-                      {isDraft && (
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: 8,
-                            marginTop: 12,
-                            justifyContent: "flex-end",
-                          }}
-                        >
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => copyToClipboard(m.content)}
-                          >
-                            Copy
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setEditingId(m.id);
-                              setEditText(m.content);
-                            }}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={pending}
-                            onClick={() => {
-                              setEditText(m.content);
-                              markSent(m.id);
-                            }}
-                          >
-                            <Check size={13} />
-                            Mark sent
-                          </Button>
-                          {lead.phone && (
-                            <Button
-                              size="sm"
-                              loading={pending}
-                              onClick={() => sendViaWhatsApp(m.id, m.content)}
-                            >
-                              <Send size={13} />
-                              Send WhatsApp
-                            </Button>
-                          )}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </Card>
-              );
-            })
-          )}
+                ) : (
+                  <>
+                    <div className="ld-bubble">{m.content}</div>
+                    {isDraft && draftActions(m, m.content)}
+                  </>
+                )}
+              </div>
+            );
+          })}
 
           {replyOpen && (
-            <Card>
-              <CardLabel>Log a reply from outside AdonisAgent</CardLabel>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+            <div className="ld-log">
+              <div className="ld-log-head">
+                <strong>Log a reply they gave elsewhere</strong>
+                <span>A phone call, your own email, in person.</span>
+              </div>
+              <div className="ld-log-channels">
                 {(["email", "sms", "whatsapp", "call", "manual"] as const).map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setReplyChannel(c)}
-                    style={{
-                      padding: "6px 12px",
-                      fontSize: 12,
-                      borderRadius: "var(--radius)",
-                      border: `1px solid ${
-                        replyChannel === c ? "var(--text-primary)" : "var(--hairline)"
-                      }`,
-                      background: replyChannel === c ? "var(--text-primary)" : "transparent",
-                      color: replyChannel === c ? "var(--bg)" : "var(--text-secondary)",
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                      textTransform: "capitalize",
-                    }}
-                  >
-                    {c}
+                  <button key={c} type="button" data-on={replyChannel === c} onClick={() => setReplyChannel(c)}>
+                    {c === "manual" ? "In person" : c === "sms" ? "Text" : c.charAt(0).toUpperCase() + c.slice(1)}
                   </button>
                 ))}
               </div>
-              <Textarea
-                rows={4}
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-                placeholder="What did they say?"
-              />
-              <div style={{ display: "flex", gap: 8, marginTop: 10, justifyContent: "flex-end" }}>
+              <Textarea rows={4} value={replyText} onChange={(e) => setReplyText(e.target.value)} placeholder="What did they say?" />
+              <div className="ld-draft-actions">
                 <Button variant="ghost" size="sm" onClick={() => setReplyOpen(false)}>
                   Cancel
                 </Button>
@@ -639,87 +502,71 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
                   Save reply
                 </Button>
               </div>
+            </div>
+          )}
+        </section>
+
+        <aside className="ld-side">
+          <Card className="ld-card">
+            <CardLabel>Details</CardLabel>
+            <dl className="ld-facts">
+              <div>
+                <dt>Came in</dt>
+                <dd>{SOURCE_NAME[lead.source] ?? lead.source}</dd>
+              </div>
+              {lead.campaign && (
+                <div>
+                  <dt>Campaign</dt>
+                  <dd>{lead.campaign}</dd>
+                </div>
+              )}
+              <div>
+                <dt>Arrived from</dt>
+                <dd>{arrival ?? "Not recorded"}</dd>
+              </div>
+              {lead.therapyInterest && (
+                <div>
+                  <dt>Interested in</dt>
+                  <dd>{lead.therapyInterest}</dd>
+                </div>
+              )}
+              <div>
+                <dt>First contact</dt>
+                <dd>{formatDateTime(lead.createdAt)}</dd>
+              </div>
+              <div>
+                <dt>Last activity</dt>
+                <dd>{relativeTime(lead.updatedAt)}</dd>
+              </div>
+            </dl>
+          </Card>
+
+          {lead.clientId && (
+            <Card className="ld-card">
+              <CardLabel>Client</CardLabel>
+              <p className="ld-note">{fullName.split(" ")[0]} is a client now: their bookings, treatments and payments are on their client page.</p>
+              <div className="ld-links">
+                <Link href={`/clients/${lead.clientId}?tab=journey`}>View their journey</Link>
+                <Link href={`/clients/${lead.clientId}`}>Open client</Link>
+              </div>
             </Card>
           )}
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <Card>
-            <CardLabel>Pipeline stage</CardLabel>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {stages.map((s) => {
-                const active = lead.stageId === s.id;
-                return (
-                  <button
-                    key={s.id}
-                    type="button"
-                    disabled={pending || active}
-                    onClick={() => setStage(s.id)}
-                    style={{
-                      padding: "8px 12px",
-                      borderRadius: "var(--radius)",
-                      border: `1px solid ${active ? s.colour : "var(--hairline)"}`,
-                      background: active ? `${s.colour}1f` : "transparent",
-                      color: active ? s.colour : "var(--text-primary)",
-                      cursor: active ? "default" : "pointer",
-                      textAlign: "left",
-                      fontFamily: "inherit",
-                      fontSize: 13,
-                      fontWeight: active ? 600 : 400,
-                      opacity: active ? 1 : 0.85,
-                    }}
-                  >
-                    {s.name}
-                  </button>
-                );
-              })}
-            </div>
-          </Card>
-
-          <Card>
-            <CardLabel>Lead detail</CardLabel>
-            <Row label="Source" value={SOURCE_NAME[lead.source] ?? lead.source} />
-            {lead.campaign && <Row label="Campaign" value={lead.campaign} />}
-            {lead.arrival && <Row label="Arrived from" value={describeArrival(parseArrival(lead.arrival))} />}
-            {lead.clientId && (
-              <Row
-                label="Client"
-                value={
-                  <Link href={`/clients/${lead.clientId}?tab=journey`} style={{ color: "var(--accent)" }}>
-                    View their journey
-                  </Link>
-                }
-              />
-            )}
-            {lead.sourceLeadId && (
-              <Row
-                label="Source ID"
-                value={lead.sourceLeadId}
-                mono
-              />
-            )}
-            <Row label="Created" value={formatDateTime(lead.createdAt)} />
-            <Row label="Updated" value={formatDateTime(lead.updatedAt)} />
-          </Card>
-
-          <Card>
-            <CardLabel>Danger zone</CardLabel>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={remove}
-              style={{ color: "#dc2626" }}
-              disabled={pending}
-            >
-              <Trash2 size={13} />
-              Delete lead
-            </Button>
-          </Card>
-        </div>
+        </aside>
       </div>
-    </>
+    </div>
   );
 }
+
+const CHANNEL_NAME: Record<string, string> = {
+  whatsapp: "WhatsApp",
+  email: "Email",
+  sms: "Text",
+  call: "Phone call",
+  manual: "In person",
+  instagram: "Instagram",
+  messenger: "Messenger",
+  facebook: "Facebook",
+};
 
 const SOURCE_NAME: Record<string, string> = {
   offer: "Bought online",
@@ -731,37 +578,3 @@ const SOURCE_NAME: Record<string, string> = {
   manual: "Added by the team",
   voice: "Phone call",
 };
-
-function Row({
-  label,
-  value,
-  mono = false,
-}: {
-  label: string;
-  value: React.ReactNode;
-  mono?: boolean;
-}) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        gap: 12,
-        padding: "8px 0",
-        borderBottom: "1px solid var(--hairline)",
-        fontSize: 13,
-      }}
-    >
-      <span style={{ color: "var(--text-tertiary)" }}>{label}</span>
-      <span
-        style={{
-          color: "var(--text-primary)",
-          fontFamily: mono ? "ui-monospace, monospace" : undefined,
-          textAlign: "right",
-        }}
-      >
-        {value}
-      </span>
-    </div>
-  );
-}

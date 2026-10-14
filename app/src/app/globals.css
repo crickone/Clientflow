@@ -4861,3 +4861,62 @@ a.stat-row:hover .stat-label { color: var(--text-primary); }
 .cj-time { font-size: 11.5px; font-weight: 400; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
 .cj-detail { font-size: 12.5px; line-height: 1.55; color: var(--text-secondary); white-space: pre-line; overflow-wrap: anywhere; }
 .cj-empty { font-size: 13.5px; color: var(--text-tertiary); margin: 0; }
+/* Lead page (/leads/[id]) */
+.ld { max-width: 1200px; }
+.ld-back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-tertiary); text-decoration: none; margin-bottom: 18px; }
+.ld-back:hover { color: var(--text-primary); }
+.ld-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; flex-wrap: wrap; padding-bottom: 22px; margin-bottom: 22px; border-bottom: 1px solid var(--hairline); }
+.ld-who { display: flex; gap: 16px; align-items: flex-start; min-width: 0; }
+.ld-avatar { width: 52px; height: 52px; flex-shrink: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--surface-2); border: 1px solid var(--hairline); font-size: 17px; font-weight: 600; color: var(--text-primary); letter-spacing: 0.02em; }
+.ld-who-text { display: grid; gap: 4px; min-width: 0; }
+.ld-name { margin: 0; font-size: clamp(22px, 2.6vw, 28px); font-weight: 600; letter-spacing: -0.01em; color: var(--text-primary); line-height: 1.15; }
+.ld-origin { margin: 0; font-size: 13.5px; color: var(--text-secondary); }
+.ld-contact { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-top: 4px; }
+.ld-contact a { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-secondary); text-decoration: none; }
+.ld-contact a:hover { color: var(--text-primary); }
+.ld-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ld-stage { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px 0 12px; border-radius: var(--radius); border: 1px solid var(--hairline); background: var(--surface-1); color: var(--text-primary); font: inherit; font-size: 13.5px; font-weight: 500; cursor: pointer; }
+.ld-stage:hover { border-color: var(--hairline-strong, var(--text-tertiary)); }
+.ld-stage-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+.ld-more { width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius); border: 1px solid var(--hairline); background: transparent; color: var(--text-secondary); cursor: pointer; }
+.ld-more:hover { color: var(--text-primary); background: var(--surface-2); }
+.ld-stage:focus-visible, .ld-more:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ld-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; align-items: start; }
+@media (max-width: 960px) { .ld-grid { grid-template-columns: minmax(0, 1fr); } }
+.ld-thread { display: grid; gap: 16px; min-width: 0; }
+.ld-event { display: inline-flex; align-items: center; gap: 8px; justify-self: center; flex-wrap: wrap; justify-content: center; padding: 7px 14px; border-radius: 999px; background: var(--surface-1); border: 1px solid var(--hairline); font-size: 12.5px; color: var(--text-secondary); text-align: center; }
+.ld-event span { color: var(--text-tertiary); }
+.ld-msg { display: grid; gap: 6px; max-width: min(640px, 88%); }
+.ld-msg[data-side="them"] { justify-self: start; }
+.ld-msg[data-side="us"] { justify-self: end; }
+.ld-msg[data-side="note"] { justify-self: center; }
+.ld-msg-meta { font-size: 11.5px; color: var(--text-tertiary); }
+.ld-msg[data-side="us"] .ld-msg-meta { text-align: right; }
+.ld-bubble { padding: 12px 14px; border-radius: 14px; font-size: 14px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-primary); background: var(--surface-1); border: 1px solid var(--hairline); }
+.ld-msg[data-side="them"] .ld-bubble { border-top-left-radius: 4px; }
+.ld-msg[data-side="us"] .ld-bubble { background: var(--surface-2); border-top-right-radius: 4px; }
+.ld-msg[data-draft="true"] .ld-bubble { background: transparent; border-style: dashed; border-color: var(--hairline-strong, var(--text-tertiary)); }
+.ld-msg[data-draft="true"] .ld-msg-meta { color: var(--warning); }
+.ld-draft-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
+.ld-edit { display: grid; gap: 8px; }
+.ld-empty { display: grid; justify-items: center; gap: 12px; padding: 36px 16px; border: 1px dashed var(--hairline); border-radius: 14px; }
+.ld-empty p { margin: 0; font-size: 14px; color: var(--text-tertiary); }
+.ld-log { display: grid; gap: 10px; padding: 16px; border-radius: 14px; border: 1px solid var(--hairline); background: var(--surface-1); }
+.ld-log-head { display: grid; gap: 2px; }
+.ld-log-head strong { font-size: 13.5px; color: var(--text-primary); }
+.ld-log-head span { font-size: 12.5px; color: var(--text-tertiary); }
+.ld-log-channels { display: flex; gap: 6px; flex-wrap: wrap; }
+.ld-log-channels button { padding: 6px 12px; font: inherit; font-size: 12.5px; border-radius: 999px; border: 1px solid var(--hairline); background: transparent; color: var(--text-secondary); cursor: pointer; }
+.ld-log-channels button[data-on="true"] { background: var(--text-primary); color: var(--bg); border-color: var(--text-primary); }
+.ld-side { display: grid; gap: 14px; }
+.ld-card { padding: 18px; }
+.ld-facts { margin: 4px 0 0; display: grid; }
+.ld-facts div { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid var(--hairline); font-size: 13px; }
+.ld-facts div:first-child { border-top: 0; }
+.ld-facts dt { color: var(--text-tertiary); flex-shrink: 0; }
+.ld-facts dd { margin: 0; color: var(--text-primary); text-align: right; overflow-wrap: anywhere; }
+.ld-note { margin: 4px 0 10px; font-size: 13px; line-height: 1.55; color: var(--text-secondary); }
+.ld-links { display: flex; gap: 16px; flex-wrap: wrap; }
+.ld-links a { font-size: 13px; font-weight: 500; color: var(--accent); text-decoration: none; }
+.ld-links a:hover { text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 640px) { .ld-msg { max-width: 100%; } .ld-actions { width: 100%; } }
