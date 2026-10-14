@@ -3602,9 +3602,12 @@ function RedesignSlideButton({
               onKeyDown={(e) => {
                 // A single-line field submits on Enter by convention; Cmd/Ctrl+Enter
                 // is honoured too so the habit from the topic box carries over.
+                // Enter does what the button does: reads the sentence and picks
+                // the route. It used to call redesign() directly, so "use a
+                // different photo" + Enter came back as the same photo.
                 if (e.key === "Enter" && busy === null) {
                   e.preventDefault();
-                  void redesign();
+                  void interpretAndRun();
                 }
               }}
             />
@@ -3633,6 +3636,13 @@ function RedesignSlideButton({
                   ? "Do that"
                   : "Try a different design"}
             </Button>
+            {/* Changing the picture shouldn't depend on wording it right: a
+                blank-box redesign keeps the same photograph by design. */}
+            {imageGenEnabled && busy === null && (
+              <Button variant="secondary" onClick={() => void newPhoto("generate")}>
+                <ImageIcon size={15} /> New photo
+              </Button>
+            )}
           </div>
 
           {/* The route is invisible until it is wrong. Naming what happened is
