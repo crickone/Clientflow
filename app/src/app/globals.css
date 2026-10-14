@@ -509,10 +509,16 @@ a {
   display: none;
 }
 .app-sidebar.is-collapsed .nav-badge {
+  /* A corner dot-with-number, clear of the centred icon. */
   position: absolute;
-  top: 4px;
-  right: 10px;
+  top: 2px;
+  right: 4px;
   margin-left: 0 !important;
+  font-size: 9.5px;
+  min-width: 16px;
+  height: 16px;
+  line-height: 16px;
+  padding: 0 4px;
 }
 .app-sidebar.is-collapsed .nav-active-bar { display: none; }
 /* Header + footer have no room for a row of controls on the rail — stack them,
@@ -4173,12 +4179,11 @@ a.stat-row:hover .stat-label { color: var(--text-primary); }
 @media (max-width: 640px) { .bp-grid { grid-template-columns: 1fr; } .bp-section { padding: 18px; } }
 .bp-sblock ul { list-style: disc; } .bp-sblock li::marker { color: var(--text-tertiary); }
 
-/* ---- Sidebar drill-in panels (Sidebar.tsx renderPanel) ---- */
-.nav-panel-back { display: flex; align-items: center; gap: 8px; width: 100%; margin: 0 0 8px; padding: 9px 10px; border: 0; border-radius: var(--radius); background: transparent; color: var(--text-primary); font: inherit; font-size: 14px; font-weight: 600; text-align: left; cursor: pointer; }
-.nav-panel-back:hover { background: var(--surface-2); }
-.nav-panel-back svg { color: var(--text-secondary); }
-.nav-panel-group { margin-top: 14px; }
-.nav-panel-heading { padding: 0 13px 6px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-tertiary); }
+/* ---- Sidebar sections (Sidebar.tsx): a flat list with headings ---- */
+.nav-section { margin-top: 14px; }
+.nav-heading { padding: 0 13px 6px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-tertiary); }
+.app-sidebar.is-collapsed .nav-section { margin-top: 0; }
+.app-sidebar.is-collapsed .nav-heading { display: none; }
 
 /* ---- Full-width pages and Vercel-style page headers (2026-10-12) ---- */
 .app-page { max-width: none !important; margin: 0; padding: 28px clamp(20px, 3vw, 44px) 88px; }

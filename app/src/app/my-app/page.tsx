@@ -12,7 +12,7 @@ export default async function MyAppPage() {
   return (
     <div className="app-page" style={{ maxWidth: 960 }}>
       <PageHeader
-        eyebrow="My App"
+        eyebrow="Client app"
         title="Your client app"
         subtitle="A branded mobile app where your clients see their dashboard, book classes, and track attendance, nutrition & workouts. It uses your theme and logo, and updates live from this dashboard."
       />

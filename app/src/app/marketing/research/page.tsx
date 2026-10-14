@@ -138,7 +138,7 @@ export default async function MarketingResearchPage() {
     <div className="app-page">
       <PageHeader
         eyebrow="Marketing"
-        title="Research"
+        title="Competitors"
         subtitle="Nearby competitors — ratings, reviews and the ads they're running. Browsing is always free; only a scan spends."
       />
       <ResearchView

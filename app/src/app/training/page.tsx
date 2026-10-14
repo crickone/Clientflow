@@ -11,7 +11,7 @@ export default function TrainingHome() {
   return (
     <div className="app-page">
       <PageHeader
-        eyebrow="Training"
+        eyebrow="Sales training"
         title="Sales Agent Programme"
         subtitle={`The complete guide to helping clients find the right therapy at ${clinicName()}. Work through the modules, take the quizzes, drill the scripts, run the roleplays.`}
       />

@@ -25,8 +25,8 @@ export default async function CmsSitesPage({
   return (
     <div className="app-page">
       <PageHeader
-        eyebrow="CMS"
-        title="Sites"
+        eyebrow="Marketing"
+        title="Website"
         actions={
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <Link href="/cms/requests">

@@ -1,4 +1,8 @@
+import Link from "next/link";
+import { CalendarDays } from "lucide-react";
+
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Button } from "@/components/ui/Button";
 import { requireUserPage } from "@/lib/auth";
 import { listEventsInRange } from "@/lib/calendar";
 import { CalendarView } from "@/components/calendar/CalendarView";
@@ -36,8 +40,15 @@ export default async function CalendarPage({
     <div className="app-page">
       <PageHeader
         eyebrow="Schedule"
-        title="Calendar"
-        subtitle="Meetings, reminders and any events — separate from your client bookings."
+        title="Diary"
+        subtitle="Your own meetings, reminders and events. Client bookings are under Appointments."
+        actions={
+          <Link href="/appointments">
+            <Button variant="ghost">
+              <CalendarDays size={15} /> Appointments
+            </Button>
+          </Link>
+        }
       />
       <CalendarView
         label={`${MONTH_NAMES[m - 1]} ${y}`}

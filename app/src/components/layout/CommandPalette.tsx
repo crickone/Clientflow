@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Search } from "lucide-react";
 
-import { ADONIS_LINK, DASHBOARD_LINK, NAV_GROUPS } from "./Sidebar";
+import { ADONIS_LINK, DASHBOARD_LINK, NAV_GROUPS, NAV_TOP } from "./Sidebar";
 import { buildCommands, filterCommands, type CommandContext } from "@/lib/ui/commands";
 import { SHORTCUTS } from "@/lib/ui/shortcuts";
 
@@ -46,7 +46,7 @@ export function CommandPalette({
   const listRef = useRef<HTMLUListElement>(null);
 
   const commands = useMemo(() => {
-    const flat = buildCommands([ADONIS_LINK, DASHBOARD_LINK, ...NAV_GROUPS], ctx);
+    const flat = buildCommands([ADONIS_LINK, DASHBOARD_LINK, ...NAV_TOP, ...NAV_GROUPS], ctx);
     // De-duplicate by href: a destination that appears in two groups should be
     // one row, not two identical ones the user has to choose between.
     const seen = new Set<string>();

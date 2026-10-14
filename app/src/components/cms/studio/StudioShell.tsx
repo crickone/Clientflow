@@ -326,7 +326,7 @@ export function StudioShell({
           className="nav-link"
           style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--text-secondary)", fontSize: 13, padding: "5px 8px", borderRadius: 6 }}
         >
-          <ArrowLeft size={16} /> Sites
+          <ArrowLeft size={16} /> Website
         </Link>
         <strong style={{ fontSize: 14 }}>Visual editor</strong>
         <span style={{ color: "var(--text-tertiary)", fontSize: 13 }}>{path}</span>

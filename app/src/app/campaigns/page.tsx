@@ -30,8 +30,8 @@ export default async function CampaignsPage() {
   return (
     <div className="app-page">
       <PageHeader
-        eyebrow="Email marketing"
-        title="Campaigns"
+        eyebrow="Marketing"
+        title="Email campaigns"
         subtitle="Compose and send one-off emails to your mailing list."
         actions={
           <>

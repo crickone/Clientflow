@@ -23,6 +23,7 @@ export interface NavLinkLike {
 }
 export interface NavGroupLike {
   label: string;
+  labelKey?: string;
   adminOnly?: boolean;
   children: NavEntryLike[];
 }
@@ -55,7 +56,8 @@ export function buildCommands(entries: NavEntryLike[], ctx: CommandContext, trai
     if (entry.adminOnly && !ctx.isAdmin) continue;
 
     if (isGroup(entry)) {
-      out.push(...buildCommands(entry.children, ctx, [...trail, entry.label]));
+      const heading = (entry.labelKey && ctx.vocab?.[entry.labelKey]) || entry.label;
+      out.push(...buildCommands(entry.children, ctx, [...trail, heading]));
       continue;
     }
     if (entry.mode && entry.mode !== ctx.mode) continue;

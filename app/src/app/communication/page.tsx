@@ -28,7 +28,7 @@ export default async function CommunicationPage({ searchParams }: { searchParams
   return (
     <div className="app-page inbox-page">
       <header className="inbox-page-head">
-        <h1 className="dash-greeting">Communication</h1>
+        <h1 className="dash-greeting">Inbox</h1>
         <p className="inbox-page-sub">Email, WhatsApp, Messenger, Instagram and Google reviews in one place.</p>
       </header>
       <UnifiedInbox

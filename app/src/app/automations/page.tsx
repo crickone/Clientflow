@@ -11,8 +11,8 @@ export default async function AutomationsPage() {
   return (
     <div className="app-page">
       <PageHeader
-        eyebrow="Automation"
-        title="Trigger List"
+        eyebrow="Marketing"
+        title="Automations"
         subtitle="Choose a trigger below and create a series of messages to be sent when that action takes place."
       />
       <TriggerListView triggers={triggers} />

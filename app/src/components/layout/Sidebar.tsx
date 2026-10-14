@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { type CSSProperties, useEffect, useState, useTransition } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { type CSSProperties, useEffect, useRef, useState, useTransition } from "react";
+import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { EASE, DUR } from "@/lib/motion";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -27,8 +27,7 @@ import {
   CalendarRange,
   Check,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
+
   ClipboardCheck,
   ClipboardList,
   ChevronsUpDown,
@@ -97,6 +96,8 @@ type NavLink = {
 };
 type NavGroup = {
   label: string;
+  /** When set, the heading is taken from the active venue vocabulary ("Coaching" on a gym, "Programmes" in a clinic). */
+  labelKey?: keyof Vocab;
   icon: typeof LayoutDashboard;
   adminOnly?: boolean;
   /** Children may themselves be groups — the sidebar renders up to two levels of nesting. */
@@ -124,31 +125,51 @@ export const ADONIS_LINK: NavLink = { href: "/adonis", label: "Adonis", icon: Bo
 export const DASHBOARD_LINK: NavLink = { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard };
 
 /**
- * Five collapsible top-level groups, folded by default (see `openGroups`).
- *
- * EXPORTED because the command palette indexes this exact tree — see
- * @/lib/ui/commands. A second, hand-written list of destinations would drift,
- * and a palette offering a page the sidebar hides sends someone to a route the
- * layout redirects away from.
+ * The pages used all day, flat at the top (one click, no heading), then four
+ * headed sections. Both lists are EXPORTED because the command palette indexes
+ * this exact tree — see @/lib/ui/commands. A second, hand-written list of
+ * destinations would drift, and a palette offering a page the sidebar hides
+ * sends someone to a route the layout redirects away from.
  */
+export const NAV_TOP: NavLink[] = [
+  { href: "/communication", label: "Inbox", icon: MessagesSquare },
+  { href: "/leads", label: "Leads", icon: Sparkles },
+  { href: "/clients", label: "Clients", icon: Users, labelKey: "members" },
+  { href: "/appointments", label: "Appointments", icon: CalendarDays, labelKey: "bookings", mode: "appointments" },
+  { href: "/timetable", label: "Timetable", icon: CalendarRange, mode: "timetable" },
+  { href: "/calendar", label: "Diary", icon: CalendarClock },
+  { href: "/reports", label: "Reports", icon: BarChart3, adminOnly: true },
+];
+
 export const NAV_GROUPS: NavGroup[] = [
   {
-    label: "Clients",
-    icon: Users,
+    label: "Marketing",
+    icon: Megaphone,
     children: [
-      { href: "/clients", label: "Clients", icon: Users, labelKey: "members" },
-      { href: "/leads", label: "Leads", icon: Sparkles },
-      { href: "/communication", label: "Communication", icon: MessagesSquare },
-      { href: "/calendar", label: "Calendar", icon: CalendarClock },
-      { href: "/appointments", label: "Appointments", icon: CalendarDays, labelKey: "bookings", mode: "appointments" },
+      { href: "/marketing/campaigns", label: "Campaigns", icon: Megaphone, adminOnly: true },
+      { href: "/content-studio", label: "Content Studio", icon: Clapperboard },
+      { href: "/marketing/ads", label: "Ads", icon: Target, adminOnly: true },
+      {
+        label: "Email",
+        icon: Send,
+        adminOnly: true,
+        children: [
+          { href: "/campaigns", label: "Email campaigns", icon: Send, exact: true },
+          { href: "/campaigns/contacts", label: "Contacts", icon: Send },
+          { href: "/campaigns/domains", label: "Sending domains", icon: Send, adminOnly: true },
+        ],
+      },
+      { href: "/automations", label: "Automations", icon: Zap },
+      { href: "/cms", label: "Website", icon: Globe, adminOnly: true },
+      { href: "/marketing/research", label: "Competitors", icon: Binoculars, adminOnly: true },
+      { href: "/marketing/calendar", label: "Seasonal calendar", icon: Calendar, adminOnly: true },
     ],
   },
   {
-    label: "Coaching",
+    label: "Programmes",
+    labelKey: "programmes",
     icon: GraduationCap,
     children: [
-      { href: "/timetable", label: "Timetable", icon: CalendarRange, mode: "timetable" },
-      { href: "/attendance", label: "Attendance", icon: ClipboardCheck },
       {
         label: "Nutrition",
         icon: Salad,
@@ -164,7 +185,7 @@ export const NAV_GROUPS: NavGroup[] = [
         children: [
           { href: "/workout", label: "Programs", icon: Dumbbell, exact: true },
           { href: "/workout/workouts", label: "Workouts", icon: Dumbbell },
-          { href: "/workout/exercises", label: "Exercise Library", icon: Dumbbell },
+          { href: "/workout/exercises", label: "Exercise library", icon: Dumbbell },
           { href: "/workout/circuits", label: "Circuits", icon: Dumbbell },
         ],
       },
@@ -172,88 +193,35 @@ export const NAV_GROUPS: NavGroup[] = [
         label: "Forms",
         icon: ClipboardList,
         children: [
-          { href: "/forms/initial", label: "Initial Questionnaire", icon: ClipboardList },
-          { href: "/forms/checkin", label: "Check In Form", icon: ClipboardList },
-          { href: "/forms/habits", label: "Daily Habits", icon: ClipboardList },
-          { href: "/forms/contact", label: "Contact Forms", icon: ClipboardList },
-          { href: "/forms/terms", label: "Terms & Conditions", icon: ClipboardList },
+          { href: "/forms/initial", label: "Initial questionnaire", icon: ClipboardList },
+          { href: "/forms/checkin", label: "Check-in form", icon: ClipboardList },
+          { href: "/forms/habits", label: "Daily habits", icon: ClipboardList },
+          { href: "/forms/contact", label: "Contact forms", icon: ClipboardList },
+          { href: "/forms/terms", label: "Terms and conditions", icon: ClipboardList },
         ],
       },
-      { href: "/automations", label: "Automation", icon: Zap },
+      { href: "/attendance", label: "Attendance", icon: ClipboardCheck, mode: "timetable" },
     ],
   },
   {
-    label: "Business",
+    label: "Sales",
     icon: ShoppingBag,
     children: [
-      {
-        label: "Products",
-        icon: ShoppingBag,
-        children: [
-          { href: "/memberships", label: "Memberships", icon: CreditCard },
-          { href: "/session-packages", label: "Packages", icon: PackageIcon },
-          { href: "/packages", label: "Session bundles", icon: PackageIcon },
-          { href: "/vouchers", label: "Gift Vouchers", icon: Gift },
-        ],
-      },
-      { href: "/staff", label: "Staff", icon: UserCog, adminOnly: true },
-      { href: "/reports", label: "Reports", icon: BarChart3, adminOnly: true },
+      { href: "/memberships", label: "Memberships", icon: CreditCard },
+      { href: "/session-packages", label: "Packages", icon: PackageIcon },
+      { href: "/packages", label: "Session bundles", icon: PackageIcon },
+      { href: "/vouchers", label: "Gift vouchers", icon: Gift },
     ],
   },
   {
-    label: "Marketing",
-    icon: Megaphone,
-    children: [
-      // Campaign Engine hub (Slice 1): Adonis builds a full seasonal kit
-      // (offer/blog/social/email/ads/video script) here, one asset at a
-      // time. Admin-only for the same reason the email Campaigns group
-      // below is — this page is requireAdminPage'd and its detail page's
-      // Launch action publishes content live. (The build runs through
-      // Adonis's chat on /adonis, which is staff-visible, but only an admin
-      // ever reaches the Build-campaign links from these admin-only pages.)
-      { href: "/marketing/campaigns", label: "Campaigns", icon: Megaphone, adminOnly: true },
-      // Campaign Engine Slice 3: the year-map of Irish marketing dates +
-      // seasons overlaid with real campaigns, plus the AI radar "coming up"
-      // rail. Same admin-only reasoning as "Marketing" above (this page is
-      // requireAdminPage'd; Build-campaign from here opens Adonis on /adonis).
-      { href: "/marketing/calendar", label: "Seasonal calendar", icon: Calendar, adminOnly: true },
-      // Everything booked for a time: scheduled posts, scheduled email sends,
-      // and the nurture queue. Admin-only like the rest of this group.
-      // Market Research P1 (Task 10): the competitor-tracking dashboard —
-      // ranked list, rating/review trends, a change feed, per-competitor
-      // detail. Admin-gated (requireAdminPage) for the same reason as the
-      // two Campaign Engine links above — keep the nav consistent.
-      // Facebook + Instagram ads on the business's own ad account (lib/ads).
-      // Admin-only: launching and budgets spend real money.
-      { href: "/marketing/ads", label: "Ads", icon: Target, adminOnly: true },
-      { href: "/marketing/research", label: "Research", icon: Binoculars, adminOnly: true },
-      { href: "/cms", label: "Sites", icon: Globe, adminOnly: true },
-      { href: "/content-studio", label: "Content Studio", icon: Clapperboard },
-      {
-        label: "Email campaigns",
-        icon: Send,
-        // Admin-only: campaign pages/actions are all requireAdmin (credit spend,
-        // contact-list management, deliverability) — keep the nav consistent so
-        // staff don't see links that redirect to /dashboard.
-        adminOnly: true,
-        children: [
-          { href: "/campaigns", label: "Campaigns", icon: Send, exact: true },
-          { href: "/campaigns/contacts", label: "Contacts", icon: Send },
-          { href: "/campaigns/domains", label: "Sending domains", icon: Send, adminOnly: true },
-        ],
-      },
-    ],
-  },
-  {
-    label: "System",
+    label: "Settings",
     icon: SettingsIcon,
     children: [
-      { href: "/my-app", label: "My App", icon: Smartphone },
-      // Staff training content for the HBOT/PEMF/infrared clinics (see app/training/layout.tsx).
-      { href: "/training", label: "Training", icon: GraduationCap, tenants: ["optimal-health", "renova"] },
       { href: "/settings", label: "Settings", icon: SettingsIcon, adminOnly: true },
-      // Dismissible self-onboarding checklist — admin-only, hidden once complete (showSetup).
-      { href: "/setup", label: "Set up", icon: Rocket, adminOnly: true, dot: true },
+      { href: "/staff", label: "Staff", icon: UserCog, adminOnly: true },
+      { href: "/my-app", label: "Client app", icon: Smartphone },
+      { href: "/training", label: "Sales training", icon: GraduationCap, tenants: ["optimal-health", "renova"] },
+      { href: "/setup", label: "Set-up guide", icon: Rocket, adminOnly: true, dot: true },
     ],
   },
 ];
@@ -327,18 +295,15 @@ export function Sidebar({
   const [now, setNow] = useState<Date | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
-  // Drill-in navigation (like Vercel): the root menu lists the sections, and
-  // choosing one slides the whole menu to that section with a back arrow.
-  // undefined = follow the current route (open the section the page is in);
-  // null = the root menu chosen explicitly; a label = that section.
-  const [panelChoice, setPanelChoice] = useState<string | null | undefined>(undefined);
-  const [panelDir, setPanelDir] = useState(1);
-  const reduceMotion = useReducedMotion();
-  // A route change re-follows the route.
-  useEffect(() => setPanelChoice(undefined), [pathname]);
   // Which row the pointer is over. One shared pill slides between rows
   // (layoutId) instead of each row flashing its own background on.
   const [hoverKey, setHoverKey] = useState<string | null>(null);
+  // The list is longer than the screen; bring the current page into view
+  // when it's below the fold (a form, a workout), without jumping otherwise.
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    navRef.current?.querySelector(".nav-link--active")?.scrollIntoView({ block: "nearest" });
+  }, [pathname]);
 
   useEffect(() => {
     setNow(new Date());
@@ -371,40 +336,7 @@ export function Sidebar({
     (g): g is NavGroup => g !== null
   );
 
-  const routeGroup = visibleGroups.find((g) => groupHasActiveDescendant(g, pathname))?.label ?? null;
-  const panelLabel = collapsed ? null : panelChoice === undefined ? routeGroup : panelChoice;
-  const panelGroup = panelLabel ? visibleGroups.find((g) => g.label === panelLabel) ?? null : null;
-  const openPanel = (label: string | null) => {
-    setPanelDir(label ? 1 : -1);
-    setPanelChoice(label);
-  };
-
-  /** A section's panel: its links, with any sub-group as a small heading over its own links. */
-  function renderPanel(group: NavGroup) {
-    return (
-      <>
-        <button
-          type="button"
-          className="nav-panel-back"
-          onClick={() => openPanel(null)}
-          onMouseEnter={() => setHoverKey(null)}
-        >
-          <ChevronLeft size={16} strokeWidth={2} />
-          <span>{group.label}</span>
-        </button>
-        {group.children.map((c) =>
-          isGroup(c) ? (
-            <div key={c.label} className="nav-panel-group">
-              <div className="nav-panel-heading">{c.label}</div>
-              {c.children.map((cc) => (isGroup(cc) ? cc.children.filter((x): x is NavLink => !isGroup(x)).map((x) => renderLink(x, 0)) : renderLink(cc, 0)))}
-            </div>
-          ) : (
-            renderLink(c, 0)
-          ),
-        )}
-      </>
-    );
-  }
+  const topLinks = NAV_TOP.filter(linkAllowed);
 
   async function signOut() {
     setSigningOut(true);
@@ -697,7 +629,7 @@ export function Sidebar({
         )}
       </div>
 
-      <nav style={{ padding: "8px 8px 12px", flex: 1, overflowY: "auto" }} onMouseLeave={() => setHoverKey(null)}>
+      <nav ref={navRef} style={{ padding: "8px 8px 12px", flex: 1, overflowY: "auto" }} onMouseLeave={() => setHoverKey(null)}>
         {(showAdonis || showDashboard) && (
           <div
             style={{
@@ -710,45 +642,20 @@ export function Sidebar({
             {showDashboard && renderLink(DASHBOARD_LINK)}
           </div>
         )}
-        {collapsed ? (
-          visibleGroups.map((group) => renderEntry(group, 0))
-        ) : (
-          <AnimatePresence mode="wait" initial={false} custom={panelDir}>
-            <motion.div
-              key={panelGroup?.label ?? "root"}
-              initial={reduceMotion ? { opacity: 0 } : { opacity: 0, x: panelDir * 18 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: panelDir * -18 }}
-              transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
-            >
-              {panelGroup ? (
-                renderPanel(panelGroup)
-              ) : (
-                visibleGroups.map((group) => {
-                  const Icon = group.icon;
-                  const childActive = groupHasActiveDescendant(group, pathname);
-                  return (
-                    <button
-                      key={group.label}
-                      type="button"
-                      onClick={() => openPanel(group.label)}
-                      className="nav-link nav-link--slide"
-                      onMouseEnter={() => setHoverKey(`group:${group.label}`)}
-                      style={{ ...navRowStyle, width: "100%", border: "none", cursor: "pointer", paddingLeft: indentFor(0), ...(childActive ? { color: "var(--text-primary)" } : {}) }}
-                    >
-                      {hoverPill(`group:${group.label}`)}
-                      <Icon size={16} strokeWidth={1.75} />
-                      <span className="nav-label" style={{ flex: 1, textAlign: "left" }}>
-                        {group.label}
-                      </span>
-                      <ChevronRight size={14} className="nav-chevron" style={{ opacity: 0.55 }} />
-                    </button>
-                  );
-                })
-              )}
-            </motion.div>
-          </AnimatePresence>
+        {topLinks.length > 0 && (
+          <div style={{ marginBottom: 10, paddingBottom: 10, borderBottom: "1px solid var(--hairline)" }}>
+            {topLinks.map((l) => renderLink(l, 0))}
+          </div>
         )}
+        {collapsed
+          ? // On the rail a section is one tile; clicking it expands the menu (renderEntry).
+            visibleGroups.map((group) => renderEntry(group, 0))
+          : visibleGroups.map((group) => (
+              <div key={group.label} className="nav-section">
+                <div className="nav-heading">{group.labelKey ? vocab[group.labelKey] : group.label}</div>
+                {group.children.map((c) => renderEntry(c, 0))}
+              </div>
+            ))}
       </nav>
 
       <div

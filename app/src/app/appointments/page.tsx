@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarPlus, CalendarRange } from "lucide-react";
+import { CalendarClock, CalendarPlus, CalendarRange } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -56,12 +56,19 @@ export default async function AppointmentsPage({ searchParams }: Props) {
         eyebrow="Schedule"
         title={vocab.bookings}
         actions={
-          <Link href="/appointments/new">
-            <Button>
-              <CalendarPlus size={15} />
-              {vocab.bookVerb}
-            </Button>
-          </Link>
+          <>
+            <Link href="/calendar">
+              <Button variant="ghost">
+                <CalendarClock size={15} /> Diary
+              </Button>
+            </Link>
+            <Link href="/appointments/new">
+              <Button>
+                <CalendarPlus size={15} />
+                {vocab.bookVerb}
+              </Button>
+            </Link>
+          </>
         }
       />
 

@@ -29,6 +29,8 @@ export interface Vocab {
    * not verb+noun, to read naturally in both.
    */
   bookCta: string;
+  /** The sidebar heading over nutrition, workouts and forms: "Coaching" on a gym, "Programmes" in a clinic. */
+  programmes: string;
 }
 
 export const VOCAB: Record<VenueType, Vocab> = {
@@ -43,6 +45,7 @@ export const VOCAB: Record<VenueType, Vocab> = {
     plans: "Packages",
     bookVerb: "Book",
     bookCta: "Book appointment",
+    programmes: "Programmes",
   },
   gym: {
     member: "Member",
@@ -55,6 +58,7 @@ export const VOCAB: Record<VenueType, Vocab> = {
     plans: "Memberships",
     bookVerb: "Book",
     bookCta: "Book class",
+    programmes: "Coaching",
   },
 };
 
