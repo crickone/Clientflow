@@ -1,10 +1,10 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { Fragment, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Camera, ChevronDown, ChevronLeft, ChevronRight, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { Camera, ChevronDown, ChevronLeft, ChevronRight, Loader2, Minus, Pencil, Plus, Trash2 } from "lucide-react";
 
-import { addMealAction, deleteMealAction, updateMealAction } from "@/app/app/actions";
+import { addMealAction, deleteMealAction, setMealServingsAction, updateMealAction } from "@/app/app/actions";
 import { Card } from "@/components/clientapp/ui";
 import { kcal, type MealItem, type MealTotals } from "@/lib/mealsModel";
 
@@ -75,9 +75,11 @@ function shiftDay(day: string, by: number) {
   d.setUTCDate(d.getUTCDate() + by);
   return d.toISOString().slice(0, 10);
 }
+const grams = (n: number) => `${Math.round(n)} g`;
 
-const CONFIDENCE: Record<string, string> = { high: "Read from the label", medium: "Estimated from the photo", low: "Rough estimate" };
+const CONFIDENCE: Record<string, string> = { high: "Read from the label", medium: "Estimated from the photo", low: "A rough estimate: the portions are hard to see" };
 
+/** The day's meals as M1, M2, M3: snapped and read on the spot, or typed in. */
 export function MealLog({ day, today, meals, totals, target, week }: Props) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -86,30 +88,29 @@ export function MealLog({ day, today, meals, totals, target, week }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<number | null>(null);
   const [editing, setEditing] = useState<number | "new" | null>(null);
-  const [note, setNote] = useState("");
-  const [askNote, setAskNote] = useState<File | null>(null);
 
   const go = (d: string) => router.push(d === today ? "/app/nutrition" : `/app/nutrition?day=${d}`);
 
-  async function send(file: File) {
+  /** The photo is read the moment it's taken: no extra step. */
+  async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
     setReading(true);
     setError(null);
     try {
       const blob = await shrink(file);
       const form = new FormData();
       form.append("file", blob, "meal.jpg");
-      if (note.trim()) form.append("note", note.trim());
       const res = await fetch("/api/app/meals/photo", { method: "POST", body: form });
       const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string; meal?: { id: number } } | null;
       if (!res.ok || !data?.ok) {
         setError(data?.error ?? "Couldn't read that photo. Try again, or add the meal by hand.");
         return;
       }
-      setNote("");
-      setAskNote(null);
       if (day !== today) router.push("/app/nutrition");
       router.refresh();
-      if (data.meal) setOpen(data.meal.id);
+      if (data.meal) setOpen(data.meal.id); // show the breakdown straight away
     } catch {
       setError("Couldn't upload the photo. Check your connection and try again.");
     } finally {
@@ -117,19 +118,18 @@ export function MealLog({ day, today, meals, totals, target, week }: Props) {
     }
   }
 
-  function onPick(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    e.target.value = "";
-    if (!f) return;
-    setAskNote(f);
-    setError(null);
-  }
-
   function remove(id: number) {
     start(async () => {
       const r = await deleteMealAction(id);
       if (!r.ok) setError(r.error);
       setOpen(null);
+      router.refresh();
+    });
+  }
+  function servings(m: MealView, next: number) {
+    start(async () => {
+      const r = await setMealServingsAction(m.id, next);
+      if (!r.ok) setError(r.error);
       router.refresh();
     });
   }
@@ -189,29 +189,14 @@ export function MealLog({ day, today, meals, totals, target, week }: Props) {
         ))}
       </div>
 
-      {askNote ? (
-        <Card style={{ display: "grid", gap: 10 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Anything the photo doesn&rsquo;t show?</div>
-          <input className="ml-input" placeholder="Optional: e.g. two slices, no butter, half the bar" value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} disabled={reading} />
-          <div style={{ display: "flex", gap: 8 }}>
-            <button type="button" className="ml-btn ml-btn--ghost" onClick={() => setAskNote(null)} disabled={reading}>
-              Cancel
-            </button>
-            <button type="button" className="ml-btn" onClick={() => void send(askNote)} disabled={reading}>
-              {reading ? <Loader2 size={16} className="spin" /> : <Camera size={16} />} {reading ? "Reading your photo" : "Read the photo"}
-            </button>
-          </div>
-        </Card>
-      ) : (
-        <div style={{ display: "flex", gap: 8 }}>
-          <button type="button" className="ml-btn" onClick={() => fileRef.current?.click()} disabled={reading || pending}>
-            <Camera size={17} /> Snap a meal or label
-          </button>
-          <button type="button" className="ml-btn ml-btn--ghost" onClick={() => setEditing(editing === "new" ? null : "new")} disabled={reading}>
-            <Plus size={17} /> By hand
-          </button>
-        </div>
-      )}
+      <div style={{ display: "flex", gap: 8 }}>
+        <button type="button" className="ml-btn" onClick={() => fileRef.current?.click()} disabled={reading || pending}>
+          {reading ? <Loader2 size={17} className="spin" /> : <Camera size={17} />} {reading ? "Reading your photo" : "Snap a meal or label"}
+        </button>
+        <button type="button" className="ml-btn ml-btn--ghost" onClick={() => setEditing(editing === "new" ? null : "new")} disabled={reading}>
+          <Plus size={17} /> By hand
+        </button>
+      </div>
 
       {error && (
         <div className="ml-error" role="alert">
@@ -232,8 +217,8 @@ export function MealLog({ day, today, meals, totals, target, week }: Props) {
           <table className="ml-table">
             <thead>
               <tr>
-                <th>Time</th>
                 <th>Meal</th>
+                <th>Time</th>
                 <th className="ml-num">kcal</th>
                 <th className="ml-num ml-hide">P</th>
                 <th className="ml-num ml-hide">C</th>
@@ -242,16 +227,21 @@ export function MealLog({ day, today, meals, totals, target, week }: Props) {
               </tr>
             </thead>
             <tbody>
-              {meals.map((m) => {
+              {meals.map((m, idx) => {
                 const isOpen = open === m.id;
+                const label = `M${idx + 1}`;
                 return (
-                  <>
-                    <tr key={m.id} className="ml-row" onClick={() => setOpen(isOpen ? null : m.id)} aria-expanded={isOpen}>
-                      <td className="ml-time">{time(m.loggedAt)}</td>
+                  <Fragment key={m.id}>
+                    <tr className="ml-row" onClick={() => setOpen(isOpen ? null : m.id)} aria-expanded={isOpen}>
                       <td className="ml-name">
-                        {m.name}
-                        {m.kind === "label" && m.servings !== 1 && <span className="ml-sub"> · {m.servings} servings</span>}
+                        <b>{label}</b>
+                        <span className="ml-sub">
+                          {" "}
+                          {m.name}
+                          {m.kind === "label" && m.servings !== 1 ? ` · ${m.servings} servings` : ""}
+                        </span>
                       </td>
+                      <td className="ml-time">{time(m.loggedAt)}</td>
                       <td className="ml-num">{Math.round(m.calories)}</td>
                       <td className="ml-num ml-hide">{Math.round(m.protein)}</td>
                       <td className="ml-num ml-hide">{Math.round(m.carbs)}</td>
@@ -261,16 +251,41 @@ export function MealLog({ day, today, meals, totals, target, week }: Props) {
                       </td>
                     </tr>
                     {isOpen && (
-                      <tr key={`${m.id}-d`} className="ml-detail">
+                      <tr className="ml-detail">
                         <td colSpan={7}>
                           {editing === m.id ? (
                             <MealForm initial={m} onDone={() => setEditing(null)} onSaved={() => router.refresh()} />
                           ) : (
-                            <div style={{ display: "grid", gap: 10 }}>
+                            <div style={{ display: "grid", gap: 12 }}>
                               {m.hasPhoto && (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img className="ml-photo" src={`/api/app/meals/photo?meal=${m.id}`} alt="" loading="lazy" />
                               )}
+
+                              {m.items.length > 0 && (
+                                <div>
+                                  <div className="ml-h">What&rsquo;s in it</div>
+                                  <table className="ml-items">
+                                    <tbody>
+                                      {m.items.map((it, i) => (
+                                        <tr key={i}>
+                                          <td>
+                                            <div>{it.name}</div>
+                                            <div className="ml-sub">{[it.portion, it.grams ? grams(it.grams) : null].filter(Boolean).join(" · ")}</div>
+                                          </td>
+                                          <td className="ml-num">
+                                            <div>{it.calories} kcal</div>
+                                            <div className="ml-sub">
+                                              {it.protein}P {it.carbs}C {it.fat}F
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+
                               <div className="ml-macros">
                                 <span>
                                   <b>{Math.round(m.protein)} g</b> protein
@@ -282,26 +297,33 @@ export function MealLog({ day, today, meals, totals, target, week }: Props) {
                                   <b>{Math.round(m.fat)} g</b> fat
                                 </span>
                               </div>
-                              {m.items.length > 0 && (
-                                <ul className="ml-items">
-                                  {m.items.map((it, i) => (
-                                    <li key={i}>
-                                      <span>
-                                        {it.name}
-                                        {it.grams ? <span className="ml-sub"> · {it.grams} g</span> : null}
-                                      </span>
-                                      <span>{it.calories} kcal</span>
-                                    </li>
-                                  ))}
-                                </ul>
+
+                              {m.kind === "label" && (
+                                <div className="ml-servings">
+                                  <span>Servings eaten</span>
+                                  <button type="button" aria-label="Fewer servings" onClick={() => servings(m, m.servings - (m.servings > 1 ? 1 : 0.25))} disabled={pending || m.servings <= 0.25}>
+                                    <Minus size={14} />
+                                  </button>
+                                  <b>{m.servings}</b>
+                                  <button type="button" aria-label="More servings" onClick={() => servings(m, m.servings < 1 ? m.servings + 0.25 : m.servings + 1)} disabled={pending || m.servings >= 20}>
+                                    <Plus size={14} />
+                                  </button>
+                                </div>
                               )}
-                              <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-                                {m.kind === "manual" ? "Added by hand" : CONFIDENCE[m.confidence ?? "medium"]}
-                                {m.notes ? ` · ${m.notes}` : ""}
+
+                              <div>
+                                <div className="ml-h">{m.kind === "manual" ? "Added by hand" : "How it was worked out"}</div>
+                                {m.kind !== "manual" && (
+                                  <p className="ml-notes">
+                                    {CONFIDENCE[m.confidence ?? "medium"]}
+                                    {m.notes ? `. ${m.notes}` : "."}
+                                  </p>
+                                )}
                               </div>
+
                               <div style={{ display: "flex", gap: 8 }}>
                                 <button type="button" className="ml-btn ml-btn--ghost ml-btn--sm" onClick={() => setEditing(m.id)}>
-                                  <Pencil size={14} /> Edit
+                                  <Pencil size={14} /> Change the numbers
                                 </button>
                                 <button type="button" className="ml-btn ml-btn--ghost ml-btn--sm" onClick={() => remove(m.id)} disabled={pending}>
                                   <Trash2 size={14} /> Delete
@@ -312,7 +334,7 @@ export function MealLog({ day, today, meals, totals, target, week }: Props) {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
             </tbody>
@@ -321,17 +343,17 @@ export function MealLog({ day, today, meals, totals, target, week }: Props) {
       )}
 
       <p style={{ margin: 0, fontSize: 11.5, color: "var(--text-tertiary)", lineHeight: 1.5 }}>
-        Photo readings are estimates. Labels are read as printed, per serving. Tap a meal to check or change the numbers.
+        A photo of a plate is an estimate; a label is read as printed, per serving. Tap a meal to see what was counted and change it.
       </p>
     </div>
   );
 }
 
-/** Add a meal by hand, or correct one. */
+/** Add a meal by hand, or correct one. The meal keeps its M-number; the name is what it was. */
 function MealForm({ initial, onDone, onSaved }: { initial: MealView | null; onDone: () => void; onSaved: () => void }) {
   const [pending, start] = useTransition();
   const [v, setV] = useState({
-    name: initial?.name ?? "",
+    name: initial && initial.name !== "Meal" ? initial.name : "",
     calories: initial ? String(Math.round(initial.calories)) : "",
     protein: initial ? String(Math.round(initial.protein)) : "",
     carbs: initial ? String(Math.round(initial.carbs)) : "",
@@ -358,12 +380,12 @@ function MealForm({ initial, onDone, onSaved }: { initial: MealView | null; onDo
       }}
     >
       <label className="ml-field ml-field--wide">
-        <span>Meal</span>
-        <input className="ml-input" value={v.name} onChange={set("name")} placeholder="e.g. Chicken wrap" maxLength={80} autoFocus={!initial} />
+        <span>What was it (optional)</span>
+        <input className="ml-input" value={v.name} onChange={set("name")} placeholder="e.g. Chicken wrap" maxLength={80} />
       </label>
       <label className="ml-field">
         <span>kcal</span>
-        <input className="ml-input" inputMode="numeric" value={v.calories} onChange={set("calories")} placeholder="0" />
+        <input className="ml-input" inputMode="numeric" value={v.calories} onChange={set("calories")} placeholder="0" autoFocus={!initial} />
       </label>
       <label className="ml-field">
         <span>Protein g</span>
@@ -386,7 +408,7 @@ function MealForm({ initial, onDone, onSaved }: { initial: MealView | null; onDo
         <button type="button" className="ml-btn ml-btn--ghost ml-btn--sm" onClick={onDone} disabled={pending}>
           Cancel
         </button>
-        <button type="submit" className="ml-btn ml-btn--sm" disabled={pending || !v.name.trim()}>
+        <button type="submit" className="ml-btn ml-btn--sm" disabled={pending || !v.calories.trim()}>
           {pending ? <Loader2 size={14} className="spin" /> : null} {initial ? "Save" : "Add meal"}
         </button>
       </div>

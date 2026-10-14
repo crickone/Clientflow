@@ -22,7 +22,7 @@ import {
 } from "@/lib/workoutLog";
 import { listExercises } from "@/lib/exerciseLibrary";
 import { setTrainingPlan } from "@/lib/trainingOverview";
-import { deleteMeal, logMeal, updateMeal } from "@/lib/meals";
+import { deleteMeal, logMeal, setMealServings, updateMeal } from "@/lib/meals";
 import type { LoggedSet, SessionExercise } from "@/lib/workoutLogModel";
 import { personalBests } from "@/lib/workoutLogModel";
 
@@ -208,7 +208,8 @@ export async function saveTrainingDaysAction(programId: number, weekdays: number
 // ── meals ──────────────────────────────────────────────────────────────────────
 
 const mealFields = z.object({
-  name: z.string().trim().min(1, "Give the meal a name.").max(80),
+  // Meals are numbered M1, M2, M3 in the app; the name is what it was, and optional.
+  name: z.string().trim().max(80).transform((v) => v || "Meal"),
   calories: z.coerce.number().min(0).max(10000),
   protein: z.coerce.number().min(0).max(1000).default(0),
   carbs: z.coerce.number().min(0).max(1000).default(0),
@@ -235,6 +236,17 @@ export async function updateMealAction(id: number, input: unknown): Promise<Meal
   if (!i.success) return { ok: false, error: "Meal not found." };
   if (!p.success) return { ok: false, error: p.error.issues[0]?.message ?? "Check the numbers." };
   if (!updateMeal(clientId, i.data, p.data)) return { ok: false, error: "Meal not found." };
+  revalidatePath("/app/nutrition");
+  revalidatePath("/app");
+  return { ok: true };
+}
+
+export async function setMealServingsAction(id: number, servings: number): Promise<MealResult> {
+  const { clientId } = requireClient();
+  const i = idSchema.safeParse(id);
+  const s = z.coerce.number().min(0.25).max(20).safeParse(servings);
+  if (!i.success || !s.success) return { ok: false, error: "Pick between a quarter and 20 servings." };
+  if (!setMealServings(clientId, i.data, s.data)) return { ok: false, error: "Only a label meal has servings." };
   revalidatePath("/app/nutrition");
   revalidatePath("/app");
   return { ok: true };

@@ -4,7 +4,16 @@
  * the target from the client's plan. Pure, so tested without a model or DB.
  */
 
-export type MealItem = { name: string; grams: number | null; calories: number; protein: number; carbs: number; fat: number };
+export type MealItem = {
+  name: string;
+  /** How much, in words the client can check against the plate: "1 breast, palm-sized", "a cupped handful". */
+  portion: string | null;
+  grams: number | null;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+};
 
 export type MealKind = "meal" | "label" | "manual";
 export type Confidence = "high" | "medium" | "low";
@@ -21,7 +30,7 @@ export type MealReading = {
   /** For a label: what one serving is ("30 g", "1 bar"), if it says. */
   serving: string | null;
   confidence: Confidence;
-  /** One short line on how it was worked out or what was assumed. */
+  /** How it was worked out: what gave the scale, what was assumed. Two or three short sentences. */
   notes: string | null;
 };
 
@@ -56,6 +65,7 @@ export function parseMealReading(raw: string): MealReading | null {
     .map((x) => (x && typeof x === "object" ? (x as Record<string, unknown>) : {}))
     .map((x) => ({
       name: str(x.name, 60),
+      portion: str(x.portion, 60) || null,
       grams: x.grams === null || x.grams === undefined ? null : num(x.grams, 5000) || null,
       calories: num(x.calories),
       protein: num(x.protein, 1000),
@@ -80,7 +90,7 @@ export function parseMealReading(raw: string): MealReading | null {
     fat: num(o.fat, 1000) || sum("fat"),
     serving: str(o.serving, 40) || null,
     confidence,
-    notes: str(o.notes, 200) || null,
+    notes: str(o.notes, 400) || null,
   };
 }
 

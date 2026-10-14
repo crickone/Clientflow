@@ -93,6 +93,26 @@ export function updateMeal(clientId: number, id: number, patch: { name: string }
   );
 }
 
+/** A label meal: change how many servings were eaten; the numbers scale from the per-serving values. */
+export function setMealServings(clientId: number, id: number, servings: number): boolean {
+  const row = db.select().from(mealLogs).where(and(eq(mealLogs.id, id), eq(mealLogs.clientId, clientId))).get();
+  if (!row || row.kind !== "label") return false;
+  const k = Math.min(20, Math.max(0.25, servings));
+  const per = (v: number) => (row.servings > 0 ? v / row.servings : v);
+  db.update(mealLogs)
+    .set({
+      servings: k,
+      calories: Math.round(per(row.calories) * k),
+      protein: Math.round(per(row.protein) * k),
+      carbs: Math.round(per(row.carbs) * k),
+      fat: Math.round(per(row.fat) * k),
+      updatedAt: new Date(),
+    })
+    .where(eq(mealLogs.id, id))
+    .run();
+  return true;
+}
+
 export function deleteMeal(clientId: number, id: number): boolean {
   const row = db.select().from(mealLogs).where(and(eq(mealLogs.id, id), eq(mealLogs.clientId, clientId))).get();
   if (!row) return false;

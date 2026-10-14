@@ -16,6 +16,7 @@ const plate = parseMealReading(
   '```json\n{"kind":"meal","name":"Chicken, rice and broccoli","items":[{"name":"Grilled chicken breast","grams":150,"calories":248,"protein":46,"carbs":0,"fat":5},{"name":"White rice","grams":180,"calories":234,"protein":5,"carbs":51,"fat":1},{"name":"Broccoli","grams":80,"calories":28,"protein":2,"carbs":5,"fat":0}],"calories":510,"protein":53,"carbs":56,"fat":6,"serving":null,"confidence":"medium","notes":"Portions estimated from the plate size."}\n```',
 )!;
 check("a plate reads with its items", plate !== null && plate.kind === "meal" && plate.items.length === 3 && plate.calories === 510);
+check("an item's portion in words comes through, and is optional", parseMealReading('{"name":"Toast","items":[{"name":"Toast","portion":"2 slices","grams":70,"calories":180}]}')!.items[0].portion === "2 slices" && plate.items[0].portion === null);
 check("the code fence is stripped", plate.name === "Chicken, rice and broccoli");
 
 const label = parseMealReading('{"kind":"label","name":"Fulfil protein bar","items":[],"calories":"220","protein":20,"carbs":22,"fat":9,"serving":"1 bar (55 g)","confidence":"high","notes":"Read from the nutrition table."}')!;
