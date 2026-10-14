@@ -10,7 +10,8 @@ import { therapies } from "@/lib/db/schema";
 import { discountedCents, parseEuroToCents, validateOffer } from "@/lib/offers/model";
 import { deleteOffer, getOffer as getOfferById, listOffersForCampaign, saveOffer, setCampaignOffersActive, setCampaignOffersSchedule, setOfferActive } from "@/lib/offers/store";
 import { getStripeConnection } from "@/lib/stripe/connection";
-import { getOfferAccessKey, setOfferAccessKey } from "@/lib/offers/access";
+import { setOfferAccessKey } from "@/lib/offers/access";
+import { deleteCampaign } from "@/lib/campaigns/deleteCampaign";
 import { setCampaignBuildModel } from "@/lib/campaigns/buildModel";
 import { getCampaign, setCampaignAdSpend } from "@/lib/campaigns/store";
 import { seedTestCampaign, removeTestCampaign } from "@/lib/campaigns/demoSeed";
@@ -260,4 +261,15 @@ export async function setAdOnlyAction(campaignId: number, on: boolean): Promise<
   const key = setOfferAccessKey(campaign.id, on === true);
   revalidatePath(`/marketing/campaigns/${campaign.id}`);
   return { ok: true, key };
+}
+
+/** Delete a campaign with no sales (lib/campaigns/deleteCampaign). */
+export async function deleteCampaignAction(campaignId: number): Promise<{ ok: true; leadsMoved: number } | { ok: false; error: string }> {
+  await requireAdmin();
+  const r = deleteCampaign(Number(campaignId));
+  if (r.ok) {
+    revalidatePath("/marketing/campaigns");
+    revalidatePath("/leads");
+  }
+  return r;
 }

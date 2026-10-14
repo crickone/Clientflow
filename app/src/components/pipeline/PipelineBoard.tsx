@@ -31,6 +31,7 @@ import { PipelineMetrics } from "./PipelineMetrics";
 import { StageColumn } from "./StageColumn";
 import { Dialog, DialogContent } from "@/components/ui/Dialog";
 import { PipelineStagesManager } from "@/components/settings/PipelineStagesManager";
+import { NewPipelineButton, PipelineSettings } from "./PipelineControls";
 
 const WON_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -264,7 +265,7 @@ export function PipelineBoard({
 
   return (
     <>
-      {pipelines.length > 1 && (
+      {pipelines.length > 0 && (
         <nav aria-label="Pipelines" style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
           {pipelines.map((p) => {
             const active = p.id === activePipelineId;
@@ -288,6 +289,7 @@ export function PipelineBoard({
               </Link>
             );
           })}
+          <NewPipelineButton />
         </nav>
       )}
 
@@ -421,7 +423,8 @@ export function PipelineBoard({
 
       {canManageStages && (
         <Dialog open={manageOpen} onOpenChange={setManageOpen}>
-          <DialogContent title={activePipeline ? `${activePipeline.name} stages` : "Pipeline stages"} description="Add, rename, reorder or recolour your stages — changes apply to the board immediately." width={720}>
+          <DialogContent title={activePipeline ? `Manage ${activePipeline.name}` : "Pipeline stages"} description="Rename or delete this pipeline, and add, rename, reorder or recolour its columns. Changes apply to the board straight away." width={720}>
+            {activePipeline && <PipelineSettings key={activePipeline.id} pipeline={activePipeline} onDeleted={() => setManageOpen(false)} />}
             <PipelineStagesManager stages={stages} pipelineId={activePipelineId} />
           </DialogContent>
         </Dialog>

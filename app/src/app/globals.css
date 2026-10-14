@@ -4838,3 +4838,11 @@ a.stat-row:hover .stat-label { color: var(--text-primary); }
 .rv-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
 .rv-head > :first-child { margin-bottom: 0; }
 .rv-seg { width: 220px; }
+/* Leads: pipeline tabs + pipeline settings */
+.pl-newtab { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 999px; border: 1px dashed var(--hairline-strong, var(--hairline)); background: transparent; color: var(--text-tertiary); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
+.pl-newtab:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
+.pl-newtab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pl-settings { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--hairline); }
+.pl-settings-name { display: flex; gap: 8px; align-items: center; flex: 1 1 280px; }
+.pl-settings-name > :first-child { flex: 1; }
+.pl-settings-note { font-size: 12.5px; color: var(--text-tertiary); }

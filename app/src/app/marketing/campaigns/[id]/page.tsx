@@ -36,6 +36,7 @@ import { LaunchCampaignButton } from "@/components/campaigns/LaunchCampaignButto
 import { setCampaignAdSpendAction } from "../actions";
 import { OfferPanel } from "@/components/campaigns/OfferPanel";
 import { PriceVisibility } from "@/components/campaigns/PriceVisibility";
+import { DeleteCampaignButton } from "@/components/campaigns/DeleteCampaignButton";
 import { listCampaignOrders, listOffersForCampaign, offerTotals } from "@/lib/offers/store";
 import { getOfferAccessKey } from "@/lib/offers/access";
 import { getStripeConnection } from "@/lib/stripe/connection";
@@ -478,6 +479,7 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
               AI build cost about {formatCentsEur(estimateCents)} on {modelLabel} · created {formatDate(campaign.createdAt)}
             </p>
           </Card>
+          <DeleteCampaignButton campaignId={campaign.id} campaignName={campaign.name} />
         </aside>
       </div>
     </div>

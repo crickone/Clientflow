@@ -1,6 +1,6 @@
 import "server-only";
 
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 
 import { db, schema } from "@/lib/db";
 import type { TenantDb } from "@/lib/db/tenant";
@@ -129,4 +129,45 @@ export function renamePipeline(id: number, name: string): void {
   const trimmed = name.trim();
   if (!trimmed) return;
   db.update(schema.pipelines).set({ name: trimmed }).where(eq(schema.pipelines.id, id)).run();
+}
+
+/**
+ * Delete a pipeline, keeping its leads: each lead moves to the Main
+ * pipeline's column with the same role (New lead, Booked, Won ...), or Main's
+ * first column when there's no match. The default (Main) pipeline can't be
+ * deleted. Returns how many leads moved.
+ */
+export function deletePipeline(id: number): { moved: number } {
+  return db.transaction((tx) => {
+    const target = tx.select(SELECT).from(schema.pipelines).where(eq(schema.pipelines.id, id)).get();
+    if (!target) throw new Error("Pipeline not found.");
+    if (target.isDefault) throw new Error("The main pipeline can't be deleted.");
+    const mainId = defaultOf(tx.select(SELECT).from(schema.pipelines).orderBy(asc(schema.pipelines.id)).all());
+    const mainStages = tx
+      .select({ id: schema.pipelineStages.id, role: schema.pipelineStages.role })
+      .from(schema.pipelineStages)
+      .where(eq(schema.pipelineStages.pipelineId, mainId))
+      .orderBy(asc(schema.pipelineStages.position))
+      .all();
+    const first = mainStages[0]?.id ?? null;
+    const stages = tx
+      .select({ id: schema.pipelineStages.id, role: schema.pipelineStages.role })
+      .from(schema.pipelineStages)
+      .where(eq(schema.pipelineStages.pipelineId, id))
+      .all();
+    let moved = 0;
+    for (const st of stages) {
+      const to = (st.role && mainStages.find((m) => m.role === st.role)?.id) || first;
+      moved += tx.update(schema.leads).set({ pipelineId: mainId, stageId: to }).where(and(eq(schema.leads.pipelineId, id), eq(schema.leads.stageId, st.id))).run().changes;
+    }
+    // Leads on this board with no column (or one not in its list).
+    moved += tx.update(schema.leads).set({ pipelineId: mainId, stageId: first }).where(eq(schema.leads.pipelineId, id)).run().changes;
+    if (stages.length) {
+      // Anything else still pointing at these columns (shouldn't happen) is pointed at Main's first.
+      tx.update(schema.leads).set({ stageId: first }).where(inArray(schema.leads.stageId, stages.map((x) => x.id))).run();
+      tx.delete(schema.pipelineStages).where(eq(schema.pipelineStages.pipelineId, id)).run();
+    }
+    tx.delete(schema.pipelines).where(eq(schema.pipelines.id, id)).run();
+    return { moved };
+  });
 }

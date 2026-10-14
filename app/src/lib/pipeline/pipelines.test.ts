@@ -40,12 +40,14 @@ const requireLocal = createRequire(import.meta.url);
 (async () => {
   const { controlSqlite } = requireLocal("../db/control") as typeof import("../db/control");
   const { getTenantDbById, runWithTenant } = requireLocal("../db/tenant") as typeof import("../db/tenant");
-  const { listPipelines, createPipeline, defaultPipelineId, pipelineForCampaign, leadPipelineId } =
+  const { listPipelines, createPipeline, defaultPipelineId, pipelineForCampaign, leadPipelineId, deletePipeline } =
     requireLocal("./pipelineRepo") as typeof import("./pipelineRepo");
   const { listStages, resolveEntryStageId, resolveStageIdByRole } = requireLocal("./stageRepo") as typeof import("./stageRepo");
   const { advanceStage, currentStageRecord, setStageToId } = requireLocal("./stage") as typeof import("./stage");
   const { upsertLead, listLeadsForBoard } = requireLocal("../leads") as typeof import("../leads");
-  const { createCampaign } = requireLocal("../campaigns/store") as typeof import("../campaigns/store");
+  const { createCampaign, getCampaign } = requireLocal("../campaigns/store") as typeof import("../campaigns/store");
+  const { deleteCampaign } = requireLocal("../campaigns/deleteCampaign") as typeof import("../campaigns/deleteCampaign");
+  const { saveOffer, createPendingOrder, setOrderStatus, getOffer } = requireLocal("../offers/store") as typeof import("../offers/store");
 
   const slug = "pipelines-test";
   const dbFile = `tenants/${slug}/${slug}.db`;
@@ -132,6 +134,36 @@ const requireLocal = createRequire(import.meta.url);
       assert.equal(board!.name, "Autumn Reset");
       assert.equal(listStages(board!.id).length, 9);
       assert.equal(listPipelines().length, 3);
+
+      // ── deleting a pipeline keeps its leads (2026-10-14) ──
+      const extra = createPipeline({ name: "Corporate" });
+      const won = upsertLead({ source: "manual", firstName: "Dara", email: "dara@example.com", pipelineId: extra.id }).lead;
+      setStageToId(won.id, resolveStageIdByRole("won", extra.id)!);
+      const fresh = upsertLead({ source: "manual", firstName: "Eve", email: "eve@example.com", pipelineId: extra.id }).lead;
+      const { moved } = deletePipeline(extra.id);
+      assert.equal(moved, 2, "both leads moved");
+      assert.equal(leadPipelineId(won.id), defaultPipelineId(), "to the main pipeline");
+      assert.equal(currentStageRecord(won.id)?.id, resolveStageIdByRole("won"), "a won lead lands in main's won column");
+      assert.equal(currentStageRecord(fresh.id)?.id, resolveEntryStageId(), "a new lead lands in main's entry column");
+      assert.ok(!listPipelines().some((p) => p.id === extra.id), "the pipeline is gone");
+      assert.equal(listStages(extra.id).length, 0, "its columns are gone");
+      assert.throws(() => deletePipeline(defaultPipelineId()), /main pipeline/, "the main pipeline can't be deleted");
+
+      // ── deleting a campaign ──
+      const sold = createCampaign({ name: "Sold Out Promo", slug: "sold-out-promo", offer: "x", skipCalendarNote: true });
+      const offerId = saveOffer(null, sold.id, { title: "Promo", description: null, priceCents: 1000, compareAtCents: null, items: [], quantityLimit: null, saleStartsAt: null, saleEndsAt: null, useByDate: "2027-01-01", terms: null });
+      const order = createPendingOrder(getOffer(offerId)!, "acct_test");
+      setOrderStatus(order.id, "paid");
+      const refused = deleteCampaign(sold.id);
+      assert.ok(!refused.ok && /sales/.test(refused.error), "a campaign with sales is kept");
+      assert.ok(getCampaign(sold.id), "and still exists");
+
+      const leadOnAutumn = upsertLead({ source: "landing", firstName: "Finn", email: "finn@example.com", pipelineId: board!.id }).lead;
+      const gone = deleteCampaign(campaign.id);
+      assert.ok(gone.ok && gone.leadsMoved === 1, "a campaign without sales is deleted, moving its lead");
+      assert.equal(getCampaign(campaign.id), null, "the campaign is gone");
+      assert.equal(pipelineForCampaign(campaign.id), null, "and its pipeline");
+      assert.equal(leadPipelineId(leadOnAutumn.id), defaultPipelineId(), "its lead is on the main pipeline");
     });
 
     console.log("pipelines.test.ts: all assertions passed");

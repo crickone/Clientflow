@@ -12,7 +12,7 @@ import {
   updateStage,
 } from "@/lib/pipeline/stageRepo";
 import { ALL_ROLES, canDeleteStage, roleConflict, type StageRole } from "@/lib/pipeline/roles";
-import { defaultPipelineId, getPipeline } from "@/lib/pipeline/pipelineRepo";
+import { createPipeline, defaultPipelineId, deletePipeline, getPipeline, renamePipeline } from "@/lib/pipeline/pipelineRepo";
 
 /** The board an action works on: the one named, if it exists, else the default. */
 function boardId(pipelineId: number | undefined): number {
@@ -196,4 +196,36 @@ export async function deleteStageAction(id: number, moveToId: number, pipelineId
   deleteStageWithMove(id, moveToId);
   revalidate();
   return { ok: true };
+}
+
+/** A new pipeline (its own board and columns, copied from the main one). Returns its id. */
+export async function createPipelineAction(name: string): Promise<{ ok: true; id: number } | { ok: false; error: string }> {
+  await adminTenantId();
+  const parsed = nameField.safeParse(name);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Give it a name." };
+  const p = createPipeline({ name: parsed.data });
+  revalidate();
+  return { ok: true, id: p.id };
+}
+
+export async function renamePipelineAction(id: number, name: string): Promise<ActionResult> {
+  await adminTenantId();
+  const parsed = nameField.safeParse(name);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Give it a name." };
+  if (!getPipeline(Number(id))) return { ok: false, error: "Pipeline not found." };
+  renamePipeline(Number(id), parsed.data);
+  revalidate();
+  return { ok: true };
+}
+
+/** Delete a pipeline; its leads move to the matching column on the main pipeline. */
+export async function deletePipelineAction(id: number): Promise<{ ok: true; moved: number } | { ok: false; error: string }> {
+  await adminTenantId();
+  try {
+    const { moved } = deletePipeline(Number(id));
+    revalidate();
+    return { ok: true, moved };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Couldn't delete that pipeline." };
+  }
 }
