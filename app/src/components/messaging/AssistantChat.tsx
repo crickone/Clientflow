@@ -222,6 +222,10 @@ export function AssistantChat({
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastUserRef = useRef<HTMLDivElement | null>(null);
   const scrollPending = useRef(false);
+  // The conversation the view was last opened at the bottom of. Opening a
+  // chat (or coming back to the page) lands on the latest reply, once; the
+  // polling that follows never yanks the view around.
+  const openedAt = useRef<string | null>(null);
   // Campaign Engine Slice 3: guards the initialInput seed effect below to
   // apply (at most) once per mount.
   const initialInputApplied = useRef(false);
@@ -423,6 +427,13 @@ export function AssistantChat({
   // After sending, bring the user's question to the TOP of the view so the reply
   // streams in below it and reads from the start (instead of pinning to bottom).
   useLayoutEffect(() => {
+    if (!conv || conv.messages.length === 0 || openedAt.current === conv.id) return;
+    openedAt.current = conv.id;
+    const container = scrollRef.current;
+    if (container) container.scrollTop = container.scrollHeight;
+  }, [conv]);
+
+  useLayoutEffect(() => {
     if (!scrollPending.current) return;
     scrollPending.current = false;
     const el = lastUserRef.current;
@@ -488,6 +499,7 @@ export function AssistantChat({
     setInput("");
     setAttachments([]);
     scrollPending.current = true; // scroll this new question to the top on render
+    openedAt.current = activeId; // sending isn't opening: keep the question-at-top scroll
     void post({ type: "message", text: q }, (c) => ({
       ...c,
       running: true,
