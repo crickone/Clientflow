@@ -29,6 +29,10 @@ const HOUR_PX = 60; // 1px per minute — roomy, simple math
 const TIME_COL = 52;
 const DAY_MIN = 132;
 const CARD_GAP = 2;
+// A block is never drawn shorter than this, so a 12-minute session still
+// shows who and what. Layout packs by this drawn size, so short sessions
+// that follow each other sit side by side rather than on top of each other.
+const MIN_CARD_PX = 40;
 
 function hmToMin(hm: string) {
   const [h, m] = hm.split(":").map(Number);
@@ -41,6 +45,19 @@ function isoOf(d: Date) {
 
 function shortTherapyLabel(name: string) {
   return name.replace(/\s*Therapy$/i, "").trim();
+}
+
+/** Dark text on a light therapy colour (mint, sand), white on a dark one. */
+function inkOn(hex: string): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return "#fff";
+  const n = parseInt(m[1], 16);
+  const lin = (c: number) => {
+    const v = c / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  };
+  const L = 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+  return L > 0.4 ? "#111214" : "#fff";
 }
 
 function fmtTime(hm: string) {
@@ -69,7 +86,10 @@ function packDay(
   pxPerMin: number,
 ): Positioned[] {
   const items = appts
-    .map((a) => ({ a, s: hmToMin(a.startTime), e: hmToMin(a.endTime) }))
+    .map((a) => {
+      const s = hmToMin(a.startTime);
+      return { a, s, e: Math.max(hmToMin(a.endTime), s + Math.ceil(MIN_CARD_PX / pxPerMin)) };
+    })
     .sort((x, y) => x.s - y.s || x.e - y.e);
 
   const colEnds: number[] = []; // end-min of the last appt in each open sub-column
@@ -109,7 +129,7 @@ function packDay(
     return {
       appt: it.a,
       top: (it.s - windowStart) * pxPerMin,
-      height: Math.max(22, (it.e - it.s) * pxPerMin - CARD_GAP),
+      height: Math.max(MIN_CARD_PX - CARD_GAP, (it.e - it.s) * pxPerMin - CARD_GAP),
       leftPct: colOf[i] * widthPct,
       widthPct,
     };
@@ -531,8 +551,8 @@ export function WeekCalendar({
                         width: `calc(${box.widthPct}% - 4px)`,
                         background: colour,
                         borderRadius: "var(--radius)",
-                        padding: "4px 6px",
-                        color: "#fff",
+                        padding: "5px 8px",
+                        color: inkOn(colour),
                         overflow: "hidden",
                         zIndex: 3,
                         display: "flex",
@@ -545,8 +565,8 @@ export function WeekCalendar({
                       <span
                         style={{
                           fontWeight: 600,
-                          fontSize: 11,
-                          lineHeight: 1.15,
+                          fontSize: 12,
+                          lineHeight: 1.2,
                           whiteSpace: "nowrap",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
@@ -556,18 +576,16 @@ export function WeekCalendar({
                       </span>
                       <span
                         style={{
-                          fontSize: 9,
-                          lineHeight: 1.1,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.04em",
-                          opacity: 0.9,
+                          fontSize: 10.5,
+                          lineHeight: 1.2,
+                          opacity: 0.85,
                           whiteSpace: "nowrap",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                         }}
                       >
-                        {label ? `${label} · ` : ""}
                         {fmtTime(a.startTime)}
+                        {label ? ` · ${label}` : ""}
                       </span>
                     </Link>
                   );
