@@ -83,7 +83,9 @@ export async function fulfilCheckout(
           .values({
             clientId: client!.id,
             therapyId: item.therapyId,
-            packageName: `${offer.title}: ${item.sessions} x ${item.name}`,
+            // One service, one session: the offer's own name says it all ("Black Friday: Swedish massage").
+            packageName:
+              offer.items.length === 1 && item.sessions === 1 ? offer.title : `${offer.title}: ${item.sessions} x ${item.name}`,
             totalSessions: item.sessions,
             pricePaidEur: shares[idx] / 100,
             purchaseDate: today,
