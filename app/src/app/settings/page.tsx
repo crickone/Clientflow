@@ -22,6 +22,7 @@ import {
   CreditCard,
   Workflow,
   Scale,
+  Gauge,
   type LucideIcon,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -109,6 +110,7 @@ function buildGroups(vocab: ReturnType<typeof getVocab>, tenantId: number): { ti
       items: [
         { href: "/settings/users", icon: UserCog, title: "Users and permissions", desc: "Staff and admin accounts, invites and passwords." },
         { href: "/settings/billing", icon: CreditCard, title: "Billing", desc: "Your AdonisAgent plan, payment card and invoices." },
+        { href: "/settings/usage", icon: Gauge, title: "AI usage", desc: "What the AI has cost each month, and which campaigns and chats it went on." },
       ],
     },
   ];

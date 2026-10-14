@@ -6,6 +6,7 @@ import { getTenantDbById, runWithTenant } from "@/lib/db/tenant";
 import { agentConversations, campaigns, type AgentConversation } from "@/lib/db/schema";
 import { executeTool, type ToolArtifact } from "@/lib/assistant/tools";
 import { AiCapError } from "@/lib/ai/usage";
+import { withUsageContext, type UsageContext } from "@/lib/ai/usageContext";
 import { composeAgentSystem } from "@/lib/agents/context";
 import { resolveChatAgent } from "@/lib/agents/chatAgent";
 import { runAgentTurn } from "@/lib/agents/runAgentTurn";
@@ -324,12 +325,24 @@ async function drive(c: Ctx, kick: Kick): Promise<void> {
     write(c, conv);
   };
   const stopAsked = () => row(c)?.stopRequested === true;
+  // File every AI cost under the campaign being worked on, else this chat,
+  // for the account's AI usage page.
+  const campaignNames = new Map<number, string>();
+  const usageTag = (): UsageContext => {
+    const id = conv.campaignId;
+    if (id === null) return { ref: `chat:${c.convId}`, label: `Adonis: ${conv.title}` };
+    if (!campaignNames.has(id)) {
+      const camp = db(c.tenantId).select({ name: campaigns.name }).from(campaigns).where(eq(campaigns.id, id)).get();
+      campaignNames.set(id, camp?.name ?? `Campaign ${id}`);
+    }
+    return { ref: `campaign:${id}`, label: campaignNames.get(id)! };
+  };
 
   const execute = async (actions: ConvAction[]) => {
     const out: (AutopilotResult & { artifact?: ToolArtifact })[] = [];
     for (const a of actions) {
       try {
-        const r = await executeTool(a.name, a.input ?? {}, { tenantId: c.tenantId, userId: c.userId });
+        const r = await withUsageContext(usageTag(), () => executeTool(a.name, a.input ?? {}, { tenantId: c.tenantId, userId: c.userId }));
         out.push({ name: a.name, ok: true, text: r.text, artifact: r.artifact });
       } catch (err) {
         out.push({ name: a.name, ok: false, text: err instanceof Error ? err.message : "Action failed." });
@@ -384,7 +397,7 @@ async function drive(c: Ctx, kick: Kick): Promise<void> {
       conv.messages.push(reply);
       save();
 
-      const out = await runAgentTurn({
+      const out = await withUsageContext(usageTag(), () => runAgentTurn({
         tenantId: c.tenantId,
         agentKey: c.agentKey,
         userId: c.userId,
@@ -400,7 +413,7 @@ async function drive(c: Ctx, kick: Kick): Promise<void> {
           reply.tools.push(n);
           save();
         },
-      });
+      }));
       reply.content = out.text;
       for (const a of out.artifacts) {
         if (!reply.artifacts.some((x) => x.url === a.url)) reply.artifacts.push({ url: a.url, filename: a.filename, label: a.label });

@@ -6,6 +6,7 @@ import { db, schema } from "@/lib/db";
 import { runWithTenant } from "@/lib/db/tenant";
 import { designPost } from "@/lib/ai/designPost";
 import { AiCapError } from "@/lib/ai/usage";
+import { withUsageContextIfNone } from "@/lib/ai/usageContext";
 import { getBrandImageStyle } from "@/lib/settings";
 import { getBusinessProfile } from "@/lib/businessProfile";
 import { resolveLogoPath } from "@/lib/branding";
@@ -112,7 +113,11 @@ export function enqueueCarouselGeneration(input: CarouselGenerationInput): void 
 /** Run one generation and write its outcome onto the row. Never throws. */
 async function runAndRecord(input: CarouselGenerationInput): Promise<void> {
   try {
-    await runCarouselGeneration(input);
+    // For the AI usage page: a design made on its own is filed under itself.
+    const name = getCarousel(input.carouselId)?.name || input.topic;
+    await withUsageContextIfNone({ ref: `post:${input.carouselId}`, label: `Post: ${name}`.slice(0, 120) }, () =>
+      runCarouselGeneration(input),
+    );
     setGenerationStatus(input.carouselId, null);
   } catch (err) {
     const message =

@@ -96,6 +96,9 @@ export function AgentOrgChart({ agents, usageByAgent, usageByModel, capCents, mo
           </div>
           <div style={{ flex: "1 1 240px", maxWidth: 380 }}>
             <UsageMeter valueCents={monthCents} capCents={capCents} />
+            <Link href="/settings/usage" style={{ display: "inline-block", marginTop: 8, fontSize: 12.5, color: "var(--accent)" }}>
+              See what it went on
+            </Link>
           </div>
         </div>
 

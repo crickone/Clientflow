@@ -887,6 +887,20 @@ export function ensureControlTables() {
     console.error("[control] site_domains.proxied_seen_at migration failed:", err);
   }
 
+  // What each AI cost was for (lib/ai/usageContext): `ref` groups the calls of
+  // one piece of work ("campaign:12", "chat:<id>", "post:34") and `label`
+  // names it, for the account's AI usage page. Older rows have neither.
+  try {
+    const cols = controlSqlite.prepare("PRAGMA table_info(ai_usage)").all() as Array<{ name: string }>;
+    if (!cols.find((c) => c.name === "ref")) {
+      controlSqlite.exec("ALTER TABLE ai_usage ADD COLUMN ref TEXT");
+      controlSqlite.exec("ALTER TABLE ai_usage ADD COLUMN label TEXT");
+    }
+    controlSqlite.exec("CREATE INDEX IF NOT EXISTS idx_ai_usage_tenant_ref ON ai_usage(tenant_id, ref)");
+  } catch (err) {
+    console.error("[control] ai_usage.ref/label migration failed:", err);
+  }
+
   // Existing control DBs predate auth_sessions.active_tenant_id; the CREATE above
   // only applies to fresh installs, so add it once on older DBs (PRAGMA-guarded,
   // mirroring the tenant-plane column-add migrations).

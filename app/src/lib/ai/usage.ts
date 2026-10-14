@@ -5,6 +5,7 @@ import { assertUnderMonthlyCap, currentMonthKey, readTenantCapCents } from "@/li
 import { estCostCents, type Usage } from "./client";
 import { getAiBalanceCents, isAiSuspended, recordAiSpend, withMargin } from "./creditsLedger";
 import { isStopped } from "@/lib/platform/killSwitch";
+import { currentUsageContext } from "./usageContext";
 
 /**
  * Central per-tenant AI spend metering + hard cap. Every AI call records its
@@ -50,10 +51,11 @@ export function recordUsage(
   u: Usage,
 ): number {
   const cost = estCostCents(model, u);
+  const ctx = currentUsageContext();
   controlSqlite
     .prepare(
-      `INSERT INTO ai_usage (tenant_id, yyyymm, agent_key, model, input_tokens, output_tokens, cache_read_tokens, cache_create_tokens, cost_cents)
-       VALUES (?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO ai_usage (tenant_id, yyyymm, agent_key, model, input_tokens, output_tokens, cache_read_tokens, cache_create_tokens, cost_cents, ref, label)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
     )
     .run(
       tenantId,
@@ -65,6 +67,8 @@ export function recordUsage(
       u.cacheReadTokens ?? 0,
       u.cacheCreateTokens ?? 0,
       cost,
+      ctx.ref ?? null,
+      ctx.label ?? null,
     );
   return cost;
 }
@@ -232,12 +236,13 @@ export function recordFlatUsage(
   model: string,
   costCents: number,
 ): number {
+  const ctx = currentUsageContext();
   controlSqlite
     .prepare(
-      `INSERT INTO ai_usage (tenant_id, yyyymm, agent_key, model, input_tokens, output_tokens, cache_read_tokens, cache_create_tokens, cost_cents)
-       VALUES (?,?,?,?,0,0,0,0,?)`,
+      `INSERT INTO ai_usage (tenant_id, yyyymm, agent_key, model, input_tokens, output_tokens, cache_read_tokens, cache_create_tokens, cost_cents, ref, label)
+       VALUES (?,?,?,?,0,0,0,0,?,?,?)`,
     )
-    .run(tenantId, currentMonthKey(), agentKey, model, costCents);
+    .run(tenantId, currentMonthKey(), agentKey, model, costCents, ctx.ref ?? null, ctx.label ?? null);
   return costCents;
 }
 
