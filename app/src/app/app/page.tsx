@@ -4,6 +4,8 @@ import { CalendarRange, ChevronRight, CreditCard, Dumbbell, Play, Salad, ScanLin
 import { requireClientPage } from "@/lib/clientAuth";
 import { clientDashboard, clientUpcoming } from "@/lib/clientApp";
 import { Card, dayLabel, euros, SectionTitle } from "@/components/clientapp/ui";
+import { dailyTarget, mealsForDay } from "@/lib/meals";
+import { dayTotals, kcal } from "@/lib/mealsModel";
 import { bodyScansEnabled, getScanProfile, listClientScans } from "@/lib/inbody/scans";
 import { formatMetric } from "@/lib/inbody/metrics";
 import { formatChange } from "@/lib/inbody/metrics";
@@ -26,6 +28,8 @@ export default async function ClientHome() {
   const upcoming = clientUpcoming(clientId, 3);
   const t = trainingOverview(clientId);
   const today = dateKey(Date.now());
+  const mealsToday = dayTotals(mealsForDay(clientId, today));
+  const mealTarget = dailyTarget(clientId);
   const showTraining = t.programs.length > 0 || t.totalWorkouts > 0;
   const strengthNow = t.strength.length && t.lifts.some((l) => l.sessions > 1) ? t.strength[t.strength.length - 1].value : null;
   const muscle = latestScan && firstScan && latestScan !== firstScan ? formatChange("smm", latestScan.metrics.smm, firstScan.metrics.smm) : null;
@@ -114,6 +118,28 @@ export default async function ClientHome() {
           </Card>
         </Link>
       )}
+
+      {/* meals */}
+      <Link href="/app/nutrition">
+        <Card style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ width: 38, height: 38, borderRadius: 10, background: "var(--surface-2)", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--accent-ink)", flexShrink: 0 }}>
+            <Salad size={18} />
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
+              {mealsToday.calories > 0 ? `${kcal(mealsToday.calories)} today` : "Log a meal"}
+            </div>
+            <div style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>
+              {mealsToday.calories > 0
+                ? mealTarget
+                  ? `of ${kcal(mealTarget.calories)} · ${mealsToday.protein} g protein`
+                  : `${mealsToday.protein} g protein`
+                : "Snap a photo of your meal or the label"}
+            </div>
+          </div>
+          <ChevronRight size={18} style={{ color: "var(--text-tertiary)" }} />
+        </Card>
+      </Link>
 
       {/* week progress */}
       <Card>

@@ -22,6 +22,7 @@ import {
 } from "@/lib/workoutLog";
 import { listExercises } from "@/lib/exerciseLibrary";
 import { setTrainingPlan } from "@/lib/trainingOverview";
+import { deleteMeal, logMeal, updateMeal } from "@/lib/meals";
 import type { LoggedSet, SessionExercise } from "@/lib/workoutLogModel";
 import { personalBests } from "@/lib/workoutLogModel";
 
@@ -200,6 +201,50 @@ export async function saveTrainingDaysAction(programId: number, weekdays: number
   if (!assignedWorkoutProgramDetail(clientId, p.data)) return { ok: false, error: "That programme isn't assigned to you." };
   setTrainingPlan(clientId, p.data, d.data);
   revalidatePath("/app/workouts");
+  revalidatePath("/app");
+  return { ok: true };
+}
+
+// ── meals ──────────────────────────────────────────────────────────────────────
+
+const mealFields = z.object({
+  name: z.string().trim().min(1, "Give the meal a name.").max(80),
+  calories: z.coerce.number().min(0).max(10000),
+  protein: z.coerce.number().min(0).max(1000).default(0),
+  carbs: z.coerce.number().min(0).max(1000).default(0),
+  fat: z.coerce.number().min(0).max(1000).default(0),
+});
+type MealResult = { ok: true } | { ok: false; error: string };
+
+/** A meal typed in by hand (no photo). */
+export async function addMealAction(input: unknown): Promise<MealResult> {
+  const { clientId } = requireClient();
+  const p = mealFields.safeParse(input);
+  if (!p.success) return { ok: false, error: p.error.issues[0]?.message ?? "Check the numbers." };
+  logMeal(clientId, { manual: p.data });
+  revalidatePath("/app/nutrition");
+  revalidatePath("/app");
+  return { ok: true };
+}
+
+/** Correct a logged meal's name or numbers (the AI's read is an estimate). */
+export async function updateMealAction(id: number, input: unknown): Promise<MealResult> {
+  const { clientId } = requireClient();
+  const i = idSchema.safeParse(id);
+  const p = mealFields.safeParse(input);
+  if (!i.success) return { ok: false, error: "Meal not found." };
+  if (!p.success) return { ok: false, error: p.error.issues[0]?.message ?? "Check the numbers." };
+  if (!updateMeal(clientId, i.data, p.data)) return { ok: false, error: "Meal not found." };
+  revalidatePath("/app/nutrition");
+  revalidatePath("/app");
+  return { ok: true };
+}
+
+export async function deleteMealAction(id: number): Promise<MealResult> {
+  const { clientId } = requireClient();
+  const i = idSchema.safeParse(id);
+  if (!i.success || !deleteMeal(clientId, i.data)) return { ok: false, error: "Meal not found." };
+  revalidatePath("/app/nutrition");
   revalidatePath("/app");
   return { ok: true };
 }

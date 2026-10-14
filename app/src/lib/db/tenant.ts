@@ -2905,6 +2905,31 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     );
   `);
 
+  // Meals a client logs in their app from a photo, a label or by hand
+  // (lib/meals.ts). Additive; idempotent.
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS meal_logs (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id   INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      day         TEXT NOT NULL,
+      logged_at   INTEGER NOT NULL,
+      name        TEXT NOT NULL,
+      items_json  TEXT NOT NULL DEFAULT '[]',
+      calories    REAL NOT NULL DEFAULT 0,
+      protein     REAL NOT NULL DEFAULT 0,
+      carbs       REAL NOT NULL DEFAULT 0,
+      fat         REAL NOT NULL DEFAULT 0,
+      kind        TEXT NOT NULL DEFAULT 'meal',
+      servings    REAL NOT NULL DEFAULT 1,
+      confidence  TEXT,
+      notes       TEXT,
+      photo       TEXT,
+      created_at  INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+      updated_at  INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_meal_logs_client_day ON meal_logs(client_id, day);
+  `);
+
   // How a person arrived the visit they got in touch (lib/arrival.ts): JSON on
   // the lead, and on an online order until it becomes a lead. Additive.
   for (const table of ["leads", "offer_orders"]) {

@@ -27,6 +27,7 @@ const FEATURES: Record<string, string> = {
   followup: "Follow-up drafts",
   media: "Image descriptions",
   transcribe: "Voice notes",
+  meals: "Meal logging",
 };
 
 export function featureOf(agentKey: string): string {

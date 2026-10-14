@@ -3370,3 +3370,32 @@ export const trainingPlans = sqliteTable("training_plans", {
   weekdays: text("weekdays").notNull().default(""),
   updatedAt: integer("updated_at").notNull(),
 });
+
+/** A meal a client logged in their app: read from a photo or a label by the AI, or typed in (lib/meals.ts). */
+export const mealLogs = sqliteTable(
+  "meal_logs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    clientId: integer("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    /** Irish calendar day, YYYY-MM-DD. */
+    day: text("day").notNull(),
+    loggedAt: integer("logged_at").notNull(),
+    name: text("name").notNull(),
+    itemsJson: text("items_json").notNull().default("[]"), // JSON MealItem[]
+    calories: real("calories").notNull().default(0),
+    protein: real("protein").notNull().default(0),
+    carbs: real("carbs").notNull().default(0),
+    fat: real("fat").notNull().default(0),
+    kind: text("kind", { enum: ["meal", "label", "manual"] }).notNull().default("meal"),
+    servings: real("servings").notNull().default(1),
+    confidence: text("confidence", { enum: ["high", "medium", "low"] }),
+    notes: text("notes"),
+    photo: text("photo"),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().default(sql`(unixepoch() * 1000)`),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull().default(sql`(unixepoch() * 1000)`),
+  },
+  (t) => ({ byClientDay: index("idx_meal_logs_client_day").on(t.clientId, t.day) }),
+);
+export type MealLog = typeof mealLogs.$inferSelect;
