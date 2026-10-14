@@ -2144,24 +2144,26 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     console.error("[db] lead_messages whatsapp-cols migration failed:", err);
   }
 
-  // "Approve and build everything" jobs (schema.ts agentAutopilot): the
-  // server-side loop that keeps building a campaign after the operator leaves
-  // the chat. Additive; idempotent.
+  // Adonis conversations, held on the server (schema.ts agentConversations,
+  // lib/agents/conversation.ts): the server runs every turn and carries on
+  // after approvals, so nothing depends on the chat page staying open.
+  // Additive; idempotent.
   sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS agent_autopilot (
+    CREATE TABLE IF NOT EXISTS agent_conversations (
       id              TEXT PRIMARY KEY,
-      conversation_id TEXT NOT NULL,
+      user_id         INTEGER NOT NULL,
       agent_key       TEXT NOT NULL,
-      status          TEXT NOT NULL DEFAULT 'running',
-      stop_requested  INTEGER NOT NULL DEFAULT 0,
-      campaign_id     INTEGER,
-      start_results   TEXT,
+      title           TEXT NOT NULL DEFAULT 'New chat',
       messages        TEXT NOT NULL DEFAULT '[]',
-      error           TEXT,
+      campaign_events TEXT NOT NULL DEFAULT '[]',
+      status          TEXT NOT NULL DEFAULT 'idle',
+      building        INTEGER NOT NULL DEFAULT 0,
+      campaign_id     INTEGER,
+      stop_requested  INTEGER NOT NULL DEFAULT 0,
       created_at      INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
       updated_at      INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
-    CREATE INDEX IF NOT EXISTS idx_agent_autopilot_convo ON agent_autopilot(conversation_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_agent_conversations_user ON agent_conversations(user_id, agent_key, updated_at);
   `);
 
   // Daily follower snapshots for the Social dashboard (schema.ts socialFollowersDaily).

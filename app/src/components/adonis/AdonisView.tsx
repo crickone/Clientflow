@@ -153,7 +153,7 @@ export function AdonisView({
         <div style={{ flex: 1, minHeight: 0 }}>
           <AssistantChat
             tenantId={tenantId}
-            endpoint="/api/agents/orchestrator/chat"
+            agentKey="orchestrator"
             bare
             heroSlot={hero}
             emptyTitle="Ask for anything — I'll handle it"

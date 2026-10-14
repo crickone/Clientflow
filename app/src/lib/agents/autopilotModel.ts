@@ -73,25 +73,3 @@ export function decideAfterTurn(o: {
   }
   return o.autopilot && o.nudges < 1 ? "nudge" : "finish";
 }
-
-/** One message the job adds to the conversation. Mirrors AssistantChat's ChatMessage, with tool names instead of labels. */
-export type AutopilotMessage = {
-  role: "user" | "assistant";
-  hidden?: boolean;
-  content: string;
-  tools: string[];
-  artifacts: { url: string; filename: string; label: string }[];
-  pending?: { actions: { name: string; input: Record<string, unknown>; summary: string }[]; status: "awaiting" | "approved" };
-  results?: AutopilotResult[];
-};
-
-export type AutopilotStatus = "running" | "awaiting_approval" | "done" | "stopped" | "error";
-
-export type AutopilotView = {
-  id: string;
-  status: AutopilotStatus;
-  stopRequested: boolean;
-  startResults: (AutopilotResult & { artifact?: { url: string; filename: string; label: string } })[] | null;
-  messages: AutopilotMessage[];
-  error: string | null;
-};

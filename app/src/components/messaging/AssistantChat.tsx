@@ -6,21 +6,13 @@ import { createPortal } from "react-dom";
 import { Sparkles, Send, Download, Loader2, Check, History, Plus, Trash2, MessageSquare, Mic, Square, Paperclip, X as XIcon } from "lucide-react";
 import { toast } from "sonner";
 import { EASE } from "@/lib/motion";
-import { humanResult, splitAttachments } from "@/components/messaging/chatText";
-import { continuationMessage, type AutopilotView } from "@/lib/agents/autopilotModel";
-
+import { splitAttachments } from "@/components/messaging/chatText";
+import type { ConversationSummary, ConversationView } from "@/lib/agents/conversationModel";
 
 import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Tooltip } from "@/components/ui/Tooltip";
-import {
-  campaignGoAgainMessage,
-  campaignPlanEventFromActions,
-  campaignProgressEventFromResult,
-  deriveCampaignProgress,
-  type CampaignProgress,
-  type CampaignProgressEvent,
-} from "./campaignProgress";
+import { deriveCampaignProgress, type CampaignProgress } from "./campaignProgress";
 import { appendTranscript } from "./voiceInput";
 import { useVoiceInput } from "./useVoiceInput";
 import { Soundwave } from "./Soundwave";
@@ -29,6 +21,7 @@ type Artifact = { url: string; filename: string; label: string };
 type Step = { label: string; done: boolean };
 type PendingAction = { name: string; input: Record<string, unknown>; summary: string };
 type Pending = { actions: PendingAction[]; status: "awaiting" | "approving" | "approved" | "cancelled" };
+/** One message as MessageBubble shows it (built from the server's ConvMessage). */
 type ChatMessage = {
   role: "user" | "assistant";
   /** A message the app sent for the operator (handing an approval's result back to the agent); kept in the history, not shown. */
@@ -37,54 +30,6 @@ type ChatMessage = {
   steps: Step[];
   artifacts: Artifact[];
   pending?: Pending | null;
-};
-type Conversation = {
-  id: string;
-  title: string;
-  messages: ChatMessage[];
-  updatedAt: number;
-  /**
-   * DR2 (.superpowers/sdd/durableruns-design.md): the id of this
-   * conversation's in-flight specialist run, if any — captured from the
-   * leading `{type:"run", runId}` SSE frame (DR1) and cleared once that run
-   * reaches a terminal state (`done`/`error`). Persists with the conversation
-   * in localStorage via the existing persist effect, so a reload/navigate
-   * knows which run (if any) to resume by polling
-   * `GET /api/agents/run/[id]`. The Communication endpoint
-   * (`/api/assistant/chat`) never emits a `run` frame, so this stays
-   * `undefined` for any conversation created there — resume is a no-op.
-   */
-  activeRunId?: string;
-  /**
-   * Campaign Engine Slice 1 (Task 6): a chronological log of campaign-build
-   * signal seen so far in THIS conversation — one entry per proposed
-   * create_campaign call ("plan") or executed create_campaign/
-   * approve_campaign_asset/launch_campaign result ("progress"). Folded by
-   * `deriveCampaignProgress` (@/components/messaging/campaignProgress) into
-   * the compact progress-strip render model just below the header. Plain
-   * JSON, so it round-trips through the existing localStorage persist/load
-   * effects with zero changes there; absent entirely on any conversation
-   * that predates this feature or never touched a campaign tool — reads as
-   * `undefined`, which `deriveCampaignProgress([])` renders as "no strip".
-   */
-  campaignEvents?: CampaignProgressEvent[];
-  /**
-   * The operator chose "Approve and build everything" on a campaign plan.
-   * The server builds the kit (lib/agents/autopilot.ts) whether or not this
-   * page stays open; the chat follows job `jobId` and shows what it adds
-   * after the first `base` messages. `anchor` is the plan's card; `baseEvents`
-   * the campaign log before the build. Launching, scheduling, sending and
-   * publishing still ask.
-   */
-  autopilot?: {
-    jobId: string;
-    anchor: number;
-    base: number;
-    baseEvents: CampaignProgressEvent[];
-    stopping?: boolean;
-    /** The plan card already shows what approving it did. */
-    startShown?: boolean;
-  };
 };
 
 function newId(): string {
@@ -107,22 +52,6 @@ function ago(ts: number): string {
   return new Date(ts).toLocaleDateString();
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * DR2: merge a resumed run's server-known artifacts into a message's list
- * without duplicating ones already attached from a live `artifact` SSE event
- * before the disconnect (matched by url — the same field the live path keys
- * download links on).
- */
-function mergeArtifacts(existing: Artifact[], incoming: Artifact[]): Artifact[] {
-  if (!incoming.length) return existing;
-  const seen = new Set(existing.map((a) => a.url));
-  const additions = incoming.filter((a) => a && a.url && !seen.has(a.url));
-  return additions.length ? [...existing, ...additions] : existing;
-}
 
 const SUGGESTIONS = [
   "Give me a breakdown of everything important today",
@@ -179,23 +108,11 @@ const TOOL_LABEL: Record<string, string> = {
   launch_campaign: "Launching the campaign",
 };
 
-const DEFAULT_ENDPOINT = "/api/assistant/chat";
-
-// DR2 (.superpowers/sdd/durableruns-design.md) resume-on-reload tuning. DR1
-// made the specialist chat route (/api/agents/[key]/chat) persist an
-// in-flight run and survive a client disconnect; these constants control how
-// this component polls `GET /api/agents/run/[id]` to pick a run back up
-// after a refresh/navigate. The Communication endpoint (DEFAULT_ENDPOINT)
-// never emits the `run` frame this depends on, so none of it ever engages
-// for that assistant — see the `activeRunId` doc comment on `Conversation`.
-const RESUME_POLL_MS = 1500;
-const RESUME_MAX_MS = 2 * 60 * 1000; // belt-and-suspenders vs. the server's own ~3min stale guard
-const RESUME_ERROR_RECHECK_MS = 5000; // one more look before trusting a stale-guard "error"
 
 export function AssistantChat({
   tenantId,
   height,
-  endpoint = DEFAULT_ENDPOINT,
+  agentKey = "orchestrator",
   title = "Assistant",
   subtitle = "knows your emails, WhatsApp, clients & money",
   emptyTitle = "Ask me anything about your business",
@@ -211,15 +128,8 @@ export function AssistantChat({
 }: {
   tenantId: number;
   height?: string;
-  /**
-   * POST target for a chat turn. Defaults to the shared Dashboard assistant
-   * route, so omitting this prop leaves the Dashboard assistant's behaviour
-   * 100% unchanged. A scoped specialist (e.g. the Sales agent) passes its own
-   * `/api/agents/<key>/chat` here instead. The Approve flow always POSTs to
-   * `/api/assistant/execute` regardless of this prop — see `approve()` below,
-   * which this parameterisation does not touch.
-   */
-  endpoint?: string;
+  /** The agent this chat talks to (its registry key). Its conversations live on the server under /api/agents/<key>/conversations. */
+  agentKey?: string;
   title?: string;
   subtitle?: string;
   emptyTitle?: string;
@@ -291,40 +201,35 @@ export function AssistantChat({
    */
   composeFooter?: ReactNode;
 }) {
-  // Per-account chat HISTORY in localStorage (survives browser close). Each entry
-  // is a saved conversation; "New chat" opens a fresh one and keeps the old ones.
-  // The default endpoint keeps the EXACT pre-existing key (so the Dashboard
-  // assistant's saved history is untouched); a non-default endpoint — a scoped
-  // specialist chat — gets its own bucket, otherwise it would silently share
-  // one history with the Dashboard assistant despite using different tools
-  // and a different system prompt.
-  const storeKey =
-    endpoint === DEFAULT_ENDPOINT
-      ? `cf_assistant_chats_v2_${tenantId}`
-      : `cf_assistant_chats_v2_${tenantId}_${endpoint.replace(/[^a-zA-Z0-9]+/g, "-")}`;
+  // The conversations live on the server (lib/agents/conversation.ts), which
+  // runs every turn and carries on after approvals whether or not this page
+  // is open. This component only sends what the operator does and shows the
+  // conversation as it changes.
+  const base = `/api/agents/${agentKey}/conversations`;
+  // Where an older build of this page kept chats in the browser — moved to
+  // the server once, below.
+  const legacyKey = `cf_assistant_chats_v2_${tenantId}_${`/api/agents/${agentKey}/chat`.replace(/[^a-zA-Z0-9]+/g, "-")}`;
+  const openKey = `adonis_open_${tenantId}_${agentKey}`;
   const confirm = useConfirm();
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [list, setList] = useState<ConversationSummary[]>([]);
   const [activeId, setActiveId] = useState<string>("");
+  // The open conversation; null while it's a new chat nothing has been sent in.
+  const [conv, setConv] = useState<ConversationView | null>(null);
   const [input, setInput] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [sending, setSending] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastUserRef = useRef<HTMLDivElement | null>(null);
   const scrollPending = useRef(false);
-  // DR2 resume-on-reload: which conversation (if any) is currently being
-  // polled back to life. Deliberately separate from `busy` — which still
-  // gates the live-stream input exactly as before — so the input stays
-  // usable while an old run resumes in the background; see resumeRun()'s
-  // cancellation guard for what happens if the user sends a new message into
-  // the conversation being resumed. `resumeAttempted` ensures the mount
-  // effect below only ever starts (at most) one resume per component mount.
-  const [resumingConvId, setResumingConvId] = useState<string | null>(null);
-  const resumeAttempted = useRef(false);
-  const resumeCancelRef = useRef<Record<string, boolean>>({});
   // Campaign Engine Slice 3: guards the initialInput seed effect below to
-  // apply (at most) once per mount, same pattern as resumeAttempted.
+  // apply (at most) once per mount.
   const initialInputApplied = useRef(false);
+  const activeIdRef = useRef(activeId);
+  activeIdRef.current = activeId;
+  const sendingRef = useRef(false);
+  // Polls the open conversation again straight away (after an action).
+  const wakeRef = useRef<(() => void) | null>(null);
 
   // Voice T2: a ref on the compose textarea so a landed transcript can
   // focus it and place the caret at the end (see the effect just below) —
@@ -397,235 +302,123 @@ export function AssistantChat({
     el.setSelectionRange(len, len);
   }, [input]);
 
-  const active = conversations.find((c) => c.id === activeId) ?? null;
-  const messages = active?.messages ?? [];
-  // The server is building a campaign in this chat: the composer waits.
-  const building = Boolean(active?.autopilot);
-
-  // After an approval runs, the result goes back to the agent so it carries
-  // on (see approve()). Queued here and sent once the current turn is over.
-  const [continueQueue, setContinueQueue] = useState<{ convId: string; text: string } | null>(null);
-  const convsRef = useRef(conversations);
-  convsRef.current = conversations;
-  useEffect(() => {
-    if (!continueQueue || busy || continueQueue.convId !== activeId) return;
-    const text = continueQueue.text;
-    setContinueQueue(null);
-    void send(text, { hidden: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [continueQueue, busy, activeId]);
-
-  // "Approve and build everything" jobs this page is following (by job id).
-  const followingRef = useRef<Set<string>>(new Set());
-  const aliveRef = useRef(true);
-  useEffect(() => {
-    aliveRef.current = true;
-    return () => {
-      aliveRef.current = false;
-    };
-  }, []);
-
-  // Restore this account's history (survives navigation, reload + browser close).
-  useEffect(() => {
+  async function fetchList(): Promise<ConversationSummary[]> {
     try {
-      const raw = localStorage.getItem(storeKey);
-      if (raw) {
-        const parsed = JSON.parse(raw) as { conversations?: Conversation[]; activeId?: string };
-        const convs = (Array.isArray(parsed.conversations) ? parsed.conversations : []).map((c) =>
-          c.autopilot && typeof c.autopilot === "object" && typeof c.autopilot.jobId === "string" ? c : { ...c, autopilot: undefined },
-        );
-        if (convs.length) {
-          setConversations(convs);
-          setActiveId(convs.some((c) => c.id === parsed.activeId) ? parsed.activeId! : convs[0].id);
-          setLoaded(true);
-          return;
+      const res = await fetch(base, { cache: "no-store" });
+      if (!res.ok) return [];
+      const data = (await res.json()) as { conversations?: ConversationSummary[] };
+      const next = data.conversations ?? [];
+      setList(next);
+      return next;
+    } catch {
+      return [];
+    }
+  }
+
+  // First load: move any browser-kept chats to the server (once), then open
+  // the chat this device had open last, or the newest.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const raw = localStorage.getItem(legacyKey);
+        if (raw && !localStorage.getItem(`${legacyKey}_moved`)) {
+          const parsed = JSON.parse(raw) as { conversations?: unknown[] };
+          const res = await fetch(base, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ conversations: parsed.conversations ?? [] }),
+          });
+          if (res.ok) localStorage.setItem(`${legacyKey}_moved`, "1");
         }
+      } catch {
+        /* the old history stays in the browser; try again next load */
       }
+      const summaries = await fetchList();
+      if (cancelled) return;
+      let last: string | null = null;
+      try {
+        last = localStorage.getItem(openKey);
+      } catch {
+        /* ignore */
+      }
+      const pick = summaries.find((s) => s.id === last) ?? summaries[0];
+      setActiveId(pick ? pick.id : newId());
+      setLoaded(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [base, legacyKey, openKey]);
+
+  // Follow the open conversation: quickly while Adonis is working, slowly
+  // otherwise (it may be running from another device).
+  useEffect(() => {
+    if (!loaded || !activeId) return;
+    try {
+      localStorage.setItem(openKey, activeId);
     } catch {
       /* ignore */
     }
-    const id = newId();
-    setConversations([{ id, title: "New chat", messages: [], updatedAt: Date.now() }]);
-    setActiveId(id);
-    setLoaded(true);
-  }, [storeKey]);
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let wasRunning = false;
+    const tick = async () => {
+      if (timer) clearTimeout(timer);
+      timer = null;
+      let next: ConversationView | null | undefined;
+      try {
+        const res = await fetch(`${base}/${activeId}`, { cache: "no-store" });
+        if (res.status === 404) next = null;
+        else if (res.ok) next = (await res.json()) as ConversationView;
+      } catch {
+        /* a network blip: try again next tick */
+      }
+      if (stopped) return;
+      if (next !== undefined && !sendingRef.current) {
+        setConv(next);
+        if (wasRunning && next && !next.running) void fetchList();
+        wasRunning = Boolean(next?.running);
+      }
+      const delay = next?.running || sendingRef.current ? 700 : document.hidden ? 15000 : 5000;
+      timer = setTimeout(() => void tick(), delay);
+    };
+    wakeRef.current = () => void tick();
+    void tick();
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+      wakeRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, activeId, base, openKey]);
 
   // Campaign Engine Slice 3 (Task 3): prime the compose box from a
   // "Build campaign" seed, once conversations are loaded. Functional
-  // setInput update (rather than reading `input` in the effect body) means
-  // this never needs `input` in the dependency array, so it can't re-fire
-  // just because the operator started typing. `cur || initialInput` means it
-  // only ever fills a genuinely empty box.
+  // setInput update means this never needs `input` in the dependency array,
+  // and `cur || initialInput` means it only ever fills a genuinely empty box.
   useEffect(() => {
     if (!loaded || initialInputApplied.current || !initialInput) return;
     initialInputApplied.current = true;
     setInput((cur) => cur || initialInput);
   }, [loaded, initialInput]);
 
-  // Persist (keep the 40 most-recent).
-  useEffect(() => {
-    if (!loaded) return;
-    try {
-      localStorage.setItem(storeKey, JSON.stringify({ conversations: conversations.slice(0, 40), activeId }));
-    } catch {
-      /* ignore */
-    }
-  }, [conversations, activeId, loaded, storeKey]);
-
-  /**
-   * DR2: pick a run back up after a refresh/navigate. `convId`/`runId` come
-   * from the conversation's persisted `activeRunId` (see the mount effect
-   * below) — polls `GET /api/agents/run/[id]` (tenant-scoped, membership
-   * guarded server-side) until the run reaches a terminal state, growing the
-   * last assistant message's text on every tick exactly like the brief
-   * describes. Mirrors send()'s own `patch`/`patchConv` helpers but is a
-   * free function (not a send() closure) since it can start independently of
-   * any live send() call, keyed off an explicit `convId` parameter instead.
-   */
-  async function resumeRun(convId: string, runId: string) {
-    // A new turn already started in this conversation before this resume got
-    // a chance to run (e.g. the user typed and hit send within the same
-    // instant the mount effect fired) — the run we'd be resuming is now
-    // stale; send()'s own `run` frame has already taken over `activeRunId`.
-    if (resumeCancelRef.current[convId]) return;
-    setResumingConvId(convId);
-
-    const patchLast = (fn: (m: ChatMessage) => ChatMessage) =>
-      setConversations((prev) =>
-        prev.map((c) => {
-          if (c.id !== convId || c.messages.length === 0) return c;
-          const msgs = [...c.messages];
-          msgs[msgs.length - 1] = fn(msgs[msgs.length - 1]);
-          return { ...c, messages: msgs, updatedAt: Date.now() };
-        }),
-      );
-    const clearRunId = () =>
-      setConversations((prev) => prev.map((c) => (c.id === convId ? { ...c, activeRunId: undefined } : c)));
-
-    type RunPayload = {
-      status?: string;
-      text?: string;
-      pending?: PendingAction[];
-      artifacts?: Artifact[];
-      error?: string | null;
-    };
-
-    const startedAt = Date.now();
-    let staleErrorSeen = false;
-    try {
-      for (;;) {
-        if (resumeCancelRef.current[convId]) break; // user sent a new message into this conversation
-        if (Date.now() - startedAt > RESUME_MAX_MS) break; // belt-and-suspenders — a future reload can try again
-
-        let data: RunPayload | null = null;
-        let notFound = false;
-        try {
-          const res = await fetch(`/api/agents/run/${runId}`);
-          if (res.status === 404) notFound = true;
-          else if (res.ok) data = await res.json().catch(() => null);
-        } catch {
-          /* transient network blip — retry next tick */
-        }
-
-        if (notFound) {
-          // Run pruned/unknown: nothing to show beyond what's already saved.
-          clearRunId();
-          break;
-        }
-        if (!data || !data.status) {
-          await sleep(RESUME_POLL_MS);
-          continue;
-        }
-
-        if (typeof data.text === "string") {
-          const text = data.text;
-          patchLast((m) => ({ ...m, content: text }));
-        }
-
-        if (data.status === "done") {
-          // A read tool (e.g. bundle_invoices) can attach an artifact to a
-          // run that finishes cleanly, same as awaiting_approval/error below
-          // — merge it in so a resumed client doesn't silently drop a
-          // download link the server already has.
-          const arts = data.artifacts ?? [];
-          patchLast((m) => ({
-            ...m,
-            steps: m.steps.map((s) => ({ ...s, done: true })),
-            artifacts: mergeArtifacts(m.artifacts, arts),
-          }));
-          clearRunId();
-          break;
-        }
-
-        if (data.status === "awaiting_approval") {
-          const actions = data.pending ?? [];
-          const arts = data.artifacts ?? [];
-          // Same `pending` shape a live `confirm` frame builds — the Approve
-          // card this renders POSTs to /api/assistant/execute exactly like
-          // the live path (approve() below doesn't know or care whether the
-          // run that proposed it was live or resumed).
-          patchLast((m) => ({
-            ...m,
-            steps: m.steps.map((s) => ({ ...s, done: true })),
-            pending: actions.length ? { actions, status: "awaiting" } : m.pending,
-            artifacts: mergeArtifacts(m.artifacts, arts),
-          }));
-          // Campaign Engine Slice 1 (Task 6): a reload/reconnect landing
-          // exactly on a not-yet-approved create_campaign proposal still
-          // seeds the progress strip, same as the live confirm branch below.
-          if (actions.length) {
-            const planEvent = campaignPlanEventFromActions(actions);
-            if (planEvent) appendCampaignEvent(convId, planEvent);
-          }
-          clearRunId();
-          break;
-        }
-
-        if (data.status === "error") {
-          // DR1 review note: a genuinely slow single step (>3min, no interim
-          // text) can trip the server's stale guard while the run is still
-          // actually finishing. Give it one more look before surfacing the
-          // error, in case the real result lands in the meantime.
-          if (!staleErrorSeen) {
-            staleErrorSeen = true;
-            await sleep(RESUME_ERROR_RECHECK_MS);
-            continue;
-          }
-          const arts = data.artifacts ?? [];
-          const errText = data.error ?? "Assistant error";
-          patchLast((m) => ({
-            ...m,
-            content: m.content + `\n\n_Error: ${errText}_`,
-            artifacts: mergeArtifacts(m.artifacts, arts),
-          }));
-          clearRunId();
-          break;
-        }
-
-        // status === "running" (or anything else unexpected) — keep polling.
-        staleErrorSeen = false;
-        await sleep(RESUME_POLL_MS);
-      }
-    } finally {
-      setResumingConvId((cur) => (cur === convId ? null : cur));
-    }
-  }
-
-  // DR2: after the initial conversations-load effect restores `conversations`
-  // + `activeId` from localStorage, resume whichever run (if any) was
-  // in-flight for the active conversation when the page last went away. Runs
-  // at most once per mount (`resumeAttempted` ref guard) — the effect itself
-  // may re-fire as `conversations` changes during any later live stream, but
-  // those re-entries are no-ops. For the Communication assistant
-  // (`/api/assistant/chat`), `activeRunId` is never set on any conversation
-  // (that route never emits a `run` frame), so `conv?.activeRunId` is always
-  // falsy there and this cleanly does nothing.
-  useEffect(() => {
-    if (!loaded || resumeAttempted.current) return;
-    resumeAttempted.current = true;
-    const conv = conversations.find((c) => c.id === activeId);
-    if (conv?.activeRunId) void resumeRun(conv.id, conv.activeRunId);
-  }, [loaded, activeId, conversations]);
+  const running = Boolean(conv?.running);
+  const busy = sending || running;
+  // The server's messages, shaped for MessageBubble: a step is done unless
+  // it's the tool the live reply is on right now.
+  const messages: ChatMessage[] = (conv?.messages ?? []).map((m, i, all) => ({
+    role: m.role,
+    hidden: m.hidden,
+    content: m.content,
+    artifacts: m.artifacts,
+    pending: m.pending ?? null,
+    steps: m.tools.map((t, k) => ({
+      label: TOOL_LABEL[t] ?? t,
+      done: !(running && i === all.length - 1 && k === m.tools.length - 1),
+    })),
+  }));
 
   // After sending, bring the user's question to the TOP of the view so the reply
   // streams in below it and reads from the start (instead of pinning to bottom).
@@ -642,428 +435,106 @@ export function AssistantChat({
       // hard snap.
       container.scrollTo({ top: container.scrollTop + (eRect.top - cRect.top - 10), behavior: "smooth" });
     }
-  }, [messages]);
+  }, [messages.length]);
 
-  async function send(text: string, opts?: { hidden?: boolean }) {
-    const hidden = opts?.hidden === true;
+  /**
+   * Tell the server what the operator did. `optimistic` shows it at once;
+   * the server's answer (and the polling after it) replaces that.
+   */
+  async function post(body: Record<string, unknown>, optimistic?: (c: ConversationView) => ConversationView): Promise<boolean> {
+    const id = activeId;
+    if (!id) return false;
+    if (optimistic) {
+      setConv((c) =>
+        optimistic(
+          c ?? { id, title: "New chat", updatedAt: Date.now(), running: false, messages: [], campaignEvents: [], building: false, stopRequested: false },
+        ),
+      );
+    }
+    sendingRef.current = true;
+    setSending(true);
+    try {
+      const res = await fetch(`${base}/${id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = (await res.json().catch(() => null)) as { ok?: boolean; conversation?: ConversationView; error?: string } | null;
+      if (!res.ok || !data?.ok || !data.conversation) {
+        toast.error(data?.error ?? `Adonis couldn't do that (${res.status}).`);
+        return false;
+      }
+      if (activeIdRef.current === id) setConv(data.conversation);
+      void fetchList();
+      return true;
+    } catch {
+      toast.error("Couldn't reach Adonis. Check your connection and try again.");
+      return false;
+    } finally {
+      sendingRef.current = false;
+      setSending(false);
+      wakeRef.current?.();
+    }
+  }
+
+  function send(text: string) {
     // Name the attachments in the message itself. The id is the useful part:
     // it is what every tool that touches a picture or a document takes.
-    const attachLine = !hidden && attachments.length
-      ? attachments
-          .map((a) => `[Attached to the library: "${a.name}" — ${a.kind} #${a.id}]`)
-          .join("\n")
+    const attachLine = attachments.length
+      ? attachments.map((a) => `[Attached to the library: "${a.name}" — ${a.kind} #${a.id}]`).join("\n")
       : "";
     const q = [text.trim(), attachLine].filter(Boolean).join("\n\n");
     if (!q || busy || !activeId) return;
-    if (convsRef.current.find((c) => c.id === activeId)?.autopilot) return; // the server is building in this chat
-    if (!hidden) {
-      setInput("");
-      setAttachments([]);
-    }
-    const convId = activeId; // pin updates to THIS chat, even if the user switches
-    // DR2: a fresh turn supersedes any resume still polling for this same
-    // conversation (e.g. the user chose not to wait) — stop it so it can't
-    // later clobber the new turn's message with stale/unrelated run data.
-    resumeCancelRef.current[convId] = true;
-    const history = messages.map((m) => ({ role: m.role, content: m.content }));
-    const nextUser: ChatMessage = { role: "user", content: q, steps: [], artifacts: [], hidden };
-    const assistant: ChatMessage = { role: "assistant", content: "", steps: [], artifacts: [], pending: null };
+    setInput("");
+    setAttachments([]);
     scrollPending.current = true; // scroll this new question to the top on render
-    setConversations((prev) =>
-      prev.map((c) =>
-        c.id === convId
-          ? {
-              ...c,
-              title: c.messages.length === 0 ? q.slice(0, 48) : c.title,
-              messages: [...c.messages, nextUser, assistant],
-              updatedAt: Date.now(),
-            }
-          : c,
-      ),
-    );
-    setBusy(true);
-
-    const patch = (fn: (m: ChatMessage) => ChatMessage) =>
-      setConversations((prev) =>
-        prev.map((c) => {
-          if (c.id !== convId) return c;
-          const msgs = [...c.messages];
-          msgs[msgs.length - 1] = fn(msgs[msgs.length - 1]);
-          return { ...c, messages: msgs, updatedAt: Date.now() };
-        }),
-      );
-    // DR2: conversation-level patch (vs. `patch`'s last-message patch), used
-    // to set/clear `activeRunId` as the `run`/`done`/`error` frames arrive.
-    const patchConv = (fn: (c: Conversation) => Conversation) =>
-      setConversations((prev) => prev.map((c) => (c.id === convId ? fn(c) : c)));
-
-    try {
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        // DR1/DR2 (.superpowers/sdd/durableruns-design.md): a stable
-        // conversationId lets the specialist route (/api/agents/[key]/chat)
-        // group this turn's durable run under the same conversation DR2's
-        // resume flow keys off of. The Communication route
-        // (/api/assistant/chat) doesn't read this field at all — an unread
-        // extra body field is harmless there, so sending it unconditionally
-        // for both endpoints is safe.
-        body: JSON.stringify({ messages: [...history, { role: "user", content: q }], conversationId: convId }),
-      });
-      if (!res.ok || !res.body) {
-        patch((m) => ({ ...m, content: `Sorry — the assistant is unavailable (${res.status}).` }));
-        return;
-      }
-      const reader = res.body.getReader();
-      const dec = new TextDecoder();
-      let buf = "";
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
-        let idx: number;
-        while ((idx = buf.indexOf("\n\n")) >= 0) {
-          const raw = buf.slice(0, idx).replace(/^data: /, "");
-          buf = buf.slice(idx + 2);
-          if (!raw) continue;
-          let evt: { type: string; text?: string; name?: string; error?: string; actions?: PendingAction[]; runId?: string } & Partial<Artifact>;
-          try {
-            evt = JSON.parse(raw);
-          } catch {
-            continue;
-          }
-          if (evt.type === "run" && evt.runId) {
-            // DR1's leading frame: capture + persist this turn's run id on
-            // the conversation so a reload/navigate can resume it (DR2). The
-            // live render below is completely unaffected by this — it's
-            // purely bookkeeping for a future reconnect.
-            const runId = evt.runId;
-            patchConv((c) => ({ ...c, activeRunId: runId }));
-          } else if (evt.type === "confirm" && evt.actions?.length) {
-            // The assistant proposed one or more WRITE actions. Nothing has run —
-            // show an Approve/Cancel card; execution happens only on approve.
-            const actions = evt.actions;
-            patch((m) => ({
-              ...m,
-              steps: m.steps.map((s) => ({ ...s, done: true })),
-              pending: { actions, status: "awaiting" },
-            }));
-            // Campaign Engine Slice 1 (Task 6): a proposed create_campaign
-            // call is the only moment the full ordered asset list is ever
-            // visible client-side — seed (or replace) the progress-strip
-            // model from it. A no-op (returns null) for every other action,
-            // i.e. every non-campaign write in the app.
-            const planEvent = campaignPlanEventFromActions(actions);
-            if (planEvent) appendCampaignEvent(convId, planEvent);
-          } else if (evt.type === "text" && evt.text) {
-            // First token means tool work is done → mark all steps complete.
-            patch((m) => ({
-              ...m,
-              content: m.content + evt.text,
-              steps: m.steps.some((s) => !s.done) ? m.steps.map((s) => ({ ...s, done: true })) : m.steps,
-            }));
-          } else if (evt.type === "tool" && evt.name) {
-            const label = TOOL_LABEL[evt.name] ?? evt.name;
-            patch((m) =>
-              m.steps.some((s) => s.label === label)
-                ? m
-                : { ...m, steps: [...m.steps.map((s) => ({ ...s, done: true })), { label, done: false }] },
-            );
-          } else if (evt.type === "artifact" && evt.url && evt.filename && evt.label) {
-            const art = { url: evt.url, filename: evt.filename, label: evt.label };
-            patch((m) => ({ ...m, artifacts: [...m.artifacts, art] }));
-          } else if (evt.type === "error") {
-            patch((m) => ({ ...m, content: m.content + `\n\n_Error: ${evt.error}_` }));
-            // DR2: the turn ended (in error) — nothing left to resume.
-            patchConv((c) => ({ ...c, activeRunId: undefined }));
-          } else if (evt.type === "done") {
-            patch((m) => ({ ...m, steps: m.steps.map((s) => ({ ...s, done: true })) }));
-            // DR2: the turn ended normally — nothing left to resume. (Also
-            // reached, harmlessly, right after the `error` branch above on
-            // the AiCapError path, which sends both — clearing twice is a
-            // no-op.)
-            patchConv((c) => ({ ...c, activeRunId: undefined }));
-          }
-        }
-      }
-    } catch {
-      patch((m) => ({ ...m, content: m.content || "Sorry — something went wrong reaching the assistant." }));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function patchAt(convId: string, index: number, fn: (m: ChatMessage) => ChatMessage) {
-    setConversations((prev) =>
-      prev.map((c) => {
-        if (c.id !== convId) return c;
-        const msgs = [...c.messages];
-        if (!msgs[index]) return c;
-        msgs[index] = fn(msgs[index]);
-        return { ...c, messages: msgs, updatedAt: Date.now() };
-      }),
-    );
-  }
-
-  // Campaign Engine Slice 1 (Task 6): append one entry to a conversation's
-  // campaign-event log (see the `campaignEvents` doc comment on
-  // Conversation). A plain function declaration (hoisted), like patchAt
-  // above, so it's safe to call from resumeRun() even though that's defined
-  // earlier in this file — by the time either actually RUNS (both are
-  // invoked from effects/callbacks, never during the initial render), every
-  // const/function in this component body has already been initialised.
-  function appendCampaignEvent(convId: string, event: CampaignProgressEvent) {
-    setConversations((prev) =>
-      prev.map((c) => (c.id === convId ? { ...c, campaignEvents: [...(c.campaignEvents ?? []), event] } : c)),
-    );
-  }
-
-  async function approve(convId: string, index: number, actions: PendingAction[]) {
-    patchAt(convId, index, (m) => (m.pending ? { ...m, pending: { ...m.pending, status: "approving" } } : m));
-    try {
-      const res = await fetch("/api/assistant/execute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ actions: actions.map((a) => ({ name: a.name, input: a.input })) }),
-      });
-      const data = (await res.json().catch(() => null)) as
-        | { ok: boolean; results?: { name: string; ok: boolean; text: string; artifact?: Artifact }[]; error?: string }
-        | null;
-      if (!res.ok || !data?.ok || !data.results) {
-        patchAt(convId, index, (m) => ({
-          ...m,
-          content: m.content + `\n\n_Couldn't complete that (${data?.error ?? res.status})._`,
-          pending: m.pending ? { ...m.pending, status: "cancelled" } : m.pending,
-        }));
-        return;
-      }
-      const lines = data.results.map((r) => (r.ok ? humanResult(r.text) : `Failed: ${humanResult(r.text)}`)).join("\n\n");
-      const arts = data.results.flatMap((r) => (r.artifact ? [r.artifact] : []));
-      // Campaign Engine Slice 1 (Task 6): fold any executed campaign write's
-      // result into the progress-strip log — a no-op (returns null) for
-      // every non-campaign write, so this never affects any other tool.
-      for (const r of data.results) {
-        if (!r.ok) continue;
-        const progressEvent = campaignProgressEventFromResult(r.name, r.text);
-        if (progressEvent) appendCampaignEvent(convId, progressEvent);
-      }
-      patchAt(convId, index, (m) => ({
-        ...m,
-        content: m.content + (m.content ? "\n\n" : "") + lines,
-        artifacts: [...m.artifacts, ...arts],
-        pending: m.pending ? { ...m.pending, status: "approved" } : m.pending,
-      }));
-      // Hand the result back to Adonis so it carries on with the next step,
-      // the way a person would after hearing "approved". The Communication
-      // assistant answers one question at a time, so it isn't continued.
-      if (endpoint !== DEFAULT_ENDPOINT) {
-        setContinueQueue({ convId, text: continuationMessage(data.results, { auto: false, autopilot: false }) });
-      }
-    } catch {
-      patchAt(convId, index, (m) => ({
-        ...m,
-        content: m.content + "\n\n_Something went wrong running that._",
-        pending: m.pending ? { ...m.pending, status: "cancelled" } : m.pending,
-      }));
-    }
-  }
-
-  /**
-   * "Approve and build everything": hand the plan to the server, which runs
-   * it and keeps building every asset until it needs the operator — whether
-   * or not this page stays open (lib/agents/autopilot.ts). This chat then
-   * only follows the job (followJob).
-   */
-  async function startBuild(convId: string, index: number, actions: PendingAction[], resumeCampaignId?: number) {
-    const conv = convsRef.current.find((c) => c.id === convId);
-    if (!conv || conv.autopilot || busy) return;
-    const history = conv.messages.map((m) => ({ role: m.role, content: m.content }));
-    if (index >= 0) patchAt(convId, index, (m) => (m.pending ? { ...m, pending: { ...m.pending, status: "approving" } } : m));
-    const fail = (why: string) => {
-      if (index < 0) return void toast.error(`Couldn't start the build (${why}).`);
-      patchAt(convId, index, (m) => ({
-        ...m,
-        content: m.content + `\n\n_Couldn't start the build (${why})._`,
-        pending: m.pending ? { ...m.pending, status: "awaiting" } : m.pending,
-      }));
-    };
-    try {
-      const res = await fetch(endpoint.replace(/\/chat$/, "/autopilot"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          conversationId: convId,
-          messages: history,
-          actions: actions.map((a) => ({ name: a.name, input: a.input })),
-          campaignId: resumeCampaignId,
-        }),
-      });
-      const data = (await res.json().catch(() => null)) as { ok?: boolean; jobId?: string; error?: string } | null;
-      if (!res.ok || !data?.ok || !data.jobId) return fail(data?.error ?? String(res.status));
-      const jobId = data.jobId;
-      setConversations((prev) =>
-        prev.map((c) =>
-          c.id === convId
-            ? { ...c, autopilot: { jobId, anchor: index, base: c.messages.length, baseEvents: c.campaignEvents ?? [] }, updatedAt: Date.now() }
-            : c,
-        ),
-      );
-    } catch {
-      fail("network");
-    }
-  }
-
-  /** Rebuild the conversation's tail from where the server's job has got to. */
-  function applyJob(convId: string, jobId: string, view: AutopilotView) {
-    setConversations((prev) =>
-      prev.map((c) => {
-        const job = c.autopilot;
-        if (c.id !== convId || !job || job.jobId !== jobId) return c;
-        const msgs = c.messages.slice(0, job.base);
-        const events = [...job.baseEvents];
-        const card = msgs[job.anchor];
-        if (card && view.startResults && !job.startShown) {
-          const lines = view.startResults.map((r) => (r.ok ? humanResult(r.text) : `Failed: ${humanResult(r.text)}`)).join("\n\n");
-          const arts = view.startResults.flatMap((r) => (r.artifact ? [r.artifact] : []));
-          msgs[job.anchor] = {
-            ...card,
-            content: card.content + (card.content ? "\n\n" : "") + lines,
-            artifacts: [...card.artifacts, ...arts],
-            pending: card.pending ? { ...card.pending, status: "approved" } : card.pending,
-          };
-        }
-        for (const r of view.startResults ?? []) {
-          const e = r.ok ? campaignProgressEventFromResult(r.name, r.text) : null;
-          if (e) events.push(e);
-        }
-        const running = view.status === "running";
-        view.messages.forEach((jm, k) => {
-          const live = running && k === view.messages.length - 1;
-          msgs.push({
-            role: jm.role,
-            hidden: jm.hidden,
-            content: jm.content,
-            artifacts: jm.artifacts,
-            steps: jm.tools.map((n, t) => ({ label: TOOL_LABEL[n] ?? n, done: !live || t < jm.tools.length - 1 })),
-            pending: jm.pending ? { actions: jm.pending.actions, status: jm.pending.status } : null,
-          });
-          for (const r of jm.results ?? []) {
-            const e = r.ok ? campaignProgressEventFromResult(r.name, r.text) : null;
-            if (e) events.push(e);
-          }
-          if (jm.pending?.status === "awaiting") {
-            const e = campaignPlanEventFromActions(jm.pending.actions);
-            if (e) events.push(e);
-          }
-        });
-        if (!running && view.error && msgs.length) {
-          const last = msgs[msgs.length - 1];
-          msgs[msgs.length - 1] = { ...last, content: last.content + (last.content ? "\n\n" : "") + `_${view.error}_` };
-        }
-        return {
-          ...c,
-          messages: msgs,
-          campaignEvents: events,
-          autopilot: running ? { ...job, stopping: view.stopRequested, startShown: job.startShown || Boolean(view.startResults) } : undefined,
-          updatedAt: Date.now(),
-        };
-      }),
-    );
-  }
-
-  /** Poll a build job until it stops running; resumes after a reload or coming back to the page. */
-  async function followJob(convId: string, jobId: string) {
-    try {
-      for (;;) {
-        if (!aliveRef.current) return;
-        if (!convsRef.current.some((c) => c.id === convId && c.autopilot?.jobId === jobId)) return;
-        let view: AutopilotView | null = null;
-        try {
-          const res = await fetch(`/api/agents/autopilot/${jobId}`);
-          if (res.status === 404) {
-            setConversations((prev) => prev.map((c) => (c.id === convId && c.autopilot?.jobId === jobId ? { ...c, autopilot: undefined } : c)));
-            return;
-          }
-          if (res.ok) view = (await res.json()) as AutopilotView;
-        } catch {
-          /* a network blip: try again next tick */
-        }
-        if (view) {
-          applyJob(convId, jobId, view);
-          if (view.status !== "running") return;
-        }
-        await sleep(1500);
-      }
-    } finally {
-      followingRef.current.delete(jobId);
-    }
-  }
-
-  useEffect(() => {
-    if (!loaded) return;
-    for (const c of conversations) {
-      const jobId = c.autopilot?.jobId;
-      if (!jobId || followingRef.current.has(jobId)) continue;
-      followingRef.current.add(jobId);
-      void followJob(c.id, jobId);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded, conversations]);
-
-  async function stopBuild(convId: string) {
-    const job = convsRef.current.find((c) => c.id === convId)?.autopilot;
-    if (!job) return;
-    setConversations((prev) => prev.map((c) => (c.id === convId && c.autopilot ? { ...c, autopilot: { ...c.autopilot, stopping: true } } : c)));
-    await fetch(`/api/agents/autopilot/${job.jobId}/stop`, { method: "POST" }).catch(() => null);
-  }
-
-  function cancelPending(convId: string, index: number) {
-    patchAt(convId, index, (m) => ({
-      ...m,
-      content: m.content + (m.content ? "\n\n" : "") + "_Cancelled — nothing was changed._",
-      pending: m.pending ? { ...m.pending, status: "cancelled" } : m.pending,
+    void post({ type: "message", text: q }, (c) => ({
+      ...c,
+      running: true,
+      messages: [...c.messages, { role: "user", content: q, tools: [], artifacts: [] }, { role: "assistant", content: "", tools: [], artifacts: [] }],
     }));
   }
 
+  const markCard = (index: number, status: "approving" | "cancelled") => (c: ConversationView): ConversationView => ({
+    ...c,
+    messages: c.messages.map((m, i) => (i === index && m.pending ? { ...m, pending: { ...m.pending, status } } : m)),
+  });
+
+  function approve(index: number, all = false) {
+    void post({ type: "approve", index, all }, (c) => ({ ...markCard(index, "approving")(c), running: true, building: all }));
+  }
+  function cancelPending(index: number) {
+    void post({ type: "cancel", index }, markCard(index, "cancelled"));
+  }
   /**
    * Campaign Engine Slice 1 (Task 6): "Go again" on a campaign plan/asset
-   * Approve-card. Deliberately does NOT call /api/assistant/execute (that
-   * would run the write) — instead it closes this card (same terminal
-   * "cancelled" status cancelPending uses — nothing here was approved
-   * either) and sends a normal chat message down the EXISTING send() path,
-   * containing the literal words "Go again" Adonis's own
-   * playbook (specialists/orchestrator.ts) already anchors on. This was the
-   * simplest-reliable option from the task brief: zero new endpoint, zero
-   * new SSE frame type, reuses every bit of send()'s existing streaming/
-   * durable-run machinery untouched. Message construction (which asset,
-   * which campaign, quoting the tweak) lives in the pure
-   * campaignGoAgainMessage helper — see campaignProgress.ts.
+   * card. The server closes the card and sends Adonis a message carrying the
+   * words "Go again" its playbook anchors on (campaignGoAgainMessage).
    */
-  function goAgain(convId: string, index: number, actions: PendingAction[], tweak: string) {
-    const action = actions.find((a) => a.name === "create_campaign" || a.name === "approve_campaign_asset");
-    if (!action) return; // the button only ever renders when one of these is present
-    patchAt(convId, index, (m) => ({
-      ...m,
-      content: m.content + (m.content ? "\n\n" : "") + "_Asked for another draft…_",
-      pending: m.pending ? { ...m.pending, status: "cancelled" } : m.pending,
-    }));
-    void send(campaignGoAgainMessage(action, tweak));
+  function goAgain(index: number, tweak: string) {
+    void post({ type: "goAgain", index, tweak }, (c) => ({ ...markCard(index, "cancelled")(c), running: true }));
+  }
+  function buildRest(campaignId: number) {
+    void post({ type: "buildRest", campaignId }, (c) => ({ ...c, running: true, building: true }));
+  }
+  function stopBuild() {
+    void post({ type: "stop" }, (c) => ({ ...c, stopRequested: true }));
   }
 
   function newChat() {
-    if (busy) return;
     setHistoryOpen(false);
-    if (active && active.messages.length === 0) return; // already a fresh chat
-    const id = newId();
-    setConversations((prev) => [{ id, title: "New chat", messages: [], updatedAt: Date.now() }, ...prev]);
-    setActiveId(id);
+    if (!conv || conv.messages.length === 0) return; // already a fresh chat
+    setConv(null);
+    setActiveId(newId());
   }
   function openChat(id: string) {
-    setActiveId(id);
     setHistoryOpen(false);
+    if (id === activeId) return;
+    setConv(null);
+    setActiveId(id);
   }
   async function deleteChat(id: string) {
-    const target = conversations.find((c) => c.id === id);
+    const target = list.find((c) => c.id === id);
     if (
       !(await confirm({
         title: "Delete conversation?",
@@ -1074,27 +545,23 @@ export function AssistantChat({
     ) {
       return;
     }
-    const next = conversations.filter((c) => c.id !== id);
-    if (next.length === 0) {
-      const nid = newId();
-      setConversations([{ id: nid, title: "New chat", messages: [], updatedAt: Date.now() }]);
-      setActiveId(nid);
-    } else {
-      setConversations(next);
-      if (id === activeId) setActiveId(next[0].id);
+    const res = await fetch(`${base}/${id}`, { method: "DELETE" }).catch(() => null);
+    if (!res?.ok) {
+      toast.error("Adonis is still working in that chat. Delete it when it's finished.");
+      return;
+    }
+    const next = await fetchList();
+    if (id === activeId) {
+      setConv(null);
+      setActiveId(next[0]?.id ?? newId());
     }
   }
-  const historyList = [...conversations]
-    .filter((c) => c.messages.length > 0)
-    .sort((a, b) => b.updatedAt - a.updatedAt);
+  const historyList = list;
 
   const empty = messages.length === 0;
-  // Campaign Engine Slice 1 (Task 6): purely derived from this conversation's
-  // campaignEvents log (see the Conversation type's doc comment) — null on
-  // every chat that hasn't touched a campaign tool, which is the overwhelming
-  // majority (Sales/Operations/Communication chats, and most Marketing/
-  // Orchestrator turns too), so the strip below renders nothing for them.
-  const campaignProgress = deriveCampaignProgress(active?.campaignEvents ?? []);
+  // Campaign Engine Slice 1 (Task 6): derived from this conversation's
+  // campaign log — null on every chat that hasn't touched a campaign tool.
+  const campaignProgress = deriveCampaignProgress(conv?.campaignEvents ?? []);
   let lastAssistantIdx = -1;
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i].role === "assistant" && !messages[i].hidden) { lastAssistantIdx = i; break; }
@@ -1104,14 +571,12 @@ export function AssistantChat({
     if (messages[i].role === "user" && !messages[i].hidden) { lastUserIdx = i; break; }
   }
 
-  // History + New-chat controls — rendered inline in the header by default, or
-  // portaled into `controlsContainer` (e.g. /adonis's top bar) when provided.
   const controlsStrip = (
     <div style={{ marginLeft: controlsContainer ? 0 : "auto", display: "flex", gap: 2, position: "relative" }}>
       <Button variant="ghost" size="sm" onClick={() => setHistoryOpen((v) => !v)}>
         <History size={14} /> History{historyList.length ? ` (${historyList.length})` : ""}
       </Button>
-      <Button variant="ghost" size="sm" onClick={newChat} disabled={busy}>
+      <Button variant="ghost" size="sm" onClick={newChat}>
         <Plus size={14} /> New chat
       </Button>
       {historyOpen && (
@@ -1158,7 +623,10 @@ export function AssistantChat({
                     <div style={{ fontSize: 13, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {c.title || "Untitled"}
                     </div>
-                    <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{ago(c.updatedAt)}</div>
+                    <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>
+                      {ago(c.updatedAt)}
+                      {c.running && <span style={{ color: "var(--accent)" }}> · Working</span>}
+                    </div>
                   </div>
                   <Tooltip label="Delete chat">
                     <button
@@ -1209,15 +677,15 @@ export function AssistantChat({
         {controlsContainer && createPortal(controlsStrip, controlsContainer)}
       </div>
 
-      {active?.autopilot && (
+      {conv?.building && running && (
         <div className="ai-autopilot" role="status">
           <span>
-            {active.autopilot.stopping
+            {conv.stopRequested
               ? "Stopping after the step Adonis is on."
               : "Building every asset without stopping, even if you leave this page. Adonis will ask before launching, scheduling or sending anything."}
           </span>
-          {!active.autopilot.stopping && (
-            <button type="button" onClick={() => activeId && void stopBuild(activeId)}>
+          {!conv.stopRequested && (
+            <button type="button" onClick={stopBuild}>
               Stop after this one
             </button>
           )}
@@ -1242,33 +710,18 @@ export function AssistantChat({
             <div key={i} ref={i === lastUserIdx ? lastUserRef : undefined}>
               <MessageBubble
                 m={m}
-                // DR2: while `resumingConvId` is null (no resume in flight —
-                // the overwhelming common case, and the ONLY case for the
-                // Communication assistant) this is exactly the original
-                // `busy && i === messages.length - 1`, so the live-connected
-                // path renders byte-for-byte as before. It only additionally
-                // lights up for the last message while a reconnect poll is
-                // actively resuming THIS conversation, giving it the same
-                // "still working" affordance (thinking dots / caret) as a
-                // live stream.
-                streaming={(busy || building || resumingConvId === activeId) && i === messages.length - 1}
-                busy={busy || building}
-                onApprove={() => m.pending && approve(activeId, i, m.pending.actions)}
-                onApproveAll={
-                  endpoint === DEFAULT_ENDPOINT ? undefined : () => m.pending && void startBuild(activeId, i, m.pending.actions)
-                }
-                onCancel={() => cancelPending(activeId, i)}
-                onGoAgain={(tweak) => m.pending && goAgain(activeId, i, m.pending.actions, tweak)}
+                streaming={running && i === messages.length - 1}
+                busy={busy}
+                onApprove={() => approve(i)}
+                onApproveAll={() => approve(i, true)}
+                onCancel={() => cancelPending(i)}
+                onGoAgain={(tweak) => goAgain(i, tweak)}
               />
               {campaignProgress && i === lastAssistantIdx && (
                 <CampaignChecklist
                   progress={campaignProgress}
-                  working={busy || building}
-                  onBuildRest={
-                    endpoint !== DEFAULT_ENDPOINT && campaignProgress.campaignId !== null
-                      ? () => void startBuild(activeId, -1, [], campaignProgress.campaignId ?? undefined)
-                      : undefined
-                  }
+                  working={busy}
+                  onBuildRest={campaignProgress.campaignId !== null ? () => buildRest(campaignProgress.campaignId!) : undefined}
                 />
               )}
             </div>
@@ -1452,7 +905,7 @@ export function AssistantChat({
             }}
             rows={1}
             placeholder={placeholder}
-            disabled={busy || building}
+            disabled={busy}
             style={{
               flex: 1,
               resize: "none",
@@ -1529,9 +982,9 @@ export function AssistantChat({
         )}
         <Button
           onClick={() => send(input)}
-          disabled={busy || building || (!input.trim() && attachments.length === 0) || voice.state !== "idle"}
+          disabled={busy || (!input.trim() && attachments.length === 0) || voice.state !== "idle"}
         >
-          {busy || building ? <Loader2 size={15} className="spin" /> : <Send size={15} strokeWidth={2} />}
+          {busy ? <Loader2 size={15} className="spin" /> : <Send size={15} strokeWidth={2} />}
         </Button>
       </div>
       {composeFooter && (

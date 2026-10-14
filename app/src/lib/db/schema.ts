@@ -2894,26 +2894,25 @@ export const agentRuns = sqliteTable("agent_runs", {
 export type AgentRun = typeof agentRuns.$inferSelect;
 
 /**
- * One "Approve and build everything" job (lib/agents/autopilot.ts): the
- * server keeps taking turns and approving campaign assets after the operator
- * leaves the page; the chat polls this row to catch up.
+ * One Adonis conversation, held on the server (lib/agents/conversation.ts).
+ * The server runs its turns and carries on after approvals; the chat page
+ * only shows it. Per user: staff don't see each other's chats.
  */
-export const agentAutopilot = sqliteTable("agent_autopilot", {
-  id: text("id").primaryKey(),
-  conversationId: text("conversation_id").notNull(),
+export const agentConversations = sqliteTable("agent_conversations", {
+  id: text("id").primaryKey(), // made by the chat (crypto.randomUUID)
+  userId: integer("user_id").notNull(),
   agentKey: text("agent_key").notNull(),
-  status: text("status", { enum: ["running", "awaiting_approval", "done", "stopped", "error"] })
-    .notNull()
-    .default("running"),
+  title: text("title").notNull().default("New chat"),
+  messages: text("messages").notNull().default("[]"), // JSON ConvMessage[]
+  campaignEvents: text("campaign_events").notNull().default("[]"), // JSON CampaignProgressEvent[]
+  status: text("status", { enum: ["idle", "running"] }).notNull().default("idle"),
+  building: integer("building", { mode: "boolean" }).notNull().default(false), // "build everything" in progress
+  campaignId: integer("campaign_id"), // the campaign a build approves assets for
   stopRequested: integer("stop_requested", { mode: "boolean" }).notNull().default(false),
-  campaignId: integer("campaign_id"),
-  startResults: text("start_results"), // JSON AutopilotResult[] for the approval that started it
-  messages: text("messages").notNull().default("[]"), // JSON AutopilotMessage[]
-  error: text("error"),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().default(sql`(unixepoch() * 1000)`),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull().default(sql`(unixepoch() * 1000)`),
 });
-export type AgentAutopilot = typeof agentAutopilot.$inferSelect;
+export type AgentConversation = typeof agentConversations.$inferSelect;
 
 // ── Market Research P1 (Task 4): competitor watchlist + weekly metrics +
 // review sample + change feed ──────────────────────────────────────────────
