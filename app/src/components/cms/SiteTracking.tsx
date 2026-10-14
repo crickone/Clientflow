@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { rememberArrival } from "./arrivalClient";
 
 import {
   consentStorageKey,
@@ -105,6 +106,7 @@ export function SiteTracking({
   function decide(next: ConsentChoice) {
     try {
       window.localStorage.setItem(consentStorageKey(siteSlug), next);
+      if (next === "granted") rememberArrival();
     } catch {
       // Remembering failed, so they will be asked again. Honouring the
       // answer for this page view still matters more than the record of it.

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { verifyCheckoutToken } from "@/lib/offers/checkoutToken";
 import { startCheckout } from "@/lib/offers/checkout";
+import { parseArrival } from "@/lib/arrival";
 import { clientIp, rateLimit } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +15,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   const rl = rateLimit(`offer-checkout:${clientIp(req)}`, 20, 60 * 1000);
   if (!rl.ok) return NextResponse.json({ ok: false, error: "Too many tries. Please wait a minute." }, { status: 429 });
-  let body: { token?: unknown };
+  let body: { token?: unknown; arrival?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest) {
   }
   const claim = verifyCheckoutToken(String(body.token ?? ""));
   if (!claim) return NextResponse.json({ ok: false, error: "This page is out of date. Please refresh and try again." }, { status: 400 });
-  const r = await startCheckout(claim);
+  const r = await startCheckout(claim, parseArrival(body.arrival));
   if (!r.ok) return NextResponse.json(r, { status: 409 });
   return NextResponse.json(r);
 }

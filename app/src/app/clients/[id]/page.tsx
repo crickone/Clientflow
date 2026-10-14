@@ -51,6 +51,8 @@ import { liftRecords, listSessions, openSession } from "@/lib/workoutLog";
 import { ClientWorkoutLog } from "@/components/clients/ClientWorkoutLog";
 import { trainingOverview } from "@/lib/trainingOverview";
 import { ClientBodyScans } from "@/components/clients/ClientBodyScans";
+import { ClientJourney } from "@/components/clients/ClientJourney";
+import { getClientJourney } from "@/lib/clientJourney";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +65,7 @@ export default async function ClientProfile({
   const id = Number(params.id);
   const client = await getClient(id);
   if (!client) notFound();
+  const journey = getClientJourney(client.id);
   const [stats, appointments, sessions, packages, payments, therapyMap] =
     await Promise.all([
       getClientStats(id),
@@ -169,6 +172,7 @@ export default async function ClientProfile({
       <Tabs defaultValue="overview">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="journey">Journey</TabsTrigger>
           <TabsTrigger value="appointments">
             {vocab.bookings} ({appointments.length})
           </TabsTrigger>
@@ -261,6 +265,10 @@ export default async function ClientProfile({
               </div>
             </Card>
           )}
+        </TabsContent>
+
+        <TabsContent value="journey">
+          <ClientJourney events={journey} />
         </TabsContent>
 
         <TabsContent value="appointments">

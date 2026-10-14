@@ -2905,6 +2905,17 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     );
   `);
 
+  // How a person arrived the visit they got in touch (lib/arrival.ts): JSON on
+  // the lead, and on an online order until it becomes a lead. Additive.
+  for (const table of ["leads", "offer_orders"]) {
+    try {
+      const cols = sqlite.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+      if (!cols.find((c) => c.name === "arrival")) sqlite.exec(`ALTER TABLE ${table} ADD COLUMN arrival TEXT`);
+    } catch (err) {
+      console.error(`[db] ${table}.arrival migration failed:`, err);
+    }
+  }
+
   // Dashboard slice 2: stamp each event recorder's start date once.
   try {
     sqlite.exec(RECORDER_START_SQL);

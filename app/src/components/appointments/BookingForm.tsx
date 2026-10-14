@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { Client, Package, PackageTemplate, Therapy } from "@/lib/db/schema";
@@ -114,18 +114,30 @@ export function BookingForm({
     setPrice(t.defaultPriceEur);
   }, [therapyId, therapyById]);
 
-  // Fetch active packages for the client (filtered to the selected therapy)
-  // when paymentMethod = package.
+  // The client's active packages for the selected treatment. Fetched as soon
+  // as both are picked, so a prepaid session (e.g. one bought online) is used
+  // by default instead of charging for the treatment again -- which is how a
+  // Black Friday buyer got charged twice and showed as a repeat customer.
+  const methodChosen = useRef(Boolean(defaultVoucherCode));
   useEffect(() => {
-    if (paymentMethod !== "package" || !clientId || !therapyId) {
+    if (!clientId || !therapyId) {
       setActivePackages([]);
       return;
     }
     fetch(`/api/packages?clientId=${clientId}&therapyId=${therapyId}`)
       .then((r) => r.json())
-      .then((d: Package[]) => setActivePackages(d))
+      .then((d: Package[]) => {
+        const usable = (Array.isArray(d) ? d : []).filter((p) => p.totalSessions - p.sessionsUsed > 0);
+        setActivePackages(usable);
+        if (usable.length && !methodChosen.current) {
+          setPaymentMethod("package");
+          setPackageMode("existing");
+          setPackageId(usable[0].id);
+        }
+      })
       .catch(() => setActivePackages([]));
-  }, [paymentMethod, clientId, therapyId]);
+  }, [clientId, therapyId]);
+  const prepaidLeft = activePackages.reduce((n, p) => n + (p.totalSessions - p.sessionsUsed), 0);
 
   // Validate voucher code
   useEffect(() => {
@@ -536,6 +548,12 @@ export function BookingForm({
 
       <Card>
         <CardLabel>Payment</CardLabel>
+        {prepaidLeft > 0 && (
+          <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--text-secondary)" }}>
+            {prepaidLeft === 1 ? "This client has 1 prepaid session" : `This client has ${prepaidLeft} prepaid sessions`} for this treatment
+            {paymentMethod === "package" ? ", so this booking uses one and they aren't charged again." : ". Choose Package to use one instead of charging."}
+          </p>
+        )}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
           {(
             ["cash", "card", "package", "voucher", "bank_transfer"] as const
@@ -543,7 +561,10 @@ export function BookingForm({
             <button
               key={m}
               type="button"
-              onClick={() => setPaymentMethod(m)}
+              onClick={() => {
+                methodChosen.current = true;
+                setPaymentMethod(m);
+              }}
               style={{
                 padding: "8px 16px",
                 fontSize: 13,

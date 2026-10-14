@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { parseArrival } from "@/lib/arrival";
 import { getCampaign } from "@/lib/campaigns/store";
 import { isHoneypotTripped, validateSignup } from "@/lib/campaigns/signup";
 import { verifyCampaignSignupToken } from "@/lib/campaigns/signupToken";
@@ -140,6 +141,7 @@ export async function POST(req: NextRequest) {
       email: email || null,
       phone: phone || null,
       notes: message || null,
+      arrival: parseArrival(bodyObj.arrival),
     });
 
     return { ok: true } as const;

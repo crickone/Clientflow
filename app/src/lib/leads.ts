@@ -15,6 +15,8 @@ import type { StageRole } from "./pipeline/roles";
 
 export type LeadStatus = "new" | "contacted" | "replied" | "booked" | "lost";
 
+import type { Arrival } from "@/lib/arrival";
+
 export interface NormalizedLeadInput {
   source?: string;
   sourceLeadId?: string | null;
@@ -27,6 +29,8 @@ export interface NormalizedLeadInput {
   therapyInterest?: string | null;
   notes?: string | null;
   rawPayload?: unknown;
+  /** How they arrived the visit they got in touch (lib/arrival.ts). Kept on create only. */
+  arrival?: Arrival | null;
   /** The board the lead enters. Omitted = the default pipeline. */
   pipelineId?: number | null;
   /** Who created the lead, for the stage history. Omitted = system. */
@@ -87,6 +91,7 @@ export function upsertLead(input: NormalizedLeadInput): {
       therapyInterest: nz(input.therapyInterest),
       notes: nz(input.notes),
       rawPayload: input.rawPayload ? JSON.stringify(input.rawPayload) : null,
+      arrival: input.arrival ? JSON.stringify(input.arrival) : null,
       pipelineId,
       stageId: resolveEntryStageId(pipelineId) ?? undefined,
     })

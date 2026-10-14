@@ -1,5 +1,6 @@
 "use client";
 
+import { readArrival } from "@/components/cms/arrivalClient";
 import { useState } from "react";
 
 // Mirrors lib/campaigns/signup.ts's MAX_FIELD_LEN/MAX_MESSAGE_LEN (that
@@ -80,7 +81,7 @@ export function SignupForm({ token }: Props) {
       const res = await fetch("/api/campaigns/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, arrival: readArrival() }),
       });
       const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
       if (!res.ok || !body.ok) {

@@ -1,4 +1,5 @@
 import "server-only";
+import { parseArrival } from "@/lib/arrival";
 import { eq, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
@@ -128,6 +129,7 @@ export async function fulfilCheckout(
         email,
         phone: phone || null,
         notes: `Bought ${offer?.title ?? "an offer"} online for ${formatEur(order.amountCents)}.`,
+        arrival: parseArrival(order.arrival),
       });
       db.update(leads).set({ clientId: client.id }).where(eq(leads.id, lead.id)).run();
       onPaymentRecorded(client.id);

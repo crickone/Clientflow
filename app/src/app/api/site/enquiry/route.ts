@@ -4,6 +4,7 @@ import { clientIp, rateLimit } from "@/lib/rateLimit";
 import { getTenantDbById, runWithTenant } from "@/lib/db/tenant";
 import { sites } from "@/lib/db/schema";
 import { appendLeadNotes, upsertLead } from "@/lib/leads";
+import { parseArrival } from "@/lib/arrival";
 import { logActivity } from "@/lib/queries";
 import { reopenLostLead } from "@/lib/pipeline/stage";
 import { verifySiteEnquiryToken, type SiteEnquiryClaim } from "@/lib/cms/enquiryToken";
@@ -132,6 +133,7 @@ export async function POST(req: Request) {
       email: data.email,
       phone: data.phone,
       notes: enquiryNotes(data, siteSlug),
+      arrival: parseArrival(fields.arrival),
     });
     // A lead the business had written off is put back on the board when the
     // person enquires again: they are asking to be contacted, so the card has

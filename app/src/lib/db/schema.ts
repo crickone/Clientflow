@@ -342,6 +342,8 @@ export const leads = sqliteTable("leads", {
   therapyInterest: text("therapy_interest"),
   notes: text("notes"),
   rawPayload: text("raw_payload"),
+  /** How they arrived the visit they got in touch: JSON Arrival (lib/arrival.ts), or null. */
+  arrival: text("arrival"),
   // Do-not-call: set when someone asks not to be phoned again. Checked by
   // lib/voice/dial.ts before every dial, and it is a HARD refusal — an opt-out
   // on a sales call is a legal obligation, not a preference, so it is a column
@@ -3356,6 +3358,8 @@ export const offerOrders = sqliteTable("offer_orders", {
   createdAt: integer("created_at").notNull(),
   paidAt: integer("paid_at"),
   refundedAt: integer("refunded_at"),
+  /** JSON Arrival from the checkout page, handed to the lead on payment. */
+  arrival: text("arrival"),
 });
 export type OfferOrder = typeof offerOrders.$inferSelect;
 

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Lock } from "lucide-react";
 
+import { readArrival } from "@/components/cms/arrivalClient";
+
 import { formatEur, savingLabel, type OfferState } from "@/lib/offers/model";
 
 export interface LandingOffer {
@@ -29,7 +31,7 @@ export const CLOSED: Partial<Record<OfferState, string>> = {
 /** Ask for a Stripe Checkout page and go there; returns an error message if it can't. */
 export async function goToCheckout(token: string): Promise<string | null> {
   try {
-    const res = await fetch("/api/offers/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token }) });
+    const res = await fetch("/api/offers/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token, arrival: readArrival() }) });
     const r = (await res.json().catch(() => null)) as { ok?: boolean; url?: string; error?: string } | null;
     if (r?.ok && r.url) {
       window.location.assign(r.url);

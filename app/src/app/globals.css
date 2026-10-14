@@ -4846,3 +4846,18 @@ a.stat-row:hover .stat-label { color: var(--text-primary); }
 .pl-settings-name { display: flex; gap: 8px; align-items: center; flex: 1 1 280px; }
 .pl-settings-name > :first-child { flex: 1; }
 .pl-settings-note { font-size: 12.5px; color: var(--text-tertiary); }
+/* Client journey timeline (/clients/[id], Journey tab) */
+.cj { list-style: none; margin: 0; padding: 0; display: grid; gap: 22px; max-width: 760px; }
+.cj-date { margin: 0 0 10px; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; color: var(--text-tertiary); text-transform: uppercase; }
+.cj-events { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; position: relative; }
+.cj-events::before { content: ""; position: absolute; left: 14px; top: 14px; bottom: 14px; width: 1px; background: var(--hairline); }
+.cj-event { display: flex; gap: 14px; padding: 6px 0; position: relative; }
+.cj-icon { width: 29px; height: 29px; flex-shrink: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--surface-2); border: 1px solid var(--hairline); color: var(--text-secondary); position: relative; z-index: 1; }
+.cj-event[data-kind="first-contact"] .cj-icon, .cj-event[data-kind="purchase"] .cj-icon { background: var(--accent-soft); color: var(--text-primary); border-color: var(--hairline-strong, var(--hairline)); }
+.cj-event[data-kind="treatment"] .cj-icon { background: var(--success-soft); color: var(--success); }
+.cj-event[data-kind="missed"] .cj-icon { background: var(--danger-soft); color: var(--danger); }
+.cj-body { min-width: 0; padding-top: 4px; display: grid; gap: 3px; }
+.cj-title { font-size: 13.5px; font-weight: 500; color: var(--text-primary); display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.cj-time { font-size: 11.5px; font-weight: 400; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.cj-detail { font-size: 12.5px; line-height: 1.55; color: var(--text-secondary); white-space: pre-line; overflow-wrap: anywhere; }
+.cj-empty { font-size: 13.5px; color: var(--text-tertiary); margin: 0; }

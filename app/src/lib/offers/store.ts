@@ -3,6 +3,7 @@ import { and, desc, eq, gt, inArray, or, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { offerOrders, offers, therapies, type Offer, type OfferOrder } from "@/lib/db/schema";
+import type { Arrival } from "@/lib/arrival";
 import { offerState, parseItems, remaining, type OfferInput, type OfferItem, type OfferState } from "./model";
 
 /** Offers and their orders, for the CURRENT tenant (ambient `db`). */
@@ -150,10 +151,18 @@ export function orderForPaymentIntent(pi: string): OfferOrder | null {
   return db.select().from(offerOrders).where(eq(offerOrders.paymentIntentId, pi)).get() ?? null;
 }
 
-export function createPendingOrder(o: Offer, accountId: string): OfferOrder {
+export function createPendingOrder(o: Offer, accountId: string, arrival: Arrival | null = null): OfferOrder {
   const [row] = db
     .insert(offerOrders)
-    .values({ offerId: o.id, stripeAccountId: accountId, amountCents: o.priceCents, currency: o.currency, status: "pending", createdAt: Date.now() })
+    .values({
+      offerId: o.id,
+      stripeAccountId: accountId,
+      amountCents: o.priceCents,
+      currency: o.currency,
+      status: "pending",
+      createdAt: Date.now(),
+      arrival: arrival ? JSON.stringify(arrival) : null,
+    })
     .returning()
     .all();
   return row;
