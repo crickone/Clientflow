@@ -2144,6 +2144,26 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     console.error("[db] lead_messages whatsapp-cols migration failed:", err);
   }
 
+  // "Approve and build everything" jobs (schema.ts agentAutopilot): the
+  // server-side loop that keeps building a campaign after the operator leaves
+  // the chat. Additive; idempotent.
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS agent_autopilot (
+      id              TEXT PRIMARY KEY,
+      conversation_id TEXT NOT NULL,
+      agent_key       TEXT NOT NULL,
+      status          TEXT NOT NULL DEFAULT 'running',
+      stop_requested  INTEGER NOT NULL DEFAULT 0,
+      campaign_id     INTEGER,
+      start_results   TEXT,
+      messages        TEXT NOT NULL DEFAULT '[]',
+      error           TEXT,
+      created_at      INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
+      updated_at      INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_autopilot_convo ON agent_autopilot(conversation_id, created_at);
+  `);
+
   // Daily follower snapshots for the Social dashboard (schema.ts socialFollowersDaily).
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS social_followers_daily (

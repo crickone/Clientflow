@@ -7,6 +7,7 @@ import { Sparkles, Send, Download, Loader2, Check, History, Plus, Trash2, Messag
 import { toast } from "sonner";
 import { EASE } from "@/lib/motion";
 import { humanResult, splitAttachments } from "@/components/messaging/chatText";
+import { continuationMessage, type AutopilotView } from "@/lib/agents/autopilotModel";
 
 
 import { Button } from "@/components/ui/Button";
@@ -68,37 +69,23 @@ type Conversation = {
    */
   campaignEvents?: CampaignProgressEvent[];
   /**
-   * The operator chose "Approve and build everything" on a campaign plan:
-   * each campaign asset's approval is given automatically until the kit is
-   * built. Launching, scheduling, sending and publishing still ask.
+   * The operator chose "Approve and build everything" on a campaign plan.
+   * The server builds the kit (lib/agents/autopilot.ts) whether or not this
+   * page stays open; the chat follows job `jobId` and shows what it adds
+   * after the first `base` messages. `anchor` is the plan's card; `baseEvents`
+   * the campaign log before the build. Launching, scheduling, sending and
+   * publishing still ask.
    */
-  autopilot?: boolean;
+  autopilot?: {
+    jobId: string;
+    anchor: number;
+    base: number;
+    baseEvents: CampaignProgressEvent[];
+    stopping?: boolean;
+    /** The plan card already shows what approving it did. */
+    startShown?: boolean;
+  };
 };
-
-/** Sent when a "build everything" turn ends without proposing the next step. */
-const AUTOPILOT_NUDGE =
-  "[Check from the app: the operator approved every campaign asset in advance, and that turn ended without proposing anything.] If you stopped on purpose because something needs the operator to decide (a draft you aren't happy with, a fact you need), say what in one or two lines and stop; the app hands it back to them. Otherwise: if a campaign asset is drafted but not approved, read its draft and propose approve_campaign_asset for it now; or draft the next asset, wait for and read the draft, then propose its approval in this same turn; or if every asset is approved, call get_campaign, list each in a line and propose launch_campaign.";
-
-/** The only writes "Approve and build everything" approves on the operator's behalf. */
-const AUTOPILOT_TOOLS = new Set(["approve_campaign_asset"]);
-
-/**
- * What the agent is told after an approval runs, so it carries on with the
- * next step instead of the turn simply ending.
- */
-function continuationMessage(
-  results: { name: string; ok: boolean; text: string }[],
-  o: { auto: boolean; autopilot: boolean },
-): string {
-  const lines = results.map((r) => `${r.name}: ${r.ok ? "done" : "failed"}. ${r.text.slice(0, 1200)}`).join("\n");
-  return [
-    o.auto ? "[Approved automatically: the operator approved every campaign asset in advance.]" : "[The operator approved that and it has run.]",
-    lines,
-    o.autopilot
-      ? "Carry on now with the next campaign asset, without stopping to ask: call draft_campaign_asset and wait for its result, read the draft yourself, then propose approve_campaign_asset for it in a later step of this same turn (never both calls at once). The app approves it for the operator. If the draft isn't good enough, redraft it first. When every asset is approved, call get_campaign and list each asset in a line from what it says (landing page headline, each email subject, each post's caption) so the operator can check them, then propose launch_campaign for them to approve; never schedule, send or publish without them."
-      : "Carry on with the next step now, without waiting to be asked. If it needs the operator's approval, propose it. If everything is finished, say so in one line.",
-  ].join("\n\n");
-}
 
 function newId(): string {
   try {
@@ -412,6 +399,8 @@ export function AssistantChat({
 
   const active = conversations.find((c) => c.id === activeId) ?? null;
   const messages = active?.messages ?? [];
+  // The server is building a campaign in this chat: the composer waits.
+  const building = Boolean(active?.autopilot);
 
   // After an approval runs, the result goes back to the agent so it carries
   // on (see approve()). Queued here and sent once the current turn is over.
@@ -426,14 +415,15 @@ export function AssistantChat({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [continueQueue, busy, activeId]);
 
-  // "Build everything" safety net: how many times in a row Adonis ended a
-  // turn without proposing the next approval (see the end of send()).
-  const nudgesRef = useRef<Record<string, number>>({});
-
-  function setAutopilot(convId: string, on: boolean) {
-    nudgesRef.current[convId] = 0;
-    setConversations((prev) => prev.map((c) => (c.id === convId ? { ...c, autopilot: on } : c)));
-  }
+  // "Approve and build everything" jobs this page is following (by job id).
+  const followingRef = useRef<Set<string>>(new Set());
+  const aliveRef = useRef(true);
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+    };
+  }, []);
 
   // Restore this account's history (survives navigation, reload + browser close).
   useEffect(() => {
@@ -441,7 +431,9 @@ export function AssistantChat({
       const raw = localStorage.getItem(storeKey);
       if (raw) {
         const parsed = JSON.parse(raw) as { conversations?: Conversation[]; activeId?: string };
-        const convs = Array.isArray(parsed.conversations) ? parsed.conversations : [];
+        const convs = (Array.isArray(parsed.conversations) ? parsed.conversations : []).map((c) =>
+          c.autopilot && typeof c.autopilot === "object" && typeof c.autopilot.jobId === "string" ? c : { ...c, autopilot: undefined },
+        );
         if (convs.length) {
           setConversations(convs);
           setActiveId(convs.some((c) => c.id === parsed.activeId) ? parsed.activeId! : convs[0].id);
@@ -663,6 +655,7 @@ export function AssistantChat({
       : "";
     const q = [text.trim(), attachLine].filter(Boolean).join("\n\n");
     if (!q || busy || !activeId) return;
+    if (convsRef.current.find((c) => c.id === activeId)?.autopilot) return; // the server is building in this chat
     if (!hidden) {
       setInput("");
       setAttachments([]);
@@ -674,9 +667,6 @@ export function AssistantChat({
     resumeCancelRef.current[convId] = true;
     const history = messages.map((m) => ({ role: m.role, content: m.content }));
     const nextUser: ChatMessage = { role: "user", content: q, steps: [], artifacts: [], hidden };
-    // Where this turn's reply lands, for an automatic approval of what it proposes.
-    const assistantIdx = (convsRef.current.find((c) => c.id === convId)?.messages.length ?? messages.length) + 1;
-    let proposed = null as PendingAction[] | null;
     const assistant: ChatMessage = { role: "assistant", content: "", steps: [], artifacts: [], pending: null };
     scrollPending.current = true; // scroll this new question to the top on render
     setConversations((prev) =>
@@ -753,7 +743,6 @@ export function AssistantChat({
             // The assistant proposed one or more WRITE actions. Nothing has run —
             // show an Approve/Cancel card; execution happens only on approve.
             const actions = evt.actions;
-            proposed = actions;
             patch((m) => ({
               ...m,
               steps: m.steps.map((s) => ({ ...s, done: true })),
@@ -802,26 +791,6 @@ export function AssistantChat({
     } finally {
       setBusy(false);
     }
-    // "Approve and build everything": approve a campaign asset for the
-    // operator as soon as it's proposed. Anything else still waits for them.
-    const auto = proposed;
-    if (convsRef.current.find((c) => c.id === convId)?.autopilot) {
-      if (auto && auto.every((a) => AUTOPILOT_TOOLS.has(a.name))) {
-        nudgesRef.current[convId] = 0;
-        setTimeout(() => void approve(convId, assistantIdx, auto, { auto: true }), 0);
-      } else if (!auto && hidden) {
-        // A continuation turn ended without proposing anything. Remind it
-        // once (it may have stopped on purpose, which the reminder lets it
-        // say), then hand back to the operator rather than stall silently.
-        const n = (nudgesRef.current[convId] ?? 0) + 1;
-        if (n <= 1) {
-          nudgesRef.current[convId] = n;
-          setContinueQueue({ convId, text: AUTOPILOT_NUDGE });
-        } else {
-          setAutopilot(convId, false);
-        }
-      }
-    }
   }
 
   function patchAt(convId: string, index: number, fn: (m: ChatMessage) => ChatMessage) {
@@ -849,8 +818,7 @@ export function AssistantChat({
     );
   }
 
-  async function approve(convId: string, index: number, actions: PendingAction[], opts?: { auto?: boolean; autopilot?: boolean }) {
-    const autopilot = opts?.autopilot ?? convsRef.current.find((c) => c.id === convId)?.autopilot === true;
+  async function approve(convId: string, index: number, actions: PendingAction[]) {
     patchAt(convId, index, (m) => (m.pending ? { ...m, pending: { ...m.pending, status: "approving" } } : m));
     try {
       const res = await fetch("/api/assistant/execute", {
@@ -862,7 +830,6 @@ export function AssistantChat({
         | { ok: boolean; results?: { name: string; ok: boolean; text: string; artifact?: Artifact }[]; error?: string }
         | null;
       if (!res.ok || !data?.ok || !data.results) {
-        setAutopilot(convId, false);
         patchAt(convId, index, (m) => ({
           ...m,
           content: m.content + `\n\n_Couldn't complete that (${data?.error ?? res.status})._`,
@@ -882,21 +849,17 @@ export function AssistantChat({
       }
       patchAt(convId, index, (m) => ({
         ...m,
-        content: m.content + (m.content ? "\n\n" : "") + (opts?.auto ? "_Approved automatically._\n\n" : "") + lines,
+        content: m.content + (m.content ? "\n\n" : "") + lines,
         artifacts: [...m.artifacts, ...arts],
         pending: m.pending ? { ...m.pending, status: "approved" } : m.pending,
       }));
       // Hand the result back to Adonis so it carries on with the next step,
       // the way a person would after hearing "approved". The Communication
       // assistant answers one question at a time, so it isn't continued.
-      const failed = data.results.some((r) => !r.ok);
-      const launched = data.results.some((r) => r.name === "launch_campaign");
-      if (failed || launched) setAutopilot(convId, false);
       if (endpoint !== DEFAULT_ENDPOINT) {
-        setContinueQueue({ convId, text: continuationMessage(data.results, { auto: opts?.auto === true, autopilot: autopilot && !failed && !launched }) });
+        setContinueQueue({ convId, text: continuationMessage(data.results, { auto: false, autopilot: false }) });
       }
     } catch {
-      setAutopilot(convId, false);
       patchAt(convId, index, (m) => ({
         ...m,
         content: m.content + "\n\n_Something went wrong running that._",
@@ -905,8 +868,156 @@ export function AssistantChat({
     }
   }
 
+  /**
+   * "Approve and build everything": hand the plan to the server, which runs
+   * it and keeps building every asset until it needs the operator — whether
+   * or not this page stays open (lib/agents/autopilot.ts). This chat then
+   * only follows the job (followJob).
+   */
+  async function startBuild(convId: string, index: number, actions: PendingAction[], resumeCampaignId?: number) {
+    const conv = convsRef.current.find((c) => c.id === convId);
+    if (!conv || conv.autopilot || busy) return;
+    const history = conv.messages.map((m) => ({ role: m.role, content: m.content }));
+    if (index >= 0) patchAt(convId, index, (m) => (m.pending ? { ...m, pending: { ...m.pending, status: "approving" } } : m));
+    const fail = (why: string) => {
+      if (index < 0) return void toast.error(`Couldn't start the build (${why}).`);
+      patchAt(convId, index, (m) => ({
+        ...m,
+        content: m.content + `\n\n_Couldn't start the build (${why})._`,
+        pending: m.pending ? { ...m.pending, status: "awaiting" } : m.pending,
+      }));
+    };
+    try {
+      const res = await fetch(endpoint.replace(/\/chat$/, "/autopilot"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversationId: convId,
+          messages: history,
+          actions: actions.map((a) => ({ name: a.name, input: a.input })),
+          campaignId: resumeCampaignId,
+        }),
+      });
+      const data = (await res.json().catch(() => null)) as { ok?: boolean; jobId?: string; error?: string } | null;
+      if (!res.ok || !data?.ok || !data.jobId) return fail(data?.error ?? String(res.status));
+      const jobId = data.jobId;
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === convId
+            ? { ...c, autopilot: { jobId, anchor: index, base: c.messages.length, baseEvents: c.campaignEvents ?? [] }, updatedAt: Date.now() }
+            : c,
+        ),
+      );
+    } catch {
+      fail("network");
+    }
+  }
+
+  /** Rebuild the conversation's tail from where the server's job has got to. */
+  function applyJob(convId: string, jobId: string, view: AutopilotView) {
+    setConversations((prev) =>
+      prev.map((c) => {
+        const job = c.autopilot;
+        if (c.id !== convId || !job || job.jobId !== jobId) return c;
+        const msgs = c.messages.slice(0, job.base);
+        const events = [...job.baseEvents];
+        const card = msgs[job.anchor];
+        if (card && view.startResults && !job.startShown) {
+          const lines = view.startResults.map((r) => (r.ok ? humanResult(r.text) : `Failed: ${humanResult(r.text)}`)).join("\n\n");
+          const arts = view.startResults.flatMap((r) => (r.artifact ? [r.artifact] : []));
+          msgs[job.anchor] = {
+            ...card,
+            content: card.content + (card.content ? "\n\n" : "") + lines,
+            artifacts: [...card.artifacts, ...arts],
+            pending: card.pending ? { ...card.pending, status: "approved" } : card.pending,
+          };
+        }
+        for (const r of view.startResults ?? []) {
+          const e = r.ok ? campaignProgressEventFromResult(r.name, r.text) : null;
+          if (e) events.push(e);
+        }
+        const running = view.status === "running";
+        view.messages.forEach((jm, k) => {
+          const live = running && k === view.messages.length - 1;
+          msgs.push({
+            role: jm.role,
+            hidden: jm.hidden,
+            content: jm.content,
+            artifacts: jm.artifacts,
+            steps: jm.tools.map((n, t) => ({ label: TOOL_LABEL[n] ?? n, done: !live || t < jm.tools.length - 1 })),
+            pending: jm.pending ? { actions: jm.pending.actions, status: jm.pending.status } : null,
+          });
+          for (const r of jm.results ?? []) {
+            const e = r.ok ? campaignProgressEventFromResult(r.name, r.text) : null;
+            if (e) events.push(e);
+          }
+          if (jm.pending?.status === "awaiting") {
+            const e = campaignPlanEventFromActions(jm.pending.actions);
+            if (e) events.push(e);
+          }
+        });
+        if (!running && view.error && msgs.length) {
+          const last = msgs[msgs.length - 1];
+          msgs[msgs.length - 1] = { ...last, content: last.content + (last.content ? "\n\n" : "") + `_${view.error}_` };
+        }
+        return {
+          ...c,
+          messages: msgs,
+          campaignEvents: events,
+          autopilot: running ? { ...job, stopping: view.stopRequested, startShown: job.startShown || Boolean(view.startResults) } : undefined,
+          updatedAt: Date.now(),
+        };
+      }),
+    );
+  }
+
+  /** Poll a build job until it stops running; resumes after a reload or coming back to the page. */
+  async function followJob(convId: string, jobId: string) {
+    try {
+      for (;;) {
+        if (!aliveRef.current) return;
+        if (!convsRef.current.some((c) => c.id === convId && c.autopilot?.jobId === jobId)) return;
+        let view: AutopilotView | null = null;
+        try {
+          const res = await fetch(`/api/agents/autopilot/${jobId}`);
+          if (res.status === 404) {
+            setConversations((prev) => prev.map((c) => (c.id === convId && c.autopilot?.jobId === jobId ? { ...c, autopilot: undefined } : c)));
+            return;
+          }
+          if (res.ok) view = (await res.json()) as AutopilotView;
+        } catch {
+          /* a network blip: try again next tick */
+        }
+        if (view) {
+          applyJob(convId, jobId, view);
+          if (view.status !== "running") return;
+        }
+        await sleep(1500);
+      }
+    } finally {
+      followingRef.current.delete(jobId);
+    }
+  }
+
+  useEffect(() => {
+    if (!loaded) return;
+    for (const c of conversations) {
+      const jobId = c.autopilot?.jobId;
+      if (!jobId || followingRef.current.has(jobId)) continue;
+      followingRef.current.add(jobId);
+      void followJob(c.id, jobId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, conversations]);
+
+  async function stopBuild(convId: string) {
+    const job = convsRef.current.find((c) => c.id === convId)?.autopilot;
+    if (!job) return;
+    setConversations((prev) => prev.map((c) => (c.id === convId && c.autopilot ? { ...c, autopilot: { ...c.autopilot, stopping: true } } : c)));
+    await fetch(`/api/agents/autopilot/${job.jobId}/stop`, { method: "POST" }).catch(() => null);
+  }
+
   function cancelPending(convId: string, index: number) {
-    setAutopilot(convId, false);
     patchAt(convId, index, (m) => ({
       ...m,
       content: m.content + (m.content ? "\n\n" : "") + "_Cancelled — nothing was changed._",
@@ -931,7 +1042,6 @@ export function AssistantChat({
   function goAgain(convId: string, index: number, actions: PendingAction[], tweak: string) {
     const action = actions.find((a) => a.name === "create_campaign" || a.name === "approve_campaign_asset");
     if (!action) return; // the button only ever renders when one of these is present
-    setAutopilot(convId, false);
     patchAt(convId, index, (m) => ({
       ...m,
       content: m.content + (m.content ? "\n\n" : "") + "_Asked for another draft…_",
@@ -1101,10 +1211,16 @@ export function AssistantChat({
 
       {active?.autopilot && (
         <div className="ai-autopilot" role="status">
-          <span>Building every asset without stopping. Adonis will ask before launching, scheduling or sending anything.</span>
-          <button type="button" onClick={() => activeId && setAutopilot(activeId, false)}>
-            Stop after this one
-          </button>
+          <span>
+            {active.autopilot.stopping
+              ? "Stopping after the step Adonis is on."
+              : "Building every asset without stopping, even if you leave this page. Adonis will ask before launching, scheduling or sending anything."}
+          </span>
+          {!active.autopilot.stopping && (
+            <button type="button" onClick={() => activeId && void stopBuild(activeId)}>
+              Stop after this one
+            </button>
+          )}
         </div>
       )}
 
@@ -1135,18 +1251,26 @@ export function AssistantChat({
                 // actively resuming THIS conversation, giving it the same
                 // "still working" affordance (thinking dots / caret) as a
                 // live stream.
-                streaming={(busy || resumingConvId === activeId) && i === messages.length - 1}
-                busy={busy}
+                streaming={(busy || building || resumingConvId === activeId) && i === messages.length - 1}
+                busy={busy || building}
                 onApprove={() => m.pending && approve(activeId, i, m.pending.actions)}
-                onApproveAll={() => {
-                  if (!m.pending) return;
-                  setAutopilot(activeId, true);
-                  void approve(activeId, i, m.pending.actions, { autopilot: true });
-                }}
+                onApproveAll={
+                  endpoint === DEFAULT_ENDPOINT ? undefined : () => m.pending && void startBuild(activeId, i, m.pending.actions)
+                }
                 onCancel={() => cancelPending(activeId, i)}
                 onGoAgain={(tweak) => m.pending && goAgain(activeId, i, m.pending.actions, tweak)}
               />
-              {campaignProgress && i === lastAssistantIdx && <CampaignChecklist progress={campaignProgress} working={busy || Boolean(active?.autopilot)} />}
+              {campaignProgress && i === lastAssistantIdx && (
+                <CampaignChecklist
+                  progress={campaignProgress}
+                  working={busy || building}
+                  onBuildRest={
+                    endpoint !== DEFAULT_ENDPOINT && campaignProgress.campaignId !== null
+                      ? () => void startBuild(activeId, -1, [], campaignProgress.campaignId ?? undefined)
+                      : undefined
+                  }
+                />
+              )}
             </div>
           ))}
 
@@ -1328,7 +1452,7 @@ export function AssistantChat({
             }}
             rows={1}
             placeholder={placeholder}
-            disabled={busy}
+            disabled={busy || building}
             style={{
               flex: 1,
               resize: "none",
@@ -1405,9 +1529,9 @@ export function AssistantChat({
         )}
         <Button
           onClick={() => send(input)}
-          disabled={busy || (!input.trim() && attachments.length === 0) || voice.state !== "idle"}
+          disabled={busy || building || (!input.trim() && attachments.length === 0) || voice.state !== "idle"}
         >
-          {busy ? <Loader2 size={15} className="spin" /> : <Send size={15} strokeWidth={2} />}
+          {busy || building ? <Loader2 size={15} className="spin" /> : <Send size={15} strokeWidth={2} />}
         </Button>
       </div>
       {composeFooter && (
@@ -1424,7 +1548,16 @@ export function AssistantChat({
  * done, spinning on the one Adonis is working on, empty for what's next.
  * Rendered under the latest reply, so it moves down the chat as work goes on.
  */
-function CampaignChecklist({ progress, working }: { progress: CampaignProgress; working: boolean }) {
+function CampaignChecklist({
+  progress,
+  working,
+  onBuildRest,
+}: {
+  progress: CampaignProgress;
+  working: boolean;
+  /** Finish a part-built campaign on the server, without stopping (shown when nothing is running). */
+  onBuildRest?: () => void;
+}) {
   const done = progress.assets.filter((a) => a.status === "done").length;
   const total = progress.assets.length;
   const finished = done === total;
@@ -1448,6 +1581,14 @@ function CampaignChecklist({ progress, working }: { progress: CampaignProgress; 
           </li>
         ))}
       </ol>
+      {!finished && !working && onBuildRest && (
+        <div className="ai-tasks-foot">
+          <Button size="sm" variant="secondary" onClick={onBuildRest}>
+            Build the rest
+          </Button>
+          <span>Approves each asset as it&rsquo;s written, even if you leave this page. Launching still asks you.</span>
+        </div>
+      )}
     </div>
   );
 }

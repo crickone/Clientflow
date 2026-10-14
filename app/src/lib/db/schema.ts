@@ -2893,6 +2893,28 @@ export const agentRuns = sqliteTable("agent_runs", {
 });
 export type AgentRun = typeof agentRuns.$inferSelect;
 
+/**
+ * One "Approve and build everything" job (lib/agents/autopilot.ts): the
+ * server keeps taking turns and approving campaign assets after the operator
+ * leaves the page; the chat polls this row to catch up.
+ */
+export const agentAutopilot = sqliteTable("agent_autopilot", {
+  id: text("id").primaryKey(),
+  conversationId: text("conversation_id").notNull(),
+  agentKey: text("agent_key").notNull(),
+  status: text("status", { enum: ["running", "awaiting_approval", "done", "stopped", "error"] })
+    .notNull()
+    .default("running"),
+  stopRequested: integer("stop_requested", { mode: "boolean" }).notNull().default(false),
+  campaignId: integer("campaign_id"),
+  startResults: text("start_results"), // JSON AutopilotResult[] for the approval that started it
+  messages: text("messages").notNull().default("[]"), // JSON AutopilotMessage[]
+  error: text("error"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull().default(sql`(unixepoch() * 1000)`),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull().default(sql`(unixepoch() * 1000)`),
+});
+export type AgentAutopilot = typeof agentAutopilot.$inferSelect;
+
 // ── Market Research P1 (Task 4): competitor watchlist + weekly metrics +
 // review sample + change feed ──────────────────────────────────────────────
 // `competitors` is the watchlist; site_id is reserved for future multi-site

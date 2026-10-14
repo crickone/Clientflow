@@ -3,12 +3,11 @@ import { type NextRequest } from "next/server";
 
 import { requireUser, getCurrentMembership } from "@/lib/auth";
 import { rateLimit } from "@/lib/rateLimit";
-import { TOOLS, type ToolArtifact } from "@/lib/assistant/tools";
+import { type ToolArtifact } from "@/lib/assistant/tools";
 import { AiCapError } from "@/lib/ai/usage";
 import { runWithTenant } from "@/lib/db/tenant";
-import { getAgent, parseDisabledTools } from "@/lib/agents/registry";
 import { composeAgentSystem } from "@/lib/agents/context";
-import { SPECIALISTS } from "@/lib/agents/specialists";
+import { resolveChatAgent } from "@/lib/agents/chatAgent";
 import { runAgentTurn, type PendingWrite } from "@/lib/agents/runAgentTurn";
 import { createRun, updateRunText, finishRun } from "@/lib/agents/runStore";
 
@@ -72,18 +71,11 @@ export async function POST(
     });
   }
 
-  // Gate: only an agent that is BOTH marked "active" in the registry AND has
-  // a SPECIALISTS entry (its tool slice + playbook) is reachable here.
-  // getAgent takes an explicit tenantId (not the ambient one) so this is safe
-  // to resolve before entering runWithTenant below. Any agent that's still
-  // "dormant" in AGENT_CATALOG (@/lib/agents/registry) 404s instead of
-  // silently running with no playbook/tool slice — same for a hypothetical
-  // active row with no matching SPECIALISTS entry (shouldn't happen, but
-  // fails closed).
+  // Gate + tool slice: see resolveChatAgent (also used by the "build
+  // everything" loop, so both run the same agent).
   const key = params.key;
-  const agent = getAgent(tenantId, key);
-  const spec = SPECIALISTS[key];
-  if (!agent || agent.status !== "active" || !spec) return new Response("Agent not available", { status: 404 });
+  const resolved = resolveChatAgent(tenantId, key);
+  if (!resolved) return new Response("Agent not available", { status: 404 });
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return new Response("AI is not configured (missing ANTHROPIC_API_KEY).", { status: 503 });
@@ -107,23 +99,7 @@ export async function POST(
       ? body.conversationId
       : crypto.randomUUID();
 
-  // Built in request scope; the async loop below uses only tenantId + these
-  // values. Unlike `system` (composed below, inside runWithTenant), this tool
-  // slice needs no ambient tenant state — it's a pure name-filter over the
-  // static TOOLS registry — so it's safe to compute here.
-  // Set<string> (not the inferred literal-union type): compared below against
-  // t.name, which is a plain `string` on the Anthropic.Tool type.
-  const allowed = new Set<string>(spec.toolNames); // per-agent tool slice
-  // Tool-access toggles (admin-editable on /agents/[key]): the operator can
-  // switch individual tools OFF for this agent. `disabled_tools` is the OFF
-  // set — drop those here so a disabled tool is fully absent from the agent's
-  // toolkit (it can't call it, and never sees it in the tool list). This is
-  // ACCESS control, upstream of and independent from the write-approval gate
-  // (WRITE_TOOLS): a still-enabled write tool is deferred for Approve exactly
-  // as before; a disabled tool simply isn't offered at all.
-  const disabled = new Set<string>(parseDisabledTools(agent.disabledTools));
-  const tools = TOOLS.filter((t) => allowed.has(t.name) && !disabled.has(t.name));
-  const model = agent.model; // registry model: Sonnet default, Opus if upgraded — never hardcoded
+  const { tools, model } = resolved;
 
   const encoder = new TextEncoder();
   const { readable, writable } = new TransformStream();
