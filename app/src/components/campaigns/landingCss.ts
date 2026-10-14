@@ -87,6 +87,16 @@ export const LANDING_CSS = `
 .cl-steps p{line-height:1.6;color:var(--cl-mute)}
 @media(max-width:760px){.cl-steps{grid-template-columns:1fr}}
 
+.cl-why h3{font-size:clamp(18px,1.7vw,21px)}
+.cl-strip{margin-bottom:clamp(8px,2vw,24px)}
+.cl-faqs{border-top:1px solid var(--cl-ink);max-width:860px}
+.cl-faq{border-bottom:1px solid var(--cl-line)}
+.cl-faq summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 0;cursor:pointer;font-size:clamp(16px,1.5vw,19px)}
+.cl-faq summary::-webkit-details-marker{display:none}
+.cl-faq-icon{flex-shrink:0;transition:transform .25s ease}
+.cl-faq[open] .cl-faq-icon{transform:rotate(45deg)}
+.cl-faq p{padding:0 0 22px;line-height:1.65;color:var(--cl-mute);max-width:68ch}
+@media(prefers-reduced-motion:reduce){.cl-faq-icon{transition:none}}
 .cl-ask{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:clamp(28px,5vw,72px);align-items:start}
 .cl-ask-form{background:var(--cl-soft);padding:clamp(20px,3vw,36px)}
 .cl-visit{display:grid;gap:6px;margin-top:26px;line-height:1.6}

@@ -1,4 +1,4 @@
-import { Phone } from "lucide-react";
+import { Phone, Plus } from "lucide-react";
 
 import { themeCss, type ThemeConfig } from "@/lib/theme";
 import type { ParsedLandingBody } from "@/lib/campaigns/assetBody";
@@ -61,6 +61,8 @@ export function CampaignLanding({ body, business, logoSrc, siteHead, theme, phot
   const headline = body.headline.trim() || businessName;
   const subhead = body.subhead.trim();
   const bullets = body.bullets.map((b) => b.trim()).filter(Boolean);
+  const benefits = body.benefits.slice(0, 3);
+  const faqs = body.faqs.slice(0, 5);
   const phone = business.phone.trim();
   const telHref = phone ? `tel:${phone.replace(/[^\d+]/g, "")}` : null;
   const email = business.email.trim();
@@ -151,6 +153,23 @@ export function CampaignLanding({ body, business, logoSrc, siteHead, theme, phot
             </section>
           )}
 
+          {benefits.length > 0 && (
+            <section className="cl-section" aria-labelledby="cl-why-h">
+              <div className="cl-section-head">
+                <p className="cl-eyebrow">Why {businessName}</p>
+                <h2 id="cl-why-h">What you get</h2>
+              </div>
+              <ul className="cl-steps cl-why">
+                {benefits.map((b) => (
+                  <li key={b.title}>
+                    <h3>{b.title}</h3>
+                    <p>{b.text}</p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           {strip.length >= 2 && (
             <div className={`cl-strip${strip.length === 2 ? " cl-strip--2" : ""}`} aria-hidden>
               {strip.map((src) => (
@@ -199,6 +218,26 @@ export function CampaignLanding({ body, business, logoSrc, siteHead, theme, phot
                   <p>{contact ? `To book, ${contact}.` : "Get in touch to book a time that suits you."}</p>
                 </li>
               </ol>
+            </section>
+          )}
+
+          {faqs.length > 0 && (
+            <section className="cl-section" aria-labelledby="cl-faq-h">
+              <div className="cl-section-head">
+                <p className="cl-eyebrow">Questions</p>
+                <h2 id="cl-faq-h">{selling ? "Before you buy" : "Good questions"}</h2>
+              </div>
+              <div className="cl-faqs">
+                {faqs.map((f) => (
+                  <details key={f.q} className="cl-faq">
+                    <summary>
+                      <span>{f.q}</span>
+                      <Plus size={18} aria-hidden className="cl-faq-icon" />
+                    </summary>
+                    <p>{f.a}</p>
+                  </details>
+                ))}
+              </div>
             </section>
           )}
 

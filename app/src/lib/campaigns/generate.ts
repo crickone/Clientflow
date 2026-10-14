@@ -14,7 +14,7 @@ import { getCampaignBuildModel } from "@/lib/campaigns/buildModel";
 import type { Campaign, CampaignAsset } from "@/lib/db/schema";
 
 import { adCopyPrompt, landingPagePrompt, offerPrompt, videoScriptPrompt } from "./prompts";
-import { parseLandingBody, type ParsedLandingBody } from "./assetBody";
+import { landingGaps, parseLandingBody, type ParsedLandingBody } from "./assetBody";
 
 /**
  * Per-asset generation dispatch (Campaign Engine Slice 1 + Slice 2) — turns a
@@ -91,21 +91,34 @@ Formatting:
 Output format:
 - Return ONLY the offer description. No heading, no preamble, no notes about the writing process.`;
 
-const LANDING_FORMAT_RULES = `You write landing-page copy for a marketing campaign, built around a specific offer — copy for a public page whose only job is to get a visitor to register their interest.
+const LANDING_FORMAT_RULES = `You write the copy for a campaign landing page: a short sales page on the business's own website, built around one offer. Every campaign page has the same fixed structure, and you fill each part of it.
+
+The page, top to bottom (the platform lays it out; you write the words):
+1. Hero: headline, subhead, and a button (ctaLabel) that takes the visitor to the prices.
+2. The prices and Buy buttons (the platform fills these from the offer; write nothing for them).
+3. "Why": exactly three benefits, each a short title and one sentence.
+4. Photographs (the platform picks them).
+5. "Good to know": 3 to 6 plain facts about the offer and the visit.
+6. "How it works" after buying (the platform writes it).
+7. Questions: 3 to 5 questions people ask before buying, each with a short answer.
+8. An enquiry form and the address (the platform adds them).
 
 Formatting:
-- Return ONLY a single JSON object — no markdown, no code fences, no preamble, no notes about the writing process.
-- Shape exactly: {"headline": string, "subhead": string, "bullets": string[], "ctaLabel": string, "metaTitle": string, "metaDescription": string}.
-- headline: short and punchy (under 60 characters).
-- subhead: one sentence expanding on the headline.
-- bullets: 3-5 short, concrete benefit statements grounded in the offer.
-- ctaLabel: always exactly "Sign up" — never a price, a booking action, or a guarantee.
-- metaTitle: search-engine page title, 60 characters or fewer, names the offer or business, compelling but never clickbait.
-- metaDescription: search-engine snippet, 155 characters or fewer, benefit-led, reads as a natural search-result snippet — not just a repeat of the headline.
-- Represent the campaign's offer faithfully — don't add discounts, guarantees, bonuses or deadlines the offer doesn't already state, and don't publish a specific standard price.
+- Return ONLY a single JSON object: no markdown, no code fences, no preamble, no notes.
+- Shape exactly: {"headline": string, "subhead": string, "ctaLabel": string, "benefits": [{"title": string, "text": string}], "bullets": string[], "faqs": [{"q": string, "a": string}], "metaTitle": string, "metaDescription": string}.
+- headline: under 60 characters. Says what the offer is, plainly (e.g. "20% off every massage this Black Friday"). No wordplay.
+- subhead: one sentence, under 160 characters, with the most useful facts (what, where, when).
+- ctaLabel: 2 to 4 words naming what the visitor picks, e.g. "Choose your massage" or "See prices". Never a price.
+- benefits: exactly 3. title 2 to 5 words; text one sentence of fact about this business or offer.
+- bullets: 3 to 6 short facts: what's included, how long sessions are, where it is and parking, who it's for. One fact each.
+- faqs: 3 to 5. Only questions you can answer from the offer and the business details you were given (when to use it by, how to book, where it is, how long a session takes, whether it can be a gift). Never invent a policy, price or fact; leave a question out rather than guess.
+- metaTitle: 50 to 60 characters: the service and the town, with the business name shortened at the end (e.g. "Black Friday Massage Offer Clonmel | Optimal Health").
+- metaDescription: 140 to 160 characters: names the service and town, states facts from the offer, and ends with an action ("Book online or call ...").
 
-Output format:
-- Return ONLY the JSON object described above. No heading, no preamble, no code fences, no notes about the writing process.`;
+The copy must read right for EVERY visitor: some see the prices and Buy buttons, others (who didn't come through the ad) see only an enquiry form. So never write "buy on this page", "at checkout" or "click below to buy", and never state a price.
+
+Plain copy: short factual sentences. No "X rather than Y", no "not just X", no poetic or punning lines, no warm filler, no exclamation marks, no emojis. Cut any sentence that states no fact.
+Represent the offer faithfully: don't add discounts, guarantees, bonuses or deadlines it doesn't state.`;
 
 const AD_COPY_FORMAT_RULES = `You write paid social ad copy (Facebook/Instagram) for a marketing campaign, built around a specific offer.
 
@@ -233,7 +246,19 @@ export async function generateAsset(
     }
 
     case "landing_page": {
-      const raw = await generateRaw(meter, LANDING_FORMAT_RULES, landingPagePrompt(campaign, tweak), model);
+      let raw = await generateRaw(meter, LANDING_FORMAT_RULES, landingPagePrompt(campaign, tweak), model);
+      // Every campaign page follows the same structure; a draft missing a
+      // part goes back once with what to fix.
+      const first = parseLandingBody(raw);
+      const gaps = first ? landingGaps(first) : ["valid JSON in the shape given"];
+      if (gaps.length) {
+        raw = await generateRaw(
+          meter,
+          LANDING_FORMAT_RULES,
+          `${landingPagePrompt(campaign, tweak)}\n\nYour last draft was missing: ${gaps.join(", ")}. Write the whole page again with every part.\n\nLast draft:\n${raw.slice(0, 6000)}`,
+          model,
+        );
+      }
       // parseLandingBody never throws; a model response it can't make sense
       // of at all (empty/non-JSON) falls back to a safe, honest default
       // rather than failing the draft outright — same "never 500 the
@@ -247,7 +272,9 @@ export async function generateAsset(
         headline: fallbackTitle,
         subhead: "",
         bullets: [],
-        ctaLabel: "Sign up",
+        benefits: [],
+        faqs: [],
+        ctaLabel: "See prices",
         metaTitle: fallbackTitle,
         metaDescription: campaign.offer || "",
       };

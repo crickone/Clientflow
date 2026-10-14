@@ -7,7 +7,7 @@
  */
 import assert from "node:assert/strict";
 
-import { parseSocialBody, parseEmailBody, parseLandingBody } from "./assetBody";
+import { parseSocialBody, parseEmailBody, parseLandingBody, landingGaps } from "./assetBody";
 
 let passed = 0;
 function check(name: string, cond: boolean) {
@@ -199,5 +199,39 @@ check(
   "parseLandingBody: empty string body returns null",
   parseLandingBody("") === null,
 );
+
+// ── the fixed landing structure (2026-10-14) ───────────────────────────────
+{
+  const full = parseLandingBody(
+    JSON.stringify({
+      headline: "20% off every massage this Black Friday",
+      subhead: "Every massage at Optimal Health in Clonmel, 1 November to 1 December.",
+      ctaLabel: "Choose your massage",
+      benefits: [
+        { title: "Trained therapists", text: "Every massage is given by a qualified therapist." },
+        { title: "Free parking", text: "There is free parking on site." },
+        { title: "Fourteen treatments", text: "From a 30-minute back massage to Pamper Yourself." },
+        { title: "", text: "dropped: no title" },
+      ],
+      bullets: ["Sessions are 30, 60 or 90 minutes", "Unit 12m, Ard Gaoithe Business Park", "Book by phone"],
+      faqs: [
+        { q: "When do I use it by?", a: "By 31 January 2027." },
+        { q: "How do I book?", a: "Call 083 867 2844." },
+        { q: "Can I buy it as a gift?", a: "Yes, use their name when you book." },
+      ],
+      metaTitle: "Black Friday Massage Offer Clonmel | Optimal Health",
+      metaDescription: "20% off every massage at Optimal Health in Clonmel from 1 November to 1 December. Swedish, deep tissue, hot lava shells and more. Call 083 867 2844.",
+    }),
+  )!;
+  check("parseLandingBody: benefits with both parts come through", full.benefits.length === 3);
+  check("parseLandingBody: faqs come through", full.faqs.length === 3 && full.faqs[1].a === "Call 083 867 2844.");
+  check("landingGaps: a complete page has no gaps", landingGaps(full).length === 0);
+
+  const old = parseLandingBody(JSON.stringify({ headline: "H", subhead: "S", bullets: ["a", "b", "c"], ctaLabel: "Sign up", metaTitle: "T", metaDescription: "D" }))!;
+  check("parseLandingBody: an older page parses with no benefits or faqs", old.benefits.length === 0 && old.faqs.length === 0);
+  const gaps = landingGaps(old);
+  check("landingGaps: names what's missing", gaps.some((g) => g.startsWith("exactly 3 benefits")) && gaps.some((g) => g.startsWith("3 to 5 faqs")));
+  check("parseLandingBody: 'details' is read as the facts list too", parseLandingBody(JSON.stringify({ details: ["x", "y"] }))!.bullets.length === 2);
+}
 
 console.log(`\n${passed} passed`);

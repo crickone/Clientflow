@@ -236,7 +236,16 @@ function assetPreview(a: CampaignAsset): string {
   if (!raw) return "(not drafted yet)";
   if (a.kind === "landing_page") {
     const b = parseLandingBody(raw);
-    if (b) return `Headline: ${b.headline}${b.subhead ? ` / Subhead: ${b.subhead}` : ""}${b.bullets.length ? ` / ${b.bullets.length} points: ${b.bullets.slice(0, 5).join("; ")}` : ""}`;
+    if (b)
+      return [
+        `Headline: ${b.headline}`,
+        b.subhead && `Subhead: ${b.subhead}`,
+        b.benefits.length && `Benefits: ${b.benefits.map((x) => x.title).join("; ")}`,
+        b.bullets.length && `Good to know: ${b.bullets.slice(0, 6).join("; ")}`,
+        b.faqs.length && `Questions: ${b.faqs.map((x) => x.q).join("; ")}`,
+      ]
+        .filter(Boolean)
+        .join(" / ");
   }
   if (a.kind === "email") {
     const b = parseEmailBody(raw);

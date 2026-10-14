@@ -63,7 +63,12 @@ export interface ParsedEmailBody {
 export interface ParsedLandingBody {
   headline: string;
   subhead: string;
+  /** "Good to know": 3-6 plain facts about the offer and the visit. */
   bullets: string[];
+  /** "Why" section: exactly three reasons, each a short title and one sentence. Empty on pages written before 2026-10-14. */
+  benefits: { title: string; text: string }[];
+  /** Questions people ask before buying, answered from the offer and the business's own facts. Empty on older pages. */
+  faqs: { q: string; a: string }[];
   ctaLabel: string;
   /** Search-engine page title (≤60 chars), rendered into <title>/og:title/
    *  twitter:title by the landing route's generateMetadata. Defaults to ""
@@ -167,14 +172,41 @@ export function parseLandingBody(raw: string): ParsedLandingBody | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
 
   const obj = value as Record<string, unknown>;
-  const bullets = Array.isArray(obj.bullets) ? obj.bullets.map((b: unknown) => asString(b)) : [];
+  const list = (v: unknown) => (Array.isArray(v) ? v : []);
+  const pairs = <A extends string, B extends string>(v: unknown, a: A, b: B) =>
+    list(v)
+      .map((x) => (x && typeof x === "object" ? (x as Record<string, unknown>) : {}))
+      .map((x) => ({ [a]: asString(x[a]).trim(), [b]: asString(x[b]).trim() }) as Record<A | B, string>)
+      .filter((x) => x[a] && x[b]);
+  const bullets = list(obj.bullets ?? obj.details).map((b: unknown) => asString(b));
 
   return {
     headline: asString(obj.headline),
     subhead: asString(obj.subhead),
     bullets,
+    benefits: pairs(obj.benefits, "title", "text"),
+    faqs: pairs(obj.faqs, "q", "a"),
     ctaLabel: asString(obj.ctaLabel),
     metaTitle: asString(obj.metaTitle),
     metaDescription: asString(obj.metaDescription),
   };
+}
+
+/**
+ * What a landing page's copy is missing against the fixed structure every
+ * campaign page follows (CampaignLanding): hero, three reasons, good to
+ * know, questions, and the search snippet. Empty means complete. Used to
+ * send the draft back once with what to fix (lib/campaigns/generate.ts).
+ */
+export function landingGaps(b: ParsedLandingBody): string[] {
+  const gaps: string[] = [];
+  if (!b.headline.trim()) gaps.push("a headline");
+  if (!b.subhead.trim()) gaps.push("a subhead");
+  if (b.benefits.length !== 3) gaps.push(`exactly 3 benefits (got ${b.benefits.length})`);
+  const facts = b.bullets.filter((x) => x.trim()).length;
+  if (facts < 3 || facts > 6) gaps.push(`3 to 6 bullets (got ${facts})`);
+  if (b.faqs.length < 3 || b.faqs.length > 5) gaps.push(`3 to 5 faqs (got ${b.faqs.length})`);
+  if (!b.metaTitle.trim()) gaps.push("a metaTitle");
+  if (!b.metaDescription.trim()) gaps.push("a metaDescription");
+  return gaps;
 }

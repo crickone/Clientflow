@@ -249,6 +249,8 @@ function resolveCampaignLanding(
       headline: campaign.name,
       subhead: "",
       bullets: [],
+      benefits: [],
+      faqs: [],
       ctaLabel: "Sign up",
       metaTitle: "",
       metaDescription: "",

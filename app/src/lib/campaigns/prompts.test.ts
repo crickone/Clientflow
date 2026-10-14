@@ -70,13 +70,13 @@ for (const [name, build] of builders) {
   check(`${name}: includes the tweak when passed`, tweaked.includes(tweak));
 }
 
-// landingPagePrompt-specific: the CTA is fixed to "Sign up" — never a price,
-// booking action, or guarantee (the landing page captures a lead, it
-// doesn't transact). It also instructs the model to produce SEO meta copy
-// (metaTitle/metaDescription) alongside the landing copy itself.
+// landingPagePrompt-specific: every landing page follows one fixed structure
+// (hero, 3 benefits, good-to-know facts, questions, SEO meta), and the copy
+// must read right whether or not the visitor can see the prices.
 {
   const out = landingPagePrompt(campaign);
-  check('landingPagePrompt: states the CTA is "Sign up"', out.includes("Sign up"));
+  check("landingPagePrompt: asks for the fixed structure", out.includes("exactly 3 benefits") && out.includes("faqs") && out.includes("bullets"));
+  check("landingPagePrompt: copy must work without prices showing", out.includes("never say") && out.includes("at checkout"));
   check(
     "landingPagePrompt: instructs the model to also produce metaTitle + metaDescription",
     out.includes("metaTitle") && out.includes("metaDescription"),
