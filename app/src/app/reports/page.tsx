@@ -3,15 +3,17 @@ import { Card, CardLabel } from "@/components/ui/Card";
 import { RangePicker } from "@/components/reports/RangePicker";
 import { rangeFromKey } from "@/lib/reportsRange";
 import { ExportButton } from "@/components/reports/ExportButton";
-import { RevenueLine } from "@/components/charts/RevenueLine";
+import { RevenueCard } from "@/components/reports/RevenueCard";
 import { TherapyDonut } from "@/components/charts/TherapyDonut";
 import { StackedClients } from "@/components/charts/StackedClients";
 import { TopClients } from "@/components/charts/TopClients";
 import {
   attendanceStats,
+  cashReport,
   leadConversionByTherapy,
   newVsReturning,
   packageUtilization,
+  prepaidOutstanding,
   reportsSummary,
   revenueSeries,
   sessionsByTherapy,
@@ -33,7 +35,7 @@ export default async function ReportsPage({ searchParams }: Props) {
   const vocab = getVocab(getVenueType());
   const range = rangeFromKey(searchParams.range ?? "month");
 
-  const [revenue, donut, clientsBars, top, summary, attendance, pkgUtil, leadConv] =
+  const [revenue, donut, clientsBars, top, summary, attendance, pkgUtil, leadConv, cash] =
     await Promise.all([
       revenueSeries(range.start, range.end),
       sessionsByTherapy(range.start, range.end),
@@ -43,7 +45,9 @@ export default async function ReportsPage({ searchParams }: Props) {
       attendanceStats(range.start, range.end),
       packageUtilization(),
       leadConversionByTherapy(range.start, range.end),
+      cashReport(range.start, range.end),
     ]);
+  const prepaid = prepaidOutstanding();
 
   return (
     <div className="app-page">
@@ -73,11 +77,7 @@ export default async function ReportsPage({ searchParams }: Props) {
         }}
       >
         <Card>
-          <CardLabel>Revenue</CardLabel>
-          <RevenueLine
-            data={fillRange(revenue, range.start, range.end)}
-            height={260}
-          />
+          <RevenueCard cash={cash.days} earned={fillRange(revenue, range.start, range.end)} />
         </Card>
         <Card>
           <CardLabel>Sessions by {vocab.service.toLowerCase()}</CardLabel>
@@ -110,7 +110,14 @@ export default async function ReportsPage({ searchParams }: Props) {
           gap: 16,
         }}
       >
-        <Stat label="Total revenue" value={formatEur(summary.totalRevenue)} />
+        <Stat label="Cash taken" value={formatEur(cash.total)} detail="Every payment in this period" />
+        <Stat
+          label="Online sales"
+          value={formatEur(cash.onlineTotal)}
+          detail={cash.onlineCount === 0 ? "None in this period" : `${cash.onlineCount} paid ${cash.onlineCount === 1 ? "order" : "orders"} from campaign pages`}
+        />
+        <Stat label="Earned" value={formatEur(summary.totalRevenue)} detail="From sessions done" />
+        <Stat label="Prepaid, not yet used" value={formatEur(prepaid)} detail="Owed in sessions and vouchers, today" />
         <Stat label="Total sessions" value={String(summary.totalSessions)} />
         <Stat label="Avg session" value={formatEur(summary.avgSession)} />
         <Stat label="Most popular" value={summary.mostPopularTherapy ?? "—"} />
@@ -398,7 +405,7 @@ function BigStat({
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
     <Card>
       <CardLabel>{label}</CardLabel>
@@ -412,6 +419,7 @@ function Stat({ label, value }: { label: string; value: string }) {
       >
         {value}
       </div>
+      {detail && <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 4 }}>{detail}</div>}
     </Card>
   );
 }

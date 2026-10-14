@@ -4834,3 +4834,7 @@ a.stat-row:hover .stat-label { color: var(--text-primary); }
 @media (max-width: 640px) { .op-row { flex-wrap: wrap; gap: 8px 12px; } .op-row-main { min-width: 100%; } .op-row-price { min-width: 0; justify-content: flex-start; } .op-state { min-width: 0; } .op-row .op-switch { margin-left: auto; } .op-sched { padding: 12px; } .op-sched-facts { gap: 16px; } }
 @media (prefers-reduced-motion: reduce) { .op-switch, .op-switch span, .ch-asset-chev { transition: none; } }
 .op-state-gap { min-width: 84px; } @media (max-width: 640px) { .op-state-gap { display: none; } }
+/* Reports: revenue card switch */
+.rv-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
+.rv-head > :first-child { margin-bottom: 0; }
+.rv-seg { width: 220px; }

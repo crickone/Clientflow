@@ -1,12 +1,14 @@
 import "server-only";
 import { and, desc, eq, gte, inArray, like, lte, or, sql } from "drizzle-orm";
 import { db } from "./db";
+import { bucketByDay, dublinDay, rangeBoundsMs } from "./cashModel";
 import {
   activityLog,
   appointments,
   clients,
   giftVouchers,
   leads,
+  offerOrders,
   packages,
   payments,
   sessions,
@@ -279,38 +281,7 @@ export async function dashboardKpis() {
     )
     .get()?.s ?? 0;
 
-  const deferredFromPackages = db
-    .select({
-      s: sql<number>`coalesce(sum(
-        (${packages.totalSessions} - ${packages.sessionsUsed}) *
-        (${packages.pricePaidEur} * 1.0 / ${packages.totalSessions})
-      ),0)`,
-    })
-    .from(packages)
-    .where(
-      and(
-        eq(packages.isActive, true),
-        gte(packages.expiryDate, today),
-        sql`${packages.sessionsUsed} < ${packages.totalSessions}`,
-      ),
-    )
-    .get()?.s ?? 0;
-
-  // Use balance_eur (remaining), not value_eur — partial redemptions need
-  // to subtract what's already been used.
-  const deferredFromVouchers = db
-    .select({ s: sql<number>`coalesce(sum(${giftVouchers.balanceEur}),0)` })
-    .from(giftVouchers)
-    .where(
-      and(
-        eq(giftVouchers.isRedeemed, false),
-        gte(giftVouchers.expiryDate, today),
-        sql`${giftVouchers.balanceEur} > 0`,
-      ),
-    )
-    .get()?.s ?? 0;
-
-  const deferredRevenue = deferredFromPackages + deferredFromVouchers;
+  const deferredRevenue = prepaidOutstanding(today);
 
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 90);
@@ -398,6 +369,80 @@ export async function revenueByDay(days = 30) {
     out.push({ day: key, total: map.get(key) ?? 0 });
   }
   return out;
+}
+
+/**
+ * Money already taken for things not yet delivered, as of `today`: unused
+ * session credits (by what was paid per session) plus open vouchers. The
+ * dashboard's "Deferred revenue" and Reports' "Prepaid, not yet used".
+ */
+export function prepaidOutstanding(today: string = dublinDay(Date.now())): number {
+  const deferredFromPackages = db
+    .select({
+      s: sql<number>`coalesce(sum(
+        (${packages.totalSessions} - ${packages.sessionsUsed}) *
+        (${packages.pricePaidEur} * 1.0 / ${packages.totalSessions})
+      ),0)`,
+    })
+    .from(packages)
+    .where(
+      and(
+        eq(packages.isActive, true),
+        gte(packages.expiryDate, today),
+        sql`${packages.sessionsUsed} < ${packages.totalSessions}`,
+      ),
+    )
+    .get()?.s ?? 0;
+
+  // Use balance_eur (remaining), not value_eur — partial redemptions need
+  // to subtract what's already been used.
+  const deferredFromVouchers = db
+    .select({ s: sql<number>`coalesce(sum(${giftVouchers.balanceEur}),0)` })
+    .from(giftVouchers)
+    .where(
+      and(
+        eq(giftVouchers.isRedeemed, false),
+        gte(giftVouchers.expiryDate, today),
+        sql`${giftVouchers.balanceEur} > 0`,
+      ),
+    )
+    .get()?.s ?? 0;
+
+  return deferredFromPackages + deferredFromVouchers;
+}
+
+/**
+ * Money taken in a period, by Irish day: every recorded payment (desk,
+ * packages, vouchers and online sales alike), plus the online-sales part on
+ * its own (paid campaign orders). Beside reportsSummary's earned revenue,
+ * which only counts sessions done.
+ */
+export async function cashReport(startIso: string, endIso: string) {
+  const { from, to } = rangeBoundsMs(startIso, endIso);
+  const pays = db
+    .select({ at: payments.createdAt, amount: payments.amountEur })
+    .from(payments)
+    .where(and(gte(payments.createdAt, new Date(from)), lte(payments.createdAt, new Date(to))))
+    .all()
+    .map((r) => ({ at: r.at.getTime(), amount: r.amount }));
+  const days = bucketByDay(pays, startIso, endIso);
+  const orders = db
+    .select({ at: offerOrders.paidAt, cents: offerOrders.amountCents })
+    .from(offerOrders)
+    .where(and(eq(offerOrders.status, "paid"), gte(offerOrders.paidAt, from), lte(offerOrders.paidAt, to)))
+    .all()
+    .filter((o) => o.at !== null)
+    .map((o) => ({ at: o.at as number, amount: o.cents / 100 }));
+  const online = bucketByDay(orders, startIso, endIso);
+  return {
+    days,
+    total: Math.round(days.reduce((s, d) => s + d.total, 0) * 100) / 100,
+    onlineTotal: Math.round(online.reduce((s, d) => s + d.total, 0) * 100) / 100,
+    onlineCount: orders.filter((o) => {
+      const d = dublinDay(o.at);
+      return d >= startIso && d <= endIso;
+    }).length,
+  };
 }
 
 /* -------------------- reports -------------------- */
