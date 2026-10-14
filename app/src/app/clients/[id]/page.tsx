@@ -58,8 +58,10 @@ export const dynamic = "force-dynamic";
 
 export default async function ClientProfile({
   params,
+  searchParams,
 }: {
   params: { id: string };
+  searchParams?: { tab?: string };
 }) {
   const vocab = getVocab(getVenueType());
   const id = Number(params.id);
@@ -169,7 +171,7 @@ export default async function ClientProfile({
         </div>
       </div>
 
-      <Tabs defaultValue="overview">
+      <Tabs defaultValue={searchParams?.tab === "journey" ? "journey" : "overview"}>
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="journey">Journey</TabsTrigger>

@@ -35,6 +35,7 @@ import {
   setLeadStageAction,
 } from "@/app/leads/actions";
 import { formatDate, formatDateTime, relativeTime } from "@/lib/utils";
+import { describeArrival, parseArrival } from "@/lib/arrival";
 
 interface Props {
   lead: Lead;
@@ -677,7 +678,19 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
 
           <Card>
             <CardLabel>Lead detail</CardLabel>
-            <Row label="Source" value={lead.source} />
+            <Row label="Source" value={SOURCE_NAME[lead.source] ?? lead.source} />
+            {lead.campaign && <Row label="Campaign" value={lead.campaign} />}
+            {lead.arrival && <Row label="Arrived from" value={describeArrival(parseArrival(lead.arrival))} />}
+            {lead.clientId && (
+              <Row
+                label="Client"
+                value={
+                  <Link href={`/clients/${lead.clientId}?tab=journey`} style={{ color: "var(--accent)" }}>
+                    View their journey
+                  </Link>
+                }
+              />
+            )}
             {lead.sourceLeadId && (
               <Row
                 label="Source ID"
@@ -707,6 +720,17 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
     </>
   );
 }
+
+const SOURCE_NAME: Record<string, string> = {
+  offer: "Bought online",
+  landing: "Campaign page sign-up",
+  website: "Website enquiry",
+  facebook: "Facebook Lead Ad",
+  meta: "Facebook Lead Ad",
+  whatsapp: "WhatsApp",
+  manual: "Added by the team",
+  voice: "Phone call",
+};
 
 function Row({
   label,
