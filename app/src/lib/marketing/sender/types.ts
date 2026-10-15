@@ -48,7 +48,8 @@ export type CampaignSendResult = { ok: true; providerId: string } | { ok: false;
 
 export interface DomainStatus {
   state: "unverified" | "verified" | "failed";
-  dnsRecords: { type: string; name: string; value: string }[];
+  /** `valid`: whether the provider has seen this record in DNS (absent when it didn't say). */
+  dnsRecords: { type: string; name: string; value: string; valid?: boolean }[];
 }
 
 /**

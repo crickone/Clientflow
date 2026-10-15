@@ -102,7 +102,7 @@ function mapDnsRecords(raw: unknown): DomainStatus["dnsRecords"] {
     const name = rec.name;
     const value = rec.value;
     if (typeof type === "string" && typeof name === "string" && typeof value === "string") {
-      out.push({ type, name, value });
+      out.push(typeof rec.valid === "string" ? { type, name, value, valid: rec.valid === "valid" } : { type, name, value });
     }
   }
   return out;

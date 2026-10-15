@@ -11,11 +11,11 @@ export default async function SendingDomainsPage() {
   const domain = getSendingDomain(tenantId);
 
   return (
-    <div className="app-page" style={{ maxWidth: 720 }}>
+    <div className="app-page">
       <PageHeader
         eyebrow="Email marketing"
         title="Sending domain"
-        subtitle="Connect a domain to send campaigns from your own address instead of a shared one."
+        subtitle="The domain your email campaigns send from."
       />
       <DomainConnectCard domain={domain} />
     </div>
