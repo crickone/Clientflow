@@ -9,6 +9,10 @@ import { LogoutButton } from "@/components/clientapp/LogoutButton";
 import { MessagePrefs } from "@/components/clientapp/MessagePrefs";
 import { PushSetup } from "@/components/clientapp/PushSetup";
 import { getPrefs, vapidPublicKey } from "@/lib/push";
+import { DevicesList } from "@/components/clientapp/DevicesList";
+import { connectionsFor } from "@/lib/wearables/store";
+import { isProviderId, PROVIDER_NAME, PROVIDERS } from "@/lib/wearables/model";
+import { isProviderConfigured } from "@/lib/wearables/providers";
 import { businessContact } from "@/lib/agreements";
 import { consentsFor } from "@/lib/marketingConsent";
 import { CONSENT_CHANNELS, CONSENT_LABEL, consentStatement } from "@/lib/memberChoicesModel";
@@ -21,14 +25,25 @@ const STATUS: Record<string, { label: string; tone: "neutral" | "amber" | "green
   booked: { label: "Booked", tone: "neutral" },
 };
 
-export default async function ClientProfilePage() {
-  const { clientId, client } = requireClientPage();
+export default async function ClientProfilePage({ searchParams }: { searchParams: { device?: string; status?: string } }) {
+  const { clientId, client, tenantId } = requireClientPage();
   const m = clientMembership(clientId);
   const history = clientHistory(clientId, 12);
   const initials = `${client.firstName?.[0] ?? ""}${client.lastName?.[0] ?? ""}`.toUpperCase();
   const business = businessContact().name;
   const consents = consentsFor(clientId, client.email);
   const vapid = vapidPublicKey();
+  const conns = connectionsFor(tenantId, clientId);
+  const ago = (ms: number | null) => {
+    if (!ms) return null;
+    const m = Math.round((Date.now() - ms) / 60000);
+    return m < 2 ? "just now" : m < 60 ? `${m} minutes ago` : m < 1440 ? `${Math.round(m / 60)} hours ago` : `${Math.round(m / 1440)} days ago`;
+  };
+  const deviceRows = PROVIDERS.map((p) => {
+    const c = conns.find((x) => x.provider === p.id);
+    return { id: p.id, name: p.name, gives: p.gives, available: isProviderConfigured(p.id), connected: Boolean(c), syncedAgo: ago(c?.lastSyncAt ?? null), error: c?.lastError ?? null };
+  });
+  const flash = isProviderId(searchParams.device) && searchParams.status ? { name: PROVIDER_NAME[searchParams.device], status: searchParams.status } : null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -65,6 +80,13 @@ export default async function ClientProfilePage() {
           </Card>
         </div>
       )}
+
+      <div id="devices">
+        <SectionTitle>Devices</SectionTitle>
+        <Card style={{ padding: "4px 14px" }}>
+          <DevicesList rows={deviceRows} flash={flash} />
+        </Card>
+      </div>
 
       <div>
         <SectionTitle>Messages from {business}</SectionTitle>

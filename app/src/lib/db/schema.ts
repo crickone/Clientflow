@@ -828,6 +828,43 @@ export const gmailConnections = sqliteTable("gmail_connections", {
 // A tenant's connected Google Business Profile, plus Search Console and
 // Analytics from the same sign-in (lib/google/business). Control plane, one
 // per tenant, tokens ENCRYPTED. Mirrors the DDL in lib/db/control.ts.
+/** Control plane: a member's connected wearable, tokens encrypted (lib/wearables). */
+export const wearableConnections = sqliteTable("wearable_connections", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  tenantId: integer("tenant_id").notNull(),
+  clientId: integer("client_id").notNull(),
+  provider: text("provider", { enum: ["fitbit", "garmin", "oura", "whoop", "polar", "withings"] }).notNull(),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token"),
+  expiresAt: integer("expires_at"),
+  externalUserId: text("external_user_id"),
+  connectedAt: integer("connected_at").notNull(),
+  lastSyncAt: integer("last_sync_at"),
+  lastError: text("last_error"),
+});
+
+/** Tenant: one day of readings from one of a member's devices (lib/wearables/store.ts). */
+export const wearableDays = sqliteTable(
+  "wearable_days",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    clientId: integer("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(),
+    day: text("day").notNull(),
+    steps: integer("steps"),
+    activeKcal: integer("active_kcal"),
+    restingHr: integer("resting_hr"),
+    hrvMs: integer("hrv_ms"),
+    sleepMinutes: integer("sleep_minutes"),
+    sleepScore: integer("sleep_score"),
+    readiness: integer("readiness"),
+    weightKg: real("weight_kg"),
+    bodyFatPct: real("body_fat_pct"),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => ({ uniq: uniqueIndex("idx_wearable_days_uniq").on(t.clientId, t.provider, t.day) }),
+);
+
 export const googleBusinessConnections = sqliteTable("google_business_connections", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id")

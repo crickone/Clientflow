@@ -26,6 +26,8 @@ const PUBLIC_API_PREFIXES = [
   "/api/integrations/facebook/leadgen", // Facebook leadgen webhook — server-to-server, X-Hub-Signature-256-verified inside the route handler
   "/api/integrations/meta/data-deletion", // Meta data deletion callback: signed_request-verified inside the route handler
   "/api/integrations/meta/webhook", // Meta webhook (lead ads + Messenger + Instagram DMs) — X-Hub-Signature-256-verified inside the route handler
+  "/api/wearables/callback/", // wearable sign-in return (Fitbit, Oura...): trust is the sealed OAuth state, verified in the route
+  "/api/wearables/garmin/", // Garmin Health API push: path-secret-verified inside the route handler
   "/api/inbody/webhook/", // InBody (LookinBody Web) new-scan notification -- server-to-server, path-secret-verified inside the route handler
   "/api/voice/webhook", // ElevenLabs post-call webhook — server-to-server, HMAC-verified inside the route handler
   "/api/cron/", // self-authorizes via CRON_SECRET or an admin session

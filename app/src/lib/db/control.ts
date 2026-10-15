@@ -316,6 +316,26 @@ export function ensureControlTables() {
       created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000)
     );
 
+    -- A member's wearable (Fitbit, Garmin, Oura, Whoop, Polar, Withings),
+    -- connected from the client app (lib/wearables). Tokens ENCRYPTED. Kept
+    -- here, not per tenant, so a provider's push (Garmin) can find the member
+    -- by its own user id.
+    CREATE TABLE IF NOT EXISTS wearable_connections (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      client_id INTEGER NOT NULL,
+      provider TEXT NOT NULL,
+      access_token TEXT NOT NULL,
+      refresh_token TEXT,
+      expires_at INTEGER,
+      external_user_id TEXT,
+      connected_at INTEGER NOT NULL,
+      last_sync_at INTEGER,
+      last_error TEXT,
+      UNIQUE (tenant_id, client_id, provider)
+    );
+    CREATE INDEX IF NOT EXISTS idx_wearable_connections_ext ON wearable_connections(provider, external_user_id);
+
     -- A tenant's connected IMAP/SMTP mailbox (generic, non-Gmail). Password
     -- stored ENCRYPTED. Parallels gmail_connections above for businesses on a
     -- non-Google mailbox (e.g. Microsoft 365, cPanel/Hostinger hosted email).

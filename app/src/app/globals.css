@@ -5404,3 +5404,33 @@ textarea.ag-input { resize: vertical; line-height: 1.5; }
 .wl-next[data-change="up"] { background: var(--accent-soft); color: var(--text-primary); }
 .wl-next[data-change="up"] svg { color: var(--accent-ink); flex-shrink: 0; margin-top: 2px; }
 .wl-next b { color: var(--text-primary); }
+
+/* ── Wearables: devices list (client Profile) and the 7-day summary ── */
+.dv { display: grid; }
+.dv-flash { margin: 10px 0 4px; padding: 9px 12px; border-radius: 10px; background: var(--warning-soft); font-size: 13px; color: var(--text-primary); }
+.dv-flash[data-ok="true"] { background: var(--success-soft); }
+.dv-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--hairline); }
+.dv-row:first-of-type { border-top: 0; }
+.dv-icon { width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; background: var(--surface-2); color: var(--accent-ink); }
+.dv-text { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.dv-text b { font-size: 14px; color: var(--text-primary); }
+.dv-text span { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-tertiary); line-height: 1.4; }
+.dv-btn { display: inline-flex; align-items: center; min-height: 34px; padding: 0 14px; border-radius: 10px; background: var(--accent); color: var(--accent-contrast); font-size: 13px; font-weight: 600; text-decoration: none; flex-shrink: 0; }
+.dv-link { min-height: 34px; padding: 0 8px; border: 0; background: transparent; color: var(--text-tertiary); font: inherit; font-size: 12.5px; cursor: pointer; }
+.dv-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.dv-soon { font-size: 11.5px; color: var(--text-tertiary); flex-shrink: 0; }
+.dv-note { margin: 4px 0 12px; font-size: 12px; line-height: 1.5; color: var(--text-tertiary); }
+.wsum { display: grid; gap: 14px; }
+.wsum-empty { margin: 0; font-size: 13px; color: var(--text-tertiary); }
+.wsum-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
+.wsum-tiles div { display: grid; gap: 2px; }
+.wsum-tiles span { font-size: 11.5px; color: var(--text-tertiary); }
+.wsum-tiles b { font-size: 17px; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.wsum-bars { display: grid; gap: 6px; }
+.wsum-barlabel { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.wsum-cols { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.wsum-cols > div { display: grid; gap: 4px; justify-items: center; }
+.wsum-bar { display: flex; align-items: flex-end; width: 100%; height: 56px; border-radius: 6px; background: var(--surface-2); overflow: hidden; }
+.wsum-bar span { display: block; width: 100%; background: var(--accent); border-radius: 6px 6px 0 0; }
+.wsum-dow { font-size: 10.5px; color: var(--text-tertiary); }
+.wsum-note { font-size: 11.5px; color: var(--text-tertiary); }

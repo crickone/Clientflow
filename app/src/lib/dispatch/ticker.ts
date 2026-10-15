@@ -16,6 +16,7 @@ import { sweepLegacyUploads } from "@/lib/video/uploadSweep";
 import { listTenants } from "@/lib/tenants";
 import { dispatchDueBroadcasts } from "@/lib/whatsappBroadcasts";
 import { dispatchReminders } from "@/lib/reminders";
+import { syncWearablesIfStale } from "@/lib/wearables/store";
 
 /**
  * The dispatch ticker: everything that was booked for a time, sent when that
@@ -105,6 +106,8 @@ async function runTenant(tenantId: number, baseUrl: string, summary: DispatchSum
     } catch (err) {
       console.error(`[dispatch] tenant ${tenantId} nurture queue failed:`, err);
     }
+    // Members' wearables: each connection pulled at most hourly (Garmin pushes instead).
+    await syncWearablesIfStale(tenantId).catch((err) => console.error(`[dispatch] tenant ${tenantId} wearables failed:`, err));
     // Member reminders by push notification: classes, check-ins, habits
     // (a no-op until a member turns notifications on).
     try {

@@ -3,7 +3,10 @@ import { ChevronRight, ScanLine } from "lucide-react";
 
 import { requireClientPage } from "@/lib/clientAuth";
 import { trainingOverview } from "@/lib/trainingOverview";
-import { signed } from "@/lib/trainingProgress";
+import { dateKey, signed } from "@/lib/trainingProgress";
+import { connectionsFor, recentDays } from "@/lib/wearables/store";
+import { PROVIDER_NAME } from "@/lib/wearables/model";
+import { WearableSummary } from "@/components/clientapp/WearableSummary";
 import { formatSet } from "@/lib/workoutLogModel";
 import { bodyScansEnabled, getScanProfile, listClientScans } from "@/lib/inbody/scans";
 import { formatChange, formatMetric, METRIC_BY_KEY, type MetricKey } from "@/lib/inbody/metrics";
@@ -34,6 +37,7 @@ export default async function ProgressPage() {
   const strengthNow = t.strength.length ? t.strength[t.strength.length - 1].value : null;
   const tracked = t.lifts.filter((l) => l.sessions > 1);
   const thisWeek = t.weeks[t.weeks.length - 1];
+  const devices = connectionsFor(tenantId, clientId);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -81,6 +85,15 @@ export default async function ProgressPage() {
         </div>
         <WeekBars label="Workouts each week" weeks={t.weeks.map((w) => ({ weekStart: w.weekStart, value: w.workouts }))} />
       </Card>
+
+      {devices.length > 0 && (
+        <div style={{ display: "grid", gap: 10 }}>
+          <SectionTitle>From your {devices.length === 1 ? PROVIDER_NAME[devices[0].provider] : "devices"}</SectionTitle>
+          <Card>
+            <WearableSummary days={recentDays(tenantId, clientId, 14)} today={dateKey(Date.now())} />
+          </Card>
+        </div>
+      )}
 
       {scansOn && (
         <div style={{ display: "grid", gap: 10 }}>

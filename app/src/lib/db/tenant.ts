@@ -3030,6 +3030,23 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       checkins    INTEGER NOT NULL DEFAULT 1,
       habits      INTEGER NOT NULL DEFAULT 1
     );
+    CREATE TABLE IF NOT EXISTS wearable_days (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id     INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      provider      TEXT NOT NULL,
+      day           TEXT NOT NULL,
+      steps         INTEGER,
+      active_kcal   INTEGER,
+      resting_hr    INTEGER,
+      hrv_ms        INTEGER,
+      sleep_minutes INTEGER,
+      sleep_score   INTEGER,
+      readiness     INTEGER,
+      weight_kg     REAL,
+      body_fat_pct  REAL,
+      updated_at    INTEGER NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_wearable_days_uniq ON wearable_days(client_id, provider, day);
     CREATE TABLE IF NOT EXISTS client_measurements (
       client_id  INTEGER PRIMARY KEY REFERENCES clients(id) ON DELETE CASCADE,
       weight_kg  REAL NOT NULL,

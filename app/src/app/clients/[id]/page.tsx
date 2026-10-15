@@ -50,6 +50,9 @@ import { ClientForms } from "@/components/clients/ClientForms";
 import { clientHabitView } from "@/lib/habits";
 import { HabitGrid } from "@/components/clientapp/HabitGrid";
 import { dateKey } from "@/lib/trainingProgress";
+import { connectionsFor, recentDays } from "@/lib/wearables/store";
+import { PROVIDER_NAME, sleepLabel } from "@/lib/wearables/model";
+import { WearableSummary } from "@/components/clientapp/WearableSummary";
 import { pendingRequest } from "@/lib/cancellations";
 import { listCheckins } from "@/lib/checkins";
 import { consentsFor } from "@/lib/marketingConsent";
@@ -101,6 +104,9 @@ export default async function ClientProfile({
   const agreements = clientAgreementView(id);
   const memberForms = clientForms(id);
   const habitView = clientHabitView(id);
+  const tenantIdForDevices = membership?.tenant.id ?? 0;
+  const devices = connectionsFor(tenantIdForDevices, id);
+  const deviceDays = devices.length ? recentDays(tenantIdForDevices, id, 14) : [];
   const agreedAll = agreements.docs.every((d) => d.current);
   const cancelNotice = pendingRequest(id);
   const consents = consentsFor(id, client.email);
@@ -200,6 +206,7 @@ export default async function ClientProfile({
             </TabsTrigger>
           )}
           {habitView && <TabsTrigger value="habits">Habits</TabsTrigger>}
+          {devices.length > 0 && <TabsTrigger value="devices">Wearables</TabsTrigger>}
           <TabsTrigger value="app">Client app</TabsTrigger>
           {checkins.length > 0 && (
             <TabsTrigger value="checkins">
@@ -558,6 +565,44 @@ export default async function ClientProfile({
           </TabsContent>
         )}
 
+        {devices.length > 0 && (
+          <TabsContent value="devices">
+            <p className="cp-origin" style={{ marginBottom: 12 }}>
+              Connected: {devices.map((d) => `${PROVIDER_NAME[d.provider]}${d.lastError ? " (needs reconnecting)" : ""}`).join(", ")}
+            </p>
+            <div className="wb-grid">
+              <Card className="cp-card">
+                <CardLabel>Last 7 days</CardLabel>
+                <WearableSummary days={deviceDays} today={dateKey(Date.now())} />
+              </Card>
+              <Card style={{ padding: 0, overflow: "hidden" }}>
+                <table className="ib-table">
+                  <thead>
+                    <tr>
+                      <th>Day</th>
+                      <th>Steps</th>
+                      <th>Sleep</th>
+                      <th>Resting HR</th>
+                      <th>HRV</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...deviceDays].reverse().map((d) => (
+                      <tr key={d.day}>
+                        <td>{formatDate(d.day)}</td>
+                        <td>{d.steps?.toLocaleString("en-IE") ?? "-"}</td>
+                        <td>{sleepLabel(d.sleepMinutes)}</td>
+                        <td>{d.restingHr ?? "-"}</td>
+                        <td>{d.hrvMs ?? "-"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </Card>
+            </div>
+          </TabsContent>
+        )}
+
         <TabsContent value="app">
           <ClientAppAccess
             clientId={id}
@@ -688,7 +733,7 @@ export default async function ClientProfile({
   );
 }
 
-const TAB_KEYS = new Set(["journey", "appointments", "sessions", "packages", "payments", "messages", "email", "forms", "habits", "app", "checkins", "workouts", "scans"]);
+const TAB_KEYS = new Set(["journey", "appointments", "sessions", "packages", "payments", "messages", "email", "forms", "habits", "devices", "app", "checkins", "workouts", "scans"]);
 
 /** A count beside a tab name, only when there is something to count. */
 function Count({ n }: { n: number }) {
