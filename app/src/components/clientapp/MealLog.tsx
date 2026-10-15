@@ -212,7 +212,7 @@ export function MealLog({ day, today, meals, totals, target, source, goalHref, w
         <div className="ml-hint">
           {goalHref ? (
             <>
-              <Link href={goalHref} className="ml-hint-link">Pick a goal from your InBody scan</Link> to set your targets, or your coach adds a plan with calories.
+              <Link href={goalHref} className="ml-hint-link">Pick a goal</Link> to set your targets, or your coach adds a plan with calories.
             </>
           ) : (
             "Your targets show here once your coach adds a plan with calories."
@@ -226,7 +226,7 @@ export function MealLog({ day, today, meals, totals, target, source, goalHref, w
       )}
       {target && source?.kind === "plan" && goalHref && (
         <div className="ml-hint">
-          Target from your coach&rsquo;s plan. <Link href={goalHref} className="ml-hint-link">Pick a goal from your scan</Link> to use that instead.
+          Target from your coach&rsquo;s plan. <Link href={goalHref} className="ml-hint-link">Pick a goal</Link> to use that instead.
         </div>
       )}
 

@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { CalendarRange, ChevronRight, CreditCard, Dumbbell, Play, Salad, ScanLine, TrendingUp, Trophy } from "lucide-react";
+import { CalendarRange, ChevronRight, CreditCard, Dumbbell, Play, Salad, ScanLine, Target, TrendingUp, Trophy } from "lucide-react";
 
 import { requireClientPage } from "@/lib/clientAuth";
 import { clientDashboard, clientUpcoming } from "@/lib/clientApp";
 import { Card, dayLabel, euros, SectionTitle } from "@/components/clientapp/ui";
 import { dailyTarget, mealsForDay } from "@/lib/meals";
+import { goalTarget } from "@/lib/goals";
+import { GOAL_BY_KEY } from "@/lib/goalsModel";
 import { dayTotals, kcal } from "@/lib/mealsModel";
 import { bodyScansEnabled, getScanProfile, listClientScans } from "@/lib/inbody/scans";
 import { formatMetric } from "@/lib/inbody/metrics";
@@ -30,6 +32,7 @@ export default async function ClientHome() {
   const today = dateKey(Date.now());
   const mealsToday = dayTotals(mealsForDay(clientId, today));
   const mealTarget = dailyTarget(clientId);
+  const goal = goalTarget(clientId);
   const showTraining = t.programs.length > 0 || t.totalWorkouts > 0;
   const strengthNow = t.strength.length && t.lifts.some((l) => l.sessions > 1) ? t.strength[t.strength.length - 1].value : null;
   const muscle = latestScan && firstScan && latestScan !== firstScan ? formatChange("smm", latestScan.metrics.smm, firstScan.metrics.smm) : null;
@@ -193,6 +196,22 @@ export default async function ClientHome() {
               </div>
               <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
                 {d.membership ? `${euros(d.membership.priceCents)} · ${d.membership.status}` : "Ask your coach to set one up"}
+              </div>
+            </div>
+            <ChevronRight size={18} style={{ color: "var(--text-tertiary)" }} />
+          </div>
+        </Card>
+      </Link>
+
+      {/* goal */}
+      <Link href="/app/goal">
+        <Card>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={iconBox}><Target size={18} /></span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{goal ? `Goal: ${GOAL_BY_KEY[goal.goal.goal].label}` : "Set a goal"}</div>
+              <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
+                {goal ? `${goal.target.calories.toLocaleString("en-IE")} kcal a day, ${goal.target.protein} g protein` : "Drop body fat, maintain or build muscle: your calories and macros"}
               </div>
             </div>
             <ChevronRight size={18} style={{ color: "var(--text-tertiary)" }} />

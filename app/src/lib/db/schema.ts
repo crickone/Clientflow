@@ -3289,6 +3289,17 @@ export const clientGoals = sqliteTable("client_goals", {
   setAt: integer("set_at").notNull(),
 });
 
+/** Weight, height, age and sex a client typed into the app when they have no InBody scan (lib/goals.ts). */
+export const clientMeasurements = sqliteTable("client_measurements", {
+  clientId: integer("client_id").primaryKey().references(() => clients.id, { onDelete: "cascade" }),
+  weightKg: real("weight_kg").notNull(),
+  heightCm: real("height_cm").notNull(),
+  age: integer("age").notNull(),
+  sex: text("sex", { enum: ["male", "female"] }).notNull(),
+  pbf: real("pbf"),
+  enteredAt: integer("entered_at").notNull(),
+});
+
 export const workoutSessions = sqliteTable("workout_sessions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   clientId: integer("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),

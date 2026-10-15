@@ -91,7 +91,7 @@ export default async function ClientProfile({
   const showScans = membership ? bodyScansEnabled(membership.tenant.id) : false;
   const scans = showScans ? listClientScans(id) : [];
   const scanProfile = showScans ? getScanProfile(id) : null;
-  const clientGoal = showScans ? goalTarget(id) : null;
+  const clientGoal = goalTarget(id);
   const workoutSessions = listSessions(id, 60);
   const openWorkout = openSession(id);
   const showWorkoutLog = assignedWk.length > 0 || workoutSessions.length > 0 || openWorkout !== null;

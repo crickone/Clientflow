@@ -4,8 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2 } from "lucide-react";
 
-import { ACTIVITIES, GOALS, describeDelta, recommendAll, type ActivityKey, type GoalKey } from "@/lib/goalsModel";
-import type { Metrics } from "@/lib/inbody/metrics";
+import { ACTIVITIES, GOALS, describeDelta, recommendAll, type ActivityKey, type Body, type GoalKey } from "@/lib/goalsModel";
 import { clearGoalAction, setGoalAction } from "@/app/app/actions";
 
 /**
@@ -13,7 +12,7 @@ import { clearGoalAction, setGoalAction } from "@/app/app/actions";
  * the client from the scan's numbers (goalsModel, pure) so changing the
  * training days updates every card at once; choosing a card saves it.
  */
-export function GoalPicker({ metrics, current }: { metrics: Metrics; current: { goal: GoalKey; activity: ActivityKey } | null }) {
+export function GoalPicker({ metrics, current }: { metrics: Body; current: { goal: GoalKey; activity: ActivityKey } | null }) {
   const router = useRouter();
   const [activity, setActivity] = useState<ActivityKey>(current?.activity ?? "moderate");
   const [saving, setSaving] = useState<GoalKey | "clear" | null>(null);

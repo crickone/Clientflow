@@ -3,7 +3,6 @@ import { ChevronRight, Salad } from "lucide-react";
 
 import { requireClientPage } from "@/lib/clientAuth";
 import { assignedNutritionPlans } from "@/lib/clientApp";
-import { bodyScansEnabled } from "@/lib/inbody/scans";
 import { dailyCalories, dailyTarget, mealsForDay, targetSource } from "@/lib/meals";
 import { dayTotals } from "@/lib/mealsModel";
 import { dateKey } from "@/lib/trainingProgress";
@@ -22,7 +21,7 @@ function shiftDay(day: string, by: number) {
 
 /** What the client ate today (snapped or typed in), their target, and the plans their coach gave them. */
 export default async function ClientNutritionPage({ searchParams }: { searchParams: { day?: string } }) {
-  const { clientId, tenantId } = requireClientPage();
+  const { clientId } = requireClientPage();
   const today = dateKey(Date.now());
   const day = searchParams.day && /^\d{4}-\d{2}-\d{2}$/.test(searchParams.day) && searchParams.day <= today ? searchParams.day : today;
 
@@ -45,7 +44,7 @@ export default async function ClientNutritionPage({ searchParams }: { searchPara
   const totals = dayTotals(rows);
   const target = dailyTarget(clientId);
   const source = targetSource(clientId);
-  const goalHref = bodyScansEnabled(tenantId) ? "/app/goal" : null;
+  const goalHref = "/app/goal";
   const weekDays = Array.from({ length: 7 }, (_, i) => shiftDay(day, i - 6));
   const perDay = dailyCalories(clientId, weekDays[0], weekDays[6]);
   const week = weekDays.map((d) => ({ day: d, calories: Math.round(perDay[d] ?? 0) }));

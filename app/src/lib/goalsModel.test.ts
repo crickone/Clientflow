@@ -3,7 +3,7 @@
 // A goal picked from an InBody scan becomes a daily calorie and macro target.
 import assert from "node:assert/strict";
 
-import { bmrFrom, describeDelta, isActivityKey, isGoalKey, leanMass, recommend, recommendAll } from "./goalsModel";
+import { bmrFrom, bodyFromManual, describeDelta, isActivityKey, isGoalKey, leanMass, parseManualBody, recommend, recommendAll } from "./goalsModel";
 
 let passed = 0;
 function check(name: string, cond: boolean) {
@@ -44,5 +44,17 @@ check("macros add up to about the calories", Math.abs(all.build.protein * 4 + al
 
 check("keys are validated", isGoalKey("lose") && !isGoalKey("bulk") && isActivityKey("active") && !isActivityKey("none"));
 check("deltas read plainly", describeDelta(-500) === "-500 kcal a day" && describeDelta(250) === "+250 kcal a day" && describeDelta(0) === "your maintenance");
+
+// ── typed in, no scan ──
+const typed = parseManualBody({ weightKg: "82", heightCm: "180", age: "31", sex: "male", pbf: "" });
+check("typed numbers parse", typed.ok && typed.body.weightKg === 82 && typed.body.pbf === null);
+const m = bmrFrom(bodyFromManual((typed as { ok: true; body: import("./goalsModel").ManualBody }).body))!;
+check("without body fat, BMR is Mifflin-St Jeor", m.source === "mifflin" && m.bmr === Math.round(10 * 82 + 6.25 * 180 - 5 * 31 + 5));
+check("a woman's figure differs by the formula's constant", bmrFrom({ weight: 60, heightCm: 165, age: 28, sex: "female" })!.bmr === Math.round(600 + 1031.25 - 140 - 161));
+check("with body fat, lean mass wins over the formula", bmrFrom({ weight: 82, heightCm: 180, age: 31, sex: "male", pbf: 18 })!.source === "lean");
+check("typed numbers give all three options", recommendAll({ weight: 82, heightCm: 180, age: 31, sex: "male" }, "moderate") !== null);
+check("a silly weight is refused", !parseManualBody({ weightKg: "20", heightCm: "180", age: "31", sex: "male" }).ok);
+check("sex is required", !parseManualBody({ weightKg: "82", heightCm: "180", age: "31", sex: "" }).ok);
+check("body fat out of range is refused", !parseManualBody({ weightKg: "82", heightCm: "180", age: "31", sex: "male", pbf: "90" }).ok);
 
 console.log(`goalsModel: ${passed} checks passed`);

@@ -2941,6 +2941,15 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       activity   TEXT NOT NULL DEFAULT 'moderate',
       set_at     INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS client_measurements (
+      client_id  INTEGER PRIMARY KEY REFERENCES clients(id) ON DELETE CASCADE,
+      weight_kg  REAL NOT NULL,
+      height_cm  REAL NOT NULL,
+      age        INTEGER NOT NULL,
+      sex        TEXT NOT NULL,
+      pbf        REAL,
+      entered_at INTEGER NOT NULL
+    );
   `);
 
   // How a person arrived the visit they got in touch (lib/arrival.ts): JSON on

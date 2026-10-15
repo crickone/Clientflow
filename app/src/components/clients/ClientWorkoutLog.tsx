@@ -3,6 +3,7 @@ import type { TrainingOverview } from "@/lib/trainingOverview";
 import { signed, WEEKDAY_SHORT } from "@/lib/trainingProgress";
 import { TrendChart } from "@/components/bodyscans/TrendChart";
 import { WeekBars } from "@/components/progress/WeekBars";
+import { LiftProgress } from "@/components/clients/LiftProgress";
 import { durationLabel, formatSet, setsDone, volumeKg, type SessionView } from "@/lib/workoutLogModel";
 
 function day(ms: number) {
@@ -85,6 +86,8 @@ export function ClientWorkoutLog({
           )}
         </div>
       )}
+
+      {overview.lifts.length > 0 && <LiftProgress lifts={overview.lifts} />}
 
       {records.length > 0 && (
         <div className="bs-history">
