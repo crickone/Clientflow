@@ -1,10 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Mail, Pencil, Phone, Star } from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
+import { ArrowLeft, CalendarPlus, Pencil, Star } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardLabel } from "@/components/ui/Card";
-import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { DeleteClientButton } from "@/components/clients/DeleteClientButton";
@@ -46,6 +44,7 @@ import { ClientEmailPanel } from "@/components/clients/ClientEmailPanel";
 import { listClientEmails } from "@/lib/clientEmail";
 import { isEmailConfigured } from "@/lib/email";
 import { getCurrentMembership } from "@/lib/auth";
+import { clientMembership } from "@/lib/clientApp";
 import { bodyScansEnabled, getScanProfile, listClientScans } from "@/lib/inbody/scans";
 import { goalTarget } from "@/lib/goals";
 import { ACTIVITY_BY_KEY, GOAL_BY_KEY } from "@/lib/goalsModel";
@@ -88,6 +87,7 @@ export default async function ClientProfile({
   const assignedWk = assignedWorkouts(id);
   const availWk = availableWorkouts();
   const membership = getCurrentMembership();
+  const activeMembership = clientMembership(id);
   const showScans = membership ? bodyScansEnabled(membership.tenant.id) : false;
   const scans = showScans ? listClientScans(id) : [];
   const scanProfile = showScans ? getScanProfile(id) : null;
@@ -98,67 +98,45 @@ export default async function ClientProfile({
   const lifts = showWorkoutLog ? liftRecords(id) : [];
   const training = showWorkoutLog ? trainingOverview(id) : null;
 
+  const lastSeen = stats.lastVisit ? formatDate(stats.lastVisit) : null;
+  const appState = !clientLogin ? "No app login" : !clientLogin.isActive ? "App disabled" : clientLogin.lastLoginAt ? `In the app ${relativeDay(clientLogin.lastLoginAt)}` : "Never opened the app";
+  const appTone = clientLogin?.isActive && clientLogin.lastLoginAt ? "green" : "neutral";
+  const defaultTab = searchParams?.tab && TAB_KEYS.has(searchParams.tab) ? searchParams.tab : "journey";
+
   return (
-    <div className="app-page">
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          gap: 24,
-          marginBottom: 32,
-          flexWrap: "wrap",
-        }}
-      >
-        <Avatar initials={initialsOf(client.firstName, client.lastName)} size={72} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: 11,
-              color: "var(--text-tertiary)",
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-              marginBottom: 8,
-              fontWeight: 500,
-            }}
-          >
-            {vocab.member}
-          </div>
-          <h1
-            style={{
-              fontFamily: "var(--font-heading), sans-serif",
-              fontSize: "clamp(28px, 3.5vw, 40px)",
-              fontWeight: 400,
-              textTransform: "uppercase",
-              color: "var(--text-primary)",
-              lineHeight: 1.05,
-            }}
-          >
-            {client.firstName} {client.lastName}
-          </h1>
-          <div
-            style={{
-              display: "flex",
-              gap: 16,
-              marginTop: 12,
-              color: "var(--text-secondary)",
-              fontSize: 14,
-              flexWrap: "wrap",
-            }}
-          >
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-              <Phone size={14} /> {client.phone}
-            </span>
-            {client.email && (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                <Mail size={14} /> {client.email}
-              </span>
-            )}
-            {client.gdprConsent && (
-              <Badge tone="green">GDPR consent</Badge>
-            )}
+    <div className="app-page cp">
+      <Link href="/clients" className="cp-back">
+        <ArrowLeft size={14} /> {vocab.members}
+      </Link>
+
+      <header className="cp-head">
+        <div className="cp-who">
+          <span className="cp-avatar" aria-hidden>
+            {initialsOf(client.firstName, client.lastName)}
+          </span>
+          <div className="cp-who-text">
+            <h1 className="cp-name">
+              {client.firstName} {client.lastName}
+            </h1>
+            <p className="cp-origin">
+              {vocab.member}
+              {stats.firstVisit ? ` since ${formatDate(stats.firstVisit)}` : ""}
+              {lastSeen ? ` · last in ${lastSeen}` : " · not in yet"}
+            </p>
+            <div className="cp-chips">
+              <Badge tone={activeMembership ? "green" : "neutral"}>{activeMembership ? activeMembership.name : "No membership"}</Badge>
+              <Badge tone={appTone}>{appState}</Badge>
+              {clientGoal && <Badge tone="neutral">Goal: {GOAL_BY_KEY[clientGoal.goal.goal].label}</Badge>}
+            </div>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+        <div className="cp-actions">
+          <Link href={`/appointments/new?client=${id}`}>
+            <Button>
+              <CalendarPlus size={14} />
+              Book
+            </Button>
+          </Link>
           <Link href={`/clients/${id}/edit`}>
             <Button variant="outline">
               <Pencil size={14} />
@@ -172,33 +150,33 @@ export default async function ClientProfile({
             packageCount={packages.length}
           />
         </div>
-      </div>
+      </header>
 
-      <Tabs defaultValue={searchParams?.tab === "journey" ? "journey" : "overview"}>
+      <div className="cp-grid">
+      <Tabs defaultValue={defaultTab} className="cp-main">
         <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="journey">Journey</TabsTrigger>
           <TabsTrigger value="appointments">
-            {vocab.bookings} ({appointments.length})
+            {vocab.bookings} <Count n={appointments.length} />
           </TabsTrigger>
           <TabsTrigger value="sessions">
-            Sessions ({sessions.length})
+            Sessions <Count n={sessions.length} />
           </TabsTrigger>
           <TabsTrigger value="packages">
-            {vocab.plans} ({packages.length})
+            {vocab.plans} <Count n={packages.length} />
           </TabsTrigger>
           <TabsTrigger value="payments">
-            Payments ({payments.length})
+            Payments <Count n={payments.length} />
           </TabsTrigger>
           <TabsTrigger value="messages">
-            Messages ({messages.length})
+            Messages <Count n={messages.length} />
           </TabsTrigger>
           <TabsTrigger value="email">
-            Email ({clientEmailHistory.length})
+            Email <Count n={clientEmailHistory.length} />
           </TabsTrigger>
-          <TabsTrigger value="app">App &amp; Plans</TabsTrigger>
-          {showWorkoutLog && <TabsTrigger value="workouts">Workout log ({workoutSessions.length})</TabsTrigger>}
-          {showScans && <TabsTrigger value="scans">Body scans ({scans.length})</TabsTrigger>}
+          <TabsTrigger value="app">Client app</TabsTrigger>
+          {showWorkoutLog && <TabsTrigger value="workouts">Workout log <Count n={workoutSessions.length} /></TabsTrigger>}
+          {showScans && <TabsTrigger value="scans">Body scans <Count n={scans.length} /></TabsTrigger>}
         </TabsList>
 
         {showWorkoutLog && training && (
@@ -231,59 +209,6 @@ export default async function ClientProfile({
             />
           </TabsContent>
         )}
-
-        <TabsContent value="overview">
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-              gap: 16,
-              marginBottom: 24,
-            }}
-          >
-            <Stat label="Total sessions" value={String(stats.totalSessions)} />
-            <Stat label="Total spend" value={formatEur(stats.totalSpend)} />
-            <Stat
-              label="First visit"
-              value={stats.firstVisit ? formatDate(stats.firstVisit) : "—"}
-            />
-            <Stat
-              label="Last visit"
-              value={stats.lastVisit ? formatDate(stats.lastVisit) : "—"}
-            />
-            <Stat
-              label={`Favourite ${vocab.service.toLowerCase()}`}
-              value={stats.favouriteTherapy ?? "—"}
-            />
-          </div>
-          {client.medicalNotes && (
-            <Card>
-              <CardLabel>Medical notes</CardLabel>
-              <div style={{ color: "var(--text-secondary)", fontSize: 14, whiteSpace: "pre-wrap" }}>
-                {client.medicalNotes}
-              </div>
-            </Card>
-          )}
-          {client.address && (
-            <Card style={{ marginTop: 16 }}>
-              <CardLabel>Address</CardLabel>
-              <div style={{ color: "var(--text-secondary)", fontSize: 14, whiteSpace: "pre-wrap" }}>
-                {client.address}
-              </div>
-            </Card>
-          )}
-          {(client.emergencyContactName || client.emergencyContactPhone) && (
-            <Card style={{ marginTop: 16 }}>
-              <CardLabel>Emergency contact</CardLabel>
-              <div style={{ color: "var(--text-primary)", fontSize: 14 }}>
-                {client.emergencyContactName ?? "—"}
-              </div>
-              <div style={{ color: "var(--text-tertiary)", fontSize: 13, marginTop: 4 }}>
-                {client.emergencyContactPhone ?? ""}
-              </div>
-            </Card>
-          )}
-        </TabsContent>
 
         <TabsContent value="journey">
           <ClientJourney events={journey} />
@@ -532,8 +457,116 @@ export default async function ClientProfile({
           />
         </TabsContent>
       </Tabs>
+
+      <aside className="cp-side">
+        <Card className="cp-card">
+          <CardLabel>Details</CardLabel>
+          <dl className="cp-facts">
+            <div>
+              <dt>Phone</dt>
+              <dd><a href={`tel:${client.phone.replace(/[^\d+]/g, "")}`}>{client.phone}</a></dd>
+            </div>
+            {client.email && (
+              <div>
+                <dt>Email</dt>
+                <dd><a href={`mailto:${client.email}`}>{client.email}</a></dd>
+              </div>
+            )}
+            {client.dateOfBirth && (
+              <div>
+                <dt>Born</dt>
+                <dd>{formatDate(client.dateOfBirth)}</dd>
+              </div>
+            )}
+            {client.address && (
+              <div>
+                <dt>Address</dt>
+                <dd>{client.address}</dd>
+              </div>
+            )}
+            <div>
+              <dt>GDPR consent</dt>
+              <dd>{client.gdprConsent ? "Given" : "Not given"}</dd>
+            </div>
+          </dl>
+        </Card>
+
+        <Card className="cp-card">
+          <CardLabel>With us</CardLabel>
+          <dl className="cp-facts">
+            <div>
+              <dt>Sessions</dt>
+              <dd>{stats.totalSessions}</dd>
+            </div>
+            <div>
+              <dt>Spent</dt>
+              <dd>{formatEur(stats.totalSpend)}</dd>
+            </div>
+            <div>
+              <dt>First visit</dt>
+              <dd>{stats.firstVisit ? formatDate(stats.firstVisit) : "Not yet"}</dd>
+            </div>
+            <div>
+              <dt>Last visit</dt>
+              <dd>{lastSeen ?? "Not yet"}</dd>
+            </div>
+            {stats.favouriteTherapy && (
+              <div>
+                <dt>Favourite {vocab.service.toLowerCase()}</dt>
+                <dd>{stats.favouriteTherapy}</dd>
+              </div>
+            )}
+            <div>
+              <dt>Membership</dt>
+              <dd>{activeMembership ? `${activeMembership.name}, ${formatEur(activeMembership.priceCents)}` : "None"}</dd>
+            </div>
+            {clientGoal && (
+              <div>
+                <dt>Goal in the app</dt>
+                <dd>{GOAL_BY_KEY[clientGoal.goal.goal].label}, {clientGoal.target.calories.toLocaleString("en-IE")} kcal</dd>
+              </div>
+            )}
+          </dl>
+        </Card>
+
+        {(client.medicalNotes || client.emergencyContactName || client.emergencyContactPhone) && (
+          <Card className="cp-card">
+            <CardLabel>Care</CardLabel>
+            {client.medicalNotes && (
+              <p className="cp-notes">{client.medicalNotes}</p>
+            )}
+            {(client.emergencyContactName || client.emergencyContactPhone) && (
+              <dl className="cp-facts">
+                <div>
+                  <dt>Emergency contact</dt>
+                  <dd>
+                    {client.emergencyContactName ?? ""}
+                    {client.emergencyContactPhone ? (client.emergencyContactName ? ", " : "") + client.emergencyContactPhone : ""}
+                  </dd>
+                </div>
+              </dl>
+            )}
+          </Card>
+        )}
+      </aside>
+      </div>
     </div>
   );
+}
+
+const TAB_KEYS = new Set(["journey", "appointments", "sessions", "packages", "payments", "messages", "email", "app", "workouts", "scans"]);
+
+/** A count beside a tab name, only when there is something to count. */
+function Count({ n }: { n: number }) {
+  return n > 0 ? <span className="tab-count">{n}</span> : null;
+}
+
+function relativeDay(ms: number): string {
+  const days = Math.floor((Date.now() - ms) / 86_400_000);
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 30) return `${days} days ago`;
+  return formatDate(new Date(ms).toISOString().slice(0, 10));
 }
 
 const th: React.CSSProperties = {
@@ -557,24 +590,6 @@ const linkStyle: React.CSSProperties = {
   color: "var(--text-primary)",
   fontWeight: 500,
 };
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <Card>
-      <CardLabel>{label}</CardLabel>
-      <div
-        style={{
-          fontFamily: "var(--font-heading)",
-          fontSize: 24,
-          textTransform: "uppercase",
-          color: "var(--text-primary)",
-        }}
-      >
-        {value}
-      </div>
-    </Card>
-  );
-}
 
 function Empty({ message }: { message: string }) {
   return (

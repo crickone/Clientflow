@@ -54,7 +54,7 @@ export function ClientAppAccess({
   availableWorkouts: Item[];
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 18, maxWidth: 620 }}>
+    <div className="ca-grid">
       <LoginCard clientId={clientId} clientEmail={clientEmail} login={login} />
       <AssignCard
         title="Nutrition plans"
@@ -126,7 +126,7 @@ function LoginCard({ clientId, clientEmail, login }: { clientId: number; clientE
     });
 
   return (
-    <div style={card}>
+    <div style={card} className="ca-login">
       <Head icon={<Smartphone size={18} />} title="Client app login" />
       {!login ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -239,7 +239,11 @@ function AssignCard({
     <div style={card}>
       <Head icon={icon} title={title} />
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {assigned.length === 0 && <div style={{ fontSize: 13, color: "var(--text-tertiary)" }}>None assigned yet.</div>}
+        {assigned.length === 0 && (
+          <div style={{ fontSize: 13, color: "var(--text-tertiary)", lineHeight: 1.5 }}>
+            {available.length ? `Nothing assigned. Pick one below and it shows in their app.` : `None built yet. Build one under ${title} first.`}
+          </div>
+        )}
         {assigned.map((a) => (
           <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", border: "1px solid var(--hairline)", borderRadius: "var(--radius)" }}>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -287,8 +291,9 @@ const card: React.CSSProperties = {
 };
 const selectStyle: React.CSSProperties = {
   flex: 1,
+  minWidth: 0,
   height: 38,
-  padding: "0 12px",
+  paddingLeft: 12,
   borderRadius: "var(--radius)",
   border: "1px solid var(--hairline)",
   background: "var(--surface-1)",
