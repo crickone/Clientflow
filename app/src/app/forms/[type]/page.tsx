@@ -1,7 +1,10 @@
 import { notFound } from "next/navigation";
 
 import { PageHeader } from "@/components/layout/PageHeader";
-import { requireUser } from "@/lib/auth";
+import { getCurrentMembership, requireUser } from "@/lib/auth";
+import { ourDocs, requiredDocs, signoffProgress, welcomeForm } from "@/lib/agreements";
+import { checkinForm, getCheckinDay } from "@/lib/checkins";
+import { FormsAppNote } from "@/components/forms/FormsAppNote";
 import { listForms } from "@/lib/forms";
 import { FORM_TYPE_META, type FormType } from "@/lib/formsModel";
 import { FormsListView } from "@/components/forms/FormsListView";
@@ -16,9 +19,14 @@ export default async function FormsListPage({ params }: { params: { type: string
   const type = params.type as FormType;
   const meta = FORM_TYPE_META[type];
   const forms = listForms(type);
+  const tenantId = getCurrentMembership()?.tenant.id ?? 0;
+  const termsLive = requiredDocs().length > 0;
   return (
     <div className="app-page">
       <PageHeader eyebrow="Forms" title={meta.label} subtitle={meta.intro[0]} />
+      {type === "terms" && <FormsAppNote kind="terms" live={termsLive} ours={ourDocs()} progress={signoffProgress(tenantId)} />}
+      {type === "initial" && <FormsAppNote kind="initial" live={welcomeForm()?.title || (welcomeForm() ? "Untitled" : null)} termsLive={termsLive} />}
+      {type === "checkin" && <FormsAppNote kind="checkin" live={checkinForm()?.title || (checkinForm() ? "Untitled" : null)} weekday={getCheckinDay()} />}
       <FormsListView type={type} meta={meta} forms={forms} />
     </div>
   );

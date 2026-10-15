@@ -1,14 +1,14 @@
 import "server-only";
 
-import { and, desc, eq, isNotNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { clientAgreements, formSubmissions, forms } from "@/lib/db/schema";
+import { clientAgreements, clientCredentials, formSubmissions, forms } from "@/lib/db/schema";
+import { authDb } from "@/lib/db/control";
 import { getBusinessProfile } from "@/lib/businessProfile";
 import { getForm } from "@/lib/forms";
 import type { FormInput } from "@/lib/formsModel";
 import { buildAnswers, insertFormSubmission, validateRequired, type Answer } from "@/lib/publicForms";
-import { readKey, setKey } from "@/lib/settings";
 import {
   agreementStatus,
   businessTermsDoc,
@@ -21,27 +21,12 @@ import {
 
 /**
  * Before a member uses the client app: the documents they agree to and the
- * Welcome Q&A they fill in, for the CURRENT tenant (ambient `db`). Off until
- * the business turns it on, so switching it on never surprises anyone.
+ * Welcome Q&A they fill in, for the CURRENT tenant (ambient `db`). Driven by
+ * Forms, with no separate switch:
+ *   - any switched-on Terms & Conditions form means every member signs ours
+ *     and all of the business's switched-on terms before the app opens;
+ *   - the Default Initial Questionnaire, when switched on, is asked once after.
  */
-
-export interface AgreementSettings {
-  /** Members must agree (and answer the Welcome Q&A) before the app opens. */
-  on: boolean;
-  /** An Initial Questionnaire from Forms to ask after the documents; null for none. */
-  welcomeFormId: number | null;
-}
-
-const KEY = "app_agreements";
-
-export function getAgreementSettings(): AgreementSettings {
-  const s = readKey<Partial<AgreementSettings>>(KEY, {});
-  return { on: s.on === true, welcomeFormId: typeof s.welcomeFormId === "number" ? s.welcomeFormId : null };
-}
-
-export function setAgreementSettings(next: AgreementSettings): void {
-  setKey(KEY, next);
-}
 
 export function businessContact(): BusinessContact {
   const p = getBusinessProfile();
@@ -60,10 +45,19 @@ function businessTerms(businessName: string): AgreementDoc[] {
     .map((f) => businessTermsDoc({ id: f.id, title: f.title, content: f.content! }, businessName));
 }
 
-/** Everything a member agrees to, in the order they see it: ours first, then the business's. */
+/**
+ * Everything a member agrees to, in the order they see it: ours first, then
+ * the business's. Nothing until the business switches on terms of its own.
+ */
 export function requiredDocs(): AgreementDoc[] {
   const contact = businessContact();
-  return [...platformDocs(contact), ...businessTerms(contact.name)];
+  const theirs = businessTerms(contact.name);
+  return theirs.length ? [...platformDocs(contact), ...theirs] : [];
+}
+
+/** Ours, with the business's name and contact in, for previews on the Forms page. */
+export function ourDocs(): AgreementDoc[] {
+  return platformDocs(businessContact());
 }
 
 function accepted(clientId: number): AcceptedRow[] {
@@ -74,11 +68,16 @@ function accepted(clientId: number): AcceptedRow[] {
     .all();
 }
 
-/** The Welcome Q&A form when one is set, switched on and has questions. */
-export function welcomeForm(settings = getAgreementSettings()): (FormInput & { id: number }) | null {
-  if (!settings.welcomeFormId) return null;
-  const f = getForm(settings.welcomeFormId);
-  if (!f || !f.status || f.type !== "initial" || f.questions.length === 0) return null;
+/** The Welcome Q&A: the Default Initial Questionnaire, when it's switched on and has questions. */
+export function welcomeForm(): (FormInput & { id: number }) | null {
+  const row = db
+    .select({ id: forms.id })
+    .from(forms)
+    .where(and(eq(forms.type, "initial"), eq(forms.isDefault, true), eq(forms.status, true)))
+    .get();
+  if (!row) return null;
+  const f = getForm(row.id);
+  if (!f || f.questions.length === 0) return null;
   return f as FormInput & { id: number };
 }
 
@@ -98,10 +97,8 @@ export interface Onboarding {
 
 /** What this member still has to do before the app opens; null when nothing (or the business has it off). */
 export function onboardingFor(clientId: number): Onboarding | null {
-  const settings = getAgreementSettings();
-  if (!settings.on) return null;
   const docs = pendingDocs(requiredDocs(), accepted(clientId));
-  const form = welcomeForm(settings);
+  const form = welcomeForm();
   const welcome = form && !welcomeSubmission(clientId, form.id) ? form : null;
   return docs.length || welcome ? { docs, welcome } : null;
 }
@@ -162,8 +159,8 @@ export interface ClientAgreementView {
 }
 
 export function clientAgreementView(clientId: number): ClientAgreementView {
-  const settings = getAgreementSettings();
-  const docs = agreementStatus(requiredDocs(), accepted(clientId)).map((s) => ({
+  const required = requiredDocs();
+  const docs = agreementStatus(required, accepted(clientId)).map((s) => ({
     key: s.doc.key,
     title: s.doc.title,
     owner: s.doc.owner,
@@ -187,7 +184,7 @@ export function clientAgreementView(clientId: number): ClientAgreementView {
     }
     welcome = { title: sub.title || "Welcome Q&A", at: sub.createdAt.getTime(), answers };
   }
-  return { on: settings.on, docs, welcome };
+  return { on: required.length > 0, docs, welcome };
 }
 
 /** The exact text a member agreed to, for one document (the latest acceptance). */
@@ -202,17 +199,21 @@ export function agreedCopy(clientId: number, docKey: string) {
   );
 }
 
-/** How many members have agreed to the current version of everything, for the settings card. */
-export function agreementCounts(): { required: number } {
-  return { required: requiredDocs().length };
-}
-
-/** The Initial Questionnaires the business can pick as its Welcome Q&A. */
-export function welcomeChoices(): { id: number; title: string; status: boolean }[] {
-  return db
-    .select({ id: forms.id, title: forms.title, status: forms.status })
-    .from(forms)
-    .where(eq(forms.type, "initial"))
-    .orderBy(forms.id)
+/** How many of the business's app members have signed everything current, for the Terms page. */
+export function signoffProgress(tenantId: number): { members: number; signed: number } {
+  const required = requiredDocs();
+  const members = authDb
+    .select({ clientId: clientCredentials.clientId })
+    .from(clientCredentials)
+    .where(and(eq(clientCredentials.tenantId, tenantId), eq(clientCredentials.isActive, true)))
+    .all()
+    .map((r) => r.clientId);
+  if (!required.length || !members.length) return { members: members.length, signed: 0 };
+  const rows = db
+    .select({ clientId: clientAgreements.clientId, docKey: clientAgreements.docKey, version: clientAgreements.version, acceptedAt: clientAgreements.acceptedAt })
+    .from(clientAgreements)
+    .where(inArray(clientAgreements.clientId, members))
     .all();
+  const signed = members.filter((id) => pendingDocs(required, rows.filter((r) => r.clientId === id)).length === 0).length;
+  return { members: members.length, signed };
 }

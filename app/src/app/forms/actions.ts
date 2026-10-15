@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { setCheckinDay } from "@/lib/checkins";
 import { z } from "zod";
 
 import { requireUser } from "@/lib/auth";
@@ -88,4 +89,13 @@ export async function duplicateFormAction(id: number, type: string): Promise<Sav
   if (!newId) return { ok: false, error: "Form not found." };
   revalidatePath(`/forms/${type}`);
   return { ok: true, id: newId };
+}
+
+/** The day check-ins fall due in the client app. */
+export async function setCheckinDayAction(weekday: number): Promise<void> {
+  await requireUser();
+  const d = Number(weekday);
+  if (!Number.isInteger(d) || d < 1 || d > 7) return;
+  setCheckinDay(d);
+  revalidatePath("/forms/checkin");
 }

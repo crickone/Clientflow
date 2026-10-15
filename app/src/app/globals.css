@@ -5253,3 +5253,16 @@ textarea.ag-input { resize: vertical; line-height: 1.5; }
 .wb-input { width: 100%; min-height: 42px; padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--hairline); background: var(--surface-2); color: var(--text-primary); font: inherit; font-size: 14px; }
 .wb-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .wb-when .wb-input { width: auto; }
+
+/* ── Forms pages: what the form does in the client app ── */
+.fan { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; margin-bottom: 18px; border-radius: var(--radius); border: 1px solid var(--hairline); background: var(--surface-1); }
+.fan[data-live="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.fan-icon { width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; background: var(--surface-2); color: var(--accent-ink); }
+.fan-text { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.fan-text b { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.fan-text > span { font-size: 13px; line-height: 1.55; color: var(--text-secondary); }
+.fan-docs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.fan-docs button { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--hairline); background: var(--surface-1); color: var(--text-primary); font: inherit; font-size: 12.5px; cursor: pointer; }
+.fan-docs button:hover { border-color: var(--accent); }
+.fan-day { display: inline-flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 13px; color: var(--text-secondary); }
+.fan-day select { height: 34px; padding-left: 12px; border-radius: var(--radius); border: 1px solid var(--hairline); background: var(--surface-1); color: var(--text-primary); font: inherit; font-size: 13px; }

@@ -93,7 +93,7 @@ export const FORM_TYPE_META: Record<FormType, FormTypeMeta> = {
     builderTitle: "Add New Terms & Conditions",
     navLabel: "Terms & Conditions",
     kind: "terms",
-    intro: ["The terms your clients agree to when they join."],
+    intro: ["The terms your members must sign in the app before they can use it."],
     sections: [],
   },
 };

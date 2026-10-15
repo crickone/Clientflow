@@ -17,40 +17,36 @@ import { checkinState, photoNames, type CheckinState } from "@/lib/memberChoices
 
 /**
  * Weekly check-ins in the client app, for the CURRENT tenant (ambient `db`).
- * The business picks a Check-in form and a day; from that day a member sees
+ * The Default Check-in form (when switched on) is the one members fill in,
+ * due on the day picked on the Check-in forms page; from that day a member sees
  * "Check-in due" until they send one. Photos are kept per member under
  * data/tenants/<slug>/checkins/<clientId>/ and shown only to that member and
  * the business's staff.
  */
 
-export interface CheckinSettings {
-  formId: number | null;
-  /** 1 = Monday ... 7 = Sunday. */
-  weekday: number;
-}
-
 const KEY = "app_checkins";
 
-export function getCheckinSettings(): CheckinSettings {
-  const s = readKey<Partial<CheckinSettings>>(KEY, {});
-  const weekday = typeof s.weekday === "number" && s.weekday >= 1 && s.weekday <= 7 ? s.weekday : 1;
-  return { formId: typeof s.formId === "number" ? s.formId : null, weekday };
+/** The day check-ins fall due: 1 = Monday ... 7 = Sunday. */
+export function getCheckinDay(): number {
+  const s = readKey<{ weekday?: number }>(KEY, {});
+  return typeof s.weekday === "number" && s.weekday >= 1 && s.weekday <= 7 ? s.weekday : 1;
 }
 
-export function setCheckinSettings(next: CheckinSettings): void {
-  setKey(KEY, next);
+export function setCheckinDay(weekday: number): void {
+  setKey(KEY, { weekday });
 }
 
-/** The check-in form when one is set, switched on and has questions. */
-export function checkinForm(settings = getCheckinSettings()): (FormInput & { id: number }) | null {
-  if (!settings.formId) return null;
-  const f = getForm(settings.formId);
-  if (!f || !f.status || f.type !== "checkin" || f.questions.length === 0) return null;
+/** The Default Check-in form, when it's switched on and has questions. */
+export function checkinForm(): (FormInput & { id: number }) | null {
+  const row = db
+    .select({ id: forms.id })
+    .from(forms)
+    .where(and(eq(forms.type, "checkin"), eq(forms.isDefault, true), eq(forms.status, true)))
+    .get();
+  if (!row) return null;
+  const f = getForm(row.id);
+  if (!f || f.questions.length === 0) return null;
   return f as FormInput & { id: number };
-}
-
-export function checkinChoices(): { id: number; title: string; status: boolean }[] {
-  return db.select({ id: forms.id, title: forms.title, status: forms.status }).from(forms).where(eq(forms.type, "checkin")).orderBy(forms.id).all();
 }
 
 export interface CheckinView {
@@ -83,11 +79,11 @@ export function listCheckins(clientId: number, limit = 52): CheckinView[] {
 
 /** Where this member stands this week, or null when the business has no check-in set up. */
 export function memberCheckin(clientId: number): (CheckinState & { form: FormInput & { id: number }; weekday: number }) | null {
-  const settings = getCheckinSettings();
-  const form = checkinForm(settings);
+  const form = checkinForm();
   if (!form) return null;
+  const weekday = getCheckinDay();
   const last = listCheckins(clientId, 1)[0];
-  return { ...checkinState(settings.weekday, dateKey(Date.now()), last ? dateKey(last.at) : null), form, weekday: settings.weekday };
+  return { ...checkinState(weekday, dateKey(Date.now()), last ? dateKey(last.at) : null), form, weekday };
 }
 
 export function saveCheckin(tenantId: number, clientId: number, raw: Record<string, string>): { ok: true } | { ok: false; error: string } {
