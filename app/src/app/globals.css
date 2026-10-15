@@ -5464,3 +5464,52 @@ textarea.ag-input { resize: vertical; line-height: 1.5; }
 .cp-stack { display: grid; gap: 16px; }
 .mb-edit .ml-input { width: 100%; min-width: 0; }
 .wsum-bar { max-width: 30px; }
+
+/* ── Staff client page: Nutrition tab (what the member logged, week by week) ── */
+.nt { display: grid; gap: 16px; }
+.nt-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.nt-nav { display: flex; align-items: center; gap: 6px; }
+.nt-step { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; border: 1px solid var(--hairline); background: var(--surface-1); color: var(--text-secondary); }
+.nt-step:hover { color: var(--text-primary); background: var(--surface-2); }
+.nt-step[aria-disabled="true"] { opacity: 0.35; pointer-events: none; }
+.nt-range { min-width: 132px; text-align: center; font-size: 14.5px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.nt-today { margin-left: 6px; font-size: 13px; color: var(--accent-ink); }
+.nt-source { font-size: 12.5px; color: var(--text-tertiary); }
+.nt-tile-sub { font-size: 12px; color: var(--text-tertiary); }
+.nt-days { display: grid; gap: 8px; }
+.nt-day { border-radius: 14px; border: 1px solid var(--hairline); background: var(--surface-1); }
+.nt-day--empty { display: flex; justify-content: space-between; gap: 12px; padding: 12px 16px; font-size: 13.5px; background: transparent; border-style: dashed; }
+.nt-day--empty b { color: var(--text-secondary); font-weight: 500; }
+.nt-day--empty span { color: var(--text-tertiary); }
+.nt-day summary { position: relative; display: grid; grid-template-columns: 120px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 14px 16px 16px; cursor: pointer; list-style: none; font-size: 13.5px; }
+.nt-day summary::-webkit-details-marker { display: none; }
+.nt-day summary b { color: var(--text-primary); font-weight: 600; }
+.nt-sum { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.nt-kcal { color: var(--text-primary); font-weight: 600; }
+.nt-chev { color: var(--text-tertiary); transition: transform 0.15s ease; }
+.nt-day[open] .nt-chev { transform: rotate(180deg); }
+.nt-bar { position: absolute; left: 16px; right: 16px; bottom: 7px; height: 3px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.nt-bar > span { display: block; height: 100%; border-radius: 3px; background: var(--accent); }
+.nt-bar > span[data-over="true"] { background: var(--warning, #d97706); }
+.nt-meals { display: grid; border-top: 1px solid var(--hairline); }
+.nt-meal { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 14px; padding: 14px 16px; border-top: 1px solid var(--hairline); }
+.nt-meal:first-child { border-top: 0; }
+.nt-photo { width: 72px; height: 72px; border-radius: 10px; overflow: hidden; border: 1px solid var(--hairline); background: var(--surface-2); display: block; }
+.nt-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.nt-photo--none { display: flex; align-items: center; justify-content: center; font-size: 11.5px; color: var(--text-tertiary); text-align: center; }
+.nt-meal-body { display: grid; gap: 4px; min-width: 0; }
+.nt-meal-top { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
+.nt-meal-top b { color: var(--text-primary); font-weight: 600; min-width: 0; }
+.nt-meal-top span { color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.nt-meal-meta { font-size: 12.5px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.nt-items { list-style: none; margin: 6px 0 0; padding: 0; display: grid; border-radius: 10px; border: 1px solid var(--hairline); overflow: hidden; }
+.nt-items li { display: grid; grid-template-columns: minmax(0, 1fr) 90px 80px; gap: 10px; padding: 7px 12px; font-size: 13px; color: var(--text-secondary); border-top: 1px solid var(--hairline); font-variant-numeric: tabular-nums; }
+.nt-items li:first-child { border-top: 0; }
+.nt-items li span:nth-child(2), .nt-items li span:nth-child(3) { text-align: right; color: var(--text-tertiary); }
+@media (max-width: 700px) {
+  .nt-day summary { grid-template-columns: minmax(0, 1fr) auto; }
+  .nt-sum { grid-column: 1 / -1; grid-row: 2; }
+  .nt-items li { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .nt-meal { grid-template-columns: 56px minmax(0, 1fr); }
+  .nt-photo { width: 56px; height: 56px; }
+}

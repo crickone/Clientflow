@@ -65,7 +65,7 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
   {
     key: "coaching",
     label: "Nutrition & workouts",
-    tools: ["add_food", "create_nutrition_plan", "assign_nutrition_plan", "add_exercise", "create_workout_program", "assign_workout_program"],
+    tools: ["get_client_nutrition", "add_food", "create_nutrition_plan", "assign_nutrition_plan", "add_exercise", "create_workout_program", "assign_workout_program"],
   },
   {
     key: "content",

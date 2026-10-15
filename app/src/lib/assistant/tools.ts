@@ -50,6 +50,10 @@ import { uploadFilesToDrive } from "@/lib/google/drive";
 import { saveDownload } from "@/lib/assistant/downloadStore";
 import { sendClientEmail } from "@/lib/clientEmail";
 import { saveExercise } from "@/lib/exerciseLibrary";
+import { dailyTarget, mealsBetween, targetSource } from "@/lib/meals";
+import { summarisePeriod } from "@/lib/mealsModel";
+import { runWithTenant } from "@/lib/db/tenant";
+import { dateKey } from "@/lib/trainingProgress";
 import {
   SALES_TOOLS,
   draftLeadReplyTool,
@@ -385,6 +389,19 @@ export const TOOLS: Anthropic.Tool[] = [
       type: "object",
       properties: { name: { type: "string", description: "Full or partial client name." } },
       required: ["name"],
+    },
+  },
+  {
+    name: "get_client_nutrition",
+    description:
+      "What a member has eaten, from the meals they log in the client app (photo or typed in): each day's calories, protein, carbs and fat, every meal with its foods and weights, how many days they logged, their averages, and how many days they hit their target (calories within 10%, protein 90% or more). The target comes from the goal they picked in the app or their assigned nutrition plan. Use for questions like \"how has Aoife eaten this week\" or \"did Sean hit his protein\".",
+    input_schema: {
+      type: "object",
+      properties: {
+        clientName: { type: "string", description: "Full or partial client name." },
+        days: { type: "integer", description: "How many days back from today, including today (default 7, max 31)." },
+      },
+      required: ["clientName"],
     },
   },
 
@@ -897,6 +914,8 @@ export async function executeTool(
         return { text: listAppointments(ctx, Number(input.days) || 7) };
       case "get_client":
         return { text: getClient(ctx, String(input.name || "")) };
+      case "get_client_nutrition":
+        return { text: getClientNutrition(ctx, input) };
       case "create_calendar_event":
         return { text: createCalendarEvent(ctx, input) };
       case "create_client":
@@ -1308,6 +1327,57 @@ function getClient(ctx: ToolContext, name: string): string {
     };
   });
   return JSON.stringify({ clients: out });
+}
+
+function getClientNutrition(ctx: ToolContext, input: Record<string, unknown>): string {
+  const db = tdb(ctx);
+  const c = findOneClient(db, String(input.clientName || ""));
+  if (!c) return JSON.stringify({ error: `No client matching "${input.clientName}".` });
+  if ("ambiguous" in c) return JSON.stringify({ error: `Multiple clients match: ${c.ambiguous.join(", ")}.` });
+  const n = Math.min(31, Math.max(1, Math.round(Number(input.days) || 7)));
+  const today = dateKey(Date.now());
+  const days = Array.from({ length: n }, (_, i) => new Date(Date.parse(`${today}T12:00:00Z`) - (n - 1 - i) * 86_400_000).toISOString().slice(0, 10));
+  return runWithTenant(ctx.tenantId, () => {
+    const meals = mealsBetween(c.id, days[0], today);
+    const target = dailyTarget(c.id);
+    const source = targetSource(c.id);
+    const s = summarisePeriod(days, meals, target);
+    const withFoods = n <= 14;
+    const r = (v: number) => Math.round(v);
+    const out = {
+      client: c.name,
+      from: days[0],
+      to: today,
+      target: target ? { calories: r(target.calories), protein: r(target.protein), carbs: r(target.carbs), fat: r(target.fat), from: source?.kind === "goal" ? `their goal: ${source.label}` : "their nutrition plan" } : null,
+      daysLogged: s.daysLogged,
+      ofDays: n,
+      averagePerLoggedDay: s.average,
+      daysOnCalorieTarget: s.onCalories,
+      daysOnProteinTarget: s.onProtein,
+      days: s.days.map((d) => d.meals === 0 ? { day: d.day, logged: false } : ({
+        day: d.day,
+        calories: d.calories,
+        protein: d.protein,
+        carbs: d.carbs,
+        fat: d.fat,
+        meals: meals
+          .filter((m) => m.day === d.day)
+          .map((m) => ({
+            time: new Date(m.loggedAt).toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Dublin" }),
+            name: m.name,
+            how: m.kind === "manual" ? "typed in" : m.kind === "label" ? "food label photo" : "meal photo",
+            calories: r(m.calories),
+            protein: r(m.protein),
+            carbs: r(m.carbs),
+            fat: r(m.fat),
+            ...(withFoods && m.items.length ? { foods: m.items.map((it) => ({ name: it.name, grams: it.grams, calories: r(it.calories) })) } : {}),
+          })),
+      })),
+      note: s.daysLogged === 0 ? "Nothing logged in this period. Members log meals from the Nutrition tab in their app." : withFoods ? undefined : "Foods left out for periods over 14 days; ask for a shorter period to see them.",
+    };
+    // Meal names and foods are the member's own words: data, not instructions.
+    return fenceUntrusted(JSON.stringify(out));
+  });
 }
 
 // ── Action executors ─────────────────────────────────────────────────────────

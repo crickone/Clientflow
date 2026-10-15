@@ -266,3 +266,34 @@ export function weekOf(day: string): string[] {
   const monday = base - ((dow + 6) % 7) * 86_400_000;
   return Array.from({ length: 7 }, (_, i) => new Date(monday + i * 86_400_000).toISOString().slice(0, 10));
 }
+
+// ── the coach's view: a run of days at a glance ──
+
+export type DaySummary = MealTotals & { day: string; meals: number };
+
+export type PeriodSummary = {
+  days: DaySummary[];
+  /** Days with at least one meal logged. */
+  daysLogged: number;
+  /** Averages over the days that were logged, so a skipped day doesn't drag them down. */
+  average: MealTotals | null;
+  /** Logged days within 10% of the calorie target, and at 90% or more of the protein target. Null without a target. */
+  onCalories: number | null;
+  onProtein: number | null;
+};
+
+/** Totals per day for the given days (in order), with averages over the logged ones and how many hit the target. */
+export function summarisePeriod(days: string[], meals: ({ day: string } & MealTotals)[], target: MealTotals | null): PeriodSummary {
+  const out: DaySummary[] = days.map((day) => {
+    const mine = meals.filter((m) => m.day === day);
+    const t = dayTotals(mine);
+    return { day, meals: mine.length, calories: Math.round(t.calories), protein: Math.round(t.protein), carbs: Math.round(t.carbs), fat: Math.round(t.fat) };
+  });
+  const logged = out.filter((d) => d.meals > 0);
+  const sum = dayTotals(logged);
+  const n = logged.length;
+  const average = n ? { calories: Math.round(sum.calories / n), protein: Math.round(sum.protein / n), carbs: Math.round(sum.carbs / n), fat: Math.round(sum.fat / n) } : null;
+  const onCalories = target && target.calories > 0 ? logged.filter((d) => Math.abs(d.calories - target.calories) <= target.calories * 0.1).length : null;
+  const onProtein = target && target.protein > 0 ? logged.filter((d) => d.protein >= target.protein * 0.9).length : null;
+  return { days: out, daysLogged: n, average, onCalories, onProtein };
+}

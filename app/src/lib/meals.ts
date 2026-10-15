@@ -3,7 +3,7 @@ import "server-only";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { and, desc, eq, gte, lte } from "drizzle-orm";
+import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { clientNutritionPlans, mealLogs, type MealLog } from "@/lib/db/schema";
@@ -143,6 +143,22 @@ export function mealsForDay(clientId: number, day: string): MealRow[] {
     .orderBy(mealLogs.loggedAt)
     .all()
     .map(withItems);
+}
+
+/** Every meal over a date range (inclusive), oldest first: the coach's view and Adonis's. */
+export function mealsBetween(clientId: number, fromDay: string, toDay: string): MealRow[] {
+  return db
+    .select()
+    .from(mealLogs)
+    .where(and(eq(mealLogs.clientId, clientId), gte(mealLogs.day, fromDay), lte(mealLogs.day, toDay)))
+    .orderBy(mealLogs.loggedAt)
+    .all()
+    .map(withItems);
+}
+
+/** How many meals this client has ever logged. */
+export function mealCount(clientId: number): number {
+  return db.select({ n: sql<number>`count(*)` }).from(mealLogs).where(eq(mealLogs.clientId, clientId)).get()?.n ?? 0;
 }
 
 /** Calories per day over a date range (inclusive), for the week strip. */

@@ -4,7 +4,7 @@
 // numbers the app can trust.
 import assert from "node:assert/strict";
 
-import { applyItemDelta, cleanItemEdit, loggedAtFor, looksMixed, weekOf, parseMealItems, dayTotals, itemsTotal, kcal, mealSlot, parseMealItem, parseMealReading, per100, scaleItem, scaleReading, unaccounted } from "./mealsModel";
+import { summarisePeriod, applyItemDelta, cleanItemEdit, loggedAtFor, looksMixed, weekOf, parseMealItems, dayTotals, itemsTotal, kcal, mealSlot, parseMealItem, parseMealReading, per100, scaleItem, scaleReading, unaccounted } from "./mealsModel";
 
 let passed = 0;
 function check(name: string, cond: boolean) {
@@ -82,5 +82,27 @@ check("more than 60 days back logs now", loggedAtFor("2026-01-01", now, "2026-10
 const wk = weekOf("2026-10-15");
 check("the week runs Monday to Sunday around the day", wk[0] === "2026-10-12" && wk[6] === "2026-10-18" && wk.length === 7);
 check("a Sunday belongs to the week before", weekOf("2026-10-18")[0] === "2026-10-12" && weekOf("2026-10-19")[0] === "2026-10-19");
+
+// The coach's view of a week.
+{
+  const week = weekOf("2026-10-15");
+  const meals = [
+    { day: "2026-10-12", calories: 900, protein: 60, carbs: 90, fat: 30 },
+    { day: "2026-10-12", calories: 1100, protein: 70, carbs: 110, fat: 40 },
+    { day: "2026-10-14", calories: 1500, protein: 100, carbs: 150, fat: 50 },
+    { day: "2026-10-30", calories: 5000, protein: 1, carbs: 1, fat: 1 },
+  ];
+  const target = { calories: 2000, protein: 140, carbs: 200, fat: 70 };
+  const s = summarisePeriod(week, meals, target);
+  check("one row per day, in order", s.days.length === 7 && s.days[0].day === "2026-10-12" && s.days[6].day === "2026-10-18");
+  check("a day's meals add up", s.days[0].meals === 2 && s.days[0].calories === 2000 && s.days[0].protein === 130);
+  check("a day outside the period is ignored", s.days.every((d) => d.calories < 5000));
+  check("days logged counts days, not meals", s.daysLogged === 2);
+  check("averages skip empty days", s.average!.calories === 1750 && s.average!.protein === 115);
+  check("calories within 10% count as on target", s.onCalories === 1);
+  check("protein at 90% or more counts", s.onProtein === 1);
+  const none = summarisePeriod(week, [], null);
+  check("nothing logged and no target", none.daysLogged === 0 && none.average === null && none.onCalories === null && none.onProtein === null);
+}
 
 console.log(`mealsModel: ${passed} checks passed`);

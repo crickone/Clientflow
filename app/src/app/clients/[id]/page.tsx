@@ -67,6 +67,9 @@ import { trainingOverview } from "@/lib/trainingOverview";
 import { ClientBodyScans } from "@/components/clients/ClientBodyScans";
 import { ClientJourney } from "@/components/clients/ClientJourney";
 import { getClientJourney } from "@/lib/clientJourney";
+import { dailyTarget, mealCount, mealsBetween, targetSource } from "@/lib/meals";
+import { weekOf } from "@/lib/mealsModel";
+import { ClientNutrition } from "@/components/clients/ClientNutrition";
 
 export const dynamic = "force-dynamic";
 
@@ -75,7 +78,7 @@ export default async function ClientProfile({
   searchParams,
 }: {
   params: { id: string };
-  searchParams?: { tab?: string };
+  searchParams?: { tab?: string; week?: string };
 }) {
   const vocab = getVocab(getVenueType());
   const id = Number(params.id);
@@ -121,6 +124,13 @@ export default async function ClientProfile({
   const showWorkoutLog = assignedWk.length > 0 || workoutSessions.length > 0 || openWorkout !== null;
   const lifts = showWorkoutLog ? liftRecords(id) : [];
   const training = showWorkoutLog ? trainingOverview(id) : null;
+  const mealsLogged = mealCount(id);
+  const showNutrition = mealsLogged > 0 || assignedNut.length > 0 || clientGoal !== null;
+  const todayKey = dateKey(Date.now());
+  const nutWeek = weekOf(searchParams?.week && /^\d{4}-\d{2}-\d{2}$/.test(searchParams.week) && searchParams.week <= todayKey ? searchParams.week : todayKey);
+  const nutMeals = showNutrition ? mealsBetween(id, nutWeek[0], nutWeek[6]) : [];
+  const nutTarget = showNutrition ? dailyTarget(id) : null;
+  const nutSource = showNutrition ? targetSource(id) : null;
 
   const lastSeen = stats.lastVisit ? formatDate(stats.lastVisit) : null;
   const appState = !clientLogin ? "No app login" : !clientLogin.isActive ? "App disabled" : clientLogin.lastLoginAt ? `In the app ${relativeDay(clientLogin.lastLoginAt)}` : "Never opened the app";
@@ -214,8 +224,27 @@ export default async function ClientProfile({
             </TabsTrigger>
           )}
           {showWorkoutLog && <TabsTrigger value="workouts">Workout log <Count n={workoutSessions.length} /></TabsTrigger>}
+          {showNutrition && <TabsTrigger value="nutrition">Nutrition <Count n={mealsLogged} /></TabsTrigger>}
           {showScans && <TabsTrigger value="scans">Body scans <Count n={scans.length} /></TabsTrigger>}
         </TabsList>
+
+        {showNutrition && (
+          <TabsContent value="nutrition">
+            {mealsLogged === 0 ? (
+              <Empty message="Nothing logged yet. Members log meals from the Nutrition tab in their app, by photo or by hand." />
+            ) : (
+              <ClientNutrition
+                clientId={id}
+                week={nutWeek}
+                today={todayKey}
+                meals={nutMeals}
+                target={nutTarget}
+                targetFrom={nutSource?.kind === "goal" ? `their goal (${nutSource.label.toLowerCase()})` : nutSource?.kind === "plan" ? "their nutrition plan" : null}
+                plans={assignedNut.map((p) => p.title)}
+              />
+            )}
+          </TabsContent>
+        )}
 
         {showWorkoutLog && training && (
           <TabsContent value="workouts">
@@ -735,7 +764,7 @@ export default async function ClientProfile({
   );
 }
 
-const TAB_KEYS = new Set(["journey", "appointments", "sessions", "packages", "payments", "messages", "email", "forms", "habits", "devices", "app", "checkins", "workouts", "scans"]);
+const TAB_KEYS = new Set(["journey", "appointments", "sessions", "packages", "payments", "messages", "email", "forms", "habits", "devices", "app", "checkins", "workouts", "nutrition", "scans"]);
 
 /** A count beside a tab name, only when there is something to count. */
 function Count({ n }: { n: number }) {
