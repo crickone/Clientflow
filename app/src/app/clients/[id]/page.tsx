@@ -47,6 +47,8 @@ import { listClientEmails } from "@/lib/clientEmail";
 import { isEmailConfigured } from "@/lib/email";
 import { getCurrentMembership } from "@/lib/auth";
 import { bodyScansEnabled, getScanProfile, listClientScans } from "@/lib/inbody/scans";
+import { goalTarget } from "@/lib/goals";
+import { ACTIVITY_BY_KEY, GOAL_BY_KEY } from "@/lib/goalsModel";
 import { liftRecords, listSessions, openSession } from "@/lib/workoutLog";
 import { ClientWorkoutLog } from "@/components/clients/ClientWorkoutLog";
 import { trainingOverview } from "@/lib/trainingOverview";
@@ -89,6 +91,7 @@ export default async function ClientProfile({
   const showScans = membership ? bodyScansEnabled(membership.tenant.id) : false;
   const scans = showScans ? listClientScans(id) : [];
   const scanProfile = showScans ? getScanProfile(id) : null;
+  const clientGoal = showScans ? goalTarget(id) : null;
   const workoutSessions = listSessions(id, 60);
   const openWorkout = openSession(id);
   const showWorkoutLog = assignedWk.length > 0 || workoutSessions.length > 0 || openWorkout !== null;
@@ -212,6 +215,19 @@ export default async function ClientProfile({
               inbodyUserId={scanProfile.inbodyUserId}
               consentAt={scanProfile.consentAt}
               isAdmin={membership?.role === "admin"}
+              goal={
+                clientGoal
+                  ? {
+                      label: GOAL_BY_KEY[clientGoal.goal.goal].label,
+                      activity: `${ACTIVITY_BY_KEY[clientGoal.goal.activity].label} ${ACTIVITY_BY_KEY[clientGoal.goal.activity].sub}`,
+                      calories: clientGoal.target.calories,
+                      protein: clientGoal.target.protein,
+                      carbs: clientGoal.target.carbs,
+                      fat: clientGoal.target.fat,
+                      setAt: clientGoal.goal.setAt,
+                    }
+                  : null
+              }
             />
           </TabsContent>
         )}

@@ -16,12 +16,15 @@ export function ClientBodyScans({
   inbodyUserId,
   consentAt,
   isAdmin,
+  goal = null,
 }: {
   clientId: number;
   scans: ScanView[];
   inbodyUserId: string | null;
   consentAt: number | null;
   isAdmin: boolean;
+  /** The goal they picked in the app from this scan, with its target. */
+  goal?: { label: string; activity: string; calories: number; protein: number; carbs: number; fat: number; setAt: number } | null;
 }) {
   const withResults = scans.filter((s) => Object.keys(s.metrics).length > 0);
   const latest = withResults[0];
@@ -55,6 +58,14 @@ export function ClientBodyScans({
               {previous ? `, compared with ${day(previous.measuredAt)}` : ""}
             </span>
           </div>
+          {goal && (
+            <div className="bs-goal">
+              <b>Goal in the app: {goal.label}</b>
+              <span>
+                {goal.calories.toLocaleString("en-IE")} kcal a day, {goal.protein} g protein, {goal.carbs} g carbs, {goal.fat} g fat. Trains {goal.activity}. Set {day(goal.setAt)}.
+              </span>
+            </div>
+          )}
           <div className="bs-tiles">
             {HEADLINE_METRICS.map((k) => {
               const ch = previous ? formatChange(k, latest.metrics[k], previous.metrics[k]) : null;

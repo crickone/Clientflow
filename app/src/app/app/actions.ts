@@ -7,6 +7,8 @@ import { requireClient } from "@/lib/clientAuth";
 import { assignedWorkoutProgramDetail, clientMembership } from "@/lib/clientApp";
 import { bookClient, removeBooking } from "@/lib/timetable";
 import { setScanConsent } from "@/lib/inbody/scans";
+import { clearGoal, latestScanForGoal, setGoal } from "@/lib/goals";
+import { isActivityKey, isGoalKey } from "@/lib/goalsModel";
 import {
   addSessionExercise,
   deleteSession,
@@ -65,6 +67,24 @@ export async function setBodyScanConsentAction(consent: boolean): Promise<{ ok: 
   setScanConsent(clientId, consent === true);
   revalidatePath("/app/body");
   revalidatePath("/app");
+  return { ok: true };
+}
+
+// ---- Goal from the InBody scan ---------------------------------------------
+
+export async function setGoalAction(goal: string, activity: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { clientId } = requireClient();
+  if (!isGoalKey(goal) || !isActivityKey(activity)) return { ok: false, error: "Pick a goal and how often you train." };
+  if (!latestScanForGoal(clientId)) return { ok: false, error: "You need an InBody scan first." };
+  setGoal(clientId, goal, activity);
+  for (const p of ["/app/goal", "/app/nutrition", "/app/body", "/app"]) revalidatePath(p);
+  return { ok: true };
+}
+
+export async function clearGoalAction(): Promise<{ ok: true }> {
+  const { clientId } = requireClient();
+  clearGoal(clientId);
+  for (const p of ["/app/goal", "/app/nutrition", "/app/body", "/app"]) revalidatePath(p);
   return { ok: true };
 }
 

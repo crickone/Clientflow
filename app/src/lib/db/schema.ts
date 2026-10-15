@@ -3281,6 +3281,14 @@ export const bodyScanProfiles = sqliteTable("body_scan_profiles", {
   updatedAt: integer("updated_at").notNull(),
 });
 
+/** The goal a client picked from their InBody scan in the app (lib/goals.ts). */
+export const clientGoals = sqliteTable("client_goals", {
+  clientId: integer("client_id").primaryKey().references(() => clients.id, { onDelete: "cascade" }),
+  goal: text("goal", { enum: ["lose", "maintain", "build"] }).notNull(),
+  activity: text("activity", { enum: ["light", "moderate", "active"] }).notNull().default("moderate"),
+  setAt: integer("set_at").notNull(),
+});
+
 export const workoutSessions = sqliteTable("workout_sessions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   clientId: integer("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),

@@ -8,6 +8,8 @@ import { and, desc, eq, gte, lte } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { clientNutritionPlans, mealLogs, type MealLog } from "@/lib/db/schema";
 import { getCurrentTenant } from "@/lib/db/tenant";
+import { goalTarget } from "@/lib/goals";
+import { GOAL_BY_KEY } from "@/lib/goalsModel";
 import { getPlan } from "@/lib/nutrition";
 import { dayTotals as planDayTotals } from "@/lib/nutritionModel";
 import { dateKey } from "@/lib/trainingProgress";
@@ -157,11 +159,25 @@ export function dailyCalories(clientId: number, fromDay: string, toDay: string):
 }
 
 /**
- * The client's daily calorie target, from their most recently assigned
+ * The client's daily target. The goal they picked from their InBody scan
+ * comes first (lib/goals.ts); otherwise their most recently assigned
  * nutrition plan: a "daily" macro plan's day total, or the average of a full
- * plan's days. Null when they have no plan with numbers.
+ * plan's days. Null when neither gives numbers.
  */
 export function dailyTarget(clientId: number): MealTotals | null {
+  const g = goalTarget(clientId);
+  if (g) return { calories: g.target.calories, protein: g.target.protein, carbs: g.target.carbs, fat: g.target.fat };
+  return planTarget(clientId);
+}
+
+/** Where the target comes from, for the label under it. */
+export function targetSource(clientId: number): { kind: "goal"; label: string } | { kind: "plan" } | null {
+  const g = goalTarget(clientId);
+  if (g) return { kind: "goal", label: GOAL_BY_KEY[g.goal.goal].label };
+  return planTarget(clientId) ? { kind: "plan" } : null;
+}
+
+function planTarget(clientId: number): MealTotals | null {
   const assigned = db
     .select({ planId: clientNutritionPlans.planId })
     .from(clientNutritionPlans)

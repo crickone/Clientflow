@@ -1,8 +1,11 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ScanLine } from "lucide-react";
+import { ChevronRight, ScanLine, Target } from "lucide-react";
 
 import { requireClientPage } from "@/lib/clientAuth";
 import { bodyScansEnabled, getScanProfile, listClientScans } from "@/lib/inbody/scans";
+import { goalTarget } from "@/lib/goals";
+import { GOAL_BY_KEY } from "@/lib/goalsModel";
 import { formatChange, formatMetric, HEADLINE_METRICS, METRIC_BY_KEY, type MetricKey } from "@/lib/inbody/metrics";
 import { Card, PageTitle, SectionTitle } from "@/components/clientapp/ui";
 import { TrendChart } from "@/components/bodyscans/TrendChart";
@@ -46,6 +49,7 @@ export default async function ClientBodyScansPage() {
   const scans = listClientScans(clientId).filter((s) => Object.keys(s.metrics).length > 0);
   const latest = scans[0];
   const previous = scans[1];
+  const goal = latest ? goalTarget(clientId) : null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -60,6 +64,20 @@ export default async function ClientBodyScansPage() {
         </Card>
       ) : (
         <>
+          <Link href="/app/goal">
+            <Card style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", ...(goal ? {} : { borderColor: "var(--accent)", background: "var(--accent-soft)" }) }}>
+              <span style={{ width: 38, height: 38, borderRadius: 10, background: goal ? "var(--surface-2)" : "var(--accent)", display: "inline-flex", alignItems: "center", justifyContent: "center", color: goal ? "var(--accent-ink)" : "var(--accent-contrast)", flexShrink: 0 }}>
+                <Target size={18} />
+              </span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{goal ? `Goal: ${GOAL_BY_KEY[goal.goal.goal].label}` : "Pick a goal from this scan"}</div>
+                <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
+                  {goal ? `${goal.target.calories.toLocaleString("en-IE")} kcal a day, ${goal.target.protein} g protein` : "Drop body fat, maintain, or build muscle: your calories and macros"}
+                </div>
+              </div>
+              <ChevronRight size={18} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
+            </Card>
+          </Link>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             {HEADLINE_METRICS.map((k) => {
               const ch = previous ? formatChange(k, latest.metrics[k], previous.metrics[k]) : null;

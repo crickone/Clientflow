@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Camera, ChevronDown, Loader2, Minus, Pencil, Plus, Trash2, X } from "lucide-react";
 
@@ -37,6 +38,9 @@ type Props = {
   meals: MealView[];
   totals: MealTotals;
   target: MealTotals | null;
+  /** Where the target comes from, and (when the business has InBody) where to pick a goal. */
+  source: { kind: "goal"; label: string } | { kind: "plan" } | null;
+  goalHref: string | null;
   week: { day: string; calories: number }[];
 };
 
@@ -84,7 +88,7 @@ const CONFIDENCE: Record<string, string> = {
 };
 
 /** The day's meals as M1, M2, M3: snapped and read on the spot, or typed in, with every number open to correction. */
-export function MealLog({ day, today, meals, totals, target, week }: Props) {
+export function MealLog({ day, today, meals, totals, target, source, goalHref, week }: Props) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [pending, start] = useTransition();
@@ -204,7 +208,27 @@ export function MealLog({ day, today, meals, totals, target, week }: Props) {
       </div>
 
 
-      {!target && <div className="ml-hint">Your targets show here once your coach adds a plan with calories.</div>}
+      {!target && (
+        <div className="ml-hint">
+          {goalHref ? (
+            <>
+              <Link href={goalHref} className="ml-hint-link">Pick a goal from your InBody scan</Link> to set your targets, or your coach adds a plan with calories.
+            </>
+          ) : (
+            "Your targets show here once your coach adds a plan with calories."
+          )}
+        </div>
+      )}
+      {target && source?.kind === "goal" && (
+        <div className="ml-hint">
+          Target from your goal, {source.label.toLowerCase()}.{goalHref && (<> <Link href={goalHref} className="ml-hint-link">Change</Link></>)}
+        </div>
+      )}
+      {target && source?.kind === "plan" && goalHref && (
+        <div className="ml-hint">
+          Target from your coach&rsquo;s plan. <Link href={goalHref} className="ml-hint-link">Pick a goal from your scan</Link> to use that instead.
+        </div>
+      )}
 
       <button type="button" className="ml-camera" onClick={() => fileRef.current?.click()} disabled={preview !== null || pending}>
         {preview ? <Loader2 size={18} className="spin" /> : <Camera size={18} />} {preview ? "Reading your photo" : "Snap a meal or a label"}

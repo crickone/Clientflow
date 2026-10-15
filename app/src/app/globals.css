@@ -4340,6 +4340,8 @@ a.stat-row:hover .stat-label { color: var(--text-primary); }
 .bs-empty a { color: var(--text-primary); text-decoration: underline; text-underline-offset: 3px; }
 .bs-muted, .bs-empty .bs-muted { font-size: 13px; color: var(--text-tertiary); }
 .bs-latest-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: -8px; }
+.bs-goal { display: grid; gap: 2px; padding: 10px 14px; border-radius: 10px; background: var(--accent-soft); border: 1px solid var(--accent); font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; }
+.bs-goal b { color: var(--text-primary); font-weight: 600; }
 .bs-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); border: 1px solid var(--hairline); border-radius: 12px; overflow: hidden; background: var(--hairline); gap: 1px; }
 .bs-tile { background: var(--surface-1); padding: 16px 18px; display: grid; gap: 4px; }
 .bs-tile-label { font-size: 12.5px; color: var(--text-tertiary); }
@@ -4961,6 +4963,7 @@ a.stat-row:hover .stat-label { color: var(--text-primary); }
 .ml-stat-of { font-size: 11.5px; color: var(--text-tertiary); }
 .ml-stat .ml-macro-bar { margin-top: 4px; }
 .ml-hint { font-size: 12px; color: var(--text-tertiary); line-height: 1.5; margin: 0; }
+.ml-hint-link { color: var(--accent-ink); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
 .ml-camera { width: 100%; min-height: 52px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 0 18px; border-radius: 14px; border: 0; background: var(--accent); color: var(--accent-contrast); font: inherit; font-size: 15.5px; font-weight: 600; cursor: pointer; }
 .ml-camera:disabled { opacity: 0.7; cursor: progress; }
 .ml-camera:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -5026,3 +5029,39 @@ a.stat-row:hover .stat-label { color: var(--text-primary); }
 .ml-lightbox button { position: absolute; top: 16px; right: 16px; width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(255,255,255,0.15); color: #fff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 @media (max-width: 480px) { .ml-form { grid-template-columns: repeat(2, 1fr); } }
 @media (prefers-reduced-motion: reduce) { .ml-bar span, .ml-chev { transition: none; } }
+
+/* ── Goal from the InBody scan (client app /app/goal) ── */
+.gl { display: grid; gap: 14px; }
+.gl-scan { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 12px 14px; border-radius: 14px; background: var(--surface-1); border: 1px solid var(--hairline); }
+.gl-scan div { display: grid; gap: 2px; min-width: 0; }
+.gl-scan span { font-size: 11px; color: var(--text-tertiary); }
+.gl-scan b { font-size: 14px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.gl-note { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--text-tertiary); }
+.gl-activity { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 4px; border-radius: 14px; background: var(--surface-2); }
+.gl-act { display: grid; gap: 1px; min-height: 48px; padding: 8px 10px; border-radius: 11px; border: 0; background: transparent; color: var(--text-secondary); font: inherit; text-align: center; cursor: pointer; }
+.gl-act b { font-size: 13px; font-weight: 600; color: inherit; }
+.gl-act span { font-size: 10.5px; line-height: 1.2; color: var(--text-tertiary); }
+.gl-act[aria-checked="true"] { background: var(--surface-1); color: var(--text-primary); box-shadow: 0 1px 2px rgba(0,0,0,0.18); }
+.gl-act:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.gl-cards { display: grid; gap: 10px; }
+.gl-card { display: grid; gap: 8px; width: 100%; padding: 16px; border-radius: 16px; border: 1.5px solid var(--hairline); background: var(--surface-1); color: var(--text-primary); font: inherit; text-align: left; cursor: pointer; transition: border-color 0.15s ease, background 0.15s ease; }
+.gl-card:disabled { cursor: progress; }
+.gl-card[data-on="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.gl-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.gl-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.gl-card-title { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+.gl-card-line { font-size: 12.5px; line-height: 1.45; color: var(--text-secondary); margin-top: 2px; }
+.gl-tick { flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; border: 1.5px solid var(--hairline); color: var(--accent-contrast); }
+.gl-card[data-on="true"] .gl-tick { background: var(--accent); border-color: var(--accent); }
+.gl-kcal { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.gl-kcal small { font-size: 12.5px; font-weight: 500; color: var(--text-tertiary); margin-left: 6px; letter-spacing: 0; }
+.gl-macros { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-tertiary); }
+.gl-macros b { color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
+.gl-delta { font-size: 12px; color: var(--text-tertiary); }
+.gl-current { font-size: 12px; font-weight: 600; color: var(--accent-ink); }
+.gl-error { font-size: 13px; color: var(--warning); }
+.gl-clear { justify-self: center; padding: 10px 12px; border: 0; background: transparent; color: var(--text-tertiary); font: inherit; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.gl-go { display: inline-flex; align-items: center; gap: 4px; justify-self: start; min-height: 40px; padding: 0 14px; border-radius: 10px; background: var(--accent); color: var(--accent-contrast); font-size: 13.5px; font-weight: 600; text-decoration: none; }
+.gl-go:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 360px) { .gl-scan { grid-template-columns: repeat(2, 1fr); } }
+@media (prefers-reduced-motion: reduce) { .gl-card { transition: none; } }

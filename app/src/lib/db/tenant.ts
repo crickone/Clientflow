@@ -2930,6 +2930,19 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     CREATE INDEX IF NOT EXISTS idx_meal_logs_client_day ON meal_logs(client_id, day);
   `);
 
+  // The goal a client picked from their InBody scan in the app (lib/goals.ts):
+  // drop body fat, maintain or build muscle, and how many days they train.
+  // The target itself is worked out from their latest scan each time, so a
+  // new scan moves it. Additive; idempotent.
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS client_goals (
+      client_id  INTEGER PRIMARY KEY REFERENCES clients(id) ON DELETE CASCADE,
+      goal       TEXT NOT NULL,
+      activity   TEXT NOT NULL DEFAULT 'moderate',
+      set_at     INTEGER NOT NULL
+    );
+  `);
+
   // How a person arrived the visit they got in touch (lib/arrival.ts): JSON on
   // the lead, and on an online order until it becomes a lead. Additive.
   for (const table of ["leads", "offer_orders"]) {
