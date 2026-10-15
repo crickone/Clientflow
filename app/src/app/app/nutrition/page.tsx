@@ -4,7 +4,7 @@ import { ChevronRight, Salad } from "lucide-react";
 import { requireClientPage } from "@/lib/clientAuth";
 import { assignedNutritionPlans } from "@/lib/clientApp";
 import { dailyCalories, dailyTarget, mealsForDay, targetSource } from "@/lib/meals";
-import { dayTotals } from "@/lib/mealsModel";
+import { dayTotals, weekOf } from "@/lib/mealsModel";
 import { dateKey } from "@/lib/trainingProgress";
 import { Card, PageTitle, SectionTitle } from "@/components/clientapp/ui";
 import { MealLog, type MealView } from "@/components/clientapp/MealLog";
@@ -45,7 +45,7 @@ export default async function ClientNutritionPage({ searchParams }: { searchPara
   const target = dailyTarget(clientId);
   const source = targetSource(clientId);
   const goalHref = "/app/goal";
-  const weekDays = Array.from({ length: 7 }, (_, i) => shiftDay(day, i - 6));
+  const weekDays = weekOf(day);
   const perDay = dailyCalories(clientId, weekDays[0], weekDays[6]);
   const week = weekDays.map((d) => ({ day: d, calories: Math.round(perDay[d] ?? 0) }));
   const plans = assignedNutritionPlans(clientId);

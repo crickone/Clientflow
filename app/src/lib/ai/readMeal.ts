@@ -12,11 +12,23 @@ import { parseMealReading, type MealReading } from "@/lib/mealsModel";
  * is read as printed, per serving. Metered against the business's AI
  * allowance under "meals". Returns null when the photo isn't food.
  */
+/**
+ * Shared with priceItem: anything made from parts is listed as its raw
+ * ingredients, one line each with its own amount, so the client sees (and
+ * can fix) 40 g of oats and 10 g of chia rather than "overnight oats, 220 g".
+ */
+export const RAW_INGREDIENT_RULE = `- List each raw ingredient as its own item with its own amount. Anything made from parts is broken up: porridge or overnight oats (oats, milk, chia, flax, seeds, fruit, sweetener as separate lines), smoothies, salads, sandwiches, wraps, bowls, stir-fries, a full Irish, home cooking. Never one line for a mixed dish.
+- Weigh ingredients as they go in: oats, rice and pasta by their DRY weight ("Rolled oats, dry"), milk and other liquids in ml with the grams alongside, meat and fish cooked unless clearly raw.
+- Name each ingredient plainly ("Rolled oats, dry", "Chia seeds", "Semi-skimmed milk", "Peanut butter"), not the dish.
+- A packaged or ready meal you can't see inside (a ready-meal tray, a protein bar, a sandwich from a shop with a label) stays one line: it is one product.`;
+
 const RULES = `You read a photo a client took in a gym or clinic's app and return what they ate as JSON.
 
 Decide which it is:
 - "label": a food package or its nutrition table is visible. Read the printed values PER SERVING (not per 100 g unless that's the only figure, then say so in notes). Put the serving size in "serving" ("1 bar (55 g)", "30 g"). items may be empty. Confidence "high" when the table is readable.
-- "meal": a plate, bowl, drink or snack. Name each visible food in "items" with how much of it there is in words the client can check against the plate ("portion": "1 breast, palm-sized", "a cupped handful", "2 slices", "about a third of the plate"), the estimated grams, and its calories, protein, carbs and fat. Use what's visible for scale: plate size (a dinner plate is about 26 cm), cutlery, a hand, the packaging. Irish and UK foods and brands are common (Brennans bread, Avonmore milk, Fulfil bars, a chicken fillet roll, a full Irish). Totals are the sum of the items. Confidence "medium" for a normal plate, "low" when portions are hidden (a sauce, a wrap, a stew).
+- "meal": a plate, bowl, drink or snack. List what's in it in "items", following these rules:
+${RAW_INGREDIENT_RULE}
+  For each item give how much of it there is in words the client can check against the plate ("portion": "1 breast, palm-sized", "a cupped handful", "2 slices", "about a third of the plate"), the estimated grams, and its calories, protein, carbs and fat. Use what's visible for scale: plate size (a dinner plate is about 26 cm), cutlery, a hand, the packaging. Irish and UK foods and brands are common (Brennans bread, Avonmore milk, Fulfil bars, a chicken fillet roll, a full Irish). Totals are the sum of the items. Confidence "medium" for a normal plate, "low" when portions are hidden (a sauce, a wrap, a stew).
 
 "notes" is how you worked it out, so the client can judge it: what gave you the scale, which portions you're least sure of, and anything you assumed (oil in the pan, full-fat milk). Two or three short plain sentences.
 - Not food at all: return {"food": false, "notes": "<what it is>"}.
@@ -38,7 +50,8 @@ export async function readMeal(input: {
     // A number the client will act on, so `medium`, stated: Opus/Sonnet 5.5
     // default to medium but a silent default is not a decision. Thinking
     // counts against max_tokens.
-    max_tokens: 2500,
+    // A mixed dish now comes back as its raw ingredients, so more lines.
+    max_tokens: 4000,
     thinking: { type: "adaptive" },
     output_config: { effort: "medium" },
     system: [{ type: "text", text: RULES, cache_control: { type: "ephemeral" } }],

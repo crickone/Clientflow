@@ -206,12 +206,27 @@ function writeItems(row: MealLog, items: MealItem[], totals: MealTotals, noteLin
     .run();
 }
 
-/** Something the reader missed, priced from the client's words (lib/ai/priceItem) and added to the meal. */
-export function addMealItem(clientId: number, id: number, item: MealItem): MealRow | null {
+/** What the reader missed, priced from the client's words (lib/ai/priceItem) and added to the meal: one line per ingredient. */
+export function addMealItems(clientId: number, id: number, added: MealItem[]): MealRow | null {
   const row = db.select().from(mealLogs).where(and(eq(mealLogs.id, id), eq(mealLogs.clientId, clientId))).get();
-  if (!row) return null;
-  const items = [...withItems(row).items, item].slice(0, 20);
-  writeItems(row, items, applyItemDelta(row, item, 1), `${item.name} added by you`);
+  if (!row || added.length === 0) return null;
+  const items = [...withItems(row).items, ...added].slice(0, 30);
+  const kept = items.slice(withItems(row).items.length);
+  const totals = kept.reduce<MealTotals>((t, it) => applyItemDelta(t, it, 1), row);
+  writeItems(row, items, totals, `${kept.map((i) => i.name).join(", ")} added by you`);
+  return getMeal(clientId, id);
+}
+
+/** One line replaced by its raw ingredients (lib/ai/priceItem splitItem); the meal moves by the difference. */
+export function splitMealItem(clientId: number, id: number, index: number, parts: MealItem[]): MealRow | null {
+  const row = db.select().from(mealLogs).where(and(eq(mealLogs.id, id), eq(mealLogs.clientId, clientId))).get();
+  if (!row || parts.length === 0) return null;
+  const items = withItems(row).items;
+  const item = items[index];
+  if (!item) return null;
+  const next = [...items.slice(0, index), ...parts, ...items.slice(index + 1)].slice(0, 30);
+  const totals = parts.reduce<MealTotals>((t, it) => applyItemDelta(t, it, 1), applyItemDelta(row, item, -1));
+  writeItems(row, next, totals, `${item.name} split into ingredients`);
   return getMeal(clientId, id);
 }
 

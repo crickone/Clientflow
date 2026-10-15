@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, X } from "lucide-react";
+import { Loader2, Pencil, Scissors, X } from "lucide-react";
 
-import { itemsTotal, per100, unaccounted, type MealItem, type MealTotals } from "@/lib/mealsModel";
+import { itemsTotal, looksMixed, per100, unaccounted, type MealItem, type MealTotals } from "@/lib/mealsModel";
 
 type Patch = { name: string; grams: number | null; calories: number; protein: number; carbs: number; fat: number };
 
@@ -19,14 +19,25 @@ export function MealBreakdown({
   pending,
   onSave,
   onRemove,
+  onSplit,
 }: {
   items: MealItem[];
   meal: MealTotals;
   pending: boolean;
   onSave: (index: number, patch: Patch) => Promise<boolean>;
   onRemove: (index: number) => void;
+  onSplit: (index: number) => Promise<boolean>;
 }) {
   const [editing, setEditing] = useState<number | null>(null);
+  const [splitting, setSplitting] = useState<number | null>(null);
+  async function split(i: number) {
+    setSplitting(i);
+    try {
+      await onSplit(i);
+    } finally {
+      setSplitting(null);
+    }
+  }
   const rest = unaccounted(meal, items);
 
   return (
@@ -57,6 +68,12 @@ export function MealBreakdown({
                   P {it.protein} g · C {it.carbs} g · F {it.fat} g
                 </span>
               </button>
+              {looksMixed(it.name) && (
+                <button type="button" className="mb-split" onClick={() => void split(i)} disabled={pending || splitting !== null}>
+                  {splitting === i ? <Loader2 size={13} className="spin" /> : <Scissors size={13} />}
+                  {splitting === i ? "Splitting into ingredients" : "Split into ingredients"}
+                </button>
+              )}
               <span className="mb-kcal">
                 {it.calories}
                 <small>kcal</small>
@@ -64,6 +81,9 @@ export function MealBreakdown({
               <span className="mb-tools">
                 <button type="button" aria-label={`Change ${it.name}`} onClick={() => setEditing(i)}>
                   <Pencil size={13} />
+                </button>
+                <button type="button" aria-label={`Split ${it.name} into ingredients`} title="Split into ingredients" onClick={() => void split(i)} disabled={pending || splitting !== null}>
+                  {splitting === i ? <Loader2 size={13} className="spin" /> : <Scissors size={13} />}
                 </button>
                 <button type="button" aria-label={`Remove ${it.name}`} onClick={() => onRemove(i)} disabled={pending}>
                   <X size={14} />

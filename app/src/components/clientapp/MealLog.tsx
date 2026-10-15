@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Camera, ChevronDown, Loader2, Minus, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Camera, ChevronDown, ChevronLeft, ChevronRight, Loader2, Minus, Pencil, Plus, Trash2, X } from "lucide-react";
 
 import {
   addMealAction,
@@ -11,6 +11,7 @@ import {
   deleteMealAction,
   removeMealItemAction,
   updateMealItemAction,
+  splitMealItemAction,
   setMealServingsAction,
   updateMealAction,
 } from "@/app/app/actions";
@@ -47,6 +48,19 @@ type Props = {
 };
 
 const time = (ms: number) => new Date(ms).toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Dublin" });
+/** A day key moved by n days. */
+const shift = (day: string, n: number) => {
+  const d = new Date(`${day}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+};
+/** "12 to 18 Oct", or "28 Sept to 4 Oct" across months. */
+const weekLabel = (from: string, to: string) => {
+  const f = new Date(`${from}T12:00:00Z`);
+  const t = new Date(`${to}T12:00:00Z`);
+  const fmt = (d: Date, month: boolean) => d.toLocaleDateString("en-IE", { day: "numeric", ...(month ? { month: "short" } : {}), timeZone: "UTC" });
+  return `${fmt(f, f.getUTCMonth() !== t.getUTCMonth())} to ${fmt(t, true)}`;
+};
 const longDay = (day: string) => new Date(`${day}T12:00:00Z`).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 const weekday = (day: string) => new Date(`${day}T12:00:00Z`).toLocaleDateString("en-IE", { weekday: "narrow", timeZone: "UTC" });
 function dayTitle(day: string, today: string) {
@@ -91,6 +105,7 @@ export function MealLog({ day, today, meals, totals, target, source, goalHref, w
       const blob = await shrink(file);
       const form = new FormData();
       form.append("file", blob, "meal.jpg");
+      if (day !== today) form.append("day", day);
       const res = await fetch("/api/app/meals/photo", { method: "POST", body: form });
       const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string; meal?: { id: number; kind: string } } | null;
       if (!res.ok || !data?.ok) {
@@ -130,9 +145,31 @@ export function MealLog({ day, today, meals, totals, target, source, goalHref, w
           {dayTitle(day, today)}
           {day === today && <span>{longDay(day)}</span>}
         </div>
-        <div className="ml-week" aria-label="Last seven days">
+        <div className="ml-weeknav">
+          <button type="button" className="ml-navbtn" onClick={() => go(shift(day, -7))} aria-label="Previous week">
+            <ChevronLeft size={18} />
+          </button>
+          <span className="ml-weeklabel">{weekLabel(week[0].day, week[6].day)}</span>
+          {day !== today && (
+            <button type="button" className="ml-today" onClick={() => go(today)}>
+              Today
+            </button>
+          )}
+          <button type="button" className="ml-navbtn" onClick={() => go(shift(day, 7) > today ? today : shift(day, 7))} disabled={week[6].day >= today} aria-label="Next week">
+            <ChevronRight size={18} />
+          </button>
+        </div>
+        <div className="ml-week" aria-label="This week">
           {week.map((w) => (
-            <button key={w.day} type="button" onClick={() => go(w.day)} aria-current={w.day === day ? "date" : undefined} aria-label={`${longDay(w.day)}: ${kcal(w.calories)}`}>
+            <button
+              key={w.day}
+              type="button"
+              onClick={() => go(w.day)}
+              disabled={w.day > today}
+              data-today={w.day === today}
+              aria-current={w.day === day ? "date" : undefined}
+              aria-label={`${longDay(w.day)}: ${kcal(w.calories)}`}
+            >
               <span className="ml-week-day">{weekday(w.day)}</span>
               <span className="ml-week-bar">
                 <span style={{ height: `${Math.max(w.calories > 0 ? 8 : 0, (w.calories / maxWeek) * 100)}%` }} />
@@ -219,7 +256,7 @@ export function MealLog({ day, today, meals, totals, target, source, goalHref, w
         </div>
       )}
 
-      {editing === "new" && <MealForm initial={null} onDone={() => setEditing(null)} onSaved={refresh} />}
+      {editing === "new" && <MealForm initial={null} onDone={() => setEditing(null)} onSaved={refresh} day={day === today ? undefined : day} />}
 
       <div className="ml-list">
         {preview && (
@@ -270,6 +307,12 @@ export function MealLog({ day, today, meals, totals, target, source, goalHref, w
               refresh();
               return r.ok;
             }}
+            onSplitItem={async (i) => {
+              const r = await splitMealItemAction(m.id, i);
+              if (!r.ok) setError(r.error ?? "Something went wrong.");
+              refresh();
+              return r.ok;
+            }}
             onPhoto={() => setLightbox(m.id)}
             refresh={refresh}
           />
@@ -306,6 +349,7 @@ function MealCard({
   onAddItem,
   onRemoveItem,
   onUpdateItem,
+  onSplitItem,
   onPhoto,
   refresh,
 }: {
@@ -323,6 +367,7 @@ function MealCard({
   onAddItem: (text: string) => void;
   onRemoveItem: (index: number) => void;
   onUpdateItem: (index: number, patch: { name: string; grams: number | null; calories: number; protein: number; carbs: number; fat: number }) => Promise<boolean>;
+  onSplitItem: (index: number) => Promise<boolean>;
   onPhoto: () => void;
   refresh: () => void;
 }) {
@@ -378,7 +423,7 @@ function MealCard({
                 </div>
               )}
 
-              {m.items.length > 0 && <MealBreakdown items={m.items} meal={m} pending={pending} onSave={onUpdateItem} onRemove={onRemoveItem} />}
+              {m.items.length > 0 && <MealBreakdown items={m.items} meal={m} pending={pending} onSave={onUpdateItem} onRemove={onRemoveItem} onSplit={onSplitItem} />}
 
               {m.kind === "label" && m.servings > 0 && (
                 <div className="mb-label">
@@ -448,7 +493,7 @@ function MealCard({
 }
 
 /** Add a meal by hand, or correct one's totals. The meal keeps its M-number; the name is what it was. */
-function MealForm({ initial, onDone, onSaved }: { initial: MealView | null; onDone: () => void; onSaved: () => void }) {
+function MealForm({ initial, onDone, onSaved, day }: { initial: MealView | null; onDone: () => void; onSaved: () => void; day?: string }) {
   const [pending, start] = useTransition();
   const [v, setV] = useState({
     name: initial && initial.name !== "Meal" ? initial.name : "",
@@ -462,7 +507,7 @@ function MealForm({ initial, onDone, onSaved }: { initial: MealView | null; onDo
 
   function save() {
     start(async () => {
-      const r = initial ? await updateMealAction(initial.id, v) : await addMealAction(v);
+      const r = initial ? await updateMealAction(initial.id, v) : await addMealAction(v, day);
       if (!r.ok) return void setError(r.error);
       onDone();
       onSaved();

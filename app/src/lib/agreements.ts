@@ -217,3 +217,32 @@ export function signoffProgress(tenantId: number): { members: number; signed: nu
   const signed = members.filter((id) => pendingDocs(required, rows.filter((r) => r.clientId === id)).length === 0).length;
   return { members: members.length, signed };
 }
+
+export interface ClientFormView {
+  id: number;
+  title: string;
+  type: string;
+  at: number;
+  answers: Answer[];
+}
+
+/** Every form this member has filled in from the app, newest first. Check-ins have their own tab. */
+export function clientForms(clientId: number): ClientFormView[] {
+  return db
+    .select({ id: formSubmissions.id, payload: formSubmissions.payload, createdAt: formSubmissions.createdAt, title: forms.title, type: forms.type })
+    .from(formSubmissions)
+    .innerJoin(forms, eq(forms.id, formSubmissions.formId))
+    .where(eq(formSubmissions.clientId, clientId))
+    .orderBy(desc(formSubmissions.createdAt))
+    .all()
+    .filter((r) => r.type !== "checkin")
+    .map((r) => {
+      let answers: Answer[] = [];
+      try {
+        answers = (JSON.parse(r.payload) as { answers?: Answer[] }).answers ?? [];
+      } catch {
+        answers = [];
+      }
+      return { id: r.id, title: r.title || "Questionnaire", type: r.type, at: r.createdAt.getTime(), answers };
+    });
+}

@@ -4,7 +4,7 @@
 // numbers the app can trust.
 import assert from "node:assert/strict";
 
-import { applyItemDelta, cleanItemEdit, dayTotals, itemsTotal, kcal, mealSlot, parseMealItem, parseMealReading, per100, scaleItem, scaleReading, unaccounted } from "./mealsModel";
+import { applyItemDelta, cleanItemEdit, loggedAtFor, looksMixed, weekOf, parseMealItems, dayTotals, itemsTotal, kcal, mealSlot, parseMealItem, parseMealReading, per100, scaleItem, scaleReading, unaccounted } from "./mealsModel";
 
 let passed = 0;
 function check(name: string, cond: boolean) {
@@ -62,5 +62,25 @@ check("an edit keeps the member's numbers, trimmed", edited.name === "Chicken th
 check("same weight keeps the portion words; a new weight drops them", cleanItemEdit({ ...chicken, portion: "1 breast" }, { ...chicken, grams: 150 })!.portion === "1 breast" && cleanItemEdit({ ...chicken, portion: "1 breast" }, { ...chicken, grams: 200 })!.portion === null);
 check("a blank name or a nonsense number can't be saved", cleanItemEdit(chicken, { ...chicken, name: " " }) === null && cleanItemEdit(chicken, { ...chicken, calories: NaN }) === null && cleanItemEdit(chicken, { ...chicken, grams: 0 }) === null);
 check("silly numbers are capped", cleanItemEdit(chicken, { ...chicken, calories: 99999 })!.calories === 5000);
+
+// ── several items in one answer ──
+const oats = parseMealItems('```json\n{"items":[{"name":"Rolled oats (dry)","portion":"40 g","grams":40,"calories":150,"protein":5,"carbs":24,"fat":3},{"name":"Chia seeds","grams":10,"calories":49,"protein":2,"carbs":4,"fat":3},{"food":false}]}\n```');
+check("a list of ingredients parses, not-food dropped", oats.length === 2 && oats[0].name === "Rolled oats (dry)" && oats[1].grams === 10);
+check("a bare array parses", parseMealItems('[{"name":"Flaxseed","grams":10,"calories":53}]').length === 1);
+check("a single object still parses", parseMealItems('{"name":"Honey","grams":21,"calories":64}')[0].calories === 64);
+check("junk is an empty list", parseMealItems("no idea").length === 0);
+
+check("a combined line looks mixed", looksMixed("Overnight oats / chia and flax base (in milk)") && looksMixed("Chicken salad") && looksMixed("Oats with milk"));
+check("a single food doesn't", !looksMixed("Banana") && !looksMixed("Chia seeds") && !looksMixed("Black coffee"));
+
+// ── which day a meal goes to, and the week strip ──
+const now = Date.parse("2026-10-15T14:30:00Z");
+check("logging while on today logs now", loggedAtFor("2026-10-15", now, "2026-10-15") === now && loggedAtFor(null, now, "2026-10-15") === now);
+check("logging while on Monday lands on Monday at the same time", loggedAtFor("2026-10-12", now, "2026-10-15") === Date.parse("2026-10-12T14:30:00Z"));
+check("a future day or a junk day logs now", loggedAtFor("2026-10-20", now, "2026-10-15") === now && loggedAtFor("nope", now, "2026-10-15") === now);
+check("more than 60 days back logs now", loggedAtFor("2026-01-01", now, "2026-10-15") === now);
+const wk = weekOf("2026-10-15");
+check("the week runs Monday to Sunday around the day", wk[0] === "2026-10-12" && wk[6] === "2026-10-18" && wk.length === 7);
+check("a Sunday belongs to the week before", weekOf("2026-10-18")[0] === "2026-10-12" && weekOf("2026-10-19")[0] === "2026-10-19");
 
 console.log(`mealsModel: ${passed} checks passed`);

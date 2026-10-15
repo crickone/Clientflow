@@ -30,9 +30,10 @@ import {
 } from "@/lib/workoutLog";
 import { listExercises } from "@/lib/exerciseLibrary";
 import { setTrainingPlan } from "@/lib/trainingOverview";
-import { addMealItem, deleteMeal, getMeal, getMealName, logMeal, removeMealItem, setMealServings, updateMeal, updateMealItem } from "@/lib/meals";
-import { cleanItemEdit } from "@/lib/mealsModel";
-import { priceItem } from "@/lib/ai/priceItem";
+import { addMealItems, deleteMeal, getMeal, getMealName, logMeal, removeMealItem, setMealServings, splitMealItem, updateMeal, updateMealItem } from "@/lib/meals";
+import { cleanItemEdit, loggedAtFor } from "@/lib/mealsModel";
+import { dateKey } from "@/lib/trainingProgress";
+import { priceItems, splitItem } from "@/lib/ai/priceItem";
 import { AiCapError } from "@/lib/ai/usage";
 import type { LoggedSet, SessionExercise } from "@/lib/workoutLogModel";
 import { personalBests } from "@/lib/workoutLogModel";
@@ -332,11 +333,12 @@ const mealFields = z.object({
 type MealResult = { ok: true } | { ok: false; error: string };
 
 /** A meal typed in by hand (no photo). */
-export async function addMealAction(input: unknown): Promise<MealResult> {
+export async function addMealAction(input: unknown, day?: string): Promise<MealResult> {
   const { clientId } = requireClient();
   const p = mealFields.safeParse(input);
   if (!p.success) return { ok: false, error: p.error.issues[0]?.message ?? "Check the numbers." };
-  logMeal(clientId, { manual: p.data });
+  const now = Date.now();
+  logMeal(clientId, { manual: p.data, loggedAt: loggedAtFor(day, now, dateKey(now)) });
   revalidatePath("/app/nutrition");
   revalidatePath("/app");
   return { ok: true };
@@ -384,15 +386,15 @@ export async function addMealItemAction(id: number, text: string): Promise<MealR
   if (!t.success) return { ok: false, error: t.error.issues[0]?.message ?? "Say what it was." };
   const meal = getMealName(clientId, i.data);
   if (meal === null) return { ok: false, error: "Meal not found." };
-  let item;
+  let items;
   try {
-    item = await priceItem({ tenantId, text: t.data, mealName: meal });
+    items = await priceItems({ tenantId, text: t.data, mealName: meal });
   } catch (err) {
     if (err instanceof AiCapError) return { ok: false, error: "Adding by description is paused on this account for now." };
     return { ok: false, error: "Couldn't work that out. Try again in a moment." };
   }
-  if (!item) return { ok: false, error: "That doesn't read as food. Try naming the food and roughly how much." };
-  if (!addMealItem(clientId, i.data, item)) return { ok: false, error: "Meal not found." };
+  if (items.length === 0) return { ok: false, error: "That doesn't read as food. Try naming the food and roughly how much." };
+  if (!addMealItems(clientId, i.data, items)) return { ok: false, error: "Meal not found." };
   revalidatePath("/app/nutrition");
   revalidatePath("/app");
   return { ok: true };
@@ -403,6 +405,29 @@ export async function removeMealItemAction(id: number, index: number): Promise<M
   const i = idSchema.safeParse(id);
   const n = z.coerce.number().int().min(0).safeParse(index);
   if (!i.success || !n.success || !removeMealItem(clientId, i.data, n.data)) return { ok: false, error: "That item isn't on the meal." };
+  revalidatePath("/app/nutrition");
+  revalidatePath("/app");
+  return { ok: true };
+}
+
+/** Break one line of a meal into its raw ingredients, each with its own amount. */
+export async function splitMealItemAction(id: number, index: number): Promise<MealResult> {
+  const { clientId, tenantId } = requireClient();
+  const i = idSchema.safeParse(id);
+  const n = z.coerce.number().int().min(0).safeParse(index);
+  if (!i.success || !n.success) return { ok: false, error: "That item isn't on the meal." };
+  const meal = getMeal(clientId, i.data);
+  const item = meal?.items[n.data];
+  if (!meal || !item) return { ok: false, error: "That item isn't on the meal." };
+  let parts;
+  try {
+    parts = await splitItem({ tenantId, item, mealName: meal.name });
+  } catch (err) {
+    if (err instanceof AiCapError) return { ok: false, error: "Splitting is paused on this account for now." };
+    return { ok: false, error: "Couldn't split that. Try again in a moment." };
+  }
+  if (parts.length < 2) return { ok: false, error: "That's already a single food." };
+  splitMealItem(clientId, i.data, n.data, parts);
   revalidatePath("/app/nutrition");
   revalidatePath("/app");
   return { ok: true };

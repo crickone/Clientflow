@@ -45,7 +45,8 @@ import { listClientEmails } from "@/lib/clientEmail";
 import { isEmailConfigured } from "@/lib/email";
 import { getCurrentMembership } from "@/lib/auth";
 import { clientMembership } from "@/lib/clientApp";
-import { clientAgreementView } from "@/lib/agreements";
+import { clientAgreementView, clientForms } from "@/lib/agreements";
+import { ClientForms } from "@/components/clients/ClientForms";
 import { pendingRequest } from "@/lib/cancellations";
 import { listCheckins } from "@/lib/checkins";
 import { consentsFor } from "@/lib/marketingConsent";
@@ -95,6 +96,7 @@ export default async function ClientProfile({
   const membership = getCurrentMembership();
   const activeMembership = clientMembership(id);
   const agreements = clientAgreementView(id);
+  const memberForms = clientForms(id);
   const agreedAll = agreements.docs.every((d) => d.current);
   const cancelNotice = pendingRequest(id);
   const consents = consentsFor(id, client.email);
@@ -188,6 +190,11 @@ export default async function ClientProfile({
           <TabsTrigger value="email">
             Email <Count n={clientEmailHistory.length} />
           </TabsTrigger>
+          {(memberForms.length > 0 || agreements.on) && (
+            <TabsTrigger value="forms">
+              Forms <Count n={memberForms.length + (agreements.docs.some((d) => d.acceptedAt) ? 1 : 0)} />
+            </TabsTrigger>
+          )}
           <TabsTrigger value="app">Client app</TabsTrigger>
           {checkins.length > 0 && (
             <TabsTrigger value="checkins">
@@ -501,24 +508,13 @@ export default async function ClientProfile({
           </TabsContent>
         )}
 
+        {(memberForms.length > 0 || agreements.on) && (
+          <TabsContent value="forms">
+            <ClientForms clientId={id} forms={memberForms} docs={agreements.docs} />
+          </TabsContent>
+        )}
+
         <TabsContent value="app">
-          {agreements.welcome && (
-            <Card className="cp-card" style={{ marginBottom: 16 }}>
-              <CardLabel>
-                {agreements.welcome.title}, answered {formatDate(new Date(agreements.welcome.at).toISOString().slice(0, 10))}
-              </CardLabel>
-              <div className="wq">
-                {agreements.welcome.answers
-                  .filter((a) => a.fieldType !== "photo" && a.fieldType !== "video")
-                  .map((a) => (
-                    <div key={a.questionId} className="wq-row">
-                      <span className="wq-q">{a.label}</span>
-                      <span className="wq-a">{a.fieldType === "confirm" ? (a.value === "yes" ? "Ticked" : "Not ticked") : a.value || "No answer"}</span>
-                    </div>
-                  ))}
-              </div>
-            </Card>
-          )}
           <ClientAppAccess
             clientId={id}
             clientEmail={client.email}
@@ -606,28 +602,6 @@ export default async function ClientProfile({
           </dl>
         </Card>
 
-        {(agreements.on || agreements.docs.some((d) => d.acceptedAt)) && (
-          <Card className="cp-card">
-            <CardLabel>Agreed in the app</CardLabel>
-            <dl className="cp-agree">
-              {agreements.docs.map((d) => (
-                <div key={d.key}>
-                  <dt>{d.title}</dt>
-                  <dd data-state={d.acceptedAt === null ? "missing" : d.current ? "ok" : "old"}>
-                    {d.acceptedAt === null ? (
-                      "Not yet"
-                    ) : (
-                      <Link href={`/clients/${id}/agreements/${encodeURIComponent(d.key)}`}>
-                        {d.current ? formatDate(new Date(d.acceptedAt).toISOString().slice(0, 10)) : "Older version"}
-                      </Link>
-                    )}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </Card>
-        )}
-
         <Card className="cp-card">
           <CardLabel>News and offers</CardLabel>
           <dl className="cp-agree">
@@ -670,7 +644,7 @@ export default async function ClientProfile({
   );
 }
 
-const TAB_KEYS = new Set(["journey", "appointments", "sessions", "packages", "payments", "messages", "email", "app", "checkins", "workouts", "scans"]);
+const TAB_KEYS = new Set(["journey", "appointments", "sessions", "packages", "payments", "messages", "email", "forms", "app", "checkins", "workouts", "scans"]);
 
 /** A count beside a tab name, only when there is something to count. */
 function Count({ n }: { n: number }) {

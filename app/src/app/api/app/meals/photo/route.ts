@@ -7,6 +7,8 @@ import { readMeal } from "@/lib/ai/readMeal";
 import { getMeal, logMeal, photoPath, savePhoto } from "@/lib/meals";
 import { mediaSecurityHeaders } from "@/lib/api/mediaSecurityHeaders";
 import { rateLimit } from "@/lib/rateLimit";
+import { loggedAtFor } from "@/lib/mealsModel";
+import { dateKey } from "@/lib/trainingProgress";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -60,7 +62,9 @@ export async function POST(req: Request) {
   }
 
   const photo = savePhoto(client.clientId, bytes, type.ext);
-  const meal = logMeal(client.clientId, { reading, servings: Number.isFinite(servings) ? servings : 1, photo });
+  const now = Date.now();
+  const day = typeof form.get("day") === "string" ? String(form.get("day")) : null;
+  const meal = logMeal(client.clientId, { reading, servings: Number.isFinite(servings) ? servings : 1, photo, loggedAt: loggedAtFor(day, now, dateKey(now)) });
   return NextResponse.json({ ok: true, meal });
 }
 

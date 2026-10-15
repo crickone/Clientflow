@@ -152,6 +152,32 @@ export function parseMealItem(raw: string): MealItem | null {
   };
 }
 
+/**
+ * Several items in one answer: {"items":[...]}, a bare [...], or a single
+ * item object. Each is read as parseMealItem reads one; at most 12. Empty when
+ * none of it is food.
+ */
+export function parseMealItems(raw: string): MealItem[] {
+  const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+  let v: unknown;
+  try {
+    v = JSON.parse(cleaned);
+  } catch {
+    const m = cleaned.match(/[\[{][\s\S]*[\]}]/);
+    if (!m) return [];
+    try {
+      v = JSON.parse(m[0]);
+    } catch {
+      return [];
+    }
+  }
+  const list = Array.isArray(v) ? v : v && typeof v === "object" && Array.isArray((v as { items?: unknown }).items) ? (v as { items: unknown[] }).items : [v];
+  return list
+    .slice(0, 12)
+    .map((x) => parseMealItem(JSON.stringify(x)))
+    .filter((x): x is MealItem => x !== null);
+}
+
 /** The same item at a different weight: everything scales with the grams. */
 export function scaleItem(item: MealItem, grams: number): MealItem {
   if (!item.grams || item.grams <= 0 || !Number.isFinite(grams) || grams <= 0) return item;
@@ -209,4 +235,34 @@ export function cleanItemEdit(prev: MealItem, patch: { name: string; grams: numb
   if ([out.calories, out.protein, out.carbs, out.fat].some(Number.isNaN) || (grams !== null && (Number.isNaN(grams) || grams < 1))) return null;
   const sameWeight = grams === prev.grams;
   return { name, portion: sameWeight ? prev.portion : null, grams, ...out };
+}
+
+/** A line that names several foods or a mixed dish, worth offering to split into its ingredients. */
+export function looksMixed(name: string): boolean {
+  return /[\/,+&]|\b(with|and|base|mix|blend)\b|porridge|overnight oats|oats|salad|smoothie|bowl|sandwich|wrap|stir.?fry|curry|stew|casserole|full irish|breakfast/i.test(name);
+}
+
+// ── which day a meal goes to ──
+
+/**
+ * When the member logs a meal while looking at an earlier day, it goes to
+ * that day (at the same time of day as now). Today, a future day or anything
+ * more than 60 days back logs to now.
+ */
+export function loggedAtFor(day: string | null | undefined, now: number, todayKey: string): number {
+  if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day) || day >= todayKey) return now;
+  const [y, m, d] = day.split("-").map(Number);
+  const [ty, tm, td] = todayKey.split("-").map(Number);
+  const daysBack = Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(y, m - 1, d)) / 86_400_000);
+  if (daysBack <= 0 || daysBack > 60) return now;
+  return now - daysBack * 86_400_000;
+}
+
+/** The Monday-to-Sunday week a day falls in, as seven "YYYY-MM-DD" keys. */
+export function weekOf(day: string): string[] {
+  const [y, m, d] = day.split("-").map(Number);
+  const base = Date.UTC(y, m - 1, d);
+  const dow = new Date(base).getUTCDay(); // 0 = Sunday
+  const monday = base - ((dow + 6) % 7) * 86_400_000;
+  return Array.from({ length: 7 }, (_, i) => new Date(monday + i * 86_400_000).toISOString().slice(0, 10));
 }
