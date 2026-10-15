@@ -1,11 +1,18 @@
 "use client";
 
-import { Fragment, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Camera, ChevronDown, ChevronLeft, ChevronRight, Loader2, Minus, Pencil, Plus, Trash2 } from "lucide-react";
+import { Camera, ChevronDown, Loader2, Minus, Pencil, Plus, Trash2, X } from "lucide-react";
 
-import { addMealAction, deleteMealAction, setMealServingsAction, updateMealAction } from "@/app/app/actions";
-import { Card } from "@/components/clientapp/ui";
+import {
+  addMealAction,
+  addMealItemAction,
+  deleteMealAction,
+  removeMealItemAction,
+  setMealItemGramsAction,
+  setMealServingsAction,
+  updateMealAction,
+} from "@/app/app/actions";
 import { kcal, type MealItem, type MealTotals } from "@/lib/mealsModel";
 
 export type MealView = {
@@ -59,144 +66,152 @@ async function shrink(file: File): Promise<Blob> {
   }
 }
 
-function time(ms: number) {
-  return new Date(ms).toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Dublin" });
-}
+const time = (ms: number) => new Date(ms).toLocaleTimeString("en-IE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Dublin" });
+const longDay = (day: string) => new Date(`${day}T12:00:00Z`).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+const weekday = (day: string) => new Date(`${day}T12:00:00Z`).toLocaleDateString("en-IE", { weekday: "narrow", timeZone: "UTC" });
 function dayTitle(day: string, today: string) {
   if (day === today) return "Today";
   const d = new Date(`${day}T12:00:00Z`);
-  const yesterday = new Date(`${today}T12:00:00Z`);
-  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-  if (d.getTime() === yesterday.getTime()) return "Yesterday";
-  return d.toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+  const y = new Date(`${today}T12:00:00Z`);
+  y.setUTCDate(y.getUTCDate() - 1);
+  return d.getTime() === y.getTime() ? "Yesterday" : longDay(day);
 }
-function shiftDay(day: string, by: number) {
-  const d = new Date(`${day}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + by);
-  return d.toISOString().slice(0, 10);
-}
-const grams = (n: number) => `${Math.round(n)} g`;
 
-const CONFIDENCE: Record<string, string> = { high: "Read from the label", medium: "Estimated from the photo", low: "A rough estimate: the portions are hard to see" };
+const CONFIDENCE: Record<string, string> = {
+  high: "Read from the label.",
+  medium: "Estimated from the photo.",
+  low: "A rough estimate: the portions are hard to see.",
+};
 
-/** The day's meals as M1, M2, M3: snapped and read on the spot, or typed in. */
+/** The day's meals as M1, M2, M3: snapped and read on the spot, or typed in, with every number open to correction. */
 export function MealLog({ day, today, meals, totals, target, week }: Props) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [pending, start] = useTransition();
-  const [reading, setReading] = useState(false);
+  const [preview, setPreview] = useState<string | null>(null); // the photo being read
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<number | null>(null);
+  const [justRead, setJustRead] = useState<number | null>(null);
   const [editing, setEditing] = useState<number | "new" | null>(null);
+  const [lightbox, setLightbox] = useState<number | null>(null);
+
+  useEffect(() => () => void (preview && URL.revokeObjectURL(preview)), [preview]);
 
   const go = (d: string) => router.push(d === today ? "/app/nutrition" : `/app/nutrition?day=${d}`);
+  const refresh = () => router.refresh();
 
-  /** The photo is read the moment it's taken: no extra step. */
+  /** The photo is read the moment it's taken: it shows in the list at once, and becomes the meal when the numbers come back. */
   async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    setReading(true);
     setError(null);
+    setPreview(URL.createObjectURL(file));
     try {
       const blob = await shrink(file);
       const form = new FormData();
       form.append("file", blob, "meal.jpg");
       const res = await fetch("/api/app/meals/photo", { method: "POST", body: form });
-      const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string; meal?: { id: number } } | null;
+      const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string; meal?: { id: number; kind: string } } | null;
       if (!res.ok || !data?.ok) {
         setError(data?.error ?? "Couldn't read that photo. Try again, or add the meal by hand.");
         return;
       }
       if (day !== today) router.push("/app/nutrition");
-      router.refresh();
-      if (data.meal) setOpen(data.meal.id); // show the breakdown straight away
+      refresh();
+      if (data.meal) {
+        setOpen(data.meal.id);
+        setJustRead(data.meal.kind === "meal" ? data.meal.id : null);
+      }
     } catch {
       setError("Couldn't upload the photo. Check your connection and try again.");
     } finally {
-      setReading(false);
+      setPreview(null);
     }
   }
 
-  function remove(id: number) {
+  const act = (fn: () => Promise<{ ok: boolean; error?: string }>) =>
     start(async () => {
-      const r = await deleteMealAction(id);
-      if (!r.ok) setError(r.error);
-      setOpen(null);
-      router.refresh();
+      const r = await fn();
+      if (!r.ok) setError(r.error ?? "Something went wrong.");
+      refresh();
     });
-  }
-  function servings(m: MealView, next: number) {
-    start(async () => {
-      const r = await setMealServingsAction(m.id, next);
-      if (!r.ok) setError(r.error);
-      router.refresh();
-    });
-  }
 
-  const pct = target && target.calories > 0 ? Math.min(100, (totals.calories / target.calories) * 100) : null;
-  const over = target !== null && totals.calories > target.calories;
+  const left = target ? target.calories - totals.calories : null;
+  const pct = target && target.calories > 0 ? Math.min(100, (totals.calories / target.calories) * 100) : 0;
   const maxWeek = Math.max(1, target?.calories ?? 0, ...week.map((w) => w.calories));
 
   return (
-    <div style={{ display: "grid", gap: 12 }}>
+    <div className="ml">
       <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={onPick} />
 
-      <div className="ml-daynav">
-        <button type="button" aria-label="Previous day" onClick={() => go(shiftDay(day, -1))}>
-          <ChevronLeft size={18} />
-        </button>
-        <span>{dayTitle(day, today)}</span>
-        <button type="button" aria-label="Next day" onClick={() => go(shiftDay(day, 1))} disabled={day >= today}>
-          <ChevronRight size={18} />
-        </button>
+      <div className="ml-head">
+        <div className="ml-title">
+          {dayTitle(day, today)}
+          {day === today && <span>{longDay(day)}</span>}
+        </div>
+        <div className="ml-week" aria-label="Last seven days">
+          {week.map((w) => (
+            <button key={w.day} type="button" onClick={() => go(w.day)} aria-current={w.day === day ? "date" : undefined} aria-label={`${longDay(w.day)}: ${kcal(w.calories)}`}>
+              <span className="ml-week-day">{weekday(w.day)}</span>
+              <span className="ml-week-bar">
+                <span style={{ height: `${Math.max(w.calories > 0 ? 8 : 0, (w.calories / maxWeek) * 100)}%` }} />
+              </span>
+              <span className="ml-week-kcal">{w.calories > 0 ? Math.round(w.calories) : ""}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
-      <Card style={{ display: "grid", gap: 10 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-          <span className="ml-big" data-over={over}>
-            {kcal(totals.calories)}
-          </span>
-          {target && <span style={{ fontSize: 13, color: "var(--text-tertiary)" }}>of {kcal(target.calories)}</span>}
+      <section className="ml-summary">
+        <div className="ml-big" data-over={left !== null && left < 0}>
+          {kcal(totals.calories)}
         </div>
-        {pct !== null && (
+        <div className="ml-left">
+          {left === null ? "logged this day" : left >= 0 ? `${Math.round(left).toLocaleString("en-IE")} kcal left of ${target!.calories.toLocaleString("en-IE")}` : `${Math.round(-left).toLocaleString("en-IE")} kcal over ${target!.calories.toLocaleString("en-IE")}`}
+        </div>
+        {target && (
           <div className="ml-bar" aria-hidden>
-            <span style={{ width: `${pct}%` }} data-over={over} />
+            <span style={{ width: `${pct}%` }} data-over={left !== null && left < 0} />
           </div>
         )}
-        <div className="ml-macros">
-          <span>
-            <b>{totals.protein} g</b> protein{target ? ` / ${target.protein}` : ""}
-          </span>
-          <span>
-            <b>{totals.carbs} g</b> carbs{target ? ` / ${target.carbs}` : ""}
-          </span>
-          <span>
-            <b>{totals.fat} g</b> fat{target ? ` / ${target.fat}` : ""}
-          </span>
-        </div>
-        {!target && <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>Your target shows here once your coach adds a plan with calories.</div>}
-      </Card>
+      </section>
 
-      <div className="ml-week" aria-label="Last seven days">
-        {week.map((w) => (
-          <button key={w.day} type="button" onClick={() => go(w.day)} aria-current={w.day === day ? "date" : undefined} aria-label={`${w.day}: ${kcal(w.calories)}`}>
-            <span className="ml-week-bar">
-              <span style={{ height: `${Math.max(w.calories > 0 ? 6 : 0, (w.calories / maxWeek) * 100)}%` }} />
+      <div className="ml-stats" aria-label="Today's macros">
+        {(
+          [
+            ["Protein", totals.protein, target?.protein],
+            ["Carbs", totals.carbs, target?.carbs],
+            ["Fat", totals.fat, target?.fat],
+          ] as const
+        ).map(([name, have, want]) => (
+          <div key={name} className="ml-stat" data-over={want ? have > want : false}>
+            <span className="ml-stat-name">{name}</span>
+            <span className="ml-stat-num">
+              {Math.round(have)}
+              <small>g</small>
             </span>
-            <span className="ml-week-day">{new Date(`${w.day}T12:00:00Z`).toLocaleDateString("en-IE", { weekday: "narrow", timeZone: "UTC" })}</span>
-          </button>
+            {want ? (
+              <>
+                <span className="ml-stat-of">of {Math.round(want)} g</span>
+                <span className="ml-macro-bar" aria-hidden>
+                  <span style={{ width: `${Math.min(100, (have / want) * 100)}%` }} data-over={have > want} />
+                </span>
+              </>
+            ) : null}
+          </div>
         ))}
       </div>
 
-      <div style={{ display: "flex", gap: 8 }}>
-        <button type="button" className="ml-btn" onClick={() => fileRef.current?.click()} disabled={reading || pending}>
-          {reading ? <Loader2 size={17} className="spin" /> : <Camera size={17} />} {reading ? "Reading your photo" : "Snap a meal or label"}
-        </button>
-        <button type="button" className="ml-btn ml-btn--ghost" onClick={() => setEditing(editing === "new" ? null : "new")} disabled={reading}>
-          <Plus size={17} /> By hand
-        </button>
-      </div>
+
+      {!target && <div className="ml-hint">Your targets show here once your coach adds a plan with calories.</div>}
+
+      <button type="button" className="ml-camera" onClick={() => fileRef.current?.click()} disabled={preview !== null || pending}>
+        {preview ? <Loader2 size={18} className="spin" /> : <Camera size={18} />} {preview ? "Reading your photo" : "Snap a meal or a label"}
+      </button>
+      <button type="button" className="ml-link" onClick={() => setEditing(editing === "new" ? null : "new")}>
+        <Plus size={14} /> Add by hand
+      </button>
 
       {error && (
         <div className="ml-error" role="alert">
@@ -204,152 +219,272 @@ export function MealLog({ day, today, meals, totals, target, week }: Props) {
         </div>
       )}
 
-      {editing === "new" && <MealForm initial={null} onDone={() => setEditing(null)} onSaved={() => router.refresh()} />}
+      {editing === "new" && <MealForm initial={null} onDone={() => setEditing(null)} onSaved={refresh} />}
 
-      {meals.length === 0 ? (
-        <Card>
-          <div style={{ fontSize: 13.5, color: "var(--text-secondary)", textAlign: "center", padding: "12px 0" }}>
-            {day === today ? "Nothing logged yet today. Snap your next meal." : "Nothing logged this day."}
+      <div className="ml-list">
+        {preview && (
+          <div className="ml-card ml-card--reading" aria-live="polite">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="ml-thumb" src={preview} alt="" />
+            <div className="ml-card-main">
+              <span className="ml-card-name">Reading your photo</span>
+              <span className="ml-card-sub">Working out what&rsquo;s in it and how much</span>
+            </div>
+            <Loader2 size={18} className="spin" style={{ color: "var(--text-tertiary)" }} />
           </div>
-        </Card>
-      ) : (
-        <Card style={{ padding: 0, overflow: "hidden" }}>
-          <table className="ml-table">
-            <thead>
-              <tr>
-                <th>Meal</th>
-                <th>Time</th>
-                <th className="ml-num">kcal</th>
-                <th className="ml-num ml-hide">P</th>
-                <th className="ml-num ml-hide">C</th>
-                <th className="ml-num ml-hide">F</th>
-                <th aria-label="Details" />
-              </tr>
-            </thead>
-            <tbody>
-              {meals.map((m, idx) => {
-                const isOpen = open === m.id;
-                const label = `M${idx + 1}`;
-                return (
-                  <Fragment key={m.id}>
-                    <tr className="ml-row" onClick={() => setOpen(isOpen ? null : m.id)} aria-expanded={isOpen}>
-                      <td className="ml-name">
-                        <b>{label}</b>
-                        <span className="ml-sub">
-                          {" "}
-                          {m.name}
-                          {m.kind === "label" && m.servings !== 1 ? ` · ${m.servings} servings` : ""}
-                        </span>
-                      </td>
-                      <td className="ml-time">{time(m.loggedAt)}</td>
-                      <td className="ml-num">{Math.round(m.calories)}</td>
-                      <td className="ml-num ml-hide">{Math.round(m.protein)}</td>
-                      <td className="ml-num ml-hide">{Math.round(m.carbs)}</td>
-                      <td className="ml-num ml-hide">{Math.round(m.fat)}</td>
-                      <td className="ml-chev">
-                        <ChevronDown size={16} style={{ transform: isOpen ? "rotate(180deg)" : undefined }} />
-                      </td>
-                    </tr>
-                    {isOpen && (
-                      <tr className="ml-detail">
-                        <td colSpan={7}>
-                          {editing === m.id ? (
-                            <MealForm initial={m} onDone={() => setEditing(null)} onSaved={() => router.refresh()} />
-                          ) : (
-                            <div style={{ display: "grid", gap: 12 }}>
-                              {m.hasPhoto && (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img className="ml-photo" src={`/api/app/meals/photo?meal=${m.id}`} alt="" loading="lazy" />
-                              )}
+        )}
 
-                              {m.items.length > 0 && (
-                                <div>
-                                  <div className="ml-h">What&rsquo;s in it</div>
-                                  <table className="ml-items">
-                                    <tbody>
-                                      {m.items.map((it, i) => (
-                                        <tr key={i}>
-                                          <td>
-                                            <div>{it.name}</div>
-                                            <div className="ml-sub">{[it.portion, it.grams ? grams(it.grams) : null].filter(Boolean).join(" · ")}</div>
-                                          </td>
-                                          <td className="ml-num">
-                                            <div>{it.calories} kcal</div>
-                                            <div className="ml-sub">
-                                              {it.protein}P {it.carbs}C {it.fat}F
-                                            </div>
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              )}
+        {meals.length === 0 && !preview && (
+          <div className="ml-empty">
+            <Camera size={26} strokeWidth={1.5} />
+            <div>{day === today ? "Nothing logged yet today." : "Nothing logged this day."}</div>
+            <div className="ml-hint">Snap your next meal or the label on a packet. It&rsquo;s read on the spot.</div>
+          </div>
+        )}
 
-                              <div className="ml-macros">
-                                <span>
-                                  <b>{Math.round(m.protein)} g</b> protein
-                                </span>
-                                <span>
-                                  <b>{Math.round(m.carbs)} g</b> carbs
-                                </span>
-                                <span>
-                                  <b>{Math.round(m.fat)} g</b> fat
-                                </span>
-                              </div>
+        {meals.map((m, idx) => (
+          <MealCard
+            key={m.id}
+            m={m}
+            n={idx + 1}
+            open={open === m.id}
+            nudge={justRead === m.id}
+            editing={editing === m.id}
+            pending={pending}
+            onToggle={() => {
+              setOpen(open === m.id ? null : m.id);
+              if (justRead === m.id) setJustRead(null);
+            }}
+            onEdit={() => setEditing(m.id)}
+            onEditDone={() => setEditing(null)}
+            onDelete={() => {
+              setOpen(null);
+              act(() => deleteMealAction(m.id));
+            }}
+            onServings={(s) => act(() => setMealServingsAction(m.id, s))}
+            onAddItem={(text) => act(() => addMealItemAction(m.id, text))}
+            onRemoveItem={(i) => act(() => removeMealItemAction(m.id, i))}
+            onGrams={(i, g) => act(() => setMealItemGramsAction(m.id, i, g))}
+            onPhoto={() => setLightbox(m.id)}
+            refresh={refresh}
+          />
+        ))}
+      </div>
 
-                              {m.kind === "label" && (
-                                <div className="ml-servings">
-                                  <span>Servings eaten</span>
-                                  <button type="button" aria-label="Fewer servings" onClick={() => servings(m, m.servings - (m.servings > 1 ? 1 : 0.25))} disabled={pending || m.servings <= 0.25}>
-                                    <Minus size={14} />
-                                  </button>
-                                  <b>{m.servings}</b>
-                                  <button type="button" aria-label="More servings" onClick={() => servings(m, m.servings < 1 ? m.servings + 0.25 : m.servings + 1)} disabled={pending || m.servings >= 20}>
-                                    <Plus size={14} />
-                                  </button>
-                                </div>
-                              )}
+      <p className="ml-hint">A plate is an estimate; a label is read as printed. Open a meal to see what was counted, add what was missed and change any number.</p>
 
-                              <div>
-                                <div className="ml-h">{m.kind === "manual" ? "Added by hand" : "How it was worked out"}</div>
-                                {m.kind !== "manual" && (
-                                  <p className="ml-notes">
-                                    {CONFIDENCE[m.confidence ?? "medium"]}
-                                    {m.notes ? `. ${m.notes}` : "."}
-                                  </p>
-                                )}
-                              </div>
-
-                              <div style={{ display: "flex", gap: 8 }}>
-                                <button type="button" className="ml-btn ml-btn--ghost ml-btn--sm" onClick={() => setEditing(m.id)}>
-                                  <Pencil size={14} /> Change the numbers
-                                </button>
-                                <button type="button" className="ml-btn ml-btn--ghost ml-btn--sm" onClick={() => remove(m.id)} disabled={pending}>
-                                  <Trash2 size={14} /> Delete
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
-                );
-              })}
-            </tbody>
-          </table>
-        </Card>
+      {lightbox !== null && (
+        <div className="ml-lightbox" role="dialog" aria-label="Photo" onClick={() => setLightbox(null)}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`/api/app/meals/photo?meal=${lightbox}`} alt="" />
+          <button type="button" aria-label="Close">
+            <X size={20} />
+          </button>
+        </div>
       )}
-
-      <p style={{ margin: 0, fontSize: 11.5, color: "var(--text-tertiary)", lineHeight: 1.5 }}>
-        A photo of a plate is an estimate; a label is read as printed, per serving. Tap a meal to see what was counted and change it.
-      </p>
     </div>
   );
 }
 
-/** Add a meal by hand, or correct one. The meal keeps its M-number; the name is what it was. */
+function MealCard({
+  m,
+  n,
+  open,
+  nudge,
+  editing,
+  pending,
+  onToggle,
+  onEdit,
+  onEditDone,
+  onDelete,
+  onServings,
+  onAddItem,
+  onRemoveItem,
+  onGrams,
+  onPhoto,
+  refresh,
+}: {
+  m: MealView;
+  n: number;
+  open: boolean;
+  nudge: boolean;
+  editing: boolean;
+  pending: boolean;
+  onToggle: () => void;
+  onEdit: () => void;
+  onEditDone: () => void;
+  onDelete: () => void;
+  onServings: (s: number) => void;
+  onAddItem: (text: string) => void;
+  onRemoveItem: (index: number) => void;
+  onGrams: (index: number, grams: number) => void;
+  onPhoto: () => void;
+  refresh: () => void;
+}) {
+  const [addText, setAddText] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [grams, setGrams] = useState<{ index: number; value: string } | null>(null);
+  const addRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (nudge) addRef.current?.focus();
+  }, [nudge]);
+
+  async function add() {
+    const t = addText.trim();
+    if (!t) return;
+    setAdding(true);
+    try {
+      await onAddItem(t);
+      setAddText("");
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  const sub = [time(m.loggedAt), `P ${Math.round(m.protein)} · C ${Math.round(m.carbs)} · F ${Math.round(m.fat)}`, m.kind === "label" && m.servings !== 1 ? `${m.servings} servings` : null].filter(Boolean).join(" · ");
+
+  return (
+    <article className="ml-card" data-open={open}>
+      <button type="button" className="ml-card-head" onClick={onToggle} aria-expanded={open}>
+        <span className="ml-badge">M{n}</span>
+        {m.hasPhoto && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="ml-thumb" src={`/api/app/meals/photo?meal=${m.id}`} alt="" loading="lazy" />
+        )}
+        <span className="ml-card-main">
+          <span className="ml-card-name">{m.name}</span>
+          <span className="ml-card-sub">{sub}</span>
+        </span>
+        <span className="ml-card-kcal">
+          {Math.round(m.calories)}
+          <small>kcal</small>
+        </span>
+        <ChevronDown size={16} className="ml-chev" />
+      </button>
+
+      {open && (
+        <div className="ml-card-body">
+          {editing ? (
+            <MealForm initial={m} onDone={onEditDone} onSaved={refresh} />
+          ) : (
+            <>
+              {nudge && (
+                <div className="ml-nudge">
+                  Anything on it I can&rsquo;t see? Seeds, a sauce, butter, oil, a drink. Add it below and the numbers update.
+                </div>
+              )}
+
+              {m.items.length > 0 && (
+                <div>
+                  <div className="ml-h">What&rsquo;s in it</div>
+                  <ul className="ml-items">
+                    {m.items.map((it, i) => (
+                      <li key={i}>
+                        <div className="ml-item-main">
+                          <span className="ml-item-name">{it.name}</span>
+                          <span className="ml-item-sub">
+                            {it.portion ? `${it.portion}` : null}
+                            {it.grams ? (
+                              grams?.index === i ? (
+                                <form
+                                  className="ml-grams"
+                                  onSubmit={(e) => {
+                                    e.preventDefault();
+                                    const g = Number(grams.value);
+                                    if (g > 0) onGrams(i, g);
+                                    setGrams(null);
+                                  }}
+                                >
+                                  <input className="ml-input ml-input--sm" inputMode="numeric" value={grams.value} onChange={(e) => setGrams({ index: i, value: e.target.value })} autoFocus aria-label="Grams" />
+                                  <span>g</span>
+                                  <button type="submit" className="ml-btn ml-btn--sm">
+                                    Save
+                                  </button>
+                                  <button type="button" className="ml-link" onClick={() => setGrams(null)}>
+                                    Cancel
+                                  </button>
+                                </form>
+                              ) : (
+                                <button type="button" className="ml-gramsbtn" onClick={() => setGrams({ index: i, value: String(it.grams) })} title="Change the weight">
+                                  {it.portion ? " · " : ""}
+                                  {it.grams} g <Pencil size={11} />
+                                </button>
+                              )
+                            ) : null}
+                          </span>
+                        </div>
+                        <span className="ml-item-kcal">
+                          {it.calories}
+                          <small>P {it.protein} · C {it.carbs} · F {it.fat}</small>
+                        </span>
+                        <button type="button" className="ml-x" aria-label={`Remove ${it.name}`} onClick={() => onRemoveItem(i)} disabled={pending}>
+                          <X size={14} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <form
+                className="ml-add"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void add();
+                }}
+              >
+                <input ref={addRef} className="ml-input" placeholder={m.items.length ? "Missing something? e.g. a tablespoon of seeds" : "Add what's in it, e.g. 50 g oats"} value={addText} onChange={(e) => setAddText(e.target.value)} maxLength={200} disabled={adding} />
+                <button type="submit" className="ml-btn ml-btn--sm" disabled={adding || !addText.trim()}>
+                  {adding ? <Loader2 size={14} className="spin" /> : <Plus size={14} />} {adding ? "Working it out" : "Add"}
+                </button>
+              </form>
+
+              {m.kind === "label" && (
+                <div className="ml-servings">
+                  <span>Servings eaten</span>
+                  <button type="button" aria-label="Fewer servings" onClick={() => onServings(m.servings - (m.servings > 1 ? 1 : 0.25))} disabled={pending || m.servings <= 0.25}>
+                    <Minus size={14} />
+                  </button>
+                  <b>{m.servings}</b>
+                  <button type="button" aria-label="More servings" onClick={() => onServings(m.servings < 1 ? m.servings + 0.25 : m.servings + 1)} disabled={pending || m.servings >= 20}>
+                    <Plus size={14} />
+                  </button>
+                </div>
+              )}
+
+              {m.kind !== "manual" && (
+                <details className="ml-why">
+                  <summary>Why these numbers?</summary>
+                  <p>
+                    {CONFIDENCE[m.confidence ?? "medium"]}
+                    {m.notes ? ` ${m.notes}` : ""}
+                  </p>
+                </details>
+              )}
+
+              <div className="ml-card-actions">
+                {m.hasPhoto && (
+                  <button type="button" className="ml-link" onClick={onPhoto}>
+                    See the photo
+                  </button>
+                )}
+                <span style={{ flex: 1 }} />
+                <button type="button" className="ml-btn ml-btn--ghost ml-btn--sm" onClick={onEdit}>
+                  <Pencil size={14} /> Edit
+                </button>
+                <button type="button" className="ml-btn ml-btn--ghost ml-btn--sm" onClick={onDelete} disabled={pending}>
+                  <Trash2 size={14} /> Delete
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </article>
+  );
+}
+
+/** Add a meal by hand, or correct one's totals. The meal keeps its M-number; the name is what it was. */
 function MealForm({ initial, onDone, onSaved }: { initial: MealView | null; onDone: () => void; onSaved: () => void }) {
   const [pending, start] = useTransition();
   const [v, setV] = useState({

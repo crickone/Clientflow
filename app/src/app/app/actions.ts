@@ -22,7 +22,9 @@ import {
 } from "@/lib/workoutLog";
 import { listExercises } from "@/lib/exerciseLibrary";
 import { setTrainingPlan } from "@/lib/trainingOverview";
-import { deleteMeal, logMeal, setMealServings, updateMeal } from "@/lib/meals";
+import { addMealItem, deleteMeal, getMealName, logMeal, removeMealItem, setMealItemGrams, setMealServings, updateMeal } from "@/lib/meals";
+import { priceItem } from "@/lib/ai/priceItem";
+import { AiCapError } from "@/lib/ai/usage";
 import type { LoggedSet, SessionExercise } from "@/lib/workoutLogModel";
 import { personalBests } from "@/lib/workoutLogModel";
 
@@ -256,6 +258,52 @@ export async function deleteMealAction(id: number): Promise<MealResult> {
   const { clientId } = requireClient();
   const i = idSchema.safeParse(id);
   if (!i.success || !deleteMeal(clientId, i.data)) return { ok: false, error: "Meal not found." };
+  revalidatePath("/app/nutrition");
+  revalidatePath("/app");
+  return { ok: true };
+}
+
+/** Something the photo reader missed: priced from the client's words and added to the meal. */
+export async function addMealItemAction(id: number, text: string): Promise<MealResult> {
+  const { clientId, tenantId } = requireClient();
+  const i = idSchema.safeParse(id);
+  const t = z.string().trim().min(2, "Say what it was.").max(200).safeParse(text);
+  if (!i.success) return { ok: false, error: "Meal not found." };
+  if (!t.success) return { ok: false, error: t.error.issues[0]?.message ?? "Say what it was." };
+  const meal = getMealName(clientId, i.data);
+  if (meal === null) return { ok: false, error: "Meal not found." };
+  let item;
+  try {
+    item = await priceItem({ tenantId, text: t.data, mealName: meal });
+  } catch (err) {
+    if (err instanceof AiCapError) return { ok: false, error: "Adding by description is paused on this account for now." };
+    return { ok: false, error: "Couldn't work that out. Try again in a moment." };
+  }
+  if (!item) return { ok: false, error: "That doesn't read as food. Try naming the food and roughly how much." };
+  if (!addMealItem(clientId, i.data, item)) return { ok: false, error: "Meal not found." };
+  revalidatePath("/app/nutrition");
+  revalidatePath("/app");
+  return { ok: true };
+}
+
+export async function removeMealItemAction(id: number, index: number): Promise<MealResult> {
+  const { clientId } = requireClient();
+  const i = idSchema.safeParse(id);
+  const n = z.coerce.number().int().min(0).safeParse(index);
+  if (!i.success || !n.success || !removeMealItem(clientId, i.data, n.data)) return { ok: false, error: "That item isn't on the meal." };
+  revalidatePath("/app/nutrition");
+  revalidatePath("/app");
+  return { ok: true };
+}
+
+export async function setMealItemGramsAction(id: number, index: number, grams: number): Promise<MealResult> {
+  const { clientId } = requireClient();
+  const i = idSchema.safeParse(id);
+  const n = z.coerce.number().int().min(0).safeParse(index);
+  const g = z.coerce.number().min(1).max(5000).safeParse(grams);
+  if (!i.success || !n.success) return { ok: false, error: "That item isn't on the meal." };
+  if (!g.success) return { ok: false, error: "Enter the weight in grams, from 1 to 5000." };
+  if (!setMealItemGrams(clientId, i.data, n.data, g.data)) return { ok: false, error: "That item has no weight to change. Remove it and add it again with the amount." };
   revalidatePath("/app/nutrition");
   revalidatePath("/app");
   return { ok: true };

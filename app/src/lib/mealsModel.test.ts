@@ -4,7 +4,7 @@
 // numbers the app can trust.
 import assert from "node:assert/strict";
 
-import { dayTotals, kcal, mealSlot, parseMealReading, scaleReading } from "./mealsModel";
+import { applyItemDelta, dayTotals, kcal, mealSlot, parseMealItem, parseMealReading, scaleItem, scaleReading } from "./mealsModel";
 
 let passed = 0;
 function check(name: string, cond: boolean) {
@@ -37,5 +37,16 @@ const t = dayTotals([plate, scaleReading(label, 1)]);
 check("the day adds up", t.calories === 730 && t.protein === 73);
 check("calories read with a separator", kcal(1240) === "1,240 kcal");
 check("meal slots follow Irish time", mealSlot(Date.parse("2026-10-14T07:30:00Z")) === "Breakfast" && mealSlot(Date.parse("2026-10-14T18:30:00Z")) === "Dinner" && mealSlot(Date.parse("2026-10-14T21:30:00Z")) === "Snack");
+
+// ── items the client adds or fixes ──
+const seeds = parseMealItem('{"name":"Pumpkin seeds","portion":"1 tablespoon","grams":10,"calories":57,"protein":3,"carbs":1,"fat":5}')!;
+check("an added item parses", seeds !== null && seeds.grams === 10 && seeds.calories === 57);
+check("not food is null", parseMealItem('{"food":false}') === null);
+const more = scaleItem(seeds, 20);
+check("doubling the grams doubles the numbers", more.calories === 114 && more.fat === 10 && more.portion === null);
+check("an item with no grams can't be scaled by grams", scaleItem({ ...seeds, grams: null }, 20).calories === 57);
+const base = { calories: 290, protein: 13, carbs: 42, fat: 8 };
+check("adding an item moves the meal by exactly that item", applyItemDelta(base, seeds, 1).calories === 347 && applyItemDelta(base, seeds, 1).fat === 13);
+check("removing it moves it back, never below zero", applyItemDelta(applyItemDelta(base, seeds, 1), seeds, -1).calories === 290 && applyItemDelta({ calories: 10, protein: 0, carbs: 0, fat: 0 }, seeds, -1).calories === 0);
 
 console.log(`mealsModel: ${passed} checks passed`);

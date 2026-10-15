@@ -11,7 +11,7 @@ import { getCurrentTenant } from "@/lib/db/tenant";
 import { getPlan } from "@/lib/nutrition";
 import { dayTotals as planDayTotals } from "@/lib/nutritionModel";
 import { dateKey } from "@/lib/trainingProgress";
-import { dayTotals, type MealItem, type MealKind, type MealReading, type MealTotals } from "@/lib/mealsModel";
+import { applyItemDelta, dayTotals, scaleItem, type MealItem, type MealKind, type MealReading, type MealTotals } from "@/lib/mealsModel";
 
 /** Meals a client logs in their app, for the CURRENT tenant (ambient `db`). */
 
@@ -124,6 +124,10 @@ export function deleteMeal(clientId: number, id: number): boolean {
   return true;
 }
 
+export function getMealName(clientId: number, id: number): string | null {
+  return db.select({ name: mealLogs.name }).from(mealLogs).where(and(eq(mealLogs.id, id), eq(mealLogs.clientId, clientId))).get()?.name ?? null;
+}
+
 export function getMeal(clientId: number, id: number): MealRow | null {
   const row = db.select().from(mealLogs).where(and(eq(mealLogs.id, id), eq(mealLogs.clientId, clientId))).get();
   return row ? withItems(row) : null;
@@ -174,4 +178,46 @@ export function dailyTarget(clientId: number): MealTotals | null {
     return { calories: Math.round(avg.calories / n), protein: Math.round(avg.protein / n), carbs: Math.round(avg.carbs / n), fat: Math.round(avg.fat / n) };
   }
   return null;
+}
+
+// ── fixing what's in a meal: the totals move by exactly the item changed ──
+
+function writeItems(row: MealLog, items: MealItem[], totals: MealTotals, noteLine: string | null): void {
+  const notes = noteLine ? [row.notes, noteLine].filter(Boolean).join(" · ").slice(0, 600) : row.notes;
+  db.update(mealLogs)
+    .set({ itemsJson: JSON.stringify(items), calories: totals.calories, protein: totals.protein, carbs: totals.carbs, fat: totals.fat, notes, updatedAt: new Date() })
+    .where(eq(mealLogs.id, row.id))
+    .run();
+}
+
+/** Something the reader missed, priced from the client's words (lib/ai/priceItem) and added to the meal. */
+export function addMealItem(clientId: number, id: number, item: MealItem): MealRow | null {
+  const row = db.select().from(mealLogs).where(and(eq(mealLogs.id, id), eq(mealLogs.clientId, clientId))).get();
+  if (!row) return null;
+  const items = [...withItems(row).items, item].slice(0, 20);
+  writeItems(row, items, applyItemDelta(row, item, 1), `${item.name} added by you`);
+  return getMeal(clientId, id);
+}
+
+export function removeMealItem(clientId: number, id: number, index: number): MealRow | null {
+  const row = db.select().from(mealLogs).where(and(eq(mealLogs.id, id), eq(mealLogs.clientId, clientId))).get();
+  if (!row) return null;
+  const items = withItems(row).items;
+  const item = items[index];
+  if (!item) return null;
+  writeItems(row, items.filter((_, i) => i !== index), applyItemDelta(row, item, -1), `${item.name} removed by you`);
+  return getMeal(clientId, id);
+}
+
+/** A different weight for one item; its numbers scale and the meal moves by the difference. */
+export function setMealItemGrams(clientId: number, id: number, index: number, grams: number): MealRow | null {
+  const row = db.select().from(mealLogs).where(and(eq(mealLogs.id, id), eq(mealLogs.clientId, clientId))).get();
+  if (!row) return null;
+  const items = withItems(row).items;
+  const item = items[index];
+  if (!item || !item.grams) return null;
+  const next = scaleItem(item, grams);
+  const totals = applyItemDelta(applyItemDelta(row, item, -1), next, 1);
+  writeItems(row, items.map((it, i) => (i === index ? next : it)), totals, `${item.name} set to ${Math.round(grams)} g by you`);
+  return getMeal(clientId, id);
 }

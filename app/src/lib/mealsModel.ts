@@ -120,3 +120,55 @@ export function mealSlot(ms: number): string {
   if (h < 21) return "Dinner";
   return "Snack";
 }
+
+/** One item the client adds in words ("a tablespoon of pumpkin seeds"), as the AI priced it. Null when it isn't food. */
+export function parseMealItem(raw: string): MealItem | null {
+  const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+  let v: unknown;
+  try {
+    v = JSON.parse(cleaned);
+  } catch {
+    const m = cleaned.match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    try {
+      v = JSON.parse(m[0]);
+    } catch {
+      return null;
+    }
+  }
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  if (o.food === false) return null;
+  const name = str(o.name, 60);
+  if (!name) return null;
+  return {
+    name,
+    portion: str(o.portion, 60) || null,
+    grams: o.grams === null || o.grams === undefined ? null : num(o.grams, 5000) || null,
+    calories: num(o.calories),
+    protein: num(o.protein, 1000),
+    carbs: num(o.carbs, 1000),
+    fat: num(o.fat, 1000),
+  };
+}
+
+/** The same item at a different weight: everything scales with the grams. */
+export function scaleItem(item: MealItem, grams: number): MealItem {
+  if (!item.grams || item.grams <= 0 || !Number.isFinite(grams) || grams <= 0) return item;
+  const k = Math.min(50, grams / item.grams);
+  return {
+    ...item,
+    grams: Math.round(grams),
+    portion: null, // the words no longer describe it
+    calories: Math.round(item.calories * k),
+    protein: Math.round(item.protein * k),
+    carbs: Math.round(item.carbs * k),
+    fat: Math.round(item.fat * k),
+  };
+}
+
+/** Totals after an item is added (+) or removed (-): a meal's numbers move by exactly that item. */
+export function applyItemDelta(t: MealTotals, item: MealTotals, sign: 1 | -1): MealTotals {
+  const f = (a: number, b: number) => Math.max(0, Math.round(a + sign * b));
+  return { calories: f(t.calories, item.calories), protein: f(t.protein, item.protein), carbs: f(t.carbs, item.carbs), fat: f(t.fat, item.fat) };
+}
