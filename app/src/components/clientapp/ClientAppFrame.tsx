@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { CalendarRange, ChevronLeft, Dumbbell, LayoutDashboard, Salad, User } from "lucide-react";
 
@@ -31,6 +32,31 @@ export function ClientAppFrame({
   const isWelcome = pathname === "/app/welcome";
   // Sub-page = any /app route that isn't one of the bottom-nav tabs → show a back button.
   const isSubPage = !isLogin && !isWelcome && !TAB_HREFS.has(pathname);
+
+  // Sign-off can't wait for the next page load: if the gym switches it on or
+  // edits a document while the app is open, check again whenever the app
+  // comes back to the front or the page changes.
+  useEffect(() => {
+    if (isLogin || isWelcome || pathname === "/app/reset") return;
+    let stopped = false;
+    const check = () => {
+      if (document.visibilityState !== "visible") return;
+      fetch("/api/app/onboarding", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j: { pending?: boolean } | null) => {
+          if (!stopped && j?.pending) router.replace("/app/welcome");
+        })
+        .catch(() => undefined);
+    };
+    check();
+    document.addEventListener("visibilitychange", check);
+    window.addEventListener("focus", check);
+    return () => {
+      stopped = true;
+      document.removeEventListener("visibilitychange", check);
+      window.removeEventListener("focus", check);
+    };
+  }, [pathname, isLogin, isWelcome, router]);
 
   const goBack = () => {
     if (window.history.length > 1) router.back();

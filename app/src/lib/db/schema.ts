@@ -3336,6 +3336,30 @@ export const cancellationRequests = sqliteTable("cancellation_requests", {
   outcome: text("outcome", { enum: ["ended", "kept"] }),
 });
 
+/** One WhatsApp message to the members who said yes to news and offers by text or WhatsApp (lib/whatsappBroadcasts.ts). */
+export const whatsappBroadcasts = sqliteTable("whatsapp_broadcasts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  message: text("message").notNull().default(""),
+  audience: text("audience", { enum: ["everyone", "active"] }).notNull().default("everyone"),
+  status: text("status", { enum: ["draft", "scheduled", "sending", "sent", "cancelled"] }).notNull().default("draft"),
+  sendAt: integer("send_at"),
+  createdAt: integer("created_at").notNull(),
+  startedAt: integer("started_at"),
+  finishedAt: integer("finished_at"),
+});
+
+/** Each member a broadcast goes to, fixed when it's sent; the ticker works through the queued ones. */
+export const whatsappBroadcastSends = sqliteTable("whatsapp_broadcast_sends", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  broadcastId: integer("broadcast_id").notNull().references(() => whatsappBroadcasts.id, { onDelete: "cascade" }),
+  clientId: integer("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  status: text("status", { enum: ["queued", "sending", "sent", "failed", "skipped"] }).notNull().default("queued"),
+  error: text("error"),
+  providerMessageId: text("provider_message_id"),
+  sentAt: integer("sent_at"),
+});
+
 /** Weight, height, age and sex a client typed into the app when they have no InBody scan (lib/goals.ts). */
 export const clientMeasurements = sqliteTable("client_measurements", {
   clientId: integer("client_id").primaryKey().references(() => clients.id, { onDelete: "cascade" }),

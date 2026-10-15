@@ -27,7 +27,6 @@ import {
   CalendarRange,
   Check,
   ChevronDown,
-
   ClipboardCheck,
   ClipboardList,
   ChevronsUpDown,
@@ -54,6 +53,7 @@ import {
   X,
   Zap,
   PanelLeftClose,
+  MessageCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -150,11 +150,12 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/content-studio", label: "Content Studio", icon: Clapperboard },
       { href: "/marketing/ads", label: "Ads", icon: Target, adminOnly: true },
       {
-        label: "Email",
+        label: "Messaging",
         icon: Send,
         adminOnly: true,
         children: [
           { href: "/campaigns", label: "Email campaigns", icon: Send, exact: true },
+          { href: "/campaigns/whatsapp", label: "WhatsApp broadcasts", icon: MessageCircle },
           { href: "/campaigns/contacts", label: "Contacts", icon: Send },
           { href: "/campaigns/domains", label: "Sending domains", icon: Send, adminOnly: true },
         ],

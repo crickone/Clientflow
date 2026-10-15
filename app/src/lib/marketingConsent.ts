@@ -46,7 +46,7 @@ export function recordConsent(
   businessName: string,
   channel: ConsentChannel,
   granted: boolean,
-  source: "welcome" | "profile" | "staff",
+  source: "welcome" | "profile" | "staff" | "unsubscribe",
   meta: { ip: string | null; userAgent: string | null } = { ip: null, userAgent: null },
 ): { ok: true; note?: string } {
   db.insert(clientConsents)

@@ -5214,3 +5214,42 @@ textarea.ag-input { resize: vertical; line-height: 1.5; }
 .as-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 560px) { .as-grid2 { grid-template-columns: 1fr; } }
 .cp-notice { border-color: var(--warning); }
+
+/* ── WhatsApp broadcasts (/campaigns/whatsapp) ── */
+.wb-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 12px; overflow: hidden; margin-bottom: 18px; }
+.wb-strip > div { display: grid; gap: 4px; padding: 14px 16px; background: var(--surface-1); }
+.wb-strip span { font-size: 12px; color: var(--text-tertiary); }
+.wb-strip b { font-size: 20px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.wb-note { padding: 14px 16px; margin-bottom: 14px; font-size: 13.5px; color: var(--text-secondary); }
+.wb-note a { display: inline-flex; align-items: center; gap: 4px; color: var(--accent-ink); font-weight: 500; }
+.wb-hint { margin: 0 0 16px; font-size: 12.5px; line-height: 1.55; color: var(--text-tertiary); }
+.wb-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start; }
+@media (max-width: 1000px) { .wb-grid { grid-template-columns: minmax(0, 1fr); } }
+.wb-card { padding: 20px; display: grid; gap: 16px; }
+.wb-field { display: grid; gap: 6px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.wb-field > span, .wb-field legend { font-size: 12.5px; font-weight: 500; color: var(--text-tertiary); padding: 0; margin-bottom: 6px; }
+.wb-text { min-height: 160px; resize: vertical; line-height: 1.55; }
+.wb-tools { display: flex; gap: 8px; align-items: center; margin-top: -8px; }
+.wb-tools button { min-height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--hairline); background: var(--surface-2); color: var(--text-secondary); font: inherit; font-size: 12.5px; cursor: pointer; }
+.wb-tools button:hover { color: var(--text-primary); }
+.wb-tools span { margin-left: auto; font-size: 12px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.wb-tools span[data-over="true"] { color: var(--warning); }
+.wb-err { margin: 0; font-size: 13px; color: var(--warning); }
+.wb-radio { display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 8px 12px; border-radius: var(--radius); border: 1px solid var(--hairline); background: var(--surface-1); font-size: 13.5px; color: var(--text-primary); cursor: pointer; }
+.wb-radio + .wb-radio { margin-top: 6px; }
+.wb-radio[data-on="true"] { border-color: var(--accent); }
+.wb-radio input { accent-color: var(--accent); }
+.wb-radio span { flex: 1; }
+.wb-radio b { font-variant-numeric: tabular-nums; }
+.wb-when { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.wb-when .wb-radio { margin: 0; min-width: 110px; }
+.wb-when input[type="datetime-local"] { width: auto; }
+.wb-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.wb-preview { position: sticky; top: 16px; display: grid; gap: 8px; }
+.wb-preview-label { font-size: 12.5px; color: var(--text-tertiary); }
+.wb-phone { padding: 18px 14px; border-radius: 22px; border: 1px solid var(--hairline); background: color-mix(in srgb, var(--surface-2) 70%, #0b3d2e 30%); min-height: 220px; }
+.wb-bubble { max-width: 92%; margin-left: auto; padding: 10px 12px; border-radius: 12px 12px 4px 12px; background: #1f5c46; color: #f1f5f2; font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.wb-row-err { display: block; margin-top: 4px; font-size: 12px; color: var(--text-tertiary); }
+.wb-input { width: 100%; min-height: 42px; padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--hairline); background: var(--surface-2); color: var(--text-primary); font: inherit; font-size: 14px; }
+.wb-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.wb-when .wb-input { width: auto; }

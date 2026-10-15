@@ -22,6 +22,10 @@ import { logActivity } from "@/lib/queries";
 import { runTriage } from "@/lib/inbox/triagePipeline";
 import { onInboundFromClient, onInboundFromLead } from "@/lib/pipeline/stage";
 import { AiCapError } from "@/lib/ai/usage";
+import { getBusinessProfileForTenant } from "@/lib/businessProfile";
+import { recordConsent } from "@/lib/marketingConsent";
+import { isOptedIn } from "@/lib/whatsappBroadcasts";
+import { isStopReply } from "@/lib/whatsappBroadcastModel";
 
 /**
  * Distinguishes an expected "tenant is over its monthly AI cap" skip from a
@@ -64,7 +68,16 @@ export const dynamic = "force-dynamic";
  * owning tenant from the inbound channel/number → tenant mapping here (e.g. a
  * control-plane whatsapp_channels table) instead of the single configured one.
  */
-function whatsAppTenant() {
+function whatsAppTenant(slug: string | null) {
+  // Per business: the webhook address carries the business (?t=<slug>), so
+  // each gym's WhatsApp lands in its own account. Without it, the old single
+  // connection: the one business holding a WhatsApp token.
+  if (slug) {
+    const t = listTenants().find((x) => x.slug === slug && x.isActive !== false);
+    if (!t) return undefined;
+    const cfg = readKeyForTenant<{ token?: string }>(t.id, "whatsapp_config", {});
+    return typeof cfg.token === "string" && cfg.token.trim() ? t : undefined;
+  }
   return listTenants().find((t) => {
     if (t.isActive === false) return false;
     const cfg = readKeyForTenant<{ token?: string }>(t.id, "whatsapp_config", {});
@@ -73,7 +86,7 @@ function whatsAppTenant() {
 }
 
 export async function POST(req: NextRequest) {
-  const tenant = whatsAppTenant();
+  const tenant = whatsAppTenant(new URL(req.url).searchParams.get("t"));
   if (!tenant) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
@@ -117,6 +130,18 @@ export async function POST(req: NextRequest) {
           `WhatsApp reply from ${client.firstName} ${client.lastName}`.trim(),
           { clientId: client.id },
         );
+        // STOP on its own turns off news and offers by WhatsApp, and says so.
+        if (isStopReply(inbound.text) && isOptedIn(client.id)) {
+          const business = getBusinessProfileForTenant(tenant.id).businessName;
+          recordConsent(tenant.id, client, business, "sms", false, "unsubscribe");
+          const reply = `You won't get news and offers from ${business} on WhatsApp again. Messages about your bookings still come.`;
+          try {
+            const { providerMessageId } = await bridge.sendText(client.phone, reply);
+            addClientMessage({ clientId: client.id, direction: "outbound", channel: "whatsapp", content: reply, providerMessageId, status: "sent", sentAt: new Date() });
+          } catch (err) {
+            console.error("[whatsapp] stop confirmation failed:", err);
+          }
+        }
         try {
           onInboundFromClient(client.id);
         } catch (err) {

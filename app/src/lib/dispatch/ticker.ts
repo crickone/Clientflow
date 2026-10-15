@@ -14,6 +14,7 @@ import { syncGoogleReviewsIfStale } from "@/lib/google/business";
 import { syncInBodyIfStale } from "@/lib/inbody/scans";
 import { sweepLegacyUploads } from "@/lib/video/uploadSweep";
 import { listTenants } from "@/lib/tenants";
+import { dispatchDueBroadcasts } from "@/lib/whatsappBroadcasts";
 
 /**
  * The dispatch ticker: everything that was booked for a time, sent when that
@@ -102,6 +103,13 @@ async function runTenant(tenantId: number, baseUrl: string, summary: DispatchSum
       summary.nurtureSent += await dispatchDueAutomationQueue(tenantId);
     } catch (err) {
       console.error(`[dispatch] tenant ${tenantId} nurture queue failed:`, err);
+    }
+    // WhatsApp broadcasts: a few messages a minute, daytime only (a no-op
+    // without a broadcast in flight).
+    try {
+      await dispatchDueBroadcasts(tenantId);
+    } catch (err) {
+      console.error(`[dispatch] tenant ${tenantId} whatsapp broadcasts failed:`, err);
     }
   });
 }

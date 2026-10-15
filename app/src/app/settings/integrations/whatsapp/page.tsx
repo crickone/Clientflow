@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/Button";
 import { requireAdminPage } from "@/lib/auth";
 import { getWhatsAppConfig } from "@/lib/whatsapp/config";
+import { getCurrentTenant } from "@/lib/db/tenant";
 import { WhatsAppConnectForm } from "@/components/settings/WhatsAppConnectForm";
 
 export const dynamic = "force-dynamic";
@@ -17,8 +18,10 @@ export default async function WhatsAppSettingsPage() {
   const h = headers();
   const host = h.get("host") ?? "localhost:3000";
   const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  const secretParam = cfg.webhookSecret ? `?secret=${cfg.webhookSecret}` : "";
-  const webhookUrl = `${proto}://${host}/api/whatsapp/webhook${secretParam}`;
+  // The business goes in the address so each gym's replies land in its own account.
+  const q = new URLSearchParams({ t: getCurrentTenant().slug });
+  if (cfg.webhookSecret) q.set("secret", cfg.webhookSecret);
+  const webhookUrl = `${proto}://${host}/api/whatsapp/webhook?${q.toString()}`;
 
   return (
     <div className="app-page" style={{ maxWidth: 720 }}>
