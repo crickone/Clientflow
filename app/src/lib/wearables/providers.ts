@@ -39,7 +39,7 @@ interface ProviderConfig {
 const CONFIG: Record<ProviderId, ProviderConfig> = {
   fitbit: { authorizeUrl: "https://www.fitbit.com/oauth2/authorize", tokenUrl: "https://api.fitbit.com/oauth2/token", scope: "activity heartrate sleep weight", pkce: true, clientAuth: "basic" },
   oura: { authorizeUrl: "https://cloud.ouraring.com/oauth/authorize", tokenUrl: "https://api.ouraring.com/oauth/token", scope: "daily heartrate personal", pkce: false, clientAuth: "body" },
-  whoop: { authorizeUrl: "https://api.prod.whoop.com/oauth/oauth2/auth", tokenUrl: "https://api.prod.whoop.com/oauth/oauth2/token", scope: "read:recovery read:sleep read:cycles offline", pkce: false, clientAuth: "body" },
+  whoop: { authorizeUrl: "https://api.prod.whoop.com/oauth/oauth2/auth", tokenUrl: "https://api.prod.whoop.com/oauth/oauth2/token", scope: "read:recovery read:sleep read:cycles read:profile offline", pkce: false, clientAuth: "body" },
   withings: { authorizeUrl: "https://account.withings.com/oauth2_user/authorize2", tokenUrl: "https://wbsapi.withings.net/v2/oauth2", scope: "user.metrics,user.activity", scopeSep: ",", pkce: false, clientAuth: "body" },
   polar: { authorizeUrl: "https://flow.polar.com/oauth2/authorization", tokenUrl: "https://polarremote.com/v2/oauth2/token", scope: "accesslink.read_all", pkce: false, clientAuth: "basic" },
   garmin: { authorizeUrl: "https://connect.garmin.com/oauth2Confirm", tokenUrl: "https://diauth.garmin.com/di-oauth2-service/oauth/token", scope: "", pkce: true, clientAuth: "body", push: true },
@@ -147,7 +147,8 @@ export async function exchangeCode(p: ProviderId, code: string, redirectUri: str
   const t = await tokenRequest(p, params);
   // Some providers name the account separately, or need the member registered first.
   if (p === "whoop" && !t.externalUserId) {
-    const prof = (await call(u("https://api.prod.whoop.com/developer/v2/user/profile/basic"), { headers: bearer(t.accessToken) })) as { user_id?: unknown };
+    // Only a label for the account: data is pulled with the token, so a failed lookup doesn't stop the connection.
+    const prof = (await call(u("https://api.prod.whoop.com/developer/v2/user/profile/basic"), { headers: bearer(t.accessToken) }).catch(() => null)) as { user_id?: unknown } | null;
     if (prof?.user_id !== undefined) t.externalUserId = String(prof.user_id);
   }
   if (p === "polar") await registerPolarUser(t);
