@@ -2,12 +2,16 @@ import { requireClientPage } from "@/lib/clientAuth";
 import { clientMembership } from "@/lib/clientApp";
 import { Badge } from "@/components/ui/Badge";
 import { Card, dayLabel, euros, PageTitle } from "@/components/clientapp/ui";
+import { CancelMembership } from "@/components/clientapp/CancelMembership";
+import { businessContact } from "@/lib/agreements";
+import { pendingRequest } from "@/lib/cancellations";
 
 export const dynamic = "force-dynamic";
 
 export default async function ClientMembershipPage() {
   const { clientId } = requireClientPage();
   const m = clientMembership(clientId);
+  const notice = pendingRequest(clientId);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -32,6 +36,12 @@ export default async function ClientMembershipPage() {
             <div style={{ height: 1, background: "var(--hairline)", margin: "10px 0" }} />
             <Row label="Next billing" value={m.nextBillingDate ? dayLabel(m.nextBillingDate, { day: "numeric", month: "long", year: "numeric" }) : "—"} />
           </Card>
+
+          <CancelMembership
+            businessName={businessContact().name}
+            membershipName={m.name}
+            pendingSince={notice ? new Date(notice.requestedAt).toLocaleDateString("en-IE", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Dublin" }) : null}
+          />
         </>
       ) : (
         <Card>

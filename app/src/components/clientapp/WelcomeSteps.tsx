@@ -13,9 +13,21 @@ import { acceptAgreementsAction, submitWelcomeAction } from "@/app/app/actions";
  * Step one: tick each document (open any to read it in full). The health
  * consent is short enough to read on the tick box itself.
  */
-export function AgreeStep({ docs, businessName, step }: { docs: AgreementDoc[]; businessName: string; step: string | null }) {
+export function AgreeStep({
+  docs,
+  businessName,
+  step,
+  optional = [],
+}: {
+  docs: AgreementDoc[];
+  businessName: string;
+  step: string | null;
+  /** News-and-offers ticks not yet answered: optional, never needed to continue. */
+  optional?: { channel: "email" | "sms"; statement: string }[];
+}) {
   const router = useRouter();
   const [ticked, setTicked] = useState<Record<string, boolean>>({});
+  const [optIn, setOptIn] = useState<{ email?: boolean; sms?: boolean }>({});
   const [open, setOpen] = useState<AgreementDoc | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -24,7 +36,7 @@ export function AgreeStep({ docs, businessName, step }: { docs: AgreementDoc[]; 
   function submit() {
     setError(null);
     start(async () => {
-      const r = await acceptAgreementsAction(docs.map((d) => ({ key: d.key, version: d.version })));
+      const r = await acceptAgreementsAction(docs.map((d) => ({ key: d.key, version: d.version })), optIn);
       if (!r.ok) {
         setError(r.error);
         router.refresh();
@@ -70,6 +82,28 @@ export function AgreeStep({ docs, businessName, step }: { docs: AgreementDoc[]; 
           );
         })}
       </ul>
+
+      {optional.length > 0 && (
+        <div className="ag-optional">
+          <div className="ag-optional-head">
+            <b>Optional</b>
+            <span>You can use the app either way, and change these in your profile.</span>
+          </div>
+          <ul className="ag-list">
+            {optional.map((o) => (
+              <li key={o.channel} className="ag-item" data-on={Boolean(optIn[o.channel])}>
+                <label className="ag-tick">
+                  <input type="checkbox" checked={Boolean(optIn[o.channel])} onChange={(e) => setOptIn({ ...optIn, [o.channel]: e.target.checked })} />
+                  <span className="ag-box" aria-hidden>
+                    <Check size={14} />
+                  </span>
+                  <span>{o.statement}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {error && (
         <div className="ag-error" role="alert">

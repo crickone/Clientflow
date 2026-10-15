@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/Button";
 import { getCurrentMembership, requireUser } from "@/lib/auth";
 import { getAgreementSettings, requiredDocs, welcomeChoices } from "@/lib/agreements";
 import { AgreementSettingsCard } from "@/components/agreements/AgreementSettingsCard";
+import { CheckinSettingsCard } from "@/components/agreements/CheckinSettingsCard";
+import { checkinChoices, getCheckinSettings } from "@/lib/checkins";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +15,7 @@ export default async function MyAppPage() {
   await requireUser();
   const settings = getAgreementSettings();
   const isAdmin = getCurrentMembership()?.role === "admin";
+  const checkins = getCheckinSettings();
   return (
     <div className="app-page" style={{ maxWidth: 960 }}>
       <PageHeader
@@ -57,6 +60,7 @@ export default async function MyAppPage() {
         {/* info */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <AgreementSettingsCard on={settings.on} welcomeFormId={settings.welcomeFormId} docs={requiredDocs()} choices={welcomeChoices()} isAdmin={isAdmin} />
+          <CheckinSettingsCard formId={checkins.formId} weekday={checkins.weekday} choices={checkinChoices()} isAdmin={isAdmin} />
 
           <Card style={{ padding: 22 }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", marginBottom: 10 }}>What clients can do</div>

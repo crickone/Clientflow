@@ -2953,6 +2953,30 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       user_agent  TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_client_agreements_client ON client_agreements(client_id, doc_key);
+    CREATE TABLE IF NOT EXISTS client_consents (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id   INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      channel     TEXT NOT NULL,
+      granted     INTEGER NOT NULL,
+      statement   TEXT NOT NULL,
+      source      TEXT NOT NULL,
+      at          INTEGER NOT NULL,
+      ip          TEXT,
+      user_agent  TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_client_consents_client ON client_consents(client_id, channel, at);
+    CREATE TABLE IF NOT EXISTS cancellation_requests (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id       INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      membership_id   INTEGER,
+      membership_name TEXT NOT NULL,
+      reason          TEXT,
+      status          TEXT NOT NULL DEFAULT 'pending',
+      requested_at    INTEGER NOT NULL,
+      handled_at      INTEGER,
+      outcome         TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_cancellation_requests_client ON cancellation_requests(client_id, status);
     CREATE TABLE IF NOT EXISTS client_measurements (
       client_id  INTEGER PRIMARY KEY REFERENCES clients(id) ON DELETE CASCADE,
       weight_kg  REAL NOT NULL,

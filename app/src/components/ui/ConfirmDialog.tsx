@@ -35,8 +35,13 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
     resolve: (v: boolean) => void;
   } | null>(null);
 
+  // Most callers await confirm() inside startTransition(async () => ...). An
+  // update made there belongs to the transition, and React holds it until the
+  // transition's promise settles, which is waiting on this dialog: it never
+  // opened and the button sat disabled. Opening it on the next tick takes the
+  // update out of the transition, so it renders straight away.
   const confirm = React.useCallback<ConfirmFn>(
-    (opts) => new Promise<boolean>((resolve) => setState({ opts, resolve })),
+    (opts) => new Promise<boolean>((resolve) => setTimeout(() => setState({ opts, resolve }), 0)),
     [],
   );
 

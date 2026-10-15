@@ -46,6 +46,11 @@ import { isEmailConfigured } from "@/lib/email";
 import { getCurrentMembership } from "@/lib/auth";
 import { clientMembership } from "@/lib/clientApp";
 import { clientAgreementView } from "@/lib/agreements";
+import { pendingRequest } from "@/lib/cancellations";
+import { listCheckins } from "@/lib/checkins";
+import { consentsFor } from "@/lib/marketingConsent";
+import { CONSENT_CHANNELS, CONSENT_LABEL, photoNames } from "@/lib/memberChoicesModel";
+import { CancelNoticeCard } from "@/components/clients/CancelNoticeCard";
 import { bodyScansEnabled, getScanProfile, listClientScans } from "@/lib/inbody/scans";
 import { goalTarget } from "@/lib/goals";
 import { ACTIVITY_BY_KEY, GOAL_BY_KEY } from "@/lib/goalsModel";
@@ -91,6 +96,10 @@ export default async function ClientProfile({
   const activeMembership = clientMembership(id);
   const agreements = clientAgreementView(id);
   const agreedAll = agreements.docs.every((d) => d.current);
+  const cancelNotice = pendingRequest(id);
+  const consents = consentsFor(id, client.email);
+  const checkins = listCheckins(id);
+  const dayOf = (ms: number) => new Date(ms).toLocaleDateString("en-IE", { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Dublin" });
   const showScans = membership ? bodyScansEnabled(membership.tenant.id) : false;
   const scans = showScans ? listClientScans(id) : [];
   const scanProfile = showScans ? getScanProfile(id) : null;
@@ -131,6 +140,7 @@ export default async function ClientProfile({
               <Badge tone={appTone}>{appState}</Badge>
               {clientGoal && <Badge tone="neutral">Goal: {GOAL_BY_KEY[clientGoal.goal.goal].label}</Badge>}
               {agreements.on && <Badge tone={agreedAll ? "green" : "neutral"}>{agreedAll ? "Agreed to terms" : "Terms not agreed"}</Badge>}
+              {cancelNotice && <Badge tone="amber">Asked to cancel</Badge>}
             </div>
           </div>
         </div>
@@ -179,6 +189,11 @@ export default async function ClientProfile({
             Email <Count n={clientEmailHistory.length} />
           </TabsTrigger>
           <TabsTrigger value="app">Client app</TabsTrigger>
+          {checkins.length > 0 && (
+            <TabsTrigger value="checkins">
+              Check-ins <Count n={checkins.length} />
+            </TabsTrigger>
+          )}
           {showWorkoutLog && <TabsTrigger value="workouts">Workout log <Count n={workoutSessions.length} /></TabsTrigger>}
           {showScans && <TabsTrigger value="scans">Body scans <Count n={scans.length} /></TabsTrigger>}
         </TabsList>
@@ -449,6 +464,43 @@ export default async function ClientProfile({
           />
         </TabsContent>
 
+        {checkins.length > 0 && (
+          <TabsContent value="checkins">
+            <div style={{ display: "grid", gap: 12 }}>
+              {checkins.map((c, i) => (
+                <details key={c.id} className="ci-past" open={i === 0}>
+                  <summary>
+                    <b>{dayOf(c.at)}</b>
+                    <span>{c.formTitle}</span>
+                  </summary>
+                  <div className="wq" style={{ padding: "4px 16px 14px" }}>
+                    {c.answers
+                      .filter((a) => a.fieldType !== "video")
+                      .map((a) => (
+                        <div key={a.questionId} className="wq-row">
+                          <span className="wq-q">{a.label}</span>
+                          {a.fieldType === "photo" ? (
+                            <div className="ci-photos">
+                              {photoNames(a.value).map((n) => (
+                                <a key={n} href={`/api/checkins/photo?client=${id}&name=${encodeURIComponent(n)}`} target="_blank" rel="noreferrer">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img className="ci-thumb" src={`/api/checkins/photo?client=${id}&name=${encodeURIComponent(n)}`} alt={a.label} />
+                                </a>
+                              ))}
+                              {photoNames(a.value).length === 0 && <span className="wq-a">No photo</span>}
+                            </div>
+                          ) : (
+                            <span className="wq-a">{a.fieldType === "confirm" ? (a.value === "yes" ? "Ticked" : "Not ticked") : a.value || "No answer"}</span>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                </details>
+              ))}
+            </div>
+          </TabsContent>
+        )}
+
         <TabsContent value="app">
           {agreements.welcome && (
             <Card className="cp-card" style={{ marginBottom: 16 }}>
@@ -480,6 +532,10 @@ export default async function ClientProfile({
       </Tabs>
 
       <aside className="cp-side">
+        {cancelNotice && (
+          <CancelNoticeCard clientId={id} requestId={cancelNotice.id} membershipName={cancelNotice.membershipName} when={dayOf(cancelNotice.requestedAt)} reason={cancelNotice.reason} />
+        )}
+
         <Card className="cp-card">
           <CardLabel>Details</CardLabel>
           <dl className="cp-facts">
@@ -539,7 +595,7 @@ export default async function ClientProfile({
             )}
             <div>
               <dt>Membership</dt>
-              <dd>{activeMembership ? `${activeMembership.name}, ${formatEur(activeMembership.priceCents)}` : "None"}</dd>
+              <dd>{activeMembership ? `${activeMembership.name}, ${formatEur(activeMembership.priceCents / 100)}` : "None"}</dd>
             </div>
             {clientGoal && (
               <div>
@@ -572,6 +628,23 @@ export default async function ClientProfile({
           </Card>
         )}
 
+        <Card className="cp-card">
+          <CardLabel>News and offers</CardLabel>
+          <dl className="cp-agree">
+            {CONSENT_CHANNELS.map((ch) => {
+              const c = consents[ch];
+              return (
+                <div key={ch}>
+                  <dt>{CONSENT_LABEL[ch]}</dt>
+                  <dd data-state={c?.granted ? "ok" : "missing"}>
+                    {!c ? "Not asked" : c.granted ? `Yes, ${dayOf(c.at!)}` : c.source === "unsubscribe" ? "Unsubscribed" : `No, ${dayOf(c.at!)}`}
+                  </dd>
+                </div>
+              );
+            })}
+          </dl>
+        </Card>
+
         {(client.medicalNotes || client.emergencyContactName || client.emergencyContactPhone) && (
           <Card className="cp-card">
             <CardLabel>Care</CardLabel>
@@ -597,7 +670,7 @@ export default async function ClientProfile({
   );
 }
 
-const TAB_KEYS = new Set(["journey", "appointments", "sessions", "packages", "payments", "messages", "email", "app", "workouts", "scans"]);
+const TAB_KEYS = new Set(["journey", "appointments", "sessions", "packages", "payments", "messages", "email", "app", "checkins", "workouts", "scans"]);
 
 /** A count beside a tab name, only when there is something to count. */
 function Count({ n }: { n: number }) {

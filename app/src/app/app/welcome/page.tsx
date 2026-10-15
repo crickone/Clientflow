@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 
 import { getCurrentClient } from "@/lib/clientAuth";
 import { businessContact, onboardingFor } from "@/lib/agreements";
+import { consentsFor } from "@/lib/marketingConsent";
+import { CONSENT_CHANNELS, consentStatement } from "@/lib/memberChoicesModel";
 import { AgreeStep, WelcomeStep } from "@/components/clientapp/WelcomeSteps";
 import { LogoutButton } from "@/components/clientapp/LogoutButton";
 
@@ -18,11 +20,13 @@ export default async function WelcomePage() {
   const todo = onboardingFor(c.clientId);
   if (!todo) redirect("/app");
   const name = businessContact().name;
+  const answered = consentsFor(c.clientId, c.client.email);
+  const optional = CONSENT_CHANNELS.filter((ch) => answered[ch] === null).map((ch) => ({ channel: ch, statement: consentStatement(ch, name) }));
 
   return (
     <div style={{ display: "grid", gap: 18 }}>
       {todo.docs.length > 0 ? (
-        <AgreeStep docs={todo.docs} businessName={name} step={todo.welcome ? "Step 1 of 2" : null} />
+        <AgreeStep docs={todo.docs} businessName={name} step={todo.welcome ? "Step 1 of 2" : null} optional={optional} />
       ) : (
         <WelcomeStep title={todo.welcome!.title} questions={todo.welcome!.questions} businessName={name} step="Step 2 of 2" />
       )}

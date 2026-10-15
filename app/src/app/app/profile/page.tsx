@@ -6,6 +6,10 @@ import { clientHistory, clientMembership } from "@/lib/clientApp";
 import { Badge } from "@/components/ui/Badge";
 import { Card, dayLabel, PageTitle, SectionTitle } from "@/components/clientapp/ui";
 import { LogoutButton } from "@/components/clientapp/LogoutButton";
+import { MessagePrefs } from "@/components/clientapp/MessagePrefs";
+import { businessContact } from "@/lib/agreements";
+import { consentsFor } from "@/lib/marketingConsent";
+import { CONSENT_CHANNELS, CONSENT_LABEL, consentStatement } from "@/lib/memberChoicesModel";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +24,8 @@ export default async function ClientProfilePage() {
   const m = clientMembership(clientId);
   const history = clientHistory(clientId, 12);
   const initials = `${client.firstName?.[0] ?? ""}${client.lastName?.[0] ?? ""}`.toUpperCase();
+  const business = businessContact().name;
+  const consents = consentsFor(clientId, client.email);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -47,6 +53,18 @@ export default async function ClientProfilePage() {
           <ChevronRight size={18} style={{ color: "var(--text-tertiary)" }} />
         </Card>
       </Link>
+
+      <div>
+        <SectionTitle>Messages from {business}</SectionTitle>
+        <Card style={{ padding: "4px 16px" }}>
+          <MessagePrefs
+            items={CONSENT_CHANNELS.map((ch) => ({ channel: ch, label: CONSENT_LABEL[ch], statement: consentStatement(ch, business), on: consents[ch]?.granted === true }))}
+          />
+        </Card>
+        <div style={{ fontSize: 12, color: "var(--text-tertiary)", margin: "6px 2px 0", lineHeight: 1.5 }}>
+          Messages about your bookings and membership still come either way.
+        </div>
+      </div>
 
       <div>
         <SectionTitle>Attendance history</SectionTitle>

@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { CalendarRange, ChevronRight, CreditCard, Dumbbell, Play, Salad, ScanLine, Target, TrendingUp, Trophy } from "lucide-react";
+import { CalendarRange, ChevronRight, ClipboardCheck, CreditCard, Dumbbell, Play, Salad, ScanLine, Target, TrendingUp, Trophy } from "lucide-react";
+import { memberCheckin } from "@/lib/checkins";
+import { WEEKDAYS } from "@/lib/memberChoicesModel";
 
 import { requireClientPage } from "@/lib/clientAuth";
 import { clientDashboard, clientUpcoming } from "@/lib/clientApp";
@@ -33,6 +35,7 @@ export default async function ClientHome() {
   const mealsToday = dayTotals(mealsForDay(clientId, today));
   const mealTarget = dailyTarget(clientId);
   const goal = goalTarget(clientId);
+  const checkin = memberCheckin(clientId);
   const showTraining = t.programs.length > 0 || t.totalWorkouts > 0;
   const strengthNow = t.strength.length && t.lifts.some((l) => l.sessions > 1) ? t.strength[t.strength.length - 1].value : null;
   const muscle = latestScan && firstScan && latestScan !== firstScan ? formatChange("smm", latestScan.metrics.smm, firstScan.metrics.smm) : null;
@@ -57,6 +60,30 @@ export default async function ClientHome() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Continue {t.open.dayName}</div>
                 <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>{t.open.done} of {t.open.total} sets done</div>
+              </div>
+              <ChevronRight size={18} style={{ color: "var(--text-tertiary)" }} />
+            </div>
+          </Card>
+        </Link>
+      )}
+
+      {/* weekly check-in */}
+      {checkin && (
+        <Link href="/app/checkin">
+          <Card style={checkin.due ? { borderColor: "var(--accent)", background: "var(--accent-soft)" } : undefined}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={checkin.due ? { ...iconBox, background: "var(--accent)", color: "var(--accent-contrast)" } : iconBox}>
+                <ClipboardCheck size={18} />
+              </span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{checkin.due ? "Check-in due" : "Check-in done"}</div>
+                <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
+                  {checkin.due
+                    ? checkin.daysLate === 0
+                      ? "Due today. Takes a couple of minutes."
+                      : `Due since ${WEEKDAYS[checkin.weekday - 1]}`
+                    : `Next one ${new Date(`${checkin.next}T12:00:00Z`).toLocaleDateString("en-IE", { weekday: "long", day: "numeric", month: "short", timeZone: "UTC" })}`}
+                </div>
               </div>
               <ChevronRight size={18} style={{ color: "var(--text-tertiary)" }} />
             </div>

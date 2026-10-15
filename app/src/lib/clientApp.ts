@@ -22,6 +22,7 @@ import type { ProgramInput } from "@/lib/workoutModel";
 // ── membership ─────────────────────────────────────────────────────────────────
 
 export interface ClientMembershipInfo {
+  id: number;
   name: string;
   priceCents: number;
   status: string;
@@ -42,6 +43,7 @@ export function clientMembership(clientId: number): ClientMembershipInfo | null 
     ? db.select().from(membershipPlans).where(eq(membershipPlans.id, row.membershipId)).get()
     : null;
   return {
+    id: row.id,
     name: row.membershipName,
     priceCents: row.priceCents,
     status: row.status,

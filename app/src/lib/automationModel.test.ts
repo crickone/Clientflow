@@ -20,17 +20,17 @@ function check(name: string, cond: boolean) {
   passed++;
 }
 
-// The 4 triggers verified (improvement-plan-2026-08.md Theme D1) to actually
-// be dispatched today: 3 via fireTrigger()'s real call sites
-// (clients/actions.ts, clients/appAccessActions.ts) and 1 via the birthday
-// job (automations/scheduler.ts). Every other catalog entry is configurable
+// The triggers verified to actually be dispatched today: fireTrigger()'s real
+// call sites (clients/actions.ts, clients/appAccessActions.ts, the check-in
+// submit in app/app/actions.ts, campaign sign-ups) and the birthday job
+// (automations/scheduler.ts). Every other catalog entry is configurable
 // in the UI but nothing ever calls fireTrigger() for it.
-const EXPECTED_ACTIVE = ["new_client_created", "nutrition_plan_added", "workout_plan_added", "client_birthday", "campaign_signup"];
+const EXPECTED_ACTIVE = ["new_client_created", "client_check_in", "nutrition_plan_added", "workout_plan_added", "client_birthday", "campaign_signup"];
 
 check("TRIGGER_CATALOG has exactly 13 entries (the fixed Kahunas trigger list plus the campaign sign-up nurture trigger)", TRIGGER_CATALOG.length === 13);
 
 check(
-  "ACTIVE_TRIGGER_KEYS is exactly the 5 verified-active triggers, no more, no fewer",
+  "ACTIVE_TRIGGER_KEYS is exactly the 6 verified-active triggers, no more, no fewer",
   ACTIVE_TRIGGER_KEYS.size === EXPECTED_ACTIVE.length && EXPECTED_ACTIVE.every((k) => ACTIVE_TRIGGER_KEYS.has(k)),
 );
 
@@ -47,9 +47,9 @@ for (const t of TRIGGER_CATALOG) {
 
 const comingSoonKeys = TRIGGER_CATALOG.filter((t) => t.status === "coming_soon").map((t) => t.key);
 check(
-  "the other 8 catalog entries are status: coming_soon",
-  comingSoonKeys.length === 8 &&
-    ["client_check_in", "initial_qa_form", "supplement_plan_added", "workout_plan_updated", "nutrition_plan_updated", "client_missed_check_in", "client_check_in_reminder", "supplement_plan_updated"].every(
+  "the other 7 catalog entries are status: coming_soon",
+  comingSoonKeys.length === 7 &&
+    ["initial_qa_form", "supplement_plan_added", "workout_plan_updated", "nutrition_plan_updated", "client_missed_check_in", "client_check_in_reminder", "supplement_plan_updated"].every(
       (k) => comingSoonKeys.includes(k),
     ),
 );

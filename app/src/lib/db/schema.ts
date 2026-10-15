@@ -3304,6 +3304,38 @@ export const clientAgreements = sqliteTable("client_agreements", {
   userAgent: text("user_agent"),
 });
 
+/**
+ * A member's yes or no to news and offers by email or text, as a log: the
+ * latest row per channel is the current answer (lib/marketingConsent.ts).
+ * Each row keeps the exact wording they saw, so consent can be shown.
+ */
+export const clientConsents = sqliteTable("client_consents", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  clientId: integer("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  channel: text("channel", { enum: ["email", "sms"] }).notNull(),
+  granted: integer("granted", { mode: "boolean" }).notNull(),
+  statement: text("statement").notNull(),
+  /** Where the answer came from: the welcome step, the member's profile, an email unsubscribe link, or staff. */
+  source: text("source", { enum: ["welcome", "profile", "unsubscribe", "staff"] }).notNull(),
+  at: integer("at").notNull(),
+  ip: text("ip"),
+  userAgent: text("user_agent"),
+});
+
+/** A member's notice to cancel, sent from the app (lib/cancellations.ts). */
+export const cancellationRequests = sqliteTable("cancellation_requests", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  clientId: integer("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  membershipId: integer("membership_id"),
+  membershipName: text("membership_name").notNull(),
+  reason: text("reason"),
+  status: text("status", { enum: ["pending", "done", "withdrawn"] }).notNull().default("pending"),
+  requestedAt: integer("requested_at").notNull(),
+  handledAt: integer("handled_at"),
+  /** What staff did: ended the membership, or kept it. */
+  outcome: text("outcome", { enum: ["ended", "kept"] }),
+});
+
 /** Weight, height, age and sex a client typed into the app when they have no InBody scan (lib/goals.ts). */
 export const clientMeasurements = sqliteTable("client_measurements", {
   clientId: integer("client_id").primaryKey().references(() => clients.id, { onDelete: "cascade" }),

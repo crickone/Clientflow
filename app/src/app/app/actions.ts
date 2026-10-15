@@ -8,7 +8,11 @@ import { requireClient } from "@/lib/clientAuth";
 import { assignedWorkoutProgramDetail, clientMembership } from "@/lib/clientApp";
 import { bookClient, removeBooking } from "@/lib/timetable";
 import { setScanConsent } from "@/lib/inbody/scans";
-import { acceptDocs, saveWelcome } from "@/lib/agreements";
+import { acceptDocs, businessContact, saveWelcome } from "@/lib/agreements";
+import { recordConsent } from "@/lib/marketingConsent";
+import { requestCancel, withdrawRequest } from "@/lib/cancellations";
+import { saveCheckin } from "@/lib/checkins";
+import { fireTrigger } from "@/lib/automations";
 import { bodyForGoal, clearGoal, setGoal, setManualBody } from "@/lib/goals";
 import { isActivityKey, isGoalKey, parseManualBody } from "@/lib/goalsModel";
 import {
@@ -74,14 +78,68 @@ export async function setBodyScanConsentAction(consent: boolean): Promise<{ ok: 
 
 // ---- Welcome: documents to agree to, then the Welcome Q&A ------------------
 
-export async function acceptAgreementsAction(ticked: { key: string; version: string }[]): Promise<{ ok: true } | { ok: false; error: string }> {
-  const { clientId } = requireClient();
-  const list = z.array(z.object({ key: z.string().max(40), version: z.string().max(20) })).max(30).safeParse(ticked);
-  if (!list.success) return { ok: false, error: "Tick each document to continue." };
+function requestMeta() {
   const h = headers();
   const ip = (h.get("x-forwarded-for") ?? "").split(",")[0].trim() || h.get("x-real-ip");
-  const r = acceptDocs(clientId, list.data, { ip: ip || null, userAgent: h.get("user-agent") });
+  return { ip: ip || null, userAgent: h.get("user-agent") };
+}
+
+export async function acceptAgreementsAction(
+  ticked: { key: string; version: string }[],
+  /** The optional news-and-offers ticks shown under the documents. Only a tick is recorded; an empty box changes nothing. */
+  optIns: { email?: boolean; sms?: boolean } = {},
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { clientId, tenantId, client } = requireClient();
+  const list = z.array(z.object({ key: z.string().max(40), version: z.string().max(20) })).max(30).safeParse(ticked);
+  if (!list.success) return { ok: false, error: "Tick each document to continue." };
+  const meta = requestMeta();
+  const r = acceptDocs(clientId, list.data, meta);
+  if (r.ok) {
+    const name = businessContact().name;
+    for (const ch of ["email", "sms"] as const) if (optIns[ch] === true) recordConsent(tenantId, { ...client, id: clientId }, name, ch, true, "welcome", meta);
+  }
   revalidatePath("/app/welcome");
+  return r;
+}
+
+/** News and offers by email or text: on or off, from the member's profile. */
+export async function setConsentAction(channel: string, granted: boolean): Promise<{ ok: true; note?: string } | { ok: false; error: string }> {
+  const { clientId, tenantId, client } = requireClient();
+  if (channel !== "email" && channel !== "sms") return { ok: false, error: "Unknown choice." };
+  const r = recordConsent(tenantId, { ...client, id: clientId }, businessContact().name, channel, granted === true, "profile", requestMeta());
+  revalidatePath("/app/profile");
+  return r;
+}
+
+// ---- Cancelling a membership ----------------------------------------------
+
+export async function requestCancelAction(reason: string): Promise<{ ok: true; emailed: boolean } | { ok: false; error: string }> {
+  const { clientId, client } = requireClient();
+  const r = await requestCancel({ client: { ...client, id: clientId }, businessName: businessContact().name, reason: typeof reason === "string" ? reason : "" });
+  revalidatePath("/app/membership");
+  revalidatePath("/app/profile");
+  return r.ok ? { ok: true, emailed: r.emailed } : r;
+}
+
+export async function withdrawCancelAction(): Promise<{ ok: true }> {
+  const { clientId } = requireClient();
+  withdrawRequest(clientId);
+  revalidatePath("/app/membership");
+  return { ok: true };
+}
+
+// ---- Weekly check-in ------------------------------------------------------
+
+export async function submitCheckinAction(raw: Record<string, string>): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { clientId, tenantId } = requireClient();
+  const clean: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw ?? {})) if (/^q_\d+$/.test(k) && typeof v === "string") clean[k] = v;
+  const r = saveCheckin(tenantId, clientId, clean);
+  if (r.ok) {
+    await fireTrigger("client_check_in", clientId);
+    revalidatePath("/app");
+    revalidatePath("/app/checkin");
+  }
   return r;
 }
 

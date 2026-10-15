@@ -28,7 +28,7 @@ export interface TriggerDef {
 /** Fixed catalog of event triggers (Kahunas "Trigger List"). */
 export const TRIGGER_CATALOG: TriggerDef[] = [
   { key: "new_client_created", label: "New client created", description: "When a new client is added to your roster.", status: "active" },
-  { key: "client_check_in", label: "Client completes a check-in", description: "When a client submits a check-in.", status: "coming_soon" },
+  { key: "client_check_in", label: "Client completes a check-in", description: "When a client sends their weekly check-in from the app.", status: "active" },
   { key: "nutrition_plan_added", label: "Nutrition plan added to your client", description: "When a nutrition plan is assigned to a client.", status: "active" },
   { key: "initial_qa_form", label: "Client completes initial Q&A form", description: "When a client completes their onboarding form.", status: "coming_soon" },
   { key: "workout_plan_added", label: "Workout plan added to your client", description: "When a workout program is assigned to a client.", status: "active" },

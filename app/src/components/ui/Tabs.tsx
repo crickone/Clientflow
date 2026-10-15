@@ -15,7 +15,7 @@ export const TabsList = React.forwardRef<
     className={cn(className)}
     style={{
       display: "flex",
-      gap: 4,
+      gap: 2,
       borderBottom: "1px solid var(--grid)",
       // Tab strips (e.g. the 8-tab client profile) scroll horizontally instead of
       // overflowing the page on mobile.
@@ -39,7 +39,7 @@ export const TabsTrigger = React.forwardRef<
       display: "inline-flex",
       alignItems: "center",
       gap: 7,
-      padding: "10px 14px",
+      padding: "10px 12px",
       cursor: "pointer",
       font: "inherit",
       fontSize: 13.5,

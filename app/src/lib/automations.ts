@@ -187,7 +187,7 @@ export function listSent(): SentRow[] {
  * (Push/chat channels and delayed messages need the client-app + scheduler and
  * are skipped for now.)
  *
- * Only dispatches ACTIVE_TRIGGER_KEYS (automationModel.ts) — the other 8
+ * Only dispatches ACTIVE_TRIGGER_KEYS (automationModel.ts) — the other 7
  * catalog entries are "coming_soon": configurable in the UI, but nothing
  * calls fireTrigger() for them, and even if something did, this guard stops
  * it from silently doing anything (improvement-plan-2026-08.md Theme D1).
