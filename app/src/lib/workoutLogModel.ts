@@ -16,6 +16,8 @@ export interface SessionExercise {
   targetReps: string | null;
   restSeconds: number;
   notes: string | null;
+  /** Done back to back with the exercise above (superset or circuit). */
+  joined?: boolean;
   sets: LoggedSet[];
 }
 

@@ -31,6 +31,7 @@ import {
   type StartResult,
 } from "@/lib/workoutLog";
 import { listExercises } from "@/lib/exerciseLibrary";
+import { searchExercises } from "@/lib/workoutGroupsModel";
 import { setTrainingPlan } from "@/lib/trainingOverview";
 import { addMealItems, deleteMeal, getMeal, getMealName, logMeal, removeMealItem, setMealServings, splitMealItem, updateMeal, updateMealItem } from "@/lib/meals";
 import { cleanItemEdit, loggedAtFor } from "@/lib/mealsModel";
@@ -294,12 +295,7 @@ export async function searchExercisesAction(query: string): Promise<ExerciseHit[
     }
     return [...seen.values()].slice(0, 25);
   }
-  const words = q.split(/\s+/);
-  return listExercises()
-    .filter((e) => words.every((w) => e.name.toLowerCase().includes(w)))
-    .sort((a, b) => Number(!a.name.toLowerCase().startsWith(q)) - Number(!b.name.toLowerCase().startsWith(q)) || a.name.length - b.name.length)
-    .slice(0, 25)
-    .map((e) => ({ exerciseId: e.id, name: e.name, detail: e.muscleGroups.slice(0, 3).join(", ") || e.category }));
+  return searchExercises(listExercises(), q, 25).map((e) => ({ exerciseId: e.id, name: e.name, detail: e.muscleGroups.slice(0, 3).join(", ") || e.category }));
 }
 
 export async function addWorkoutExerciseAction(

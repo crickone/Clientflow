@@ -5383,3 +5383,24 @@ textarea.ag-input { resize: vertical; line-height: 1.5; }
 .ps-hint { margin: 10px 0; font-size: 12.5px; color: var(--text-tertiary); }
 .ps-off { justify-self: start; padding: 8px 0; border: 0; background: transparent; color: var(--text-tertiary); font: inherit; font-size: 12.5px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .ps--card { padding: 14px; border-radius: 16px; border: 1px solid var(--accent); background: var(--accent-soft); }
+
+/* ── Workout builder: supersets/circuits and coaching notes ── */
+.wbx-ex { display: grid; gap: 4px; }
+.wbx-ex[data-joined="true"] { margin-top: -8px; }
+.wbx-ex[data-joined="true"] > div:last-child { border-left: 3px solid var(--accent) !important; }
+.wbx-join { justify-self: start; display: inline-flex; align-items: center; gap: 5px; min-height: 26px; padding: 0 10px; border-radius: 999px; border: 1px dashed var(--hairline); background: transparent; color: var(--text-tertiary); font: inherit; font-size: 11.5px; cursor: pointer; }
+.wbx-join:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
+.wbx-join[data-on="true"] { border-style: solid; border-color: var(--accent); color: var(--accent-ink); background: var(--accent-soft); }
+.wbx-tag { font-size: 11.5px; font-weight: 600; color: var(--accent-ink); padding-left: 2px; }
+.wbx-notebtn { border: 0; background: transparent; color: var(--text-tertiary); font: inherit; font-size: 11.5px; cursor: pointer; padding: 1px 4px; }
+.wbx-notebtn:hover { color: var(--accent-ink); }
+/* ── Logger: supersets/circuits and the next-weight hint ── */
+.wl-group { display: grid; gap: 6px; }
+.wl-group[data-joined="true"] { margin-top: -6px; }
+.wl-group[data-ingroup="true"] > div:last-child { border-left: 3px solid var(--accent); }
+.wl-grouptag { font-size: 12px; font-weight: 600; color: var(--accent-ink); padding: 0 4px; }
+.wl-label { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 22px; padding: 0 6px; margin-right: 8px; border-radius: 6px; background: var(--surface-2); color: var(--text-secondary); font-size: 11.5px; font-weight: 700; font-family: var(--font-mono), monospace; vertical-align: 2px; }
+.wl-next { display: flex; gap: 6px; align-items: flex-start; margin-top: 6px; padding: 7px 10px; border-radius: 10px; background: var(--surface-2); font-size: 12.5px; line-height: 1.45; color: var(--text-secondary); }
+.wl-next[data-change="up"] { background: var(--accent-soft); color: var(--text-primary); }
+.wl-next[data-change="up"] svg { color: var(--accent-ink); flex-shrink: 0; margin-top: 2px; }
+.wl-next b { color: var(--text-primary); }

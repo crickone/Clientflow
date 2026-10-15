@@ -2,8 +2,8 @@ import { Dumbbell } from "lucide-react";
 
 import { dayVolume, fmtRest, SECTIONS, type ExerciseInput } from "@/lib/workoutModel";
 import { normalizeExerciseName } from "@/lib/workoutPreviewMedia";
+import { groupLabels, groupName, groupSize } from "@/lib/workoutGroupsModel";
 
-const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 /**
  * Shared, read-only render of one day/workout's exercises — grouped by
@@ -44,15 +44,20 @@ export function ExerciseSections({
       {SECTIONS.map((sec) => {
         const rows = exercises.filter((e) => e.section === sec.key);
         if (rows.length === 0) return null;
+        const labels = groupLabels(rows);
         return (
           <div key={sec.key}>
             <div style={sectionLabel}>{sec.label}</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
               {rows.map((ex, i) => {
                 const url = media[normalizeExerciseName(ex.name)] ?? null;
+                const startsGroup = !(ex.joined && i > 0) && i + 1 < rows.length && rows[i + 1].joined;
+                const inGroup = Boolean(ex.joined && i > 0) || startsGroup;
                 return (
-                  <div key={i} style={exRow}>
-                    <span style={{ fontFamily: "var(--font-mono), monospace", fontWeight: 700, color: "var(--text-tertiary)", width: 18, textAlign: "center" }}>{LETTERS[i] ?? "•"}</span>
+                  <div key={i} style={{ display: "grid", gap: 4, marginTop: ex.joined && i > 0 ? -6 : 0 }}>
+                  {startsGroup && <span style={groupTag}>{groupName(groupSize(rows, i))}: back to back, rest after the last</span>}
+                  <div style={{ ...exRow, ...(inGroup ? { borderLeft: "3px solid var(--accent)" } : null) }}>
+                    <span style={{ fontFamily: "var(--font-mono), monospace", fontWeight: 700, color: "var(--text-tertiary)", minWidth: 18, textAlign: "center" }}>{labels[i] ?? "•"}</span>
                     {url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={url} alt="" style={{ width: 44, height: 44, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
@@ -68,7 +73,9 @@ export function ExerciseSections({
                         {ex.reps && <span style={stat}>Reps: {ex.reps}</span>}
                         {ex.restSeconds > 0 && <span style={stat}>Rest: {fmtRest(ex.restSeconds)}</span>}
                       </span>
+                      {ex.notes && <span style={{ fontSize: 12.5, color: "var(--text-tertiary)", lineHeight: 1.45 }}>{ex.notes}</span>}
                     </span>
+                  </div>
                   </div>
                 );
               })}
@@ -99,6 +106,12 @@ const exRow: React.CSSProperties = {
   padding: "12px 16px",
   border: "1px solid var(--hairline)",
   borderRadius: "var(--radius)",
+};
+const groupTag: React.CSSProperties = {
+  fontSize: 11.5,
+  fontWeight: 600,
+  color: "var(--accent-ink)",
+  paddingLeft: 4,
 };
 const stat: React.CSSProperties = {
   fontSize: 13,

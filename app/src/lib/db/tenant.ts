@@ -3048,6 +3048,13 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     if (!cols.some((c) => c.name === "client_id")) sqlite.exec("ALTER TABLE form_submissions ADD COLUMN client_id INTEGER");
   }
 
+  // Supersets and circuits (lib/workoutGroupsModel.ts): an exercise "joined"
+  // to the one above is done back to back with it. Additive.
+  for (const table of ["workout_exercises", "workout_session_exercises"]) {
+    const cols = sqlite.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+    if (cols.length && !cols.some((c) => c.name === "joined")) sqlite.exec(`ALTER TABLE ${table} ADD COLUMN joined INTEGER NOT NULL DEFAULT 0`);
+  }
+
   // How a person arrived the visit they got in touch (lib/arrival.ts): JSON on
   // the lead, and on an online order until it becomes a lead. Additive.
   for (const table of ["leads", "offer_orders"]) {

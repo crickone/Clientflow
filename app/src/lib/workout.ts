@@ -103,6 +103,7 @@ export function getProgram(id: number): ProgramInput | null {
           restSeconds: e.restSeconds,
           notes: e.notes,
           muscleGroups: parseGroups(e.muscleGroups),
+          joined: e.joined,
         })),
     })),
   };
@@ -153,6 +154,7 @@ export function saveProgram(input: ProgramInput): number {
             reps: ex.reps,
             restSeconds: ex.restSeconds,
             notes: ex.notes,
+            joined: ex.joined === true,
             muscleGroups: ex.muscleGroups.map((g) => g.trim()).filter(Boolean).join(",") || null,
           })
           .run();

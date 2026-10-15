@@ -20,6 +20,8 @@ export interface ExerciseInput {
   restSeconds: number;
   notes: string | null;
   muscleGroups: string[];
+  /** Done back to back with the exercise above (superset or circuit). */
+  joined?: boolean;
 }
 export interface WorkoutDayInput {
   id?: number;

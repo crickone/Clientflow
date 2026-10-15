@@ -17,6 +17,7 @@ const exerciseSchema = z.object({
   restSeconds: z.coerce.number().int().min(0).max(86400).catch(0),
   notes: z.string().trim().max(2000).nullable().default(null),
   muscleGroups: z.array(z.string().trim().max(60)).max(20).default([]),
+  joined: z.boolean().default(false),
 });
 const daySchema = z.object({
   id: z.number().int().positive().optional(),

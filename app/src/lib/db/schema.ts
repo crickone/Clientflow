@@ -2508,6 +2508,8 @@ export const workoutExercises = sqliteTable(
     reps: text("reps"), // free text: "12", "40 seconds", "AMRAP"
     restSeconds: integer("rest_seconds").notNull().default(0),
     notes: text("notes"),
+    /** Done back to back with the exercise above: a superset (2) or circuit (3+). lib/workoutGroupsModel.ts */
+    joined: integer("joined", { mode: "boolean" }).notNull().default(false),
     muscleGroups: text("muscle_groups"), // denormalized from the library exercise
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
@@ -3439,6 +3441,8 @@ export const workoutSessionExercises = sqliteTable("workout_session_exercises", 
   targetReps: text("target_reps"),
   restSeconds: integer("rest_seconds").notNull().default(0),
   notes: text("notes"),
+  /** Copied from the programme: done back to back with the exercise above. */
+  joined: integer("joined", { mode: "boolean" }).notNull().default(false),
 });
 
 export const workoutSetLogs = sqliteTable("workout_set_logs", {

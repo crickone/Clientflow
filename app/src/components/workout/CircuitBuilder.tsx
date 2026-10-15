@@ -1,6 +1,7 @@
 "use client";
 
 import { ExerciseColumnHeads } from "@/components/workout/ExerciseColumnHeads";
+import { searchExercises } from "@/lib/workoutGroupsModel";
 import { useDraft } from "@/components/workout/useDraft";
 import { DraftNotice, DraftSaved } from "@/components/workout/DraftNotice";
 import { QuickAddExercise } from "@/components/workout/QuickAddExercise";
@@ -192,8 +193,8 @@ function ChooseExerciseSheet({
   const [q, setQ] = useState("");
   const [adding, setAdding] = useState(false);
   const matches = useMemo(() => {
-    const query = q.trim().toLowerCase();
-    return (query ? exercises.filter((e) => e.name.toLowerCase().includes(query)) : exercises).slice(0, 60);
+    const query = q.trim();
+    return query ? searchExercises(exercises, query, 60) : exercises.slice(0, 60);
   }, [q, exercises]);
 
   return (

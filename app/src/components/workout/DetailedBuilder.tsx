@@ -5,7 +5,7 @@ import { useDraft } from "@/components/workout/useDraft";
 import { DraftNotice, DraftSaved } from "@/components/workout/DraftNotice";
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Copy, Play, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, Copy, Link2, Play, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
@@ -24,9 +24,9 @@ import {
   type WorkoutDayInput,
 } from "@/lib/workoutModel";
 import type { ExerciseLibRow } from "@/lib/exerciseLibrary";
+import { groupLabels, groupName, groupSize, searchExercises } from "@/lib/workoutGroupsModel";
 import { exerciseHasVideo } from "@/lib/youtube";
 
-const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 export function DetailedBuilder({ initial, exercises, draftKey }: { initial: ProgramInput; exercises: ExerciseLibRow[]; draftKey?: string }) {
   const router = useRouter();
@@ -186,6 +186,7 @@ export function DetailedBuilder({ initial, exercises, draftKey }: { initial: Pro
       {/* sections */}
       {SECTIONS.map((sec) => {
         const rows = day.exercises.map((ex, i) => ({ ex, i })).filter((x) => x.ex.section === sec.key);
+        const labels = groupLabels(rows.map((r) => r.ex));
         return (
           <div key={sec.key} style={card}>
             <div style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-secondary)", fontFamily: "var(--font-mono), monospace" }}>
@@ -210,7 +211,9 @@ export function DetailedBuilder({ initial, exercises, draftKey }: { initial: Pro
                   {rows.map(({ ex, i }, li) => (
                     <ExerciseRow
                       key={i}
-                      letter={LETTERS[li] ?? "•"}
+                      letter={labels[li] ?? "•"}
+                      canJoin={li > 0}
+                      groupTag={groupTagAt(rows.map((r) => r.ex), li)}
                       ex={ex}
                       library={exercises}
                       focused={focused === i}
@@ -267,8 +270,17 @@ export function DetailedBuilder({ initial, exercises, draftKey }: { initial: Pro
   );
 }
 
+/** "Superset" or "Circuit" on the first exercise of a group, else null. */
+function groupTagAt(rows: ExerciseInput[], li: number): string | null {
+  if (rows[li].joined && li > 0) return null;
+  if (!(li + 1 < rows.length && rows[li + 1].joined)) return null;
+  return groupName(groupSize(rows, li));
+}
+
 function ExerciseRow({
   letter,
+  canJoin,
+  groupTag,
   ex,
   library,
   focused,
@@ -279,6 +291,8 @@ function ExerciseRow({
   onPreview,
 }: {
   letter: string;
+  canJoin: boolean;
+  groupTag: string | null;
   ex: ExerciseInput;
   library: ExerciseLibRow[];
   focused: boolean;
@@ -291,10 +305,24 @@ function ExerciseRow({
   const matches = useMemo(() => {
     const q = ex.name.trim().toLowerCase();
     if (!q) return [];
-    return library.filter((l) => l.name.toLowerCase().includes(q) && l.name.toLowerCase() !== q).slice(0, 6);
+    return searchExercises(library, q, 7).filter((l) => l.name.toLowerCase() !== q).slice(0, 6);
   }, [ex.name, library]);
+  const [showNotes, setShowNotes] = useState(Boolean(ex.notes));
 
   return (
+    <div className="wbx-ex" data-joined={Boolean(ex.joined && canJoin)}>
+      {canJoin && (
+        <button
+          type="button"
+          className="wbx-join"
+          data-on={Boolean(ex.joined)}
+          onClick={() => onPatch({ joined: !ex.joined })}
+          title={ex.joined ? "Unlink: do this on its own" : "Link to the exercise above: done back to back as a superset or circuit"}
+        >
+          <Link2 size={12} /> {ex.joined ? "Linked to the one above" : "Link to the one above"}
+        </button>
+      )}
+      {groupTag && <span className="wbx-tag">{groupTag}: no rest between these, rest after the last</span>}
     <div style={{ border: "1px solid var(--hairline)", borderRadius: "var(--radius)", padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ display: "grid", gridTemplateColumns: "24px 1fr 70px 140px 90px 30px", gap: 8, alignItems: "center" }}>
         <span style={{ fontFamily: "var(--font-mono), monospace", fontWeight: 600, color: "var(--text-tertiary)", textAlign: "center" }}>{letter}</span>
@@ -366,15 +394,30 @@ function ExerciseRow({
           <Trash2 size={14} />
         </button>
       </div>
-      {ex.muscleGroups.length > 0 && (
-        <div style={{ display: "flex", gap: 5, flexWrap: "wrap", paddingLeft: 32 }}>
-          {ex.muscleGroups.map((g) => (
-            <span key={g} style={{ fontSize: 10.5, padding: "1px 7px", borderRadius: 5, background: "var(--surface-2)", color: "var(--text-tertiary)", fontFamily: "var(--font-mono), monospace" }}>
-              {g}
-            </span>
-          ))}
+      <div style={{ display: "flex", gap: 5, flexWrap: "wrap", paddingLeft: 32, alignItems: "center" }}>
+        {ex.muscleGroups.map((g) => (
+          <span key={g} style={{ fontSize: 10.5, padding: "1px 7px", borderRadius: 5, background: "var(--surface-2)", color: "var(--text-tertiary)", fontFamily: "var(--font-mono), monospace" }}>
+            {g}
+          </span>
+        ))}
+        {!showNotes && (
+          <button type="button" className="wbx-notebtn" onClick={() => setShowNotes(true)}>
+            + Coaching note
+          </button>
+        )}
+      </div>
+      {showNotes && (
+        <div style={{ paddingLeft: 32 }}>
+          <Input
+            value={ex.notes ?? ""}
+            onChange={(e) => onPatch({ notes: e.target.value || null })}
+            placeholder="Coaching note the member sees, e.g. 3 seconds down, pause at the bottom"
+            style={{ height: 34 }}
+            maxLength={500}
+          />
         </div>
       )}
+    </div>
     </div>
   );
 }

@@ -19,6 +19,7 @@ import {
 } from "@/app/app/actions";
 import { ExercisePicker } from "@/components/clientapp/ExercisePicker";
 import { SECTIONS } from "@/lib/workoutModel";
+import { groupLabels, groupName, groupSize, nextWeight, restsAfter } from "@/lib/workoutGroupsModel";
 import {
   beatsPrevious,
   completeSet,
@@ -137,6 +138,25 @@ export function WorkoutLogger({
     return () => clearInterval(t);
   }, [rest]);
 
+  // The rest countdown survives a reload or the app being reopened mid-rest.
+  const restKey = `wl-rest-${session.id}`;
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(restKey) ?? "null") as { until: number; total: number } | null;
+      if (saved && saved.until > Date.now()) setRest(saved);
+    } catch {
+      /* storage blocked */
+    }
+  }, [restKey]);
+  useEffect(() => {
+    try {
+      if (rest) localStorage.setItem(restKey, JSON.stringify(rest));
+      else localStorage.removeItem(restKey);
+    } catch {
+      /* storage blocked */
+    }
+  }, [rest, restKey]);
+
   useEffect(() => {
     if (rest && now >= rest.until) {
       setRest(null);
@@ -145,19 +165,28 @@ export function WorkoutLogger({
       } catch {
         /* not supported */
       }
+      beep();
     }
   }, [now, rest]);
 
-  function tick(exId: number, i: number, restSeconds: number, targetReps: string | null, prev: LoggedSet | undefined) {
+  /**
+   * Tick a set. In a superset or circuit there's no rest mid-group: the app
+   * jumps to the next exercise, and the group's rest starts after the last.
+   * A blank weight takes the suggested next weight before last time's.
+   */
+  function tick(exId: number, i: number, restSeconds: number, targetReps: string | null, prev: LoggedSet | undefined, opts: { rests: boolean; nextId: number | null; suggestKg: number | null }) {
     const sets = draft[exId];
     const s = sets[i];
     if (s.done) {
       update(exId, (xs) => xs.map((x, k) => (k === i ? { ...x, done: false } : x)));
       return;
     }
-    const filled = completeSet(toLogged(s), prev, i > 0 ? toLogged(sets[i - 1]) : undefined, targetReps);
+    const base = !s.w && opts.suggestKg !== null && i === 0 ? { ...s, w: String(opts.suggestKg) } : s;
+    const filled = completeSet(toLogged(base), prev && opts.suggestKg !== null ? { ...prev, weightKg: opts.suggestKg } : prev, i > 0 ? toLogged(sets[i - 1]) : undefined, targetReps);
     update(exId, (xs) => xs.map((x, k) => (k === i ? toDraft(filled) : x)));
-    if (!finishedAlready && restSeconds > 0) setRest({ until: Date.now() + restSeconds * 1000, total: restSeconds });
+    if (finishedAlready) return;
+    if (opts.rests && restSeconds > 0) setRest({ until: Date.now() + restSeconds * 1000, total: restSeconds });
+    else if (!opts.rests && opts.nextId !== null) document.getElementById(`wl-ex-${opts.nextId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   /** Warm-up and cool-down are a tick per exercise: one tap marks every set. */
@@ -273,7 +302,15 @@ export function WorkoutLogger({
         return (
           <div key={sec.key} className="wl-section">
             {SECTIONS.filter((s) => exercises.some((e) => e.section === s.key)).length > 1 && <SectionTitle>{sec.label}</SectionTitle>}
-            {inSection.map((ex) => {
+            {inSection.map((ex, xi) => {
+              const labels = groupLabels(inSection);
+              const joinedHere = Boolean(ex.joined && xi > 0);
+              const startsGroup = !joinedHere && xi + 1 < inSection.length && inSection[xi + 1].joined;
+              const rests = restsAfter(inSection, xi);
+              // The group's rest: the longest rest set on any exercise in it.
+              let gStart = xi;
+              while (gStart > 0 && inSection[gStart].joined) gStart--;
+              const groupRest = Math.max(...inSection.slice(gStart, gStart + groupSize(inSection, xi)).map((e) => e.restSeconds));
               const sets = draft[ex.id] ?? [];
               const prev = prevMap[ex.exerciseKey] ?? [];
               const allDone = sets.length > 0 && sets.every((s) => s.done);
@@ -297,19 +334,35 @@ export function WorkoutLogger({
                   </Card>
                 );
               }
+              const sug = nextWeight(prev, ex.targetReps);
               return (
-                <Card key={ex.id} style={{ padding: "14px 12px 10px", scrollMarginTop: 80 }}>
+                <div key={ex.id} className="wl-group" data-joined={joinedHere} data-ingroup={joinedHere || startsGroup}>
+                {startsGroup && (
+                  <div className="wl-grouptag">
+                    {groupName(groupSize(inSection, xi))}: do {labels.slice(xi, xi + groupSize(inSection, xi)).join(", ")} back to back, then rest
+                  </div>
+                )}
+                <Card style={{ padding: "14px 12px 10px", scrollMarginTop: 80 }}>
                   <span id={`wl-ex-${ex.id}`} />
                   <div className="wl-ex-head">
                     <div className="wl-ex-name" data-done={allDone}>
+                      <span className="wl-label">{labels[xi]}</span>
                       {ex.name}
                       {allDone && <Check size={16} aria-label="All sets done" />}
                     </div>
                     <div className="wl-ex-target">
                       {ex.targetSets} {ex.targetSets === 1 ? "set" : "sets"}
                       {ex.targetReps ? ` x ${ex.targetReps}` : ""}
-                      {ex.restSeconds > 0 ? ` · rest ${restLabel(ex.restSeconds)}` : ""}
+                      {rests ? (groupRest > 0 ? ` · rest ${restLabel(groupRest)}` : "") : " · then straight on"}
                     </div>
+                    {sug && !allDone && (
+                      <div className="wl-next" data-change={sug.change}>
+                        {sug.change === "up" ? <TrendingUp size={14} /> : null}
+                        <span>
+                          <b>{sug.change === "up" ? `Try ${sug.weightKg} kg today.` : `${sug.weightKg} kg again.`}</b> {sug.reason}
+                        </span>
+                      </div>
+                    )}
                     {prevAtMap[ex.exerciseKey] && (
                       <div className="wl-ex-last">
                         Last time: {new Date(prevAtMap[ex.exerciseKey]).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short", timeZone: "Europe/Dublin" })}
@@ -340,7 +393,7 @@ export function WorkoutLogger({
                           inputMode="decimal"
                           enterKeyHint="next"
                           aria-label={`${ex.name} set ${i + 1} weight in kg`}
-                          placeholder={p?.weightKg != null ? String(p.weightKg) : ""}
+                          placeholder={sug ? String(sug.weightKg) : p?.weightKg != null ? String(p.weightKg) : ""}
                           value={s.w}
                           onChange={(e) => update(ex.id, (xs) => xs.map((x, k) => (k === i ? { ...x, w: e.target.value.replace(/[^\d.,]/g, "").slice(0, 6) } : x)))}
                         />
@@ -358,7 +411,7 @@ export function WorkoutLogger({
                           className="wl-tick"
                           aria-pressed={s.done}
                           aria-label={s.done ? `Untick set ${i + 1}` : `Tick off set ${i + 1}`}
-                          onClick={() => tick(ex.id, i, ex.restSeconds, ex.targetReps, p)}
+                          onClick={() => tick(ex.id, i, groupRest, ex.targetReps, p, { rests, nextId: rests ? null : inSection[xi + 1]?.id ?? null, suggestKg: sug?.weightKg ?? null })}
                         >
                           <Check size={18} strokeWidth={2.6} />
                         </button>
@@ -385,6 +438,7 @@ export function WorkoutLogger({
                     )}
                   </div>
                 </Card>
+                </div>
               );
             })}
           </div>
@@ -489,3 +543,25 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** Two short beeps when a rest ends. Quietly does nothing where audio isn't allowed. */
+function beep() {
+  try {
+    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    [0, 0.25].forEach((at) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.frequency.value = 880;
+      g.gain.setValueAtTime(0.0001, ctx.currentTime + at);
+      g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + at + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + at + 0.18);
+      o.connect(g).connect(ctx.destination);
+      o.start(ctx.currentTime + at);
+      o.stop(ctx.currentTime + at + 0.2);
+    });
+    setTimeout(() => void ctx.close(), 800);
+  } catch {
+    /* no audio */
+  }
+}

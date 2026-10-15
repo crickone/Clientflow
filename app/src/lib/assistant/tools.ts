@@ -580,6 +580,7 @@ export const TOOLS: Anthropic.Tool[] = [
                     restSeconds: { type: "number" },
                     notes: { type: "string" },
                     muscleGroups: { type: "string" },
+                    joined: { type: "boolean", description: "true = done back to back with the exercise before it (superset or circuit, same section). The group's rest goes on its last exercise." },
                   },
                   required: ["name"],
                 },
@@ -1583,7 +1584,7 @@ function addExercise(ctx: ToolContext, input: Record<string, unknown>): string {
   return JSON.stringify({ result: `Added "${name}" to the exercise library.`, exerciseId: id });
 }
 
-type ExIn = { name?: unknown; section?: unknown; sets?: unknown; reps?: unknown; restSeconds?: unknown; notes?: unknown; muscleGroups?: unknown };
+type ExIn = { name?: unknown; section?: unknown; sets?: unknown; reps?: unknown; restSeconds?: unknown; notes?: unknown; muscleGroups?: unknown; joined?: unknown };
 type WDayIn = { name?: unknown; instructions?: unknown; exercises?: ExIn[] };
 
 function createWorkoutProgram(ctx: ToolContext, input: Record<string, unknown>): string {
@@ -1618,6 +1619,7 @@ function createWorkoutProgram(ctx: ToolContext, input: Record<string, unknown>):
         restSeconds: Math.round(num(e.restSeconds, 0)),
         notes: str(e.notes),
         muscleGroups: str(e.muscleGroups),
+        joined: e.joined === true,
       }).run();
     }
     dPos++;

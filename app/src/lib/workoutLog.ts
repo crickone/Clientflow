@@ -50,6 +50,7 @@ export function startSession(clientId: number, program: ProgramInput, dayPositio
           targetSets: Math.max(1, Math.min(MAX_SETS, ex.sets || 1)),
           targetReps: ex.reps,
           restSeconds: ex.restSeconds,
+          joined: ex.joined === true,
           notes: ex.notes,
         })
         .returning({ id: workoutSessionExercises.id })
@@ -182,6 +183,7 @@ function assemble(rows: WorkoutSession[]): SessionView[] {
           targetReps: e.targetReps,
           restSeconds: e.restSeconds,
           notes: e.notes,
+          joined: e.joined,
           sets: setsBy.get(e.id) ?? [],
         }),
       ),
