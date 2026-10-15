@@ -25,6 +25,7 @@ export function videoCostCents(durationSec: 5 | 10): number {
   return durationSec === 10 ? VIDEO_COST_CENTS_PER_5S * 2 : VIDEO_COST_CENTS_PER_5S;
 }
 
+import { falErrorMessage } from "@/lib/ai/falErrors";
 const QUEUE_BASE = "https://queue.fal.run";
 /** Generation typically lands in 1–3 min; give it 6 before calling it failed. */
 const MAX_WAIT_MS = 360_000;
@@ -104,7 +105,7 @@ export async function falGenerateVideo(
     });
     if (!submitRes.ok) {
       const text = await submitRes.text().catch(() => "");
-      throw new VideoGenError(`Video API error ${submitRes.status}: ${text.slice(0, 200)}`);
+      throw new VideoGenError(falErrorMessage("Video", submitRes.status, text));
     }
     const submitted = (await submitRes.json()) as QueueSubmitResponse;
     const requestId = submitted.request_id;

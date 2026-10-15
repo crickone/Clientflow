@@ -6,6 +6,8 @@ import "server-only";
  * SDK dependency — the same deliberate choice as MailgunSender.
  */
 
+import { falErrorMessage } from "@/lib/ai/falErrors";
+
 export const IMAGE_MODEL_ID = "fal:flux-2-pro";
 /**
  * fal bills FLUX.2 [pro] at $0.03 for the first megapixel and $0.015 for each
@@ -72,7 +74,7 @@ export async function falGenerateImage(
     });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
-      throw new ImageGenError(`Image API error ${res.status}: ${text.slice(0, 200)}`);
+      throw new ImageGenError(falErrorMessage("Image", res.status, text));
     }
     const json = (await res.json()) as FalImageResponse;
     const url = json.images?.[0]?.url;
