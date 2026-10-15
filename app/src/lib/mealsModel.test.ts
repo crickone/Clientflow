@@ -4,7 +4,7 @@
 // numbers the app can trust.
 import assert from "node:assert/strict";
 
-import { applyItemDelta, dayTotals, kcal, mealSlot, parseMealItem, parseMealReading, scaleItem, scaleReading } from "./mealsModel";
+import { applyItemDelta, cleanItemEdit, dayTotals, itemsTotal, kcal, mealSlot, parseMealItem, parseMealReading, per100, scaleItem, scaleReading, unaccounted } from "./mealsModel";
 
 let passed = 0;
 function check(name: string, cond: boolean) {
@@ -48,5 +48,19 @@ check("an item with no grams can't be scaled by grams", scaleItem({ ...seeds, gr
 const base = { calories: 290, protein: 13, carbs: 42, fat: 8 };
 check("adding an item moves the meal by exactly that item", applyItemDelta(base, seeds, 1).calories === 347 && applyItemDelta(base, seeds, 1).fat === 13);
 check("removing it moves it back, never below zero", applyItemDelta(applyItemDelta(base, seeds, 1), seeds, -1).calories === 290 && applyItemDelta({ calories: 10, protein: 0, carbs: 0, fat: 0 }, seeds, -1).calories === 0);
+
+// ── the breakdown ──
+const chicken = plate.items[0];
+check("per 100 g comes from the weight", per100(chicken)!.calories === 165 && per100({ ...chicken, grams: null }) === null);
+check("the items add up", itemsTotal(plate.items).calories === 510);
+check("a meal the items explain has nothing unaccounted", unaccounted(plate, plate.items) === null);
+const oily = { calories: 600, protein: 53, carbs: 56, fat: 16 };
+check("oil the photo couldn't split out shows as the difference", unaccounted(oily, plate.items)!.calories === 90 && unaccounted(oily, plate.items)!.fat === 10);
+check("no items, nothing to compare", unaccounted(oily, []) === null);
+const edited = cleanItemEdit(chicken, { name: "  Chicken thigh ", grams: 150, calories: 290, protein: 38, carbs: 0, fat: 15 })!;
+check("an edit keeps the member's numbers, trimmed", edited.name === "Chicken thigh" && edited.calories === 290 && edited.fat === 15);
+check("same weight keeps the portion words; a new weight drops them", cleanItemEdit({ ...chicken, portion: "1 breast" }, { ...chicken, grams: 150 })!.portion === "1 breast" && cleanItemEdit({ ...chicken, portion: "1 breast" }, { ...chicken, grams: 200 })!.portion === null);
+check("a blank name or a nonsense number can't be saved", cleanItemEdit(chicken, { ...chicken, name: " " }) === null && cleanItemEdit(chicken, { ...chicken, calories: NaN }) === null && cleanItemEdit(chicken, { ...chicken, grams: 0 }) === null);
+check("silly numbers are capped", cleanItemEdit(chicken, { ...chicken, calories: 99999 })!.calories === 5000);
 
 console.log(`mealsModel: ${passed} checks passed`);

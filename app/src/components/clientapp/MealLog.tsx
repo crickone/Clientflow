@@ -10,12 +10,13 @@ import {
   addMealItemAction,
   deleteMealAction,
   removeMealItemAction,
-  setMealItemGramsAction,
+  updateMealItemAction,
   setMealServingsAction,
   updateMealAction,
 } from "@/app/app/actions";
 import { kcal, type MealItem, type MealTotals } from "@/lib/mealsModel";
 import { shrink } from "@/components/clientapp/shrinkPhoto";
+import { MealBreakdown } from "@/components/clientapp/MealBreakdown";
 
 export type MealView = {
   id: number;
@@ -263,7 +264,12 @@ export function MealLog({ day, today, meals, totals, target, source, goalHref, w
             onServings={(s) => act(() => setMealServingsAction(m.id, s))}
             onAddItem={(text) => act(() => addMealItemAction(m.id, text))}
             onRemoveItem={(i) => act(() => removeMealItemAction(m.id, i))}
-            onGrams={(i, g) => act(() => setMealItemGramsAction(m.id, i, g))}
+            onUpdateItem={async (i, patch) => {
+              const r = await updateMealItemAction(m.id, i, patch);
+              if (!r.ok) setError(r.error ?? "Something went wrong.");
+              refresh();
+              return r.ok;
+            }}
             onPhoto={() => setLightbox(m.id)}
             refresh={refresh}
           />
@@ -299,7 +305,7 @@ function MealCard({
   onServings,
   onAddItem,
   onRemoveItem,
-  onGrams,
+  onUpdateItem,
   onPhoto,
   refresh,
 }: {
@@ -316,13 +322,12 @@ function MealCard({
   onServings: (s: number) => void;
   onAddItem: (text: string) => void;
   onRemoveItem: (index: number) => void;
-  onGrams: (index: number, grams: number) => void;
+  onUpdateItem: (index: number, patch: { name: string; grams: number | null; calories: number; protein: number; carbs: number; fat: number }) => Promise<boolean>;
   onPhoto: () => void;
   refresh: () => void;
 }) {
   const [addText, setAddText] = useState("");
   const [adding, setAdding] = useState(false);
-  const [grams, setGrams] = useState<{ index: number; value: string } | null>(null);
   const addRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (nudge) addRef.current?.focus();
@@ -373,55 +378,14 @@ function MealCard({
                 </div>
               )}
 
-              {m.items.length > 0 && (
-                <div>
-                  <div className="ml-h">What&rsquo;s in it</div>
-                  <ul className="ml-items">
-                    {m.items.map((it, i) => (
-                      <li key={i}>
-                        <div className="ml-item-main">
-                          <span className="ml-item-name">{it.name}</span>
-                          <span className="ml-item-sub">
-                            {it.portion ? `${it.portion}` : null}
-                            {it.grams ? (
-                              grams?.index === i ? (
-                                <form
-                                  className="ml-grams"
-                                  onSubmit={(e) => {
-                                    e.preventDefault();
-                                    const g = Number(grams.value);
-                                    if (g > 0) onGrams(i, g);
-                                    setGrams(null);
-                                  }}
-                                >
-                                  <input className="ml-input ml-input--sm" inputMode="numeric" value={grams.value} onChange={(e) => setGrams({ index: i, value: e.target.value })} autoFocus aria-label="Grams" />
-                                  <span>g</span>
-                                  <button type="submit" className="ml-btn ml-btn--sm">
-                                    Save
-                                  </button>
-                                  <button type="button" className="ml-link" onClick={() => setGrams(null)}>
-                                    Cancel
-                                  </button>
-                                </form>
-                              ) : (
-                                <button type="button" className="ml-gramsbtn" onClick={() => setGrams({ index: i, value: String(it.grams) })} title="Change the weight">
-                                  {it.portion ? " · " : ""}
-                                  {it.grams} g <Pencil size={11} />
-                                </button>
-                              )
-                            ) : null}
-                          </span>
-                        </div>
-                        <span className="ml-item-kcal">
-                          {it.calories}
-                          <small>P {it.protein} · C {it.carbs} · F {it.fat}</small>
-                        </span>
-                        <button type="button" className="ml-x" aria-label={`Remove ${it.name}`} onClick={() => onRemoveItem(i)} disabled={pending}>
-                          <X size={14} />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+              {m.items.length > 0 && <MealBreakdown items={m.items} meal={m} pending={pending} onSave={onUpdateItem} onRemove={onRemoveItem} />}
+
+              {m.kind === "label" && m.servings > 0 && (
+                <div className="mb-label">
+                  {Math.round(m.calories / m.servings)} kcal a serving × {m.servings} serving{m.servings === 1 ? "" : "s"} = <b>{Math.round(m.calories)} kcal</b>
+                  <span>
+                    P {Math.round(m.protein / m.servings)} · C {Math.round(m.carbs / m.servings)} · F {Math.round(m.fat / m.servings)} g a serving, read from the label
+                  </span>
                 </div>
               )}
 

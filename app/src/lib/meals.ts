@@ -225,15 +225,14 @@ export function removeMealItem(clientId: number, id: number, index: number): Mea
   return getMeal(clientId, id);
 }
 
-/** A different weight for one item; its numbers scale and the meal moves by the difference. */
-export function setMealItemGrams(clientId: number, id: number, index: number, grams: number): MealRow | null {
+/** Any of an item's numbers changed by the member; the meal moves by the difference. */
+export function updateMealItem(clientId: number, id: number, index: number, next: MealItem): MealRow | null {
   const row = db.select().from(mealLogs).where(and(eq(mealLogs.id, id), eq(mealLogs.clientId, clientId))).get();
   if (!row) return null;
   const items = withItems(row).items;
   const item = items[index];
-  if (!item || !item.grams) return null;
-  const next = scaleItem(item, grams);
+  if (!item) return null;
   const totals = applyItemDelta(applyItemDelta(row, item, -1), next, 1);
-  writeItems(row, items.map((it, i) => (i === index ? next : it)), totals, `${item.name} set to ${Math.round(grams)} g by you`);
+  writeItems(row, items.map((it, i) => (i === index ? next : it)), totals, `${next.name} changed by you`);
   return getMeal(clientId, id);
 }

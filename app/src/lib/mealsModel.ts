@@ -172,3 +172,41 @@ export function applyItemDelta(t: MealTotals, item: MealTotals, sign: 1 | -1): M
   const f = (a: number, b: number) => Math.max(0, Math.round(a + sign * b));
   return { calories: f(t.calories, item.calories), protein: f(t.protein, item.protein), carbs: f(t.carbs, item.carbs), fat: f(t.fat, item.fat) };
 }
+
+// ── the breakdown: how a meal's numbers were worked out, item by item ──
+
+/** An item's numbers per 100 g, the figure its calories were scaled from. Null without a weight. */
+export function per100(item: MealItem): MealTotals | null {
+  if (!item.grams || item.grams <= 0) return null;
+  const k = 100 / item.grams;
+  return { calories: Math.round(item.calories * k), protein: Math.round(item.protein * k * 10) / 10, carbs: Math.round(item.carbs * k * 10) / 10, fat: Math.round(item.fat * k * 10) / 10 };
+}
+
+/** What the items add up to. */
+export function itemsTotal(items: MealTotals[]): MealTotals {
+  return dayTotals(items);
+}
+
+/**
+ * The part of the meal's numbers no item accounts for: oil in the pan, a
+ * sauce the photo couldn't separate, rounding. Null when it's under 5 kcal
+ * and 1 g of each, which is just rounding.
+ */
+export function unaccounted(meal: MealTotals, items: MealTotals[]): MealTotals | null {
+  if (items.length === 0) return null;
+  const s = itemsTotal(items);
+  const d = { calories: Math.round(meal.calories - s.calories), protein: Math.round(meal.protein - s.protein), carbs: Math.round(meal.carbs - s.carbs), fat: Math.round(meal.fat - s.fat) };
+  return Math.abs(d.calories) < 5 && Math.abs(d.protein) <= 1 && Math.abs(d.carbs) <= 1 && Math.abs(d.fat) <= 1 ? null : d;
+}
+
+/** An item as the member edited it: names trimmed, numbers whole and sane. Null when it can't be saved. */
+export function cleanItemEdit(prev: MealItem, patch: { name: string; grams: number | null; calories: number; protein: number; carbs: number; fat: number }): MealItem | null {
+  const name = patch.name.replace(/\s+/g, " ").trim().slice(0, 80);
+  if (!name) return null;
+  const n = (v: number, max: number) => (Number.isFinite(v) ? Math.min(max, Math.max(0, Math.round(v))) : NaN);
+  const grams = patch.grams === null ? null : n(patch.grams, 5000);
+  const out = { calories: n(patch.calories, 5000), protein: n(patch.protein, 500), carbs: n(patch.carbs, 1000), fat: n(patch.fat, 500) };
+  if ([out.calories, out.protein, out.carbs, out.fat].some(Number.isNaN) || (grams !== null && (Number.isNaN(grams) || grams < 1))) return null;
+  const sameWeight = grams === prev.grams;
+  return { name, portion: sameWeight ? prev.portion : null, grams, ...out };
+}

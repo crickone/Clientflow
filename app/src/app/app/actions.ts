@@ -30,7 +30,8 @@ import {
 } from "@/lib/workoutLog";
 import { listExercises } from "@/lib/exerciseLibrary";
 import { setTrainingPlan } from "@/lib/trainingOverview";
-import { addMealItem, deleteMeal, getMealName, logMeal, removeMealItem, setMealItemGrams, setMealServings, updateMeal } from "@/lib/meals";
+import { addMealItem, deleteMeal, getMeal, getMealName, logMeal, removeMealItem, setMealServings, updateMeal, updateMealItem } from "@/lib/meals";
+import { cleanItemEdit } from "@/lib/mealsModel";
 import { priceItem } from "@/lib/ai/priceItem";
 import { AiCapError } from "@/lib/ai/usage";
 import type { LoggedSet, SessionExercise } from "@/lib/workoutLogModel";
@@ -407,15 +408,24 @@ export async function removeMealItemAction(id: number, index: number): Promise<M
   return { ok: true };
 }
 
-export async function setMealItemGramsAction(id: number, index: number, grams: number): Promise<MealResult> {
+/** Save an item from the breakdown: its name, weight and numbers as the member set them. */
+export async function updateMealItemAction(
+  id: number,
+  index: number,
+  patch: { name: string; grams: number | null; calories: number; protein: number; carbs: number; fat: number },
+): Promise<MealResult> {
   const { clientId } = requireClient();
   const i = idSchema.safeParse(id);
   const n = z.coerce.number().int().min(0).safeParse(index);
-  const g = z.coerce.number().min(1).max(5000).safeParse(grams);
   if (!i.success || !n.success) return { ok: false, error: "That item isn't on the meal." };
-  if (!g.success) return { ok: false, error: "Enter the weight in grams, from 1 to 5000." };
-  if (!setMealItemGrams(clientId, i.data, n.data, g.data)) return { ok: false, error: "That item has no weight to change. Remove it and add it again with the amount." };
+  const meal = getMeal(clientId, i.data);
+  const prev = meal?.items[n.data];
+  if (!prev) return { ok: false, error: "That item isn't on the meal." };
+  const next = cleanItemEdit(prev, patch);
+  if (!next) return { ok: false, error: "Give it a name, and numbers of 0 or more (the weight at least 1 g)." };
+  updateMealItem(clientId, i.data, n.data, next);
   revalidatePath("/app/nutrition");
   revalidatePath("/app");
   return { ok: true };
 }
+
