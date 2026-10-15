@@ -3,6 +3,8 @@ import { CalendarRange, ChevronRight, ClipboardCheck, CreditCard, Dumbbell, List
 import { memberCheckin } from "@/lib/checkins";
 import { memberHabits } from "@/lib/habits";
 import { HabitTicks } from "@/components/clientapp/HabitTicks";
+import { PushSetup } from "@/components/clientapp/PushSetup";
+import { getPrefs, vapidPublicKey } from "@/lib/push";
 import { WEEKDAYS } from "@/lib/memberChoicesModel";
 
 import { requireClientPage } from "@/lib/clientAuth";
@@ -39,6 +41,7 @@ export default async function ClientHome() {
   const goal = goalTarget(clientId);
   const checkin = memberCheckin(clientId);
   const habits = memberHabits(clientId);
+  const vapid = vapidPublicKey();
   const showTraining = t.programs.length > 0 || t.totalWorkouts > 0;
   const strengthNow = t.strength.length && t.lifts.some((l) => l.sessions > 1) ? t.strength[t.strength.length - 1].value : null;
   const muscle = latestScan && firstScan && latestScan !== firstScan ? formatChange("smm", latestScan.metrics.smm, firstScan.metrics.smm) : null;
@@ -69,6 +72,9 @@ export default async function ClientHome() {
           </Card>
         </Link>
       )}
+
+      {/* reminders: shows only until notifications are on (or can't be) */}
+      {vapid && <PushSetup vapidKey={vapid} prefs={getPrefs(clientId)} compact />}
 
       {/* daily habits */}
       {habits && (

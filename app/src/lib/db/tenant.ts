@@ -3007,6 +3007,29 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_habit_ticks_uniq ON habit_ticks(client_id, question_id, day);
     CREATE INDEX IF NOT EXISTS idx_habit_ticks_client_day ON habit_ticks(client_id, day);
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id   INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      endpoint    TEXT NOT NULL UNIQUE,
+      p256dh      TEXT NOT NULL,
+      auth        TEXT NOT NULL,
+      user_agent  TEXT,
+      created_at  INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_push_subscriptions_client ON push_subscriptions(client_id);
+    CREATE TABLE IF NOT EXISTS push_log (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id   INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      key         TEXT NOT NULL,
+      sent_at     INTEGER NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_push_log_uniq ON push_log(client_id, key);
+    CREATE TABLE IF NOT EXISTS push_prefs (
+      client_id   INTEGER PRIMARY KEY REFERENCES clients(id) ON DELETE CASCADE,
+      classes     INTEGER NOT NULL DEFAULT 1,
+      checkins    INTEGER NOT NULL DEFAULT 1,
+      habits      INTEGER NOT NULL DEFAULT 1
+    );
     CREATE TABLE IF NOT EXISTS client_measurements (
       client_id  INTEGER PRIMARY KEY REFERENCES clients(id) ON DELETE CASCADE,
       weight_kg  REAL NOT NULL,

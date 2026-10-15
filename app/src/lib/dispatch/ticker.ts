@@ -15,6 +15,7 @@ import { syncInBodyIfStale } from "@/lib/inbody/scans";
 import { sweepLegacyUploads } from "@/lib/video/uploadSweep";
 import { listTenants } from "@/lib/tenants";
 import { dispatchDueBroadcasts } from "@/lib/whatsappBroadcasts";
+import { dispatchReminders } from "@/lib/reminders";
 
 /**
  * The dispatch ticker: everything that was booked for a time, sent when that
@@ -103,6 +104,13 @@ async function runTenant(tenantId: number, baseUrl: string, summary: DispatchSum
       summary.nurtureSent += await dispatchDueAutomationQueue(tenantId);
     } catch (err) {
       console.error(`[dispatch] tenant ${tenantId} nurture queue failed:`, err);
+    }
+    // Member reminders by push notification: classes, check-ins, habits
+    // (a no-op until a member turns notifications on).
+    try {
+      await dispatchReminders(tenantId);
+    } catch (err) {
+      console.error(`[dispatch] tenant ${tenantId} reminders failed:`, err);
     }
     // WhatsApp broadcasts: a few messages a minute, daytime only (a no-op
     // without a broadcast in flight).

@@ -13,6 +13,7 @@ import { recordConsent } from "@/lib/marketingConsent";
 import { requestCancel, withdrawRequest } from "@/lib/cancellations";
 import { saveCheckin } from "@/lib/checkins";
 import { setTick } from "@/lib/habits";
+import { setPrefs } from "@/lib/push";
 import { fireTrigger } from "@/lib/automations";
 import { bodyForGoal, clearGoal, setGoal, setManualBody } from "@/lib/goals";
 import { isActivityKey, isGoalKey, parseManualBody } from "@/lib/goalsModel";
@@ -128,6 +129,15 @@ export async function withdrawCancelAction(): Promise<{ ok: true }> {
   const { clientId } = requireClient();
   withdrawRequest(clientId);
   revalidatePath("/app/membership");
+  return { ok: true };
+}
+
+// ---- Notification preferences ---------------------------------------------
+
+export async function setPushPrefsAction(prefs: { classes: boolean; checkins: boolean; habits: boolean }): Promise<{ ok: true }> {
+  const { clientId } = requireClient();
+  setPrefs(clientId, { classes: prefs.classes === true, checkins: prefs.checkins === true, habits: prefs.habits === true });
+  revalidatePath("/app/profile");
   return { ok: true };
 }
 

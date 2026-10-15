@@ -3373,6 +3373,37 @@ export const habitTicks = sqliteTable(
   (t) => ({ uniq: uniqueIndex("idx_habit_ticks_uniq").on(t.clientId, t.questionId, t.day) }),
 );
 
+/** A member's phone or browser that can receive push notifications (lib/push.ts). */
+export const pushSubscriptions = sqliteTable("push_subscriptions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  clientId: integer("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  userAgent: text("user_agent"),
+  createdAt: integer("created_at").notNull(),
+});
+
+/** Each reminder sent, by key, so none goes twice (lib/reminders.ts). */
+export const pushLog = sqliteTable(
+  "push_log",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    clientId: integer("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+    key: text("key").notNull(),
+    sentAt: integer("sent_at").notNull(),
+  },
+  (t) => ({ uniq: uniqueIndex("idx_push_log_uniq").on(t.clientId, t.key) }),
+);
+
+/** Which reminders a member wants. No row means all on. */
+export const pushPrefs = sqliteTable("push_prefs", {
+  clientId: integer("client_id").primaryKey().references(() => clients.id, { onDelete: "cascade" }),
+  classes: integer("classes", { mode: "boolean" }).notNull().default(true),
+  checkins: integer("checkins", { mode: "boolean" }).notNull().default(true),
+  habits: integer("habits", { mode: "boolean" }).notNull().default(true),
+});
+
 /** Weight, height, age and sex a client typed into the app when they have no InBody scan (lib/goals.ts). */
 export const clientMeasurements = sqliteTable("client_measurements", {
   clientId: integer("client_id").primaryKey().references(() => clients.id, { onDelete: "cascade" }),

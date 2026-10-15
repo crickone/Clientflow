@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/Badge";
 import { Card, dayLabel, PageTitle, SectionTitle } from "@/components/clientapp/ui";
 import { LogoutButton } from "@/components/clientapp/LogoutButton";
 import { MessagePrefs } from "@/components/clientapp/MessagePrefs";
+import { PushSetup } from "@/components/clientapp/PushSetup";
+import { getPrefs, vapidPublicKey } from "@/lib/push";
 import { businessContact } from "@/lib/agreements";
 import { consentsFor } from "@/lib/marketingConsent";
 import { CONSENT_CHANNELS, CONSENT_LABEL, consentStatement } from "@/lib/memberChoicesModel";
@@ -26,6 +28,7 @@ export default async function ClientProfilePage() {
   const initials = `${client.firstName?.[0] ?? ""}${client.lastName?.[0] ?? ""}`.toUpperCase();
   const business = businessContact().name;
   const consents = consentsFor(clientId, client.email);
+  const vapid = vapidPublicKey();
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -53,6 +56,15 @@ export default async function ClientProfilePage() {
           <ChevronRight size={18} style={{ color: "var(--text-tertiary)" }} />
         </Card>
       </Link>
+
+      {vapid && (
+        <div>
+          <SectionTitle>Notifications</SectionTitle>
+          <Card style={{ padding: "4px 16px" }}>
+            <PushSetup vapidKey={vapid} prefs={getPrefs(clientId)} />
+          </Card>
+        </div>
+      )}
 
       <div>
         <SectionTitle>Messages from {business}</SectionTitle>
