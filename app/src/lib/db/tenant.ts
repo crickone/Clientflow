@@ -2941,6 +2941,18 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       activity   TEXT NOT NULL DEFAULT 'moderate',
       set_at     INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS client_agreements (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id   INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      doc_key     TEXT NOT NULL,
+      title       TEXT NOT NULL,
+      version     TEXT NOT NULL,
+      body        TEXT NOT NULL,
+      accepted_at INTEGER NOT NULL,
+      ip          TEXT,
+      user_agent  TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_client_agreements_client ON client_agreements(client_id, doc_key);
     CREATE TABLE IF NOT EXISTS client_measurements (
       client_id  INTEGER PRIMARY KEY REFERENCES clients(id) ON DELETE CASCADE,
       weight_kg  REAL NOT NULL,
@@ -2951,6 +2963,13 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       entered_at INTEGER NOT NULL
     );
   `);
+
+  // The member who sent a form from the client app (the Welcome Q&A in
+  // lib/agreements.ts). Public /f/<slug> submissions leave it null. Additive.
+  {
+    const cols = sqlite.prepare("PRAGMA table_info(form_submissions)").all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === "client_id")) sqlite.exec("ALTER TABLE form_submissions ADD COLUMN client_id INTEGER");
+  }
 
   // How a person arrived the visit they got in touch (lib/arrival.ts): JSON on
   // the lead, and on an online order until it becomes a lead. Additive.

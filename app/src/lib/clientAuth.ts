@@ -11,6 +11,7 @@ import { authDb, CLIENT_SESSION_COOKIE } from "@/lib/db/control";
 import { clientAppHost } from "@/lib/clientAppHost";
 import { clientCredentials, clientSessions, clients, type Client } from "@/lib/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/auth";
+import { onboardingFor } from "@/lib/agreements";
 
 export { CLIENT_SESSION_COOKIE, hashPassword };
 
@@ -99,10 +100,15 @@ export function requireClient(): CurrentClient {
   return c;
 }
 
-/** Page guard: redirect to the client login when not signed in. */
+/**
+ * Page guard: redirect to the client login when not signed in, and to the
+ * welcome steps while the member still has documents to agree to or the
+ * Welcome Q&A to answer (lib/agreements.ts; only when the business has it on).
+ */
 export function requireClientPage(): CurrentClient {
   const c = getCurrentClient();
   if (!c) redirect("/app/login");
+  if (onboardingFor(c.clientId)) redirect("/app/welcome");
   return c;
 }
 

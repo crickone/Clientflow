@@ -134,6 +134,10 @@ export function validateRequired(form: FormInput, answers: Answer[]): string | n
   for (const q of form.questions) {
     if (!q.required || UNSUPPORTED_INPUT_TYPES.has(q.fieldType)) continue;
     const a = answers.find((x) => x.questionId === q.id);
+    if (q.fieldType === "confirm") {
+      if (a?.value !== "yes") return `Tick "${q.label}" to continue.`;
+      continue;
+    }
     if (!a || !a.value) return `"${q.label}" is required.`;
   }
   return null;
@@ -156,7 +160,7 @@ export function extractSubmitter(answers: Answer[]): { name: string | null; emai
  * MUST pass the tenantId resolveFormBySlug returned — never one taken from
  * client input.
  */
-export function insertFormSubmission(tenantId: number, formId: number, answers: Answer[]): number {
+export function insertFormSubmission(tenantId: number, formId: number, answers: Answer[], clientId: number | null = null): number {
   const tdb = getTenantDbById(tenantId);
   const { name, email } = extractSubmitter(answers);
   const row = tdb
@@ -167,6 +171,7 @@ export function insertFormSubmission(tenantId: number, formId: number, answers: 
       submitterName: name,
       submitterEmail: email,
       payload: JSON.stringify({ answers }),
+      clientId,
     })
     .returning({ id: formSubmissions.id })
     .get();

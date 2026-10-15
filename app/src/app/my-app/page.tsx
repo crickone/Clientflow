@@ -3,12 +3,16 @@ import { ExternalLink, Smartphone } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { requireUser } from "@/lib/auth";
+import { getCurrentMembership, requireUser } from "@/lib/auth";
+import { getAgreementSettings, requiredDocs, welcomeChoices } from "@/lib/agreements";
+import { AgreementSettingsCard } from "@/components/agreements/AgreementSettingsCard";
 
 export const dynamic = "force-dynamic";
 
 export default async function MyAppPage() {
   await requireUser();
+  const settings = getAgreementSettings();
+  const isAdmin = getCurrentMembership()?.role === "admin";
   return (
     <div className="app-page" style={{ maxWidth: 960 }}>
       <PageHeader
@@ -52,6 +56,8 @@ export default async function MyAppPage() {
 
         {/* info */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <AgreementSettingsCard on={settings.on} welcomeFormId={settings.welcomeFormId} docs={requiredDocs()} choices={welcomeChoices()} isAdmin={isAdmin} />
+
           <Card style={{ padding: 22 }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", marginBottom: 10 }}>What clients can do</div>
             <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.9 }}>

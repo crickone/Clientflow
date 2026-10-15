@@ -2756,6 +2756,8 @@ export const formSubmissions = sqliteTable(
     // a label/type snapshot at submit time, so the admin view still reads
     // sensibly even if the question is later edited or removed.
     payload: text("payload").notNull(),
+    /** The member who sent it from the client app; null for a public link. */
+    clientId: integer("client_id"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .default(sql`(unixepoch() * 1000)`),
@@ -3287,6 +3289,19 @@ export const clientGoals = sqliteTable("client_goals", {
   goal: text("goal", { enum: ["lose", "maintain", "build"] }).notNull(),
   activity: text("activity", { enum: ["light", "moderate", "active"] }).notNull().default("moderate"),
   setAt: integer("set_at").notNull(),
+});
+
+/** What a member agreed to in the client app, with a copy of the exact text (lib/agreements.ts). */
+export const clientAgreements = sqliteTable("client_agreements", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  clientId: integer("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+  docKey: text("doc_key").notNull(),
+  title: text("title").notNull(),
+  version: text("version").notNull(),
+  body: text("body").notNull(),
+  acceptedAt: integer("accepted_at").notNull(),
+  ip: text("ip"),
+  userAgent: text("user_agent"),
 });
 
 /** Weight, height, age and sex a client typed into the app when they have no InBody scan (lib/goals.ts). */

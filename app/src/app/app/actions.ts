@@ -1,12 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { z } from "zod";
 
 import { requireClient } from "@/lib/clientAuth";
 import { assignedWorkoutProgramDetail, clientMembership } from "@/lib/clientApp";
 import { bookClient, removeBooking } from "@/lib/timetable";
 import { setScanConsent } from "@/lib/inbody/scans";
+import { acceptDocs, saveWelcome } from "@/lib/agreements";
 import { bodyForGoal, clearGoal, setGoal, setManualBody } from "@/lib/goals";
 import { isActivityKey, isGoalKey, parseManualBody } from "@/lib/goalsModel";
 import {
@@ -68,6 +70,28 @@ export async function setBodyScanConsentAction(consent: boolean): Promise<{ ok: 
   revalidatePath("/app/body");
   revalidatePath("/app");
   return { ok: true };
+}
+
+// ---- Welcome: documents to agree to, then the Welcome Q&A ------------------
+
+export async function acceptAgreementsAction(ticked: { key: string; version: string }[]): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { clientId } = requireClient();
+  const list = z.array(z.object({ key: z.string().max(40), version: z.string().max(20) })).max(30).safeParse(ticked);
+  if (!list.success) return { ok: false, error: "Tick each document to continue." };
+  const h = headers();
+  const ip = (h.get("x-forwarded-for") ?? "").split(",")[0].trim() || h.get("x-real-ip");
+  const r = acceptDocs(clientId, list.data, { ip: ip || null, userAgent: h.get("user-agent") });
+  revalidatePath("/app/welcome");
+  return r;
+}
+
+export async function submitWelcomeAction(raw: Record<string, string>): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { clientId, tenantId } = requireClient();
+  const clean: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw ?? {})) if (/^q_\d+$/.test(k) && typeof v === "string") clean[k] = v;
+  const r = saveWelcome(tenantId, clientId, clean);
+  revalidatePath("/app/welcome");
+  return r;
 }
 
 // ---- Goal from the InBody scan ---------------------------------------------

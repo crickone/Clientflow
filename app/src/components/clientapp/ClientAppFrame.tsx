@@ -26,8 +26,11 @@ export function ClientAppFrame({
   const pathname = usePathname();
   const router = useRouter();
   const isLogin = pathname === "/app/login";
+  // The welcome steps (documents to agree to, Welcome Q&A) come before the
+  // app: no tabs and no back button until they're done.
+  const isWelcome = pathname === "/app/welcome";
   // Sub-page = any /app route that isn't one of the bottom-nav tabs → show a back button.
-  const isSubPage = !isLogin && !TAB_HREFS.has(pathname);
+  const isSubPage = !isLogin && !isWelcome && !TAB_HREFS.has(pathname);
 
   const goBack = () => {
     if (window.history.length > 1) router.back();
@@ -93,9 +96,9 @@ export function ClientAppFrame({
           </header>
         )}
 
-        <main style={{ flex: 1, padding: isLogin ? 0 : "16px 16px 88px" }}>{children}</main>
+        <main style={{ flex: 1, padding: isLogin ? 0 : isWelcome ? "16px 16px 32px" : "16px 16px 88px" }}>{children}</main>
 
-        {!isLogin && (
+        {!isLogin && !isWelcome && (
           <nav
             style={{
               position: "sticky",

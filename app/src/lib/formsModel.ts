@@ -3,13 +3,14 @@
 
 export type FormType = "initial" | "checkin" | "habits" | "contact" | "terms";
 
-export type FieldType = "number" | "short" | "long" | "dropdown" | "photo" | "video" | "metric";
+export type FieldType = "number" | "short" | "long" | "dropdown" | "confirm" | "photo" | "video" | "metric";
 
 export const FIELD_TYPES: { key: FieldType; label: string }[] = [
   { key: "number", label: "Number" },
   { key: "short", label: "Short Answer" },
   { key: "long", label: "Long Answer" },
   { key: "dropdown", label: "Dropdown" },
+  { key: "confirm", label: "Tick to confirm" },
   { key: "photo", label: "Upload Photo" },
   { key: "video", label: "Upload Video" },
 ];

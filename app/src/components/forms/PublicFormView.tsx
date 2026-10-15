@@ -130,6 +130,18 @@ function Field({ question }: { question: QuestionInput }) {
     );
   }
 
+  if (question.fieldType === "confirm") {
+    return (
+      <label htmlFor={name} style={{ ...labelStyle, display: "flex", gap: 10, alignItems: "flex-start", cursor: "pointer" }}>
+        <input id={name} type="checkbox" name={name} value="yes" required={question.required} style={{ marginTop: 3, width: 18, height: 18, flexShrink: 0 }} />
+        <span>
+          {question.label}
+          {question.required && <span style={{ color: "#ef5a24" }}> *</span>}
+        </span>
+      </label>
+    );
+  }
+
   return (
     <div>
       <FieldLabel question={question} required={question.required} />

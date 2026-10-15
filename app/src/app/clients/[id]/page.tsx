@@ -45,6 +45,7 @@ import { listClientEmails } from "@/lib/clientEmail";
 import { isEmailConfigured } from "@/lib/email";
 import { getCurrentMembership } from "@/lib/auth";
 import { clientMembership } from "@/lib/clientApp";
+import { clientAgreementView } from "@/lib/agreements";
 import { bodyScansEnabled, getScanProfile, listClientScans } from "@/lib/inbody/scans";
 import { goalTarget } from "@/lib/goals";
 import { ACTIVITY_BY_KEY, GOAL_BY_KEY } from "@/lib/goalsModel";
@@ -88,6 +89,8 @@ export default async function ClientProfile({
   const availWk = availableWorkouts();
   const membership = getCurrentMembership();
   const activeMembership = clientMembership(id);
+  const agreements = clientAgreementView(id);
+  const agreedAll = agreements.docs.every((d) => d.current);
   const showScans = membership ? bodyScansEnabled(membership.tenant.id) : false;
   const scans = showScans ? listClientScans(id) : [];
   const scanProfile = showScans ? getScanProfile(id) : null;
@@ -127,6 +130,7 @@ export default async function ClientProfile({
               <Badge tone={activeMembership ? "green" : "neutral"}>{activeMembership ? activeMembership.name : "No membership"}</Badge>
               <Badge tone={appTone}>{appState}</Badge>
               {clientGoal && <Badge tone="neutral">Goal: {GOAL_BY_KEY[clientGoal.goal.goal].label}</Badge>}
+              {agreements.on && <Badge tone={agreedAll ? "green" : "neutral"}>{agreedAll ? "Agreed to terms" : "Terms not agreed"}</Badge>}
             </div>
           </div>
         </div>
@@ -446,6 +450,23 @@ export default async function ClientProfile({
         </TabsContent>
 
         <TabsContent value="app">
+          {agreements.welcome && (
+            <Card className="cp-card" style={{ marginBottom: 16 }}>
+              <CardLabel>
+                {agreements.welcome.title}, answered {formatDate(new Date(agreements.welcome.at).toISOString().slice(0, 10))}
+              </CardLabel>
+              <div className="wq">
+                {agreements.welcome.answers
+                  .filter((a) => a.fieldType !== "photo" && a.fieldType !== "video")
+                  .map((a) => (
+                    <div key={a.questionId} className="wq-row">
+                      <span className="wq-q">{a.label}</span>
+                      <span className="wq-a">{a.fieldType === "confirm" ? (a.value === "yes" ? "Ticked" : "Not ticked") : a.value || "No answer"}</span>
+                    </div>
+                  ))}
+              </div>
+            </Card>
+          )}
           <ClientAppAccess
             clientId={id}
             clientEmail={client.email}
@@ -528,6 +549,28 @@ export default async function ClientProfile({
             )}
           </dl>
         </Card>
+
+        {(agreements.on || agreements.docs.some((d) => d.acceptedAt)) && (
+          <Card className="cp-card">
+            <CardLabel>Agreed in the app</CardLabel>
+            <dl className="cp-agree">
+              {agreements.docs.map((d) => (
+                <div key={d.key}>
+                  <dt>{d.title}</dt>
+                  <dd data-state={d.acceptedAt === null ? "missing" : d.current ? "ok" : "old"}>
+                    {d.acceptedAt === null ? (
+                      "Not yet"
+                    ) : (
+                      <Link href={`/clients/${id}/agreements/${encodeURIComponent(d.key)}`}>
+                        {d.current ? formatDate(new Date(d.acceptedAt).toISOString().slice(0, 10)) : "Older version"}
+                      </Link>
+                    )}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </Card>
+        )}
 
         {(client.medicalNotes || client.emergencyContactName || client.emergencyContactPhone) && (
           <Card className="cp-card">
