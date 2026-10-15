@@ -3360,6 +3360,19 @@ export const whatsappBroadcastSends = sqliteTable("whatsapp_broadcast_sends", {
   sentAt: integer("sent_at"),
 });
 
+/** A habit a member ticked off for a day (lib/habits.ts). question_id is the habit line on the Default Daily Habits form. */
+export const habitTicks = sqliteTable(
+  "habit_ticks",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    clientId: integer("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+    questionId: integer("question_id").notNull(),
+    day: text("day").notNull(),
+    tickedAt: integer("ticked_at").notNull(),
+  },
+  (t) => ({ uniq: uniqueIndex("idx_habit_ticks_uniq").on(t.clientId, t.questionId, t.day) }),
+);
+
 /** Weight, height, age and sex a client typed into the app when they have no InBody scan (lib/goals.ts). */
 export const clientMeasurements = sqliteTable("client_measurements", {
   clientId: integer("client_id").primaryKey().references(() => clients.id, { onDelete: "cascade" }),

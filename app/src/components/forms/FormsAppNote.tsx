@@ -19,7 +19,8 @@ export function FormsAppNote(
   props:
     | { kind: "terms"; live: boolean; ours: AgreementDoc[]; progress: { members: number; signed: number } }
     | { kind: "initial"; live: string | null; termsLive: boolean }
-    | { kind: "checkin"; live: string | null; weekday: number },
+    | { kind: "checkin"; live: string | null; weekday: number }
+    | { kind: "habits"; live: string | null; count: number },
 ) {
   const [preview, setPreview] = useState<AgreementDoc | null>(null);
   const router = useRouter();
@@ -68,6 +69,23 @@ export function FormsAppNote(
             {props.live
               ? `Every member answers the Default questionnaire once${props.termsLive ? ", straight after signing your terms," : ""} before the app opens. Their answers show on their client page.`
               : "The Default questionnaire, when switched on, is asked once before a member can use the app. Use the Tick to confirm question type for lines they must agree to."}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  if (props.kind === "habits") {
+    return (
+      <div className="fan" data-live={Boolean(props.live)}>
+        <span className="fan-icon" aria-hidden>
+          <Smartphone size={17} />
+        </span>
+        <div className="fan-text">
+          <b>{props.live ? `"${props.live}" is on every member's Home, ${props.count} habit${props.count === 1 ? "" : "s"} a day` : "Make one the Default to show it on every member's Home"}</b>
+          <span>
+            Each Habit Tracking line is a tick box the member clears every day, with a streak. You see their last four weeks on their client page. Progress Tracking lines aren&rsquo;t
+            shown yet.
           </span>
         </div>
       </div>

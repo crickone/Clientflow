@@ -1,6 +1,8 @@
 import Link from "next/link";
-import { CalendarRange, ChevronRight, ClipboardCheck, CreditCard, Dumbbell, Play, Salad, ScanLine, Target, TrendingUp, Trophy } from "lucide-react";
+import { CalendarRange, ChevronRight, ClipboardCheck, CreditCard, Dumbbell, ListChecks, Play, Salad, ScanLine, Target, TrendingUp, Trophy } from "lucide-react";
 import { memberCheckin } from "@/lib/checkins";
+import { memberHabits } from "@/lib/habits";
+import { HabitTicks } from "@/components/clientapp/HabitTicks";
 import { WEEKDAYS } from "@/lib/memberChoicesModel";
 
 import { requireClientPage } from "@/lib/clientAuth";
@@ -36,6 +38,7 @@ export default async function ClientHome() {
   const mealTarget = dailyTarget(clientId);
   const goal = goalTarget(clientId);
   const checkin = memberCheckin(clientId);
+  const habits = memberHabits(clientId);
   const showTraining = t.programs.length > 0 || t.totalWorkouts > 0;
   const strengthNow = t.strength.length && t.lifts.some((l) => l.sessions > 1) ? t.strength[t.strength.length - 1].value : null;
   const muscle = latestScan && firstScan && latestScan !== firstScan ? formatChange("smm", latestScan.metrics.smm, firstScan.metrics.smm) : null;
@@ -65,6 +68,21 @@ export default async function ClientHome() {
             </div>
           </Card>
         </Link>
+      )}
+
+      {/* daily habits */}
+      {habits && (
+        <Card>
+          <Link href="/app/habits" style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+            <span style={iconBox}><ListChecks size={18} /></span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{habits.title}</div>
+              <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>Tick them off as you go</div>
+            </div>
+            <ChevronRight size={18} style={{ color: "var(--text-tertiary)" }} />
+          </Link>
+          <HabitTicks habits={habits.habits} ticked={[...habits.tickedToday]} day={habits.today} streak={habits.streak} compact />
+        </Card>
       )}
 
       {/* weekly check-in */}

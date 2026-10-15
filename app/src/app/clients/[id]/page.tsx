@@ -47,6 +47,9 @@ import { getCurrentMembership } from "@/lib/auth";
 import { clientMembership } from "@/lib/clientApp";
 import { clientAgreementView, clientForms } from "@/lib/agreements";
 import { ClientForms } from "@/components/clients/ClientForms";
+import { clientHabitView } from "@/lib/habits";
+import { HabitGrid } from "@/components/clientapp/HabitGrid";
+import { dateKey } from "@/lib/trainingProgress";
 import { pendingRequest } from "@/lib/cancellations";
 import { listCheckins } from "@/lib/checkins";
 import { consentsFor } from "@/lib/marketingConsent";
@@ -97,6 +100,7 @@ export default async function ClientProfile({
   const activeMembership = clientMembership(id);
   const agreements = clientAgreementView(id);
   const memberForms = clientForms(id);
+  const habitView = clientHabitView(id);
   const agreedAll = agreements.docs.every((d) => d.current);
   const cancelNotice = pendingRequest(id);
   const consents = consentsFor(id, client.email);
@@ -195,6 +199,7 @@ export default async function ClientProfile({
               Forms <Count n={memberForms.length + (agreements.docs.some((d) => d.acceptedAt) ? 1 : 0)} />
             </TabsTrigger>
           )}
+          {habitView && <TabsTrigger value="habits">Habits</TabsTrigger>}
           <TabsTrigger value="app">Client app</TabsTrigger>
           {checkins.length > 0 && (
             <TabsTrigger value="checkins">
@@ -514,6 +519,45 @@ export default async function ClientProfile({
           </TabsContent>
         )}
 
+        {habitView && (
+          <TabsContent value="habits">
+            <div className="bs-tiles" style={{ marginBottom: 16 }}>
+              <div className="bs-tile">
+                <span className="bs-tile-label">Last four weeks</span>
+                <span className="bs-tile-value">{habitView.rate}%</span>
+              </div>
+              <div className="bs-tile">
+                <span className="bs-tile-label">Current streak</span>
+                <span className="bs-tile-value">{habitView.streak} day{habitView.streak === 1 ? "" : "s"}</span>
+              </div>
+              <div className="bs-tile">
+                <span className="bs-tile-label">Habits</span>
+                <span className="bs-tile-value">{habitView.habits.length}</span>
+              </div>
+            </div>
+            <div className="wb-grid">
+              <Card className="cp-card">
+                <CardLabel>Every day</CardLabel>
+                <HabitGrid days={habitView.days} today={dateKey(Date.now())} />
+                {!habitView.everTicked && <p className="cp-notes">Nothing ticked yet. The habits show on their Home screen in the app.</p>}
+              </Card>
+              <Card className="cp-card">
+                <CardLabel>By habit</CardLabel>
+                <dl className="cp-facts">
+                  {habitView.perHabit.map((p) => (
+                    <div key={p.habit.id}>
+                      <dt>{p.habit.label}</dt>
+                      <dd>
+                        {p.days} of {p.of} days
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </Card>
+            </div>
+          </TabsContent>
+        )}
+
         <TabsContent value="app">
           <ClientAppAccess
             clientId={id}
@@ -644,7 +688,7 @@ export default async function ClientProfile({
   );
 }
 
-const TAB_KEYS = new Set(["journey", "appointments", "sessions", "packages", "payments", "messages", "email", "forms", "app", "checkins", "workouts", "scans"]);
+const TAB_KEYS = new Set(["journey", "appointments", "sessions", "packages", "payments", "messages", "email", "forms", "habits", "app", "checkins", "workouts", "scans"]);
 
 /** A count beside a tab name, only when there is something to count. */
 function Count({ n }: { n: number }) {

@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { getCurrentMembership, requireUser } from "@/lib/auth";
 import { ourDocs, requiredDocs, signoffProgress, welcomeForm } from "@/lib/agreements";
 import { checkinForm, getCheckinDay } from "@/lib/checkins";
+import { habitForm } from "@/lib/habits";
 import { FormsAppNote } from "@/components/forms/FormsAppNote";
 import { listForms } from "@/lib/forms";
 import { FORM_TYPE_META, type FormType } from "@/lib/formsModel";
@@ -26,6 +27,7 @@ export default async function FormsListPage({ params }: { params: { type: string
       <PageHeader eyebrow="Forms" title={meta.label} subtitle={meta.intro[0]} />
       {type === "terms" && <FormsAppNote kind="terms" live={termsLive} ours={ourDocs()} progress={signoffProgress(tenantId)} />}
       {type === "initial" && <FormsAppNote kind="initial" live={welcomeForm()?.title || (welcomeForm() ? "Untitled" : null)} termsLive={termsLive} />}
+      {type === "habits" && <FormsAppNote kind="habits" live={habitForm()?.title ?? null} count={habitForm()?.habits.length ?? 0} />}
       {type === "checkin" && <FormsAppNote kind="checkin" live={checkinForm()?.title || (checkinForm() ? "Untitled" : null)} weekday={getCheckinDay()} />}
       <FormsListView type={type} meta={meta} forms={forms} />
     </div>

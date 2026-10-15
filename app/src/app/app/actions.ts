@@ -12,6 +12,7 @@ import { acceptDocs, businessContact, saveWelcome } from "@/lib/agreements";
 import { recordConsent } from "@/lib/marketingConsent";
 import { requestCancel, withdrawRequest } from "@/lib/cancellations";
 import { saveCheckin } from "@/lib/checkins";
+import { setTick } from "@/lib/habits";
 import { fireTrigger } from "@/lib/automations";
 import { bodyForGoal, clearGoal, setGoal, setManualBody } from "@/lib/goals";
 import { isActivityKey, isGoalKey, parseManualBody } from "@/lib/goalsModel";
@@ -127,6 +128,18 @@ export async function withdrawCancelAction(): Promise<{ ok: true }> {
   const { clientId } = requireClient();
   withdrawRequest(clientId);
   revalidatePath("/app/membership");
+  return { ok: true };
+}
+
+// ---- Daily habits ---------------------------------------------------------
+
+export async function setHabitAction(questionId: number, day: string, done: boolean): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { clientId } = requireClient();
+  const q = idSchema.safeParse(questionId);
+  if (!q.success || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return { ok: false, error: "That habit isn't on your list." };
+  if (!setTick(clientId, q.data, day, done === true)) return { ok: false, error: "That habit isn't on your list any more." };
+  revalidatePath("/app");
+  revalidatePath("/app/habits");
   return { ok: true };
 }
 
