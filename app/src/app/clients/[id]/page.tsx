@@ -570,7 +570,7 @@ export default async function ClientProfile({
             <p className="cp-origin" style={{ marginBottom: 12 }}>
               Connected: {devices.map((d) => `${PROVIDER_NAME[d.provider]}${d.lastError ? " (needs reconnecting)" : ""}`).join(", ")}
             </p>
-            <div className="wb-grid">
+            <div className="cp-stack">
               <Card className="cp-card">
                 <CardLabel>Last 7 days</CardLabel>
                 <WearableSummary days={deviceDays} today={dateKey(Date.now())} />
@@ -584,6 +584,7 @@ export default async function ClientProfile({
                       <th>Sleep</th>
                       <th>Resting HR</th>
                       <th>HRV</th>
+                      <th>Readiness</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -592,8 +593,9 @@ export default async function ClientProfile({
                         <td>{formatDate(d.day)}</td>
                         <td>{d.steps?.toLocaleString("en-IE") ?? "-"}</td>
                         <td>{sleepLabel(d.sleepMinutes)}</td>
-                        <td>{d.restingHr ?? "-"}</td>
-                        <td>{d.hrvMs ?? "-"}</td>
+                        <td>{d.restingHr ? `${d.restingHr} bpm` : "-"}</td>
+                        <td>{d.hrvMs ? `${d.hrvMs} ms` : "-"}</td>
+                        <td>{d.readiness ?? "-"}</td>
                       </tr>
                     ))}
                   </tbody>

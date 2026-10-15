@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarRange, ChevronRight, ClipboardCheck, CreditCard, Dumbbell, ListChecks, Play, Salad, ScanLine, Target, TrendingUp, Trophy } from "lucide-react";
+import { ChevronRight, ClipboardCheck, CreditCard, ListChecks, Play, Salad, ScanLine, Target, TrendingUp, Trophy } from "lucide-react";
 import { memberCheckin } from "@/lib/checkins";
 import { memberHabits } from "@/lib/habits";
 import { HabitTicks } from "@/components/clientapp/HabitTicks";
@@ -195,7 +195,8 @@ export default async function ClientHome() {
         </Card>
       </Link>
 
-      {/* week progress */}
+      {/* week progress: only once something has been booked */}
+      {(d.weekBooked > 0 || d.totalAttended > 0) && (
       <Card>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <Ring pct={pct} />
@@ -210,6 +211,7 @@ export default async function ClientHome() {
           </div>
         </div>
       </Card>
+      )}
 
       {/* next class */}
       <div>
@@ -311,13 +313,6 @@ export default async function ClientHome() {
         </div>
       )}
 
-      {/* quick tiles */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
-        <Tile href="/app/timetable" icon={<CalendarRange size={20} />} label="Book a class" />
-        <Tile href="/app/nutrition" icon={<Salad size={20} />} label="My nutrition" />
-        <Tile href="/app/workouts" icon={<Dumbbell size={20} />} label="My workouts" />
-        <Tile href="/app/membership" icon={<CreditCard size={20} />} label="Membership" />
-      </div>
     </div>
   );
 }
@@ -356,17 +351,6 @@ function Ring({ pct }: { pct: number }) {
         {pct}%
       </text>
     </svg>
-  );
-}
-
-function Tile({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
-  return (
-    <Link href={href}>
-      <Card style={{ display: "flex", flexDirection: "column", gap: 8, padding: 14 }}>
-        <span style={{ color: "var(--accent-ink)" }}>{icon}</span>
-        <span style={{ fontSize: 13.5, fontWeight: 500, color: "var(--text-primary)" }}>{label}</span>
-      </Card>
-    </Link>
   );
 }
 

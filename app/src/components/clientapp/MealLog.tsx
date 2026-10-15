@@ -441,7 +441,7 @@ function MealCard({
                   void add();
                 }}
               >
-                <input ref={addRef} className="ml-input" placeholder={m.items.length ? "Missing something? e.g. a tablespoon of seeds" : "Add what's in it, e.g. 50 g oats"} value={addText} onChange={(e) => setAddText(e.target.value)} maxLength={200} disabled={adding} />
+                <input ref={addRef} className="ml-input" placeholder={m.items.length ? "Add something it missed" : "Add what's in it, e.g. 50 g oats"} value={addText} onChange={(e) => setAddText(e.target.value)} maxLength={200} disabled={adding} />
                 <button type="submit" className="ml-btn ml-btn--sm" disabled={adding || !addText.trim()}>
                   {adding ? <Loader2 size={14} className="spin" /> : <Plus size={14} />} {adding ? "Working it out" : "Add"}
                 </button>

@@ -192,7 +192,7 @@ function FormRowItem({
     <div style={{ ...rowStyle(cols), opacity: pending ? 0.7 : 1 }}>
       <button onClick={onEdit} style={{ textAlign: "left", background: "transparent", border: "none", cursor: "pointer", padding: 0, minWidth: 0 }}>
         <div style={{ fontSize: 14, color: "var(--text-primary)", fontWeight: 500 }}>{form.title || `Untitled ${meta.label}`}</div>
-        <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{form.questionCount} question{form.questionCount === 1 ? "" : "s"}</div>
+        {meta.kind !== "terms" && <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>{form.questionCount} question{form.questionCount === 1 ? "" : "s"}</div>}
       </button>
 
       {isContact ? (

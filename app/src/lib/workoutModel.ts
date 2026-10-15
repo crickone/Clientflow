@@ -93,7 +93,8 @@ export function fmtRest(seconds: number): string {
   if (!seconds) return "—";
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
-  return `${m} min ${s} sec`;
+  if (m === 0) return `${s} sec`;
+  return s === 0 ? `${m} min` : `${m} min ${s} sec`;
 }
 
 export function blankExercise(section: Section): ExerciseInput {

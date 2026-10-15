@@ -39,7 +39,8 @@ export default async function ClientProfilePage({ searchParams }: { searchParams
     const m = Math.round((Date.now() - ms) / 60000);
     return m < 2 ? "just now" : m < 60 ? `${m} minutes ago` : m < 1440 ? `${Math.round(m / 60)} hours ago` : `${Math.round(m / 1440)} days ago`;
   };
-  const deviceRows = PROVIDERS.map((p) => {
+  // Only devices the gym has set up; until then the section doesn't show at all.
+  const deviceRows = PROVIDERS.filter((p) => isProviderConfigured(p.id) || conns.some((c) => c.provider === p.id)).map((p) => {
     const c = conns.find((x) => x.provider === p.id);
     return { id: p.id, name: p.name, gives: p.gives, available: isProviderConfigured(p.id), connected: Boolean(c), syncedAgo: ago(c?.lastSyncAt ?? null), error: c?.lastError ?? null };
   });
@@ -81,12 +82,14 @@ export default async function ClientProfilePage({ searchParams }: { searchParams
         </div>
       )}
 
-      <div id="devices">
-        <SectionTitle>Devices</SectionTitle>
-        <Card style={{ padding: "4px 14px" }}>
-          <DevicesList rows={deviceRows} flash={flash} />
-        </Card>
-      </div>
+      {deviceRows.length > 0 && (
+        <div id="devices">
+          <SectionTitle>Devices</SectionTitle>
+          <Card style={{ padding: "4px 14px" }}>
+            <DevicesList rows={deviceRows} flash={flash} />
+          </Card>
+        </div>
+      )}
 
       <div>
         <SectionTitle>Messages from {business}</SectionTitle>

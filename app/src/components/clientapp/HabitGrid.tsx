@@ -30,6 +30,14 @@ export function HabitGrid({ days, today }: { days: { day: string; done: number; 
           ),
         )}
       </div>
+      <div className="hg-legend" aria-hidden>
+        <span>None</span>
+        <span className="hg-cell" data-level={0} />
+        <span className="hg-cell" data-level={1} />
+        <span className="hg-cell" data-level={2} />
+        <span className="hg-cell" data-level={3} />
+        <span>All done</span>
+      </div>
     </div>
   );
 }

@@ -5434,3 +5434,33 @@ textarea.ag-input { resize: vertical; line-height: 1.5; }
 .wsum-bar span { display: block; width: 100%; background: var(--accent); border-radius: 6px 6px 0 0; }
 .wsum-dow { font-size: 10.5px; color: var(--text-tertiary); }
 .wsum-note { font-size: 11.5px; color: var(--text-tertiary); }
+
+/* Habits grid: compact squares on a phone, a legend underneath */
+.hg { max-width: 300px; }
+.hg-grid, .hg-dows { gap: 5px; }
+.hg-cell { border-radius: 5px; }
+.hg-legend { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 11px; color: var(--text-tertiary); }
+.hg-legend .hg-cell { width: 12px; height: 12px; aspect-ratio: auto; border-radius: 3px; }
+
+/* Meal breakdown rows, v2: name and kcal on one line, tap a line to change it */
+.mb-row { grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 11px 12px; }
+.mb-main { width: 100%; }
+.mb-top { display: flex; align-items: baseline; gap: 8px; }
+.mb-top .mb-name { flex: 1; min-width: 0; }
+.mb-top .mb-kcal { text-align: right; white-space: nowrap; font-size: 14.5px; }
+.mb-top .mb-kcal small { display: inline; font-size: 11px; }
+.mb-pen { color: var(--text-tertiary); flex-shrink: 0; align-self: center; }
+.mb-portion { font-size: 12px; color: var(--text-tertiary); }
+.mb-split { grid-column: auto; margin-top: 0; }
+.mb-remove { color: var(--warning); }
+.mb-edit-actions .ml-link { display: inline-flex; align-items: center; gap: 4px; }
+
+/* Logger: the superset/circuit bracket beats the card's inline border */
+.wl-group[data-ingroup="true"] > div:last-child { border-left: 3px solid var(--accent) !important; }
+/* Staff client page: tabs wrap on wide screens, so the selected one is never scrolled out of view */
+@media (min-width: 900px) {
+  .cp-main [role="tablist"] { flex-wrap: wrap; overflow: visible !important; }
+}
+.cp-stack { display: grid; gap: 16px; }
+.mb-edit .ml-input { width: 100%; min-width: 0; }
+.wsum-bar { max-width: 30px; }

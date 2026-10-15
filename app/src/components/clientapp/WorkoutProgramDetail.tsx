@@ -54,7 +54,7 @@ export function WorkoutProgramDetail({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <PageTitle sub={PROGRAM_TYPE_LABEL[program.type]}>{program.title}</PageTitle>
+      <PageTitle sub={program.type === "detailed" ? `${program.days.length} day${program.days.length === 1 ? "" : "s"}` : PROGRAM_TYPE_LABEL[program.type]}>{program.title}</PageTitle>
 
       {program.type === "upload" ? (
         <DocumentCard href={`/api/app/workout/file?program=${program.id}`} name={program.uploadOriginalName ?? program.title} />

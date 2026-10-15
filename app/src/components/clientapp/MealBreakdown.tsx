@@ -49,6 +49,14 @@ export function MealBreakdown({
             <li key={i} className="mb-row mb-row--edit">
               <ItemEditor
                 item={it}
+                onRemove={() => {
+                  setEditing(null);
+                  onRemove(i);
+                }}
+                onSplit={() => {
+                  setEditing(null);
+                  void split(i);
+                }}
                 onCancel={() => setEditing(null)}
                 onSave={async (p) => {
                   if (await onSave(i, p)) setEditing(null);
@@ -58,11 +66,16 @@ export function MealBreakdown({
             </li>
           ) : (
             <li key={i} className="mb-row">
-              <button type="button" className="mb-main" onClick={() => setEditing(i)} title="Change this line">
-                <span className="mb-name">
-                  {it.name}
-                  {it.portion && <small>{it.portion}</small>}
+              <button type="button" className="mb-main" onClick={() => setEditing(i)} aria-label={`Change ${it.name}`}>
+                <span className="mb-top">
+                  <span className="mb-name">{it.name}</span>
+                  <span className="mb-kcal">
+                    {it.calories}
+                    <small> kcal</small>
+                  </span>
+                  <Pencil size={12} className="mb-pen" aria-hidden />
                 </span>
+                {it.portion && <span className="mb-portion">{it.portion}</span>}
                 <span className="mb-calc">{calcLine(it)}</span>
                 <span className="mb-macros">
                   P {it.protein} g · C {it.carbs} g · F {it.fat} g
@@ -74,38 +87,24 @@ export function MealBreakdown({
                   {splitting === i ? "Splitting into ingredients" : "Split into ingredients"}
                 </button>
               )}
-              <span className="mb-kcal">
-                {it.calories}
-                <small>kcal</small>
-              </span>
-              <span className="mb-tools">
-                <button type="button" aria-label={`Change ${it.name}`} onClick={() => setEditing(i)}>
-                  <Pencil size={13} />
-                </button>
-                <button type="button" aria-label={`Split ${it.name} into ingredients`} title="Split into ingredients" onClick={() => void split(i)} disabled={pending || splitting !== null}>
-                  {splitting === i ? <Loader2 size={13} className="spin" /> : <Scissors size={13} />}
-                </button>
-                <button type="button" aria-label={`Remove ${it.name}`} onClick={() => onRemove(i)} disabled={pending}>
-                  <X size={14} />
-                </button>
-              </span>
             </li>
           ),
         )}
         {rest && (
           <li className="mb-row mb-row--rest">
             <span className="mb-main mb-main--static">
-              <span className="mb-name">Not split out</span>
+              <span className="mb-top">
+                <span className="mb-name">Not split out</span>
+                <span className="mb-kcal">
+                  {rest.calories}
+                  <small> kcal</small>
+                </span>
+              </span>
               <span className="mb-calc">Oil, a sauce or dressing the photo couldn&rsquo;t separate, and rounding.</span>
               <span className="mb-macros">
                 P {rest.protein} g · C {rest.carbs} g · F {rest.fat} g
               </span>
             </span>
-            <span className="mb-kcal">
-              {rest.calories}
-              <small>kcal</small>
-            </span>
-            <span className="mb-tools" />
           </li>
         )}
       </ul>
@@ -123,11 +122,25 @@ export function MealBreakdown({
 
 function calcLine(it: MealItem): string {
   const p = per100(it);
-  if (!p || !it.grams) return "Weight not known, so the numbers are for the portion as a whole.";
-  return `${it.grams} g × ${p.calories} kcal per 100 g = ${it.calories} kcal`;
+  if (!p || !it.grams) return "Weight not known: numbers are for the whole portion";
+  return `${it.grams} g at ${p.calories} kcal per 100 g`;
 }
 
-function ItemEditor({ item, onSave, onCancel, pending }: { item: MealItem; onSave: (p: Patch) => void; onCancel: () => void; pending: boolean }) {
+function ItemEditor({
+  item,
+  onSave,
+  onCancel,
+  onRemove,
+  onSplit,
+  pending,
+}: {
+  item: MealItem;
+  onSave: (p: Patch) => void;
+  onCancel: () => void;
+  onRemove: () => void;
+  onSplit: () => void;
+  pending: boolean;
+}) {
   const base = per100(item);
   const [v, setV] = useState({
     name: item.name,
@@ -194,6 +207,13 @@ function ItemEditor({ item, onSave, onCancel, pending }: { item: MealItem; onSav
         </button>
         <button type="button" className="ml-link" onClick={onCancel}>
           Cancel
+        </button>
+        <span style={{ flex: 1 }} />
+        <button type="button" className="ml-link" onClick={onSplit} disabled={pending}>
+          <Scissors size={13} /> Split
+        </button>
+        <button type="button" className="ml-link mb-remove" onClick={onRemove} disabled={pending}>
+          <X size={13} /> Remove
         </button>
       </div>
     </form>
