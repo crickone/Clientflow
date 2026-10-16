@@ -1,7 +1,7 @@
 import "server-only";
 
 import type Anthropic from "@anthropic-ai/sdk";
-import { desc, eq, inArray } from "drizzle-orm";
+import { desc, eq, inArray, sql } from "drizzle-orm";
 
 import { leadMessages, leads } from "@/lib/db/schema";
 import { addMessage, getLead } from "@/lib/leads";
@@ -42,7 +42,7 @@ export const SALES_TOOLS: Anthropic.Tool[] = [
   {
     name: "list_leads",
     description:
-      "List pipeline leads with their pipeline stage, name, contact details and last-touch date. Optionally filter to a single stage. Use for 'who's in the pipeline' / 'show me hot leads' etc.",
+      "List pipeline leads with their pipeline stage, name, contact details, last-touch date and lead score (readiness to buy out of 100, with a suggested next step: book, call, message, wait or close; null when not scored yet). Optionally filter to a single stage, or sort hottest first. Use for 'who's in the pipeline' / 'who should I call today' / 'show me hot leads' etc.",
     input_schema: {
       type: "object",
       properties: {
@@ -53,6 +53,7 @@ export const SALES_TOOLS: Anthropic.Tool[] = [
             "check a lead's `stage` in this tool's own results for the live names). Omit to list all leads.",
         },
         limit: { type: "integer", description: "Max leads to return (default 50)." },
+        sort: { type: "string", enum: ["recent", "hottest"], description: "recent (default): most recently active first. hottest: highest lead score first." },
       },
     },
   },
@@ -208,11 +209,12 @@ export function listLeadsTool(ctx: ToolContext, input: Record<string, unknown>):
   const limitArg = Number(input.limit);
   const limit = Number.isFinite(limitArg) && limitArg > 0 ? Math.min(200, Math.round(limitArg)) : 50;
 
+  const hottest = input.sort === "hottest";
   const rows = db
     .select()
     .from(leads)
     .where(stageMatch ? inArray(leads.stageId, stageMatch.ids) : undefined)
-    .orderBy(desc(leads.updatedAt))
+    .orderBy(...(hottest ? [sql`${leads.leadScore} is null`, desc(leads.leadScore), desc(leads.updatedAt)] : [desc(leads.updatedAt)]))
     .limit(limit)
     .all();
 
@@ -235,6 +237,8 @@ export function listLeadsTool(ctx: ToolContext, input: Record<string, unknown>):
       phone: l.phone,
       email: l.email,
       lastTouchAt: last?.createdAt ? last.createdAt.toISOString() : null,
+      leadScore: l.leadScore,
+      nextStep: l.leadNextStep,
     };
   });
 
@@ -274,6 +278,8 @@ export function getLeadHealthTool(ctx: ToolContext, input: Record<string, unknow
         lastTouchAt: lastTouch ? lastTouch.createdAt.toISOString() : null,
         lastInboundSnippet: lastInbound ? lastInbound.content.slice(0, 500) : null,
         notes: lead.notes || null,
+        leadScore: lead.leadScore,
+        nextStep: lead.leadNextStep,
       }),
     ),
   };

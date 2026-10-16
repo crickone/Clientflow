@@ -24,6 +24,7 @@ const FEATURES: Record<string, string> = {
   brand: "Brand interview",
   triage: "Inbox sorting",
   "jev-triage": "Inbox sorting (Jev trial)",
+  "lead-score": "Lead scores",
   inbox: "Inbox replies",
   followup: "Follow-up drafts",
   media: "Image descriptions",

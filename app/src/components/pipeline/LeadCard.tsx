@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { slaTone, isStale } from "@/lib/pipeline/boardMetrics";
 import { initialsOf } from "@/lib/utils";
+import { LeadScoreBadge } from "@/components/leads/LeadScoreBadge";
 
 export interface LeadCardProps {
   lead: LeadWithSla;
@@ -99,6 +100,7 @@ export function LeadCard({ lead, now, onDraft, onWhatsApp }: LeadCardProps) {
             {lead.email ?? lead.phone ?? "—"}
           </span>
         </span>
+        <LeadScoreBadge score={lead.leadScore} next={lead.leadNextStep} />
         {stale && (
           <span
             title={`${staleDays}d in ${lead.stage?.name ?? ""}`}

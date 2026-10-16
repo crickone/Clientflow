@@ -17,6 +17,7 @@ import { listTenants } from "@/lib/tenants";
 import { dispatchDueBroadcasts } from "@/lib/whatsappBroadcasts";
 import { dispatchReminders } from "@/lib/reminders";
 import { syncWearablesIfStale } from "@/lib/wearables/store";
+import { scoreLeadsIfDue } from "@/lib/leadScore";
 
 /**
  * The dispatch ticker: everything that was booked for a time, sent when that
@@ -121,6 +122,13 @@ async function runTenant(tenantId: number, baseUrl: string, summary: DispatchSum
       await dispatchDueBroadcasts(tenantId);
     } catch (err) {
       console.error(`[dispatch] tenant ${tenantId} whatsapp broadcasts failed:`, err);
+    }
+    // Lead scores from Jev: new or changed leads, and a daily refresh (a no-op
+    // without AI_GATEWAY_API_KEY).
+    try {
+      await scoreLeadsIfDue(tenantId);
+    } catch (err) {
+      console.error(`[dispatch] tenant ${tenantId} lead scores failed:`, err);
     }
   });
 }

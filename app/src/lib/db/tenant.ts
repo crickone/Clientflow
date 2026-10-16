@@ -3100,6 +3100,16 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     }
   }
 
+  // Lead score from Jev (lib/leadScore.ts). Additive.
+  try {
+    const cols = sqlite.prepare("PRAGMA table_info(leads)").all() as Array<{ name: string }>;
+    if (cols.length && !cols.some((c) => c.name === "lead_score")) sqlite.exec("ALTER TABLE leads ADD COLUMN lead_score INTEGER");
+    if (cols.length && !cols.some((c) => c.name === "lead_next_step")) sqlite.exec("ALTER TABLE leads ADD COLUMN lead_next_step TEXT");
+    if (cols.length && !cols.some((c) => c.name === "lead_scored_at")) sqlite.exec("ALTER TABLE leads ADD COLUMN lead_scored_at INTEGER");
+  } catch (err) {
+    console.error("[db] leads.lead_score migration failed:", err);
+  }
+
   // Dashboard slice 2: stamp each event recorder's start date once.
   try {
     sqlite.exec(RECORDER_START_SQL);

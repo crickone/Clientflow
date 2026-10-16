@@ -12,6 +12,7 @@ import { StageChip } from "@/components/pipeline/StageChip";
 import type { StageRecord } from "@/lib/pipeline/roles";
 import { useVocab } from "@/components/providers/VocabProvider";
 import { formatDate, initialsOf } from "@/lib/utils";
+import { LeadScoreBadge } from "./LeadScoreBadge";
 
 type Filter = number | "all";
 
@@ -239,6 +240,7 @@ export function LeadList({ leads, stages }: Props) {
                         {l.email ?? l.phone ?? "—"}
                       </div>
                     </div>
+                    <LeadScoreBadge score={l.leadScore} next={l.leadNextStep} />
                     <StageChip stage={l.stage} />
                   </div>
                   <div

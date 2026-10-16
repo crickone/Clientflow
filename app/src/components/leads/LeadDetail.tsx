@@ -40,6 +40,7 @@ import {
 } from "@/app/leads/actions";
 import { formatDateTime, relativeTime } from "@/lib/utils";
 import { describeArrival, parseArrival } from "@/lib/arrival";
+import { band, BAND_LABEL, NEXT_STEPS, type NextStep } from "@/lib/leadScoreModel";
 
 interface Props {
   lead: Lead;
@@ -507,6 +508,31 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
         </section>
 
         <aside className="ld-side">
+          {lead.leadScore !== null && (
+            <Card className="ld-card ls-card">
+              <CardLabel>Lead score</CardLabel>
+              <div className="ls-top">
+                <span className="ls-num">{lead.leadScore}</span>
+                <span className="ls-of">out of 100</span>
+                <span className="ls-band lsb" data-band={band(lead.leadScore)} data-size="md">
+                  <span className="lsb-dot" aria-hidden />
+                  {BAND_LABEL[band(lead.leadScore)]}
+                </span>
+              </div>
+              <div className="ls-meter" data-band={band(lead.leadScore)} aria-hidden>
+                <span style={{ width: `${Math.max(3, lead.leadScore)}%` }} />
+              </div>
+              {lead.leadNextStep && lead.leadNextStep in NEXT_STEPS && (
+                <div className="ls-next">
+                  <b>Next: {NEXT_STEPS[lead.leadNextStep as NextStep].label}</b>
+                  <span>{NEXT_STEPS[lead.leadNextStep as NextStep].what}</span>
+                </div>
+              )}
+              <span className="ls-when">
+                Scored {lead.leadScoredAt ? relativeTime(lead.leadScoredAt) : "recently"} from their messages and details. It updates as things change.
+              </span>
+            </Card>
+          )}
           <Card className="ld-card">
             <CardLabel>Details</CardLabel>
             <dl className="ld-facts">

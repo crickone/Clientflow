@@ -11,6 +11,7 @@ const AGENT_LABELS: Record<string, string> = {
   blog: "Blog",
   triage: "Inbox triage",
   "jev-triage": "Inbox sorting (Jev trial)",
+  "lead-score": "Lead scores",
   brief: "Daily brief",
   video: "Video",
   transcribe: "Transcription",

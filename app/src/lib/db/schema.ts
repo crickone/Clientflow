@@ -351,6 +351,11 @@ export const leads = sqliteTable("leads", {
   // move off. Separate from the email `suppressions` table on purpose: an
   // email unsubscribe is not a phone opt-out, and vice versa.
   doNotCall: integer("do_not_call", { mode: "boolean" }).notNull().default(false),
+  // Lead score (lib/leadScore.ts): readiness to buy out of 100 and the next
+  // step, from Jev. Null until first scored. Writing them never touches updatedAt.
+  leadScore: integer("lead_score"),
+  leadNextStep: text("lead_next_step"),
+  leadScoredAt: integer("lead_scored_at"),
   status: text("status", {
     enum: ["new", "contacted", "replied", "booked", "lost"],
   })

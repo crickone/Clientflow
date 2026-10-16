@@ -76,6 +76,7 @@ export function PipelineBoard({
   const [campaignFilter, setCampaignFilter] = useState("");
   const [therapyFilter, setTherapyFilter] = useState("");
   const [sourceFilter, setSourceFilter] = useState("");
+  const [sort, setSort] = useState<"newest" | "hottest">("newest");
   const [now, setNow] = useState(() => Date.now());
   const [railOpen, setRailOpen] = useState<Record<string, boolean>>({});
   const [activeId, setActiveId] = useState<number | null>(null);
@@ -117,6 +118,7 @@ export function PipelineBoard({
     const savedCampaign = localStorage.getItem("leads.filter.campaign");
     const savedTherapy = localStorage.getItem("leads.filter.therapy");
     const savedSource = localStorage.getItem("leads.filter.source");
+    if (localStorage.getItem("leads.sort") === "hottest") setSort("hottest");
     if (savedCampaign && leads.some((l) => l.campaign === savedCampaign)) setCampaignFilter(savedCampaign);
     if (savedTherapy && leads.some((l) => l.therapyInterest === savedTherapy)) setTherapyFilter(savedTherapy);
     if (savedSource && leads.some((l) => l.source === savedSource)) setSourceFilter(savedSource);
@@ -155,9 +157,11 @@ export function PipelineBoard({
   const therapyOptions = useMemo(() => distinctValues(leads.map((l) => l.therapyInterest)), [leads]);
   const sourceOptions = useMemo(() => distinctValues(leads.map((l) => l.source)), [leads]);
 
+  const anyScored = useMemo(() => leads.some((l) => l.leadScore !== null), [leads]);
+
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return leads.filter((l) => {
+    const out = leads.filter((l) => {
       if (campaignFilter && l.campaign !== campaignFilter) return false;
       if (therapyFilter && l.therapyInterest !== therapyFilter) return false;
       if (sourceFilter && l.source !== sourceFilter) return false;
@@ -168,7 +172,9 @@ export function PipelineBoard({
         .toLowerCase()
         .includes(needle);
     });
-  }, [leads, q, campaignFilter, therapyFilter, sourceFilter]);
+    // Hottest first: highest score first, unscored at the bottom, newest breaking ties.
+    return sort === "hottest" ? [...out].sort((a, b) => (b.leadScore ?? -1) - (a.leadScore ?? -1) || b.createdAt.getTime() - a.createdAt.getTime()) : out;
+  }, [leads, q, campaignFilter, therapyFilter, sourceFilter, sort]);
 
   // Segment-scoped metrics: recomputes from `filtered`, so the 4 tiles above
   // the board always describe the currently-visible segment (search + filters).
@@ -335,6 +341,25 @@ export function PipelineBoard({
               <option key={s} value={s}>{s}</option>
             ))}
           </select>
+          {anyScored && (
+            <select
+              aria-label="Sort leads"
+              value={sort}
+              onChange={(e) => {
+                const v = e.target.value === "hottest" ? "hottest" : "newest";
+                setSort(v);
+                try {
+                  localStorage.setItem("leads.sort", v);
+                } catch {
+                  /* private mode: the choice just isn't remembered */
+                }
+              }}
+              style={selectStyle}
+            >
+              <option value="newest">Newest first</option>
+              <option value="hottest">Hottest first</option>
+            </select>
+          )}
         </div>
 
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>

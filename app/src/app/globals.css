@@ -5607,3 +5607,25 @@ textarea.ag-input { resize: vertical; line-height: 1.5; }
 .jt-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .jt-tags span { padding: 3px 9px; border-radius: 999px; font-size: 12px; background: var(--surface-2); color: var(--text-secondary); }
 .jt-tags span[data-diff="true"] { background: var(--warning-soft); color: var(--text-primary); }
+
+/* ── Lead score (Jev): pill on board cards and the list, card on the lead page ── */
+.lsb { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; background: var(--surface-1); border: 1px solid var(--hairline); color: var(--text-secondary); flex: 0 0 auto; }
+.lsb[data-size="md"] { height: 26px; padding: 0 10px; font-size: 13px; }
+.lsb-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--text-tertiary); }
+.lsb[data-band="hot"] { color: var(--text-primary); background: var(--danger-soft); border-color: transparent; }
+.lsb[data-band="hot"] .lsb-dot { background: var(--danger); }
+.lsb[data-band="warm"] { color: var(--text-primary); background: var(--warning-soft); border-color: transparent; }
+.lsb[data-band="warm"] .lsb-dot { background: var(--warning); }
+.ls-card { display: grid; gap: 12px; }
+.ls-top { display: flex; align-items: baseline; gap: 10px; }
+.ls-num { font-size: 34px; font-weight: 600; letter-spacing: -0.02em; line-height: 1; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.ls-of { font-size: 13px; color: var(--text-tertiary); }
+.ls-band { margin-left: auto; }
+.ls-meter { height: 6px; border-radius: 6px; background: var(--surface-2); overflow: hidden; }
+.ls-meter > span { display: block; height: 100%; border-radius: 6px; background: var(--text-tertiary); }
+.ls-meter[data-band="hot"] > span { background: var(--danger); }
+.ls-meter[data-band="warm"] > span { background: var(--warning); }
+.ls-next { display: grid; gap: 2px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); }
+.ls-next b { font-size: 13.5px; color: var(--text-primary); }
+.ls-next span { font-size: 12.5px; color: var(--text-secondary); line-height: 1.45; }
+.ls-when { font-size: 12px; color: var(--text-tertiary); }
