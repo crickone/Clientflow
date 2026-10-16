@@ -19,14 +19,32 @@ import { sendWhatsApp } from "@/lib/whatsapp/send";
 import { setStageToId } from "@/lib/pipeline/stage";
 import { dialLead } from "@/lib/voice/dial";
 import { cancelForLead } from "@/lib/voice/queue";
-import { getCurrentTenantDb } from "@/lib/db/tenant";
+import { getCurrentTenant, getCurrentTenantDb } from "@/lib/db/tenant";
+import { scoreLead } from "@/lib/leadScore";
+import type { LeadScore } from "@/lib/leadScoreModel";
+
+/**
+ * Rescore a lead straight away after something the operator did (a move, a
+ * message), so the new score is on screen when the page refreshes rather
+ * than after the next minute's ticker run. Never throws; null when Jev isn't
+ * set up or didn't answer in time (the ticker then catches it).
+ */
+async function rescore(leadId: number): Promise<LeadScore | null> {
+  try {
+    return await scoreLead(getCurrentTenant().id, leadId, 3000);
+  } catch {
+    return null;
+  }
+}
 
 /** Operator override of a lead's pipeline stage (e.g. mark Lost, or correct). */
-export async function setLeadStageAction(leadId: number, stageId: number) {
+export async function setLeadStageAction(leadId: number, stageId: number): Promise<{ score: LeadScore | null }> {
   await requireUser();
   setStageToId(leadId, stageId);
+  const score = await rescore(leadId);
   revalidatePath(`/leads/${leadId}`);
   revalidatePath("/leads");
+  return { score };
 }
 
 const manualSchema = z.object({
@@ -90,6 +108,7 @@ export async function createManualLeadAction(
     { leadId: lead.id },
   );
 
+  await rescore(lead.id);
   revalidatePath("/leads");
   redirect(`/leads/${lead.id}`);
 }
@@ -101,6 +120,7 @@ export async function updateLeadStatusAction(
   await requireUser();
   setLeadStatus(id, status);
   await logActivity("lead.status", `Lead #${id} → ${status}`, { leadId: id });
+  await rescore(id);
   revalidatePath(`/leads/${id}`);
   revalidatePath("/leads");
 }
@@ -129,6 +149,7 @@ export async function markMessageSentAction(
       `UPDATE leads SET status = 'contacted', updated_at = unixepoch()*1000
        WHERE id = ${row.leadId} AND status = 'new'`,
     );
+    await rescore(row.leadId);
     revalidatePath(`/leads/${row.leadId}`);
     revalidatePath("/leads");
   }
@@ -158,6 +179,7 @@ export async function sendLeadWhatsAppAction(
         .run();
     }
     setLeadStatus(leadId, "contacted");
+    await rescore(leadId);
     revalidatePath(`/leads/${leadId}`);
     revalidatePath("/leads");
     return { ok: true, messageId };
@@ -183,6 +205,7 @@ export async function logInboundReplyAction(
     sentAt: new Date(),
   });
   setLeadStatus(leadId, "replied");
+  await rescore(leadId);
   revalidatePath(`/leads/${leadId}`);
   revalidatePath("/leads");
 }
@@ -246,6 +269,7 @@ export async function setLeadDoNotCallAction(
       `Lead #${leadId} do-not-call ${doNotCall ? "set" : "cleared"}`,
       { leadId, userId: user.id },
     );
+    await rescore(leadId);
     revalidatePath(`/leads/${leadId}`);
     return { ok: true };
   } catch (err) {

@@ -25,6 +25,7 @@ import {
 import { sendReply } from "@/lib/messaging/reply";
 import { logActivity } from "@/lib/queries";
 import { shadowJevTriage } from "@/lib/inbox/jevTrial";
+import { scoreLead } from "@/lib/leadScore";
 
 export type OwnerType = "lead" | "client";
 export type { AutoReplyDecision };
@@ -197,6 +198,8 @@ async function runTriageBound(
   // is against the right gym, never a default.
   const tenantId = getCurrentTenant().id;
   const ctx = gatherContext(ownerType, ownerId, messageId);
+  // A message from a lead changes how ready they are: rescore now, not at the next ticker run.
+  if (ownerType === "lead") void scoreLead(tenantId, ownerId).catch(() => null);
 
   // NOTE on AiCapError: triageMessage's assertUnderCap is deliberately left to
   // propagate from here — same reference pattern as runAgentTurn.ts. Both of

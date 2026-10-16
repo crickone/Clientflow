@@ -171,8 +171,8 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
     const target = stages.find((s) => s.id === stageId);
     if (!target) return;
     start(async () => {
-      await setLeadStageAction(lead.id, stageId);
-      setLead({ ...lead, stageId });
+      const r = await setLeadStageAction(lead.id, stageId);
+      setLead({ ...lead, stageId, ...(r?.score ? { leadScore: r.score.score, leadNextStep: r.score.next, leadScoredAt: Date.now() } : {}) });
       toast.success(`Moved to ${target.name}.`);
     });
   }

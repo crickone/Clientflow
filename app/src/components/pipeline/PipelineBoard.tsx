@@ -229,7 +229,12 @@ export function PipelineBoard({
       );
       startTransition(async () => {
         try {
-          await setLeadStageAction(id, to.id);
+          const r = await setLeadStageAction(id, to.id);
+          // The lead was rescored as part of the move: show the new score on its card.
+          if (r?.score) {
+            const sc = r.score;
+            setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, leadScore: sc.score, leadNextStep: sc.next, leadScoredAt: Date.now() } : l)));
+          }
           toast.success(`Moved to ${to.name}`, {
             duration: 5000,
             action: { label: "Undo", onClick: () => move(id, from, to) },

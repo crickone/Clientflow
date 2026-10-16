@@ -52,12 +52,13 @@ function factsFor(tenantId: number, leadId: number): LeadFacts | null {
 }
 
 /** Score one lead now. Returns the score, or null when Jev isn't set up or didn't answer. */
-export async function scoreLead(tenantId: number, leadId: number): Promise<LeadScore | null> {
+/** `timeoutMs`: shorter when someone is waiting on screen (a stage move), so a slow gateway never holds up the move. */
+export async function scoreLead(tenantId: number, leadId: number, timeoutMs = 8000): Promise<LeadScore | null> {
   if (!jevConfigured()) return null;
   const facts = factsFor(tenantId, leadId);
   if (!facts) return null;
   const now = Date.now();
-  const r = await jevDecide({ tenantId, agentKey: "lead-score" }, leadScoreState(facts, now), LEAD_SCORE_QUESTIONS);
+  const r = await jevDecide({ tenantId, agentKey: "lead-score" }, leadScoreState(facts, now), LEAD_SCORE_QUESTIONS, timeoutMs);
   if (!r.ok) {
     console.error(`[lead-score] tenant ${tenantId} lead ${leadId}: ${r.error}`);
     return null;
