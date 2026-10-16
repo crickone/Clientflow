@@ -8,6 +8,9 @@ import { getInboxAiSettings } from "@/lib/inbox/settings";
 import { isBriefComplete } from "@/lib/businessProfile";
 import { listTags } from "@/lib/inbox/tags";
 import { InboxAiSettingsForm } from "@/components/settings/InboxAiSettingsForm";
+import { JevTrialCard } from "@/components/settings/JevTrialCard";
+import { jevTrialHasRows, jevTrialView } from "@/lib/inbox/jevTrial";
+import { jevConfigured } from "@/lib/ai/jev";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +19,7 @@ export default async function InboxAiSettingsPage() {
   const settings = getInboxAiSettings();
   const tags = listTags();
   const briefComplete = isBriefComplete();
+  const trial = jevConfigured() || jevTrialHasRows() ? jevTrialView() : null;
 
   return (
     <div className="app-page" style={{ maxWidth: 720 }}>
@@ -29,6 +33,7 @@ export default async function InboxAiSettingsPage() {
         tags={tags}
         briefComplete={briefComplete}
       />
+      {trial && <JevTrialCard view={trial} />}
     </div>
   );
 }

@@ -3574,3 +3574,25 @@ export const mealLogs = sqliteTable(
   (t) => ({ byClientDay: index("idx_meal_logs_client_day").on(t.clientId, t.day) }),
 );
 export type MealLog = typeof mealLogs.$inferSelect;
+
+/**
+ * The Jev trial: for each inbound message Claude triaged, what Jev said about
+ * the same message, side by side, so the two can be compared before Jev is
+ * trusted with the inbox. Message text isn't copied: join on owner + message id.
+ */
+export const jevTriageTrial = sqliteTable("jev_triage_trial", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  ownerType: text("owner_type", { enum: ["lead", "client"] }).notNull(),
+  messageId: integer("message_id").notNull(),
+  channel: text("channel").notNull(),
+  claudeCategory: text("claude_category").notNull(),
+  claudePriority: text("claude_priority").notNull(),
+  claudeSensitive: integer("claude_sensitive", { mode: "boolean" }).notNull(),
+  jevCategory: text("jev_category"),
+  jevPriority: text("jev_priority"),
+  jevSensitive: integer("jev_sensitive", { mode: "boolean" }),
+  jevConfidence: real("jev_confidence"),
+  jevMs: integer("jev_ms"),
+  error: text("error"),
+  createdAt: integer("created_at").notNull(),
+});

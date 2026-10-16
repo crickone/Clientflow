@@ -2998,6 +2998,23 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       sent_at             INTEGER
     );
     CREATE INDEX IF NOT EXISTS idx_wa_sends_broadcast ON whatsapp_broadcast_sends(broadcast_id, status);
+    CREATE TABLE IF NOT EXISTS jev_triage_trial (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      owner_type       TEXT NOT NULL,
+      message_id       INTEGER NOT NULL,
+      channel          TEXT NOT NULL,
+      claude_category  TEXT NOT NULL,
+      claude_priority  TEXT NOT NULL,
+      claude_sensitive INTEGER NOT NULL,
+      jev_category     TEXT,
+      jev_priority     TEXT,
+      jev_sensitive    INTEGER,
+      jev_confidence   REAL,
+      jev_ms           INTEGER,
+      error            TEXT,
+      created_at       INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_jev_trial_created ON jev_triage_trial(created_at);
     CREATE TABLE IF NOT EXISTS habit_ticks (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       client_id   INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,

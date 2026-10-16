@@ -24,6 +24,7 @@ import {
 } from "@/lib/inbox/autoReplyDecision";
 import { sendReply } from "@/lib/messaging/reply";
 import { logActivity } from "@/lib/queries";
+import { shadowJevTriage } from "@/lib/inbox/jevTrial";
 
 export type OwnerType = "lead" | "client";
 export type { AutoReplyDecision };
@@ -211,6 +212,17 @@ async function runTriageBound(
     senderName: ctx.senderName,
     history: ctx.history,
     tenantId,
+  });
+
+  // The Jev trial: Jev labels the same message beside Claude and the two are
+  // recorded for comparison. Not awaited, never used for the inbox itself.
+  void shadowJevTriage({
+    tenantId,
+    ownerType,
+    messageId,
+    channel,
+    input: { messageText, isExistingClient: ctx.isExistingClient, senderName: ctx.senderName, history: ctx.history },
+    claude: triage,
   });
 
   const decision = decideAutoReply(

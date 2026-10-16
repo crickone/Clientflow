@@ -23,6 +23,7 @@ const FEATURES: Record<string, string> = {
   research: "Market research",
   brand: "Brand interview",
   triage: "Inbox sorting",
+  "jev-triage": "Inbox sorting (Jev trial)",
   inbox: "Inbox replies",
   followup: "Follow-up drafts",
   media: "Image descriptions",

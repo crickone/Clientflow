@@ -65,6 +65,8 @@ export const PRICING: Record<string, { inCents: number; outCents: number }> = {
   // Superseded, still answered by the API; priced so an un-migrated agent
   // meters correctly rather than silently at the fallback rate.
   "claude-haiku-4-5-20251001": { inCents: 100, outCents: 500 },
+  // Jev (TypeSafe AI) via Vercel's AI Gateway: $0.042 per million input tokens, output free.
+  "typesafe-ai/jev": { inCents: 4.2, outCents: 0 },
   "claude-sonnet-5": { inCents: 200, outCents: 1000 },
   "claude-opus-5": { inCents: 500, outCents: 2500 },
   "claude-opus-4-8": { inCents: 500, outCents: 2500 },
