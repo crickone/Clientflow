@@ -41,6 +41,7 @@ import {
 import { formatDateTime, relativeTime } from "@/lib/utils";
 import { describeArrival, parseArrival } from "@/lib/arrival";
 import { band, BAND_LABEL, NEXT_STEPS, type NextStep } from "@/lib/leadScoreModel";
+import { LeadScoreBadge } from "./LeadScoreBadge";
 
 interface Props {
   lead: Lead;
@@ -509,18 +510,17 @@ export function LeadDetail({ lead: initialLead, messages: initialMessages, stage
 
         <aside className="ld-side">
           {lead.leadScore !== null && (
-            <Card className="ld-card ls-card">
+            <Card className="ld-card ls-card" data-band={band(lead.leadScore)}>
               <CardLabel>Lead score</CardLabel>
               <div className="ls-top">
-                <span className="ls-num">{lead.leadScore}</span>
-                <span className="ls-of">out of 100</span>
-                <span className="ls-band lsb" data-band={band(lead.leadScore)} data-size="md">
-                  <span className="lsb-dot" aria-hidden />
-                  {BAND_LABEL[band(lead.leadScore)]}
-                </span>
-              </div>
-              <div className="ls-meter" data-band={band(lead.leadScore)} aria-hidden>
-                <span style={{ width: `${Math.max(3, lead.leadScore)}%` }} />
+                <LeadScoreBadge score={lead.leadScore} next={lead.leadNextStep} size="lg" />
+                <div className="ls-top-text">
+                  <span className="lsb" data-band={band(lead.leadScore)}>
+                    <span className="lsb-dot" aria-hidden />
+                    {BAND_LABEL[band(lead.leadScore)]} lead
+                  </span>
+                  <span className="ls-of">{lead.leadScore} out of 100</span>
+                </div>
               </div>
               {lead.leadNextStep && lead.leadNextStep in NEXT_STEPS && (
                 <div className="ls-next">

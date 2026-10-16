@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/Badge";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { slaTone, isStale } from "@/lib/pipeline/boardMetrics";
 import { initialsOf } from "@/lib/utils";
-import { LeadScoreBadge } from "@/components/leads/LeadScoreBadge";
+import { LeadNextStep, LeadScoreBadge } from "@/components/leads/LeadScoreBadge";
+import { band } from "@/lib/leadScoreModel";
 
 export interface LeadCardProps {
   lead: LeadWithSla;
@@ -42,11 +43,16 @@ export function LeadCard({ lead, now, onDraft, onWhatsApp }: LeadCardProps) {
   const stale = isStale(msInStage, role);
   const staleDays = Math.floor(msInStage / 86_400_000);
 
+  const scoreBand = lead.leadScore !== null ? band(lead.leadScore) : undefined;
+
   return (
     <div
+      data-band={scoreBand}
       style={{
         background: "var(--surface-2, var(--surface-1))",
         border: "1px solid var(--hairline)",
+        // The score's band colour down the left edge, so hot leads stand out across the board.
+        ...(scoreBand ? { borderLeft: "3px solid var(--band)" } : {}),
         borderRadius: "var(--radius)",
         padding: 12,
         display: "flex",
@@ -121,6 +127,7 @@ export function LeadCard({ lead, now, onDraft, onWhatsApp }: LeadCardProps) {
             {waitLabel(waitingMs!)}
           </span>
         )}
+        <LeadNextStep score={lead.leadScore} next={lead.leadNextStep} />
         <span style={{ marginLeft: "auto", display: "inline-flex", gap: 4 }}>
           <Tooltip label="AI draft">
             <button

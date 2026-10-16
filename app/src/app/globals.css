@@ -43,6 +43,10 @@
   --info: #4d8df0;     --info-soft: rgba(77, 141, 240, 0.14);
   --warning: #d6a635;  --warning-soft: rgba(214, 166, 53, 0.14);
   --danger: #f85149;   --danger-soft: rgba(248, 81, 73, 0.14);
+  /* Lead score bands (lib/leadScoreModel band()): hot, warm, cold. */
+  --score-hot: #ff6b3d;  --score-hot-soft: rgba(255, 107, 61, 0.16);
+  --score-warm: #f2b33d; --score-warm-soft: rgba(242, 179, 61, 0.16);
+  --score-cold: #5c9cf5; --score-cold-soft: rgba(92, 156, 245, 0.16);
   --max-width: 1200px;
   --radius-sm: 6px;
   --radius: 9px;
@@ -5608,24 +5612,33 @@ textarea.ag-input { resize: vertical; line-height: 1.5; }
 .jt-tags span { padding: 3px 9px; border-radius: 999px; font-size: 12px; background: var(--surface-2); color: var(--text-secondary); }
 .jt-tags span[data-diff="true"] { background: var(--warning-soft); color: var(--text-primary); }
 
-/* ── Lead score (Jev): pill on board cards and the list, card on the lead page ── */
-.lsb { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; background: var(--surface-1); border: 1px solid var(--hairline); color: var(--text-secondary); flex: 0 0 auto; }
-.lsb[data-size="md"] { height: 26px; padding: 0 10px; font-size: 13px; }
-.lsb-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--text-tertiary); }
-.lsb[data-band="hot"] { color: var(--text-primary); background: var(--danger-soft); border-color: transparent; }
-.lsb[data-band="hot"] .lsb-dot { background: var(--danger); }
-.lsb[data-band="warm"] { color: var(--text-primary); background: var(--warning-soft); border-color: transparent; }
-.lsb[data-band="warm"] .lsb-dot { background: var(--warning); }
-.ls-card { display: grid; gap: 12px; }
-.ls-top { display: flex; align-items: baseline; gap: 10px; }
-.ls-num { font-size: 34px; font-weight: 600; letter-spacing: -0.02em; line-height: 1; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+/* ── Lead score (Jev): ring on board cards and the list, card on the lead page ── */
+:root[data-theme="light"] {
+  --score-hot: #e2491f;  --score-hot-soft: rgba(226, 73, 31, 0.12);
+  --score-warm: #b97a0c; --score-warm-soft: rgba(185, 122, 12, 0.13);
+  --score-cold: #2f6fd6; --score-cold-soft: rgba(47, 111, 214, 0.12);
+}
+[data-band="hot"] { --band: var(--score-hot); --band-soft: var(--score-hot-soft); }
+[data-band="warm"] { --band: var(--score-warm); --band-soft: var(--score-warm-soft); }
+[data-band="cold"] { --band: var(--score-cold); --band-soft: var(--score-cold-soft); }
+.lsr { position: relative; width: 40px; height: 40px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: var(--band-soft); }
+.lsr svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+.lsr-track { fill: none; stroke: var(--hairline); stroke-width: 3; }
+.lsr-arc { fill: none; stroke: var(--band); stroke-width: 3; stroke-linecap: round; transition: stroke-dashoffset 0.5s var(--ease, ease); }
+.lsr b { position: relative; font-size: 13px; font-weight: 700; color: var(--band); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.lsr[data-size="lg"] { width: 64px; height: 64px; }
+.lsr[data-size="lg"] b { font-size: 21px; }
+.lsr[data-size="lg"] .lsr-track, .lsr[data-size="lg"] .lsr-arc { stroke-width: 4; }
+.lc-next { font-size: 11.5px; font-weight: 600; color: var(--band); white-space: nowrap; }
+.lsb { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 999px; font-size: 12.5px; font-weight: 600; background: var(--band-soft); color: var(--band); flex: 0 0 auto; }
+.lsb-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--band); }
+.ls-card { display: grid; gap: 14px; border-top: 3px solid var(--band) !important; }
+.ls-top { display: flex; align-items: center; gap: 14px; }
+.ls-top-text { display: grid; gap: 4px; min-width: 0; }
 .ls-of { font-size: 13px; color: var(--text-tertiary); }
-.ls-band { margin-left: auto; }
 .ls-meter { height: 6px; border-radius: 6px; background: var(--surface-2); overflow: hidden; }
-.ls-meter > span { display: block; height: 100%; border-radius: 6px; background: var(--text-tertiary); }
-.ls-meter[data-band="hot"] > span { background: var(--danger); }
-.ls-meter[data-band="warm"] > span { background: var(--warning); }
-.ls-next { display: grid; gap: 2px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); }
+.ls-meter > span { display: block; height: 100%; border-radius: 6px; background: var(--band); }
+.ls-next { display: grid; gap: 2px; padding: 10px 12px; border-radius: 10px; background: var(--band-soft); }
 .ls-next b { font-size: 13.5px; color: var(--text-primary); }
 .ls-next span { font-size: 12.5px; color: var(--text-secondary); line-height: 1.45; }
 .ls-when { font-size: 12px; color: var(--text-tertiary); }
