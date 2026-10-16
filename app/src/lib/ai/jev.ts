@@ -68,7 +68,9 @@ export async function jevDecide(
     const why =
       err?.type === "customer_verification_required"
         ? "Vercel needs a credit card on the account before the gateway answers."
-        : res.status === 401
+        : err?.type === "no_providers_available" && /free tier/i.test(String(err?.message ?? ""))
+          ? "Jev needs paid AI Gateway credits. Vercel's free tier doesn't include it."
+          : res.status === 401
           ? "Vercel rejected the API key. Check AI_GATEWAY_API_KEY in Railway."
           : res.status === 429
             ? "The gateway is rate limiting requests."
