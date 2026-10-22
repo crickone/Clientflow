@@ -249,7 +249,13 @@ with `tools/push-site-to-prod.cjs`.
 ## Running
 
 - `cd app && npm run dev` → http://localhost:3000 (Node at `/usr/local/bin`).
-- Public site dev preview: `http://localhost:3000/site/<slug>`.
+- Public site dev preview: `http://localhost:3000/site/<slug>`. In production
+  `/site/<slug>` is NEVER served on the app host (bespoke pages run their own
+  scripts, and the staff cookie lives there): the middleware sends it to the
+  preview origin (`SITE_PREVIEW_HOST`, else the Railway domain; today
+  `www.adonisagent.ie/site/<slug>`), except `?cmsedit=1` (Studio) and
+  `?preview=1` (drafts), which only render to a member of the owning business.
+  See `src/lib/cms/previewHost.ts`.
 - Theme is **dark premium** by default (a light mode exists, per-viewer via the
   `ui-theme` cookie), token-driven in `src/app/globals.css` (`--bg`,
   `--surface-*`, `--accent`) via `src/lib/theme.ts`. EVERY account looks the

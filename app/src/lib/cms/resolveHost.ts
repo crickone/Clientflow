@@ -11,6 +11,8 @@ import {
   type TenantDb,
 } from "@/lib/db/tenant";
 import { listTenants } from "@/lib/tenants";
+import { getCurrentMembership } from "@/lib/auth";
+import { appHost } from "./previewHost";
 
 /**
  * PUBLIC site resolution. Public requests have no session cookie, so the normal
@@ -90,11 +92,18 @@ export function resolvePublicSite(opts: {
     }
   }
 
-  // 2) Dev fallback: ?site=<slug> / /site/<slug>. A site can live in ANY tenant,
+  // 2) Slug fallback: ?site=<slug> / /site/<slug>. A site can live in ANY tenant,
   //    so search the active tenants in registry order — there is no "default"
   //    tenant to try first any more. Connections are cached, so this stays cheap.
+  //
+  //    On the APP host this is only honoured for a signed-in member of the
+  //    business that owns the site: the fallback trusts the URL alone, bespoke
+  //    pages run their own scripts verbatim, and the app host is where the
+  //    staff cookie lives. Everyone else is sent to the preview origin by the
+  //    middleware before getting here (lib/cms/previewHost.ts).
   const slug = opts.siteParam?.trim().toLowerCase();
   if (slug) {
+    const onAppHost = host !== null && host === appHost(process.env);
     for (const tenant of listTenants()) {
       if (tenant.isActive === false) continue;
       const conn = openTenantDb(tenant.dbFile);
@@ -104,6 +113,7 @@ export function resolvePublicSite(opts: {
         .where(eq(sites.slug, slug))
         .get();
       if (site) {
+        if (onAppHost && getCurrentMembership()?.tenant.id !== tenant.id) return null;
         return {
           db: conn.db,
           tenantId: tenant.id,

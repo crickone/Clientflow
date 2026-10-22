@@ -9,6 +9,8 @@ import { NextRequest } from "next/server";
 
 process.env.CMS_SITE_HOSTS = "www.example-client.ie=example";
 process.env.SITES_PROXY_SECRET = "a-test-secret-of-some-length";
+process.env.APP_URL = "https://app.adonisagent.ie";
+process.env.SITE_PREVIEW_HOST = "www.adonisagent.ie";
 
 async function main() {
   const { middleware } = await import("./middleware");
@@ -23,6 +25,21 @@ async function main() {
     assert.ok(res.headers.get("x-middleware-rewrite")?.endsWith(expected), `${path}: rewritten to ${expected}`);
     assert.equal(res.headers.get("x-middleware-request-x-pathname"), expected, `${path}: x-pathname is the rewritten path`);
   }
+  // Site previews never render on the app host (the staff cookie lives there):
+  // `/site/<slug>` is sent to the preview origin, query intact, except the
+  // Studio canvas and a draft preview, which need the operator's own session.
+  {
+    const res = middleware(new NextRequest("https://app.adonisagent.ie/site/optimal-health/about?site=optimal-health", { headers: { host: "app.adonisagent.ie" } }));
+    assert.equal(res?.headers.get("location"), "https://www.adonisagent.ie/site/optimal-health/about?site=optimal-health", "app host: /site/<slug> goes to the preview origin");
+    for (const q of ["?cmsedit=1", "?preview=1"]) {
+      const r = middleware(new NextRequest(`https://app.adonisagent.ie/site/optimal-health${q}`, { headers: { host: "app.adonisagent.ie" } }));
+      assert.equal(r?.headers.get("location") ?? null, null, `app host: ${q} stays (session-gated on the server)`);
+    }
+    const onPreview = middleware(new NextRequest("https://www.adonisagent.ie/site/optimal-health/about", { headers: { host: "www.adonisagent.ie" } }));
+    assert.equal(onPreview?.headers.get("location") ?? null, null, "preview host: served, no redirect loop");
+    assert.equal(onPreview?.headers.get("x-middleware-rewrite") ?? null, null, "preview host: a /site path is not rewritten into the mapped site");
+  }
+
   // Meta fetches post images without a session. Redirecting it to /login
   // handed Meta an HTML page: "The image format is not supported" (2026-10-03).
   for (const path of ["/api/social/render/sometoken", "/api/integrations/meta/webhook", "/api/integrations/meta/data-deletion"]) {

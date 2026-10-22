@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { parseSiteHosts } from "@/lib/cms/siteHostsEnv";
 import { PROXIED_SITE_SLUG, PROXY_KEY_HEADER, SITE_HOST_HEADER, trustedProxyHost } from "@/lib/cms/proxyHost";
+import { previewHost, shouldSendToPreview } from "@/lib/cms/previewHost";
 
 // "/open" is the platform "Open business" token handoff: pre-session (no
 // cookie yet when it's first hit) but does nothing without a valid one-time
@@ -120,6 +121,25 @@ export function middleware(req: NextRequest) {
     // signed-out visitor on a mapped domain to /login. Hand it the rewritten one.
     requestHeaders.set("x-pathname", url.pathname);
     return NextResponse.rewrite(url, { request: { headers: requestHeaders } });
+  }
+
+  // Site previews (`/site/<slug>/...`) are served from a separate origin that
+  // never carries the staff cookie (lib/cms/previewHost.ts). On the app host
+  // they are sent there, except the two views that need the operator's own
+  // session: the Studio canvas and an unpublished-page preview, both of
+  // which the server only renders to a member of the owning business.
+  if (
+    !proxiedHost &&
+    pathname.startsWith("/site/") &&
+    shouldSendToPreview(host, process.env) &&
+    req.nextUrl.searchParams.get("cmsedit") !== "1" &&
+    req.nextUrl.searchParams.get("preview") !== "1"
+  ) {
+    const url = req.nextUrl.clone();
+    url.protocol = "https:";
+    url.host = previewHost(process.env)!;
+    url.port = "";
+    return NextResponse.redirect(url, 307);
   }
 
   // Public CMS-served site + its media/sitemap/robots — unauthenticated.
