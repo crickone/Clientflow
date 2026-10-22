@@ -26,34 +26,37 @@ try {
   process.env.MAILGUN_WEBHOOK_SIGNING_KEY = SIGNING_KEY;
 
   const timestamp = "1234567890";
+  const NOW = 1234567890 + 30;
   const token = "a-random-token-value";
   const correctSig = createHmac("sha256", SIGNING_KEY).update(timestamp + token).digest("hex");
 
-  check("correct signature -> true", verifyMailgunSignature(timestamp, token, correctSig) === true);
+  check("correct signature -> true", verifyMailgunSignature(timestamp, token, correctSig, NOW) === true);
+  check("a captured event older than five minutes is refused (replay)", verifyMailgunSignature(timestamp, token, correctSig, NOW + 6 * 60) === false);
+  check("a non-numeric timestamp is refused", verifyMailgunSignature("soon", token, correctSig, NOW) === false);
 
   // Same length, wrong content: flip the last hex character.
   const lastChar = correctSig.at(-1)!;
   const flipped = lastChar === "0" ? "1" : "0";
   const wrongSameLength = correctSig.slice(0, -1) + flipped;
-  check("wrong signature, same length -> false", verifyMailgunSignature(timestamp, token, wrongSameLength) === false);
+  check("wrong signature, same length -> false", verifyMailgunSignature(timestamp, token, wrongSameLength, NOW) === false);
 
   check(
     "length-mismatch signature -> false",
-    verifyMailgunSignature(timestamp, token, correctSig.slice(0, -4)) === false,
+    verifyMailgunSignature(timestamp, token, correctSig.slice(0, -4), NOW) === false,
   );
-  check("empty signature -> false", verifyMailgunSignature(timestamp, token, "") === false);
+  check("empty signature -> false", verifyMailgunSignature(timestamp, token, "", NOW) === false);
 
   // The whole point of the length guard: a mismatched-length compare must
   // never throw (crypto.timingSafeEqual throws directly on a Buffer length
   // mismatch).
-  assert.doesNotThrow(() => verifyMailgunSignature(timestamp, token, "short"), "shorter guess must not throw");
+  assert.doesNotThrow(() => verifyMailgunSignature(timestamp, token, "short", NOW), "shorter guess must not throw");
   passed++;
   console.log("  ✓ shorter guess does not throw");
 
   // Fail CLOSED when unconfigured — never reaches the compare at all, even
   // against a signature that would otherwise be correct.
   delete process.env.MAILGUN_WEBHOOK_SIGNING_KEY;
-  check("unset signing key -> always false", verifyMailgunSignature(timestamp, token, correctSig) === false);
+  check("unset signing key -> always false", verifyMailgunSignature(timestamp, token, correctSig, NOW) === false);
 } finally {
   if (originalKey === undefined) delete process.env.MAILGUN_WEBHOOK_SIGNING_KEY;
   else process.env.MAILGUN_WEBHOOK_SIGNING_KEY = originalKey;

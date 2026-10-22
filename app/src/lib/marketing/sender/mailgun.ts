@@ -288,9 +288,14 @@ export class MailgunSender implements CampaignSender {
  * reaches the compare at all, so an unconfigured deployment can never
  * accidentally accept forged webhook events.
  */
-export function verifyMailgunSignature(timestamp: string, token: string, signature: string): boolean {
+/** Mailgun stamps each event; one older (or newer) than this can't be replayed with its captured signature. */
+export const MAILGUN_MAX_SKEW_SEC = 5 * 60;
+
+export function verifyMailgunSignature(timestamp: string, token: string, signature: string, nowSec: number = Math.floor(Date.now() / 1000)): boolean {
   const signingKey = process.env.MAILGUN_WEBHOOK_SIGNING_KEY;
   if (!signingKey) return false;
+  const ts = Number(timestamp);
+  if (!Number.isFinite(ts) || Math.abs(nowSec - ts) > MAILGUN_MAX_SKEW_SEC) return false;
   const expected = createHmac("sha256", signingKey).update(timestamp + token).digest("hex");
   const a = Buffer.from(signature);
   const b = Buffer.from(expected);

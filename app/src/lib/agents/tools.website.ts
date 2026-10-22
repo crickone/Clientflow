@@ -172,8 +172,8 @@ function visibleText(html: string): string {
  */
 function swapText(content: string, find: string, replace: string, where: string): { error: string } | { content: string } {
   if (!find.trim()) return { error: "find is required." };
-  if (/[<>]/.test(replace)) {
-    return { error: "replace must be plain text — it cannot contain < or >. Use the CMS editor for markup changes." };
+  if (/[<>"']/.test(replace) || /javascript:|data:/i.test(replace)) {
+    return { error: "replace must be plain text — it cannot contain < > \" ' or a javascript: link. Use the CMS editor for markup changes." };
   }
   const occurrences = content.split(find).length - 1;
   if (occurrences === 0) {

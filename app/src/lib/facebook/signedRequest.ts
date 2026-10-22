@@ -13,7 +13,14 @@ export interface SignedRequestPayload {
   [key: string]: unknown;
 }
 
-export function parseSignedRequest(signedRequest: string | null | undefined, appSecret: string | undefined): SignedRequestPayload | null {
+/** How old a signed request may be (Meta stamps `issued_at`); a captured one can't be replayed later. */
+export const SIGNED_REQUEST_MAX_AGE_SEC = 10 * 60;
+
+export function parseSignedRequest(
+  signedRequest: string | null | undefined,
+  appSecret: string | undefined,
+  nowSec: number = Math.floor(Date.now() / 1000),
+): SignedRequestPayload | null {
   if (!signedRequest || !appSecret) return null;
   const [sig, body] = signedRequest.split(".", 2);
   if (!sig || !body) return null;
@@ -24,6 +31,8 @@ export function parseSignedRequest(signedRequest: string | null | undefined, app
     const payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as SignedRequestPayload;
     if (typeof payload !== "object" || payload === null) return null;
     if (payload.algorithm && String(payload.algorithm).toUpperCase() !== "HMAC-SHA256") return null;
+    // Stale or future-dated requests are refused: the signature alone would let a captured request be replayed.
+    if (typeof payload.issued_at === "number" && Math.abs(nowSec - payload.issued_at) > SIGNED_REQUEST_MAX_AGE_SEC) return null;
     return payload;
   } catch {
     return null;

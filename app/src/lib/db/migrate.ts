@@ -190,16 +190,21 @@ export function runBootMigration(): void {
           }
         ).c === 0;
       if (stillEmpty) {
+        // The password comes from SEED_ADMIN_PASSWORD when set; otherwise it
+        // is random and never printed, so a fresh install is reached through
+        // "Forgot password" rather than a value anyone could read in the code.
+        const seedPassword =
+          process.env.SEED_ADMIN_PASSWORD?.trim() || crypto.randomBytes(32).toString("base64url");
         controlSqlite
           .prepare(
             `INSERT INTO users
                (email, name, password_hash, role, tenant_id, is_platform_admin, must_change_password)
              VALUES (?, ?, ?, 'admin', ?, 1, 1)`,
           )
-          .run(OWNER_EMAIL, "Christopher", seedHashPassword("Renova2026"), renova.id);
+          .run(OWNER_EMAIL, "Christopher", seedHashPassword(seedPassword), renova.id);
         console.log(
-          "[migrate] seeded default control admin (fresh install):",
-          OWNER_EMAIL,
+          `[migrate] seeded default control admin (fresh install): ${OWNER_EMAIL}` +
+            (process.env.SEED_ADMIN_PASSWORD ? " (password from SEED_ADMIN_PASSWORD)" : " (random password: use Forgot password to set one)"),
         );
       }
     } finally {

@@ -48,6 +48,15 @@ export async function POST(req: NextRequest) {
   }
 
   const email = parsed.data.email.trim().toLowerCase();
+  // Per-account bucket too: the IP bucket alone lets a distributed guess at
+  // one account run unthrottled.
+  const rlEmail = rateLimit(`login:email:${email}`, MAX_ATTEMPTS, WINDOW_MS);
+  if (!rlEmail.ok) {
+    return NextResponse.json(
+      { error: "Too many attempts. Please wait a few minutes and try again." },
+      { status: 429, headers: { "Retry-After": String(rlEmail.retryAfterSec) } },
+    );
+  }
   const user = await authDb
     .select()
     .from(users)

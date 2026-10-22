@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { requireUser } from "@/lib/auth";
+import { requireAdmin, requireUser } from "@/lib/auth";
 import {
   assignMembership,
   createMembership,
@@ -65,7 +65,7 @@ export async function updateMembershipAction(id: number, raw: unknown): Promise<
 }
 
 export async function deleteMembershipAction(id: number) {
-  await requireUser();
+  await requireAdmin();
   const mid = idSchema.safeParse(id);
   if (!mid.success) return;
   deleteMembership(mid.data);

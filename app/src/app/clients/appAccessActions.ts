@@ -27,6 +27,7 @@ import {
   renderEmailShell,
   sendEmail,
   textToParagraphs,
+  escapeHtml,
 } from "@/lib/email";
 import { getAppBaseUrl } from "@/lib/appUrl";
 import { clientAppBaseUrl } from "@/lib/clientAppHost";
@@ -64,7 +65,7 @@ export async function sendClientLoginEmailAction(clientId: number): Promise<Logi
     </p>
     <table role="presentation" cellpadding="0" cellspacing="0" style="font-size:14px;color:#374151;margin:0 0 16px;">
       <tr><td style="padding:2px 12px 2px 0;color:#6b7280;">Link</td><td><a href="${link}" style="color:#374151;">${link}</a></td></tr>
-      <tr><td style="padding:2px 12px 2px 0;color:#6b7280;">Email</td><td><strong>${login.email}</strong></td></tr>
+      <tr><td style="padding:2px 12px 2px 0;color:#6b7280;">Email</td><td><strong>${escapeHtml(login.email)}</strong></td></tr>
       <tr><td style="padding:2px 12px 2px 0;color:#6b7280;">Temporary password</td><td><strong>${temp}</strong></td></tr>
     </table>
     <p style="margin:0;font-size:13px;color:#6b7280;">You can change your password after signing in.</p>`;
@@ -145,7 +146,7 @@ export async function enableClientLoginAction(clientId: number, email: string, p
 }
 
 export async function resetClientPasswordAction(clientId: number, password: string): Promise<LoginResult> {
-  await requireUser();
+  await requireAdmin();
   const p = id.safeParse(clientId);
   if (!p.success) return { ok: false, error: "Invalid client." };
   const res = resetClientPassword(p.data, String(password ?? ""));
@@ -162,7 +163,7 @@ export async function setClientLoginActiveAction(clientId: number, active: boole
 }
 
 export async function removeClientLoginAction(clientId: number) {
-  await requireUser();
+  await requireAdmin();
   const p = id.safeParse(clientId);
   if (!p.success) return;
   removeClientLogin(p.data);

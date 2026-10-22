@@ -281,8 +281,7 @@ export function renderEmailShell(opts: {
     ? `<h1 style="margin:0 0 16px;font-size:20px;font-weight:700;color:#111827;">${escapeHtml(opts.heading)}</h1>`
     : "";
   const footer =
-    opts.footer ??
-    `You received this email from ${escapeHtml(opts.businessName)}.`;
+    opts.footer !== undefined ? escapeHtml(opts.footer) : `You received this email from ${escapeHtml(opts.businessName)}.`;
   return `<!doctype html><html><body style="margin:0;background:#f3f4f6;padding:24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
     <tr><td style="height:4px;background:${accent};"></td></tr>

@@ -22,8 +22,12 @@ function sign(payload: object, secret = SECRET) {
   return `${sig}.${body}`;
 }
 
-const good = sign({ algorithm: "HMAC-SHA256", user_id: "12345", issued_at: 1700000000 });
-check("a correctly signed request parses", parseSignedRequest(good, SECRET)?.user_id === "12345");
+const NOW = 1700000000;
+const good = sign({ algorithm: "HMAC-SHA256", user_id: "12345", issued_at: NOW - 30 });
+check("a correctly signed request parses", parseSignedRequest(good, SECRET, NOW)?.user_id === "12345");
+check("a request older than ten minutes is refused (replay)", parseSignedRequest(good, SECRET, NOW + 11 * 60) === null);
+check("a future-dated request is refused", parseSignedRequest(sign({ user_id: "1", issued_at: NOW + 3600 }), SECRET, NOW) === null);
+check("no issued_at still parses when the signature is right", parseSignedRequest(sign({ user_id: "7" }), SECRET, NOW)?.user_id === "7");
 check("another secret is rejected", parseSignedRequest(sign({ user_id: "1" }, "other"), SECRET) === null);
 check("a tampered payload is rejected", parseSignedRequest(good.split(".")[0] + "." + Buffer.from('{"user_id":"999"}').toString("base64url"), SECRET) === null);
 check("no app secret fails closed", parseSignedRequest(good, undefined) === null);

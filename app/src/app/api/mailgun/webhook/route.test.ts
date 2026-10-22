@@ -73,7 +73,7 @@ function sign(timestamp: string, token: string): string {
 
 /** Mailgun's real webhook shape: {signature:{...}, "event-data":{...}}, correctly HMAC-signed unless badSignature is set. */
 function mailgunPayload(eventData: Record<string, unknown>, opts: { badSignature?: boolean } = {}) {
-  const timestamp = "1700000000";
+  const timestamp = String(Math.floor(Date.now() / 1000));
   const token = "route-test-token";
   const signature = opts.badSignature ? "0".repeat(64) : sign(timestamp, token);
   return { signature: { timestamp, token, signature }, "event-data": eventData };

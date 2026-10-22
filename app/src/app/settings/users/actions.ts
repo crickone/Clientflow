@@ -315,9 +315,30 @@ export async function updateMemberEmailAction(
   newEmail: string,
 ): Promise<ActionResult> {
   const { tenantId } = await adminContext(); // 1. requireAdmin() in the active tenant
+  const shared = sharedIdentityError(userId, tenantId);
+  if (shared) return { ok: false, error: shared };
   const result = await applyMemberEmailUpdate(tenantId, userId, newEmail);
   if (result.ok) revalidatePath("/settings/users");
   return result;
+}
+
+/**
+ * Identities are global: one person, one row, memberships in many clinics. A
+ * clinic admin may only change the password or email of someone who belongs to
+ * THEIR clinic alone. Anyone who also works in another clinic, or runs the
+ * platform, would otherwise be taken over from the least careful clinic.
+ */
+function sharedIdentityError(userId: number, tenantId: number): string | null {
+  const target = authDb.select({ isPlatformAdmin: users.isPlatformAdmin }).from(users).where(eq(users.id, userId)).get();
+  if (!target) return "Not a member of this clinic";
+  if (target.isPlatformAdmin) return "This account is managed by the platform. Ask them to reset it themselves.";
+  const elsewhere = authDb
+    .select({ id: memberships.id })
+    .from(memberships)
+    .where(and(eq(memberships.userId, userId), ne(memberships.tenantId, tenantId)))
+    .get();
+  if (elsewhere) return "This person also belongs to another business, so only they can change their own login. Ask them to use Forgot password.";
+  return null;
 }
 
 const resetSchema = z.object({
@@ -345,6 +366,8 @@ export async function resetPasswordAction(
     .where(and(eq(memberships.userId, userId), eq(memberships.tenantId, tenantId)))
     .get();
   if (!mem) return { ok: false, error: "Not a member of this clinic" };
+  const shared = sharedIdentityError(userId, tenantId);
+  if (shared) return { ok: false, error: shared };
 
   authDb
     .update(users)

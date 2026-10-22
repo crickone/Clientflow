@@ -1,12 +1,16 @@
 import { marked } from "marked";
 
+import { sanitizeHtml } from "@/lib/cms/html";
+
 /**
- * Render trusted markdown (Claude-generated blog content) to HTML. Synchronous.
- * For user-entered HTML content blocks we sanitize separately (see Block).
+ * Render markdown (blog posts, richtext blocks) to HTML. Synchronous. marked
+ * passes raw HTML through, and posts are written by any staff member or
+ * drafted by the model from outside sources, so the result goes through the
+ * same rich-text allow-list as a kind:'html' block: no scripts, no handlers.
  */
 export function renderMarkdown(md: string | null | undefined): string {
   if (!md) return "";
-  return marked.parse(md, { async: false, gfm: true, breaks: false }) as string;
+  return sanitizeHtml(marked.parse(md, { async: false, gfm: true, breaks: false }) as string);
 }
 
 /** Plain-text excerpt from markdown, for meta descriptions / cards. */

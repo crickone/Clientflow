@@ -1067,6 +1067,28 @@ export function ensureControlTables() {
     console.error("[control] facebook_pages instagram columns migration failed:", err);
   }
 
+  // Page tokens at rest (2026-10-22): rows written before this held the Page
+  // access token in plaintext. Seal any that still are. Idempotent: a sealed
+  // token decrypts, so it is left alone; the lazy import keeps this file free
+  // of a load-order edge on the crypto helper until the table exists.
+  try {
+    const { decryptToken, encryptToken } = require("@/lib/google/tokenCrypto") as typeof import("@/lib/google/tokenCrypto");
+    const rows = controlSqlite.prepare("SELECT id, page_access_token FROM facebook_pages WHERE page_access_token != ''").all() as Array<{ id: number; page_access_token: string }>;
+    const seal = controlSqlite.prepare("UPDATE facebook_pages SET page_access_token = ? WHERE id = ?");
+    let sealed = 0;
+    for (const r of rows) {
+      try {
+        decryptToken(r.page_access_token);
+      } catch {
+        seal.run(encryptToken(r.page_access_token), r.id);
+        sealed++;
+      }
+    }
+    if (sealed) console.log(`[control] sealed ${sealed} Facebook Page token(s) at rest`);
+  } catch (err) {
+    console.error("[control] facebook_pages token sealing failed:", err);
+  }
+
   // Meta grant + ad accounts (2026-10-03). The Facebook Login for Business
   // connect yields ONE token per tenant (a never-expiring business-integration
   // system-user token, or a 60-day user token without a config): it lists the

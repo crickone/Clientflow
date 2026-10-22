@@ -8,6 +8,9 @@ import { processImageUpload } from "@/lib/image/processUpload";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+/** Largest single upload accepted; the pipeline re-encodes rasters, so anything bigger is a mistake or a flood. */
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+
 const ALLOWED = new Set([
   "image/jpeg",
   "image/jpg",
@@ -61,11 +64,14 @@ export async function POST(
   const created = [];
   for (const file of files) {
     const mime = (file.type || "").toLowerCase();
-    if (mime && !ALLOWED.has(mime)) {
+    if (!ALLOWED.has(mime)) {
       return NextResponse.json(
         { ok: false, error: `Unsupported file type: ${file.type}` },
         { status: 400 },
       );
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      return NextResponse.json({ ok: false, error: `${file.name} is over 25 MB.` }, { status: 413 });
     }
     const rawBytes = Buffer.from(await file.arrayBuffer());
     // Batch 5c: downscale + re-encode raster uploads; SVG/GIF/unknown mimes

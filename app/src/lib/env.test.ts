@@ -79,8 +79,8 @@ assert.deepEqual(checkEnv(FULL_ENV, true), { missingRequired: [], missingRecomme
 // backup group (17 named recommended vars + 1 backup group = 18).
 {
   const result = checkEnv({}, false);
-  assert.deepEqual(result.missingRequired, ["ANTHROPIC_API_KEY"]);
-  assert.equal(result.missingRecommended.length, 18);
+  assert.deepEqual(result.missingRequired, ["ANTHROPIC_API_KEY", "APP_URL"]);
+  assert.equal(result.missingRecommended.length, 17);
 }
 
 console.log("env.test.ts: all assertions passed");

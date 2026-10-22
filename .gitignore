@@ -22,6 +22,12 @@ app/seed/**/*.db-wal
 .env.*
 !.env.example
 
+# Never commit: a local copy of the control DB (users, sessions, encrypted
+# tokens), Stripe recovery codes, and the dev server log
+/data/
+/Stripe/
+app/.devlog
+
 # Logs / OS
 *.log
 .DS_Store

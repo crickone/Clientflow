@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireUser } from "@/lib/auth";
+import { requireAdmin, requireUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
@@ -194,7 +194,7 @@ export async function quickAddClientAction(formData: FormData) {
 }
 
 export async function deleteClientAction(id: number) {
-  await requireUser();
+  await requireAdmin();
   db.delete(clients).where(eq(clients.id, id)).run();
   await logActivity("client.delete", `Client #${id} deleted`);
   revalidatePath("/clients");

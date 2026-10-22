@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { type NextRequest } from "next/server";
 
-import { requireAdmin } from "@/lib/auth";
+import { requirePlatformAdmin } from "@/lib/auth";
 import { runDailyAutomations } from "@/lib/automations/scheduler";
 
 export const dynamic = "force-dynamic";
@@ -28,11 +28,13 @@ async function run(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
   const bySecret = Boolean(secret) && secretMatches(req.headers.get("x-cron-secret"), secret!);
   if (!bySecret) {
-    // Human fallback: must be an ADMIN — runDailyAutomations touches EVERY tenant
-    // (birthday emails + shared YouTube quota), so a plain staff member of one
-    // tenant must not be able to drive all tenants' side effects.
+    // Human fallback: a PLATFORM admin, and only on POST. runDailyAutomations
+    // touches EVERY tenant (birthday emails, scheduled posts, purges), so a
+    // tenant's own admin must not drive the fleet, and a GET must not either,
+    // or any page could trigger it with a link while an admin is signed in.
+    if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
     try {
-      await requireAdmin();
+      await requirePlatformAdmin();
     } catch {
       return new Response("Unauthorized", { status: 401 });
     }

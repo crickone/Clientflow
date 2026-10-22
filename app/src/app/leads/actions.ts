@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
@@ -145,10 +145,7 @@ export async function markMessageSentAction(
     .where(eq(leadMessages.id, messageId))
     .get();
   if (row) {
-    db.run(
-      `UPDATE leads SET status = 'contacted', updated_at = unixepoch()*1000
-       WHERE id = ${row.leadId} AND status = 'new'`,
-    );
+    db.run(sql`UPDATE leads SET status = 'contacted', updated_at = unixepoch()*1000 WHERE id = ${row.leadId} AND status = 'new'`);
     await rescore(row.leadId);
     revalidatePath(`/leads/${row.leadId}`);
     revalidatePath("/leads");
@@ -211,7 +208,7 @@ export async function logInboundReplyAction(
 }
 
 export async function deleteLeadAction(id: number) {
-  await requireUser();
+  await requireAdmin();
   const leadId = z.number().int().positive().parse(id);
   db.delete(leadMessages).where(eq(leadMessages.leadId, leadId)).run();
   db.delete(leads).where(eq(leads.id, leadId)).run();

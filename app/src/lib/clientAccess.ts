@@ -142,6 +142,16 @@ export function setClientLoginActive(clientId: number, active: boolean) {
     .set({ isActive: active })
     .where(and(eq(clientCredentials.tenantId, tenantId), eq(clientCredentials.clientId, clientId)))
     .run();
+  // Switching the login off has to log them out as well: sessions last 60 days
+  // and getClientSession never re-reads is_active.
+  if (!active) {
+    const creds = authDb
+      .select({ id: clientCredentials.id })
+      .from(clientCredentials)
+      .where(and(eq(clientCredentials.tenantId, tenantId), eq(clientCredentials.clientId, clientId)))
+      .all();
+    for (const c of creds) authDb.delete(clientSessions).where(eq(clientSessions.credentialId, c.id)).run();
+  }
 }
 
 export function removeClientLogin(clientId: number) {

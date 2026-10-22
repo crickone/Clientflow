@@ -35,6 +35,13 @@ export async function POST(req: NextRequest) {
   if (!email || !password) {
     return NextResponse.json({ ok: false, error: "Email and password are required." }, { status: 400 });
   }
+  const rlEmail = rateLimit(`client-login:email:${email.toLowerCase()}`, MAX_ATTEMPTS, WINDOW_MS);
+  if (!rlEmail.ok) {
+    return NextResponse.json(
+      { ok: false, error: "Too many attempts. Please wait a few minutes and try again." },
+      { status: 429, headers: { "Retry-After": String(rlEmail.retryAfterSec) } },
+    );
+  }
   const info = loginClient(email, password);
   // On a business's own domain, only its members sign in. Same answer as a
   // wrong password, so the form never says which emails exist elsewhere.

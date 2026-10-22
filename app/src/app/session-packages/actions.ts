@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { requireUser } from "@/lib/auth";
+import { requireAdmin, requireUser } from "@/lib/auth";
 import {
   adjustPackageCredits,
   assignPackage,
@@ -70,7 +70,7 @@ export async function updatePackageAction(id: number, raw: unknown): Promise<Pac
 }
 
 export async function deletePackageAction(id: number) {
-  await requireUser();
+  await requireAdmin();
   const pid = idSchema.safeParse(id);
   if (!pid.success) return;
   deletePackagePlan(pid.data);
@@ -107,7 +107,7 @@ export async function setClientPackageStatusAction(
 }
 
 export async function adjustPackageCreditsAction(id: number, delta: number) {
-  await requireUser();
+  await requireAdmin();
   const cpid = idSchema.safeParse(id);
   const d = z.coerce.number().int().min(-1).max(1).safeParse(delta);
   if (!cpid.success || !d.success) return;

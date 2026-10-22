@@ -65,15 +65,17 @@ export function resetRateLimit(key: string): void {
 }
 
 /**
- * Best-effort client IP. Behind Railway's proxy the real client is the first
- * entry of `x-forwarded-for`; fall back to the platform value or a sentinel.
- * A spoofed XFF only lets an attacker rate-limit *themselves*, so this is safe
- * for throttling. Typed as the standard `Request` (NextRequest satisfies it —
- * it extends Request) rather than importing `next/server` for a function that
- * only ever reads `.headers`.
+ * Best-effort client IP for throttling. Railway's proxy APPENDS the address it
+ * saw to `x-forwarded-for`, so the trustworthy entry is the LAST one: the first
+ * entry is whatever the caller put there, and keying on it would hand an
+ * attacker a fresh bucket per request. Typed as the standard `Request`
+ * (NextRequest satisfies it) rather than importing `next/server`.
  */
 export function clientIp(req: Request): string {
   const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0]!.trim();
+  if (xff) {
+    const parts = xff.split(",").map((s) => s.trim()).filter(Boolean);
+    if (parts.length) return parts[parts.length - 1]!;
+  }
   return req.headers.get("x-real-ip")?.trim() || "unknown";
 }

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { controlSqlite } from "@/lib/db/control";
+import { decryptToken, encryptToken } from "@/lib/google/tokenCrypto";
 import { splitFullName } from "@/lib/humanName";
 import { GRAPH_BASE } from "./graph";
 import type { GraphPage } from "./grants";
@@ -12,8 +13,28 @@ import type { NormalizedLeadInput } from "@/lib/leads";
  * controlSqlite prepared statements like apiKeys.ts) because the leadgen webhook
  * has NO session and must resolve the owning tenant + Page token from an
  * incoming page_id. Page access tokens are secrets — never returned to the UI or
- * put in a thrown/logged string.
+ * put in a thrown/logged string, and sealed at rest (sealPageToken) with the
+ * same key as every other stored token.
  */
+
+/** Encrypt a Page token for storage. Empty stays empty (the revoked marker). */
+export function sealPageToken(plain: string): string {
+  return plain ? encryptToken(plain) : "";
+}
+
+/**
+ * Decrypt a stored Page token. Rows written before 2026-10-22 hold the token
+ * in plaintext; those are handed back as they are (and re-sealed at boot by
+ * control.ts), so a connection never breaks on the way to encrypted-at-rest.
+ */
+export function openPageToken(stored: string): string {
+  if (!stored) return "";
+  try {
+    return decryptToken(stored);
+  } catch {
+    return stored;
+  }
+}
 
 
 /**
@@ -51,9 +72,9 @@ export async function saveConnectedPages(
     const igUsername = page.instagram_business_account?.username ?? null;
     const existing = findExisting.get(page.id) as { id: number } | undefined;
     if (existing) {
-      update.run(tenantId, page.name ?? null, page.access_token, connectedByUserId, subscribedAt, igUserId, igUsername, existing.id);
+      update.run(tenantId, page.name ?? null, sealPageToken(page.access_token ?? ""), connectedByUserId, subscribedAt, igUserId, igUsername, existing.id);
     } else {
-      insert.run(tenantId, page.id, page.name ?? null, page.access_token, connectedByUserId, subscribedAt, igUserId, igUsername);
+      insert.run(tenantId, page.id, page.name ?? null, sealPageToken(page.access_token ?? ""), connectedByUserId, subscribedAt, igUserId, igUsername);
     }
     names.push(page.name ?? page.id);
   }
@@ -102,7 +123,7 @@ export function getFacebookPageByPageId(pageId: string): ResolvedPage | null {
     .prepare("SELECT tenant_id, page_access_token, page_name FROM facebook_pages WHERE page_id = ? AND revoked_at IS NULL")
     .get(pageId) as { tenant_id: number; page_access_token: string; page_name: string | null } | undefined;
   if (!row) return null;
-  return { tenantId: row.tenant_id, pageAccessToken: row.page_access_token, pageName: row.page_name };
+  return { tenantId: row.tenant_id, pageAccessToken: openPageToken(row.page_access_token), pageName: row.page_name };
 }
 
 export interface MessagingPage {
@@ -122,7 +143,7 @@ export function getPageForMessagingAccount(channel: "messenger" | "instagram", a
       `SELECT tenant_id, page_id, page_access_token FROM facebook_pages WHERE ${column} = ? AND revoked_at IS NULL AND page_access_token != ''`,
     )
     .get(accountId) as { tenant_id: number; page_id: string; page_access_token: string } | undefined;
-  return row ? { tenantId: row.tenant_id, pageId: row.page_id, pageAccessToken: row.page_access_token } : null;
+  return row ? { tenantId: row.tenant_id, pageId: row.page_id, pageAccessToken: openPageToken(row.page_access_token) } : null;
 }
 
 /** A connected Page's token for sending a DM, scoped to the tenant (server-only). */
@@ -130,7 +151,7 @@ export function getPageTokenForTenant(tenantId: number, pageId: string): string 
   const row = controlSqlite
     .prepare("SELECT page_access_token FROM facebook_pages WHERE tenant_id = ? AND page_id = ? AND revoked_at IS NULL AND page_access_token != ''")
     .get(tenantId, pageId) as { page_access_token: string } | undefined;
-  return row?.page_access_token ?? null;
+  return row ? openPageToken(row.page_access_token) || null : null;
 }
 
 export interface FacebookPageRow {
@@ -177,7 +198,7 @@ export function getPostingPage(tenantId: number, preferredPageId: string | null)
     .all(tenantId) as Array<{ page_id: string; page_name: string | null; page_access_token: string; ig_user_id: string | null }>;
   const row = rows.find((r) => r.page_id === preferredPageId) ?? rows[0];
   if (!row) return null;
-  return { pageId: row.page_id, pageName: row.page_name, pageAccessToken: row.page_access_token, igUserId: row.ig_user_id };
+  return { pageId: row.page_id, pageName: row.page_name, pageAccessToken: openPageToken(row.page_access_token), igUserId: row.ig_user_id };
 }
 
 /** Disconnect (revoke) one of a tenant's Pages; best-effort unsubscribe from Graph. */
@@ -192,7 +213,7 @@ export async function disconnectFacebookPage(tenantId: number, pageId: string): 
     try {
       await fetch(
         `${GRAPH_BASE}/${encodeURIComponent(pageId)}/subscribed_apps?` +
-          new URLSearchParams({ access_token: row.page_access_token }),
+          new URLSearchParams({ access_token: openPageToken(row.page_access_token) }),
         { method: "DELETE" },
       );
     } catch {

@@ -1,3 +1,5 @@
+import { timingSafeEqual } from "node:crypto";
+
 import { runWithTenant } from "@/lib/db/tenant";
 import { verifyFacebookSignature, parseLeadgenEvents, parseMessagingEvents } from "@/lib/facebook/webhook";
 import { getFacebookPageByPageId, fetchLeadAsInput, getPageForMessagingAccount } from "@/lib/facebook/pages";
@@ -30,7 +32,9 @@ export async function GET(req: Request) {
   const token = url.searchParams.get("hub.verify_token");
   const challenge = url.searchParams.get("hub.challenge");
   const expected = process.env.FACEBOOK_WEBHOOK_VERIFY_TOKEN;
-  if (mode === "subscribe" && expected && token === expected && challenge) {
+  const tokenMatches =
+    Boolean(expected && token) && Buffer.byteLength(token!) === Buffer.byteLength(expected!) && timingSafeEqual(Buffer.from(token!), Buffer.from(expected!));
+  if (mode === "subscribe" && tokenMatches && challenge) {
     return new Response(challenge, { status: 200, headers: { "Content-Type": "text/plain" } });
   }
   return new Response("Forbidden", { status: 403 });

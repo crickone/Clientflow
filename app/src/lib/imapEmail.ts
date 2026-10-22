@@ -2,10 +2,9 @@ import "server-only";
 
 import { eq, inArray, sql } from "drizzle-orm";
 import { ImapFlow } from "imapflow";
-// @ts-expect-error — mailparser has no types (same pattern as
-// lib/video/ffmpeg.ts's ffprobe-static import). ParsedMail below gives real
-// types to everything downstream of the one `as ParsedMail` cast where
-// simpleParser is actually called, in syncImapInbox.
+// mailparser ships its own types since 3.12 (the earlier @ts-expect-error
+// here is gone with it). ParsedMail below still types everything downstream
+// of the one `as ParsedMail` cast where simpleParser is called, in syncImapInbox.
 import { simpleParser } from "mailparser";
 import { createTransport } from "nodemailer";
 

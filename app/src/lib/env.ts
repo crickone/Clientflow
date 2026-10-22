@@ -25,7 +25,10 @@ export interface EnvCheckResult {
 }
 
 /** App can't function correctly without these — see module doc. */
-const REQUIRED_VARS = ["ANTHROPIC_API_KEY"] as const;
+const REQUIRED_VARS = [
+  "ANTHROPIC_API_KEY",
+  "APP_URL", // the one origin that password-reset, invite and unsubscribe links are built on; without it lib/appUrl.ts falls back to the request Host header, which a caller controls
+] as const;
 
 /** A specific feature degrades or silently no-ops without these. */
 const RECOMMENDED_VARS = [
@@ -43,7 +46,6 @@ const RECOMMENDED_VARS = [
   "FACEBOOK_APP_ID", // native Facebook lead-gen connect flow — unset = facebookConfigured() is false, so "Connect Facebook" stays disabled
   "FACEBOOK_APP_SECRET", // FB OAuth code exchange + leadgen webhook X-Hub-Signature-256 verification — unset = every leadgen webhook is rejected (fails closed)
   "FACEBOOK_WEBHOOK_VERIFY_TOKEN", // echoed on Facebook's webhook-subscription GET — unset = the leadgen subscription can never be verified
-  "APP_URL", // stable absolute origin for links that must work outside a request (unsubscribe links, invite emails); the campaign-send pipeline threads the in-request forwarded host through to its detached continuation as the primary mechanism, so this is belt-and-suspenders, not the only path — see lib/appUrl.ts
   "GOOGLE_PLACES_API_KEY", // Market Research competitor discovery/refresh (lib/research/places.ts) — unset = placesConfigured() is false, so both the weekly scheduler refresh and manual "Rescan now" silently no-op
   "META_AD_LIBRARY_TOKEN", // Market Research competitor ADS (lib/research/adLibrary.ts) — unset = adLibraryConfigured() is false, so competitor ad lookups silently no-op
 ] as const;
