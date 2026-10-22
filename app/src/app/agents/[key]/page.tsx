@@ -18,11 +18,12 @@ import { AgentDetail } from "@/components/agents/AgentDetail";
 
 export const dynamic = "force-dynamic";
 
-export default async function AgentDetailPage({
-  params,
-}: {
-  params: { key: string };
-}) {
+export default async function AgentDetailPage(
+  props: {
+    params: Promise<{ key: string }>;
+  }
+) {
+  const params = await props.params;
   await requireAdminPage();
   // requireAdminPage guarantees an admin membership in the active tenant.
   const tenantId = getCurrentMembership()!.tenant.id;

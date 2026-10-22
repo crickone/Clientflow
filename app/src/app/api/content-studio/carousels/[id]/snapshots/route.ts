@@ -16,7 +16,8 @@ const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
  * no server render). Multipart: repeated `slideId` + `file` (PNG) pairs, in
  * the same order. Designed slides are skipped: they post their own render.
  */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const denied = await guard("user");
   if (denied) return denied;
   const carousel = getCarousel(Number(params.id));

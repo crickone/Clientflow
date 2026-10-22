@@ -17,7 +17,8 @@ export const dynamic = "force-dynamic";
  * action lives in two places is one where the audit trail is the only way to
  * tell what actually happened.
  */
-export default async function TenantOverviewPage({ params }: { params: { id: string } }) {
+export default async function TenantOverviewPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const id = Number(params.id);
   let data: TenantDetail;
   try {

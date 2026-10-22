@@ -10,11 +10,12 @@ import { Button } from "@/components/ui/Button";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Subscription paused — AdonisAgent" };
 
-export default async function SuspendedPage({
-  searchParams,
-}: {
-  searchParams: { failed?: string };
-}) {
+export default async function SuspendedPage(
+  props: {
+    searchParams: Promise<{ failed?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const user = await requireUserPage();
   const m = getCurrentMembership();
   if (!m) redirect("/login");

@@ -32,11 +32,12 @@ const NEEDS_YOU_KEY = "overview.needsYou";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: { tab?: string; range?: string; from?: string; to?: string };
-}) {
+export default async function DashboardPage(
+  props: {
+    searchParams: Promise<{ tab?: string; range?: string; from?: string; to?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const membership = getCurrentMembership();
   if (!membership) return null; // the layout already redirects signed-out users
   const vocab = getVocab(getVenueType());

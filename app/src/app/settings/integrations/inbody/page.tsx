@@ -15,7 +15,7 @@ export default async function InBodySettingsPage() {
   const tenantId = getCurrentMembership()!.tenant.id;
   const conn = ensureInBodyConnection(tenantId);
 
-  const h = headers();
+  const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
   const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   const webhookUrl = `${proto}://${host}/api/inbody/webhook/${conn.webhookSecret}`;

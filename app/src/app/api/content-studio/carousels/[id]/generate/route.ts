@@ -25,10 +25,8 @@ export const dynamic = "force-dynamic";
  * with the refresh route's spend — both are the one Content Studio carousel
  * feature — and stays distinct from the Marketing agent's draft_carousel tool.
  */
-export async function POST(
-  req: Request,
-  { params }: { params: { id: string } },
-) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const __auth = await guard("user");
   if (__auth) return __auth;
   const membership = getCurrentMembership();

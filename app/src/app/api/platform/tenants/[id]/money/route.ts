@@ -26,7 +26,8 @@ export const dynamic = "force-dynamic";
  * or changes what a business pays every month from now on, and that is the
  * line the two roles were drawn on.
  */
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const g = guardPlatform(req);
   if (g instanceof Response) return g;
   const tenantId = Number(params.id);
@@ -64,7 +65,8 @@ const bodySchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("refund"), invoiceId: z.number().int().positive(), reason: z.string().min(3).max(300) }),
 ]);
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const g = guardPlatform(req);
   if (g instanceof Response) return g;
   const tenantId = Number(params.id);

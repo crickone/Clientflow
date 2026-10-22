@@ -1,6 +1,6 @@
 import "server-only";
 
-import { headers } from "next/headers";
+import { headers, type UnsafeUnwrappedHeaders } from "next/headers";
 
 import { SITE_HOST_HEADER } from "./proxyHost";
 
@@ -13,6 +13,7 @@ import { SITE_HOST_HEADER } from "./proxyHost";
  * name. See lib/cms/proxyHost.ts.
  */
 export function siteRequestHost(): string | null {
-  const h = headers();
+  const h = (/* @next-codemod-ignore sync request access still works in Next 15 (dev warning only); making this helper and its callers async is a separate migration */
+  headers() as unknown as UnsafeUnwrappedHeaders);
   return h.get(SITE_HOST_HEADER) ?? h.get("host");
 }

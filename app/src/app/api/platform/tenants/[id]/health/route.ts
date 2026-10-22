@@ -14,7 +14,8 @@ export const dynamic = "force-dynamic";
  * the question being asked ("is their database sound?") is the whole point
  * of opening the tab. The fleet view deliberately skips it.
  */
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const g = guardPlatform(req);
   if (g instanceof Response) return g;
   const tenantId = Number(params.id);
@@ -29,7 +30,8 @@ const bodySchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("retry-queue"), queue: z.enum(["nurture", "posts"]) }),
 ]);
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const g = guardPlatform(req);
   if (g instanceof Response) return g;
   const tenantId = Number(params.id);

@@ -27,10 +27,8 @@ export const maxDuration = 120;
  * goes, so there is no fixed slot for a control to address. An operator
  * accepts what they see, regenerates it, or nudges it with a sentence.
  */
-export async function POST(
-  req: Request,
-  { params }: { params: { id: string } },
-) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const __auth = await guard("user");
   if (__auth) return __auth;
   const membership = getCurrentMembership();

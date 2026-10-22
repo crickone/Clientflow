@@ -30,11 +30,12 @@ const STATUS_FILTERS = [
   { value: "archived", label: "Archived" },
 ];
 
-export default async function GymsPage({
-  searchParams,
-}: {
-  searchParams: { q?: string; status?: string; venueType?: string };
-}) {
+export default async function GymsPage(
+  props: {
+    searchParams: Promise<{ q?: string; status?: string; venueType?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const me = await requireAdminSession();
   const qs = new URLSearchParams();
   if (searchParams.q) qs.set("q", searchParams.q);

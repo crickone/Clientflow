@@ -1,9 +1,15 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Emit a self-contained server bundle for the Docker runtime image
   // (.next/standalone). Native deps (better-sqlite3, ffmpeg-static) stay
   // external — see serverComponentsExternalPackages below.
   output: "standalone",
+  // The repo holds two apps with their own lockfiles; pin tracing to this one so the
+  // standalone server always lands at .next/standalone/server.js (the Dockerfile's CMD).
+  outputFileTracingRoot: path.dirname(fileURLToPath(import.meta.url)),
   images: { unoptimized: true },
   async headers() {
     // Conservative, high-value headers applied everywhere. SAMEORIGIN (not DENY)
@@ -52,14 +58,8 @@ const nextConfig = {
   // Revisit once the backlog is cleared (see the Lint step's comment in
   // .github/workflows/ci.yml).
   eslint: { ignoreDuringBuilds: true },
-  experimental: {
-    // Batch 1 fix wave (review finding #1, CRITICAL): on Next 14, `register()`
-    // in src/instrumentation.ts is ONLY invoked — and the file is only emitted
-    // into the standalone build at all — when this flag is set. Without it the
-    // process-level crash guards (unhandledRejection/uncaughtException) never
-    // install in production; they'd silently be dead code on Railway. Stable
-    // (no flag needed) from Next 15 onward — remove this once upgraded past 14.
-    instrumentationHook: true,
+    // Next 15: instrumentation.ts is always on, so the old
+    // experimental.instrumentationHook flag is gone.
     // better-sqlite3/sharp ship native bindings — keep them server-only.
     // sharp (Batch 5c, improvement-plan-2026-08.md Theme F4): downscales +
     // re-encodes uploaded raster images. Never import it from a client
@@ -73,7 +73,7 @@ const nextConfig = {
     // text-shaping engines are WASM loaded through dynamic requires, so webpack
     // bundles the JS and leaves the .wasm behind. External keeps
     // output-file-tracing copying the real packages.
-    serverComponentsExternalPackages: [
+    serverExternalPackages: [
       "better-sqlite3",
       "ffmpeg-static",
       "ffprobe-static",
@@ -95,7 +95,6 @@ const nextConfig = {
         "./node_modules/yoga-layout/**",
       ],
     },
-  },
 };
 
 export default nextConfig;

@@ -21,11 +21,12 @@ export const dynamic = "force-dynamic";
 const NEW_CAMPAIGN_STARTER =
   "Build a campaign for [what it's for, e.g. Black Friday massage], running from [start date] to [end date]. The offer is [what's included and the price].";
 
-export default async function AdonisPage({
-  searchParams,
-}: {
-  searchParams: { seedName?: string; season?: string; startsOn?: string; endsOn?: string; angle?: string; new?: string };
-}) {
+export default async function AdonisPage(
+  props: {
+    searchParams: Promise<{ seedName?: string; season?: string; startsOn?: string; endsOn?: string; angle?: string; new?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const tenantId = getCurrentTenant().id;
   const isAdmin = getCurrentMembership()?.role === "admin";
   // Voice T2: computed here (server component — process.env is safe to

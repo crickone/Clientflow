@@ -13,7 +13,8 @@ function when(ms: number) {
   return new Date(ms).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Dublin" });
 }
 
-export default async function LiftDetailPage({ params }: { params: { key: string } }) {
+export default async function LiftDetailPage(props: { params: Promise<{ key: string }> }) {
+  const params = await props.params;
   const { clientId } = requireClientPage();
   const lift = liftProgress(clientId, decodeURIComponent(params.key));
   if (!lift || lift.points.length === 0) notFound();

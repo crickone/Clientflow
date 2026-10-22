@@ -15,7 +15,7 @@ export default async function WhatsAppSettingsPage() {
   await requireAdminPage();
   const cfg = getWhatsAppConfig();
 
-  const h = headers();
+  const h = await headers();
   const host = h.get("host") ?? "localhost:3000";
   const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   // The business goes in the address so each gym's replies land in its own account.

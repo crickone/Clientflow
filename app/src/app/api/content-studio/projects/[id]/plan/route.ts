@@ -10,10 +10,8 @@ export const maxDuration = 120;
  * and then triggers the ffmpeg render explicitly via /render with
  * useSavedPlan=true.
  */
-export async function POST(
-  _req: Request,
-  { params }: { params: { id: string } },
-) {
+export async function POST(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const __auth = await guard("user");
   if (__auth) return __auth;
   const id = Number(params.id);

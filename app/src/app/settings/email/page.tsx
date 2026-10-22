@@ -15,11 +15,12 @@ import { ImapConnectCard } from "@/components/settings/ImapConnectCard";
 
 export const dynamic = "force-dynamic";
 
-export default async function EmailSettingsPage({
-  searchParams,
-}: {
-  searchParams: { connected?: string; error?: string };
-}) {
+export default async function EmailSettingsPage(
+  props: {
+    searchParams: Promise<{ connected?: string; error?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   await requireAdminPage();
   const tenantId = getCurrentMembership()!.tenant.id;
   const sender = getEmailSender();

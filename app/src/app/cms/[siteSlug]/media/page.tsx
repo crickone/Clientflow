@@ -8,11 +8,12 @@ import { listMedia, mediaUrl } from "@/lib/cms/media";
 
 export const dynamic = "force-dynamic";
 
-export default async function SiteMediaPage({
-  params,
-}: {
-  params: { siteSlug: string };
-}) {
+export default async function SiteMediaPage(
+  props: {
+    params: Promise<{ siteSlug: string }>;
+  }
+) {
+  const params = await props.params;
   await requireAdminPage();
   const site = await getSiteBySlug(params.siteSlug);
   if (!site) notFound();

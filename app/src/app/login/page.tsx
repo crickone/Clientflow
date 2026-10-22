@@ -16,11 +16,12 @@ export const metadata: Metadata = {
   description: "Sign in to AdonisAgent.",
 };
 
-export default async function LoginPage({
-  searchParams,
-}: {
-  searchParams: { opened?: string; reset?: string };
-}) {
+export default async function LoginPage(
+  props: {
+    searchParams: Promise<{ opened?: string; reset?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const user = await getSessionUser();
   if (user) {
     redirect(user.mustChangePassword ? "/change-password" : "/dashboard");

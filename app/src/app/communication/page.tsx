@@ -11,7 +11,10 @@ import { getVocab } from "@/lib/vocabulary";
 
 export const dynamic = "force-dynamic";
 
-export default async function CommunicationPage({ searchParams }: { searchParams?: { c?: string; open?: string; view?: string } }) {
+export default async function CommunicationPage(
+  props: { searchParams?: Promise<{ c?: string; open?: string; view?: string }> }
+) {
+  const searchParams = await props.searchParams;
   await requireUserPage();
   const vocab = getVocab(getVenueType());
   const membership = getCurrentMembership()!;

@@ -4,10 +4,8 @@ import { getProject, runTranscription } from "@/lib/video/projects";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(
-  _req: Request,
-  { params }: { params: { id: string } },
-) {
+export async function POST(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const __auth = await guard("user");
   if (__auth) return __auth;
   const id = Number(params.id);

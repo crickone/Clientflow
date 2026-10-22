@@ -7,7 +7,8 @@ import { UploadProgramForm } from "@/components/workout/UploadProgramForm";
 
 export const dynamic = "force-dynamic";
 
-export default async function NewProgramPage({ searchParams }: { searchParams: { type?: string } }) {
+export default async function NewProgramPage(props: { searchParams: Promise<{ type?: string }> }) {
+  const searchParams = await props.searchParams;
   await requireUser();
   const type: ProgramType =
     searchParams.type === "detailed" ? "detailed" : searchParams.type === "upload" ? "upload" : "simple";

@@ -18,10 +18,8 @@ export const dynamic = "force-dynamic";
  * editor can show it in the tray and poll; the actual fal call runs detached
  * (1–3 min per clip) and fills the row in — see runBrollGeneration.
  */
-export async function POST(
-  req: Request,
-  { params }: { params: { id: string } },
-) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const __auth = await guard("admin");
   if (__auth) return __auth;
 

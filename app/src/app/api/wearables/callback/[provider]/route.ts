@@ -15,7 +15,8 @@ export const maxDuration = 60;
  * trust comes from the sealed state. Saves the connection, pulls the last
  * 30 days, and returns the member to their app.
  */
-export async function GET(req: Request, { params }: { params: { provider: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ provider: string }> }) {
+  const params = await props.params;
   const url = new URL(req.url);
   const state = openState(url.searchParams.get("state") ?? "");
   const back = (to: string, status: string) => NextResponse.redirect(`${to}/app/profile?device=${encodeURIComponent(params.provider)}&status=${status}#devices`);

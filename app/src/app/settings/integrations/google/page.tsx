@@ -10,7 +10,8 @@ import { GoogleConnectCard } from "@/components/settings/GoogleConnectCard";
 
 export const dynamic = "force-dynamic";
 
-export default async function GoogleSettingsPage({ searchParams }: { searchParams?: { error?: string; connected?: string } }) {
+export default async function GoogleSettingsPage(props: { searchParams?: Promise<{ error?: string; connected?: string }> }) {
+  const searchParams = await props.searchParams;
   await requireAdminPage();
   const tenantId = getCurrentMembership()!.tenant.id;
   return (

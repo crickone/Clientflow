@@ -17,11 +17,12 @@ import { NewPageForm } from "@/components/cms/NewPageForm";
 
 export const dynamic = "force-dynamic";
 
-export default async function SitePagesList({
-  params,
-}: {
-  params: { siteSlug: string };
-}) {
+export default async function SitePagesList(
+  props: {
+    params: Promise<{ siteSlug: string }>;
+  }
+) {
+  const params = await props.params;
   await requireAdminPage();
   const site = await getSiteBySlug(params.siteSlug);
   if (!site) notFound();

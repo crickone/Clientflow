@@ -23,13 +23,18 @@ import { openTenant } from "./actions";
  * Tabs appear as their slices land. The four in TENANT_TABS are what exists;
  * People, Integrations, Features, Data and Health arrive with theirs.
  */
-export default async function TenantLayout({
-  children,
-  params,
-}: {
-  children: ReactNode;
-  params: { id: string };
-}) {
+export default async function TenantLayout(
+  props: {
+    children: ReactNode;
+    params: Promise<{ id: string }>;
+  }
+) {
+  const params = await props.params;
+
+  const {
+    children
+  } = props;
+
   const id = Number(params.id);
   const me = await requireAdminSession();
 

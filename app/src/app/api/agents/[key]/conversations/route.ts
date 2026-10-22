@@ -7,7 +7,8 @@ import { importConversations, listConversations } from "@/lib/agents/conversatio
 export const dynamic = "force-dynamic";
 
 /** This user's conversations with the agent, newest first (lib/agents/conversation.ts). */
-export async function GET(_req: NextRequest, { params }: { params: { key: string } }) {
+export async function GET(_req: NextRequest, props: { params: Promise<{ key: string }> }) {
+  const params = await props.params;
   const me = await requireUser();
   const membership = getCurrentMembership();
   if (!membership) return new Response("No active account", { status: 401 });
@@ -16,7 +17,8 @@ export async function GET(_req: NextRequest, { params }: { params: { key: string
 }
 
 /** One-time move of chats an older page kept in this browser onto the server. */
-export async function POST(req: NextRequest, { params }: { params: { key: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ key: string }> }) {
+  const params = await props.params;
   const me = await requireUser();
   const membership = getCurrentMembership();
   if (!membership) return new Response("No active account", { status: 401 });

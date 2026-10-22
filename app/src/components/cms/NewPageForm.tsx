@@ -1,6 +1,7 @@
 "use client";
 
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormStatus } from "react-dom";
+import { useActionState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -26,7 +27,7 @@ export function NewPageForm({
   templates: { id: string; label: string }[];
 }) {
   const action = createPageAction.bind(null, siteSlug);
-  const [state, formAction] = useFormState(action, initial);
+  const [state, formAction] = useActionState(action, initial);
   return (
     <form action={formAction}>
       <Card style={{ display: "grid", gap: 14, maxWidth: 640 }}>

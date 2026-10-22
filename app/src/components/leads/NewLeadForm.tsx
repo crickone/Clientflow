@@ -1,6 +1,6 @@
 "use client";
 
-import { useFormState } from "react-dom";
+import { useActionState } from "react";
 
 import { Card, CardLabel } from "@/components/ui/Card";
 import { FieldError, Input, Label, Textarea } from "@/components/ui/Input";
@@ -19,7 +19,7 @@ export function NewLeadForm({
   serviceLabel: string;
   therapyOptions: { id: number; name: string }[];
 }) {
-  const [state, formAction] = useFormState<LeadFormState | null, FormData>(
+  const [state, formAction] = useActionState<LeadFormState | null, FormData>(
     createManualLeadAction,
     null,
   );

@@ -99,10 +99,8 @@ function sceneFromSlideCopy(slide: { designHtml: string | null }): string {
  * snapshots the slide for undo when it is the second -- a redesign REPLACES
  * designHtml, and a picture is one click.
  */
-export async function POST(
-  req: Request,
-  { params }: { params: { id: string; slideId: string } },
-) {
+export async function POST(req: Request, props: { params: Promise<{ id: string; slideId: string }> }) {
+  const params = await props.params;
   const __auth = await guard("user");
   if (__auth) return __auth;
   const membership = getCurrentMembership();

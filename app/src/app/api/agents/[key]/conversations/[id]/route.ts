@@ -13,9 +13,10 @@ import {
 
 export const dynamic = "force-dynamic";
 
-type Params = { params: { key: string; id: string } };
+type Params = { params: Promise<{ key: string; id: string }> };
 
-async function context({ params }: Params) {
+async function context({ params: paramsPromise }: Params) {
+  const params = await paramsPromise;
   const me = await requireUser();
   const membership = getCurrentMembership();
   if (!membership) return null;

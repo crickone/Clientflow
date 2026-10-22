@@ -52,15 +52,16 @@ function ownsBlogPage(siteSlug: string, searchParams: { site?: string }): boolea
   return Boolean(pc && pc.template);
 }
 
-export function generateMetadata({
-  params,
-  searchParams,
-}: {
-  params: { siteSlug: string };
-  searchParams: { site?: string };
-}): Metadata {
+export async function generateMetadata(
+  props: {
+    params: Promise<{ siteSlug: string }>;
+    searchParams: Promise<{ site?: string }>;
+  }
+): Promise<Metadata> {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   if (ownsBlogPage(params.siteSlug, searchParams)) {
-    return pageMetadata({ params: { siteSlug: params.siteSlug, slug: BLOG_PATH }, searchParams });
+    return pageMetadata({ params: Promise.resolve({ siteSlug: params.siteSlug, slug: BLOG_PATH }), searchParams: Promise.resolve(searchParams) });
   }
   const host = siteRequestHost();
   const resolved = resolvePublicSite({ host, siteParam: searchParams.site ?? params.siteSlug });
@@ -72,20 +73,21 @@ export function generateMetadata({
   };
 }
 
-export default async function PublicBlogIndex({
-  params,
-  searchParams,
-}: {
-  params: { siteSlug: string };
-  searchParams: { site?: string; cmsedit?: string };
-}) {
+export default async function PublicBlogIndex(
+  props: {
+    params: Promise<{ siteSlug: string }>;
+    searchParams: Promise<{ site?: string; cmsedit?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   // The Studio edit canvas resolves through the operator's own tenant, not
   // the host, so it is checked the way the catch-all checks it.
   const delegate =
     (searchParams.cmsedit === "1" && (await studioEditZones(params.siteSlug, "/blog")) !== null) ||
     ownsBlogPage(params.siteSlug, searchParams);
   if (delegate) {
-    return PublicSitePage({ params: { siteSlug: params.siteSlug, slug: BLOG_PATH }, searchParams });
+    return PublicSitePage({ params: Promise.resolve({ siteSlug: params.siteSlug, slug: BLOG_PATH }), searchParams: Promise.resolve(searchParams) });
   }
 
   const host = siteRequestHost();

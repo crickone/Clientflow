@@ -7,7 +7,7 @@ import { CopyButton } from "./CopyButton";
 export const dynamic = "force-dynamic";
 
 interface Props {
-  params: { code: string };
+  params: Promise<{ code: string }>;
 }
 
 const fmtEur = (n: number) =>
@@ -71,7 +71,8 @@ const DEMO_VOUCHER = {
   therapyName: null as string | null,
 };
 
-export default async function VoucherPublicPage({ params }: Props) {
+export default async function VoucherPublicPage(props: Props) {
+  const params = await props.params;
   const code = decodeURIComponent(params.code);
 
   let voucher: {

@@ -12,10 +12,11 @@ export const dynamic = "force-dynamic";
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 
 interface Props {
-  searchParams: { from?: string; to?: string; status?: string; q?: string };
+  searchParams: Promise<{ from?: string; to?: string; status?: string; q?: string }>;
 }
 
-export default async function BookingsPage({ searchParams }: Props) {
+export default async function BookingsPage(props: Props) {
+  const searchParams = await props.searchParams;
   await requireUser();
 
   const today = todayIso();

@@ -25,10 +25,11 @@ const TABS = [
 ] as const;
 
 interface Props {
-  searchParams: { filter?: string };
+  searchParams: Promise<{ filter?: string }>;
 }
 
-export default async function PackagesPage({ searchParams }: Props) {
+export default async function PackagesPage(props: Props) {
+  const searchParams = await props.searchParams;
   const vocab = getVocab(getVenueType());
   const filter = (searchParams.filter ?? "active") as
     | "active"

@@ -7,12 +7,13 @@ import { AttendanceDashboard } from "@/components/attendance/AttendanceDashboard
 export const dynamic = "force-dynamic";
 
 interface Props {
-  searchParams: { range?: string; from?: string; to?: string };
+  searchParams: Promise<{ range?: string; from?: string; to?: string }>;
 }
 
 const RANGES: Record<string, number> = { "7": 7, "30": 30, "90": 90 };
 
-export default async function AttendancePage({ searchParams }: Props) {
+export default async function AttendancePage(props: Props) {
+  const searchParams = await props.searchParams;
   await requireUser();
 
   const today = todayIso();

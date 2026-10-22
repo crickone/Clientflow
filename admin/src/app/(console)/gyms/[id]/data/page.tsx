@@ -12,13 +12,14 @@ export const dynamic = "force-dynamic";
  * state so a support conversation can link straight to "this is who I
  * found" — and so the search survives a refresh after a deletion.
  */
-export default async function TenantDataPage({
-  params,
-  searchParams,
-}: {
-  params: { id: string };
-  searchParams: { q?: string };
-}) {
+export default async function TenantDataPage(
+  props: {
+    params: Promise<{ id: string }>;
+    searchParams: Promise<{ q?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const id = Number(params.id);
   const me = await requireAdminSession();
   const q = searchParams.q ?? "";

@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/Button";
 export const dynamic = "force-dynamic";
 
 /** DEV-ONLY simulated hosted payment page (the DevProvider's "gateway"). */
-export default async function DevPayPage({ params }: { params: { ref: string } }) {
+export default async function DevPayPage(props: { params: Promise<{ ref: string }> }) {
+  const params = await props.params;
   await requireUserPage();
   if ((process.env.PAYMENT_PROVIDER ?? "dev") !== "dev") notFound();
   const s = controlSqlite

@@ -27,10 +27,11 @@ import { getVocab } from "@/lib/vocabulary";
 export const dynamic = "force-dynamic";
 
 interface Props {
-  searchParams: { range?: string };
+  searchParams: Promise<{ range?: string }>;
 }
 
-export default async function ReportsPage({ searchParams }: Props) {
+export default async function ReportsPage(props: Props) {
+  const searchParams = await props.searchParams;
   await requireAdminPage();
   const vocab = getVocab(getVenueType());
   const range = rangeFromKey(searchParams.range ?? "month");

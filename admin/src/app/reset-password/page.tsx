@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, use } from "react";
 
 import { Logo } from "@/components/Logo";
 import { completeConsoleResetAction, verifyConsoleResetAction } from "./actions";
@@ -13,11 +13,12 @@ import { completeConsoleResetAction, verifyConsoleResetAction } from "./actions"
  * admin to /login rather than signing them in: `completeUserReset` revokes
  * every existing session, which is the point of a reset.
  */
-export default function ResetPasswordPage({
-  searchParams,
-}: {
-  searchParams: { token?: string };
-}) {
+export default function ResetPasswordPage(
+  props: {
+    searchParams: Promise<{ token?: string }>;
+  }
+) {
+  const searchParams = use(props.searchParams);
   const token = searchParams.token ?? "";
   const [state, setState] = useState<
     { phase: "checking" } | { phase: "bad"; reason: string } | { phase: "ready"; email: string } | { phase: "done" }

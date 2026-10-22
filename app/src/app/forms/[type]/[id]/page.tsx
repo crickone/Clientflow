@@ -11,7 +11,8 @@ export const dynamic = "force-dynamic";
 
 const VALID = new Set(Object.keys(FORM_TYPE_META));
 
-export default async function EditFormPage({ params }: { params: { type: string; id: string } }) {
+export default async function EditFormPage(props: { params: Promise<{ type: string; id: string }> }) {
+  const params = await props.params;
   await requireUser();
   if (!VALID.has(params.type)) notFound();
   const type = params.type as FormType;

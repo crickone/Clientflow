@@ -29,10 +29,8 @@ const ACCEPTED = new Set([
  * create route: probe for duration/dimensions/rotation, and run the
  * sideways-shot orientation check on a main clip.
  */
-export async function POST(
-  req: Request,
-  { params }: { params: { id: string } },
-) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const __auth = await guard("user");
   if (__auth) return __auth;
 

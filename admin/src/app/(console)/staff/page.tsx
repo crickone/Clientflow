@@ -14,7 +14,8 @@ export const dynamic = "force-dynamic";
  * privileged information within the team -- but only an owner can change a
  * role, and the API enforces that regardless of what this page renders.
  */
-export default async function StaffPage({ searchParams }: { searchParams: { error?: string; saved?: string } }) {
+export default async function StaffPage(props: { searchParams: Promise<{ error?: string; saved?: string }> }) {
+  const searchParams = await props.searchParams;
   const me = await requireAdminSession();
   const { staff } = await api<StaffResponse>("/staff");
 

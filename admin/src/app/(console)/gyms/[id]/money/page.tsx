@@ -35,21 +35,22 @@ function InvoiceChip({ status }: { status: InvoiceRow["status"] }) {
   );
 }
 
-export default async function GymMoneyPage({
-  params,
-  searchParams,
-}: {
-  params: { id: string };
-  searchParams: {
-    error?: string;
-    granted?: string;
-    aiError?: string;
-    aiGranted?: string;
-    voiceError?: string;
-    voiceGranted?: string;
-    voiceSaved?: string;
-  };
-}) {
+export default async function GymMoneyPage(
+  props: {
+    params: Promise<{ id: string }>;
+    searchParams: Promise<{
+      error?: string;
+      granted?: string;
+      aiError?: string;
+      aiGranted?: string;
+      voiceError?: string;
+      voiceGranted?: string;
+      voiceSaved?: string;
+    }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const id = Number(params.id);
   let data: TenantDetail;
   try {

@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import { headers } from "next/headers";
+import { headers, type UnsafeUnwrappedHeaders } from "next/headers";
 import { and, eq, gt, isNotNull } from "drizzle-orm";
 
 import { controlDb } from "@/lib/db/control";
@@ -22,7 +22,8 @@ import { getAppBaseUrl } from "@/lib/appUrl";
 
 function proxiedHost(): string | null {
   try {
-    return normalizeHost(headers().get(SITE_HOST_HEADER));
+    return normalizeHost((/* @next-codemod-ignore sync request access still works in Next 15 (dev warning only); making this helper and its callers async is a separate migration */
+    headers() as unknown as UnsafeUnwrappedHeaders).get(SITE_HOST_HEADER));
   } catch {
     return null; // outside a request
   }

@@ -3,11 +3,12 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { ClientForm } from "@/components/clients/ClientForm";
 import { getClient } from "@/lib/queries";
 
-export default async function EditClientPage({
-  params,
-}: {
-  params: { id: string };
-}) {
+export default async function EditClientPage(
+  props: {
+    params: Promise<{ id: string }>;
+  }
+) {
+  const params = await props.params;
   const id = Number(params.id);
   const client = await getClient(id);
   if (!client) notFound();

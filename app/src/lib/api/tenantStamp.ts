@@ -1,6 +1,6 @@
 import "server-only";
 
-import { headers } from "next/headers";
+import { headers, type UnsafeUnwrappedHeaders } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { getTenantById, resolveCurrentTenant } from "@/lib/db/tenant";
@@ -48,7 +48,8 @@ export { TENANT_MISMATCH_CODE, TENANT_STAMP_HEADER } from "./tenantStampRules";
 export function tenantStampMismatch(): Response | null {
   let stampedId: number | null = null;
   try {
-    stampedId = parseStamp(headers().get(TENANT_STAMP_HEADER));
+    stampedId = parseStamp((/* @next-codemod-ignore sync request access still works in Next 15 (dev warning only); making this helper and its callers async is a separate migration */
+    headers() as unknown as UnsafeUnwrappedHeaders).get(TENANT_STAMP_HEADER));
   } catch {
     // Outside a request scope — nothing to check.
     return null;

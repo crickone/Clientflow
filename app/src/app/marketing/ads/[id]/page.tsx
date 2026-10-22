@@ -11,7 +11,11 @@ import { builderData } from "@/lib/ads/pageData";
 export const dynamic = "force-dynamic";
 
 /** A draft opens in the builder; a launched campaign shows its results and controls. */
-export default async function AdCampaignPage({ params, searchParams }: { params: { id: string }; searchParams?: { launched?: string } }) {
+export default async function AdCampaignPage(
+  props: { params: Promise<{ id: string }>; searchParams?: Promise<{ launched?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   await requireAdminPage();
   const campaign = getAdCampaign(Number(params.id));
   if (!campaign) notFound();

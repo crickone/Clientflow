@@ -16,7 +16,8 @@ export const dynamic = "force-dynamic";
  * irreversible and it is exactly the kind of request that arrives by email
  * claiming to be from someone it is not.
  */
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const g = guardPlatform(req);
   if (g instanceof Response) return g;
   const tenantId = Number(params.id);
@@ -46,7 +47,8 @@ const bodySchema = z.discriminatedUnion("op", [
 /** Deleting a person cannot be undone, so it is an owner's call. */
 const OWNER_OPS = new Set(["delete-person"]);
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const g = guardPlatform(req);
   if (g instanceof Response) return g;
   const tenantId = Number(params.id);

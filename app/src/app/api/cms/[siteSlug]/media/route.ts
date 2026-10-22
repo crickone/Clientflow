@@ -20,10 +20,8 @@ const ALLOWED = new Set([
   "image/gif",
 ]);
 
-export async function GET(
-  _req: Request,
-  { params }: { params: { siteSlug: string } },
-) {
+export async function GET(_req: Request, props: { params: Promise<{ siteSlug: string }> }) {
+  const params = await props.params;
   try {
     await requireAdmin();
   } catch {
@@ -34,10 +32,8 @@ export async function GET(
   return NextResponse.json({ ok: true, assets: listMedia(site.id) });
 }
 
-export async function POST(
-  req: Request,
-  { params }: { params: { siteSlug: string } },
-) {
+export async function POST(req: Request, props: { params: Promise<{ siteSlug: string }> }) {
+  const params = await props.params;
   try {
     await requireAdmin();
   } catch {

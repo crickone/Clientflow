@@ -47,10 +47,8 @@ export const maxDuration = 120;
 
 type InMsg = { role: "user" | "assistant"; content: string };
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: { key: string } },
-) {
+export async function POST(req: NextRequest, props: { params: Promise<{ key: string }> }) {
+  const params = await props.params;
   const me = await requireUser();
   const membership = getCurrentMembership();
   if (!membership) return new Response("No active account", { status: 401 });

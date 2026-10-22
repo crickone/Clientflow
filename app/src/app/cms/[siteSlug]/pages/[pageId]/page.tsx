@@ -19,11 +19,12 @@ import "@/lib/cms/registerTemplates";
 
 export const dynamic = "force-dynamic";
 
-export default async function EditPagePage({
-  params,
-}: {
-  params: { siteSlug: string; pageId: string };
-}) {
+export default async function EditPagePage(
+  props: {
+    params: Promise<{ siteSlug: string; pageId: string }>;
+  }
+) {
+  const params = await props.params;
   await requireAdminPage();
   const site = await getSiteBySlug(params.siteSlug);
   if (!site) notFound();

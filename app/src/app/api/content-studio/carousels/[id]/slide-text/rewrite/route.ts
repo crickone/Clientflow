@@ -27,7 +27,8 @@ export const maxDuration = 60;
  *
  * Saving is the existing slide-text POST, unchanged.
  */
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const __auth = await guard("user");
   if (__auth) return __auth;
   const membership = getCurrentMembership();

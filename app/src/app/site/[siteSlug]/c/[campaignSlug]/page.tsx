@@ -51,15 +51,15 @@ import { signCheckoutToken } from "@/lib/offers/checkoutToken";
 import { fulfilCheckout } from "@/lib/offers/fulfil";
 import { getStripeConnection } from "@/lib/stripe/connection";
 import { getCheckoutSession } from "@/lib/stripe/api";
-import { cookies } from "next/headers";
+import { cookies, type UnsafeUnwrappedCookies } from "next/headers";
 import { accessCookieName, getOfferAccessKey, hasOfferAccess } from "@/lib/offers/access";
 import { RememberOfferAccess } from "@/components/campaigns/RememberOfferAccess";
 
 export const dynamic = "force-dynamic";
 
 type Props = {
-  params: { siteSlug: string; campaignSlug: string };
-  searchParams: { site?: string; paid?: string; session_id?: string; k?: string };
+  params: Promise<{ siteSlug: string; campaignSlug: string }>;
+  searchParams: Promise<{ site?: string; paid?: string; session_id?: string; k?: string }>;
 };
 
 const LOGO_MIME_BY_EXT: Record<string, string> = {
@@ -201,8 +201,8 @@ interface Resolved {
  * would then never actually move.
  */
 function resolveCampaignLanding(
-  params: Props["params"],
-  searchParams: Props["searchParams"],
+  params: Awaited<Props["params"]>,
+  searchParams: Awaited<Props["searchParams"]>,
   opts?: { countView?: boolean },
 ): Resolved | null {
   const host = siteRequestHost();
@@ -278,7 +278,8 @@ function resolveCampaignLanding(
     const accessKey = getOfferAccessKey(campaign.id);
     let cookieKey: string | undefined;
     try {
-      cookieKey = cookies().get(accessCookieName(campaign.id))?.value;
+      cookieKey = (/* @next-codemod-ignore sync request access still works in Next 15 (dev warning only); making this helper and its callers async is a separate migration */
+      cookies() as unknown as UnsafeUnwrappedCookies).get(accessCookieName(campaign.id))?.value;
     } catch {
       cookieKey = undefined;
     }
@@ -366,7 +367,7 @@ function landingReturnUrl(site: PublicSite, campaignSlug: string, host: string |
  * (fulfilCheckout is safe to run twice). Only a session id that matches the
  * order counts, so a guessed order number shows nothing.
  */
-async function purchaseState(tenantId: number, searchParams: Props["searchParams"]) {
+async function purchaseState(tenantId: number, searchParams: Awaited<Props["searchParams"]>) {
   const orderId = Number(searchParams.paid);
   const sessionId = String(searchParams.session_id ?? "");
   if (!Number.isInteger(orderId) || orderId <= 0 || !sessionId.startsWith("cs_")) return null;
@@ -396,7 +397,9 @@ async function purchaseState(tenantId: number, searchParams: Props["searchParams
   };
 }
 
-export function generateMetadata({ params, searchParams }: Props): Metadata {
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const data = resolveCampaignLanding(params, searchParams);
   if (!data) return { title: "Campaign" };
 
@@ -440,7 +443,9 @@ export function generateMetadata({ params, searchParams }: Props): Metadata {
   };
 }
 
-export default async function CampaignLandingPage({ params, searchParams }: Props) {
+export default async function CampaignLandingPage(props: Props) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   // countView: true — this is the actual page render (as opposed to
   // generateMetadata's separate pass over the same request), so this is the
   // one call site that should count as a view. See resolveCampaignLanding's

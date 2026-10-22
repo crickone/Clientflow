@@ -29,10 +29,8 @@ interface PlanShape {
   }>;
 }
 
-export async function GET(
-  _req: Request,
-  { params }: { params: { id: string } },
-) {
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const __auth = await guard("user");
   if (__auth) return __auth;
   const id = Number(params.id);
@@ -87,10 +85,8 @@ export async function GET(
  * shape and rejects edits during an active render so the in-flight pipeline
  * doesn't read stale state.
  */
-export async function PATCH(
-  req: Request,
-  { params }: { params: { id: string } },
-) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const __auth = await guard("user");
   if (__auth) return __auth;
   const id = Number(params.id);

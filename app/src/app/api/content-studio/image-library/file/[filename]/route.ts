@@ -37,10 +37,8 @@ const MIME_BY_EXT: Record<string, string> = {
 const DOWNLOAD_EXT = new Set([".txt", ".csv", ".md", ".json", ".docx", ".xlsx", ".pptx"]);
 const VIDEO_EXT = new Set([".mp4", ".mov", ".webm"]);
 
-export async function GET(
-  req: Request,
-  { params }: { params: { filename: string } },
-) {
+export async function GET(req: Request, props: { params: Promise<{ filename: string }> }) {
+  const params = await props.params;
   const __auth = await guard("user");
   if (__auth) return __auth;
   const filename = decodeURIComponent(params.filename);

@@ -20,11 +20,12 @@ const STATE_TONE: Record<string, "neutral" | "amber" | "green" | "red"> = {
   draft: "neutral",
 };
 
-export default async function SiteBlogList({
-  params,
-}: {
-  params: { siteSlug: string };
-}) {
+export default async function SiteBlogList(
+  props: {
+    params: Promise<{ siteSlug: string }>;
+  }
+) {
+  const params = await props.params;
   await requireAdminPage();
   const site = await getSiteBySlug(params.siteSlug);
   if (!site) notFound();

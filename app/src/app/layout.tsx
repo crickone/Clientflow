@@ -103,7 +103,7 @@ export default async function RootLayout({
   // visitor hitting a share link would be wrapped in the logged-out admin
   // sidebar chrome (and getCurrentTenant() below would resolve the unrelated
   // DEFAULT tenant) instead of seeing a standalone branded form.
-  const pathname = headers().get("x-pathname") ?? "";
+  const pathname = (await headers()).get("x-pathname") ?? "";
   // A business's domain reaching us through the Worker is live; the member
   // app's emailed links switch to it (lib/clientAppHost.ts).
   noteProxiedHost();
@@ -347,7 +347,7 @@ export default async function RootLayout({
   // account looks the same: colours come from the mode preset and the heading
   // font is the platform default (per-tenant appearance settings were removed
   // 2026-10-07).
-  const themeMode = coerceThemeMode(cookies().get(THEME_MODE_COOKIE)?.value);
+  const themeMode = coerceThemeMode((await cookies()).get(THEME_MODE_COOKIE)?.value);
   const themeStyle = themeCss(themeForMode(themeMode));
   const tenantSlug = current ? current.tenant.slug : "";
   const schedulingMode = current ? getSchedulingMode() : "appointments";

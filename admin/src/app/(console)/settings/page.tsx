@@ -13,11 +13,12 @@ interface Settings {
   provider: string;
 }
 
-export default async function SettingsPage({
-  searchParams,
-}: {
-  searchParams: { saved?: string; error?: string };
-}) {
+export default async function SettingsPage(
+  props: {
+    searchParams: Promise<{ saved?: string; error?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const s = await api<Settings>("/settings");
 
   return (

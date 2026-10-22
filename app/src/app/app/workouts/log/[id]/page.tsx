@@ -6,7 +6,8 @@ import { WorkoutLogger } from "@/components/clientapp/WorkoutLogger";
 
 export const dynamic = "force-dynamic";
 
-export default async function WorkoutLogPage({ params }: { params: { id: string } }) {
+export default async function WorkoutLogPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const { clientId } = requireClientPage();
   const id = Number(params.id);
   if (!Number.isInteger(id) || id <= 0) notFound();

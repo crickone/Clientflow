@@ -10,7 +10,7 @@ export interface AdminUser { userId: number; email: string; name: string | null;
 
 /** Page guard: verified against /auth/me; redirects to /login when invalid. */
 export const requireAdminSession = cache(async (): Promise<AdminUser> => {
-  const token = cookies().get(ADMIN_COOKIE)?.value;
+  const token = (await cookies()).get(ADMIN_COOKIE)?.value;
   if (!token) redirect("/login");
   try {
     const { user } = await api<{ user: AdminUser }>("/auth/me");

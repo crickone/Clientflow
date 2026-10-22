@@ -1,6 +1,6 @@
 import "server-only";
 
-import { headers } from "next/headers";
+import { headers, type UnsafeUnwrappedHeaders } from "next/headers";
 
 /**
  * Absolute base URL of the running app (e.g. https://app.clientflow.ie), used to
@@ -14,7 +14,8 @@ export function getAppBaseUrl(): string {
   const env = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
   if (env) return env.replace(/\/+$/, "");
   try {
-    const h = headers();
+    const h = (/* @next-codemod-ignore sync request access still works in Next 15 (dev warning only); making this helper and its callers async is a separate migration */
+    headers() as unknown as UnsafeUnwrappedHeaders);
     const host = h.get("x-forwarded-host") ?? h.get("host");
     if (host) {
       const proto =

@@ -20,7 +20,8 @@ function shiftDay(day: string, by: number) {
 }
 
 /** What the client ate today (snapped or typed in), their target, and the plans their coach gave them. */
-export default async function ClientNutritionPage({ searchParams }: { searchParams: { day?: string } }) {
+export default async function ClientNutritionPage(props: { searchParams: Promise<{ day?: string }> }) {
+  const searchParams = await props.searchParams;
   const { clientId } = requireClientPage();
   const today = dateKey(Date.now());
   const day = searchParams.day && /^\d{4}-\d{2}-\d{2}$/.test(searchParams.day) && searchParams.day <= today ? searchParams.day : today;

@@ -35,10 +35,8 @@ export const maxDuration = 30;
  * answer all fall back to guessIntent's reading of the words, because a
  * router that can block is worse than the three buttons it replaced.
  */
-export async function POST(
-  req: Request,
-  { params }: { params: { id: string; slideId: string } },
-) {
+export async function POST(req: Request, props: { params: Promise<{ id: string; slideId: string }> }) {
+  const params = await props.params;
   const __auth = await guard("user");
   if (__auth) return __auth;
   const membership = getCurrentMembership();

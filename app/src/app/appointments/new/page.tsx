@@ -12,10 +12,11 @@ import { getVocab } from "@/lib/vocabulary";
 export const dynamic = "force-dynamic";
 
 interface Props {
-  searchParams: { client?: string; date?: string; time?: string; voucher?: string };
+  searchParams: Promise<{ client?: string; date?: string; time?: string; voucher?: string }>;
 }
 
-export default async function NewAppointmentPage({ searchParams }: Props) {
+export default async function NewAppointmentPage(props: Props) {
+  const searchParams = await props.searchParams;
   const vocab = getVocab(getVenueType());
   const allTherapies = db
     .select()

@@ -5,10 +5,8 @@ import { and, eq } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
-export async function PATCH(
-  req: Request,
-  { params }: { params: { id: string; assetId: string } },
-) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string; assetId: string }> }) {
+  const params = await props.params;
   const __auth = await guard("user");
   if (__auth) return __auth;
   const projectId = Number(params.id);
@@ -85,10 +83,8 @@ export async function PATCH(
  * dismiss it. Scoped by projectId like the PATCH above, so an id from another
  * project can't be deleted through this route.
  */
-export async function DELETE(
-  _req: Request,
-  { params }: { params: { id: string; assetId: string } },
-) {
+export async function DELETE(_req: Request, props: { params: Promise<{ id: string; assetId: string }> }) {
+  const params = await props.params;
   const __auth = await guard("user");
   if (__auth) return __auth;
   const projectId = Number(params.id);

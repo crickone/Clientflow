@@ -17,10 +17,8 @@ const DEMO = {
   therapyName: null as string | null,
 };
 
-export async function GET(
-  request: Request,
-  { params }: { params: { code: string } },
-) {
+export async function GET(request: Request, props: { params: Promise<{ code: string }> }) {
+  const params = await props.params;
   const code = decodeURIComponent(params.code);
   const url = new URL(request.url);
   const baseUrl = `${url.protocol}//${url.host}`;

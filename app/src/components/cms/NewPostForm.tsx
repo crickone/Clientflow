@@ -1,6 +1,7 @@
 "use client";
 
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormStatus } from "react-dom";
+import { useActionState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -20,7 +21,7 @@ function SubmitButton() {
 
 export function NewPostForm({ siteSlug }: { siteSlug: string }) {
   const action = createPostAction.bind(null, siteSlug);
-  const [state, formAction] = useFormState(action, initial);
+  const [state, formAction] = useActionState(action, initial);
   return (
     <form action={formAction}>
       <Card style={{ maxWidth: 640, display: "grid", gap: 16 }}>

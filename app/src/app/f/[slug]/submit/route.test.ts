@@ -109,7 +109,7 @@ const FAKE_IP = "10.99.0.1"; // one shared IP for this file — well under the r
           headers: { "content-type": "application/json", accept: "application/json", "x-forwarded-for": FAKE_IP },
           body: JSON.stringify(body),
         }),
-        { params: { slug: slugParam } },
+        { params: Promise.resolve({ slug: slugParam }) },
       );
 
     // ── 1. a valid submit persists a row under the form's own tenant ──
@@ -167,7 +167,7 @@ const FAKE_IP = "10.99.0.1"; // one shared IP for this file — well under the r
         },
         body: new URLSearchParams({ [`q_${qName.id}`]: "No JS Nancy" }).toString(),
       }),
-      { params: { slug: "route-test-enquiry" } },
+      { params: Promise.resolve({ slug: "route-test-enquiry" }) },
     );
     assert.equal(res6.status, 303, "the no-JS fallback gets a redirect, not a JSON body");
     const location = res6.headers.get("location") ?? "";

@@ -28,7 +28,8 @@ function when(ms: number | null) {
   return ms ? new Date(ms).toLocaleString("en-IE", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Dublin" }) : "";
 }
 
-export default async function BroadcastPage({ params }: { params: { id: string } }) {
+export default async function BroadcastPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   await requireAdminPage();
   const b = getBroadcast(Number(params.id));
   if (!b) notFound();

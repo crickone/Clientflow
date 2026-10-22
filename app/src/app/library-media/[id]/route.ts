@@ -10,10 +10,8 @@ export const dynamic = "force-dynamic";
  * (not site-scoped), so an image is usable on any site. Cacheable so a CDN can
  * sit in front in production.
  */
-export async function GET(
-  _req: Request,
-  { params }: { params: { id: string } },
-) {
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const id = Number(params.id);
   if (!Number.isFinite(id)) return new Response("Not found", { status: 404 });
 

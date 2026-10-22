@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
+import { headers, type UnsafeUnwrappedHeaders } from "next/headers";
 import { z } from "zod";
 
 import { requireClient } from "@/lib/clientAuth";
@@ -84,7 +84,8 @@ export async function setBodyScanConsentAction(consent: boolean): Promise<{ ok: 
 // ---- Welcome: documents to agree to, then the Welcome Q&A ------------------
 
 function requestMeta() {
-  const h = headers();
+  const h = (/* @next-codemod-ignore sync request access still works in Next 15 (dev warning only); making this helper and its callers async is a separate migration */
+  headers() as unknown as UnsafeUnwrappedHeaders);
   const ip = (h.get("x-forwarded-for") ?? "").split(",")[0].trim() || h.get("x-real-ip");
   return { ip: ip || null, userAgent: h.get("user-agent") };
 }

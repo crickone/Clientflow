@@ -17,7 +17,8 @@ function at(ms: number) {
 }
 
 /** This week's check-in, and the ones sent before. */
-export default async function CheckinPage({ searchParams }: { searchParams: { sent?: string; again?: string } }) {
+export default async function CheckinPage(props: { searchParams: Promise<{ sent?: string; again?: string }> }) {
+  const searchParams = await props.searchParams;
   const { clientId } = requireClientPage();
   const c = memberCheckin(clientId);
   if (!c) redirect("/app");

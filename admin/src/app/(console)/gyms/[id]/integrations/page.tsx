@@ -7,7 +7,8 @@ import type { TenantIntegrations } from "@/lib/types";
 export const dynamic = "force-dynamic";
 
 /** The Integrations tab: every outside connection, its state, and what can be done to it. */
-export default async function TenantIntegrationsPage({ params }: { params: { id: string } }) {
+export default async function TenantIntegrationsPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const id = Number(params.id);
   let data: TenantIntegrations;
   try {

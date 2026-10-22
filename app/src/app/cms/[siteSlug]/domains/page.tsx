@@ -10,11 +10,12 @@ import { cnameTarget, getCustomHostname, hostnameConfig } from "@/lib/cms/custom
 
 export const dynamic = "force-dynamic";
 
-export default async function SiteDomainsPage({
-  params,
-}: {
-  params: { siteSlug: string };
-}) {
+export default async function SiteDomainsPage(
+  props: {
+    params: Promise<{ siteSlug: string }>;
+  }
+) {
+  const params = await props.params;
   await requireAdminPage();
   const membership = getCurrentMembership();
   const site = await getSiteBySlug(params.siteSlug);

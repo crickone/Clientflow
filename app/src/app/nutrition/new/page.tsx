@@ -6,10 +6,11 @@ import { UploadPlanForm } from "@/components/nutrition/UploadPlanForm";
 export const dynamic = "force-dynamic";
 
 interface Props {
-  searchParams: { type?: string; mode?: string };
+  searchParams: Promise<{ type?: string; mode?: string }>;
 }
 
-export default async function NewNutritionPlanPage({ searchParams }: Props) {
+export default async function NewNutritionPlanPage(props: Props) {
+  const searchParams = await props.searchParams;
   await requireUser();
 
   const type: PlanType =

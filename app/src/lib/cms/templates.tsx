@@ -4,6 +4,8 @@ import type { Page } from "@/lib/db/schema";
 import type { BlockKind } from "@/lib/db/schema";
 import { Block, type RenderCtx } from "@/components/cms/Block";
 
+import type { JSX } from "react";
+
 /**
  * Template registry. Each coded page template declares the editable slots it
  * exposes (the `blocks` manifest drives the admin editor) and a server

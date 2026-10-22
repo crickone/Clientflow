@@ -162,7 +162,8 @@ function previewText(asset: CampaignAsset): string {
   return asset.body;
 }
 
-export default async function CampaignDetailPage({ params }: { params: { id: string } }) {
+export default async function CampaignDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   await requireAdminPage();
   const id = Number(params.id);
   if (!Number.isInteger(id)) notFound();

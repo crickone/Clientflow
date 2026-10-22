@@ -14,10 +14,8 @@ export const dynamic = "force-dynamic";
  * so the timeline editor can scrub it. Supports HTTP range requests so the
  * <video> element can seek without re-downloading.
  */
-export async function GET(
-  req: Request,
-  { params }: { params: { id: string; assetId: string } },
-) {
+export async function GET(req: Request, props: { params: Promise<{ id: string; assetId: string }> }) {
+  const params = await props.params;
   const __auth = await guard("user");
   if (__auth) return __auth;
   const projectId = Number(params.id);

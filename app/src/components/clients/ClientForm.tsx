@@ -1,6 +1,7 @@
 "use client";
 
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormStatus } from "react-dom";
+import { useActionState } from "react";
 import { Stethoscope } from "lucide-react";
 import type { Client } from "@/lib/db/schema";
 import { Button } from "@/components/ui/Button";
@@ -21,7 +22,7 @@ export function ClientForm({ client }: Props) {
   const action = client
     ? updateClientAction.bind(null, client.id)
     : createClientAction;
-  const [state, formAction] = useFormState<ClientFormState | null, FormData>(
+  const [state, formAction] = useActionState<ClientFormState | null, FormData>(
     action,
     null,
   );

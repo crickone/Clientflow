@@ -9,7 +9,8 @@ import { getBusinessProfile } from "@/lib/businessProfile";
 
 export const dynamic = "force-dynamic";
 
-export default async function NewAdCampaignPage({ searchParams }: { searchParams?: { fromAd?: string; versions?: string } }) {
+export default async function NewAdCampaignPage(props: { searchParams?: Promise<{ fromAd?: string; versions?: string }> }) {
+  const searchParams = await props.searchParams;
   await requireAdminPage();
   const { adAccounts, designs, photos, brand, videoAds } = builderData();
   if (adAccounts.length === 0) redirect("/marketing/ads");

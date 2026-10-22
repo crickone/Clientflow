@@ -24,10 +24,11 @@ import { getVocab } from "@/lib/vocabulary";
 export const dynamic = "force-dynamic";
 
 interface Props {
-  searchParams: { q?: string; filter?: string };
+  searchParams: Promise<{ q?: string; filter?: string }>;
 }
 
-export default async function ClientsPage({ searchParams }: Props) {
+export default async function ClientsPage(props: Props) {
+  const searchParams = await props.searchParams;
   const vocab = getVocab(getVenueType());
   const filter = (searchParams.filter ?? "all") as ClientListFilter;
   const q = searchParams.q ?? "";

@@ -12,10 +12,11 @@ import { TimetableView } from "@/components/timetable/TimetableView";
 export const dynamic = "force-dynamic";
 
 interface Props {
-  searchParams: { week?: string; view?: string; day?: string };
+  searchParams: Promise<{ week?: string; view?: string; day?: string }>;
 }
 
-export default async function TimetablePage({ searchParams }: Props) {
+export default async function TimetablePage(props: Props) {
+  const searchParams = await props.searchParams;
   await requireUser();
 
   const today = todayIso();

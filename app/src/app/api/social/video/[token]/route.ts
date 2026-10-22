@@ -13,7 +13,8 @@ export const dynamic = "force-dynamic";
  * is uploaded), by signed token only -- the same scheme as slide images. The
  * token names "v/<project>/<file>" and only ad output names are accepted.
  */
-export async function GET(_req: Request, { params }: { params: { token: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const claim = verifyRenderToken(decodeURIComponent(params.token));
   const m = claim ? /^v\/(\d+)\/(ad-(?:9x16|1x1)-\d+\.mp4)$/.exec(claim.filename) : null;
   if (!m) return NextResponse.json({ ok: false, error: "Not found." }, { status: 404 });

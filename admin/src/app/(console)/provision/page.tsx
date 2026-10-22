@@ -2,7 +2,8 @@
 "use client";
 
 import { useRef, useState, type CSSProperties } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormStatus } from "react-dom";
+import { useActionState } from "react";
 
 import { OpenBusinessButton } from "@/components/OpenBusinessButton";
 import { openTenant } from "../gyms/[id]/actions";
@@ -38,7 +39,7 @@ interface AdminRow {
 }
 
 export default function ProvisionPage() {
-  const [state, formAction] = useFormState(provisionGym, initialState);
+  const [state, formAction] = useActionState(provisionGym, initialState);
   const [slug, setSlug] = useState("");
   const slugTouched = useRef(false);
 

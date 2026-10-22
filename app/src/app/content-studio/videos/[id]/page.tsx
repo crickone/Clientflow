@@ -13,7 +13,8 @@ import type { Transcript } from "@/lib/ai/transcribe";
 
 export const dynamic = "force-dynamic";
 
-export default function VideoProjectPage({ params }: { params: { id: string } }) {
+export default async function VideoProjectPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const id = Number(params.id);
   const project = getProject(id);
   if (!project) notFound();

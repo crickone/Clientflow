@@ -2,7 +2,7 @@ import "server-only";
 
 import crypto from "node:crypto";
 import { cache } from "react";
-import { cookies } from "next/headers";
+import { cookies, type UnsafeUnwrappedCookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { and, eq, lt } from "drizzle-orm";
 
@@ -50,7 +50,7 @@ export async function createSession(
     impersonatedBy: impersonation?.byUserId ?? null,
     impersonationReason: impersonation?.reason ?? null,
   });
-  cookies().set(SESSION_COOKIE, id, {
+  (await cookies()).set(SESSION_COOKIE, id, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
@@ -61,11 +61,11 @@ export async function createSession(
 }
 
 export async function destroySession(): Promise<void> {
-  const token = cookies().get(SESSION_COOKIE)?.value;
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (token) {
     await authDb.delete(authSessions).where(eq(authSessions.id, token));
   }
-  cookies().delete(SESSION_COOKIE);
+  (await cookies()).delete(SESSION_COOKIE);
 }
 
 export interface CurrentMembership {
@@ -96,7 +96,8 @@ export interface CurrentMembership {
 export const getCurrentMembership = cache((): CurrentMembership | null => {
   let token: string | undefined;
   try {
-    token = cookies().get(SESSION_COOKIE)?.value;
+    token = (/* @next-codemod-ignore sync request access still works in Next 15 (dev warning only); making this helper and its callers async is a separate migration */
+    cookies() as unknown as UnsafeUnwrappedCookies).get(SESSION_COOKIE)?.value;
   } catch {
     return null; // outside a request scope (background job)
   }
@@ -187,7 +188,7 @@ export async function listActiveMemberships(
  * (→ /login) apart from "valid identity, no active clinic" (→ /select-account).
  */
 export async function getSessionUser(): Promise<User | null> {
-  const token = cookies().get(SESSION_COOKIE)?.value;
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
 
   const row = await authDb
@@ -310,7 +311,7 @@ export async function requireUserPage(): Promise<User> {
 export async function setActiveTenant(
   tenantId: number,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const token = cookies().get(SESSION_COOKIE)?.value;
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return { ok: false, error: "Not signed in" };
 
   const session = await authDb

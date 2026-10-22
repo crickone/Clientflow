@@ -63,7 +63,8 @@ async function handleUnsubscribe(token: string): Promise<NextResponse> {
  * GET: a mail client / a browser / a link-scanning security proxy fetching
  * the link with a plain navigation.
  */
-export async function GET(_request: Request, { params }: { params: { token: string } }) {
+export async function GET(_request: Request, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   return handleUnsubscribe(params.token);
 }
 
@@ -73,7 +74,8 @@ export async function GET(_request: Request, { params }: { params: { token: stri
  * to this same URL instead of a browser GET — same token, same suppress(),
  * same generic response either way, always 200.
  */
-export async function POST(_request: Request, { params }: { params: { token: string } }) {
+export async function POST(_request: Request, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   return handleUnsubscribe(params.token);
 }
 

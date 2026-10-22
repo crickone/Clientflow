@@ -73,13 +73,14 @@ import { ClientNutrition } from "@/components/clients/ClientNutrition";
 
 export const dynamic = "force-dynamic";
 
-export default async function ClientProfile({
-  params,
-  searchParams,
-}: {
-  params: { id: string };
-  searchParams?: { tab?: string; week?: string };
-}) {
+export default async function ClientProfile(
+  props: {
+    params: Promise<{ id: string }>;
+    searchParams?: Promise<{ tab?: string; week?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const vocab = getVocab(getVenueType());
   const id = Number(params.id);
   const client = await getClient(id);

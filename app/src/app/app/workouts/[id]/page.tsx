@@ -9,7 +9,11 @@ import { openSession } from "@/lib/workoutLog";
 
 export const dynamic = "force-dynamic";
 
-export default async function ClientWorkoutProgramPage({ params, searchParams }: { params: { id: string }; searchParams: { day?: string } }) {
+export default async function ClientWorkoutProgramPage(
+  props: { params: Promise<{ id: string }>; searchParams: Promise<{ day?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const { clientId } = requireClientPage();
   const id = Number(params.id);
   if (!Number.isInteger(id) || id <= 0) notFound();

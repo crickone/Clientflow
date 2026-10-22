@@ -14,7 +14,7 @@ export async function api<T>(
   path: string,
   opts: { method?: string; body?: unknown; session?: string | null } = {},
 ): Promise<T> {
-  const session = opts.session === undefined ? cookies().get(ADMIN_COOKIE)?.value ?? null : opts.session;
+  const session = opts.session === undefined ? (await cookies()).get(ADMIN_COOKIE)?.value ?? null : opts.session;
   const res = await fetch(`${BASE}/api/platform${path}`, {
     method: opts.method ?? "GET",
     headers: {

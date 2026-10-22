@@ -28,7 +28,8 @@ export const dynamic = "force-dynamic";
  */
 const MAX_BODY_BYTES = 20 * 1024; // forms can have several long-answer fields
 
-export async function POST(req: Request, { params }: { params: { slug: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const slug = params.slug;
 
   const rl = rateLimit(`form-submit:${clientIp(req)}`, 8, 10 * 60 * 1000);

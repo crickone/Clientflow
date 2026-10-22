@@ -13,11 +13,12 @@ import { listRequests } from "@/lib/cms/requests";
 
 export const dynamic = "force-dynamic";
 
-export default async function CmsSitesPage({
-  searchParams,
-}: {
-  searchParams: { requested?: string };
-}) {
+export default async function CmsSitesPage(
+  props: {
+    searchParams: Promise<{ requested?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   await requireAdminPage();
   const sites = await listSites();
   const openRequests = listRequests().filter((r) => r.status === "new").length;

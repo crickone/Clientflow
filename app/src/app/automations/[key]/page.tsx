@@ -7,7 +7,8 @@ import { TriggerEditor } from "@/components/automations/TriggerEditor";
 
 export const dynamic = "force-dynamic";
 
-export default async function TriggerDetailPage({ params }: { params: { key: string } }) {
+export default async function TriggerDetailPage(props: { params: Promise<{ key: string }> }) {
+  const params = await props.params;
   await requireUser();
   const trigger = getTrigger(params.key);
   if (!trigger) notFound();

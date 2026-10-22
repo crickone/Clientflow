@@ -41,13 +41,14 @@ export const dynamic = "force-dynamic";
  * replacing. Fixing the path is this route's whole job; moving someone
  * between domains is a different concern and not one to do by accident.
  */
-export default function LegacyBlogPostUrl({
-  params,
-  searchParams,
-}: {
-  params: { siteSlug: string; slug: string };
-  searchParams: { site?: string };
-}) {
+export default async function LegacyBlogPostUrl(
+  props: {
+    params: Promise<{ siteSlug: string; slug: string }>;
+    searchParams: Promise<{ site?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const host = siteRequestHost();
   const resolved = resolvePublicSite({
     host,

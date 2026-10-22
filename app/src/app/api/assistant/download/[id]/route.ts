@@ -6,7 +6,8 @@ import { readDownload } from "@/lib/assistant/downloadStore";
 export const dynamic = "force-dynamic";
 
 /** Serve an AI-generated bundle (e.g. invoices.zip) to the signed-in tenant. */
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   await requireUser();
   const membership = getCurrentMembership();
   if (!membership) return new Response("No active account", { status: 401 });

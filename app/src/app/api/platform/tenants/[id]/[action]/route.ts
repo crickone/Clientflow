@@ -30,8 +30,9 @@ export const dynamic = "force-dynamic";
 /** Per-tenant billing actions. Body varies by action; all audited via `actor`. */
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string; action: string } },
+  props: { params: Promise<{ id: string; action: string }> }
 ) {
+  const params = await props.params;
   const g = guardPlatform(req);
   if (g instanceof Response) return g;
   const actor = `admin:${g.userId}`;

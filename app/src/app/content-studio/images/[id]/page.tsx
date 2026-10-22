@@ -16,11 +16,12 @@ import { isGoogleProfileConnected } from "@/lib/google/business";
 
 export const dynamic = "force-dynamic";
 
-export default function ImageDesignPage({
-  params,
-}: {
-  params: { id: string };
-}) {
+export default async function ImageDesignPage(
+  props: {
+    params: Promise<{ id: string }>;
+  }
+) {
+  const params = await props.params;
   const id = Number(params.id);
   const design = getCarousel(id);
   if (!design) notFound();

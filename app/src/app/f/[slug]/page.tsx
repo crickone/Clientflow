@@ -9,11 +9,12 @@ import { PublicFormView } from "@/components/forms/PublicFormView";
 export const dynamic = "force-dynamic";
 
 type Props = {
-  params: { slug: string };
-  searchParams: { ok?: string; err?: string };
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ ok?: string; err?: string }>;
 };
 
-export function generateMetadata({ params }: Props): Metadata {
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const params = await props.params;
   const resolved = resolveFormBySlug(params.slug);
   if (!resolved) return { title: "Form" };
   return {
@@ -22,7 +23,9 @@ export function generateMetadata({ params }: Props): Metadata {
   };
 }
 
-export default function PublicFormPage({ params, searchParams }: Props) {
+export default async function PublicFormPage(props: Props) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const resolved = resolveFormBySlug(params.slug);
   // Unknown slug, deleted form, deactivated tenant, or the owner switched the
   // form off — all read as "not found" to a public visitor.

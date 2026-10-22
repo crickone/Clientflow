@@ -14,10 +14,8 @@ import { AiCapError } from "@/lib/ai/usage";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-export async function POST(
-  req: Request,
-  { params }: { params: { id: string } },
-) {
+export async function POST(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const __auth = await guard("user");
   if (__auth) return __auth;
   const membership = getCurrentMembership();

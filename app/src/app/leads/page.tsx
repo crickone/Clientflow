@@ -10,7 +10,8 @@ import { getCurrentMembership } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-export default async function LeadsPage({ searchParams }: { searchParams?: { pipeline?: string } }) {
+export default async function LeadsPage(props: { searchParams?: Promise<{ pipeline?: string }> }) {
+  const searchParams = await props.searchParams;
   // One board per campaign: `?pipeline=<id>` picks the board, the default
   // board when absent or unknown. Leads and stages are both read for THAT
   // board only, so a campaign's sign-ups never mix into the main funnel.

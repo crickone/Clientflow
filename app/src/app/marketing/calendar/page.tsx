@@ -13,11 +13,12 @@ export const dynamic = "force-dynamic";
 // an AI-radar "coming up" rail. Admin-gated the same way (and for the same
 // reason) as its sibling /marketing/campaigns hub — see that page's comment
 // on requireAdminPage + Sidebar.tsx's Marketing nav note.
-export default async function MarketingCalendarPage({
-  searchParams,
-}: {
-  searchParams: { year?: string };
-}) {
+export default async function MarketingCalendarPage(
+  props: {
+    searchParams: Promise<{ year?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   await requireAdminPage();
   // requireAdminPage() guarantees an admin membership in the active tenant —
   // same idiom as /agents/[key]/page.tsx's `getCurrentMembership()!.tenant.id`.

@@ -1,6 +1,6 @@
 "use server";
 
-import { headers } from "next/headers";
+import { headers, type UnsafeUnwrappedHeaders } from "next/headers";
 
 import { requestUserReset } from "@/lib/userPasswordReset";
 import { rateLimit } from "@/lib/rateLimit";
@@ -9,9 +9,11 @@ import { rateLimit } from "@/lib/rateLimit";
  *  server action has no Request object, so this reads the header directly,
  *  same as app/app/reset/actions.ts's requestIp). */
 function requestIp(): string {
-  const xff = headers().get("x-forwarded-for");
+  const xff = (/* @next-codemod-ignore sync request access still works in Next 15 (dev warning only); making this helper and its callers async is a separate migration */
+  headers() as unknown as UnsafeUnwrappedHeaders).get("x-forwarded-for");
   if (xff) return xff.split(",")[0]!.trim();
-  return headers().get("x-real-ip")?.trim() || "unknown";
+  return (/* @next-codemod-ignore sync request access still works in Next 15 (dev warning only); making this helper and its callers async is a separate migration */
+  headers() as unknown as UnsafeUnwrappedHeaders).get("x-real-ip")?.trim() || "unknown";
 }
 
 /**

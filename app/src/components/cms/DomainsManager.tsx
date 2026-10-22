@@ -1,6 +1,7 @@
 "use client";
 
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormStatus } from "react-dom";
+import { useActionState } from "react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -106,7 +107,7 @@ export function DomainsManager({
   const confirm = useConfirm();
   const [pending, startTransition] = useTransition();
   const action = addDomainAction.bind(null, siteSlug);
-  const [state, formAction] = useFormState(action, initial);
+  const [state, formAction] = useActionState(action, initial);
 
   return (
     <div className="dm">

@@ -8,7 +8,7 @@ import {
 } from "drizzle-orm/better-sqlite3";
 import { and, eq } from "drizzle-orm";
 import { cache } from "react";
-import { cookies } from "next/headers";
+import { cookies, type UnsafeUnwrappedCookies } from "next/headers";
 import { AsyncLocalStorage } from "node:async_hooks";
 import fs from "node:fs";
 import path from "node:path";
@@ -302,7 +302,8 @@ export const resolveCurrentTenant = cache((): schema.Tenant | null => {
 
   let token: string | undefined;
   try {
-    token = cookies().get(SESSION_COOKIE)?.value;
+    token = (/* @next-codemod-ignore sync request access still works in Next 15 (dev warning only); making this helper and its callers async is a separate migration */
+    cookies() as unknown as UnsafeUnwrappedCookies).get(SESSION_COOKIE)?.value;
   } catch {
     // cookies() throws only outside a request scope — a detached background job.
     // Had it bound a tenant via runWithTenant we'd have returned above, so
@@ -345,7 +346,8 @@ export const resolveCurrentTenant = cache((): schema.Tenant | null => {
   // per-request `db` proxy points at the signed-in client's tenant DB.
   let clientToken: string | undefined;
   try {
-    clientToken = cookies().get(CLIENT_SESSION_COOKIE)?.value;
+    clientToken = (/* @next-codemod-ignore sync request access still works in Next 15 (dev warning only); making this helper and its callers async is a separate migration */
+    cookies() as unknown as UnsafeUnwrappedCookies).get(CLIENT_SESSION_COOKIE)?.value;
   } catch {
     clientToken = undefined;
   }

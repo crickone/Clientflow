@@ -1,6 +1,7 @@
 "use client";
 
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormStatus } from "react-dom";
+import { useActionState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -19,7 +20,7 @@ function SubmitButton() {
 }
 
 export function RequestSiteForm() {
-  const [state, action] = useFormState(createRequestAction, initial);
+  const [state, action] = useActionState(createRequestAction, initial);
   return (
     <form action={action}>
       <Card style={{ maxWidth: 560, display: "grid", gap: 16 }}>

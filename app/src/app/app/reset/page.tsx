@@ -6,11 +6,12 @@ import { ClientResetForm, ClientResetMessage } from "@/components/clientapp/Clie
 
 export const dynamic = "force-dynamic";
 
-export default function ClientResetPage({
-  searchParams,
-}: {
-  searchParams: { token?: string };
-}) {
+export default async function ClientResetPage(
+  props: {
+    searchParams: Promise<{ token?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const token = (searchParams.token ?? "").trim();
   // Pre-session page: tenant resolution is fail-closed, so there is usually no
   // tenant to brand for here. The valid-token branch below still shows the

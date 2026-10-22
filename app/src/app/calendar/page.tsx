@@ -12,11 +12,12 @@ export const dynamic = "force-dynamic";
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAY = 86_400_000;
 
-export default async function CalendarPage({
-  searchParams,
-}: {
-  searchParams: { m?: string };
-}) {
+export default async function CalendarPage(
+  props: {
+    searchParams: Promise<{ m?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   await requireUserPage();
 
   const todayIso = new Date().toISOString().slice(0, 10);

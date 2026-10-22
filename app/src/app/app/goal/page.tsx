@@ -31,7 +31,8 @@ function ageFrom(dob: string | null): string {
  * options, one choice. Anyone can type their numbers in; a scan takes over
  * when there is one.
  */
-export default async function ClientGoalPage({ searchParams }: { searchParams: { edit?: string } }) {
+export default async function ClientGoalPage(props: { searchParams: Promise<{ edit?: string }> }) {
+  const searchParams = await props.searchParams;
   const { clientId, tenantId, client } = requireClientPage();
   const scansOn = bodyScansEnabled(tenantId);
   const consent = scansOn && getScanProfile(clientId).consentAt !== null;

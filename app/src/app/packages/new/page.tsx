@@ -8,11 +8,12 @@ import { getVocab } from "@/lib/vocabulary";
 
 export const dynamic = "force-dynamic";
 
-export default function NewPackagePage({
-  searchParams,
-}: {
-  searchParams: { client?: string };
-}) {
+export default async function NewPackagePage(
+  props: {
+    searchParams: Promise<{ client?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const vocab = getVocab(getVenueType());
   const therapyList = db
     .select()

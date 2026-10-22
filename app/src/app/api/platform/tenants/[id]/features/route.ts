@@ -16,7 +16,8 @@ export const dynamic = "force-dynamic";
  * console never has to keep its own copy of the list -- add a module to
  * MODULE_CATALOG and it appears here.
  */
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const g = guardPlatform(req);
   if (g instanceof Response) return g;
   const tenantId = Number(params.id);
@@ -36,7 +37,8 @@ const bodySchema = z.object({
   on: z.boolean(),
 });
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const g = guardPlatform(req);
   if (g instanceof Response) return g;
   const tenantId = Number(params.id);

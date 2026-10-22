@@ -16,10 +16,8 @@ import { getTenantLifecycle } from "@/lib/platform/lifecycle";
 export const dynamic = "force-dynamic";
 
 /** One tenant: summary + usage + full invoice/event history + email-marketing state. */
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { id: string } },
-) {
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const g = guardPlatform(req);
   if (g instanceof Response) return g;
 

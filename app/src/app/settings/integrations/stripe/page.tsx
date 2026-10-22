@@ -14,7 +14,8 @@ const ERRORS: Record<string, string> = {
   missing_code: "Stripe didn't send the connection back. Try again.",
 };
 
-export default async function StripeSettingsPage({ searchParams }: { searchParams: { connected?: string; error?: string } }) {
+export default async function StripeSettingsPage(props: { searchParams: Promise<{ connected?: string; error?: string }> }) {
+  const searchParams = await props.searchParams;
   await requireAdminPage();
   const tenantId = getCurrentMembership()!.tenant.id;
   const conn = getStripeConnection(tenantId);

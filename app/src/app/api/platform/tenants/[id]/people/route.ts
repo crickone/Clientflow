@@ -27,7 +27,8 @@ export const dynamic = "force-dynamic";
  * touch a person who is not a member) live in lib/platform/people, so they
  * hold however this route is called.
  */
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const g = guardPlatform(req);
   if (g instanceof Response) return g;
   const tenantId = Number(params.id);
@@ -53,7 +54,8 @@ const bodySchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("transfer-ownership"), userId: z.number().int().positive() }),
 ]);
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const g = guardPlatform(req);
   if (g instanceof Response) return g;
   const tenantId = Number(params.id);

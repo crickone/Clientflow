@@ -7,7 +7,8 @@ import { CircuitBuilder } from "@/components/workout/CircuitBuilder";
 
 export const dynamic = "force-dynamic";
 
-export default async function EditCircuitPage({ params }: { params: { id: string } }) {
+export default async function EditCircuitPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   await requireUser();
   const id = Number(params.id);
   if (!Number.isInteger(id) || id <= 0) notFound();

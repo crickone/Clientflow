@@ -20,7 +20,11 @@ export const dynamic = "force-dynamic";
  * with it or add it to one that exists. Content Studio makes the ad; this is
  * where it goes to work.
  */
-export default async function UseAdPage({ params, searchParams }: { params: { adId: string }; searchParams?: { only?: string } }) {
+export default async function UseAdPage(
+  props: { params: Promise<{ adId: string }>; searchParams?: Promise<{ only?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   await requireAdminPage();
   const ad = getAdCreative(Number(params.adId));
   if (!ad) notFound();

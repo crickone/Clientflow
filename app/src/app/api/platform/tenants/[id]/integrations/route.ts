@@ -23,7 +23,8 @@ export const dynamic = "force-dynamic";
  * the client's own consent, and a console that could mint one could read a
  * client's mail without anyone agreeing to it.
  */
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const g = guardPlatform(req);
   if (g instanceof Response) return g;
   const tenantId = Number(params.id);
@@ -39,7 +40,8 @@ const bodySchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("revoke-api-key"), keyId: z.number().int().positive(), reason: z.string().optional() }),
 ]);
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const g = guardPlatform(req);
   if (g instanceof Response) return g;
   const tenantId = Number(params.id);

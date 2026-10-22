@@ -17,17 +17,21 @@ import { siteRequestHost } from "@/lib/cms/requestHost";
 export const dynamic = "force-dynamic";
 
 type Props = {
-  params: { siteSlug: string };
-  searchParams: { site?: string; cmsedit?: string; preview?: string };
+  params: Promise<{ siteSlug: string }>;
+  searchParams: Promise<{ site?: string; cmsedit?: string; preview?: string }>;
 };
 
-export function generateMetadata({ params, searchParams }: Props): Metadata {
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const pc = resolvePageContext(params, searchParams);
   if (pc) return buildPageMetadata(pc);
   return { title: "Site" };
 }
 
-export default async function PublicSiteHome({ params, searchParams }: Props) {
+export default async function PublicSiteHome(props: Props) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   // The edit canvas resolves through the operator's OWN tenant (see
   // studioEditZones), never the host — the admin host maps to no site, and a
   // cross-tenant slug search could otherwise land on a different tenant's

@@ -6,11 +6,12 @@ import { voiceAvailability } from "@/lib/voice/dial";
 
 export const dynamic = "force-dynamic";
 
-export default async function LeadDetailPage({
-  params,
-}: {
-  params: { id: string };
-}) {
+export default async function LeadDetailPage(
+  props: {
+    params: Promise<{ id: string }>;
+  }
+) {
+  const params = await props.params;
   const id = Number(params.id);
   const lead = getLead(id);
   if (!lead) notFound();

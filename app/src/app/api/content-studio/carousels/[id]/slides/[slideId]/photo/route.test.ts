@@ -150,7 +150,7 @@ function check(fn: () => void) {
     briefedScene = "";
     redesignInput = null;
     const res = await POST({ json: async () => body } as unknown as Request, {
-      params: { id: String(CAROUSEL_ID), slideId: String(slideId) },
+      params: Promise.resolve({ id: String(CAROUSEL_ID), slideId: String(slideId) }),
     });
     return { status: res.status, body: (await res.json()) as Record<string, unknown> };
   };

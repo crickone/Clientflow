@@ -7,7 +7,8 @@ import { UploadPlanForm } from "@/components/nutrition/UploadPlanForm";
 
 export const dynamic = "force-dynamic";
 
-export default async function EditNutritionPlanPage({ params }: { params: { id: string } }) {
+export default async function EditNutritionPlanPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   await requireUser();
   const id = Number(params.id);
   if (!Number.isInteger(id) || id <= 0) notFound();

@@ -25,7 +25,8 @@ const STATUS: Record<string, { label: string; tone: "neutral" | "amber" | "green
   booked: { label: "Booked", tone: "neutral" },
 };
 
-export default async function ClientProfilePage({ searchParams }: { searchParams: { device?: string; status?: string } }) {
+export default async function ClientProfilePage(props: { searchParams: Promise<{ device?: string; status?: string }> }) {
+  const searchParams = await props.searchParams;
   const { clientId, client, tenantId } = requireClientPage();
   const m = clientMembership(clientId);
   const history = clientHistory(clientId, 12);

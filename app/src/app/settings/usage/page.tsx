@@ -31,7 +31,8 @@ function plural(n: number, one: string, many: string) {
 }
 
 /** Where the account's AI spend went: the month's total, by feature, and each piece of work. */
-export default async function UsagePage({ searchParams }: { searchParams: { m?: string } }) {
+export default async function UsagePage(props: { searchParams: Promise<{ m?: string }> }) {
+  const searchParams = await props.searchParams;
   await requireAdminPage();
   const tenantId = getCurrentMembership()!.tenant.id;
   const r = getUsageReport(tenantId, searchParams.m);

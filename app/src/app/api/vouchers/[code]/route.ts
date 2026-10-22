@@ -4,10 +4,8 @@ import { guard } from "@/lib/api/guard";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(
-  _req: Request,
-  { params }: { params: { code: string } },
-) {
+export async function GET(_req: Request, props: { params: Promise<{ code: string }> }) {
+  const params = await props.params;
   // Staff-only: without this, a forged cookie resolves to the default tenant and
   // lets anyone enumerate voucher codes + balances. Vouchers are redeemed by
   // staff in person, so this is not a public endpoint.

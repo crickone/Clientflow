@@ -10,8 +10,9 @@ export const dynamic = "force-dynamic";
 
 export async function GET(
   _req: Request,
-  { params }: { params: { siteSlug: string; id: string } },
+  props: { params: Promise<{ siteSlug: string; id: string }> }
 ) {
+  const params = await props.params;
   const host = siteRequestHost();
   const resolved = resolvePublicSite({ host, siteParam: params.siteSlug });
   if (!resolved) {

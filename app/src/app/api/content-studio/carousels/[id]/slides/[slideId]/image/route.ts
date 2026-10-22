@@ -27,10 +27,8 @@ export const maxDuration = 60;
  * through buildImagePrompt would double-wrap); otherwise the slide's stored
  * image_prompt; otherwise a fresh house-style prompt from the slide copy.
  */
-export async function POST(
-  req: Request,
-  { params }: { params: { id: string; slideId: string } },
-) {
+export async function POST(req: Request, props: { params: Promise<{ id: string; slideId: string }> }) {
+  const params = await props.params;
   const __auth = await guard("user");
   if (__auth) return __auth;
   const membership = getCurrentMembership();

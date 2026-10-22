@@ -5,10 +5,8 @@ import { deleteLibraryAsset, getLibraryAsset } from "@/lib/image/library";
 export const dynamic = "force-dynamic";
 
 /** Fetch one asset row — used by the designer's poller to hydrate newly-generated backgrounds into its local library state. */
-export async function GET(
-  _req: Request,
-  { params }: { params: { id: string } },
-) {
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const __auth = await guard("user");
   if (__auth) return __auth;
   const asset = getLibraryAsset(Number(params.id));
@@ -18,10 +16,8 @@ export async function GET(
   return NextResponse.json({ ok: true, asset });
 }
 
-export async function DELETE(
-  _req: Request,
-  { params }: { params: { id: string } },
-) {
+export async function DELETE(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const __auth = await guard("user");
   if (__auth) return __auth;
   const id = Number(params.id);

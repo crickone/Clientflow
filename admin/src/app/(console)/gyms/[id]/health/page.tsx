@@ -7,7 +7,8 @@ import type { TenantHealth } from "@/lib/types";
 export const dynamic = "force-dynamic";
 
 /** The Health tab: is anything broken for this business, and the repairs worth offering. */
-export default async function TenantHealthPage({ params }: { params: { id: string } }) {
+export default async function TenantHealthPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const id = Number(params.id);
   let data: TenantHealth;
   try {

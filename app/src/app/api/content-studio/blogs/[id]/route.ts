@@ -9,10 +9,8 @@ import { runBlogGeneration } from "@/lib/blog/generator";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(
-  _req: Request,
-  { params }: { params: { id: string } },
-) {
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const __auth = await guard("user");
   if (__auth) return __auth;
   const id = Number(params.id);
@@ -26,10 +24,8 @@ export async function GET(
   return NextResponse.json({ ok: true, post });
 }
 
-export async function PATCH(
-  req: Request,
-  { params }: { params: { id: string } },
-) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const __auth = await guard("user");
   if (__auth) return __auth;
   const id = Number(params.id);
@@ -87,10 +83,8 @@ export async function PATCH(
   return NextResponse.json({ ok: true, post: getBlogPost(id) });
 }
 
-export async function DELETE(
-  _req: Request,
-  { params }: { params: { id: string } },
-) {
+export async function DELETE(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const __auth = await guard("user");
   if (__auth) return __auth;
   const id = Number(params.id);

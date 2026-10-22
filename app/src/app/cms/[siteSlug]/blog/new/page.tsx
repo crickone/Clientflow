@@ -7,11 +7,12 @@ import { getSiteBySlug } from "@/lib/cms/sites";
 
 export const dynamic = "force-dynamic";
 
-export default async function NewPostPage({
-  params,
-}: {
-  params: { siteSlug: string };
-}) {
+export default async function NewPostPage(
+  props: {
+    params: Promise<{ siteSlug: string }>;
+  }
+) {
+  const params = await props.params;
   await requireAdminPage();
   const site = await getSiteBySlug(params.siteSlug);
   if (!site) notFound();

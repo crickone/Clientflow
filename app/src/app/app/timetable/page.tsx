@@ -7,7 +7,8 @@ export const dynamic = "force-dynamic";
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 
-export default async function ClientTimetablePage({ searchParams }: { searchParams: { week?: string } }) {
+export default async function ClientTimetablePage(props: { searchParams: Promise<{ week?: string }> }) {
+  const searchParams = await props.searchParams;
   const { clientId } = requireClientPage();
   const base = ISO.test(searchParams.week ?? "") ? searchParams.week! : todayIso();
   const { weekStart, classes } = clientWeek(clientId, base);

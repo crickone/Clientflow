@@ -18,10 +18,8 @@ export const dynamic = "force-dynamic";
  * and the response is cached hard. `private` because a render is a tenant's
  * work, not public.
  */
-export async function GET(
-  _req: Request,
-  { params }: { params: { filename: string } },
-) {
+export async function GET(_req: Request, props: { params: Promise<{ filename: string }> }) {
+  const params = await props.params;
   const __auth = await guard("user");
   if (__auth) return __auth;
 

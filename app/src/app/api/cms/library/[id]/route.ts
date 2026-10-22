@@ -17,10 +17,8 @@ export const maxDuration = 120;
  * Update an asset's alt text, or regenerate it from the image.
  * Body: { alt: string } to set manually, or { regenerate: true } for AI.
  */
-export async function PATCH(
-  req: Request,
-  { params }: { params: { id: string } },
-) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     await requireAdmin();
   } catch {
@@ -63,10 +61,8 @@ export async function PATCH(
   return NextResponse.json({ ok: false, error: "Nothing to update" }, { status: 400 });
 }
 
-export async function DELETE(
-  _req: Request,
-  { params }: { params: { id: string } },
-) {
+export async function DELETE(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     await requireAdmin();
   } catch {

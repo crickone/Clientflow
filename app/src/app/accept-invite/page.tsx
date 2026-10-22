@@ -4,11 +4,12 @@ import { InviteMessage } from "@/components/auth/InviteMessage";
 
 export const dynamic = "force-dynamic";
 
-export default function AcceptInvitePage({
-  searchParams,
-}: {
-  searchParams: { token?: string };
-}) {
+export default async function AcceptInvitePage(
+  props: {
+    searchParams: Promise<{ token?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const token = (searchParams.token ?? "").trim();
   // Pre-session page: there is no resolvable tenant yet (and the invitee may
   // not even have an account), so this is platform-branded — the invite's own

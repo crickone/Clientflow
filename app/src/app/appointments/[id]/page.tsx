@@ -20,11 +20,12 @@ import { getVocab } from "@/lib/vocabulary";
 
 export const dynamic = "force-dynamic";
 
-export default async function AppointmentDetail({
-  params,
-}: {
-  params: { id: string };
-}) {
+export default async function AppointmentDetail(
+  props: {
+    params: Promise<{ id: string }>;
+  }
+) {
+  const params = await props.params;
   const vocab = getVocab(getVenueType());
   const id = Number(params.id);
   const appt = await getAppointment(id);

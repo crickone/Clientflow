@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   if (!body?.email || !body?.password) return NextResponse.json({ error: "Email and password required" }, { status: 400 });
   try {
     const res = await api<{ token: string }>("/auth/login", { method: "POST", body, session: null });
-    cookies().set(ADMIN_COOKIE, res.token, {
+    (await cookies()).set(ADMIN_COOKIE, res.token, {
       httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production",
       path: "/", maxAge: 7 * 24 * 60 * 60,
     });
@@ -22,6 +22,6 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE() {
   try { await api("/auth/logout", { method: "POST" }); } catch { /* session may be gone */ }
-  cookies().delete(ADMIN_COOKIE);
+  (await cookies()).delete(ADMIN_COOKIE);
   return NextResponse.json({ ok: true });
 }

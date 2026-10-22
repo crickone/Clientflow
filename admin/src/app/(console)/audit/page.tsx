@@ -15,11 +15,12 @@ export const dynamic = "force-dynamic";
  * log. Filters are plain query parameters so a link to "everything done to
  * this business" or "everything this person did" can be pasted into a chat.
  */
-export default async function AuditPage({
-  searchParams,
-}: {
-  searchParams: { tenantId?: string; action?: string; actorUserId?: string };
-}) {
+export default async function AuditPage(
+  props: {
+    searchParams: Promise<{ tenantId?: string; action?: string; actorUserId?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const qs = new URLSearchParams({ limit: "200" });
   if (searchParams.tenantId) qs.set("tenantId", searchParams.tenantId);
   if (searchParams.action) qs.set("action", searchParams.action);

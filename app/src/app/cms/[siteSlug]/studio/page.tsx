@@ -8,13 +8,14 @@ import { listPagePathsWithDrafts } from "@/lib/cms/pageDraft";
 
 export const dynamic = "force-dynamic";
 
-export default async function StudioPage({
-  params,
-  searchParams,
-}: {
-  params: { siteSlug: string };
-  searchParams: { path?: string };
-}) {
+export default async function StudioPage(
+  props: {
+    params: Promise<{ siteSlug: string }>;
+    searchParams: Promise<{ path?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   await requireAdminPage();
   const site = await getSiteBySlug(params.siteSlug);
   if (!site) notFound();

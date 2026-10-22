@@ -25,7 +25,8 @@ export const dynamic = "force-dynamic";
  * is reported as `error`), so the poller never needs to special-case a
  * server restart.
  */
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   await requireUser();
   const membership = getCurrentMembership();
   if (!membership) return new Response("No active account", { status: 401 });

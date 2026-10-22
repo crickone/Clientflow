@@ -23,10 +23,11 @@ import { listBlockOuts, weekWindow } from "@/lib/schedule";
 export const dynamic = "force-dynamic";
 
 interface Props {
-  searchParams: { view?: string; week?: string };
+  searchParams: Promise<{ view?: string; week?: string }>;
 }
 
-export default async function AppointmentsPage({ searchParams }: Props) {
+export default async function AppointmentsPage(props: Props) {
+  const searchParams = await props.searchParams;
   const vocab = getVocab(getVenueType());
   const view = searchParams.view === "list" ? "list" : "week";
   const weekStart = searchParams.week

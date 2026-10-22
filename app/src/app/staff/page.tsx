@@ -9,10 +9,11 @@ export const dynamic = "force-dynamic";
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 
 interface Props {
-  searchParams: { payFrom?: string; payTo?: string; perfFrom?: string; perfTo?: string };
+  searchParams: Promise<{ payFrom?: string; payTo?: string; perfFrom?: string; perfTo?: string }>;
 }
 
-export default async function StaffPage({ searchParams }: Props) {
+export default async function StaffPage(props: Props) {
+  const searchParams = await props.searchParams;
   await requireAdminPage();
 
   const today = todayIso();

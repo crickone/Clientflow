@@ -5,10 +5,8 @@ import { clampHeadingScale } from "@/lib/image/templates";
 
 export const dynamic = "force-dynamic";
 
-export async function PATCH(
-  req: Request,
-  { params }: { params: { id: string; slideId: string } },
-) {
+export async function PATCH(req: Request, props: { params: Promise<{ id: string; slideId: string }> }) {
+  const params = await props.params;
   const __auth = await guard("user");
   if (__auth) return __auth;
   const slideId = Number(params.slideId);
@@ -80,10 +78,8 @@ export async function PATCH(
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(
-  _req: Request,
-  { params }: { params: { id: string; slideId: string } },
-) {
+export async function DELETE(_req: Request, props: { params: Promise<{ id: string; slideId: string }> }) {
+  const params = await props.params;
   const __auth = await guard("user");
   if (__auth) return __auth;
   const slideId = Number(params.slideId);

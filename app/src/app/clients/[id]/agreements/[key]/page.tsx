@@ -11,7 +11,8 @@ import { DocText } from "@/components/agreements/DocText";
 export const dynamic = "force-dynamic";
 
 /** The exact text a member agreed to in the app, with when and from where: the record if it's ever questioned. */
-export default async function AgreedCopyPage({ params }: { params: { id: string; key: string } }) {
+export default async function AgreedCopyPage(props: { params: Promise<{ id: string; key: string }> }) {
+  const params = await props.params;
   await requireUserPage();
   const id = Number(params.id);
   const client = await getClient(id);

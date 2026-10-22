@@ -18,11 +18,12 @@ const SECTIONS = [
   { key: "domains", label: "Domains", icon: Globe, desc: "Map hostnames to this site" },
 ] as const;
 
-export default async function SiteDashboard({
-  params,
-}: {
-  params: { siteSlug: string };
-}) {
+export default async function SiteDashboard(
+  props: {
+    params: Promise<{ siteSlug: string }>;
+  }
+) {
+  const params = await props.params;
   await requireAdminPage();
   const site = await getSiteBySlug(params.siteSlug);
   if (!site) notFound();

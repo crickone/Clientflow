@@ -27,13 +27,14 @@ function resolve(params: Params, searchParams: Search) {
   return { resolved, post, host };
 }
 
-export function generateMetadata({
-  params,
-  searchParams,
-}: {
-  params: Params;
-  searchParams: Search;
-}): Metadata {
+export async function generateMetadata(
+  props: {
+    params: Promise<Params>;
+    searchParams: Promise<Search>;
+  }
+): Promise<Metadata> {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const r = resolve(params, searchParams);
   if (!r) return { title: "Not found" };
   const { resolved, post, host } = r;
@@ -59,13 +60,14 @@ export function generateMetadata({
   };
 }
 
-export default function PublicBlogPost({
-  params,
-  searchParams,
-}: {
-  params: Params;
-  searchParams: Search;
-}) {
+export default async function PublicBlogPost(
+  props: {
+    params: Promise<Params>;
+    searchParams: Promise<Search>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const r = resolve(params, searchParams);
   if (!r) notFound();
   const { resolved, post, host } = r;

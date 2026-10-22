@@ -8,7 +8,8 @@ import { ModuleClient } from "./ModuleClient";
 // Rendered per request: the scripts name the signed-in clinic (forClinic).
 export const dynamic = "force-dynamic";
 
-export default function ModulePage({ params }: { params: { slug: string } }) {
+export default async function ModulePage(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const LESSONS = forClinic(BASE_LESSONS);
   const lesson = LESSONS.find((l) => l.slug === params.slug);
   if (!lesson) notFound();

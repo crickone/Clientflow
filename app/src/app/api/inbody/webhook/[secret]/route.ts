@@ -30,7 +30,8 @@ async function readBody(req: NextRequest): Promise<Record<string, unknown>> {
   }
 }
 
-export async function POST(req: NextRequest, { params }: { params: { secret: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ secret: string }> }) {
+  const params = await props.params;
   const tenant = tenantForWebhookSecret(params.secret);
   if (!tenant) return NextResponse.json({ success: false }, { status: 404 });
   const payload = await readBody(req);
@@ -49,7 +50,8 @@ export async function POST(req: NextRequest, { params }: { params: { secret: str
 }
 
 /** A GET answers "is this address alive" for anyone checking it in a browser. */
-export async function GET(_req: NextRequest, { params }: { params: { secret: string } }) {
+export async function GET(_req: NextRequest, props: { params: Promise<{ secret: string }> }) {
+  const params = await props.params;
   const tenant = tenantForWebhookSecret(params.secret);
   return NextResponse.json({ ok: Boolean(tenant) }, { status: tenant ? 200 : 404 });
 }

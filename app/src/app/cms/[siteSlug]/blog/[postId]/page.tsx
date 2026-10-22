@@ -8,11 +8,12 @@ import { getSiteBlogPost } from "@/lib/cms/blog";
 
 export const dynamic = "force-dynamic";
 
-export default async function EditPostPage({
-  params,
-}: {
-  params: { siteSlug: string; postId: string };
-}) {
+export default async function EditPostPage(
+  props: {
+    params: Promise<{ siteSlug: string; postId: string }>;
+  }
+) {
+  const params = await props.params;
   await requireAdminPage();
   const site = await getSiteBySlug(params.siteSlug);
   if (!site) notFound();

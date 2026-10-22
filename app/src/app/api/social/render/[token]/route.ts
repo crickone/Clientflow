@@ -13,7 +13,8 @@ export const dynamic = "force-dynamic";
  * or expired token is a 404, not a 403: there is nothing to tell an outsider
  * about what exists behind this route.
  */
-export async function GET(_req: Request, { params }: { params: { token: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const claim = verifyRenderToken(decodeURIComponent(params.token));
   if (!claim) return NextResponse.json({ ok: false, error: "Not found." }, { status: 404 });
 

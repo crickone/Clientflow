@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
   // authenticated this request) so the user isn't logged out by their own
   // change. If for some reason the current token can't be read, fail safe by
   // revoking all of them — worst case the user re-logs in.
-  const currentToken = cookies().get(SESSION_COOKIE)?.value;
+  const currentToken = (await cookies()).get(SESSION_COOKIE)?.value;
   await authDb
     .delete(authSessions)
     .where(

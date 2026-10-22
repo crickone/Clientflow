@@ -2,7 +2,7 @@ import "server-only";
 
 import crypto from "node:crypto";
 import { cache } from "react";
-import { cookies } from "next/headers";
+import { cookies, type UnsafeUnwrappedCookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { eq, lt } from "drizzle-orm";
 
@@ -46,7 +46,7 @@ export async function createClientSession(info: ClientSessionInfo): Promise<void
     clientId: info.clientId,
     expiresAt,
   }).run();
-  cookies().set(CLIENT_SESSION_COOKIE, id, {
+  (await cookies()).set(CLIENT_SESSION_COOKIE, id, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
@@ -56,16 +56,17 @@ export async function createClientSession(info: ClientSessionInfo): Promise<void
 }
 
 export async function destroyClientSession(): Promise<void> {
-  const token = cookies().get(CLIENT_SESSION_COOKIE)?.value;
+  const token = (await cookies()).get(CLIENT_SESSION_COOKIE)?.value;
   if (token) authDb.delete(clientSessions).where(eq(clientSessions.id, token)).run();
-  cookies().delete(CLIENT_SESSION_COOKIE);
+  (await cookies()).delete(CLIENT_SESSION_COOKIE);
 }
 
 /** The current client-app session (memoised), or null. */
 export const getClientSession = cache((): ClientSessionInfo | null => {
   let token: string | undefined;
   try {
-    token = cookies().get(CLIENT_SESSION_COOKIE)?.value;
+    token = (/* @next-codemod-ignore sync request access still works in Next 15 (dev warning only); making this helper and its callers async is a separate migration */
+    cookies() as unknown as UnsafeUnwrappedCookies).get(CLIENT_SESSION_COOKIE)?.value;
   } catch {
     return null;
   }

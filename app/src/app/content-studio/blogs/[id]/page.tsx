@@ -15,7 +15,8 @@ function modeCopy(mode: "prompt" | "therapy" | "video", serviceTerm: string): st
   return mode === "video" ? "From video transcript" : "Topic prompt";
 }
 
-export default function BlogDetailPage({ params }: { params: { id: string } }) {
+export default async function BlogDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const vocab = getVocab(getVenueType());
   const id = Number(params.id);
   const post = getBlogPost(id);
