@@ -1684,6 +1684,18 @@ export const CATALOG = [
     requires: ["social"],
   },
   {
+    key: "social.igViews",
+    title: "Instagram views",
+    description: "Times your Instagram posts, reels and stories were seen in the period.",
+    domain: "social",
+    sizes: ["S", "M"],
+    defaultSize: "S",
+    venues: ["clinic", "gym"],
+    sensitivity: "general",
+    rangeMode: "tab",
+    requires: ["social"],
+  },
+  {
     key: "social.fbViews",
     title: "Facebook views",
     description: "Times your Page's content was viewed in the period.",

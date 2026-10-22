@@ -72,6 +72,18 @@ export const SOCIAL_WIDGETS = {
     },
     render: kpi,
   },
+  "social.igViews": {
+    href: SETTINGS,
+    async load(ctx) {
+      const [cur, prev] = await Promise.all([
+        cached(ctx, `social.reach:${ctx.range.fromMs}`, () => getReach(ctx.tenantId, ctx.range.fromMs, ctx.range.toMs)),
+        cached(ctx, `social.reach:${ctx.previous.fromMs}`, () => getReach(ctx.tenantId, ctx.previous.fromMs, ctx.previous.toMs)),
+      ]);
+      if (cur.instagramViews == null) return { value: "Not available", sub: "Needs a linked Instagram account" };
+      return { value: n(cur.instagramViews), sub: ctx.range.label, delta: prev.instagramViews != null ? deltaPct(cur.instagramViews, prev.instagramViews) : null };
+    },
+    render: kpi,
+  },
   "social.fbViews": {
     href: SETTINGS,
     async load(ctx) {

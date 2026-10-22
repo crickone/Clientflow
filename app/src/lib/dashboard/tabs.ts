@@ -4,7 +4,7 @@ import { asc, eq, isNull } from "drizzle-orm";
 
 import { db, schema } from "@/lib/db";
 import { MAX_TABS_PER_USER, validateLayout } from "./catalog";
-import { LEGACY_OVERVIEW_KEYS, OVERVIEW_PRESET_KEY, PRESET_BY_KEY, presetAppliesTo, presetWidgets } from "./presets";
+import { LEGACY_OVERVIEW_KEYS, LEGACY_SOCIAL_KEYS, OVERVIEW_PRESET_KEY, PRESET_BY_KEY, presetAppliesTo, presetWidgets } from "./presets";
 import { STORED_RANGE_KEYS, type StoredRangeKey } from "./range";
 import type { Venue, WidgetRef } from "./types";
 
@@ -74,14 +74,15 @@ const RETIRED_KEYS = new Set(["overview.needsAttention"]);
  */
 function upgradeLegacyOverview(rows: schema.DashboardRow[], venue: Venue): schema.DashboardRow[] {
   return rows.map((r) => {
-    if (r.presetKey !== OVERVIEW_PRESET_KEY) return r;
+    const sets = r.presetKey === OVERVIEW_PRESET_KEY ? LEGACY_OVERVIEW_KEYS[venue] : r.presetKey === "social" ? LEGACY_SOCIAL_KEYS : null;
+    if (!sets || !r.presetKey) return r;
     const keys = [...new Set(parseWidgets(r.widgets).map((w) => w.key).filter((k) => !RETIRED_KEYS.has(k)))].sort();
-    const legacy = LEGACY_OVERVIEW_KEYS[venue].some((set) => {
+    const legacy = sets.some((set) => {
       const want = [...set].sort();
       return want.length === keys.length && want.every((k, i) => k === keys[i]);
     });
     if (!legacy) return r;
-    const widgets = JSON.stringify(presetWidgets(OVERVIEW_PRESET_KEY, venue) ?? []);
+    const widgets = JSON.stringify(presetWidgets(r.presetKey, venue) ?? []);
     touch(r.id, { widgets });
     return { ...r, widgets };
   });

@@ -46,6 +46,15 @@ export const OVERVIEW_PRESET_KEY = "overview";
  * Overview tab still holding exactly one of these (order and sizes aside) was
  * never customised, so it is moved onto the current preset (see tabs.ts).
  */
+/**
+ * The Social preset's widgets before Instagram views was added (2026-10-22).
+ * A Social tab with exactly these was never customised, so it gets the
+ * current preset; anyone's own changes are left alone. Same for both venues.
+ */
+export const LEGACY_SOCIAL_KEYS: readonly (readonly string[])[] = [
+  ["social.fbFollowers", "social.igFollowers", "social.igReach", "social.engagement", "social.followerTrend", "social.topPosts", "social.fbViews", "social.byChannel"],
+];
+
 export const LEGACY_OVERVIEW_KEYS: Record<Venue, readonly (readonly string[])[]> = {
   clinic: [
     [
@@ -481,6 +490,7 @@ export const PRESETS: Preset[] = [
         { key: "social.followerTrend", size: "XL" },
         { key: "social.topPosts", size: "L" },
         { key: "social.fbViews", size: "S" },
+        { key: "social.igViews", size: "S" },
         { key: "social.byChannel", size: "M" },
       ],
       gym: [
@@ -491,6 +501,7 @@ export const PRESETS: Preset[] = [
         { key: "social.followerTrend", size: "XL" },
         { key: "social.topPosts", size: "L" },
         { key: "social.fbViews", size: "S" },
+        { key: "social.igViews", size: "S" },
         { key: "social.byChannel", size: "M" },
       ],
     },

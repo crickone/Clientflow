@@ -129,6 +129,8 @@ export interface ReachSummary {
   /** Instagram accounts reached in the period (null when Meta did not report it). */
   instagramReach: number | null;
   instagramProfileViews: number | null;
+  /** Instagram: times its content (posts, reels, stories) was shown or played in the period. Meta's "views", which replaced impressions in 2025. */
+  instagramViews: number | null;
   /** Facebook Page: times its content was viewed in the period (null when not available). */
   facebookViews: number | null;
 }
@@ -157,16 +159,17 @@ async function sumInsight(objectId: string, token: string, metric: string, fromM
 
 export async function getReach(tenantId: number, fromMs: number, toMs: number): Promise<ReachSummary> {
   const p = page(tenantId);
-  if (!p) return { instagramReach: null, instagramProfileViews: null, facebookViews: null };
+  if (!p) return { instagramReach: null, instagramProfileViews: null, instagramViews: null, facebookViews: null };
   return memo(`${tenantId}:reach:${fromMs}:${toMs}`, async () => {
-    const [instagramReach, instagramProfileViews, facebookViews] = await Promise.all([
+    const [instagramReach, instagramProfileViews, instagramViews, facebookViews] = await Promise.all([
       p.igUserId ? sumInsight(p.igUserId, p.pageAccessToken, "reach", fromMs, toMs, { metric_type: "total_value" }) : Promise.resolve(null),
       p.igUserId ? sumInsight(p.igUserId, p.pageAccessToken, "profile_views", fromMs, toMs, { metric_type: "total_value" }) : Promise.resolve(null),
+      p.igUserId ? sumInsight(p.igUserId, p.pageAccessToken, "views", fromMs, toMs, { metric_type: "total_value" }) : Promise.resolve(null),
       // Meta replaced Page impressions with media views (2025); try the new
       // metric first and fall back for Pages still reporting the old one.
       sumInsight(p.pageId, p.pageAccessToken, "page_media_view", fromMs, toMs, {}).then((v) => v ?? sumInsight(p.pageId, p.pageAccessToken, "page_impressions", fromMs, toMs, {})),
     ]);
-    return { instagramReach, instagramProfileViews, facebookViews };
+    return { instagramReach, instagramProfileViews, instagramViews, facebookViews };
   });
 }
 
