@@ -2,6 +2,7 @@ import "server-only";
 
 import { controlSqlite } from "@/lib/db/control";
 import { decryptToken, encryptToken } from "@/lib/google/tokenCrypto";
+import { openStored, SEALED_PREFIX } from "./pageTokenAtRest";
 import { splitFullName } from "@/lib/humanName";
 import { GRAPH_BASE } from "./graph";
 import type { GraphPage } from "./grants";
@@ -17,23 +18,19 @@ import type { NormalizedLeadInput } from "@/lib/leads";
  * same key as every other stored token.
  */
 
-/** Encrypt a Page token for storage. Empty stays empty (the revoked marker). */
+/** Encrypt a Page token for storage, marked as sealed. Empty stays empty (the revoked marker). */
 export function sealPageToken(plain: string): string {
-  return plain ? encryptToken(plain) : "";
+  return plain ? SEALED_PREFIX + encryptToken(plain) : "";
 }
 
 /**
- * Decrypt a stored Page token. Rows written before 2026-10-22 hold the token
- * in plaintext; those are handed back as they are (and re-sealed at boot by
- * control.ts), so a connection never breaks on the way to encrypted-at-rest.
+ * The usable Page token from a stored value: sealed (prefixed), sealed before
+ * the prefix existed, or plaintext from before 2026-10-22 (re-sealed at boot by
+ * control.ts). One this key cannot read comes back empty, so the Page shows as
+ * needing a reconnect instead of sending garbage to Meta.
  */
 export function openPageToken(stored: string): string {
-  if (!stored) return "";
-  try {
-    return decryptToken(stored);
-  } catch {
-    return stored;
-  }
+  return openStored(stored, { decrypt: decryptToken });
 }
 
 

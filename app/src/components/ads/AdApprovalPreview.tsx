@@ -43,7 +43,7 @@ const hostOf = (url?: string) => {
  * the operator approves what people will actually see.
  */
 export function AdApprovalPreview({ name, input }: { name: string; input: Record<string, unknown> }) {
-  const [data, setData] = useState<{ brand: Brand; designs: Record<number, string[]>; currency: string; socialPosts: number[] } | null>(null);
+  const [data, setData] = useState<{ brand: Brand; designs: Record<number, string[]>; currency: string; socialPosts: number[]; versions: Record<number, { feed: string | null; tall: string | null }> } | null>(null);
   const currency = data?.currency ?? "EUR";
   const ads = useMemo(
     () => adsOf(name, input, (n) => new Intl.NumberFormat("en-IE", { style: "currency", currency, maximumFractionDigits: n % 1 ? 2 : 0 }).format(n)),
@@ -70,7 +70,10 @@ export function AdApprovalPreview({ name, input }: { name: string; input: Record
   const cur = ads[Math.min(i, ads.length - 1)];
   const c = cur.ad.creative;
   const images = data?.designs[Number(c?.designId)] ?? [];
-  const shown = c?.format === "single" ? images.slice(0, 1) : images;
+  // A Content Studio ad version: the 4:5 feed image in feeds and the 9:16 one in
+  // Stories and Reels, as the campaign will run it. A design shows its slides.
+  const version = data?.versions[Number(c?.designId)];
+  const shown = version?.feed ? [version.feed] : c?.format === "single" ? images.slice(0, 1) : images;
   const preview: PreviewAd = {
     pageName: data?.brand.pageName ?? "Your Page",
     instagramHandle: data?.brand.instagramHandle ?? null,
@@ -81,6 +84,7 @@ export function AdApprovalPreview({ name, input }: { name: string; input: Record
     ctaLabel: cur.objective === "messages" ? "Send message" : CTA_LABEL[c?.cta ?? "LEARN_MORE"] ?? "Learn more",
     images: shown,
     linkHost: cur.objective === "leads" || cur.objective === "messages" ? null : hostOf(c?.linkUrl),
+    story: version?.tall ? { kind: "image", url: version.tall } : null,
   };
 
   return (

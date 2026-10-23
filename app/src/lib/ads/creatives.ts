@@ -378,6 +378,24 @@ export function adVersionSizes(designId: number): string[] | null {
     .map((s) => s.aspectRatio);
 }
 
+/**
+ * A Content Studio ad version's feed and Stories/Reels images (render files),
+ * the way a campaign uses them: 4:5 in feeds (1:1 if there is no 4:5), 9:16
+ * in Stories and Reels. Null for an ordinary design.
+ */
+export function adVersionImages(designId: number): { feed: string | null; tall: string | null } | null {
+  const set = db.select({ adCreativeId: carouselSets.adCreativeId }).from(carouselSets).where(eq(carouselSets.id, designId)).get();
+  if (!set?.adCreativeId) return null;
+  const slides = db
+    .select()
+    .from(schema.carouselSlides)
+    .where(eq(schema.carouselSlides.carouselSetId, designId))
+    .all()
+    .filter((s) => !!s.renderFilename);
+  const of = (size: string) => slides.find((s) => s.aspectRatio === size)?.renderFilename ?? null;
+  return { feed: of("4:5") ?? of("1:1"), tall: of("9:16") };
+}
+
 /** Redesign one size of one version (the editor's "Try another design"). */
 export async function redesignAdImage(tenantId: number, adId: number, slideId: number, note: string | null): Promise<void> {
   const ad = getAdCreative(adId);

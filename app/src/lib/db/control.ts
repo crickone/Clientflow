@@ -1067,24 +1067,36 @@ export function ensureControlTables() {
     console.error("[control] facebook_pages instagram columns migration failed:", err);
   }
 
-  // Page tokens at rest (2026-10-22): rows written before this held the Page
-  // access token in plaintext. Seal any that still are. Idempotent: a sealed
-  // token decrypts, so it is left alone; the lazy import keeps this file free
-  // of a load-order edge on the crypto helper until the table exists.
+  // Page tokens at rest (2026-10-22): seal plaintext tokens, and mark ones
+  // sealed before the prefix existed. Decided by the value itself
+  // (lib/facebook/pageTokenAtRest), never by whether this process's key can
+  // decrypt it, so a sealed token is never wrapped a second time. The lazy
+  // imports keep this file free of a load-order edge on the crypto helper.
   try {
     const { decryptToken, encryptToken } = require("@/lib/google/tokenCrypto") as typeof import("@/lib/google/tokenCrypto");
-    const rows = controlSqlite.prepare("SELECT id, page_access_token FROM facebook_pages WHERE page_access_token != ''").all() as Array<{ id: number; page_access_token: string }>;
-    const seal = controlSqlite.prepare("UPDATE facebook_pages SET page_access_token = ? WHERE id = ?");
-    let sealed = 0;
-    for (const r of rows) {
+    const { migrateStored } = require("@/lib/facebook/pageTokenAtRest") as typeof import("@/lib/facebook/pageTokenAtRest");
+    const canDecrypt = (s: string) => {
       try {
-        decryptToken(r.page_access_token);
+        decryptToken(s);
+        return true;
       } catch {
-        seal.run(encryptToken(r.page_access_token), r.id);
-        sealed++;
+        return false;
+      }
+    };
+    const rows = controlSqlite.prepare("SELECT id, page_access_token FROM facebook_pages WHERE page_access_token != '' AND length(page_access_token) < 20000").all() as Array<{ id: number; page_access_token: string }>;
+    const put = controlSqlite.prepare("UPDATE facebook_pages SET page_access_token = ? WHERE id = ?");
+    let changed = 0;
+    for (const r of rows) {
+      const next = migrateStored(r.page_access_token, { encrypt: encryptToken, canDecrypt });
+      if (next !== null) {
+        put.run(next, r.id);
+        changed++;
       }
     }
-    if (sealed) console.log(`[control] sealed ${sealed} Facebook Page token(s) at rest`);
+    // A token can never be this long: one wrapped repeatedly by the first version of this step. It cannot be used; clear it so the Page shows as needing a reconnect.
+    const bloated = controlSqlite.prepare("UPDATE facebook_pages SET page_access_token = '' WHERE length(page_access_token) >= 20000").run().changes;
+    if (changed) console.log(`[control] sealed or marked ${changed} Facebook Page token(s) at rest`);
+    if (bloated) console.log(`[control] cleared ${bloated} unusable Facebook Page token(s); reconnect Facebook to restore`);
   } catch (err) {
     console.error("[control] facebook_pages token sealing failed:", err);
   }
