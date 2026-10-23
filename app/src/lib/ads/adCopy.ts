@@ -41,6 +41,16 @@ export interface AdBrief {
   goal: AdGoal;
   /** Where the button sends people, for website / bookings goals. */
   linkUrl: string;
+  /** How many versions to write and design, 1 to 5. Absent = 3 (briefs saved before this). */
+  versions?: number;
+}
+
+export const MAX_AD_VERSIONS = 5;
+
+/** A brief's version count, kept to what one ad can hold. */
+export function versionCount(brief: Pick<AdBrief, "versions">): number {
+  const n = Math.round(Number(brief.versions));
+  return Number.isFinite(n) && n >= 1 ? Math.min(MAX_AD_VERSIONS, n) : 3;
 }
 
 export interface AdCopy {
@@ -78,6 +88,7 @@ export function parseBrief(raw: unknown): AdBrief {
     audience: String(o.audience ?? "").trim().slice(0, 300),
     goal,
     linkUrl: String(o.linkUrl ?? "").trim().slice(0, 500),
+    ...(o.versions !== undefined ? { versions: versionCount({ versions: Number(o.versions) }) } : {}),
   };
 }
 

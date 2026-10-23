@@ -17,7 +17,7 @@ import {
 } from "@/lib/ads/service";
 import { OBJECTIVES, PLATFORM_LABEL, PLATFORMS, platformsOf, totalDailyBudget, validateSpec, type AdSpec, type CampaignSpec, type Platforms } from "@/lib/ads/spec";
 import { listAdAccounts } from "@/lib/facebook/grants";
-import { AD_GOALS, parseBrief } from "@/lib/ads/adCopy";
+import { AD_GOALS, parseBrief, versionCount } from "@/lib/ads/adCopy";
 import { createAdCreative, listAdCreatives, queueImageAd } from "@/lib/ads/creatives";
 import { titleFrom } from "@/lib/content-studio/title";
 import { AiCapError, assertAiAllowed } from "@/lib/ai/usage";
@@ -187,7 +187,7 @@ export const ADS_TOOLS: Anthropic.Tool[] = [
   {
     name: "create_ad",
     description:
-      "Make a NEW image ad in Content Studio, the same as Content Studio > New ad: three versions with different angles, each with its own main text, headline and button, designed in the brand's style in a feed size and a Stories/Reels size. Runs in the background and takes a minute or two; afterwards list_ad_campaigns shows it under 'ads' with each version's designId and copy, ready for draft_ad_campaign or add_ad_to_campaign. Costs AI usage. Same copy house rules: no money-back guarantees, no free consults, no prices, no made-up claims.",
+      "Make a NEW image ad in Content Studio, the same as Content Studio > New ad: 1 to 5 versions (default 3) with different angles, each with its own main text, headline and button, designed in the brand's style in a feed size and a Stories/Reels size. For 'four variations' make ONE ad with versions 4, not two ads. Runs in the background for a few minutes. Do NOT ask the operator to check back: when it finishes, this chat resumes by itself with a message saying it is ready, and you then show the versions by proposing draft_ad_campaign or add_ad_to_campaign (the approval card previews each ad). Costs AI usage. Same copy house rules: no money-back guarantees, no free consults, no prices, no made-up claims.",
     input_schema: {
       type: "object",
       properties: {
@@ -195,6 +195,7 @@ export const ADS_TOOLS: Anthropic.Tool[] = [
         audience: { type: "string", description: "Who it is for, in plain words. Optional." },
         goal: { type: "string", enum: [...AD_GOALS], description: "bookings, leads (instant form), messages, website or awareness. Sets the button." },
         linkUrl: { type: "string", description: "https link the button opens, for bookings or website goals. Optional." },
+        versions: { type: "integer", description: "How many versions, 1 to 5. Default 3." },
       },
       required: ["offer", "goal"],
     },
@@ -396,12 +397,13 @@ export function createAdTool(ctx: ToolContext, input: Record<string, unknown>): 
   } catch (e) {
     return { text: JSON.stringify({ error: e instanceof AiCapError ? e.message : "AI is not available right now." }) };
   }
-  const brief = parseBrief({ offer, audience: input.audience ?? "", goal, linkUrl });
+  const brief = parseBrief({ offer, audience: input.audience ?? "", goal, linkUrl, ...(input.versions !== undefined ? { versions: input.versions } : {}) });
   const row = createAdCreative({ name: titleFrom(brief.offer, 80) || "New ad", kind: "image", brief });
   queueImageAd(ctx.tenantId, row.id);
   return {
     text: JSON.stringify({
-      result: `Making ad #${row.id} in Content Studio: three versions, each with its own copy and button. It takes a minute or two. Call list_ad_campaigns to see it under 'ads' once its state is 'ready', then use a version's designId and copy in the campaign.`,
+      result: `Making the ad in Content Studio: ${versionCount(brief)} versions, each with its own copy and button. It takes a few minutes. This chat picks up by itself when it is ready and shows you the ads to approve.`,
+      adId: row.id,
       url: `/content-studio/ads/${row.id}`,
     }),
   };

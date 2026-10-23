@@ -6,17 +6,17 @@ import { MODELS } from "@/lib/ai/client";
 import { meteredCreate } from "@/lib/ai/metered";
 import { getVenueType } from "@/lib/settings";
 import { CTAS } from "@/lib/ads/spec";
-import { AD_GOAL_LABEL, LIMITS, coerceCopy, type AdBrief, type AdCopy } from "@/lib/ads/adCopy";
+import { AD_GOAL_LABEL, LIMITS, coerceCopy, type AdBrief, type AdCopy, versionCount } from "@/lib/ads/adCopy";
 
 /**
- * The copy for an ad's three versions. An ad is not a post: it interrupts
+ * The copy for an ad's versions (three unless the brief asks for another number, up to five). An ad is not a post: it interrupts
  * someone who did not ask to see it, so it leads with one idea, says who it is
  * for and what to do, and each version tests a DIFFERENT angle so Meta can
  * find the one that works.
  */
 const RULES = `You write PAID social ads (Facebook and Instagram) for the business above. An ad is not an organic post: it interrupts someone scrolling, so it makes ONE point, fast, and tells them what to do.
 
-Write exactly THREE versions. Each tests a different angle (for example: the outcome they want described plainly, the objection that stops them, how easy it is to start, who it is for, a specific detail of the service). Never three rewordings of one idea.
+Write exactly the number of versions asked for. Each tests a different angle (for example: the outcome they want described plainly, the objection that stops them, how easy it is to start, who it is for, a specific detail of the service). Never rewordings of one idea.
 
 For each version:
 - angle: the idea it tests, 2 to 5 words.
@@ -48,7 +48,7 @@ Rules that always apply:
 - Describe the mechanism, never the benefit as a claim: "more oxygen dissolves into the blood plasma" is a fact; "used for cellular recovery", "boosts healing" or "reduces inflammation" are claims and are banned.
 - Persuade with specifics, never with invented urgency: no "limited spots", "only this week" or countdowns unless the brief states them.
 
-Return ONLY JSON: {"versions":[{"angle":"","hook":"","support":"","primaryText":"","headline":"","description":"","cta":""}, ...three]}`;
+Return ONLY JSON: {"versions":[{"angle":"","hook":"","support":"","primaryText":"","headline":"","description":"","cta":""}, ...one per version]}`;
 
 const SCHEMA = {
   type: "object",
@@ -93,7 +93,7 @@ export async function writeAdCopy(tenantId: number, brief: AdBrief): Promise<AdC
           `Goal: ${AD_GOAL_LABEL[brief.goal]}`,
           brief.linkUrl ? `Button links to: ${brief.linkUrl}` : "",
           "",
-          "Write the three versions.",
+          `Write ${versionCount(brief)} versions.`,
         ]
           .filter(Boolean)
           .join("\n"),
@@ -115,7 +115,7 @@ export async function writeAdCopy(tenantId: number, brief: AdBrief): Promise<AdC
   const versions = ((parsed as { versions?: unknown[] }).versions ?? [])
     .map((v) => coerceCopy(v, brief.goal))
     .filter((v): v is AdCopy => v !== null)
-    .slice(0, 3);
+    .slice(0, versionCount(brief));
   if (versions.length === 0) throw new Error("Adonis did not write any usable ad copy. Try again.");
   return versions;
 }

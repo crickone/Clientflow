@@ -29,7 +29,7 @@ import { AD_SIZES, AD_SIZE_LABEL, coerceCopy, parseBrief, parseStoredCopy, type 
 /**
  * Ads made in Content Studio.
  *
- * An IMAGE ad is three versions (different angles, each with its own ad copy),
+ * An IMAGE ad is 1 to 5 versions, three by default (different angles, each with its own ad copy),
  * each designed in three sizes: 4:5 for the feed, 1:1 square, 9:16 for
  * Stories and Reels. Each version is stored as an ordinary design
  * (carousel_sets row, ad_creative_id set) whose slides are the three sizes,
@@ -253,7 +253,7 @@ async function runImageAd(tenantId: number, adId: number): Promise<void> {
   const brief = parseBrief(safeJson(row.brief));
   const meter = { tenantId, agentKey: "ads" };
 
-  // 1. The words: three versions, three angles.
+  // 1. The words: one version per angle (three unless the brief says otherwise).
   const copies = await writeAdCopy(tenantId, brief);
 
   // 2. The feed versions, designed together so they differ from each other.

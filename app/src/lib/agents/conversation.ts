@@ -11,6 +11,8 @@ import { composeAgentSystem } from "@/lib/agents/context";
 import { resolveChatAgent } from "@/lib/agents/chatAgent";
 import { runAgentTurn } from "@/lib/agents/runAgentTurn";
 import { humanResult } from "@/components/messaging/chatText";
+import { getAdCreative } from "@/lib/ads/creatives";
+import { adsFinishedMessage, adIdsFromResults } from "@/lib/agents/backgroundWorkModel";
 import {
   campaignGoAgainMessage,
   campaignPlanEventFromActions,
@@ -314,7 +316,55 @@ export function act(c: Ctx, action: ConversationAction): ConversationView {
 type Kick =
   | { kind: "turn" }
   | { kind: "approve"; index: number; all: boolean }
-  | { kind: "resume"; campaign: { id: number; name: string } };
+  | { kind: "resume"; campaign: { id: number; name: string } }
+  /** Background work Adonis started has finished: carry on without the operator asking. */
+  | { kind: "followUp"; message: string };
+
+// ── Background work ─────────────────────────────────────────────────────────
+//
+// Some tools start work that finishes later (a Content Studio ad is written
+// and designed in the background). Rather than tell the operator to "check
+// back", the server watches it and, when it is done, opens a new turn in the
+// same chat with a hidden note saying so. The chat page polls, so Adonis's
+// reply (with its Approve card and ad previews) simply appears.
+
+const WATCH_EVERY_MS = 10_000;
+const WATCH_FOR_MS = 20 * 60_000;
+
+/** Watch Content Studio ads until none is still being made, then pick the chat back up. */
+export function watchAds(c: Ctx, adIds: number[]): void {
+  if (adIds.length === 0) return;
+  const started = Date.now();
+  const check = () => {
+    const ads = runWithTenant(c.tenantId, () => adIds.map((id) => getAdCreative(id)));
+    const stillMaking = ads.some((a) => a?.status === "writing");
+    if (stillMaking && Date.now() - started < WATCH_FOR_MS) {
+      setTimeout(check, WATCH_EVERY_MS);
+      return;
+    }
+    followUp(c, adsFinishedMessage(adIds, ads.map((a) => (a ? { id: a.id, name: a.name, status: a.status, error: a.error, versions: a.versions.length } : null))));
+  };
+  setTimeout(check, WATCH_EVERY_MS);
+}
+
+/**
+ * Open a turn in this chat with a hidden note, as soon as Adonis is free in it.
+ * If the operator is mid-conversation it waits its turn; a chat deleted in the
+ * meantime is left alone.
+ */
+function followUp(c: Ctx, message: string, tries = 0): void {
+  const conv = load(c);
+  if (!conv) return;
+  if (conv.status === "running" || live.has(liveKey(c))) {
+    if (tries < 120) setTimeout(() => followUp(c, message, tries + 1), WATCH_EVERY_MS);
+    return;
+  }
+  conv.status = "running";
+  conv.stopRequested = false;
+  write(c, conv);
+  live.add(liveKey(c));
+  void runWithTenant(c.tenantId, () => drive(c, { kind: "followUp", message }));
+}
 
 /** The loop: take turns until Adonis needs the operator. Runs detached; `live` already holds this conversation. */
 async function drive(c: Ctx, kick: Kick): Promise<void> {
@@ -377,7 +427,10 @@ async function drive(c: Ctx, kick: Kick): Promise<void> {
       const ok = results.every((r) => r.ok);
       conv.building = kick.all && ok && conv.campaignId !== null;
       next = continuationMessage(results, { auto: false, autopilot: conv.building });
+      watchAds(c, adIdsFromResults(results));
       save();
+    } else if (kick.kind === "followUp") {
+      next = kick.message;
     } else if (kick.kind === "resume") {
       conv.building = true;
       conv.campaignId = kick.campaign.id;
@@ -438,6 +491,7 @@ async function drive(c: Ctx, kick: Kick): Promise<void> {
       const results = await execute(out.pendingWrites);
       reply.pending.status = "approved";
       record(reply, results, true);
+      watchAds(c, adIdsFromResults(results));
       if (results.some((r) => !r.ok)) conv.building = false;
       nudges = 0;
       next = continuationMessage(results, { auto: true, autopilot: conv.building });
