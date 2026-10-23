@@ -47,13 +47,13 @@ const requireLocal = createRequire(import.meta.url);
   try {
     assert.equal(pages.getPostingPage(a, null), null, "no Page connected -> nothing to post through");
 
-    insert.run(a, "pt-first", "First", "tok-first", "ig-1", 1000);
-    insert.run(a, "pt-second", "Second", "tok-second", null, 2000);
-    insert.run(b, "pt-other", "Other tenant", "tok-other", null, 500);
+    insert.run(a, "pt-first", "First", "EAAtokfirst0000000000000000000000", "ig-1", 1000);
+    insert.run(a, "pt-second", "Second", "EAAtoksecond0000000000000000000000", null, 2000);
+    insert.run(b, "pt-other", "Other tenant", "EAAtokother0000000000000000000000", null, 500);
 
     assert.equal(pages.getPostingPage(a, null)?.pageId, "pt-first", "default is the earliest-connected Page");
     assert.equal(pages.getPostingPage(a, null)?.igUserId, "ig-1", "carries the linked Instagram account");
-    assert.equal(pages.getPostingPage(a, "pt-second")?.pageAccessToken, "tok-second", "honours the chosen Page");
+    assert.equal(pages.getPostingPage(a, "pt-second")?.pageAccessToken, "EAAtoksecond0000000000000000000000", "honours the chosen Page");
     assert.equal(pages.getPostingPage(a, "pt-other")?.pageId, "pt-first", "another tenant's Page is never used");
 
     await pages.disconnectFacebookPage(a, "pt-second");
