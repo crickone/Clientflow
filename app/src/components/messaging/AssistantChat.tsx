@@ -1,5 +1,6 @@
 "use client";
 
+import { AdApprovalPreview } from "@/components/ads/AdApprovalPreview";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { createPortal } from "react-dom";
@@ -1217,6 +1218,12 @@ function MessageBubble({
                 </li>
               ))}
             </ul>
+            {/* An ad Adonis wants to save or add: show the ad itself, as people will see it. */}
+            {m.pending.actions
+              .filter((a) => a.name === "draft_ad_campaign" || a.name === "add_ad_to_campaign")
+              .map((a, idx) => (
+                <AdApprovalPreview key={`ad-${idx}`} name={a.name} input={a.input} />
+              ))}
             {campaignAction && tweakOpen ? (
               // Campaign Engine Slice 1 (Task 6): the revealed one-line tweak
               // input — submitting sends a normal chat message down the

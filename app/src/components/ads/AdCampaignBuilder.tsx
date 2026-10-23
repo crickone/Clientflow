@@ -41,6 +41,7 @@ import {
   type Objective,
 } from "@/lib/ads/spec";
 import { money } from "./status";
+import { CTA_LABEL } from "./ctaLabel";
 
 // Leaflet needs window, so the map only ever renders in the browser.
 const AudienceMap = dynamic(() => import("./AudienceMap"), {
@@ -91,17 +92,6 @@ export interface BuilderBrand {
   logoUrl: string | null;
 }
 
-const CTA_LABEL: Record<Cta, string> = {
-  LEARN_MORE: "Learn more",
-  BOOK_NOW: "Book now",
-  SIGN_UP: "Sign up",
-  CONTACT_US: "Contact us",
-  GET_OFFER: "Get offer",
-  SHOP_NOW: "Shop now",
-  MESSAGE_PAGE: "Send message",
-  APPLY_NOW: "Apply now",
-  SUBSCRIBE: "Subscribe",
-};
 
 const selectStyle: React.CSSProperties = {
   width: "100%",
@@ -463,7 +453,7 @@ export function AdCampaignBuilder({
               </button>
             </div>
           )}
-          <AdPreview ad={previewAd} />
+          <AdPreview ad={previewAd} platforms={platformsOf(spec)} />
         </div>
       )}
       <div className="adb-rail-card">

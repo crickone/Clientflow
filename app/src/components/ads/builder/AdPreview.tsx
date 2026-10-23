@@ -180,10 +180,12 @@ function Story({ ad }: { ad: PreviewAd }) {
   );
 }
 
-export function AdPreview({ ad }: { ad: PreviewAd }) {
-  const [placement, setPlacement] = useState<"facebook" | "instagram" | "story">("facebook");
-  const tabs = (["facebook", "instagram", ...(ad.story ? (["story"] as const) : [])] as const).slice() as Array<"facebook" | "instagram" | "story">;
-  const shown = placement === "story" && !ad.story ? "facebook" : placement;
+/** `platforms`: where the campaign runs; a feed it never runs in is not offered as a preview. */
+export function AdPreview({ ad, platforms = "both" }: { ad: PreviewAd; platforms?: "both" | "facebook" | "instagram" }) {
+  const [placement, setPlacement] = useState<"facebook" | "instagram" | "story">(platforms === "instagram" ? "instagram" : "facebook");
+  const feeds = platforms === "facebook" ? (["facebook"] as const) : platforms === "instagram" ? (["instagram"] as const) : (["facebook", "instagram"] as const);
+  const tabs = [...feeds, ...(ad.story ? (["story"] as const) : [])] as Array<"facebook" | "instagram" | "story">;
+  const shown = tabs.includes(placement) ? placement : tabs[0];
   return (
     <div className="adb-preview">
       <div className="adb-seg" role="tablist" aria-label="Where the ad appears">

@@ -19,6 +19,29 @@ import { listAdCreatives } from "@/lib/ads/creatives";
  * launch, so it is not offered) with their image URLs for the live preview,
  * the photos in the library, and the Page identity the preview shows.
  */
+/**
+ * What the chat's approval card needs to show an ad Adonis proposes: the
+ * Page's name, handle and logo, and each named design's images in order.
+ * Unknown or unrendered designs come back with no images.
+ */
+export function adPreviewData(designIds: number[], adAccountId?: string | null): { brand: BuilderBrand; designs: Record<number, string[]>; currency: string } {
+  const tenantId = getCurrentMembership()!.tenant.id;
+  const page = getPostingPage(tenantId, getPreferredPostingPageId(tenantId));
+  const designs: Record<number, string[]> = {};
+  for (const id of designIds.slice(0, 12)) designs[id] = postableRenders(id).filenames.slice(0, 10).map(renderFileUrl);
+  const accounts = listAdAccounts(tenantId);
+  const currency = (accounts.find((a) => a.adAccountId === adAccountId) ?? accounts[0])?.currency || "EUR";
+  return {
+    currency,
+    brand: {
+      pageName: page?.pageName || getBusinessProfile().businessName || "Your Page",
+      instagramHandle: listFacebookPages(tenantId).find((p) => p.pageId === page?.pageId)?.igUsername ?? null,
+      logoUrl: getChromeLogoSrc(),
+    },
+    designs,
+  };
+}
+
 export function builderData(): { adAccounts: BuilderAdAccount[]; designs: BuilderDesign[]; photos: BuilderPhoto[]; brand: BuilderBrand; videoAds: BuilderVideoAd[] } {
   const tenantId = getCurrentMembership()!.tenant.id;
   const page = getPostingPage(tenantId, getPreferredPostingPageId(tenantId));
