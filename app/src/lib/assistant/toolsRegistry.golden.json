@@ -78,6 +78,7 @@
     "launch_ad_campaign",
     "set_ad_campaign_status",
     "set_ad_budget",
+    "create_ad",
     "add_ad_to_campaign",
     "set_ad_placements",
     "cancel_scheduled_item",
@@ -291,6 +292,10 @@
     "set_ad_placements": [
       "Show ad campaign #4 on ?",
       "Show ad campaign #? on ?"
+    ],
+    "create_ad": [
+      "Make a new image ad in Content Studio",
+      "Make a new image ad in Content Studio"
     ]
   },
   "readSamplesAllFalse": [

@@ -17,6 +17,10 @@ import {
 } from "@/lib/ads/service";
 import { OBJECTIVES, PLATFORM_LABEL, PLATFORMS, platformsOf, totalDailyBudget, validateSpec, type AdSpec, type CampaignSpec, type Platforms } from "@/lib/ads/spec";
 import { listAdAccounts } from "@/lib/facebook/grants";
+import { AD_GOALS, parseBrief } from "@/lib/ads/adCopy";
+import { createAdCreative, listAdCreatives, queueImageAd } from "@/lib/ads/creatives";
+import { titleFrom } from "@/lib/content-studio/title";
+import { AiCapError, assertAiAllowed } from "@/lib/ai/usage";
 import { listCarousels } from "@/lib/image/carousels";
 import { fenceUntrusted, type ToolContext, type ToolResult } from "@/lib/agents/toolKit";
 
@@ -37,7 +41,11 @@ const AD_SCHEMA = {
     creative: {
       type: "object",
       properties: {
-        designId: { type: "integer", description: "A Content Studio design id (list_ad_campaigns lists them)." },
+        designId: {
+          type: "integer",
+          description:
+            "The picture: a version of a Content Studio AD (list_ad_campaigns 'ads', each version's designId, with format 'single' and that version's own texts and cta). Make one with create_ad when none fits. 'socialPosts' designs were written for organic posts (they can say things like 'link in bio') and are NOT ads: use one only if the operator explicitly asks.",
+        },
         format: { type: "string", enum: ["single", "carousel"] },
         primaryText: { type: "string" },
         headline: { type: "string" },
@@ -177,6 +185,21 @@ export const ADS_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "create_ad",
+    description:
+      "Make a NEW image ad in Content Studio, the same as Content Studio > New ad: three versions with different angles, each with its own main text, headline and button, designed in the brand's style in a feed size and a Stories/Reels size. Runs in the background and takes a minute or two; afterwards list_ad_campaigns shows it under 'ads' with each version's designId and copy, ready for draft_ad_campaign or add_ad_to_campaign. Costs AI usage. Same copy house rules: no money-back guarantees, no free consults, no prices, no made-up claims.",
+    input_schema: {
+      type: "object",
+      properties: {
+        offer: { type: "string", description: "What the ad is for, in a sentence or two: the service, offer or event, and anything it must say." },
+        audience: { type: "string", description: "Who it is for, in plain words. Optional." },
+        goal: { type: "string", enum: [...AD_GOALS], description: "bookings, leads (instant form), messages, website or awareness. Sets the button." },
+        linkUrl: { type: "string", description: "https link the button opens, for bookings or website goals. Optional." },
+      },
+      required: ["offer", "goal"],
+    },
+  },
+  {
     name: "add_ad_to_campaign",
     description:
       "Add one ad to an ad set of an existing campaign. On a draft it joins the plan. On a LIVE or paused campaign it is created on Meta straight away inside that ad set and, once Meta approves it, shows and spends from that ad set's existing budget. Show the operator the ad (design, texts, button) first. Same copy house rules as draft_ad_campaign. An ad set takes at most 6 ads.",
@@ -228,11 +251,30 @@ export function listAdCampaignsTool(ctx: ToolContext): ToolResult {
     error: c.error,
   }));
   const adAccounts = listAdAccounts(ctx.tenantId).map((a) => ({ adAccountId: a.adAccountId, name: a.name, currency: a.currency, active: a.accountStatus === 1 }));
-  const designs = listCarousels({ includeAdVersions: true })
-    .filter((c) => c.generationStatus == null && c.slideCount > 0)
+  // Content Studio ads: made for ads (ad copy, a real button, feed + Stories sizes).
+  const adCreatives = listAdCreatives().filter((a) => a.kind === "image");
+  const adVersionIds = new Set(adCreatives.flatMap((a) => a.versions.map((v) => v.designId)));
+  const ads = adCreatives.slice(0, 20).map((a) => ({
+    adId: a.id,
+    name: a.name,
+    goal: a.brief.goal,
+    state: a.status === "writing" ? `being made (${a.stage ?? "working"})` : a.status === "failed" ? `failed: ${a.error ?? "unknown"}` : "ready",
+    versions: a.versions.map((v) => ({
+      designId: v.designId,
+      version: v.variant,
+      angle: v.copy?.angle ?? "",
+      primaryText: v.copy?.primaryText ?? "",
+      headline: v.copy?.headline ?? "",
+      description: v.copy?.description ?? "",
+      cta: v.copy?.cta ?? "LEARN_MORE",
+    })),
+  }));
+  // Everything else is a social post design: written for organic posts, not ads.
+  const socialPosts = listCarousels({ includeAdVersions: true })
+    .filter((c) => c.generationStatus == null && c.slideCount > 0 && !adVersionIds.has(c.id))
     .slice(0, 30)
     .map((c) => ({ designId: c.id, name: c.name, images: c.slideCount }));
-  return { text: fenceUntrusted(JSON.stringify({ adAccounts, campaigns, designs })) };
+  return { text: fenceUntrusted(JSON.stringify({ adAccounts, campaigns, ads, socialPosts })) };
 }
 
 /** READ */
@@ -339,4 +381,28 @@ export async function setAdPlacementsTool(_ctx: ToolContext, input: Record<strin
   } catch (e) {
     return err(e);
   }
+}
+
+/** WRITE — spends AI usage; makes a Content Studio image ad in the background. */
+export function createAdTool(ctx: ToolContext, input: Record<string, unknown>): ToolResult {
+  const offer = String(input.offer ?? "").trim();
+  if (offer.length < 3) return { text: JSON.stringify({ error: "Say what the ad is for (offer)." }) };
+  const goal = String(input.goal ?? "");
+  if (!(AD_GOALS as readonly string[]).includes(goal)) return { text: JSON.stringify({ error: `goal must be one of ${AD_GOALS.join(", ")}.` }) };
+  const linkUrl = String(input.linkUrl ?? "").trim();
+  if (linkUrl && !/^https:\/\//i.test(linkUrl)) return { text: JSON.stringify({ error: "linkUrl must start with https://" }) };
+  try {
+    assertAiAllowed(ctx.tenantId);
+  } catch (e) {
+    return { text: JSON.stringify({ error: e instanceof AiCapError ? e.message : "AI is not available right now." }) };
+  }
+  const brief = parseBrief({ offer, audience: input.audience ?? "", goal, linkUrl });
+  const row = createAdCreative({ name: titleFrom(brief.offer, 80) || "New ad", kind: "image", brief });
+  queueImageAd(ctx.tenantId, row.id);
+  return {
+    text: JSON.stringify({
+      result: `Making ad #${row.id} in Content Studio: three versions, each with its own copy and button. It takes a minute or two. Call list_ad_campaigns to see it under 'ads' once its state is 'ready', then use a version's designId and copy in the campaign.`,
+      url: `/content-studio/ads/${row.id}`,
+    }),
+  };
 }

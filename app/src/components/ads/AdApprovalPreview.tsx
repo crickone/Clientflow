@@ -43,7 +43,7 @@ const hostOf = (url?: string) => {
  * the operator approves what people will actually see.
  */
 export function AdApprovalPreview({ name, input }: { name: string; input: Record<string, unknown> }) {
-  const [data, setData] = useState<{ brand: Brand; designs: Record<number, string[]>; currency: string } | null>(null);
+  const [data, setData] = useState<{ brand: Brand; designs: Record<number, string[]>; currency: string; socialPosts: number[] } | null>(null);
   const currency = data?.currency ?? "EUR";
   const ads = useMemo(
     () => adsOf(name, input, (n) => new Intl.NumberFormat("en-IE", { style: "currency", currency, maximumFractionDigits: n % 1 ? 2 : 0 }).format(n)),
@@ -104,6 +104,11 @@ export function AdApprovalPreview({ name, input }: { name: string; input: Record
       <div className="aap-where">{cur.where}</div>
       <div className="aap-mock">{data ? <AdPreview ad={preview} platforms={cur.platforms} /> : <div className="aap-loading">Loading the ad…</div>}</div>
       {data && images.length === 0 && <div className="aap-warn">This design has no images yet. Generate it in Content Studio first, or the ad can't launch.</div>}
+      {data && images.length > 0 && data.socialPosts.includes(Number(c?.designId)) && (
+        <div className="aap-warn">
+          This picture was made as a social post, not an ad, so its words can be wrong for an ad (for example &ldquo;link in bio&rdquo;). Ask Adonis to make a new ad instead.
+        </div>
+      )}
     </div>
   );
 }

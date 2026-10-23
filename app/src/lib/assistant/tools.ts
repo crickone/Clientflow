@@ -103,6 +103,7 @@ import {
   setAdCampaignStatusTool,
   addAdToCampaignTool,
   setAdPlacementsTool,
+  createAdTool,
 } from "@/lib/agents/tools.ads";
 import { SOCIAL_METRICS_TOOLS, getSocialMetricsTool } from "@/lib/agents/tools.social";
 import { GOOGLE_TOOLS, getGoogleMetricsTool, listGoogleReviewsTool, replyToGoogleReviewTool } from "@/lib/agents/tools.google";
@@ -257,6 +258,7 @@ const WRITE_TOOL_META: Record<string, WriteToolMeta> = {
   launch_ad_campaign: { label: "Launch ad campaign", summarize: ({ v }) => `Launch ad campaign #${v("campaignId") || "?"} on Meta (starts spending)` },
   set_ad_campaign_status: { label: "Change ad campaign status", summarize: ({ v }) => `${v("status") === "active" ? "Resume (starts spending)" : v("status") === "archived" ? "Archive" : "Pause"} ad campaign #${v("campaignId") || "?"}` },
   set_ad_budget: { label: "Change ad budget", summarize: ({ v }) => `Set ad set ${Number(v("adSetIndex") || 0) + 1} of ad campaign #${v("campaignId") || "?"} to ${v("dailyBudget") || "?"} a day` },
+  create_ad: { label: "Make a new ad", summarize: ({ v }) => `Make a new image ad in Content Studio${v("goal") ? ` (${v("goal")})` : ""}${v("offer") ? `: ${String(v("offer")).slice(0, 80)}` : ""}` },
   add_ad_to_campaign: { label: "Add an ad to a campaign", summarize: ({ v, input }) => { const ad = (input.ad ?? {}) as { name?: string }; return `Add the ad ${ad.name ? `"${ad.name}"` : "(unnamed)"} to ad set ${Number(v("adSetIndex") || 0) + 1} of ad campaign #${v("campaignId") || "?"} (on a live campaign it runs once Meta approves it)`; } },
   set_ad_placements: { label: "Change where ads show", summarize: ({ v }) => `Show ad campaign #${v("campaignId") || "?"} on ${v("platforms") === "facebook" ? "Facebook only" : v("platforms") === "instagram" ? "Instagram only" : v("platforms") === "both" ? "Facebook and Instagram" : "?"}` },
   cancel_scheduled_item: { label: "Cancel scheduled item", summarize: ({ v }) => `Cancel the scheduled ${v("kind") || "item"}${v("name") ? ` "${v("name")}"` : ""}` },
@@ -1050,6 +1052,8 @@ export async function executeTool(
         return await setAdCampaignStatusTool(ctx, input);
       case "set_ad_budget":
         return await setAdBudgetTool(ctx, input);
+      case "create_ad":
+        return createAdTool(ctx, input);
       case "add_ad_to_campaign":
         return await addAdToCampaignTool(ctx, input);
       case "set_ad_placements":

@@ -59,7 +59,7 @@ const MARKETING_TOOLS = [
   // and a public review reply (approve-gated).
   "get_google_metrics", "list_google_reviews", "reply_to_google_review",
   "draft_ad_campaign", "launch_ad_campaign", "set_ad_campaign_status", "set_ad_budget",
-  "add_ad_to_campaign", "set_ad_placements",
+  "add_ad_to_campaign", "set_ad_placements", "create_ad",
 ] as const;
 
 const OPS_TOOLS = [

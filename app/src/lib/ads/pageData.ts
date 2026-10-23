@@ -11,7 +11,7 @@ import { renderFileUrl } from "@/lib/image/renderStore.client";
 import { postableRenders } from "@/lib/social/schedule";
 import { getPreferredPostingPageId } from "@/lib/social/publisher";
 import type { BuilderAdAccount, BuilderBrand, BuilderDesign, BuilderPhoto, BuilderVideoAd } from "@/components/ads/AdCampaignBuilder";
-import { listAdCreatives } from "@/lib/ads/creatives";
+import { adVersionSizes, listAdCreatives } from "@/lib/ads/creatives";
 
 /**
  * What the builder needs: the tenant's ad accounts, the Content Studio designs
@@ -24,14 +24,17 @@ import { listAdCreatives } from "@/lib/ads/creatives";
  * Page's name, handle and logo, and each named design's images in order.
  * Unknown or unrendered designs come back with no images.
  */
-export function adPreviewData(designIds: number[], adAccountId?: string | null): { brand: BuilderBrand; designs: Record<number, string[]>; currency: string } {
+export function adPreviewData(designIds: number[], adAccountId?: string | null): { brand: BuilderBrand; designs: Record<number, string[]>; currency: string; socialPosts: number[] } {
   const tenantId = getCurrentMembership()!.tenant.id;
   const page = getPostingPage(tenantId, getPreferredPostingPageId(tenantId));
   const designs: Record<number, string[]> = {};
   for (const id of designIds.slice(0, 12)) designs[id] = postableRenders(id).filenames.slice(0, 10).map(renderFileUrl);
   const accounts = listAdAccounts(tenantId);
   const currency = (accounts.find((a) => a.adAccountId === adAccountId) ?? accounts[0])?.currency || "EUR";
+  // A design that is not a version of a Content Studio ad was made as a social post.
+  const socialPosts = Object.keys(designs).map(Number).filter((id) => adVersionSizes(id) === null);
   return {
+    socialPosts,
     currency,
     brand: {
       pageName: page?.pageName || getBusinessProfile().businessName || "Your Page",
