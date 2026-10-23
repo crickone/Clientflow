@@ -17,11 +17,12 @@ import {
   refreshAdInsights,
   searchAdCities,
   searchAdInterests,
+  setAdCampaignPlatforms,
   setAdCampaignStatus,
   setAdSetBudget,
   updateAdDraft,
 } from "@/lib/ads/service";
-import type { CampaignSpec } from "@/lib/ads/spec";
+import type { CampaignSpec, Platforms } from "@/lib/ads/spec";
 
 /**
  * Server actions for the ads manager. Admin-only: launching, resuming and
@@ -57,6 +58,11 @@ export async function saveAdDraftAction(id: number | null, adAccountId: string, 
 
 export async function deleteAdDraftAction(id: number): Promise<AdsResult> {
   return run(() => { deleteAdDraft(id); return undefined; });
+}
+
+/** Where a campaign's ads show; on a live campaign every ad set is updated on Meta. */
+export async function setAdPlacementsAction(id: number, platforms: Platforms): Promise<AdsResult> {
+  return run(async () => { await setAdCampaignPlatforms(id, platforms); return undefined; });
 }
 
 export async function launchAdCampaignAction(id: number): Promise<AdsResult> {

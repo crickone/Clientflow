@@ -7,6 +7,7 @@ import { AdCampaignDetail } from "@/components/ads/AdCampaignDetail";
 import { requireAdminPage } from "@/lib/auth";
 import { getAdCampaign } from "@/lib/ads/service";
 import { builderData } from "@/lib/ads/pageData";
+import { platformsOf } from "@/lib/ads/spec";
 
 export const dynamic = "force-dynamic";
 
@@ -67,12 +68,13 @@ export default async function AdCampaignPage(
           status={campaign.status}
           objective={campaign.objective}
           currency={currency}
-          adSets={campaign.spec.adSets.map((s) => ({ name: s.name, dailyBudget: s.dailyBudget }))}
+          adSets={campaign.spec.adSets.map((s) => ({ name: s.name, dailyBudget: s.dailyBudget, ads: s.ads.length }))}
           insights={campaign.insights}
           insightsAt={campaign.insightsAt ? campaign.insightsAt.toISOString() : null}
           launchedAt={campaign.launchedAt ? campaign.launchedAt.toISOString() : null}
           adAccountId={campaign.adAccountId}
           metaCampaignId={campaign.metaIds.campaignId ?? null}
+          platforms={platformsOf(campaign.spec)}
         />
       )}
     </div>

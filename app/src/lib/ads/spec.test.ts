@@ -17,6 +17,8 @@ import {
   buildLeadFormParams,
   toMinorUnits,
   totalDailyBudget,
+  platformsOf,
+  placementProblems,
   type CampaignSpec,
 } from "./spec";
 
@@ -140,5 +142,20 @@ check("lead form asks the chosen fields with the privacy link", form.questions.l
   check("Advantage+ narrow ages go as a suggested range", adv.age_min === 25 && adv.age_max === 65 && JSON.stringify(adv.age_range) === "[30,60]");
   const strict = buildTargeting({ ...aud, ageMin: 30, ageMax: 60, advantageAudience: false }) as Record<string, unknown>;
   check("without Advantage+ ages are a hard limit", strict.age_min === 30 && strict.age_max === 60 && strict.age_range === undefined);
+}
+// Where the ads show.
+{
+  const aud = base().adSets[0].audience;
+  check("both: no platform limit, Meta places the ads", buildTargeting(aud).publisher_platforms === undefined && buildTargeting(aud, "both").publisher_platforms === undefined);
+  check("Facebook only limits the targeting to Facebook", JSON.stringify(buildTargeting(aud, "facebook").publisher_platforms) === '["facebook"]');
+  check("Instagram only limits it to Instagram", JSON.stringify(buildTargeting(aud, "instagram").publisher_platforms) === '["instagram"]');
+  const fbSet = buildAdSetParams(base({ platforms: "facebook" }), base().adSets[0], { campaignId: "c1", pageId: "p1" }) as { targeting: Record<string, unknown> };
+  check("the ad set carries the campaign's placement", JSON.stringify(fbSet.targeting.publisher_platforms) === '["facebook"]');
+  check("plans saved before the setting show on both", platformsOf(base()) === "both" && platformsOf(base({ platforms: "instagram" })) === "instagram");
+  check("a valid placement passes", validateSpec(base({ platforms: "facebook" })).length === 0);
+  check("an unknown placement is refused", validateSpec(base({ platforms: "tiktok" as never })).some((e) => e.includes("where the ads show")));
+  check("a Messenger chat ad cannot be Instagram only", placementProblems({ objective: "messages", messageDestination: "messenger", platforms: "instagram" }).length === 1);
+  check("an Instagram chat ad cannot be Facebook only", placementProblems({ objective: "messages", messageDestination: "instagram", platforms: "facebook" }).length === 1);
+  check("a chat ad on both is fine", placementProblems({ objective: "messages", messageDestination: "instagram", platforms: "both" }).length === 0);
 }
 console.log(`ads/spec.test.ts: ${passed} checks passed.`);

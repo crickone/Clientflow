@@ -21,6 +21,33 @@ export const OBJECTIVE_LABEL: Record<Objective, string> = {
   messages: "Messages (opens a Messenger or Instagram chat)",
 };
 
+/** Where the ads show. "both" leaves placements to Meta (Facebook, Instagram and their Stories and Reels). */
+export const PLATFORMS = ["both", "facebook", "instagram"] as const;
+export type Platforms = (typeof PLATFORMS)[number];
+
+export const PLATFORM_LABEL: Record<Platforms, string> = {
+  both: "Facebook and Instagram",
+  facebook: "Facebook only",
+  instagram: "Instagram only",
+};
+
+/** A plan's placement choice; plans saved before it existed show on both. */
+export function platformsOf(spec: Pick<CampaignSpec, "platforms">): Platforms {
+  return spec.platforms && (PLATFORMS as readonly string[]).includes(spec.platforms) ? spec.platforms : "both";
+}
+
+/** What is wrong with a placement choice for this plan, in plain words. */
+export function placementProblems(spec: Pick<CampaignSpec, "platforms" | "objective" | "messageDestination">): string[] {
+  if (spec.platforms !== undefined && !(PLATFORMS as readonly string[]).includes(spec.platforms)) return ["Pick where the ads show: Facebook and Instagram, Facebook only, or Instagram only."];
+  const p = platformsOf(spec);
+  if (spec.objective === "messages") {
+    const dest = spec.messageDestination ?? "messenger";
+    if (p === "facebook" && dest === "instagram") return ["An ad that opens an Instagram chat has to show on Instagram. Show it on Instagram, or on both."];
+    if (p === "instagram" && dest === "messenger") return ["An ad that opens a Messenger chat has to show on Facebook. Show it on Facebook, or on both."];
+  }
+  return [];
+}
+
 export const CTAS = ["LEARN_MORE", "BOOK_NOW", "SIGN_UP", "CONTACT_US", "GET_OFFER", "SHOP_NOW", "MESSAGE_PAGE", "APPLY_NOW", "SUBSCRIBE"] as const;
 export type Cta = (typeof CTAS)[number];
 
@@ -121,6 +148,8 @@ export interface CampaignSpec {
   advertiser?: string | null;
   /** For "messages": which inbox the ad opens. */
   messageDestination?: "messenger" | "instagram";
+  /** Where the ads show. Absent = both (Meta places them). */
+  platforms?: Platforms;
 }
 
 const MAX_AD_SETS = 10;
@@ -144,6 +173,7 @@ export function validateSpec(spec: CampaignSpec): string[] {
   if (!OBJECTIVES.includes(spec.objective)) errors.push("Pick an objective.");
   if (!spec.adSets?.length) errors.push("Add at least one ad set.");
   if (spec.adSets?.length > MAX_AD_SETS) errors.push(`At most ${MAX_AD_SETS} ad sets per campaign.`);
+  errors.push(...placementProblems(spec));
 
   if (spec.objective === "leads") {
     const f = spec.leadForm;
@@ -231,8 +261,8 @@ export function toMinorUnits(amount: number): number {
   return Math.round(amount * 100);
 }
 
-/** The targeting object for an ad set. */
-export function buildTargeting(a: AudienceSpec): Record<string, unknown> {
+/** The targeting object for an ad set. A placement other than "both" limits it to that platform (all its positions). */
+export function buildTargeting(a: AudienceSpec, platforms: Platforms = "both"): Record<string, unknown> {
   const cities = a.locations.filter((l): l is Extract<LocationRef, { kind: "city" }> => l.kind === "city");
   const countries = a.locations.filter((l): l is Extract<LocationRef, { kind: "country" }> => l.kind === "country");
   const geo: Record<string, unknown> = {};
@@ -264,6 +294,7 @@ export function buildTargeting(a: AudienceSpec): Record<string, unknown> {
   }
   if (a.genders.length === 1) t.genders = [a.genders[0] === "male" ? 1 : 2];
   if (a.interests.length) t.flexible_spec = [{ interests: a.interests.map((i) => ({ id: i.id, name: i.name })) }];
+  if (platforms !== "both") t.publisher_platforms = [platforms];
   return t;
 }
 
@@ -286,7 +317,7 @@ export function buildAdSetParams(spec: CampaignSpec, set: AdSetSpec, ctx: AdSetC
     billing_event: o.billingEvent,
     optimization_goal: o.optimizationGoal,
     bid_strategy: "LOWEST_COST_WITHOUT_CAP",
-    targeting: buildTargeting(set.audience),
+    targeting: buildTargeting(set.audience, platformsOf(spec)),
     // ACTIVE under a campaign that stays PAUSED until the whole tree exists, so
     // switching the campaign on is the single launch switch.
     status: "ACTIVE",
@@ -482,6 +513,13 @@ const TALL_POSITIONS = {
   instagram_positions: ["story", "reels"],
 };
 
+/** A placement rule narrowed to the campaign's platform, so a Facebook-only ad never names Instagram positions (and the reverse). */
+function positionsFor(base: typeof FEED_POSITIONS, platforms: Platforms): Record<string, unknown> {
+  if (platforms === "facebook") return { publisher_platforms: ["facebook"], facebook_positions: base.facebook_positions };
+  if (platforms === "instagram") return { publisher_platforms: ["instagram"], instagram_positions: base.instagram_positions };
+  return base;
+}
+
 function placementFeed(spec: CampaignSpec, ad: AdSpec, ctx: CreativeContext) {
   const c = ad.creative;
   const { texts, headlines } = textOptions(c);
@@ -513,8 +551,8 @@ export function buildPlacementImageParams(spec: CampaignSpec, ad: AdSpec, ctx: C
   ];
   feed.ad_formats = ["SINGLE_IMAGE"];
   feed.asset_customization_rules = [
-    { customization_spec: FEED_POSITIONS, image_label: { name: "feed_image" }, priority: 1 },
-    { customization_spec: TALL_POSITIONS, image_label: { name: "tall_image" }, priority: 2 },
+    { customization_spec: positionsFor(FEED_POSITIONS, platformsOf(spec)), image_label: { name: "feed_image" }, priority: 1 },
+    { customization_spec: positionsFor(TALL_POSITIONS, platformsOf(spec)), image_label: { name: "tall_image" }, priority: 2 },
   ];
   return { name: ad.name, object_story_spec: storySpec, asset_feed_spec: feed };
 }
@@ -534,8 +572,8 @@ export function buildPlacementVideoParams(spec: CampaignSpec, ad: AdSpec, ctx: C
   ];
   feed.ad_formats = ["SINGLE_VIDEO"];
   feed.asset_customization_rules = [
-    { customization_spec: FEED_POSITIONS, video_label: { name: "feed_video" }, priority: 1 },
-    { customization_spec: TALL_POSITIONS, video_label: { name: "tall_video" }, priority: 2 },
+    { customization_spec: positionsFor(FEED_POSITIONS, platformsOf(spec)), video_label: { name: "feed_video" }, priority: 1 },
+    { customization_spec: positionsFor(TALL_POSITIONS, platformsOf(spec)), video_label: { name: "tall_video" }, priority: 2 },
   ];
   return { name: ad.name, object_story_spec: storySpec, asset_feed_spec: feed };
 }

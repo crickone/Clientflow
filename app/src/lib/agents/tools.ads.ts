@@ -3,6 +3,7 @@ import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 
 import {
+  addAdsToCampaign,
   createAdDraft,
   launchAdCampaign,
   listAdCampaigns,
@@ -10,10 +11,11 @@ import {
   searchAdCities,
   searchAdInterests,
   setAdCampaignStatus,
+  setAdCampaignPlatforms,
   setAdSetBudget,
   updateAdDraft,
 } from "@/lib/ads/service";
-import { OBJECTIVES, totalDailyBudget, validateSpec, type CampaignSpec } from "@/lib/ads/spec";
+import { OBJECTIVES, PLATFORM_LABEL, PLATFORMS, platformsOf, totalDailyBudget, validateSpec, type AdSpec, type CampaignSpec, type Platforms } from "@/lib/ads/spec";
 import { listAdAccounts } from "@/lib/facebook/grants";
 import { listCarousels } from "@/lib/image/carousels";
 import { fenceUntrusted, type ToolContext, type ToolResult } from "@/lib/agents/toolKit";
@@ -22,9 +24,32 @@ import { fenceUntrusted, type ToolContext, type ToolResult } from "@/lib/agents/
  * Adonis's ads tools (the ads manager, lib/ads). Reads run freely: listing
  * campaigns, searching audiences, pulling results. Every write goes through
  * the approval gate (WRITE_TOOL_META): saving a draft, launching, pausing /
- * resuming / archiving, and changing a budget. Launching, resuming and a
- * budget change spend the business's money on its own ad account.
+ * resuming / archiving, changing a budget, adding an ad to a campaign
+ * (live ones included) and changing where a campaign shows. Launching,
+ * resuming, a budget change and an ad added to a live campaign spend the
+ * business's money on its own ad account.
  */
+
+const AD_SCHEMA = {
+  type: "object",
+  properties: {
+    name: { type: "string" },
+    creative: {
+      type: "object",
+      properties: {
+        designId: { type: "integer", description: "A Content Studio design id (list_ad_campaigns lists them)." },
+        format: { type: "string", enum: ["single", "carousel"] },
+        primaryText: { type: "string" },
+        headline: { type: "string" },
+        description: { type: "string" },
+        cta: { type: "string", enum: ["LEARN_MORE", "BOOK_NOW", "SIGN_UP", "CONTACT_US", "GET_OFFER", "SHOP_NOW", "MESSAGE_PAGE", "APPLY_NOW", "SUBSCRIBE"] },
+        linkUrl: { type: "string", description: "https link; required for traffic, awareness and engagement." },
+      },
+      required: ["designId", "format", "primaryText", "headline", "cta"],
+    },
+  },
+  required: ["name", "creative"],
+} as const;
 
 const SPEC_SCHEMA = {
   type: "object",
@@ -34,6 +59,11 @@ const SPEC_SCHEMA = {
     name: { type: "string" },
     objective: { type: "string", enum: [...OBJECTIVES] },
     messageDestination: { type: "string", enum: ["messenger", "instagram"], description: "For objective 'messages': which inbox the ad opens." },
+    platforms: {
+      type: "string",
+      enum: [...PLATFORMS],
+      description: "Where the ads show: 'both' (default; Meta places them across Facebook and Instagram), 'facebook' (Facebook only) or 'instagram' (Instagram only).",
+    },
     leadForm: {
       type: "object",
       description: "Required for objective 'leads': the instant form.",
@@ -86,26 +116,7 @@ const SPEC_SCHEMA = {
           },
           ads: {
             type: "array",
-            items: {
-              type: "object",
-              properties: {
-                name: { type: "string" },
-                creative: {
-                  type: "object",
-                  properties: {
-                    designId: { type: "integer", description: "A Content Studio design id (list_ad_campaigns lists them)." },
-                    format: { type: "string", enum: ["single", "carousel"] },
-                    primaryText: { type: "string" },
-                    headline: { type: "string" },
-                    description: { type: "string" },
-                    cta: { type: "string", enum: ["LEARN_MORE", "BOOK_NOW", "SIGN_UP", "CONTACT_US", "GET_OFFER", "SHOP_NOW", "MESSAGE_PAGE", "APPLY_NOW", "SUBSCRIBE"] },
-                    linkUrl: { type: "string", description: "https link; required for traffic, awareness and engagement." },
-                  },
-                  required: ["designId", "format", "primaryText", "headline", "cta"],
-                },
-              },
-              required: ["name", "creative"],
-            },
+            items: AD_SCHEMA as unknown as Record<string, unknown>,
           },
         },
         required: ["name", "dailyBudget", "audience", "ads"],
@@ -153,7 +164,7 @@ export const ADS_TOOLS: Anthropic.Tool[] = [
   {
     name: "launch_ad_campaign",
     description:
-      "Launch a draft ad campaign on Facebook and Instagram. It goes live immediately and spends up to its total daily budget from the business's ad account. Only when the operator has explicitly asked to launch it.",
+      "Launch a draft ad campaign on Meta, on the platforms its plan names (Facebook and Instagram, Facebook only, or Instagram only). It goes live immediately and spends up to its total daily budget from the business's ad account. Only when the operator has explicitly asked to launch it.",
     input_schema: { type: "object", properties: { campaignId: { type: "integer" } }, required: ["campaignId"] },
   },
   {
@@ -163,6 +174,30 @@ export const ADS_TOOLS: Anthropic.Tool[] = [
       type: "object",
       properties: { campaignId: { type: "integer" }, status: { type: "string", enum: ["active", "paused", "archived"] } },
       required: ["campaignId", "status"],
+    },
+  },
+  {
+    name: "add_ad_to_campaign",
+    description:
+      "Add one ad to an ad set of an existing campaign. On a draft it joins the plan. On a LIVE or paused campaign it is created on Meta straight away inside that ad set and, once Meta approves it, shows and spends from that ad set's existing budget. Show the operator the ad (design, texts, button) first. Same copy house rules as draft_ad_campaign. An ad set takes at most 6 ads.",
+    input_schema: {
+      type: "object",
+      properties: {
+        campaignId: { type: "integer" },
+        adSetIndex: { type: "integer", description: "0-based, in the order list_ad_campaigns shows. Default 0." },
+        ad: AD_SCHEMA as unknown as Record<string, unknown>,
+      },
+      required: ["campaignId", "ad"],
+    },
+  },
+  {
+    name: "set_ad_placements",
+    description:
+      "Change where a campaign's ads show: 'both' (Facebook and Instagram), 'facebook' (Facebook only) or 'instagram' (Instagram only). Works on drafts and on live or paused campaigns (every ad set is updated on Meta).",
+    input_schema: {
+      type: "object",
+      properties: { campaignId: { type: "integer" }, platforms: { type: "string", enum: [...PLATFORMS] } },
+      required: ["campaignId", "platforms"],
     },
   },
   {
@@ -185,9 +220,10 @@ export function listAdCampaignsTool(ctx: ToolContext): ToolResult {
     name: c.name,
     objective: c.objective,
     status: c.status,
+    showsOn: PLATFORM_LABEL[platformsOf(c.spec)],
     adAccountId: c.adAccountId,
     dailyBudget: totalDailyBudget(c.spec),
-    adSets: c.spec.adSets.map((s, i) => ({ index: i, name: s.name, dailyBudget: s.dailyBudget })),
+    adSets: c.spec.adSets.map((s, i) => ({ index: i, name: s.name, dailyBudget: s.dailyBudget, ads: s.ads.length })),
     results: c.insights ? { spend: c.insights.spend, results: c.insights.results, label: c.insights.resultLabel, costPerResult: c.insights.costPerResult } : null,
     error: c.error,
   }));
@@ -244,7 +280,7 @@ export function draftAdCampaignTool(ctx: ToolContext, input: Record<string, unkn
 export async function launchAdCampaignTool(_ctx: ToolContext, input: Record<string, unknown>): Promise<ToolResult> {
   try {
     const c = await launchAdCampaign(Number(input.campaignId));
-    return { text: JSON.stringify({ result: `"${c.name}" is live on Facebook and Instagram.`, url: `/marketing/ads/${c.id}` }) };
+    return { text: JSON.stringify({ result: `"${c.name}" is live (${PLATFORM_LABEL[platformsOf(c.spec)]}).`, url: `/marketing/ads/${c.id}` }) };
   } catch (e) {
     return err(e);
   }
@@ -267,6 +303,39 @@ export async function setAdBudgetTool(_ctx: ToolContext, input: Record<string, u
   try {
     const c = await setAdSetBudget(Number(input.campaignId), Number(input.adSetIndex), Number(input.dailyBudget));
     return { text: JSON.stringify({ result: `Budget updated on "${c.name}".` }) };
+  } catch (e) {
+    return err(e);
+  }
+}
+
+/** WRITE — on a live campaign this spends from the ad set's budget once Meta approves the ad. */
+export async function addAdToCampaignTool(_ctx: ToolContext, input: Record<string, unknown>): Promise<ToolResult> {
+  try {
+    const ad = input.ad as AdSpec | undefined;
+    if (!ad || typeof ad !== "object" || !ad.creative) return { text: JSON.stringify({ error: "ad is required (name and creative)." }) };
+    const adSetIndex = input.adSetIndex === undefined ? 0 : Number(input.adSetIndex);
+    const c = await addAdsToCampaign(Number(input.campaignId), adSetIndex, [{ ...ad, creative: { source: "design", ...ad.creative } }]);
+    const live = c.status === "active" || c.status === "paused";
+    return {
+      text: JSON.stringify({
+        result: live
+          ? `Added to "${c.spec.adSets[adSetIndex]?.name}" in "${c.name}". Meta reviews new ads before they run, usually within a few hours.`
+          : `Added to the draft "${c.name}". Nothing runs until it is launched.`,
+        url: `/marketing/ads/${c.id}`,
+      }),
+    };
+  } catch (e) {
+    return err(e);
+  }
+}
+
+/** WRITE */
+export async function setAdPlacementsTool(_ctx: ToolContext, input: Record<string, unknown>): Promise<ToolResult> {
+  const platforms = input.platforms as Platforms;
+  if (!(PLATFORMS as readonly string[]).includes(platforms)) return { text: JSON.stringify({ error: "platforms must be both, facebook or instagram." }) };
+  try {
+    const c = await setAdCampaignPlatforms(Number(input.campaignId), platforms);
+    return { text: JSON.stringify({ result: `"${c.name}" now shows on ${PLATFORM_LABEL[platforms]}.` }) };
   } catch (e) {
     return err(e);
   }

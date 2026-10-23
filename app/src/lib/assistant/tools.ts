@@ -101,6 +101,8 @@ import {
   searchAdAudienceTool,
   setAdBudgetTool,
   setAdCampaignStatusTool,
+  addAdToCampaignTool,
+  setAdPlacementsTool,
 } from "@/lib/agents/tools.ads";
 import { SOCIAL_METRICS_TOOLS, getSocialMetricsTool } from "@/lib/agents/tools.social";
 import { GOOGLE_TOOLS, getGoogleMetricsTool, listGoogleReviewsTool, replyToGoogleReviewTool } from "@/lib/agents/tools.google";
@@ -252,9 +254,11 @@ const WRITE_TOOL_META: Record<string, WriteToolMeta> = {
   // resuming and budget changes spend the business's own ad money. The 3
   // reads (list_ad_campaigns, search_ad_audience, get_ad_results) are absent.
   draft_ad_campaign: { label: "Save ad campaign draft", summarize: ({ v, input }) => { const spec = (input.spec ?? {}) as { name?: string; objective?: string; adSets?: Array<{ dailyBudget?: number }> }; const total = (spec.adSets ?? []).reduce((s, a) => s + (Number(a.dailyBudget) || 0), 0); return `Save the ad campaign draft ${spec.name ? `"${spec.name}"` : v("campaignId") ? `#${v("campaignId")}` : "(untitled)"}${spec.objective ? ` (${spec.objective})` : ""}${total ? `, ${total} a day once launched` : ""}`; } },
-  launch_ad_campaign: { label: "Launch ad campaign", summarize: ({ v }) => `Launch ad campaign #${v("campaignId") || "?"} on Facebook and Instagram (starts spending)` },
+  launch_ad_campaign: { label: "Launch ad campaign", summarize: ({ v }) => `Launch ad campaign #${v("campaignId") || "?"} on Meta (starts spending)` },
   set_ad_campaign_status: { label: "Change ad campaign status", summarize: ({ v }) => `${v("status") === "active" ? "Resume (starts spending)" : v("status") === "archived" ? "Archive" : "Pause"} ad campaign #${v("campaignId") || "?"}` },
   set_ad_budget: { label: "Change ad budget", summarize: ({ v }) => `Set ad set ${Number(v("adSetIndex") || 0) + 1} of ad campaign #${v("campaignId") || "?"} to ${v("dailyBudget") || "?"} a day` },
+  add_ad_to_campaign: { label: "Add an ad to a campaign", summarize: ({ v, input }) => { const ad = (input.ad ?? {}) as { name?: string }; return `Add the ad ${ad.name ? `"${ad.name}"` : "(unnamed)"} to ad set ${Number(v("adSetIndex") || 0) + 1} of ad campaign #${v("campaignId") || "?"} (on a live campaign it runs once Meta approves it)`; } },
+  set_ad_placements: { label: "Change where ads show", summarize: ({ v }) => `Show ad campaign #${v("campaignId") || "?"} on ${v("platforms") === "facebook" ? "Facebook only" : v("platforms") === "instagram" ? "Instagram only" : v("platforms") === "both" ? "Facebook and Instagram" : "?"}` },
   cancel_scheduled_item: { label: "Cancel scheduled item", summarize: ({ v }) => `Cancel the scheduled ${v("kind") || "item"}${v("name") ? ` "${v("name")}"` : ""}` },
 
   // Operations agent (Operations Task 1): WhatsApp send to a CLIENT (distinct
@@ -1046,6 +1050,10 @@ export async function executeTool(
         return await setAdCampaignStatusTool(ctx, input);
       case "set_ad_budget":
         return await setAdBudgetTool(ctx, input);
+      case "add_ad_to_campaign":
+        return await addAdToCampaignTool(ctx, input);
+      case "set_ad_placements":
+        return await setAdPlacementsTool(ctx, input);
       case "list_website_pages":
         return listWebsitePagesTool(ctx, input);
       case "read_website_page":

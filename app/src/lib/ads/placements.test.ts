@@ -35,4 +35,18 @@ assert.equal(single.object_story_spec.link_data, undefined, "a video ad carries 
 const bad = validateSpec({ ...spec, adSets: [{ ...spec.adSets[0], ads: [{ ...vad, creative: { ...vad.creative, adCreativeId: undefined } }] }] });
 assert.ok(bad.some((e) => e.includes("video ad")));
 
+// Facebook only: the feed and Stories/Reels rules name Facebook positions only.
+{
+  const fb = buildPlacementImageParams({ ...spec, platforms: "facebook" }, ad, ctx, { feed: "F", tall: "T" }) as { asset_feed_spec: { asset_customization_rules: { customization_spec: Record<string, unknown> }[] } };
+  for (const r of fb.asset_feed_spec.asset_customization_rules) {
+    assert.deepEqual(r.customization_spec.publisher_platforms, ["facebook"]);
+    assert.equal(r.customization_spec.instagram_positions, undefined, "no Instagram positions on a Facebook-only ad");
+  }
+  const ig = buildPlacementVideoParams({ ...spec, platforms: "instagram" }, vad, ctx, { feed: { videoId: "v1", thumbnailHash: "h1" }, tall: { videoId: "v2", thumbnailHash: "h2" } }) as { asset_feed_spec: { asset_customization_rules: { customization_spec: Record<string, unknown> }[] } };
+  for (const r of ig.asset_feed_spec.asset_customization_rules) {
+    assert.deepEqual(r.customization_spec.publisher_platforms, ["instagram"]);
+    assert.equal(r.customization_spec.facebook_positions, undefined, "no Facebook positions on an Instagram-only ad");
+  }
+}
+
 console.log("placements: all checks passed.");

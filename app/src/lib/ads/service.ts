@@ -24,7 +24,13 @@ import {
   buildPlacementImageParams,
   buildPlacementVideoParams,
   buildSingleVideoParams,
+  buildTargeting,
   hasVariants,
+  placementProblems,
+  platformsOf,
+  PLATFORM_LABEL,
+  PLATFORMS,
+  type Platforms,
   splitVariants,
   toMinorUnits,
   validateSpec,
@@ -177,6 +183,13 @@ function adsPage(): { pageId: string; pageToken: string; igUserId: string | null
   const page = getPostingPage(tenantId, getPreferredPostingPageId(tenantId));
   if (!page) throw new AdsError("No Facebook Page is connected. Ads run from your Page, so connect it first.");
   return { pageId: page.pageId, pageToken: page.pageAccessToken, igUserId: page.igUserId ?? null, pageName: page.pageName ?? null };
+}
+
+/** Instagram only needs an Instagram account behind the Page, or Meta has nowhere to show the ads. */
+function requirePlacementPossible(spec: CampaignSpec, page: { igUserId: string | null }): void {
+  if (platformsOf(spec) === "instagram" && !page.igUserId) {
+    throw new AdsError("Instagram only needs an Instagram account linked to your Facebook Page. Link it in Meta Business Suite, then reconnect Facebook in Settings.");
+  }
 }
 
 async function uploadDesignImages(adAccountId: string, token: string, designId: number, cache: Map<number, string[]>): Promise<string[]> {
@@ -460,6 +473,7 @@ export async function launchAdCampaign(id: number): Promise<AdCampaignRow> {
   const page = adsPage();
   const spec = current.spec;
   const acct = current.adAccountId;
+  requirePlacementPossible(spec, page);
 
   update(id, { status: "launching", error: null, pageId: page.pageId });
   const ids: MetaIds = { adSets: [] };
@@ -543,6 +557,7 @@ export async function addAdsToCampaign(id: number, adSetIndex: number, ads: AdSp
   const token = requireToken();
   requireAdAccount(current.adAccountId);
   const page = adsPage();
+  requirePlacementPossible(spec, page);
   await createAdsInAdSet(
     { acct: current.adAccountId, token, page, spec, adSetId: entry.adSetId, leadFormId: ids.leadFormId ?? null, entry, caches: newCaches() },
     fresh,
@@ -567,6 +582,35 @@ export async function setAdCampaignStatus(id: number, status: "active" | "paused
   await graph("POST", c.metaIds.campaignId, requireToken(), { status: meta });
   update(id, { status });
   await logActivity(`ads.${status}`, `Ad campaign "${c.name}" ${status === "active" ? "resumed" : status}`, { adCampaignId: id });
+  return getAdCampaign(id)!;
+}
+
+/**
+ * Where a campaign's ads show: Facebook and Instagram, Facebook only, or
+ * Instagram only. A draft just changes its plan. On a campaign already on Meta
+ * every ad set's targeting is sent again with the new platform (Meta replaces
+ * targeting whole, so it is rebuilt from the stored audience).
+ */
+export async function setAdCampaignPlatforms(id: number, platforms: Platforms): Promise<AdCampaignRow> {
+  if (!(PLATFORMS as readonly string[]).includes(platforms)) throw new AdsError("Pick Facebook and Instagram, Facebook only, or Instagram only.");
+  const current = getAdCampaign(id);
+  if (!current) throw new AdsError("Campaign not found.");
+  const spec: CampaignSpec = { ...current.spec, platforms };
+  const problems = placementProblems(spec);
+  if (problems.length) throw new AdsError(problems.join(" "));
+  if (current.status === "draft" || current.status === "error") return updateAdDraft(id, { spec });
+  if (current.status !== "active" && current.status !== "paused") throw new AdsError("This campaign has been archived.");
+  const c = launched(id);
+  const page = adsPage();
+  requirePlacementPossible(spec, page);
+  const token = requireToken();
+  for (const [i, entry] of (c.metaIds.adSets ?? []).entries()) {
+    const set = spec.adSets[i];
+    if (!set) continue;
+    await graph("POST", entry.adSetId, token, { targeting: buildTargeting(set.audience, platforms) });
+  }
+  update(id, { spec: JSON.stringify(spec) });
+  await logActivity("ads.placements", `Ad campaign "${current.name}" now shows on ${PLATFORM_LABEL[platforms]}`, { adCampaignId: id });
   return getAdCampaign(id)!;
 }
 

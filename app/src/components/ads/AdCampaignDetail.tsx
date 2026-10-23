@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Archive, ExternalLink, Pause, Play, RefreshCw } from "lucide-react";
+import { Archive, ExternalLink, Pause, Play, Plus, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
@@ -10,14 +11,17 @@ import { Badge } from "@/components/ui/Badge";
 import { Card, CardLabel, CardValue } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-import { refreshAdInsightsAction, setAdCampaignStatusAction, setAdSetBudgetAction } from "@/app/marketing/ads/actions";
+import { refreshAdInsightsAction, setAdCampaignStatusAction, setAdPlacementsAction, setAdSetBudgetAction } from "@/app/marketing/ads/actions";
 import type { AdInsights } from "@/lib/ads/service";
+import { PLATFORM_LABEL, PLATFORMS, type Platforms } from "@/lib/ads/spec";
+import { Segmented } from "./builder/controls";
 import { AD_STATUS, money } from "./status";
 
 /**
  * A launched campaign: what it has spent and achieved (pulled from Meta on
- * open and on demand), each ad set's daily budget, and pause / resume /
- * archive. Resuming and raising a budget confirm the spend first.
+ * open and on demand), each ad set's daily budget, where it shows, adding
+ * an ad, and pause / resume / archive. Resuming, raising a budget and
+ * changing where it shows confirm first.
  */
 export function AdCampaignDetail({
   id,
@@ -30,22 +34,25 @@ export function AdCampaignDetail({
   launchedAt,
   adAccountId,
   metaCampaignId,
+  platforms,
 }: {
   id: number;
   status: string;
   objective: string;
   currency: string;
-  adSets: Array<{ name: string; dailyBudget: number }>;
+  adSets: Array<{ name: string; dailyBudget: number; ads: number }>;
   insights: AdInsights | null;
   insightsAt: string | null;
   launchedAt: string | null;
   adAccountId: string;
   metaCampaignId: string | null;
+  platforms: Platforms;
 }) {
   const router = useRouter();
   const confirm = useConfirm();
   const [busy, start] = useTransition();
   const [budgets, setBudgets] = useState(adSets.map((s) => String(s.dailyBudget)));
+  const [where, setWhere] = useState<Platforms>(platforms);
   const st = AD_STATUS[status] ?? AD_STATUS.draft;
 
   function refresh(quiet = false) {
@@ -102,6 +109,21 @@ export function AdCampaignDetail({
     });
   }
 
+  async function savePlacements() {
+    const ok = await confirm({
+      title: `Show it on ${PLATFORM_LABEL[where]}?`,
+      body: "Every ad set in this campaign is updated on Meta. Meta may review the ads again, which can pause delivery for a few hours.",
+      confirmLabel: "Update",
+    });
+    if (!ok) return;
+    start(async () => {
+      const r = await setAdPlacementsAction(id, where);
+      if (!r.ok) return void toast.error(r.error);
+      toast.success(`Now shows on ${PLATFORM_LABEL[where]}`);
+      router.refresh();
+    });
+  }
+
   const managerUrl = metaCampaignId
     ? `https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${adAccountId.replace(/^act_/, "")}&selected_campaign_ids=${metaCampaignId}`
     : null;
@@ -114,6 +136,7 @@ export function AdCampaignDetail({
         </Badge>
         <span style={{ fontSize: 13, color: "var(--text-tertiary)", textTransform: "capitalize" }}>
           {objective}
+          <span style={{ textTransform: "none" }}> · {PLATFORM_LABEL[platforms]}</span>
           {launchedAt ? ` · launched ${new Date(launchedAt).toLocaleDateString("en-IE")}` : ""}
         </span>
         <span style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -164,7 +187,9 @@ export function AdCampaignDetail({
           return (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "8px 0", borderTop: i ? "1px solid var(--hairline)" : "none" }}>
               <div style={{ flex: "1 1 200px" }}>
-                <div style={{ fontSize: 14, color: "var(--text-primary)" }}>{s.name}</div>
+                <div style={{ fontSize: 14, color: "var(--text-primary)" }}>
+                  {s.name} <span style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>· {s.ads} ad{s.ads === 1 ? "" : "s"}</span>
+                </div>
                 {row && (
                   <div style={{ fontSize: 12.5, color: "var(--text-tertiary)" }}>
                     {money(row.spend, currency)} spent · {row.results} {insights?.resultLabel.toLowerCase()}
@@ -184,6 +209,34 @@ export function AdCampaignDetail({
           );
         })}
       </Card>
+
+      {status !== "archived" && (
+        <Card style={{ padding: 20, display: "grid", gap: 12 }}>
+          <CardLabel>Where it shows</CardLabel>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <Segmented label="Where it shows" value={where} onChange={setWhere} options={PLATFORMS.map((k) => ({ key: k, label: PLATFORM_LABEL[k] }))} />
+            <Button variant="outline" size="sm" onClick={savePlacements} disabled={busy || where === platforms}>
+              Save
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {status !== "archived" && (
+        <Card style={{ padding: 20, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+          <div style={{ flex: "1 1 260px", display: "grid", gap: 4 }}>
+            <CardLabel>Add an ad</CardLabel>
+            <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+              New ads come from Content Studio. Open one and choose Use in a campaign, then pick this campaign. It runs inside the ad set you choose, from that budget, once Meta approves it.
+            </span>
+          </div>
+          <Link href="/content-studio/ads">
+            <Button variant="outline">
+              <Plus size={14} /> Choose an ad
+            </Button>
+          </Link>
+        </Card>
+      )}
 
       {managerUrl && (
         <div>

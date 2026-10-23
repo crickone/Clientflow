@@ -78,6 +78,8 @@
     "launch_ad_campaign",
     "set_ad_campaign_status",
     "set_ad_budget",
+    "add_ad_to_campaign",
+    "set_ad_placements",
     "cancel_scheduled_item",
     "send_client_whatsapp"
   ],
@@ -263,8 +265,8 @@
       "Save the ad campaign draft (untitled)"
     ],
     "launch_ad_campaign": [
-      "Launch ad campaign #4 on Facebook and Instagram (starts spending)",
-      "Launch ad campaign #? on Facebook and Instagram (starts spending)"
+      "Launch ad campaign #4 on Meta (starts spending)",
+      "Launch ad campaign #? on Meta (starts spending)"
     ],
     "set_ad_campaign_status": [
       "Pause ad campaign #4",
@@ -281,6 +283,14 @@
     "reply_to_google_review": [
       "Post a public reply on Google to review #? — “Hi there”",
       "Post a public reply on Google to review #?"
+    ],
+    "add_ad_to_campaign": [
+      "Add the ad (unnamed) to ad set 1 of ad campaign #4 (on a live campaign it runs once Meta approves it)",
+      "Add the ad (unnamed) to ad set 1 of ad campaign #? (on a live campaign it runs once Meta approves it)"
+    ],
+    "set_ad_placements": [
+      "Show ad campaign #4 on ?",
+      "Show ad campaign #? on ?"
     ]
   },
   "readSamplesAllFalse": [

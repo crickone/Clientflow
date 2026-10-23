@@ -26,6 +26,9 @@ import {
   CTAS,
   OBJECTIVES,
   OBJECTIVE_LABEL,
+  PLATFORM_LABEL,
+  PLATFORMS,
+  platformsOf,
   textOptions,
   totalDailyBudget,
   validateSpec,
@@ -337,7 +340,7 @@ export function AdCampaignBuilder({
     const total = totalDailyBudget(spec);
     const ok = await confirm({
       title: "Launch this campaign?",
-      body: `It goes live on Facebook and Instagram straight away and spends up to ${money(total, currency)} a day from your ad account until you pause it${spec.adSets.some((s) => s.endAt) ? " or its end date passes" : ""}. Meta bills your ad account directly.`,
+      body: `It goes live on ${PLATFORM_LABEL[platformsOf(spec)].replace(" only", "")} straight away and spends up to ${money(total, currency)} a day from your ad account until you pause it${spec.adSets.some((s) => s.endAt) ? " or its end date passes" : ""}. Meta bills your ad account directly.`,
       confirmLabel: `Launch at ${money(total, currency)} a day`,
     });
     if (!ok) return;
@@ -471,6 +474,11 @@ export function AdCampaignBuilder({
             <dd>{splitLabel(OBJECTIVE_LABEL[spec.objective])[0]}</dd>
             <button type="button" className="adb-plan-edit" onClick={() => go(0)}>Edit</button>
           </div>
+          <div className="adb-plan-row">
+            <dt>Shows on</dt>
+            <dd>{PLATFORM_LABEL[platformsOf(spec)]}</dd>
+            <button type="button" className="adb-plan-edit" onClick={() => go(0)}>Edit</button>
+          </div>
           {spec.adSets.map((x, j) => (
             <div className="adb-plan-row" key={j}>
               <dt>{spec.adSets.length > 1 ? x.name || `Ad set ${j + 1}` : "Who"}</dt>
@@ -555,6 +563,15 @@ export function AdCampaignBuilder({
                   <p>Pick one goal. Meta shows the ads to the people most likely to do it.</p>
                 </header>
                 <ObjectiveCards options={objectiveOptions} value={spec.objective} onChange={setObjective} />
+                <div style={{ display: "grid", gap: 8 }}>
+                  <span className="adb-hint">Where the ads show</span>
+                  <Segmented
+                    label="Where the ads show"
+                    value={platformsOf(spec)}
+                    onChange={(v) => patch({ platforms: v })}
+                    options={PLATFORMS.map((k) => ({ key: k, label: PLATFORM_LABEL[k] }))}
+                  />
+                </div>
                 {spec.objective === "messages" && (
                   <div style={{ display: "grid", gap: 8 }}>
                     <span className="adb-hint">Open the chat in</span>
