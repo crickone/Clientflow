@@ -45,6 +45,7 @@ import {
 } from "@/lib/ai/postTreatments";
 import { readKey, setKey } from "@/lib/settings";
 import type { DesignSystem } from "@/lib/design/parse";
+import { briefsAfterRedesign, cleanScene } from "@/lib/image/photoScenes";
 
 /**
  * The design pass: the model authors the post, this renders it.
@@ -602,6 +603,12 @@ export async function redesignSlide(
     /** The photograph this slide already has: it keeps the first slot. */
     photo?: PhotoChoice | null;
     /**
+     * What `photo` shows: the brief it was made from. The model never sees the
+     * picture, so without this it designs around a scene of its own invention
+     * and writes that scene down as the slide's brief.
+     */
+    photoBrief?: string | null;
+    /**
      * Everything the library can supply, for a slide the model redesigns into
      * a genuine comparison. Without it a redesign carried one photograph, so
      * the prompt forbade a second slot outright and "make this a split screen,
@@ -619,6 +626,8 @@ export async function redesignSlide(
   const aspectRatio = input.aspectRatio ?? "1:1";
   const { width, height } = canvasFor(aspectRatio);
   const hasPhotography = !!input.photo;
+  const photoBrief = input.photo ? cleanScene(input.photoBrief ?? "") : "";
+  const keepsPhoto = photoBrief !== "";
 
   // The slide's own photograph first, then the rest of the library with it
   // removed, so the count is of DISTINCT pictures and redesignPhotoSlots draws
@@ -677,11 +686,11 @@ export async function redesignSlide(
       { role: "user" as const, content: askFor },
       {
         role: "assistant" as const,
-        content: `<design>\n${JSON.stringify({ caption: "", slides: [{ photos: [""], html: input.previousHtml }] })}\n</design>`,
+        content: `<design>\n${JSON.stringify({ caption: "", slides: [{ photos: [photoBrief], html: input.previousHtml }] })}\n</design>`,
       },
       {
         role: "user" as const,
-        content: input.note?.trim()
+        content: (input.note?.trim()
           ? `${input.note.trim()}\n\nRedesign that slide accordingly. Keep everything the instruction does not touch. Same format.`
           : // A plain regenerate with no steer lands on a near-identical
             // composition surprisingly often — the model has just written this
@@ -689,7 +698,10 @@ export async function redesignSlide(
             // different direction is what makes "again, differently" actually
             // different. Only when the operator gave no instruction of their
             // own: a note is a steer, and this would fight it.
-            `Design that slide again, differently. Same content, a different composition -- take it toward ${redesignMove.directive}. Same format.`,
+            `Design that slide again, differently. Same content, a different composition -- take it toward ${redesignMove.directive}. Same format.`) +
+          (keepsPhoto
+            ? `\n\nThe photograph in {{PHOTO}} stays. It shows: ${photoBrief}. Design around that picture and keep "photos"[0] as that description.`
+            : ""),
       },
     ],
   }));
@@ -738,12 +750,23 @@ export async function redesignSlide(
     input.logoPath ?? null,
   );
 
+  // The model's slot 1 brief is a guess at a picture it never saw; when slot 1
+  // still holds the photograph it was given, that photograph's own brief is
+  // the true one. See briefsAfterRedesign.
+  const briefs = briefsAfterRedesign({
+    keptPhotoId: input.photo?.id ?? null,
+    keptBrief: photoBrief,
+    slotIds: assetIds,
+    photo: design.photo,
+    photos: design.photos,
+  });
+
   return {
     slide: {
       html: design.html,
       renderFilename,
-      photo: design.photo,
-      photoScenes: design.photos,
+      photo: briefs.photo,
+      photoScenes: briefs.photos,
       photoAssetId: assetIds[0] ?? null,
       photoAssetIds: assetIds,
       violations: violation

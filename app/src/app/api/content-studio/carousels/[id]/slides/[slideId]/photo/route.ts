@@ -301,7 +301,10 @@ export async function POST(req: Request, props: { params: Promise<{ id: string; 
       // decides -- swap it in, or redesign around it -- and can say which
       // step it is on while it does, which one long request never could.
       if (o.onlyGenerate === true) {
-        return NextResponse.json({ ok: true, asset });
+        // The scene goes back with it: a slide with no photo slot redesigns
+        // around this picture next, and the redesign needs to know what it
+        // shows (see briefsAfterRedesign).
+        return NextResponse.json({ ok: true, asset, scene });
       }
     } catch (err) {
       if (err instanceof AiCapError) {
@@ -359,6 +362,9 @@ export async function POST(req: Request, props: { params: Promise<{ id: string; 
           note: "Use the photograph on this slide.",
           aspectRatio: slide.aspectRatio,
           photo,
+          // Set when this route just made the picture; a library pick has no
+          // brief, and the model's stands for it.
+          photoBrief: scene || null,
           photoLibrary: photoChoices(),
           logoPath: carousel.showLogo ? resolveLogoPath() : null,
         },

@@ -8,7 +8,7 @@
 // that predates it.
 import assert from "node:assert/strict";
 
-import { cleanScene, parsePhotoScenes, sceneForSlot, serialisePhotoScenes } from "./photoScenes";
+import { briefsAfterRedesign, cleanScene, parsePhotoScenes, sceneForSlot, serialisePhotoScenes } from "./photoScenes";
 
 let passed = 0;
 function check(name: string, cond: boolean) {
@@ -104,5 +104,55 @@ check(
     "a glass of water on a table",
 );
 check("a plain scene is left alone", cleanScene("Notebook on a desk by a window") === "Notebook on a desk by a window");
+
+// A redesign keeps slot 1's photograph but the model writes a new brief for it
+// without seeing it. The kept photograph keeps its own brief.
+{
+  const kept = briefsAfterRedesign({
+    keptPhotoId: 228,
+    keptBrief: "a woman kneeling at a vegetable bed",
+    slotIds: [228],
+    photo: "a person sitting on a treatment table",
+    photos: ["a person sitting on a treatment table"],
+  });
+  check("the kept photograph keeps the brief it was made from", kept.photo === "a woman kneeling at a vegetable bed");
+  check("and so does slot 1 of the list", kept.photos[0] === "a woman kneeling at a vegetable bed");
+
+  const two = briefsAfterRedesign({
+    keptPhotoId: 228,
+    keptBrief: "a vegetable bed",
+    slotIds: [228, 40],
+    photo: "x",
+    photos: ["x", "an infrared bed"],
+  });
+  check("slot 2's brief is the model's, untouched", two.photos[1] === "an infrared bed" && two.photos[0] === "a vegetable bed");
+
+  const swapped = briefsAfterRedesign({
+    keptPhotoId: 228,
+    keptBrief: "a vegetable bed",
+    slotIds: [null, 228],
+    photo: "a treatment table",
+    photos: ["a treatment table", "a vegetable bed"],
+  });
+  check("a photograph that moved off slot 1 leaves slot 1's brief to the model", swapped.photo === "a treatment table");
+
+  const unknown = briefsAfterRedesign({
+    keptPhotoId: 228,
+    keptBrief: null,
+    slotIds: [228],
+    photo: "a treatment table",
+    photos: [],
+  });
+  check("with no known brief the model's stands", unknown.photo === "a treatment table" && unknown.photos.length === 0);
+
+  const none = briefsAfterRedesign({
+    keptPhotoId: null,
+    keptBrief: "a vegetable bed",
+    slotIds: [],
+    photo: "",
+    photos: [],
+  });
+  check("a slide with no photograph is unaffected", none.photo === "");
+}
 
 console.log(`\nphotoScenes: ${passed} checks passed`);

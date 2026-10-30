@@ -88,3 +88,35 @@ export function cleanScene(scene: string): string {
   s = s.replace(/^(?:but\s+)?(?:if|should|where)\s+(?:a|one)\s+(?:photo(?:graph)?|picture|image)\s+(?:is|were|be)\s+(?:wanted|needed|added|used)\s*[,:;-]?\s*/i, "");
   return s;
 }
+
+/**
+ * The briefs to record after a redesign.
+ *
+ * A redesign keeps the slide's own photograph in slot 1, but the model never
+ * sees that picture and writes a fresh brief for slot 1 anyway. Storing that
+ * brief left the slide showing one photograph while "This slide asked for"
+ * described another: a gardening photograph under a brief for a treatment
+ * table, and the next "Make a new photo" briefed from words the picture on
+ * screen never matched. When slot 1 still holds the photograph the redesign
+ * was given, its own brief (the one it was made from) stays with it. Any
+ * other outcome -- a different picture in slot 1, or none -- keeps the
+ * model's briefs, since those are the only description of what it asked for.
+ */
+export function briefsAfterRedesign(input: {
+  /** The photograph the redesign was given for slot 1, if any. */
+  keptPhotoId: number | null;
+  /** What that photograph was made from, if known. */
+  keptBrief: string | null;
+  /** The ids the redesign rendered, by slot (index 0 is slot 1). */
+  slotIds: (number | null)[];
+  /** The model's slot 1 brief. */
+  photo: string;
+  /** The model's briefs by slot. */
+  photos: string[];
+}): { photo: string; photos: string[] } {
+  const brief = cleanScene(input.keptBrief ?? "");
+  if (!brief || input.keptPhotoId == null || input.slotIds[0] !== input.keptPhotoId) {
+    return { photo: input.photo, photos: input.photos };
+  }
+  return { photo: brief, photos: input.photos.length > 0 ? [brief, ...input.photos.slice(1)] : [] };
+}

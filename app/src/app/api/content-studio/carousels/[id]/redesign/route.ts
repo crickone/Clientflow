@@ -7,7 +7,7 @@ import { getCurrentMembership } from "@/lib/auth";
 import { getCarousel, updateSlide } from "@/lib/image/carousels";
 import { photoChoiceFor, photoChoices } from "@/lib/image/library";
 import { serialisePhotoAssetIds } from "@/lib/image/photoAssetIds";
-import { serialisePhotoScenes } from "@/lib/image/photoScenes";
+import { sceneForSlot, serialisePhotoScenes } from "@/lib/image/photoScenes";
 import { resolveLogoPath } from "@/lib/branding";
 import { DESIGNED_TEMPLATE_ID } from "@/lib/image/paintSlide";
 
@@ -42,7 +42,7 @@ export async function POST(req: Request, props: { params: Promise<{ id: string }
     return NextResponse.json({ ok: false, error: "Design not found." }, { status: 404 });
   }
 
-  let body: { slideId?: unknown; note?: unknown; photoAssetId?: unknown };
+  let body: { slideId?: unknown; note?: unknown; photoAssetId?: unknown; photoScene?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -81,6 +81,15 @@ export async function POST(req: Request, props: { params: Promise<{ id: string }
   // a real id to resolve.
   const targetPhotoId = requestedPhotoExists ? requestedPhotoId : slide.backgroundAssetId;
   const photo = targetPhotoId != null ? photoChoiceFor(targetPhotoId) : null;
+  // What that photograph shows, so the redesign designs around it and the
+  // slide keeps describing it. A photograph just made (the two-step path)
+  // brings the scene it was made from; the slide's own is described by its
+  // slot 1 brief.
+  const photoBrief = requestedPhotoExists
+    ? typeof body?.photoScene === "string"
+      ? body.photoScene.trim().slice(0, 1000)
+      : null
+    : sceneForSlot(slide.photoScenes, slide.imagePrompt, 1) || null;
 
   /**
    * What the model is shown as "the design so far".
@@ -110,6 +119,7 @@ export async function POST(req: Request, props: { params: Promise<{ id: string }
         note: note || null,
         aspectRatio: slide.aspectRatio,
         photo,
+        photoBrief,
         // A second slot needs a second picture. Without the library a redesign
         // was told only one photograph existed, and the prompt then forbade
         // {{PHOTO:2}} -- so "make this a split screen" could not be answered.

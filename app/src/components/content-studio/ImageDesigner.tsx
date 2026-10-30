@@ -3462,6 +3462,7 @@ function RedesignSlideButton({
     );
     setError(null);
     let asset: ImageLibraryAsset | null = null;
+    let madeFrom: string | null = null;
     try {
       const res = await fetch(
         `/api/content-studio/carousels/${designId}/slides/${slide.id}/photo`,
@@ -3499,6 +3500,7 @@ function RedesignSlideButton({
         return;
       }
       asset = json.asset as ImageLibraryAsset;
+      madeFrom = typeof json.scene === "string" ? json.scene : null;
     } catch (err) {
       setError(
         err instanceof DOMException && err.name === "TimeoutError"
@@ -3543,7 +3545,14 @@ function RedesignSlideButton({
       setBusy("designing");
       await post(
         `/api/content-studio/carousels/${designId}/redesign`,
-        { slideId: slide.id, note: "Use the photograph on this slide.", photoAssetId: asset.id },
+        {
+          slideId: slide.id,
+          note: "Use the photograph on this slide.",
+          photoAssetId: asset.id,
+          // What the photograph was made from, so the slide keeps describing
+          // the picture it shows.
+          ...(madeFrom ? { photoScene: madeFrom } : {}),
+        },
         (json) => {
           applied = true;
           return (json.carousel?.slides as CarouselSlide[] | undefined)?.find(
