@@ -153,6 +153,16 @@ export function durationLabel(ms: number): string {
   return m ? `${h} h ${m} min` : `${h} h`;
 }
 
+/** The rest between sets when the programme sets none. The builder stores 0 for
+ *  "not filled in", and a 0 rest showed no countdown at all, so a member on a
+ *  coach-built programme had no timer between sets. */
+export const DEFAULT_REST_SECONDS = 90;
+
+/** The rest a set actually gets: the programme's, or the default when it set none. */
+export function restFor(seconds: number | null | undefined): number {
+  return seconds && seconds > 0 ? seconds : DEFAULT_REST_SECONDS;
+}
+
 export function restLabel(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;

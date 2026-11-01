@@ -13,6 +13,7 @@ import {
   parseReps,
   parseWeight,
   personalBests,
+  restFor,
   setsDone,
   targetRepsNumber,
   volumeKg,
@@ -81,5 +82,10 @@ check("less weight doesn't, even with more reps", !beatsPrevious({ weightKg: 20,
 check("unticked doesn't count", !beatsPrevious({ weightKg: 30, reps: 7, done: false }, { weightKg: 22.5, reps: 7, done: true }));
 check("nothing last time, nothing to beat", !beatsPrevious({ weightKg: 30, reps: 7, done: true }, undefined));
 check("bodyweight: more reps beats it", beatsPrevious({ weightKg: null, reps: 12, done: true }, { weightKg: null, reps: 10, done: true }));
+
+// A programme that sets no rest (the builder stores 0) still gets a countdown.
+check("a set rest is kept", restFor(120) === 120);
+check("no rest set means the default, not no timer", restFor(0) === 90);
+check("a missing rest means the default too", restFor(null) === 90 && restFor(undefined) === 90);
 
 console.log(`workoutLogModel: ${passed} checks passed`);

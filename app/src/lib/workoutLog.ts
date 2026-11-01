@@ -4,7 +4,7 @@ import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, ne } from "drizzle-
 import { db } from "@/lib/db";
 import { workoutSessionExercises, workoutSessions, workoutSetLogs, type WorkoutSession } from "@/lib/db/schema";
 import type { ProgramInput } from "@/lib/workoutModel";
-import { bestSet, exerciseKey, setsDone, volumeKg, type LoggedSet, type SessionExercise, type SessionView } from "@/lib/workoutLogModel";
+import { DEFAULT_REST_SECONDS, bestSet, exerciseKey, restFor, setsDone, volumeKg, type LoggedSet, type SessionExercise, type SessionView } from "@/lib/workoutLogModel";
 
 /**
  * Workout logging for the CURRENT tenant (ambient `db`). Every function that
@@ -49,7 +49,7 @@ export function startSession(clientId: number, program: ProgramInput, dayPositio
           name: ex.name.trim(),
           targetSets: Math.max(1, Math.min(MAX_SETS, ex.sets || 1)),
           targetReps: ex.reps,
-          restSeconds: ex.restSeconds,
+          restSeconds: restFor(ex.restSeconds),
           joined: ex.joined === true,
           notes: ex.notes,
         })
@@ -110,7 +110,7 @@ export function addSessionExercise(
   return db.transaction((tx) => {
     const [row] = tx
       .insert(workoutSessionExercises)
-      .values({ sessionId, position: count, section: "workout", exerciseKey: exerciseKey(ex.exerciseId, name), name, targetSets: n, targetReps: null, restSeconds: 90, notes: null })
+      .values({ sessionId, position: count, section: "workout", exerciseKey: exerciseKey(ex.exerciseId, name), name, targetSets: n, targetReps: null, restSeconds: DEFAULT_REST_SECONDS, notes: null })
       .returning()
       .all();
     for (let k = 1; k <= n; k++) tx.insert(workoutSetLogs).values({ sessionExerciseId: row.id, setNumber: k, done: false }).run();
@@ -122,7 +122,7 @@ export function addSessionExercise(
       name: row.name,
       targetSets: n,
       targetReps: null,
-      restSeconds: 90,
+      restSeconds: DEFAULT_REST_SECONDS,
       notes: null,
       sets: Array.from({ length: n }, () => ({ weightKg: null, reps: null, done: false })),
     };
@@ -181,7 +181,8 @@ function assemble(rows: WorkoutSession[]): SessionView[] {
           name: e.name,
           targetSets: e.targetSets,
           targetReps: e.targetReps,
-          restSeconds: e.restSeconds,
+          // Sessions started before the default existed still get a timer.
+          restSeconds: restFor(e.restSeconds),
           notes: e.notes,
           joined: e.joined,
           sets: setsBy.get(e.id) ?? [],

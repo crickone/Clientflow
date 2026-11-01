@@ -4459,6 +4459,9 @@ a.stat-row:hover .stat-label { color: var(--text-primary); }
   min-width: 44px; height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--hairline);
   background: var(--surface-1); color: var(--text-primary); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer;
 }
+.wl-bar-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+/* The tap-to-rest button sits by the set count; "Saved" keeps the right edge. */
+.wl-bar .wl-bar-main + .wl-bar-rest { margin-left: 8px; }
 .wl-bar-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .wl-bar-fill, .wl-tick, .wl-set { transition: none; } }
 

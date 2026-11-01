@@ -21,6 +21,7 @@ import { ExercisePicker } from "@/components/clientapp/ExercisePicker";
 import { SECTIONS } from "@/lib/workoutModel";
 import { groupLabels, groupName, groupSize, nextWeight, restsAfter } from "@/lib/workoutGroupsModel";
 import {
+  DEFAULT_REST_SECONDS,
   beatsPrevious,
   completeSet,
   durationLabel,
@@ -519,6 +520,14 @@ export function WorkoutLogger({
               <span className="wl-bar-main">
                 {doneCount} of {all.length} sets
               </span>
+              <button
+                type="button"
+                className="wl-bar-btn wl-bar-rest"
+                onClick={() => setRest({ until: Date.now() + DEFAULT_REST_SECONDS * 1000, total: DEFAULT_REST_SECONDS })}
+                aria-label={`Start a ${restLabel(DEFAULT_REST_SECONDS)} rest`}
+              >
+                <Timer size={14} /> Rest
+              </button>
               <span className="wl-bar-save">{saveState === "saving" ? "Saving" : saveState === "error" ? "Not saved yet" : saveState === "saved" ? "Saved" : ""}</span>
             </>
           )}
