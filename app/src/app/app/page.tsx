@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, ClipboardCheck, CreditCard, ListChecks, Play, Salad, ScanLine, Target, TrendingUp, Trophy } from "lucide-react";
+import { CalendarHeart, ChevronRight, ClipboardCheck, CreditCard, ListChecks, Play, Salad, ScanLine, Target, TrendingUp, Trophy } from "lucide-react";
 import { memberCheckin } from "@/lib/checkins";
 import { memberHabits } from "@/lib/habits";
 import { HabitTicks } from "@/components/clientapp/HabitTicks";
@@ -11,7 +11,9 @@ import { requireClientPage } from "@/lib/clientAuth";
 import { clientDashboard, clientUpcoming } from "@/lib/clientApp";
 import { Card, dayLabel, euros, SectionTitle } from "@/components/clientapp/ui";
 import { dailyTarget, mealsForDay } from "@/lib/meals";
-import { goalTarget } from "@/lib/goals";
+import { getManualBody, goalTarget } from "@/lib/goals";
+import { memberCycle } from "@/lib/cycle";
+import { PHASE_LABEL, statusLine } from "@/lib/cycleModel";
 import { GOAL_BY_KEY } from "@/lib/goalsModel";
 import { dayTotals, kcal } from "@/lib/mealsModel";
 import { bodyScansEnabled, getScanProfile, listClientScans } from "@/lib/inbody/scans";
@@ -41,6 +43,9 @@ export default async function ClientHome() {
   const goal = goalTarget(clientId);
   const checkin = memberCheckin(clientId);
   const habits = memberHabits(clientId);
+  const cycle = memberCycle(clientId);
+  // The invite shows only where the member said they're female; the Profile page offers it to everyone.
+  const inviteCycle = !cycle && getManualBody(clientId)?.sex === "female";
   const vapid = vapidPublicKey();
   const showTraining = t.programs.length > 0 || t.totalWorkouts > 0;
   const strengthNow = t.strength.length && t.lifts.some((l) => l.sessions > 1) ? t.strength[t.strength.length - 1].value : null;
@@ -255,6 +260,32 @@ export default async function ClientHome() {
           </div>
         </Card>
       </Link>
+
+      {/* cycle: on, or a quiet invite */}
+      {(cycle || inviteCycle) && (
+        <Link href="/app/cycle">
+          <Card style={cycle?.status.onPeriod ? { borderColor: "var(--accent)", background: "var(--accent-soft)" } : undefined}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={iconBox}><CalendarHeart size={18} /></span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>
+                  {cycle ? (cycle.settings.mode === "cycle" && cycle.status.phase ? `Cycle: ${PHASE_LABEL[cycle.status.phase]}` : "Cycle") : "Track your cycle"}
+                </div>
+                <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>
+                  {cycle
+                    ? cycle.settings.mode === "cycle"
+                      ? statusLine(cycle.status)
+                      : cycle.todayLog.energy || cycle.todayLog.mood
+                        ? "Checked in today"
+                        : "How are you today?"
+                    : "Periods, how you feel, and what to expect in training. Private to you."}
+                </div>
+              </div>
+              <ChevronRight size={18} style={{ color: "var(--text-tertiary)" }} />
+            </div>
+          </Card>
+        </Link>
+      )}
 
       {/* goal */}
       <Link href="/app/goal">

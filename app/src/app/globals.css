@@ -5656,3 +5656,56 @@ textarea.ag-input { resize: vertical; line-height: 1.5; }
 .aap-mock { max-width: 360px; }
 .aap-loading { font-size: 12.5px; color: var(--text-tertiary); padding: 24px 0; }
 .aap-warn { font-size: 12.5px; color: var(--warning); }
+
+/* ---- Cycle tracking (client app) --------------------------------------- */
+.cy-icon { width: 36px; height: 36px; border-radius: 10px; background: var(--surface-2); color: var(--accent-ink); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.cy-terms { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.cy-terms li { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; line-height: 1.5; color: var(--text-secondary); }
+.cy-terms li svg { flex-shrink: 0; margin-top: 3px; color: var(--accent-ink); }
+.cy-terms strong { color: var(--text-primary); font-weight: 600; }
+.cy-link { background: none; border: 0; padding: 6px 0; color: var(--text-tertiary); font: inherit; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.cy-link:disabled { opacity: 0.6; cursor: default; }
+.cy-date { flex: 1; min-width: 0; height: 38px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--hairline); background: var(--surface-2); color: var(--text-primary); font: inherit; font-size: 14px; }
+.cy-checkin { display: grid; gap: 10px; }
+.cy-row { display: grid; gap: 6px; }
+.cy-row-label { font-size: 13px; color: var(--text-secondary); }
+.cy-chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.cy-chip { min-height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--hairline); background: var(--surface-2); color: var(--text-primary); font: inherit; font-size: 14px; cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease; }
+.cy-chip[data-on="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.cy-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cy-note { width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--hairline); background: var(--surface-2); color: var(--text-primary); font: inherit; font-size: 14px; resize: vertical; }
+.cy-cal { display: grid; gap: 14px; }
+.cy-month-name { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px; }
+.cy-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.cy-dow { font-size: 10.5px; color: var(--text-tertiary); text-align: center; padding-bottom: 2px; }
+.cy-day { position: relative; aspect-ratio: 1; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 12.5px; color: var(--text-secondary); font-variant-numeric: tabular-nums; border: 1px solid transparent; }
+.cy-day[data-future="true"] { color: var(--text-tertiary); }
+.cy-day[data-period="true"] { background: var(--accent); color: var(--accent-contrast); font-weight: 600; }
+.cy-day[data-predicted="true"] { border-color: var(--accent); border-style: dashed; color: var(--accent-ink); }
+.cy-day[data-today="true"] { box-shadow: 0 0 0 2px var(--text-primary) inset; color: var(--text-primary); }
+.cy-day[data-today="true"][data-period="true"] { color: var(--accent-contrast); }
+.cy-dot { position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
+.cy-key { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--text-tertiary); }
+.cy-key span { display: inline-flex; align-items: center; gap: 6px; }
+.cy-swatch { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+.cy-swatch[data-kind="period"] { background: var(--accent); }
+.cy-swatch[data-kind="predicted"] { border: 1px dashed var(--accent); }
+.cy-swatch[data-kind="logged"] { position: relative; border: 1px solid var(--hairline); }
+.cy-swatch[data-kind="logged"]::after { content: ""; position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: var(--text-secondary); }
+.cy-switch { display: flex; align-items: center; justify-content: space-between; gap: 14px; cursor: pointer; }
+.cy-switch > span { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.cy-switch-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.cy-switch-sub { font-size: 12.5px; line-height: 1.45; color: var(--text-secondary); }
+.cy-switch input { appearance: none; width: 44px; height: 26px; border-radius: 13px; background: var(--surface-3, var(--surface-2)); border: 1px solid var(--hairline); position: relative; flex-shrink: 0; cursor: pointer; transition: background 0.15s ease; margin: 0; }
+.cy-switch input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: var(--text-tertiary); transition: transform 0.15s ease, background 0.15s ease; }
+.cy-switch input:checked { background: var(--accent); border-color: var(--accent); }
+.cy-switch input:checked::after { transform: translateX(18px); background: var(--accent-contrast); }
+.cy-switch input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cy-periods { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.cy-periods li { display: flex; justify-content: space-between; align-items: center; font-size: 13.5px; color: var(--text-primary); }
+/* The coach's phase table on the client page. */
+.cy-phase-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.cy-phase-table th, .cy-phase-table td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--hairline); color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.cy-phase-table th { font-weight: 500; color: var(--text-tertiary); font-size: 12px; }
+.cy-phase-table td:not(:first-child), .cy-phase-table th:not(:first-child) { text-align: center; }
+@media (prefers-reduced-motion: reduce) { .cy-chip, .cy-switch input, .cy-switch input::after { transition: none; } }

@@ -48,6 +48,8 @@ import { clientMembership } from "@/lib/clientApp";
 import { clientAgreementView, clientForms } from "@/lib/agreements";
 import { ClientForms } from "@/components/clients/ClientForms";
 import { clientHabitView } from "@/lib/habits";
+import { coachCycleView } from "@/lib/cycle";
+import { ClientCycle } from "@/components/clients/ClientCycle";
 import { HabitGrid } from "@/components/clientapp/HabitGrid";
 import { dateKey } from "@/lib/trainingProgress";
 import { connectionsFor, recentDays } from "@/lib/wearables/store";
@@ -108,6 +110,7 @@ export default async function ClientProfile(
   const agreements = clientAgreementView(id);
   const memberForms = clientForms(id);
   const habitView = clientHabitView(id);
+  const cycleView = coachCycleView(id);
   const tenantIdForDevices = membership?.tenant.id ?? 0;
   const devices = connectionsFor(tenantIdForDevices, id);
   const deviceDays = devices.length ? recentDays(tenantIdForDevices, id, 14) : [];
@@ -217,6 +220,7 @@ export default async function ClientProfile(
             </TabsTrigger>
           )}
           {habitView && <TabsTrigger value="habits">Habits</TabsTrigger>}
+          {cycleView && <TabsTrigger value="cycle">Cycle</TabsTrigger>}
           {devices.length > 0 && <TabsTrigger value="devices">Wearables</TabsTrigger>}
           <TabsTrigger value="app">Client app</TabsTrigger>
           {checkins.length > 0 && (
@@ -595,6 +599,12 @@ export default async function ClientProfile(
           </TabsContent>
         )}
 
+        {cycleView && (
+          <TabsContent value="cycle">
+            <ClientCycle view={cycleView} />
+          </TabsContent>
+        )}
+
         {devices.length > 0 && (
           <TabsContent value="devices">
             <p className="cp-origin" style={{ marginBottom: 12 }}>
@@ -765,7 +775,7 @@ export default async function ClientProfile(
   );
 }
 
-const TAB_KEYS = new Set(["journey", "appointments", "sessions", "packages", "payments", "messages", "email", "forms", "habits", "devices", "app", "checkins", "workouts", "nutrition", "scans"]);
+const TAB_KEYS = new Set(["journey", "appointments", "sessions", "packages", "payments", "messages", "email", "forms", "habits", "cycle", "devices", "app", "checkins", "workouts", "nutrition", "scans"]);
 
 /** A count beside a tab name, only when there is something to count. */
 function Count({ n }: { n: number }) {

@@ -3459,6 +3459,50 @@ export const clientMeasurements = sqliteTable("client_measurements", {
   enteredAt: integer("entered_at").notNull(),
 });
 
+/**
+ * Cycle tracking in the client app (lib/cycle.ts). Health data: the member
+ * turns it on with its own consent, it is private to them unless they share
+ * it with the coach, and "delete everything" wipes all three tables.
+ */
+export const cycleSettings = sqliteTable("cycle_settings", {
+  clientId: integer("client_id").primaryKey().references(() => clients.id, { onDelete: "cascade" }),
+  consentAt: integer("consent_at").notNull(),
+  shareWithCoach: integer("share_with_coach", { mode: "boolean" }).notNull().default(false),
+  /** "cycle" tracks periods; "none" is check-ins only (no periods at the moment). */
+  mode: text("mode", { enum: ["cycle", "none"] }).notNull().default("cycle"),
+  updatedAt: integer("updated_at").notNull(),
+});
+
+export const cyclePeriods = sqliteTable(
+  "cycle_periods",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    clientId: integer("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+    startDay: text("start_day").notNull(),
+    endDay: text("end_day"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => ({ uniq: uniqueIndex("idx_cycle_periods_uniq").on(t.clientId, t.startDay) }),
+);
+
+/** One day's check-in: each scale 1-3, null where not answered. */
+export const cycleDays = sqliteTable(
+  "cycle_days",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    clientId: integer("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),
+    day: text("day").notNull(),
+    energy: integer("energy"),
+    mood: integer("mood"),
+    sleep: integer("sleep"),
+    pain: integer("pain"),
+    cravings: integer("cravings"),
+    note: text("note"),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => ({ uniq: uniqueIndex("idx_cycle_days_uniq").on(t.clientId, t.day) }),
+);
+
 export const workoutSessions = sqliteTable("workout_sessions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   clientId: integer("client_id").notNull().references(() => clients.id, { onDelete: "cascade" }),

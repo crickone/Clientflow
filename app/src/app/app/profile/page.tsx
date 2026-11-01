@@ -15,6 +15,7 @@ import { isProviderId, PROVIDER_NAME, PROVIDERS } from "@/lib/wearables/model";
 import { isProviderConfigured } from "@/lib/wearables/providers";
 import { businessContact } from "@/lib/agreements";
 import { consentsFor } from "@/lib/marketingConsent";
+import { cycleSettingsFor } from "@/lib/cycle";
 import { CONSENT_CHANNELS, CONSENT_LABEL, consentStatement } from "@/lib/memberChoicesModel";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,7 @@ export default async function ClientProfilePage(props: { searchParams: Promise<{
   const searchParams = await props.searchParams;
   const { clientId, client, tenantId } = requireClientPage();
   const m = clientMembership(clientId);
+  const cycle = cycleSettingsFor(clientId);
   const history = clientHistory(clientId, 12);
   const initials = `${client.firstName?.[0] ?? ""}${client.lastName?.[0] ?? ""}`.toUpperCase();
   const business = businessContact().name;
@@ -69,6 +71,16 @@ export default async function ClientProfilePage(props: { searchParams: Promise<{
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{m ? m.name : "No active membership"}</div>
             <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>{m ? m.status : "Tap to view"}</div>
+          </div>
+          <ChevronRight size={18} style={{ color: "var(--text-tertiary)" }} />
+        </Card>
+      </Link>
+
+      <Link href="/app/cycle">
+        <Card style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>Cycle tracking</div>
+            <div style={{ fontSize: 12.5, color: "var(--text-secondary)" }}>{cycle ? (cycle.shareWithCoach ? "On, shared with your coach" : "On, private to you") : "Off. Periods, how you feel, what to expect"}</div>
           </div>
           <ChevronRight size={18} style={{ color: "var(--text-tertiary)" }} />
         </Card>

@@ -13,6 +13,8 @@ import { recordConsent } from "@/lib/marketingConsent";
 import { requestCancel, withdrawRequest } from "@/lib/cancellations";
 import { saveCheckin } from "@/lib/checkins";
 import { setTick } from "@/lib/habits";
+import { deleteCycleData, endPeriod, giveCycleConsent, removePeriod, setCycleDay, setCycleNote, startPeriod, updateCycleSettings } from "@/lib/cycle";
+import { isDayField } from "@/lib/cycleModel";
 import { setPrefs } from "@/lib/push";
 import { fireTrigger } from "@/lib/automations";
 import { bodyForGoal, clearGoal, setGoal, setManualBody } from "@/lib/goals";
@@ -474,3 +476,66 @@ export async function updateMealItemAction(
   return { ok: true };
 }
 
+
+// ---- Cycle tracking ---------------------------------------------------------
+// Health data: every action checks the member's own consent row (lib/cycle),
+// and nothing here is reachable by staff or Adonis.
+
+function cyclePaths() {
+  revalidatePath("/app/cycle");
+  revalidatePath("/app");
+  revalidatePath("/app/profile");
+}
+
+export async function setCycleConsentAction(): Promise<{ ok: true }> {
+  const { clientId } = requireClient();
+  giveCycleConsent(clientId);
+  cyclePaths();
+  return { ok: true };
+}
+
+export async function setCycleSettingsAction(patch: { shareWithCoach?: boolean; mode?: string }): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { clientId } = requireClient();
+  const clean: { shareWithCoach?: boolean; mode?: "cycle" | "none" } = {};
+  if (typeof patch.shareWithCoach === "boolean") clean.shareWithCoach = patch.shareWithCoach;
+  if (patch.mode === "cycle" || patch.mode === "none") clean.mode = patch.mode;
+  if (!updateCycleSettings(clientId, clean)) return { ok: false, error: "Cycle tracking is off." };
+  cyclePaths();
+  return { ok: true };
+}
+
+export async function deleteCycleDataAction(): Promise<{ ok: true }> {
+  const { clientId } = requireClient();
+  deleteCycleData(clientId);
+  cyclePaths();
+  return { ok: true };
+}
+
+export async function logPeriodAction(kind: "start" | "end", day: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { clientId } = requireClient();
+  const r = kind === "end" ? endPeriod(clientId, day) : startPeriod(clientId, day);
+  if (r.ok) cyclePaths();
+  return r;
+}
+
+export async function removePeriodAction(id: number): Promise<{ ok: true }> {
+  const { clientId } = requireClient();
+  if (Number.isInteger(id) && id > 0) removePeriod(clientId, id);
+  cyclePaths();
+  return { ok: true };
+}
+
+export async function setCycleDayAction(day: string, field: string, value: number | null): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { clientId } = requireClient();
+  if (!isDayField(field)) return { ok: false, error: "Unknown question." };
+  const r = setCycleDay(clientId, day, field, value === null ? null : Number(value));
+  if (r.ok) cyclePaths();
+  return r;
+}
+
+export async function setCycleNoteAction(day: string, note: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { clientId } = requireClient();
+  const r = setCycleNote(clientId, day, typeof note === "string" ? note : "");
+  if (r.ok) cyclePaths();
+  return r;
+}

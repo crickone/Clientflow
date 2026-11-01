@@ -3075,6 +3075,34 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       pbf        REAL,
       entered_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS cycle_settings (
+      client_id        INTEGER PRIMARY KEY REFERENCES clients(id) ON DELETE CASCADE,
+      consent_at       INTEGER NOT NULL,
+      share_with_coach INTEGER NOT NULL DEFAULT 0,
+      mode             TEXT NOT NULL DEFAULT 'cycle',
+      updated_at       INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS cycle_periods (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id  INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      start_day  TEXT NOT NULL,
+      end_day    TEXT,
+      created_at INTEGER NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_cycle_periods_uniq ON cycle_periods(client_id, start_day);
+    CREATE TABLE IF NOT EXISTS cycle_days (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id  INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      day        TEXT NOT NULL,
+      energy     INTEGER,
+      mood       INTEGER,
+      sleep      INTEGER,
+      pain       INTEGER,
+      cravings   INTEGER,
+      note       TEXT,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_cycle_days_uniq ON cycle_days(client_id, day);
   `);
 
   // The member who sent a form from the client app (the Welcome Q&A in
