@@ -44,7 +44,7 @@ export function FacebookConnectCard({
 }: {
   configured: boolean;
   pages: FacebookPageRow[];
-  /** Pages Facebook shared on the last connect that this business has not connected. */
+  /** Pages Facebook shared on the last connect that this business can connect (none held elsewhere). */
   offers: PageOffer[];
   postingPageId: string | null;
   adAccounts: AdAccountRow[];
@@ -90,25 +90,19 @@ export function FacebookConnectCard({
     });
   }
 
-  // Pages Facebook shared that are not connected here. Another business's
-  // Page is listed so nobody wonders where it went, but it cannot be taken.
+  // Pages Facebook shared that this business can connect. Pages another
+  // business holds never reach this component (settings page filters them).
   const offerList = offers.length > 0 && (
     <div style={{ display: "grid", gap: 12 }}>
       {offers.map((o) => (
         <div key={o.pageId} style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <div style={{ flex: "1 1 220px", minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: o.status === "available" ? "var(--text-primary)" : "var(--text-tertiary)" }}>
-              {o.pageName ?? o.pageId}
-            </div>
-            <div style={{ ...muted, marginTop: 3 }}>
-              {o.status === "available" ? (o.igUsername ? `@${o.igUsername}` : "No Instagram linked") : "Connected to another business"}
-            </div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>{o.pageName ?? o.pageId}</div>
+            <div style={{ ...muted, marginTop: 3 }}>{o.igUsername ? `@${o.igUsername}` : "No Instagram linked"}</div>
           </div>
-          {o.status === "available" && (
-            <Button variant="outline" size="sm" onClick={() => connectPage(o.pageId)} disabled={busy}>
-              <Plug size={14} /> Connect
-            </Button>
-          )}
+          <Button variant="outline" size="sm" onClick={() => connectPage(o.pageId)} disabled={busy}>
+            <Plug size={14} /> Connect
+          </Button>
         </div>
       ))}
     </div>
@@ -144,12 +138,14 @@ export function FacebookConnectCard({
   }
 
   // ── Not connected, Facebook shared Pages: pick one ──────────────────────
-  if (pages.length === 0 && offers.some((o) => o.status === "available")) {
+  if (pages.length === 0 && offers.length > 0) {
     return (
       <Card style={{ padding: 24, display: "grid", gap: 18 }}>
-        <div style={sectionLabel}>Choose this business&apos;s Page</div>
+        <div style={sectionLabel}>{offers.length === 1 ? "Connect your Page" : "Choose this business\u2019s Page"}</div>
         <div style={muted}>
-          Facebook shared more than one Page. Connect the one that belongs to this business. Nothing is connected until you choose.
+          {offers.length === 1
+            ? "Connect it to post, get messages and lead ads, and run ads from here."
+            : "Facebook shared more than one Page. Connect the one that belongs to this business. Nothing is connected until you choose."}
         </div>
         {offerList}
       </Card>

@@ -43,7 +43,9 @@ export default async function FacebookSettingsPage(props: { searchParams?: Promi
       <FacebookConnectCard
         configured={facebookConfigured()}
         pages={listFacebookPages(tenantId)}
-        offers={listPageOffers(tenantId)}
+        // Only Pages this business can connect. Another business's Page is never
+        // shown: its name is that business's, not this one's.
+        offers={listPageOffers(tenantId).filter((o) => o.status === "available")}
         postingPageId={getMetaConnectionForTenant(tenantId)?.pageId ?? null}
         adAccounts={listAdAccounts(tenantId, { granted: true })}
         grant={getGrantInfo(tenantId)}
