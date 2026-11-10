@@ -865,7 +865,7 @@ const META = {
     file: "hbot.html",
     title: "Hyperbaric Oxygen Therapy (HBOT) Clonmel | Optimal Health",
     description:
-      "Hyperbaric oxygen therapy at our clinic inside Inspire, Clonmel. Sessions last 45 to 60 minutes in a pressurised chamber. Book online or call 083 867 2844.",
+      "Hyperbaric oxygen therapy at our clinic inside Inspire, Clonmel. Each session lasts 60 minutes in a pressurised chamber. Book online or call 083 867 2844.",
   },
   infrared: {
     file: "infrared.html",
@@ -877,7 +877,7 @@ const META = {
     file: "hifem.html",
     title: "HIFEM & Pelvic Floor Treatment Clonmel | Optimal Health",
     description:
-      "HIFEM treatment in Clonmel, including pelvic floor. You sit fully clothed for 20 to 30 minutes while the chair contracts the muscles. Book online today.",
+      "HIFEM treatment in Clonmel, including pelvic floor. You sit fully clothed for 30 minutes while the chair contracts the muscles. Book online today.",
   },
   pricing: {
     file: "pricing.html",
@@ -989,11 +989,11 @@ const POSTS = [
     topic: "HIFEM",
     title: "HIFEM after a week of sitting down",
     excerpt:
-      "When you sit all day, some muscles do almost no work. HIFEM makes them contract. A session is twenty to thirty minutes, seated and fully clothed.",
+      "When you sit all day, some muscles do almost no work. HIFEM makes them contract. A session is thirty minutes, seated and fully clothed.",
     photo: "hifem-chair.jpg",
     alt: "The HIFEM chair and its console, empty, a cushion on the seat",
     description:
-      "What HIFEM does for muscles that barely work during a week at a desk. Sessions at our Clonmel clinic take 20 to 30 minutes, seated and fully clothed.",
+      "What HIFEM does for muscles that barely work during a week at a desk. Sessions at our Clonmel clinic take 30 minutes, seated and fully clothed.",
   },
   {
     slug: "infrared-and-everyday-aches",
@@ -1034,7 +1034,7 @@ const POSTS = [
     topic: "Hyperbaric oxygen",
     title: "Hyperbaric oxygen and mental clarity",
     excerpt:
-      "A session is forty-five to sixty minutes in a pressurised chamber, breathing air with more oxygen in it than the air in the room. What a session is like, and what people tell us afterwards.",
+      "A session is sixty minutes in a pressurised chamber, breathing air with more oxygen in it than the air in the room. What a session is like, and what people tell us afterwards.",
     photo: "hbot-session-mask.jpg",
     alt: "A client seated in the open hyperbaric chamber holding the oxygen mask",
     description:
