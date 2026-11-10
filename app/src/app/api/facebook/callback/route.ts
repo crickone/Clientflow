@@ -46,9 +46,10 @@ export async function GET(req: NextRequest) {
     const assets = await discoverAssets(grant.token);
     saveGrant(tenantId, grant.token, grant.kind, grant.expiresAt, me.id, grant.fbUserId);
     saveAdAccounts(tenantId, assets.adAccounts);
-    const names = await saveConnectedPages(tenantId, assets.pages, me.id);
-    if (names.length === 0) return back("error=no_pages");
-    const res = back(`connected=${encodeURIComponent(String(names.length))}`);
+    const { connected, leftWithOther } = await saveConnectedPages(tenantId, assets.pages, me.id);
+    const left = leftWithOther.length ? `&left=${encodeURIComponent(leftWithOther.join("|"))}` : "";
+    if (connected.length === 0) return back(`error=${leftWithOther.length ? "pages_elsewhere" : "no_pages"}${left}`);
+    const res = back(`connected=${encodeURIComponent(String(connected.length))}${left}`);
     res.cookies.delete("fb_oauth_state");
     return res;
   } catch (err) {

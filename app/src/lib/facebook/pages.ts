@@ -37,15 +37,24 @@ export function openPageToken(stored: string): string {
 /**
  * After OAuth: store each granted Page (with its Page token and linked
  * Instagram account) for `tenantId`, and subscribe each Page to our webhook
- * (leads + messages). Returns the connected Page names. The per-Page subscribe
- * is best-effort. Re-connecting a Page updates its one row (page_id unique).
+ * (leads + messages). The per-Page subscribe is best-effort. Re-connecting a
+ * Page updates its one row (page_id unique).
+ *
+ * A Page already connected to ANOTHER business is left where it is. The
+ * never-expiring business login hands back every Page the business
+ * integration has ever been given, not just the ones ticked this time, and
+ * Meta does not say which were ticked. Taking such a Page used to move it:
+ * reconnecting Optimal Health pulled the Adonis Agent Page out of the Adonis
+ * account, so that Page's messages and leads would have landed in the wrong
+ * business (2026-11-10). To move a Page on purpose, disconnect it in the
+ * business that has it, then connect it here.
  */
 export async function saveConnectedPages(
   tenantId: number,
   pages: GraphPage[],
   connectedByUserId: number,
-): Promise<string[]> {
-  const findExisting = controlSqlite.prepare("SELECT id FROM facebook_pages WHERE page_id = ?");
+): Promise<{ connected: string[]; leftWithOther: string[] }> {
+  const findExisting = controlSqlite.prepare("SELECT id, tenant_id, revoked_at FROM facebook_pages WHERE page_id = ?");
   const insert = controlSqlite.prepare(
     `INSERT INTO facebook_pages (tenant_id, page_id, page_name, page_access_token, connected_by_user_id, subscribed_at, ig_user_id, ig_username)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -56,7 +65,14 @@ export async function saveConnectedPages(
   );
 
   const names: string[] = [];
+  const leftWithOther: string[] = [];
   for (const page of pages) {
+    const held = findExisting.get(page.id) as { id: number; tenant_id: number; revoked_at: number | null } | undefined;
+    if (held && held.tenant_id !== tenantId && held.revoked_at == null) {
+      console.log(`[facebook] Page ${page.id} left with tenant ${held.tenant_id}: already connected there`);
+      leftWithOther.push(page.name ?? page.id);
+      continue;
+    }
     let subscribedAt: number | null = null;
     try {
       if (await subscribePageToWebhook(page.id, page.access_token!)) subscribedAt = Date.now();
@@ -67,7 +83,7 @@ export async function saveConnectedPages(
     }
     const igUserId = page.instagram_business_account?.id ?? null;
     const igUsername = page.instagram_business_account?.username ?? null;
-    const existing = findExisting.get(page.id) as { id: number } | undefined;
+    const existing = held;
     if (existing) {
       update.run(tenantId, page.name ?? null, sealPageToken(page.access_token ?? ""), connectedByUserId, subscribedAt, igUserId, igUsername, existing.id);
     } else {
@@ -75,7 +91,7 @@ export async function saveConnectedPages(
     }
     names.push(page.name ?? page.id);
   }
-  return names;
+  return { connected: names, leftWithOther };
 }
 
 /** The Page webhook fields we use: lead ads, then Messenger (which also carries Instagram DMs). */
