@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-import { disconnectFacebookPageAction, refreshAdAccountsAction, setAdAccountInUseAction, setPostingPageAction } from "@/app/settings/integrations/facebook/actions";
+import { connectOfferedPageAction, disconnectFacebookPageAction, refreshAdAccountsAction, setAdAccountInUseAction, setPostingPageAction } from "@/app/settings/integrations/facebook/actions";
 // Type-only — lib/facebook/{pages,grants}.ts are `server-only`.
-import type { FacebookPageRow } from "@/lib/facebook/pages";
+import type { FacebookPageRow, PageOffer } from "@/lib/facebook/pages";
 import type { AdAccountRow, GrantInfo } from "@/lib/facebook/grants";
 import { SUPPORT_MAILTO, Unavailable } from "./Unavailable";
 
@@ -37,12 +37,15 @@ const sectionLabel: React.CSSProperties = { fontSize: 12, color: "var(--text-ter
 export function FacebookConnectCard({
   configured,
   pages,
+  offers,
   postingPageId,
   adAccounts,
   grant,
 }: {
   configured: boolean;
   pages: FacebookPageRow[];
+  /** Pages Facebook shared on the last connect that this business has not connected. */
+  offers: PageOffer[];
   postingPageId: string | null;
   adAccounts: AdAccountRow[];
   grant: GrantInfo | null;
@@ -78,6 +81,39 @@ export function FacebookConnectCard({
     });
   }
 
+  function connectPage(pageId: string) {
+    start(async () => {
+      const res = await connectOfferedPageAction(pageId);
+      if (!res.ok) return void toast.error(res.error ?? "Couldn't connect the Page.");
+      toast.success("Page connected");
+      router.refresh();
+    });
+  }
+
+  // Pages Facebook shared that are not connected here. Another business's
+  // Page is listed so nobody wonders where it went, but it cannot be taken.
+  const offerList = offers.length > 0 && (
+    <div style={{ display: "grid", gap: 12 }}>
+      {offers.map((o) => (
+        <div key={o.pageId} style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+          <div style={{ flex: "1 1 220px", minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: o.status === "available" ? "var(--text-primary)" : "var(--text-tertiary)" }}>
+              {o.pageName ?? o.pageId}
+            </div>
+            <div style={{ ...muted, marginTop: 3 }}>
+              {o.status === "available" ? (o.igUsername ? `@${o.igUsername}` : "No Instagram linked") : "Connected to another business"}
+            </div>
+          </div>
+          {o.status === "available" && (
+            <Button variant="outline" size="sm" onClick={() => connectPage(o.pageId)} disabled={busy}>
+              <Plug size={14} /> Connect
+            </Button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+
   function postFrom(pageId: string) {
     start(async () => {
       const res = await setPostingPageAction(pageId);
@@ -105,6 +141,19 @@ export function FacebookConnectCard({
       toast.success(inUse ? "Ads will run from this account" : "Ad account removed");
       router.refresh();
     });
+  }
+
+  // ── Not connected, Facebook shared Pages: pick one ──────────────────────
+  if (pages.length === 0 && offers.some((o) => o.status === "available")) {
+    return (
+      <Card style={{ padding: 24, display: "grid", gap: 18 }}>
+        <div style={sectionLabel}>Choose this business&apos;s Page</div>
+        <div style={muted}>
+          Facebook shared more than one Page. Connect the one that belongs to this business. Nothing is connected until you choose.
+        </div>
+        {offerList}
+      </Card>
+    );
   }
 
   // ── Not connected ────────────────────────────────────────────────────────
@@ -177,6 +226,15 @@ export function FacebookConnectCard({
           </div>
         ))}
 
+        {offers.length > 0 && (
+          <>
+            <div style={{ borderTop: "1px solid var(--hairline)" }} />
+            <div style={sectionLabel}>Also shared by Facebook</div>
+            <div style={muted}>Not connected. Connect a Page only if it belongs to this business.</div>
+            {offerList}
+          </>
+        )}
+
         {adAccounts.length > 0 && (
           <>
             <div style={{ borderTop: "1px solid var(--hairline)" }} />
@@ -217,9 +275,10 @@ export function FacebookConnectCard({
               >
                 <option value="">{inUse.length ? "Add another ad account" : "Choose an ad account"}</option>
                 {available.map((a) => (
-                  <option key={a.adAccountId} value={a.adAccountId}>
+                  <option key={a.adAccountId} value={a.adAccountId} disabled={a.usedElsewhere}>
                     {a.name ?? a.adAccountId}
                     {a.currency ? ` (${a.currency})` : ""}
+                    {a.usedElsewhere ? " - used by another business" : ""}
                   </option>
                 ))}
               </select>

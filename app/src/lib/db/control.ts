@@ -1129,6 +1129,20 @@ export function ensureControlTables() {
       revoked_at INTEGER,
       UNIQUE(tenant_id, ad_account_id)
     );
+    -- The Pages Facebook offered a business on its last connect. NOT connected:
+    -- the never-expiring business login returns every Page the business
+    -- integration was ever given (another business's included) and does not
+    -- say which were ticked, so a Page is only connected when the business
+    -- picks it (lib/facebook/pages.ts). No tokens here: connecting one fetches
+    -- its Page token fresh with the grant.
+    CREATE TABLE IF NOT EXISTS facebook_page_offers (
+      tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      page_id TEXT NOT NULL,
+      page_name TEXT,
+      ig_username TEXT,
+      offered_at INTEGER NOT NULL,
+      PRIMARY KEY (tenant_id, page_id)
+    );
   `);
 
   // Which granted ad accounts the business actually advertises from. A user

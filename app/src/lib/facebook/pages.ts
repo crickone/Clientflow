@@ -34,64 +34,155 @@ export function openPageToken(stored: string): string {
 }
 
 
+/** How a claim went: connected here, or held by another business (left there). */
+export type ClaimResult = "connected" | "elsewhere";
+
 /**
- * After OAuth: store each granted Page (with its Page token and linked
- * Instagram account) for `tenantId`, and subscribe each Page to our webhook
- * (leads + messages). The per-Page subscribe is best-effort. Re-connecting a
- * Page updates its one row (page_id unique).
+ * Connect one Page to `tenantId`, atomically. The claim succeeds only when no
+ * OTHER business holds the Page live: a new row, a row this business already
+ * has, or a row someone disconnected. It is one conditional write, so two
+ * businesses connecting at the same moment cannot both win, and nothing above
+ * it can forget the rule. Subscribes the Page to our webhook (best-effort).
  *
- * A Page already connected to ANOTHER business is left where it is. The
- * never-expiring business login hands back every Page the business
- * integration has ever been given, not just the ones ticked this time, and
- * Meta does not say which were ticked. Taking such a Page used to move it:
- * reconnecting Optimal Health pulled the Adonis Agent Page out of the Adonis
- * account, so that Page's messages and leads would have landed in the wrong
- * business (2026-11-10). To move a Page on purpose, disconnect it in the
- * business that has it, then connect it here.
+ * This is the only function that writes a Page's owner. 2026-11-10: the old
+ * save reassigned any Page the token listed to whoever connected last, which
+ * moved the Adonis Agent Page into Optimal Health's account.
  */
-export async function saveConnectedPages(
+export async function claimPage(tenantId: number, page: GraphPage, connectedByUserId: number): Promise<ClaimResult> {
+  const held = controlSqlite
+    .prepare("SELECT tenant_id FROM facebook_pages WHERE page_id = ? AND revoked_at IS NULL")
+    .get(page.id) as { tenant_id: number } | undefined;
+  if (held && held.tenant_id !== tenantId) return "elsewhere";
+
+  let subscribedAt: number | null = null;
+  try {
+    if (await subscribePageToWebhook(page.id, page.access_token ?? "")) subscribedAt = Date.now();
+  } catch (err) {
+    // best-effort: the connection is stored either way and can be retried.
+    console.error(`[facebook] Page ${page.id} subscribe threw:`, err);
+  }
+  const igUserId = page.instagram_business_account?.id ?? null;
+  const igUsername = page.instagram_business_account?.username ?? null;
+  const token = sealPageToken(page.access_token ?? "");
+
+  const claimed = controlSqlite.transaction(() => {
+    controlSqlite
+      .prepare(
+        `INSERT INTO facebook_pages (tenant_id, page_id, page_name, page_access_token, connected_by_user_id, subscribed_at, ig_user_id, ig_username)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(page_id) DO NOTHING`,
+      )
+      .run(tenantId, page.id, page.name ?? null, token, connectedByUserId, subscribedAt, igUserId, igUsername);
+    // Ours, or free: take it. Live elsewhere: changes nothing.
+    const res = controlSqlite
+      .prepare(
+        `UPDATE facebook_pages SET tenant_id = ?, page_name = ?, page_access_token = ?, connected_by_user_id = ?,
+           subscribed_at = ?, ig_user_id = ?, ig_username = ?, revoked_at = NULL
+         WHERE page_id = ? AND (tenant_id = ? OR revoked_at IS NOT NULL)`,
+      )
+      .run(tenantId, page.name ?? null, token, connectedByUserId, subscribedAt, igUserId, igUsername, page.id, tenantId);
+    return res.changes > 0;
+  })();
+  if (!claimed) {
+    console.log(`[facebook] Page ${page.id} left with another business: connected there`);
+    return "elsewhere";
+  }
+  return "connected";
+}
+
+/**
+ * After OAuth. Facebook's Page list is recorded as OFFERS, not connections:
+ * the never-expiring business login returns every Page the integration was
+ * ever given and does not say which were ticked. Then:
+ *
+ * - Pages this business already has connected get their fresh tokens.
+ * - A business with no Page yet, offered exactly one Page nobody else holds,
+ *   gets that one: the obvious case, so a first connect stays one click.
+ * - Everything else waits for the business to pick it in Settings.
+ *
+ * A Page this business disconnected is never reconnected by a reconnect: a
+ * disconnect is a decision, and only picking the Page again undoes it.
+ */
+export async function applyConnectedPages(
   tenantId: number,
   pages: GraphPage[],
   connectedByUserId: number,
-): Promise<{ connected: string[]; leftWithOther: string[] }> {
-  const findExisting = controlSqlite.prepare("SELECT id, tenant_id, revoked_at FROM facebook_pages WHERE page_id = ?");
-  const insert = controlSqlite.prepare(
-    `INSERT INTO facebook_pages (tenant_id, page_id, page_name, page_access_token, connected_by_user_id, subscribed_at, ig_user_id, ig_username)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-  );
-  const update = controlSqlite.prepare(
-    `UPDATE facebook_pages SET tenant_id = ?, page_name = ?, page_access_token = ?,
-       connected_by_user_id = ?, subscribed_at = ?, ig_user_id = ?, ig_username = ?, revoked_at = NULL WHERE id = ?`,
-  );
+): Promise<{ connected: string[]; waiting: number }> {
+  recordPageOffers(tenantId, pages);
+  const mine = new Set(listFacebookPages(tenantId).map((p) => p.pageId));
+  const connected: string[] = [];
 
-  const names: string[] = [];
-  const leftWithOther: string[] = [];
   for (const page of pages) {
-    const held = findExisting.get(page.id) as { id: number; tenant_id: number; revoked_at: number | null } | undefined;
-    if (held && held.tenant_id !== tenantId && held.revoked_at == null) {
-      console.log(`[facebook] Page ${page.id} left with tenant ${held.tenant_id}: already connected there`);
-      leftWithOther.push(page.name ?? page.id);
-      continue;
+    if (mine.has(page.id) && (await claimPage(tenantId, page, connectedByUserId)) === "connected") {
+      connected.push(page.name ?? page.id);
     }
-    let subscribedAt: number | null = null;
-    try {
-      if (await subscribePageToWebhook(page.id, page.access_token!)) subscribedAt = Date.now();
-    } catch (err) {
-      // best-effort: store the connection even if subscribe hiccups — it can be
-      // retried, and the webhook still resolves the Page by page_id.
-      console.error(`[facebook] Page ${page.id} subscribe threw:`, err);
-    }
-    const igUserId = page.instagram_business_account?.id ?? null;
-    const igUsername = page.instagram_business_account?.username ?? null;
-    const existing = held;
-    if (existing) {
-      update.run(tenantId, page.name ?? null, sealPageToken(page.access_token ?? ""), connectedByUserId, subscribedAt, igUserId, igUsername, existing.id);
-    } else {
-      insert.run(tenantId, page.id, page.name ?? null, sealPageToken(page.access_token ?? ""), connectedByUserId, subscribedAt, igUserId, igUsername);
-    }
-    names.push(page.name ?? page.id);
   }
-  return { connected: names, leftWithOther };
+
+  if (mine.size === 0) {
+    const free = pages.filter((p) => !pageHeldElsewhere(tenantId, p.id) && !disconnectedHere(tenantId, p.id));
+    if (free.length === 1 && (await claimPage(tenantId, free[0], connectedByUserId)) === "connected") {
+      connected.push(free[0].name ?? free[0].id);
+    }
+  }
+
+  const waiting = listPageOffers(tenantId).filter((o) => o.status === "available").length;
+  return { connected, waiting };
+}
+
+function pageHeldElsewhere(tenantId: number, pageId: string): boolean {
+  const row = controlSqlite
+    .prepare("SELECT tenant_id FROM facebook_pages WHERE page_id = ? AND revoked_at IS NULL")
+    .get(pageId) as { tenant_id: number } | undefined;
+  return Boolean(row && row.tenant_id !== tenantId);
+}
+
+function disconnectedHere(tenantId: number, pageId: string): boolean {
+  return Boolean(
+    controlSqlite.prepare("SELECT 1 FROM facebook_pages WHERE page_id = ? AND tenant_id = ? AND revoked_at IS NOT NULL").get(pageId, tenantId),
+  );
+}
+
+/** Replace the business's offer list with what Facebook returned this time. */
+export function recordPageOffers(tenantId: number, pages: GraphPage[]): void {
+  const now = Date.now();
+  controlSqlite.transaction(() => {
+    controlSqlite.prepare("DELETE FROM facebook_page_offers WHERE tenant_id = ?").run(tenantId);
+    const ins = controlSqlite.prepare(
+      "INSERT OR REPLACE INTO facebook_page_offers (tenant_id, page_id, page_name, ig_username, offered_at) VALUES (?, ?, ?, ?, ?)",
+    );
+    for (const p of pages) ins.run(tenantId, p.id, p.name ?? null, p.instagram_business_account?.username ?? null, now);
+  })();
+}
+
+export interface PageOffer {
+  pageId: string;
+  pageName: string | null;
+  igUsername: string | null;
+  /** available: the business can connect it. elsewhere: another business has it. */
+  status: "available" | "elsewhere";
+}
+
+/** Pages Facebook offered this business that it has not connected (no tokens). */
+export function listPageOffers(tenantId: number): PageOffer[] {
+  const rows = controlSqlite
+    .prepare(
+      `SELECT o.page_id, o.page_name, o.ig_username, f.tenant_id AS holder
+         FROM facebook_page_offers o
+         LEFT JOIN facebook_pages f ON f.page_id = o.page_id AND f.revoked_at IS NULL
+        WHERE o.tenant_id = ? AND (f.tenant_id IS NULL OR f.tenant_id != ?)
+        ORDER BY o.page_name COLLATE NOCASE`,
+    )
+    .all(tenantId, tenantId) as Array<{ page_id: string; page_name: string | null; ig_username: string | null; holder: number | null }>;
+  return rows.map((r) => ({
+    pageId: r.page_id,
+    pageName: r.page_name,
+    igUsername: r.ig_username,
+    status: r.holder === null ? "available" : "elsewhere",
+  }));
+}
+
+/** Whether Facebook offered this business this Page on its last connect. */
+export function wasOffered(tenantId: number, pageId: string): boolean {
+  return Boolean(controlSqlite.prepare("SELECT 1 FROM facebook_page_offers WHERE tenant_id = ? AND page_id = ?").get(tenantId, pageId));
 }
 
 /** The Page webhook fields we use: lead ads, then Messenger (which also carries Instagram DMs). */

@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireAdmin, getCurrentMembership } from "@/lib/auth";
 import { exchangeCode } from "@/lib/facebook/oauth";
 import { discoverAssets, saveGrant, saveAdAccounts } from "@/lib/facebook/grants";
-import { saveConnectedPages } from "@/lib/facebook/pages";
+import { applyConnectedPages } from "@/lib/facebook/pages";
 import { getAppBaseUrl } from "@/lib/appUrl";
 
 export const dynamic = "force-dynamic";
@@ -46,10 +46,11 @@ export async function GET(req: NextRequest) {
     const assets = await discoverAssets(grant.token);
     saveGrant(tenantId, grant.token, grant.kind, grant.expiresAt, me.id, grant.fbUserId);
     saveAdAccounts(tenantId, assets.adAccounts);
-    const { connected, leftWithOther } = await saveConnectedPages(tenantId, assets.pages, me.id);
-    const left = leftWithOther.length ? `&left=${encodeURIComponent(leftWithOther.join("|"))}` : "";
-    if (connected.length === 0) return back(`error=${leftWithOther.length ? "pages_elsewhere" : "no_pages"}${left}`);
-    const res = back(`connected=${encodeURIComponent(String(connected.length))}${left}`);
+    if (assets.pages.length === 0) return back("error=no_pages");
+    // Facebook's Pages are offers; only a picked (or the one obvious) Page is
+    // connected. See applyConnectedPages.
+    const { connected, waiting } = await applyConnectedPages(tenantId, assets.pages, me.id);
+    const res = back(`connected=${connected.length}&waiting=${waiting}`);
     res.cookies.delete("fb_oauth_state");
     return res;
   } catch (err) {

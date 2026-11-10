@@ -3,9 +3,9 @@
 import { revalidatePath } from "next/cache";
 
 import { requireAdmin, getCurrentMembership } from "@/lib/auth";
-import { disconnectFacebookPage, listFacebookPages } from "@/lib/facebook/pages";
+import { claimPage, disconnectFacebookPage, listFacebookPages, wasOffered } from "@/lib/facebook/pages";
 import { setPostingPage } from "@/lib/social/publisher";
-import { discoverAdAccounts, getGrantToken, saveAdAccounts, setAdAccountInUse } from "@/lib/facebook/grants";
+import { adAccountUsedElsewhere, discoverAdAccounts, fetchGrantedPage, getGrantToken, saveAdAccounts, setAdAccountInUse } from "@/lib/facebook/grants";
 
 /** Disconnect (revoke) one of the current tenant's connected Pages. Admin-only, tenant-scoped. */
 export async function disconnectFacebookPageAction(pageId: string): Promise<{ ok: boolean; error?: string }> {
@@ -13,6 +13,27 @@ export async function disconnectFacebookPageAction(pageId: string): Promise<{ ok
   const membership = getCurrentMembership();
   if (!membership) return { ok: false, error: "No tenant in context." };
   await disconnectFacebookPage(membership.tenant.id, pageId);
+  revalidatePath("/settings/integrations/facebook");
+  return { ok: true };
+}
+
+/**
+ * Connect a Page Facebook offered on the last connect. Admin-only,
+ * tenant-scoped; refused when the Page was not offered to this business or
+ * another business has it (claimPage enforces that in one write).
+ */
+export async function connectOfferedPageAction(pageId: string): Promise<{ ok: boolean; error?: string }> {
+  const me = await requireAdmin();
+  const membership = getCurrentMembership();
+  if (!membership) return { ok: false, error: "No tenant in context." };
+  const tenantId = membership.tenant.id;
+  if (!wasOffered(tenantId, pageId)) return { ok: false, error: "Facebook did not share that Page with this account. Reconnect and tick it." };
+  const token = getGrantToken(tenantId);
+  if (!token) return { ok: false, error: "Reconnect Facebook first." };
+  const page = await fetchGrantedPage(token, pageId).catch(() => null);
+  if (!page) return { ok: false, error: "Facebook no longer shares that Page. Reconnect and tick it." };
+  const result = await claimPage(tenantId, page, me.id);
+  if (result === "elsewhere") return { ok: false, error: "That Page is connected to another business. Disconnect it there first." };
   revalidatePath("/settings/integrations/facebook");
   return { ok: true };
 }
@@ -55,6 +76,9 @@ export async function setAdAccountInUseAction(adAccountId: string, inUse: boolea
   await requireAdmin();
   const membership = getCurrentMembership();
   if (!membership) return { ok: false, error: "No tenant in context." };
+  if (inUse && adAccountUsedElsewhere(membership.tenant.id, adAccountId)) {
+    return { ok: false, error: "Another business advertises from that ad account, so it can't be used here." };
+  }
   if (!setAdAccountInUse(membership.tenant.id, adAccountId, inUse)) {
     return { ok: false, error: "That ad account is not part of this connection." };
   }

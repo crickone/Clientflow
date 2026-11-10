@@ -174,6 +174,21 @@ export async function discoverAssets(token: string): Promise<{ pages: GraphPage[
   return { pages: pages.filter((p) => Boolean(p.id && p.access_token)), adAccounts };
 }
 
+/**
+ * One Page the grant reaches, with its Page token, for connecting a Page the
+ * business picked. Null when the grant no longer reaches it.
+ */
+export async function fetchGrantedPage(token: string, pageId: string): Promise<GraphPage | null> {
+  try {
+    const page = await getJson<GraphPage>(encodeURIComponent(pageId), token, { fields: PAGE_FIELDS });
+    if (page?.id && page.access_token) return page;
+  } catch {
+    // fall through to the list
+  }
+  const listed = await listAll<GraphPage>("me/accounts", token, PAGE_FIELDS).catch(() => [] as GraphPage[]);
+  return listed.find((p) => p.id === pageId && p.access_token) ?? null;
+}
+
 /** Store (or replace) the tenant's grant token, encrypted. */
 export function saveGrant(tenantId: number, token: string, kind: TokenKind, expiresAt: number | null, userId: number, fbUserId: string | null = null): void {
   controlSqlite
@@ -244,10 +259,24 @@ export function saveAdAccounts(tenantId: number, accounts: GraphAdAccount[]): vo
     const revoke = controlSqlite.prepare("UPDATE facebook_ad_accounts SET revoked_at = ?, in_use = 0 WHERE tenant_id = ? AND ad_account_id = ?");
     for (const r of live) if (!keep.has(r.ad_account_id)) revoke.run(now, tenantId, r.ad_account_id);
     // One account granted: that is the one. Several: the business chooses.
-    if (accounts.length === 1) {
+    if (accounts.length === 1 && !adAccountUsedElsewhere(tenantId, accounts[0].id)) {
       controlSqlite.prepare("UPDATE facebook_ad_accounts SET in_use = 1 WHERE tenant_id = ? AND ad_account_id = ?").run(tenantId, accounts[0].id);
     }
   })();
+}
+
+/**
+ * Whether another business advertises from this ad account. The never-expiring
+ * login shares every ad account the business integration reaches, so one
+ * business is offered another's; it can see it listed but not use it, or its
+ * ads would bill to someone else (2026-11-10).
+ */
+export function adAccountUsedElsewhere(tenantId: number, adAccountId: string): boolean {
+  return Boolean(
+    controlSqlite
+      .prepare("SELECT 1 FROM facebook_ad_accounts WHERE ad_account_id = ? AND tenant_id != ? AND in_use = 1 AND revoked_at IS NULL")
+      .get(adAccountId, tenantId),
+  );
 }
 
 export interface AdAccountRow {
@@ -259,6 +288,8 @@ export interface AdAccountRow {
   accountStatus: number | null;
   /** Chosen in Settings as an account this business advertises from. */
   inUse: boolean;
+  /** Another business advertises from it: listed, but it cannot be chosen here. */
+  usedElsewhere: boolean;
 }
 
 /**
@@ -279,11 +310,13 @@ export function listAdAccounts(tenantId: number, opts: { granted?: boolean } = {
     timezone: r.timezone,
     accountStatus: r.account_status,
     inUse: r.in_use === 1,
+    usedElsewhere: r.in_use !== 1 && adAccountUsedElsewhere(tenantId, r.ad_account_id),
   }));
 }
 
 /** Choose (or stop using) one of the granted ad accounts. False when the grant does not reach it. */
 export function setAdAccountInUse(tenantId: number, adAccountId: string, inUse: boolean): boolean {
+  if (inUse && adAccountUsedElsewhere(tenantId, adAccountId)) return false;
   const res = controlSqlite
     .prepare("UPDATE facebook_ad_accounts SET in_use = ? WHERE tenant_id = ? AND ad_account_id = ? AND revoked_at IS NULL")
     .run(inUse ? 1 : 0, tenantId, adAccountId);
