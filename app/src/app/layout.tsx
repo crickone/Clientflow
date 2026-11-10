@@ -70,6 +70,12 @@ import {
 } from "./fonts";
 import "./globals.css";
 
+// The platform's own icon, for the admin screens. Set here rather than as an
+// app/icon.svg file: a file icon outranks every page's own `icons`, which put
+// the platform's mark on every client website (site/[siteSlug]/layout.tsx and
+// app/layout.tsx set theirs).
+const PLATFORM_ICONS: Metadata["icons"] = { icon: { url: "/icon.svg", type: "image/svg+xml" } };
+
 export async function generateMetadata(): Promise<Metadata> {
   // No resolvable tenant (logged out, mid-account-selection) → platform brand.
   // Tenant resolution is fail-closed now, so never touch tenant settings here
@@ -78,12 +84,14 @@ export async function generateMetadata(): Promise<Metadata> {
     return {
       title: "AdonisAgent",
       description: "AdonisAgent — management & marketing.",
+      icons: PLATFORM_ICONS,
     };
   }
   const profile = getBusinessProfile();
   return {
     title: profile.businessName,
     description: `${profile.businessName} — management & marketing.`,
+    icons: PLATFORM_ICONS,
   };
 }
 
