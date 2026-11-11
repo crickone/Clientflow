@@ -439,8 +439,8 @@ table.tbl { border-collapse: collapse; width: 100%; }
 }
 
 /* ─── Console sign-in ────────────────────────────────────────────────────────
-   The page is the surface: no card, wordmark pinned top-left, content held
-   left of centre, legal line at the foot. See src/app/login/page.tsx. */
+   The page is the surface: no card, wordmark pinned top-left, one centred
+   column, legal line at the foot. See src/app/login/page.tsx. */
 .signin {
   position: relative;
   min-height: 100vh;
@@ -451,30 +451,37 @@ table.tbl { border-collapse: collapse; width: 100%; }
   overflow: hidden;
   isolation: isolate;
 }
-/* One cool pool of light behind the top-left corner, the way the marketing
-   site lights its hero. Sized in vmax so it scales with the viewport instead
-   of pooling in a corner on a large screen. */
+/* One cool pool of light above the form, the way the marketing site lights
+   its hero. Sized in vmax so it scales with the viewport. */
 .signin-wash {
   position: absolute;
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(60vmax 45vmax at 8% -10%, rgba(96, 132, 186, 0.22), transparent 62%),
-    radial-gradient(45vmax 40vmax at 88% 108%, rgba(124, 92, 190, 0.14), transparent 66%);
+    radial-gradient(55vmax 38vmax at 50% -12%, rgba(96, 132, 186, 0.2), transparent 64%),
+    radial-gradient(40vmax 30vmax at 50% 112%, rgba(124, 92, 190, 0.1), transparent 66%);
   pointer-events: none;
 }
 .signin-mark { flex: 0 0 auto; }
 .signin-body {
   flex: 1 1 auto;
   display: grid;
-  grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
-  align-items: center;
-  gap: 40px;
-  max-width: 1180px;
+  place-items: center;
   width: 100%;
-  margin: 0 auto;
+  padding: 32px 0 48px;
 }
-.signin-form { max-width: 380px; }
+.signin-form {
+  width: 100%;
+  max-width: 380px;
+  animation: signin-in 0.5s var(--ease) both;
+}
+@keyframes signin-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .signin-form { animation: none; }
+}
 .signin-form h1 {
   font-family: var(--font-heading), system-ui, sans-serif;
   font-size: clamp(30px, 4vw, 38px);
@@ -531,15 +538,11 @@ table.tbl { border-collapse: collapse; width: 100%; }
 .signin-note { margin: 22px 0 0; color: var(--text-tertiary); font-size: 12.5px; line-height: 1.5; }
 .signin-note a { color: var(--text-secondary); }
 
-.signin-art { display: grid; place-items: center; }
-.signin-art svg { width: min(100%, 460px); height: auto; transform: rotate(-8deg); }
-.sculpt-depth { fill: none; stroke: url(#edge); stroke-width: 35; stroke-linecap: square; transform: translate(5px, 13px); }
-.sculpt-face { fill: none; stroke: url(#metal); stroke-width: 30; stroke-linecap: square; }
-.sculpt-edge { fill: none; stroke: #ecf6ff; stroke-width: 0.9; stroke-linecap: square; opacity: 0.8; transform: translate(-13px, -13px); }
 
 .signin-foot {
   flex: 0 0 auto;
   display: flex;
+  justify-content: center;
   gap: 22px;
   font-family: var(--font-mono), ui-monospace, monospace;
   font-size: 10.5px;
@@ -551,11 +554,7 @@ table.tbl { border-collapse: collapse; width: 100%; }
 .signin-foot a:hover { color: var(--text-secondary); }
 
 @media (max-width: 900px) {
-  .signin { padding: 26px 22px 22px; }
-  /* The sculpture is decoration; on a phone the form gets the whole screen. */
-  .signin-art { display: none; }
-  .signin-body { grid-template-columns: minmax(0, 1fr); }
-  .signin-form { max-width: 420px; }
+  .signin { padding: 26px 16px 22px; }
 }
 .signin-forgot {
   display: inline-block;

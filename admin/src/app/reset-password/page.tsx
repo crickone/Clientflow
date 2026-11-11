@@ -125,35 +125,6 @@ export default function ResetPasswordPage(
             {state.phase === "bad" ? "Send me a new link" : "Back to sign in"}
           </a>
         </section>
-
-        <aside className="signin-art" aria-hidden>
-          <svg viewBox="0 0 420 420">
-            <defs>
-              <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stopColor="#f1f7ff" />
-                <stop offset=".19" stopColor="#8193a9" />
-                <stop offset=".36" stopColor="#e4ebf6" />
-                <stop offset=".48" stopColor="#47596a" />
-                <stop offset=".69" stopColor="#a9bbcf" />
-                <stop offset=".85" stopColor="#34404f" />
-                <stop offset="1" stopColor="#d7e9fa" />
-              </linearGradient>
-              <linearGradient id="edge" x1="0" y1="1" x2="1" y2="0">
-                <stop stopColor="#111821" />
-                <stop offset=".5" stopColor="#607286" />
-                <stop offset="1" stopColor="#151e29" />
-              </linearGradient>
-              <filter id="metal-shadow" x="-40%" y="-40%" width="180%" height="180%">
-                <feDropShadow dx="4" dy="25" stdDeviation="15" floodColor="#000" floodOpacity=".7" />
-              </filter>
-            </defs>
-            <g filter="url(#metal-shadow)">
-              <path className="sculpt-depth" d="M70 70H350V350H70V140H280V280H140V210H210" />
-              <path className="sculpt-face" d="M70 70H350V350H70V140H280V280H140V210H210" />
-              <path className="sculpt-edge" d="M70 70H350V350H70V140H280V280H140V210H210" />
-            </g>
-          </svg>
-        </aside>
       </div>
 
       <footer className="signin-foot">
