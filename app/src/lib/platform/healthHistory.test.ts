@@ -11,11 +11,13 @@ mod._load = function (this: unknown, request: string, ...rest: unknown[]) {
   if (request === "next/navigation") return { redirect: () => { throw new Error("redirect stub"); } };
   return realLoad.call(this, request, ...rest);
 };
+import { rmSync } from "node:fs";
+import path from "node:path";
 const requireLocal = createRequire(import.meta.url);
 
 (async () => {
   const { controlSqlite } = requireLocal("../db/control") as typeof import("../db/control");
-  const { syncPlatformAlerts } = requireLocal("./healthHistory") as typeof import("./healthHistory");
+  const { syncPlatformAlerts, snapshotFleetHealth, listHealthHistory, buildFleetCandidates } = requireLocal("./healthHistory") as typeof import("./healthHistory");
 
   const slug = "health-history-test";
   controlSqlite.prepare("DELETE FROM tenants WHERE slug = ?").run(slug);
@@ -25,29 +27,35 @@ const requireLocal = createRequire(import.meta.url);
   const tid = t.id;
   const open = () =>
     controlSqlite.prepare("SELECT key, level, resolved_at, opened_at, last_seen_at FROM platform_alerts WHERE tenant_id = ? ORDER BY key").all(tid) as Array<{ key: string; level: string; resolved_at: number | null; opened_at: number; last_seen_at: number }>;
+  const dbDir = path.join(process.cwd(), "data", "tenants", slug);
   const cleanup = () => {
+    rmSync(dbDir, { recursive: true, force: true });
     controlSqlite.prepare("DELETE FROM platform_alerts WHERE tenant_id = ?").run(tid);
+    // snapshotFleetHealth also writes rows for every other local tenant at the fake instants.
+    controlSqlite.prepare("DELETE FROM health_snapshots WHERE at IN (10000, 20000, 30000)").run();
+    controlSqlite.prepare("DELETE FROM platform_alerts WHERE opened_at IN (10000, 20000, 30000)").run();
     controlSqlite.prepare("DELETE FROM tenants WHERE id = ?").run(tid);
   };
 
+  const cleanup2 = () => { controlSqlite.prepare("DELETE FROM platform_alerts WHERE tenant_id = ?").run(tid); };
   try {
     // 1. a new problem opens one alert.
-    let r = syncPlatformAlerts([{ tenantId: tid, key: "wal", level: "warn", title: "WAL too big" }], 1000);
+    let r = syncPlatformAlerts([{ tenantId: tid, key: "wal", level: "warn", title: "WAL too big" }], 1000, { tenantIds: [tid] });
     assert.deepEqual(r, { opened: 1, resolved: 0, seen: 0 });
     assert.equal(open().length, 1);
     assert.equal(open()[0].opened_at, 1000);
 
     // 2. the same problem an hour later is the same alert, seen again.
-    r = syncPlatformAlerts([{ tenantId: tid, key: "wal", level: "warn", title: "WAL too big" }], 2000);
+    r = syncPlatformAlerts([{ tenantId: tid, key: "wal", level: "warn", title: "WAL too big" }], 2000, { tenantIds: [tid] });
     assert.deepEqual(r, { opened: 0, resolved: 0, seen: 1 });
     assert.equal(open().length, 1);
     assert.equal(open()[0].last_seen_at, 2000);
 
     // 3. when it stops being reported it is resolved, and a new one can open later.
-    r = syncPlatformAlerts([], 3000);
+    r = syncPlatformAlerts([], 3000, { tenantIds: [tid] });
     assert.deepEqual(r, { opened: 0, resolved: 1, seen: 0 });
     assert.equal(open()[0].resolved_at, 3000);
-    r = syncPlatformAlerts([{ tenantId: tid, key: "wal", level: "bad", title: "WAL too big" }], 4000);
+    r = syncPlatformAlerts([{ tenantId: tid, key: "wal", level: "bad", title: "WAL too big" }], 4000, { tenantIds: [tid] });
     assert.deepEqual(r, { opened: 1, resolved: 0, seen: 0 });
     assert.equal(open().length, 2);
 
@@ -55,6 +63,44 @@ const requireLocal = createRequire(import.meta.url);
     r = syncPlatformAlerts([], 5000, { tenantIds: [tid + 100000] });
     assert.deepEqual(r, { opened: 0, resolved: 0, seen: 0 });
     assert.equal(open().filter((a) => a.resolved_at === null).length, 1);
+
+    // 5. duplicate candidates never break the hour.
+    cleanup2();
+    r = syncPlatformAlerts([
+      { tenantId: tid, key: "dup", level: "warn", title: "a" },
+      { tenantId: tid, key: "dup", level: "warn", title: "b" },
+    ], 6000, { tenantIds: [tid] });
+    assert.equal(r.opened, 1);
+
+    // 6. snapshot on a business whose database file is missing: alert raised, no crash, a row written.
+    cleanup2();
+    // Reading a business opens (and so creates) its database, so start from no file.
+    rmSync(dbDir, { recursive: true, force: true });
+    const snap = snapshotFleetHealth(10_000);
+    assert.ok(snap.tenants >= 1);
+    assert.ok(open().some((a) => a.key === "health:db_missing" && a.resolved_at === null), "db_missing alert opened");
+    const hist = listHealthHistory(tid, 0);
+    assert.equal(hist.length, 1);
+    assert.equal(hist[0].at, 10_000);
+    assert.ok(hist[0].alertsBad >= 1);
+
+    // 7. listHealthHistory: time order, since an instant.
+    snapshotFleetHealth(30_000);
+    snapshotFleetHealth(20_000);
+    assert.deepEqual(listHealthHistory(tid, 0).map((x) => x.at), [10_000, 20_000, 30_000]);
+    assert.deepEqual(listHealthHistory(tid, 20_000).map((x) => x.at), [20_000, 30_000]);
+
+    // 8. an unreadable business raises health:unreadable, and the sync leaves its alerts open.
+    const unreadable = {
+      tenants: [{ tenantId: tid, name: "x", slug, dbBytes: 0, walBytes: 0, queueDue: 0, queueFailed: 0, stuck: 0, readable: false,
+        alerts: [{ key: "unreadable", level: "bad" as const, message: "boom" }] }],
+      schedulers: [], duplicateSiteSlugs: [],
+    };
+    const cands = buildFleetCandidates(unreadable);
+    assert.deepEqual(cands.map((c) => c.key), ["health:unreadable"]);
+    syncPlatformAlerts(cands, 40_000, { tenantIds: [tid] });
+    const rows = open();
+    assert.ok(rows.find((a) => a.key === "health:unreadable" && a.resolved_at === null));
 
     console.log("healthHistory.test.ts: ok");
   } finally {

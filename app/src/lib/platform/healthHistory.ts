@@ -1,7 +1,7 @@
 import "server-only";
 
 import { controlSqlite } from "@/lib/db/control";
-import { getFleetHealth, getTenantHealth } from "./health";
+import { getFleetHealth } from "./health";
 
 /**
  * Health over time. `snapshotFleetHealth` runs hourly: one row per active
@@ -42,6 +42,13 @@ export function syncPlatformAlerts(
   now: number = Date.now(),
   scope?: { tenantIds?: number[]; platform?: boolean },
 ): { opened: number; resolved: number; seen: number } {
+  const seenKeys = new Set<string>();
+  candidates = candidates.filter((c) => {
+    const k = `${c.tenantId ?? 0}|${c.key}`;
+    if (seenKeys.has(k)) return false;
+    seenKeys.add(k);
+    return true;
+  });
   const openRows = controlSqlite
     .prepare("SELECT id, tenant_id, key, level FROM platform_alerts WHERE resolved_at IS NULL")
     .all() as Array<{ id: number; tenant_id: number | null; key: string; level: string }>;
@@ -87,35 +94,11 @@ export function syncPlatformAlerts(
   return { opened, resolved, seen };
 }
 
-/** One snapshot per active business, then the alert list reconciled. */
-export function snapshotFleetHealth(now: number = Date.now()): { tenants: number; opened: number; resolved: number } {
-  const fleet = getFleetHealth();
+/** Alert candidates from one fleet sweep: each business's own alerts (an unreadable business raises health:unreadable) plus platform-wide ones. */
+export function buildFleetCandidates(fleet: ReturnType<typeof getFleetHealth>): AlertCandidate[] {
   const candidates: AlertCandidate[] = [];
-  const tenantIds: number[] = [];
-  const insert = controlSqlite.prepare(
-    `INSERT INTO health_snapshots (tenant_id, at, db_bytes, wal_bytes, queue_due, queue_failed, stuck, alerts_bad, alerts_warn)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  );
   for (const row of fleet.tenants) {
-    tenantIds.push(row.tenantId);
-    let h;
-    try {
-      h = getTenantHealth(row.tenantId);
-    } catch {
-      continue;
-    }
-    insert.run(
-      row.tenantId,
-      now,
-      h.dbBytes,
-      h.walBytes,
-      h.queues.reduce((n, q) => n + q.due, 0),
-      h.queues.reduce((n, q) => n + q.failed, 0),
-      h.stuckGenerations,
-      h.alerts.filter((a) => a.level === "bad").length,
-      h.alerts.filter((a) => a.level === "warn").length,
-    );
-    for (const a of h.alerts) {
+    for (const a of row.alerts) {
       candidates.push({
         tenantId: row.tenantId,
         key: `health:${a.key}`,
@@ -134,7 +117,28 @@ export function snapshotFleetHealth(now: number = Date.now()): { tenants: number
       href: "/health",
     });
   }
-  const r = syncPlatformAlerts(candidates, now, { tenantIds, platform: true });
+  return candidates;
+}
+
+/** One snapshot per readable business (one health sweep), then the alert list reconciled. */
+export function snapshotFleetHealth(now: number = Date.now()): { tenants: number; opened: number; resolved: number } {
+  const fleet = getFleetHealth();
+  const insert = controlSqlite.prepare(
+    `INSERT INTO health_snapshots (tenant_id, at, db_bytes, wal_bytes, queue_due, queue_failed, stuck, alerts_bad, alerts_warn)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
+  for (const row of fleet.tenants) {
+    if (!row.readable) continue;
+    insert.run(
+      row.tenantId, now, row.dbBytes, row.walBytes, row.queueDue, row.queueFailed, row.stuck,
+      row.alerts.filter((a) => a.level === "bad").length,
+      row.alerts.filter((a) => a.level === "warn").length,
+    );
+  }
+  const r = syncPlatformAlerts(buildFleetCandidates(fleet), now, {
+    tenantIds: fleet.tenants.map((t) => t.tenantId),
+    platform: true,
+  });
   return { tenants: fleet.tenants.length, opened: r.opened, resolved: r.resolved };
 }
 

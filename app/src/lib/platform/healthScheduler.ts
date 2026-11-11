@@ -29,8 +29,10 @@ async function runOnce(): Promise<void> {
 }
 
 export function startHealthScheduler(): void {
-  if (armed || process.env.NEXT_PHASE === "phase-production-build") return;
+  const g = globalThis as { __adonisHealthScheduler?: boolean };
+  if (armed || g.__adonisHealthScheduler || process.env.NEXT_PHASE === "phase-production-build") return;
   armed = true;
+  g.__adonisHealthScheduler = true;
   const boot = setTimeout(() => void runOnce(), 60 * 1000);
   boot.unref();
   const armNext = () => {

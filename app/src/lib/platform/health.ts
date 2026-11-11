@@ -211,6 +211,12 @@ export interface FleetHealthRow {
   name: string;
   slug: string;
   dbBytes: number;
+  walBytes: number;
+  queueDue: number;
+  queueFailed: number;
+  stuck: number;
+  /** False when the health read threw; the row then carries an "unreadable" alert and zeros. */
+  readable: boolean;
   alerts: HealthAlert[];
 }
 
@@ -233,13 +239,25 @@ export function getFleetHealth(): {
     try {
       const h = getTenantHealth(t.id);
       schedulers = h.schedulers; // fleet-wide, identical for every tenant
-      tenants.push({ tenantId: t.id, name: t.name, slug: t.slug, dbBytes: h.dbBytes, alerts: h.alerts });
+      tenants.push({ tenantId: t.id, name: t.name, slug: t.slug, dbBytes: h.dbBytes,
+        walBytes: h.walBytes,
+        queueDue: h.queues.reduce((n, q) => n + q.due, 0),
+        queueFailed: h.queues.reduce((n, q) => n + q.failed, 0),
+        stuck: h.stuckGenerations,
+        readable: true,
+        alerts: h.alerts,
+      });
     } catch (err) {
       tenants.push({
         tenantId: t.id,
         name: t.name,
         slug: t.slug,
         dbBytes: 0,
+        walBytes: 0,
+        queueDue: 0,
+        queueFailed: 0,
+        stuck: 0,
+        readable: false,
         alerts: [{ key: "unreadable", level: "bad", message: err instanceof Error ? err.message : "Health could not be read." }],
       });
     }
