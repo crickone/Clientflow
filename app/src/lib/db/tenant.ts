@@ -1647,6 +1647,13 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     if (!siteCols.some((c) => c.name === "google_site_verification")) {
       sqlite.exec("ALTER TABLE sites ADD COLUMN google_site_verification TEXT");
     }
+    // Meta Conversions API (lib/facebook/capi.ts): sealed token + test code.
+    if (!siteCols.some((c) => c.name === "meta_capi_token")) {
+      sqlite.exec("ALTER TABLE sites ADD COLUMN meta_capi_token TEXT");
+    }
+    if (!siteCols.some((c) => c.name === "meta_capi_test_code")) {
+      sqlite.exec("ALTER TABLE sites ADD COLUMN meta_capi_test_code TEXT");
+    }
   } catch (err) {
     console.error("[db] sites meta_pixel_id migration failed:", err);
   }

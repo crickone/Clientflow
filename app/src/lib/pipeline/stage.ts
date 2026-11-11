@@ -8,6 +8,8 @@ import { listStages, resolveStageIdByRole, resolveEntryStageId } from "./stageRe
 import { leadPipelineId } from "./pipelineRepo";
 import { recordStageEvent, type StageActor } from "./stageEvents";
 import { cancelNurtureForLead } from "@/lib/automations/nurture";
+import { getCurrentTenant } from "@/lib/db/tenant";
+import { queueCrmStage } from "@/lib/facebook/capi";
 import { INACTIVE_ROLES } from "./roles";
 import { reopensOnRepeatEnquiry, shouldAdvance, ROLE_TO_LEGACY_KEY, type StageRecord, type StageRole } from "./roles";
 
@@ -68,6 +70,17 @@ export function writeStageId(leadId: number, stageId: number, note: string, acto
     .run();
   if (before) {
     recordStageEvent(db, { leadId, pipelineId: before.pipelineId, fromStageId: before.stageId ?? null, toStageId: stageId, actor });
+  }
+  // A Facebook lead-ads lead that books, attends or buys: Meta is told, by
+  // its own lead id, so lead ads learn which leads become customers
+  // (lib/facebook/capi.ts). Once per lead and stage. Never breaks the move.
+  if (stage?.role && before?.stageId !== stageId) {
+    try {
+      const lead = db.select({ source: schema.leads.source, sourceLeadId: schema.leads.sourceLeadId }).from(schema.leads).where(eq(schema.leads.id, leadId)).get();
+      if (lead) queueCrmStage(getCurrentTenant().id, lead, stage.role);
+    } catch (err) {
+      console.error(`[pipeline] conversion-lead event for lead #${leadId} not queued:`, err);
+    }
   }
   void logActivity("pipeline.stage", note, { leadId });
 }

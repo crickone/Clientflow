@@ -5,6 +5,7 @@ import { DomainsManager } from "@/components/cms/DomainsManager";
 import { TrackingCard } from "@/components/cms/TrackingCard";
 import { requireAdminPage, getCurrentMembership } from "@/lib/auth";
 import { getSiteBySlug } from "@/lib/cms/sites";
+import { capiStatus } from "@/lib/facebook/capi";
 import { isApexHost, listDomains, pointsAt } from "@/lib/cms/domains";
 import { cnameTarget, getCustomHostname, hostnameConfig } from "@/lib/cms/customHostnames";
 
@@ -59,6 +60,11 @@ export default async function SiteDomainsPage(
         initialPixelId={site.metaPixelId}
         initialGoogleTagId={site.googleTagId}
         initialSiteVerification={site.googleSiteVerification}
+        capi={{
+          hasToken: Boolean(site.metaCapiToken),
+          testCode: site.metaCapiTestCode,
+          status: capiStatus(membership.tenant.id, site.metaPixelId?.trim() || null),
+        }}
       />
     </div>
   );

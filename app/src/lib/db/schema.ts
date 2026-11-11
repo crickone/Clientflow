@@ -1760,6 +1760,14 @@ export const sites = sqliteTable("sites", {
    * the moment it is needed.
    */
   googleSiteVerification: text("google_site_verification"),
+  /**
+   * Meta Conversions API access token for this site's Pixel, sealed with the
+   * platform key (lib/google/tokenCrypto). A secret: never sent to a browser.
+   * Generated in Meta Events Manager > the Pixel > Settings.
+   */
+  metaCapiToken: text("meta_capi_token"),
+  /** Events Manager's "Test events" code; while set, events show there (and are not counted). */
+  metaCapiTestCode: text("meta_capi_test_code"),
   defaultLocale: text("default_locale").notNull().default("en"),
   themeJson: text("theme_json"),
   status: text("status", { enum: ["draft", "live"] })

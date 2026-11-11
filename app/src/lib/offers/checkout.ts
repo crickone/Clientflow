@@ -7,13 +7,19 @@ import { formatEur } from "./model";
 import { createPendingOrder, getOffer, setOrderSession, setOrderStatus } from "./store";
 import type { Arrival } from "@/lib/arrival";
 import type { CheckoutClaim } from "./checkoutToken";
+import { rememberCheckoutContext } from "@/lib/facebook/capi";
+import type { AdContext } from "@/lib/facebook/capiModel";
 
 /**
  * Open a Stripe Checkout page for one offer, on the business's own connected
  * Stripe account. A pending order is written first so the last place can't
  * be sold twice while the buyer pays (see store.takenCount).
  */
-export async function startCheckout(claim: CheckoutClaim, arrival: Arrival | null = null): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+export async function startCheckout(
+  claim: CheckoutClaim,
+  arrival: Arrival | null = null,
+  adContext: AdContext | null = null,
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
   const conn = getStripeConnection(claim.tenantId);
   if (!conn) return { ok: false, error: "Online payments aren't set up for this business yet." };
 
@@ -25,6 +31,8 @@ export async function startCheckout(claim: CheckoutClaim, arrival: Arrival | nul
     if (offer.state !== "live") return { ok: false as const, error: "This offer isn't on sale yet." };
 
     const order = createPendingOrder(offer, conn.accountId, arrival);
+    // For the Purchase event once Stripe says it was paid (consented visitors only).
+    if (adContext) rememberCheckoutContext(claim.tenantId, order.id, adContext);
     const includes = offer.items.map((i) => `${i.sessions} x ${i.name}`).join(", ");
     const useBy = new Date(`${offer.useByDate}T12:00:00Z`).toLocaleDateString("en-IE", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
     const termsLine = [`Use by ${useBy}.`, offer.terms ?? ""].join(" ").trim().slice(0, 1000);

@@ -1,5 +1,6 @@
 "use server";
 
+import { sealCapiToken } from "@/lib/facebook/capi";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -120,6 +121,35 @@ export async function deleteSiteAction(
  *
  * Both are written in one call so a half-saved pair cannot exist.
  */
+/**
+ * The site's Meta Conversions API token (server-side events) and the optional
+ * Events Manager test code. The token is write-only: it is sealed on the way
+ * in and never sent back to a browser; `token` null keeps the saved one,
+ * `removeToken` deletes it. Admin-only.
+ */
+export async function saveConversionsApiAction(
+  siteSlug: string,
+  opts: { token: string | null; testCode: string; removeToken?: boolean },
+): Promise<{ ok: boolean; error?: string }> {
+  await requireAdminPage();
+  const site = await getSiteBySlug(siteSlug);
+  if (!site) return { ok: false, error: "Unknown site." };
+  const token = (opts.token ?? "").trim();
+  if (token && !/^[A-Za-z0-9_-]{40,600}$/.test(token)) {
+    return { ok: false, error: "That does not look like a Conversions API token. Copy the whole token Meta shows under the Pixel's Settings, Conversions API." };
+  }
+  const testCode = opts.testCode.trim();
+  if (testCode && !/^TEST\d{3,12}$/i.test(testCode)) {
+    return { ok: false, error: "A test event code looks like TEST12345. Leave it empty once you have checked events arrive." };
+  }
+  await updateSite(site.id, {
+    ...(opts.removeToken ? { metaCapiToken: null } : token ? { metaCapiToken: sealCapiToken(token) } : {}),
+    metaCapiTestCode: testCode ? testCode.toUpperCase() : null,
+  });
+  revalidatePath(`/cms/${siteSlug}/domains`);
+  return { ok: true };
+}
+
 export async function saveTrackingAction(
   siteSlug: string,
   pixelId: string,

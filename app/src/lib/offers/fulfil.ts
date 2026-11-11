@@ -1,4 +1,5 @@
 import "server-only";
+import { queuePurchase } from "@/lib/facebook/capi";
 import { parseArrival } from "@/lib/arrival";
 import { eq, sql } from "drizzle-orm";
 
@@ -136,6 +137,16 @@ export async function fulfilCheckout(
     } catch (err) {
       console.error("[offers] lead update failed", err);
     }
+    // Meta Conversions API Purchase (only if the buyer accepted advertising
+    // cookies when they started checkout; same event id as the browser's).
+    queuePurchase({
+      tenantId,
+      orderId: order.id,
+      valueCents: order.amountCents,
+      currency: order.currency,
+      person: { email, phone: phone || null, firstName: firstName || null, lastName: lastName || null },
+      contentName: offer?.title ?? "Offer",
+    });
     await logActivity("offer_sale", `${fullName || email || "Someone"} bought ${offer?.title ?? "an offer"} online (${formatEur(order.amountCents)})`, { orderId: order.id, clientId: client.id });
 
     if (email && offer) {

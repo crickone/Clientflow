@@ -16,6 +16,7 @@ import {
   validateEnquiry,
 } from "@/lib/cms/enquiry";
 import { parsePublicFormFields, respondPublicForm } from "@/lib/publicFormExchange";
+import { adContextFromRequest, queueWebsiteLead } from "@/lib/facebook/capi";
 
 export const dynamic = "force-dynamic";
 
@@ -156,6 +157,18 @@ export async function POST(req: Request) {
           : `Repeat website enquiry: ${data.name}`,
       { leadId: lead.id, programme: data.programme, siteId: claim.siteId, created, reopened, about: data.about },
     );
+    // Meta Conversions API: a NEW lead, from a visitor who accepted
+    // advertising cookies, is queued as a Lead event (lib/facebook/capi.ts).
+    if (created) {
+      queueWebsiteLead({
+        tenantId: claim.tenantId,
+        siteId: claim.siteId,
+        leadId: lead.id,
+        person: { email: lead.email, phone: lead.phone, firstName: lead.firstName, lastName: lead.lastName },
+        ctx: adContextFromRequest(req),
+        contentName: "Website enquiry",
+      });
+    }
     return { leadId: lead.id, created, reopened };
   });
 

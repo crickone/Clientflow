@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { rememberArrival } from "./arrivalClient";
+import { ADS_CONSENT_COOKIE } from "@/lib/facebook/consentCookie";
 
 import {
   consentStorageKey,
@@ -74,6 +75,23 @@ export function SiteTracking({
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, [read]);
+
+  // Tell the server the visitor's answer, so the Conversions API (server-side
+  // Lead and Purchase events, lib/facebook/capi.ts) follows the same rule as
+  // the Pixel: a first-party cookie while they have said yes, gone the moment
+  // they say no or reopen the choice. It holds the answer only.
+  useEffect(() => {
+    if (choice === undefined) return;
+    try {
+      const secure = window.location.protocol === "https:" ? "; Secure" : "";
+      document.cookie =
+        mayTrack(choice) && hasTags
+          ? `${ADS_CONSENT_COOKIE}=1; Path=/; Max-Age=15552000; SameSite=Lax${secure}`
+          : `${ADS_CONSENT_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax${secure}`;
+    } catch {
+      // Cookies blocked: the server sees no consent and sends nothing.
+    }
+  }, [choice, hasTags]);
 
   // Load the tags, once, and only on an explicit yes.
   useEffect(() => {

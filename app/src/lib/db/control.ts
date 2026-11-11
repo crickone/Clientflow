@@ -1155,6 +1155,44 @@ export function ensureControlTables() {
       done_at INTEGER
     );
     CREATE INDEX IF NOT EXISTS idx_meta_lead_queue_due ON meta_lead_queue(status, next_attempt_at);
+    -- Meta Conversions API events waiting to be sent (lib/facebook/capi.ts).
+    -- event_key makes each event go once however often it is queued. payload
+    -- holds the event with personal data already hashed, and is cleared once
+    -- Meta has it; rows are deleted after 30 days.
+    CREATE TABLE IF NOT EXISTS capi_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id INTEGER NOT NULL,
+      site_id INTEGER,
+      pixel_id TEXT NOT NULL,
+      event_key TEXT NOT NULL UNIQUE,
+      event_name TEXT NOT NULL,
+      payload TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      attempts INTEGER NOT NULL DEFAULT 0,
+      next_attempt_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      sent_at INTEGER,
+      last_error TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_capi_events_due ON capi_events(status, next_attempt_at);
+    -- The visitor's ad context (consent, Meta cookies, IP, browser) captured
+    -- when a checkout starts, for the Purchase event sent when Stripe says it
+    -- was paid. Deleted when used, or after 2 days.
+    CREATE TABLE IF NOT EXISTS capi_context (
+      key TEXT PRIMARY KEY,
+      tenant_id INTEGER NOT NULL,
+      data TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+    -- When each Pixel last took an event from us, and the last refusal, for Settings.
+    CREATE TABLE IF NOT EXISTS capi_status (
+      tenant_id INTEGER NOT NULL,
+      pixel_id TEXT NOT NULL,
+      last_ok_at INTEGER,
+      last_error TEXT,
+      last_error_at INTEGER,
+      PRIMARY KEY (tenant_id, pixel_id)
+    );
     -- When each alert email last went to a business's admins, per kind, so a
     -- problem that repeats every minute sends one email, not hundreds
     -- (lib/alerts/tenantAlerts.ts).

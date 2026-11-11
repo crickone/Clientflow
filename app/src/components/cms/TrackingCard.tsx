@@ -7,7 +7,9 @@ import { Activity } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
-import { saveTrackingAction } from "@/app/cms/actions";
+import { saveConversionsApiAction, saveTrackingAction } from "@/app/cms/actions";
+// Type-only: lib/facebook/capi.ts is server-only.
+import type { CapiStatus } from "@/lib/facebook/capi";
 
 /**
  * The client's analytics, advertising and search-console tags for this
@@ -29,11 +31,14 @@ export function TrackingCard({
   initialPixelId,
   initialGoogleTagId,
   initialSiteVerification,
+  capi,
 }: {
   siteSlug: string;
   initialPixelId: string | null;
   initialGoogleTagId: string | null;
   initialSiteVerification: string | null;
+  /** Meta Conversions API: whether a token is saved (never the token), the test code, and how sending is going. */
+  capi?: { hasToken: boolean; testCode: string | null; status: CapiStatus | null };
 }) {
   const [pixel, setPixel] = useState(initialPixelId ?? "");
   const [google, setGoogle] = useState(initialGoogleTagId ?? "");
@@ -140,6 +145,109 @@ export function TrackingCard({
           {pending ? "Saving…" : "Save tracking"}
         </Button>
       </div>
+
+      {capi && <ConversionsApi siteSlug={siteSlug} hasPixel={Boolean(saved.pixel)} {...capi} />}
     </Card>
+  );
+}
+
+const when = (t: number) =>
+  new Date(t).toLocaleString("en-IE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Dublin" });
+
+/**
+ * Server-side events (Meta Conversions API, lib/facebook/capi.ts): leads and
+ * purchases sent from our server as well as the visitor's browser, for
+ * visitors who accepted advertising cookies. The token is write-only.
+ */
+function ConversionsApi({
+  siteSlug,
+  hasPixel,
+  hasToken,
+  testCode,
+  status,
+}: {
+  siteSlug: string;
+  hasPixel: boolean;
+  hasToken: boolean;
+  testCode: string | null;
+  status: CapiStatus | null;
+}) {
+  const [token, setToken] = useState("");
+  const [test, setTest] = useState(testCode ?? "");
+  const [savedTest, setSavedTest] = useState(testCode ?? "");
+  const [tokenSaved, setTokenSaved] = useState(hasToken);
+  const [pending, start] = useTransition();
+  const dirty = token.trim() !== "" || test.trim() !== savedTest.trim();
+
+  function save(removeToken = false) {
+    start(async () => {
+      const res = await saveConversionsApiAction(siteSlug, { token: removeToken ? null : token, testCode: test, removeToken });
+      if (!res.ok) return void toast.error(res.error ?? "Could not save that.");
+      if (removeToken) setTokenSaved(false);
+      else if (token.trim()) setTokenSaved(true);
+      setToken("");
+      setSavedTest(test.trim().toUpperCase());
+      toast.success(removeToken ? "Token removed." : "Server-side events saved.");
+    });
+  }
+
+  const statusLine = !hasPixel
+    ? "Add the Meta Pixel above first. Server-side events go to that Pixel."
+    : status?.lastError && (!status.lastOkAt || (status.lastErrorAt ?? 0) > status.lastOkAt)
+      ? `Meta refused the last events (${when(status.lastErrorAt!)}): ${status.lastError}`
+      : status?.lastOkAt
+        ? `Working. Meta last took events ${when(status.lastOkAt)}; ${status.sentLast7Days} sent in the last 7 days${status.waiting ? `, ${status.waiting} waiting` : ""}.`
+        : "Nothing sent yet. Events go once a visitor who accepted cookies enquires, signs up or buys.";
+  const statusBad = Boolean(hasPixel && status?.lastError && (!status.lastOkAt || (status.lastErrorAt ?? 0) > status.lastOkAt));
+
+  return (
+    <div style={{ marginTop: 24, paddingTop: 20, borderTop: "1px solid var(--hairline)" }}>
+      <h3 style={{ fontSize: 14, margin: "0 0 4px" }}>Server-side events (Meta Conversions API)</h3>
+      <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--text-secondary)", maxWidth: "70ch" }}>
+        Sends leads, sign-ups and purchases to Meta from our server as well as the browser, so ad blockers and phone
+        privacy settings stop losing them. Only for visitors who accepted cookies. Facebook lead-ads leads that book or
+        buy are reported too, so lead ads learn which leads become customers.
+      </p>
+      <div style={{ display: "flex", gap: 22, flexWrap: "wrap" }}>
+        <div style={{ minWidth: 260, flex: "2 1 320px" }}>
+          <label style={{ display: "block", fontSize: 12.5, color: "var(--text-secondary)", marginBottom: 6 }}>
+            Conversions API token
+            {tokenSaved && <span style={{ color: "var(--text-tertiary)", marginLeft: 8 }}>· saved</span>}
+          </label>
+          <Input
+            type="password"
+            autoComplete="off"
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+            placeholder={tokenSaved ? "Saved. Paste a new one to replace it." : "EAAB..."}
+            aria-label="Conversions API token"
+            style={{ width: "100%" }}
+          />
+          <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--text-tertiary)" }}>
+            Meta Events Manager, the Pixel, Settings, Conversions API, Generate access token. Without one, the business&apos;s Facebook connection is used.
+          </p>
+        </div>
+        <div style={{ minWidth: 180, flex: "1 1 200px" }}>
+          <label style={{ display: "block", fontSize: 12.5, color: "var(--text-secondary)", marginBottom: 6 }}>Test event code</label>
+          <Input value={test} onChange={(e) => setTest(e.target.value)} placeholder="TEST12345" aria-label="Test event code" style={{ width: "100%" }} />
+          <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--text-tertiary)" }}>
+            From Events Manager&apos;s Test events tab. Remove it once events show there.
+          </p>
+        </div>
+      </div>
+      <p role="status" style={{ margin: "14px 0 0", fontSize: 13, color: statusBad ? "var(--warning)" : "var(--text-secondary)", lineHeight: 1.5 }}>
+        {statusLine}
+      </p>
+      <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <Button onClick={() => save(false)} disabled={pending || !dirty}>
+          {pending ? "Saving…" : "Save server-side events"}
+        </Button>
+        {tokenSaved && (
+          <Button variant="ghost" onClick={() => save(true)} disabled={pending}>
+            Remove token
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }

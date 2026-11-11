@@ -4,6 +4,7 @@ import { verifyCheckoutToken } from "@/lib/offers/checkoutToken";
 import { startCheckout } from "@/lib/offers/checkout";
 import { parseArrival } from "@/lib/arrival";
 import { clientIp, rateLimit } from "@/lib/rateLimit";
+import { adContextFromRequest } from "@/lib/facebook/capi";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
   }
   const claim = verifyCheckoutToken(String(body.token ?? ""));
   if (!claim) return NextResponse.json({ ok: false, error: "This page is out of date. Please refresh and try again." }, { status: 400 });
-  const r = await startCheckout(claim, parseArrival(body.arrival));
+  const r = await startCheckout(claim, parseArrival(body.arrival), adContextFromRequest(req));
   if (!r.ok) return NextResponse.json(r, { status: 409 });
   return NextResponse.json(r);
 }

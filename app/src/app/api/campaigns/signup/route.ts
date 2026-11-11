@@ -8,6 +8,7 @@ import { runWithTenant } from "@/lib/db/tenant";
 import { upsertLead } from "@/lib/leads";
 import { pipelineForCampaign } from "@/lib/pipeline/pipelineRepo";
 import { clientIp, rateLimit } from "@/lib/rateLimit";
+import { adContextFromRequest, queueWebsiteLead } from "@/lib/facebook/capi";
 
 export const dynamic = "force-dynamic";
 
@@ -130,7 +131,7 @@ export async function POST(req: NextRequest) {
     // is non-empty, so this key is always meaningful (never "landing:<id>:").
     const sourceLeadId = `landing:${claim.campaignId}:${(email || phone || "").toLowerCase()}`;
 
-    upsertLead({
+    const { lead, created } = upsertLead({
       source: "landing",
       sourceLeadId,
       campaign: campaign.name,
@@ -143,6 +144,17 @@ export async function POST(req: NextRequest) {
       notes: message || null,
       arrival: parseArrival(bodyObj.arrival),
     });
+    // Meta Conversions API: a new sign-up from a visitor who accepted
+    // advertising cookies is queued as a Lead event (lib/facebook/capi.ts).
+    if (created) {
+      queueWebsiteLead({
+        tenantId: claim.tenantId,
+        leadId: lead.id,
+        person: { email: lead.email, phone: lead.phone, firstName: lead.firstName, lastName: lead.lastName },
+        ctx: adContextFromRequest(req),
+        contentName: campaign.name,
+      });
+    }
 
     return { ok: true } as const;
   });

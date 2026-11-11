@@ -19,6 +19,7 @@ import { dispatchReminders } from "@/lib/reminders";
 import { syncWearablesIfStale } from "@/lib/wearables/store";
 import { scoreLeadsIfDue } from "@/lib/leadScore";
 import { processDueLeads } from "@/lib/facebook/leadQueue";
+import { processDueCapiEvents } from "@/lib/facebook/capi";
 
 /**
  * The dispatch ticker: everything that was booked for a time, sent when that
@@ -153,6 +154,12 @@ export async function runDispatchOnce(): Promise<DispatchSummary> {
     await processDueLeads();
   } catch (err) {
     console.error("[dispatch] facebook lead retries failed:", err);
+  }
+  // Meta Conversions API events (leads, purchases, conversion leads).
+  try {
+    await processDueCapiEvents();
+  } catch (err) {
+    console.error("[dispatch] conversions api send failed:", err);
   }
   return summary;
 }
