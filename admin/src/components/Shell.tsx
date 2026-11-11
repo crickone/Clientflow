@@ -18,6 +18,7 @@ import {
 
 import { cn } from "@/lib/cn";
 import { Logo } from "@/components/Logo";
+import { Shortcuts } from "@/components/Shortcuts";
 import type { AdminUser } from "@/lib/session";
 
 // Grouped by what you came to do: look at the fleet, change something, or
@@ -172,6 +173,7 @@ export function Shell({ user, children }: { user: AdminUser; children: ReactNode
       {navOpen && <div className="app-backdrop" onClick={() => setNavOpen(false)} />}
 
       <main className="app-main">
+        <Shortcuts />
         <div className="app-topbar">
           <button className="app-hamburger" onClick={() => setNavOpen(true)} aria-label="Open menu">
             <Menu size={22} strokeWidth={1.9} />
