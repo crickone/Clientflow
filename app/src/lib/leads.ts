@@ -7,7 +7,7 @@ import { splitFullName } from "./humanName";
 import { resolveEntryStageId } from "./pipeline/stageRepo";
 import { recordStageEvent, type StageActor } from "./pipeline/stageEvents";
 import { defaultPipelineId, getPipeline, listPipelines } from "./pipeline/pipelineRepo";
-import { enrolLeadInNurture } from "./automations/nurture";
+import { enrolLeadInNurture, enrolLeadInSequence, sequenceEnabled } from "./automations/nurture";
 import { getCurrentTenantDb } from "./db/tenant";
 import { getCallFlow } from "./voice/flow";
 import { enqueueCall } from "./voice/queue";
@@ -115,9 +115,19 @@ export function upsertLead(input: NormalizedLeadInput): {
  * the lead is the money path, the follow-up is not.
  */
 function enrolInNurture(lead: Lead): void {
-  if (!lead.campaign) return;
   try {
-    enrolLeadInNurture(lead);
+    // A campaign landing-page sign-up has its own sequence; a buyer is a
+    // customer, not a lead to chase.
+    if (lead.source === "landing") return void enrolLeadInNurture(lead);
+    if (lead.source === "offer") return;
+    // An enquiry (website form, Facebook lead ad, a public form, or a lead
+    // posted in with a campaign) gets the New lead sequence when the business
+    // has switched it on, and the campaign sequence as before when not. A
+    // walk-in typed in by hand is neither, so nothing is sent to them.
+    const enquiry = ["website", "facebook", "form"].includes(lead.source ?? "") || Boolean(lead.campaign);
+    if (!enquiry) return;
+    if (sequenceEnabled("new_lead")) enrolLeadInSequence(lead, "new_lead");
+    else if (lead.campaign) enrolLeadInNurture(lead);
   } catch (err) {
     console.error(`[leads] nurture enrolment failed for lead #${lead.id}:`, err);
   }

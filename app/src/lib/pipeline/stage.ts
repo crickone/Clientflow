@@ -7,7 +7,8 @@ import { logActivity } from "@/lib/queries";
 import { listStages, resolveStageIdByRole, resolveEntryStageId } from "./stageRepo";
 import { leadPipelineId } from "./pipelineRepo";
 import { recordStageEvent, type StageActor } from "./stageEvents";
-import { cancelNurtureForLead } from "@/lib/automations/nurture";
+import { cancelNurtureForLead, cancelSequences, enrolLeadInSequence } from "@/lib/automations/nurture";
+import { STOP_ON_BOOKED, STOP_ON_NO_SHOW, STOP_ON_REPLY } from "@/lib/automationModel";
 import { getCurrentTenant } from "@/lib/db/tenant";
 import { queueCrmStage } from "@/lib/facebook/capi";
 import { INACTIVE_ROLES } from "./roles";
@@ -70,6 +71,25 @@ export function writeStageId(leadId: number, stageId: number, note: string, acto
     .run();
   if (before) {
     recordStageEvent(db, { leadId, pipelineId: before.pipelineId, fromStageId: before.stageId ?? null, toStageId: stageId, actor });
+  }
+  // Lead follow-up sequences (lib/automations/nurture.ts): booking in stops
+  // the "come and book" nudges and starts the booked messages; a no-show
+  // stops those and starts the rebooking ones. Fail-soft: the move stands.
+  if (stage?.role === "booked" || stage?.role === "no_show") {
+    try {
+      const lead = db.select().from(schema.leads).where(eq(schema.leads.id, leadId)).get();
+      if (lead && before?.stageId !== stageId) {
+        if (stage.role === "booked") {
+          cancelSequences(leadId, STOP_ON_BOOKED);
+          enrolLeadInSequence(lead, "lead_booked");
+        } else {
+          cancelSequences(leadId, STOP_ON_NO_SHOW);
+          enrolLeadInSequence(lead, "lead_no_show");
+        }
+      }
+    } catch (err) {
+      console.error(`[pipeline] follow-up sequence for lead #${leadId} not updated:`, err);
+    }
   }
   // A Facebook lead-ads lead that books, attends or buys: Meta is told, by
   // its own lead id, so lead ads learn which leads become customers
@@ -170,6 +190,12 @@ export function leadIdForClient(clientId: number): number | null {
 
 // ── Event hooks (signatures UNCHANGED — call sites in appointments/packages/whatsapp untouched) ──
 export function onInboundFromLead(leadId: number): void {
+  // They replied: a person takes it from here, so the automatic nudges stop.
+  try {
+    cancelSequences(leadId, STOP_ON_REPLY);
+  } catch (err) {
+    console.error(`[pipeline] could not stop follow-ups for lead #${leadId}:`, err);
+  }
   advanceStage(leadId, "engaged");
 }
 export function onInboundFromClient(clientId: number): void {

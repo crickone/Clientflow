@@ -1,6 +1,6 @@
 // Pure automations model — the fixed trigger catalog + message types.
 
-export type Channel = "email" | "push" | "chat";
+export type Channel = "email" | "whatsapp" | "push" | "chat";
 export type IntervalUnit = "minutes" | "hours" | "days";
 
 /**
@@ -43,6 +43,25 @@ export const TRIGGER_CATALOG: TriggerDef[] = [
   // up through ANY campaign landing page (or arrives tagged with a campaign)
   // gets these messages, spaced by their delays. The only trigger whose
   // delays are honoured -- see DELAYED_TRIGGER_KEYS.
+  {
+    key: "new_lead",
+    label: "New lead (website or Facebook)",
+    description:
+      "When an enquiry comes in from the website form or a Facebook lead ad. Stops when they reply, book, buy or are marked lost. While this is off, these leads get the campaign sign-up sequence instead.",
+    status: "active",
+  },
+  {
+    key: "lead_booked",
+    label: "Lead books in",
+    description: "When a lead moves to the booked stage on the leads board: a confirmation and what to bring. Stops if they no-show, buy or are marked lost.",
+    status: "active",
+  },
+  {
+    key: "lead_no_show",
+    label: "Lead does not show up",
+    description: "When a lead moves to the no-show stage: a note to rebook. Stops when they reply, book again, buy or are marked lost.",
+    status: "active",
+  },
   { key: "campaign_signup", label: "Campaign sign-up", description: "When someone signs up through a campaign landing page. The same follow-up sequence runs for every campaign; each message goes out after its delay.", status: "active" },
 ];
 
@@ -79,7 +98,45 @@ export const LIVE_DELAY_VALUE = 0;
  * the automation_queue table and the dispatch ticker. Every other trigger
  * still sends immediately and only its delay-0 messages (see isMessageLive).
  */
-export const DELAYED_TRIGGER_KEYS: ReadonlySet<string> = new Set(["campaign_signup"]);
+export const DELAYED_TRIGGER_KEYS: ReadonlySet<string> = new Set(["campaign_signup", "new_lead", "lead_booked", "lead_no_show"]);
+
+/**
+ * The lead follow-up sequences (lib/automations/nurture.ts): queued per lead,
+ * sent by the ticker, by email or WhatsApp. They replaced GoHighLevel's lead
+ * workflows for the clinics that used it (2026-11-11).
+ */
+export const LEAD_SEQUENCE_KEYS = ["new_lead", "lead_booked", "lead_no_show", "campaign_signup"] as const;
+
+/** Sequences a lead's reply stops: a person has taken over the conversation. */
+export const STOP_ON_REPLY: readonly string[] = ["new_lead", "campaign_signup", "lead_no_show"];
+/** Sequences booking in stops: no more "come and book" nudges. */
+export const STOP_ON_BOOKED: readonly string[] = ["new_lead", "campaign_signup", "lead_no_show"];
+/** Sequences a no-show stops: the booking they were about is gone. */
+export const STOP_ON_NO_SHOW: readonly string[] = ["lead_booked"];
+
+/** Channels that actually send for a trigger. The lead sequences add WhatsApp. */
+export function liveChannelsFor(triggerKey: string): Channel[] {
+  return supportsDelays(triggerKey) ? ["email", "whatsapp"] : ["email"];
+}
+
+/**
+ * WhatsApp messages go out between 9:00 and 21:00 Irish time, like the
+ * broadcasts: a follow-up should not buzz someone's phone at 2am. Returns
+ * the first moment at or after `at` inside that window (email is unchanged).
+ */
+export function inSendingHours(at: number, channel: Channel): number {
+  if (channel !== "whatsapp") return at;
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Dublin", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+      .formatToParts(new Date(at))
+      .map((p) => [p.type, p.value]),
+  );
+  const h = Number(parts.hour);
+  const min = Number(parts.minute);
+  if (h >= 9 && h < 21) return at;
+  const hoursToNine = h < 9 ? 9 - h : 24 - h + 9;
+  return at + hoursToNine * 3_600_000 - min * 60_000;
+}
 
 export function supportsDelays(triggerKey: string): boolean {
   return DELAYED_TRIGGER_KEYS.has(triggerKey);
@@ -104,7 +161,7 @@ export function delayToMs(value: number, unit: IntervalUnit): number {
  * is no longer a reason to drop a message: only the channel has to be live.
  */
 export function isMessageLive(m: { channel: Channel; delayValue: number }, triggerKey?: string): boolean {
-  if (triggerKey && supportsDelays(triggerKey)) return m.channel === LIVE_CHANNEL;
+  if (triggerKey && supportsDelays(triggerKey)) return liveChannelsFor(triggerKey).includes(m.channel);
   return m.channel === LIVE_CHANNEL && m.delayValue === LIVE_DELAY_VALUE;
 }
 
@@ -164,7 +221,7 @@ export function blankMessage(): MessageInput {
   };
 }
 
-export const CHANNEL_LABEL: Record<Channel, string> = { email: "Email", push: "Push", chat: "Chat" };
+export const CHANNEL_LABEL: Record<Channel, string> = { email: "Email", whatsapp: "WhatsApp", push: "Push", chat: "Chat" };
 
 function msg(channel: Channel, subject: string | null, template: string): MessageInput {
   return { channel, subject, template, attachmentFilename: null, attachmentOriginal: null, delayValue: 0, delayUnit: "minutes" };
@@ -207,6 +264,23 @@ export const DEFAULT_MESSAGES: Record<string, MessageInput[]> = {
   ],
   supplement_plan_updated: [
     msg("chat", null, "Hi [FIRST_NAME], your supplement plan has been updated — check the app for the details."),
+  ],
+  // Lead follow-ups. Plain and short: WhatsApp first because that is what
+  // people answer here, then email. No prices, offers or promises (the
+  // campaign house rules); the business edits these before switching on.
+  new_lead: [
+    msg("whatsapp", null, "Hi [FIRST_NAME], thanks for getting in touch with [BUSINESS_NAME]. We got your message and we'll call you shortly. If it's easier, reply here with a good time to talk."),
+    { ...msg("email", "Your enquiry with [BUSINESS_NAME]", "Hi [FIRST_NAME],\n\nThanks for your enquiry. We'll be in touch soon to talk it through and find a time that suits you.\n\nIf you have a question in the meantime, just reply to this email.\n\n[BUSINESS_NAME]"), delayValue: 1, delayUnit: "hours" },
+    { ...msg("whatsapp", null, "Hi [FIRST_NAME], just following up on your enquiry. Would you like us to book you in? Reply with a day that suits and we'll find a time."), delayValue: 1, delayUnit: "days" },
+    { ...msg("whatsapp", null, "Hi [FIRST_NAME], we haven't managed to connect yet. No rush. When you're ready, reply here and we'll sort a time for you."), delayValue: 4, delayUnit: "days" },
+  ],
+  lead_booked: [
+    msg("whatsapp", null, "Hi [FIRST_NAME], you're booked in with [BUSINESS_NAME]. If you need to change the time, just reply here."),
+    { ...msg("email", "You're booked in with [BUSINESS_NAME]", "Hi [FIRST_NAME],\n\nThanks for booking. If anything changes, reply to this email or call us and we'll move it for you.\n\nSee you soon.\n\n[BUSINESS_NAME]"), delayValue: 5, delayUnit: "minutes" },
+  ],
+  lead_no_show: [
+    { ...msg("whatsapp", null, "Hi [FIRST_NAME], we missed you today. No problem at all. Would you like to rebook? Reply with a day that suits."), delayValue: 2, delayUnit: "hours" },
+    { ...msg("email", "Shall we find another time, [FIRST_NAME]?", "Hi [FIRST_NAME],\n\nWe missed you at your appointment. Things come up. If you'd like to rebook, reply to this email and we'll find a time that works.\n\n[BUSINESS_NAME]"), delayValue: 3, delayUnit: "days" },
   ],
   campaign_signup: [
     msg("email", "Thanks for signing up, [FIRST_NAME]", "Hi [FIRST_NAME],\n\nThanks for signing up with [BUSINESS_NAME]. We'll be in touch very shortly to get you booked in — if you'd rather not wait, just reply to this email and we'll sort it now.\n\nTalk soon."),

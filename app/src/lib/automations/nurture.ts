@@ -10,6 +10,7 @@ import {
   TRIGGER_LABELS,
   applyShortcodes,
   delayToMs,
+  inSendingHours,
   isMessageLive,
   type Channel,
 } from "@/lib/automationModel";
@@ -56,11 +57,11 @@ interface QueuedMessage {
   delayUnit: "minutes" | "hours" | "days";
 }
 
-function sequenceMessages(): QueuedMessage[] {
+function sequenceMessages(triggerKey: string): QueuedMessage[] {
   const saved = db
     .select()
     .from(schema.automationMessages)
-    .where(eq(schema.automationMessages.triggerKey, NURTURE_TRIGGER_KEY))
+    .where(eq(schema.automationMessages.triggerKey, triggerKey))
     .orderBy(asc(schema.automationMessages.position))
     .all();
   const messages: QueuedMessage[] =
@@ -72,31 +73,47 @@ function sequenceMessages(): QueuedMessage[] {
           delayValue: m.delayValue,
           delayUnit: m.delayUnit,
         }))
-      : (DEFAULT_MESSAGES[NURTURE_TRIGGER_KEY] ?? []).map((m) => ({
+      : (DEFAULT_MESSAGES[triggerKey] ?? []).map((m) => ({
           channel: m.channel,
           subject: m.subject,
           template: m.template,
           delayValue: m.delayValue,
           delayUnit: m.delayUnit,
         }));
-  return messages.filter((m) => isMessageLive(m, NURTURE_TRIGGER_KEY) && m.template.trim());
+  return messages.filter((m) => isMessageLive(m, triggerKey) && m.template.trim());
 }
 
-/**
- * Queue the sequence for one lead. Runs in the ambient tenant (the lead was
- * just created there). Nothing is sent here; nothing is queued for a lead
- * with no email address, since email is the one live channel.
- */
-export function enrolLeadInNurture(lead: Pick<Lead, "id" | "firstName" | "lastName" | "email" | "campaign">): number {
+/** Whether a sequence is switched on for the ambient tenant (campaign sign-up is on unless switched off). */
+export function sequenceEnabled(triggerKey: string): boolean {
   const state = db
     .select({ enabled: schema.automationTriggers.enabled })
     .from(schema.automationTriggers)
-    .where(eq(schema.automationTriggers.key, NURTURE_TRIGGER_KEY))
+    .where(eq(schema.automationTriggers.key, triggerKey))
     .get();
-  if (!isTriggerEnabled(NURTURE_TRIGGER_KEY, state)) return 0;
-  if (!lead.email) return 0;
+  return isTriggerEnabled(triggerKey, state);
+}
 
-  const messages = sequenceMessages();
+/**
+ * Queue a sequence for one lead. Runs in the ambient tenant. Nothing is sent
+ * here. Each message goes by its own channel: an email needs an email
+ * address, a WhatsApp a phone number; a message the lead cannot receive is
+ * skipped, the rest still go. A lead already in this sequence is not
+ * enrolled twice (moving to booked, out and back, does not double the
+ * reminders).
+ */
+export function enrolLeadInSequence(
+  lead: Pick<Lead, "id" | "firstName" | "lastName" | "email" | "phone">,
+  triggerKey: string,
+): number {
+  if (!sequenceEnabled(triggerKey)) return 0;
+  const already = db
+    .select({ id: schema.automationQueue.id })
+    .from(schema.automationQueue)
+    .where(and(eq(schema.automationQueue.leadId, lead.id), eq(schema.automationQueue.triggerKey, triggerKey), eq(schema.automationQueue.status, "queued")))
+    .get();
+  if (already) return 0;
+
+  const messages = sequenceMessages(triggerKey);
   if (messages.length === 0) return 0;
 
   const businessName = getBusinessProfile().businessName;
@@ -104,22 +121,39 @@ export function enrolLeadInNurture(lead: Pick<Lead, "id" | "firstName" | "lastNa
   const now = Date.now();
   let queued = 0;
   for (const m of messages) {
-    const subject = applyShortcodes((m.subject ?? "").trim() || `A message from ${businessName}`, vars);
+    const sendTo = m.channel === "whatsapp" ? lead.phone : lead.email;
+    if (!sendTo) continue;
+    const subject = m.channel === "email" ? applyShortcodes((m.subject ?? "").trim() || `A message from ${businessName}`, vars) : null;
     const body = applyShortcodes(m.template, vars);
     db.insert(schema.automationQueue)
       .values({
-        triggerKey: NURTURE_TRIGGER_KEY,
+        triggerKey,
         leadId: lead.id,
         channel: m.channel,
         subject,
         body,
-        sendTo: lead.email,
-        dueAt: new Date(now + delayToMs(m.delayValue, m.delayUnit)),
+        sendTo,
+        dueAt: new Date(inSendingHours(now + delayToMs(m.delayValue, m.delayUnit), m.channel)),
       })
       .run();
     queued++;
   }
   return queued;
+}
+
+/** The campaign sign-up sequence (kept for its callers). */
+export function enrolLeadInNurture(lead: Pick<Lead, "id" | "firstName" | "lastName" | "email" | "phone" | "campaign">): number {
+  return enrolLeadInSequence(lead, NURTURE_TRIGGER_KEY);
+}
+
+/** Stop what is still queued for a lead in the named sequences only. */
+export function cancelSequences(leadId: number, triggerKeys: readonly string[]): number {
+  if (triggerKeys.length === 0) return 0;
+  return db
+    .update(schema.automationQueue)
+    .set({ status: "cancelled" })
+    .where(and(eq(schema.automationQueue.leadId, leadId), eq(schema.automationQueue.status, "queued"), inArray(schema.automationQueue.triggerKey, [...triggerKeys])))
+    .run().changes;
 }
 
 /**
@@ -173,7 +207,6 @@ export async function dispatchDueAutomationQueue(tenantId: number, now: number =
 
   const businessName = getBusinessProfileForTenant(tenantId).businessName;
   const accent = getThemeForTenant(tenantId).accent;
-  const label = TRIGGER_LABELS[NURTURE_TRIGGER_KEY] ?? NURTURE_TRIGGER_KEY;
   let sent = 0;
 
   for (const item of due) {
@@ -187,9 +220,43 @@ export async function dispatchDueAutomationQueue(tenantId: number, now: number =
         continue;
       }
     }
+    const label = TRIGGER_LABELS[item.triggerKey] ?? item.triggerKey;
+
+    // WhatsApp: within sending hours (it may have become due overnight),
+    // through the business's own WhatsApp connection, recorded on the
+    // lead's conversation like a reply typed in the inbox.
+    if (item.channel === "whatsapp") {
+      const allowed = inSendingHours(now, "whatsapp");
+      if (allowed > now) {
+        tdb.update(schema.automationQueue).set({ dueAt: new Date(allowed) }).where(eq(schema.automationQueue.id, item.id)).run();
+        continue;
+      }
+      let error: string | null = null;
+      if (item.leadId == null) error = "No lead to send to.";
+      else {
+        try {
+          // Loaded here: whatsapp/send imports leads, which imports this module.
+          const { sendWhatsApp } = await import("@/lib/whatsapp/send");
+          await sendWhatsApp({ subjectType: "lead", subjectId: item.leadId, text: item.body });
+        } catch (err) {
+          error = err instanceof Error ? err.message : "WhatsApp send failed.";
+        }
+      }
+      tdb.update(schema.automationQueue)
+        .set({ status: error ? "failed" : "sent", error, sentAt: new Date() })
+        .where(eq(schema.automationQueue.id, item.id))
+        .run();
+      tdb.insert(schema.automationLog)
+        .values({ triggerKey: item.triggerKey, triggerName: label, channel: "whatsapp", subject: null, sentTo: item.sendTo, status: error ? "failed" : "sent", sentAt: new Date() })
+        .run();
+      if (error) console.error(`[automations] tenant ${tenantId} WhatsApp follow-up ${item.id} failed: ${error}`);
+      else sent++;
+      continue;
+    }
+
     if (item.channel !== "email" || !item.sendTo) {
       tdb.update(schema.automationQueue)
-        .set({ status: "failed", error: item.channel !== "email" ? "Only email sends today." : "No email address." })
+        .set({ status: "failed", error: item.channel !== "email" ? "This channel does not send." : "No email address." })
         .where(eq(schema.automationQueue.id, item.id))
         .run();
       continue;

@@ -11,7 +11,7 @@ const KEYS = TRIGGER_CATALOG.map((t) => t.key) as [string, ...string[]];
 
 const messageSchema = z.object({
   id: z.number().int().positive().optional(),
-  channel: z.enum(["email", "push", "chat"]),
+  channel: z.enum(["email", "whatsapp", "push", "chat"]),
   subject: z.string().trim().max(300).nullable().default(null),
   template: z.string().max(20000).default(""),
   attachmentFilename: z.string().trim().max(300).nullable().default(null),

@@ -8,7 +8,11 @@ import assert from "node:assert/strict";
 import {
   ACTIVE_TRIGGER_KEYS,
   blankMessage,
+  inSendingHours,
   isMessageLive,
+  liveChannelsFor,
+  STOP_ON_BOOKED,
+  STOP_ON_REPLY,
   LIVE_CHANNEL,
   LIVE_DELAY_VALUE,
   TRIGGER_CATALOG,
@@ -25,12 +29,14 @@ function check(name: string, cond: boolean) {
 // submit in app/app/actions.ts, campaign sign-ups) and the birthday job
 // (automations/scheduler.ts). Every other catalog entry is configurable
 // in the UI but nothing ever calls fireTrigger() for it.
-const EXPECTED_ACTIVE = ["new_client_created", "client_check_in", "nutrition_plan_added", "workout_plan_added", "client_birthday", "campaign_signup"];
+// Plus the lead follow-up sequences (new_lead, lead_booked, lead_no_show), started
+// from upsertLead and the pipeline stage writer (lib/automations/nurture.ts).
+const EXPECTED_ACTIVE = ["new_client_created", "client_check_in", "nutrition_plan_added", "workout_plan_added", "client_birthday", "campaign_signup", "new_lead", "lead_booked", "lead_no_show"];
 
-check("TRIGGER_CATALOG has exactly 13 entries (the fixed Kahunas trigger list plus the campaign sign-up nurture trigger)", TRIGGER_CATALOG.length === 13);
+check("TRIGGER_CATALOG has exactly 16 entries (the fixed Kahunas trigger list, the campaign sign-up sequence and the three lead sequences)", TRIGGER_CATALOG.length === 16);
 
 check(
-  "ACTIVE_TRIGGER_KEYS is exactly the 6 verified-active triggers, no more, no fewer",
+  "ACTIVE_TRIGGER_KEYS is exactly the 9 verified-active triggers, no more, no fewer",
   ACTIVE_TRIGGER_KEYS.size === EXPECTED_ACTIVE.length && EXPECTED_ACTIVE.every((k) => ACTIVE_TRIGGER_KEYS.has(k)),
 );
 
@@ -71,5 +77,22 @@ const fresh = blankMessage();
 check("blankMessage() defaults to the live channel", fresh.channel === LIVE_CHANNEL);
 check("blankMessage() defaults to the live delay", fresh.delayValue === LIVE_DELAY_VALUE);
 check("blankMessage() starts live end-to-end (via isMessageLive)", isMessageLive(fresh));
+
+// Lead follow-up sequences (replacing GoHighLevel workflows): WhatsApp is a
+// live channel for them, and only for them; an immediate client trigger
+// still sends email only.
+check("lead sequences send WhatsApp and email", liveChannelsFor("new_lead").join() === "email,whatsapp");
+check("a delayed WhatsApp lead message is live", isMessageLive({ channel: "whatsapp", delayValue: 2 }, "lead_no_show"));
+check("a client trigger never sends WhatsApp", !isMessageLive({ channel: "whatsapp", delayValue: 0 }, "new_client_created"));
+check("replying stops the nudges but not the booking messages", STOP_ON_REPLY.includes("new_lead") && !STOP_ON_REPLY.includes("lead_booked"));
+check("booking stops the new-lead nudges", STOP_ON_BOOKED.includes("new_lead") && STOP_ON_BOOKED.includes("campaign_signup"));
+
+// Sending hours: WhatsApp 9:00-21:00 Irish time; email any time.
+const dublin = (iso: string) => new Date(iso).getTime(); // November: Dublin = UTC
+check("WhatsApp at 14:00 goes at 14:00", inSendingHours(dublin("2026-11-11T14:00:00Z"), "whatsapp") === dublin("2026-11-11T14:00:00Z"));
+check("WhatsApp at 02:30 waits until 09:00", inSendingHours(dublin("2026-11-11T02:30:00Z"), "whatsapp") === dublin("2026-11-11T09:00:00Z"));
+check("WhatsApp at 22:15 waits until 09:00 next day", inSendingHours(dublin("2026-11-11T22:15:00Z"), "whatsapp") === dublin("2026-11-12T09:00:00Z"));
+check("WhatsApp in summer time respects Irish hours", inSendingHours(dublin("2026-07-01T07:30:00Z"), "whatsapp") === dublin("2026-07-01T08:00:00Z"));
+check("email at 02:30 goes at 02:30", inSendingHours(dublin("2026-11-11T02:30:00Z"), "email") === dublin("2026-11-11T02:30:00Z"));
 
 console.log(`automationModel: ${passed} checks passed.`);

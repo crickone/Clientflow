@@ -265,6 +265,8 @@ export async function processDueCapiEvents(now = Date.now()): Promise<number> {
       for (const r of ok) mark.run(Date.now(), r.id);
       sent += ok.length;
       setStatus(tenantId, pixelId, true);
+      // One line per batch so a send can be confirmed from the logs (names only, never personal data).
+      console.log(`[capi] tenant ${tenantId} Pixel ${pixelId}: ${ok.length} event(s) accepted (${[...new Set(ok.map((r) => (JSON.parse(r.payload ?? "{}") as { event_name?: string }).event_name))].join(", ")})${testCode ? " as test events" : ""}`);
     } catch (err) {
       const reason = (err instanceof Error ? err.message : String(err)).slice(0, 300);
       const hint = isConnectionRefused(err) ? `${reason} Add a Conversions API token for this Pixel on the website's Domains screen.` : reason;

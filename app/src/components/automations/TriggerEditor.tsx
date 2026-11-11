@@ -13,7 +13,7 @@ import {
   applyShortcodes,
   blankMessage,
   CHANNEL_LABEL,
-  LIVE_CHANNEL,
+  liveChannelsFor,
   supportsDelays,
   SHORTCODES,
   type Channel,
@@ -122,6 +122,7 @@ export function TriggerEditor({ initial, businessName }: { initial: Detail; busi
               onRemove={() => removeMsg(i)}
               businessName={businessName}
               delaysLive={supportsDelays(initial.key)}
+              liveChannels={liveChannelsFor(initial.key)}
             />
           ))}
 
@@ -153,6 +154,7 @@ function MessageCard({
   onRemove,
   businessName,
   delaysLive,
+  liveChannels,
 }: {
   index: number;
   message: MessageInput;
@@ -160,8 +162,10 @@ function MessageCard({
   onPatch: (p: Partial<MessageInput>) => void;
   onRemove: () => void;
   businessName: string;
-  /** Whether this trigger honours the delay (the campaign nurture sequence does; see DELAYED_TRIGGER_KEYS). */
+  /** Whether this trigger honours the delay (the lead sequences do; see DELAYED_TRIGGER_KEYS). */
   delaysLive: boolean;
+  /** Channels that actually send for this trigger (liveChannelsFor). */
+  liveChannels: Channel[];
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -203,13 +207,13 @@ function MessageCard({
           <div style={{ fontSize: 12, color: "var(--text-tertiary)" }}>What type of notification do you want to send?</div>
         </div>
         <div style={{ marginLeft: "auto", display: "inline-flex", border: "1px solid var(--hairline)", borderRadius: "var(--radius)", overflow: "hidden" }}>
-          {(["email", "push", "chat"] as Channel[]).map((c) => {
-            // Only LIVE_CHANNEL ("email") is ever actually dispatched — see
-            // automationModel.ts's isMessageLive(). Push/chat stay visible
-            // (so a historically-saved value is still legible) but disabled,
-            // rather than silently accepting a choice that will never send
-            // (improvement-plan-2026-08.md Theme D1).
-            const live = c === LIVE_CHANNEL;
+          {(["email", "whatsapp", "push", "chat"] as Channel[]).filter((c) => c !== "whatsapp" || liveChannels.includes(c)).map((c) => {
+            // Only the channels liveChannelsFor() returns are dispatched (email
+            // everywhere; WhatsApp too for the lead sequences). Push/chat stay
+            // visible (so a historically-saved value is still legible) but
+            // disabled, rather than silently accepting a choice that will
+            // never send (improvement-plan-2026-08.md Theme D1).
+            const live = liveChannels.includes(c);
             const selected = message.channel === c;
             return (
               <button
@@ -217,14 +221,16 @@ function MessageCard({
                 type="button"
                 onClick={() => live && onPatch({ channel: c })}
                 disabled={!live}
-                title={live ? undefined : "Coming soon — only Email actually sends today"}
+                title={live ? undefined : "Coming soon"}
                 style={{
                   padding: "8px 18px",
                   border: "none",
                   cursor: live ? "pointer" : "not-allowed",
                   fontSize: 13,
                   background: selected ? "var(--accent)" : "transparent",
-                  color: selected ? "#fff" : live ? "var(--text-secondary)" : "var(--text-tertiary)",
+                  // The accent is white in the dark theme: its own ink, not a fixed white.
+                  color: selected ? "var(--accent-contrast)" : live ? "var(--text-secondary)" : "var(--text-tertiary)",
+                  fontWeight: selected ? 600 : 400,
                   opacity: live ? 1 : 0.6,
                 }}
               >
@@ -261,8 +267,8 @@ function MessageCard({
         )}
       </div>
 
-      {/* attachment */}
-      <div>
+      {/* attachment (email only: WhatsApp follow-ups send text) */}
+      <div style={message.channel === "whatsapp" ? { display: "none" } : undefined}>
         <Label>Attached file</Label>
         <input
           ref={fileRef}
@@ -324,7 +330,9 @@ function MessageCard({
         </div>
         <div style={{ fontSize: 11.5, color: "var(--text-tertiary)", marginTop: 6 }}>
           {delaysLive
-            ? "Counted from the moment the person signs up. 0 sends straight away."
+            ? message.channel === "whatsapp"
+              ? "Counted from when the sequence starts. WhatsApp messages only go between 9am and 9pm Irish time; one due outside that waits until 9am."
+              : "Counted from when the sequence starts. 0 sends straight away."
             : "Scheduled & multi-channel sending coming soon — for now every message sends by Email, immediately."}
         </div>
       </div>
