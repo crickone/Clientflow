@@ -1,12 +1,20 @@
 "use client";
 
-import { useId, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { cn } from "@/lib/cn";
+import { notify } from "@/lib/toast";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 type ActionResult = { ok: boolean; error?: string };
 
+/**
+ * A button that runs a server action after the operator confirms in the
+ * console's dialog. Success is a toast; a failure is a toast and stays
+ * under the button as selectable text. `undo` turns the success toast into
+ * one with an Undo that runs the inverse action.
+ */
 export function ConfirmButton({
   label,
   action,
@@ -15,25 +23,29 @@ export function ConfirmButton({
   danger,
   className,
   redirectTo,
+  done,
+  undo,
 }: {
   label: string;
   /** A server action (typically `tenantAction.bind(null, …)`). */
   action: () => Promise<ActionResult>;
-  /** When set, `window.confirm(confirm)` must pass before the action runs. */
+  /** Body text of the dialog. Without it the action runs on click. */
   confirm?: string;
-  /** Offboard variant: the user must type this exact slug to proceed. */
+  /** Offboard variant: the user must type this exact slug in the dialog. */
   slug?: string;
   danger?: boolean;
   className?: string;
   /** On a successful `{ok:true}`, navigate here (used by Offboard → /gyms). */
   redirectTo?: string;
+  /** Toast text on success. */
+  done?: string;
+  /** The inverse action, offered on the success toast for ten seconds. */
+  undo?: { label: string; action: () => Promise<ActionResult> };
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState(false);
-  const [typed, setTyped] = useState("");
   const router = useRouter();
-  const inputId = useId();
+  const ask = useConfirm();
 
   function runAction() {
     setError(null);
@@ -41,81 +53,43 @@ export function ConfirmButton({
       const r = await action();
       if (!r.ok) {
         setError(r.error ?? "Action failed");
+        notify.fail(r.error ?? "Action failed");
         return;
       }
+      const message = done ?? `${label}: done`;
+      if (undo) {
+        notify.undo(message, {
+          label: undo.label,
+          onUndo: () => {
+            startTransition(async () => {
+              const u = await undo.action();
+              if (!u.ok) notify.fail(u.error ?? "Could not undo that");
+              else notify.ok(`${undo.label}: done`);
+              router.refresh();
+            });
+          },
+        });
+      } else {
+        notify.ok(message);
+      }
       if (redirectTo) router.push(redirectTo);
+      else router.refresh();
     });
   }
 
-  function onClick() {
-    // Gate destructive actions before touching the server.
-    if (slug !== undefined) {
-      // Reveal the inline type-to-confirm field instead of a silent
-      // window.prompt — a mismatch here is visibly disabled, never a no-op.
-      setConfirming(true);
+  async function onClick() {
+    if (confirm === undefined && slug === undefined) {
+      runAction();
       return;
     }
-    if (confirm && !window.confirm(confirm)) return;
-    runAction();
-  }
-
-  function onCancel() {
-    setConfirming(false);
-    setTyped("");
-    setError(null);
-  }
-
-  function onConfirmTyped() {
-    if (typed !== slug) return; // belt-and-braces — the button is disabled until this matches
-    setConfirming(false);
-    setTyped("");
-    runAction();
-  }
-
-  if (slug !== undefined && confirming) {
-    const matches = typed === slug;
-    return (
-      <span style={{ display: "inline-flex", flexDirection: "column", gap: 6, maxWidth: 260 }}>
-        <label htmlFor={inputId} style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-          Type the slug <strong>{slug}</strong> to confirm.
-        </label>
-        <input
-          id={inputId}
-          type="text"
-          className="input"
-          value={typed}
-          onChange={(e) => setTyped(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && matches) onConfirmTyped();
-            else if (e.key === "Escape") onCancel();
-          }}
-          placeholder={slug}
-          autoFocus
-          autoComplete="off"
-          spellCheck={false}
-          style={{ fontSize: 13 }}
-        />
-        <span style={{ display: "inline-flex", gap: 8 }}>
-          <button
-            type="button"
-            className={className ?? cn("btn", danger ? "btn--destructive" : "btn--secondary", "btn--sm")}
-            onClick={onConfirmTyped}
-            disabled={pending || !matches}
-            style={pending || !matches ? { opacity: 0.6, cursor: pending ? "wait" : "not-allowed" } : undefined}
-          >
-            {pending ? "Working…" : label}
-          </button>
-          <button type="button" className="btn btn--secondary btn--sm" onClick={onCancel} disabled={pending}>
-            Cancel
-          </button>
-        </span>
-        {error && (
-          <span role="alert" style={{ color: "var(--red)", fontSize: 11.5, maxWidth: 220 }}>
-            {error}
-          </span>
-        )}
-      </span>
-    );
+    const r = await ask({
+      title: label,
+      body: confirm,
+      confirmLabel: label,
+      danger,
+      typeToConfirm: slug,
+    });
+    if (r.ok) runAction();
   }
 
   return (

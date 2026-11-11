@@ -144,6 +144,8 @@ export default async function GymMoneyPage(
                   danger
                   confirm="Suspend this business? Members lose access until it is reactivated."
                   action={tenantAction.bind(null, tenant.id, "suspend", {})}
+                  done="Business suspended"
+                  undo={{ label: "Reactivate", action: tenantAction.bind(null, tenant.id, "reactivate", {}) }}
                 />
               ) : null}
               {billing.nextRenewalAt && (
@@ -249,6 +251,8 @@ export default async function GymMoneyPage(
               danger
               confirm="Suspend email marketing for this business? No campaigns can be sent until resumed."
               action={tenantAction.bind(null, tenant.id, "suspend-marketing", {})}
+              done="Email marketing suspended"
+              undo={{ label: "Resume marketing", action: tenantAction.bind(null, tenant.id, "resume-marketing", {}) }}
             />
           )}
         </div>
@@ -322,6 +326,8 @@ export default async function GymMoneyPage(
               danger
               confirm="Suspend AI for this business? No agent or content-studio calls run until resumed."
               action={tenantAction.bind(null, tenant.id, "suspend-ai", {})}
+              done="AI suspended"
+              undo={{ label: "Resume AI", action: tenantAction.bind(null, tenant.id, "resume-ai", {}) }}
             />
           )}
         </div>
@@ -467,6 +473,8 @@ export default async function GymMoneyPage(
               danger
               confirm="Suspend voice for this business? No calls are placed until resumed."
               action={tenantAction.bind(null, tenant.id, "suspend-voice", {})}
+              done="Voice suspended"
+              undo={{ label: "Resume voice", action: tenantAction.bind(null, tenant.id, "resume-voice", {}) }}
             />
           )}
         </div>
