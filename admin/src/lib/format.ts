@@ -20,3 +20,11 @@ export const fmtEurWhole = (cents: number) =>
   new Intl.NumberFormat("en-IE", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(
     Math.round(cents / 100),
   );
+
+/** File size for people: "0 B", "512 B", "3.4 MB". Plain module so server pages and client panels can both use it. */
+export function bytes(n: number): string {
+  if (n <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  const i = Math.min(units.length - 1, Math.floor(Math.log(n) / Math.log(1024)));
+  return `${(n / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+}

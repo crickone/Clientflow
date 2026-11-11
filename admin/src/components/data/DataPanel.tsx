@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { dataAction, type DataActionResult, type DataOp } from "@/app/(console)/gyms/[id]/data/actions";
 import { Card } from "@/components/ui/Card";
-import { bytes } from "@/components/health/HealthPanel";
+import { bytes } from "@/lib/format";
 import type { PersonHit, TenantData } from "@/lib/types";
 
 /**

@@ -1,5 +1,6 @@
 import "server-only";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 const BASE = process.env.MAIN_APP_URL!;
 const KEY = process.env.PLATFORM_API_KEY!;
@@ -25,6 +26,10 @@ export async function api<T>(
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
     cache: "no-store",
   });
+  // A page renders in parallel with the layout's requireAdminSession, so its own
+  // call can see an expired sign-in first. Send it to /login instead of an
+  // error screen. Only for a cookie session: /login's own call sends none.
+  if (res.status === 401 && session && opts.session === undefined) redirect("/login");
   if (!res.ok) {
     let msg = `Request failed (${res.status})`;
     try { msg = ((await res.json()) as { error?: string }).error ?? msg; } catch { /* keep default */ }

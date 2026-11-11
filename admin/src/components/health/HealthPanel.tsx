@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { healthAction, type HealthActionResult, type HealthOp } from "@/app/(console)/gyms/[id]/health/actions";
 import { Card } from "@/components/ui/Card";
+import { bytes } from "@/lib/format";
 import type { TenantHealth } from "@/lib/types";
 
 /**
@@ -16,13 +17,6 @@ import type { TenantHealth } from "@/lib/types";
  * work that failed. Anything more invasive belongs in the Data slice, behind
  * a backup.
  */
-export function bytes(n: number): string {
-  if (n <= 0) return "0 B";
-  const units = ["B", "KB", "MB", "GB"];
-  const i = Math.min(units.length - 1, Math.floor(Math.log(n) / Math.log(1024)));
-  return `${(n / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
-}
-
 export function HealthPanel({ tenantId, data }: { tenantId: number; data: TenantHealth }) {
   const router = useRouter();
   const [pending, start] = useTransition();

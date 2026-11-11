@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { api } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
-import { bytes } from "@/components/health/HealthPanel";
+import { bytes } from "@/lib/format";
 import type { FleetHealth } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
