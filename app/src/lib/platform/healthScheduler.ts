@@ -1,6 +1,6 @@
 import "server-only";
 
-import { recordJobRun } from "./jobRuns";
+import { recordJobRun, pruneHistory } from "./jobRuns";
 import { snapshotFleetHealth } from "./healthHistory";
 
 let armed = false;
@@ -16,6 +16,11 @@ async function runOnce(): Promise<void> {
   running = true;
   try {
     await recordJobRun("health_snapshot", "Health snapshot", () => snapshotFleetHealth());
+    try {
+      pruneHistory();
+    } catch (err) {
+      console.error("[health] prune failed:", err);
+    }
   } catch (err) {
     console.error("[health] snapshot failed:", err);
   } finally {

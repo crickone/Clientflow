@@ -22,30 +22,59 @@ export interface JobRunRow {
 
 export async function recordJobRun<T>(key: string, label: string, fn: () => Promise<T> | T): Promise<T> {
   const startedAt = Date.now();
-  const id = Number(
-    controlSqlite
-      .prepare("INSERT INTO job_runs (key, label, started_at) VALUES (?, ?, ?)")
-      .run(key, label, startedAt).lastInsertRowid,
-  );
+  let id: number | null = null;
   try {
-    const out = await fn();
-    const finishedAt = Date.now();
-    controlSqlite
-      .prepare("UPDATE job_runs SET finished_at = ?, ok = 1, duration_ms = ?, detail = ? WHERE id = ?")
-      .run(finishedAt, finishedAt - startedAt, out === undefined ? null : safeJson(out), id);
-    return out;
+    id = Number(
+      controlSqlite
+        .prepare("INSERT INTO job_runs (key, label, started_at) VALUES (?, ?, ?)")
+        .run(key, label, startedAt).lastInsertRowid,
+    );
   } catch (err) {
-    const finishedAt = Date.now();
-    controlSqlite
-      .prepare("UPDATE job_runs SET finished_at = ?, ok = 0, duration_ms = ?, error = ? WHERE id = ?")
-      .run(finishedAt, finishedAt - startedAt, err instanceof Error ? err.message : String(err), id);
+    console.error("[jobs] could not record start of", key, err);
+  }
+  let out: T;
+  try {
+    out = await fn();
+  } catch (err) {
+    if (id !== null) {
+      try {
+        const finishedAt = Date.now();
+        controlSqlite
+          .prepare("UPDATE job_runs SET finished_at = ?, ok = 0, duration_ms = ?, error = ? WHERE id = ?")
+          .run(finishedAt, finishedAt - startedAt, err instanceof Error ? err.message : String(err), id);
+      } catch (recErr) {
+        console.error("[jobs] could not record failure of", key, recErr);
+      }
+    }
     throw err;
   }
+  if (id !== null) {
+    try {
+      const finishedAt = Date.now();
+      controlSqlite
+        .prepare("UPDATE job_runs SET finished_at = ?, ok = 1, duration_ms = ?, detail = ? WHERE id = ?")
+        .run(finishedAt, finishedAt - startedAt, out === undefined ? null : safeJson(out), id);
+    } catch (recErr) {
+      console.error("[jobs] could not record finish of", key, recErr);
+    }
+  }
+  return out;
+}
+
+const DAY_MS = 86400000;
+
+/** Drop job runs and health snapshots older than keepDays. */
+export function pruneHistory(now = Date.now(), keepDays = 90): { jobRuns: number; snapshots: number } {
+  const cutoff = now - keepDays * DAY_MS;
+  const jobRuns = controlSqlite.prepare("DELETE FROM job_runs WHERE started_at < ?").run(cutoff).changes;
+  const snapshots = controlSqlite.prepare("DELETE FROM health_snapshots WHERE at < ?").run(cutoff).changes;
+  return { jobRuns, snapshots };
 }
 
 function safeJson(v: unknown): string | null {
   try {
-    return JSON.stringify(v);
+    const j = JSON.stringify(v);
+    return j !== undefined && j.length <= 4000 ? j : null;
   } catch {
     return null;
   }
