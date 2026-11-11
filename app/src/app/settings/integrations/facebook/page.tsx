@@ -47,7 +47,8 @@ export default async function FacebookSettingsPage(props: { searchParams?: Promi
         // shown: its name is that business's, not this one's.
         offers={listPageOffers(tenantId).filter((o) => o.status === "available")}
         postingPageId={getMetaConnectionForTenant(tenantId)?.pageId ?? null}
-        adAccounts={listAdAccounts(tenantId, { granted: true })}
+        // Never another business's ad account: it isn't this business's to see or use.
+        adAccounts={listAdAccounts(tenantId, { granted: true }).filter((a) => !a.usedElsewhere)}
         grant={getGrantInfo(tenantId)}
       />
     </div>

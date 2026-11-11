@@ -271,10 +271,9 @@ export function FacebookConnectCard({
               >
                 <option value="">{inUse.length ? "Add another ad account" : "Choose an ad account"}</option>
                 {available.map((a) => (
-                  <option key={a.adAccountId} value={a.adAccountId} disabled={a.usedElsewhere}>
+                  <option key={a.adAccountId} value={a.adAccountId}>
                     {a.name ?? a.adAccountId}
                     {a.currency ? ` (${a.currency})` : ""}
-                    {a.usedElsewhere ? " - used by another business" : ""}
                   </option>
                 ))}
               </select>
