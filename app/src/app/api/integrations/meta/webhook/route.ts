@@ -2,9 +2,8 @@ import { timingSafeEqual } from "node:crypto";
 
 import { runWithTenant } from "@/lib/db/tenant";
 import { verifyFacebookSignature, parseLeadgenEvents, parseMessagingEvents } from "@/lib/facebook/webhook";
-import { getFacebookPageByPageId, fetchLeadAsInput, getPageForMessagingAccount } from "@/lib/facebook/pages";
-import { upsertLead } from "@/lib/leads";
-import { logActivity } from "@/lib/queries";
+import { getPageForMessagingAccount } from "@/lib/facebook/pages";
+import { enqueueLead, processDueLeads } from "@/lib/facebook/leadQueue";
 import { recordDmEvent } from "@/lib/social/dm";
 import { runTriage } from "@/lib/inbox/triagePipeline";
 import { onInboundFromClient, onInboundFromLead } from "@/lib/pipeline/stage";
@@ -68,24 +67,20 @@ export async function POST(req: Request) {
   console.log(`[meta webhook] ${String(object ?? "unknown")}: ${leadEvents.length} lead(s), ${dmEvents.length} message event(s)`);
 
   // ── Lead ads ──
+  // Saved first, then fetched: Meta never resends a leadgen notification, so
+  // one that fails here is retried by the minute ticker instead of lost
+  // (lib/facebook/leadQueue.ts).
   for (const ev of leadEvents) {
     try {
-      const page = getFacebookPageByPageId(ev.pageId);
-      if (!page) {
-        console.log(`[meta webhook] lead for Page ${ev.pageId}: no connected Page matches, ignored`);
-        continue;
-      }
-      const input = await fetchLeadAsInput(ev.leadgenId, page.pageAccessToken);
-      await runWithTenant(page.tenantId, async () => {
-        const { lead, created } = upsertLead(input);
-        if (created) {
-          const name = [lead.firstName, lead.lastName].filter(Boolean).join(" ").trim() || lead.email || lead.phone || "anonymous";
-          await logActivity("lead.new", `New lead via facebook: ${name}`, { leadId: lead.id });
-        }
-      });
+      enqueueLead(ev.leadgenId, ev.pageId);
     } catch (err) {
-      console.error(`[meta webhook] lead ${ev.leadgenId} failed:`, err);
+      console.error(`[meta webhook] lead ${ev.leadgenId} could not be queued:`, err);
     }
+  }
+  if (leadEvents.length) {
+    await processDueLeads({ leadgenIds: leadEvents.map((ev) => ev.leadgenId) }).catch((err) =>
+      console.error("[meta webhook] lead processing failed; the ticker retries:", err),
+    );
   }
 
   // ── Messenger + Instagram DMs ──

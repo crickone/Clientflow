@@ -1063,6 +1063,9 @@ export function ensureControlTables() {
     const cols = controlSqlite.prepare("PRAGMA table_info(facebook_pages)").all() as Array<{ name: string }>;
     if (!cols.find((c) => c.name === "ig_user_id")) controlSqlite.exec("ALTER TABLE facebook_pages ADD COLUMN ig_user_id TEXT");
     if (!cols.find((c) => c.name === "ig_username")) controlSqlite.exec("ALTER TABLE facebook_pages ADD COLUMN ig_username TEXT");
+    // Meta refused this Page's token (lib/facebook/health.ts); cleared by a reconnect.
+    if (!cols.find((c) => c.name === "needs_reconnect_at")) controlSqlite.exec("ALTER TABLE facebook_pages ADD COLUMN needs_reconnect_at INTEGER");
+    if (!cols.find((c) => c.name === "needs_reconnect_reason")) controlSqlite.exec("ALTER TABLE facebook_pages ADD COLUMN needs_reconnect_reason TEXT");
   } catch (err) {
     console.error("[control] facebook_pages instagram columns migration failed:", err);
   }
@@ -1135,6 +1138,32 @@ export function ensureControlTables() {
     -- say which were ticked, so a Page is only connected when the business
     -- picks it (lib/facebook/pages.ts). No tokens here: connecting one fetches
     -- its Page token fresh with the grant.
+    -- Every lead-ad notification Meta sends, saved BEFORE the lead is fetched,
+    -- so a failed fetch (Page token refused, Graph down, Page reconnecting) is
+    -- retried instead of lost: Meta does not resend a leadgen notification.
+    -- Ids only, never the lead's details (lib/facebook/leadQueue.ts).
+    CREATE TABLE IF NOT EXISTS meta_lead_queue (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      leadgen_id TEXT NOT NULL UNIQUE,
+      page_id TEXT NOT NULL,
+      received_at INTEGER NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      next_attempt_at INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      tenant_id INTEGER,
+      last_error TEXT,
+      done_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_meta_lead_queue_due ON meta_lead_queue(status, next_attempt_at);
+    -- When each alert email last went to a business's admins, per kind, so a
+    -- problem that repeats every minute sends one email, not hundreds
+    -- (lib/alerts/tenantAlerts.ts).
+    CREATE TABLE IF NOT EXISTS tenant_alerts (
+      tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      key TEXT NOT NULL,
+      sent_at INTEGER NOT NULL,
+      PRIMARY KEY (tenant_id, key)
+    );
     CREATE TABLE IF NOT EXISTS facebook_page_offers (
       tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
       page_id TEXT NOT NULL,
@@ -1160,6 +1189,9 @@ export function ensureControlTables() {
   try {
     const cols = controlSqlite.prepare("PRAGMA table_info(meta_grants)").all() as Array<{ name: string }>;
     if (!cols.find((c) => c.name === "fb_user_id")) controlSqlite.exec("ALTER TABLE meta_grants ADD COLUMN fb_user_id TEXT");
+    // Meta refused the grant token (ads); cleared when the grant is saved again on reconnect.
+    if (!cols.find((c) => c.name === "needs_reconnect_at")) controlSqlite.exec("ALTER TABLE meta_grants ADD COLUMN needs_reconnect_at INTEGER");
+    if (!cols.find((c) => c.name === "needs_reconnect_reason")) controlSqlite.exec("ALTER TABLE meta_grants ADD COLUMN needs_reconnect_reason TEXT");
   } catch (err) {
     console.error("[control] meta_grants fb_user_id migration failed:", err);
   }

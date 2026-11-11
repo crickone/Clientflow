@@ -2,7 +2,8 @@ import "server-only";
 
 import { readKeyForTenant, setKey } from "@/lib/settings";
 import { getPostingPage } from "@/lib/facebook/pages";
-import { GRAPH_BASE } from "@/lib/facebook/graph";
+import { GRAPH_BASE, metaApiError } from "@/lib/facebook/graph";
+import { notePageRefusal } from "@/lib/facebook/health";
 import { isGoogleProfileConnected, postToGoogle } from "@/lib/google/business";
 
 /**
@@ -147,10 +148,7 @@ async function graph<T = Record<string, unknown>>(
   const body = new URLSearchParams({ ...params, access_token: token });
   const res = await fetch(`${GRAPH}/${path}`, { method: "POST", body });
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!res.ok) {
-    const err = json.error as { message?: string } | undefined;
-    throw new Error(err?.message || `Graph API ${path} failed (${res.status}).`);
-  }
+  if (!res.ok) throw metaApiError(json, res.status, `Graph API ${path} failed (${res.status}).`);
   return json as T;
 }
 
@@ -171,6 +169,8 @@ export class MetaGraphPublisher implements SocialPublisher {
       try {
         refs.facebook = await this.publishFacebook(input);
       } catch (err) {
+        // A refused token marks the Page for reconnect and tells the admins.
+        await notePageRefusal(this.connection.pageId, err).catch(() => false);
         errors.push(`Facebook: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
@@ -181,6 +181,7 @@ export class MetaGraphPublisher implements SocialPublisher {
         try {
           refs.instagram = await this.publishInstagram(input, this.connection.igUserId);
         } catch (err) {
+          await notePageRefusal(this.connection.pageId, err).catch(() => false);
           errors.push(`Instagram: ${err instanceof Error ? err.message : String(err)}`);
         }
       }

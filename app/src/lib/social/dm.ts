@@ -5,7 +5,8 @@ import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { socialContacts } from "@/lib/db/schema";
 import { getCurrentTenant } from "@/lib/db/tenant";
-import { GRAPH_BASE } from "@/lib/facebook/graph";
+import { GRAPH_BASE, metaApiError } from "@/lib/facebook/graph";
+import { notePageRefusal } from "@/lib/facebook/health";
 import { getPageTokenForTenant } from "@/lib/facebook/pages";
 import type { MessagingEvent } from "@/lib/facebook/webhook";
 import { addMessage, findLeadMessageByProviderId, setLeadStatus, upsertLead } from "@/lib/leads";
@@ -203,7 +204,14 @@ export async function sendDm(input: SendDmInput): Promise<{ messageId: number; p
     body: JSON.stringify(body),
   });
   const json = (await res.json().catch(() => ({}))) as { message_id?: string; error?: { message?: string } };
-  if (!res.ok || !json.message_id) throw new Error(json.error?.message || `${label} send failed (${res.status}).`);
+  if (!res.ok || !json.message_id) {
+    const err = metaApiError(json, res.status, `${label} send failed (${res.status}).`);
+    // A refused token marks the Page for reconnect and tells the admins.
+    if (await notePageRefusal(target.pageId, err).catch(() => false)) {
+      throw new Error(`Facebook stopped accepting this Page's connection. Reconnect Facebook in Settings, then send again. (${err.message})`);
+    }
+    throw err;
+  }
 
   const stored = storeMessage(
     { ownerType: input.subjectType, ownerId: input.subjectId },

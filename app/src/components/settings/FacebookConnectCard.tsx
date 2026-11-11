@@ -184,13 +184,20 @@ export function FacebookConnectCard({
   const posting = pages.find((p) => p.pageId === postingPageId) ?? pages[pages.length - 1];
   const inUse = adAccounts.filter((a) => a.inUse);
   const available = adAccounts.filter((a) => !a.inUse);
+  const refused = Boolean(posting.needsReconnectAt);
   const ready: Array<{ ok: boolean; label: string; retry?: boolean }> = [
-    { ok: true, label: "Posting to Facebook" },
-    { ok: Boolean(posting.igUsername), label: posting.igUsername ? "Posting to Instagram" : "Instagram: link an Instagram account to your Page, then reconnect" },
-    { ok: Boolean(posting.subscribedAt), label: posting.subscribedAt ? "Messages and lead ads" : "Messages and lead ads: reconnect to switch these on" },
+    { ok: !refused, label: refused ? "Posting to Facebook: reconnect, Facebook stopped accepting the connection" : "Posting to Facebook" },
+    { ok: Boolean(posting.igUsername) && !refused, label: posting.igUsername ? "Posting to Instagram" : "Instagram: link an Instagram account to your Page, then reconnect" },
+    { ok: Boolean(posting.subscribedAt) && !refused, label: posting.subscribedAt ? "Messages and lead ads" : "Messages and lead ads: reconnect to switch these on" },
     {
-      ok: inUse.length > 0,
-      label: inUse.length ? "Ads" : adAccounts.length ? "Ads: choose the ad account above" : "Ads: no ad account found yet",
+      ok: inUse.length > 0 && !grant?.needsReconnectReason,
+      label: grant?.needsReconnectReason
+        ? `Ads: reconnect, Facebook stopped accepting the connection (${grant.needsReconnectReason})`
+        : inUse.length
+          ? "Ads"
+          : adAccounts.length
+            ? "Ads: choose the ad account above"
+            : "Ads: no ad account found yet",
       retry: adAccounts.length === 0,
     },
   ];
@@ -210,6 +217,13 @@ export function FacebookConnectCard({
                 <AtSign size={12} />
                 {p.igUsername ?? "No Instagram linked"}
               </div>
+              {p.needsReconnectAt && (
+                <div style={{ fontSize: 13, color: "var(--warning)", lineHeight: 1.5, marginTop: 6 }}>
+                  Facebook stopped accepting this connection on{" "}
+                  {new Date(p.needsReconnectAt).toLocaleDateString("en-IE", { day: "numeric", month: "long" })}. Reconnect below to start posts, replies and
+                  lead ads again.{p.needsReconnectReason ? ` Facebook said: ${p.needsReconnectReason}` : ""}
+                </div>
+              )}
             </div>
             {pages.length > 1 && p.pageId !== posting.pageId && (
               <Button variant="outline" size="sm" onClick={() => postFrom(p.pageId)} disabled={busy}>

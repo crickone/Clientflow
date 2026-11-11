@@ -38,6 +38,9 @@ import { getBilling } from "@/lib/billing/engine";
 import { countLeadsInEntryStage } from "@/lib/leads";
 import { countPendingRequests } from "@/lib/cms/requests";
 import { PastDueBanner } from "@/components/billing/PastDueBanner";
+import { FacebookProblemBanner } from "@/components/settings/FacebookProblemBanner";
+import { connectionProblems } from "@/lib/facebook/health";
+import { stuckLeadCounts } from "@/lib/facebook/leadQueue";
 import { pathAllowed, type FeatureFlags } from "@/lib/features";
 import { ImpersonationBanner } from "@/components/layout/ImpersonationBanner";
 import { TenantTabGuard } from "@/components/layout/TenantTabGuard";
@@ -288,6 +291,7 @@ export default async function RootLayout({
   let accounts: SidebarAccount[] = [];
   let activeTenantId: number | null = null;
   let showPastDue = false;
+  let facebookProblem: { problem: string | null; waitingLeads: number } | null = null;
   const current = user ? getCurrentMembership() : null;
   if (user) {
     const bare = isBarePath(pathname);
@@ -317,6 +321,23 @@ export default async function RootLayout({
         if (!onExempt && billing.status === "pending_payment") redirect("/billing/activate");
         if (!onExempt && billing.status === "suspended") redirect("/billing/suspended");
         showPastDue = billing.status === "past_due";
+      }
+
+      // Facebook stopped accepting the connection, or lead ads are stuck:
+      // admins see it on every page until it is fixed. Fail-soft.
+      if (current.role === "admin" && !bare) {
+        try {
+          const problems = connectionProblems(current.tenant.id);
+          const { waiting, failed } = stuckLeadCounts(current.tenant.id);
+          if (problems.length || waiting + failed) {
+            facebookProblem = {
+              problem: problems.length ? problems.map((p) => (p.kind === "ads" ? "your ad account" : p.name)).join(" and ") : null,
+              waitingLeads: waiting + failed,
+            };
+          }
+        } catch (err) {
+          console.error("[layout] facebook health read failed:", err);
+        }
       }
 
       // Module gate (Platform Console v2, slice 4). A module switched off in
@@ -420,6 +441,7 @@ export default async function RootLayout({
                   />
                 ) : null}
                 {showPastDue ? <PastDueBanner /> : null}
+                {facebookProblem ? <FacebookProblemBanner {...facebookProblem} /> : null}
                 {children}
               </AppShell>
             </ConfirmProvider>

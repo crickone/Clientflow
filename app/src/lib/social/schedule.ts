@@ -1,4 +1,5 @@
 import "server-only";
+import { alertTenantAdmins } from "@/lib/alerts/tenantAlerts";
 
 import fs from "node:fs";
 import { and, asc, eq, inArray, lte } from "drizzle-orm";
@@ -221,7 +222,7 @@ export async function dispatchDueScheduledPosts(tenantId: number, baseUrl: strin
       }
       continue;
     }
-    if ((await publishRow(tdb, row, tenantId, baseUrl, publisher, now)).ok) posted++;
+    if ((await publishRow(tdb, row, tenantId, baseUrl, publisher, now, { notify: true })).ok) posted++;
   }
   return posted;
 }
@@ -241,6 +242,7 @@ async function publishRow(
   baseUrl: string,
   publisher: Publisher,
   now: number,
+  opts: { notify?: boolean } = {},
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   tdb.update(schema.scheduledPosts)
     .set({ status: "posting", lastAttemptAt: new Date(now), error: null })
@@ -249,6 +251,21 @@ async function publishRow(
 
   const fail = (error: string) => {
     tdb.update(schema.scheduledPosts).set({ status: "failed", error }).where(eq(schema.scheduledPosts.id, row.id)).run();
+    // A post the ticker sent fails with nobody watching: tell the admins,
+    // once per post. (Publish-now shows its error to the person who pressed it.)
+    if (opts.notify) {
+      const when = new Date(row.scheduledFor).toLocaleString("en-IE", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Dublin" });
+      void alertTenantAdmins(
+        tenantId,
+        `post-failed:${row.id}`,
+        {
+          subject: "A scheduled post did not go out",
+          lines: [`The post scheduled for ${when} did not go out.`, `The reason: ${error}`, "Fix the cause, then schedule it again from the Schedule page."],
+          action: { label: "Open the schedule", path: "/marketing/schedule" },
+        },
+        365 * 24 * 60 * 60 * 1000,
+      );
+    }
     return { ok: false as const, error };
   };
 

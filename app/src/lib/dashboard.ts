@@ -10,8 +10,12 @@ import {
   leads,
   membershipPlans,
   payments,
+  scheduledPosts,
   sessionBookings,
 } from "@/lib/db/schema";
+import { getCurrentTenant } from "@/lib/db/tenant";
+import { connectionProblems } from "@/lib/facebook/health";
+import { stuckLeadCounts } from "@/lib/facebook/leadQueue";
 
 const DAY = 86_400_000;
 const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -153,6 +157,44 @@ export function getNeedsAttention(): AttentionItem[] {
   const newLeads = db.select({ id: leads.id }).from(leads).where(eq(leads.status, "new")).all().length;
   if (newLeads > 0) {
     items.push({ key: "leads", label: newLeads === 1 ? "new lead to follow up" : "new leads to follow up", count: newLeads, href: "/leads", tone: "alert" });
+  }
+
+  // Things that stopped working with nobody watching. Each is fail-soft: the
+  // strip must render even if one of these reads fails.
+  const tenantId = getCurrentTenant().id;
+  try {
+    const problems = connectionProblems(tenantId).length;
+    if (problems > 0) {
+      items.push({ key: "facebook", label: "Facebook connection needs reconnecting", count: problems, href: "/settings/integrations/facebook", tone: "alert" });
+    }
+  } catch (err) {
+    console.error("[dashboard] facebook health read failed:", err);
+  }
+  try {
+    const { waiting, failed } = stuckLeadCounts(tenantId);
+    if (waiting + failed > 0) {
+      items.push({
+        key: "fb-leads",
+        label: failed > 0 ? "Facebook leads could not be fetched" : "Facebook leads waiting to come in",
+        count: waiting + failed,
+        href: "/settings/integrations/facebook",
+        tone: "alert",
+      });
+    }
+  } catch (err) {
+    console.error("[dashboard] facebook lead queue read failed:", err);
+  }
+  try {
+    const failedPosts = db
+      .select({ id: scheduledPosts.id })
+      .from(scheduledPosts)
+      .where(and(eq(scheduledPosts.status, "failed"), gte(scheduledPosts.lastAttemptAt, new Date(Date.now() - 7 * DAY))))
+      .all().length;
+    if (failedPosts > 0) {
+      items.push({ key: "posts-failed", label: failedPosts === 1 ? "scheduled post failed" : "scheduled posts failed", count: failedPosts, href: "/marketing/schedule", tone: "alert" });
+    }
+  } catch (err) {
+    console.error("[dashboard] failed posts read failed:", err);
   }
 
   return items;

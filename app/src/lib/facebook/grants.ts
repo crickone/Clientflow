@@ -197,7 +197,8 @@ export function saveGrant(tenantId: number, token: string, kind: TokenKind, expi
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(tenant_id) DO UPDATE SET token_enc = excluded.token_enc, token_kind = excluded.token_kind,
          expires_at = excluded.expires_at, granted_by_user_id = excluded.granted_by_user_id,
-         fb_user_id = COALESCE(excluded.fb_user_id, meta_grants.fb_user_id), updated_at = excluded.updated_at`,
+         fb_user_id = COALESCE(excluded.fb_user_id, meta_grants.fb_user_id), updated_at = excluded.updated_at,
+         needs_reconnect_at = NULL, needs_reconnect_reason = NULL`,
     )
     .run(tenantId, encryptToken(token), kind, expiresAt, userId, fbUserId, Date.now(), Date.now());
 }
@@ -211,14 +212,25 @@ export interface GrantInfo {
   kind: TokenKind;
   expiresAt: number | null;
   updatedAt: number;
+  /** Meta stopped accepting the grant token (lib/facebook/health.ts). */
+  needsReconnectReason: string | null;
 }
 
 /** What the settings UI may know about the grant — never the token. */
 export function getGrantInfo(tenantId: number): GrantInfo | null {
   const row = controlSqlite
-    .prepare("SELECT token_kind, expires_at, updated_at FROM meta_grants WHERE tenant_id = ?")
-    .get(tenantId) as { token_kind: TokenKind; expires_at: number | null; updated_at: number } | undefined;
-  return row ? { kind: row.token_kind, expiresAt: row.expires_at, updatedAt: row.updated_at } : null;
+    .prepare("SELECT token_kind, expires_at, updated_at, needs_reconnect_at, needs_reconnect_reason FROM meta_grants WHERE tenant_id = ?")
+    .get(tenantId) as
+    | { token_kind: TokenKind; expires_at: number | null; updated_at: number; needs_reconnect_at: number | null; needs_reconnect_reason: string | null }
+    | undefined;
+  return row
+    ? {
+        kind: row.token_kind,
+        expiresAt: row.expires_at,
+        updatedAt: row.updated_at,
+        needsReconnectReason: row.needs_reconnect_at ? row.needs_reconnect_reason ?? "Facebook refused the connection." : null,
+      }
+    : null;
 }
 
 /** The decrypted grant token for server-side Marketing API calls, or null. */
@@ -234,6 +246,8 @@ export function getGrantToken(tenantId: number): string | null {
 /** Forget the grant and the ad accounts it listed. */
 export function deleteGrant(tenantId: number): void {
   controlSqlite.prepare("DELETE FROM meta_grants WHERE tenant_id = ?").run(tenantId);
+  // The Pages Facebook offered on the last connect came from this grant too.
+  controlSqlite.prepare("DELETE FROM facebook_page_offers WHERE tenant_id = ?").run(tenantId);
   controlSqlite
     .prepare("UPDATE facebook_ad_accounts SET revoked_at = ? WHERE tenant_id = ? AND revoked_at IS NULL")
     .run(Date.now(), tenantId);

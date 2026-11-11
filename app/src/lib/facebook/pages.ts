@@ -4,7 +4,7 @@ import { controlSqlite } from "@/lib/db/control";
 import { decryptToken, encryptToken } from "@/lib/google/tokenCrypto";
 import { openStored, SEALED_PREFIX } from "./pageTokenAtRest";
 import { splitFullName } from "@/lib/humanName";
-import { GRAPH_BASE } from "./graph";
+import { GRAPH_BASE, metaApiError } from "./graph";
 import type { GraphPage } from "./grants";
 import type { NormalizedLeadInput } from "@/lib/leads";
 
@@ -76,7 +76,8 @@ export async function claimPage(tenantId: number, page: GraphPage, connectedByUs
     const res = controlSqlite
       .prepare(
         `UPDATE facebook_pages SET tenant_id = ?, page_name = ?, page_access_token = ?, connected_by_user_id = ?,
-           subscribed_at = ?, ig_user_id = ?, ig_username = ?, revoked_at = NULL
+           subscribed_at = ?, ig_user_id = ?, ig_username = ?, revoked_at = NULL,
+           needs_reconnect_at = NULL, needs_reconnect_reason = NULL
          WHERE page_id = ? AND (tenant_id = ? OR revoked_at IS NOT NULL)`,
       )
       .run(tenantId, page.name ?? null, token, connectedByUserId, subscribedAt, igUserId, igUsername, page.id, tenantId);
@@ -86,6 +87,9 @@ export async function claimPage(tenantId: number, page: GraphPage, connectedByUs
     console.log(`[facebook] Page ${page.id} left with another business: connected there`);
     return "elsewhere";
   }
+  // Lead ads that arrived while the Page could not be reached are tried again
+  // now rather than on their next backoff step (lib/facebook/leadQueue.ts).
+  controlSqlite.prepare("UPDATE meta_lead_queue SET next_attempt_at = ? WHERE page_id = ? AND status = 'pending'").run(Date.now(), page.id);
   return "connected";
 }
 
@@ -264,21 +268,34 @@ export interface FacebookPageRow {
   subscribedAt: number | null;
   createdAt: number;
   igUsername: string | null;
+  /** When Meta stopped accepting this Page's token (lib/facebook/health.ts); null when fine. */
+  needsReconnectAt: number | null;
+  needsReconnectReason: string | null;
 }
 
 /** List a tenant's connected Pages for the settings UI — WITHOUT the token. */
 export function listFacebookPages(tenantId: number): FacebookPageRow[] {
   const rows = controlSqlite
     .prepare(
-      "SELECT page_id, page_name, subscribed_at, created_at, ig_username FROM facebook_pages WHERE tenant_id = ? AND revoked_at IS NULL ORDER BY created_at DESC",
+      "SELECT page_id, page_name, subscribed_at, created_at, ig_username, needs_reconnect_at, needs_reconnect_reason FROM facebook_pages WHERE tenant_id = ? AND revoked_at IS NULL ORDER BY created_at DESC",
     )
-    .all(tenantId) as Array<{ page_id: string; page_name: string | null; subscribed_at: number | null; created_at: number; ig_username: string | null }>;
+    .all(tenantId) as Array<{
+    page_id: string;
+    page_name: string | null;
+    subscribed_at: number | null;
+    created_at: number;
+    ig_username: string | null;
+    needs_reconnect_at: number | null;
+    needs_reconnect_reason: string | null;
+  }>;
   return rows.map((r) => ({
     pageId: r.page_id,
     pageName: r.page_name,
     subscribedAt: r.subscribed_at,
     createdAt: r.created_at,
     igUsername: r.ig_username,
+    needsReconnectAt: r.needs_reconnect_at,
+    needsReconnectReason: r.needs_reconnect_reason,
   }));
 }
 
@@ -345,7 +362,7 @@ export async function fetchLeadAsInput(leadgenId: string, pageAccessToken: strin
     `${GRAPH_BASE}/${encodeURIComponent(leadgenId)}?` +
       new URLSearchParams({ fields, access_token: pageAccessToken }),
   );
-  if (!res.ok) throw new Error(`Facebook lead fetch failed (${res.status})`);
+  if (!res.ok) throw metaApiError(await res.json().catch(() => ({})), res.status, `Facebook lead fetch failed (${res.status})`);
   const lead = (await res.json()) as {
     id?: string;
     created_time?: string;

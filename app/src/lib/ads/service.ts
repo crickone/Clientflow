@@ -8,7 +8,8 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { adCampaigns } from "@/lib/db/schema";
 import { getCurrentTenant } from "@/lib/db/tenant";
-import { GRAPH_BASE } from "@/lib/facebook/graph";
+import { GRAPH_BASE, isConnectionRefused, metaApiError } from "@/lib/facebook/graph";
+import { noteGrantRefusal } from "@/lib/facebook/health";
 import { getGrantToken, listAdAccounts, type AdAccountRow } from "@/lib/facebook/grants";
 import { getPostingPage } from "@/lib/facebook/pages";
 import { getPreferredPostingPageId } from "@/lib/social/publisher";
@@ -172,6 +173,10 @@ async function graph<T = Record<string, unknown>>(method: "GET" | "POST" | "DELE
         "Meta did not accept the advertiser name shown in the EU (who the ad is for and who paid). In Meta Ads Manager open the ad account's settings, set its beneficiary and payer, then launch again, or type that exact name in the Advertiser field on the Campaign step.",
       );
     }
+    // A refused token (removed app, lost access, withdrawn permission) marks
+    // the ads connection for reconnect and tells the admins.
+    const refusal = metaApiError(json, res.status, `Meta ${path} failed (${res.status}).`);
+    if (isConnectionRefused(refusal)) await noteGrantRefusal(getCurrentTenant().id, refusal).catch(() => false);
     throw new AdsError(e?.error_user_msg || e?.message || `Meta ${path} failed (${res.status}).`);
   }
   return json;

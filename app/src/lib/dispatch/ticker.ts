@@ -18,6 +18,7 @@ import { dispatchDueBroadcasts } from "@/lib/whatsappBroadcasts";
 import { dispatchReminders } from "@/lib/reminders";
 import { syncWearablesIfStale } from "@/lib/wearables/store";
 import { scoreLeadsIfDue } from "@/lib/leadScore";
+import { processDueLeads } from "@/lib/facebook/leadQueue";
 
 /**
  * The dispatch ticker: everything that was booked for a time, sent when that
@@ -145,6 +146,13 @@ export async function runDispatchOnce(): Promise<DispatchSummary> {
     } catch (err) {
       console.error(`[dispatch] tenant ${t.id} failed (retrying next tick):`, err);
     }
+  }
+  // Facebook lead ads whose first fetch failed. Not per tenant: the queue is
+  // control-plane, since a lead's business is only known once its Page is.
+  try {
+    await processDueLeads();
+  } catch (err) {
+    console.error("[dispatch] facebook lead retries failed:", err);
   }
   return summary;
 }
