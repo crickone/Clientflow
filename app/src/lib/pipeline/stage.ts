@@ -110,17 +110,34 @@ export function writeStageId(leadId: number, stageId: number, note: string, acto
  * lead is missing, the tenant has no stage for that role, or `shouldAdvance`
  * says no (lost frozen / lapsed pull-out / forward-only-by-position).
  */
-export function advanceStage(leadId: number, role: StageRole): void {
+export function advanceStage(leadId: number, role: StageRole, reason?: string): boolean {
   const cur = currentStageRecord(leadId);
-  if (!cur) return;
+  if (!cur) return false;
   const pipelineId = leadPipelineId(leadId) ?? undefined;
   const targetId = resolveStageIdByRole(role, pipelineId);
-  if (targetId == null) return; // this board doesn't use that role → automation off
+  if (targetId == null) return false; // this board doesn't use that role → automation off
   const stages = listStages(pipelineId);
   const candidate = stages.find((s) => s.id === targetId);
-  if (!candidate) return;
-  if (!shouldAdvance(cur, candidate)) return;
-  writeStageId(leadId, candidate.id, `Lead moved to ${candidate.name}`, "automation");
+  if (!candidate) return false;
+  if (!shouldAdvance(cur, candidate)) return false;
+  writeStageId(leadId, candidate.id, `Lead moved to ${candidate.name}${reason ? `: ${reason}` : ""}`, "automation");
+  // The engaged ("Hot lead") stage says why the card is there.
+  if (role === "engaged") db.update(schema.leads).set({ hotReason: reason ?? null }).where(eq(schema.leads.id, leadId)).run();
+  return true;
+}
+
+/**
+ * A lead showing intent to buy goes to the Hot lead stage, for either of two
+ * reasons: they replied to us, or their score (lib/leadScore.ts) is 70 or
+ * more. "Hot" on the board then means one thing, intent shown, whatever the
+ * signal. Forward-only like every automatic move: a lead already booked,
+ * attended or bought stays where it is.
+ */
+export const HOT_SCORE = 70;
+
+export function hotReasonFromScore(score: number, nextStep: string | null | undefined): string | null {
+  if (score < HOT_SCORE) return null;
+  return nextStep === "book" ? "asked to book" : nextStep === "call" ? "keen to talk" : "showing intent";
 }
 
 /**
@@ -196,11 +213,16 @@ export function onInboundFromLead(leadId: number): void {
   } catch (err) {
     console.error(`[pipeline] could not stop follow-ups for lead #${leadId}:`, err);
   }
-  advanceStage(leadId, "engaged");
+  advanceStage(leadId, "engaged", "replied");
 }
 export function onInboundFromClient(clientId: number): void {
   const leadId = leadIdForClient(clientId);
-  if (leadId) advanceStage(leadId, "engaged");
+  if (leadId) advanceStage(leadId, "engaged", "replied");
+}
+/** A fresh lead score: 70 or more moves the lead to Hot lead (forward-only). */
+export function onLeadScored(leadId: number, score: number, nextStep: string | null | undefined): void {
+  const reason = hotReasonFromScore(score, nextStep);
+  if (reason) advanceStage(leadId, "engaged", reason);
 }
 export function onAppointmentBooked(clientId: number, status: string): void {
   const leadId = leadIdForClient(clientId);

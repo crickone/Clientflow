@@ -116,6 +116,12 @@ export function LeadCard({ lead, now, onDraft, onWhatsApp }: LeadCardProps) {
       </div>
 
       <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+        {/* Why it is in Hot lead: they replied, or what their score picked up (lib/pipeline/stage.ts). */}
+        {role === "engaged" && lead.hotReason && (
+          <Badge tone="warning" dot>
+            {lead.hotReason.charAt(0).toUpperCase() + lead.hotReason.slice(1)}
+          </Badge>
+        )}
         {lead.therapyInterest && <Badge>{lead.therapyInterest}</Badge>}
         {lead.campaign && <Badge>{lead.campaign}</Badge>}
         <Badge tone="neutral">{lead.source}</Badge>

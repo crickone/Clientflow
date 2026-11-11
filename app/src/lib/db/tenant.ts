@@ -3144,6 +3144,7 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     if (cols.length && !cols.some((c) => c.name === "lead_score")) sqlite.exec("ALTER TABLE leads ADD COLUMN lead_score INTEGER");
     if (cols.length && !cols.some((c) => c.name === "lead_next_step")) sqlite.exec("ALTER TABLE leads ADD COLUMN lead_next_step TEXT");
     if (cols.length && !cols.some((c) => c.name === "lead_scored_at")) sqlite.exec("ALTER TABLE leads ADD COLUMN lead_scored_at INTEGER");
+    if (cols.length && !cols.some((c) => c.name === "hot_reason")) sqlite.exec("ALTER TABLE leads ADD COLUMN hot_reason TEXT");
   } catch (err) {
     console.error("[db] leads.lead_score migration failed:", err);
   }

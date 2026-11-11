@@ -2,7 +2,8 @@ import "server-only";
 
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 
-import { getTenantDbById } from "@/lib/db/tenant";
+import { getTenantDbById, runWithTenant } from "@/lib/db/tenant";
+import { onLeadScored } from "@/lib/pipeline/stage";
 import { leadMessages, leads, pipelineStages } from "@/lib/db/schema";
 import { jevConfigured, jevDecide } from "@/lib/ai/jev";
 import { LEAD_SCORE_QUESTIONS, leadScoreState, readLeadScore, scoreDue, type LeadFacts, type LeadScore } from "@/lib/leadScoreModel";
@@ -66,6 +67,12 @@ export async function scoreLead(tenantId: number, leadId: number, timeoutMs = 80
   const s = readLeadScore(r.answers);
   if (!s) return null;
   getTenantDbById(tenantId).update(leads).set({ leadScore: s.score, leadNextStep: s.next, leadScoredAt: now }).where(eq(leads.id, leadId)).run();
+  // 70 or more: the lead is showing intent, so it moves to Hot lead (forward-only).
+  try {
+    await runWithTenant(tenantId, () => onLeadScored(leadId, s.score, s.next));
+  } catch (err) {
+    console.error(`[lead-score] tenant ${tenantId} lead ${leadId}: stage move failed:`, err);
+  }
   return s;
 }
 

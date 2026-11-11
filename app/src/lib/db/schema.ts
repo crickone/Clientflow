@@ -356,6 +356,12 @@ export const leads = sqliteTable("leads", {
   leadScore: integer("lead_score"),
   leadNextStep: text("lead_next_step"),
   leadScoredAt: integer("lead_scored_at"),
+  /**
+   * Why the lead was moved to the Hot lead stage automatically: "replied",
+   * or what its score picked up ("asked to book", "keen to talk", "showing
+   * intent"). Shown on the card. Null when it got there by hand or not yet.
+   */
+  hotReason: text("hot_reason"),
   status: text("status", {
     enum: ["new", "contacted", "replied", "booked", "lost"],
   })
