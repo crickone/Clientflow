@@ -47,6 +47,14 @@ const requireLocal = createRequire(import.meta.url);
   assert.equal(m.stateOf("WITH_ISSUES"), "issue");
   assert.equal(m.rangeOf("bogus").key, "30d", "an unknown range falls back to 30 days");
   assert.equal(m.adsManagerUrl("act_123", "999"), "https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=123&selected_campaign_ids=999");
+  // Revenue matching: the ad link's utm_campaign is the Meta campaign id.
+  assert.equal(m.metaCampaignOf({ campaign: "120201234567890" }), "120201234567890");
+  assert.equal(m.metaCampaignOf({ campaign: "Black Friday" }), null, "a named utm_campaign is not a Meta id");
+  assert.equal(m.returnOnSpend(250, 100), 2.5);
+  assert.equal(m.returnOnSpend(10, 0), null);
+  const nov11 = Date.UTC(2026, 10, 11, 15, 0, 0);
+  assert.deepEqual(m.rangeBounds("last_month", nov11), { from: Date.UTC(2026, 9, 1), to: Date.UTC(2026, 10, 1) });
+  assert.equal(m.rangeBounds("7d", nov11).to, Date.UTC(2026, 10, 11), "last 7 days stops at today, as Meta's does");
 
   // ── the fetch, against a faked Meta ──
   const { controlSqlite } = requireLocal("../db/control") as typeof import("../db/control");

@@ -19,6 +19,9 @@ import {
   totalDailyBudget,
   platformsOf,
   placementProblems,
+  AD_URL_TAGS,
+  PIXEL_OBJECTIVES,
+  websiteAudienceRule,
   type CampaignSpec,
 } from "./spec";
 
@@ -157,5 +160,37 @@ check("lead form asks the chosen fields with the privacy link", form.questions.l
   check("a Messenger chat ad cannot be Instagram only", placementProblems({ objective: "messages", messageDestination: "messenger", platforms: "instagram" }).length === 1);
   check("an Instagram chat ad cannot be Facebook only", placementProblems({ objective: "messages", messageDestination: "instagram", platforms: "facebook" }).length === 1);
   check("a chat ad on both is fine", placementProblems({ objective: "messages", messageDestination: "instagram", platforms: "both" }).length === 0);
+}
+// Sales and website leads: ads to a page, optimised on the business's Pixel.
+{
+  const sales = base({ objective: "sales" });
+  const set = buildAdSetParams(sales, sales.adSets[0], { campaignId: "c1", pageId: "p1", pixelId: "123456789012" });
+  check("sales is Meta's sales objective", buildCampaignParams(sales).objective === "OUTCOME_SALES");
+  check("sales optimises for website conversions", set.optimization_goal === "OFFSITE_CONVERSIONS" && set.destination_type === "WEBSITE");
+  check("on purchases by default, through the Pixel", JSON.stringify(set.promoted_object) === JSON.stringify({ pixel_id: "123456789012", custom_event_type: "PURCHASE" }));
+  const early = base({ objective: "sales", conversionEvent: "INITIATED_CHECKOUT" });
+  check("or an earlier step of the funnel", (buildAdSetParams(early, early.adSets[0], { campaignId: "c1", pageId: "p1", pixelId: "1" }).promoted_object as { custom_event_type: string }).custom_event_type === "INITIATED_CHECKOUT");
+  const bogus = base({ objective: "sales", conversionEvent: "NOPE" as never });
+  check("an unknown event falls back to purchases", (buildAdSetParams(bogus, bogus.adSets[0], { campaignId: "c1", pageId: "p1", pixelId: "1" }).promoted_object as { custom_event_type: string }).custom_event_type === "PURCHASE");
+  const wl = base({ objective: "website_leads" });
+  const wlSet = buildAdSetParams(wl, wl.adSets[0], { campaignId: "c1", pageId: "p1", pixelId: "9" });
+  check("website leads optimise on the Pixel's Lead", buildCampaignParams(wl).objective === "OUTCOME_LEADS" && (wlSet.promoted_object as { custom_event_type: string }).custom_event_type === "LEAD");
+  check("both are Pixel objectives", PIXEL_OBJECTIVES.has("sales") && PIXEL_OBJECTIVES.has("website_leads") && !PIXEL_OBJECTIVES.has("leads"));
+  const noLink = base({ objective: "sales" });
+  noLink.adSets[0].ads[0].creative.linkUrl = "";
+  check("a sales ad needs the page it leads to", validateSpec(noLink).some((e) => e.includes("website link")));
+  check("every ad link says which campaign and ad", AD_URL_TAGS.includes("utm_campaign={{campaign.id}}") && AD_URL_TAGS.includes("utm_content={{ad.id}}"));
+}
+// Retargeting and exclusions.
+{
+  const rule = websiteAudienceRule("777", "started_checkout") as { inclusions: { rules: Array<{ event_sources: Array<{ id: string }>; retention_seconds: number; filter: { filters: Array<{ value: string }> } }> }; exclusions: { rules: Array<{ filter: { filters: Array<{ value: string }> } }> } };
+  check("retarget: checkouts started on the business's Pixel", rule.inclusions.rules[0].event_sources[0].id === "777" && rule.inclusions.rules[0].filter.filters[0].value === "InitiateCheckout");
+  check("over the last 30 days", rule.inclusions.rules[0].retention_seconds === 30 * 24 * 60 * 60);
+  check("minus anyone who bought", rule.exclusions.rules[0].filter.filters[0].value === "Purchase");
+  check("viewers retarget on ViewContent", (websiteAudienceRule("1", "viewed_offer") as typeof rule).inclusions.rules[0].filter.filters[0].value === "ViewContent");
+  const aud = { ...base().adSets[0].audience, customAudienceIds: ["a1"], excludedAudienceIds: ["c9"] };
+  const tg = buildTargeting(aud) as { custom_audiences?: Array<{ id: string }>; excluded_custom_audiences?: Array<{ id: string }> };
+  check("resolved audiences ride on the targeting (so every later update keeps them)", tg.custom_audiences?.[0]?.id === "a1" && tg.excluded_custom_audiences?.[0]?.id === "c9");
+  check("none, none", (buildTargeting(base().adSets[0].audience) as typeof tg).custom_audiences === undefined);
 }
 console.log(`ads/spec.test.ts: ${passed} checks passed.`);

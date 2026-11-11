@@ -51,6 +51,16 @@ import {
 
 /** The visitor's ad context from an incoming request (a form post or checkout start). */
 export function adContextFromRequest(req: Request): AdContext {
+  return adContextFromHeaders(req.headers, clientIp(req));
+}
+
+/**
+ * The same from request headers, for a page render (a server component has
+ * headers(), not a Request). `pageUrl` overrides the event's page address,
+ * which for a form post is the referring page.
+ */
+export function adContextFromHeaders(headers: Headers, ipFallback?: string | null, pageUrl?: string | null): AdContext {
+  const req = { headers };
   const cookies = req.headers.get("cookie");
   const fbp = cookieValue(cookies, "_fbp");
   const fbc = cookieValue(cookies, "_fbc");
@@ -58,7 +68,8 @@ export function adContextFromRequest(req: Request): AdContext {
   // middleware before it sets SITE_HOST_HEADER) the visitor's address is
   // Cloudflare's CF-Connecting-IP; otherwise the proxy chain's.
   const proxied = Boolean(req.headers.get(SITE_HOST_HEADER));
-  const ip = (proxied && req.headers.get("cf-connecting-ip")?.trim()) || clientIp(req);
+  const xff = req.headers.get("x-forwarded-for")?.split(",").map((s) => s.trim()).filter(Boolean);
+  const ip = (proxied && req.headers.get("cf-connecting-ip")?.trim()) || ipFallback || xff?.[xff.length - 1] || null;
   return {
     consent: cookieValue(cookies, ADS_CONSENT_COOKIE) === "1",
     fbp: isMetaCookie(fbp) ? fbp : null,
@@ -66,7 +77,7 @@ export function adContextFromRequest(req: Request): AdContext {
     ip: ip && ip !== "unknown" ? ip.slice(0, 64) : null,
     userAgent: req.headers.get("user-agent")?.slice(0, 400) ?? null,
     url: (() => {
-      const r = req.headers.get("referer");
+      const r = pageUrl ?? req.headers.get("referer");
       try {
         return r ? new URL(r).toString().slice(0, 500) : null;
       } catch {
@@ -151,6 +162,28 @@ export function queueWebsiteLead(opts: { tenantId: number; siteId?: number | nul
       eventId,
       websiteEvent({ name: "Lead", eventId, person: { ...opts.person, externalId: `lead-${opts.leadId}` }, ctx: opts.ctx, custom: { content_name: opts.contentName.slice(0, 100) } }),
     );
+  });
+}
+
+/**
+ * A step before a purchase: an offer seen (ViewContent) or a checkout
+ * started (InitiateCheckout). The browser fires the same event with the same
+ * id, so Meta counts it once. A small clinic sells too few offers a week for
+ * Meta to learn from purchases alone; these give it the earlier signal.
+ */
+export function queueFunnelEvent(opts: {
+  tenantId: number;
+  name: "ViewContent" | "InitiateCheckout";
+  eventId: string;
+  ctx: AdContext;
+  custom: Record<string, unknown>;
+  person?: Person;
+}): void {
+  safely(`${opts.name} ${opts.eventId}`, () => {
+    if (!opts.ctx.consent) return;
+    const target = pixelFor(opts.tenantId);
+    if (!target) return;
+    enqueue(opts.tenantId, target, `${opts.name}-${opts.tenantId}-${opts.eventId}`, websiteEvent({ name: opts.name, eventId: opts.eventId, person: opts.person ?? {}, ctx: opts.ctx, custom: opts.custom }));
   });
 }
 

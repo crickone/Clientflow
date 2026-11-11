@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Eye, Heart, MessageCircle, Minus, MousePointerClick, Plus, UserPlus } from "lucide-react";
+import { Eye, Globe, Heart, MessageCircle, Minus, MousePointerClick, Plus, ShoppingBag, UserPlus } from "lucide-react";
 
 import type { Objective } from "@/lib/ads/spec";
 
@@ -17,6 +17,8 @@ const OBJECTIVE_ICON: Record<Objective, typeof Eye> = {
   traffic: MousePointerClick,
   engagement: Heart,
   leads: UserPlus,
+  website_leads: Globe,
+  sales: ShoppingBag,
   messages: MessageCircle,
 };
 

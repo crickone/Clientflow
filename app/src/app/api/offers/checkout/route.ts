@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   const rl = rateLimit(`offer-checkout:${clientIp(req)}`, 20, 60 * 1000);
   if (!rl.ok) return NextResponse.json({ ok: false, error: "Too many tries. Please wait a minute." }, { status: 429 });
-  let body: { token?: unknown; arrival?: unknown };
+  let body: { token?: unknown; arrival?: unknown; eventId?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -24,7 +24,9 @@ export async function POST(req: NextRequest) {
   }
   const claim = verifyCheckoutToken(String(body.token ?? ""));
   if (!claim) return NextResponse.json({ ok: false, error: "This page is out of date. Please refresh and try again." }, { status: 400 });
-  const r = await startCheckout(claim, parseArrival(body.arrival), adContextFromRequest(req));
+  // The browser's InitiateCheckout event id, so the server's copy is the same event.
+  const eventId = typeof body.eventId === "string" && /^[\w-]{8,80}$/.test(body.eventId) ? body.eventId : null;
+  const r = await startCheckout(claim, parseArrival(body.arrival), adContextFromRequest(req), eventId);
   if (!r.ok) return NextResponse.json(r, { status: 409 });
   return NextResponse.json(r);
 }

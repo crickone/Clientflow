@@ -43,7 +43,7 @@ export function LandingOfferMenu({ offers }: { offers: LandingOffer[] }) {
     if (!o.checkoutToken) return;
     setBusy(o.id);
     setError(null);
-    const err = await goToCheckout(o.checkoutToken);
+    const err = await goToCheckout(o.checkoutToken, o);
     if (err) {
       setError({ id: o.id, text: err });
       setBusy(null);

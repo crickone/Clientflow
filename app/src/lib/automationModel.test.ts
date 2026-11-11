@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 
 import {
   ACTIVE_TRIGGER_KEYS,
+  applyShortcodes,
   blankMessage,
   inSendingHours,
   isMessageLive,
@@ -31,12 +32,12 @@ function check(name: string, cond: boolean) {
 // in the UI but nothing ever calls fireTrigger() for it.
 // Plus the lead follow-up sequences (new_lead, lead_booked, lead_no_show), started
 // from upsertLead and the pipeline stage writer (lib/automations/nurture.ts).
-const EXPECTED_ACTIVE = ["new_client_created", "client_check_in", "nutrition_plan_added", "workout_plan_added", "client_birthday", "campaign_signup", "new_lead", "lead_booked", "lead_no_show"];
+const EXPECTED_ACTIVE = ["new_client_created", "client_check_in", "nutrition_plan_added", "workout_plan_added", "client_birthday", "campaign_signup", "new_lead", "lead_booked", "lead_no_show", "checkout_abandoned"];
 
-check("TRIGGER_CATALOG has exactly 16 entries (the fixed Kahunas trigger list, the campaign sign-up sequence and the three lead sequences)", TRIGGER_CATALOG.length === 16);
+check("TRIGGER_CATALOG has exactly 17 entries (the fixed Kahunas trigger list, the campaign sign-up sequence, three lead sequences and the unfinished-checkout sequence)", TRIGGER_CATALOG.length === 17);
 
 check(
-  "ACTIVE_TRIGGER_KEYS is exactly the 9 verified-active triggers, no more, no fewer",
+  "ACTIVE_TRIGGER_KEYS is exactly the 10 verified-active triggers, no more, no fewer",
   ACTIVE_TRIGGER_KEYS.size === EXPECTED_ACTIVE.length && EXPECTED_ACTIVE.every((k) => ACTIVE_TRIGGER_KEYS.has(k)),
 );
 
@@ -94,5 +95,8 @@ check("WhatsApp at 02:30 waits until 09:00", inSendingHours(dublin("2026-11-11T0
 check("WhatsApp at 22:15 waits until 09:00 next day", inSendingHours(dublin("2026-11-11T22:15:00Z"), "whatsapp") === dublin("2026-11-12T09:00:00Z"));
 check("WhatsApp in summer time respects Irish hours", inSendingHours(dublin("2026-07-01T07:30:00Z"), "whatsapp") === dublin("2026-07-01T08:00:00Z"));
 check("email at 02:30 goes at 02:30", inSendingHours(dublin("2026-11-11T02:30:00Z"), "email") === dublin("2026-11-11T02:30:00Z"));
+
+check("offer shortcodes fill in for the checkout sequence", applyShortcodes("[OFFER_NAME]: [OFFER_LINK]", { offerName: "Massage", offerLink: "https://x.ie/c/bf?k=1" }) === "Massage: https://x.ie/c/bf?k=1");
+check("and are left as typed where there is no offer", applyShortcodes("[OFFER_NAME]", { firstName: "A" }) === "[OFFER_NAME]");
 
 console.log(`automationModel: ${passed} checks passed.`);

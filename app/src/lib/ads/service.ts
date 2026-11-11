@@ -6,10 +6,13 @@ import fs from "node:fs";
 import { desc, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { adCampaigns } from "@/lib/db/schema";
+import { adCampaigns, clients } from "@/lib/db/schema";
 import { getCurrentTenant } from "@/lib/db/tenant";
 import { GRAPH_BASE, isConnectionRefused, metaApiError } from "@/lib/facebook/graph";
 import { noteGrantRefusal } from "@/lib/facebook/health";
+import { pixelFor } from "@/lib/facebook/capi";
+import { normEmail, normPhone, sha256 } from "@/lib/facebook/capiModel";
+import { controlSqlite } from "@/lib/db/control";
 import { getGrantToken, listAdAccounts, type AdAccountRow } from "@/lib/facebook/grants";
 import { getPostingPage } from "@/lib/facebook/pages";
 import { getPreferredPostingPageId } from "@/lib/social/publisher";
@@ -17,6 +20,11 @@ import { postableRenders } from "@/lib/social/schedule";
 import { renderFilePath } from "@/lib/image/renderStore";
 import { logActivity } from "@/lib/queries";
 import {
+  AD_URL_TAGS,
+  PIXEL_OBJECTIVES,
+  RETARGET_LABEL,
+  websiteAudienceRule,
+  type Retarget,
   buildAdSetParams,
   buildCampaignParams,
   buildCreativeParams,
@@ -404,7 +412,7 @@ async function createAdsInAdSet(
       const vids = await uploadAdVideos(acct, token, ad.creative.adCreativeId!, caches.adVideos);
       const vctx = { pageId: page.pageId, instagramUserId: page.igUserId, imageHashes: [], leadFormId };
       const createVideoAd = async (params: Record<string, unknown>) => {
-        const creativeId = (await graph<{ id: string }>("POST", `${acct}/adcreatives`, token, params)).id;
+        const creativeId = (await graph<{ id: string }>("POST", `${acct}/adcreatives`, token, { ...params, url_tags: AD_URL_TAGS })).id;
         entry.adIds.push((await graph<{ id: string }>("POST", `${acct}/ads`, token, { name: ad.name, adset_id: adSetId, creative: { creative_id: creativeId }, status: "ACTIVE" })).id);
       };
       try {
@@ -428,7 +436,9 @@ async function createAdsInAdSet(
     const multi = ad.creative.source === "library" ? hashes.length > 1 : ad.creative.format !== "single";
     const adHashes = multi ? hashes : hashes.slice(0, 1);
     const createAd = async (name: string, params: Record<string, unknown>) => {
-      const creativeId = (await graph<{ id: string }>("POST", `${acct}/adcreatives`, token, params)).id;
+      // Every ad link carries the campaign and ad ids (AD_URL_TAGS), so a lead
+      // or a sale it brings is matched back to it.
+      const creativeId = (await graph<{ id: string }>("POST", `${acct}/adcreatives`, token, { ...params, url_tags: AD_URL_TAGS })).id;
       entry.adIds.push((await graph<{ id: string }>("POST", `${acct}/ads`, token, { name, adset_id: adSetId, creative: { creative_id: creativeId }, status: "ACTIVE" })).id);
     };
 
@@ -466,6 +476,85 @@ async function createAdsInAdSet(
     }
 }
 
+// ── Retargeting and exclusion audiences ───────────────────────────────────
+
+/** A saved Meta audience for this business and ad account, or a new one made by `create`. */
+async function savedOrCreateAudience(tenantId: number, acct: string, kind: string, create: () => Promise<string>): Promise<string> {
+  const row = controlSqlite
+    .prepare("SELECT audience_id FROM meta_audiences WHERE tenant_id = ? AND ad_account_id = ? AND kind = ?")
+    .get(tenantId, acct, kind) as { audience_id: string } | undefined;
+  if (row) return row.audience_id;
+  const id = await create();
+  controlSqlite
+    .prepare("INSERT OR REPLACE INTO meta_audiences (tenant_id, ad_account_id, kind, audience_id, updated_at) VALUES (?, ?, ?, ?, ?)")
+    .run(tenantId, acct, kind, id, Date.now());
+  return id;
+}
+
+/**
+ * Upload the business's clients to its "existing clients" audience: email
+ * and phone, normalised and SHA-256 hashed (Meta matches hashes; nothing
+ * readable leaves us). Re-sent at each launch so new clients are covered.
+ */
+async function uploadClientsToAudience(audienceId: string, token: string): Promise<number> {
+  const rows = db.select({ email: clients.email, phone: clients.phone }).from(clients).all();
+  const emails = [...new Set(rows.map((r) => normEmail(r.email)).filter((e): e is string => Boolean(e)))].map((e) => [sha256(e)]);
+  const phones = [...new Set(rows.map((r) => normPhone(r.phone)).filter((p): p is string => Boolean(p)))].map((p) => [sha256(p)]);
+  for (const [schema, data] of [["EMAIL_SHA256", emails], ["PHONE_SHA256", phones]] as const) {
+    for (let i = 0; i < data.length; i += 5000) {
+      await graph("POST", `${audienceId}/users`, token, { payload: { schema, data: data.slice(i, i + 5000) } });
+    }
+  }
+  return emails.length + phones.length;
+}
+
+/**
+ * Resolve each ad set's retargeting and "leave out existing clients" into
+ * Meta audience ids, carried on the plan so every later targeting update
+ * keeps them (buildTargeting reads them). Pixel audiences: who viewed an
+ * offer or started a checkout in the last 30 days, minus buyers.
+ */
+async function resolveAudiences(spec: CampaignSpec, acct: string, token: string, pixelId: string | null): Promise<CampaignSpec> {
+  const tenantId = getCurrentTenant().id;
+  const retargets = [...new Set(spec.adSets.map((s) => s.audience.retarget).filter((r): r is Retarget => Boolean(r)))];
+  const needClients = spec.adSets.some((s) => s.audience.excludeClients);
+  if (!retargets.length && !needClients) return spec;
+  const ids: Record<string, string> = {};
+  for (const r of retargets) {
+    if (!pixelId) throw new AdsError("Retargeting uses your Meta Pixel. Add it to your website first: Website, Domains, Tracking.");
+    ids[r] = await savedOrCreateAudience(tenantId, acct, `retarget:${r}:${pixelId}`, async () =>
+      (await graph<{ id: string }>("POST", `${acct}/customaudiences`, token, {
+        name: `AdonisAgent: ${RETARGET_LABEL[r]} (30 days)`,
+        description: "Made by AdonisAgent for retargeting. Do not delete while campaigns use it.",
+        rule: websiteAudienceRule(pixelId, r),
+        prefill: true,
+      })).id,
+    );
+  }
+  if (needClients) {
+    ids.clients = await savedOrCreateAudience(tenantId, acct, "clients", async () =>
+      (await graph<{ id: string }>("POST", `${acct}/customaudiences`, token, {
+        name: "AdonisAgent: existing clients",
+        description: "The business's clients, hashed. Used to leave them out of ads.",
+        subtype: "CUSTOM",
+        customer_file_source: "USER_PROVIDED_ONLY",
+      })).id,
+    );
+    await uploadClientsToAudience(ids.clients, token);
+  }
+  return {
+    ...spec,
+    adSets: spec.adSets.map((s) => ({
+      ...s,
+      audience: {
+        ...s.audience,
+        customAudienceIds: s.audience.retarget ? [ids[s.audience.retarget]] : undefined,
+        excludedAudienceIds: s.audience.excludeClients ? [ids.clients] : undefined,
+      },
+    })),
+  };
+}
+
 export async function launchAdCampaign(id: number): Promise<AdCampaignRow> {
   const current = getAdCampaign(id);
   if (!current) throw new AdsError("Campaign not found.");
@@ -476,9 +565,17 @@ export async function launchAdCampaign(id: number): Promise<AdCampaignRow> {
   const token = requireToken();
   requireAdAccount(current.adAccountId);
   const page = adsPage();
-  const spec = current.spec;
+  let spec = current.spec;
   const acct = current.adAccountId;
   requirePlacementPossible(spec, page);
+  // Sales and website-lead ads are measured by the business's Pixel.
+  const pixelId = PIXEL_OBJECTIVES.has(spec.objective) ? pixelFor(getCurrentTenant().id)?.pixelId ?? null : null;
+  if (PIXEL_OBJECTIVES.has(spec.objective) && !pixelId) {
+    throw new AdsError("Sales and website-lead ads are measured by your Meta Pixel. Add it to your website first: Website, Domains, Tracking.");
+  }
+  // Retargeting / exclusion audiences, resolved to ids and kept on the plan.
+  spec = await resolveAudiences(spec, acct, token, pixelId ?? pixelFor(getCurrentTenant().id)?.pixelId ?? null);
+  update(id, { spec: JSON.stringify(spec) });
 
   update(id, { status: "launching", error: null, pageId: page.pageId });
   const ids: MetaIds = { adSets: [] };
@@ -498,7 +595,7 @@ export async function launchAdCampaign(id: number): Promise<AdCampaignRow> {
     const dsa = await dsaNames(acct, token, page.pageName ?? getBusinessProfile().businessName);
     const caches = newCaches();
     for (const set of spec.adSets) {
-      const adSetId = (await graph<{ id: string }>("POST", `${acct}/adsets`, token, buildAdSetParams(spec, set, { campaignId: ids.campaignId, pageId: page.pageId, advertiser: dsa.beneficiary, payor: dsa.payor }))).id;
+      const adSetId = (await graph<{ id: string }>("POST", `${acct}/adsets`, token, buildAdSetParams(spec, set, { campaignId: ids.campaignId, pageId: page.pageId, advertiser: dsa.beneficiary, payor: dsa.payor, pixelId }))).id;
       const entry = { adSetId, adIds: [] as string[] };
       ids.adSets!.push(entry);
       await createAdsInAdSet({ acct, token, page, spec, adSetId, leadFormId: ids.leadFormId ?? null, entry, caches }, set.ads);
@@ -635,11 +732,13 @@ export async function setAdSetBudget(id: number, adSetIndex: number, dailyBudget
 
 // ── Results ───────────────────────────────────────────────────────────────
 
-const RESULT_ACTION: Record<Objective, { type: string | null; label: string }> = {
+const RESULT_ACTION: Record<Objective, { type: string | string[] | null; label: string }> = {
   awareness: { type: null, label: "People reached" },
   traffic: { type: "link_click", label: "Link clicks" },
   engagement: { type: "post_engagement", label: "Engagements" },
   leads: { type: "lead", label: "Leads" },
+  website_leads: { type: ["offsite_conversion.fb_pixel_lead", "lead"], label: "Website leads" },
+  sales: { type: ["omni_purchase", "purchase", "offsite_conversion.fb_pixel_purchase"], label: "Purchases" },
   messages: { type: "onsite_conversion.messaging_conversation_started_7d", label: "Conversations started" },
 };
 
@@ -656,7 +755,12 @@ type InsightRow = {
 function resultsOf(row: InsightRow, objective: Objective): number {
   const want = RESULT_ACTION[objective];
   if (!want.type) return Number(row.reach ?? 0);
-  return Number(row.actions?.find((a) => a.action_type === want.type)?.value ?? 0);
+  // Meta reports one purchase under several names; the first present counts, once.
+  for (const type of Array.isArray(want.type) ? want.type : [want.type]) {
+    const hit = row.actions?.find((a) => a.action_type === type);
+    if (hit) return Number(hit.value ?? 0);
+  }
+  return 0;
 }
 
 /** Pull lifetime spend and results from Meta and keep them on the row. Read-only on Meta. */

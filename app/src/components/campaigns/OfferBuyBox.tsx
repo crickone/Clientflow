@@ -28,10 +28,22 @@ export const CLOSED: Partial<Record<OfferState, string>> = {
   off: "Not on sale",
 };
 
-/** Ask for a Stripe Checkout page and go there; returns an error message if it can't. */
-export async function goToCheckout(token: string): Promise<string | null> {
+/**
+ * Ask for a Stripe Checkout page and go there; returns an error message if it
+ * can't. Tells Meta a checkout started (InitiateCheckout) from the browser
+ * and, with the same event id, from the server (lib/offers/checkout.ts).
+ */
+export async function goToCheckout(token: string, offer?: { title: string; priceCents: number; currency?: string }): Promise<string | null> {
+  const eventId = `ic-${typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
   try {
-    const res = await fetch("/api/offers/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token, arrival: readArrival() }) });
+    if (offer && typeof window.fbq === "function") {
+      window.fbq("track", "InitiateCheckout", { value: offer.priceCents / 100, currency: (offer.currency ?? "EUR").toUpperCase(), content_name: offer.title, num_items: 1 }, { eventID: eventId });
+    }
+  } catch {
+    /* the Pixel is optional */
+  }
+  try {
+    const res = await fetch("/api/offers/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token, arrival: readArrival(), eventId }) });
     const r = (await res.json().catch(() => null)) as { ok?: boolean; url?: string; error?: string } | null;
     if (r?.ok && r.url) {
       window.location.assign(r.url);
@@ -63,7 +75,7 @@ export function OfferBuyBox({ offer }: { offer: LandingOffer }) {
     if (!offer.checkoutToken) return;
     setBusy(true);
     setError(null);
-    const err = await goToCheckout(offer.checkoutToken);
+    const err = await goToCheckout(offer.checkoutToken, offer);
     if (err) {
       setError(err);
       setBusy(false);
@@ -134,7 +146,7 @@ export function OfferMenu({ offers }: { offers: LandingOffer[] }) {
     if (!o.checkoutToken) return;
     setBusy(o.id);
     setError(null);
-    const err = await goToCheckout(o.checkoutToken);
+    const err = await goToCheckout(o.checkoutToken, o);
     if (err) {
       setError({ id: o.id, text: err });
       setBusy(null);

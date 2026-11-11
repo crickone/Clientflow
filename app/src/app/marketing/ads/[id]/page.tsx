@@ -6,7 +6,7 @@ import { AdCampaignBuilder } from "@/components/ads/AdCampaignBuilder";
 import { AdCampaignDetail } from "@/components/ads/AdCampaignDetail";
 import { requireAdminPage } from "@/lib/auth";
 import { getAdCampaign } from "@/lib/ads/service";
-import { builderData } from "@/lib/ads/pageData";
+import { builderData, offerPagesForAds } from "@/lib/ads/pageData";
 import { platformsOf } from "@/lib/ads/spec";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +21,7 @@ export default async function AdCampaignPage(
   const campaign = getAdCampaign(Number(params.id));
   if (!campaign) notFound();
   const { adAccounts, designs, photos, brand, videoAds } = builderData();
+  const offerPages = await offerPagesForAds();
   const editable = campaign.status === "draft" || campaign.status === "error";
   const currency = adAccounts.find((a) => a.adAccountId === campaign.adAccountId)?.currency ?? "EUR";
 
@@ -61,7 +62,7 @@ export default async function AdCampaignPage(
         </div>
       )}
       {editable ? (
-        <AdCampaignBuilder campaignId={campaign.id} initialSpec={campaign.spec} initialAdAccountId={campaign.adAccountId} adAccounts={adAccounts} designs={designs} photos={photos} brand={brand} videoAds={videoAds} />
+        <AdCampaignBuilder campaignId={campaign.id} initialSpec={campaign.spec} initialAdAccountId={campaign.adAccountId} adAccounts={adAccounts} designs={designs} photos={photos} brand={brand} videoAds={videoAds} offerPages={offerPages} />
       ) : (
         <AdCampaignDetail
           id={campaign.id}

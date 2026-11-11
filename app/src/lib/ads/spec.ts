@@ -10,7 +10,7 @@
  * and only switched on once the whole tree exists (lib/ads/service.ts).
  */
 
-export const OBJECTIVES = ["awareness", "traffic", "engagement", "leads", "messages"] as const;
+export const OBJECTIVES = ["awareness", "traffic", "engagement", "leads", "website_leads", "sales", "messages"] as const;
 export type Objective = (typeof OBJECTIVES)[number];
 
 export const OBJECTIVE_LABEL: Record<Objective, string> = {
@@ -18,8 +18,29 @@ export const OBJECTIVE_LABEL: Record<Objective, string> = {
   traffic: "Traffic (visits to your website)",
   engagement: "Engagement (likes, comments, shares)",
   leads: "Leads (an instant form; leads land in your pipeline)",
+  website_leads: "Website leads (enquiries on your website or a campaign page)",
+  sales: "Sales (people likely to buy your offer online)",
   messages: "Messages (opens a Messenger or Instagram chat)",
 };
+
+/**
+ * What a Sales campaign tells Meta to find more of, all measured by the
+ * business's Pixel (and our server-side events, lib/facebook/capi.ts).
+ * Meta learns best with dozens of a week; a small clinic sells far fewer, so
+ * an earlier step of the same funnel gives it enough to learn from while the
+ * ads still lead to the offer.
+ */
+export const CONVERSION_EVENTS = ["PURCHASE", "INITIATED_CHECKOUT", "CONTENT_VIEW"] as const;
+export type ConversionEvent = (typeof CONVERSION_EVENTS)[number];
+
+export const CONVERSION_EVENT_LABEL: Record<ConversionEvent, string> = {
+  PURCHASE: "Purchases (best once the offer sells a few a week)",
+  INITIATED_CHECKOUT: "Checkouts started (more to learn from while sales are few)",
+  CONTENT_VIEW: "Offer page views (the most signal, the least intent)",
+};
+
+/** Objectives that send people to a website and are measured by the Pixel. */
+export const PIXEL_OBJECTIVES: ReadonlySet<Objective> = new Set<Objective>(["sales", "website_leads"]);
 
 /** Where the ads show. "both" leaves placements to Meta (Facebook, Instagram and their Stories and Reels). */
 export const PLATFORMS = ["both", "facebook", "instagram"] as const;
@@ -72,6 +93,37 @@ export interface AudienceSpec {
   interests: InterestRef[];
   /** Let Meta widen the audience beyond the interests when it finds better results. */
   advantageAudience: boolean;
+  /**
+   * Retargeting: only people who, on the business's Pixel in the last 30 days,
+   * viewed an offer or started a checkout, and did not buy.
+   */
+  retarget?: Retarget | null;
+  /** Leave out the business's existing clients (a customer-list audience). */
+  excludeClients?: boolean;
+  /** Meta audience ids, resolved at launch (lib/ads/service.ts); targeting carries them. */
+  customAudienceIds?: string[];
+  excludedAudienceIds?: string[];
+}
+
+export const RETARGETS = ["viewed_offer", "started_checkout"] as const;
+export type Retarget = (typeof RETARGETS)[number];
+export const RETARGET_LABEL: Record<Retarget, string> = {
+  viewed_offer: "People who viewed an offer and did not buy",
+  started_checkout: "People who started a checkout and did not buy",
+};
+
+/**
+ * The rule for a Pixel audience: who did `event` in the last 30 days, minus
+ * anyone who bought. Meta's website custom audience rule format.
+ */
+export function websiteAudienceRule(pixelId: string, retarget: Retarget): Record<string, unknown> {
+  const days30 = 30 * 24 * 60 * 60;
+  const source = [{ id: pixelId, type: "pixel" }];
+  const event = retarget === "started_checkout" ? "InitiateCheckout" : "ViewContent";
+  return {
+    inclusions: { operator: "or", rules: [{ event_sources: source, retention_seconds: days30, filter: { operator: "and", filters: [{ field: "event", operator: "eq", value: event }] } }] },
+    exclusions: { operator: "or", rules: [{ event_sources: source, retention_seconds: days30, filter: { operator: "and", filters: [{ field: "event", operator: "eq", value: "Purchase" }] } }] },
+  };
 }
 
 export interface AdCreativeSpec {
@@ -150,6 +202,8 @@ export interface CampaignSpec {
   messageDestination?: "messenger" | "instagram";
   /** Where the ads show. Absent = both (Meta places them). */
   platforms?: Platforms;
+  /** For "sales": what Meta optimises for (default PURCHASE). */
+  conversionEvent?: ConversionEvent;
 }
 
 const MAX_AD_SETS = 10;
@@ -220,7 +274,7 @@ export function validateSpec(spec: CampaignSpec): string[] {
       if (c?.extraTexts?.some((t) => !t.trim()) || c?.extraHeadlines?.some((t) => !t.trim())) errors.push(`${at} has an empty text option: fill it in or remove it.`);
       if (!c?.primaryText?.trim()) errors.push(`${at} needs its main text.`);
       if (!c?.headline?.trim()) errors.push(`${at} needs a headline.`);
-      if ((spec.objective === "traffic" || spec.objective === "awareness" || spec.objective === "engagement") && !isHttpsUrl(c?.linkUrl)) {
+      if ((spec.objective === "traffic" || spec.objective === "awareness" || spec.objective === "engagement" || PIXEL_OBJECTIVES.has(spec.objective)) && !isHttpsUrl(c?.linkUrl)) {
         errors.push(`${at} needs a website link (https).`);
       }
     });
@@ -235,8 +289,21 @@ export function objectiveSettings(spec: CampaignSpec): {
   billingEvent: string;
   destinationType?: string;
   needsPagePromotedObject: boolean;
+  /** For website conversions: the Pixel event Meta optimises for (promoted_object.custom_event_type). */
+  pixelEvent?: string;
 } {
   switch (spec.objective) {
+    case "sales":
+      return {
+        metaObjective: "OUTCOME_SALES",
+        optimizationGoal: "OFFSITE_CONVERSIONS",
+        billingEvent: "IMPRESSIONS",
+        destinationType: "WEBSITE",
+        needsPagePromotedObject: false,
+        pixelEvent: spec.conversionEvent && (CONVERSION_EVENTS as readonly string[]).includes(spec.conversionEvent) ? spec.conversionEvent : "PURCHASE",
+      };
+    case "website_leads":
+      return { metaObjective: "OUTCOME_LEADS", optimizationGoal: "OFFSITE_CONVERSIONS", billingEvent: "IMPRESSIONS", destinationType: "WEBSITE", needsPagePromotedObject: false, pixelEvent: "LEAD" };
     case "awareness":
       return { metaObjective: "OUTCOME_AWARENESS", optimizationGoal: "REACH", billingEvent: "IMPRESSIONS", needsPagePromotedObject: false };
     case "traffic":
@@ -294,6 +361,8 @@ export function buildTargeting(a: AudienceSpec, platforms: Platforms = "both"): 
   }
   if (a.genders.length === 1) t.genders = [a.genders[0] === "male" ? 1 : 2];
   if (a.interests.length) t.flexible_spec = [{ interests: a.interests.map((i) => ({ id: i.id, name: i.name })) }];
+  if (a.customAudienceIds?.length) t.custom_audiences = a.customAudienceIds.map((id) => ({ id }));
+  if (a.excludedAudienceIds?.length) t.excluded_custom_audiences = a.excludedAudienceIds.map((id) => ({ id }));
   if (platforms !== "both") t.publisher_platforms = [platforms];
   return t;
 }
@@ -305,6 +374,8 @@ export interface AdSetContext {
   advertiser?: string | null;
   /** Who pays, when the ad account registers a different payer. Defaults to the advertiser. */
   payor?: string | null;
+  /** The business's Meta Pixel, for website conversion objectives (sales, website_leads). */
+  pixelId?: string | null;
 }
 
 /** POST /act_<id>/adsets parameters for one ad set (its campaign is the on/off switch). */
@@ -324,6 +395,7 @@ export function buildAdSetParams(spec: CampaignSpec, set: AdSetSpec, ctx: AdSetC
   };
   if (o.destinationType) params.destination_type = o.destinationType;
   if (o.needsPagePromotedObject) params.promoted_object = { page_id: ctx.pageId };
+  if (o.pixelEvent) params.promoted_object = { pixel_id: ctx.pixelId, custom_event_type: o.pixelEvent };
   // EU Digital Services Act: every ad set says who it promotes and who paid.
   // Meta refuses EU-targeted ad sets without them ("Enter the person or
   // organization being promoted by an ad").
@@ -596,3 +668,11 @@ export function buildSingleVideoParams(spec: CampaignSpec, ad: AdSpec, ctx: Crea
   if (ctx.instagramUserId) storySpec.instagram_user_id = ctx.instagramUserId;
   return { name: ad.name, object_story_spec: storySpec };
 }
+
+/**
+ * Tags Meta adds to every ad link (url_tags on the creative), so a lead or an
+ * order that came from an ad says which campaign and ad: lib/arrival.ts reads
+ * them as utm_campaign / utm_content, and the Ads page matches orders to
+ * campaigns by them for revenue and return on spend. Meta fills the {{...}}.
+ */
+export const AD_URL_TAGS = "utm_source=facebook&utm_medium=paid&utm_campaign={{campaign.id}}&utm_term={{adset.id}}&utm_content={{ad.id}}";

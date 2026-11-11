@@ -119,7 +119,9 @@ function enrolInNurture(lead: Lead): void {
     // A campaign landing-page sign-up has its own sequence; a buyer is a
     // customer, not a lead to chase.
     if (lead.source === "landing") return void enrolLeadInNurture(lead);
-    if (lead.source === "offer") return;
+    // A buyer is a customer; an unfinished checkout has its own sequence
+    // (lib/offers/fulfil.ts recoverAbandonedCheckout).
+    if (lead.source === "offer" || lead.source === "checkout") return;
     // An enquiry (website form, Facebook lead ad, a public form, or a lead
     // posted in with a campaign) gets the New lead sequence when the business
     // has switched it on, and the campaign sequence as before when not. A

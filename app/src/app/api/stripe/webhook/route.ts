@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { verifyStripeSignature } from "@/lib/stripe/encode";
 import { tenantForStripeAccount, updateStripeAccountStatus, removeStripeConnection } from "@/lib/stripe/connection";
 import { stripeEnv, type CheckoutSession, type StripeAccount } from "@/lib/stripe/api";
-import { expireOrder, fulfilCheckout, refundOrder } from "@/lib/offers/fulfil";
+import { expireOrder, fulfilCheckout, recoverAbandonedCheckout, refundOrder } from "@/lib/offers/fulfil";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +41,8 @@ export async function POST(req: NextRequest) {
         break;
       case "checkout.session.expired":
         expireOrder(tenantId, String(obj.id ?? ""));
+        // Gave their details but never paid: a lead, and the follow-up if switched on.
+        await recoverAbandonedCheckout(tenantId, obj as unknown as CheckoutSession);
         break;
       case "charge.refunded": {
         const pi = typeof obj.payment_intent === "string" ? obj.payment_intent : "";

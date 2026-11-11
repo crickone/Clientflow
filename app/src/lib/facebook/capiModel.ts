@@ -93,7 +93,7 @@ export interface CapiEvent {
 
 /** A website event (Lead, Purchase) from a visitor who accepted advertising cookies. */
 export function websiteEvent(opts: {
-  name: "Lead" | "Purchase";
+  name: "Lead" | "Purchase" | "ViewContent" | "InitiateCheckout";
   eventId: string;
   person: Person;
   ctx: AdContext;

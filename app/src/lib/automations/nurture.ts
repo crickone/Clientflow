@@ -104,6 +104,7 @@ export function sequenceEnabled(triggerKey: string): boolean {
 export function enrolLeadInSequence(
   lead: Pick<Lead, "id" | "firstName" | "lastName" | "email" | "phone">,
   triggerKey: string,
+  extra: { offerName?: string | null; offerLink?: string | null } = {},
 ): number {
   if (!sequenceEnabled(triggerKey)) return 0;
   const already = db
@@ -117,7 +118,7 @@ export function enrolLeadInSequence(
   if (messages.length === 0) return 0;
 
   const businessName = getBusinessProfile().businessName;
-  const vars = { firstName: lead.firstName, lastName: lead.lastName, businessName };
+  const vars = { firstName: lead.firstName, lastName: lead.lastName, businessName, ...extra };
   const now = Date.now();
   let queued = 0;
   for (const m of messages) {

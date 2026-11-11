@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { AdCampaignBuilder } from "@/components/ads/AdCampaignBuilder";
 import { requireAdminPage } from "@/lib/auth";
-import { builderData } from "@/lib/ads/pageData";
+import { builderData, offerPagesForAds } from "@/lib/ads/pageData";
 import { campaignSpecFromCreative, parseVariants } from "@/lib/ads/fromCreative";
 import { getBusinessProfile } from "@/lib/businessProfile";
 
@@ -13,6 +13,7 @@ export default async function NewAdCampaignPage(props: { searchParams?: Promise<
   const searchParams = await props.searchParams;
   await requireAdminPage();
   const { adAccounts, designs, photos, brand, videoAds } = builderData();
+  const offerPages = await offerPagesForAds();
   if (adAccounts.length === 0) redirect("/marketing/ads");
   const initialSpec = searchParams?.fromAd ? campaignSpecFromCreative(Number(searchParams.fromAd), getBusinessProfile().website, parseVariants(searchParams.versions)) : null;
   return (
@@ -21,7 +22,7 @@ export default async function NewAdCampaignPage(props: { searchParams?: Promise<
       {/* initialSpec null: the builder makes the blank spec itself. Calling
           blankSpec here crashed the page -- it is exported from a "use client"
           module, so on the server it is a client reference, not a function. */}
-      <AdCampaignBuilder campaignId={null} initialSpec={initialSpec} initialAdAccountId={adAccounts[0].adAccountId} adAccounts={adAccounts} designs={designs} photos={photos} brand={brand} videoAds={videoAds} />
+      <AdCampaignBuilder campaignId={null} initialSpec={initialSpec} initialAdAccountId={adAccounts[0].adAccountId} adAccounts={adAccounts} designs={designs} photos={photos} brand={brand} videoAds={videoAds} offerPages={offerPages} />
     </div>
   );
 }

@@ -18,6 +18,7 @@ import {
 import { OBJECTIVES, PLATFORM_LABEL, PLATFORMS, platformsOf, totalDailyBudget, validateSpec, type AdSpec, type CampaignSpec, type Platforms } from "@/lib/ads/spec";
 import { listAdAccounts } from "@/lib/facebook/grants";
 import { getAdsOverview } from "@/lib/ads/accountInsights";
+import { offerPagesForAds } from "@/lib/ads/pageData";
 import { AD_GOALS, parseBrief, versionCount } from "@/lib/ads/adCopy";
 import { createAdCreative, listAdCreatives, queueImageAd } from "@/lib/ads/creatives";
 import { titleFrom } from "@/lib/content-studio/title";
@@ -68,6 +69,12 @@ const SPEC_SCHEMA = {
     name: { type: "string" },
     objective: { type: "string", enum: [...OBJECTIVES] },
     messageDestination: { type: "string", enum: ["messenger", "instagram"], description: "For objective 'messages': which inbox the ad opens." },
+    conversionEvent: {
+      type: "string",
+      enum: ["PURCHASE", "INITIATED_CHECKOUT", "CONTENT_VIEW"],
+      description:
+        "For objective 'sales' (ads to an offer page, measured by the Pixel): what Meta optimises for. PURCHASE once the offer sells a few a week; INITIATED_CHECKOUT or CONTENT_VIEW give Meta more to learn from while sales are few. Every ad's linkUrl must be the offer page (list_ad_campaigns 'offerPages'). 'website_leads' is the same for enquiries on the website.",
+    },
     platforms: {
       type: "string",
       enum: [...PLATFORMS],
@@ -120,6 +127,12 @@ const SPEC_SCHEMA = {
                 type: "boolean",
                 description: "Advantage+ audience lets Meta reach beyond the ages and interests set. Default false: these are local businesses that want their area and age range kept strict. True only if the operator asks for it.",
               },
+              retarget: {
+                type: "string",
+                enum: ["viewed_offer", "started_checkout"],
+                description: "Retargeting (uses the Pixel): only people who viewed an offer, or started a checkout, in the last 30 days and did not buy. Omit for everyone in the locations. Needs a few hundred such visitors before Meta will deliver.",
+              },
+              excludeClients: { type: "boolean", description: "Leave out the business's existing clients (uploaded to Meta hashed). Good for offers meant for new customers." },
             },
             required: ["locations", "ageMin", "ageMax", "genders", "interests", "advantageAudience"],
           },
@@ -248,7 +261,7 @@ export const ADS_TOOLS: Anthropic.Tool[] = [
 const err = (e: unknown): ToolResult => ({ text: JSON.stringify({ error: e instanceof Error ? e.message : String(e) }) });
 
 /** READ */
-export function listAdCampaignsTool(ctx: ToolContext): ToolResult {
+export async function listAdCampaignsTool(ctx: ToolContext): Promise<ToolResult> {
   const campaigns = listAdCampaigns().map((c) => ({
     id: c.id,
     name: c.name,
@@ -285,7 +298,9 @@ export function listAdCampaignsTool(ctx: ToolContext): ToolResult {
     .filter((c) => c.generationStatus == null && c.slideCount > 0 && !adVersionIds.has(c.id))
     .slice(0, 30)
     .map((c) => ({ designId: c.id, name: c.name, images: c.slideCount }));
-  return { text: fenceUntrusted(JSON.stringify({ adAccounts, campaigns, ads, socialPosts })) };
+  // Campaign pages with an offer: where a Sales ad leads (the ad link, with the ad-only key when set).
+  const offerPages = await offerPagesForAds().catch(() => []);
+  return { text: fenceUntrusted(JSON.stringify({ adAccounts, campaigns, ads, socialPosts, offerPages })) };
 }
 
 /** READ */
@@ -315,6 +330,9 @@ export async function getAdAccountPerformanceTool(ctx: ToolContext, input: Recor
           leads: a.leads,
           costPerLead: a.costPerLead,
           conversations: a.conversations,
+          salesFromAds: a.sales,
+          revenueFromAds: a.revenue,
+          returnOnAdSpend: a.returnOnSpend,
           pausedOrEndedWithNoSpend: a.quiet,
           campaigns: a.campaigns.map((c) => ({
             name: c.name,
@@ -328,6 +346,10 @@ export async function getAdAccountPerformanceTool(ctx: ToolContext, input: Recor
             impressions: c.numbers.impressions,
             linkClicks: c.numbers.linkClicks,
             clickRatePct: c.numbers.ctr,
+            sales: c.ours.sales,
+            revenue: c.ours.revenue,
+            returnOnSpend: c.ours.returnOnSpend,
+            enquiriesFromThisCampaign: c.ours.leads,
           })),
         })),
       }),

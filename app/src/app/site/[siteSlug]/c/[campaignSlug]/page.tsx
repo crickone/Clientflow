@@ -51,7 +51,10 @@ import { signCheckoutToken } from "@/lib/offers/checkoutToken";
 import { fulfilCheckout } from "@/lib/offers/fulfil";
 import { getStripeConnection } from "@/lib/stripe/connection";
 import { getCheckoutSession } from "@/lib/stripe/api";
-import { cookies, type UnsafeUnwrappedCookies } from "next/headers";
+import { cookies, headers, type UnsafeUnwrappedCookies } from "next/headers";
+import { randomUUID } from "node:crypto";
+import { adContextFromHeaders, queueFunnelEvent } from "@/lib/facebook/capi";
+import { PixelEvent } from "@/components/campaigns/PixelEvent";
 import { accessCookieName, getOfferAccessKey, hasOfferAccess } from "@/lib/offers/access";
 import { RememberOfferAccess } from "@/components/campaigns/RememberOfferAccess";
 
@@ -454,11 +457,30 @@ export default async function CampaignLandingPage(props: Props) {
   if (!data) notFound();
   const purchase = searchParams.paid ? await purchaseState(data.publicSite.tenantId, searchParams) : null;
 
+  // The offer was seen (prices on screen): Meta's ViewContent, from our
+  // server now and from the browser with the same id (PixelEvent). Only for
+  // a visitor who accepted advertising cookies (queueFunnelEvent checks).
+  let viewEvent: { eventId: string; params: Record<string, unknown> } | null = null;
+  if (data.offers.length > 0 && !purchase) {
+    const cheapest = Math.min(...data.offers.map((o) => o.priceCents));
+    const evParams = { content_name: data.campaign.name, content_ids: data.offers.map((o) => String(o.id)), content_type: "product", value: cheapest / 100, currency: "EUR" };
+    viewEvent = { eventId: `vc-${randomUUID()}`, params: evParams };
+    const h = await headers();
+    queueFunnelEvent({
+      tenantId: data.publicSite.tenantId,
+      name: "ViewContent",
+      eventId: viewEvent.eventId,
+      ctx: adContextFromHeaders(h, null, siteUrl(data.publicSite, `/c/${params.campaignSlug}`, data.host)),
+      custom: evParams,
+    });
+  }
+
   return (
     <>
       {data.campaign.status === "active" && <SiteBeacon />}
       {data.rememberKey && <RememberOfferAccess name={`oak_${data.campaign.id}`} value={data.rememberKey} />}
       <SiteTracking siteSlug={data.publicSite.site.slug} pixelId={data.publicSite.site.metaPixelId} googleTagId={data.publicSite.site.googleTagId} />
+      {viewEvent && <PixelEvent name="ViewContent" eventId={viewEvent.eventId} params={viewEvent.params} />}
       <CampaignLanding
         offers={data.offers}
         purchase={purchase}

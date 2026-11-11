@@ -44,7 +44,7 @@ export function AdAccountPerformance({ overview }: { overview: AdsOverview }) {
         <Account key={a.adAccountId} account={a} several={overview.accounts.length > 1} />
       ))}
       <div className="adp-foot">
-        From Meta at {fetched}. Numbers can take a few hours to settle, as in Ads Manager.{" "}
+        From Meta at {fetched}. Numbers can take a few hours to settle, as in Ads Manager. Sales and revenue are from Stripe, matched to campaigns by the ad link (ads made in Ads Manager count when their links carry utm_campaign={"{{campaign.id}}"}).{" "}
         <Link href={`/marketing/ads?range=${overview.range.key}&fresh=1`} className="adp-refresh">
           <RefreshCw size={12} /> Refresh
         </Link>
@@ -73,6 +73,11 @@ function Account({ account: a, several }: { account: AccountPerformance; several
   ];
   if (a.leads > 0) tiles.push(["Leads", int(a.leads)], ["Cost per lead", m(a.costPerLead)]);
   if (a.conversations > 0) tiles.push(["Conversations", int(a.conversations)]);
+  // Sales from our own Stripe orders, matched to campaigns by the ad link.
+  const selling = a.sales > 0 || a.campaigns.some((c) => c.objectiveKind === "purchases");
+  if (selling) {
+    tiles.push(["Sales from ads", int(a.sales)], ["Revenue from ads", m(a.revenue)], ["Return on ad spend", a.returnOnSpend == null ? "-" : `${a.returnOnSpend.toFixed(1)}x`]);
+  }
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
@@ -103,6 +108,13 @@ function Account({ account: a, several }: { account: AccountPerformance; several
                 <th style={{ textAlign: "right" }}>Reach</th>
                 <th style={{ textAlign: "right" }}>Link clicks</th>
                 <th style={{ textAlign: "right" }}>Click rate</th>
+                {selling && (
+                  <>
+                    <th style={{ textAlign: "right" }}>Sales</th>
+                    <th style={{ textAlign: "right" }}>Revenue</th>
+                    <th style={{ textAlign: "right" }} title="Revenue from Stripe divided by what the campaign spent">Return</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -134,6 +146,13 @@ function Account({ account: a, several }: { account: AccountPerformance; several
                     <td style={{ textAlign: "right" }}>{int(c.numbers.reach)}</td>
                     <td style={{ textAlign: "right" }}>{int(c.numbers.linkClicks)}</td>
                     <td style={{ textAlign: "right" }}>{pct(c.numbers.ctr)}</td>
+                    {selling && (
+                      <>
+                        <td style={{ textAlign: "right" }}>{int(c.ours.sales)}</td>
+                        <td style={{ textAlign: "right" }}>{c.ours.revenue ? m(c.ours.revenue) : "-"}</td>
+                        <td style={{ textAlign: "right" }}>{c.ours.returnOnSpend == null || !c.ours.revenue ? "-" : `${c.ours.returnOnSpend.toFixed(1)}x`}</td>
+                      </>
+                    )}
                   </tr>
                 );
               })}

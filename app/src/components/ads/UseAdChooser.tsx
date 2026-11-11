@@ -40,6 +40,8 @@ const OBJECTIVE_SHORT: Record<Objective, string> = {
   traffic: "Website visits",
   engagement: "Engagement",
   leads: "Leads",
+  website_leads: "Website leads",
+  sales: "Sales",
   messages: "Messages",
 };
 const STATUS: Record<ChooserCampaign["status"], { label: string; tone: string }> = {

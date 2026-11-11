@@ -7,7 +7,7 @@ import { formatEur } from "./model";
 import { createPendingOrder, getOffer, setOrderSession, setOrderStatus } from "./store";
 import type { Arrival } from "@/lib/arrival";
 import type { CheckoutClaim } from "./checkoutToken";
-import { rememberCheckoutContext } from "@/lib/facebook/capi";
+import { queueFunnelEvent, rememberCheckoutContext } from "@/lib/facebook/capi";
 import type { AdContext } from "@/lib/facebook/capiModel";
 
 /**
@@ -19,6 +19,7 @@ export async function startCheckout(
   claim: CheckoutClaim,
   arrival: Arrival | null = null,
   adContext: AdContext | null = null,
+  checkoutEventId: string | null = null,
 ): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
   const conn = getStripeConnection(claim.tenantId);
   if (!conn) return { ok: false, error: "Online payments aren't set up for this business yet." };
@@ -32,7 +33,17 @@ export async function startCheckout(
 
     const order = createPendingOrder(offer, conn.accountId, arrival);
     // For the Purchase event once Stripe says it was paid (consented visitors only).
-    if (adContext) rememberCheckoutContext(claim.tenantId, order.id, adContext);
+    if (adContext) {
+      rememberCheckoutContext(claim.tenantId, order.id, adContext);
+      // A checkout started: Meta's InitiateCheckout, same id as the browser's.
+      queueFunnelEvent({
+        tenantId: claim.tenantId,
+        name: "InitiateCheckout",
+        eventId: checkoutEventId ?? `checkout-${order.id}`,
+        ctx: adContext,
+        custom: { value: offer.priceCents / 100, currency: offer.currency.toUpperCase(), content_name: offer.title, content_ids: [String(offer.id)], num_items: 1 },
+      });
+    }
     const includes = offer.items.map((i) => `${i.sessions} x ${i.name}`).join(", ");
     const useBy = new Date(`${offer.useByDate}T12:00:00Z`).toLocaleDateString("en-IE", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
     const termsLine = [`Use by ${useBy}.`, offer.terms ?? ""].join(" ").trim().slice(0, 1000);

@@ -62,6 +62,13 @@ export const TRIGGER_CATALOG: TriggerDef[] = [
     description: "When a lead moves to the no-show stage: a note to rebook. Stops when they reply, book again, buy or are marked lost.",
     status: "active",
   },
+  {
+    key: "checkout_abandoned",
+    label: "Checkout not finished",
+    description:
+      "When someone enters their details at an offer's checkout but does not pay before it times out. [OFFER_NAME] and [OFFER_LINK] (back to the offer) work in these messages. Stops if they buy, reply or are marked lost.",
+    status: "active",
+  },
   { key: "campaign_signup", label: "Campaign sign-up", description: "When someone signs up through a campaign landing page. The same follow-up sequence runs for every campaign; each message goes out after its delay.", status: "active" },
 ];
 
@@ -98,17 +105,17 @@ export const LIVE_DELAY_VALUE = 0;
  * the automation_queue table and the dispatch ticker. Every other trigger
  * still sends immediately and only its delay-0 messages (see isMessageLive).
  */
-export const DELAYED_TRIGGER_KEYS: ReadonlySet<string> = new Set(["campaign_signup", "new_lead", "lead_booked", "lead_no_show"]);
+export const DELAYED_TRIGGER_KEYS: ReadonlySet<string> = new Set(["campaign_signup", "new_lead", "lead_booked", "lead_no_show", "checkout_abandoned"]);
 
 /**
  * The lead follow-up sequences (lib/automations/nurture.ts): queued per lead,
  * sent by the ticker, by email or WhatsApp. They replaced GoHighLevel's lead
  * workflows for the clinics that used it (2026-11-11).
  */
-export const LEAD_SEQUENCE_KEYS = ["new_lead", "lead_booked", "lead_no_show", "campaign_signup"] as const;
+export const LEAD_SEQUENCE_KEYS = ["new_lead", "lead_booked", "lead_no_show", "campaign_signup", "checkout_abandoned"] as const;
 
 /** Sequences a lead's reply stops: a person has taken over the conversation. */
-export const STOP_ON_REPLY: readonly string[] = ["new_lead", "campaign_signup", "lead_no_show"];
+export const STOP_ON_REPLY: readonly string[] = ["new_lead", "campaign_signup", "lead_no_show", "checkout_abandoned"];
 /** Sequences booking in stops: no more "come and book" nudges. */
 export const STOP_ON_BOOKED: readonly string[] = ["new_lead", "campaign_signup", "lead_no_show"];
 /** Sequences a no-show stops: the booking they were about is gone. */
@@ -174,12 +181,15 @@ export const SHORTCODES = ["[FIRST_NAME]", "[LAST_NAME]", "[BUSINESS_NAME]"];
  */
 export function applyShortcodes(
   template: string,
-  vars: { firstName?: string | null; lastName?: string | null; businessName?: string | null },
+  vars: { firstName?: string | null; lastName?: string | null; businessName?: string | null; offerName?: string | null; offerLink?: string | null },
 ): string {
   const map: Record<string, string> = {
     first_name: (vars.firstName ?? "").trim(),
     last_name: (vars.lastName ?? "").trim(),
     business_name: (vars.businessName ?? "").trim(),
+    // Only for the checkout sequence (left as typed elsewhere).
+    ...(vars.offerName != null ? { offer_name: vars.offerName.trim() } : {}),
+    ...(vars.offerLink != null ? { offer_link: vars.offerLink.trim() } : {}),
   };
   return template.replace(/\[([a-z_]+)\]/gi, (whole, key: string) => {
     const v = map[key.toLowerCase()];
@@ -281,6 +291,10 @@ export const DEFAULT_MESSAGES: Record<string, MessageInput[]> = {
   lead_no_show: [
     { ...msg("whatsapp", null, "Hi [FIRST_NAME], we missed you today. No problem at all. Would you like to rebook? Reply with a day that suits."), delayValue: 2, delayUnit: "hours" },
     { ...msg("email", "Shall we find another time, [FIRST_NAME]?", "Hi [FIRST_NAME],\n\nWe missed you at your appointment. Things come up. If you'd like to rebook, reply to this email and we'll find a time that works.\n\n[BUSINESS_NAME]"), delayValue: 3, delayUnit: "days" },
+  ],
+  checkout_abandoned: [
+    { ...msg("whatsapp", null, "Hi [FIRST_NAME], it looks like your booking for [OFFER_NAME] didn't go through. If you'd still like it, you can finish here: [OFFER_LINK]. Any questions, just reply."), delayValue: 1, delayUnit: "hours" },
+    { ...msg("email", "Your [OFFER_NAME] booking", "Hi [FIRST_NAME],\n\nYou started booking [OFFER_NAME] but the payment didn't finish. If you'd still like it, you can pick up where you left off here:\n\n[OFFER_LINK]\n\nIf something went wrong or you have a question, just reply to this email.\n\n[BUSINESS_NAME]"), delayValue: 1, delayUnit: "days" },
   ],
   campaign_signup: [
     msg("email", "Thanks for signing up, [FIRST_NAME]", "Hi [FIRST_NAME],\n\nThanks for signing up with [BUSINESS_NAME]. We'll be in touch very shortly to get you booked in — if you'd rather not wait, just reply to this email and we'll sort it now.\n\nTalk soon."),

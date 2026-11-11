@@ -26,6 +26,10 @@ import {
   CTAS,
   OBJECTIVES,
   OBJECTIVE_LABEL,
+  CONVERSION_EVENTS,
+  CONVERSION_EVENT_LABEL,
+  RETARGETS,
+  RETARGET_LABEL,
   PLATFORM_LABEL,
   PLATFORMS,
   platformsOf,
@@ -34,6 +38,7 @@ import {
   validateSpec,
   type AdSetSpec,
   type AdSpec,
+  type AudienceSpec,
   type CampaignSpec,
   type Cta,
   type InterestRef,
@@ -83,6 +88,13 @@ export interface BuilderDesign {
   slideCount: number;
   /** Rendered slide image URLs, for the picker and the live preview. */
   images: string[];
+}
+
+/** A campaign page with an offer on sale, where a Sales ad can lead (the ad link when the offer is ad-only). */
+export interface BuilderOfferPage {
+  campaignId: number;
+  name: string;
+  url: string;
 }
 
 /** The Page identity the live preview shows. */
@@ -152,6 +164,7 @@ export function AdCampaignBuilder({
   brand = null,
   initialStep,
   videoAds = [],
+  offerPages = [],
 }: {
   campaignId: number | null;
   /** Step to open on (from ?step= in the URL), so a refresh lands where you were. */
@@ -166,6 +179,8 @@ export function AdCampaignBuilder({
   brand?: BuilderBrand | null;
   /** Finished video ads from Content Studio. */
   videoAds?: BuilderVideoAd[];
+  /** Campaign pages with an offer, for a Sales campaign's link. */
+  offerPages?: BuilderOfferPage[];
 }) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -574,6 +589,48 @@ export function AdCampaignBuilder({
                         { key: "instagram", label: "Instagram" },
                       ]}
                     />
+                  </div>
+                )}
+
+                {spec.objective === "sales" && (
+                  <div className="adb-section">
+                    <h3>
+                      What should Meta find more of?{" "}
+                      <small>Measured by your Pixel and our server. While the offer sells only a few a week, an earlier step gives Meta more to learn from.</small>
+                    </h3>
+                    <Segmented
+                      label="Optimise for"
+                      value={spec.conversionEvent ?? "PURCHASE"}
+                      onChange={(v) => patch({ conversionEvent: v })}
+                      options={CONVERSION_EVENTS.map((k) => ({ key: k, label: splitLabel(CONVERSION_EVENT_LABEL[k])[0] }))}
+                    />
+                    <span className="adb-hint">{splitLabel(CONVERSION_EVENT_LABEL[spec.conversionEvent ?? "PURCHASE"])[1]}</span>
+                    <div style={{ display: "grid", gap: 6, marginTop: 6 }}>
+                      <span className="adb-hint">Where the ads lead</span>
+                      {offerPages.length === 0 ? (
+                        <span className="adb-hint">
+                          No campaign page has an offer yet. Put an offer on sale from a campaign first (Campaigns, Sell online), or type the page address on each ad.
+                        </span>
+                      ) : (
+                        <select
+                          aria-label="Offer page"
+                          style={selectStyle}
+                          value={offerPages.find((o) => spec.adSets.every((s) => s.ads.every((a) => a.creative.linkUrl === o.url)))?.url ?? ""}
+                          onChange={(e) => {
+                            const url = e.target.value;
+                            if (!url) return;
+                            patch({ adSets: spec.adSets.map((s) => ({ ...s, ads: s.ads.map((a) => ({ ...a, creative: { ...a.creative, linkUrl: url, cta: a.creative.cta === "LEARN_MORE" ? "SHOP_NOW" : a.creative.cta } })) })) });
+                          }}
+                        >
+                          <option value="">Choose the offer page</option>
+                          {offerPages.map((o) => (
+                            <option key={o.campaignId} value={o.url}>
+                              {o.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -1321,6 +1378,32 @@ function AudienceEditor({
       <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-secondary)" }}>
         <input type="checkbox" checked={audience.advantageAudience} onChange={(e) => onChange({ advantageAudience: e.target.checked })} />
         Let Meta show it to people beyond these interests when it expects better results (Advantage+ audience)
+      </label>
+      {/* Retargeting and exclusion: Meta audiences made at launch (lib/ads/service.ts resolveAudiences). */}
+      <div style={{ display: "grid", gap: 6 }}>
+        <span className="adb-hint">Who sees these ads</span>
+        <select
+          aria-label="Who sees these ads"
+          style={selectStyle}
+          value={audience.retarget ?? ""}
+          onChange={(e) => onChange({ retarget: (e.target.value || null) as AudienceSpec["retarget"], customAudienceIds: undefined })}
+        >
+          <option value="">Everyone in the places above</option>
+          {RETARGETS.map((r) => (
+            <option key={r} value={r}>
+              {RETARGET_LABEL[r]} (last 30 days)
+            </option>
+          ))}
+        </select>
+        {audience.retarget && (
+          <span className="adb-hint">
+            Uses your Meta Pixel. Retargeting needs a few hundred people in the audience before Meta will show the ads, so it suits a page that already gets visits.
+          </span>
+        )}
+      </div>
+      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-secondary)" }}>
+        <input type="checkbox" checked={Boolean(audience.excludeClients)} onChange={(e) => onChange({ excludeClients: e.target.checked, excludedAudienceIds: undefined })} />
+        Leave out existing clients (their email and phone go to Meta scrambled, to match and exclude them)
       </label>
     </div>
   );

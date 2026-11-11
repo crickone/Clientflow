@@ -6,7 +6,9 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { runWithTenant } from "@/lib/db/tenant";
 import { clients, leads, offerOrders, packages, payments } from "@/lib/db/schema";
-import { getCampaign } from "@/lib/campaigns/store";
+import { getCampaign, getCampaignLandingUrl } from "@/lib/campaigns/store";
+import { ACCESS_PARAM, getOfferAccessKey } from "./access";
+import { cancelSequences, enrolLeadInSequence } from "@/lib/automations/nurture";
 import { upsertLead } from "@/lib/leads";
 import { pipelineForCampaign } from "@/lib/pipeline/pipelineRepo";
 import { onPaymentRecorded } from "@/lib/pipeline/stage";
@@ -133,6 +135,12 @@ export async function fulfilCheckout(
         arrival: parseArrival(order.arrival),
       });
       db.update(leads).set({ clientId: client.id }).where(eq(leads.id, lead.id)).run();
+      // They bought: an earlier unfinished checkout of theirs stops chasing them.
+      if (email) {
+        for (const a of db.select({ id: leads.id }).from(leads).where(sql`${leads.source} = 'checkout' and lower(${leads.email}) = ${email}`).all()) {
+          cancelSequences(a.id, ["checkout_abandoned"]);
+        }
+      }
       onPaymentRecorded(client.id);
     } catch (err) {
       console.error("[offers] lead update failed", err);
@@ -176,6 +184,51 @@ export function expireOrder(tenantId: number, sessionId: string): void {
     const order = orderForSession(sessionId);
     if (order) setOrderStatus(order.id, "expired", ["pending"]);
   });
+}
+
+/**
+ * Someone who gave their details at checkout but never paid (Stripe expired
+ * the session): a lead on the campaign's board, and the "Checkout not
+ * finished" sequence with a link back to the offer, if the business has it
+ * switched on. Nothing for someone who has since bought the offer. Fail-soft.
+ */
+export async function recoverAbandonedCheckout(tenantId: number, session: CheckoutSession): Promise<void> {
+  const details = session.customer_details ?? {};
+  const email = (details.email ?? "").trim().toLowerCase() || null;
+  const phone = (details.phone ?? "").trim() || null;
+  if (!email && !phone) return;
+  try {
+    await runWithTenant(tenantId, async () => {
+      const order = orderForSession(session.id);
+      if (!order || order.status === "paid") return;
+      const offer = getOffer(order.offerId);
+      if (!offer) return;
+      if (email && db.select({ id: offerOrders.id }).from(offerOrders).where(sql`${offerOrders.offerId} = ${offer.id} and ${offerOrders.status} = 'paid' and lower(${offerOrders.email}) = ${email}`).get()) return;
+      const campaign = offer.campaignId ? getCampaign(offer.campaignId) : null;
+      const { lead, created } = upsertLead({
+        source: "checkout",
+        sourceLeadId: `checkout:${offer.id}:${email ?? phone}`,
+        campaign: campaign?.name ?? offer.title,
+        pipelineId: campaign ? pipelineForCampaign(campaign.id)?.id ?? null : null,
+        fullName: (details.name ?? "").trim() || null,
+        email,
+        phone,
+        notes: `Started checkout for ${offer.title} (${formatEur(order.amountCents)}) but did not pay.`,
+        arrival: parseArrival(order.arrival),
+      });
+      if (!created) return;
+      let offerLink: string | null = null;
+      if (campaign) {
+        const url = await getCampaignLandingUrl(campaign.slug);
+        const key = getOfferAccessKey(campaign.id);
+        offerLink = url ? (key ? `${url}${url.includes("?") ? "&" : "?"}${ACCESS_PARAM}=${encodeURIComponent(key)}` : url) : null;
+      }
+      enrolLeadInSequence(lead, "checkout_abandoned", { offerName: offer.title, offerLink: offerLink ?? "" });
+      await logActivity("offer_checkout_abandoned", `${lead.firstName || email || phone} started checkout for ${offer.title} but did not pay`, { leadId: lead.id, orderId: order.id });
+    });
+  } catch (err) {
+    console.error(`[offers] abandoned checkout follow-up for tenant ${tenantId} failed:`, err);
+  }
 }
 
 async function sendConfirmation(

@@ -159,3 +159,37 @@ export function adsManagerUrl(adAccountId: string, campaignId: string): string {
   const act = adAccountId.replace(/^act_/, "");
   return `https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${encodeURIComponent(act)}&selected_campaign_ids=${encodeURIComponent(campaignId)}`;
 }
+
+/**
+ * The same period as Meta's date_preset, in ms, for counting our own orders
+ * and leads against it. Days are cut at UTC midnight (Ireland is UTC or UTC+1,
+ * so a sale near midnight can land a day apart from Ads Manager's count).
+ */
+export function rangeBounds(key: RangeKey, now: number): { from: number; to: number } {
+  const d = new Date(now);
+  const today = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  const DAY = 86_400_000;
+  switch (key) {
+    case "7d":
+      return { from: today - 7 * DAY, to: today };
+    case "30d":
+      return { from: today - 30 * DAY, to: today };
+    case "this_month":
+      return { from: Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1), to: now };
+    case "last_month":
+      return { from: Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1), to: Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1) };
+    default:
+      return { from: 0, to: now };
+  }
+}
+
+/** The Meta campaign an arrival names (AD_URL_TAGS puts its id in utm_campaign), or null. */
+export function metaCampaignOf(arrival: { source?: string; campaign?: string } | null | undefined): string | null {
+  const id = arrival?.campaign?.trim();
+  return id && /^\d{6,25}$/.test(id) ? id : null;
+}
+
+/** Revenue over spend, to one decimal (2.5 = EUR 2.50 back per EUR 1); null without spend. */
+export function returnOnSpend(revenue: number, spend: number): number | null {
+  return spend > 0 ? Math.round((revenue / spend) * 10) / 10 : null;
+}

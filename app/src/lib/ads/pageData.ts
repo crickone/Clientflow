@@ -10,7 +10,11 @@ import { listLibraryAssets } from "@/lib/image/library";
 import { renderFileUrl } from "@/lib/image/renderStore.client";
 import { postableRenders } from "@/lib/social/schedule";
 import { getPreferredPostingPageId } from "@/lib/social/publisher";
-import type { BuilderAdAccount, BuilderBrand, BuilderDesign, BuilderPhoto, BuilderVideoAd } from "@/components/ads/AdCampaignBuilder";
+import type { BuilderAdAccount, BuilderBrand, BuilderDesign, BuilderOfferPage, BuilderPhoto, BuilderVideoAd } from "@/components/ads/AdCampaignBuilder";
+import { getCampaignLandingUrl, listAssets, listCampaigns } from "@/lib/campaigns/store";
+import { findApprovedLandingAsset } from "@/lib/campaigns/plan";
+import { listOffersForCampaign } from "@/lib/offers/store";
+import { ACCESS_PARAM, getOfferAccessKey } from "@/lib/offers/access";
 import { adVersionImages, listAdCreatives } from "@/lib/ads/creatives";
 
 /**
@@ -79,4 +83,23 @@ export function builderData(): { adAccounts: BuilderAdAccount[]; designs: Builde
       logoUrl: getChromeLogoSrc(),
     },
   };
+}
+
+/**
+ * Campaign pages a Sales ad can lead to: a ready or live campaign with an
+ * approved landing page and at least one offer not yet over. The link carries
+ * the ad-only key when the campaign hides its prices from the plain address,
+ * so people from the ad see the Buy button.
+ */
+export async function offerPagesForAds(): Promise<BuilderOfferPage[]> {
+  const out: BuilderOfferPage[] = [];
+  for (const c of listCampaigns()) {
+    if (!findApprovedLandingAsset(c.status, listAssets(c.id))) continue;
+    if (!listOffersForCampaign(c.id).some((o) => o.state !== "ended" && o.state !== "sold_out")) continue;
+    const url = await getCampaignLandingUrl(c.slug);
+    if (!url) continue;
+    const key = getOfferAccessKey(c.id);
+    out.push({ campaignId: c.id, name: c.name, url: key ? `${url}${url.includes("?") ? "&" : "?"}${ACCESS_PARAM}=${encodeURIComponent(key)}` : url });
+  }
+  return out;
 }

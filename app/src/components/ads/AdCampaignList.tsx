@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Eye, Heart, Megaphone, MessageCircle, MousePointerClick, UserPlus } from "lucide-react";
+import { Eye, Globe, Heart, Megaphone, MessageCircle, MousePointerClick, ShoppingBag, UserPlus } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -18,9 +18,9 @@ export interface AdCampaignListItem {
   error: string | null;
 }
 
-const OBJECTIVE_ICON: Record<string, typeof Megaphone> = { awareness: Eye, traffic: MousePointerClick, engagement: Heart, leads: UserPlus, messages: MessageCircle };
+const OBJECTIVE_ICON: Record<string, typeof Megaphone> = { awareness: Eye, traffic: MousePointerClick, engagement: Heart, leads: UserPlus, website_leads: Globe, sales: ShoppingBag, messages: MessageCircle };
 
-const OBJECTIVE_NAME: Record<string, string> = { awareness: "Awareness", traffic: "Traffic", engagement: "Engagement", leads: "Leads", messages: "Messages" };
+const OBJECTIVE_NAME: Record<string, string> = { awareness: "Awareness", traffic: "Traffic", engagement: "Engagement", leads: "Leads", website_leads: "Website leads", sales: "Sales", messages: "Messages" };
 
 /** The card's one-line reason: Meta's message without its help links (the campaign page has them). */
 function shortError(e: string): string {

@@ -1202,6 +1202,17 @@ export function ensureControlTables() {
       sent_at INTEGER NOT NULL,
       PRIMARY KEY (tenant_id, key)
     );
+    -- Meta custom audiences made for a business's ads (lib/ads/service.ts):
+    -- the Pixel retargeting audiences and the existing-clients list, one of
+    -- each per ad account, reused across campaigns.
+    CREATE TABLE IF NOT EXISTS meta_audiences (
+      tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      ad_account_id TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      audience_id TEXT NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (tenant_id, ad_account_id, kind)
+    );
     CREATE TABLE IF NOT EXISTS facebook_page_offers (
       tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
       page_id TEXT NOT NULL,
