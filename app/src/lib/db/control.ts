@@ -1374,6 +1374,33 @@ export function resetDailyClaim(key: string): void {
   controlSqlite.prepare("DELETE FROM cron_state WHERE key = ?").run(key);
 }
 
+// Bearer tokens are stored hashed (lib/auth/tokenKey.ts). Any row still
+// holding a raw token (from before 2026-11-11, or the legacy session copy in
+// migrate.ts) is converted in place, every boot, so a signed-in person stays
+// signed in: their cookie hashes to the converted value. Idempotent.
+export function hashStoredTokens(): number {
+  const { TOKEN_COLUMNS, TOKEN_KEY_PREFIX, tokenKey } = require("@/lib/security/tokenKey") as typeof import("@/lib/security/tokenKey");
+  controlSqlite.function("aa_token_key", { deterministic: true }, (v: unknown) => tokenKey(String(v)));
+  let total = 0;
+  controlSqlite.transaction(() => {
+    for (const { table, column } of TOKEN_COLUMNS) {
+      const exists = controlSqlite.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table);
+      if (!exists) continue;
+      const n = controlSqlite
+        .prepare(`UPDATE ${table} SET ${column} = aa_token_key(${column}) WHERE ${column} IS NOT NULL AND substr(${column}, 1, 3) != ?`)
+        .run(TOKEN_KEY_PREFIX).changes;
+      if (n) console.log(`[control] ${table}: ${n} token(s) now stored hashed`);
+      total += n;
+    }
+  })();
+  return total;
+}
+try {
+  hashStoredTokens();
+} catch (err) {
+  console.error("[control] token hashing migration failed:", err);
+}
+
 /**
  * Auth + user management read/write identity, which lives in the control plane.
  * They use THIS connection, never the per-request tenant `db` proxy.

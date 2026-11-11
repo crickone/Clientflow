@@ -67,6 +67,39 @@ export class WhapiBridge implements WhatsAppBridge {
     return { providerMessageId: id };
   }
 
+  /**
+   * Point Whapi's webhook at `webhookUrl` (no secret in it) and have Whapi
+   * send the secret as an x-webhook-secret header instead. Headers can only
+   * be set through Whapi's API (not its dashboard). The channel's current
+   * settings are read first and written back with only our webhook entry
+   * changed, so nothing else the business configured resets.
+   */
+  async moveSecretToHeader(webhookUrl: string): Promise<void> {
+    if (!this.webhookSecret) throw new Error("No webhook secret yet: save the WhatsApp settings first.");
+    const cur = await fetch(`${this.base}/settings`, { headers: this.headers() });
+    if (!cur.ok) throw new Error(`Could not read the WhatsApp settings (${cur.status}): ${await safeText(cur)}`);
+    const settings = (await cur.json().catch(() => ({}))) as Record<string, unknown> & {
+      webhooks?: Array<{ url?: string; events?: unknown; mode?: string; headers?: Record<string, string> }>;
+    };
+    const ours = (u?: string) => Boolean(u && u.includes("/api/whatsapp/webhook"));
+    const existing = settings.webhooks ?? [];
+    const mine = existing.filter((h) => ours(h.url));
+    const others = existing.filter((h) => !ours(h.url));
+    const base = mine[0] ?? { events: [{ type: "messages", method: "post" }, { type: "statuses", method: "post" }], mode: "body" };
+    const webhooks = [...others, { ...base, url: webhookUrl, headers: { ...(base.headers ?? {}), "x-webhook-secret": this.webhookSecret } }];
+
+    let res = await fetch(`${this.base}/settings`, { method: "PATCH", headers: this.headers(), body: JSON.stringify({ ...settings, webhooks }) });
+    // Some fields the read returns may not be writable; the webhooks alone are enough.
+    if (!res.ok) res = await fetch(`${this.base}/settings`, { method: "PATCH", headers: this.headers(), body: JSON.stringify({ webhooks }) });
+    if (!res.ok) throw new Error(`WhatsApp did not accept the webhook change (${res.status}): ${await safeText(res)}`);
+
+    // Confirm it took before the app starts refusing the old address.
+    const check = await fetch(`${this.base}/settings`, { headers: this.headers() });
+    const after = (await check.json().catch(() => ({}))) as { webhooks?: Array<{ url?: string; headers?: Record<string, string> }> };
+    const ok = (after.webhooks ?? []).some((h) => h.url === webhookUrl && h.headers?.["x-webhook-secret"] === this.webhookSecret);
+    if (!ok) throw new Error("WhatsApp saved the settings but the webhook header is not there. Nothing was changed on our side.");
+  }
+
   async connectionStatus(): Promise<ConnectionStatus> {
     const res = await fetch(`${this.base}/health`, { headers: this.headers() });
     if (!res.ok) return { connected: false, phone: null };

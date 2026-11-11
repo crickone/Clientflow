@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { runWithTenant } from "@/lib/db/tenant";
 import { listTenants } from "@/lib/tenants";
 import { readKeyForTenant } from "@/lib/settings";
+import { getWhatsAppConfig } from "@/lib/whatsapp/config";
 import { getWhatsAppBridge, isWhatsAppConfigured } from "@/lib/whatsapp";
 import {
   addMessage,
@@ -98,8 +99,11 @@ export async function POST(req: NextRequest) {
     const bridge = getWhatsAppBridge();
 
     const url = new URL(req.url);
-    const secret =
-      url.searchParams.get("secret") ?? req.headers.get("x-webhook-secret");
+    // The secret comes in the x-webhook-secret header. In the address only
+    // until the business moves it (Settings > WhatsApp); after that an
+    // address secret is refused, so one leaked from a log is useless.
+    const headerSecret = req.headers.get("x-webhook-secret");
+    const secret = headerSecret ?? (getWhatsAppConfig().webhookHeaderMode ? null : url.searchParams.get("secret"));
     if (!bridge.verifyWebhook(secret)) {
       return NextResponse.json({ ok: false }, { status: 401 });
     }

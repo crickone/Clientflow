@@ -14,6 +14,7 @@
 // has no "type": "module", so tsx/esbuild compiles .ts files to CJS, where
 // top-level await is unsupported (same reasoning as platform/auth.test.ts and
 // settings/users/updateMemberEmail.test.ts).
+import { tokenKey } from "./security/tokenKey";
 import assert from "node:assert/strict";
 
 import { controlSqlite } from "./db/control";
@@ -73,7 +74,7 @@ import {
     .run(userActive, tenant.id);
 
   const rowByToken = (token: string) =>
-    controlSqlite.prepare("SELECT * FROM user_password_resets WHERE token = ?").get(token) as
+    controlSqlite.prepare("SELECT * FROM user_password_resets WHERE token = ?").get(tokenKey(token)) as
       | { id: number; user_id: number; used_at: number | null; expires_at: number }
       | undefined;
 
@@ -115,7 +116,7 @@ import {
     const expiredToken = "upr-test-expired-token";
     controlSqlite
       .prepare("INSERT INTO user_password_resets (user_id, token, expires_at) VALUES (?, ?, ?)")
-      .run(userActive, expiredToken, Date.now() - 1000);
+      .run(userActive, tokenKey(expiredToken), Date.now() - 1000);
     assert.deepEqual(verifyUserResetToken(expiredToken), { status: "expired" });
 
     // ── completeUserReset: rejects a short password — no state change, token
@@ -196,7 +197,11 @@ import {
     const mintedRow = controlSqlite
       .prepare("SELECT token FROM user_password_resets WHERE user_id = ?")
       .get(userNoMembership) as { token: string };
-    assert.deepEqual(verifyUserResetToken(mintedRow.token), { status: "valid", email: EMAIL_NO_MEMBERSHIP });
+    // Stored hashed (lib/security/tokenKey.ts): the link in the email carries
+    // the raw token, and the stored value is useless as a link, so a copy of
+    // the database cannot reset anyone's password.
+    assert.ok(mintedRow.token.startsWith("h1:"), "the reset token is stored as a hash");
+    assert.deepEqual(verifyUserResetToken(mintedRow.token), { status: "invalid" }, "the stored hash does not work as a link");
 
     console.log("userPasswordReset.test.ts: all assertions passed");
   } finally {

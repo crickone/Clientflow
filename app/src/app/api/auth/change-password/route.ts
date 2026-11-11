@@ -6,6 +6,7 @@ import { z } from "zod";
 import { authDb } from "@/lib/db/control";
 import { authSessions, users } from "@/lib/db/schema";
 import { getSessionUser, hashPassword, verifyPassword, SESSION_COOKIE } from "@/lib/auth";
+import { tokenKey } from "@/lib/security/tokenKey";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
     .delete(authSessions)
     .where(
       currentToken
-        ? and(eq(authSessions.userId, user.id), ne(authSessions.id, currentToken))
+        ? and(eq(authSessions.userId, user.id), ne(authSessions.id, tokenKey(currentToken)))
         : eq(authSessions.userId, user.id),
     );
 

@@ -29,6 +29,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Dependency audit (critical blocks)
+        # Production dependencies only. A critical advisory fails the run; the
+        # full report (high and below) prints in the next step without
+        # failing, because some fixes need a framework major (e.g. the
+        # PostCSS bundled in Next 15, fixed only in Next 16, build-time only).
+        run: npm audit --omit=dev --audit-level=critical
+
+      - name: Dependency audit (full report)
+        run: npm audit --omit=dev
+        continue-on-error: true
+
       - name: Type-check
         run: npm run typecheck
 

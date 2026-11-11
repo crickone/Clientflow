@@ -1,4 +1,5 @@
 import "server-only";
+import { tokenKey } from "@/lib/security/tokenKey";
 import crypto, { timingSafeEqual } from "node:crypto";
 
 import { controlSqlite } from "@/lib/db/control";
@@ -36,7 +37,7 @@ export function platformLogin(
   const token = crypto.randomBytes(32).toString("hex");
   controlSqlite
     .prepare("INSERT INTO platform_sessions (token, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)")
-    .run(token, u.id, Date.now() + SESSION_TTL_MS, Date.now());
+    .run(tokenKey(token), u.id, Date.now() + SESSION_TTL_MS, Date.now());
   return { ok: true, token, user: { userId: u.id, email: u.email, name: u.name, role: roleOf(u) } };
 }
 
@@ -48,7 +49,7 @@ export function requirePlatformSession(req: Request): PlatformUser {
       `SELECT s.user_id, s.expires_at, u.email, u.name, u.platform_role, u.is_platform_admin, u.is_active
        FROM platform_sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?`,
     )
-    .get(token) as
+    .get(tokenKey(token)) as
     | { user_id: number; expires_at: number; email: string; name: string | null; platform_role: string | null; is_platform_admin: number; is_active: number }
     | undefined;
   if (!row || row.expires_at < Date.now() || !row.is_platform_admin || !row.is_active) {
@@ -59,7 +60,7 @@ export function requirePlatformSession(req: Request): PlatformUser {
 
 export function destroyPlatformSession(req: Request): void {
   const token = req.headers.get("x-admin-session");
-  if (token) controlSqlite.prepare("DELETE FROM platform_sessions WHERE token = ?").run(token);
+  if (token) controlSqlite.prepare("DELETE FROM platform_sessions WHERE token = ?").run(tokenKey(token));
 }
 
 /** One-call guard for platform API routes: service key AND session, else a Response. */

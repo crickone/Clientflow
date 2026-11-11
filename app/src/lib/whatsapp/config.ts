@@ -19,6 +19,13 @@ export interface WhatsAppConfig {
   baseUrl: string;
   /** Shared secret we require on inbound webhook calls. */
   webhookSecret: string;
+  /**
+   * The secret now travels as the x-webhook-secret header Whapi adds to each
+   * call (set through Whapi's API by moveSecretToHeader). Once true, a secret
+   * in the webhook address is refused: an address ends up in logs, a header
+   * does not (October 2026 security audit, item 4).
+   */
+  webhookHeaderMode: boolean;
 }
 
 /** What is actually written to the settings row: secrets sealed, the rest plain. */
@@ -28,6 +35,7 @@ type StoredWhatsAppConfig = Partial<Omit<WhatsAppConfig, "token" | "webhookSecre
   webhookSecret?: string;
   tokenEnc?: string;
   webhookSecretEnc?: string;
+  webhookHeaderMode?: boolean;
 };
 
 const DEFAULTS: WhatsAppConfig = {
@@ -36,6 +44,7 @@ const DEFAULTS: WhatsAppConfig = {
   channel: "",
   baseUrl: "",
   webhookSecret: "",
+  webhookHeaderMode: false,
 };
 
 function open(sealed: string | undefined, legacy: string | undefined): string {
@@ -57,6 +66,7 @@ export function getWhatsAppConfig(): WhatsAppConfig {
     baseUrl: stored.baseUrl ?? DEFAULTS.baseUrl,
     token: open(stored.tokenEnc, stored.token),
     webhookSecret: open(stored.webhookSecretEnc, stored.webhookSecret),
+    webhookHeaderMode: stored.webhookHeaderMode === true,
   };
 }
 
@@ -68,6 +78,7 @@ export function setWhatsAppConfig(config: Partial<WhatsAppConfig>): void {
     baseUrl: next.baseUrl,
     tokenEnc: next.token ? encryptToken(next.token) : undefined,
     webhookSecretEnc: next.webhookSecret ? encryptToken(next.webhookSecret) : undefined,
+    webhookHeaderMode: next.webhookHeaderMode || undefined,
   };
   setKey("whatsapp_config", stored);
 }

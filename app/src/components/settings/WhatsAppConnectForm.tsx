@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { Card, CardLabel } from "@/components/ui/Card";
 import { Input, Label } from "@/components/ui/Input";
-import { updateWhatsAppConfig } from "@/app/settings/integrations/whatsapp/actions";
+import { moveWhatsAppSecretToHeader, updateWhatsAppConfig } from "@/app/settings/integrations/whatsapp/actions";
 
 interface ConnectionState {
   configured: boolean;
@@ -20,15 +20,29 @@ interface ConnectionState {
 export function WhatsAppConnectForm({
   initial,
   webhookUrl,
+  headerMode = false,
+  canMoveSecret = false,
 }: {
   initial: { token: string; channel: string; baseUrl: string };
   webhookUrl: string;
+  /** The webhook secret travels as a header (Settings action moveWhatsAppSecretToHeader). */
+  headerMode?: boolean;
+  canMoveSecret?: boolean;
 }) {
   const [token, setToken] = useState(initial.token);
   const [channel, setChannel] = useState(initial.channel);
   const [baseUrl, setBaseUrl] = useState(initial.baseUrl);
   const [isPending, startTransition] = useTransition();
   const [conn, setConn] = useState<ConnectionState | null>(null);
+  const [moving, startMove] = useTransition();
+  function moveSecret() {
+    startMove(async () => {
+      const res = await moveWhatsAppSecretToHeader();
+      if (!res.ok) return void toast.error(res.error);
+      toast.success("WhatsApp now sends the secret as a header.");
+      window.location.reload();
+    });
+  }
 
   const refresh = useCallback(async () => {
     try {
@@ -167,6 +181,27 @@ export function WhatsAppConnectForm({
         >
           {webhookUrl}
         </code>
+        {headerMode ? (
+          <p style={{ color: "var(--text-secondary)", fontSize: 13, margin: "10px 0 0" }}>
+            The secret is sent as a header WhatsApp adds to each call, not in this address. It was set through WhatsApp&rsquo;s API; if you
+            change the webhook in the WhatsApp dashboard, use the button below again.
+          </p>
+        ) : null}
+        {canMoveSecret && (
+          <div style={{ marginTop: 12, display: "grid", gap: 6 }}>
+            {!headerMode && (
+              <p style={{ color: "var(--text-secondary)", fontSize: 13, margin: 0 }}>
+                The secret is part of this address today. Moving it into a header keeps it out of logs. This sets the webhook in WhatsApp for
+                you.
+              </p>
+            )}
+            <div>
+              <Button variant="outline" size="sm" onClick={moveSecret} disabled={moving}>
+                {moving ? "Updating WhatsApp" : headerMode ? "Set the webhook in WhatsApp again" : "Move the secret into a header"}
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       <div

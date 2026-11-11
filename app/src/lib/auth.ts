@@ -17,6 +17,7 @@ import {
   type Tenant,
   type User,
 } from "@/lib/db/schema";
+import { tokenKey } from "@/lib/security/tokenKey";
 
 export { SESSION_COOKIE };
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -43,7 +44,7 @@ export async function createSession(
   const id = crypto.randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
   await authDb.insert(authSessions).values({
-    id,
+    id: tokenKey(id),
     userId,
     activeTenantId,
     expiresAt,
@@ -63,7 +64,7 @@ export async function createSession(
 export async function destroySession(): Promise<void> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (token) {
-    await authDb.delete(authSessions).where(eq(authSessions.id, token));
+    await authDb.delete(authSessions).where(eq(authSessions.id, tokenKey(token)));
   }
   (await cookies()).delete(SESSION_COOKIE);
 }
@@ -112,7 +113,7 @@ export const getCurrentMembership = cache((): CurrentMembership | null => {
       impersonationReason: authSessions.impersonationReason,
     })
     .from(authSessions)
-    .where(eq(authSessions.id, token))
+    .where(eq(authSessions.id, tokenKey(token)))
     .get();
   if (!session) return null;
   if (session.expiresAt.getTime() < Date.now()) return null;
@@ -199,12 +200,12 @@ export async function getSessionUser(): Promise<User | null> {
     })
     .from(authSessions)
     .innerJoin(users, eq(users.id, authSessions.userId))
-    .where(eq(authSessions.id, token))
+    .where(eq(authSessions.id, tokenKey(token)))
     .get();
 
   if (!row) return null;
   if (row.expiresAt.getTime() < Date.now()) {
-    await authDb.delete(authSessions).where(eq(authSessions.id, token));
+    await authDb.delete(authSessions).where(eq(authSessions.id, tokenKey(token)));
     return null;
   }
   if (!row.user.isActive) return null;
@@ -317,7 +318,7 @@ export async function setActiveTenant(
   const session = await authDb
     .select({ userId: authSessions.userId, expiresAt: authSessions.expiresAt })
     .from(authSessions)
-    .where(eq(authSessions.id, token))
+    .where(eq(authSessions.id, tokenKey(token)))
     .get();
   if (!session) return { ok: false, error: "Not signed in" };
   if (session.expiresAt.getTime() < Date.now()) {
@@ -340,7 +341,7 @@ export async function setActiveTenant(
   await authDb
     .update(authSessions)
     .set({ activeTenantId: tenantId })
-    .where(eq(authSessions.id, token));
+    .where(eq(authSessions.id, tokenKey(token)));
   return { ok: true };
 }
 

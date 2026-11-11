@@ -18,9 +18,11 @@ export default async function WhatsAppSettingsPage() {
   const h = await headers();
   const host = h.get("host") ?? "localhost:3000";
   const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  // The business goes in the address so each gym's replies land in its own account.
+  // The business goes in the address so each gym's replies land in its own
+  // account. The secret too, until it is moved into a header (then it is
+  // never shown in the address again).
   const q = new URLSearchParams({ t: getCurrentTenant().slug });
-  if (cfg.webhookSecret) q.set("secret", cfg.webhookSecret);
+  if (cfg.webhookSecret && !cfg.webhookHeaderMode) q.set("secret", cfg.webhookSecret);
   const webhookUrl = `${proto}://${host}/api/whatsapp/webhook?${q.toString()}`;
 
   return (
@@ -33,6 +35,8 @@ export default async function WhatsAppSettingsPage() {
       <WhatsAppConnectForm
         initial={{ token: cfg.token, channel: cfg.channel, baseUrl: cfg.baseUrl }}
         webhookUrl={webhookUrl}
+        headerMode={cfg.webhookHeaderMode}
+        canMoveSecret={Boolean(cfg.token && cfg.webhookSecret)}
       />
     </div>
   );

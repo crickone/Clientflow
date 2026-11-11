@@ -15,6 +15,7 @@ import {
 } from "@/lib/email";
 import { getBusinessProfileForTenant } from "@/lib/businessProfile";
 import { getThemeForTenant } from "@/lib/settings";
+import { tokenKey } from "@/lib/security/tokenKey";
 
 /**
  * Client-app password resets + first-password invites. A single-use, expiring
@@ -50,7 +51,7 @@ export function createClientResetToken(credentialId: number, ttlMs = RESET_TTL_M
   const token = newToken();
   authDb
     .insert(clientPasswordResets)
-    .values({ credentialId, token, expiresAt: new Date(Date.now() + ttlMs) })
+    .values({ credentialId, token: tokenKey(token), expiresAt: new Date(Date.now() + ttlMs) })
     .run();
   return token;
 }
@@ -64,7 +65,7 @@ export function verifyResetToken(token: string): ResetTokenView {
   const row = authDb
     .select()
     .from(clientPasswordResets)
-    .where(eq(clientPasswordResets.token, token))
+    .where(eq(clientPasswordResets.token, tokenKey(token)))
     .get();
   if (!row) return { status: "invalid" };
   if (row.usedAt) return { status: "used" };
@@ -96,7 +97,7 @@ export function completeClientReset(token: string, newPassword: string): ResetRe
   const row = authDb
     .select()
     .from(clientPasswordResets)
-    .where(eq(clientPasswordResets.token, token))
+    .where(eq(clientPasswordResets.token, tokenKey(token)))
     .get();
   if (!row) return { ok: false, error: "This link is invalid." };
   if (row.usedAt) return { ok: false, error: "This link has already been used." };

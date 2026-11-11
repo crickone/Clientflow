@@ -1,4 +1,5 @@
 import "server-only";
+import { tokenKey } from "@/lib/security/tokenKey";
 
 import crypto from "node:crypto";
 
@@ -33,7 +34,7 @@ export function createOpenToken(userId: number, tenantId: number, reason: string
       `INSERT INTO platform_open_tokens (token, user_id, tenant_id, reason, expires_at, created_at)
        VALUES (?, ?, ?, ?, ?, ?)`,
     )
-    .run(token, userId, tenantId, reason, now + OPEN_TOKEN_TTL_MS, now);
+    .run(tokenKey(token), userId, tenantId, reason, now + OPEN_TOKEN_TTL_MS, now);
   pruneExpiredOpenTokens();
   return token;
 }
@@ -59,12 +60,12 @@ export function consumeOpenToken(token: string): OpenTokenClaim | null {
       `UPDATE platform_open_tokens SET used_at = ?
        WHERE token = ? AND used_at IS NULL AND expires_at > ?`,
     )
-    .run(now, token, now);
+    .run(now, tokenKey(token), now);
   if (claim.changes !== 1) return null;
 
   const row = controlSqlite
     .prepare("SELECT user_id, tenant_id, reason FROM platform_open_tokens WHERE token = ?")
-    .get(token) as { user_id: number; tenant_id: number; reason: string | null } | undefined;
+    .get(tokenKey(token)) as { user_id: number; tenant_id: number; reason: string | null } | undefined;
   // Unreachable in practice: the UPDATE above only ever matches a row that
   // still exists (nothing deletes a token between the two statements on a
   // single-threaded better-sqlite3 connection) — guarded anyway so a future

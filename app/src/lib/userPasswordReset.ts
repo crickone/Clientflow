@@ -6,6 +6,7 @@ import { and, eq, isNull, lt } from "drizzle-orm";
 import { authDb } from "@/lib/db/control";
 import { authSessions, memberships, tenants, userPasswordResets, users } from "@/lib/db/schema";
 import { hashPassword } from "@/lib/password";
+import { tokenKey } from "@/lib/security/tokenKey";
 
 /**
  * Staff (operator) password resets — the `users`-table analogue of
@@ -54,7 +55,7 @@ export function createUserResetToken(userId: number, ttlMs = RESET_TTL_MS): stri
   const token = newToken();
   authDb
     .insert(userPasswordResets)
-    .values({ userId, token, expiresAt: new Date(Date.now() + ttlMs) })
+    .values({ userId, token: tokenKey(token), expiresAt: new Date(Date.now() + ttlMs) })
     .run();
   return token;
 }
@@ -68,7 +69,7 @@ export function verifyUserResetToken(token: string): UserResetTokenView {
   const row = authDb
     .select()
     .from(userPasswordResets)
-    .where(eq(userPasswordResets.token, token))
+    .where(eq(userPasswordResets.token, tokenKey(token)))
     .get();
   if (!row) return { status: "invalid" };
   if (row.usedAt) return { status: "used" };
@@ -92,7 +93,7 @@ export function completeUserReset(token: string, newPassword: string): UserReset
   const row = authDb
     .select()
     .from(userPasswordResets)
-    .where(eq(userPasswordResets.token, token))
+    .where(eq(userPasswordResets.token, tokenKey(token)))
     .get();
   if (!row) return { ok: false, error: "This link is invalid." };
   if (row.usedAt) return { ok: false, error: "This link has already been used." };

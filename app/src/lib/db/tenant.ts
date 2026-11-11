@@ -17,6 +17,7 @@ import * as schema from "./schema";
 import { runMigrations, TENANT_MIGRATIONS } from "./migrations";
 import { RECORDER_START_SQL } from "@/lib/recorders/started";
 import { CLIENT_SESSION_COOKIE, controlDb, controlSqlite, SESSION_COOKIE } from "./control";
+import { tokenKey } from "@/lib/security/tokenKey";
 
 /**
  * Per-tenant database plane. Each business has its own SQLite file holding all
@@ -329,7 +330,7 @@ export const resolveCurrentTenant = cache((): schema.Tenant | null => {
         expiresAt: schema.authSessions.expiresAt,
       })
       .from(schema.authSessions)
-      .where(eq(schema.authSessions.id, token))
+      .where(eq(schema.authSessions.id, tokenKey(token)))
       .get();
     if (row && row.expiresAt.getTime() > Date.now()) {
       const resolved = resolveSessionTenant(row.userId, row.activeTenantId);
@@ -355,7 +356,7 @@ export const resolveCurrentTenant = cache((): schema.Tenant | null => {
     const cs = controlDb
       .select({ tenantId: schema.clientSessions.tenantId, expiresAt: schema.clientSessions.expiresAt })
       .from(schema.clientSessions)
-      .where(eq(schema.clientSessions.id, clientToken))
+      .where(eq(schema.clientSessions.id, tokenKey(clientToken)))
       .get();
     if (cs && cs.expiresAt.getTime() > Date.now()) {
       const t = getTenantById(cs.tenantId);

@@ -33,6 +33,7 @@
 // next/cache's revalidatePath is stubbed to a no-op (the real one throws
 // outside an actual Next request/build: "Invariant: static generation store
 // missing in revalidatePath").
+import { tokenKey } from "../../../lib/security/tokenKey";
 import assert from "node:assert/strict";
 import Module from "node:module";
 import { createRequire } from "node:module";
@@ -113,10 +114,13 @@ const requireLocal = createRequire(import.meta.url);
   controlSqlite
     .prepare("INSERT INTO memberships (user_id, tenant_id, role, is_active) VALUES (?, ?, 'staff', 1)")
     .run(user.id, tenantA);
-  const session = controlSqlite
-    .prepare("INSERT INTO auth_sessions (id, user_id, active_tenant_id, expires_at) VALUES (?, ?, ?, ?) RETURNING id")
-    .get(`gel-t5-test-session-${Date.now()}`, user.id, tenantA, Date.now() + 3_600_000) as { id: string };
-  cookieToken = session.id; // "log in" as this user for every action call below
+  // Sessions are stored hashed (lib/security/tokenKey.ts): the row holds the
+  // hash, the cookie the raw token.
+  const rawSession = `gel-t5-test-session-${Date.now()}`;
+  controlSqlite
+    .prepare("INSERT INTO auth_sessions (id, user_id, active_tenant_id, expires_at) VALUES (?, ?, ?, ?)")
+    .run(tokenKey(rawSession), user.id, tenantA, Date.now() + 3_600_000);
+  cookieToken = rawSession; // "log in" as this user for every action call below
 
   const exerciseIds: number[] = []; // every row this test creates -- cleaned up in `finally`
   const insertRaw = (tenantId: number | null, name: string): number =>

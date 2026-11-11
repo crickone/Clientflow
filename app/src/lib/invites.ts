@@ -17,6 +17,7 @@ import {
 } from "@/lib/email";
 import { getBusinessProfile } from "@/lib/businessProfile";
 import { getTheme } from "@/lib/settings";
+import { tokenKey } from "@/lib/security/tokenKey";
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
@@ -50,7 +51,7 @@ export function createInvite(opts: {
   authDb
     .insert(userInvites)
     .values({
-      token,
+      token: tokenKey(token),
       email,
       tenantId: opts.tenantId,
       userId: opts.userId,
@@ -77,7 +78,7 @@ export function getInviteByToken(token: string): InviteView {
   const inv = authDb
     .select()
     .from(userInvites)
-    .where(eq(userInvites.token, token))
+    .where(eq(userInvites.token, tokenKey(token)))
     .get();
   if (!inv) {
     return {
@@ -131,7 +132,7 @@ export function acceptInvite(
   token: string,
   input: { name: string; password: string },
 ): AcceptResult {
-  const inv = authDb.select().from(userInvites).where(eq(userInvites.token, token)).get();
+  const inv = authDb.select().from(userInvites).where(eq(userInvites.token, tokenKey(token))).get();
   if (!inv) return { ok: false, error: "This invite link is invalid." };
   if (inv.acceptedAt) return { ok: false, error: "This invite has already been used." };
   if (inv.expiresAt.getTime() < Date.now())

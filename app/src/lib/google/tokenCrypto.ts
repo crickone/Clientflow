@@ -9,8 +9,8 @@ import crypto from "node:crypto";
  * base64(salt|iv|tag|ciphertext).
  */
 
-function deriveKey(salt: Buffer): Buffer {
-  const secret = process.env.EMAIL_TOKEN_SECRET;
+function deriveKey(salt: Buffer, secretOverride?: string): Buffer {
+  const secret = secretOverride ?? process.env.EMAIL_TOKEN_SECRET;
   if (secret) return crypto.scryptSync(secret, salt, 32);
 
   // Fail closed in production: silently keying off GOOGLE_CLIENT_SECRET means
@@ -39,14 +39,55 @@ export function encryptToken(plain: string): string {
   return Buffer.concat([salt, iv, tag, ct]).toString("base64");
 }
 
-export function decryptToken(payload: string): string {
+function decryptWith(payload: string, secret?: string): string {
   const buf = Buffer.from(payload, "base64");
   const salt = buf.subarray(0, 16);
   const iv = buf.subarray(16, 28);
   const tag = buf.subarray(28, 44);
   const ct = buf.subarray(44);
-  const key = deriveKey(salt);
+  const key = deriveKey(salt, secret);
   const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(ct), decipher.final()]).toString("utf8");
+}
+
+/**
+ * Decrypt with the current key, or, during a key rotation, the previous one.
+ *
+ * ROTATING EMAIL_TOKEN_SECRET: set EMAIL_TOKEN_SECRET_PREVIOUS to the old
+ * value and EMAIL_TOKEN_SECRET to the new one, then redeploy. Everything
+ * still decrypts (this fallback), and lib/security/resealSecrets.ts
+ * re-encrypts every stored secret with the new key shortly after boot and
+ * logs what is left. Once it reports 0 left, remove the _PREVIOUS variable.
+ * Without the fallback, changing the secret made every stored token, API key
+ * and password unreadable at once, so it could never be rotated.
+ */
+export function decryptToken(payload: string): string {
+  try {
+    return decryptWith(payload);
+  } catch (err) {
+    const previous = process.env.EMAIL_TOKEN_SECRET_PREVIOUS;
+    if (!previous) throw err;
+    return decryptWith(payload, previous);
+  }
+}
+
+/**
+ * The same secret under the CURRENT key when `payload` is only readable with
+ * the previous one; null when it is already current (or unreadable either
+ * way, which is reported, never rewritten).
+ */
+export function resealIfPrevious(payload: string): { resealed: string } | { current: true } | { unreadable: true } {
+  try {
+    decryptWith(payload);
+    return { current: true };
+  } catch {
+    const previous = process.env.EMAIL_TOKEN_SECRET_PREVIOUS;
+    if (!previous) return { unreadable: true };
+    try {
+      return { resealed: encryptToken(decryptWith(payload, previous)) };
+    } catch {
+      return { unreadable: true };
+    }
+  }
 }

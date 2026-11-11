@@ -20,6 +20,7 @@ import { syncWearablesIfStale } from "@/lib/wearables/store";
 import { scoreLeadsIfDue } from "@/lib/leadScore";
 import { processDueLeads } from "@/lib/facebook/leadQueue";
 import { processDueCapiEvents } from "@/lib/facebook/capi";
+import { resealAllSecrets } from "@/lib/security/resealSecrets";
 
 /**
  * The dispatch ticker: everything that was booked for a time, sent when that
@@ -190,6 +191,17 @@ export function startDispatchTicker(): void {
   // this file would never exit, which is exactly what happened when a test
   // first reached for runDispatchForTenant.
   setTimeout(() => void tick(), 75_000).unref();
+  // An EMAIL_TOKEN_SECRET rotation in progress: re-encrypt what is still under
+  // the previous key (lib/security/resealSecrets.ts). A no-op otherwise.
+  if (process.env.EMAIL_TOKEN_SECRET_PREVIOUS) {
+    setTimeout(() => {
+      try {
+        resealAllSecrets();
+      } catch (err) {
+        console.error("[security] reseal failed:", err);
+      }
+    }, 60_000).unref();
+  }
   // Once per process: move any video files still in the old shared uploads
   // folders into their tenants' own (lib/video/uploadPaths). Idempotent.
   setTimeout(() => {

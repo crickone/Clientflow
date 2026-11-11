@@ -12,6 +12,7 @@ import { clientAppHost } from "@/lib/clientAppHost";
 import { clientCredentials, clientSessions, clients, type Client } from "@/lib/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/auth";
 import { onboardingFor } from "@/lib/agreements";
+import { tokenKey } from "@/lib/security/tokenKey";
 
 export { CLIENT_SESSION_COOKIE, hashPassword };
 
@@ -40,7 +41,7 @@ export async function createClientSession(info: ClientSessionInfo): Promise<void
   const id = crypto.randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + TTL_MS);
   authDb.insert(clientSessions).values({
-    id,
+    id: tokenKey(id),
     credentialId: info.credentialId,
     tenantId: info.tenantId,
     clientId: info.clientId,
@@ -57,7 +58,7 @@ export async function createClientSession(info: ClientSessionInfo): Promise<void
 
 export async function destroyClientSession(): Promise<void> {
   const token = (await cookies()).get(CLIENT_SESSION_COOKIE)?.value;
-  if (token) authDb.delete(clientSessions).where(eq(clientSessions.id, token)).run();
+  if (token) authDb.delete(clientSessions).where(eq(clientSessions.id, tokenKey(token))).run();
   (await cookies()).delete(CLIENT_SESSION_COOKIE);
 }
 
@@ -71,7 +72,7 @@ export const getClientSession = cache((): ClientSessionInfo | null => {
     return null;
   }
   if (!token) return null;
-  const row = authDb.select().from(clientSessions).where(eq(clientSessions.id, token)).get();
+  const row = authDb.select().from(clientSessions).where(eq(clientSessions.id, tokenKey(token))).get();
   if (!row) return null;
   if (row.expiresAt.getTime() < Date.now()) return null;
   return { credentialId: row.credentialId, tenantId: row.tenantId, clientId: row.clientId };

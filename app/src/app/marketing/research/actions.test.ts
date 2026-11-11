@@ -41,6 +41,7 @@
 // runWithTenant IS still used for this test's OWN setup/assertions (seeding
 // + reading back the competitor row via lib/research/store.ts directly),
 // matching store.test.ts.
+import { tokenKey } from "../../../lib/security/tokenKey";
 import assert from "node:assert/strict";
 import Module from "node:module";
 import { createRequire } from "node:module";
@@ -138,9 +139,11 @@ const requireLocal = createRequire(import.meta.url);
   controlSqlite
     .prepare("INSERT INTO memberships (user_id, tenant_id, role, is_active) VALUES (?, ?, 'admin', 1)")
     .run(adminUser.id, tid);
-  const adminSession = controlSqlite
-    .prepare("INSERT INTO auth_sessions (id, user_id, active_tenant_id, expires_at) VALUES (?, ?, ?, ?) RETURNING id")
-    .get(`pageid-t2-admin-session-${Date.now()}`, adminUser.id, tid, Date.now() + 3_600_000) as { id: string };
+  const adminRaw = `pageid-t2-admin-session-${Date.now()}`;
+  controlSqlite
+    .prepare("INSERT INTO auth_sessions (id, user_id, active_tenant_id, expires_at) VALUES (?, ?, ?, ?)")
+    .run(tokenKey(adminRaw), adminUser.id, tid, Date.now() + 3_600_000);
+  const adminSession = { id: adminRaw }; // the cookie carries the raw token; the row its hash
 
   const staffUser = controlSqlite
     .prepare("INSERT INTO users (email, password_hash, role, is_active) VALUES (?, 'x', 'staff', 1) RETURNING id")
@@ -148,9 +151,11 @@ const requireLocal = createRequire(import.meta.url);
   controlSqlite
     .prepare("INSERT INTO memberships (user_id, tenant_id, role, is_active) VALUES (?, ?, 'staff', 1)")
     .run(staffUser.id, tid);
-  const staffSession = controlSqlite
-    .prepare("INSERT INTO auth_sessions (id, user_id, active_tenant_id, expires_at) VALUES (?, ?, ?, ?) RETURNING id")
-    .get(`pageid-t2-staff-session-${Date.now()}`, staffUser.id, tid, Date.now() + 3_600_000) as { id: string };
+  const staffRaw = `pageid-t2-staff-session-${Date.now()}`;
+  controlSqlite
+    .prepare("INSERT INTO auth_sessions (id, user_id, active_tenant_id, expires_at) VALUES (?, ?, ?, ?)")
+    .run(tokenKey(staffRaw), staffUser.id, tid, Date.now() + 3_600_000);
+  const staffSession = { id: staffRaw }; // the cookie carries the raw token; the row its hash
 
   try {
     // Seed one competitor row directly via the store, bypassing HTTP/cookie

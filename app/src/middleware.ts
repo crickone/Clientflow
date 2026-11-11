@@ -39,6 +39,7 @@ const PUBLIC_API_PREFIXES = [
   "/api/stripe/webhook", // Stripe Connect events (payments on businesses' accounts) — Stripe-Signature-verified inside the route handler
   "/api/offers/checkout", // landing-page Buy button → Stripe Checkout; signed-token-verified inside the route handler, rate-limited
   "/api/health", // unauthenticated liveness probe (control-DB ping; leaks nothing) — must not 307→/login for uptime monitors
+  "/api/csp-report", // browsers' Content-Security-Policy violation reports (report-only policy below); rate-limited, logs only
 ];
 
 // Host → site-slug map for serving public CMS sites at their domain root. The
@@ -51,7 +52,33 @@ const SITE_HOSTS = parseSiteHosts(process.env.CMS_SITE_HOSTS);
 const PROXY_SECRET = process.env.SITES_PROXY_SECRET;
 
 
+/**
+ * A script-src Content-Security-Policy for the admin app, REPORT-ONLY for now
+ * (October 2026 security audit, item 6). Each request gets a nonce; Next
+ * stamps it on its own scripts (it reads the nonce from this header too), and
+ * browsers report, without blocking, any script that would fail it, to
+ * /api/csp-report. Once the logs stay clean, rename the header to
+ * Content-Security-Policy to enforce it. Not on client websites, forms,
+ * unsubscribe pages or APIs: client sites run their own scripts verbatim.
+ */
+function adminScriptPolicy(req: NextRequest): string | null {
+  const p = req.nextUrl.pathname;
+  if (/^\/(site|site-media|library-media|sites|f|u|api|_next)(\/|$)/.test(p)) return null;
+  if (req.headers.get(PROXY_KEY_HEADER)) return null; // a client domain through the Worker
+  const host = (req.headers.get("host") || "").split(":")[0].toLowerCase();
+  if (SITE_HOSTS[host]) return null;
+  const nonce = btoa(crypto.randomUUID());
+  return `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-inline' https:; object-src 'none'; base-uri 'self'; report-uri /api/csp-report`;
+}
+
 export function middleware(req: NextRequest) {
+  const policy = adminScriptPolicy(req);
+  const res = handle(req, policy);
+  if (policy && !res.headers.get("location")) res.headers.set("Content-Security-Policy-Report-Only", policy);
+  return res;
+}
+
+function handle(req: NextRequest, scriptPolicy: string | null) {
   const { pathname } = req.nextUrl;
 
   // Expose path + host to server components (root layout uses x-pathname to
@@ -59,6 +86,8 @@ export function middleware(req: NextRequest) {
   // so precise host→site resolution happens server-side in resolveHost).
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("x-pathname", pathname);
+  // The nonce reaches Next's renderer through the request headers.
+  if (scriptPolicy) requestHeaders.set("content-security-policy-report-only", scriptPolicy);
 
   // A client domain arriving through the Cloudflare Worker. The site-host
   // header is trusted ONLY with the Worker's secret, and stripped otherwise
