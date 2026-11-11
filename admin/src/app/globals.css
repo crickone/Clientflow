@@ -1006,3 +1006,24 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { opacity: 0.45; c
   color: var(--text-secondary);
   cursor: pointer;
 }
+
+/* ── Confirm dialog (components/ui/ConfirmDialog.tsx) ───────────────────── */
+.dlg {
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  padding: 0;
+  width: min(440px, calc(100vw - 32px));
+  background: var(--surface-1);
+  color: var(--text-primary);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 30px 80px -30px rgba(0, 0, 0, 0.9);
+  animation: dlg-in 0.18s var(--ease) both;
+}
+.dlg::backdrop { background: rgba(5, 6, 8, 0.6); backdrop-filter: blur(2px); }
+@keyframes dlg-in { from { opacity: 0; transform: translateY(6px) scale(0.985); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .dlg { animation: none; } }
+.dlg-body { display: flex; flex-direction: column; gap: 14px; padding: 24px 24px 20px; }
+.dlg-title { margin: 0; font-family: var(--font-heading), system-ui, sans-serif; font-size: 18px; font-weight: 500; letter-spacing: -0.015em; }
+.dlg-text { margin: 0; color: var(--text-secondary); font-size: 14px; line-height: 1.5; }
+.dlg-field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-secondary); }
+.dlg-field strong { color: var(--text-primary); font-family: var(--font-mono), ui-monospace, monospace; font-weight: 500; }
+.dlg-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
