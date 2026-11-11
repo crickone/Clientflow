@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { api, ApiError } from "@/lib/api";
+import { bust } from "@/lib/revalidate";
 
 /**
  * Server actions for the People tab. Each one carries a single operation to
@@ -27,6 +28,7 @@ export async function peopleAction(tenantId: number, body: PeopleOp): Promise<Pe
       method: "POST",
       body,
     });
+    bust(tenantId);
     revalidatePath(`/gyms/${tenantId}/people`);
     revalidatePath(`/gyms/${tenantId}`);
     return { ok: true, note: res.note, link: res.link };

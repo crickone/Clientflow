@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 import { api, ApiError } from "@/lib/api";
+import { bust } from "@/lib/revalidate";
 
 export type TenantActionName =
   | "suspend"
@@ -44,6 +45,7 @@ export async function tenantAction(
 ): Promise<{ ok: boolean; error?: string }> {
   try {
     await api(`/tenants/${id}/${action}`, { method: "POST", body: body ?? {} });
+    bust(id);
     revalidatePath(`/gyms/${id}`);
     revalidatePath("/gyms");
     revalidatePath("/");
@@ -69,6 +71,7 @@ export async function openTenant(
       method: "POST",
       body: { reason },
     });
+    bust(id);
     revalidatePath(`/gyms/${id}`); // the "opened_by_admin" event now shows in Events
     revalidatePath("/gyms");
     revalidatePath("/");

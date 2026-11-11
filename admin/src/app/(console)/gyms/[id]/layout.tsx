@@ -41,7 +41,7 @@ export default async function TenantLayout(
 
   let data: TenantDetail;
   try {
-    data = await api<TenantDetail>(`/tenants/${id}`);
+    data = await api<TenantDetail>(`/tenants/${id}`, { revalidate: 15, tags: [`tenant-${id}`] });
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) notFound();
     throw err;

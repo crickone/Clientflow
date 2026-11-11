@@ -43,7 +43,7 @@ export default async function GymsPage(
   if (searchParams.status) qs.set("status", searchParams.status);
   if (searchParams.venueType) qs.set("venueType", searchParams.venueType);
 
-  const { tenants, killSwitches } = await api<FleetResponse>(`/fleet${qs.toString() ? `?${qs}` : ""}`);
+  const { tenants, killSwitches } = await api<FleetResponse>(`/fleet${qs.toString() ? `?${qs}` : ""}`, { revalidate: 30, tags: ["fleet"] });
   const filtered = Boolean(searchParams.q || searchParams.status || searchParams.venueType);
 
   return (

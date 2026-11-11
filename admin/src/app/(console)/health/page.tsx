@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
  * Health tab is where the deep check happens.
  */
 export default async function FleetHealthPage() {
-  const { tenants, schedulers } = await api<FleetHealth>("/health");
+  const { tenants, schedulers } = await api<FleetHealth>("/health", { revalidate: 30, tags: ["fleet"] });
 
   const rank = (t: FleetHealth["tenants"][number]) =>
     t.alerts.some((a) => a.level === "bad") ? 0 : t.alerts.length > 0 ? 1 : 2;

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { api, ApiError } from "@/lib/api";
+import { bust } from "@/lib/revalidate";
 
 export type MoneyActionResult = { ok: true; note: string } | { ok: false; error: string };
 
@@ -16,6 +17,7 @@ export type MoneyOp =
 export async function moneyAction(tenantId: number, body: MoneyOp): Promise<MoneyActionResult> {
   try {
     const res = await api<{ ok: true; note: string }>(`/tenants/${tenantId}/money`, { method: "POST", body });
+    bust(tenantId);
     revalidatePath(`/gyms/${tenantId}/money`);
     revalidatePath(`/gyms/${tenantId}`);
     return { ok: true, note: res.note };

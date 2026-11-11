@@ -53,7 +53,7 @@ function Readout({ label, value, note }: { label: string; value: string; note?: 
 }
 
 export default async function DashboardPage() {
-  const data = await api<PlatformAnalytics>("/analytics");
+  const data = await api<PlatformAnalytics>("/analytics", { revalidate: 30, tags: ["fleet"] });
   const { platform, gyms } = data;
 
   const growth = platform.gymsByMonth.map((p) => p.total);

@@ -1,6 +1,7 @@
 "use server";
 
 import { api, ApiError } from "@/lib/api";
+import { bust } from "@/lib/revalidate";
 
 export interface ProvisionedAdmin {
   email: string;
@@ -72,6 +73,7 @@ export async function provisionGym(_prev: ProvisionState, formData: FormData): P
       method: "POST",
       body: { name, slug, venueType, admins, addMe },
     });
+    bust();
     return { ok: true, tenantId: res.tenantId, name, admins: res.admins, addMe };
   } catch (err) {
     return { ok: false, error: err instanceof ApiError ? err.message : "Failed to provision business." };

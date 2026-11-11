@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 import { api, ApiError } from "@/lib/api";
+import { bust } from "@/lib/revalidate";
 
 /**
  * Bound directly to the settings `<form action={saveSettings}>` (no client
@@ -82,6 +83,7 @@ export async function saveSettings(formData: FormData): Promise<void> {
     redirect(`/settings?error=${encodeURIComponent(errorMsg)}`);
   }
 
+  bust();
   revalidatePath("/settings");
   redirect("/settings?saved=1");
 }

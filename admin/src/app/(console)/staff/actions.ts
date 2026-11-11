@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 import { api, ApiError } from "@/lib/api";
+import { bust } from "@/lib/revalidate";
 import type { PlatformRole } from "@/lib/types";
 
 /**
@@ -22,6 +23,7 @@ export async function setStaffRoleAction(userId: number, formData: FormData): Pr
     const message = err instanceof ApiError ? err.message : "Could not change that role.";
     redirect(`/staff?error=${encodeURIComponent(message)}`);
   }
+  bust();
   revalidatePath("/staff");
   redirect("/staff?saved=1");
 }

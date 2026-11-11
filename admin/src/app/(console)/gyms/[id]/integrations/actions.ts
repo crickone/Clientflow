@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { api, ApiError } from "@/lib/api";
+import { bust } from "@/lib/revalidate";
 
 /**
  * Server actions for the Integrations tab. The rules and the audit row live
@@ -24,6 +25,7 @@ export async function integrationAction(
       method: "POST",
       body,
     });
+    bust(tenantId);
     revalidatePath(`/gyms/${tenantId}/integrations`);
     return { ok: true, note: res.note };
   } catch (err) {

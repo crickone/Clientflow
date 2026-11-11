@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { api, ApiError } from "@/lib/api";
+import { bust } from "@/lib/revalidate";
 
 export type DataActionResult =
   | { ok: true; note?: string; data?: unknown }
@@ -20,6 +21,7 @@ export async function dataAction(tenantId: number, body: DataOp): Promise<DataAc
       method: "POST",
       body,
     });
+    bust(tenantId);
     revalidatePath(`/gyms/${tenantId}/data`);
     return { ok: true, note: res.note, data: res.data };
   } catch (err) {

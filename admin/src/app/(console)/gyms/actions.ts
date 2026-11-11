@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { api, ApiError } from "@/lib/api";
+import { bust } from "@/lib/revalidate";
 
 export type FleetActionResult = { ok: true; note: string } | { ok: false; error: string };
 
@@ -17,6 +18,7 @@ export async function setKillSwitchAction(
       method: "POST",
       body: { key, stopped, reason },
     });
+    bust();
     revalidatePath("/gyms");
     revalidatePath("/");
     return { ok: true, note: res.note };

@@ -13,7 +13,17 @@ export class ApiError extends Error {
 /** Server-side call to the main app's platform API (key + session attached). */
 export async function api<T>(
   path: string,
-  opts: { method?: string; body?: unknown; session?: string | null } = {},
+  opts: {
+    method?: string;
+    body?: unknown;
+    session?: string | null;
+    /**
+     * Seconds a GET may be served from Next's data cache. Only for reads a
+     * write busts by tag (see lib/revalidate.ts). Omitted: never cached.
+     */
+    revalidate?: number;
+    tags?: string[];
+  } = {},
 ): Promise<T> {
   const session = opts.session === undefined ? (await cookies()).get(ADMIN_COOKIE)?.value ?? null : opts.session;
   const res = await fetch(`${BASE}/api/platform${path}`, {
@@ -24,7 +34,9 @@ export async function api<T>(
       ...(opts.body !== undefined ? { "Content-Type": "application/json" } : {}),
     },
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
-    cache: "no-store",
+    ...(opts.revalidate !== undefined
+      ? { next: { revalidate: opts.revalidate, tags: opts.tags ?? [] } }
+      : { cache: "no-store" as const }),
   });
   // A page renders in parallel with the layout's requireAdminSession, so its own
   // call can see an expired sign-in first. Send it to /login instead of an

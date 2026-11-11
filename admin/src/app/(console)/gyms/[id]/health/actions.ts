@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { api, ApiError } from "@/lib/api";
+import { bust } from "@/lib/revalidate";
 
 export type HealthActionResult = { ok: true; note: string } | { ok: false; error: string };
 
@@ -12,6 +13,7 @@ export type HealthOp = { op: "clear-stuck" } | { op: "retry-queue"; queue: "nurt
 export async function healthAction(tenantId: number, body: HealthOp): Promise<HealthActionResult> {
   try {
     const res = await api<{ ok: true; note: string }>(`/tenants/${tenantId}/health`, { method: "POST", body });
+    bust(tenantId);
     revalidatePath(`/gyms/${tenantId}/health`);
     revalidatePath("/health");
     return { ok: true, note: res.note };
