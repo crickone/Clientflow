@@ -856,7 +856,7 @@ export function AdCampaignBuilder({
                                   options={[
                                     { key: "single", label: "First slide only" },
                                     { key: "carousel", label: `Carousel (${design.slideCount} slides)` },
-                                    { key: "options", label: "Let Meta choose a slide" },
+                                    { key: "options", label: "Flexible format" },
                                   ]}
                                 />
                               )}
@@ -894,7 +894,7 @@ export function AdCampaignBuilder({
                                 onChange={(v) => patchAd(si, k, { format: v })}
                                 options={[
                                   { key: "carousel", label: "Carousel, in this order" },
-                                  { key: "options", label: "Let Meta choose a photo" },
+                                  { key: "options", label: "Flexible format" },
                                 ]}
                               />
                             )}
