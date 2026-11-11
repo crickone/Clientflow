@@ -32,6 +32,7 @@ export function Shortcuts() {
         timer.current = setTimeout(() => (prev.current = null), 1000);
       } else if (r.kind === "go") {
         e.preventDefault();
+        setHelp(false);
         router.push(r.href);
       } else if (r.kind === "help") {
         e.preventDefault();
