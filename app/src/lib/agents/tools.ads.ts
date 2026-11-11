@@ -17,6 +17,7 @@ import {
 } from "@/lib/ads/service";
 import { OBJECTIVES, PLATFORM_LABEL, PLATFORMS, platformsOf, totalDailyBudget, validateSpec, type AdSpec, type CampaignSpec, type Platforms } from "@/lib/ads/spec";
 import { listAdAccounts } from "@/lib/facebook/grants";
+import { getAdsOverview } from "@/lib/ads/accountInsights";
 import { AD_GOALS, parseBrief, versionCount } from "@/lib/ads/adCopy";
 import { createAdCreative, listAdCreatives, queueImageAd } from "@/lib/ads/creatives";
 import { titleFrom } from "@/lib/content-studio/title";
@@ -148,6 +149,15 @@ export const ADS_TOOLS: Anthropic.Tool[] = [
       type: "object",
       properties: { type: { type: "string", enum: ["interest", "city"] }, query: { type: "string" } },
       required: ["type", "query"],
+    },
+  },
+  {
+    name: "get_ad_account_performance",
+    description:
+      "Every campaign on the business's ad account with Meta's numbers for a period, INCLUDING campaigns made in Meta Ads Manager: spend, people reached, impressions, link clicks, click rate, results (leads, conversations, link clicks... by objective) and cost per result, plus account totals. Use this for 'how are my ads doing'.",
+    input_schema: {
+      type: "object",
+      properties: { range: { type: "string", enum: ["7d", "30d", "this_month", "last_month", "max"], description: "Default 30d." } },
     },
   },
   {
@@ -284,6 +294,44 @@ export async function searchAdAudienceTool(_ctx: ToolContext, input: Record<stri
     const q = String(input.query ?? "");
     const data = input.type === "city" ? await searchAdCities(q) : await searchAdInterests(q);
     return { text: fenceUntrusted(JSON.stringify(data)) };
+  } catch (e) {
+    return err(e);
+  }
+}
+
+/** READ — Meta's numbers for every campaign on the ad account (lib/ads/accountInsights). */
+export async function getAdAccountPerformanceTool(ctx: ToolContext, input: Record<string, unknown>): Promise<ToolResult> {
+  try {
+    const overview = await getAdsOverview(ctx.tenantId, typeof input.range === "string" ? input.range : null);
+    if (!overview) return { text: JSON.stringify({ error: "No ad account is connected and chosen. Settings > Integrations > Facebook." }) };
+    return {
+      text: JSON.stringify({
+        period: overview.range.label,
+        accounts: overview.accounts.map((a) => ({
+          name: a.name,
+          currency: a.currency,
+          error: a.error,
+          totals: a.totals,
+          leads: a.leads,
+          costPerLead: a.costPerLead,
+          conversations: a.conversations,
+          pausedOrEndedWithNoSpend: a.quiet,
+          campaigns: a.campaigns.map((c) => ({
+            name: c.name,
+            status: c.state,
+            builtInAdonisAgent: c.builtHere,
+            spend: c.numbers.spend,
+            results: c.results,
+            resultLabel: c.resultLabel,
+            costPerResult: c.costPerResult,
+            reach: c.numbers.reach,
+            impressions: c.numbers.impressions,
+            linkClicks: c.numbers.linkClicks,
+            clickRatePct: c.numbers.ctr,
+          })),
+        })),
+      }),
+    };
   } catch (e) {
     return err(e);
   }

@@ -95,6 +95,7 @@ import {
 import {
   ADS_TOOLS,
   draftAdCampaignTool,
+  getAdAccountPerformanceTool,
   getAdResultsTool,
   launchAdCampaignTool,
   listAdCampaignsTool,
@@ -1044,6 +1045,8 @@ export async function executeTool(
         return await searchAdAudienceTool(ctx, input);
       case "get_ad_results":
         return await getAdResultsTool(ctx, input);
+      case "get_ad_account_performance":
+        return await getAdAccountPerformanceTool(ctx, input);
       case "draft_ad_campaign":
         return draftAdCampaignTool(ctx, input);
       case "launch_ad_campaign":
