@@ -1,5 +1,6 @@
 import "server-only";
 
+import { recordJobRun } from "@/lib/platform/jobRuns";
 import { runBackup, isBackupConfigured } from "./runBackup";
 import { claimDailyRun, getCronState, resetDailyClaim, setCronState, shouldRunToday } from "@/lib/db/control";
 import { sendPlatformEmail } from "@/lib/billing/emails";
@@ -99,7 +100,12 @@ async function runNightlyBackupIfNeeded(): Promise<void> {
   if (!claimDailyRun(CRON_KEY, today)) return;
   running = true;
   try {
-    const r = await runBackup();
+    const r = await recordJobRun("nightly_backup", "Nightly backup", async () => {
+      const res = await runBackup();
+      // The backup reports failure as a value; the run should read as failed too.
+      if (!res.ok) throw new Error(res.error ?? "Backup failed");
+      return res;
+    }).catch((err) => ({ ok: false as const, uploaded: [] as string[], error: err instanceof Error ? err.message : String(err) }));
     console.log("[backup] nightly:", JSON.stringify(r));
     if (r.ok) {
       // Claim already marks today done (claimDailyRun wrote it above).

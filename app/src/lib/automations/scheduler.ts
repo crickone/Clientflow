@@ -21,6 +21,7 @@ import { dublinToday } from "@/lib/billing/dates";
 import { placesConfigured } from "@/lib/research/places";
 import { refreshTenant } from "@/lib/research/refresh";
 import { runDuePurges } from "@/lib/platform/lifecycle";
+import { recordJobRun } from "@/lib/platform/jobRuns";
 
 function isLeapYear(y: number): boolean {
   return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
@@ -294,7 +295,7 @@ export async function runDailyAutomations(): Promise<{ tenants: number; birthday
   const today = dublinToday();
   if (getCronState(billingKey) !== today) {
     try {
-      const summary = await runBillingForDate(today);
+      const summary = await recordJobRun("billing_run", "Billing run", () => runBillingForDate(today));
       setCronState(billingKey, today);
       console.log(`[billing] daily run:`, summary);
     } catch (err) {
@@ -360,7 +361,7 @@ export function startScheduler(): void {
     if (!claimDailyRun("last_daily_run", today)) return;
     running = true;
     try {
-      await runDailyAutomations();
+      await recordJobRun("daily_automations", "Daily automations", runDailyAutomations);
       // Claim already marks today done (claimDailyRun wrote it above) — a
       // SUCCESSFUL run leaves it as-is, same as the old "only setCronState on
       // success" behaviour.

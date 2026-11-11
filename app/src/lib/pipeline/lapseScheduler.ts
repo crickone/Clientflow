@@ -1,6 +1,7 @@
 import "server-only";
 
 import { recomputeLapsedAllTenants } from "./lapse";
+import { recordJobRun } from "@/lib/platform/jobRuns";
 import { claimDailyRun, resetDailyClaim } from "@/lib/db/control";
 
 let armed = false;
@@ -19,7 +20,7 @@ const CRON_KEY = "lapse_last_run";
  * failure it's released via resetDailyClaim, so a failed attempt stays
  * retryable rather than being silently marked "done" for the day.
  */
-function runDailyLapseIfNeeded(): void {
+async function runDailyLapseIfNeeded(): Promise<void> {
   if (running) return;
   // Review finding #4 (midnight-straddle): captured ONCE per invocation and
   // reused for both the claim and the date derivation below, rather than
@@ -35,7 +36,7 @@ function runDailyLapseIfNeeded(): void {
   if (!claimDailyRun(CRON_KEY, today)) return;
   running = true;
   try {
-    const r = recomputeLapsedAllTenants();
+    const r = await recordJobRun("lapse_sweep", "Lapsed-member sweep", () => recomputeLapsedAllTenants());
     console.log("[pipeline] daily lapse:", JSON.stringify(r));
     // Claim already marks today done (claimDailyRun wrote it above).
   } catch (e) {
@@ -73,15 +74,11 @@ export function scheduleDailyLapse(): void {
     if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
     const ms = next.getTime() - now.getTime();
     setTimeout(() => {
-      try {
-        runDailyLapseIfNeeded();
-      } finally {
-        armNext();
-      }
+      void runDailyLapseIfNeeded().finally(armNext);
     }, ms);
   };
 
-  runDailyLapseIfNeeded(); // boot-time catch-up
+  void runDailyLapseIfNeeded(); // boot-time catch-up
   armNext();
   console.log("[pipeline] daily lapse scheduler armed (04:00 UTC + boot catch-up)");
 }
