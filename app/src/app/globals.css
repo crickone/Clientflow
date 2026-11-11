@@ -56,6 +56,8 @@
   --radius-field: 13px;
   --field-bg: #22242b;
   --field-bg-focus: #282b33;
+  /* Resting edge on every field (lib/theme.ts sets it per theme). */
+  --field-border: rgba(255, 255, 255, 0.14);
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-2: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 24px 60px -24px rgba(0, 0, 0, 0.7);
   --glass: rgba(23, 24, 28, 0.72);
@@ -301,6 +303,9 @@ a {
    state that the inline styles don't set (so no !important needed). */
 .field::placeholder { color: var(--text-tertiary); }
 .field:hover:not(:disabled) { background: var(--field-bg-focus); }
+/* The resting border is inline (components/ui/Input.tsx); hovering firms it up,
+   except on a field in error, whose red border is inline too. */
+.field:not(.field--error):hover:not(:disabled):not(:focus) { border-color: var(--hairline-strong) !important; }
 .field:focus,
 .field:focus-visible {
   background: var(--field-bg-focus);
@@ -2348,7 +2353,7 @@ a {
 .auth-field {
   width: 100%;
   background: var(--field-bg);
-  border: 1px solid transparent;
+  border: 1px solid var(--field-border);
   border-radius: 14px;
   padding: 17px 18px;
   margin-bottom: 12px;
@@ -2755,7 +2760,7 @@ a {
 .adb-budget-btn:hover:not(:disabled) { border-color: var(--hairline-strong); }
 .adb-budget-btn:disabled { opacity: 0.4; cursor: default; }
 .adb-budget-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.adb-budget-figure { display: flex; align-items: baseline; justify-content: center; gap: 4px; padding: 8px 12px; border-radius: var(--radius-field); background: var(--field-bg); cursor: text; }
+.adb-budget-figure { display: flex; align-items: baseline; justify-content: center; gap: 4px; padding: 8px 12px; border-radius: var(--radius-field); background: var(--field-bg); border: 1px solid var(--field-border); cursor: text; }
 .adb-budget-figure:focus-within { background: var(--field-bg-focus); box-shadow: 0 0 0 2px var(--accent-soft); }
 .adb-budget-currency { font-family: var(--font-heading), sans-serif; font-size: 22px; color: var(--text-secondary); }
 .adb-budget-figure input { width: 4.2ch; border: none; background: transparent; color: var(--text-primary); font-family: var(--font-heading), sans-serif; font-size: 30px; font-weight: 600; text-align: center; outline: none; -moz-appearance: textfield; }
@@ -2774,7 +2779,7 @@ a {
 .adb-age-track input:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px var(--accent-soft); }
 
 .adb-datechoice { display: grid; gap: 8px; justify-items: start; }
-.adb-date { height: 40px; padding: 0 12px; border-radius: var(--radius-field); border: none; background: var(--field-bg); color: var(--text-primary); font-size: 13.5px; color-scheme: dark; }
+.adb-date { height: 40px; padding: 0 12px; border-radius: var(--radius-field); border: 1px solid var(--field-border); background: var(--field-bg); color: var(--text-primary); font-size: 13.5px; color-scheme: dark; }
 :root[data-theme="light"] .adb-date { color-scheme: light; }
 
 .adb-rail-card { background: var(--surface-1); border: 1px solid var(--hairline); border-radius: var(--radius-lg); padding: 16px; display: grid; gap: 12px; }
@@ -3546,6 +3551,7 @@ a.stat-row:hover .stat-label { color: var(--text-primary); }
 .inbox-search {
   display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 6px 0 11px;
   border-radius: 10px; background: var(--field-bg); color: var(--text-tertiary);
+  border: 1px solid var(--field-border);
   transition: box-shadow 0.15s var(--ease), background-color 0.15s var(--ease);
 }
 .inbox-search:focus-within { background: var(--field-bg-focus); box-shadow: 0 0 0 3px var(--accent-soft); }
@@ -3827,7 +3833,8 @@ a.stat-row:hover .stat-label { color: var(--text-primary); }
 .ad-form .nc-label, .ad-copy .nc-label { padding: 0 0 6px; }
 .ad-form .nc-input, .ad-copy .nc-input {
   min-height: 84px; padding: 12px 14px; font-size: 15px; border-radius: var(--radius-field);
-  background: var(--field-bg); transition: background-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
+  /* .nc-input is borderless with !important (it lives inside .nc-card); here it stands alone. */
+  background: var(--field-bg); border: 1px solid var(--field-border) !important; transition: background-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
 }
 .ad-form .nc-input:focus, .ad-copy .nc-input:focus { background: var(--field-bg-focus); box-shadow: 0 0 0 3px var(--accent-soft); }
 .ad-video-row { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; }
@@ -4101,7 +4108,7 @@ a.stat-row:hover .stat-label { color: var(--text-primary); }
 .bi-field-help { margin-top: 2px; font-size: 13px; color: var(--text-secondary); }
 .bi-keep { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--hairline-strong); background: transparent; color: var(--text-secondary); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
 .bi-keep.is-on { background: var(--text-primary); border-color: var(--text-primary); color: var(--bg); }
-.bi-field-text { display: block; width: 100%; margin-top: 12px; padding: 12px 14px; border-radius: 12px; border: 1px solid transparent; background: var(--field-bg, var(--surface-2)); color: var(--text-primary); font: inherit; font-size: 14px; line-height: 1.6; resize: vertical; outline: none; white-space: pre-wrap; }
+.bi-field-text { display: block; width: 100%; margin-top: 12px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--field-border); background: var(--field-bg, var(--surface-2)); color: var(--text-primary); font: inherit; font-size: 14px; line-height: 1.6; resize: vertical; outline: none; white-space: pre-wrap; }
 .bi-field-text:focus { border-color: var(--hairline-strong); }
 .bi-savebar { position: sticky; bottom: 12px; padding: 12px; margin-top: 20px; border-radius: 16px; background: color-mix(in srgb, var(--surface-1) 92%, transparent); border: 1px solid var(--hairline); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: var(--shadow-2, none); }
 @media (prefers-reduced-motion: reduce) { .bi-chip, .bi-progress span { transition: none; } .bi-chip:hover { transform: none; } }

@@ -20,7 +20,7 @@ export const Input = React.forwardRef<
     style={{
       width: "100%",
       background: "var(--field-bg)",
-      border: "1px solid transparent",
+      border: "1px solid var(--field-border)",
       borderRadius: "var(--radius-field)",
       padding: "13px 16px",
       color: "var(--text-primary)",
@@ -97,7 +97,7 @@ export const Textarea = React.forwardRef<
     style={{
       width: "100%",
       background: "var(--field-bg)",
-      border: "1px solid transparent",
+      border: "1px solid var(--field-border)",
       borderRadius: "var(--radius-field)",
       padding: "13px 16px",
       color: "var(--text-primary)",

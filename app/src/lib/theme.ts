@@ -170,6 +170,10 @@ export function resolveThemeVars(cfg: ThemeConfig): Array<[string, string]> {
     // value leaves dark charcoal inputs sitting on a light page.
     ["--field-bg", toHex(step(bg, dark ? 0.09 : 0.05))],
     ["--field-bg-focus", toHex(step(bg, dark ? 0.13 : 0.09))],
+    // A visible resting edge on every field: the fill alone barely separates
+    // from a card, most of all in light mode, so a box did not read as
+    // somewhere to type (2026-11-11).
+    ["--field-border", rgba(fg, dark ? 0.14 : 0.22)],
     ["--text-primary", rgba(fg, dark ? 0.96 : 0.92)],
     ["--text-secondary", rgba(fg, 0.64)],
     ["--text-tertiary", rgba(fg, 0.42)],
