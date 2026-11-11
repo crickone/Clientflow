@@ -17,7 +17,7 @@ const requireLocal = createRequire(import.meta.url);
 
 (async () => {
   const { controlSqlite } = requireLocal("../db/control") as typeof import("../db/control");
-  const { syncPlatformAlerts, snapshotFleetHealth, listHealthHistory, buildFleetCandidates } = requireLocal("./healthHistory") as typeof import("./healthHistory");
+  const { syncPlatformAlerts, snapshotFleetHealth, listHealthHistory, planFleetSync } = requireLocal("./healthHistory") as typeof import("./healthHistory");
 
   const slug = "health-history-test";
   controlSqlite.prepare("DELETE FROM tenants WHERE slug = ?").run(slug);
@@ -90,17 +90,23 @@ const requireLocal = createRequire(import.meta.url);
     assert.deepEqual(listHealthHistory(tid, 0).map((x) => x.at), [10_000, 20_000, 30_000]);
     assert.deepEqual(listHealthHistory(tid, 20_000).map((x) => x.at), [20_000, 30_000]);
 
-    // 8. an unreadable business raises health:unreadable, and the sync leaves its alerts open.
-    const unreadable = {
-      tenants: [{ tenantId: tid, name: "x", slug, dbBytes: 0, walBytes: 0, queueDue: 0, queueFailed: 0, stuck: 0, readable: false,
-        alerts: [{ key: "unreadable", level: "bad" as const, message: "boom" }] }],
+    // 8. a failed health read never resolves that business's other open alerts.
+    cleanup2();
+    type Fleet = Parameters<typeof planFleetSync>[0];
+    const mk = (readable: boolean, alerts: Array<{ key: string; level: "bad" | "warn"; message: string }>): Fleet => ({
+      tenants: [{ tenantId: tid, name: "x", slug, dbBytes: 0, walBytes: 0, queueDue: 0, queueFailed: 0, stuck: 0, readable, alerts }],
       schedulers: [], duplicateSiteSlugs: [],
-    };
-    const cands = buildFleetCandidates(unreadable);
-    assert.deepEqual(cands.map((c) => c.key), ["health:unreadable"]);
-    syncPlatformAlerts(cands, 40_000, { tenantIds: [tid] });
-    const rows = open();
-    assert.ok(rows.find((a) => a.key === "health:unreadable" && a.resolved_at === null));
+    } as unknown as Fleet);
+    const sync = (f: Fleet, at: number) => { const p = planFleetSync(f); return syncPlatformAlerts(p.candidates, at, { tenantIds: p.tenantIds }); };
+    const isOpen = (key: string) => open().some((a) => a.key === key && a.resolved_at === null);
+    sync(mk(true, [{ key: "wal", level: "warn", message: "wal big" }]), 40_000);
+    assert.ok(isOpen("health:wal"), "wal opened");
+    sync(mk(false, [{ key: "unreadable", level: "bad", message: "boom" }]), 50_000);
+    assert.ok(isOpen("health:wal"), "wal stays open through a failed read");
+    assert.ok(isOpen("health:unreadable"), "unreadable open");
+    sync(mk(true, []), 60_000);
+    assert.ok(!isOpen("health:wal"), "wal resolved once readable and clear");
+    assert.ok(!isOpen("health:unreadable"), "unreadable resolved on recovery");
 
     console.log("healthHistory.test.ts: ok");
   } finally {

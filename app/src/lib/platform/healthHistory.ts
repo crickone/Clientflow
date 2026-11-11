@@ -120,6 +120,19 @@ export function buildFleetCandidates(fleet: ReturnType<typeof getFleetHealth>): 
   return candidates;
 }
 
+/**
+ * What one fleet sweep feeds the alert sync. The resolve scope is READABLE
+ * businesses only: a failed read yields just health:unreadable, and must never
+ * resolve that business's other open alerts. Once it reads again it is in
+ * scope, health:unreadable is no longer a candidate, and it resolves itself.
+ */
+export function planFleetSync(fleet: ReturnType<typeof getFleetHealth>): { candidates: AlertCandidate[]; tenantIds: number[] } {
+  return {
+    candidates: buildFleetCandidates(fleet),
+    tenantIds: fleet.tenants.filter((t) => t.readable).map((t) => t.tenantId),
+  };
+}
+
 /** One snapshot per readable business (one health sweep), then the alert list reconciled. */
 export function snapshotFleetHealth(now: number = Date.now()): { tenants: number; opened: number; resolved: number } {
   const fleet = getFleetHealth();
@@ -135,10 +148,8 @@ export function snapshotFleetHealth(now: number = Date.now()): { tenants: number
       row.alerts.filter((a) => a.level === "warn").length,
     );
   }
-  const r = syncPlatformAlerts(buildFleetCandidates(fleet), now, {
-    tenantIds: fleet.tenants.map((t) => t.tenantId),
-    platform: true,
-  });
+  const plan = planFleetSync(fleet);
+  const r = syncPlatformAlerts(plan.candidates, now, { tenantIds: plan.tenantIds, platform: true });
   return { tenants: fleet.tenants.length, opened: r.opened, resolved: r.resolved };
 }
 
