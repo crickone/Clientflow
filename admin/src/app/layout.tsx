@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import "./globals.css";
 import { body, heading, mono, nebula } from "./fonts";
+import { Toaster } from "@/components/ui/Toaster";
 
 export const metadata = { title: "AdonisAgent Platform" };
 
@@ -10,7 +11,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       lang="en"
       className={`${body.variable} ${heading.variable} ${mono.variable} ${nebula.variable}`}
     >
-      <body>{children}</body>
+      <body>
+        {children}
+        <Toaster />
+      </body>
     </html>
   );
 }

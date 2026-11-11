@@ -946,3 +946,63 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { opacity: 0.45; c
   .card, .glass { padding: 18px !important; }
   .biz-mark { width: 48px; height: 48px; font-size: 21px; border-radius: 13px; }
 }
+
+/* ── Toasts (components/ui/Toaster.tsx) ─────────────────────────────────── */
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  padding: 13px 14px 13px 16px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 18px 40px -18px rgba(0, 0, 0, 0.8);
+  color: var(--text-primary);
+  font-family: var(--font-body), system-ui, sans-serif;
+  font-size: 13.5px;
+  line-height: 1.4;
+  position: relative;
+}
+.toast::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--text-tertiary);
+}
+.toast--ok::before { background: var(--green); }
+.toast--fail::before { background: var(--red); }
+.toast [data-icon] { display: none; }
+.toast-title { font-weight: 500; }
+.toast-desc { margin-top: 3px; color: var(--text-secondary); font-size: 12.5px; }
+.toast-action {
+  margin-left: auto;
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--hairline-strong);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.toast-action:hover { background: var(--surface-3); }
+.toast-close {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--hairline);
+  background: var(--surface-3);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
