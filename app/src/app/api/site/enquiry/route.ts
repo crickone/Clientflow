@@ -168,6 +168,8 @@ export async function POST(req: Request) {
         ctx: adContextFromRequest(req),
         contentName: "Website enquiry",
       });
+    } else {
+      console.log(`[capi] tenant ${claim.tenantId} lead ${lead.id}: no Lead event, a repeat enquiry from a contact already on the board`);
     }
     return { leadId: lead.id, created, reopened };
   });

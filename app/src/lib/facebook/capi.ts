@@ -96,9 +96,24 @@ export function pixelFor(tenantId: number, siteId?: number | null): PixelTarget 
   }
 }
 
+/**
+ * Send what is queued in a few seconds rather than on the next minute's
+ * ticker pass: a lead's event reaches Meta while the visitor is still on the
+ * thank-you message. Fire and forget; the ticker remains the backstop.
+ */
+let soon: ReturnType<typeof setTimeout> | null = null;
+function sendSoon(): void {
+  if (soon) return;
+  soon = setTimeout(() => {
+    soon = null;
+    processDueCapiEvents().catch((err) => console.error("[capi] immediate send failed; the ticker retries:", err));
+  }, 2000);
+  soon.unref?.();
+}
+
 function enqueue(tenantId: number, target: PixelTarget, key: string, event: CapiEvent): boolean {
   const now = Date.now();
-  return (
+  const added = (
     controlSqlite
       .prepare(
         `INSERT INTO capi_events (tenant_id, site_id, pixel_id, event_key, event_name, payload, next_attempt_at, created_at)
@@ -106,6 +121,11 @@ function enqueue(tenantId: number, target: PixelTarget, key: string, event: Capi
       )
       .run(tenantId, target.siteId, target.pixelId, key, event.event_name, JSON.stringify(event), now, now).changes > 0
   );
+  if (added) {
+    console.log(`[capi] tenant ${tenantId} Pixel ${target.pixelId}: ${event.event_name} queued`);
+    sendSoon();
+  }
+  return added;
 }
 
 /** Never throws: a conversion that cannot be queued must not break the form that caused it. */
@@ -120,9 +140,10 @@ function safely(label: string, fn: () => void): void {
 /** A new lead from the website or a campaign page. */
 export function queueWebsiteLead(opts: { tenantId: number; siteId?: number | null; leadId: number; person: Person; ctx: AdContext; contentName: string }): void {
   safely(`lead ${opts.leadId}`, () => {
-    if (!opts.ctx.consent) return;
+    // Every skip says why, so "nothing reached Meta" is answerable from the logs.
+    if (!opts.ctx.consent) return void console.log(`[capi] tenant ${opts.tenantId} lead ${opts.leadId}: not sent, the visitor had not accepted advertising cookies`);
     const target = pixelFor(opts.tenantId, opts.siteId);
-    if (!target) return;
+    if (!target) return void console.log(`[capi] tenant ${opts.tenantId} lead ${opts.leadId}: not sent, no Meta Pixel on the website`);
     const eventId = `lead-${opts.tenantId}-${opts.leadId}`;
     enqueue(
       opts.tenantId,
@@ -148,7 +169,7 @@ export function queuePurchase(opts: { tenantId: number; orderId: number; valueCe
   safely(`purchase ${opts.orderId}`, () => {
     const key = `order-${opts.tenantId}-${opts.orderId}`;
     const row = controlSqlite.prepare("SELECT data FROM capi_context WHERE key = ?").get(key) as { data: string } | undefined;
-    if (!row) return; // no consent recorded at checkout: nothing goes to Meta
+    if (!row) return void console.log(`[capi] tenant ${opts.tenantId} order ${opts.orderId}: Purchase not sent, the buyer had not accepted advertising cookies`);
     controlSqlite.prepare("DELETE FROM capi_context WHERE key = ?").run(key);
     const ctx = JSON.parse(row.data) as AdContext;
     const target = pixelFor(opts.tenantId);
