@@ -4,6 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { setKillSwitchAction, type FleetActionResult } from "@/app/(console)/gyms/actions";
+import { notify } from "@/lib/toast";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Card } from "@/components/ui/Card";
 import type { KillSwitchState } from "@/lib/types";
 
@@ -16,26 +18,36 @@ import type { KillSwitchState } from "@/lib/types";
  */
 export function KillSwitches({ switches, isOwner }: { switches: KillSwitchState[]; isOwner: boolean }) {
   const router = useRouter();
+  const ask = useConfirm();
   const [pending, start] = useTransition();
   const [result, setResult] = useState<FleetActionResult | null>(null);
 
-  function toggle(s: KillSwitchState) {
+  async function toggle(s: KillSwitchState) {
     let reason = "";
     if (!s.stopped) {
-      reason = window.prompt(`Stop ${s.label} for EVERY business. Why?`, "")?.trim() ?? "";
-      if (!reason) return;
-      if (reason.length < 3) {
-        setResult({ ok: false, error: "Give a slightly longer reason." });
-        return;
-      }
-    } else if (!window.confirm(`Start ${s.label} again for every business?`)) {
-      return;
+      const r = await ask({
+        title: `Stop ${s.label} for every business`,
+        body: "Work waits while it is off and resumes when you start it again.",
+        confirmLabel: "Stop",
+        danger: true,
+        prompt: { label: "Why?", placeholder: "Provider outage…", minLength: 3 },
+      });
+      if (!r.ok) return;
+      reason = r.value;
+    } else {
+      const r = await ask({ title: `Start ${s.label} again for every business?`, confirmLabel: "Start" });
+      if (!r.ok) return;
     }
     setResult(null);
     start(async () => {
       const r = await setKillSwitchAction(s.key, !s.stopped, reason);
-      setResult(r);
-      if (r.ok) router.refresh();
+      if (r.ok) {
+        notify.ok(r.note);
+        router.refresh();
+      } else {
+        setResult(r);
+        notify.fail(r.error);
+      }
     });
   }
 

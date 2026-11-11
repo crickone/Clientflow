@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { fmtCents } from "@/lib/format";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 /**
  * The console's one free-numeric-input tenant action — every other action on
@@ -10,11 +11,9 @@ import { fmtCents } from "@/lib/format";
  * (see gyms/[id]/page.tsx). ConfirmButton doesn't fit here: it expects a
  * zero-arg action, but the grant amount comes from live user input, not a
  * bound param. A grant has no "un-grant" from here, so this guards the
- * native form submission with a plain confirm() that echoes back the parsed
+ * native form submission with a dialog that echoes back the parsed
  * €-amount — cheap insurance against a double-click or a fat-fingered digit
- * (e.g. 500 instead of 50). Calling `event.preventDefault()` in `onSubmit`
- * cancels the pending server-action submission, same as it would for a plain
- * form post.
+ * (e.g. 500 instead of 50).
  */
 export function GrantCreditsForm({
   action,
@@ -26,17 +25,30 @@ export function GrantCreditsForm({
   noun?: string;
 }) {
   const [euros, setEuros] = useState("");
+  const ask = useConfirm();
+  // Set once the dialog has said yes, so the resubmit below goes straight through.
+  const confirmed = useRef(false);
 
   return (
     <form
       action={action}
-      onSubmit={(e) => {
-        const amount = parseFloat(euros);
-        const label =
-          Number.isFinite(amount) && amount > 0 ? fmtCents(Math.round(amount * 100)) : "this amount";
-        if (!window.confirm(`Grant ${label} in ${noun} to this business? This can't be undone from here.`)) {
-          e.preventDefault();
+      onSubmit={async (e) => {
+        if (confirmed.current) {
+          confirmed.current = false;
+          return;
         }
+        e.preventDefault();
+        const form = e.currentTarget;
+        const amount = parseFloat(euros);
+        const label = Number.isFinite(amount) && amount > 0 ? fmtCents(Math.round(amount * 100)) : "this amount";
+        const r = await ask({
+          title: `Grant ${label} in ${noun}`,
+          body: "This cannot be undone from here.",
+          confirmLabel: "Grant",
+        });
+        if (!r.ok) return;
+        confirmed.current = true;
+        form.requestSubmit();
       }}
       style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}
     >

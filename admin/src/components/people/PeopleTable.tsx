@@ -4,6 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { peopleAction, inviteAction, type PeopleActionResult, type PeopleOp } from "@/app/(console)/gyms/[id]/people/actions";
+import { notify } from "@/lib/toast";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Card } from "@/components/ui/Card";
 import type { TenantPeople } from "@/lib/types";
 
@@ -21,19 +23,35 @@ import type { TenantPeople } from "@/lib/types";
  */
 export function PeopleTable({ tenantId, data }: { tenantId: number; data: TenantPeople }) {
   const router = useRouter();
+  const ask = useConfirm();
   const [pending, start] = useTransition();
   const [result, setResult] = useState<PeopleActionResult | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
-  function run(key: string, body: PeopleOp, confirmText?: string) {
-    if (confirmText && !window.confirm(confirmText)) return;
+  async function run(key: string, body: PeopleOp, confirmText?: string, undo?: { label: string; op: PeopleOp }) {
+    if (confirmText) {
+      const r = await ask({ title: confirmText, confirmLabel: "Yes", danger: body.op === "set-access" && !body.active });
+      if (!r.ok) return;
+    }
     setBusyKey(key);
     setResult(null);
     start(async () => {
       const r = await peopleAction(tenantId, body);
-      setResult(r);
       setBusyKey(null);
-      if (r.ok) router.refresh();
+      if (!r.ok) {
+        setResult(r);
+        notify.fail(r.error);
+        return;
+      }
+      // A reset link must stay on the page as selectable text; everything else is a toast.
+      if (r.link) setResult(r);
+      else if (undo) {
+        notify.undo(r.note ?? "Done", {
+          label: undo.label,
+          onUndo: () => void run(`${key}-undo`, undo.op),
+        });
+      } else notify.ok(r.note ?? "Done");
+      router.refresh();
     });
   }
 
@@ -42,9 +60,15 @@ export function PeopleTable({ tenantId, data }: { tenantId: number; data: Tenant
     setResult(null);
     start(async () => {
       const r = await inviteAction(tenantId, formData);
-      setResult(r);
       setBusyKey(null);
-      if (r.ok) router.refresh();
+      if (!r.ok) {
+        setResult(r);
+        notify.fail(r.error);
+        return;
+      }
+      if (r.link) setResult(r);
+      else notify.ok(r.note ?? "Invite sent");
+      router.refresh();
     });
   }
 
@@ -174,6 +198,7 @@ export function PeopleTable({ tenantId, data }: { tenantId: number; data: Tenant
                               `access-${p.userId}`,
                               { op: "set-access", userId: p.userId, active: revoked },
                               revoked ? undefined : `Revoke ${p.email}'s access to this business?`,
+                              revoked ? undefined : { label: "Restore access", op: { op: "set-access", userId: p.userId, active: true } },
                             )
                           }
                           style={revoked ? undefined : { color: "var(--red)", borderColor: "rgba(240, 128, 154, 0.3)" }}

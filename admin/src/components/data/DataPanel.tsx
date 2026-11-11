@@ -4,6 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { dataAction, type DataActionResult, type DataOp } from "@/app/(console)/gyms/[id]/data/actions";
+import { notify } from "@/lib/toast";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Card } from "@/components/ui/Card";
 import { bytes } from "@/lib/format";
 import type { PersonHit, TenantData } from "@/lib/types";
@@ -29,6 +31,7 @@ export function DataPanel({
   isOwner: boolean;
 }) {
   const router = useRouter();
+  const ask = useConfirm();
   const [pending, start] = useTransition();
   const [result, setResult] = useState<DataActionResult | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -38,9 +41,16 @@ export function DataPanel({
     setResult(null);
     start(async () => {
       const r = await dataAction(tenantId, body);
-      setResult(r);
       setBusyKey(null);
-      if (r.ok && !r.data) router.refresh();
+      if (!r.ok) {
+        setResult(r);
+        notify.fail(r.error);
+        return;
+      }
+      if (!r.data) {
+        notify.ok(r.note ?? "Done");
+        router.refresh();
+      } else setResult(r);
     });
   }
 
@@ -67,18 +77,17 @@ export function DataPanel({
     });
   }
 
-  function deletePerson(p: PersonHit) {
-    const reason = window.prompt(
-      `Delete ${p.name} and everything attached to them? This cannot be undone.\n\nExport them first if they asked for their data.\n\nWhy is this being deleted?`,
-      "",
-    )?.trim();
-    if (!reason) return;
-    if (reason.length < 3) {
-      setResult({ ok: false, error: "Give a slightly longer reason." });
-      return;
-    }
-    if (!window.confirm(`Last check: permanently delete ${p.name} (${p.email ?? p.phone ?? "no contact"})?`)) return;
-    run(`delete-${p.kind}-${p.id}`, { op: "delete-person", kind: p.kind, personId: p.id, reason });
+  async function deletePerson(p: PersonHit) {
+    const r = await ask({
+      title: `Permanently delete ${p.name}`,
+      body: `${p.email ?? p.phone ?? "No contact details"}. Every record of them in this business goes. This is the one action here that cannot be restored.`,
+      confirmLabel: "Delete",
+      danger: true,
+      prompt: { label: "Why? (kept on the audit trail)", minLength: 3 },
+      typeToConfirm: "delete",
+    });
+    if (!r.ok) return;
+    run(`delete-${p.kind}-${p.id}`, { op: "delete-person", kind: p.kind, personId: p.id, reason: r.value });
   }
 
   const life = data.lifecycle;

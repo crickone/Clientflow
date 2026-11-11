@@ -8,6 +8,8 @@ import {
   type IntegrationActionResult,
   type IntegrationOp,
 } from "@/app/(console)/gyms/[id]/integrations/actions";
+import { notify } from "@/lib/toast";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Card } from "@/components/ui/Card";
 import type { ConnectionRow, TenantIntegrations } from "@/lib/types";
 
@@ -31,19 +33,28 @@ function day(ms: number | null): string {
 
 export function IntegrationsBoard({ tenantId, data }: { tenantId: number; data: TenantIntegrations }) {
   const router = useRouter();
+  const ask = useConfirm();
   const [pending, start] = useTransition();
   const [result, setResult] = useState<IntegrationActionResult | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
-  function run(key: string, body: IntegrationOp, confirmText?: string) {
-    if (confirmText && !window.confirm(confirmText)) return;
+  async function run(key: string, body: IntegrationOp, confirmText?: string) {
+    if (confirmText) {
+      const r = await ask({ title: confirmText, confirmLabel: "Yes", danger: true });
+      if (!r.ok) return;
+    }
     setBusyKey(key);
     setResult(null);
     start(async () => {
       const r = await integrationAction(tenantId, body);
-      setResult(r);
       setBusyKey(null);
-      if (r.ok) router.refresh();
+      if (r.ok) {
+        notify.ok(r.note ?? "Done");
+        router.refresh();
+      } else {
+        setResult(r);
+        notify.fail(r.error);
+      }
     });
   }
 

@@ -2,6 +2,9 @@
 
 import { useState, useTransition } from "react";
 
+import { notify } from "@/lib/toast";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+
 type OpenResult = { ok: true; url: string } | { ok: false; error: string };
 
 /**
@@ -11,8 +14,6 @@ type OpenResult = { ok: true; url: string } | { ok: false; error: string };
  * shown in a banner inside the tenant app for the life of the session -- so
  * the client can see why someone was in their account.
  */
-const REASON_PROMPT =
-  "Why are you opening this business? This is recorded, and shown to them in a banner while you are in there.";
 
 /**
  * "Open business": calls a server action that mints a one-time login URL
@@ -35,22 +36,25 @@ export function OpenBusinessButton({
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const ask = useConfirm();
 
-  function onClick() {
+  async function onClick() {
     setError(null);
-    const reason = window.prompt(REASON_PROMPT, "")?.trim() ?? "";
-    if (!reason) return; // cancelled, or nothing typed: do not open
-    if (reason.length < 3) {
-      setError("Give a slightly longer reason.");
-      return;
-    }
+    const r = await ask({
+      title: "Open this business",
+      body: "This is recorded, and shown to them in a banner while you are in there.",
+      confirmLabel: "Open in a new tab",
+      prompt: { label: "Why are you opening it?", placeholder: "Support call about…", minLength: 3 },
+    });
+    if (!r.ok) return;
     startTransition(async () => {
-      const r = await action(reason);
-      if (!r.ok) {
-        setError(r.error);
+      const res = await action(r.value);
+      if (!res.ok) {
+        setError(res.error);
+        notify.fail(res.error);
         return;
       }
-      window.open(r.url, "_blank", "noopener,noreferrer");
+      window.open(res.url, "_blank", "noopener,noreferrer");
     });
   }
 

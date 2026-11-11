@@ -4,6 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { moneyAction, type MoneyActionResult, type MoneyOp } from "@/app/(console)/gyms/[id]/money/adjustments-actions";
+import { notify } from "@/lib/toast";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Card } from "@/components/ui/Card";
 import { fmtCents } from "@/lib/format";
 import type { TenantMoney } from "@/lib/types";
@@ -25,6 +27,7 @@ export function MoneyAdjustments({
   isOwner: boolean;
 }) {
   const router = useRouter();
+  const ask = useConfirm();
   const [pending, start] = useTransition();
   const [result, setResult] = useState<MoneyActionResult | null>(null);
   const [price, setPrice] = useState(
@@ -37,8 +40,13 @@ export function MoneyAdjustments({
     setResult(null);
     start(async () => {
       const r = await moneyAction(tenantId, body);
-      setResult(r);
-      if (r.ok) router.refresh();
+      if (r.ok) {
+        notify.ok(r.note ?? "Saved");
+        router.refresh();
+      } else {
+        setResult(r);
+        notify.fail(r.error);
+      }
     });
   }
 
@@ -56,7 +64,7 @@ export function MoneyAdjustments({
     run({ op: "set-price", cents: Math.round(euros * 100) });
   }
 
-  function addCredit() {
+  async function addCredit() {
     const euros = Number(amount.trim());
     if (!Number.isFinite(euros) || euros <= 0) {
       setResult({ ok: false, error: "Give an amount in euro." });
@@ -66,8 +74,14 @@ export function MoneyAdjustments({
       setResult({ ok: false, error: "Say what the credit is for — it appears on their invoice." });
       return;
     }
-    const reason = window.prompt("Why is this credit being given? (kept on the audit trail)", "")?.trim() ?? "";
-    run({ op: "add-credit", cents: Math.round(euros * 100), description: description.trim(), reason });
+    const r = await ask({
+      title: `Add a credit of ${fmtCents(Math.round(euros * 100))}`,
+      body: description.trim(),
+      confirmLabel: "Add credit",
+      prompt: { label: "Why is this credit being given? (kept on the audit trail)", minLength: 3 },
+    });
+    if (!r.ok) return;
+    run({ op: "add-credit", cents: Math.round(euros * 100), description: description.trim(), reason: r.value });
     setAmount("");
     setDescription("");
   }

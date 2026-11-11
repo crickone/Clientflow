@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { healthAction, type HealthActionResult, type HealthOp } from "@/app/(console)/gyms/[id]/health/actions";
+import { notify } from "@/lib/toast";
 import { Card } from "@/components/ui/Card";
 import { bytes } from "@/lib/format";
 import type { TenantHealth } from "@/lib/types";
@@ -28,9 +29,14 @@ export function HealthPanel({ tenantId, data }: { tenantId: number; data: Tenant
     setResult(null);
     start(async () => {
       const r = await healthAction(tenantId, body);
-      setResult(r);
       setBusyKey(null);
-      if (r.ok) router.refresh();
+      if (r.ok) {
+        notify.ok(r.note);
+        router.refresh();
+      } else {
+        setResult(r);
+        notify.fail(r.error);
+      }
     });
   }
 
