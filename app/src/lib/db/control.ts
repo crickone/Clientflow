@@ -1213,6 +1213,56 @@ export function ensureControlTables() {
       updated_at INTEGER NOT NULL,
       PRIMARY KEY (tenant_id, ad_account_id, kind)
     );
+    -- Console history (Tier 1 of the console upgrade). One health snapshot
+    -- per active business per hour, one row per background job run, and the
+    -- platform's own alert list, so the console can say "worse than last
+    -- week" and "what needs me today" from stored facts.
+    CREATE TABLE IF NOT EXISTS health_snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      at INTEGER NOT NULL,
+      db_bytes INTEGER NOT NULL DEFAULT 0,
+      wal_bytes INTEGER NOT NULL DEFAULT 0,
+      queue_due INTEGER NOT NULL DEFAULT 0,
+      queue_failed INTEGER NOT NULL DEFAULT 0,
+      stuck INTEGER NOT NULL DEFAULT 0,
+      alerts_bad INTEGER NOT NULL DEFAULT 0,
+      alerts_warn INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_health_snapshots_tenant_at ON health_snapshots(tenant_id, at);
+
+    CREATE TABLE IF NOT EXISTS job_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      key TEXT NOT NULL,
+      label TEXT NOT NULL,
+      started_at INTEGER NOT NULL,
+      finished_at INTEGER,
+      ok INTEGER,
+      error TEXT,
+      duration_ms INTEGER,
+      detail TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_job_runs_key_started ON job_runs(key, started_at);
+
+    CREATE TABLE IF NOT EXISTS platform_alerts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+      key TEXT NOT NULL,
+      level TEXT NOT NULL CHECK (level IN ('warn','bad')),
+      title TEXT NOT NULL,
+      detail TEXT,
+      href TEXT,
+      opened_at INTEGER NOT NULL,
+      last_seen_at INTEGER NOT NULL,
+      resolved_at INTEGER,
+      acknowledged_at INTEGER,
+      acknowledged_by INTEGER REFERENCES users(id),
+      snoozed_until INTEGER,
+      assigned_to INTEGER REFERENCES users(id),
+      notified_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_alerts_open ON platform_alerts(resolved_at, level, opened_at);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_platform_alerts_open_key ON platform_alerts(COALESCE(tenant_id, 0), key) WHERE resolved_at IS NULL;
     CREATE TABLE IF NOT EXISTS facebook_page_offers (
       tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
       page_id TEXT NOT NULL,
