@@ -77,7 +77,7 @@ export function MoneyAdjustments({
   return (
     <Card style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
       <div>
-        <h2 style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+        <h2 className="card-title" style={{ margin: "0 0 4px" }}>
           Price and credits
         </h2>
         <p style={{ margin: 0, fontSize: 13, color: "var(--text-secondary)" }}>
@@ -197,11 +197,11 @@ export function MoneyAdjustments({
                 <td style={{ fontVariantNumeric: "tabular-nums" }}>{fmtCents(c.netCents)}</td>
                 <td>
                   {c.appliedAt ? (
-                    <span className="chip" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>
+                    <span className="chip" style={{ backgroundColor: "var(--surface-2)", color: "var(--muted)" }}>
                       used on invoice #{c.appliedInvoiceId}
                     </span>
                   ) : (
-                    <span className="chip" style={{ background: "rgba(63,185,80,.15)", color: "var(--green)" }}>owed</span>
+                    <span className="chip" style={{ backgroundColor: "rgba(63,185,80,.15)", color: "var(--green)" }}>owed</span>
                   )}
                 </td>
                 <td>

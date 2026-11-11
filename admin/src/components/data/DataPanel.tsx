@@ -113,7 +113,7 @@ export function DataPanel({
       )}
 
       <Card style={{ padding: 24 }}>
-        <h2 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+        <h2 className="card-title" style={{ margin: "0 0 16px" }}>
           What they hold
         </h2>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 18 }}>
@@ -137,7 +137,7 @@ export function DataPanel({
       </Card>
 
       <Card style={{ padding: 24 }}>
-        <h2 style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+        <h2 className="card-title" style={{ margin: "0 0 4px" }}>
           Find a person
         </h2>
         <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--text-secondary)" }}>
@@ -173,7 +173,7 @@ export function DataPanel({
                 <tr key={`${p.kind}-${p.id}`}>
                   <td>{p.name}</td>
                   <td>
-                    <span className="chip" style={{ background: "var(--surface-2)" }}>{p.kind}</span>
+                    <span className="chip" style={{ backgroundColor: "var(--surface-2)" }}>{p.kind}</span>
                   </td>
                   <td style={{ color: "var(--text-secondary)" }}>{p.email ?? p.phone ?? "—"}</td>
                   <td>
@@ -213,7 +213,7 @@ export function DataPanel({
 
       <Card style={{ padding: 24 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 4, flexWrap: "wrap" }}>
-          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+          <h2 className="card-title" style={{ margin: 0 }}>
             Backups
           </h2>
           <button

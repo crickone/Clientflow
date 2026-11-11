@@ -72,7 +72,7 @@ export default async function TenantTimelinePage(props: { params: Promise<{ id: 
 
   return (
     <Card style={{ padding: 24 }}>
-      <h2 style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+      <h2 className="card-title" style={{ margin: "0 0 4px" }}>
         Timeline
       </h2>
       <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--text-secondary)" }}>

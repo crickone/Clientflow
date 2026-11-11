@@ -29,7 +29,7 @@ const INVOICE_CHIP: Record<InvoiceRow["status"], { bg: string; fg: string }> = {
 function InvoiceChip({ status }: { status: InvoiceRow["status"] }) {
   const c = INVOICE_CHIP[status];
   return (
-    <span className="chip" style={{ background: c.bg, color: c.fg }}>
+    <span className="chip" style={{ backgroundColor: c.bg, color: c.fg }}>
       {status}
     </span>
   );
@@ -85,7 +85,7 @@ export default async function GymMoneyPage(
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       {/* Billing panel */}
       <Card style={{ padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
-        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>Billing</h2>
+        <h2 className="card-title" style={{ margin: 0 }}>Billing</h2>
         <div style={{ display: "flex", gap: 40, flexWrap: "wrap" }}>
           <div>
             <div className="mono-label" style={{ marginBottom: 6 }}>
@@ -168,7 +168,7 @@ export default async function GymMoneyPage(
 
       {/* Venue type */}
       <Card style={{ padding: 24, display: "flex", flexDirection: "column", gap: 14 }}>
-        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>Venue type</h2>
+        <h2 className="card-title" style={{ margin: 0 }}>Venue type</h2>
         <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
           <div>
             <div className="mono-label" style={{ marginBottom: 6 }}>
@@ -198,7 +198,7 @@ export default async function GymMoneyPage(
 
       {/* Email marketing */}
       <Card style={{ padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
-        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>Email marketing</h2>
+        <h2 className="card-title" style={{ margin: 0 }}>Email marketing</h2>
         <div style={{ display: "flex", gap: 40, flexWrap: "wrap" }}>
           <div>
             <div className="mono-label" style={{ marginBottom: 6 }}>
@@ -265,7 +265,7 @@ export default async function GymMoneyPage(
 
       {/* AI credits */}
       <Card style={{ padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
-        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>AI credits</h2>
+        <h2 className="card-title" style={{ margin: 0 }}>AI credits</h2>
         <div style={{ display: "flex", gap: 40, flexWrap: "wrap" }}>
           <div>
             <div className="mono-label" style={{ marginBottom: 6 }}>
@@ -368,7 +368,7 @@ export default async function GymMoneyPage(
       {/* Voice Agent add-on */}
       <Card style={{ padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+          <h2 className="card-title" style={{ margin: 0 }}>
             Voice Agent
           </h2>
           <span className={`chip ${voiceAddon?.status === "active" ? "active" : voiceAddon?.status === "trial" ? "past_due" : "suspended"}`}>
@@ -542,7 +542,7 @@ export default async function GymMoneyPage(
 
       {/* Invoices */}
       <Card style={{ padding: 24 }}>
-        <h2 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>Invoices</h2>
+        <h2 className="card-title" style={{ margin: "0 0 16px" }}>Invoices</h2>
         {invoices.length === 0 ? (
           <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: 13.5 }}>No invoices yet.</p>
         ) : (
@@ -606,7 +606,7 @@ export default async function GymMoneyPage(
 
       {/* Danger zone. Archiving is reversible for 30 days; purging is not. */}
       <Card style={{ padding: 24, borderColor: "var(--red)" }}>
-        <h2 style={{ margin: "0 0 6px", fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em", color: "var(--red)" }}>Danger zone</h2>
+        <h2 className="card-title" style={{ margin: "0 0 6px", color: "var(--red)" }}>Danger zone</h2>
         {archivedAt ? (
           <>
             <p style={{ margin: "0 0 14px", color: "var(--text-secondary)", fontSize: 13 }}>

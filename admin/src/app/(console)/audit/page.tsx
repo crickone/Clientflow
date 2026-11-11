@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
 import { Card } from "@/components/ui/Card";
 import type { AuditResponse } from "@/lib/types";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -31,14 +32,13 @@ export default async function AuditPage(
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div>
-        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>Audit log</h1>
-        <p style={{ margin: "6px 0 0", fontSize: 13.5, color: "var(--text-secondary)" }}>
-          Every action taken from this console, including the ones that were refused.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Operate"
+        title="Audit log"
+        sub="Every action taken from this console, including the ones that were refused."
+      />
 
-      <form method="GET" style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+      <form method="GET" className="toolbar">
         <input
           className="input"
           type="text"

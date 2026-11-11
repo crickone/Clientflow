@@ -68,7 +68,7 @@ export function IntegrationsBoard({ tenantId, data }: { tenantId: number; data: 
       )}
 
       <Card style={{ padding: 24 }}>
-        <h2 style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+        <h2 className="card-title" style={{ margin: "0 0 4px" }}>
           Connections
         </h2>
         <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--text-secondary)" }}>
@@ -92,7 +92,7 @@ export function IntegrationsBoard({ tenantId, data }: { tenantId: number; data: 
                 <tr key={c.key}>
                   <td>{c.label}</td>
                   <td>
-                    <span className="chip" style={{ background: style.bg, color: style.fg }}>{style.label}</span>
+                    <span className="chip" style={{ backgroundColor: style.bg, color: style.fg }}>{style.label}</span>
                   </td>
                   <td>
                     <div>{c.identity ?? <span style={{ color: "var(--text-tertiary)" }}>—</span>}</div>
@@ -139,7 +139,7 @@ export function IntegrationsBoard({ tenantId, data }: { tenantId: number; data: 
       </Card>
 
       <Card style={{ padding: 24 }}>
-        <h2 style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+        <h2 className="card-title" style={{ margin: "0 0 4px" }}>
           API keys
         </h2>
         <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--text-secondary)" }}>
@@ -195,7 +195,7 @@ export function IntegrationsBoard({ tenantId, data }: { tenantId: number; data: 
       </Card>
 
       <Card style={{ padding: 24 }}>
-        <h2 style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+        <h2 className="card-title" style={{ margin: "0 0 4px" }}>
           Website domains
         </h2>
         <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--text-secondary)" }}>

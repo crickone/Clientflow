@@ -63,7 +63,7 @@ export function HealthPanel({ tenantId, data }: { tenantId: number; data: Tenant
               : undefined,
         }}
       >
-        <h2 style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+        <h2 className="card-title" style={{ margin: "0 0 12px" }}>
           {data.alerts.length === 0 ? "Healthy" : `${data.alerts.length} thing${data.alerts.length === 1 ? "" : "s"} to look at`}
         </h2>
         {data.alerts.length === 0 ? (
@@ -82,7 +82,7 @@ export function HealthPanel({ tenantId, data }: { tenantId: number; data: Tenant
       </Card>
 
       <Card style={{ padding: 24 }}>
-        <h2 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+        <h2 className="card-title" style={{ margin: "0 0 16px" }}>
           Database
         </h2>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 20 }}>
@@ -118,7 +118,7 @@ export function HealthPanel({ tenantId, data }: { tenantId: number; data: Tenant
       </Card>
 
       <Card style={{ padding: 24 }}>
-        <h2 style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+        <h2 className="card-title" style={{ margin: "0 0 4px" }}>
           Queues
         </h2>
         <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--text-secondary)" }}>
@@ -181,7 +181,7 @@ export function HealthPanel({ tenantId, data }: { tenantId: number; data: Tenant
       </Card>
 
       <Card style={{ padding: 24 }}>
-        <h2 style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+        <h2 className="card-title" style={{ margin: "0 0 4px" }}>
           Background jobs
         </h2>
         <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--text-secondary)" }}>

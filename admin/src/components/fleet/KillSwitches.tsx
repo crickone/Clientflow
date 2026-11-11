@@ -44,11 +44,11 @@ export function KillSwitches({ switches, isOwner }: { switches: KillSwitchState[
   return (
     <Card style={{ padding: 20, borderColor: anyStopped ? "var(--red)" : undefined }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 4, flexWrap: "wrap" }}>
-        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+        <h2 className="card-title" style={{ margin: 0 }}>
           Platform switches
         </h2>
         {anyStopped && (
-          <span className="chip" style={{ background: "rgba(240,128,154,.15)", color: "var(--red)" }}>
+          <span className="chip" style={{ backgroundColor: "rgba(240,128,154,.15)", color: "var(--red)" }}>
             something is paused
           </span>
         )}
@@ -91,9 +91,9 @@ export function KillSwitches({ switches, isOwner }: { switches: KillSwitchState[
               <div style={{ fontSize: 14, fontWeight: 500 }}>
                 {s.label}{" "}
                 {s.stopped ? (
-                  <span className="chip" style={{ background: "rgba(240,128,154,.15)", color: "var(--red)" }}>stopped</span>
+                  <span className="chip" style={{ backgroundColor: "rgba(240,128,154,.15)", color: "var(--red)" }}>stopped</span>
                 ) : (
-                  <span className="chip" style={{ background: "rgba(63,185,80,.15)", color: "var(--green)" }}>running</span>
+                  <span className="chip" style={{ backgroundColor: "rgba(63,185,80,.15)", color: "var(--green)" }}>running</span>
                 )}
               </div>
               <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginTop: 2 }}>{s.blurb}</div>

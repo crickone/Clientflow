@@ -20,16 +20,34 @@ import { cn } from "@/lib/cn";
 import { Logo } from "@/components/Logo";
 import type { AdminUser } from "@/lib/session";
 
-const NAV = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { href: "/gyms", label: "Businesses", icon: Dumbbell },
-  { href: "/provision", label: "Provision", icon: Rocket },
-  // Every console action, including refused ones. Both roles can read it.
-  // Every business's alerts in one list; shallow, for skimming.
-  { href: "/health", label: "Health", icon: Activity },
-  { href: "/audit", label: "Audit log", icon: ScrollText },
-  { href: "/staff", label: "Platform staff", icon: Users },
-  { href: "/settings", label: "Settings", icon: SettingsIcon },
+// Grouped by what you came to do: look at the fleet, change something, or
+// manage the console itself. The mono group labels are the console's
+// metadata voice, the same as the dashboard's eyebrows.
+const NAV_GROUPS = [
+  {
+    label: "Fleet",
+    items: [
+      { href: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
+      { href: "/gyms", label: "Businesses", icon: Dumbbell },
+      // Every business's alerts in one list; shallow, for skimming.
+      { href: "/health", label: "Health", icon: Activity },
+    ],
+  },
+  {
+    label: "Operate",
+    items: [
+      { href: "/provision", label: "Provision", icon: Rocket },
+      // Every console action, including refused ones. Both roles can read it.
+      { href: "/audit", label: "Audit log", icon: ScrollText },
+    ],
+  },
+  {
+    label: "Console",
+    items: [
+      { href: "/staff", label: "Platform staff", icon: Users },
+      { href: "/settings", label: "Settings", icon: SettingsIcon },
+    ],
+  },
 ];
 
 /** Preserve exact behaviour: DELETE /api/session then hard-navigate to /login. */
@@ -55,41 +73,43 @@ export function Shell({ user, children }: { user: AdminUser; children: ReactNode
         </button>
 
         {/* Wordmark */}
-        <div style={{ padding: "22px 18px 20px", borderBottom: "1px solid var(--hairline)" }}>
+        <div style={{ padding: "26px 22px 18px" }}>
           <Logo size={18} />
         </div>
 
         {/* Nav */}
-        <nav style={{ padding: "10px 8px", flex: 1, overflowY: "auto" }}>
-          {NAV.map((item) => {
-            const active = item.exact
-              ? pathname === item.href
-              : pathname === item.href || pathname?.startsWith(`${item.href}/`);
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn("nav-link", active && "nav-link--active")}
-              >
-                {active && (
-                  <span
-                    aria-hidden
-                    style={{ position: "absolute", left: 0, top: 5, bottom: 5, width: 3, background: "var(--accent)", borderRadius: 2 }}
-                  />
-                )}
-                <Icon size={16} strokeWidth={1.75} />
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
+        <nav style={{ padding: "6px 10px", flex: 1, overflowY: "auto" }}>
+          {NAV_GROUPS.map((group) => (
+            <div key={group.label}>
+              <div className="nav-group-label">{group.label}</div>
+              {group.items.map((item) => {
+                const active = item.exact
+                  ? pathname === item.href
+                  : pathname === item.href || pathname?.startsWith(`${item.href}/`);
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn("nav-link", active && "nav-link--active")}
+                  >
+                    <Icon size={16} strokeWidth={1.75} />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         {/* User + sign-out */}
         <div
           style={{
-            padding: "14px 16px",
-            borderTop: "1px solid var(--hairline)",
+            margin: "0 10px 12px",
+            padding: "10px 10px 10px 12px",
+            borderRadius: 12,
+            border: "1px solid var(--grid)",
+            background: "var(--surface-1)",
             display: "flex",
             alignItems: "center",
             gap: 10,
@@ -99,9 +119,8 @@ export function Shell({ user, children }: { user: AdminUser; children: ReactNode
             style={{
               width: 32,
               height: 32,
-              borderRadius: "var(--radius)",
-              background: "var(--surface-2)",
-              border: "1px solid var(--grid)",
+              borderRadius: "50%",
+              background: "var(--surface-3)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",

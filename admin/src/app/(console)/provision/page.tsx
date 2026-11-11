@@ -8,6 +8,7 @@ import { useActionState } from "react";
 import { OpenBusinessButton } from "@/components/OpenBusinessButton";
 import { openTenant } from "../gyms/[id]/actions";
 import { provisionGym, type ProvisionState } from "./actions";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 const initialState: ProvisionState = { ok: false };
 
@@ -59,8 +60,8 @@ export default function ProvisionPage() {
 
   if (state.ok) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 560 }}>
-        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>Provision business</h1>
+      <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 640 }}>
+        <PageHeader eyebrow="Operate" title="Provision business" sub="Create a business, its database and its first admin logins." />
         <div className="glass" style={{ padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ fontSize: 16, fontWeight: 600, color: "var(--green)" }}>✓ {state.name} is live</div>
 
@@ -80,7 +81,7 @@ export default function ProvisionPage() {
                 <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, flexWrap: "wrap" }}>
                   <span style={{ color: "var(--text-primary)" }}>{a.email}</span>
                   {a.owner && (
-                    <span className="chip" style={{ background: "var(--surface-2)", color: "var(--text-tertiary)" }}>
+                    <span className="chip" style={{ backgroundColor: "var(--surface-2)", color: "var(--text-tertiary)" }}>
                       Owner
                     </span>
                   )}
@@ -140,8 +141,8 @@ export default function ProvisionPage() {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 560 }}>
-      <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>Provision business</h1>
+    <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 640 }}>
+      <PageHeader eyebrow="Operate" title="Provision business" sub="Create a business, its database and its first admin logins." />
       <form action={formAction} className="glass" style={{ padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
         <label style={label}>
           <span style={labelText}>Name</span>

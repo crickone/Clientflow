@@ -29,13 +29,7 @@ export function TenantTabs({ tenantId }: { tenantId: number }) {
   return (
     <nav
       aria-label="Business sections"
-      style={{
-        display: "flex",
-        gap: 4,
-        flexWrap: "wrap",
-        borderBottom: "1px solid var(--grid)",
-        paddingBottom: 0,
-      }}
+      className="tenant-tabs"
     >
       {TABS.map((tab) => {
         const href = tab.slug ? `${base}/${tab.slug}` : base;
@@ -46,15 +40,6 @@ export function TenantTabs({ tenantId }: { tenantId: number }) {
             href={href}
             aria-current={active ? "page" : undefined}
             className={cn("tenant-tab", active && "tenant-tab--active")}
-            style={{
-              padding: "9px 14px",
-              fontSize: 13.5,
-              fontWeight: active ? 600 : 500,
-              color: active ? "var(--text-primary)" : "var(--text-secondary)",
-              textDecoration: "none",
-              borderBottom: `2px solid ${active ? "var(--accent)" : "transparent"}`,
-              marginBottom: -1,
-            }}
           >
             {tab.label}
           </Link>

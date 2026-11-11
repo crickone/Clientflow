@@ -4,6 +4,7 @@ import { requireAdminSession } from "@/lib/session";
 import { Card } from "@/components/ui/Card";
 import { StaffRoleForm } from "@/components/StaffRoleForm";
 import type { StaffResponse } from "@/lib/types";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -21,14 +22,17 @@ export default async function StaffPage(props: { searchParams: Promise<{ error?:
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 760 }}>
-      <div>
-        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>Platform staff</h1>
-        <p style={{ margin: "6px 0 0", fontSize: 13.5, color: "var(--text-secondary)" }}>
-          An <strong>owner</strong> can do everything, including offboarding a business, waiving or comping
-          invoices, and changing these roles. A <strong>manager</strong> does everything else: support, credits,
-          caps, opening a business, and notes.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Console"
+        title="Platform staff"
+        sub={
+          <>
+            An <strong>owner</strong> can do everything, including offboarding a business, waiving or comping
+            invoices, and changing these roles. A <strong>manager</strong> does everything else: support, credits,
+            caps, opening a business, and notes.
+          </>
+        }
+      />
 
       {searchParams.error && (
         <p role="alert" style={{ margin: 0, color: "var(--red)", fontSize: 13.5 }}>{searchParams.error}</p>
@@ -63,15 +67,15 @@ export default async function StaffPage(props: { searchParams: Promise<{ error?:
                   {me.role === "owner" ? (
                     <StaffRoleForm userId={s.userId} role={s.role} isSelf={s.userId === me.userId} />
                   ) : (
-                    <span className="chip" style={{ background: "var(--surface-2)" }}>{s.role}</span>
+                    <span className="chip" style={{ backgroundColor: "var(--surface-2)" }}>{s.role}</span>
                   )}
                 </td>
                 <td>{s.lastLoginAt ? fmtDate(s.lastLoginAt) : "Never"}</td>
                 <td>
                   {s.isActive ? (
-                    <span className="chip" style={{ background: "rgba(63,185,80,.15)", color: "var(--green)" }}>active</span>
+                    <span className="chip" style={{ backgroundColor: "rgba(63,185,80,.15)", color: "var(--green)" }}>active</span>
                   ) : (
-                    <span className="chip" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>disabled</span>
+                    <span className="chip" style={{ backgroundColor: "var(--surface-2)", color: "var(--muted)" }}>disabled</span>
                   )}
                 </td>
               </tr>

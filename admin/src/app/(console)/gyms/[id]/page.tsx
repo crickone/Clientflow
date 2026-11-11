@@ -89,7 +89,7 @@ export default async function TenantOverviewPage(props: { params: Promise<{ id: 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       <Card style={{ padding: 24 }}>
-        <h2 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+        <h2 className="card-title" style={{ margin: "0 0 16px" }}>
           At a glance
         </h2>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 20 }}>
@@ -116,7 +116,7 @@ export default async function TenantOverviewPage(props: { params: Promise<{ id: 
       </Card>
 
       <Card style={{ padding: 24 }}>
-        <h2 style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+        <h2 className="card-title" style={{ margin: "0 0 4px" }}>
           Credits
         </h2>
         <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--text-secondary)" }}>
@@ -129,7 +129,7 @@ export default async function TenantOverviewPage(props: { params: Promise<{ id: 
               <div className="mono-label" style={{ marginBottom: 6, display: "flex", gap: 8, alignItems: "center" }}>
                 {c.label}
                 {c.suspended && (
-                  <span className="chip" style={{ background: "rgba(240,128,154,.15)", color: "var(--red)" }}>
+                  <span className="chip" style={{ backgroundColor: "rgba(240,128,154,.15)", color: "var(--red)" }}>
                     suspended
                   </span>
                 )}
@@ -142,7 +142,7 @@ export default async function TenantOverviewPage(props: { params: Promise<{ id: 
       </Card>
 
       <Card style={{ padding: 24 }}>
-        <h2 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+        <h2 className="card-title" style={{ margin: "0 0 16px" }}>
           Add-ons
         </h2>
         {liveAddons.length === 0 ? (
@@ -150,7 +150,7 @@ export default async function TenantOverviewPage(props: { params: Promise<{ id: 
         ) : (
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             {liveAddons.map((a) => (
-              <span key={a.key} className="chip" style={{ background: "var(--surface-2)" }}>
+              <span key={a.key} className="chip" style={{ backgroundColor: "var(--surface-2)" }}>
                 {a.name} · {a.status} · {fmtCents(a.priceCents)}
               </span>
             ))}
@@ -160,7 +160,7 @@ export default async function TenantOverviewPage(props: { params: Promise<{ id: 
 
       <Card style={{ padding: 24 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 16 }}>
-          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+          <h2 className="card-title" style={{ margin: 0 }}>
             Recent staff activity
           </h2>
           <Link href={`/gyms/${id}/timeline`} style={{ fontSize: 13, color: "var(--accent)", marginLeft: "auto" }}>

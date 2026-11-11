@@ -9,6 +9,7 @@ import { OpenBusinessButton } from "@/components/OpenBusinessButton";
 import { KillSwitches } from "@/components/fleet/KillSwitches";
 import type { FleetResponse } from "@/lib/types";
 import { openTenant } from "./[id]/actions";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -47,36 +48,38 @@ export default async function GymsPage(
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div>
-        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>Businesses</h1>
-        <p style={{ margin: "6px 0 0", fontSize: 13.5, color: "var(--text-secondary)" }}>
-          {filtered ? `${tenants.length} match` : `${tenants.length} in total`}
-          {filtered && tenants.length === 1 ? "es" : ""}.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Fleet"
+        title="Businesses"
+        sub={`${filtered ? `${tenants.length} match${tenants.length === 1 ? "es" : ""}` : `${tenants.length} in total`}.`}
+        actions={
+          <Link href="/provision" className="btn btn--primary btn--md">
+            Provision business
+          </Link>
+        }
+      />
 
       <KillSwitches switches={killSwitches} isOwner={me.role === "owner"} />
 
-      <form method="GET" style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+      <form method="GET" className="toolbar">
         <input
-          className="input"
+          className="input toolbar-search"
           type="search"
           name="q"
           placeholder="Name, slug or a staff email…"
           defaultValue={searchParams.q ?? ""}
-          style={{ maxWidth: 300 }}
         />
-        <select className="input" name="status" defaultValue={searchParams.status ?? ""} style={{ height: 38, padding: "0 10px" }}>
+        <select className="input" name="status" defaultValue={searchParams.status ?? ""}>
           {STATUS_FILTERS.map((f) => (
             <option key={f.value} value={f.value}>{f.label}</option>
           ))}
         </select>
-        <select className="input" name="venueType" defaultValue={searchParams.venueType ?? ""} style={{ height: 38, padding: "0 10px" }}>
+        <select className="input" name="venueType" defaultValue={searchParams.venueType ?? ""}>
           <option value="">Any venue</option>
           <option value="gym">Gym</option>
           <option value="clinic">Clinic</option>
         </select>
-        <button className="btn btn--primary btn--md" type="submit">Filter</button>
+        <button className="btn btn--secondary btn--md" type="submit">Filter</button>
         {filtered && (
           <Link href="/gyms" className="btn btn--secondary btn--md" style={{ textDecoration: "none" }}>
             Clear
@@ -84,7 +87,7 @@ export default async function GymsPage(
         )}
       </form>
 
-      <Card style={{ padding: 20 }}>
+      <Card style={{ padding: "22px 26px 14px" }}>
         {tenants.length === 0 ? (
           <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: 13.5 }}>No businesses match.</p>
         ) : (
@@ -105,14 +108,14 @@ export default async function GymsPage(
                 <tr key={t.id} style={t.archivedAt ? { opacity: 0.6 } : undefined}>
                   <td>
                     <Link href={`/gyms/${t.id}`}>{t.name}</Link>
-                    <div style={{ fontSize: 12, color: "var(--text-secondary)", fontFamily: "ui-monospace, monospace" }}>
+                    <div style={{ marginTop: 3, fontSize: 12, color: "var(--text-tertiary)", fontFamily: "var(--font-mono), ui-monospace, monospace" }}>
                       {t.slug}
                     </div>
                   </td>
-                  <td>{t.venueType ?? <span style={{ color: "var(--text-tertiary)" }}>Not set</span>}</td>
+                  <td style={{ textTransform: "capitalize", color: "var(--text-secondary)" }}>{t.venueType ?? <span style={{ color: "var(--text-tertiary)", textTransform: "none" }}>Not set</span>}</td>
                   <td>
                     {t.archivedAt ? (
-                      <span className="chip" style={{ background: "rgba(242,193,78,.15)", color: "var(--amber)" }}>archived</span>
+                      <span className="chip" style={{ backgroundColor: "rgba(242,193,78,.15)", color: "var(--amber)" }}>archived</span>
                     ) : (
                       <StatusChip status={t.billingStatus} exempt={t.billingExempt} />
                     )}

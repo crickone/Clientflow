@@ -75,7 +75,7 @@ export function PeopleTable({ tenantId, data }: { tenantId: number; data: Tenant
       )}
 
       <Card style={{ padding: 24 }}>
-        <h2 style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+        <h2 className="card-title" style={{ margin: "0 0 4px" }}>
           People
         </h2>
         <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--text-secondary)" }}>
@@ -104,10 +104,10 @@ export function PeopleTable({ tenantId, data }: { tenantId: number; data: Tenant
                       <div>{p.name ?? p.email}</div>
                       {p.name && <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{p.email}</div>}
                       <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
-                        {revoked && <span className="chip" style={{ background: "var(--surface-2)", color: "var(--muted)" }}>access revoked</span>}
-                        {!p.accountActive && <span className="chip" style={{ background: "rgba(240,128,154,.15)", color: "var(--red)" }}>account disabled</span>}
-                        {p.mustChangePassword && <span className="chip" style={{ background: "var(--surface-2)" }}>must change password</span>}
-                        {p.isPlatformStaff && <span className="chip" style={{ background: "rgba(232,93,36,.15)", color: "var(--accent)" }}>platform staff</span>}
+                        {revoked && <span className="chip" style={{ backgroundColor: "var(--surface-2)", color: "var(--muted)" }}>access revoked</span>}
+                        {!p.accountActive && <span className="chip" style={{ backgroundColor: "rgba(240,128,154,.15)", color: "var(--red)" }}>account disabled</span>}
+                        {p.mustChangePassword && <span className="chip" style={{ backgroundColor: "var(--surface-2)" }}>must change password</span>}
+                        {p.isPlatformStaff && <span className="chip" style={{ backgroundColor: "var(--accent-soft)", color: "var(--text-primary)" }}>platform staff</span>}
                       </div>
                     </td>
                     <td>
@@ -128,7 +128,7 @@ export function PeopleTable({ tenantId, data }: { tenantId: number; data: Tenant
                     <td style={{ fontVariantNumeric: "tabular-nums" }}>{p.activeSessions}</td>
                     <td>{p.lastLoginAt ? new Date(p.lastLoginAt).toLocaleDateString("en-IE") : "Never"}</td>
                     <td>
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "nowrap", justifyContent: "flex-end" }}>
                         <button
                           type="button"
                           className="btn btn--secondary btn--sm"
@@ -176,7 +176,7 @@ export function PeopleTable({ tenantId, data }: { tenantId: number; data: Tenant
                               revoked ? undefined : `Revoke ${p.email}'s access to this business?`,
                             )
                           }
-                          style={revoked ? undefined : { color: "var(--red)" }}
+                          style={revoked ? undefined : { color: "var(--red)", borderColor: "rgba(240, 128, 154, 0.3)" }}
                         >
                           {revoked ? "Restore access" : "Revoke access"}
                         </button>
@@ -196,7 +196,7 @@ export function PeopleTable({ tenantId, data }: { tenantId: number; data: Tenant
       </Card>
 
       <Card style={{ padding: 24 }}>
-        <h2 style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+        <h2 className="card-title" style={{ margin: "0 0 4px" }}>
           Invite someone
         </h2>
         <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--text-secondary)" }}>
@@ -226,7 +226,7 @@ export function PeopleTable({ tenantId, data }: { tenantId: number; data: Tenant
       </Card>
 
       <Card style={{ padding: 24 }}>
-        <h2 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+        <h2 className="card-title" style={{ margin: "0 0 16px" }}>
           Pending invites
         </h2>
         {data.invites.length === 0 ? (
@@ -281,7 +281,7 @@ export function PeopleTable({ tenantId, data }: { tenantId: number; data: Tenant
 
       {data.resets.length > 0 && (
         <Card style={{ padding: 24 }}>
-          <h2 style={{ margin: "0 0 4px", fontSize: 15, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.02em" }}>
+          <h2 className="card-title" style={{ margin: "0 0 4px" }}>
             Open password resets
           </h2>
           <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--text-secondary)" }}>

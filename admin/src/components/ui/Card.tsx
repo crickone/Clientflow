@@ -6,21 +6,16 @@ import { motion } from "motion/react";
 const DUR_FAST = 0.12;
 const EASE = [0.2, 0.8, 0.2, 1] as const;
 
-const baseStyle: React.CSSProperties = {
-  background: "var(--surface-1)",
-  border: "1px solid var(--grid)",
-  borderRadius: "var(--radius)",
-  padding: 24,
-  boxShadow: "var(--shadow-1)",
-};
-
 export const Card = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement> & { interactive?: boolean }
->(({ children, style, interactive, ...rest }, ref) => {
+>(({ children, style, interactive, className, ...rest }, ref) => {
+  // The surface lives in .card (globals.css) so it can carry a gradient and
+  // stay in one place; style still overrides per call (padding, gap).
+  const cls = className ? `card ${className}` : "card";
   if (!interactive) {
     return (
-      <div ref={ref} style={{ ...baseStyle, ...style }} {...rest}>
+      <div ref={ref} className={cls} style={style} {...rest}>
         {children}
       </div>
     );
@@ -28,7 +23,8 @@ export const Card = React.forwardRef<
   return (
     <motion.div
       ref={ref}
-      style={{ ...baseStyle, cursor: "pointer", ...style }}
+      className={cls}
+      style={{ cursor: "pointer", ...style }}
       whileHover={{ y: -2, boxShadow: "var(--shadow-2)", borderColor: "var(--hairline-strong)" }}
       whileTap={{ y: 1 }}
       transition={{ duration: DUR_FAST, ease: [...EASE] }}

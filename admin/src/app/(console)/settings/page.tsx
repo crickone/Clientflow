@@ -1,5 +1,6 @@
 import { api } from "@/lib/api";
 import { saveSettings } from "./actions";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 interface Settings {
   monthlyPriceCents: number;
@@ -23,7 +24,7 @@ export default async function SettingsPage(
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 480 }}>
-      <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>Settings</h1>
+      <PageHeader eyebrow="Console" title="Settings" sub="Platform prices and allowances. Changes apply to every business." />
 
       <form
         action={saveSettings}
