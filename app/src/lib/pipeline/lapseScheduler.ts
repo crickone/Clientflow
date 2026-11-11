@@ -51,6 +51,11 @@ async function runDailyLapseIfNeeded(): Promise<void> {
   }
 }
 
+/** The claim can throw before the try block; log it rather than leak an unhandled rejection. */
+function logLapseError(err: unknown): void {
+  console.error("[pipeline] lapse sweep failed:", err);
+}
+
 /**
  * Arm a daily (04:00 UTC) lapse recompute on the always-on server. Re-arms
  * after each run. Single-instance only (mirrors lib/backup/scheduler.ts).
@@ -74,11 +79,11 @@ export function scheduleDailyLapse(): void {
     if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
     const ms = next.getTime() - now.getTime();
     setTimeout(() => {
-      void runDailyLapseIfNeeded().finally(armNext);
+      void runDailyLapseIfNeeded().catch(logLapseError).finally(armNext);
     }, ms);
   };
 
-  void runDailyLapseIfNeeded(); // boot-time catch-up
+  void runDailyLapseIfNeeded().catch(logLapseError); // boot-time catch-up
   armNext();
   console.log("[pipeline] daily lapse scheduler armed (04:00 UTC + boot catch-up)");
 }
