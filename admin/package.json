@@ -4,7 +4,9 @@
   "scripts": {
     "dev": "next dev --turbopack -p 3100",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test": "node scripts/test.mjs",
+    "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
     "lucide-react": "^1.14.0",
@@ -18,7 +20,8 @@
     "@types/node": "^20",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "tsx": "^4.19.2"
   },
   "overrides": {
     "@types/react": "19.3.0",
