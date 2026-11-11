@@ -56,6 +56,8 @@ import "@/lib/voice/runner";
 // the campaign nurture sequence, sent when their time comes. Self-starts on
 // import, same as the two above.
 import "@/lib/dispatch/ticker";
+// Hourly health snapshots + platform alert sync for the console (Tier 1).
+import "@/lib/platform/healthScheduler";
 import {
   bebasNeue,
   body,

@@ -25,6 +25,8 @@ import { TENANT_MIGRATIONS } from "@/lib/db/migrations";
 export type AlertLevel = "ok" | "warn" | "bad";
 
 export interface HealthAlert {
+  /** Stable across runs, so the same problem is one alert, not one per hour. */
+  key: string;
   level: Exclude<AlertLevel, "ok">;
   message: string;
 }
@@ -164,21 +166,21 @@ export function getTenantHealth(tenantId: number, opts: { deep?: boolean } = {})
   ];
 
   const alerts: HealthAlert[] = [];
-  if (!dbExists) alerts.push({ level: "bad", message: "The database file is missing." });
-  if (integrity === "failed") alerts.push({ level: "bad", message: `Integrity check failed: ${integrityDetail ?? "unknown"}` });
+  if (!dbExists) alerts.push({ key: "db_missing", level: "bad", message: "The database file is missing." });
+  if (integrity === "failed") alerts.push({ key: "integrity", level: "bad", message: `Integrity check failed: ${integrityDetail ?? "unknown"}` });
   if (migrations.missing.length > 0) {
-    alerts.push({ level: "warn", message: `${migrations.missing.length} migration(s) have not run: ${migrations.missing.join(", ")}` });
+    alerts.push({ key: "migrations", level: "warn", message: `${migrations.missing.length} migration(s) have not run: ${migrations.missing.join(", ")}` });
   }
   // A WAL that has grown past the database itself means checkpoints are not
   // landing -- usually a connection held open by something that crashed.
   if (walBytes > 8 * 1024 * 1024 && walBytes > dbBytes) {
-    alerts.push({ level: "warn", message: "The write-ahead log is larger than the database; checkpoints may not be landing." });
+    alerts.push({ key: "wal", level: "warn", message: "The write-ahead log is larger than the database; checkpoints may not be landing." });
   }
   for (const q of queues) {
-    if (q.failed > 0) alerts.push({ level: "warn", message: `${q.failed} failed in ${q.label.toLowerCase()}.` });
+    if (q.failed > 0) alerts.push({ key: `queue_failed:${q.key}`, level: "warn", message: `${q.failed} failed in ${q.label.toLowerCase()}.` });
   }
   if (stuckGenerations > 0) {
-    alerts.push({ level: "warn", message: `${stuckGenerations} design(s) stuck mid-generation.` });
+    alerts.push({ key: "stuck_generations", level: "warn", message: `${stuckGenerations} design(s) stuck mid-generation.` });
   }
 
   return {
@@ -238,7 +240,7 @@ export function getFleetHealth(): {
         name: t.name,
         slug: t.slug,
         dbBytes: 0,
-        alerts: [{ level: "bad", message: err instanceof Error ? err.message : "Health could not be read." }],
+        alerts: [{ key: "unreadable", level: "bad", message: err instanceof Error ? err.message : "Health could not be read." }],
       });
     }
   }
