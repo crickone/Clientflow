@@ -29,18 +29,20 @@ const saveZ = z.object({
   /** Where a new program started from (the builder's ?from=); its maxes and based-on come from the server, never the request. */
   from: z.string().max(80).nullable(),
   template: z.unknown(),
-  /** For each week, the saved week it came from (null for a new one); lets a running member stay on the same logical week. */
-  weekOrigins: z.array(z.number().int().min(0).max(11).nullable()).max(12),
+  /** For each week, the saved week it came from (null for a new one); lets a running member stay on the same logical week. Required for an edit. */
+  weekOrigins: z.array(z.number().int().min(0).max(11).nullable()).max(12).optional(),
 });
+const UNREADABLE = "Couldn't read the program. Reload the page and try again.";
 
 /** Save a new program, or an edit to one. An edit to the running program applies from the next session. */
 export async function saveBuiltProgramAction(raw: unknown): Promise<SaveResult> {
   const c = member();
   if (!c) return { ok: false, errors: [OFF] };
-  // A new program has no origins; the field is optional for it.
-  const p = saveZ.safeParse(raw && typeof raw === "object" ? { weekOrigins: [], ...(raw as object) } : raw);
-  if (!p.success) return { ok: false, errors: ["Couldn't read the program. Reload the page and try again."] };
+  const p = saveZ.safeParse(raw);
+  if (!p.success) return { ok: false, errors: [UNREADABLE] };
   const v = p.data;
+  // A new program has no origins; an edit must say where each week came from.
+  if (v.id !== null && v.weekOrigins === undefined) return { ok: false, errors: [UNREADABLE] };
   if (v.id === null) {
     const from = parseStartFrom(v.from);
     const draft = from ? startingDraft(c.clientId, from) : null;
@@ -50,7 +52,7 @@ export async function saveBuiltProgramAction(raw: unknown): Promise<SaveResult> 
     return { ok: true, id: r.id, edited: false };
   }
   const r = saveMemberProgram(c.clientId, v.id, v.template, v.weekOrigins);
-  if (!r.ok) return { ok: false, errors: "errors" in r ? r.errors : [r.error] };
+  if (!r.ok) return { ok: false, errors: r.errors };
   refresh(v.id);
   return { ok: true, id: v.id, edited: r.edited };
 }

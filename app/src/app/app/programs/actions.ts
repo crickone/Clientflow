@@ -165,6 +165,8 @@ export async function setOwnMaxAction(raw: unknown): Promise<Result> {
   if (!p.success) return { ok: false, error: "Check your entry and try again." };
   const view = liveEnrolment(c.clientId);
   if (!view) return { ok: false, error: "You don't have a program running." };
+  // Only a program the member built takes a max here; library programs set theirs at start or after a test.
+  if (!view.programKey || parseMemberKey(view.programKey) === null) return { ok: false, error: "You don't have a program of your own running." };
   const maxes = resolveMaxes(c.clientId, view.unit, [p.data.max]);
   if (!maxes.ok) return maxes;
   const kg = maxes.kg[p.data.max.lift];
