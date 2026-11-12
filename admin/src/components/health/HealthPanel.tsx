@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { healthAction, type HealthActionResult, type HealthOp } from "@/app/(console)/gyms/[id]/health/actions";
 import { notify } from "@/lib/toast";
 import { Card } from "@/components/ui/Card";
+import { LineChart } from "@/components/charts/LineChart";
 import { bytes } from "@/lib/format";
 import type { TenantHealth } from "@/lib/types";
 
@@ -41,6 +42,7 @@ export function HealthPanel({ tenantId, data }: { tenantId: number; data: Tenant
   }
 
   const migrationsBehind = data.migrations.missing.length > 0;
+  const labels = data.history.map((h) => new Date(h.at).toLocaleDateString("en-IE", { day: "numeric", month: "short" }));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
@@ -84,6 +86,40 @@ export function HealthPanel({ tenantId, data }: { tenantId: number; data: Tenant
               </li>
             ))}
           </ul>
+        )}
+      </Card>
+
+      <Card style={{ padding: 24 }}>
+        <h2 className="card-title" style={{ margin: "0 0 4px" }}>Thirty days</h2>
+        <p style={{ margin: "0 0 18px", fontSize: 13, color: "var(--text-secondary)" }}>One point an hour. A queue that only grows, or a database that jumps, shows here before anyone reports it.</p>
+        {data.history.length < 2 ? (
+          <p style={{ margin: 0, fontSize: 13.5, color: "var(--text-secondary)" }}>History starts after the first two snapshots.</p>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20 }}>
+            <LineChart title="Database size" labels={labels} series={[{ label: "Database", values: data.history.map((h) => h.dbBytes / 1048576), accent: true }, { label: "WAL", values: data.history.map((h) => h.walBytes / 1048576) }]} format={(v) => `${v.toFixed(1)} MB`} />
+            <LineChart title="Queued work" labels={labels} series={[{ label: "Due", values: data.history.map((h) => h.queueDue), accent: true }, { label: "Failed", values: data.history.map((h) => h.queueFailed) }]} />
+            <LineChart title="Open alerts" labels={labels} series={[{ label: "Needs action", values: data.history.map((h) => h.alertsBad), accent: true }, { label: "Watch", values: data.history.map((h) => h.alertsWarn) }]} />
+          </div>
+        )}
+      </Card>
+
+      <Card style={{ padding: 24 }}>
+        <h2 className="card-title" style={{ margin: "0 0 12px" }}>Alert history</h2>
+        {data.alertHistory.length === 0 ? (
+          <p style={{ margin: 0, fontSize: 13.5, color: "var(--text-secondary)" }}>No alerts recorded for this business.</p>
+        ) : (
+          <table className="tbl">
+            <thead><tr><th>Opened</th><th>Alert</th><th>Resolved</th></tr></thead>
+            <tbody>
+              {data.alertHistory.map((a) => (
+                <tr key={a.id}>
+                  <td style={{ whiteSpace: "nowrap" }}>{new Date(a.openedAt).toLocaleDateString("en-IE")}</td>
+                  <td style={{ color: a.level === "bad" ? "var(--red)" : undefined }}>{a.title}</td>
+                  <td style={{ whiteSpace: "nowrap", color: "var(--text-secondary)" }}>{a.resolvedAt ? new Date(a.resolvedAt).toLocaleDateString("en-IE") : "open"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </Card>
 

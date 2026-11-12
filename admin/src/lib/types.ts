@@ -350,6 +350,7 @@ export interface TenantIntegrations {
 
 /** Health of one business (console Health tab). */
 export interface HealthAlert {
+  key: string;
   level: "warn" | "bad";
   message: string;
 }
@@ -375,6 +376,9 @@ export interface TenantHealth {
   stuckGenerations: number;
   schedulers: { key: string; label: string; lastRun: string | null }[];
   alerts: HealthAlert[];
+  history: Array<{ at: number; dbBytes: number; walBytes: number; queueDue: number; queueFailed: number; stuck: number; alertsBad: number; alertsWarn: number }>;
+  openAlerts: PlatformAlert[];
+  alertHistory: PlatformAlert[];
 }
 
 export interface FleetHealthRow {

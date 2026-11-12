@@ -12,7 +12,7 @@ export default async function TenantHealthPage(props: { params: Promise<{ id: st
   const id = Number(params.id);
   let data: TenantHealth;
   try {
-    data = await api<TenantHealth>(`/tenants/${id}/health`);
+    data = await api<TenantHealth>(`/tenants/${id}/health?history=30`);
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) notFound();
     throw err;
