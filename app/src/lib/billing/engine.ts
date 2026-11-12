@@ -13,7 +13,7 @@ import { addMonthClamped, addDays, cmpDate, dublinDayOfMonth, dublinToday } from
 import { getVatRateBp } from "./settings";
 import { monthlyLines, monthlySubtotalCents, type MonthlyLine } from "./addons";
 import { sendBillingEmail } from "./emails";
-import { claimCreditsForInvoice } from "./adjustments";
+import { claimCreditsForInvoice, getEffectiveMonthlyPriceCents } from "./adjustments";
 
 /** Retry offsets (days after the due date). 4 attempts total incl. the due-day one. */
 const RETRY_OFFSETS = [1, 3, 7] as const;
@@ -273,7 +273,7 @@ function applyFailed(inv: InvoiceRow, message: string, actor: string): void {
       inv.tenantId,
     );
   logEvent(inv.tenantId, nextAttemptAt ? "charge_failed" : "suspended",
-    { invoiceId: inv.id, attempt: attempts, nextAttemptAt, message }, actor);
+    { invoiceId: inv.id, attempt: attempts, nextAttemptAt, message, ...(nextAttemptAt ? {} : { priceCents: getEffectiveMonthlyPriceCents(inv.tenantId) }) }, actor);
   void sendBillingEmail(inv.tenantId, nextAttemptAt ? "charge_failed" : "suspended", {
     grossCents: inv.grossCents,
     nextAttemptAt,
@@ -318,7 +318,7 @@ export function activateTenant(tenantId: number, chargeRef: string, today = dubl
   controlSqlite
     .prepare("UPDATE billing_invoices SET status = 'paid', gateway_ref = ?, paid_at = ? WHERE id = ?")
     .run(chargeRef, Date.now(), inv.id);
-  logEvent(tenantId, "activated", { invoiceId: inv.id, chargeRef }, "system");
+  logEvent(tenantId, "activated", { invoiceId: inv.id, chargeRef, priceCents: getEffectiveMonthlyPriceCents(tenantId) }, "system");
 }
 
 /**
@@ -409,12 +409,12 @@ export function compMonths(tenantId: number, months: number, actor: string): voi
 
 export function suspendTenant(tenantId: number, actor: string): void {
   touch(tenantId, `status = 'suspended', suspended_at = ${Date.now()}`);
-  logEvent(tenantId, "suspended", { manual: true }, actor);
+  logEvent(tenantId, "suspended", { manual: true, priceCents: getEffectiveMonthlyPriceCents(tenantId) }, actor);
 }
 
 export function reactivateTenant(tenantId: number, actor: string): void {
   touch(tenantId, `status = 'active', failed_attempts = 0, suspended_at = NULL`);
-  logEvent(tenantId, "reactivated", { manual: true }, actor);
+  logEvent(tenantId, "reactivated", { manual: true, priceCents: getEffectiveMonthlyPriceCents(tenantId) }, actor);
   void sendBillingEmail(tenantId, "reactivated", {});
 }
 
