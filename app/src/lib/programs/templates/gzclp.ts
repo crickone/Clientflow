@@ -27,7 +27,7 @@ export const gzclp: ProgramTemplate = {
   lengthWeeks: 12,
   lifts: ["squat", "bench", "press", "deadlift"],
   tmPct: 1,
-  who: "Newer lifters ready for more structure than a beginner program.",
+  who: "Beginners who want a set plan for what to do when a lift stalls.",
   description:
     "Four workouts in rotation. Each has a heavy main lift (T1: 5 x 3 with a last set for as many as you can), a lighter second lift (T2: 3 x 10) and an accessory (T3: 3 x 15 with a last set for as many as you can). Hit your reps and the weight goes up. Miss, and the lift moves to its next rep scheme: 6 x 2 then 10 x 1 for T1, 3 x 8 then 3 x 6 for T2. T3 goes up once the last set reaches 25.",
   engine: { key: "tm_cycle", rule: "gzclp", increment: 2.5, increments: { squat: 5, deadlift: 5 }, t2ResetKg: 5, t3AmrapTarget: 25 },

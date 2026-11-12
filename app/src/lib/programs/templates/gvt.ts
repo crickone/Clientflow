@@ -4,24 +4,28 @@ import type { ProgramTemplate } from "../types";
 
 const TEMPO = "Lower for four seconds, lift in two. Rest 90 seconds, then do the paired exercise.";
 const tens = () => times(10, fixed(10, 90));
+/** The paired and finishing exercises take no max, so the member picks the weight. */
+const PICK_TENS = "Pick a weight you can finish all ten sets of ten with.";
+const PICK = "Pick a weight you can finish all sets with.";
+const EASIER = "Use a band or the assisted machine if you need to.";
 
 const chestBack = day("Chest and back", [
   ex("Bench press", tens(), { lift: "bench", notes: TEMPO }),
-  ex("Chin-up", tens(), { bodyweight: true, joined: true }),
-  ex("Incline dumbbell fly", rs(3, 10, 12, 60), { progress: false }),
-  ex("Dumbbell row", rs(3, 10, 12, 60), { progress: false, joined: true }),
+  ex("Chin-up", tens(), { bodyweight: true, joined: true, notes: `Add weight only if all ten sets of ten are easy. ${EASIER}` }),
+  ex("Incline dumbbell fly", rs(3, 10, 12, 60), { progress: false, notes: PICK }),
+  ex("Dumbbell row", rs(3, 10, 12, 60), { progress: false, joined: true, notes: PICK }),
 ]);
 const legs = day("Legs", [
   ex("Back squat", tens(), { lift: "squat", notes: TEMPO }),
-  ex("Lying leg curl", tens(), { joined: true }),
-  ex("Cable crunch", rs(3, 12, 15, 60), { progress: false }),
-  ex("Seated calf raise", rs(3, 15, 20, 60), { progress: false, joined: true }),
+  ex("Lying leg curl", tens(), { joined: true, notes: PICK_TENS }),
+  ex("Cable crunch", rs(3, 12, 15, 60), { progress: false, notes: PICK }),
+  ex("Seated calf raise", rs(3, 15, 20, 60), { progress: false, joined: true, notes: PICK }),
 ]);
 const armsShoulders = day("Arms and shoulders", [
-  ex("Dip", tens(), { bodyweight: true, notes: TEMPO }),
-  ex("Hammer curl", tens(), { joined: true }),
-  ex("Rear delt fly", rs(3, 10, 12, 60), { progress: false }),
-  ex("Lateral raise", rs(3, 10, 12, 60), { progress: false, joined: true }),
+  ex("Dip", tens(), { bodyweight: true, notes: `${TEMPO} ${EASIER}` }),
+  ex("Hammer curl", tens(), { joined: true, notes: PICK_TENS }),
+  ex("Rear delt fly", rs(3, 10, 12, 60), { progress: false, notes: PICK }),
+  ex("Lateral raise", rs(3, 10, 12, 60), { progress: false, joined: true, notes: PICK }),
 ]);
 
 export const germanVolumeTraining: ProgramTemplate = {

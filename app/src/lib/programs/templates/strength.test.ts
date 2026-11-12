@@ -5,6 +5,8 @@ import assert from "node:assert/strict";
 import { platformProgram } from "../registry";
 import { nsunsStyle } from "./nsuns";
 import { line, planAt, simulate } from "../simulate";
+import type { SetRx } from "../types";
+import { validateTemplate } from "../validate";
 
 // A max of 111.11 kg gives a 90% training max of exactly 100 kg.
 const tm100 = { squat: 111.11, bench: 111.11, deadlift: 111.11, press: 111.11 };
@@ -35,6 +37,7 @@ assert.equal(planAt(fsl, tm100, 3, 0).exercises.length, 2, "no supplemental sets
 // ── nSuns-style 5-day ─────────────────────────────────────────────────────
 // nSuns-style is not in the registry yet, so it is imported directly.
 const ns = nsunsStyle;
+assert.ok(validateTemplate(ns).ok, "nSuns-style passes the template check");
 assert.equal(ns.weeks.length, 1);
 assert.equal(ns.weeks[0].days.length, 5);
 assert.deepEqual(planAt(ns, tm100, 0, 1).exercises.map((e) => line(e)), [
@@ -73,5 +76,35 @@ assert.equal(gzOne["t1:back squat"], 77.5);
 assert.equal(gzOne["t2:back squat"], 60);
 assert.equal(gzOne["t1:deadlift"], 77.5);
 assert.equal(gzOne["t1:bench press"], 75);
+
+// GZCLP's later stages, read from the template itself (not through the engine).
+/** "6x2+": the set count, the reps, and a + when only the last set is as many as you can. */
+const scheme = (sets: SetRx[]) => {
+  const reps = sets.map((x) => (typeof x.reps === "number" ? x.reps : x.reps.min));
+  assert.ok(reps.every((r) => r === reps[0]), "one rep count per stage");
+  const plus = sets.map((x) => x.kind === "fixed" && x.amrap === true);
+  assert.ok(plus.slice(0, -1).every((p) => !p), "only the last set can be a + set");
+  return `${sets.length}x${reps[0]}${plus[plus.length - 1] ? "+" : ""}`;
+};
+const gzAll = gz.weeks.flatMap((w) => w.days.flatMap((d) => d.exercises));
+const gzT1 = gzAll.filter((e) => e.tier === "t1");
+const gzT2 = gzAll.filter((e) => e.tier === "t2");
+assert.equal(gzT1.length, 4);
+assert.equal(gzT2.length, 4);
+for (const e of gzT1) assert.deepEqual(e.stages!.map(scheme), ["5x3+", "6x2+", "10x1+"], e.name);
+for (const e of gzT2) assert.deepEqual(e.stages!.map(scheme), ["3x10", "3x8", "3x6"], e.name);
+for (const e of [...gzT1, ...gzT2]) assert.deepEqual(e.sets, e.stages![0], `${e.name} starts on its first stage`);
+assert.ok(gz.engine.key === "tm_cycle" && gz.engine.t3AmrapTarget === 25, "T3 goes up once the last set reaches 25");
+for (const e of gzAll.filter((x) => x.tier === "t3")) assert.equal(scheme(e.sets), "3x15+", e.name);
+
+// Copy that the reviews pinned.
+assert.equal(tx.author, "Texas Method, from Glenn Pendlay, as written up by Mark Rippetoe");
+assert.equal(tx.warning, "A new 5-rep max every week. Expect to stall and change the plan within a few months.");
+assert.equal(gz.level, "beginner");
+assert.ok(gz.who.startsWith("Beginners"), "GZCLP's who line agrees with its level");
+for (const t of [bbb, fsl]) {
+  assert.ok(t.description.includes("If you miss the minimum reps on a lift's + set"), `${t.key} says what a missed + set does`);
+  assert.ok(t.description.includes("This hold is our rule."), `${t.key} says the hold is our rule`);
+}
 
 console.log("programs/templates/strength: ok");

@@ -11,7 +11,7 @@ const backExt = () => ex("Back extension", times(3, fixed(10, 90)), { bodyweight
 export const texasMethod: ProgramTemplate = {
   key: "texas-method",
   name: "Texas Method",
-  author: "Texas Method, as written up by Mark Rippetoe",
+  author: "Texas Method, from Glenn Pendlay, as written up by Mark Rippetoe",
   family: "strength",
   level: "intermediate",
   daysPerWeek: 3,
@@ -22,6 +22,7 @@ export const texasMethod: ProgramTemplate = {
   who: "Lifters who have outgrown a beginner program and now progress week to week.",
   description:
     "Three days a week. Monday is volume: 5 sets of 5 at 90% of your 5-rep max. Wednesday is light: 2 sets of 5 squats at 80% of Monday's weight. Friday is intensity: a new 5-rep max. Bench and press swap each week. When you get all five reps on a top set, that lift goes up 2.5 kg, or 5 kg on the deadlift.",
+  warning: "A new 5-rep max every week. Expect to stall and change the plan within a few months.",
   engine: { key: "tm_cycle", rule: "drive_set", increment: 2.5, increments: { deadlift: 5 } },
   weeks: [
     week(

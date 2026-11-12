@@ -41,7 +41,8 @@ const shared = {
 
 const WAVE_TEXT =
   "Four days a week, one main lift a day: press, deadlift, bench, squat. Three weeks of waves (5s, 3s, then 5/3/1) at percentages of a training max set at 90% of your max, then a deload week. The last set of each wave is as many reps as you can.";
-const TM_TEXT = "The training max goes up after each four-week cycle: 2.5 kg on press and bench, 5 kg on squat and deadlift. A lift whose last set fell short of the minimum reps holds for a cycle.";
+const TM_TEXT =
+  "The training max goes up after each four-week cycle: 2.5 kg on press and bench, 5 kg on squat and deadlift. If you miss the minimum reps on a lift's + set (the last set of a wave), that lift's training max stays the same for the next cycle. This hold is our rule.";
 
 export const wendlerBbb: ProgramTemplate = {
   ...shared,

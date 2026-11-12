@@ -4,9 +4,9 @@ import type { ProgramTemplate } from "../types";
 
 const upperPower = day("Upper power", [
   ex("Bench press", rs(4, 3, 5, 180)),
-  ex("Incline dumbbell press", rs(4, 6, 10)),
+  ex("Incline dumbbell press", rs(3, 6, 10)),
   ex("Barbell row", rs(4, 3, 5, 180)),
-  ex("Lat pulldown", rs(4, 6, 10)),
+  ex("Lat pulldown", rs(3, 6, 10)),
   ex("Overhead press", rs(3, 5, 8, 120)),
   ex("Barbell curl", rs(3, 6, 10)),
   ex("Skull crusher", rs(3, 6, 10)),
@@ -14,7 +14,7 @@ const upperPower = day("Upper power", [
 const lowerPower = day("Lower power", [
   ex("Back squat", rs(4, 3, 5, 180)),
   ex("Deadlift", rs(4, 3, 5, 180)),
-  ex("Leg press", rs(4, 10, 15, 120)),
+  ex("Leg press", rs(5, 10, 15, 120)),
   ex("Lying leg curl", rs(4, 6, 10)),
   ex("Standing calf raise", rs(4, 6, 10, 60)),
 ]);
