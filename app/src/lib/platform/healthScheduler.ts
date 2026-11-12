@@ -2,6 +2,7 @@ import "server-only";
 
 import { recordJobRun, pruneHistory } from "./jobRuns";
 import { snapshotFleetHealth } from "./healthHistory";
+import { sendDailyDigest, sendInstantAlerts } from "./notify";
 
 let armed = false;
 let running = false;
@@ -20,6 +21,16 @@ async function runOnce(): Promise<void> {
       pruneHistory();
     } catch (err) {
       console.error("[health] prune failed:", err);
+    }
+    try {
+      await sendInstantAlerts();
+    } catch (err) {
+      console.error("[notify] instant alerts failed:", err);
+    }
+    try {
+      await sendDailyDigest();
+    } catch (err) {
+      console.error("[notify] digest failed:", err);
     }
   } catch (err) {
     console.error("[health] snapshot failed:", err);
@@ -44,6 +55,9 @@ export function startHealthScheduler(): void {
     t.unref();
   };
   armNext();
+  // The hourly tick alone could miss 08:00 Dublin by up to 59 minutes.
+  const digestTick = setInterval(() => void sendDailyDigest().catch((err) => console.error("[notify] digest:", err)), 10 * 60 * 1000);
+  digestTick.unref();
   console.log("[health] hourly snapshot scheduler armed");
 }
 

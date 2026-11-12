@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { guardPlatform } from "@/lib/platform/auth";
 import { listPlatformStaff, setPlatformRole } from "@/lib/platform/roles";
+import { getNotifyPrefs, setNotifyPrefs } from "@/lib/platform/notify";
 import { recordAudit, requestIp } from "@/lib/platform/audit";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +12,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const g = guardPlatform(req);
   if (g instanceof Response) return g;
-  return NextResponse.json({ staff: listPlatformStaff(), you: { userId: g.userId, role: g.role } });
+  return NextResponse.json({ staff: listPlatformStaff(), you: { userId: g.userId, role: g.role, notify: getNotifyPrefs(g.userId) } });
 }
 
 const patchSchema = z.object({
@@ -57,4 +58,16 @@ export async function PATCH(req: NextRequest) {
   });
   if (!result.ok) return NextResponse.json({ ok: false, error: result.error }, { status: 400 });
   return NextResponse.json({ ok: true, staff: listPlatformStaff() });
+}
+
+const prefsSchema = z.object({ notify: z.object({ instant: z.boolean(), digest: z.boolean() }) });
+
+/** A staff member's own notification preferences. Not audited: it is their own inbox. */
+export async function PUT(req: NextRequest) {
+  const g = guardPlatform(req);
+  if (g instanceof Response) return g;
+  const parsed = prefsSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ ok: false, error: "That request does not make sense." }, { status: 400 });
+  setNotifyPrefs(g.userId, parsed.data.notify);
+  return NextResponse.json({ ok: true, notify: getNotifyPrefs(g.userId) });
 }
