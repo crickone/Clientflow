@@ -1120,3 +1120,8 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { opacity: 0.45; c
 .nav-view-x { flex: 0 0 auto; width: 24px; height: 24px; margin-right: 4px; border: 0; background: transparent; color: var(--text-tertiary); border-radius: 6px; cursor: pointer; display: grid; place-items: center; opacity: 0; }
 .nav-view:hover .nav-view-x, .nav-view-x:focus-visible { opacity: 1; }
 .nav-view-x:hover { background: var(--surface-2); color: var(--text-primary); }
+
+/* ── Bulk actions (components/ui/BulkBar.tsx) ───────────────────────────── */
+.bulk { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--hairline); margin-bottom: 12px; }
+.bulk-count { font-size: 13px; color: var(--text-primary); font-weight: 500; }
+.bulk-actions { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
