@@ -108,6 +108,19 @@ const requireLocal = createRequire(import.meta.url);
     assert.ok(!isOpen("health:wal"), "wal resolved once readable and clear");
     assert.ok(!isOpen("health:unreadable"), "unreadable resolved on recovery");
 
+    // 9. act on an alert.
+    cleanup2();
+    syncPlatformAlerts([{ tenantId: tid, key: "act", level: "warn", title: "act" }], 1000, { tenantIds: [tid] });
+    const { alertAction, listOpenAlerts } = requireLocal("./healthHistory") as typeof import("./healthHistory");
+    const openOne = listOpenAlerts({ tenantId: tid })[0];
+    assert.ok(openOne);
+    assert.deepEqual(alertAction(openOne.id, { op: "snooze", until: 9000 }, 1, 5000), { ok: true });
+    assert.equal(listOpenAlerts({ tenantId: tid, now: 6000 }).length, 0, "snoozed is hidden");
+    assert.equal(listOpenAlerts({ tenantId: tid, now: 9001 }).length, 1, "and back when the snooze ends");
+    assert.deepEqual(alertAction(openOne.id, { op: "ack" }, 1, 7000), { ok: true });
+    assert.equal(listOpenAlerts({ tenantId: tid, now: 9001 })[0].acknowledgedBy, 1);
+    assert.equal(alertAction(999999999, { op: "ack" }, 1).ok, false);
+
     console.log("healthHistory.test.ts: ok");
   } finally {
     cleanup();

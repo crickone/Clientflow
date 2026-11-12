@@ -2,6 +2,7 @@ import "server-only";
 
 import { controlSqlite } from "@/lib/db/control";
 import { getFleetHealth } from "./health";
+import { collectAlertCandidates, buildFleetCandidates, planFleetSync } from "./alertSources";
 
 /**
  * Health over time. `snapshotFleetHealth` runs hourly: one row per active
@@ -94,44 +95,7 @@ export function syncPlatformAlerts(
   return { opened, resolved, seen };
 }
 
-/** Alert candidates from one fleet sweep: each business's own alerts (an unreadable business raises health:unreadable) plus platform-wide ones. */
-export function buildFleetCandidates(fleet: ReturnType<typeof getFleetHealth>): AlertCandidate[] {
-  const candidates: AlertCandidate[] = [];
-  for (const row of fleet.tenants) {
-    for (const a of row.alerts) {
-      candidates.push({
-        tenantId: row.tenantId,
-        key: `health:${a.key}`,
-        level: a.level,
-        title: a.message,
-        href: `/gyms/${row.tenantId}/health`,
-      });
-    }
-  }
-  for (const d of fleet.duplicateSiteSlugs) {
-    candidates.push({
-      tenantId: null,
-      key: `site_slug:${d.slug}`,
-      level: "bad",
-      title: `Site slug "${d.slug}" is used by ${d.owners.length} businesses; only ${d.servedBy} is reachable.`,
-      href: "/health",
-    });
-  }
-  return candidates;
-}
-
-/**
- * What one fleet sweep feeds the alert sync. The resolve scope is READABLE
- * businesses only: a failed read yields just health:unreadable, and must never
- * resolve that business's other open alerts. Once it reads again it is in
- * scope, health:unreadable is no longer a candidate, and it resolves itself.
- */
-export function planFleetSync(fleet: ReturnType<typeof getFleetHealth>): { candidates: AlertCandidate[]; tenantIds: number[] } {
-  return {
-    candidates: buildFleetCandidates(fleet),
-    tenantIds: fleet.tenants.filter((t) => t.readable).map((t) => t.tenantId),
-  };
-}
+export { buildFleetCandidates, planFleetSync };
 
 /** One snapshot per readable business (one health sweep), then the alert list reconciled. */
 export function snapshotFleetHealth(now: number = Date.now()): { tenants: number; opened: number; resolved: number } {
@@ -148,7 +112,7 @@ export function snapshotFleetHealth(now: number = Date.now()): { tenants: number
       row.alerts.filter((a) => a.level === "warn").length,
     );
   }
-  const plan = planFleetSync(fleet);
+  const plan = collectAlertCandidates(fleet, now);
   const r = syncPlatformAlerts(plan.candidates, now, { tenantIds: plan.tenantIds, platform: true });
   return { tenants: fleet.tenants.length, opened: r.opened, resolved: r.resolved };
 }
@@ -166,4 +130,84 @@ export function listHealthHistory(tenantId: number, sinceMs: number): HealthSnap
     at: r.at, dbBytes: r.db_bytes, walBytes: r.wal_bytes, queueDue: r.queue_due, queueFailed: r.queue_failed,
     stuck: r.stuck, alertsBad: r.alerts_bad, alertsWarn: r.alerts_warn,
   }));
+}
+
+export interface PlatformAlertRow {
+  id: number;
+  tenantId: number | null;
+  tenantName: string | null;
+  key: string;
+  level: "warn" | "bad";
+  title: string;
+  detail: string | null;
+  href: string | null;
+  openedAt: number;
+  lastSeenAt: number;
+  resolvedAt: number | null;
+  acknowledgedAt: number | null;
+  acknowledgedBy: number | null;
+  snoozedUntil: number | null;
+  assignedTo: number | null;
+}
+
+type RawAlert = {
+  id: number; tenant_id: number | null; tenant_name: string | null; key: string; level: "warn" | "bad"; title: string; detail: string | null;
+  href: string | null; opened_at: number; last_seen_at: number; resolved_at: number | null; acknowledged_at: number | null;
+  acknowledged_by: number | null; snoozed_until: number | null; assigned_to: number | null;
+};
+const toAlert = (r: RawAlert): PlatformAlertRow => ({
+  id: r.id, tenantId: r.tenant_id, tenantName: r.tenant_name, key: r.key, level: r.level, title: r.title, detail: r.detail, href: r.href,
+  openedAt: r.opened_at, lastSeenAt: r.last_seen_at, resolvedAt: r.resolved_at, acknowledgedAt: r.acknowledged_at, acknowledgedBy: r.acknowledged_by,
+  snoozedUntil: r.snoozed_until, assignedTo: r.assigned_to,
+});
+const SELECT = `SELECT a.*, t.name AS tenant_name FROM platform_alerts a LEFT JOIN tenants t ON t.id = a.tenant_id`;
+
+/** Open alerts, bad first, then oldest first. Snoozed ones are included when `includeSnoozed`. */
+export function listOpenAlerts(opts: { tenantId?: number; includeSnoozed?: boolean; now?: number } = {}): PlatformAlertRow[] {
+  const now = opts.now ?? Date.now();
+  const where = ["a.resolved_at IS NULL"];
+  const args: unknown[] = [];
+  if (opts.tenantId !== undefined) { where.push("a.tenant_id = ?"); args.push(opts.tenantId); }
+  if (!opts.includeSnoozed) { where.push("(a.snoozed_until IS NULL OR a.snoozed_until <= ?)"); args.push(now); }
+  const rows = controlSqlite
+    .prepare(`${SELECT} WHERE ${where.join(" AND ")} ORDER BY CASE a.level WHEN 'bad' THEN 0 ELSE 1 END, a.acknowledged_at IS NOT NULL, a.opened_at`)
+    .all(...args) as RawAlert[];
+  return rows.map(toAlert);
+}
+
+export function listAlertHistory(tenantId: number, limit = 50): PlatformAlertRow[] {
+  return (controlSqlite.prepare(`${SELECT} WHERE a.tenant_id = ? ORDER BY a.opened_at DESC LIMIT ?`).all(tenantId, limit) as RawAlert[]).map(toAlert);
+}
+
+export type AlertOp =
+  | { op: "ack" }
+  | { op: "unack" }
+  | { op: "snooze"; until: number }
+  | { op: "assign"; userId: number | null };
+
+export function alertAction(id: number, op: AlertOp, actorUserId: number, now: number = Date.now()): { ok: true } | { ok: false; error: string } {
+  const exists = controlSqlite.prepare("SELECT id FROM platform_alerts WHERE id = ? AND resolved_at IS NULL").get(id);
+  if (!exists) return { ok: false, error: "That alert is closed or does not exist." };
+  switch (op.op) {
+    case "ack":
+      controlSqlite.prepare("UPDATE platform_alerts SET acknowledged_at = ?, acknowledged_by = ? WHERE id = ?").run(now, actorUserId, id);
+      return { ok: true };
+    case "unack":
+      controlSqlite.prepare("UPDATE platform_alerts SET acknowledged_at = NULL, acknowledged_by = NULL WHERE id = ?").run(id);
+      return { ok: true };
+    case "snooze":
+      if (op.until <= now) return { ok: false, error: "Snooze until a time in the future." };
+      controlSqlite.prepare("UPDATE platform_alerts SET snoozed_until = ? WHERE id = ?").run(op.until, id);
+      return { ok: true };
+    case "assign":
+      controlSqlite.prepare("UPDATE platform_alerts SET assigned_to = ? WHERE id = ?").run(op.userId, id);
+      return { ok: true };
+  }
+}
+
+export function countOpenAlerts(now: number = Date.now()): { bad: number; warn: number } {
+  const rows = controlSqlite
+    .prepare("SELECT level, count(*) AS n FROM platform_alerts WHERE resolved_at IS NULL AND (snoozed_until IS NULL OR snoozed_until <= ?) GROUP BY level")
+    .all(now) as Array<{ level: "warn" | "bad"; n: number }>;
+  return { bad: rows.find((r) => r.level === "bad")?.n ?? 0, warn: rows.find((r) => r.level === "warn")?.n ?? 0 };
 }
