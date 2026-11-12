@@ -5755,64 +5755,6 @@ textarea.ag-input { resize: vertical; line-height: 1.5; }
   .wl-grid--rpe { grid-template-columns: 18px minmax(0, 1fr) 50px 40px 34px 44px; gap: 4px; }
 }
 
-/* Member app: the program library (Programs tab). Tenant brand tokens. */
-.pg-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.pg-chip { min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--hairline); background: var(--surface-1); color: var(--text-secondary); font: inherit; font-size: 13px; cursor: pointer; }
-.pg-chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
-.pg-tag { flex-shrink: 0; align-self: flex-start; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--text-tertiary); font-size: 11.5px; }
-.pg-warning { display: flex; gap: 6px; align-items: flex-start; font-size: 12.5px; line-height: 1.4; color: var(--text-secondary); }
-.pg-warning svg { flex-shrink: 0; margin-top: 2px; color: var(--danger); }
-.pg-input { width: 100%; height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--hairline); background-color: var(--surface-2); color: var(--text-primary); font: inherit; font-size: 15px; }
-select.pg-input { padding-right: 36px; }
-.pg-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-.pg-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.pg-cta { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 0 18px; border-radius: var(--radius); background: var(--accent); color: var(--accent-contrast); font-size: 15px; font-weight: 600; text-decoration: none; }
-
-/* Member app: the program builder and the member's own programs. Tenant brand tokens; 44px targets; fits a 320px phone. */
-.bld { display: grid; gap: 14px; }
-.bld-field { display: grid; gap: 6px; min-width: 0; }
-.bld-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
-.bld-hint { font-size: 12.5px; line-height: 1.45; color: var(--text-tertiary); }
-.bld-errors { padding: 12px 14px; border: 1px solid var(--danger); border-radius: var(--radius); background: var(--surface-1); color: var(--text-primary); font-size: 13.5px; line-height: 1.45; }
-.bld-errors ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; }
-.bld-weeks { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; -webkit-overflow-scrolling: touch; }
-.bld-tab { flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--hairline); background: var(--surface-1); color: var(--text-secondary); font: inherit; font-size: 13px; white-space: nowrap; cursor: pointer; }
-.bld-tab[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
-.bld-tools { display: flex; gap: 6px; align-items: center; }
-.bld-tools .pg-input { flex: 1; min-width: 0; }
-.bld-icon { flex-shrink: 0; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; border: 1px solid var(--hairline); background: var(--surface-1); color: var(--text-secondary); cursor: pointer; }
-.bld-icon:disabled { opacity: 0.4; cursor: default; }
-.bld-icon:focus-visible, .bld-tab:focus-visible, .bld-plus:focus-visible, .bld-link:focus-visible, .bld-ex-head:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.bld-day-head { display: flex; gap: 6px; align-items: center; }
-.bld-day-head .pg-input { flex: 1; min-width: 0; font-weight: 600; }
-.bld-ex { border: 1px solid var(--hairline); border-radius: 12px; background: var(--surface-2); }
-.bld-ex[data-joined="true"] { border-left: 3px solid var(--accent); }
-.bld-ex-head { width: 100%; min-height: 52px; display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 0; background: transparent; color: var(--text-secondary); font: inherit; text-align: left; cursor: pointer; }
-.bld-ex-title { flex: 1; min-width: 0; display: grid; gap: 2px; }
-.bld-ex-name { font-size: 14.5px; font-weight: 600; color: var(--text-primary); overflow-wrap: anywhere; }
-.bld-ex-sub { font-size: 12.5px; color: var(--text-tertiary); overflow-wrap: anywhere; }
-.bld-ex-body { display: grid; gap: 12px; padding: 4px 12px 12px; }
-.bld-sets { display: grid; gap: 6px; }
-.bld-set { display: grid; grid-template-columns: 22px minmax(0, 1fr) minmax(0, 1fr) 44px 44px; gap: 6px; align-items: center; }
-.bld-set--head { font-size: 11.5px; color: var(--text-tertiary); }
-.bld-setno { font-size: 13px; color: var(--text-tertiary); text-align: center; font-variant-numeric: tabular-nums; }
-.bld-num { padding: 0 6px; text-align: center; font-variant-numeric: tabular-nums; }
-.bld-plus { width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--hairline); background: var(--surface-1); color: var(--text-secondary); font: inherit; font-size: 18px; font-weight: 600; cursor: pointer; }
-.bld-plus[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); }
-.bld-link { justify-self: start; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 4px; border: 0; background: transparent; color: var(--accent-ink); font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; text-decoration: none; }
-.bld-notes { height: auto; min-height: 64px; padding: 10px 12px; resize: vertical; }
-/* Above the member app's bottom tabs. */
-.bld-save { position: sticky; bottom: 72px; padding-bottom: calc(0px + env(safe-area-inset-bottom)); z-index: 5; }
-.bld-lock { display: grid; gap: 14px; min-width: 0; margin: 0; padding: 0; border: 0; }
-.bld-add { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 44px; padding: 0 14px; border-radius: var(--radius); border: 1px solid var(--hairline); background: var(--surface-1); color: var(--text-primary); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
-.bld-add:disabled { opacity: 0.5; cursor: default; }
-.bld-add:focus-visible, .bld-save-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.bld-danger { color: var(--danger); }
-.bld-save-btn { width: 100%; border: 0; cursor: pointer; font-family: inherit; }
-.bld-save-btn:disabled { opacity: 0.6; cursor: default; }
-.bld-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.bld-chip-link { display: inline-flex; align-items: center; text-decoration: none; }
-
 /* ── Programs kit (.pk-) ── every Programs screen in the member app. Brand variables only, no fixed colours; 44px targets; fits a 320px phone. */
 .pk { display: grid; gap: 18px; min-width: 0; }
 .pk-head { display: grid; gap: 4px; min-width: 0; }
