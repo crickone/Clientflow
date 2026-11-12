@@ -117,11 +117,22 @@ export function openTenantDb(dbFile: string): TenantConn {
     sqlite.pragma("journal_mode = WAL");
   }
   sqlite.pragma("foreign_keys = ON");
-  ensureTenantTables(sqlite);
-  // Batch 6b (improvement-plan-2026-08.md Theme E1): versioned migrations for
-  // schema EVOLUTION (non-additive changes), run after the additive
-  // bootstrap above. See migrations/index.ts for the division of labour.
-  runMigrations(sqlite, TENANT_MIGRATIONS);
+  try {
+    ensureTenantTables(sqlite);
+    // Batch 6b (improvement-plan-2026-08.md Theme E1): versioned migrations for
+    // schema EVOLUTION (non-additive changes), run after the additive
+    // bootstrap above. See migrations/index.ts for the division of labour.
+    runMigrations(sqlite, TENANT_MIGRATIONS);
+  } catch (err) {
+    // Nothing is cached on failure, so the next open retries the bootstrap;
+    // close this handle so a retry does not leak one per attempt.
+    try {
+      sqlite.close();
+    } catch {
+      /* already failing; the original error is the one that matters */
+    }
+    throw err;
+  }
   const conn: TenantConn = { sqlite, db: drizzle(sqlite, { schema }) };
   connCache.set(dbFile, conn);
 
@@ -3153,61 +3164,66 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
   // platform programs, platform programs a gym hid, member enrolments (each
   // with a snapshot of the template it started from) and their change log.
   // Additive; idempotent.
-  try {
-    sqlite.exec(`
-      CREATE TABLE IF NOT EXISTS program_templates (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        based_on TEXT NOT NULL,
-        engine TEXT NOT NULL,
-        name TEXT NOT NULL,
-        template_json TEXT NOT NULL,
-        created_by INTEGER,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS program_library_hidden (
-        program_key TEXT PRIMARY KEY,
-        hidden_by INTEGER,
-        hidden_at INTEGER NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS program_enrolments (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
-        program_key TEXT,
-        copy_id INTEGER REFERENCES program_templates(id) ON DELETE SET NULL,
-        template_json TEXT NOT NULL,
-        maxes_json TEXT NOT NULL DEFAULT '{}',
-        tms_json TEXT NOT NULL DEFAULT '{}',
-        week INTEGER NOT NULL DEFAULT 0,
-        day INTEGER NOT NULL DEFAULT 0,
-        state_json TEXT NOT NULL DEFAULT '{}',
-        status TEXT NOT NULL DEFAULT 'active',
-        start_date TEXT NOT NULL,
-        weekdays TEXT NOT NULL DEFAULT '',
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL,
-        ended_at INTEGER
-      );
-      CREATE INDEX IF NOT EXISTS idx_program_enrolments_client ON program_enrolments(client_id, status);
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_program_enrolments_live ON program_enrolments(client_id) WHERE status IN ('active', 'paused');
-      CREATE TABLE IF NOT EXISTS program_enrolment_events (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        enrolment_id INTEGER NOT NULL REFERENCES program_enrolments(id) ON DELETE CASCADE,
-        at INTEGER NOT NULL,
-        actor TEXT NOT NULL,
-        actor_name TEXT,
-        kind TEXT NOT NULL,
-        reason TEXT NOT NULL,
-        before_json TEXT,
-        after_json TEXT,
-        session_id INTEGER
-      );
-      CREATE INDEX IF NOT EXISTS idx_program_events_enrolment ON program_enrolment_events(enrolment_id, at);
-    `);
-  } catch (err) {
-    console.error("[db] program library tables migration failed:", err);
-  }
-  try {
+  //
+  // Deliberately NOT wrapped in a swallowing try/catch. The ALTERs below add
+  // columns to tables the app already reads (clients, workout_sessions,
+  // workout_session_exercises, workout_set_logs), and a drizzle select()
+  // names every schema column. If one failed and was only logged, this
+  // connection would be cached without the column and every read of that
+  // table would fail for the business until a restart. Throwing here fails
+  // the open instead (openTenantDb caches nothing), so the next request
+  // retries it.
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS program_templates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      based_on TEXT NOT NULL,
+      engine TEXT NOT NULL,
+      name TEXT NOT NULL,
+      template_json TEXT NOT NULL,
+      created_by INTEGER,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS program_library_hidden (
+      program_key TEXT PRIMARY KEY,
+      hidden_by INTEGER,
+      hidden_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS program_enrolments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      program_key TEXT,
+      copy_id INTEGER REFERENCES program_templates(id) ON DELETE SET NULL,
+      template_json TEXT NOT NULL,
+      maxes_json TEXT NOT NULL DEFAULT '{}',
+      tms_json TEXT NOT NULL DEFAULT '{}',
+      week INTEGER NOT NULL DEFAULT 0,
+      day INTEGER NOT NULL DEFAULT 0,
+      state_json TEXT NOT NULL DEFAULT '{}',
+      status TEXT NOT NULL DEFAULT 'active',
+      start_date TEXT NOT NULL,
+      weekdays TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      ended_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_program_enrolments_client ON program_enrolments(client_id, status);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_program_enrolments_live ON program_enrolments(client_id) WHERE status IN ('active', 'paused');
+    CREATE TABLE IF NOT EXISTS program_enrolment_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      enrolment_id INTEGER NOT NULL REFERENCES program_enrolments(id) ON DELETE CASCADE,
+      at INTEGER NOT NULL,
+      actor TEXT NOT NULL,
+      actor_name TEXT,
+      kind TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      before_json TEXT,
+      after_json TEXT,
+      session_id INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_program_events_enrolment ON program_enrolment_events(enrolment_id, at);
+  `);
+  {
     const addColumn = (table: string, column: string, ddl: string) => {
       const cols = sqlite.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
       if (cols.length && !cols.some((c) => c.name === column)) sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
@@ -3219,8 +3235,6 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
     addColumn("workout_session_exercises", "rx_json", "rx_json TEXT");
     addColumn("workout_set_logs", "target_weight_kg", "target_weight_kg REAL");
     addColumn("workout_set_logs", "rpe", "rpe REAL");
-  } catch (err) {
-    console.error("[db] DIY training columns migration failed:", err);
   }
 
   // Dashboard slice 2: stamp each event recorder's start date once.

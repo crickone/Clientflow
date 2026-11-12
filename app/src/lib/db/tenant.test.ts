@@ -52,6 +52,58 @@ const requireLocal = createRequire(import.meta.url);
   );
 }
 
+// ── ensureTenantTables: a failed DIY column ALTER fails the open ───────────
+// The DIY columns on clients / workout_* are read by every drizzle select of
+// those tables, so a failed ALTER must throw (openTenantDb then caches
+// nothing and the next request retries) instead of being logged and skipped.
+{
+  const { ensureTenantTables } = requireLocal("./tenant") as typeof import("./tenant");
+  const Database = requireLocal("better-sqlite3") as typeof import("better-sqlite3");
+  const sqlite = new Database(":memory:");
+  const realExec = sqlite.exec.bind(sqlite);
+  let failOn: string | null = "ALTER TABLE clients ADD COLUMN training_mode";
+  (sqlite as unknown as { exec: (sql: string) => unknown }).exec = (sql: string) => {
+    if (failOn && sql.includes(failOn)) throw new Error("simulated ALTER failure");
+    return realExec(sql);
+  };
+  const columns = (table: string) =>
+    (sqlite.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map((c) => c.name);
+
+  assert.throws(
+    () => ensureTenantTables(sqlite),
+    /simulated ALTER failure/,
+    "a failed clients.training_mode ALTER throws out of ensureTenantTables",
+  );
+  assert.ok(!columns("clients").includes("training_mode"), "the column really is missing after the failure");
+
+  failOn = "ALTER TABLE workout_set_logs ADD COLUMN rpe";
+  assert.throws(
+    () => ensureTenantTables(sqlite),
+    /simulated ALTER failure/,
+    "a failed ALTER on a workout table throws too",
+  );
+
+  // The retry, with the fault gone, adds every column; a further run is a no-op.
+  failOn = null;
+  ensureTenantTables(sqlite);
+  ensureTenantTables(sqlite);
+  for (const [table, column] of [
+    ["clients", "training_mode"],
+    ["clients", "weight_unit"],
+    ["clients", "plate_step_kg"],
+    ["workout_sessions", "enrolment_id"],
+    ["workout_session_exercises", "rx_json"],
+    ["workout_set_logs", "target_weight_kg"],
+    ["workout_set_logs", "rpe"],
+  ] as const) {
+    assert.ok(columns(table).includes(column), `${table}.${column} exists after the retry`);
+  }
+  for (const table of ["program_templates", "program_library_hidden", "program_enrolments", "program_enrolment_events"]) {
+    assert.ok(columns(table).length > 0, `${table} exists after the retry`);
+  }
+  sqlite.close();
+}
+
 // ── openTenantDb: WAL pragmas + checkpoint pass on a real connection ───────
 // Wrapped in an async IIFE (not top-level await): this project's package.json
 // has no "type": "module", so tsx/esbuild compiles .ts files to CJS, where
