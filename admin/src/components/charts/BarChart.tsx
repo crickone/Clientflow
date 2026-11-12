@@ -4,7 +4,11 @@ import { useState } from "react";
 
 import { niceTicks, scale } from "@/lib/chart";
 
-/** Up (gains) above the line in the accent, down (losses) below in grey, a dot for net. For MRR movements. */
+/**
+ * Up (gains) above the line in the accent, down (losses) below in grey, a dot for net. For MRR movements.
+ * `up` and `down` are both positive magnitudes (down is the size of the loss, not a negative number);
+ * negative values are clamped to 0. `net` may be negative.
+ */
 export function BarChart({
   title,
   groups,
@@ -16,6 +20,8 @@ export function BarChart({
   height?: number;
   format?: (v: number) => string;
 }) {
+  const safe = (v: number) => (Number.isFinite(v) ? v : 0);
+  groups = groups.map((g) => ({ ...g, up: Math.max(0, safe(g.up)), down: Math.max(0, safe(g.down)), net: safe(g.net) }));
   const [hover, setHover] = useState<number | null>(null);
   const width = 600;
   const pad = { l: 50, r: 12, t: 12, b: 26 };
@@ -27,12 +33,14 @@ export function BarChart({
   const half = innerH / 2;
   const y = scale(top, half);
   const slot = innerW / groups.length;
+  const last = groups[groups.length - 1];
+  const summary = `${title}: latest month ${last.label} gained ${format(last.up)}, lost ${format(last.down)}, net ${format(last.net)}`;
   const bar = Math.min(28, slot * 0.5);
   const mid = pad.t + half;
   return (
     <figure className="chart" aria-label={title}>
       <figcaption className="chart-title">{title}</figcaption>
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" onMouseLeave={() => setHover(null)}>
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={summary} onMouseLeave={() => setHover(null)}>
         {[-top, -top / 2, 0, top / 2, top].map((t) => (
           <g key={t}>
             <line x1={pad.l} x2={width - pad.r} y1={mid - y(t)} y2={mid - y(t)} className={t === 0 ? "chart-axis" : "chart-grid"} />

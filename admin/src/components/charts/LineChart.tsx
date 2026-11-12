@@ -2,13 +2,14 @@
 
 import { useId, useState } from "react";
 
-import { niceTicks, scale } from "@/lib/chart";
+import { niceRange, scaleDomain } from "@/lib/chart";
 
 /**
  * Inline SVG line chart. One accent series (the metal gradient already used
  * by the dashboard sparkline), the rest in grey. Axes, round ticks, and a
- * hover readout. Refuses to draw when every value is zero: a flat line
- * along nothing is a picture of nothing, so it says so instead.
+ * hover readout. Negative values draw below a zero line. Refuses to draw when
+ * every value is exactly zero: a flat line along nothing is a picture of
+ * nothing, so it says so instead.
  */
 export function LineChart({
   title,
@@ -29,18 +30,23 @@ export function LineChart({
   const pad = { l: 44, r: 12, t: 12, b: 26 };
   const innerW = width - pad.l - pad.r;
   const innerH = height - pad.t - pad.b;
-  const max = Math.max(0, ...series.flatMap((s) => s.values));
-  if (max === 0) return <div className="chart chart--empty"><span className="chart-title">{title}</span><span>No movement yet.</span></div>;
-  const ticks = niceTicks(max);
+  const all = series.flatMap((s) => s.values).filter((v) => Number.isFinite(v));
+  if (all.every((v) => v === 0)) return <div className="chart chart--empty"><span className="chart-title">{title}</span><span>No movement yet.</span></div>;
+  const ticks = niceRange(Math.min(0, ...all), Math.max(0, ...all));
+  const bottom = ticks[0];
   const top = ticks[ticks.length - 1];
-  const y = scale(top, innerH);
-  const x = (i: number) => (labels.length <= 1 ? 0 : (i / (labels.length - 1)) * innerW);
+  const sy = scaleDomain(bottom, top, innerH);
+  const y = (v: number) => sy(Number.isFinite(v) ? v : 0);
+  const crossesZero = bottom < 0 && top > 0;
+  const x = (i: number) => (labels.length <= 1 ? innerW / 2 : (i / (labels.length - 1)) * innerW);
   const path = (vals: number[]) => vals.map((v, i) => `${i === 0 ? "M" : "L"}${pad.l + x(i)},${pad.t + innerH - y(v)}`).join(" ");
+  const slotW = innerW / Math.max(1, labels.length);
+  const summary = `${title}: ` + series.map((s) => `latest ${s.label} ${format(s.values[s.values.length - 1] ?? 0)}`).join(", ");
 
   return (
     <figure className="chart" aria-label={title}>
       <figcaption className="chart-title">{title}</figcaption>
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" onMouseLeave={() => setHover(null)}>
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={summary} onMouseLeave={() => setHover(null)}>
         <defs>
           <linearGradient id={`${id}-accent`} x1="0" y1="0" x2="1" y2="0">
             <stop offset="0" stopColor="#ffffff" />
@@ -50,7 +56,7 @@ export function LineChart({
         </defs>
         {ticks.map((t) => (
           <g key={t}>
-            <line x1={pad.l} x2={width - pad.r} y1={pad.t + innerH - y(t)} y2={pad.t + innerH - y(t)} className="chart-grid" />
+            <line x1={pad.l} x2={width - pad.r} y1={pad.t + innerH - y(t)} y2={pad.t + innerH - y(t)} className={t === 0 && crossesZero ? "chart-axis" : "chart-grid"} />
             <text x={pad.l - 8} y={pad.t + innerH - y(t) + 3.5} className="chart-tick" textAnchor="end">{format(t)}</text>
           </g>
         ))}
@@ -60,8 +66,11 @@ export function LineChart({
         {series.map((s) => (
           <path key={s.label} d={path(s.values)} fill="none" stroke={s.accent ? `url(#${id}-accent)` : "rgba(244,245,247,0.28)"} strokeWidth={s.accent ? 2 : 1.5} strokeLinejoin="round" strokeLinecap="round" />
         ))}
+        {series.map((s) => s.values.length === 1 && (
+          <circle key={`${s.label}-dot`} cx={pad.l + x(0)} cy={pad.t + innerH - y(s.values[0])} r={3.5} fill={s.accent ? "#ffffff" : "rgba(244,245,247,0.6)"} />
+        ))}
         {labels.map((_, i) => (
-          <rect key={i} x={pad.l + x(i) - innerW / labels.length / 2} y={pad.t} width={innerW / labels.length} height={innerH} fill="transparent" onMouseEnter={() => setHover(i)} />
+          <rect key={i} x={Math.max(pad.l, Math.min(pad.l + x(i) - slotW / 2, width - pad.r - slotW))} y={pad.t} width={slotW} height={innerH} fill="transparent" onMouseEnter={() => setHover(i)} />
         ))}
         {hover !== null && (
           <g>
