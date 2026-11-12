@@ -4,9 +4,15 @@
  * into a database, so a change here reaches every gym on the next deploy.
  * Gym copies live in the tenant DB (lib/programs/library.ts).
  */
+import { arnoldStyle } from "./templates/arnold";
 import { canditoStyle } from "./templates/candito";
 import { greyskullLp } from "./templates/greyskull";
+import { germanVolumeTraining } from "./templates/gvt";
 import { gzclp } from "./templates/gzclp";
+import { hitStyle } from "./templates/hit";
+import { phat } from "./templates/phat";
+import { phul } from "./templates/phul";
+import { pushPullLegs } from "./templates/ppl";
 import { russianSquatRoutine } from "./templates/rsr";
 import { sheikoStyle } from "./templates/sheiko";
 import { smolovBase, smolovJrBench, smolovJrSquat } from "./templates/smolov";
@@ -35,6 +41,13 @@ export const PLATFORM_PROGRAMS: ProgramTemplate[] = [
   russianSquatRoutine,
   canditoStyle,
   sheikoStyle,
+  // bodybuilding and hypertrophy
+  germanVolumeTraining,
+  phul,
+  phat,
+  arnoldStyle,
+  pushPullLegs,
+  hitStyle,
 ];
 
 const BY_KEY = new Map(PLATFORM_PROGRAMS.map((t) => [t.key, t]));

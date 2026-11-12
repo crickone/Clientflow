@@ -49,3 +49,8 @@ export const MAX_TEST_NOTE = "Work up to a new 1-rep max. Use safety bars or a s
 export function maxTest(name: string, lift: LiftKey): ExerciseRx {
   return ex(name, [pct(0.5, 5, 120), pct(0.7, 3, 150), pct(0.85, 1, 180), pct(0.95, 1, 240), rpe(10, 1, 300)], { lift, notes: MAX_TEST_NOTE });
 }
+
+/** n sets of a rep range at a fixed weight: rs(4, 8, 12) is 4 x 8-12. */
+export function rs(n: number, min: number, max: number, rest = 90): SetRx[] {
+  return times(n, fixed(range(min, max), rest));
+}
