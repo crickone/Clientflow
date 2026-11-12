@@ -16,7 +16,14 @@ export const dynamic = "force-dynamic";
 export default async function StartProgramPage(props: { params: Promise<{ key: string }> }) {
   const { key } = await props.params;
   const { clientId, client } = requireProgramsPage();
-  const entry = programByKey(decodeURIComponent(key));
+  // A malformed escape (e.g. "%E0%A4%A") makes decodeURIComponent throw: a 404, not a 500.
+  let programKey: string;
+  try {
+    programKey = decodeURIComponent(key);
+  } catch {
+    notFound();
+  }
+  const entry = programByKey(programKey);
   if (!entry) notFound();
   if (liveEnrolment(clientId)) redirect("/app/programs/mine");
   const t = entry.template;

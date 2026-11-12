@@ -41,7 +41,8 @@ export function ClientProgramPanel({ clientId, data }: { clientId: number; data:
     startWeek(async () => {
       const r = await coachMoveWeekAction(clientId, live.enrolmentId, weekIndex);
       if (!r.ok) return void toast.error(r.error);
-      toast.success(`Moved to week ${weekIndex + 1}.`);
+      const to = live.weeks.find((w) => w.index === weekIndex);
+      toast.success(to ? `Moved to week ${to.number}.` : "Moved.");
       router.refresh();
     });
   }
@@ -86,35 +87,40 @@ export function ClientProgramPanel({ clientId, data }: { clientId: number; data:
             </div>
           )}
 
-          <div className="dp-forms">
-            {live.lifts.length > 0 && (
-              <form className="dp-form" onSubmit={saveMax}>
-                <select value={lift} onChange={(e) => setLift(e.target.value as typeof lift)} aria-label="Lift">
-                  {live.lifts.map((l) => (
-                    <option key={l.lift} value={l.lift}>
-                      {l.label}
-                    </option>
-                  ))}
-                </select>
-                <Input inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} placeholder={`New max in ${live.unit}`} style={{ width: 150 }} />
-                <Button type="submit" variant="secondary" loading={maxPending} disabled={!value.trim()}>
-                  Correct max
-                </Button>
-              </form>
-            )}
-            <form className="dp-form" onSubmit={moveWeek}>
-              <select value={weekIndex} onChange={(e) => setWeekIndex(Number(e.target.value))} aria-label="Week">
-                {live.weeks.map((w) => (
-                  <option key={w.index} value={w.index}>
-                    {w.label}
-                  </option>
-                ))}
-              </select>
-              <Button type="submit" variant="secondary" loading={weekPending}>
-                Move to this week
-              </Button>
-            </form>
-          </div>
+          {(live.lifts.length > 0 || live.weeks.length > 1) && (
+            <div className="dp-forms">
+              {live.lifts.length > 0 && (
+                <form className="dp-form" onSubmit={saveMax}>
+                  <select value={lift} onChange={(e) => setLift(e.target.value as typeof lift)} aria-label="Lift">
+                    {live.lifts.map((l) => (
+                      <option key={l.lift} value={l.lift}>
+                        {l.label}
+                      </option>
+                    ))}
+                  </select>
+                  <Input inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} placeholder={`New max in ${live.unit}`} style={{ width: 150 }} />
+                  <Button type="submit" variant="secondary" loading={maxPending} disabled={!value.trim()}>
+                    Correct max
+                  </Button>
+                </form>
+              )}
+              {/* A single repeating week (PPL, Arnold, GVT) has nowhere to move to. */}
+              {live.weeks.length > 1 && (
+                <form className="dp-form" onSubmit={moveWeek}>
+                  <select value={weekIndex} onChange={(e) => setWeekIndex(Number(e.target.value))} aria-label="Week">
+                    {live.weeks.map((w) => (
+                      <option key={w.index} value={w.index}>
+                        {w.label}
+                      </option>
+                    ))}
+                  </select>
+                  <Button type="submit" variant="secondary" loading={weekPending}>
+                    Move to this week
+                  </Button>
+                </form>
+              )}
+            </div>
+          )}
 
           <div className="dp-card">
             <div className="dp-card-title">Recent skips</div>

@@ -16,7 +16,14 @@ export const dynamic = "force-dynamic";
 export default async function ProgramDetailPage(props: { params: Promise<{ key: string }> }) {
   const { key } = await props.params;
   const { clientId } = requireProgramsPage();
-  const entry = programByKey(decodeURIComponent(key));
+  // A malformed escape (e.g. "%E0%A4%A") makes decodeURIComponent throw: a 404, not a 500.
+  let programKey: string;
+  try {
+    programKey = decodeURIComponent(key);
+  } catch {
+    notFound();
+  }
+  const entry = programByKey(programKey);
   if (!entry) notFound();
   const t = entry.template;
   const card = toCard(t, entry.basedOnName);

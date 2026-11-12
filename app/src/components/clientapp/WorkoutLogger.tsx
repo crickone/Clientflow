@@ -26,6 +26,7 @@ import {
   completeSet,
   durationLabel,
   parseReps,
+  plannedFill,
   restLabel,
   targetRepsNumber,
   volumeKg,
@@ -205,8 +206,9 @@ export function WorkoutLogger({
       return;
     }
     const base = !s.w && opts.suggestKg !== null && i === 0 ? { ...s, w: String(kgToUnit(opts.suggestKg, unit)) } : s;
-    // A planned set fills from the plan: its weight, and its reps (the minimum on a + set).
-    const planned = opts.plan ? { weightKg: opts.plan.kg, reps: opts.plan.reps, done: true } : undefined;
+    // A planned set fills from the plan: its weight, and its reps (the minimum on a + set). A set
+    // planned with no weight takes last time's, then the set above, as a coach session does.
+    const planned = opts.plan ? plannedFill(opts.plan, prev) : undefined;
     const filled = completeSet(
       loggedOf(base),
       planned ?? (prev && opts.suggestKg !== null ? { ...prev, weightKg: opts.suggestKg } : prev),

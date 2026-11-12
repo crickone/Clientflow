@@ -13,6 +13,7 @@ import {
   parseReps,
   parseWeight,
   personalBests,
+  plannedFill,
   restFor,
   setsDone,
   targetRepsNumber,
@@ -48,6 +49,19 @@ const first = completeSet({ weightKg: null, reps: null }, undefined, undefined, 
 check("first set ever fills target reps only", first.weightKg === null && first.reps === 8);
 const second = completeSet({ weightKg: null, reps: null }, undefined, { weightKg: 60, reps: 8 }, "8-10");
 check("first time, set 2 carries the set above", second.weightKg === 60 && second.reps === 8);
+
+// A program set fills from the plan. One planned with no weight (GVT's "pick a
+// weight" accessories) takes last time's weight, then the set above today.
+const planKg = completeSet({ weightKg: null, reps: null }, plannedFill({ kg: 80, reps: 5 }, prev), undefined, null);
+check("planned set fills the planned weight and reps", planKg.weightKg === 80 && planKg.reps === 5);
+const pickLast = completeSet({ weightKg: null, reps: null }, plannedFill({ kg: null, reps: 10 }, prev), { weightKg: 40, reps: 10 }, null);
+check("unweighted planned set takes last time's weight", pickLast.weightKg === 60 && pickLast.reps === 10);
+const pickAbove = completeSet({ weightKg: null, reps: null }, plannedFill({ kg: null, reps: 10 }, undefined), { weightKg: 40, reps: 10 }, null);
+check("unweighted planned set with no last time takes the set above", pickAbove.weightKg === 40 && pickAbove.reps === 10);
+const pickNone = completeSet({ weightKg: null, reps: null }, plannedFill({ kg: null, reps: 10 }, undefined), undefined, null);
+check("first time, first set: reps only", pickNone.weightKg === null && pickNone.reps === 10);
+const pickTyped = completeSet({ weightKg: 55, reps: null }, plannedFill({ kg: null, reps: 10 }, prev), undefined, null);
+check("a typed weight still wins", pickTyped.weightKg === 55);
 
 const sets = [
   { weightKg: 100, reps: 1, done: true },

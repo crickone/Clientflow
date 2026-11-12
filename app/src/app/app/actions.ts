@@ -33,7 +33,7 @@ import {
   type StartResult,
 } from "@/lib/workoutLog";
 import { finishEnrolmentSession } from "@/lib/programs/enrolments";
-import { memberSeesPrograms } from "@/lib/programs/access";
+import { programsOn } from "@/lib/programs/access";
 import { listExercises } from "@/lib/exerciseLibrary";
 import { searchExercises } from "@/lib/workoutGroupsModel";
 import { setTrainingPlan } from "@/lib/trainingOverview";
@@ -262,7 +262,10 @@ export async function finishWorkoutAction(sessionId: number, exercises: unknown)
   // already counted, so a retry after a failure is safe and a later re-save changes nothing.
   let program: { reasons: string[]; finished: boolean } | null = null;
   let programError: string | null = null;
-  if (session.enrolmentId && memberSeesPrograms(current)) {
+  // Any program session runs through the store while the module is on, whatever the member's
+  // training mode now: a member switched to coach mid-workout has a paused enrolment, and the
+  // store's paused branch records that the session did not move it on.
+  if (session.enrolmentId && programsOn(current.tenantId)) {
     try {
       program = finishEnrolmentSession(clientId, session.id);
     } catch (err) {

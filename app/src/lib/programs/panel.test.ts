@@ -15,7 +15,7 @@ const data = panelFrom({
   plan: planSession(sl, state, { stepKg: 2.5 }),
   events: [
     { id: 3, at, actor: "staff:4", actorName: "Ann Byrne", kind: "max", reason: "Ann Byrne set the squat max to 140 kg, training max 140 kg." },
-    { id: 2, at, actor: "member", actorName: null, kind: "skip", reason: "Skipped Workout B, week 1." },
+    { id: 2, at, actor: "member", actorName: null, kind: "skip", reason: "Skipped Workout B, week 1 of 12." },
     { id: 1, at, actor: "engine", actorName: null, kind: "progress", reason: "Next back squat 52.5 kg. You did all 5 sets of 5.\nNext bench press 42.5 kg. You did all 5 sets of 5." },
   ],
   past: [{ name: "Starting Strength", endedAt: at }],
@@ -25,11 +25,11 @@ const live = data.live!;
 assert.equal(live.weekLine, "Week 1 of 12");
 assert.equal(live.byline, "StrongLifts 5x5 by Mehdi Hadim");
 assert.deepEqual(live.lifts[0], { lift: "squat", label: "Squat", max: "100 kg", tm: null, maxInUnit: 100 });
-assert.deepEqual(live.next, { title: "Workout A, week 1", lines: ["Back squat 5 x 5 at 50 kg", "Bench press 5 x 5 at 40 kg", "Barbell row 5 x 5 at 35 kg"] });
+assert.deepEqual(live.next, { title: "Workout A, week 1 of 12", lines: ["Back squat 5 x 5 at 50 kg", "Bench press 5 x 5 at 40 kg", "Barbell row 5 x 5 at 35 kg"] });
 assert.deepEqual(live.events.map((e) => e.who), ["Coach Ann Byrne", "Member", "Program"]);
 assert.equal(live.events[2].lines.length, 2);
-assert.deepEqual(live.skipped.map((s) => s.text), ["Skipped Workout B, week 1."]);
-assert.deepEqual(live.weeks, [{ index: 0, label: "Week 1" }, { index: 1, label: "Week 2" }]);
+assert.deepEqual(live.skipped.map((s) => s.text), ["Skipped Workout B, week 1 of 12."]);
+assert.deepEqual(live.weeks, [{ index: 0, number: 1, label: "Week 1" }, { index: 1, number: 2, label: "Week 2" }]);
 assert.equal(data.past[0].name, "Starting Strength");
 assert.equal(data.past[0].ended, "12 Nov 2026");
 
@@ -40,6 +40,34 @@ assert.equal(b.live!.status, "paused");
 assert.equal(b.live!.lifts[0].max, "220.5 lb");
 assert.equal(b.live!.lifts[0].tm, "198.4 lb");
 assert.equal(b.live!.next, null);
+
+// the coach's week options are weeks of the member's current round: a 5/3/1
+// member in their second cycle (cycle 1) on its 3s week sees weeks 5 to 8,
+// with week 6 the one selected
+const bbbCycle1 = { ...initState(bbb, { press: 100, deadlift: 100, bench: 100, squat: 100 }, 2.5), cycle: 1, week: 1, day: 2 };
+const c1 = panelFrom({ enrolment: { id: 3, status: "active", template: bbb, state: bbbCycle1, unit: "kg", basedOnName: null }, plan: planSession(bbb, bbbCycle1, { stepKg: 2.5 }), events: [], past: [] }).live!;
+assert.deepEqual(
+  c1.weeks.map((w) => w.label),
+  ["Week 5: 5s week", "Week 6: 3s week", "Week 7: 5/3/1 week", "Week 8: Deload"],
+);
+assert.equal(c1.currentWeek, 1);
+assert.equal(c1.weeks.find((w) => w.index === c1.currentWeek)!.label, "Week 6: 3s week", "the current week is the selected option");
+assert.equal(c1.weekLine, "Week 6 of 12");
+assert.equal(c1.next!.title, "Bench day, week 6 of 12");
+
+// past its length the options restart with the round, as weekLabel does
+const bbbRound2 = { ...bbbCycle1, cycle: 3, week: 0 };
+const r2 = panelFrom({ enrolment: { id: 3, status: "active", template: bbb, state: bbbRound2, unit: "kg", basedOnName: null }, plan: null, events: [], past: [] }).live!;
+assert.equal(r2.weekLine, "Week 1 of 12, round 2");
+assert.deepEqual(r2.weeks.map((w) => w.number), [1, 2, 3, 4]);
+
+// a single repeating week has nowhere to move, so no options (the control is hidden)
+for (const key of ["push-pull-legs", "arnold-style-split", "german-volume-training"]) {
+  const tpl = platformProgram(key)!;
+  assert.equal(tpl.weeks.length, 1, `${key} has one repeating week`);
+  const p = panelFrom({ enrolment: { id: 8, status: "active", template: tpl, state: { ...initState(tpl, {}, 2.5), cycle: 2 }, unit: "kg", basedOnName: null }, plan: null, events: [], past: [] });
+  assert.deepEqual(p.live!.weeks, [], `${key} offers no week to move to`);
+}
 
 // past its length the week reads as a round
 const again = panelFrom({ enrolment: { id: 2, status: "active", template: sl, state: { ...state, cycle: 6 }, unit: "kg", basedOnName: null }, plan: null, events: [], past: [] });

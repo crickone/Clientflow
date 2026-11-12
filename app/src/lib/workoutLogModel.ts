@@ -139,6 +139,19 @@ export function completeSet(
   };
 }
 
+/**
+ * What ticking a program set fills from: the planned weight and reps. A set
+ * planned with no weight (a "pick a weight" accessory) takes last time's
+ * weight on that set, as a coach session does; completeSet then falls back to
+ * the set above it today.
+ */
+export function plannedFill(
+  plan: { kg: number | null; reps: number },
+  lastTime: Pick<LoggedSet, "weightKg"> | undefined,
+): Pick<LoggedSet, "weightKg" | "reps"> {
+  return { weightKg: plan.kg ?? lastTime?.weightKg ?? null, reps: plan.reps };
+}
+
 /** Exercises whose best set today beats every earlier session's best. */
 export function personalBests(
   exercises: Pick<SessionExercise, "exerciseKey" | "name" | "sets">[],

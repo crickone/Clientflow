@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 
 import { amrap, day, ex, fixed, maxTest, range, sxr, week } from "./dsl";
 import {
+  dayTitle,
+  weekInRound,
   weekLabel,
   advance,
   isLastSession,
@@ -116,5 +118,8 @@ assert.equal(weekLabel(block, { week: 0, cycle: 1 }), "Week 1 of 4, round 2");
 const short = { weeks: [week([])], lengthWeeks: 12 };
 assert.equal(weekLabel(short, { week: 0, cycle: 8 }), "Week 9 of 12");
 assert.equal(weekLabel(short, { week: 0, cycle: 12 }), "Week 1 of 12, round 2");
+assert.deepEqual(weekInRound(block, { week: 0, cycle: 1 }), { week: 1, of: 4, round: 2 });
+assert.equal(dayTitle("Workout A", block, { week: 2, cycle: 0 }), "Workout A, week 3 of 4");
+assert.equal(dayTitle("Workout A", block, { week: 0, cycle: 1 }), "Workout A, week 1 of 4, round 2");
 
 console.log("programs/planner: ok");

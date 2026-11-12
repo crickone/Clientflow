@@ -67,12 +67,23 @@ export function weekNumber(t: Pick<ProgramTemplate, "weeks">, s: Pick<EngineStat
   return s.cycle * t.weeks.length + s.week + 1;
 }
 
-/** "Week 3 of 8", and "Week 1 of 8, round 2" once a program runs past its length (a restart, or a repeat). */
-export function weekLabel(t: Pick<ProgramTemplate, "weeks" | "lengthWeeks">, s: Pick<EngineState, "week" | "cycle">): string {
+/** Where a week falls in the program's length: week 3 of 8 in round 1, or week 1 of 8 in round 2 once it runs past its length. */
+export function weekInRound(t: Pick<ProgramTemplate, "weeks" | "lengthWeeks">, s: Pick<EngineState, "week" | "cycle">): { week: number; of: number; round: number } {
   const n = weekNumber(t, s);
   const len = Math.max(1, t.lengthWeeks);
-  if (n <= len) return `Week ${n} of ${len}`;
-  return `Week ${((n - 1) % len) + 1} of ${len}, round ${Math.floor((n - 1) / len) + 1}`;
+  return { week: ((n - 1) % len) + 1, of: len, round: Math.floor((n - 1) / len) + 1 };
+}
+
+/** "Week 3 of 8", and "Week 1 of 8, round 2" once a program runs past its length (a restart, or a repeat). */
+export function weekLabel(t: Pick<ProgramTemplate, "weeks" | "lengthWeeks">, s: Pick<EngineState, "week" | "cycle">): string {
+  const r = weekInRound(t, s);
+  return r.round === 1 ? `Week ${r.week} of ${r.of}` : `Week ${r.week} of ${r.of}, round ${r.round}`;
+}
+
+/** "Workout A, week 3 of 8", or "Workout A, week 1 of 8, round 2": a day named with weekLabel's week. */
+export function dayTitle(dayName: string, t: Pick<ProgramTemplate, "weeks" | "lengthWeeks">, s: Pick<EngineState, "week" | "cycle">): string {
+  const w = weekLabel(t, s);
+  return `${dayName}, ${w.charAt(0).toLowerCase()}${w.slice(1)}`;
 }
 
 export interface PlanContext {

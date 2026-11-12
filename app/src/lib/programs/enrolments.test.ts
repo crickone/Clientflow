@@ -125,7 +125,7 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(view.template.key, "stronglifts-5x5");
     const plan = en.planFor(view)!;
     assert.equal(plan.dayName, "Workout A");
-    assert.equal(en.sessionTitle(view, plan), "Workout A, week 1");
+    assert.equal(en.sessionTitle(view, plan), "Workout A, week 1 of 12");
 
     // ── start a session from the plan; starting again resumes it ──
     const s = en.startEnrolmentSession(clientId);
@@ -135,7 +135,7 @@ const requireLocal = createRequire(import.meta.url);
     const session = log.getSession(clientId, s.sessionId)!;
     assert.equal(session.enrolmentId, view.id);
     assert.equal(session.programId, null);
-    assert.equal(session.dayName, "Workout A, week 1");
+    assert.equal(session.dayName, "Workout A, week 1 of 12");
     assert.equal(session.exercises[0].plan?.sets[0].kg, 50);
     assert.equal(session.exercises[0].sets[0].targetKg, 50);
     assert.equal(session.exercises[0].targetReps, "5");
@@ -191,6 +191,11 @@ const requireLocal = createRequire(import.meta.url);
     assert.deepEqual(en.coachSetMax(clientId + 999, view.id, "squat", 140, staff), { ok: false, error: "That program has ended." });
     assert.deepEqual(en.coachMoveToWeek(clientId, view.id, 1, staff), { ok: true });
     assert.deepEqual([en.liveEnrolment(clientId)!.state.week, en.liveEnrolment(clientId)!.state.day], [1, 0]);
+    assert.equal(
+      en.enrolmentEvents(view.id).find((x) => x.kind === "week")!.reason,
+      "Coach Ann moved the program to week 2 of 12.",
+      "the move names the week as weekLabel does",
+    );
     assert.deepEqual(en.coachMoveToWeek(clientId, view.id, 9, staff), { ok: false, error: "That week isn't in the program." });
 
     const events = en.enrolmentEvents(view.id);
@@ -401,6 +406,9 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(stateOf(clientId), before);
     assert.deepEqual(en.restartFromTest(clientId, { squat: 150 }), { ok: true });
     assert.equal(en.liveEnrolment(clientId)!.state.maxes.squat, 150);
+    // after a restart the session title reads as a second round of the block
+    const again = en.liveEnrolment(clientId)!;
+    assert.match(en.sessionTitle(again, en.planFor(again)!), /, week 1 of 4, round 2$/);
   });
 
   // ── 3. a ticked set counts at its planned weight ──
@@ -413,6 +421,22 @@ const requireLocal = createRequire(import.meta.url);
     const end = en.liveEnrolment(clientId)!;
     assert.equal(end.state.cycle, 1);
     for (const lift of start.template.lifts) assert.ok(end.state.tms[lift]! > start.state.tms[lift]!, `${lift} training max went up`);
+  });
+
+  test("5/3/1: a coach move in the second cycle is logged as a week of that cycle", () => {
+    const clientId = newMember();
+    const id = enrolIn(clientId, "531-bbb", { press: 50, deadlift: 140, bench: 80, squat: 120 }, [1, 2, 4, 5]);
+    const perCycle = en.liveEnrolment(clientId)!.template.weeks.reduce((n, w) => n + w.days.length, 0);
+    for (let i = 0; i < perCycle; i++) assert.deepEqual(en.skipEnrolmentSession(clientId), { ok: true });
+    assert.equal(en.liveEnrolment(clientId)!.state.cycle, 1);
+    assert.deepEqual(en.coachMoveToWeek(clientId, id, 2, staff), { ok: true });
+    const moved = en.enrolmentEvents(id).find((x) => x.kind === "week")!;
+    assert.equal(moved.reason, "Coach Ann moved the program to week 7 of 12.");
+    const v = en.liveEnrolment(clientId)!;
+    assert.equal(en.sessionTitle(v, en.planFor(v)!), "Press day, week 7 of 12");
+    const skips = en.enrolmentEvents(id, 500).filter((x) => x.kind === "skip").sort((x, y) => x.id - y.id);
+    assert.match(skips[0].reason, /^Skipped Press day, week 1 of 12\./);
+    assert.match(skips[skips.length - 1].reason, /^Skipped Squat day, week 4 of 12\./);
   });
 
   test("bestLoggedSet counts a ticked set at its planned weight", () => {
@@ -448,10 +472,10 @@ const requireLocal = createRequire(import.meta.url);
     const first = runNext(clientId);
     runNext(clientId);
     runNext(clientId);
-    assert.equal(log.getSession(clientId, first)!.dayName, "Chest and back, week 1");
+    assert.equal(log.getSession(clientId, first)!.dayName, "Chest and back, week 1 of 6");
     const v = en.liveEnrolment(clientId)!;
     const title = en.sessionTitle(v, en.planFor(v)!);
-    assert.equal(title, "Chest and back, week 2");
+    assert.equal(title, "Chest and back, week 2 of 6");
     const today = en.programWeek(v, Date.now() + 8 * DAY).find((d) => d.status === "today")!;
     assert.equal(today.title, title);
     assert.equal(today.dayPosition, 0);

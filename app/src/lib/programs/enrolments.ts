@@ -11,7 +11,7 @@ import { exerciseKey } from "@/lib/workoutLogModel";
 import { initState, progress, skipSession } from "./engines";
 import { matchLibraryId, namesFor } from "./exercises";
 import { programByKey } from "./library";
-import { dayAt, planSession, positionOf, stateKey, weekNumber } from "./planner";
+import { dayAt, dayTitle, planSession, positionOf, stateKey, weekLabel } from "./planner";
 import { LIFT_EXERCISE, LIFT_LABEL, emptyState, type EngineState, type LiftKey, type PlannedSession, type ProgramTemplate, type SessionResult, type WeightUnit } from "./types";
 import { MAX_SET_REPS, formatWeight, maxFromSet, trainingMax } from "./units";
 
@@ -285,9 +285,9 @@ export function planFor(view: EnrolmentView): PlannedSession | null {
   return planSession(view.template, view.state, { stepKg: view.stepKg, e1rm });
 }
 
-/** "Workout A, week 3". Weeks count on across cycles, the same as programWeek. */
+/** "Workout A, week 3 of 8", or "..., week 1 of 4, round 2" after a restart. Weeks read as weekLabel does, the same as programWeek. */
 export function sessionTitle(view: EnrolmentView, plan: PlannedSession): string {
-  return `${plan.dayName}, week ${weekNumber(view.template, view.state)}`;
+  return dayTitle(plan.dayName, view.template, view.state);
 }
 
 /** Start (or resume) the member's next program session in the logger. */
@@ -359,7 +359,7 @@ export function skipEnrolmentSession(clientId: number): Result {
   if (!view || view.status !== "active" || view.state.finished) return { ok: false, error: "There's no session to skip." };
   const d = dayAt(view.template, view.state.week, view.state.day);
   const out = skipSession(view.template, view.state, view.unit);
-  const what = `Skipped ${d ? `${d.name}, week ${weekNumber(view.template, view.state)}` : "a session"}.`;
+  const what = `Skipped ${d ? dayTitle(d.name, view.template, view.state) : "a session"}.`;
   const done = db.transaction((tx): "ok" | "stale" | "open" => {
     if (!unchanged(tx, view)) return "stale";
     // An open session of this program would be resumed by position later, so it goes now.
@@ -493,7 +493,7 @@ export function coachMoveToWeek(clientId: number, enrolmentId: number, weekIndex
   next.finished = false;
   db.transaction((tx) => {
     saveState(tx, view.id, next);
-    logEvent(tx, view.id, actor, "week", `${actor.name} moved the program to week ${weekIndex + 1}.`, view.state, next);
+    logEvent(tx, view.id, actor, "week", `${actor.name} moved the program to ${weekLabel(view.template, next).replace(/^Week/, "week")}.`, view.state, next);
   });
   return { ok: true };
 }
@@ -534,13 +534,14 @@ export function bestLoggedSet(clientId: number, lift: LiftKey, now = Date.now())
 export function programWeek(view: EnrolmentView, now = Date.now()): PlanDay[] {
   const t = view.template;
   const perCycle = t.weeks.reduce((n, w) => n + w.days.length, 0);
-  // Week numbers count on across cycles (as sessionTitle does), so name this
-  // cycle's sessions and enough of the next ones to fill a week.
+  // Weeks read as sessionTitle reads them (weekLabel's numbering, rounds
+  // included), so name this cycle's sessions and enough of the next ones to
+  // fill a week.
   const cycle = view.state.cycle + (view.state.finished ? 1 : 0);
   const cycles = perCycle > 0 ? Math.ceil(7 / perCycle) + 1 : 0;
   const names: string[] = [];
   for (let c = 0; c < cycles; c++) {
-    t.weeks.forEach((w, wi) => w.days.forEach((d) => names.push(`${d.name}, week ${weekNumber(t, { week: wi, cycle: cycle + c })}`)));
+    t.weeks.forEach((w, wi) => w.days.forEach((d) => names.push(dayTitle(d.name, t, { week: wi, cycle: cycle + c }))));
   }
   const monday = mondayOf(dateKey(now));
   const logged = listSessions(view.clientId, 30)

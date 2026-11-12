@@ -1,7 +1,7 @@
 // app/src/lib/programs/panel.ts
 /** What the client page shows about a member's DIY program. Pure: the server reads, this shapes. */
 import { actorLabel } from "./cards";
-import { summarisePlanned, weekLabel, weekNumber } from "./planner";
+import { dayTitle, summarisePlanned, weekInRound, weekLabel } from "./planner";
 import { LIFT_LABEL, type EngineState, type LiftKey, type PlannedSession, type ProgramTemplate, type WeightUnit } from "./types";
 import { formatWeight, kgToUnit } from "./units";
 
@@ -24,7 +24,13 @@ export interface ProgramPanelData {
     finished: boolean;
     weekLine: string;
     unit: WeightUnit;
-    weeks: { index: number; label: string }[];
+    /**
+     * The weeks a coach can move the member to, numbered as weeks of the
+     * member's current round ("Week 5: 5s week" in 5/3/1's second cycle).
+     * Empty for a program with a single repeating week: there is nowhere to move.
+     */
+    weeks: { index: number; number: number; label: string }[];
+    /** The index into the template's weeks the member is on; matches a `weeks` index. */
     currentWeek: number;
     lifts: { lift: LiftKey; label: string; max: string; tm: string | null; maxInUnit: number | null }[];
     next: { title: string; lines: string[] } | null;
@@ -54,7 +60,13 @@ export function panelFrom(input: PanelInput): ProgramPanelData {
       finished: e.state.finished,
       weekLine: e.state.finished ? "Block finished. Waiting for a new max." : weekLabel(t, e.state),
       unit: e.unit,
-      weeks: t.weeks.map((w, i) => ({ index: i, label: w.label ? `Week ${i + 1}: ${w.label}` : `Week ${i + 1}` })),
+      weeks:
+        t.weeks.length > 1
+          ? t.weeks.map((w, i) => {
+              const n = weekInRound(t, { week: i, cycle: e.state.cycle }).week;
+              return { index: i, number: n, label: w.label ? `Week ${n}: ${w.label}` : `Week ${n}` };
+            })
+          : [],
       currentWeek: e.state.week,
       lifts: t.lifts.map((lift) => {
         const max = e.state.maxes[lift];
@@ -68,7 +80,7 @@ export function panelFrom(input: PanelInput): ProgramPanelData {
         };
       }),
       next: input.plan
-        ? { title: `${input.plan.dayName}, week ${weekNumber(t, e.state)}`, lines: input.plan.exercises.map((x) => `${x.name} ${summarisePlanned(x.sets, e.unit)}`) }
+        ? { title: dayTitle(input.plan.dayName, t, e.state), lines: input.plan.exercises.map((x) => `${x.name} ${summarisePlanned(x.sets, e.unit)}`) }
         : null,
       events: input.events.map((ev) => ({ id: ev.id, when: dayText(ev.at), who: actorLabel(ev.actor, ev.actorName, false), lines: ev.reason.split("\n") })),
       eventsCapped: input.events.length >= PANEL_EVENT_LIMIT,
