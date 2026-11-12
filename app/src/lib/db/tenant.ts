@@ -3162,8 +3162,8 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
 
   // DIY training and the program library (lib/programs). Gym copies of
   // platform programs, platform programs a gym hid, member enrolments (each
-  // with a snapshot of the template it started from) and their change log.
-  // Additive; idempotent.
+  // with a snapshot of the template it started from), their change log, and
+  // the programs members build for themselves. Additive; idempotent.
   //
   // Deliberately NOT wrapped in a swallowing try/catch. The ALTERs below add
   // columns to tables the app already reads (clients, workout_sessions,
@@ -3222,6 +3222,17 @@ export function ensureTenantTables(sqlite: BetterSqlite3): void {
       session_id INTEGER
     );
     CREATE INDEX IF NOT EXISTS idx_program_events_enrolment ON program_enrolment_events(enrolment_id, at);
+    CREATE TABLE IF NOT EXISTS member_programs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      template_json TEXT NOT NULL,
+      maxes_json TEXT NOT NULL DEFAULT '{}',
+      based_on TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_member_programs_client ON member_programs(client_id, updated_at);
   `);
   {
     const addColumn = (table: string, column: string, ddl: string) => {

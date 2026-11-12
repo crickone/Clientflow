@@ -7,7 +7,7 @@ import { clients, programEnrolmentEvents, programEnrolments, workoutSessionExerc
 import { listExercises } from "@/lib/exerciseLibrary";
 import { dateKey, mondayOf, parseWeekdays, planWeek, type PlanDay } from "@/lib/trainingProgress";
 import { exerciseHistory, getSession, listSessions, startPlannedSession, type StartResult } from "@/lib/workoutLog";
-import { exerciseKey } from "@/lib/workoutLogModel";
+import { exerciseKey, type LoggedSet } from "@/lib/workoutLogModel";
 import { initState, progress, skipSession } from "./engines";
 import { matchLibraryId, namesFor } from "./exercises";
 import { programByKey } from "./library";
@@ -56,7 +56,7 @@ export interface EnrolmentEvent {
 
 type Row = typeof programEnrolments.$inferSelect;
 /** A write transaction: every change and its change-log event go in one. */
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Result = { ok: true } | { ok: false; error: string };
 
 const MAX_KG = 600;
@@ -224,16 +224,37 @@ export interface EnrolInput {
   weekdays: number[];
 }
 
-/** Start a program. One at a time: a live one must be ended first. */
-export function enrol(clientId: number, input: EnrolInput): { ok: true; id: number } | { ok: false; error: string } {
-  const busy = { ok: false as const, error: "End your current program before you start another." };
-  const notDiy = { ok: false as const, error: "Programs are for DIY members. Switch this member to DIY first." };
+type EnrolResult = { ok: true; id: number } | { ok: false; error: string };
+const BUSY = { ok: false as const, error: "End your current program before you start another." };
+
+function enrolBlocked(clientId: number): EnrolResult | null {
   const member = db.select({ mode: clients.trainingMode }).from(clients).where(eq(clients.id, clientId)).get();
-  if (member?.mode !== "diy") return notDiy;
-  if (liveEnrolment(clientId)) return busy;
+  if (member?.mode !== "diy") return { ok: false, error: "Programs are for DIY members. Switch this member to DIY first." };
+  if (liveEnrolment(clientId)) return BUSY;
+  return null;
+}
+
+/** Start a library program (a platform key or "copy-<id>"). One at a time: a live one must be ended first. */
+export function enrol(clientId: number, input: EnrolInput): EnrolResult {
+  const blocked = enrolBlocked(clientId);
+  if (blocked) return blocked;
   const entry = programByKey(input.key);
   if (!entry) return { ok: false, error: "That program isn't available." };
-  const t = entry.template;
+  return enrolTemplate(clientId, input, { template: entry.template, programKey: entry.copyId ? null : entry.template.key, copyId: entry.copyId });
+}
+
+/** Where an enrolment's template came from: a platform key, a gym copy, or "member:<id>". */
+export interface EnrolSource {
+  template: ProgramTemplate;
+  programKey: string | null;
+  copyId: number | null;
+}
+
+/** Start a program from a template the caller has already found (and checked the member may run). */
+export function enrolTemplate(clientId: number, input: Omit<EnrolInput, "key">, src: EnrolSource): EnrolResult {
+  const blocked = enrolBlocked(clientId);
+  if (blocked) return blocked;
+  const t = src.template;
   const problem = maxesProblem(t, input.maxesKg);
   if (problem) return { ok: false, error: problem };
   const state = initState(t, input.maxesKg, input.stepKg);
@@ -246,8 +267,8 @@ export function enrol(clientId: number, input: EnrolInput): { ok: true; id: numb
         .insert(programEnrolments)
         .values({
           clientId,
-          programKey: entry.copyId ? null : t.key,
-          copyId: entry.copyId,
+          programKey: src.programKey,
+          copyId: src.copyId,
           templateJson: JSON.stringify(t),
           ...stateColumns(state),
           status: "active",
@@ -262,10 +283,16 @@ export function enrol(clientId: number, input: EnrolInput): { ok: true; id: numb
     });
   } catch (err) {
     // The partial unique index allows one live enrolment per member.
-    if (String(err).includes("UNIQUE")) return busy;
+    if (String(err).includes("UNIQUE")) return BUSY;
     throw err;
   }
   return { ok: true, id };
+}
+
+/** The heaviest ticked set with a weight typed in, from a logged exercise. */
+function lastWeight(sets: LoggedSet[] | undefined): number | null {
+  const ks = (sets ?? []).filter((s) => s.done && s.weightKg !== null && s.weightKg > 0).map((s) => s.weightKg as number);
+  return ks.length ? Math.max(...ks) : null;
 }
 
 /** The next session with every weight worked out, or null when finished or ended. */
@@ -276,13 +303,18 @@ export function planFor(view: EnrolmentView): PlannedSession | null {
   // RPE sets on an exercise with no max of its own take their weight from the member's logs.
   const lib = libraryIndex();
   const keys = d.exercises.map((ex) => exerciseKey(matchLibraryId(ex.name, lib), ex.name));
-  const { best } = exerciseHistory(view.clientId, keys);
+  const { best, previous } = exerciseHistory(view.clientId, keys);
+  const own = view.template.engine.key === "own_rules";
   const e1rm: Record<string, number> = {};
+  // A member-built exercise with no weight yet plans last time's weight.
+  const lastKg: Record<string, number> = {};
   d.exercises.forEach((ex, i) => {
     const b = best[keys[i]];
     if (b && !ex.lift) e1rm[stateKey(ex)] = b;
+    const w = own ? lastWeight(previous[keys[i]]) : null;
+    if (w !== null) lastKg[stateKey(ex)] = w;
   });
-  return planSession(view.template, view.state, { stepKg: view.stepKg, e1rm });
+  return planSession(view.template, view.state, { stepKg: view.stepKg, e1rm, lastKg });
 }
 
 /** "Workout A, week 3 of 8", or "..., week 1 of 4, round 2" after a restart. Weeks read as weekLabel does, the same as programWeek. */
@@ -480,6 +512,44 @@ export function coachSetMax(clientId: number, enrolmentId: number, lift: LiftKey
     logEvent(tx, view.id, actor, "max", `${actor.name} set the ${LIFT_LABEL[lift].toLowerCase()} max to ${fmt(next.maxes[lift]!)}, training max ${fmt(next.tms[lift]!)}.${reset}`, view.state, next);
   });
   return { ok: true };
+}
+
+/**
+ * A member edited the program they are running: the new template and the
+ * carried state, an open session of the current position moved to the new
+ * position (it still finishes with the sets it started with), and the change
+ * log, in the caller's transaction. False when the enrolment moved since
+ * `view` was read; nothing is written then.
+ */
+export function writeTemplateEdit(tx: Tx, view: EnrolmentView, template: ProgramTemplate, state: EngineState, reason: string): boolean {
+  if (!unchanged(tx, view, ["active", "paused"])) return false;
+  const oldPos = positionOf(view.template, view.state.week, view.state.day);
+  const newPos = positionOf(template, state.week, state.day);
+  tx.update(programEnrolments).set({ templateJson: JSON.stringify(template), ...stateColumns(state) }).where(eq(programEnrolments.id, view.id)).run();
+  tx.update(workoutSessions)
+    .set({ dayPosition: newPos })
+    .where(and(eq(workoutSessions.enrolmentId, view.id), isNull(workoutSessions.finishedAt), eq(workoutSessions.dayPosition, oldPos)))
+    .run();
+  logEvent(tx, view.id, { kind: "member" }, "edit", reason, view.state, state);
+  return true;
+}
+
+/** A member sets a max on a program they built (a percent lift, or a new max after a test). */
+export function memberSetMax(clientId: number, lift: LiftKey, kg: number): Result {
+  const view = liveEnrolment(clientId);
+  if (!view || view.template.engine.key !== "own_rules") return { ok: false, error: "You don't have a program of your own running." };
+  if (!view.template.lifts.includes(lift)) return { ok: false, error: "This program doesn't use that lift." };
+  if (!Number.isFinite(kg) || kg <= 0 || kg > MAX_KG) return { ok: false, error: "Enter a max between 1 and 600 kg." };
+  const next = clone(view.state);
+  next.maxes[lift] = round2(kg);
+  next.tms[lift] = trainingMax(kg, view.template.tmPct);
+  const done = db.transaction((tx) => {
+    if (!unchanged(tx, view, ["active", "paused"])) return false;
+    saveState(tx, view.id, next);
+    logEvent(tx, view.id, { kind: "member" }, "max", `You set the ${LIFT_LABEL[lift].toLowerCase()} max to ${formatWeight(next.maxes[lift]!, view.unit)}.`, view.state, next);
+    return true;
+  });
+  return done ? { ok: true } : { ok: false, error: "Your program changed. Try again." };
 }
 
 /** A coach moves a member to the start of another week of their program (0-based week). */

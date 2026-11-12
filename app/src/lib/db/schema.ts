@@ -3721,6 +3721,22 @@ export const programEnrolments = sqliteTable("program_enrolments", {
   endedAt: integer("ended_at"),
 });
 
+/** A program a DIY member built for themselves (lib/programs/memberPrograms.ts). Private to the member; staff read it. */
+export const memberBuiltPrograms = sqliteTable("member_programs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  clientId: integer("client_id")
+    .notNull()
+    .references(() => clients.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  templateJson: text("template_json").notNull(),
+  /** Maxes carried from the member's current program, offered when they start it. */
+  maxesJson: text("maxes_json").notNull().default("{}"),
+  /** The platform key or "copy-<id>" it was built from; null when built from blank. */
+  basedOn: text("based_on"),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
 /** Every change to an enrolment, with who made it and why. */
 export const programEnrolmentEvents = sqliteTable("program_enrolment_events", {
   id: integer("id").primaryKey({ autoIncrement: true }),
