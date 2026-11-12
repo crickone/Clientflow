@@ -6,11 +6,14 @@
  */
 import { canditoStyle } from "./templates/candito";
 import { greyskullLp } from "./templates/greyskull";
+import { gzclp } from "./templates/gzclp";
 import { russianSquatRoutine } from "./templates/rsr";
 import { sheikoStyle } from "./templates/sheiko";
 import { smolovBase, smolovJrBench, smolovJrSquat } from "./templates/smolov";
 import { startingStrength } from "./templates/startingStrength";
 import { strongLifts } from "./templates/stronglifts";
+import { texasMethod } from "./templates/texas";
+import { wendlerBbb, wendlerFsl } from "./templates/wendler";
 import type { ProgramTemplate } from "./types";
 
 /** Every platform program, in the order the library lists them. */
@@ -19,6 +22,12 @@ export const PLATFORM_PROGRAMS: ProgramTemplate[] = [
   strongLifts,
   startingStrength,
   greyskullLp,
+  // strength cycles
+  wendlerBbb,
+  wendlerFsl,
+  // nsunsStyle is left out on purpose: its second-lift rows and kg table are unchecked against the source.
+  texasMethod,
+  gzclp,
   // powerlifting peaking
   smolovBase,
   smolovJrSquat,
