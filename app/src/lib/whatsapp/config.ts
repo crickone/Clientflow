@@ -1,7 +1,7 @@
 import "server-only";
 
 import { decryptToken, encryptToken } from "@/lib/google/tokenCrypto";
-import { readKey, setKey } from "@/lib/settings";
+import { readKey, readKeyForTenant, setKey } from "@/lib/settings";
 
 /**
  * WhatsApp bridge credentials. Stored as settings keys (single instance for now;
@@ -59,7 +59,10 @@ function open(sealed: string | undefined, legacy: string | undefined): string {
 }
 
 export function getWhatsAppConfig(): WhatsAppConfig {
-  const stored = readKey<StoredWhatsAppConfig>("whatsapp_config", {});
+  return parseWhatsAppConfig(readKey<StoredWhatsAppConfig>("whatsapp_config", {}));
+}
+
+function parseWhatsAppConfig(stored: StoredWhatsAppConfig): WhatsAppConfig {
   return {
     provider: "whapi",
     channel: stored.channel ?? DEFAULTS.channel,
@@ -84,6 +87,10 @@ export function setWhatsAppConfig(config: Partial<WhatsAppConfig>): void {
 }
 
 /** True once a token is present — enough to attempt provider calls. */
+export function isWhatsAppConfiguredForTenant(tenantId: number): boolean {
+  return parseWhatsAppConfig(readKeyForTenant<StoredWhatsAppConfig>(tenantId, "whatsapp_config", {})).token.trim().length > 0;
+}
+
 export function isWhatsAppConfigured(): boolean {
   return getWhatsAppConfig().token.trim().length > 0;
 }

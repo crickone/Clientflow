@@ -67,20 +67,32 @@ export type EmailProvider = "gmail" | "imap" | "resend" | "none";
 
 /** Which provider the CURRENT tenant will actually send through. Gmail wins, then IMAP/SMTP, then Resend. */
 export function getEmailProvider(): EmailProvider {
+  let tenantId: number;
   try {
-    if (isGmailConnected(getCurrentTenant().id)) return "gmail";
+    tenantId = getCurrentTenant().id;
   } catch {
-    // no tenant context — fall through
+    // no tenant context
+    return "none";
+  }
+  return getEmailProviderForTenant(tenantId);
+}
+
+/** Same as getEmailProvider for an EXPLICIT tenant (call inside runWithTenant; the sender reads the bound tenant DB). */
+export function getEmailProviderForTenant(tenantId: number): EmailProvider {
+  try {
+    if (isGmailConnected(tenantId)) return "gmail";
+  } catch {
+    // fall through
   }
   try {
-    if (isImapConnected(getCurrentTenant().id)) return "imap";
+    if (isImapConnected(tenantId)) return "imap";
   } catch {
-    // no tenant context — fall through
+    // fall through
   }
   try {
     if (hasEmailApiKey() && getEmailSender().fromEmail) return "resend";
   } catch {
-    // no tenant context — fall through
+    // fall through
   }
   return "none";
 }
@@ -88,6 +100,10 @@ export function getEmailProvider(): EmailProvider {
 /** Fully ready to send for the CURRENT tenant (Gmail, IMAP/SMTP, or Resend set up). */
 export function isEmailConfigured(): boolean {
   return getEmailProvider() !== "none";
+}
+
+export function isEmailConfiguredForTenant(tenantId: number): boolean {
+  return getEmailProviderForTenant(tenantId) !== "none";
 }
 
 export type SendResult =

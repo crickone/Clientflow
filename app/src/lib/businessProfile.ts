@@ -108,3 +108,7 @@ export function setBusinessProfile(profile: BusinessProfile): void {
 export function isBriefComplete(): boolean {
   return getBusinessProfile().brief.trim().length > 0;
 }
+
+export function isBriefCompleteForTenant(tenantId: number): boolean {
+  return getBusinessProfileForTenant(tenantId).brief.trim().length > 0;
+}

@@ -1,11 +1,11 @@
 import "server-only";
 import { db, schema } from "@/lib/db";
-import { getCurrentTenant } from "@/lib/db/tenant";
+import { getCurrentTenant, runWithTenant } from "@/lib/db/tenant";
 import { controlSqlite } from "@/lib/db/control";
-import { readKey, setKey, getBrandingLogoFilename, getVenueType } from "@/lib/settings";
-import { getBusinessProfile, isBriefComplete } from "@/lib/businessProfile";
-import { isEmailConfigured } from "@/lib/email";
-import { isWhatsAppConfigured } from "@/lib/whatsapp/config";
+import { readKey, readKeyForTenant, setKey, getVenueTypeForTenant } from "@/lib/settings";
+import { getBusinessProfileForTenant, isBriefCompleteForTenant } from "@/lib/businessProfile";
+import { isEmailConfiguredForTenant } from "@/lib/email";
+import { isWhatsAppConfiguredForTenant } from "@/lib/whatsapp/config";
 import { listFacebookPages } from "@/lib/facebook/pages";
 import { isGoogleProfileConnected } from "@/lib/google/business";
 import { getSendingDomain } from "@/lib/marketing/domains";
@@ -109,28 +109,45 @@ function membershipCount(tenantId: number): number {
   return row.c;
 }
 
-/** WIRES live detections for the current tenant → summarizeSetup. */
+/** Detections for an explicit tenant. Everything that reads the tenant DB runs under runWithTenant. */
+function detectForTenant(tenantId: number): { detections: Record<string, boolean>; skips: Record<string, boolean>; vocab: Vocab } {
+  return runWithTenant(tenantId, () => {
+    const p = getBusinessProfileForTenant(tenantId);
+    const detections: Record<string, boolean> = {
+      business: p.businessName.trim().length > 0 && (p.phone.trim().length > 0 || p.location.trim().length > 0),
+      venue: readKeyForTenant<boolean>(tenantId, "setup_ack_venue", false) === true,
+      ai_context: isBriefCompleteForTenant(tenantId) || p.marketingBrain.trim().length > 0,
+      branding: logoForTenant(tenantId) !== null,
+      services: serviceCount() > 0,
+      email: isEmailConfiguredForTenant(tenantId),
+      whatsapp: isWhatsAppConfiguredForTenant(tenantId),
+      facebook: listFacebookPages(tenantId).length > 0,
+      google: isGoogleProfileConnected(tenantId),
+      domain: getSendingDomain(tenantId)?.state === "verified",
+      clients: clientCount() > 0,
+      team: membershipCount(tenantId) > 1,
+    };
+    const skips: Record<string, boolean> = Object.fromEntries(
+      SETUP_STEPS.filter((s) => s.optional).map((s) => [s.id, readKeyForTenant<boolean>(tenantId, `setup_skip_${s.id}`, false) === true]),
+    );
+    return { detections, skips, vocab: getVocab(getVenueTypeForTenant(tenantId)) };
+  });
+}
+
+function logoForTenant(tenantId: number): string | null {
+  const v = readKeyForTenant<string | null>(tenantId, "branding_logo_filename", null);
+  return typeof v === "string" && v.length > 0 ? v : null;
+}
+
+/** The console's view: no request, the tenant named explicitly. */
+export function getSetupSummaryForTenant(tenantId: number): SetupSummary {
+  const { detections, skips, vocab } = detectForTenant(tenantId);
+  return summarizeSetup(SETUP_STEPS, detections, skips, vocab);
+}
+
+/** WIRES live detections for the current (request) tenant. */
 export function getSetupSummary(): SetupSummary {
-  const tenantId = getCurrentTenant().id;
-  const p = getBusinessProfile();
-  const detections: Record<string, boolean> = {
-    business: p.businessName.trim().length > 0 && (p.phone.trim().length > 0 || p.location.trim().length > 0),
-    venue: readKey<boolean>("setup_ack_venue", false) === true,
-    ai_context: isBriefComplete() || p.marketingBrain.trim().length > 0,
-    branding: getBrandingLogoFilename() !== null,
-    services: serviceCount() > 0,
-    email: isEmailConfigured(),
-    whatsapp: isWhatsAppConfigured(),
-    facebook: listFacebookPages(tenantId).length > 0,
-    google: isGoogleProfileConnected(tenantId),
-    domain: getSendingDomain(tenantId)?.state === "verified",
-    clients: clientCount() > 0,
-    team: membershipCount(tenantId) > 1,
-  };
-  const skips: Record<string, boolean> = Object.fromEntries(
-    SETUP_STEPS.filter((s) => s.optional).map((s) => [s.id, readKey<boolean>(`setup_skip_${s.id}`, false) === true]),
-  );
-  return summarizeSetup(SETUP_STEPS, detections, skips, getVocab(getVenueType()));
+  return getSetupSummaryForTenant(getCurrentTenant().id);
 }
 
 export function isSetupDismissed(): boolean { return readKey<boolean>("setup_complete", false) === true; }
