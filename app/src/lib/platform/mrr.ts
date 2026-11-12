@@ -65,6 +65,7 @@ export function mrrAnalysis(events: MrrEvent[], months: string[], startingPrice:
   const ordered = events.map((e, i) => ({ e, i })).sort((a, b) => a.e.at - b.e.at || a.i - b.i);
   for (const { e } of ordered) {
     let s = states.get(e.tenantId);
+    const first = !s;
     if (!s) { s = { paying: false, exempt: false, price: null }; states.set(e.tenantId, s); }
     const row = by.get(e.month);
     const priceAt = () => e.priceCents ?? s!.price ?? startingPrice(e.tenantId);
@@ -87,6 +88,9 @@ export function mrrAnalysis(events: MrrEvent[], months: string[], startingPrice:
       case "cancelled":
       case "billing_exempted": {
         if (e.type === "billing_exempted") s.exempt = true;
+        // Backstop: a business whose first event is a churn was paying before
+        // the log began; seed it so the churn counts.
+        if (first && !s.exempt) s.paying = true;
         if (!s.paying) break;
         s.paying = false;
         const price = s.price ?? priceAt();

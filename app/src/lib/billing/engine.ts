@@ -224,6 +224,9 @@ function applyPaid(inv: InvoiceRow, gatewayRef: string | null, actor: string): v
     )
     .run(addMonthClamped(inv.periodStart, anchor), Date.now(), inv.tenantId);
   logEvent(inv.tenantId, "charged", { invoiceId: inv.id, grossCents: inv.grossCents, gatewayRef }, actor);
+  if (b.status === "suspended") {
+    logEvent(inv.tenantId, "reactivated", { priceCents: getEffectiveMonthlyPriceCents(inv.tenantId), via: "payment" }, actor);
+  }
   // `b` was read BEFORE the update above, so its status is the pre-payment one:
   // a suspended tenant paying up is a reactivation, everything else a receipt.
   if (actor === "system") {

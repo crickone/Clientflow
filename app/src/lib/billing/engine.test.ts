@@ -146,6 +146,10 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(b.status, "active");
     assert.equal(b.failedAttempts, 0);
     assert.equal(b.nextRenewalAt, "2026-04-30"); // period after Mar 31, clamped
+    assert.ok(
+      listEvents(tid).some((e) => e.type === "reactivated" && JSON.parse(e.detail ?? "{}").via === "payment"),
+      "a suspended tenant paying up logs a reactivated event",
+    );
 
     // Manual suspend / reactivate round-trip
     suspendTenant(tid, "admin:1");

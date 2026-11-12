@@ -309,10 +309,10 @@ function platformBilling(months: string[]) {
   const evRows = controlSqlite
     .prepare(
       `SELECT tenant_id, type, detail, created_at FROM billing_events
-       WHERE tenant_id IS NOT NULL AND type IN ('activated','reactivated','suspended','offboarded','cancelled','price_changed','billing_exempted','billing_unexempted','billing_exempt_created')
+       WHERE tenant_id IS NOT NULL AND type IN ('activated','reactivated','charged','suspended','offboarded','cancelled','price_changed','billing_exempted','billing_unexempted','billing_exempt_created')
        ORDER BY created_at ASC, id ASC`,
     )
-    .all() as Array<{ tenant_id: number; type: MrrEvent["type"] | "billing_exempt_created"; detail: string | null; created_at: number }>;
+    .all() as Array<{ tenant_id: number; type: MrrEvent["type"] | "billing_exempt_created" | "charged"; detail: string | null; created_at: number }>;
   const mrrEvents: MrrEvent[] = evRows.map((r) => {
     let d: { priceCents?: unknown; previousPriceCents?: unknown } = {};
     try { d = r.detail ? JSON.parse(r.detail) : {}; } catch { d = {}; }
@@ -321,7 +321,9 @@ function platformBilling(months: string[]) {
       tenantId: r.tenant_id,
       at: r.created_at,
       month: dublinMonthOf(r.created_at),
-      type: r.type === "billing_exempt_created" ? "billing_exempted" : r.type,
+      // A payment can reactivate a suspended business without an `activated`
+      // row; the replay ignores `reactivated` while already paying or exempt.
+      type: r.type === "billing_exempt_created" ? "billing_exempted" : r.type === "charged" ? "reactivated" : r.type,
       priceCents: num(d.priceCents),
       previousPriceCents: num(d.previousPriceCents),
     };

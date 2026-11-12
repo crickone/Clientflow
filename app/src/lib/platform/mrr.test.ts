@@ -146,4 +146,41 @@ const zero = (month: string) => ({ month, newCents: 0, expansionCents: 0, contra
   assert.equal(out[0].newCents, 12000);
 }
 
+// A suspended business that pays up comes back as `reactivated` (mapped from
+// charged), so its later suspend churns again.
+{
+  const out = mrrMovements(
+    [
+      ev({ tenantId: 1, month: "2026-09", type: "activated", priceCents: 20000 }),
+      ev({ tenantId: 1, month: "2026-09", type: "suspended" }),
+      ev({ tenantId: 1, month: "2026-10", type: "reactivated" }),
+      ev({ tenantId: 1, month: "2026-11", type: "suspended" }),
+    ],
+    months,
+  );
+  assert.equal(out[0].newCents, 20000);
+  assert.equal(out[0].churnCents, 20000);
+  assert.equal(out[1].reactivationCents, 20000);
+  assert.equal(out[2].churnCents, 20000);
+}
+
+// A business whose first event is a churn counts one churn at the resolved price.
+{
+  const out = mrrMovements([ev({ tenantId: 3, month: "2026-10", type: "suspended" })], months, () => 9000);
+  assert.equal(out[1].churnCents, 9000);
+  assert.equal(out[1].netCents, -9000);
+}
+
+// A reactivated (charged) while already paying counts nothing.
+{
+  const out = mrrMovements(
+    [
+      ev({ tenantId: 1, month: "2026-09", type: "activated", priceCents: 20000 }),
+      ev({ tenantId: 1, month: "2026-10", type: "reactivated" }),
+    ],
+    months,
+  );
+  assert.deepEqual(out[1], zero("2026-10"));
+}
+
 console.log("mrr.test.ts: ok");
