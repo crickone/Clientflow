@@ -5777,7 +5777,7 @@ select.pg-input { padding-right: 36px; }
 .mb-errors ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; }
 .mb-weeks { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; -webkit-overflow-scrolling: touch; }
 .mb-tab { flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--hairline); background: var(--surface-1); color: var(--text-secondary); font: inherit; font-size: 13px; white-space: nowrap; cursor: pointer; }
-.mb-tab[aria-selected="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+.mb-tab[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
 .mb-tools { display: flex; gap: 6px; align-items: center; }
 .mb-tools .pg-input { flex: 1; min-width: 0; }
 .mb-icon { flex-shrink: 0; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; border: 1px solid var(--hairline); background: var(--surface-1); color: var(--text-secondary); cursor: pointer; }
@@ -5802,7 +5802,8 @@ select.pg-input { padding-right: 36px; }
 .mb-link { justify-self: start; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 4px; border: 0; background: transparent; color: var(--accent-ink); font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; text-decoration: none; }
 .mb-notes { height: auto; min-height: 64px; padding: 10px 12px; resize: vertical; }
 /* Above the member app's bottom tabs. */
-.mb-save { position: sticky; bottom: 72px; z-index: 5; }
+.mb-save { position: sticky; bottom: 72px; padding-bottom: calc(0px + env(safe-area-inset-bottom)); z-index: 5; }
+.mb-lock { display: grid; gap: 14px; min-width: 0; margin: 0; padding: 0; border: 0; }
 .mb-add { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 44px; padding: 0 14px; border-radius: var(--radius); border: 1px solid var(--hairline); background: var(--surface-1); color: var(--text-primary); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
 .mb-add:disabled { opacity: 0.5; cursor: default; }
 .mb-add:focus-visible, .mb-save-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

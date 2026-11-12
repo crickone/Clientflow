@@ -1,7 +1,7 @@
 // app/src/components/clientapp/MemberProgramBuilder.tsx
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronDown, ChevronUp, Copy, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -437,6 +437,8 @@ export function MemberProgramBuilder({
   const [picking, setPicking] = useState<Picking>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [pending, start] = useTransition();
+  // Set the moment the create action returns, so no later save can create a second program.
+  const createdId = useRef<number | null>(null);
   const t = d.template;
   const w = Math.min(wi, t.weeks.length - 1);
   const week = t.weeks[w];
@@ -450,17 +452,20 @@ export function MemberProgramBuilder({
   }
 
   function save() {
+    const sent = d;
+    const programId = id ?? createdId.current;
     start(async () => {
-      const r = await saveBuiltProgramAction({ id, from, template: d.template, weekOrigins: d.origins });
+      const r = await saveBuiltProgramAction({ id: programId, from: programId === null ? from : null, template: sent.template, weekOrigins: sent.origins });
       if (!r.ok) {
         setErrors(r.errors);
         toast.error("Not saved. See what needs fixing at the top.");
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
+      if (programId === null) createdId.current = r.id;
       setErrors([]);
-      // Saved: every week is now a saved week.
-      setD((prev) => ({ ...prev, origins: prev.template.weeks.map((_, i) => i) }));
+      // Saved: every week of the saved snapshot is now a saved week. If the draft moved on, leave origins alone.
+      setD((prev) => (prev.template === sent.template ? { ...prev, origins: sent.template.weeks.map((_, i) => i) } : prev));
       toast.success(r.edited ? "Saved. Your program uses it from your next session." : "Saved.");
       if (id === null) router.replace(`/app/programs/built/${r.id}`);
       router.refresh();
@@ -503,13 +508,14 @@ export function MemberProgramBuilder({
         <div className="mb-errors" role="alert">
           <b>Not saved:</b>
           <ul>
-            {errors.map((e) => (
-              <li key={e}>{e}</li>
+            {errors.map((e, i) => (
+              <li key={i}>{e}</li>
             ))}
           </ul>
         </div>
       )}
 
+      <fieldset className="mb-lock" disabled={pending}>
       <Card style={{ display: "grid", gap: 12 }}>
         <label className="mb-field">
           <span className="td-label">Name</span>
@@ -532,13 +538,14 @@ export function MemberProgramBuilder({
               </button>
             ))}
           </div>
+          <span className="mb-hint">This changes how weights are shown on this screen. They are saved in kg.</span>
         </div>
         {running && <div className="mb-hint">You&rsquo;re running this program. Changes apply from your next session. Nothing you have logged changes.</div>}
       </Card>
 
-      <div className="mb-weeks" role="tablist" aria-label="Weeks">
+      <div className="mb-weeks" role="group" aria-label="Weeks">
         {t.weeks.map((wk, i) => (
-          <button key={i} type="button" role="tab" aria-selected={i === w} className="mb-tab" onClick={() => setWi(i)}>
+          <button key={i} type="button" aria-pressed={i === w} className="mb-tab" onClick={() => setWi(i)}>
             Week {i + 1}
             {wk.label ? `: ${wk.label}` : ""}
           </button>
@@ -549,6 +556,7 @@ export function MemberProgramBuilder({
             className="mb-tab"
             onClick={() => {
               edit((x) => void addWeek(x, w));
+              setOpen(null);
               setWi(w + 1);
             }}
           >
@@ -566,6 +574,7 @@ export function MemberProgramBuilder({
             disabled={w === 0}
             onClick={() => {
               edit((x) => void moveWeek(x, w, -1));
+              setOpen(null);
               setWi(w - 1);
             }}
           >
@@ -578,6 +587,7 @@ export function MemberProgramBuilder({
             disabled={w === t.weeks.length - 1}
             onClick={() => {
               edit((x) => void moveWeek(x, w, 1));
+              setOpen(null);
               setWi(w + 1);
             }}
           >
@@ -603,6 +613,7 @@ export function MemberProgramBuilder({
             aria-label={`Remove week ${w + 1}`}
             onClick={() => {
               edit((x) => removeWeek(x, w));
+              setOpen(null);
               setWi(Math.max(0, w - 1));
             }}
           >
@@ -624,13 +635,22 @@ export function MemberProgramBuilder({
                 edit((x) => void (x.template.weeks[w].days[di].name = v));
               }}
             />
-            <button type="button" className="mb-icon" aria-label={`Move ${day.name} up`} disabled={di === 0} onClick={() => edit((x) => void moveDay(x.template, w, di, -1))}>
+            <button type="button" className="mb-icon" aria-label={`Move ${day.name} up`} disabled={di === 0} onClick={() => {
+ edit((x) => void moveDay(x.template, w, di, -1));
+ setOpen(null);
+ }}>
               <ArrowUp size={16} />
             </button>
-            <button type="button" className="mb-icon" aria-label={`Move ${day.name} down`} disabled={di === week.days.length - 1} onClick={() => edit((x) => void moveDay(x.template, w, di, 1))}>
+            <button type="button" className="mb-icon" aria-label={`Move ${day.name} down`} disabled={di === week.days.length - 1} onClick={() => {
+ edit((x) => void moveDay(x.template, w, di, 1));
+ setOpen(null);
+ }}>
               <ArrowDown size={16} />
             </button>
-            <button type="button" className="mb-icon" aria-label={`Remove ${day.name}`} disabled={week.days.length === 1} onClick={() => edit((x) => removeDay(x.template, w, di))}>
+            <button type="button" className="mb-icon" aria-label={`Remove ${day.name}`} disabled={week.days.length === 1} onClick={() => {
+ edit((x) => removeDay(x.template, w, di));
+ setOpen(null);
+ }}>
               <Trash2 size={16} />
             </button>
           </div>
@@ -658,7 +678,7 @@ export function MemberProgramBuilder({
                 onRename={() => setPicking({ w, di, xi })}
                 onMove={(dir) => {
                   edit((x) => void moveExercise(x.template, w, di, xi, dir));
-                  setOpen(`${w}-${di}-${xi + dir}`);
+                  setOpen(null);
                 }}
                 onRemove={() => {
                   edit((x) => removeExercise(x.template, w, di, xi));
@@ -680,6 +700,7 @@ export function MemberProgramBuilder({
           <Plus size={16} /> Add a day
         </button>
       )}
+      </fieldset>
 
       <div className="mb-save">
         <button type="button" className="pg-cta mb-save-btn" onClick={save} disabled={pending}>
