@@ -7,9 +7,9 @@
 import assert from "node:assert/strict";
 
 import { amrap, day, ex, fixed, maxTest, pct, range, sxr, times, week } from "./dsl";
-import { initState, progress, skipState } from "./engines";
+import { initState, progress, skipSession, skipState } from "./engines";
 import { planSession } from "./planner";
-import type { DoneSet, EngineState, PlannedSet, ProgramTemplate, SessionResult } from "./types";
+import type { DoneSet, EngineState, PlannedSet, ProgramTemplate, SessionResult, WeightUnit } from "./types";
 
 type Perform = (name: string, i: number, p: PlannedSet) => DoneSet;
 
@@ -306,5 +306,272 @@ assert.equal(skipped.tms.bench, 100, "a skip runs no engine");
 
 // ── a lighter bar never goes below 20 kg ─────────────────────────────────
 assert.equal(initState(lin, { squat: 30, deadlift: 30 }, 2.5).weights["back squat"], 20);
+
+// ── review fixes ──────────────────────────────────────────────────────────
+// Each check runs on its own so a failure names the case.
+interface RunOpts {
+  stepKg?: number;
+  unit?: WeightUnit;
+  /** Extra sets logged after the planned ones, by exercise name. */
+  extra?: Record<string, DoneSet[]>;
+}
+function runWith(t: ProgramTemplate, state: EngineState, perform: Perform, o: RunOpts = {}) {
+  const stepKg = o.stepKg ?? 2.5;
+  const session = planSession(t, state, { stepKg });
+  assert.ok(session, "there is a session to run");
+  const result: SessionResult = {
+    exercises: session.exercises.map((e) => ({ planned: e, sets: [...e.sets.map((s, i) => perform(e.name, i, s)), ...(o.extra?.[e.name] ?? [])] })),
+  };
+  return progress({ template: t, state, result, stepKg, unit: o.unit ?? "kg" });
+}
+
+const fixChecks: [string, () => void][] = [
+  [
+    "1a. an extra lighter back-off set does not drag the linear weight down",
+    () => {
+      const o = runWith(lin, l0, asPlanned, { extra: { "Back squat": [{ kg: 60, reps: 10, done: true }] } });
+      assert.equal(o.state.weights["back squat"], 102.5);
+      assert.ok(o.reasons.includes("Next back squat 102.5 kg. You did all 5 sets of 5."));
+    },
+  ],
+  [
+    "1b. fixed volume counts each planned set, not a total across extra sets",
+    () => {
+      const o = runWith(gv, v0, (_n, i, p) => ({ kg: p.kg, reps: i === 9 ? 5 : 10, done: true }), {
+        extra: { "Bench press": [{ kg: 20, reps: 10, done: true }] },
+      });
+      assert.equal(o.state.weights["bench press"], 60);
+      assert.ok(o.reasons.includes("Bench press stays at 60 kg. You did 95 of 100 reps."));
+    },
+  ],
+  [
+    "1c. fixed volume: extra reps on one set do not cover a short set",
+    () => {
+      const o = runWith(gv, v0, (_n, i, p) => ({ kg: p.kg, reps: i === 0 ? 15 : i === 9 ? 5 : 10, done: true }));
+      assert.equal(o.state.weights["bench press"], 60);
+      assert.ok(o.reasons.includes("Bench press stays at 60 kg. You did 95 of 100 reps."));
+    },
+  ],
+  [
+    "2. 5/3/1: a + set not logged holds the training max at the end of the cycle",
+    () => {
+      const none: Perform = (_n, _i, p) => ({ kg: p.kg, reps: null, done: false });
+      const n1 = runWith(cyc, c0, none);
+      assert.equal(n1.state.short.bench, true);
+      assert.ok(n1.reasons.includes("Bench press: the 5+ set wasn't logged."));
+      const n2 = runWith(cyc, n1.state, none);
+      assert.equal(n2.state.tms.bench, 100);
+      assert.ok(n2.reasons.includes("Bench press training max stays at 100 kg. A + set wasn't logged this cycle."));
+      assert.deepEqual(n2.state.short, {});
+      assert.equal(n2.state.misses["short:bench"], undefined, "the cause is cleared for the new cycle");
+    },
+  ],
+  [
+    "3a. skipping the last session of a cycle still raises the training max",
+    () => {
+      const k1 = runWith(cyc, c0, asPlanned);
+      const k2 = skipSession(cyc, k1.state, "kg");
+      assert.equal(k2.state.tms.bench, 102.5);
+      assert.equal(k2.state.cycle, 1);
+      assert.equal(k2.state.week, 0);
+      assert.ok(k2.reasons.includes("Bench press training max goes up to 102.5 kg for the next cycle."));
+      assert.equal(skipState(cyc, k1.state).tms.bench, 102.5, "skipState runs the same step");
+    },
+  ],
+  [
+    "3b. skipping the last session after a short + set holds the max and clears short",
+    () => {
+      const k1 = runWith(cyc, c0, (_n, i, p) => ({ kg: p.kg, reps: i === 2 ? 2 : 5, done: true }));
+      const k2 = skipState(cyc, k1.state);
+      assert.equal(k2.tms.bench, 100);
+      assert.deepEqual(k2.short, {});
+      assert.equal(k2.cycle, 1);
+    },
+  ],
+  [
+    "4a. nSuns: a 1+ set done far lighter does not move the training max",
+    () => {
+      const o = runWith(tab, t0, (_n, i, p) => ({ kg: i === 1 ? 40 : p.kg, reps: i === 1 ? 8 : p.reps, done: true }));
+      assert.equal(o.state.tms.squat, 100);
+      assert.ok(o.reasons.includes("Squat training max stays at 100 kg. The 1+ set was lighter than planned."));
+    },
+  ],
+  [
+    "4b. nSuns: one smallest jump lighter still counts",
+    () => {
+      const o = runWith(tab, t0, (_n, i, p) => ({ kg: i === 1 && p.kg !== null ? p.kg - 2.5 : p.kg, reps: i === 1 ? 3 : p.reps, done: true }));
+      assert.equal(o.state.tms.squat, 102.5);
+    },
+  ],
+  [
+    "4c. Texas: a lighter top set does not move the training max",
+    () => {
+      const o = runWith(tex, x0, (_n, _i, p) => ({ kg: (p.kg ?? 0) - 10, reps: 5, done: true }));
+      assert.equal(o.state.tms.squat, 100);
+      assert.ok(o.reasons.includes("Squat training max stays at 100 kg. The top set was lighter than planned."));
+      const ok = runWith(tex, x0, (_n, _i, p) => ({ kg: (p.kg ?? 0) - 2.5, reps: 5, done: true }));
+      assert.equal(ok.state.tms.squat, 102.5);
+    },
+  ],
+  [
+    "4d. 5/3/1: a lighter + set holds the training max at the end of the cycle",
+    () => {
+      const k1 = runWith(cyc, c0, (_n, i, p) => ({ kg: i === 2 ? (p.kg ?? 0) - 5 : p.kg, reps: i === 2 ? 7 : 5, done: true }));
+      assert.equal(k1.state.short.bench, true);
+      assert.ok(k1.reasons.includes("Bench press: 7 reps on the 5+ set, lighter than planned."));
+      const k2 = runWith(cyc, k1.state, asPlanned);
+      assert.equal(k2.state.tms.bench, 100);
+      assert.ok(k2.reasons.includes("Bench press training max stays at 100 kg. A + set was lighter than planned this cycle."));
+      const near = runWith(cyc, c0, (_n, i, p) => ({ kg: i === 2 ? (p.kg ?? 0) - 2.5 : p.kg, reps: i === 2 ? 7 : 5, done: true }));
+      assert.equal(near.state.short.bench, undefined, "one smallest jump lighter still counts");
+    },
+  ],
+  [
+    "5a. double progression: a changed weight below the top of the range says so",
+    () => {
+      const o = runWith(dp, d1.state, () => ({ kg: 32.5, reps: 10, done: true }));
+      assert.equal(o.state.weights["incline dumbbell press@8-12"], 32.5);
+      assert.deepEqual(o.reasons, ["Next incline dumbbell press 32.5 kg, the weight you used."]);
+    },
+  ],
+  [
+    "5b. GZCLP T3: a replaced weight carries a reason",
+    () => {
+      const o = runWith(gz, z1.state, (n, _i, p) => ({ kg: n === "Lat pulldown" ? 35 : p.kg ?? 30, reps: p.reps, done: true }));
+      assert.equal(o.state.weights["t3:lat pulldown"], 35);
+      assert.ok(o.reasons.includes("Next lat pulldown 35 kg, the weight you used."));
+    },
+  ],
+  [
+    "5c. linear miss at a changed weight names that weight and the miss",
+    () => {
+      const o = runWith(lin, l1.state, (n, i, p) => (n === "Back squat" ? { kg: 110, reps: i === 3 ? 3 : 5, done: true } : asPlanned(n, i, p)));
+      assert.equal(o.state.weights["back squat"], 110);
+      assert.ok(o.reasons.includes("Next back squat 110 kg, the weight you used. You got 3 of 5 on set 4."));
+      assert.ok(!o.reasons.some((x) => x.startsWith("Back squat stays at")), "no stays-at sentence with a changed number");
+    },
+  ],
+  [
+    "6a. a linear deload never goes below the 20 kg bar",
+    () => {
+      const st: EngineState = { ...l0, weights: { ...l0.weights, "back squat": 20 }, misses: { "back squat": 2 } };
+      const o = runWith(lin, st, (n, i, p) => (n === "Back squat" ? { kg: 20, reps: 3, done: true } : asPlanned(n, i, p)));
+      assert.equal(o.state.weights["back squat"], 20);
+      assert.ok(o.reasons.includes("Back squat stays at 20 kg, the empty bar. You missed reps three sessions in a row."));
+    },
+  ],
+  [
+    "6b. the GZCLP 85% reset never goes below the 20 kg bar",
+    () => {
+      const st: EngineState = { ...z0, weights: { ...z0.weights, "t1:back squat": 20 }, stages: { "t1:back squat": 2 } };
+      const o = runWith(gz, st, failT1);
+      assert.equal(o.state.weights["t1:back squat"], 20);
+      assert.equal(o.state.stages["t1:back squat"], 0);
+      assert.ok(o.reasons.includes("Back squat goes back to 5 x 3+ at 20 kg, the empty bar."));
+    },
+  ],
+  [
+    "6c. the bar floor rounds to a 5 lb step",
+    () => {
+      const step = 2.26796;
+      const st: EngineState = { ...l0, weights: { ...l0.weights, "back squat": 22.68 }, misses: { "back squat": 2 } };
+      const o = runWith(lin, st, (n, i, p) => (n === "Back squat" ? { kg: 20.412, reps: 3, done: true } : asPlanned(n, i, p)), { stepKg: step, unit: "lb" });
+      assert.equal(o.state.weights["back squat"], 20.412);
+      assert.ok(o.reasons.includes("Next back squat 45 lb, the empty bar. You missed reps three sessions in a row."));
+    },
+  ],
+  [
+    "7. a fixed block with no test day does not mention a new max",
+    () => {
+      const noTest: ProgramTemplate = { ...blk, key: "blk2", weeks: [blk.weeks[0]] };
+      const o = runWith(noTest, initState(noTest, { squat: 150 }, 2.5), asPlanned);
+      assert.equal(o.state.finished, true);
+      assert.deepEqual(o.reasons, ["Block done. You can start it again."]);
+    },
+  ],
+  [
+    "8. double progression with no planned sets leaves the state alone",
+    () => {
+      const session = planSession(dp, d1.state, { stepKg: 2.5 });
+      assert.ok(session);
+      const result: SessionResult = { exercises: session.exercises.map((e) => ({ planned: { ...e, sets: [] }, sets: [{ kg: 40, reps: 12, done: true }] })) };
+      const o = progress({ template: dp, state: d1.state, result, stepKg: 2.5, unit: "kg" });
+      assert.deepEqual(o.state.weights, d1.state.weights);
+      assert.deepEqual(o.reasons, []);
+    },
+  ],
+  [
+    "a 1.25 kg step goes up by the program's increment",
+    () => {
+      const s0 = initState(lin, { squat: 201, deadlift: 200 }, 1.25);
+      assert.equal(s0.weights["back squat"], 100);
+      const o = runWith(lin, s0, asPlanned, { stepKg: 1.25 });
+      assert.equal(o.state.weights["back squat"], 102.5);
+      const dp1 = runWith(dp, d1.state, (_n, _i, p) => ({ kg: p.kg ?? 10, reps: p.repsMax ?? p.reps, done: true }), { stepKg: 1.25 });
+      assert.equal(dp1.state.weights["incline dumbbell press@8-12"], 31.25, "double progression goes up by the smallest jump");
+    },
+  ],
+  [
+    "a 5 lb step rounds every weight to 5 lb and reasons read in lb",
+    () => {
+      const step = 2.26796;
+      const s0 = initState(lin, { squat: 100, deadlift: 100 }, step);
+      assert.equal(s0.weights["back squat"], 49.895);
+      const o = runWith(lin, s0, asPlanned, { stepKg: step, unit: "lb" });
+      assert.equal(o.state.weights["back squat"], 52.163);
+      assert.ok(o.reasons.includes("Next back squat 115 lb. You did all 5 sets of 5."));
+      const m = runWith(lin, o.state, missSet4, { stepKg: step, unit: "lb" });
+      assert.ok(m.reasons.includes("Back squat stays at 115 lb. You got 3 of 5 on set 4. Try it again next time."));
+      const tmLb = runWith(tex, x0, asPlanned, { stepKg: step, unit: "lb" });
+      assert.ok(tmLb.reasons.includes("Squat training max goes up to 226 lb. You got all 5 reps on your top set."));
+    },
+  ],
+  [
+    "miss, hit, miss: the miss counter resets after a success",
+    () => {
+      const a = run(lin, l1.state, missSet4);
+      const b = run(lin, a.state, missSet4);
+      assert.equal(b.state.misses["back squat"], 2);
+      const hit = run(lin, b.state, asPlanned);
+      assert.equal(hit.state.misses["back squat"], 0);
+      const c = run(lin, hit.state, missSet4);
+      assert.equal(c.state.misses["back squat"], 1);
+      assert.equal(c.state.weights["back squat"], hit.state.weights["back squat"], "no deload");
+    },
+  ],
+  [
+    "progress() leaves its input deeply unchanged",
+    () => {
+      for (const [t, st] of [
+        [lin, l1.state],
+        [cyc, c1.state],
+        [gz, z1.state],
+        [dp, d1.state],
+        [gv, v0],
+        [blk, k1.state],
+      ] as [ProgramTemplate, EngineState][]) {
+        const before = structuredClone(st);
+        const session = planSession(t, st, { stepKg: 2.5 });
+        assert.ok(session);
+        const result: SessionResult = { exercises: session.exercises.map((e) => ({ planned: e, sets: e.sets.map(() => ({ kg: 40, reps: 3, done: true })) })) };
+        const resultBefore = structuredClone(result);
+        progress({ template: t, state: st, result, stepKg: 2.5, unit: "kg" });
+        skipSession(t, st, "kg");
+        assert.deepEqual(st, before, `${t.key}: state unchanged`);
+        assert.deepEqual(result, resultBefore, `${t.key}: result unchanged`);
+      }
+    },
+  ],
+];
+
+const fixFailures: string[] = [];
+for (const [name, fn] of fixChecks) {
+  try {
+    fn();
+  } catch (e) {
+    fixFailures.push(`${name}: ${(e as Error).message.split("\n")[0]}`);
+  }
+}
+assert.deepEqual(fixFailures, [], `failing checks:\n${fixFailures.join("\n")}`);
 
 console.log("programs/engines: ok");
