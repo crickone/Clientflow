@@ -12,6 +12,9 @@ export interface PanelInput {
   past: { name: string; endedAt: number | null }[];
 }
 
+/** How many change-log events the client page reads. */
+export const PANEL_EVENT_LIMIT = 40;
+
 export interface ProgramPanelData {
   live: null | {
     enrolmentId: number;
@@ -26,6 +29,9 @@ export interface ProgramPanelData {
     lifts: { lift: LiftKey; label: string; max: string; tm: string | null; maxInUnit: number | null }[];
     next: { title: string; lines: string[] } | null;
     events: { id: number; when: string; who: string; lines: string[] }[];
+    /** The log was cut at PANEL_EVENT_LIMIT, so older changes are not shown. */
+    eventsCapped: boolean;
+    /** Skips among those events only. */
     skipped: { when: string; text: string }[];
   };
   past: { name: string; ended: string }[];
@@ -65,6 +71,7 @@ export function panelFrom(input: PanelInput): ProgramPanelData {
         ? { title: `${input.plan.dayName}, week ${weekNumber(t, e.state)}`, lines: input.plan.exercises.map((x) => `${x.name} ${summarisePlanned(x.sets, e.unit)}`) }
         : null,
       events: input.events.map((ev) => ({ id: ev.id, when: dayText(ev.at), who: actorLabel(ev.actor, ev.actorName, false), lines: ev.reason.split("\n") })),
+      eventsCapped: input.events.length >= PANEL_EVENT_LIMIT,
       skipped: input.events.filter((ev) => ev.kind === "skip").map((ev) => ({ when: dayText(ev.at), text: ev.reason })),
     },
     past,

@@ -93,11 +93,15 @@ export function ProgramLibraryView({ rows, copies }: { rows: LibraryRow[]; copie
                   </small>
                 </span>
                 <span role="cell" className="pl-actions">
-                  <Link href={`/workout/library/copies/${c.id}`} className="pl-link">
-                    <Pencil size={14} /> Edit
+                  <Link href={`/workout/library/copies/${c.id}`}>
+                    <Button variant="outline" size="sm" tabIndex={-1}>
+                      <Pencil size={14} /> Edit
+                    </Button>
                   </Link>
-                  <Link href={`/workout/library/copy-${c.id}`} className="pl-link">
-                    <Eye size={14} /> Preview
+                  <Link href={`/workout/library/copy-${c.id}`}>
+                    <Button variant="outline" size="sm" tabIndex={-1}>
+                      <Eye size={14} /> Preview
+                    </Button>
                   </Link>
                   <Button variant="outline" size="sm" onClick={() => remove(c)} disabled={pending} aria-label={`Delete ${c.name}`}>
                     <Trash2 size={14} /> Delete
@@ -149,8 +153,10 @@ export function ProgramLibraryView({ rows, copies }: { rows: LibraryRow[]; copie
               </button>
             </span>
             <span role="cell" className="pl-actions">
-              <Link href={`/workout/library/${encodeURIComponent(r.key)}`} className="pl-link">
-                <Eye size={14} /> Preview
+              <Link href={`/workout/library/${encodeURIComponent(r.key)}`}>
+                <Button variant="outline" size="sm" tabIndex={-1}>
+                  <Eye size={14} /> Preview
+                </Button>
               </Link>
               <Button variant="outline" size="sm" onClick={() => copy(r.key)} disabled={pending}>
                 <Copy size={14} /> Make our version

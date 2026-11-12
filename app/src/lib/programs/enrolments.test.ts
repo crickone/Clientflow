@@ -72,7 +72,7 @@ const requireLocal = createRequire(import.meta.url);
   // ── helpers ──
   const newMember = (diy = true): number => {
     const [c] = db.insert(clients).values({ firstName: "Test", lastName: "Lifter", phone: "0" }).returning({ id: clients.id }).all();
-    if (diy) assert.equal(en.setTrainingMode(c.id, "diy", staff), true);
+    if (diy) assert.ok(en.setTrainingMode(c.id, "diy", staff));
     return c.id;
   };
   const mode = (clientId: number) => db.select().from(clients).where(eq(clients.id, clientId)).get()!.trainingMode;
@@ -110,7 +110,7 @@ const requireLocal = createRequire(import.meta.url);
   test("StrongLifts end to end", () => {
     const clientId = newMember(false);
     assert.equal(mode(clientId), "coach", "members start coach guided");
-    assert.equal(en.setTrainingMode(clientId, "diy", staff), true);
+    assert.ok(en.setTrainingMode(clientId, "diy", staff));
 
     // ── enrol ──
     const missing = en.enrol(clientId, { ...input, maxesKg: { ...maxes, row: 0 } });
@@ -175,10 +175,10 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(en.liveEnrolment(clientId)!.state.day, 2);
 
     // ── switching to coach guided pauses; back to DIY resumes ──
-    assert.equal(en.setTrainingMode(clientId, "coach", staff), true);
+    assert.deepEqual(en.setTrainingMode(clientId, "coach", staff), { paused: true, resumed: false });
     assert.equal(en.liveEnrolment(clientId)!.status, "paused");
     assert.deepEqual(en.startEnrolmentSession(clientId), { ok: false, error: "Your program is paused while you're coach guided." });
-    assert.equal(en.setTrainingMode(clientId, "diy", staff), true);
+    assert.deepEqual(en.setTrainingMode(clientId, "diy", staff), { paused: false, resumed: true });
     assert.equal(en.liveEnrolment(clientId)!.status, "active");
     assert.equal(mode(clientId), "diy");
 
@@ -425,12 +425,19 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(best!.reps, 5);
   });
 
+  test("switching mode says whether a program was paused", () => {
+    const clientId = newMember(false);
+    assert.deepEqual(en.setTrainingMode(clientId, "diy", staff), { paused: false, resumed: false }, "no program to resume");
+    assert.deepEqual(en.setTrainingMode(clientId, "coach", staff), { paused: false, resumed: false }, "no program to pause");
+    assert.equal(en.setTrainingMode(999999, "coach", staff), null, "an unknown member");
+  });
+
   // ── 4. enrolling needs a DIY member ──
   test("enrol refuses a coach-guided member", () => {
     const clientId = newMember(false);
     assert.deepEqual(en.enrol(clientId, input), NOT_DIY);
     assert.equal(en.listEnrolments(clientId).length, 0);
-    assert.equal(en.setTrainingMode(clientId, "diy", staff), true);
+    assert.ok(en.setTrainingMode(clientId, "diy", staff));
     assert.ok(en.enrol(clientId, input).ok);
   });
 
@@ -485,7 +492,7 @@ const requireLocal = createRequire(import.meta.url);
     const clientId = newMember();
     const id = enrolIn(clientId, "stronglifts-5x5", maxes);
     const sid = logNext(clientId, true);
-    assert.equal(en.setTrainingMode(clientId, "coach", staff), true);
+    assert.ok(en.setTrainingMode(clientId, "coach", staff));
     const before = stateOf(clientId);
     assert.deepEqual(en.finishEnrolmentSession(clientId, sid), { reasons: ["Your program is paused, so it did not move on."], finished: false });
     assert.equal(stateOf(clientId), before);

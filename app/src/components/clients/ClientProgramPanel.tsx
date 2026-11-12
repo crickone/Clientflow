@@ -1,14 +1,14 @@
 // app/src/components/clients/ClientProgramPanel.tsx
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { coachMoveWeekAction, coachSetMaxAction } from "@/app/clients/[id]/programActions";
-import type { ProgramPanelData } from "@/lib/programs/panel";
+import { PANEL_EVENT_LIMIT, type ProgramPanelData } from "@/lib/programs/panel";
 
 /** Staff view of a member's DIY program: where they are, their maxes, the next session, and every change with its reason. */
 export function ClientProgramPanel({ clientId, data }: { clientId: number; data: ProgramPanelData }) {
@@ -17,15 +17,19 @@ export function ClientProgramPanel({ clientId, data }: { clientId: number; data:
   const [lift, setLift] = useState(live?.lifts[0]?.lift ?? "squat");
   const [value, setValue] = useState("");
   const [weekIndex, setWeekIndex] = useState(live?.currentWeek ?? 0);
-  const [pending, start] = useTransition();
+  const [maxPending, startMax] = useTransition();
+  const [weekPending, startWeek] = useTransition();
+  // After a move or a finished session the page refreshes with a new week: follow it.
+  const currentWeek = live?.currentWeek ?? 0;
+  useEffect(() => setWeekIndex(currentWeek), [currentWeek]);
 
   function saveMax(e: React.FormEvent) {
     e.preventDefault();
     if (!live) return;
-    start(async () => {
+    startMax(async () => {
       const r = await coachSetMaxAction(clientId, live.enrolmentId, lift, Number(value.replace(",", ".")));
       if (!r.ok) return void toast.error(r.error);
-      toast.success("Max saved. The member sees the change in their log.");
+      toast.success("Max saved.");
       setValue("");
       router.refresh();
     });
@@ -34,7 +38,7 @@ export function ClientProgramPanel({ clientId, data }: { clientId: number; data:
   function moveWeek(e: React.FormEvent) {
     e.preventDefault();
     if (!live) return;
-    start(async () => {
+    startWeek(async () => {
       const r = await coachMoveWeekAction(clientId, live.enrolmentId, weekIndex);
       if (!r.ok) return void toast.error(r.error);
       toast.success(`Moved to week ${weekIndex + 1}.`);
@@ -93,7 +97,7 @@ export function ClientProgramPanel({ clientId, data }: { clientId: number; data:
                   ))}
                 </select>
                 <Input inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} placeholder={`New max in ${live.unit}`} style={{ width: 150 }} />
-                <Button type="submit" variant="secondary" loading={pending} disabled={!value.trim()}>
+                <Button type="submit" variant="secondary" loading={maxPending} disabled={!value.trim()}>
                   Correct max
                 </Button>
               </form>
@@ -106,14 +110,15 @@ export function ClientProgramPanel({ clientId, data }: { clientId: number; data:
                   </option>
                 ))}
               </select>
-              <Button type="submit" variant="secondary" loading={pending}>
+              <Button type="submit" variant="secondary" loading={weekPending}>
                 Move to this week
               </Button>
             </form>
           </div>
 
           <div className="dp-card">
-            <div className="dp-card-title">Skipped sessions: {live.skipped.length}</div>
+            <div className="dp-card-title">Recent skips</div>
+            {live.skipped.length === 0 && <div className="dp-line">No skips in the latest changes.</div>}
             {live.skipped.map((s, i) => (
               <div key={i} className="dp-line">
                 {s.when}: {s.text}
@@ -124,6 +129,7 @@ export function ClientProgramPanel({ clientId, data }: { clientId: number; data:
           <div className="dp-card">
             <div className="dp-card-title">Change log</div>
             {live.events.length === 0 && <div className="dp-line">No changes yet.</div>}
+            {live.eventsCapped && <div className="dp-note">Showing the latest {PANEL_EVENT_LIMIT} changes.</div>}
             {live.events.map((ev) => (
               <div key={ev.id} className="dp-event">
                 <span className="dp-event-meta">

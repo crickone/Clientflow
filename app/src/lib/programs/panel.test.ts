@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 
 import { initState } from "./engines";
-import { panelFrom } from "./panel";
+import { PANEL_EVENT_LIMIT, panelFrom } from "./panel";
 import { planSession } from "./planner";
 import { platformProgram } from "./registry";
 
@@ -44,6 +44,37 @@ assert.equal(b.live!.next, null);
 // past its length the week reads as a round
 const again = panelFrom({ enrolment: { id: 2, status: "active", template: sl, state: { ...state, cycle: 6 }, unit: "kg", basedOnName: null }, plan: null, events: [], past: [] });
 assert.equal(again.live!.weekLine, "Week 1 of 12, round 2");
+
+assert.equal(live.eventsCapped, false);
+assert.equal(live.finished, false);
+
+// a finished block: waiting for a new max, still live
+const smolov = platformProgram("smolov-base")!;
+const done = panelFrom({
+  enrolment: { id: 4, status: "active", template: smolov, state: { ...initState(smolov, { squat: 150 }, 2.5), week: 3, day: 2, finished: true }, unit: "kg", basedOnName: null },
+  plan: null,
+  events: [{ id: 7, at, actor: "engine", actorName: null, kind: "progress", reason: "Block done. Your new squat max is 160 kg." }],
+  past: [],
+});
+assert.equal(done.live!.finished, true);
+assert.equal(done.live!.status, "active");
+assert.equal(done.live!.weekLine, "Block finished. Waiting for a new max.");
+assert.equal(done.live!.next, null);
+assert.equal(done.live!.currentWeek, 3);
+
+// no events: an empty log, no skips, nothing cut
+const quiet = panelFrom({ enrolment: { id: 5, status: "active", template: sl, state, unit: "kg", basedOnName: null }, plan: null, events: [], past: [] });
+assert.deepEqual(quiet.live!.events, []);
+assert.deepEqual(quiet.live!.skipped, []);
+assert.equal(quiet.live!.eventsCapped, false);
+
+// a full page of events says the log is cut there; skips come from that page only
+const many = Array.from({ length: PANEL_EVENT_LIMIT }, (_, i) => ({ id: 100 - i, at, actor: "member", actorName: null, kind: i % 10 === 0 ? "skip" : "progress", reason: `Change ${i}.` }));
+const full = panelFrom({ enrolment: { id: 6, status: "active", template: sl, state, unit: "kg", basedOnName: null }, plan: null, events: many, past: [] });
+assert.equal(PANEL_EVENT_LIMIT, 40);
+assert.equal(full.live!.eventsCapped, true);
+assert.equal(full.live!.events.length, 40);
+assert.equal(full.live!.skipped.length, 4);
 
 // nothing live
 assert.equal(panelFrom({ enrolment: null, plan: null, events: [], past: [] }).live, null);

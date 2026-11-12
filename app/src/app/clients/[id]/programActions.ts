@@ -9,15 +9,17 @@ import { currentStaffActor } from "@/lib/programs/staffActor";
 
 type Result = { ok: true } | { ok: false; error: string };
 
-export async function setTrainingModeAction(clientId: number, mode: string): Promise<Result> {
+/** paused: switching to coach guided paused a live program. resumed: switching to DIY restarted a paused one. */
+export async function setTrainingModeAction(clientId: number, mode: string): Promise<{ ok: true; paused: boolean; resumed: boolean } | { ok: false; error: string }> {
   const actor = await currentStaffActor();
   if (!actor) return { ok: false, error: "Programs aren't switched on for this business." };
   const id = z.number().int().positive().safeParse(clientId);
   const m = z.enum(["coach", "diy"]).safeParse(mode);
   if (!id.success || !m.success) return { ok: false, error: "That change doesn't make sense." };
-  if (!setTrainingMode(id.data, m.data, actor)) return { ok: false, error: "Member not found." };
+  const r = setTrainingMode(id.data, m.data, actor);
+  if (!r) return { ok: false, error: "Member not found." };
   revalidatePath(`/clients/${id.data}`);
-  return { ok: true };
+  return { ok: true, ...r };
 }
 
 const OFF = { ok: false as const, error: "Programs aren't switched on for this business." };

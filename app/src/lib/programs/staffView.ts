@@ -3,7 +3,7 @@ import "server-only";
 
 import { enrolmentEvents, listEnrolments, liveEnrolment, planFor } from "./enrolments";
 import { getCopy } from "./library";
-import { panelFrom, type ProgramPanelData } from "./panel";
+import { PANEL_EVENT_LIMIT, panelFrom, type ProgramPanelData } from "./panel";
 
 /**
  * The client page's DIY program panel, or null when the member has never run a
@@ -28,7 +28,7 @@ function buildPanel(clientId: number): ProgramPanelData | null {
       ? { id: live.id, status: live.status, template: live.template, state: live.state, unit: live.unit, basedOnName: live.copyId ? (getCopy(live.copyId)?.basedOnName ?? null) : null }
       : null,
     plan: live && live.status === "active" ? planFor(live) : null,
-    events: live ? enrolmentEvents(live.id, 40) : [],
+    events: live ? enrolmentEvents(live.id, PANEL_EVENT_LIMIT) : [],
     past: past.map((p) => ({ name: p.template.name, endedAt: p.endedAt })),
   });
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -11,6 +11,8 @@ export function TrainingModeSwitch({ clientId, mode }: { clientId: number; mode:
   const router = useRouter();
   const [value, setValue] = useState(mode);
   const [pending, start] = useTransition();
+  // The page can change the mode too (a refresh after another edit): follow it.
+  useEffect(() => setValue(mode), [mode]);
 
   function pick(next: "coach" | "diy") {
     if (next === value) return;
@@ -18,7 +20,8 @@ export function TrainingModeSwitch({ clientId, mode }: { clientId: number; mode:
       const r = await setTrainingModeAction(clientId, next);
       if (!r.ok) return void toast.error(r.error);
       setValue(next);
-      toast.success(next === "diy" ? "Switched to DIY. Programs now show in their app." : "Switched to coach guided. Any DIY program is paused.");
+      if (next === "coach") toast.success(r.paused ? "Switched to coach guided. Their DIY program is paused." : "Switched to coach guided.");
+      else toast.success(r.resumed ? "Switched to DIY. Their paused program is running again." : "Switched to DIY.");
       router.refresh();
     });
   }

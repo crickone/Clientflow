@@ -16,7 +16,14 @@ export default async function ProgramPreviewPage(props: { params: Promise<{ key:
   // Signs the user in and is null where Programs is off for this business.
   if (!(await currentStaffActor())) notFound();
   const { key } = await props.params;
-  const entry = programByKey(decodeURIComponent(key), { includeHidden: true });
+  // A malformed escape in the URL (e.g. "%E0") is a page that does not exist, not a crash.
+  let programKey: string;
+  try {
+    programKey = decodeURIComponent(key);
+  } catch {
+    notFound();
+  }
+  const entry = programByKey(programKey, { includeHidden: true });
   if (!entry) notFound();
   const t = entry.template;
   const card = toCard(t, entry.basedOnName);

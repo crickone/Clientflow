@@ -406,12 +406,15 @@ export function endEnrolment(clientId: number, actor: Actor): boolean {
 
 /**
  * Coach guided or DIY. Nothing is deleted: switching to coach pauses an
- * active program, switching back to DIY resumes a paused one.
+ * active program, switching back to DIY resumes a paused one. Null when the
+ * member is not found; otherwise whether a program was paused or resumed.
  */
-export function setTrainingMode(clientId: number, mode: "coach" | "diy", actor: Actor): boolean {
+export function setTrainingMode(clientId: number, mode: "coach" | "diy", actor: Actor): { paused: boolean; resumed: boolean } | null {
   return db.transaction((tx) => {
     const r = tx.update(clients).set({ trainingMode: mode }).where(eq(clients.id, clientId)).run();
-    if (r.changes === 0) return false;
+    if (r.changes === 0) return null;
+    let paused = false;
+    let resumed = false;
     const live = tx
       .select({ id: programEnrolments.id, status: programEnrolments.status })
       .from(programEnrolments)
@@ -421,12 +424,14 @@ export function setTrainingMode(clientId: number, mode: "coach" | "diy", actor: 
     if (live && mode === "coach" && live.status === "active") {
       tx.update(programEnrolments).set({ status: "paused", updatedAt: Date.now() }).where(eq(programEnrolments.id, live.id)).run();
       logEvent(tx, live.id, actor, "pause", "Paused: switched to coach guided.", null, null);
+      paused = true;
     }
     if (live && mode === "diy" && live.status === "paused") {
       tx.update(programEnrolments).set({ status: "active", updatedAt: Date.now() }).where(eq(programEnrolments.id, live.id)).run();
       logEvent(tx, live.id, actor, "resume", "Resumed: switched back to DIY.", null, null);
+      resumed = true;
     }
-    return true;
+    return { paused, resumed };
   });
 }
 
