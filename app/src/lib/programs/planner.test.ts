@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 
 import { amrap, day, ex, fixed, maxTest, range, sxr, week } from "./dsl";
 import {
+  weekLabel,
   advance,
   isLastSession,
   planSession,
@@ -107,5 +108,13 @@ assert.equal(
 );
 assert.equal(schemeLabel([fixed(3), fixed(3), fixed(3), fixed(3), fixed(3, 180, true)]), "5 x 3+");
 assert.equal(schemeLabel([fixed(10), fixed(10), fixed(10)]), "3 x 10");
+
+// Week labels: a full-length block, a repeated short cycle, and a restarted block.
+const block = { weeks: [0, 1, 2, 3].map(() => week([])), lengthWeeks: 4 };
+assert.equal(weekLabel(block, { week: 2, cycle: 0 }), "Week 3 of 4");
+assert.equal(weekLabel(block, { week: 0, cycle: 1 }), "Week 1 of 4, round 2");
+const short = { weeks: [week([])], lengthWeeks: 12 };
+assert.equal(weekLabel(short, { week: 0, cycle: 8 }), "Week 9 of 12");
+assert.equal(weekLabel(short, { week: 0, cycle: 12 }), "Week 1 of 12, round 2");
 
 console.log("programs/planner: ok");

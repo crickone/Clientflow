@@ -5,7 +5,7 @@ import { AlertTriangle, Pause } from "lucide-react";
 import { requireProgramsPage } from "@/lib/programs/access";
 import { actorLabel } from "@/lib/programs/cards";
 import { enrolmentEvents, liveEnrolment, planFor, programWeek, sessionTitle } from "@/lib/programs/enrolments";
-import { summarisePlanned, weekNumber } from "@/lib/programs/planner";
+import { summarisePlanned, weekLabel } from "@/lib/programs/planner";
 import { LIFT_LABEL } from "@/lib/programs/types";
 import { formatWeight } from "@/lib/programs/units";
 import { dateKey } from "@/lib/trainingProgress";
@@ -37,7 +37,7 @@ export default async function MyProgramPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <PageTitle sub={`Week ${weekNumber(t, view.state)} of ${t.lengthWeeks}${startsLater}`}>{t.name}</PageTitle>
+      <PageTitle sub={`${weekLabel(t, view.state)}${startsLater}`}>{t.name}</PageTitle>
 
       {view.status === "paused" && (
         <Card style={{ display: "flex", gap: 10, alignItems: "center" }}>
