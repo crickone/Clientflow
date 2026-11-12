@@ -160,6 +160,11 @@ function parsePlan(raw: string | null): PlannedExercise | null {
   }
 }
 
+/** How hard a set felt: a number from 1 to 10 in half steps, anything else is dropped. */
+function cleanRpe(v: unknown): number | null {
+  return typeof v === "number" && Number.isFinite(v) && v >= 1 && v <= 10 && Number.isInteger(v * 2) ? v : null;
+}
+
 /** Add an exercise to the end of a member's session, with `sets` empty sets. */
 export function addSessionExercise(
   clientId: number,
@@ -325,7 +330,7 @@ export function saveSessionSets(clientId: number, sessionId: number, exercises: 
             reps: s.reps,
             done: s.done,
             targetWeightKg: targets.get(`${ex.id}:${i + 1}`) ?? null,
-            rpe: s.rpe ?? null,
+            rpe: cleanRpe(s.rpe),
           })
           .run();
       });

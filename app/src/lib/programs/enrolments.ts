@@ -55,6 +55,8 @@ export interface EnrolmentEvent {
 }
 
 type Row = typeof programEnrolments.$inferSelect;
+/** A write transaction: every change and its change-log event go in one. */
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Result = { ok: true } | { ok: false; error: string };
 
 const MAX_KG = 600;
@@ -108,16 +110,40 @@ function stateColumns(state: EngineState) {
   return { week, day, maxesJson: JSON.stringify(maxes), tmsJson: JSON.stringify(tms), stateJson: JSON.stringify(rest), updatedAt: Date.now() };
 }
 
-function saveState(id: number, state: EngineState): void {
-  db.update(programEnrolments).set(stateColumns(state)).where(eq(programEnrolments.id, id)).run();
+function saveState(tx: Tx, id: number, state: EngineState): void {
+  tx.update(programEnrolments).set(stateColumns(state)).where(eq(programEnrolments.id, id)).run();
+}
+
+/** True while the enrolment is still where `view` saw it, so a change worked out from it can be written. */
+function unchanged(tx: Tx, view: EnrolmentView, statuses: EnrolmentStatus[] = ["active"]): boolean {
+  const r = tx
+    .select({ status: programEnrolments.status, week: programEnrolments.week, day: programEnrolments.day })
+    .from(programEnrolments)
+    .where(eq(programEnrolments.id, view.id))
+    .get();
+  return !!r && statuses.includes(r.status) && r.week === view.state.week && r.day === view.state.day;
+}
+
+/** A finished session has already moved its program on. */
+function progressed(tx: Tx, sessionId: number): boolean {
+  return !!tx
+    .select({ id: programEnrolmentEvents.id })
+    .from(programEnrolmentEvents)
+    .where(and(eq(programEnrolmentEvents.sessionId, sessionId), eq(programEnrolmentEvents.kind, "progress")))
+    .get();
+}
+
+/** A ticked set with no weight typed in was lifted at the weight the program planned. */
+function liftedKg(s: { weightKg: number | null; done: boolean; targetKg?: number | null }): number | null {
+  return s.weightKg ?? (s.done ? (s.targetKg ?? null) : null);
 }
 
 function snapshot(s: EngineState) {
   return { week: s.week, day: s.day, cycle: s.cycle, maxes: s.maxes, tms: s.tms, weights: s.weights };
 }
 
-function logEvent(enrolmentId: number, actor: Actor, kind: string, reason: string, before: EngineState | null, after: EngineState | null, sessionId: number | null = null): void {
-  db.insert(programEnrolmentEvents)
+function logEvent(tx: Tx, enrolmentId: number, actor: Actor, kind: string, reason: string, before: EngineState | null, after: EngineState | null, sessionId: number | null = null): void {
+  tx.insert(programEnrolmentEvents)
     .values({
       enrolmentId,
       at: Date.now(),
@@ -201,6 +227,9 @@ export interface EnrolInput {
 /** Start a program. One at a time: a live one must be ended first. */
 export function enrol(clientId: number, input: EnrolInput): { ok: true; id: number } | { ok: false; error: string } {
   const busy = { ok: false as const, error: "End your current program before you start another." };
+  const notDiy = { ok: false as const, error: "Programs are for DIY members. Switch this member to DIY first." };
+  const member = db.select({ mode: clients.trainingMode }).from(clients).where(eq(clients.id, clientId)).get();
+  if (member?.mode !== "diy") return notDiy;
   if (liveEnrolment(clientId)) return busy;
   const entry = programByKey(input.key);
   if (!entry) return { ok: false, error: "That program isn't available." };
@@ -228,6 +257,7 @@ export function enrol(clientId: number, input: EnrolInput): { ok: true; id: numb
         })
         .returning({ id: programEnrolments.id })
         .all();
+      logEvent(tx, row.id, { kind: "member" }, "start", `Started ${t.name}.${tmLine(t, state, input.unit)}`, null, state);
       return row.id;
     });
   } catch (err) {
@@ -235,7 +265,6 @@ export function enrol(clientId: number, input: EnrolInput): { ok: true; id: numb
     if (String(err).includes("UNIQUE")) return busy;
     throw err;
   }
-  logEvent(id, { kind: "member" }, "start", `Started ${t.name}.${tmLine(t, state, input.unit)}`, null, state);
   return { ok: true, id };
 }
 
@@ -256,7 +285,7 @@ export function planFor(view: EnrolmentView): PlannedSession | null {
   return planSession(view.template, view.state, { stepKg: view.stepKg, e1rm });
 }
 
-/** "Workout A, week 3". */
+/** "Workout A, week 3". Weeks count on across cycles, the same as programWeek. */
 export function sessionTitle(view: EnrolmentView, plan: PlannedSession): string {
   return `${plan.dayName}, week ${weekNumber(view.template, view.state)}`;
 }
@@ -281,28 +310,47 @@ export function startEnrolmentSession(clientId: number): StartResult {
 /**
  * After a program session is finished: run the engine on what the member
  * actually lifted and move the program on. Only the member's current session
- * moves it, so re-saving an old one changes nothing.
+ * moves it, and only once: a session that is not finished, or that already
+ * moved the program, changes nothing and returns null. The engine runs before
+ * anything is written; if it throws, nothing is saved and a retry starts from
+ * the same place.
  */
 export function finishEnrolmentSession(clientId: number, sessionId: number): { reasons: string[]; finished: boolean } | null {
   const session = getSession(clientId, sessionId);
-  if (!session?.enrolmentId) return null;
+  if (!session?.enrolmentId || !session.finishedAt) return null;
   const view = liveEnrolment(clientId);
   if (!view || view.id !== session.enrolmentId) return null;
+  const isFinished = (tx: Tx) =>
+    !!tx
+      .select({ at: workoutSessions.finishedAt })
+      .from(workoutSessions)
+      .where(and(eq(workoutSessions.id, session.id), eq(workoutSessions.clientId, clientId)))
+      .get()?.at;
+  if (db.transaction((tx) => progressed(tx, session.id))) return null;
   if (view.status !== "active") return { reasons: ["Your program is paused, so it did not move on."], finished: false };
   if (view.state.finished || positionOf(view.template, view.state.week, view.state.day) !== session.dayPosition) {
     const reason = "This wasn't your current session, so your program did not move on.";
-    logEvent(view.id, { kind: "member" }, "note", reason, null, null, session.id);
-    return { reasons: [reason], finished: view.state.finished };
+    const noted = db.transaction((tx) => {
+      if (!isFinished(tx) || progressed(tx, session.id)) return false;
+      logEvent(tx, view.id, { kind: "member" }, "note", reason, null, null, session.id);
+      return true;
+    });
+    return noted ? { reasons: [reason], finished: view.state.finished } : null;
   }
   const result: SessionResult = {
     exercises: session.exercises
       .filter((e) => e.plan)
-      .map((e) => ({ planned: e.plan!, sets: e.sets.map((s) => ({ kg: s.weightKg, reps: s.reps, done: s.done })) })),
+      .map((e) => ({ planned: e.plan!, sets: e.sets.map((s) => ({ kg: liftedKg(s), reps: s.reps, done: s.done })) })),
   };
   const out = progress({ template: view.template, state: view.state, result, stepKg: view.stepKg, unit: view.unit });
-  saveState(view.id, out.state);
-  logEvent(view.id, { kind: "engine" }, "progress", out.reasons.join("\n") || "Session done. Nothing changes until the next one.", view.state, out.state, session.id);
-  return { reasons: out.reasons, finished: out.state.finished };
+  const reason = out.reasons.join("\n") || "Session done. Nothing changes until the next one.";
+  const moved = db.transaction((tx) => {
+    if (!isFinished(tx) || progressed(tx, session.id) || !unchanged(tx, view)) return false;
+    saveState(tx, view.id, out.state);
+    logEvent(tx, view.id, { kind: "engine" }, "progress", reason, view.state, out.state, session.id);
+    return true;
+  });
+  return moved ? { reasons: out.reasons, finished: out.state.finished } : null;
 }
 
 /** Move past the next session without doing it. Recorded. */
@@ -311,10 +359,14 @@ export function skipEnrolmentSession(clientId: number): Result {
   if (!view || view.status !== "active" || view.state.finished) return { ok: false, error: "There's no session to skip." };
   const d = dayAt(view.template, view.state.week, view.state.day);
   const out = skipSession(view.template, view.state, view.unit);
-  saveState(view.id, out.state);
   const what = `Skipped ${d ? `${d.name}, week ${weekNumber(view.template, view.state)}` : "a session"}.`;
-  logEvent(view.id, { kind: "member" }, "skip", [what, ...out.reasons].join("\n"), view.state, out.state);
-  return { ok: true };
+  const done = db.transaction((tx) => {
+    if (!unchanged(tx, view)) return false;
+    saveState(tx, view.id, out.state);
+    logEvent(tx, view.id, { kind: "member" }, "skip", [what, ...out.reasons].join("\n"), view.state, out.state);
+    return true;
+  });
+  return done ? { ok: true } : { ok: false, error: "There's no session to skip." };
 }
 
 /** End the live program. Its sessions and change log are kept. */
@@ -322,9 +374,16 @@ export function endEnrolment(clientId: number, actor: Actor): boolean {
   const view = liveEnrolment(clientId);
   if (!view) return false;
   const now = Date.now();
-  db.update(programEnrolments).set({ status: "ended", endedAt: now, updatedAt: now }).where(eq(programEnrolments.id, view.id)).run();
-  logEvent(view.id, actor, "end", "Program ended. Its history is kept.", view.state, null);
-  return true;
+  return db.transaction((tx) => {
+    const r = tx
+      .update(programEnrolments)
+      .set({ status: "ended", endedAt: now, updatedAt: now })
+      .where(and(eq(programEnrolments.id, view.id), inArray(programEnrolments.status, ["active", "paused"])))
+      .run();
+    if (r.changes === 0) return false;
+    logEvent(tx, view.id, actor, "end", "Program ended. Its history is kept.", view.state, null);
+    return true;
+  });
 }
 
 /**
@@ -332,18 +391,25 @@ export function endEnrolment(clientId: number, actor: Actor): boolean {
  * active program, switching back to DIY resumes a paused one.
  */
 export function setTrainingMode(clientId: number, mode: "coach" | "diy", actor: Actor): boolean {
-  const r = db.update(clients).set({ trainingMode: mode }).where(eq(clients.id, clientId)).run();
-  if (r.changes === 0) return false;
-  const view = liveEnrolment(clientId);
-  if (view && mode === "coach" && view.status === "active") {
-    db.update(programEnrolments).set({ status: "paused", updatedAt: Date.now() }).where(eq(programEnrolments.id, view.id)).run();
-    logEvent(view.id, actor, "pause", "Paused: switched to coach guided.", null, null);
-  }
-  if (view && mode === "diy" && view.status === "paused") {
-    db.update(programEnrolments).set({ status: "active", updatedAt: Date.now() }).where(eq(programEnrolments.id, view.id)).run();
-    logEvent(view.id, actor, "resume", "Resumed: switched back to DIY.", null, null);
-  }
-  return true;
+  return db.transaction((tx) => {
+    const r = tx.update(clients).set({ trainingMode: mode }).where(eq(clients.id, clientId)).run();
+    if (r.changes === 0) return false;
+    const live = tx
+      .select({ id: programEnrolments.id, status: programEnrolments.status })
+      .from(programEnrolments)
+      .where(and(eq(programEnrolments.clientId, clientId), inArray(programEnrolments.status, ["active", "paused"])))
+      .orderBy(desc(programEnrolments.id))
+      .get();
+    if (live && mode === "coach" && live.status === "active") {
+      tx.update(programEnrolments).set({ status: "paused", updatedAt: Date.now() }).where(eq(programEnrolments.id, live.id)).run();
+      logEvent(tx, live.id, actor, "pause", "Paused: switched to coach guided.", null, null);
+    }
+    if (live && mode === "diy" && live.status === "paused") {
+      tx.update(programEnrolments).set({ status: "active", updatedAt: Date.now() }).where(eq(programEnrolments.id, live.id)).run();
+      logEvent(tx, live.id, actor, "resume", "Resumed: switched back to DIY.", null, null);
+    }
+    return true;
+  });
 }
 
 /** The member's training weekdays for their program (1 = Monday). */
@@ -365,8 +431,10 @@ export function restartFromTest(clientId: number, maxesKg: Partial<Record<LiftKe
   if (problem) return { ok: false, error: problem };
   const fresh = initState(view.template, maxesKg, view.stepKg);
   fresh.cycle = view.state.cycle + 1;
-  saveState(view.id, fresh);
-  logEvent(view.id, { kind: "member" }, "restart", `Started ${view.template.name} again.${tmLine(view.template, fresh, view.unit)}`, view.state, fresh);
+  db.transaction((tx) => {
+    saveState(tx, view.id, fresh);
+    logEvent(tx, view.id, { kind: "member" }, "restart", `Started ${view.template.name} again.${tmLine(view.template, fresh, view.unit)}`, view.state, fresh);
+  });
   return { ok: true };
 }
 
@@ -382,10 +450,12 @@ export function coachSetMax(clientId: number, enrolmentId: number, lift: LiftKey
   const fresh = initState(view.template, { [lift]: kg }, view.stepKg);
   for (const [k, w] of Object.entries(fresh.weights)) next.weights[k] = w;
   for (const [k, w] of Object.entries(fresh.t2Base)) next.t2Base[k] = w;
-  saveState(view.id, next);
   const fmt = (n: number) => formatWeight(n, view.unit);
   const reset = Object.keys(fresh.weights).length ? " Its working weights start again from there." : "";
-  logEvent(view.id, actor, "max", `${actor.name} set the ${LIFT_LABEL[lift].toLowerCase()} max to ${fmt(next.maxes[lift]!)}, training max ${fmt(next.tms[lift]!)}.${reset}`, view.state, next);
+  db.transaction((tx) => {
+    saveState(tx, view.id, next);
+    logEvent(tx, view.id, actor, "max", `${actor.name} set the ${LIFT_LABEL[lift].toLowerCase()} max to ${fmt(next.maxes[lift]!)}, training max ${fmt(next.tms[lift]!)}.${reset}`, view.state, next);
+  });
   return { ok: true };
 }
 
@@ -398,8 +468,10 @@ export function coachMoveToWeek(clientId: number, enrolmentId: number, weekIndex
   next.week = weekIndex;
   next.day = 0;
   next.finished = false;
-  saveState(view.id, next);
-  logEvent(view.id, actor, "week", `${actor.name} moved the program to week ${weekIndex + 1}.`, view.state, next);
+  db.transaction((tx) => {
+    saveState(tx, view.id, next);
+    logEvent(tx, view.id, actor, "week", `${actor.name} moved the program to week ${weekIndex + 1}.`, view.state, next);
+  });
   return { ok: true };
 }
 
@@ -427,21 +499,32 @@ export function bestLoggedSet(clientId: number, lift: LiftKey, now = Date.now())
   const sets = db.select().from(workoutSetLogs).where(inArray(workoutSetLogs.sessionExerciseId, rows.map((r) => r.id))).all();
   let best: { kg: number; reps: number; e1rm: number; at: number } | null = null;
   for (const s of sets) {
-    if (!s.done || !s.weightKg || !s.reps || s.reps > MAX_SET_REPS) continue;
-    const e1rm = maxFromSet(s.weightKg, s.reps);
-    if (e1rm !== null && (!best || e1rm > best.e1rm)) best = { kg: s.weightKg, reps: s.reps, e1rm, at: at.get(s.sessionExerciseId) ?? now };
+    const kg = liftedKg({ weightKg: s.weightKg, done: s.done, targetKg: s.targetWeightKg });
+    if (!s.done || !kg || !s.reps || s.reps > MAX_SET_REPS) continue;
+    const e1rm = maxFromSet(kg, s.reps);
+    if (e1rm !== null && (!best || e1rm > best.e1rm)) best = { kg, reps: s.reps, e1rm, at: at.get(s.sessionExerciseId) ?? now };
   }
   return best;
 }
 
 /** This week on the member's training days: done, missed, today and planned program sessions. */
 export function programWeek(view: EnrolmentView, now = Date.now()): PlanDay[] {
+  const t = view.template;
+  const perCycle = t.weeks.reduce((n, w) => n + w.days.length, 0);
+  // Week numbers count on across cycles (as sessionTitle does), so name this
+  // cycle's sessions and enough of the next ones to fill a week.
+  const cycle = view.state.cycle + (view.state.finished ? 1 : 0);
+  const cycles = perCycle > 0 ? Math.ceil(7 / perCycle) + 1 : 0;
   const names: string[] = [];
-  view.template.weeks.forEach((w, wi) => w.days.forEach((d) => names.push(`${d.name}, week ${wi + 1}`)));
+  for (let c = 0; c < cycles; c++) {
+    t.weeks.forEach((w, wi) => w.days.forEach((d) => names.push(`${d.name}, week ${weekNumber(t, { week: wi, cycle: cycle + c })}`)));
+  }
   const monday = mondayOf(dateKey(now));
   const logged = listSessions(view.clientId, 30)
     .filter((s) => s.enrolmentId === view.id && mondayOf(dateKey(s.finishedAt!)) === monday)
     .map((s) => ({ at: s.finishedAt!, title: s.dayName }));
-  const pos = view.state.finished ? 0 : positionOf(view.template, view.state.week, view.state.day);
-  return planWeek({ now, weekdays: view.weekdays, dayNames: names, nextDayPosition: pos, logged });
+  const pos = view.state.finished ? 0 : positionOf(t, view.state.week, view.state.day);
+  return planWeek({ now, weekdays: view.weekdays, dayNames: names, nextDayPosition: pos, logged }).map((d) =>
+    d.dayPosition === null ? d : { ...d, dayPosition: d.dayPosition % perCycle },
+  );
 }
