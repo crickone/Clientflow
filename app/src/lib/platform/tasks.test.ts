@@ -17,6 +17,18 @@ const requireLocal = createRequire(import.meta.url);
   assert.deepEqual(b.later.map((t) => t.title), ["soon"]);
   assert.deepEqual(b.undated.map((t) => t.title), ["none"]);
 
+  // Dublin boundaries: in November (GMT) midnight is 00:00Z; in summer (IST) it is 23:00Z the day before.
+  const winter = Date.UTC(2026, 10, 11, 23, 30); // 23:30 Dublin, 11 Nov
+  const w = dueBuckets([mk("a", Date.UTC(2026, 10, 11, 0, 5)), mk("b", Date.UTC(2026, 10, 12, 0, 5)), mk("c", Date.UTC(2026, 10, 10, 23, 59))], winter);
+  assert.deepEqual(w.today.map((t) => t.title), ["a"]);
+  assert.deepEqual(w.later.map((t) => t.title), ["b"]);
+  assert.deepEqual(w.overdue.map((t) => t.title), ["c"]);
+  const summer = Date.UTC(2026, 6, 1, 22, 30); // 23:30 Dublin on 1 Jul, still 1 Jul locally
+  const s = dueBuckets([mk("x", Date.UTC(2026, 6, 1, 22, 45)), mk("y", Date.UTC(2026, 6, 1, 23, 5)), mk("z", Date.UTC(2026, 5, 30, 22, 59))], summer);
+  assert.deepEqual(s.today.map((t) => t.title), ["x"]);
+  assert.deepEqual(s.later.map((t) => t.title), ["y"], "23:05Z is 00:05 Dublin the next day");
+  assert.deepEqual(s.overdue.map((t) => t.title), ["z"]);
+
   const email = "tasks-test-user@example.invalid";
   controlSqlite.prepare("DELETE FROM platform_tasks WHERE title LIKE 'tasktest %'").run();
   controlSqlite.prepare("DELETE FROM users WHERE email = ?").run(email);

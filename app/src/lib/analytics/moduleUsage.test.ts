@@ -30,8 +30,22 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(u.find((m) => m.key === "nutrition")!.hits, 1);
     assert.equal(u.find((m) => m.key === "workout")!.hits, 0, "every module is listed, used or not");
     assert.equal(flushModuleUsage(now), 0, "flushing twice writes nothing");
+    // A failed flush keeps the counts; the next one writes them.
+    noteModuleVisit(t.id, "/leads", now);
+    noteModuleVisit(t.id, "/leads", now);
+    controlSqlite.exec("CREATE TRIGGER usage_test_fail BEFORE INSERT ON module_usage BEGIN SELECT RAISE(ABORT, 'disk full'); END");
+    try {
+      assert.throws(() => flushModuleUsage(now), /disk full/);
+    } finally {
+      controlSqlite.exec("DROP TRIGGER IF EXISTS usage_test_fail");
+    }
+    const before = usageByModule(t.id, 30, now).find((m) => m.key === "leads")!.hits;
+    assert.equal(before, 2, "nothing written by the failed flush");
+    assert.equal(flushModuleUsage(now), 1, "retry writes the kept entry");
+    assert.equal(usageByModule(t.id, 30, now).find((m) => m.key === "leads")!.hits, 4);
     console.log("moduleUsage.test.ts: ok");
   } finally {
+    controlSqlite.exec("DROP TRIGGER IF EXISTS usage_test_fail");
     controlSqlite.prepare("DELETE FROM module_usage WHERE tenant_id = ?").run(t.id);
     controlSqlite.prepare("DELETE FROM tenants WHERE id = ?").run(t.id);
   }

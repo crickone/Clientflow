@@ -343,11 +343,6 @@ export default async function RootLayout({
         }
       }
 
-      // Module gate (Platform Console v2, slice 4). A module switched off in
-      // the console is not merely hidden from the sidebar: its routes are
-      // refused here, the one place that sees both the tenant and the path.
-      // Unset flags mean every module is on, so a tenant nobody has touched
-      // behaves exactly as before. See @/lib/features.
       // Tier 4 console: which modules this business opens. Buffered in memory,
       // never a write here. Platform staff opening the business through the
       // console are not the business using it, so they are not counted.
@@ -358,6 +353,11 @@ export default async function RootLayout({
           /* counting must never break a page */
         }
       }
+      // Module gate (Platform Console v2, slice 4). A module switched off in
+      // the console is not merely hidden from the sidebar: its routes are
+      // refused here, the one place that sees both the tenant and the path.
+      // Unset flags mean every module is on, so a tenant nobody has touched
+      // behaves exactly as before. See @/lib/features.
       featureFlags = getFeatureFlags();
       if (!bare && !pathname.startsWith("/api/") && !pathAllowed(featureFlags, pathname)) {
         redirect("/dashboard");

@@ -1,9 +1,10 @@
 import "server-only";
+import { sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getCurrentTenant, runWithTenant } from "@/lib/db/tenant";
 import { controlSqlite } from "@/lib/db/control";
 import { readKey, readKeyForTenant, setKey, getVenueTypeForTenant } from "@/lib/settings";
-import { getBusinessProfileForTenant, isBriefCompleteForTenant } from "@/lib/businessProfile";
+import { getBusinessProfileForTenant } from "@/lib/businessProfile";
 import { isEmailConfiguredForTenant } from "@/lib/email";
 import { isWhatsAppConfiguredForTenant } from "@/lib/whatsapp/config";
 import { listFacebookPages } from "@/lib/facebook/pages";
@@ -99,10 +100,10 @@ export function summarizeSetup(
 }
 
 function serviceCount(): number {
-  return db.select({ id: schema.therapies.id }).from(schema.therapies).all().length;
+  return db.select({ n: sql<number>`COUNT(*)` }).from(schema.therapies).get()?.n ?? 0;
 }
 function clientCount(): number {
-  return db.select({ id: schema.clients.id }).from(schema.clients).all().length;
+  return db.select({ n: sql<number>`COUNT(*)` }).from(schema.clients).get()?.n ?? 0;
 }
 function membershipCount(tenantId: number): number {
   const row = controlSqlite.prepare("SELECT COUNT(*) c FROM memberships WHERE tenant_id = ?").get(tenantId) as { c: number };
@@ -116,7 +117,7 @@ function detectForTenant(tenantId: number): { detections: Record<string, boolean
     const detections: Record<string, boolean> = {
       business: p.businessName.trim().length > 0 && (p.phone.trim().length > 0 || p.location.trim().length > 0),
       venue: readKeyForTenant<boolean>(tenantId, "setup_ack_venue", false) === true,
-      ai_context: isBriefCompleteForTenant(tenantId) || p.marketingBrain.trim().length > 0,
+      ai_context: p.brief.trim().length > 0 || p.marketingBrain.trim().length > 0,
       branding: logoForTenant(tenantId) !== null,
       services: serviceCount() > 0,
       email: isEmailConfiguredForTenant(tenantId),

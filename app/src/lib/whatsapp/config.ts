@@ -86,11 +86,12 @@ export function setWhatsAppConfig(config: Partial<WhatsAppConfig>): void {
   setKey("whatsapp_config", stored);
 }
 
-/** True once a token is present — enough to attempt provider calls. */
+/** True once a token is present for the named tenant — enough to attempt provider calls. */
 export function isWhatsAppConfiguredForTenant(tenantId: number): boolean {
   return parseWhatsAppConfig(readKeyForTenant<StoredWhatsAppConfig>(tenantId, "whatsapp_config", {})).token.trim().length > 0;
 }
 
+/** True once a token is present for the current tenant. */
 export function isWhatsAppConfigured(): boolean {
   return getWhatsAppConfig().token.trim().length > 0;
 }

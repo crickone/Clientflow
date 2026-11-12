@@ -48,10 +48,23 @@ export function deleteTask(id: number): void {
   controlSqlite.prepare("DELETE FROM platform_tasks WHERE id = ?").run(id);
 }
 
-/** Buckets by due date, against the given instant (UTC day boundaries). */
+const DUBLIN_TZ = "Europe/Dublin";
+
+/** Start (UTC ms) of the Dublin calendar day containing `ms`. */
+function dublinDayStart(ms: number): number {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: DUBLIN_TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).formatToParts(new Date(ms));
+  const n = (t: string) => Number(parts.find((p) => p.type === t)!.value);
+  // Wall-clock time in Dublin, read as if it were UTC, gives the offset to undo.
+  const wallAsUtc = Date.UTC(n("year"), n("month") - 1, n("day"), n("hour"), n("minute"), n("second"));
+  const offset = wallAsUtc - Math.floor(ms / 1000) * 1000;
+  return Date.UTC(n("year"), n("month") - 1, n("day")) - offset;
+}
+
+/** Buckets by due date, against the given instant (Europe/Dublin day boundaries). */
 export function dueBuckets(tasks: Task[], now: number): { overdue: Task[]; today: Task[]; later: Task[]; undated: Task[] } {
-  const dayStart = Math.floor(now / 86400000) * 86400000;
-  const dayEnd = dayStart + 86400000;
+  const dayStart = dublinDayStart(now);
+  // Next midnight in Dublin, found from a point safely inside the next day (DST days are 23 or 25 hours).
+  const dayEnd = dublinDayStart(dayStart + 36 * 3600000);
   const out = { overdue: [] as Task[], today: [] as Task[], later: [] as Task[], undated: [] as Task[] };
   for (const t of tasks) {
     if (t.dueAt === null) out.undated.push(t);

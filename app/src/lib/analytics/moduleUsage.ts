@@ -10,7 +10,16 @@ import { MODULE_CATALOG, moduleForPath } from "@/lib/features";
  * (tenant, module, day), so a busy day is one UPDATE, not a write per
  * click. Counts are page renders, which is close enough to "did they use it".
  */
-const buffer = new Map<string, { tenantId: number; key: string; day: string; hits: number; lastAt: number }>();
+type Entry = { tenantId: number; key: string; day: string; hits: number; lastAt: number };
+/**
+ * The buffer lives on globalThis next to the flusher guard: Next can load a
+ * separate copy of this module per bundle, and the copy the layout writes to
+ * must be the copy the timer flushes.
+ */
+const g = globalThis as { __moduleUsageFlusher?: ReturnType<typeof setInterval>; __moduleUsageBuffer?: Map<string, Entry> };
+const buffer: Map<string, Entry> = (g.__moduleUsageBuffer ??= new Map());
+/** If flushes keep failing, stop growing without bound. */
+const MAX_BUFFERED = 5000;
 
 function dayOf(ms: number): string {
   return new Date(ms).toISOString().slice(0, 10);
@@ -25,25 +34,40 @@ export function noteModuleVisit(tenantId: number, pathname: string, now: number 
   if (cur) {
     cur.hits++;
     cur.lastAt = Math.max(cur.lastAt, now);
-  } else buffer.set(k, { tenantId, key: mod.key, day, hits: 1, lastAt: now });
+  } else {
+    if (buffer.size >= MAX_BUFFERED) return;
+    buffer.set(k, { tenantId, key: mod.key, day, hits: 1, lastAt: now });
+  }
 }
 
 export function flushModuleUsage(now: number = Date.now()): number {
   void now;
   if (buffer.size === 0) return 0;
-  const rows = [...buffer.values()];
-  buffer.clear();
+  // Snapshot, write, and only then subtract what was written. A throw leaves
+  // every count in place for the next flush; visits noted mid-flush survive.
+  const snapshot = [...buffer.entries()].map(([k, v]) => ({ k, ...v }));
   const up = controlSqlite.prepare(
     `INSERT INTO module_usage (tenant_id, module_key, day, hits, last_at) VALUES (?, ?, ?, ?, ?)
      ON CONFLICT(tenant_id, module_key, day) DO UPDATE SET hits = hits + excluded.hits, last_at = MAX(last_at, excluded.last_at)`,
   );
   const tx = controlSqlite.transaction(() => {
-    for (const r of rows) {
-      try { up.run(r.tenantId, r.key, r.day, r.hits, r.lastAt); } catch { /* a tenant purged mid-buffer */ }
+    for (const r of snapshot) {
+      try {
+        up.run(r.tenantId, r.key, r.day, r.hits, r.lastAt);
+      } catch (err) {
+        // A tenant purged mid-buffer can never be written; drop it. Anything else aborts the flush.
+        if (!String((err as { code?: string }).code ?? "").includes("FOREIGNKEY")) throw err;
+      }
     }
   });
   tx();
-  return rows.length;
+  for (const r of snapshot) {
+    const cur = buffer.get(r.k);
+    if (!cur) continue;
+    cur.hits -= r.hits;
+    if (cur.hits <= 0) buffer.delete(r.k);
+  }
+  return snapshot.length;
 }
 
 export function usageByModule(tenantId: number, days: number, now: number = Date.now()): { key: string; label: string; hits: number; lastAt: number | null; prevHits: number }[] {
@@ -66,7 +90,6 @@ export function usageByModule(tenantId: number, days: number, now: number = Date
   });
 }
 
-const g = globalThis as { __moduleUsageFlusher?: ReturnType<typeof setInterval> };
 if (!g.__moduleUsageFlusher && process.env.NEXT_PHASE !== "phase-production-build") {
   g.__moduleUsageFlusher = setInterval(() => {
     try { flushModuleUsage(); } catch (err) { console.error("[usage] flush failed:", err); }
