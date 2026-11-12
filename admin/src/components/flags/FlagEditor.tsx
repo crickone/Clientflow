@@ -8,13 +8,16 @@ import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { setFlagAction } from "@/app/(console)/flags/actions";
 import type { PlatformFlag } from "@/lib/types";
 
-/** One module's rollout: everyone, nobody, a percentage, or a named list. Saves on Apply, with a confirm that says how many businesses change. */
+/** One module's rollout: everyone, nobody, a percentage, or a named list. Saves on Apply, after a confirm that says who gets it. */
 export function FlagEditor({ flag, label, count, total, tenants, isOwner }: { flag: PlatformFlag; label: string; count: number; total: number; tenants: Array<{ id: number; name: string }>; isOwner: boolean }) {
   const router = useRouter();
   const ask = useConfirm();
   const [pending, start] = useTransition();
   const [draft, setDraft] = useState<PlatformFlag>(flag);
-  const dirty = JSON.stringify(draft) !== JSON.stringify(flag);
+  const norm = (f: PlatformFlag) => JSON.stringify({ ...f, allow: [...f.allow].sort((a, b) => a - b) });
+  const dirty = norm(draft) !== norm(flag);
+  // An empty named list gives the module to nobody; that is what "Nobody" is for.
+  const emptyAllow = draft.mode === "allow" && draft.allow.length === 0;
 
   async function apply() {
     const r = await ask({
@@ -46,12 +49,13 @@ export function FlagEditor({ flag, label, count, total, tenants, isOwner }: { fl
         {draft.mode === "percent" && (
           <label className="check">
             <input type="range" aria-label={`${label} rollout percentage`} min={0} max={100} step={5} value={draft.percent} disabled={!isOwner} onChange={(e) => setDraft({ ...draft, percent: Number(e.target.value) })} />
-            <span style={{ fontFamily: "var(--font-mono), ui-monospace, monospace", minWidth: 40 }}>{draft.percent}%</span>
+            <span className="flag-pct">{draft.percent}%</span>
           </label>
         )}
-        {isOwner && dirty && <button type="button" className="btn btn--primary btn--sm" style={{ paddingInline: 14 }} onClick={apply} disabled={pending}>Apply</button>}
-        {isOwner && dirty && <button type="button" className="btn btn--ghost btn--sm" style={{ paddingInline: 14 }} onClick={() => setDraft(flag)} disabled={pending}>Reset</button>}
+        {isOwner && dirty && <button type="button" className="btn btn--primary btn--sm" onClick={apply} disabled={pending || emptyAllow}>Apply</button>}
+        {isOwner && dirty && <button type="button" className="btn btn--ghost btn--sm" onClick={() => setDraft(flag)} disabled={pending}>Reset</button>}
       </div>
+      {isOwner && emptyAllow && <p className="flag-hint">Tick at least one business, or choose Nobody.</p>}
       {draft.mode === "allow" && (
         <div className="flag-allow">
           {tenants.map((t) => (
