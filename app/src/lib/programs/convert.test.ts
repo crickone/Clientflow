@@ -109,4 +109,24 @@ assert.equal(again.name, fromCurrent.name);
 const sq2 = again.weeks[0].days[0].exercises[0];
 assert.deepEqual(sq2.rule, { kind: "linear", incKg: 2.5, deloadAfter: 3, startKg: 92.5 });
 
+// ── the current GZCLP program converts at each lift's live stage ──
+{
+  const gz = platformProgram("gzclp")!;
+  const gs = initState(gz, { squat: 140, bench: 100, press: 60, deadlift: 160 }, STEP);
+  // T1 squat failed once (6 x 2), T2 bench failed twice (3 x 6).
+  const live = { ...gs.stages, "t1:back squat": 1, "t2:bench press": 2 };
+  const conv = toOwnRules(gz, { weights: gs.weights, tms: gs.tms, stages: live }).template;
+  const a1 = conv.weeks[0].days[0].exercises;
+  const repsList = (e: { sets: { reps: unknown }[] }) => e.sets.map((x) => x.reps);
+  assert.deepEqual(repsList(a1[0]), [2, 2, 2, 2, 2, 2], "T1 squat on stage 2: 6 x 2");
+  assert.deepEqual(repsList(a1[1]), [6, 6, 6], "T2 bench on stage 3: 3 x 6");
+  assert.deepEqual(repsList(a1[2]), [15, 15, 15], "T3 has no stages and keeps its sets");
+  const b1 = conv.weeks[0].days[1].exercises;
+  assert.deepEqual(repsList(b1[0]), [3, 3, 3, 3, 3], "T1 press with no stage carried: stage 1, 5 x 3");
+  assert.equal(a1[0].stages, undefined, "a converted exercise has no stages");
+  assert.ok(validateMemberTemplate(conv, memberKey(1)).ok, "it passes the member check");
+  const fresh = toOwnRules(gz, { weights: gs.weights, tms: gs.tms }).template;
+  assert.deepEqual(repsList(fresh.weeks[0].days[0].exercises[0]), [3, 3, 3, 3, 3], "no stages carried: stage 1");
+}
+
 console.log("programs/convert: ok");
