@@ -1,11 +1,11 @@
 // app/src/components/clientapp/ProgramBrowser.tsx
 "use client";
 
-import { useState, type ReactNode } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import type { ReactNode } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 
 import { PhaseBar, Pill, Pills, PkCard, PkSection } from "@/components/clientapp/programs/kit";
-import { byline, filterCards, filterQuery, groupByGoal, type CardFilter, type StoryCard } from "@/lib/programs/cards";
+import { byline, filterCards, filterQuery, groupByGoal, parseFilter, type CardFilter, type StoryCard } from "@/lib/programs/cards";
 
 const GOALS: [CardFilter["family"], string][] = [
   ["all", "Any goal"],
@@ -59,15 +59,16 @@ function ProgramStoryCard({ c }: { c: StoryCard }) {
  * when the member comes back), the member's own programs (children), then big
  * story cards under goal headings.
  */
-export function ProgramBrowser({ cards, initial, children }: { cards: StoryCard[]; initial: CardFilter; children: ReactNode }) {
-  const router = useRouter();
+export function ProgramBrowser({ cards, children }: { cards: StoryCard[]; children: ReactNode }) {
   const pathname = usePathname();
-  const [f, setF] = useState<CardFilter>(initial);
+  const params = useSearchParams();
+  // The URL is the only filter state, so the selects never drift from it.
+  const f = parseFilter({ goal: params.get("goal") ?? undefined, days: params.get("days") ?? undefined, length: params.get("length") ?? undefined });
   const groups = groupByGoal(filterCards(cards, f));
 
   function change(next: CardFilter) {
-    setF(next);
-    router.replace(`${pathname}${filterQuery(next)}`, { scroll: false });
+    // Next keeps useSearchParams in step with history.replaceState, with no trip to the server and no scroll.
+    window.history.replaceState(null, "", `${pathname}${filterQuery(next)}`);
   }
 
   return (

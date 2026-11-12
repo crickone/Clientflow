@@ -26,6 +26,16 @@ export function keyFromStep(kg: number): StepKey {
   return STEP_OPTIONS.find((s) => Math.abs(s.kg - kg) < 1e-3)?.key ?? "2.5kg";
 }
 
+/**
+ * The smallest jump weights are shown with, for the unit on screen: 5 lb in
+ * pounds; in kg the member's own step, or 2.5 kg when that step is 5 lb (or unset).
+ */
+export function shownStepKg(unit: WeightUnit, stepKg: number): number {
+  if (unit === "lb") return STEP_5LB_KG;
+  if (!(stepKg > 0) || Math.abs(stepKg - STEP_5LB_KG) < 1e-3) return 2.5;
+  return stepKg;
+}
+
 /** The nearest multiple of the smallest jump (half rounds up). */
 export function roundToStep(kg: number, stepKg: number): number {
   if (!Number.isFinite(kg)) return 0;

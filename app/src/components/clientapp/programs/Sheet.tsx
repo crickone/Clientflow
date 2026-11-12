@@ -1,7 +1,7 @@
 // app/src/components/clientapp/programs/Sheet.tsx
 "use client";
 
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -21,9 +21,10 @@ export function Sheet({ title, onClose, children, footer }: { title: string; onC
   const titleId = useId();
   const close = useRef(onClose);
   close.current = onClose;
+  // Read during the first render, before any child effect or autofocus moves focus, so it is the real trigger.
+  const [opener] = useState(() => (typeof document === "undefined" ? null : (document.activeElement as HTMLElement | null)));
 
   useEffect(() => {
-    const opener = document.activeElement as HTMLElement | null;
     const root = ref.current;
     if (root) (focusables(root)[0] ?? root).focus();
     const onKey = (e: KeyboardEvent) => {
@@ -54,7 +55,7 @@ export function Sheet({ title, onClose, children, footer }: { title: string; onC
       document.body.style.overflow = overflow;
       if (opener && document.contains(opener)) opener.focus();
     };
-  }, []);
+  }, [opener]);
 
   return (
     <div className="pk-sheet-backdrop" onClick={() => close.current()}>

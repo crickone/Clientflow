@@ -40,7 +40,7 @@ export default async function EditBuiltProgramPage(props: { params: Promise<{ id
         from={null}
         initial={p.template}
         initialUnit={unit}
-        stepKg={client.plateStepKg > 0 ? client.plateStepKg : 2.5}
+        stepKg={running && live ? live.stepKg : client.plateStepKg}
         running={running}
         current={running && live ? live.state.weights : {}}
       />

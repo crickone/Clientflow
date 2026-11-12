@@ -10,6 +10,7 @@ import {
   keyFromStep,
   kgToUnit,
   maxFromSet,
+  shownStepKg,
   parseRpe,
   parseWeightIn,
   resolveMax,
@@ -83,5 +84,13 @@ assert.equal(convertTyped("80", "kg", "kg"), "80");
 assert.equal(convertTyped("", "kg", "lb"), "");
 assert.equal(convertTyped("abc", "lb", "kg"), "abc");
 assert.equal(convertTyped("0", "kg", "lb"), "0");
+
+// The step shown follows the unit on screen: 5 lb in pounds; in kg the member's step, never 5 lb.
+assert.equal(shownStepKg("lb", 2.5), STEP_5LB_KG);
+assert.equal(shownStepKg("lb", 1.25), STEP_5LB_KG);
+assert.equal(shownStepKg("kg", 1.25), 1.25);
+assert.equal(shownStepKg("kg", 2.5), 2.5);
+assert.equal(shownStepKg("kg", STEP_5LB_KG), 2.5);
+assert.equal(shownStepKg("kg", 0), 2.5);
 
 console.log("programs/units: ok");

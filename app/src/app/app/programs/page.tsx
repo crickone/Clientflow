@@ -1,6 +1,6 @@
 // app/src/app/app/programs/page.tsx
 import { requireProgramsPage } from "@/lib/programs/access";
-import { parseFilter, toStoryCard } from "@/lib/programs/cards";
+import { toStoryCard } from "@/lib/programs/cards";
 import { programContent } from "@/lib/programs/content";
 import { liveEnrolment } from "@/lib/programs/enrolments";
 import { memberPrograms } from "@/lib/programs/library";
@@ -13,10 +13,8 @@ import { ProgramBrowser } from "@/components/clientapp/ProgramBrowser";
 
 export const dynamic = "force-dynamic";
 
-type Search = { goal?: string | string[]; days?: string | string[]; length?: string | string[] };
-
-export default async function ProgramsPage(props: { searchParams: Promise<Search> }) {
-  const sp = await props.searchParams;
+/** The filters live in the URL; ProgramBrowser reads them there, so this page never awaits searchParams. */
+export default async function ProgramsPage() {
   const { clientId } = requireProgramsPage();
   const cards = memberPrograms().map((e) =>
     toStoryCard(e.template, programContent(e.template, e.copyId !== null ? { kind: "copy", basedOnName: e.basedOnName ?? e.template.name } : { kind: "platform" }), e.basedOnName),
@@ -28,7 +26,7 @@ export default async function ProgramsPage(props: { searchParams: Promise<Search
   return (
     <div className="pk">
       <PkHeader title="Programs" lead="Well-known programs, with your weights worked out." />
-      <ProgramBrowser cards={cards} initial={parseFilter(sp)}>
+      <ProgramBrowser cards={cards}>
         <BuiltProgramList current={current} programs={built} anyLive={!!live} />
       </ProgramBrowser>
     </div>

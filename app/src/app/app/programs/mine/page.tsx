@@ -61,7 +61,7 @@ export default async function MyProgramPage() {
   const next = week.find((d) => d.status === "today" || d.status === "planned");
   const fmt = (kg: number) => formatWeight(kg, view.unit);
   const phase = view.state.finished ? null : currentPhase(content, t, view.state);
-  const startsLater = view.startDate > today ? `. Starts ${new Date(`${view.startDate}T12:00:00Z`).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })}` : "";
+  const startsLater = view.startDate > today ? ` · Starts ${new Date(`${view.startDate}T12:00:00Z`).toLocaleDateString("en-IE", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })}` : "";
   const where = view.state.finished ? "Program done" : `${weekLabel(t, view.state)}${phase !== null ? ` · ${content.phases[phase].name}` : ""}${startsLater}`;
 
   return (

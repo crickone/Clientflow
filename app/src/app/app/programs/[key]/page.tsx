@@ -8,6 +8,7 @@ import { programByKey } from "@/lib/programs/library";
 import { getMemberProgram } from "@/lib/programs/memberPrograms";
 import { memberKey, parseMemberKey } from "@/lib/programs/memberTemplate";
 import type { ProgramTemplate } from "@/lib/programs/types";
+import { shownStepKg } from "@/lib/programs/units";
 import { ProgramDetail, type DetailAction } from "@/components/clientapp/programs/ProgramDetail";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +48,7 @@ export default async function ProgramDetailPage(props: { params: Promise<{ key: 
   }
   const action: DetailAction = running ? { kind: "continue" } : live ? { kind: "busy", runningName: live.template.name } : { kind: "start", href: startHref };
   const unit = running && live ? live.unit : client.weightUnit === "lb" ? "lb" : "kg";
-  const stepKg = running && live ? live.stepKg : client.plateStepKg > 0 ? client.plateStepKg : 2.5;
+  const stepKg = shownStepKg(unit, running && live ? live.stepKg : client.plateStepKg);
   return (
     <ProgramDetail
       template={t}

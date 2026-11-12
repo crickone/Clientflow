@@ -1,7 +1,7 @@
 // app/src/components/clientapp/MemberProgramBuilder.tsx
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Copy, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -42,7 +42,7 @@ import { MEMBER_LIMITS, memberLine } from "@/lib/programs/memberTemplate";
 import { stateKey, summariseRx } from "@/lib/programs/planner";
 import { ruleSentence } from "@/lib/programs/progressionText";
 import { LIFT_KEYS, LIFT_LABEL, RULE_KINDS, RULE_LABEL, type ExerciseRx, type LiftKey, type ProgramTemplate, type RuleKind, type WeightUnit } from "@/lib/programs/types";
-import { STEP_5LB_KG, formatWeight, kgToUnit, unitToKg } from "@/lib/programs/units";
+import { formatWeight, kgToUnit, shownStepKg, unitToKg } from "@/lib/programs/units";
 
 /** The rule picker's tiles, in the member's words. */
 const RULE_TILE: Record<RuleKind, string> = {
@@ -343,7 +343,7 @@ export function MemberProgramBuilder({
   from: string | null;
   initial: ProgramTemplate;
   initialUnit: WeightUnit;
-  /** The member's smallest jump, for the sentence on how an exercise progresses. */
+  /** The smallest jump for the sentence on how an exercise progresses: the running enrolment's, else the member's. */
   stepKg: number;
   running: boolean;
   current: Record<string, number>;
@@ -358,12 +358,32 @@ export function MemberProgramBuilder({
   const [pending, start] = useTransition();
   // Set the moment the create action returns, so no later save can create a second program.
   const createdId = useRef<number | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  // Where the sheet last was, so focus can go back to that exercise's row once it closes.
+  const lastOpen = useRef<{ w: number; di: number; xi: number } | null>(null);
   const t = d.template;
   const w = Math.min(wi, t.weeks.length - 1);
   const week = t.weeks[w];
   // The step the sentences use follows the unit shown on this screen.
-  const shownStep = unit === "lb" ? STEP_5LB_KG : Math.abs(stepKg - STEP_5LB_KG) < 1e-3 ? 2.5 : stepKg;
+  const shownStep = shownStepKg(unit, stepKg);
   const sheetEx = open ? t.weeks[open.w]?.days[open.di]?.exercises[open.xi] : undefined;
+
+  // When the sheet closes, focus the row it was editing (it follows a moved exercise; after a
+  // remove it is whatever row is now in that place), else that day's Add exercise. After a
+  // save, wait until the lock clears, as nothing inside a disabled fieldset can take focus.
+  useEffect(() => {
+    if (open) {
+      lastOpen.current = open;
+      return;
+    }
+    const at = lastOpen.current;
+    if (!at || pending) return;
+    lastOpen.current = null;
+    const root = rootRef.current;
+    if (!root) return;
+    const target = root.querySelector<HTMLElement>(`[data-ex="${at.w}-${at.di}-${at.xi}"]`) ?? root.querySelector<HTMLElement>(`[data-add-ex="${at.w}-${at.di}"]`);
+    target?.focus();
+  }, [open, pending]);
 
   function edit(fn: (draft: BuilderDraft) => void) {
     setD((prev) => {
@@ -427,7 +447,7 @@ export function MemberProgramBuilder({
   }
 
   return (
-    <div className="pk">
+    <div className="pk" ref={rootRef}>
       {errors.length > 0 && (
         <div className="pk-error" role="alert">
           <b>Not saved:</b>
@@ -599,7 +619,7 @@ export function MemberProgramBuilder({
             </div>
             {day.exercises.length === 0 && <span className="pk-small">No exercises yet.</span>}
             {day.exercises.map((ex, xi) => (
-              <button key={`${w}-${di}-${xi}`} type="button" className="pk-ex" data-joined={ex.joined ? "true" : undefined} onClick={() => setOpen({ w, di, xi })}>
+              <button key={`${w}-${di}-${xi}`} type="button" className="pk-ex" data-ex={`${w}-${di}-${xi}`} data-joined={ex.joined ? "true" : undefined} onClick={() => setOpen({ w, di, xi })}>
                 <span className="pk-ex-name">
                   {ex.name}
                   <span>
@@ -611,7 +631,7 @@ export function MemberProgramBuilder({
               </button>
             ))}
             {day.exercises.length < MEMBER_LIMITS.exercises && (
-              <button type="button" className="pk-dashed" onClick={() => setPicking({ w, di, xi: null })}>
+              <button type="button" className="pk-dashed" data-add-ex={`${w}-${di}`} onClick={() => setPicking({ w, di, xi: null })}>
                 <Plus size={16} /> Add exercise
               </button>
             )}

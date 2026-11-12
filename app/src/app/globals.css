@@ -5815,7 +5815,7 @@ textarea.ag-input { resize: vertical; line-height: 1.5; }
 .pk-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 14px; border: 1px solid var(--hairline-strong); border-radius: 12px; background: var(--surface-1); color: var(--text-primary); font: inherit; font-size: 13.5px; font-weight: 600; text-decoration: none; cursor: pointer; }
 .pk-btn:disabled { opacity: 0.5; cursor: default; }
 .pk-btn--danger { color: var(--danger); }
-.pk-dashed.pk-btn--danger { border-color: color-mix(in srgb, var(--danger) 50%, transparent); }
+.pk-dashed.pk-btn--danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 50%, transparent); }
 .pk-ghost { justify-self: start; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 8px; border: 0; background: transparent; color: var(--accent-ink); font: inherit; font-size: 13.5px; font-weight: 600; text-decoration: none; cursor: pointer; }
 .pk-dashed { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 48px; padding: 0 14px; border: 1px dashed color-mix(in srgb, var(--accent) 55%, transparent); border-radius: 14px; background: transparent; color: var(--accent-ink); font: inherit; font-size: 14px; font-weight: 600; text-decoration: none; cursor: pointer; }
 .pk-dashed:disabled { opacity: 0.5; cursor: default; }

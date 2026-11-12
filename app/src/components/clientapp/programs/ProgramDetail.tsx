@@ -112,8 +112,8 @@ export function ProgramDetail({
 
       <PkSection label="How your weights move">
         <ul className="pk-list">
-          {howWeightsMove(t, unit, stepKg).map((l) => (
-            <li key={l}>{l}</li>
+          {howWeightsMove(t, unit, stepKg).map((l, i) => (
+            <li key={i}>{l}</li>
           ))}
         </ul>
       </PkSection>
