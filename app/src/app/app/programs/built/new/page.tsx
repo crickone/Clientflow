@@ -1,5 +1,4 @@
 // app/src/app/app/programs/built/new/page.tsx
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 
@@ -8,22 +7,22 @@ import { byline, toCard } from "@/lib/programs/cards";
 import { liveEnrolment } from "@/lib/programs/enrolments";
 import { memberPrograms } from "@/lib/programs/library";
 import { parseStartFrom, startingDraft } from "@/lib/programs/memberPrograms";
-import { Card, PageTitle, SectionTitle } from "@/components/clientapp/ui";
+import { PkCard, PkHeader, PkSection } from "@/components/clientapp/programs/kit";
 import { MemberProgramBuilder } from "@/components/clientapp/MemberProgramBuilder";
 
 export const dynamic = "force-dynamic";
 
 function Choice({ href, title, sub }: { href: string; title: string; sub: string }) {
   return (
-    <Link href={href}>
-      <Card style={{ display: "flex", alignItems: "center", gap: 12, minHeight: 44 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)" }}>{title}</div>
-          <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.45 }}>{sub}</div>
+    <PkCard href={href}>
+      <div className="pk-row">
+        <div>
+          <h3 className="pk-card-title">{title}</h3>
+          <span className="pk-small">{sub}</span>
         </div>
-        <ChevronRight size={18} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
-      </Card>
-    </Link>
+        <ChevronRight size={18} aria-hidden className="pk-chev" />
+      </div>
+    </PkCard>
   );
 }
 
@@ -39,9 +38,9 @@ export default async function NewBuiltProgramPage(props: { searchParams: Promise
     const draft = parsed ? startingDraft(clientId, parsed) : null;
     if (!draft) notFound();
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        <PageTitle sub="Nothing is kept until you save">Build your own</PageTitle>
-        <MemberProgramBuilder id={null} from={from} initial={draft.template} initialUnit={unit} running={false} current={{}} />
+      <div className="pk">
+        <PkHeader title="Build your own" lead="Nothing is kept until you save." />
+        <MemberProgramBuilder id={null} from={from} initial={draft.template} initialUnit={unit} stepKg={client.plateStepKg > 0 ? client.plateStepKg : 2.5} running={false} current={{}} />
       </div>
     );
   }
@@ -49,14 +48,15 @@ export default async function NewBuiltProgramPage(props: { searchParams: Promise
   const live = liveEnrolment(clientId);
   const library = memberPrograms();
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <PageTitle sub="Start blank or from a program you know">Build your own</PageTitle>
+    <div className="pk">
+      <PkHeader title="Build your own" lead="Start blank or from a program you know." />
       <Choice href="/app/programs/built/new?from=blank" title="Start blank" sub="One week, one day. Add your own exercises." />
       {live && <Choice href="/app/programs/built/new?from=current" title="Start from my current program" sub={`${live.template.name}, with your weights and maxes.`} />}
-      <SectionTitle>Or copy a library program</SectionTitle>
-      {library.map((e) => (
-        <Choice key={e.template.key} href={`/app/programs/built/new?from=${encodeURIComponent(e.template.key)}`} title={e.template.name} sub={byline(toCard(e.template, e.basedOnName))} />
-      ))}
+      <PkSection label="Or copy a library program">
+        {library.map((e) => (
+          <Choice key={e.template.key} href={`/app/programs/built/new?from=${encodeURIComponent(e.template.key)}`} title={e.template.name} sub={byline(toCard(e.template, e.basedOnName))} />
+        ))}
+      </PkSection>
     </div>
   );
 }

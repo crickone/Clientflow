@@ -4,7 +4,35 @@
 // changes keep their origins in step, days and exercises move and go.
 import assert from "node:assert/strict";
 
-import { addDay, addSet, addWeek, applyRule, defaultIncKg, draftFrom, guessLift, moveDay, moveExercise, moveWeek, newExercise, removeDay, removeExercise, removeWeek, setRest } from "./memberEditing";
+import {
+  addDay,
+  addSet,
+  addWeek,
+  applyRule,
+  defaultIncKg,
+  draftFrom,
+  guessLift,
+  moveDay,
+  moveExercise,
+  moveWeek,
+  newExercise,
+  removeDay,
+  removeExercise,
+  removeSet,
+  removeWeek,
+  setDeloadAfter,
+  setIncKg,
+  setLift,
+  setNotes,
+  setRest,
+  setSetCount,
+  setSetPct,
+  setSetReps,
+  setSetRpe,
+  setStartKg,
+  toggleAmrap,
+  toggleJoined,
+} from "./memberEditing";
 import { blankMemberTemplate, validateMemberTemplate } from "./memberTemplate";
 import type { ExerciseRx } from "./types";
 
@@ -138,5 +166,78 @@ const toManual = applyRule(rangeEx, "manual");
 assert.notEqual(toManual.sets[0].reps, rangeEx.sets[0].reps, "a kept rep range is a copy");
 const backToRange = applyRule({ ...rangeEx, rule: { kind: "manual" } }, "range");
 assert.notEqual(backToRange.sets[0].reps, rangeEx.sets[0].reps);
+
+// ── the exercise sheet: each box changes the field it is for, and the saved program carries it ──
+{
+  const lin = newExercise("Back squat");
+  setIncKg(lin, 5);
+  setDeloadAfter(lin, 2.4);
+  setStartKg(lin, 60);
+  assert.deepEqual(lin.rule, { kind: "linear", incKg: 5, deloadAfter: 2, startKg: 60 });
+  setStartKg(lin, null);
+  assert.ok(lin.rule?.kind === "linear" && !("startKg" in lin.rule), "an empty start box removes the start weight");
+  setIncKg(lin, null);
+  setDeloadAfter(lin, null);
+  assert.deepEqual(lin.rule, { kind: "linear", incKg: 0, deloadAfter: 0 }, "an empty linear box is 0, for the save check to refuse");
+
+  const rng = applyRule(newExercise("Bench press"), "range");
+  setIncKg(rng, 1.25);
+  assert.deepEqual(rng.rule, { kind: "range", incKg: 1.25 });
+  setIncKg(rng, 0);
+  assert.deepEqual(rng.rule, { kind: "range" }, "range goes back to the smallest jump");
+  setSetReps(rng, 0, 6, 10, true);
+  assert.deepEqual(rng.sets[0].kind === "fixed" && rng.sets[0].reps, { min: 6, max: 10 });
+  setSetReps(rng, 0, 6, null, true);
+  assert.deepEqual(rng.sets[0].kind === "fixed" && rng.sets[0].reps, { min: 6, max: 0 }, "a range stays a range");
+
+  const man = applyRule(newExercise("Curl"), "manual");
+  setSetReps(man, 1, 8, 12, false);
+  assert.deepEqual(man.sets[1].kind === "fixed" && man.sets[1].reps, { min: 8, max: 12 });
+  setSetReps(man, 1, 8, 8, false);
+  assert.equal(man.sets[1].kind === "fixed" && man.sets[1].reps, 8, "a top no higher than the bottom is a single count");
+
+  const pc = applyRule(newExercise("Bench press"), "percent");
+  setLift(pc, "press");
+  setSetPct(pc, 0, 82.5);
+  setSetCount(pc, 0, 3);
+  toggleAmrap(pc, 2);
+  assert.equal(pc.lift, "press");
+  assert.deepEqual(pc.sets[0], { kind: "pct", pct: 0.825, reps: 3, rest: 120 });
+  assert.equal(pc.sets[2].kind, "amrap");
+  toggleAmrap(pc, 2);
+  assert.equal(pc.sets[2].kind, "pct", "and back");
+
+  const rp = applyRule(newExercise("Barbell row"), "rpe");
+  setSetRpe(rp, 1, 9);
+  setSetCount(rp, 1, 6);
+  assert.deepEqual(rp.sets[1], { kind: "rpe", rpe: 9, reps: 6, rest: 120 });
+
+  const lin2 = newExercise("Deadlift");
+  toggleAmrap(lin2, 2);
+  assert.ok(lin2.sets[2].kind === "fixed" && lin2.sets[2].amrap === true);
+  removeSet(lin2, 0);
+  removeSet(lin2, 0);
+  removeSet(lin2, 0);
+  assert.equal(lin2.sets.length, 1, "the last set stays");
+
+  setNotes(lin2, "Belt on.");
+  assert.equal(lin2.notes, "Belt on.");
+  setNotes(lin2, "");
+  assert.ok(!("notes" in lin2));
+  toggleJoined(lin2);
+  assert.equal(lin2.joined, true);
+  toggleJoined(lin2);
+  assert.ok(!("joined" in lin2));
+
+  // What the sheet changed is what the save check sees.
+  const t = blankMemberTemplate();
+  t.weeks[0].days[0].exercises = [newExercise("Back squat"), pc, rng];
+  setSetReps(t.weeks[0].days[0].exercises[2], 0, 6, 10, true);
+  const checked = validateMemberTemplate(t, "member:1");
+  assert.ok(checked.ok, checked.ok ? "" : checked.errors.join(" | "));
+  assert.deepEqual(checked.template.weeks[0].days[0].exercises[1].sets[0], { kind: "pct", pct: 0.825, reps: 3, rest: 120 });
+  assert.equal(checked.template.weeks[0].days[0].exercises[1].lift, "press");
+  assert.deepEqual(checked.template.lifts, ["press"], "the percent exercise's max is asked for");
+}
 
 console.log("programs/memberEditing: ok");

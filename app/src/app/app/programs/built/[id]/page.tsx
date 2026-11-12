@@ -6,7 +6,7 @@ import { requireProgramsPage } from "@/lib/programs/access";
 import { liveEnrolment } from "@/lib/programs/enrolments";
 import { getMemberProgram } from "@/lib/programs/memberPrograms";
 import { memberKey } from "@/lib/programs/memberTemplate";
-import { PageTitle } from "@/components/clientapp/ui";
+import { PkHeader } from "@/components/clientapp/programs/kit";
 import { MemberProgramBuilder } from "@/components/clientapp/MemberProgramBuilder";
 
 export const dynamic = "force-dynamic";
@@ -22,14 +22,28 @@ export default async function EditBuiltProgramPage(props: { params: Promise<{ id
   const running = !!live && live.programKey === memberKey(id);
   const unit = client.weightUnit === "lb" ? "lb" : "kg";
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <PageTitle sub={running ? "You're running this program" : "Your own program"}>{p.name}</PageTitle>
-      {!live && (
-        <Link href={`/app/programs/built/${id}/start`} className="pg-cta">
-          Start this program
-        </Link>
-      )}
-      <MemberProgramBuilder id={id} from={null} initial={p.template} initialUnit={unit} running={running} current={running && live ? live.state.weights : {}} />
+    <div className="pk">
+      <PkHeader title={p.name} lead={running ? "You're running this program." : "Your own program."}>
+        <div className="pk-actions">
+          <Link href={`/app/programs/${encodeURIComponent(memberKey(id))}`} className="pk-btn">
+            See the program
+          </Link>
+          {!live && (
+            <Link href={`/app/programs/built/${id}/start`} className="pk-btn">
+              Start this program
+            </Link>
+          )}
+        </div>
+      </PkHeader>
+      <MemberProgramBuilder
+        id={id}
+        from={null}
+        initial={p.template}
+        initialUnit={unit}
+        stepKg={client.plateStepKg > 0 ? client.plateStepKg : 2.5}
+        running={running}
+        current={running && live ? live.state.weights : {}}
+      />
     </div>
   );
 }

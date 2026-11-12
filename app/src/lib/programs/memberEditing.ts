@@ -165,3 +165,87 @@ export function removeExercise(t: ProgramTemplate, w: number, di: number, xi: nu
   list.splice(xi, 1);
   if (list[0]?.joined) delete list[0].joined;
 }
+
+// ── The builder's exercise sheet. Each helper changes one field of the exercise it is given, as the sheet's boxes do. ──
+
+/** A linear, range or manual rule's starting weight in kg; empty, 0 or less removes it. */
+export function setStartKg(ex: ExerciseRx, kg: number | null): void {
+  const r = ex.rule;
+  if (!r || (r.kind !== "linear" && r.kind !== "range" && r.kind !== "manual")) return;
+  if (kg === null || kg <= 0) delete r.startKg;
+  else r.startKg = kg;
+}
+
+/** The weight a rule adds, in kg. Linear: an empty box is 0, which the save check refuses. Range: empty, 0 or less goes back to the smallest jump. */
+export function setIncKg(ex: ExerciseRx, kg: number | null): void {
+  const r = ex.rule;
+  if (r?.kind === "linear") r.incKg = kg === null ? 0 : kg;
+  else if (r?.kind === "range") {
+    if (kg === null || kg <= 0) delete r.incKg;
+    else r.incKg = kg;
+  }
+}
+
+/** Linear: misses in a row before it gets lighter. An empty box is 0, which the save check refuses. */
+export function setDeloadAfter(ex: ExerciseRx, n: number | null): void {
+  if (ex.rule?.kind === "linear") ex.rule.deloadAfter = n === null ? 0 : Math.round(n);
+}
+
+/** Percent: the max the percentages come from. */
+export function setLift(ex: ExerciseRx, lift: LiftKey): void {
+  ex.lift = lift;
+}
+
+/** Set si's reps on a fixed set. keepRange (a range rule) always stores a range; otherwise a top above the bottom makes a range. Empty is 0. */
+export function setSetReps(ex: ExerciseRx, si: number, min: number | null, max: number | null, keepRange: boolean): void {
+  const cur = ex.sets[si];
+  if (!cur || cur.kind !== "fixed") return;
+  const lo = min === null ? 0 : Math.round(min);
+  if (keepRange) cur.reps = { min: lo, max: max === null ? 0 : Math.round(max) };
+  else cur.reps = max !== null && max > lo ? { min: lo, max: Math.round(max) } : lo;
+}
+
+/** Set si's rep count on a percent or RPE set. Empty is 0. */
+export function setSetCount(ex: ExerciseRx, si: number, n: number | null): void {
+  const cur = ex.sets[si];
+  if (cur && (cur.kind === "pct" || cur.kind === "amrap" || cur.kind === "rpe")) cur.reps = n === null ? 0 : Math.round(n);
+}
+
+/** Set si's percentage, typed as a percent (75 is 75%). Empty is 0. */
+export function setSetPct(ex: ExerciseRx, si: number, percent: number | null): void {
+  const cur = ex.sets[si];
+  if (cur && (cur.kind === "pct" || cur.kind === "amrap")) cur.pct = percent === null ? 0 : percent / 100;
+}
+
+/** Set si's RPE. Empty is 0. */
+export function setSetRpe(ex: ExerciseRx, si: number, rpe: number | null): void {
+  const cur = ex.sets[si];
+  if (cur?.kind === "rpe") cur.rpe = rpe === null ? 0 : rpe;
+}
+
+/** Set si as many reps as you can, or back. */
+export function toggleAmrap(ex: ExerciseRx, si: number): void {
+  const cur = ex.sets[si];
+  if (!cur) return;
+  if (cur.kind === "fixed") {
+    if (cur.amrap) delete cur.amrap;
+    else cur.amrap = true;
+  } else if (cur.kind === "pct" || cur.kind === "amrap") ex.sets[si] = { ...cur, kind: cur.kind === "pct" ? "amrap" : "pct" };
+}
+
+/** Remove set si; the last set stays. */
+export function removeSet(ex: ExerciseRx, si: number): void {
+  if (ex.sets.length > 1 && inRange(si, ex.sets.length)) ex.sets.splice(si, 1);
+}
+
+/** The exercise's notes; empty removes them. */
+export function setNotes(ex: ExerciseRx, text: string): void {
+  if (text) ex.notes = text;
+  else delete ex.notes;
+}
+
+/** Done back to back with the exercise above, or not. */
+export function toggleJoined(ex: ExerciseRx): void {
+  if (ex.joined) delete ex.joined;
+  else ex.joined = true;
+}
