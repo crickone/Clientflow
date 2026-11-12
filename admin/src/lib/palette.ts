@@ -5,6 +5,8 @@ export interface StaticCommand { title: string; hint: string; href: string }
 export const STATIC_COMMANDS: StaticCommand[] = [
   { title: "Dashboard", hint: "g d", href: "/" },
   { title: "Businesses", hint: "g b", href: "/gyms" },
+  { title: "Inbox", hint: "g i", href: "/inbox" },
+  { title: "Jobs", hint: "g j", href: "/jobs" },
   { title: "Health", hint: "g h", href: "/health" },
   { title: "Provision a business", hint: "g p", href: "/provision" },
   { title: "Audit log", hint: "g a", href: "/audit" },

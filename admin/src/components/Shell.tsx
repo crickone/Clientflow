@@ -7,6 +7,8 @@ import {
   Activity,
   Bookmark,
   Dumbbell,
+  Inbox,
+  ListChecks,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -34,6 +36,7 @@ const NAV_GROUPS = [
   {
     label: "Fleet",
     items: [
+      { href: "/inbox", label: "Inbox", icon: Inbox },
       { href: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
       { href: "/gyms", label: "Businesses", icon: Dumbbell },
       // Every business's alerts in one list; shallow, for skimming.
@@ -46,6 +49,7 @@ const NAV_GROUPS = [
       { href: "/provision", label: "Provision", icon: Rocket },
       // Every console action, including refused ones. Both roles can read it.
       { href: "/audit", label: "Audit log", icon: ScrollText },
+      { href: "/jobs", label: "Jobs", icon: ListChecks },
     ],
   },
   {
@@ -101,7 +105,7 @@ function ViewLinks({ views }: { views: ConsoleView[] }) {
   );
 }
 
-export function Shell({ user, views, children }: { user: AdminUser; views: ConsoleView[]; children: ReactNode }) {
+export function Shell({ user, views, inboxCount, children }: { user: AdminUser; views: ConsoleView[]; inboxCount: { bad: number; warn: number }; children: ReactNode }) {
   const pathname = usePathname();
   const [navOpen, setNavOpen] = useState(false);
 
@@ -150,6 +154,9 @@ export function Shell({ user, views, children }: { user: AdminUser; views: Conso
                   >
                     <Icon size={16} strokeWidth={1.75} />
                     <span>{item.label}</span>
+                    {item.href === "/inbox" && inboxCount.bad + inboxCount.warn > 0 && (
+                      <span className={cn("nav-badge", inboxCount.bad > 0 && "is-bad")}>{inboxCount.bad + inboxCount.warn}</span>
+                    )}
                   </Link>
                 );
               })}

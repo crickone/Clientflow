@@ -10,6 +10,8 @@ assert.deepEqual(resolveShortcut("g", "h"), { kind: "go", href: "/health" });
 assert.deepEqual(resolveShortcut("g", "p"), { kind: "go", href: "/provision" });
 assert.deepEqual(resolveShortcut("g", "a"), { kind: "go", href: "/audit" });
 assert.deepEqual(resolveShortcut("g", "s"), { kind: "go", href: "/settings" });
+assert.deepEqual(resolveShortcut("g", "i"), { kind: "go", href: "/inbox" });
+assert.deepEqual(resolveShortcut("g", "j"), { kind: "go", href: "/jobs" });
 assert.deepEqual(resolveShortcut("g", "x"), { kind: "none" });
 assert.deepEqual(resolveShortcut(null, "?"), { kind: "help" });
 assert.deepEqual(resolveShortcut(null, "b"), { kind: "none" });

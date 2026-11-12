@@ -499,3 +499,26 @@ export type SearchHit =
   | { kind: "person"; id: number; title: string; subtitle: string; href: string; tenantId: number }
   | { kind: "domain"; id: number; title: string; subtitle: string; href: string; tenantId: number }
   | { kind: "invoice"; id: number; title: string; subtitle: string; href: string; tenantId: number };
+
+export interface PlatformAlert {
+  id: number;
+  tenantId: number | null;
+  tenantName: string | null;
+  key: string;
+  level: "warn" | "bad";
+  title: string;
+  detail: string | null;
+  href: string | null;
+  openedAt: number;
+  lastSeenAt: number;
+  resolvedAt: number | null;
+  acknowledgedAt: number | null;
+  acknowledgedBy: number | null;
+  snoozedUntil: number | null;
+  assignedTo: number | null;
+}
+
+export interface AlertsResponse {
+  alerts: PlatformAlert[];
+  counts: { bad: number; warn: number };
+}

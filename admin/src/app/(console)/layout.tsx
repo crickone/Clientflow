@@ -14,9 +14,15 @@ export default async function ConsoleLayout({ children }: { children: ReactNode 
   } catch {
     views = [];
   }
+  let inboxCount = { bad: 0, warn: 0 };
+  try {
+    inboxCount = (await api<{ counts: { bad: number; warn: number } }>("/alerts", { revalidate: 60, tags: ["fleet"] })).counts;
+  } catch {
+    inboxCount = { bad: 0, warn: 0 };
+  }
   return (
     <ConfirmProvider>
-      <Shell user={user} views={views}>{children}</Shell>
+      <Shell user={user} views={views} inboxCount={inboxCount}>{children}</Shell>
     </ConfirmProvider>
   );
 }
