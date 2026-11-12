@@ -44,22 +44,22 @@ export interface OutlineWeek {
   days: OutlineDay[];
 }
 
-function outlineDay(d: DayRx): OutlineDay {
+function outlineDay(d: DayRx, unit: WeightUnit): OutlineDay {
   return {
     name: d.name,
     test: d.test === true,
-    lines: d.exercises.map((ex) => ({ name: ex.name, rx: summariseRx(setsFor(ex, {})), joined: ex.joined === true, notes: ex.notes ?? null })),
+    lines: d.exercises.map((ex) => ({ name: ex.name, rx: summariseRx(setsFor(ex, {}), unit), joined: ex.joined === true, notes: ex.notes ?? null })),
   };
 }
 
-/** Every week as prescribed: "Week 2: Base, plus 10 kg", its days, and each exercise's sets. */
-export function wholeProgram(t: Pick<ProgramTemplate, "weeks">): OutlineWeek[] {
-  return t.weeks.map((w, i) => ({ title: w.label ? `Week ${i + 1}: ${w.label}` : `Week ${i + 1}`, days: w.days.map(outlineDay) }));
+/** Every week as prescribed: "Week 2: Base, plus 10 kg", its days, and each exercise's sets, with add-on weights in `unit`. */
+export function wholeProgram(t: Pick<ProgramTemplate, "weeks">, unit: WeightUnit = "kg"): OutlineWeek[] {
+  return t.weeks.map((w, i) => ({ title: w.label ? `Week ${i + 1}: ${w.label}` : `Week ${i + 1}`, days: w.days.map((d) => outlineDay(d, unit)) }));
 }
 
-/** The first week of the cycle, day by day. */
-export function typicalWeek(t: Pick<ProgramTemplate, "weeks">): OutlineDay[] {
-  return (t.weeks[0]?.days ?? []).map(outlineDay);
+/** The first week of the cycle, day by day, with add-on weights in `unit`. */
+export function typicalWeek(t: Pick<ProgramTemplate, "weeks">, unit: WeightUnit = "kg"): OutlineDay[] {
+  return (t.weeks[0]?.days ?? []).map((d) => outlineDay(d, unit));
 }
 
 /** The pill on a card: the one lift a program is about, how many lifts it takes a max for, or rep ranges. */

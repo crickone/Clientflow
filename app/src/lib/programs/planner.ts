@@ -5,7 +5,7 @@
  * previews and the logger show. Pure.
  */
 import type { DayRx, EngineState, ExerciseRx, PlannedExercise, PlannedSession, PlannedSet, ProgramTemplate, Reps, SetRx, WeightUnit } from "./types";
-import { formatWeight, kgToUnit, roundToStep, weightForRpe } from "./units";
+import { STEP_5LB_KG, formatWeight, kgToUnit, roundToStep, weightForRpe } from "./units";
 
 /**
  * The key an exercise's working weight is kept under: its name, its GZCLP
@@ -202,14 +202,23 @@ function pctText(p: number): string {
   return `${Math.round(p * 1000) / 10}%`;
 }
 
-/** "4 x 9 at 70%", "2 x 3 at 80% + 10 kg", "3 x 8-12". */
-export function summariseRx(sets: SetRx[]): string {
+/** An add-on weight: "10 kg"; for a member in pounds, "about 20 lb", to the nearest 5 lb jump. */
+function addOnText(kg: number, unit: WeightUnit | undefined): string {
+  if (unit !== "lb") return `${kg} kg`;
+  return `about ${kgToUnit(roundToStep(kg, STEP_5LB_KG), "lb")} lb`;
+}
+
+/**
+ * "4 x 9 at 70%", "2 x 3 at 80% + 10 kg", "3 x 8-12". With `unit` "lb" an
+ * add-on reads in pounds ("+ about 20 lb"); without a unit it stays in kg.
+ */
+export function summariseRx(sets: SetRx[], unit?: WeightUnit): string {
   return groupPieces(
     sets.map((s) => {
       switch (s.kind) {
         case "pct":
         case "amrap":
-          return `${s.reps}${s.kind === "amrap" ? "+" : ""} at ${pctText(s.pct)}${s.addKg ? ` + ${s.addKg} kg` : ""}`;
+          return `${s.reps}${s.kind === "amrap" ? "+" : ""} at ${pctText(s.pct)}${s.addKg ? ` + ${addOnText(s.addKg, unit)}` : ""}`;
         case "rpe":
           return `${s.reps} at RPE ${s.rpe}`;
         case "fixed":

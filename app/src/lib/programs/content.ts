@@ -70,7 +70,9 @@ export function memberPhases(t: Pick<ProgramTemplate, "weeks">): Phase[] {
       prev.toWeek = i + 1;
       return;
     }
-    out.push({ name: label, fromWeek: i + 1, toWeek: i + 1, note: `${listText(w.days.map((d) => d.name))}.` });
+    // Day names left blank are skipped; a week with none named has no note.
+    const days = w.days.map((d) => d.name.trim()).filter(Boolean);
+    out.push({ name: label, fromWeek: i + 1, toWeek: i + 1, note: days.length ? `${listText(days)}.` : "" });
   });
   for (const p of out) if (!p.name) p.name = weeksText(p.fromWeek, p.toWeek);
   return out;
@@ -100,10 +102,8 @@ export function withContentFrom(t: ProgramTemplate, original: ProgramTemplate | 
   const out: ProgramTemplate = { ...t };
   if (out.summary === undefined && original.summary !== undefined) out.summary = original.summary;
   if (out.whyItWorks === undefined && original.whyItWorks !== undefined) out.whyItWorks = original.whyItWorks;
-  if (out.phases === undefined && original.phases !== undefined) {
-    out.phases = original.phases.map((p) => ({ ...p }));
-    if (original.phasesRepeat) out.phasesRepeat = true;
-  }
+  if (out.phases === undefined && original.phases !== undefined) out.phases = original.phases.map((p) => ({ ...p }));
+  if (out.phasesRepeat === undefined && original.phasesRepeat !== undefined) out.phasesRepeat = original.phasesRepeat;
   return out;
 }
 
@@ -133,12 +133,13 @@ export function contentErrors(t: ProgramTemplate): string[] {
   if (phases.length === 0) return [...errors, `${t.key}: needs phases.`];
   const span = phaseSpan(t, t.phasesRepeat === true);
   let next = 1;
-  for (const p of phases) {
-    if (!p.name.trim()) errors.push(`${t.key}: a phase needs a name.`);
-    if (!p.note.trim()) errors.push(`${t.key}: ${p.name} needs a note.`);
-    if (p.fromWeek !== next || p.toWeek < p.fromWeek) errors.push(`${t.key}: ${p.name} should start at week ${next}.`);
+  phases.forEach((p, i) => {
+    const name = p.name.trim() || `Phase ${i + 1}`;
+    if (!p.name.trim()) errors.push(`${t.key}: each phase needs a name.`);
+    if (!p.note.trim()) errors.push(`${t.key}: ${name} needs a note.`);
+    if (p.fromWeek !== next || p.toWeek < p.fromWeek) errors.push(`${t.key}: ${name} should start at week ${next}.`);
     next = p.toWeek + 1;
-  }
+  });
   if (next - 1 !== span) errors.push(`${t.key}: the phases end at week ${next - 1}, not week ${span}.`);
   return errors;
 }

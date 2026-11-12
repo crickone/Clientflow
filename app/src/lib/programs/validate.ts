@@ -171,10 +171,31 @@ function blankReps(v: unknown): boolean {
   return v === undefined || v === null || v === "" || v === 0;
 }
 
+/** A program's phases, in plain words: "Each phase needs a name.", "A phase note is too long (300 characters at most)." */
+function phaseMessage(issue: z.core.$ZodIssue, field: string | null, max: number): string {
+  if (field === "phases" || field === null) {
+    if (issue.code === "too_small") return "add at least one phase.";
+    if (issue.code === "too_big") return `no more than ${max} phases.`;
+    return "the phases are not valid.";
+  }
+  switch (field) {
+    case "name":
+      return issue.code === "too_big" ? `a phase name is too long (${max} characters at most).` : "each phase needs a name.";
+    case "note":
+      return issue.code === "too_big" ? `a phase note is too long (${max} characters at most).` : "a phase note is not valid.";
+    case "fromWeek":
+    case "toWeek":
+      return "a phase's weeks must be whole numbers from 1 to 52.";
+    default:
+      return "a phase is not valid.";
+  }
+}
+
 function plainMessage(issue: z.core.$ZodIssue, field: string | null, value: unknown): string {
   const max = "maximum" in issue ? Number(issue.maximum) : NaN;
   const label = field ? (FIELD_LABEL[field] ?? field) : "value";
   if (issue.code === "custom") return "the top of the rep range must be at least the bottom.";
+  if (issue.path[0] === "phases") return phaseMessage(issue, field, max);
   if (issue.path.includes("exercises") && issue.path.includes("rule") && (field === "rule" || field === "kind")) return "pick a rule.";
   switch (field) {
     case "name":
@@ -182,12 +203,16 @@ function plainMessage(issue: z.core.$ZodIssue, field: string | null, value: unkn
     case "description":
       return issue.code === "too_big" ? `the ${label} is too long (${max} characters at most).` : `add a ${label}.`;
     case "notes":
-      return `the notes are too long (${max} characters at most).`;
-    case "warning":
+      return issue.code === "too_big" ? `the notes are too long (${max} characters at most).` : "the notes are not valid.";
     case "summary":
+      return issue.code === "too_big" ? `the ${label} is too long (${max} characters at most).` : "add a summary.";
     case "whyItWorks":
+      return issue.code === "too_big" ? `the ${label} is too long (${max} characters at most).` : "add why it works.";
+    case "warning":
     case "label":
-      return `the ${label} is too long (${max} characters at most).`;
+      return issue.code === "too_big" ? `the ${label} is too long (${max} characters at most).` : `the ${label} is not valid.`;
+    case "phasesRepeat":
+      return "whether the phases repeat must be yes or no.";
     case "reps":
     case "min":
     case "max":

@@ -85,7 +85,7 @@ export function ProgramDetail({
       </PkSection>
 
       <PkSection label="A typical week">
-        {typicalWeek(t).map((d, i) => (
+        {typicalWeek(t, unit).map((d, i) => (
           <DayRow key={i} d={d} />
         ))}
       </PkSection>
@@ -119,7 +119,7 @@ export function ProgramDetail({
       </PkSection>
 
       <PkSection label="The whole program">
-        {wholeProgram(t).map((w) => (
+        {wholeProgram(t, unit).map((w) => (
           <details key={w.title} className="pk-fold">
             <summary>
               <span>{w.title}</span>

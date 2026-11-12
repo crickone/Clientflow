@@ -103,6 +103,12 @@ assert.equal(weekNumber(t, { week: 1, cycle: 2 }), 6);
 assert.equal(summariseRx(sxr(4, 9, 0.7)), "4 x 9 at 70%");
 assert.equal(summariseRx(sxr(2, 3, 0.8, 180, 10)), "2 x 3 at 80% + 10 kg");
 assert.equal(summariseRx(sxr(3, 2, 0.725)), "3 x 2 at 72.5%");
+// An add-on in the member's unit: kg as before, pounds to the nearest 5 lb jump.
+assert.equal(summariseRx(sxr(2, 3, 0.8, 180, 10), "kg"), "2 x 3 at 80% + 10 kg");
+assert.equal(summariseRx(sxr(2, 3, 0.8, 180, 10), "lb"), "2 x 3 at 80% + about 20 lb");
+assert.equal(summariseRx(sxr(2, 3, 0.8, 180, 15), "lb"), "2 x 3 at 80% + about 35 lb");
+assert.equal(summariseRx(sxr(2, 3, 0.8, 180, 2.5), "lb"), "2 x 3 at 80% + about 5 lb");
+assert.equal(summariseRx(sxr(4, 9, 0.7), "lb"), "4 x 9 at 70%", "no add-on, no change in pounds");
 assert.equal(summariseRx([fixed(range(8, 12)), fixed(range(8, 12))]), "2 x 8-12");
 assert.equal(
   summariseRx(maxTest("Back squat", "squat").sets),

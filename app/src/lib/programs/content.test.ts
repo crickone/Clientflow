@@ -81,6 +81,15 @@ assert.deepEqual(memberPhases(member), [
 ]);
 const one = blankMemberTemplate();
 assert.deepEqual(memberPhases(one), [{ name: "Week 1", fromWeek: 1, toWeek: 1, note: "Day 1." }], "no labels is one phase");
+const unnamed = blankMemberTemplate();
+unnamed.weeks = [{ days: [{ name: " ", exercises: [] }, { name: "", exercises: [] }] }, { days: [{ name: "", exercises: [] }, { name: "Pull", exercises: [] }] }];
+assert.deepEqual(
+  memberPhases(unnamed).map((p) => p.note),
+  [""],
+  "blank day names give no note, never a lone full stop",
+);
+unnamed.weeks[1].label = "Next";
+assert.deepEqual(memberPhases(unnamed).map((p) => p.note), ["", "Pull."], "blank names are skipped in the list");
 const mc = programContent(member, { kind: "member" });
 assert.equal(mc.summary, "2 days a week, 5 weeks that repeat");
 assert.equal(mc.whyItWorks, null, "no why it works for a member program");
@@ -96,6 +105,12 @@ assert.equal(filled.whyItWorks, block.whyItWorks);
 assert.notEqual(filled.phases, block.phases, "the phases are copied, not shared");
 assert.equal(withContentFrom({ ...block, summary: "Ours." }, block).summary, "Ours.", "a copy's own summary is kept");
 assert.equal(withContentFrom(noContent, null), noContent);
+// phasesRepeat is copied on its own: a copy with its own phases still learns that the original's repeat.
+const repeating: ProgramTemplate = { ...block, phasesRepeat: true };
+assert.equal(withContentFrom({ ...block, phasesRepeat: undefined }, repeating).phasesRepeat, true, "phasesRepeat fills in even when the copy has phases");
+assert.equal(withContentFrom(noContent, repeating).phasesRepeat, true);
+assert.equal(withContentFrom({ ...repeating, phasesRepeat: false }, repeating).phasesRepeat, false, "a copy's own phasesRepeat is kept");
+assert.equal(withContentFrom(noContent, block).phasesRepeat, undefined, "nothing to copy stays unset");
 
 // ── the zod check keeps the new fields on a stored copy ──
 const parsed = parseTemplate(JSON.parse(JSON.stringify(block)));
@@ -124,5 +139,6 @@ assert.deepEqual(contentErrors(noContent), ["fixture-block: needs a summary.", "
 assert.deepEqual(contentErrors({ ...block, phases: [P("Base", 1, 2), P("Test", 4, 4)] }), ["fixture-block: Test should start at week 3."]);
 assert.deepEqual(contentErrors({ ...block, phases: [P("Base", 1, 3)] }), ["fixture-block: the phases end at week 3, not week 4."]);
 assert.deepEqual(contentErrors({ ...block, phases: [P("Base", 1, 3), P("Test", 4, 4, " ")] }), ["fixture-block: Test needs a note."]);
+assert.deepEqual(contentErrors({ ...block, phases: [P("Base", 1, 3), P(" ", 4, 4, "")] }), ["fixture-block: each phase needs a name.", "fixture-block: Phase 2 needs a note."], "an unnamed phase is named by its place");
 
 console.log("programs/content: ok");
