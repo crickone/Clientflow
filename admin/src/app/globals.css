@@ -1181,3 +1181,43 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { opacity: 0.45; c
 .runstrip i { width: 6px; height: 16px; border-radius: 2px; background: var(--surface-3); }
 .runstrip i.is-ok { background: rgba(63, 185, 80, 0.55); }
 .runstrip i.is-fail { background: var(--red); }
+
+/* ── Business 360 ───────────────────────────────────────────────────────── */
+.props { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-end; padding: 14px 0 0; }
+.prop { display: flex; flex-direction: column; gap: 5px; }
+.prop .input { width: auto; min-height: 36px; padding-top: 0; padding-bottom: 0; font-size: 13px; }
+.prop-label { font-family: var(--font-mono), ui-monospace, monospace; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-tertiary); }
+.prop--tags { flex: 1 1 260px; }
+.tags { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.tags .chip { padding-left: 10px; background-image: none; display: inline-flex; align-items: center; gap: 4px; }
+.tags .chip button { border: 0; background: transparent; color: inherit; cursor: pointer; display: grid; place-items: center; padding: 0; }
+.tag-input { width: 120px !important; min-height: 30px !important; font-size: 12.5px !important; }
+.bar { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.bar i { display: block; height: 100%; background: linear-gradient(90deg, #ffffff, #9fb0c4); }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px 16px; font-size: 13px; color: var(--text-secondary); }
+.steps li { display: flex; align-items: center; gap: 8px; }
+.steps i { width: 8px; height: 8px; border-radius: 50%; background: var(--surface-3); flex: 0 0 auto; }
+.steps .is-done { color: var(--text-primary); }
+.steps .is-done i { background: var(--green); }
+.steps .is-skipped i { background: var(--text-tertiary); }
+.step-opt { color: var(--text-tertiary); font-size: 11.5px; }
+.usage { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.usage li { display: grid; grid-template-columns: 180px 1fr 48px 56px; gap: 12px; align-items: center; font-size: 13px; }
+.usage-bar { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.usage-bar i { display: block; height: 100%; background: #9fb0c4; }
+.usage-n { text-align: right; font-family: var(--font-mono), ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+.usage-delta { font-size: 12px; text-align: right; }
+.usage-unused { display: block !important; margin-top: 6px; font-size: 12.5px; color: var(--text-tertiary); }
+.notes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.notes li { padding: 12px 14px; border-radius: 10px; background: var(--surface-2); border: 1px solid transparent; }
+.notes li.is-pinned { border-color: var(--hairline-strong); }
+.note-body { white-space: pre-wrap; font-size: 13.5px; line-height: 1.5; }
+.note-meta { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 12px; color: var(--text-tertiary); }
+.note-actions { display: flex; gap: 2px; }
+.note-actions .btn--icon { width: 26px; height: 26px; }
+.tasks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.tasks li { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--grid); font-size: 13.5px; }
+.tasks li.is-done .task-title { text-decoration: line-through; color: var(--text-tertiary); }
+.task-title { flex: 1; }
+.task-meta { font-size: 12px; color: var(--text-tertiary); }
+.tasks .btn--icon { width: 26px; height: 26px; }

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { setModuleAction, type FeatureActionResult } from "@/app/(console)/gyms/[id]/features/actions";
 import { Card } from "@/components/ui/Card";
-import type { TenantFeatures } from "@/lib/types";
+import type { ModuleUsage, TenantFeatures } from "@/lib/types";
 
 /**
  * The Features tab: one switch per module.
@@ -15,7 +15,7 @@ import type { TenantFeatures } from "@/lib/types";
  * Their data is untouched: switching it back on returns everything exactly
  * as it was, which is why there is no confirmation on the way off.
  */
-export function FeaturesPanel({ tenantId, data }: { tenantId: number; data: TenantFeatures }) {
+export function FeaturesPanel({ tenantId, data, usage = [] }: { tenantId: number; data: TenantFeatures; usage?: ModuleUsage[] }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [result, setResult] = useState<FeatureActionResult | null>(null);
@@ -86,6 +86,11 @@ export function FeaturesPanel({ tenantId, data }: { tenantId: number; data: Tena
               <span style={{ flex: 1 }}>
                 <span style={{ fontSize: 14, fontWeight: 500, color: "var(--text-primary)" }}>
                   {m.label}
+                  {(() => {
+                    const u = usage.find((x) => x.key === m.key);
+                    return <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: "var(--text-tertiary)" }}>{u?.lastAt ? `last opened ${new Date(u.lastAt).toLocaleDateString("en-IE")}` : "never opened"}</span>;
+                  })()}
+                  {!m.on && m.own && <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: "var(--amber)" }}>held off by a fleet rollout</span>}
                   {busyKey === m.key && <span style={{ color: "var(--text-secondary)", fontWeight: 400 }}> saving…</span>}
                 </span>
                 <span style={{ display: "block", fontSize: 12.5, color: "var(--text-secondary)" }}>{m.blurb}</span>

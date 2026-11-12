@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import { api, ApiError } from "@/lib/api";
 import { FeaturesPanel } from "@/components/features/FeaturesPanel";
-import type { TenantFeatures } from "@/lib/types";
+import type { ModuleUsage, TenantFeatures } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -17,5 +17,11 @@ export default async function TenantFeaturesPage(props: { params: Promise<{ id: 
     if (err instanceof ApiError && err.status === 404) notFound();
     throw err;
   }
-  return <FeaturesPanel tenantId={id} data={data} />;
+  let usage: ModuleUsage[] = [];
+  try {
+    usage = (await api<{ modules: ModuleUsage[] }>(`/tenants/${id}/usage?days=365`)).modules;
+  } catch {
+    usage = [];
+  }
+  return <FeaturesPanel tenantId={id} data={data} usage={usage} />;
 }

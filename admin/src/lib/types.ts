@@ -158,6 +158,9 @@ export interface EmailAllowanceState {
 }
 
 export interface TenantDetail {
+  meta: TenantMeta | null;
+  setup: SetupView;
+  risk: Risk;
   tenant: TenantSummary;
   /** Archive/purge state — drives the Money tab's danger zone. */
   lifecycle?: TenantLifecycle | null;
@@ -401,6 +404,8 @@ export interface ModuleView {
   blurb: string;
   paths: string[];
   on: boolean;
+  /** Off by the business itself, as opposed to held off by a fleet rollout. */
+  own?: boolean;
 }
 
 export interface TenantFeatures {
@@ -493,6 +498,9 @@ export interface FleetTenantRow {
   nextRenewalAt: string | null;
   createdAt: number;
   users: number;
+  setup: { requiredDone: number; requiredTotal: number };
+  risk: { score: number; level: "low" | "medium" | "high" };
+  stage: string | null;
 }
 
 export interface FleetResponse {
@@ -533,3 +541,13 @@ export interface AlertsResponse {
 
 export interface JobRun { id: number; key: string; label: string; startedAt: number; finishedAt: number | null; ok: boolean | null; error: string | null; durationMs: number | null; detail: unknown }
 export interface JobsResponse { latest: JobRun[]; history: JobRun[] }
+
+export type Stage = "trial" | "onboarding" | "active" | "at_risk" | "churned";
+export const STAGE_LABEL: Record<Stage, string> = { trial: "Trial", onboarding: "Onboarding", active: "Active", at_risk: "At risk", churned: "Churned" };
+export interface TenantMeta { tenantId: number; stage: Stage | null; stageAuto: Stage; ownerUserId: number | null; tags: string[]; updatedAt: number | null }
+export interface SetupView { requiredDone: number; requiredTotal: number; resolved: number; total: number; nextTitle: string | null; steps: { id: string; title: string; done: boolean; skipped: boolean; optional: boolean }[] }
+export interface Risk { score: number; level: "low" | "medium" | "high"; reasons: string[] }
+export interface Note { id: number; tenantId: number; authorUserId: number; authorEmail: string; body: string; pinned: boolean; createdAt: number }
+export interface Task { id: number; tenantId: number | null; tenantName: string | null; title: string; dueAt: number | null; assignedTo: number | null; doneAt: number | null; createdBy: number; createdAt: number }
+export interface ModuleUsage { key: string; label: string; hits: number; lastAt: number | null; prevHits: number }
+export interface PlatformFlag { key: string; mode: "all" | "none" | "percent" | "allow"; percent: number; allow: number[] }

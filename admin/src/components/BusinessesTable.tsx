@@ -12,7 +12,7 @@ import { OpenBusinessButton } from "@/components/OpenBusinessButton";
 import { bulkTenantAction, type BulkAction } from "@/app/(console)/gyms/bulk-actions";
 import { fmtDate, fmtDay } from "@/lib/format";
 import { notify } from "@/lib/toast";
-import type { FleetTenantRow } from "@/lib/types";
+import { STAGE_LABEL, type FleetTenantRow, type Stage } from "@/lib/types";
 
 export function BusinessesTable({
   tenants,
@@ -92,6 +92,9 @@ export function BusinessesTable({
       value: (t) => (t.archivedAt ? "archived" : t.billingExempt ? "agency" : t.billingStatus ?? "none"),
       render: (t) => (t.archivedAt ? <span className="chip past_due">archived</span> : <StatusChip status={t.billingStatus} exempt={t.billingExempt} />),
     },
+    { key: "stage", label: "Stage", sortable: true, value: (t) => t.stage ?? "", render: (t) => (t.stage ? STAGE_LABEL[t.stage as Stage] ?? t.stage : "—") },
+    { key: "risk", label: "Risk", sortable: true, align: "right", value: (t) => t.risk.score, render: (t) => <span style={{ fontFamily: "var(--font-mono), ui-monospace, monospace", color: t.risk.level === "high" ? "var(--red)" : t.risk.level === "medium" ? "var(--amber)" : "var(--text-secondary)" }}>{t.risk.score}</span> },
+    { key: "setup", label: "Setup", sortable: true, align: "right", value: (t) => (t.setup.requiredTotal ? t.setup.requiredDone / t.setup.requiredTotal : 0), render: (t) => <span style={{ fontVariantNumeric: "tabular-nums", color: "var(--text-secondary)" }}>{t.setup.requiredDone}/{t.setup.requiredTotal}</span> },
     { key: "users", label: "People", sortable: true, align: "right" },
     { key: "nextRenewalAt", label: "Next renewal", sortable: true, value: (t) => t.nextRenewalAt ?? "", render: (t) => (t.nextRenewalAt ? fmtDay(t.nextRenewalAt) : "—") },
     { key: "createdAt", label: "Joined", sortable: true, render: (t) => fmtDate(t.createdAt) },

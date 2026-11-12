@@ -8,7 +8,8 @@ import { requireAdminSession } from "@/lib/session";
 import { StatusChip } from "@/components/StatusChip";
 import { OpenBusinessButton } from "@/components/OpenBusinessButton";
 import { TenantTabs } from "@/components/TenantTabs";
-import type { TenantDetail } from "@/lib/types";
+import { Properties } from "@/components/business/Properties";
+import { STAGE_LABEL, type StaffResponse, type TenantDetail } from "@/lib/types";
 import { openTenant } from "./actions";
 
 /**
@@ -46,7 +47,8 @@ export default async function TenantLayout(
     if (err instanceof ApiError && err.status === 404) notFound();
     throw err;
   }
-  const { tenant, usage } = data;
+  const staff = await api<StaffResponse>("/staff", { revalidate: 30, tags: ["fleet"] });
+  const { tenant, usage, meta } = data;
   const billing = tenant.billing;
 
   return (
@@ -65,6 +67,7 @@ export default async function TenantLayout(
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <h1 className="page-title">{tenant.name}</h1>
               <StatusChip status={billing?.status ?? null} exempt={billing?.billingExempt} />
+              {meta && <span className="chip">{STAGE_LABEL[meta.stage ?? meta.stageAuto]}</span>}
               {!tenant.isActive && (
                 <span className="chip suspended">inactive</span>
               )}
@@ -87,6 +90,7 @@ export default async function TenantLayout(
             className="btn btn--primary btn--md"
           />
         </div>
+        {meta && <Properties tenantId={tenant.id} meta={meta} staff={staff.staff} />}
       </div>
 
       <TenantTabs tenantId={tenant.id} />
