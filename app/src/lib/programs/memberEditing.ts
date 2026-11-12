@@ -37,6 +37,10 @@ export function guessLift(name: string): LiftKey {
 }
 
 const repsOf = (s: SetRx): number => (typeof s.reps === "number" ? s.reps : s.reps.min);
+/** A rep count or a fresh copy of a rep range, so a switched exercise never shares objects with the old one. */
+const copyReps = (r: SetRx["reps"]): SetRx["reps"] => (typeof r === "number" ? r : { ...r });
+/** A whole index into a list of this length. */
+const inRange = (i: number, length: number) => Number.isInteger(i) && i >= 0 && i < length;
 
 /** A new exercise: 3 sets of 5, adding weight each session. */
 export function newExercise(name: string): ExerciseRx {
@@ -65,20 +69,20 @@ export function applyRule(ex: ExerciseRx, kind: RuleKind): ExerciseRx {
     case "range":
       return {
         ...base,
-        sets: sets.map((s) => ({ kind: "fixed", reps: typeof s.reps !== "number" ? s.reps : { min: s.reps, max: s.reps + 4 }, rest: s.rest })),
+        sets: sets.map((s) => ({ kind: "fixed", reps: typeof s.reps !== "number" ? { ...s.reps } : { min: s.reps, max: s.reps + 4 }, rest: s.rest })),
         rule: { kind: "range", ...withStart },
       };
     case "percent":
       return {
         ...base,
         lift: ex.lift ?? guessLift(ex.name),
-        sets: sets.map((s) => (s.kind === "pct" || s.kind === "amrap" ? s : { kind: "pct", pct: 0.75, reps: repsOf(s), rest: s.rest })),
+        sets: sets.map((s) => (s.kind === "pct" || s.kind === "amrap" ? { ...s } : { kind: "pct", pct: 0.75, reps: repsOf(s), rest: s.rest })),
         rule: { kind: "percent" },
       };
     case "rpe":
-      return { ...base, sets: sets.map((s) => (s.kind === "rpe" ? s : { kind: "rpe", rpe: 8, reps: repsOf(s), rest: s.rest })), rule: { kind: "rpe" } };
+      return { ...base, sets: sets.map((s) => (s.kind === "rpe" ? { ...s } : { kind: "rpe", rpe: 8, reps: repsOf(s), rest: s.rest })), rule: { kind: "rpe" } };
     case "manual":
-      return { ...base, sets: sets.map((s) => ({ kind: "fixed", reps: s.kind === "fixed" ? s.reps : repsOf(s), rest: s.rest })), rule: { kind: "manual", ...withStart } };
+      return { ...base, sets: sets.map((s) => ({ kind: "fixed", reps: s.kind === "fixed" ? copyReps(s.reps) : repsOf(s), rest: s.rest })), rule: { kind: "manual", ...withStart } };
     default: {
       const never: never = kind;
       return never;
@@ -92,20 +96,22 @@ export function addSet(ex: ExerciseRx): void {
   if (last) ex.sets.push(structuredClone(last));
 }
 
-/** Every set's rest, in seconds (0 to 900). */
+/** Every set's rest, in seconds (0 to 900). Not a number changes nothing. */
 export function setRest(ex: ExerciseRx, seconds: number): void {
+  if (!Number.isFinite(seconds)) return;
   const rest = Math.max(0, Math.min(900, Math.round(seconds)));
   for (const s of ex.sets) s.rest = rest;
 }
 
 function swap<T>(xs: T[], i: number, j: number): boolean {
-  if (i < 0 || j < 0 || i >= xs.length || j >= xs.length) return false;
+  if (!inRange(i, xs.length) || !inRange(j, xs.length)) return false;
   [xs[i], xs[j]] = [xs[j], xs[i]];
   return true;
 }
 
-/** "Add a week": a copy of week w right after it. Returns the new week's index. */
+/** "Add a week": a copy of week w right after it. Returns the new week's index, or -1 when there is no week w. */
 export function addWeek(d: BuilderDraft, w: number): number {
+  if (!inRange(w, d.template.weeks.length)) return -1;
   d.template.weeks.splice(w + 1, 0, structuredClone(d.template.weeks[w]));
   d.origins.splice(w + 1, 0, null);
   return w + 1;
@@ -113,7 +119,7 @@ export function addWeek(d: BuilderDraft, w: number): number {
 
 /** Remove week w; the last week stays. */
 export function removeWeek(d: BuilderDraft, w: number): void {
-  if (d.template.weeks.length <= 1) return;
+  if (d.template.weeks.length <= 1 || !inRange(w, d.template.weeks.length)) return;
   d.template.weeks.splice(w, 1);
   d.origins.splice(w, 1);
 }
@@ -123,28 +129,39 @@ export function moveWeek(d: BuilderDraft, w: number, dir: -1 | 1): boolean {
   return swap(d.template.weeks, w, w + dir) && swap(d.origins, w, w + dir);
 }
 
+/** The exercises of day di of week w; null when there is no such day. */
+function dayExercises(t: ProgramTemplate, w: number, di: number): ExerciseRx[] | null {
+  if (!inRange(w, t.weeks.length) || !inRange(di, t.weeks[w].days.length)) return null;
+  return t.weeks[w].days[di].exercises;
+}
+
 export function addDay(t: ProgramTemplate, w: number): void {
+  if (!inRange(w, t.weeks.length)) return;
   const days = t.weeks[w].days;
   days.push({ name: `Day ${days.length + 1}`, exercises: [] });
 }
 
 export function removeDay(t: ProgramTemplate, w: number, di: number): void {
+  if (!inRange(w, t.weeks.length) || !inRange(di, t.weeks[w].days.length)) return;
   if (t.weeks[w].days.length > 1) t.weeks[w].days.splice(di, 1);
 }
 
 export function moveDay(t: ProgramTemplate, w: number, di: number, dir: -1 | 1): boolean {
+  if (!inRange(w, t.weeks.length)) return false;
   return swap(t.weeks[w].days, di, di + dir);
 }
 
 export function moveExercise(t: ProgramTemplate, w: number, di: number, xi: number, dir: -1 | 1): boolean {
-  const list = t.weeks[w].days[di].exercises;
+  const list = dayExercises(t, w, di);
+  if (!list) return false;
   const moved = swap(list, xi, xi + dir);
   if (moved && list[0]?.joined) delete list[0].joined;
   return moved;
 }
 
 export function removeExercise(t: ProgramTemplate, w: number, di: number, xi: number): void {
-  const list = t.weeks[w].days[di].exercises;
+  const list = dayExercises(t, w, di);
+  if (!list || !inRange(xi, list.length)) return;
   list.splice(xi, 1);
   if (list[0]?.joined) delete list[0].joined;
 }

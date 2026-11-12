@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import { clients, memberBuiltPrograms, programEnrolments } from "@/lib/db/schema";
 import { toOwnRules } from "./convert";
 import { initState } from "./engines";
-import { bestLoggedSet, enrolTemplate, liveEnrolment, writeTemplateEdit, type EnrolInput } from "./enrolments";
+import { MAX_KG, MIN_KG, bestLoggedSet, enrolTemplate, liveEnrolment, writeTemplateEdit, type EnrolInput } from "./enrolments";
 import { copyKey, programByKey } from "./library";
 import { editReason, normaliseOrigins, rebaseEdit } from "./memberEdit";
 import { blankMemberTemplate, memberKey, parseMemberKey, validateMemberTemplate } from "./memberTemplate";
@@ -39,13 +39,13 @@ const STALE: Errors = { ok: false, errors: ["Your program moved on while you wer
 
 const MAX_BASED_ON = 80;
 
-/** Known lift keys with finite numbers from 1 to 600 kg; anything else is dropped. Never throws. */
+/** Known lift keys with finite numbers from MIN_KG to MAX_KG (1 to 600 kg); anything else is dropped. Never throws. */
 function cleanMaxes(raw: unknown): Partial<Record<LiftKey, number>> {
   const out: Partial<Record<LiftKey, number>> = {};
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
   for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
     if (!Object.prototype.hasOwnProperty.call(LIFT_EXERCISE, k)) continue;
-    if (typeof v !== "number" || !Number.isFinite(v) || v < 1 || v > 600) continue;
+    if (typeof v !== "number" || !Number.isFinite(v) || v < MIN_KG || v > MAX_KG) continue;
     out[k as LiftKey] = v;
   }
   return out;
@@ -53,13 +53,18 @@ function cleanMaxes(raw: unknown): Partial<Record<LiftKey, number>> {
 
 function toProgram(r: Row): MemberProgram | null {
   let raw: unknown;
-  let maxes: Partial<Record<LiftKey, number>> = {};
   try {
     raw = JSON.parse(r.templateJson);
-    maxes = cleanMaxes(JSON.parse(r.maxesJson));
   } catch (err) {
     console.error("[programs] unreadable member program", r.id, err);
     return null;
+  }
+  // Unreadable maxes only lose the maxes; the program still shows.
+  let maxes: Partial<Record<LiftKey, number>> = {};
+  try {
+    maxes = cleanMaxes(JSON.parse(r.maxesJson));
+  } catch (err) {
+    console.error("[programs] unreadable member program maxes", r.id, err);
   }
   // A row that no longer passes the check is skipped, so one bad row never takes the list down.
   const checked = validateMemberTemplate(raw, memberKey(r.id));
@@ -134,7 +139,7 @@ export function startingDraft(clientId: number, from: StartFrom): Draft | null {
   }
   const live = liveEnrolment(clientId);
   if (!live) return null;
-  const conv = toOwnRules(live.template, { weights: live.state.weights, tms: live.state.tms });
+  const conv = toOwnRules(live.template, { weights: live.state.weights, tms: live.state.tms, stages: live.state.stages });
   const ownId = live.programKey ? parseMemberKey(live.programKey) : null;
   const basedOn = ownId ? (getMemberProgram(clientId, ownId)?.basedOn ?? null) : (live.programKey ?? (live.copyId ? copyKey(live.copyId) : null));
   return { template: conv.template, maxes: conv.maxes, basedOn };
@@ -172,7 +177,7 @@ export function createMemberProgram(clientId: number, draft: { template: unknown
  * its state and a change-log entry are written in one transaction, or none
  * of them.
  */
-export function saveMemberProgram(clientId: number, id: number, raw: unknown, weekOrigins: unknown): { ok: true; edited: boolean } | Errors | { ok: false; error: string } {
+export function saveMemberProgram(clientId: number, id: number, raw: unknown, weekOrigins: unknown): { ok: true; edited: boolean } | Errors {
   const row = getMemberProgram(clientId, id);
   if (!row) return GONE;
   const key = memberKey(id);
@@ -207,7 +212,7 @@ export function saveMemberProgram(clientId: number, id: number, raw: unknown, we
     if (err instanceof Stale) return STALE;
     throw err;
   }
-  if (result === "gone") return { ok: false, error: "That program no longer exists." };
+  if (result === "gone") return GONE;
   return result === "ok" ? { ok: true, edited: running } : STALE;
 }
 

@@ -96,4 +96,47 @@ removeDay(p, 0, 0);
 removeDay(p, 0, 0);
 assert.equal(p.weeks[0].days.length, 1, "the last day stays");
 
+// ── final wave: NaN rest, bad indexes, no shared sets ──
+const rested = newExercise("Bench press");
+setRest(rested, 90);
+setRest(rested, Number.NaN);
+assert.ok(rested.sets.every((x) => x.rest === 90), "NaN rest changes nothing");
+setRest(rested, Number.POSITIVE_INFINITY);
+assert.ok(rested.sets.every((x) => x.rest === 90), "Infinity rest changes nothing");
+
+const idx = blankMemberTemplate();
+idx.weeks[0].days[0].exercises = [newExercise("Bench press"), newExercise("Back squat")];
+const idxDraft = draftFrom(idx, true);
+const snapshot = JSON.stringify(idxDraft);
+assert.equal(addWeek(idxDraft, -1), -1);
+assert.equal(addWeek(idxDraft, 5), -1);
+removeWeek(idxDraft, -1);
+assert.equal(moveWeek(idxDraft, -1, 1), false);
+addDay(idx, -1);
+addDay(idx, 3);
+removeDay(idx, 0, -1);
+removeDay(idx, -1, 0);
+assert.equal(moveDay(idx, 4, 0, 1), false);
+assert.equal(moveExercise(idx, 0, 9, 0, 1), false);
+assert.equal(moveExercise(idx, 0, 0, -1, 1), false);
+removeExercise(idx, 0, 0, -1);
+removeExercise(idx, 0, 0, 7);
+removeExercise(idx, 0, 4, 0);
+removeExercise(idx, 0, 0, 0.5);
+assert.equal(JSON.stringify(idxDraft), snapshot, "negative or out-of-range indexes change nothing");
+
+const pctEx: ExerciseRx = { name: "Back squat", lift: "squat", sets: [{ kind: "pct", pct: 0.8, reps: 5, rest: 180 }], rule: { kind: "percent" } };
+const toPct = applyRule({ ...pctEx, rule: { kind: "linear", incKg: 2.5, deloadAfter: 3 } }, "percent");
+assert.notEqual(toPct.sets[0], pctEx.sets[0], "a kept pct set is a copy");
+const rpeEx: ExerciseRx = { name: "Bench press", sets: [{ kind: "rpe", rpe: 8, reps: 5, rest: 120 }], rule: { kind: "manual" } };
+const toRpe = applyRule(rpeEx, "rpe");
+assert.notEqual(toRpe.sets[0], rpeEx.sets[0], "a kept rpe set is a copy");
+toRpe.sets[0].rest = 30;
+assert.equal(rpeEx.sets[0].rest, 120, "editing the new set leaves the old one alone");
+const rangeEx: ExerciseRx = { name: "Cable row", sets: [{ kind: "fixed", reps: { min: 8, max: 12 }, rest: 90 }], rule: { kind: "range" } };
+const toManual = applyRule(rangeEx, "manual");
+assert.notEqual(toManual.sets[0].reps, rangeEx.sets[0].reps, "a kept rep range is a copy");
+const backToRange = applyRule({ ...rangeEx, rule: { kind: "manual" } }, "range");
+assert.notEqual(backToRange.sets[0].reps, rangeEx.sets[0].reps);
+
 console.log("programs/memberEditing: ok");

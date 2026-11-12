@@ -340,6 +340,25 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(db.select().from(workoutSessions).where(eq(workoutSessions.id, s.sessionId)).get()!.dayPosition, before, "left where it was");
   });
 
+  test("the open session moves with its day when only the day name's case or spaces change", () => {
+    const clientId = newMember();
+    const id = create(clientId);
+    startIt(clientId, id);
+    const s = en.startEnrolmentSession(clientId);
+    assert.ok(s.ok);
+    const edited = program([[{ name: "Arms", exercises: [curl] }, { name: "  upper ", exercises: [bench] }, { name: "Lower", exercises: [squat, row] }]]);
+    assert.ok(mp.saveMemberProgram(clientId, id, edited, [0]).ok);
+    assert.deepEqual([en.liveEnrolment(clientId)!.state.week, en.liveEnrolment(clientId)!.state.day], [0, 1], "still on Upper");
+    assert.equal(db.select().from(workoutSessions).where(eq(workoutSessions.id, s.sessionId)).get()!.dayPosition, 1, "the open session moved with it");
+  });
+
+  test("a member's own max is refused on a library program", () => {
+    const lib = newMember();
+    assert.ok(en.enrol(lib, { ...start, key: "smolov-base", maxesKg: { squat: 150 } }).ok);
+    assert.deepEqual(en.memberSetMax(lib, "squat", 160), { ok: false, error: "You don't have a program of your own running." });
+    assert.equal(en.liveEnrolment(lib)!.state.maxes.squat, 150, "the max is unchanged");
+  });
+
   test("a member sets a max in their own unit's bounds", () => {
     const clientId = newMember();
     const id = create(clientId);
@@ -368,6 +387,13 @@ const requireLocal = createRequire(import.meta.url);
     assert.deepEqual(mp.getMemberProgram(clientId, r.id)!.maxes, { bench: 80 });
     db.update(memberBuiltPrograms).set({ maxesJson: "[1,2]" }).where(eq(memberBuiltPrograms.id, r.id)).run();
     assert.deepEqual(mp.getMemberProgram(clientId, r.id)!.maxes, {});
+    db.update(memberBuiltPrograms).set({ maxesJson: "{not json" }).where(eq(memberBuiltPrograms.id, r.id)).run();
+    const badMaxes = mp.getMemberProgram(clientId, r.id);
+    assert.ok(badMaxes, "unreadable maxes do not hide the program");
+    assert.deepEqual(badMaxes.maxes, {});
+    db.update(memberBuiltPrograms).set({ templateJson: "{not json" }).where(eq(memberBuiltPrograms.id, r.id)).run();
+    assert.equal(mp.getMemberProgram(clientId, r.id), null, "an unreadable template hides it");
+    assert.ok(mp.listMemberPrograms(clientId).every((p) => p.id !== r.id), "and the list skips it");
   });
 
   test("saving reports a program row that updated nothing", () => {
@@ -375,7 +401,7 @@ const requireLocal = createRequire(import.meta.url);
     const id = create(clientId);
     db.run(sql.raw("CREATE TRIGGER skip_update BEFORE UPDATE ON member_programs BEGIN SELECT RAISE(IGNORE); END"));
     try {
-      assert.deepEqual(mp.saveMemberProgram(clientId, id, twoDay(), null), { ok: false, error: "That program no longer exists." });
+      assert.deepEqual(mp.saveMemberProgram(clientId, id, twoDay(), null), { ok: false, errors: ["That program no longer exists."] });
     } finally {
       db.run(sql.raw("DROP TRIGGER IF EXISTS skip_update"));
     }

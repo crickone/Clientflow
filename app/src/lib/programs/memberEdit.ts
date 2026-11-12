@@ -43,8 +43,8 @@ const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
  * not fit: one entry per new week, each an old week index or null, no old week
  * twice. Missing origins mean "same index" when the week count is unchanged.
  * When the count changed and the weeks are given, the member's week is found
- * by identical content; with no identical week it is the same index, which
- * the caller clamps.
+ * by identical content when exactly one new week matches it; otherwise it is
+ * the same index, clamped to the last week.
  */
 export function normaliseOrigins(
   raw: unknown,
@@ -54,10 +54,14 @@ export function normaliseOrigins(
 ): (number | null)[] {
   const identity = Array.from({ length: afterWeeks }, (_, i) => (i < beforeWeeks ? i : null));
   if (!Array.isArray(raw)) {
-    if (weeks && beforeWeeks !== afterWeeks && weeks.before[weeks.current]) {
+    if (weeks && beforeWeeks !== afterWeeks && weeks.before[weeks.current] && afterWeeks > 0) {
       const mine = JSON.stringify(weeks.before[weeks.current]);
-      const at = weeks.after.findIndex((w) => JSON.stringify(w) === mine);
-      if (at >= 0) return weeks.after.map((_, i) => (i === at ? weeks.current : null));
+      const matches = weeks.after.flatMap((w, i) => (JSON.stringify(w) === mine ? [i] : []));
+      // Only one identical week says where the member's week went; several say nothing.
+      if (matches.length === 1) return weeks.after.map((_, i) => (i === matches[0] ? weeks.current : null));
+      // Else the same index, clamped to the last week.
+      const at = Math.min(weeks.current, afterWeeks - 1);
+      return identity.map((o, i) => (i === at ? weeks.current : o === weeks.current ? null : o));
     }
     return identity;
   }
@@ -69,6 +73,11 @@ export function normaliseOrigins(
     seen.add(o);
   }
   return raw as (number | null)[];
+}
+
+/** The weeks without notes and week labels: what the member actually lifts. */
+function withoutWords(weeks: ProgramTemplate["weeks"]): unknown {
+  return weeks.map((w) => ({ days: w.days.map((d) => ({ ...d, exercises: d.exercises.map(({ notes: _notes, ...ex }) => ex) })) }));
 }
 
 function exercises(t: ProgramTemplate): ExerciseRx[] {
@@ -121,6 +130,8 @@ const list = (xs: string[]) => xs.join(", ");
 export function rebaseEdit(input: EditInput): EditOutput {
   const { before, after, state, stepKg } = input;
   const fmt = (kg: number) => formatWeight(kg, input.unit);
+  // Lines the member must see (where they are now, a max to add) come first and are never cut.
+  const first: string[] = [];
   const lines: string[] = [];
   const next = clone(state);
   const oldKeys = byKey(before);
@@ -135,6 +146,8 @@ export function rebaseEdit(input: EditInput): EditOutput {
   // ── nothing changed: same weeks, same order ──
   const inOrder = origins.every((o, i) => o === i);
   if (inOrder && JSON.stringify(before.weeks) === JSON.stringify(after.weeks)) return { state: next, lines: [] };
+  // Only a change to the work (weeks, days, exercises, sets, rules) reopens a finished program; notes and labels do not.
+  const workChanged = !inOrder || JSON.stringify(withoutWords(before.weeks)) !== JSON.stringify(withoutWords(after.weeks));
 
   // ── what changed: weeks, days, exercises, rules ──
   if (before.weeks.length !== after.weeks.length) lines.push(`Weeks: ${before.weeks.length} to ${after.weeks.length}.`);
@@ -210,7 +223,7 @@ export function rebaseEdit(input: EditInput): EditOutput {
   for (const lift of after.lifts) {
     const max = next.maxes[lift];
     if (max !== undefined) next.tms[lift] = trainingMax(max, after.tmPct);
-    else if (!before.lifts.includes(lift)) lines.push(`Add your ${LIFT_LABEL[lift].toLowerCase()} max on My program to get its weights.`);
+    else if (!before.lifts.includes(lift)) first.push(`Add your ${LIFT_LABEL[lift].toLowerCase()} max on My program to get its weights.`);
   }
 
   // ── position: the same week where it moved to, else the nearest earlier one ──
@@ -238,17 +251,17 @@ export function rebaseEdit(input: EditInput): EditOutput {
     });
     next.week = to;
     next.day = 0;
-    lines.push(`The week you were on was removed, so you're now on week ${to + 1}.`);
+    first.unshift(`The week you were on was removed, so you're now on week ${to + 1}.`);
   }
-  next.finished = false;
+  if (workChanged) next.finished = false;
 
-  if (lines.length === 0) lines.push("Sets, reps or notes changed.");
+  if (first.length === 0 && lines.length === 0) lines.push("Sets, reps or notes changed.");
   if (lines.length > 8) {
     const more = lines.length - 8;
     lines.length = 8;
     lines.push(`and ${more} more change${more === 1 ? "" : "s"}.`);
   }
-  return { state: next, lines };
+  return { state: next, lines: [...first, ...lines] };
 }
 
 /** The change-log entry for an edit. */

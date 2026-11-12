@@ -11,6 +11,7 @@ import { exerciseKey, type LoggedSet } from "@/lib/workoutLogModel";
 import { initState, progress, skipSession } from "./engines";
 import { matchLibraryId, namesFor } from "./exercises";
 import { programByKey } from "./library";
+import { parseMemberKey } from "./memberTemplate";
 import { dayAt, dayTitle, planSession, positionOf, stateKey, weekLabel } from "./planner";
 import { LIFT_EXERCISE, LIFT_LABEL, emptyState, type EngineState, type LiftKey, type PlannedSession, type ProgramTemplate, type SessionResult, type WeightUnit } from "./types";
 import { MAX_SET_REPS, formatWeight, kgToUnit, maxFromSet, trainingMax } from "./units";
@@ -59,8 +60,11 @@ type Row = typeof programEnrolments.$inferSelect;
 export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Result = { ok: true } | { ok: false; error: string };
 
-const MAX_KG = 600;
-const MIN_KG = 1;
+/** The heaviest and lightest max a member or coach can enter, in kg. Shared with the member programs store. */
+export const MAX_KG = 600;
+export const MIN_KG = 1;
+/** Day names compare without case or extra spaces, the same way an edit matches them. */
+const sameName = (a: string, b: string) => a.trim().toLowerCase().replace(/\s+/g, " ") === b.trim().toLowerCase().replace(/\s+/g, " ");
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const clone = (s: EngineState): EngineState => JSON.parse(JSON.stringify(s)) as EngineState;
 
@@ -563,7 +567,7 @@ export function writeTemplateEdit(
   // The open session follows the member only when their day is still there: same week, a day of the same name at the mapped position.
   const oldDay = dayAt(view.template, view.state.week, view.state.day);
   const newDay = dayAt(template, state.week, state.day);
-  const dayKept = !!oldDay && !!newDay && oldDay.name === newDay.name && !!weekOrigins && weekOrigins[state.week] === view.state.week;
+  const dayKept = !!oldDay && !!newDay && sameName(oldDay.name, newDay.name) && !!weekOrigins && weekOrigins[state.week] === view.state.week;
   tx.update(programEnrolments).set({ templateJson: JSON.stringify(template), ...stateColumns(state) }).where(eq(programEnrolments.id, view.id)).run();
   if (dayKept) {
     tx.update(workoutSessions)
@@ -578,7 +582,9 @@ export function writeTemplateEdit(
 /** A member sets a max on a program they built (a percent lift, or a new max after a test). */
 export function memberSetMax(clientId: number, lift: LiftKey, kg: number): Result {
   const view = liveEnrolment(clientId);
-  if (!view || view.template.engine.key !== "own_rules") return { ok: false, error: "You don't have a program of your own running." };
+  if (!view || view.template.engine.key !== "own_rules" || !view.programKey || parseMemberKey(view.programKey) === null) {
+    return { ok: false, error: "You don't have a program of your own running." };
+  }
   if (!view.template.lifts.includes(lift)) return { ok: false, error: "This program doesn't use that lift." };
   if (!Number.isFinite(kg) || kg < MIN_KG || kg > MAX_KG) return { ok: false, error: `Enter a max between ${kgToUnit(MIN_KG, view.unit)} and ${formatWeight(MAX_KG, view.unit)}.` };
   const next = clone(view.state);
