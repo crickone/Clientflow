@@ -1,11 +1,9 @@
 import Link from "next/link";
 
 import { api } from "@/lib/api";
-import { fmtDate, fmtDay } from "@/lib/format";
 import { requireAdminSession } from "@/lib/session";
-import { StatusChip } from "@/components/StatusChip";
+import { BusinessesTable } from "@/components/BusinessesTable";
 import { Card } from "@/components/ui/Card";
-import { OpenBusinessButton } from "@/components/OpenBusinessButton";
 import { KillSwitches } from "@/components/fleet/KillSwitches";
 import type { FleetResponse } from "@/lib/types";
 import { openTenant } from "./[id]/actions";
@@ -87,48 +85,8 @@ export default async function GymsPage(
         )}
       </form>
 
-      <Card style={{ padding: "22px 26px 14px" }}>
-        {tenants.length === 0 ? (
-          <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: 13.5 }}>No businesses match.</p>
-        ) : (
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Venue</th>
-                <th>Status</th>
-                <th>People</th>
-                <th>Next renewal</th>
-                <th>Joined</th>
-                <th style={{ width: 1 }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tenants.map((t) => (
-                <tr key={t.id} style={t.archivedAt ? { opacity: 0.6 } : undefined}>
-                  <td>
-                    <Link href={`/gyms/${t.id}`}>{t.name}</Link>
-                    <div style={{ marginTop: 3, fontSize: 12, color: "var(--text-tertiary)", fontFamily: "var(--font-mono), ui-monospace, monospace" }}>
-                      {t.slug}
-                    </div>
-                  </td>
-                  <td style={{ textTransform: "capitalize", color: "var(--text-secondary)" }}>{t.venueType ?? <span style={{ color: "var(--text-tertiary)", textTransform: "none" }}>Not set</span>}</td>
-                  <td>
-                    {t.archivedAt ? (
-                      <span className="chip" style={{ backgroundColor: "rgba(242,193,78,.15)", color: "var(--amber)" }}>archived</span>
-                    ) : (
-                      <StatusChip status={t.billingStatus} exempt={t.billingExempt} />
-                    )}
-                  </td>
-                  <td style={{ fontVariantNumeric: "tabular-nums" }}>{t.users}</td>
-                  <td>{t.nextRenewalAt ? fmtDay(t.nextRenewalAt) : "—"}</td>
-                  <td>{fmtDate(t.createdAt)}</td>
-                  <td>{!t.archivedAt && <OpenBusinessButton action={openTenant.bind(null, t.id)} />}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+      <Card style={{ padding: "20px 26px 18px" }}>
+        <BusinessesTable tenants={tenants} open={openTenant} />
       </Card>
     </div>
   );

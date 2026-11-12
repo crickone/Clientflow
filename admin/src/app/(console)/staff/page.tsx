@@ -1,8 +1,7 @@
 import { api } from "@/lib/api";
-import { fmtDate } from "@/lib/format";
 import { requireAdminSession } from "@/lib/session";
 import { Card } from "@/components/ui/Card";
-import { StaffRoleForm } from "@/components/StaffRoleForm";
+import { StaffTable } from "@/components/StaffTable";
 import type { StaffResponse } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 
@@ -41,47 +40,8 @@ export default async function StaffPage(props: { searchParams: Promise<{ error?:
         <p style={{ margin: 0, color: "var(--green)", fontSize: 13.5 }}>Role updated.</p>
       )}
 
-      <Card style={{ padding: 20 }}>
-        <table className="tbl">
-          <thead>
-            <tr>
-              <th>Person</th>
-              <th>Role</th>
-              <th>Last login</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {staff.map((s) => (
-              <tr key={s.userId}>
-                <td>
-                  {s.name ?? s.email}
-                  {s.name && (
-                    <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>{s.email}</div>
-                  )}
-                  {s.userId === me.userId && (
-                    <span className="chip" style={{ marginLeft: 6, background: "var(--surface-2)" }}>you</span>
-                  )}
-                </td>
-                <td>
-                  {me.role === "owner" ? (
-                    <StaffRoleForm userId={s.userId} role={s.role} isSelf={s.userId === me.userId} />
-                  ) : (
-                    <span className="chip" style={{ backgroundColor: "var(--surface-2)" }}>{s.role}</span>
-                  )}
-                </td>
-                <td>{s.lastLoginAt ? fmtDate(s.lastLoginAt) : "Never"}</td>
-                <td>
-                  {s.isActive ? (
-                    <span className="chip" style={{ backgroundColor: "rgba(63,185,80,.15)", color: "var(--green)" }}>active</span>
-                  ) : (
-                    <span className="chip" style={{ backgroundColor: "var(--surface-2)", color: "var(--muted)" }}>disabled</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <Card style={{ padding: "20px 26px 18px" }}>
+        <StaffTable staff={staff} me={me} />
       </Card>
 
       {me.role !== "owner" && (

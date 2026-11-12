@@ -1,9 +1,8 @@
-import Link from "next/link";
-
 import { api } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import { bytes } from "@/lib/format";
 import type { FleetHealth } from "@/lib/types";
+import { FleetHealthTable } from "@/components/FleetHealthTable";
 import { PageHeader } from "@/components/ui/PageHeader";
 
 export const dynamic = "force-dynamic";
@@ -57,43 +56,8 @@ export default async function FleetHealthPage() {
         </div>
       </Card>
 
-      <Card style={{ padding: 20 }}>
-        <table className="tbl">
-          <thead>
-            <tr>
-              <th>Business</th>
-              <th>Database</th>
-              <th>State</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((t) => {
-              const bad = t.alerts.some((a) => a.level === "bad");
-              return (
-                <tr key={t.tenantId}>
-                  <td>
-                    <Link href={`/gyms/${t.tenantId}/health`}>{t.name}</Link>
-                    <div style={{ fontSize: 12, color: "var(--text-secondary)", fontFamily: "ui-monospace, monospace" }}>{t.slug}</div>
-                  </td>
-                  <td style={{ fontVariantNumeric: "tabular-nums" }}>{bytes(t.dbBytes)}</td>
-                  <td>
-                    {t.alerts.length === 0 ? (
-                      <span className="chip" style={{ backgroundColor: "rgba(63,185,80,.15)", color: "var(--green)" }}>healthy</span>
-                    ) : (
-                      <ul style={{ margin: 0, paddingLeft: 16, fontSize: 13 }}>
-                        {t.alerts.map((a, i) => (
-                          <li key={i} style={{ color: bad && a.level === "bad" ? "var(--red)" : "var(--amber)" }}>
-                            {a.message}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <Card style={{ padding: "20px 26px 18px" }}>
+        <FleetHealthTable tenants={sorted} />
       </Card>
     </div>
   );
