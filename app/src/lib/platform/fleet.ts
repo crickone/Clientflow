@@ -2,6 +2,9 @@ import "server-only";
 
 import { controlSqlite } from "@/lib/db/control";
 import { getVenueTypeForTenant } from "@/lib/settings";
+import { getSetupSummaryForTenant } from "@/lib/setup/steps";
+import { churnRisk, riskFacts } from "./churnRisk";
+import { getTenantMeta } from "./tenantMeta";
 
 /**
  * The fleet list: every business, filtered, for the console's front door.
@@ -34,6 +37,9 @@ export interface FleetTenantRow {
   nextRenewalAt: string | null;
   createdAt: number;
   users: number;
+  setup: { requiredDone: number; requiredTotal: number };
+  risk: { score: number; level: "low" | "medium" | "high" };
+  stage: string | null;
 }
 
 /**
@@ -96,6 +102,7 @@ export function listFleet(filters: FleetFilters = {}): FleetTenantRow[] {
   }>;
 
   return rows.map((r) => ({
+    ...enrich(r.id, r.archived_at !== null, r.billing_status, Boolean(r.billing_exempt)),
     id: r.id,
     name: r.name,
     slug: r.slug,
@@ -120,4 +127,39 @@ function safeVenueType(tenantId: number): string | null {
   } catch {
     return null;
   }
+}
+
+// ─── Per-business setup, risk and stage ──────────────────────────────────────
+
+type Enrichment = Pick<FleetTenantRow, "setup" | "risk" | "stage">;
+const ENRICH_TTL_MS = 5 * 60 * 1000;
+const enrichCache = new Map<number, { at: number; key: string; value: Enrichment }>();
+
+/**
+ * Setup + risk + stage open the business's own database, so they are cached
+ * in-process for five minutes (keyed also on the facts that come from the
+ * registry, so an archive or billing change shows at once). One business
+ * that cannot be read gets blanks and never breaks the list.
+ */
+function enrich(id: number, archived: boolean, billingStatus: string | null, exempt: boolean): Enrichment {
+  const key = `${archived}|${billingStatus}|${exempt}`;
+  const hit = enrichCache.get(id);
+  const now = Date.now();
+  if (hit && hit.key === key && now - hit.at < ENRICH_TTL_MS) return hit.value;
+  let setup = { requiredDone: 0, requiredTotal: 0 };
+  let risk: Enrichment["risk"] = { score: 0, level: "low" };
+  let stage: string | null = null;
+  try {
+    const s = getSetupSummaryForTenant(id);
+    setup = { requiredDone: s.requiredDone, requiredTotal: s.requiredTotal };
+    const rk = churnRisk(riskFacts(id, setup));
+    risk = { score: rk.score, level: rk.level };
+    const m = getTenantMeta(id, { archived, billingStatus, exempt, setupRequiredDone: setup.requiredDone, setupRequiredTotal: setup.requiredTotal, riskScore: rk.score });
+    stage = m.stage ?? m.stageAuto;
+  } catch {
+    // keep the row; the console shows blanks
+  }
+  const value = { setup, risk, stage };
+  enrichCache.set(id, { at: now, key, value });
+  return value;
 }
