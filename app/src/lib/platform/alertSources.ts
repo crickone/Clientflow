@@ -7,6 +7,9 @@ import { getFleetHealth } from "./health";
 import { isBackupConfigured } from "@/lib/backup/config";
 import { latestJobRuns, type JobRunRow } from "./jobRuns";
 import type { AlertCandidate } from "./healthHistory";
+import { churnRisk, riskFacts } from "./churnRisk";
+import { getSetupSummaryForTenant } from "@/lib/setup/steps";
+import { dueBuckets, listTasks } from "./tasks";
 
 /**
  * Everything that can need a platform operator, as alert candidates for
@@ -166,6 +169,30 @@ export function collectAlertCandidates(
     } catch {
       // a tenant whose usage cannot be read is not an AI-cap problem
     }
+  }
+
+  // Churn risk for every active business (exempt ones can still drift away). One bad business never drops the sync.
+  for (const b of billing) {
+    if (!inFleet.has(b.id)) continue;
+    try {
+      const setup = getSetupSummaryForTenant(b.id);
+      const r = churnRisk(riskFacts(b.id, { requiredDone: setup.requiredDone, requiredTotal: setup.requiredTotal }, now));
+      if (r.level === "high") candidates.push({ tenantId: b.id, key: "churn:high", level: "warn", title: `${b.name} looks at risk: ${r.reasons.join("; ")}`, href: `/gyms/${b.id}` });
+    } catch {
+      // a business whose database cannot be opened already has a health alert
+    }
+  }
+
+  // Tasks due today or overdue, one alert per task.
+  try {
+    const buckets = dueBuckets(listTasks({ open: true }), now);
+    const overdue = new Set(buckets.overdue.map((t) => t.id));
+    for (const t of [...buckets.overdue, ...buckets.today]) {
+      const late = overdue.has(t.id);
+      candidates.push({ tenantId: t.tenantId, key: `task:${t.id}`, level: late ? "bad" : "warn", title: `Task ${late ? "overdue" : "due today"}: ${t.title}`, href: t.tenantId ? `/gyms/${t.tenantId}` : "/inbox" });
+    }
+  } catch {
+    // tasks are optional input to the inbox
   }
 
   // Integrations that asked to be reconnected.
