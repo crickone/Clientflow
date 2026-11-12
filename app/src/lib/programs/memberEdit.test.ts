@@ -207,4 +207,20 @@ assert.deepEqual(
   [0, 1, 2],
 );
 
+// 12. the week label holds when the week count changes: the overall week stays where it was
+const oneWeek = program([[[bench]]]);
+const sixthWeek: EngineState = { ...initState(oneWeek, {}, 2.5), week: 0, cycle: 5 };
+const overall = (t: ProgramTemplate, s: EngineState) => s.cycle * t.weeks.length + s.week + 1;
+assert.equal(overall(oneWeek, sixthWeek), 6);
+const pairWeeks = program([[[curl]], [[bench]]]);
+const grown = edit(oneWeek, pairWeeks, sixthWeek, [null, 0]);
+assert.deepEqual([grown.state.cycle, grown.state.week], [2, 1], "a week in front: cycle 2, second week");
+assert.equal(overall(pairWeeks, grown.state), 6, "still week 6");
+const behind = edit(oneWeek, program([[[bench]], [[curl]]]), sixthWeek, [0, null]);
+assert.ok(Math.abs(overall(pairWeeks, behind.state) - 6) <= 1 && behind.state.cycle >= 0, "a week behind: as close to week 6 as it can be");
+const early: EngineState = { ...initState(pairWeeks, {}, 2.5), week: 0, cycle: 0 };
+const pushed = edit(pairWeeks, program([[[row]], [[row]], [[curl]], [[bench]]]), early, [null, null, 0, 1]);
+assert.deepEqual([pushed.state.cycle, pushed.state.week], [0, 2], "never a negative cycle");
+assert.equal(edit(before, program([[[bench, face], [row]]]), running).state.cycle, 2, "the same week count keeps the cycle");
+
 console.log("programs/memberEdit: ok");

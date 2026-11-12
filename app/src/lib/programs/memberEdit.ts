@@ -7,7 +7,9 @@
  * and a changed rule starts the exercise again. A start weight the member
  * changes sets the working weight from the next session. The member stays on
  * the same day (by name) where it moved; if the current week is removed, they
- * move to the nearest earlier week, or the first one if there is none. Pure.
+ * move to the nearest earlier week, or the first one if there is none. When
+ * the number of weeks changes, the cycle is reworked so the week number the
+ * member sees stays the same. Pure.
  *
  * An edit that changes nothing (same weeks, same order) returns the state
  * untouched and `lines: []`. CALLERS MUST SKIP the change-log event when
@@ -252,6 +254,11 @@ export function rebaseEdit(input: EditInput): EditOutput {
     next.week = to;
     next.day = 0;
     first.unshift(`The week you were on was removed, so you're now on week ${to + 1}.`);
+  }
+  // A new week count would move the week label (cycle x weeks + week): the cycle is set so the overall week stays put, or as near as it can without going below 0 (a tie goes to the earlier week).
+  if (before.weeks.length !== after.weeks.length && after.weeks.length > 0) {
+    const overall = state.cycle * before.weeks.length + state.week;
+    next.cycle = Math.max(0, Math.ceil((overall - next.week) / after.weeks.length - 0.5));
   }
   if (workChanged) next.finished = false;
 

@@ -336,8 +336,67 @@ const requireLocal = createRequire(import.meta.url);
     const before = db.select().from(workoutSessions).where(eq(workoutSessions.id, s.sessionId)).get()!.dayPosition;
     // A new first week, and the old week's Upper is now Push: the member's week carries over but their day does not survive.
     const edited = program([[{ name: "Extra", exercises: [curl] }], [{ name: "Push", exercises: [bench, curl] }, { name: "Lower", exercises: [squat, row] }]]);
+    assert.ok(before >= 0);
     assert.ok(mp.saveMemberProgram(clientId, id, edited, [null, 0]).ok);
-    assert.equal(db.select().from(workoutSessions).where(eq(workoutSessions.id, s.sessionId)).get()!.dayPosition, before, "left where it was");
+    assert.equal(db.select().from(workoutSessions).where(eq(workoutSessions.id, s.sessionId)).get(), undefined, "nothing ticked: the open session goes");
+  });
+
+  test("an open session for a removed day is detached and never resumed as another day", () => {
+    const clientId = newMember();
+    const abc = program([[{ name: "A", exercises: [bench] }, { name: "B", exercises: [curl] }, { name: "C", exercises: [row] }]]);
+    const id = create(clientId, abc);
+    startIt(clientId, id, {});
+    en.finishEnrolmentSession(clientId, logNext(clientId));
+    assert.equal(en.liveEnrolment(clientId)!.state.day, 1, "on B");
+    const b = en.startEnrolmentSession(clientId);
+    assert.ok(b.ok);
+    const bv = log.getSession(clientId, b.sessionId)!;
+    log.saveSessionSets(clientId, bv.id, [{ id: bv.exercises[0].id, sets: [{ weightKg: 14, reps: 10, done: true }] }]);
+    const ac = program([[{ name: "A", exercises: [bench] }, { name: "C", exercises: [row] }]]);
+    assert.ok(mp.saveMemberProgram(clientId, id, ac, [0]).ok);
+    const moved = en.liveEnrolment(clientId)!;
+    assert.deepEqual([moved.state.week, moved.state.day], [0, 1], "on C");
+    const stored = db.select().from(workoutSessions).where(eq(workoutSessions.id, b.sessionId)).get()!;
+    assert.ok(stored.dayPosition < 0, "the old B session matches no position");
+    const next = en.startEnrolmentSession(clientId);
+    assert.ok(!(next.ok && next.sessionId === b.sessionId), "B is never resumed as C");
+    assert.equal(log.finishSession(clientId, b.sessionId), true);
+    const out = en.finishEnrolmentSession(clientId, b.sessionId)!;
+    assert.deepEqual(out.reasons, ["This wasn't your current session, so your program did not move on."]);
+    const after = en.liveEnrolment(clientId)!;
+    assert.deepEqual([after.state.week, after.state.day, after.state.cycle], [0, 1, 0], "finishing the old B changes nothing");
+    assert.deepEqual(after.state.weights, moved.state.weights);
+    const c = en.startEnrolmentSession(clientId);
+    assert.ok(c.ok && c.sessionId !== b.sessionId, "C starts fresh");
+    const cv = log.getSession(clientId, c.sessionId)!;
+    assert.deepEqual(cv.exercises.map((e) => e.name), ["Cable row"]);
+    assert.ok(cv.exercises[0].sets.every((x) => !x.done));
+  });
+
+  test("an empty open session for a removed day is deleted", () => {
+    const clientId = newMember();
+    const abc = program([[{ name: "A", exercises: [bench] }, { name: "B", exercises: [curl] }, { name: "C", exercises: [row] }]]);
+    const id = create(clientId, abc);
+    startIt(clientId, id, {});
+    en.finishEnrolmentSession(clientId, logNext(clientId));
+    const b = en.startEnrolmentSession(clientId);
+    assert.ok(b.ok);
+    assert.ok(mp.saveMemberProgram(clientId, id, program([[{ name: "A", exercises: [bench] }, { name: "C", exercises: [row] }]]), [0]).ok);
+    assert.equal(db.select().from(workoutSessions).where(eq(workoutSessions.id, b.sessionId)).get(), undefined, "the empty B session is gone");
+    const c = en.startEnrolmentSession(clientId);
+    assert.ok(c.ok && c.sessionId !== b.sessionId);
+    assert.deepEqual(log.getSession(clientId, c.sessionId)!.exercises.map((e) => e.name), ["Cable row"]);
+  });
+
+  test("a member can keep 50 programs", () => {
+    const clientId = newMember();
+    for (let i = 0; i < 50; i++) create(clientId);
+    assert.deepEqual(mp.createMemberProgram(clientId, { template: twoDay(), maxes: {}, basedOn: null }), { ok: false, errors: ["You have 50 programs. Delete one to build another."] });
+    assert.equal(mp.listMemberPrograms(clientId).length, 50);
+    assert.deepEqual(mp.deleteMemberProgram(clientId, mp.listMemberPrograms(clientId)[0].id), { ok: true });
+    create(clientId);
+    const other = newMember();
+    create(other);
   });
 
   test("the open session moves with its day when only the day name's case or spaces change", () => {

@@ -539,10 +539,19 @@ export function coachSetMax(clientId: number, enrolmentId: number, lift: LiftKey
 }
 
 /**
+ * The day_position of an open session whose day an edit removed. No plan has
+ * it, so the session is never resumed as another day, and finishing it only
+ * notes that it was not the current session.
+ */
+export const DETACHED_POSITION = -1;
+
+/**
  * A member edited the program they are running: the new template and the
  * carried state, an open session of the current position moved to the new
- * position (it still finishes with the sets it started with), and the change
- * log, in the caller's transaction. False when the enrolment moved since
+ * position when its day is kept (it still finishes with the sets it started
+ * with), any other open session deleted when nothing in it is ticked or
+ * detached (DETACHED_POSITION) when something is, and the change log, in the
+ * caller's transaction. False when the enrolment moved since
  * `view` was read; nothing is written then.
  */
 export function writeTemplateEdit(
@@ -569,11 +578,29 @@ export function writeTemplateEdit(
   const newDay = dayAt(template, state.week, state.day);
   const dayKept = !!oldDay && !!newDay && sameName(oldDay.name, newDay.name) && !!weekOrigins && weekOrigins[state.week] === view.state.week;
   tx.update(programEnrolments).set({ templateJson: JSON.stringify(template), ...stateColumns(state) }).where(eq(programEnrolments.id, view.id)).run();
-  if (dayKept) {
-    tx.update(workoutSessions)
-      .set({ dayPosition: newPos })
-      .where(and(eq(workoutSessions.enrolmentId, view.id), isNull(workoutSessions.finishedAt), eq(workoutSessions.dayPosition, oldPos)))
-      .run();
+  const open = tx
+    .select({ id: workoutSessions.id, dayPosition: workoutSessions.dayPosition })
+    .from(workoutSessions)
+    .where(and(eq(workoutSessions.enrolmentId, view.id), isNull(workoutSessions.finishedAt)))
+    .all();
+  const follows = open.filter((o) => dayKept && o.dayPosition === oldPos).map((o) => o.id);
+  if (follows.length) tx.update(workoutSessions).set({ dayPosition: newPos }).where(inArray(workoutSessions.id, follows)).run();
+  // Any other open session would be resumed by position as a different day: one with nothing ticked goes, one with work is detached.
+  const others = open.filter((o) => !follows.includes(o.id)).map((o) => o.id);
+  if (others.length) {
+    const ticked = new Set(
+      tx
+        .select({ id: workoutSessionExercises.sessionId })
+        .from(workoutSetLogs)
+        .innerJoin(workoutSessionExercises, eq(workoutSetLogs.sessionExerciseId, workoutSessionExercises.id))
+        .where(and(inArray(workoutSessionExercises.sessionId, others), eq(workoutSetLogs.done, true)))
+        .all()
+        .map((r) => r.id),
+    );
+    const empty = others.filter((id) => !ticked.has(id));
+    const kept = others.filter((id) => ticked.has(id));
+    if (empty.length) tx.delete(workoutSessions).where(inArray(workoutSessions.id, empty)).run();
+    if (kept.length) tx.update(workoutSessions).set({ dayPosition: DETACHED_POSITION }).where(inArray(workoutSessions.id, kept)).run();
   }
   logEvent(tx, view.id, { kind: "member" }, "edit", reason, view.state, state);
   return true;
