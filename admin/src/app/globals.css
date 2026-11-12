@@ -1125,3 +1125,9 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { opacity: 0.45; c
 .bulk { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--hairline); margin-bottom: 12px; }
 .bulk-count { font-size: 13px; color: var(--text-primary); font-weight: 500; }
 .bulk-actions { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
+
+/* ── Money tab: two columns from 1100px, one below ──────────────────────── */
+.money { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.money-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.money-wide { grid-column: 1 / -1; }
+@media (max-width: 1100px) { .money { grid-template-columns: minmax(0, 1fr); } }
