@@ -530,3 +530,6 @@ export interface AlertsResponse {
   alerts: PlatformAlert[];
   counts: { bad: number; warn: number };
 }
+
+export interface JobRun { id: number; key: string; label: string; startedAt: number; finishedAt: number | null; ok: boolean | null; error: string | null; durationMs: number | null; detail: unknown }
+export interface JobsResponse { latest: JobRun[]; history: JobRun[] }

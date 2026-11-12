@@ -1166,3 +1166,8 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { opacity: 0.45; c
 .check { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-secondary); }
 .nav-badge { margin-left: auto; min-width: 20px; padding: 1px 6px; border-radius: 999px; font-family: var(--font-mono), ui-monospace, monospace; font-size: 10.5px; text-align: center; background: var(--surface-3); color: var(--text-secondary); }
 .nav-badge.is-bad { background: rgba(240, 128, 154, 0.18); color: var(--red); }
+
+.runstrip { display: inline-flex; gap: 2px; }
+.runstrip i { width: 6px; height: 16px; border-radius: 2px; background: var(--surface-3); }
+.runstrip i.is-ok { background: rgba(63, 185, 80, 0.55); }
+.runstrip i.is-fail { background: var(--red); }
