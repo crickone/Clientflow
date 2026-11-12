@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { Suspense } from "react";
 
 import { api } from "@/lib/api";
+import { SaveViewButton } from "@/components/SaveViewButton";
 import { Card } from "@/components/ui/Card";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { AuditTable } from "@/components/AuditTable";
@@ -61,6 +63,9 @@ export default async function AuditPage(props: { searchParams: Promise<Params> }
         <input className="input" type="date" name="to" defaultValue={sp.to ?? ""} aria-label="To" />
         <button className="btn btn--secondary btn--md" type="submit">Filter</button>
         {filtered && <Link href="/audit" className="btn btn--ghost btn--md">Clear</Link>}
+        <Suspense fallback={null}>
+          <SaveViewButton />
+        </Suspense>
       </form>
 
       <Card style={{ padding: "20px 26px 16px" }}>

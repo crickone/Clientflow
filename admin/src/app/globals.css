@@ -1113,3 +1113,10 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { opacity: 0.45; c
 .dt-pager { display: flex; align-items: center; justify-content: flex-end; gap: 8px; font-size: 12.5px; color: var(--text-secondary); }
 .tbl tr.is-selected td { background: rgba(255, 255, 255, 0.03); }
 .audit-detail { margin: 0 0 6px; padding: 12px 14px; border-radius: 10px; background: var(--surface-2); font-family: var(--font-mono), ui-monospace, monospace; font-size: 12px; line-height: 1.5; color: var(--text-secondary); white-space: pre-wrap; word-break: break-word; }
+
+.nav-view { display: flex; align-items: center; }
+.nav-view .nav-link { flex: 1; min-width: 0; }
+.nav-view .nav-link span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-view-x { flex: 0 0 auto; width: 24px; height: 24px; margin-right: 4px; border: 0; background: transparent; color: var(--text-tertiary); border-radius: 6px; cursor: pointer; display: grid; place-items: center; opacity: 0; }
+.nav-view:hover .nav-view-x, .nav-view-x:focus-visible { opacity: 1; }
+.nav-view-x:hover { background: var(--surface-2); color: var(--text-primary); }

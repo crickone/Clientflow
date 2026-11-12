@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { Suspense } from "react";
 
 import { api } from "@/lib/api";
+import { SaveViewButton } from "@/components/SaveViewButton";
 import { requireAdminSession } from "@/lib/session";
 import { BusinessesTable } from "@/components/BusinessesTable";
 import { Card } from "@/components/ui/Card";
@@ -83,6 +85,9 @@ export default async function GymsPage(
             Clear
           </Link>
         )}
+        <Suspense fallback={null}>
+          <SaveViewButton />
+        </Suspense>
       </form>
 
       <Card style={{ padding: "20px 26px 18px" }}>

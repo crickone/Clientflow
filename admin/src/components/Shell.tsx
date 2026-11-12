@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState, useTransition, type ReactNode } from "react";
 import {
   Activity,
+  Bookmark,
   Dumbbell,
   LayoutDashboard,
   LogOut,
@@ -22,6 +23,9 @@ import { Logo } from "@/components/Logo";
 import { CommandK } from "@/components/CommandK";
 import { Shortcuts } from "@/components/Shortcuts";
 import type { AdminUser } from "@/lib/session";
+import { BUILT_IN_VIEWS, type ConsoleView } from "@/lib/views";
+import { notify } from "@/lib/toast";
+import { deleteViewAction } from "@/app/(console)/views/actions";
 
 // Grouped by what you came to do: look at the fleet, change something, or
 // manage the console itself. The mono group labels are the console's
@@ -59,7 +63,45 @@ async function signOut() {
   window.location.href = "/login";
 }
 
-export function Shell({ user, children }: { user: AdminUser; children: ReactNode }) {
+function ViewLinks({ views }: { views: ConsoleView[] }) {
+  const pathname = usePathname();
+  const search = useSearchParams();
+  const [, startTransition] = useTransition();
+  const current = search.toString() ? `${pathname}?${search}` : pathname;
+
+  function remove(id: string) {
+    startTransition(async () => {
+      const r = await deleteViewAction(id);
+      if (r.ok) notify.ok("View removed");
+      else notify.fail(r.error);
+    });
+  }
+
+  return (
+    <div>
+      <div className="nav-group-label">Views</div>
+      {[...views, ...BUILT_IN_VIEWS].map((v) => {
+        const active = current === v.href;
+        const own = views.some((o) => o.id === v.id);
+        return (
+          <span key={v.id} className="nav-view">
+            <Link href={v.href} className={cn("nav-link", active && "nav-link--active")}>
+              <Bookmark size={14} strokeWidth={1.75} />
+              <span>{v.name}</span>
+            </Link>
+            {own && (
+              <button type="button" className="nav-view-x" aria-label={`Remove ${v.name}`} onClick={() => remove(v.id)}>
+                <X size={12} />
+              </button>
+            )}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+export function Shell({ user, views, children }: { user: AdminUser; views: ConsoleView[]; children: ReactNode }) {
   const pathname = usePathname();
   const [navOpen, setNavOpen] = useState(false);
 
@@ -113,6 +155,9 @@ export function Shell({ user, children }: { user: AdminUser; children: ReactNode
               })}
             </div>
           ))}
+          <Suspense fallback={null}>
+            <ViewLinks views={views} />
+          </Suspense>
         </nav>
 
         {/* User + sign-out */}
