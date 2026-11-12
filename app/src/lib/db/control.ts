@@ -1263,6 +1263,52 @@ export function ensureControlTables() {
     );
     CREATE INDEX IF NOT EXISTS idx_platform_alerts_open ON platform_alerts(resolved_at, level, opened_at);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_platform_alerts_open_key ON platform_alerts(COALESCE(tenant_id, 0), key) WHERE resolved_at IS NULL;
+
+    -- Console Tier 4: what the platform knows about a business beyond its
+    -- data. Stage/owner/tags, staff notes, tasks, which modules get used,
+    -- and staged rollouts of modules.
+    CREATE TABLE IF NOT EXISTS tenant_meta (
+      tenant_id INTEGER PRIMARY KEY REFERENCES tenants(id) ON DELETE CASCADE,
+      stage TEXT CHECK (stage IN ('trial','onboarding','active','at_risk','churned')),
+      owner_user_id INTEGER REFERENCES users(id),
+      tags TEXT NOT NULL DEFAULT '[]',
+      updated_at INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS tenant_notes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      author_user_id INTEGER NOT NULL REFERENCES users(id),
+      body TEXT NOT NULL,
+      pinned INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_tenant_notes_tenant ON tenant_notes(tenant_id, pinned, created_at);
+    CREATE TABLE IF NOT EXISTS platform_tasks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      due_at INTEGER,
+      assigned_to INTEGER REFERENCES users(id),
+      done_at INTEGER,
+      created_by INTEGER NOT NULL REFERENCES users(id),
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_platform_tasks_open ON platform_tasks(done_at, due_at);
+    CREATE TABLE IF NOT EXISTS module_usage (
+      tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      module_key TEXT NOT NULL,
+      day TEXT NOT NULL,
+      hits INTEGER NOT NULL DEFAULT 0,
+      last_at INTEGER NOT NULL,
+      PRIMARY KEY (tenant_id, module_key, day)
+    );
+    CREATE TABLE IF NOT EXISTS platform_flags (
+      key TEXT PRIMARY KEY,
+      mode TEXT NOT NULL DEFAULT 'all' CHECK (mode IN ('all','none','percent','allow')),
+      percent INTEGER NOT NULL DEFAULT 100,
+      allow TEXT NOT NULL DEFAULT '[]',
+      updated_at INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS facebook_page_offers (
       tenant_id INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
       page_id TEXT NOT NULL,
