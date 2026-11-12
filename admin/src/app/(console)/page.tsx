@@ -187,7 +187,7 @@ export default async function DashboardPage() {
         )}
       </section>
 
-      <section className="board-trends">
+      <section className="board-twelve">
         <h2>Twelve months</h2>
         <div className="chart-grid-2">
           <LineChart title="Businesses on the platform" labels={growthLabels} series={[{ label: "Total", values: growth, accent: true }]} />

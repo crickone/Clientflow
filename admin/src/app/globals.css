@@ -919,6 +919,16 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { opacity: 0.45; c
 }
 .fleet-legend span:nth-child(4), .fleet-legend span:nth-child(5) { text-align: right; }
 
+.board-twelve { border-top: 1px solid var(--grid); padding-top: 22px; }
+.board-twelve h2 {
+  margin: 0 0 18px;
+  font-family: var(--font-heading), system-ui, sans-serif;
+  font-size: 17px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+.board-twelve > :last-child { margin-top: 32px; }
 .board-trends { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0; border-top: 1px solid var(--grid); }
 .trend { padding: 22px 30px 22px 0; margin-right: 30px; border-right: 1px solid var(--grid); }
 .trend:last-child { border-right: 0; margin-right: 0; padding-right: 0; }
