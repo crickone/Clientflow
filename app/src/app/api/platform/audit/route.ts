@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { guardPlatform } from "@/lib/platform/auth";
-import { listAudit } from "@/lib/platform/audit";
+import { auditActions, countAudit, listAudit } from "@/lib/platform/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -19,14 +19,19 @@ export async function GET(req: NextRequest) {
     const v = Number(sp.get(k));
     return Number.isFinite(v) && v > 0 ? v : undefined;
   };
-
-  return NextResponse.json({
-    entries: listAudit({
-      tenantId: num("tenantId") ?? null,
-      actorUserId: num("actorUserId"),
-      action: sp.get("action") || undefined,
-      before: num("before"),
-      limit: num("limit") ?? 100,
-    }),
-  });
+  const okRaw = sp.get("ok");
+  const query = {
+    tenantId: num("tenantId") ?? null,
+    actorUserId: num("actorUserId"),
+    actorEmail: sp.get("actorEmail") || undefined,
+    action: sp.get("action") || undefined,
+    ok: okRaw === "1" ? true : okRaw === "0" ? false : undefined,
+    from: num("from"),
+    to: num("to"),
+    q: sp.get("q") || undefined,
+    before: num("before"),
+    limit: num("limit") ?? 100,
+    offset: Number(sp.get("offset")) || 0,
+  };
+  return NextResponse.json({ entries: listAudit(query), total: countAudit(query), actions: auditActions() });
 }

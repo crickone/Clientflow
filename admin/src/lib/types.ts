@@ -265,6 +265,8 @@ export interface AuditEntry {
 
 export interface AuditResponse {
   entries: AuditEntry[];
+  total: number;
+  actions: string[];
 }
 
 /** One person with access to a business (console People tab). */

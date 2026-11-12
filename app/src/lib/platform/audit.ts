@@ -81,72 +81,73 @@ export interface AuditRow {
 export interface AuditQuery {
   tenantId?: number | null;
   actorUserId?: number;
+  actorEmail?: string;
   action?: string;
+  ok?: boolean;
+  from?: number;
+  to?: number;
+  /** Substring of action, reason, detail or error. */
+  q?: string;
   limit?: number;
+  offset?: number;
   before?: number;
+}
+
+function whereFor(query: AuditQuery): { sql: string; args: unknown[] } {
+  const where: string[] = [];
+  const args: unknown[] = [];
+  if (query.tenantId != null) { where.push("a.tenant_id = ?"); args.push(query.tenantId); }
+  if (query.actorUserId != null) { where.push("a.actor_user_id = ?"); args.push(query.actorUserId); }
+  if (query.actorEmail) { where.push("a.actor_email = ?"); args.push(query.actorEmail); }
+  if (query.action) { where.push("a.action = ?"); args.push(query.action); }
+  if (query.ok !== undefined) { where.push("a.ok = ?"); args.push(query.ok ? 1 : 0); }
+  if (query.from != null) { where.push("a.created_at >= ?"); args.push(query.from); }
+  if (query.to != null) { where.push("a.created_at <= ?"); args.push(query.to); }
+  if (query.before != null) { where.push("a.created_at < ?"); args.push(query.before); }
+  if (query.q?.trim()) {
+    const like = `%${query.q.trim()}%`;
+    where.push("(a.action LIKE ? OR COALESCE(a.reason, '') LIKE ? OR COALESCE(a.detail, '') LIKE ? OR COALESCE(a.error, '') LIKE ?)");
+    args.push(like, like, like, like);
+  }
+  return { sql: where.length ? `WHERE ${where.join(" AND ")}` : "", args };
 }
 
 /** Most recent first. The tenant name is joined in so the log reads without a second lookup. */
 export function listAudit(query: AuditQuery = {}): AuditRow[] {
-  const where: string[] = [];
-  const args: unknown[] = [];
-  if (query.tenantId != null) {
-    where.push("a.tenant_id = ?");
-    args.push(query.tenantId);
-  }
-  if (query.actorUserId != null) {
-    where.push("a.actor_user_id = ?");
-    args.push(query.actorUserId);
-  }
-  if (query.action) {
-    where.push("a.action = ?");
-    args.push(query.action);
-  }
-  if (query.before != null) {
-    where.push("a.created_at < ?");
-    args.push(query.before);
-  }
+  const { sql, args } = whereFor(query);
   const limit = Math.min(500, Math.max(1, query.limit ?? 100));
+  const offset = Math.max(0, query.offset ?? 0);
   const rows = controlSqlite
     .prepare(
       `SELECT a.id, a.actor_user_id, a.actor_email, a.actor_role, a.tenant_id, t.name AS tenant_name,
               a.action, a.detail, a.reason, a.ip, a.ok, a.error, a.created_at
        FROM platform_audit a
        LEFT JOIN tenants t ON t.id = a.tenant_id
-       ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+       ${sql}
        ORDER BY a.created_at DESC, a.id DESC
-       LIMIT ${limit}`,
+       LIMIT ${limit} OFFSET ${offset}`,
     )
     .all(...args) as Array<{
-    id: number;
-    actor_user_id: number | null;
-    actor_email: string;
-    actor_role: string | null;
-    tenant_id: number | null;
-    tenant_name: string | null;
-    action: string;
-    detail: string | null;
-    reason: string | null;
-    ip: string | null;
-    ok: number;
-    error: string | null;
-    created_at: number;
+    id: number; actor_user_id: number | null; actor_email: string; actor_role: string | null; tenant_id: number | null;
+    tenant_name: string | null; action: string; detail: string | null; reason: string | null; ip: string | null; ok: number;
+    error: string | null; created_at: number;
   }>;
   return rows.map((r) => ({
-    id: r.id,
-    actorUserId: r.actor_user_id,
-    actorEmail: r.actor_email,
-    actorRole: r.actor_role,
-    tenantId: r.tenant_id,
-    tenantName: r.tenant_name,
-    action: r.action,
-    detail: parseDetail(r.detail),
-    reason: r.reason,
-    ip: r.ip,
-    ok: Boolean(r.ok),
-    error: r.error,
-    createdAt: r.created_at,
+    id: r.id, actorUserId: r.actor_user_id, actorEmail: r.actor_email, actorRole: r.actor_role, tenantId: r.tenant_id,
+    tenantName: r.tenant_name, action: r.action, detail: parseDetail(r.detail), reason: r.reason, ip: r.ip,
+    ok: Boolean(r.ok), error: r.error, createdAt: r.created_at,
   }));
+}
+
+export function countAudit(query: AuditQuery = {}): number {
+  const { sql, args } = whereFor(query);
+  const row = controlSqlite.prepare(`SELECT count(*) AS n FROM platform_audit a ${sql}`).get(...args) as { n: number };
+  return row.n;
+}
+
+/** Every action name ever recorded, for a filter dropdown. */
+export function auditActions(): string[] {
+  return (controlSqlite.prepare("SELECT DISTINCT action FROM platform_audit ORDER BY action").all() as Array<{ action: string }>).map((r) => r.action);
 }
 
 function parseDetail(raw: string | null): unknown {
