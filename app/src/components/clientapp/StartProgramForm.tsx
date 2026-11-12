@@ -1,7 +1,7 @@
 // app/src/components/clientapp/StartProgramForm.tsx
 "use client";
 
-import { useReducer, useState, useTransition } from "react";
+import { useEffect, useReducer, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { PkCard, PkSection, StepBar, StickyBar } from "@/components/clientapp/programs/kit";
 import { startProgramAction } from "@/app/app/programs/actions";
 import { firstSets, firstWeek, shortDate, trainingDates, type PlanExtra } from "@/lib/programs/outline";
-import { STEP_TITLE, initialStart, maxEntries, maxesKg, reduceStart, rowMaxKg, startSteps, stepForError, type StartLift } from "@/lib/programs/startFlow";
+import { STEP_TITLE, initialStart, maxEntries, maxesKg, reduceStart, rowMaxKg, startSteps, stepBlocker, stepForError, type StartLift } from "@/lib/programs/startFlow";
 import type { ProgramTemplate, WeightUnit } from "@/lib/programs/types";
 import { STEP_OPTIONS, formatWeight, kgToUnit, stepFromKey, trainingMax, type StepKey } from "@/lib/programs/units";
 import { WEEKDAY_SHORT } from "@/lib/trainingProgress";
@@ -48,17 +48,45 @@ export function StartProgramForm({
 }) {
   const router = useRouter();
   const steps = startSteps(lifts.length > 0);
-  const [s, dispatch] = useReducer(
+  const [s, rawDispatch] = useReducer(
     (state: ReturnType<typeof initialStart>, a: Parameters<typeof reduceStart>[1]) => reduceStart(state, a, steps.length),
     { lifts, unit: initialUnit, step: initialStep, weekdays: defaultWeekdays, today },
     (input) => initialStart(input, (kg) => String(kgToUnit(kg, input.unit))),
   );
   const [error, setError] = useState<{ at: number; text: string } | null>(null);
   const [pending, start] = useTransition();
+  const submitting = useRef(false);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const firstRender = useRef(true);
   const step = steps[s.at];
   const stepKg = stepFromKey(s.step);
   const fmt = (kg: number) => formatWeight(kg, s.unit);
   const maxes = maxesKg(s, lifts);
+
+  // Editing a field clears the message on the step it is on.
+  function dispatch(a: Parameters<typeof reduceStart>[1]) {
+    if (a.type !== "next" && a.type !== "back" && a.type !== "go") setError(null);
+    rawDispatch(a);
+  }
+
+  // Each new step starts at its heading, for screen readers and the keyboard.
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    headingRef.current?.focus();
+  }, [s.at]);
+
+  function next() {
+    const blocked = stepBlocker(s, lifts, step);
+    if (blocked) {
+      setError({ at: s.at, text: blocked });
+      return;
+    }
+    setError(null);
+    go(s.at + 1);
+  }
 
   function go(next: number) {
     dispatch({ type: "go", at: next });
@@ -66,13 +94,15 @@ export function StartProgramForm({
   }
 
   function submit() {
+    if (submitting.current) return;
+    submitting.current = true;
     setError(null);
     start(async () => {
       const res = await startProgramAction({ key: programKey, unit: s.unit, step: s.step, startDate: s.startDate, weekdays: s.days, maxes: maxEntries(s, lifts) });
       if (!res.ok) {
+        submitting.current = false;
         const at = stepForError(res.error, steps);
         setError({ at, text: res.error });
-        toast.error(res.error);
         go(at);
         return;
       }
@@ -102,7 +132,7 @@ export function StartProgramForm({
 
       {step === "weights" && (
         <>
-          <h1 className="pk-question">How do you want your weights?</h1>
+          <h1 className="pk-question" ref={headingRef} tabIndex={-1}>How do you want your weights?</h1>
           <PkSection label="Weights in">
             <div className="pk-seg" role="group" aria-label="Weights in">
               {(["kg", "lb"] as const).map((u) => (
@@ -127,7 +157,7 @@ export function StartProgramForm({
 
       {step === "maxes" && (
         <>
-          <h1 className="pk-question">{lifts.length === 1 ? `What's your ${lifts[0].label.toLowerCase()} max?` : "What are your maxes?"}</h1>
+          <h1 className="pk-question" ref={headingRef} tabIndex={-1}>{lifts.length === 1 ? `What's your ${lifts[0].label.toLowerCase()} max?` : "What are your maxes?"}</h1>
           <span className="pk-muted">Every weight in the program is worked out from {lifts.length === 1 ? "this" : "these"}.</span>
           {lifts.map((l, i) => {
             const r = s.rows[i];
@@ -200,7 +230,7 @@ export function StartProgramForm({
 
       {step === "days" && (
         <>
-          <h1 className="pk-question">When do you train?</h1>
+          <h1 className="pk-question" ref={headingRef} tabIndex={-1}>When do you train?</h1>
           <PkSection label="Days you train">
             <div className="td-days" role="group" aria-label="Days you train">
               {WEEKDAY_SHORT.map((label, i) => (
@@ -220,7 +250,7 @@ export function StartProgramForm({
 
       {step === "review" && (
         <>
-          <h1 className="pk-question">Ready to go</h1>
+          <h1 className="pk-question" ref={headingRef} tabIndex={-1}>Ready to go</h1>
           <div>
             {lifts.map((l) => (
               <div key={l.lift} className="pk-sum">
@@ -267,7 +297,7 @@ export function StartProgramForm({
             {pending ? "Starting" : "Start program"}
           </button>
         ) : (
-          <button type="button" className="pk-cta" onClick={() => go(s.at + 1)}>
+          <button type="button" className="pk-cta" onClick={next}>
             Next: {STEP_TITLE[steps[s.at + 1]].toLowerCase()}
           </button>
         )}

@@ -8,6 +8,9 @@
 import type { LiftKey, WeightUnit } from "./types";
 import { convertTyped, maxFromSet, parseWeightIn, type StepKey } from "./units";
 
+/** The smallest max or set weight the start flow accepts, in the member's unit. */
+const MIN_MAX = 5;
+
 export type StartStep = "weights" | "maxes" | "days" | "review";
 export const STEP_TITLE: Record<StartStep, string> = { weights: "Weights", maxes: "Maxes", days: "Training days", review: "Review" };
 
@@ -118,6 +121,38 @@ export function maxEntries(s: StartState, lifts: StartLift[]): { lift: LiftKey; 
     weight: r.mode === "logged" ? null : Number(r.weight.replace(",", ".")) || null,
     reps: r.mode === "set" ? Number(r.reps) || null : null,
   }));
+}
+
+/**
+ * What is missing on a screen, in a plain sentence, or null when Next may go on.
+ * The server checks everything again on Start; this only stops an empty screen.
+ */
+export function stepBlocker(s: StartState, lifts: StartLift[], step: StartStep): string | null {
+  if (step === "maxes") {
+    for (let i = 0; i < lifts.length; i++) {
+      const r = s.rows[i];
+      const name = lifts[i].label.toLowerCase();
+      if (r.mode === "logged") {
+        if (!lifts[i].logged) return `Add your ${name} max.`;
+        continue;
+      }
+      // 5 or more in the member's unit, as typed.
+      const typed = Number(r.weight.trim().replace(",", "."));
+      const kg = r.weight.trim() && Number.isFinite(typed) && typed >= MIN_MAX ? typed : null;
+      if (r.mode === "one_rm") {
+        if (kg === null) return `Add your ${name} max.`;
+      } else {
+        const reps = Number(r.reps);
+        if (kg === null || !r.reps) return `Add the weight and reps of a recent ${name} set.`;
+        if (!Number.isInteger(reps) || reps < 1 || reps > 10) return `Use a ${name} set of 10 reps or fewer.`;
+      }
+    }
+  }
+  if (step === "days") {
+    if (s.days.length === 0) return "Pick at least one training day.";
+    if (!s.startDate) return "Pick a start date.";
+  }
+  return null;
 }
 
 /** The screen a server error belongs to, so it shows where it can be fixed. */

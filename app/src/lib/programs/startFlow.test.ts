@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 
 import { firstWeek } from "./outline";
 import { platformProgram } from "./registry";
-import { initialStart, maxEntries, maxesKg, reduceStart, rowMaxKg, startSteps, stepForError, type StartAction, type StartLift, type StartState } from "./startFlow";
+import { initialStart, maxEntries, maxesKg, reduceStart, rowMaxKg, startSteps, stepBlocker, stepForError, type StartAction, type StartLift, type StartState } from "./startFlow";
 import { kgToUnit } from "./units";
 
 const steps = startSteps(true);
@@ -79,5 +79,28 @@ assert.equal(stepForError("Pick a start date between last week and a year from n
 assert.equal(stepForError("That program isn't available.", steps), 3);
 assert.equal(stepForError("End your current program before you start another.", steps), 3);
 assert.equal(stepForError("Pick a start date between last week and a year from now.", startSteps(false)), 1, "without the maxes screen");
+
+// ── Next is blocked on an incomplete step ──
+const blank = initialStart({ lifts, unit: "kg", step: "2.5kg", weekdays: [], today: "2026-11-16" }, kept);
+const row = (st: StartState, i: number, patch: Partial<StartState["rows"][number]>) => run(st, { type: "row", index: i, patch });
+assert.equal(stepBlocker(blank, lifts, "weights"), null);
+assert.equal(stepBlocker(blank, lifts, "review"), null);
+assert.equal(stepBlocker(blank, lifts, "maxes"), "Add your squat max.", "empty 1-rep max");
+assert.equal(stepBlocker(row(blank, 0, { weight: "4.5" }), lifts, "maxes"), "Add your squat max.", "under 5");
+assert.equal(stepBlocker(row(blank, 0, { weight: "abc" }), lifts, "maxes"), "Add your squat max.", "not a number");
+const okSquat = row(blank, 0, { weight: "5" });
+assert.equal(stepBlocker(okSquat, lifts, "maxes"), null, "5 is enough; the bench row is a logged best");
+assert.equal(stepBlocker(row(okSquat, 1, { mode: "logged" }), [lifts[0], { ...lifts[1], logged: null }], "maxes"), "Add your bench press max.", "logged with no logged best");
+assert.equal(stepBlocker(row(okSquat, 1, { mode: "set" }), lifts, "maxes"), "Add the weight and reps of a recent bench press set.");
+assert.equal(stepBlocker(row(okSquat, 1, { mode: "set", weight: "90" }), lifts, "maxes"), "Add the weight and reps of a recent bench press set.", "no reps");
+assert.equal(stepBlocker(row(okSquat, 1, { mode: "set", weight: "4", reps: "5" }), lifts, "maxes"), "Add the weight and reps of a recent bench press set.", "set weight under 5");
+assert.equal(stepBlocker(row(okSquat, 1, { mode: "set", weight: "90", reps: "11" }), lifts, "maxes"), "Use a bench press set of 10 reps or fewer.");
+assert.equal(stepBlocker(row(okSquat, 1, { mode: "set", weight: "90", reps: "0" }), lifts, "maxes"), "Use a bench press set of 10 reps or fewer.");
+assert.equal(stepBlocker(row(okSquat, 1, { mode: "set", weight: "90", reps: "10" }), lifts, "maxes"), null);
+// the minimum is in the member's unit
+assert.equal(stepBlocker(run(blank, { type: "unit", unit: "lb" }, { type: "row", index: 0, patch: { weight: "5" } }), lifts, "maxes"), null, "5 lb counts");
+assert.equal(stepBlocker(blank, lifts, "days"), "Pick at least one training day.");
+assert.equal(stepBlocker(run(blank, { type: "day", day: 2 }), lifts, "days"), null);
+assert.equal(stepBlocker(run(blank, { type: "day", day: 2 }, { type: "startDate", value: "" }), lifts, "days"), "Pick a start date.");
 
 console.log("programs/startFlow: ok");
