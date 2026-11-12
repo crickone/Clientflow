@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ProgramLibraryView, type LibraryRow } from "@/components/workout/ProgramLibraryView";
-import { hiddenKeys } from "@/lib/programs/library";
+import { hiddenKeys, listCopies } from "@/lib/programs/library";
 import { PLATFORM_PROGRAMS } from "@/lib/programs/registry";
 import { currentStaffActor } from "@/lib/programs/staffActor";
 import { ENGINE_LABEL, FAMILY_LABEL } from "@/lib/programs/types";
@@ -32,7 +32,7 @@ export default async function ProgramLibraryPage() {
         title="Program library"
         subtitle="Well-known programs your DIY members can run on their own, with every weight worked out from their maxes. Hide any you don't want offered."
       />
-      <ProgramLibraryView rows={rows} />
+      <ProgramLibraryView rows={rows} copies={listCopies().map((c) => ({ id: c.id, name: c.name, basedOnName: c.basedOnName, updatedAt: c.updatedAt }))} />
     </div>
   );
 }

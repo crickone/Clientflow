@@ -88,11 +88,108 @@ const templateZ = z.object({
 
 export type TemplateCheck = { ok: true; template: ProgramTemplate } | { ok: false; errors: string[] };
 
-/** Shape only. Unknown keys are dropped. */
+const FIELD_LABEL: Record<string, string> = {
+  name: "name",
+  who: "line for who it is for",
+  description: "description",
+  warning: "warning line",
+  label: "week label",
+  notes: "notes",
+};
+
+function at(raw: unknown, path: PropertyKey[]): unknown {
+  let cur: unknown = raw;
+  for (const k of path) {
+    if (cur === null || typeof cur !== "object") return undefined;
+    cur = (cur as Record<PropertyKey, unknown>)[k];
+  }
+  return cur;
+}
+
+/** "Week 2, Workout A, exercise 1, set 3": where in the template an issue sits, in the words the editor uses. */
+function whereLabel(raw: unknown, path: PropertyKey[]): { where: string; field: string | null } {
+  const parts: string[] = [];
+  let field: string | null = null;
+  let i = 0;
+  while (i < path.length) {
+    const key = path[i];
+    const next = path[i + 1];
+    if (key === "weeks" && typeof next === "number") {
+      parts.push(`Week ${next + 1}`);
+      i += 2;
+    } else if (key === "days" && typeof next === "number") {
+      const name = at(raw, [...path.slice(0, i + 2), "name"]);
+      parts.push(typeof name === "string" && name.trim() ? name.trim() : `Day ${next + 1}`);
+      i += 2;
+    } else if (key === "exercises" && typeof next === "number") {
+      parts.push(`exercise ${next + 1}`);
+      i += 2;
+    } else if (key === "sets" && typeof next === "number") {
+      parts.push(`set ${next + 1}`);
+      i += 2;
+    } else if (key === "stages" && typeof next === "number") {
+      // A stage is a list of sets: "stages.1.0" is progression stage 2, set 1.
+      const setNo = path[i + 2];
+      parts.push(typeof setNo === "number" ? `progression ${next + 1}, set ${setNo + 1}` : `progression ${next + 1}`);
+      i += typeof setNo === "number" ? 3 : 2;
+    } else {
+      field = typeof key === "string" ? key : null;
+      i += 1;
+    }
+  }
+  return { where: parts.join(", "), field };
+}
+
+function plainMessage(issue: z.core.$ZodIssue, field: string | null): string {
+  const max = "maximum" in issue ? Number(issue.maximum) : NaN;
+  const label = field ? (FIELD_LABEL[field] ?? field) : "value";
+  if (issue.code === "custom") return "the top of the rep range must be at least the bottom.";
+  switch (field) {
+    case "name":
+    case "who":
+    case "description":
+      return issue.code === "too_big" ? `the ${label} is too long (${max} characters at most).` : `add a ${label}.`;
+    case "notes":
+    case "warning":
+    case "label":
+      return `the ${label} is too long (${max} characters at most).`;
+    case "reps":
+      return "reps must be a whole number from 1 to 100.";
+    case "rest":
+      return "rest must be between 0 and 900 seconds.";
+    case "rpe":
+      return "RPE must be between 5 and 10.";
+    case "pct":
+      return "enter a percentage.";
+    case "daysPerWeek":
+      return "days a week must be a whole number from 1 to 7.";
+    case "lengthWeeks":
+      return "length in weeks must be a whole number from 1 to 52.";
+    case "kind":
+      return "pick a set type.";
+    case "days":
+      return issue.code === "too_small" ? "add at least one day." : "no more than 7 days.";
+    case "exercises":
+      return issue.code === "too_small" ? "add at least one exercise." : "no more than 20 exercises in a day.";
+    case "sets":
+      return issue.code === "too_small" ? "add at least one set." : "no more than 20 sets in an exercise.";
+    case "weeks":
+      return issue.code === "too_small" ? "add at least one week." : "no more than 26 weeks.";
+    default:
+      return `the ${label} is not valid.`;
+  }
+}
+
+/** Shape only. Unknown keys are dropped. Messages read in plain words, with the week, day and exercise they are about. */
 export function parseTemplate(raw: unknown): TemplateCheck {
   const parsed = templateZ.safeParse(raw);
   if (!parsed.success) {
-    return { ok: false, errors: parsed.error.issues.slice(0, 10).map((i) => `${i.path.join(".") || "template"}: ${i.message}`) };
+    const messages = parsed.error.issues.map((i) => {
+      const { where, field } = whereLabel(raw, i.path);
+      const msg = plainMessage(i, field);
+      return where ? `${where}: ${msg}` : `${msg.charAt(0).toUpperCase()}${msg.slice(1)}`;
+    });
+    return { ok: false, errors: [...new Set(messages)].slice(0, 10) };
   }
   return { ok: true, template: parsed.data as ProgramTemplate };
 }

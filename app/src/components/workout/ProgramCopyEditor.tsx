@@ -1,0 +1,361 @@
+// app/src/components/workout/ProgramCopyEditor.tsx
+"use client";
+
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+
+import { Button } from "@/components/ui/Button";
+import { Input, Textarea } from "@/components/ui/Input";
+import { saveCopyAction } from "@/app/workout/library/actions";
+import { SET_KINDS, blankExercise, convertSet, repsMax, repsMin, withReps } from "@/lib/programs/editing";
+import { CANONICAL_EXERCISES } from "@/lib/programs/exercises";
+import { schemeLabel, weekLabel } from "@/lib/programs/planner";
+import { LIFT_LABEL, type ExerciseRx, type LiftKey, type ProgramTemplate, type SetRx } from "@/lib/programs/types";
+
+const num = (v: string, fallback: number) => {
+  const n = Number(v);
+  return v.trim() !== "" && Number.isFinite(n) ? n : fallback;
+};
+
+function ExerciseEditor({
+  ex,
+  lifts,
+  first,
+  last,
+  onChange,
+  onRemove,
+  onMove,
+}: {
+  ex: ExerciseRx;
+  lifts: LiftKey[];
+  first: boolean;
+  last: boolean;
+  onChange: (fn: (e: ExerciseRx) => void) => void;
+  onRemove?: () => void;
+  onMove: (dir: -1 | 1) => void;
+}) {
+  const known = CANONICAL_EXERCISES.some((c) => c.name === ex.name);
+  return (
+    <div className="pe-ex">
+      <div className="pe-ex-head">
+        <select value={ex.name} aria-label="Exercise" onChange={(e) => onChange((x) => void (x.name = e.target.value))}>
+          {!known && <option value={ex.name}>{ex.name}</option>}
+          {CANONICAL_EXERCISES.map((c) => (
+            <option key={c.name} value={c.name}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+        <select value={ex.lift ?? ""} aria-label="The max it uses" onChange={(e) => onChange((x) => void (x.lift = (e.target.value || undefined) as LiftKey | undefined))}>
+          <option value="">No max</option>
+          {lifts.map((l) => (
+            <option key={l} value={l}>
+              {LIFT_LABEL[l]} max
+            </option>
+          ))}
+        </select>
+        <div className="pe-ex-tools">
+          <button type="button" className="pe-icon" aria-label="Move up" disabled={first} onClick={() => onMove(-1)}>
+            <ArrowUp size={14} />
+          </button>
+          <button type="button" className="pe-icon" aria-label="Move down" disabled={last} onClick={() => onMove(1)}>
+            <ArrowDown size={14} />
+          </button>
+          {onRemove && (
+            <button type="button" className="pe-icon" aria-label={`Remove ${ex.name}`} onClick={onRemove}>
+              <Trash2 size={14} />
+            </button>
+          )}
+        </div>
+      </div>
+      <Input value={ex.notes ?? ""} placeholder="Notes for the member (optional)" onChange={(e) => onChange((x) => void (x.notes = e.target.value || undefined))} />
+      {ex.stages && ex.stages.length > 0 ? (
+        <p className="pe-hint">Rep schemes set by the progression: {ex.stages.map((s) => schemeLabel(s)).join(", then ")}.</p>
+      ) : (
+        <div className="pe-sets">
+          <div className="pe-set pe-set--head" aria-hidden>
+            <span>Set</span>
+            <span>Type</span>
+            <span>Load</span>
+            <span>Reps</span>
+            <span>Up to</span>
+            <span>Rest (s)</span>
+            <span />
+          </div>
+          {ex.sets.map((s, si) => (
+            <div key={si} className="pe-set">
+              <span className="pe-setno">{si + 1}</span>
+              <select value={s.kind} aria-label={`Set ${si + 1} type`} onChange={(e) => onChange((x) => void (x.sets[si] = convertSet(x.sets[si], e.target.value as SetRx["kind"])))}>
+                {SET_KINDS.map((k) => (
+                  <option key={k.value} value={k.value}>
+                    {k.label}
+                  </option>
+                ))}
+              </select>
+              <span className="pe-load">
+                {(s.kind === "pct" || s.kind === "amrap") && (
+                  <>
+                    <Input
+                      type="number"
+                      step="0.5"
+                      aria-label={`Set ${si + 1} percentage`}
+                      value={Math.round(s.pct * 1000) / 10}
+                      onChange={(e) =>
+                        onChange((x) => {
+                          const cur = x.sets[si];
+                          if (cur.kind === "pct" || cur.kind === "amrap") cur.pct = num(e.target.value, cur.pct * 100) / 100;
+                        })
+                      }
+                    />
+                    <span className="pe-muted">%{s.addKg ? ` + ${s.addKg} kg` : ""}</span>
+                  </>
+                )}
+                {s.kind === "rpe" && (
+                  <>
+                    <span className="pe-muted">RPE</span>
+                    <Input
+                      type="number"
+                      step="0.5"
+                      min={5}
+                      max={10}
+                      aria-label={`Set ${si + 1} RPE`}
+                      value={s.rpe}
+                      onChange={(e) =>
+                        onChange((x) => {
+                          const cur = x.sets[si];
+                          if (cur.kind === "rpe") cur.rpe = Math.max(5, Math.min(10, num(e.target.value, cur.rpe)));
+                        })
+                      }
+                    />
+                  </>
+                )}
+                {s.kind === "fixed" && <span className="pe-muted">From progression{s.amrap ? ", as many as you can" : ""}</span>}
+                {s.kind === "same_as_last" && <span className="pe-muted">As the set before</span>}
+              </span>
+              <Input
+                type="number"
+                min={1}
+                aria-label={`Set ${si + 1} reps`}
+                value={repsMin(s.reps)}
+                onChange={(e) =>
+                  onChange((x) => {
+                    const cur = x.sets[si];
+                    const min = Math.max(1, Math.round(num(e.target.value, repsMin(cur.reps))));
+                    if (cur.kind === "fixed" || cur.kind === "same_as_last") cur.reps = withReps(min, repsMax(cur.reps));
+                    else cur.reps = min;
+                  })
+                }
+              />
+              {s.kind === "fixed" || s.kind === "same_as_last" ? (
+                <Input
+                  type="number"
+                  min={1}
+                  aria-label={`Set ${si + 1} top of the rep range`}
+                  placeholder="-"
+                  value={repsMax(s.reps) ?? ""}
+                  onChange={(e) =>
+                    onChange((x) => {
+                      const cur = x.sets[si];
+                      if (cur.kind === "fixed" || cur.kind === "same_as_last") cur.reps = withReps(repsMin(cur.reps), e.target.value ? Math.round(num(e.target.value, 0)) : null);
+                    })
+                  }
+                />
+              ) : (
+                <span />
+              )}
+              <Input
+                type="number"
+                min={0}
+                max={900}
+                step={15}
+                aria-label={`Set ${si + 1} rest in seconds`}
+                value={s.rest}
+                onChange={(e) => onChange((x) => void (x.sets[si].rest = Math.max(0, Math.min(900, Math.round(num(e.target.value, x.sets[si].rest))))))}
+              />
+              <button type="button" className="pe-icon" aria-label={`Remove set ${si + 1}`} disabled={ex.sets.length === 1} onClick={() => onChange((x) => void x.sets.splice(si, 1))}>
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+          <button type="button" className="pl-link" style={{ justifySelf: "start" }} onClick={() => onChange((x) => void x.sets.push({ ...x.sets[x.sets.length - 1] }))}>
+            <Plus size={14} /> Add set
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Weeks, then days, then exercises, then set rows, in the style of the Detailed builder. */
+export function ProgramCopyEditor({ id, initial, lifts, engineLabel, isBlock }: { id: number; initial: ProgramTemplate; lifts: LiftKey[]; engineLabel: string; isBlock: boolean }) {
+  const router = useRouter();
+  const [t, setT] = useState<ProgramTemplate>(initial);
+  const [wi, setWi] = useState(0);
+  const [errors, setErrors] = useState<string[]>([]);
+  const [pending, start] = useTransition();
+  const w = Math.min(wi, t.weeks.length - 1);
+  const week = t.weeks[w];
+
+  function edit(fn: (draft: ProgramTemplate) => void) {
+    setT((prev) => {
+      const next = structuredClone(prev);
+      fn(next);
+      return next;
+    });
+  }
+
+  function save() {
+    start(async () => {
+      const r = await saveCopyAction(id, t);
+      if (!r.ok) {
+        setErrors(r.errors);
+        toast.error("Not saved. See what needs fixing at the top.");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+      setErrors([]);
+      toast.success("Saved. Members who start this version from now on get these changes.");
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="pe">
+      {errors.length > 0 && (
+        <div className="pe-errors" role="alert">
+          <b>Not saved:</b>
+          <ul>
+            {errors.map((e) => (
+              <li key={e}>{e}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <section className="pe-card">
+        <div className="pe-grid">
+          <label className="pe-field">
+            <span>Name</span>
+            <Input value={t.name} onChange={(e) => edit((d) => void (d.name = e.target.value))} />
+          </label>
+          <label className="pe-field">
+            <span>Who it is for</span>
+            <Input value={t.who} onChange={(e) => edit((d) => void (d.who = e.target.value))} />
+          </label>
+          <label className="pe-field">
+            <span>Warning line (optional)</span>
+            <Input value={t.warning ?? ""} onChange={(e) => edit((d) => void (d.warning = e.target.value || undefined))} />
+          </label>
+          <label className="pe-field">
+            <span>Days a week</span>
+            <select value={t.daysPerWeek} onChange={(e) => edit((d) => void (d.daysPerWeek = Number(e.target.value)))}>
+              {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="pe-field">
+            <span>Length in weeks</span>
+            <Input type="number" min={1} max={52} value={t.lengthWeeks} onChange={(e) => edit((d) => void (d.lengthWeeks = Math.max(1, Math.min(52, Math.round(num(e.target.value, d.lengthWeeks))))))} />
+          </label>
+        </div>
+        <label className="pe-field">
+          <span>Description</span>
+          <Textarea rows={3} value={t.description} onChange={(e) => edit((d) => void (d.description = e.target.value))} />
+        </label>
+        <p className="pe-hint">
+          Progression: {engineLabel}. It stays the original&rsquo;s.
+          {lifts.length > 0 ? ` Keep at least one exercise using each of these maxes: ${lifts.map((l) => LIFT_LABEL[l].toLowerCase()).join(", ")}.` : ""}
+        </p>
+      </section>
+
+      <div className="pe-weeks" role="tablist" aria-label="Weeks">
+        {t.weeks.map((_, i) => (
+          <button key={i} type="button" role="tab" aria-selected={i === w} className="pe-tab" onClick={() => setWi(i)}>
+            {weekLabel(t, { week: i, cycle: 0 })}
+          </button>
+        ))}
+        <button
+          type="button"
+          className="pe-tab"
+          onClick={() => {
+            edit((d) => void d.weeks.splice(w + 1, 0, structuredClone(d.weeks[w])));
+            setWi(w + 1);
+          }}
+        >
+          <Plus size={14} /> Copy this week
+        </button>
+        {t.weeks.length > 1 && (
+          <button
+            type="button"
+            className="pe-tab"
+            onClick={() => {
+              edit((d) => void d.weeks.splice(w, 1));
+              setWi(Math.max(0, w - 1));
+            }}
+          >
+            <Trash2 size={14} /> Remove this week
+          </button>
+        )}
+      </div>
+      <label className="pe-field" style={{ maxWidth: 360 }}>
+        <span>{weekLabel(t, { week: w, cycle: 0 })}: label (optional)</span>
+        <Input value={week.label ?? ""} onChange={(e) => edit((d) => void (d.weeks[w].label = e.target.value || undefined))} />
+      </label>
+
+      {week.days.map((dayRx, di) => (
+        <section key={`${w}-${di}`} className="pe-card">
+          <div className="pe-day-head">
+            <Input aria-label="Day name" value={dayRx.name} onChange={(e) => edit((d) => void (d.weeks[w].days[di].name = e.target.value))} style={{ maxWidth: 280 }} />
+            {isBlock && (
+              <label className="pe-check">
+                <input type="checkbox" checked={dayRx.test === true} onChange={(e) => edit((d) => void (d.weeks[w].days[di].test = e.target.checked || undefined))} /> Test day
+              </label>
+            )}
+            {week.days.length > 1 && (
+              <Button variant="ghost" size="sm" onClick={() => edit((d) => void d.weeks[w].days.splice(di, 1))}>
+                <Trash2 size={14} /> Remove day
+              </Button>
+            )}
+          </div>
+          {dayRx.exercises.map((ex, xi) => (
+            <ExerciseEditor
+              key={xi}
+              ex={ex}
+              lifts={lifts}
+              first={xi === 0}
+              last={xi === dayRx.exercises.length - 1}
+              onChange={(fn) => edit((d) => fn(d.weeks[w].days[di].exercises[xi]))}
+              onRemove={dayRx.exercises.length > 1 ? () => edit((d) => void d.weeks[w].days[di].exercises.splice(xi, 1)) : undefined}
+              onMove={(dir) =>
+                edit((d) => {
+                  const list = d.weeks[w].days[di].exercises;
+                  const j = xi + dir;
+                  if (j < 0 || j >= list.length) return;
+                  [list[xi], list[j]] = [list[j], list[xi]];
+                })
+              }
+            />
+          ))}
+          <Button variant="secondary" size="sm" onClick={() => edit((d) => void d.weeks[w].days[di].exercises.push(blankExercise()))}>
+            <Plus size={14} /> Add exercise
+          </Button>
+        </section>
+      ))}
+
+      <Button variant="secondary" size="sm" onClick={() => edit((d) => void d.weeks[w].days.push({ name: `Day ${week.days.length + 1}`, exercises: [blankExercise()] }))}>
+        <Plus size={14} /> Add day
+      </Button>
+
+      <div className="pe-save">
+        <Button onClick={save} loading={pending}>
+          Save our version
+        </Button>
+      </div>
+    </div>
+  );
+}

@@ -109,6 +109,28 @@ const requireLocal = createRequire(import.meta.url);
       assert.equal(lib.programByKey(`copy-${id}`)?.copyId, id);
       assert.equal(lib.programByKey(`copy-${id}`)?.basedOnName, "Smolov base mesocycle");
 
+      // ── a stored copy that is valid JSON but not a template is skipped, not thrown on ──
+      const origError = console.error;
+      const logged: unknown[][] = [];
+      console.error = (...a: unknown[]) => void logged.push(a);
+      const { db: tdb } = requireLocal("../db") as typeof import("../db");
+      const { programTemplates } = requireLocal("../db/schema") as typeof import("../db/schema");
+      const now = Date.now();
+      const [bad] = tdb
+        .insert(programTemplates)
+        .values({ basedOn: "smolov-base", engine: "fixed_block", name: "Broken", templateJson: JSON.stringify({ name: "Broken", weeks: "nope" }), createdBy: 7, createdAt: now, updatedAt: now })
+        .returning({ id: programTemplates.id })
+        .all();
+      try {
+        assert.equal(lib.getCopy(bad.id), null);
+        assert.ok(!lib.listCopies().some((c) => c.id === bad.id));
+        assert.ok(!lib.memberPrograms().some((e) => e.template.key === `copy-${bad.id}`));
+        assert.ok(logged.length >= 1, "the skip is logged");
+      } finally {
+        console.error = origError;
+        lib.deleteCopy(bad.id);
+      }
+
       // ── unhide, delete ──
       assert.equal(lib.setHidden("smolov-base", false, 7), true);
       assert.equal(lib.hiddenKeys().size, 0);

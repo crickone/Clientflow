@@ -48,13 +48,20 @@ export interface CopyRow {
 }
 
 function toCopy(r: typeof programTemplates.$inferSelect): CopyRow | null {
-  let template: ProgramTemplate;
+  let raw: unknown;
   try {
-    template = JSON.parse(r.templateJson) as ProgramTemplate;
+    raw = JSON.parse(r.templateJson);
   } catch (err) {
     console.error("[programs] unreadable gym copy", r.id, err);
     return null;
   }
+  // Valid JSON that no longer fits the template shape is skipped the same way, so one bad row never takes the list down.
+  const parsed = parseTemplate(raw);
+  if (!parsed.ok) {
+    console.error("[programs] gym copy fails the template check", r.id, parsed.errors.join(" | "));
+    return null;
+  }
+  const template = parsed.template;
   return {
     id: r.id,
     basedOn: r.basedOn,
