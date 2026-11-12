@@ -17,7 +17,7 @@ interface Settings {
 
 export default async function SettingsPage(
   props: {
-    searchParams: Promise<{ saved?: string; error?: string }>;
+    searchParams: Promise<{ saved?: string; error?: string; notifyError?: string }>;
   }
 ) {
   const searchParams = await props.searchParams;
@@ -170,7 +170,7 @@ export default async function SettingsPage(
             {searchParams.error}
           </p>
         )}
-        {searchParams.saved && !searchParams.error && (
+        {searchParams.saved === "1" && !searchParams.error && (
           <p style={{ margin: 0, color: "var(--green)", fontSize: 13 }}>Settings saved.</p>
         )}
 
@@ -183,8 +183,14 @@ export default async function SettingsPage(
 
       <form action={saveNotifyPrefs} className="glass" style={{ padding: 24, display: "flex", flexDirection: "column", gap: 14 }}>
         <h2 className="card-title" style={{ margin: 0 }}>Alert emails to you</h2>
-        <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13.5 }}><input type="checkbox" name="instant" defaultChecked={staff.you.notify.instant} /> The moment a serious alert opens</label>
-        <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13.5 }}><input type="checkbox" name="digest" defaultChecked={staff.you.notify.digest} /> A morning digest at 8am of everything still open</label>
+        <label className="check"><input type="checkbox" name="instant" defaultChecked={staff.you.notify.instant} /> The moment a serious alert opens</label>
+        <label className="check"><input type="checkbox" name="digest" defaultChecked={staff.you.notify.digest} /> A morning digest at 8am of everything still open</label>
+        {searchParams.notifyError && (
+          <p role="alert" style={{ margin: 0, color: "var(--red)", fontSize: 13 }}>{searchParams.notifyError}</p>
+        )}
+        {searchParams.saved === "notify" && !searchParams.notifyError && (
+          <p style={{ margin: 0, color: "var(--green)", fontSize: 13 }}>Alert emails saved.</p>
+        )}
         <div><button className="btn btn--primary btn--md" type="submit">Save</button></div>
       </form>
     </div>

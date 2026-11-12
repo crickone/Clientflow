@@ -57,7 +57,10 @@ function Readout({ label, value, note }: { label: string; value: string; note?: 
 export default async function DashboardPage() {
   const [data, alertsRes] = await Promise.all([
     api<PlatformAnalytics>("/analytics", { revalidate: 30, tags: ["fleet"] }),
-    api<AlertsResponse>("/alerts", { revalidate: 60, tags: ["fleet"] }).catch(() => null),
+    api<AlertsResponse>("/alerts", { revalidate: 60, tags: ["fleet"] }).catch((err) => {
+      console.error("[dashboard] alerts unavailable:", err);
+      return null;
+    }),
   ]);
   const { platform, gyms } = data;
   const alerts = alertsRes?.alerts ?? [];
@@ -89,10 +92,10 @@ export default async function DashboardPage() {
           <span className="board-sentence">
             {platform.gyms.total === 1 ? "business" : "businesses"} on the platform,{" "}
             {needsAttention === 0 ? (
-              <>all of them running.</>
+              <>nothing needs you.</>
             ) : (
               <>
-                <strong>{needsAttention}</strong> needing attention.
+                <strong>{needsAttention}</strong> open {needsAttention === 1 ? "alert" : "alerts"}.
               </>
             )}
           </span>
@@ -132,6 +135,11 @@ export default async function DashboardPage() {
               ))}
             </ul>
           )}
+          {alerts.length > 5 ? (
+            <p style={{ margin: "8px 0 0", fontSize: 13 }}>
+              <Link href="/inbox" className="fleet-count">and {alerts.length - 5} more</Link>
+            </p>
+          ) : null}
         </section>
       ) : null}
 

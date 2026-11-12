@@ -21,6 +21,16 @@ export const fmtEurWhole = (cents: number) =>
     Math.round(cents / 100),
   );
 
+/** Duration for people: null "—", under a second "450 ms", under a minute "4.2 s", else "1m 30s". */
+export function fmtDuration(ms: number | null): string {
+  if (ms === null) return "—";
+  if (ms < 1000) return `${ms} ms`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)} s`;
+  const m = Math.floor(ms / 60000);
+  const s = Math.round((ms % 60000) / 1000);
+  return s === 60 ? `${m + 1}m 0s` : `${m}m ${s}s`;
+}
+
 /** File size for people: "0 B", "512 B", "3.4 MB". Plain module so server pages and client panels can both use it. */
 export function bytes(n: number): string {
   if (n <= 0) return "0 B";

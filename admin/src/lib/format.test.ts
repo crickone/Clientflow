@@ -1,7 +1,7 @@
 // Run: npm test -- src/lib/format.test.ts
 import assert from "node:assert/strict";
 
-import { bytes, dublinDayStartMs, fmtCents } from "./format";
+import { bytes, dublinDayStartMs, fmtCents, fmtDuration } from "./format";
 
 assert.equal(bytes(0), "0 B");
 assert.equal(bytes(512), "512 B");
@@ -13,3 +13,8 @@ assert.equal(dublinDayStartMs("2026-07-01"), Date.UTC(2026, 5, 30, 23, 0, 0));
 assert.equal(dublinDayStartMs("2026-01-15"), Date.UTC(2026, 0, 15, 0, 0, 0));
 assert.ok(Number.isNaN(dublinDayStartMs("nope")));
 console.log("format.test.ts: ok");
+
+assert.equal(fmtDuration(null), "—");
+assert.equal(fmtDuration(450), "450 ms");
+assert.equal(fmtDuration(90000), "1m 30s");
+assert.equal(fmtDuration(4200), "4.2 s");

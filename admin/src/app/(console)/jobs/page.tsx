@@ -1,4 +1,5 @@
 import { api } from "@/lib/api";
+import { fmtDuration } from "@/lib/format";
 import { Card } from "@/components/ui/Card";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { RunStrip } from "@/components/jobs/RunStrip";
@@ -40,7 +41,7 @@ export default async function JobsPage(props: { searchParams: Promise<{ key?: st
                   <td><a href={`/jobs?key=${encodeURIComponent(j.key)}`}>{j.label}</a><div style={{ fontSize: 12, color: "var(--text-tertiary)", fontFamily: MONO }}>{j.key}</div></td>
                   <td style={{ whiteSpace: "nowrap" }}>{when(j.startedAt)}</td>
                   <td>{j.ok === true ? <span className="chip active">ok</span> : j.ok === false ? <span className="chip suspended" title={j.error ?? ""}>failed</span> : <span className="chip" title="No finish was recorded">running or interrupted</span>}</td>
-                  <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{j.durationMs === null ? "—" : j.durationMs < 1000 ? `${j.durationMs} ms` : `${(j.durationMs / 1000).toFixed(1)} s`}</td>
+                  <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtDuration(j.durationMs)}</td>
                   <td><RunStrip runs={byKey.get(j.key) ?? []} /></td>
                 </tr>
               ))}
@@ -58,8 +59,8 @@ export default async function JobsPage(props: { searchParams: Promise<{ key?: st
                 <tr key={r.id}>
                   <td style={{ whiteSpace: "nowrap" }}>{when(r.startedAt)}</td>
                   <td style={{ color: r.ok === false ? "var(--red)" : undefined }}>{r.ok === true ? "ok" : r.ok === false ? r.error ?? "failed" : "running or interrupted"}</td>
-                  <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{r.durationMs === null ? "—" : `${r.durationMs} ms`}</td>
-                  <td><code style={{ fontFamily: MONO, fontSize: 12, color: "var(--text-secondary)" }}>{r.detail ? JSON.stringify(r.detail) : ""}</code></td>
+                  <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtDuration(r.durationMs)}</td>
+                  <td><code title={r.detail ? JSON.stringify(r.detail) : undefined} style={{ fontFamily: MONO, fontSize: 12, color: "var(--text-secondary)" }}>{r.detail ? (JSON.stringify(r.detail).length > 120 ? `${JSON.stringify(r.detail).slice(0, 120)}…` : JSON.stringify(r.detail)) : ""}</code></td>
                 </tr>
               ))}
             </tbody>

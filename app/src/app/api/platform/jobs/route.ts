@@ -10,6 +10,6 @@ export async function GET(req: NextRequest) {
   if (g instanceof Response) return g;
   const sp = req.nextUrl.searchParams;
   const key = sp.get("key") || undefined;
-  const limit = Number(sp.get("limit")) || 30;
+  const limit = Math.min(500, Math.max(1, Math.floor(Number(sp.get("limit")) || 30)));
   return NextResponse.json({ latest: latestJobRuns(), history: listJobRuns({ key, limit }) });
 }

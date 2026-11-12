@@ -95,7 +95,7 @@ export function HealthPanel({ tenantId, data }: { tenantId: number; data: Tenant
         {data.history.length < 2 ? (
           <p style={{ margin: 0, fontSize: 13.5, color: "var(--text-secondary)" }}>History starts after the first two snapshots.</p>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20 }}>
+          <div className="chart-grid-2">
             <LineChart title="Database size" labels={labels} series={[{ label: "Database", values: data.history.map((h) => h.dbBytes / 1048576), accent: true }, { label: "WAL", values: data.history.map((h) => h.walBytes / 1048576) }]} format={(v) => `${v.toFixed(1)} MB`} />
             <LineChart title="Queued work" labels={labels} series={[{ label: "Due", values: data.history.map((h) => h.queueDue), accent: true }, { label: "Failed", values: data.history.map((h) => h.queueFailed) }]} />
             <LineChart title="Open alerts" labels={labels} series={[{ label: "Needs action", values: data.history.map((h) => h.alertsBad), accent: true }, { label: "Watch", values: data.history.map((h) => h.alertsWarn) }]} />
