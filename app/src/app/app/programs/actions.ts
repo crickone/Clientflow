@@ -18,19 +18,27 @@ import { maxFromSet, stepFromKey, unitToKg } from "@/lib/programs/units";
 type Result = { ok: true } | { ok: false; error: string };
 const OFF = { ok: false as const, error: "Programs aren't switched on for you." };
 
+/** A real calendar date from a week ago to a year ahead. */
+function saneStartDate(v: string): boolean {
+  const ms = Date.parse(`${v}T12:00:00Z`);
+  if (Number.isNaN(ms) || new Date(ms).toISOString().slice(0, 10) !== v) return false;
+  const day = 86400000;
+  return ms >= Date.now() - 7 * day && ms <= Date.now() + 366 * day;
+}
+
 const liftZ = z.enum(["squat", "bench", "deadlift", "press", "row"]);
 const maxEntryZ = z.object({
   lift: liftZ,
   kind: z.enum(["one_rm", "set", "logged"]),
   /** In the member's unit. */
-  weight: z.number().min(0).max(1500).nullable(),
+  weight: z.number().min(5).max(1500).nullable(),
   reps: z.number().int().min(1).max(30).nullable(),
 });
 const startZ = z.object({
   key: z.string().min(1).max(80),
   unit: z.enum(["kg", "lb"]),
   step: z.enum(["2.5kg", "1.25kg", "5lb"]),
-  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(saneStartDate, "Pick a start date between last week and a year from now."),
   weekdays: z.array(z.number().int().min(1).max(7)).max(7),
   maxes: z.array(maxEntryZ).max(5),
 });
