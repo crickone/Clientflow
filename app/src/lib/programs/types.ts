@@ -181,6 +181,15 @@ export interface FixedVolumeSettings {
 
 export type EngineSettings = LinearSettings | TmCycleSettings | FixedBlockSettings | DoubleProgressionSettings | FixedVolumeSettings | OwnRulesSettings;
 
+/** One stretch of a program, in the program's own week numbers (1-based, inclusive). */
+export interface Phase {
+  name: string;
+  fromWeek: number;
+  toWeek: number;
+  /** What the phase is like, in a sentence or two. */
+  note: string;
+}
+
 export interface ProgramTemplate {
   key: string;
   name: string;
@@ -201,6 +210,17 @@ export interface ProgramTemplate {
   description: string;
   /** For demanding programs. */
   warning?: string;
+  /** One plain line for the card and the top of the program page. Platform programs always have one. */
+  summary?: string;
+  /**
+   * The program's shape, in order, with no gaps. Without phasesRepeat they run
+   * from week 1 to lengthWeeks; with it they describe one pass through `weeks`,
+   * which then repeats.
+   */
+  phases?: Phase[];
+  phasesRepeat?: boolean;
+  /** Two or three short sentences on the method. No claims of results. */
+  whyItWorks?: string;
   engine: EngineSettings;
   weeks: WeekRx[];
 }

@@ -82,6 +82,13 @@ const engineZ = z.discriminatedUnion("key", [
   z.object({ key: z.literal("own_rules") }),
 ]);
 
+const phaseZ = z.object({
+  name: z.string().trim().min(1).max(40),
+  fromWeek: z.number().int().min(1).max(52),
+  toWeek: z.number().int().min(1).max(52),
+  note: z.string().trim().max(300),
+});
+
 const templateZ = z.object({
   key: z.string().trim().min(1).max(80),
   name: z.string().trim().min(1).max(80),
@@ -95,6 +102,10 @@ const templateZ = z.object({
   who: z.string().trim().min(1).max(200),
   description: z.string().trim().min(1).max(1200),
   warning: z.string().trim().max(200).optional(),
+  summary: z.string().trim().min(1).max(200).optional(),
+  phases: z.array(phaseZ).min(1).max(12).optional(),
+  phasesRepeat: z.boolean().optional(),
+  whyItWorks: z.string().trim().min(1).max(600).optional(),
   engine: engineZ,
   weeks: z.array(weekZ).min(1).max(26),
 });
@@ -106,6 +117,8 @@ const FIELD_LABEL: Record<string, string> = {
   who: "line for who it is for",
   description: "description",
   warning: "warning line",
+  summary: "summary",
+  whyItWorks: "line on why it works",
   label: "week label",
   notes: "notes",
 };
@@ -171,6 +184,8 @@ function plainMessage(issue: z.core.$ZodIssue, field: string | null, value: unkn
     case "notes":
       return `the notes are too long (${max} characters at most).`;
     case "warning":
+    case "summary":
+    case "whyItWorks":
     case "label":
       return `the ${label} is too long (${max} characters at most).`;
     case "reps":

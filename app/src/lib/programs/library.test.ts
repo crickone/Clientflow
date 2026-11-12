@@ -162,6 +162,18 @@ const requireLocal = createRequire(import.meta.url);
         lib.deleteCopy(bad.id);
       }
 
+      // ── a copy's own summary, phases and why it works survive a save ──
+      const withContent = structuredClone(lib.getCopy(id)!.template);
+      withContent.summary = "Our three-day Smolov.";
+      withContent.phases = [{ name: "Base", fromWeek: 1, toWeek: 5, note: "Our base weeks." }];
+      withContent.whyItWorks = "Our reasons.";
+      assert.deepEqual(lib.saveCopy(id, withContent), { ok: true });
+      const kept = lib.getCopy(id)!.template;
+      assert.equal(kept.summary, "Our three-day Smolov.");
+      assert.deepEqual(kept.phases, [{ name: "Base", fromWeek: 1, toWeek: 5, note: "Our base weeks." }]);
+      assert.equal(kept.whyItWorks, "Our reasons.");
+
+
       // ── unhide, delete ──
       assert.equal(lib.setHidden("smolov-base", false, 7), true);
       assert.equal(lib.hiddenKeys().size, 0);

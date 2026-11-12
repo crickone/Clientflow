@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { programLibraryHidden, programTemplates } from "@/lib/db/schema";
 import { PLATFORM_PROGRAMS, platformProgram } from "./registry";
 import type { ProgramTemplate } from "./types";
+import { withContentFrom } from "./content";
 import { isFullBlock, mostDays } from "./editing";
 import { copyErrors, parseTemplate, templateErrors } from "./validate";
 
@@ -62,7 +63,8 @@ function toCopy(r: typeof programTemplates.$inferSelect): CopyRow | null {
     console.error("[programs] gym copy fails the template check", r.id, parsed.errors.join(" | "));
     return null;
   }
-  const template = parsed.template;
+  // A copy made before programs had a summary, phases and why it works takes them from its original.
+  const template = withContentFrom(parsed.template, platformProgram(r.basedOn));
   return {
     id: r.id,
     basedOn: r.basedOn,
