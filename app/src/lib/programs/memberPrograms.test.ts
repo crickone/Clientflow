@@ -5,8 +5,9 @@
 // for percent lifts, run a session through the own-rules engine, edit while
 // running (one transaction, kept/new/removed weights, the change log), an
 // open session finishing on the old version, the current week removed, the
-// three starting points, last session's weight, a member's own max, and
-// delete refused while running. Each case runs on its own member.
+// three starting points, last session's weight, a member's own max, the
+// staff view and a coach max, and delete refused while running. Each case
+// runs on its own member.
 import assert from "node:assert/strict";
 import Module from "node:module";
 import { createRequire } from "node:module";
@@ -43,6 +44,7 @@ const requireLocal = createRequire(import.meta.url);
   const { matchLibraryId } = requireLocal("./exercises") as typeof import("./exercises");
   const { exerciseKey } = requireLocal("../workoutLogModel") as typeof import("../workoutLogModel");
   const { blankMemberTemplate } = requireLocal("./memberTemplate") as typeof import("./memberTemplate");
+  const { programPanelData } = requireLocal("./staffView") as typeof import("./staffView");
 
   const slug = "programs-member-built-test";
   const dbFile = `tenants/${slug}/${slug}.db`;
@@ -377,6 +379,21 @@ const requireLocal = createRequire(import.meta.url);
     } finally {
       db.run(sql.raw("DROP TRIGGER IF EXISTS skip_update"));
     }
+  });
+
+  test("staff see it read-only, and a coach max keeps the working weights", () => {
+    const clientId = newMember();
+    const id = create(clientId);
+    const eid = startIt(clientId, id);
+    en.finishEnrolmentSession(clientId, logNext(clientId, 14));
+    const panel = programPanelData(clientId)!.live!;
+    assert.equal(panel.byline, "Built by the member");
+    assert.equal(panel.program![0].days[0].name, "Upper");
+    assert.equal(panel.program![0].days[1].lines[0], "Back squat: Percent of max. 1 x 3 at 80%, then 1 x 3+ at 85% of the squat max.");
+    assert.deepEqual(en.coachSetMax(clientId, eid, "squat", 160, staff), { ok: true });
+    const v = en.liveEnrolment(clientId)!;
+    assert.equal(v.state.tms.squat, 160);
+    assert.deepEqual(v.state.weights, { "linear:bench press": 62.5, "range:cable row@8-12": 50, "manual:hammer curl": 14 }, "the max never resets rule weights");
   });
 
   test("delete is refused while the program runs", () => {

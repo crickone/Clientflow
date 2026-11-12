@@ -3,6 +3,7 @@ import "server-only";
 
 import { enrolmentEvents, listEnrolments, liveEnrolment, planFor } from "./enrolments";
 import { getCopy } from "./library";
+import { parseMemberKey } from "./memberTemplate";
 import { PANEL_EVENT_LIMIT, panelFrom, type ProgramPanelData } from "./panel";
 
 /**
@@ -25,7 +26,15 @@ function buildPanel(clientId: number): ProgramPanelData | null {
   if (!live && past.length === 0) return null;
   return panelFrom({
     enrolment: live
-      ? { id: live.id, status: live.status, template: live.template, state: live.state, unit: live.unit, basedOnName: live.copyId ? (getCopy(live.copyId)?.basedOnName ?? null) : null }
+      ? {
+          id: live.id,
+          status: live.status,
+          template: live.template,
+          state: live.state,
+          unit: live.unit,
+          basedOnName: live.copyId ? (getCopy(live.copyId)?.basedOnName ?? null) : null,
+          memberBuilt: !!live.programKey && parseMemberKey(live.programKey) !== null,
+        }
       : null,
     plan: live && live.status === "active" ? planFor(live) : null,
     events: live ? enrolmentEvents(live.id, PANEL_EVENT_LIMIT) : [],

@@ -521,7 +521,8 @@ export function coachSetMax(clientId: number, enrolmentId: number, lift: LiftKey
   const next = clone(view.state);
   next.maxes[lift] = round2(kg);
   next.tms[lift] = trainingMax(kg, view.template.tmPct);
-  const fresh = initState(view.template, { [lift]: kg }, view.stepKg);
+  // A member-built program's weights come from its rules, never from a max: only percentages follow it.
+  const fresh = view.template.engine.key === "own_rules" ? emptyState() : initState(view.template, { [lift]: kg }, view.stepKg);
   for (const [k, w] of Object.entries(fresh.weights)) next.weights[k] = w;
   for (const [k, w] of Object.entries(fresh.t2Base)) next.t2Base[k] = w;
   const fmt = (n: number) => formatWeight(n, view.unit);

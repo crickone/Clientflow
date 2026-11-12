@@ -87,6 +87,30 @@ export function ClientProgramPanel({ clientId, data }: { clientId: number; data:
             </div>
           )}
 
+          {live.program && (
+            <div className="dp-card">
+              <div className="dp-card-title">Their program</div>
+              <div className="dp-note">The member built this program. Staff can correct a max or move the week; only the member edits the program.</div>
+              {live.program.map((w) => (
+                <div key={w.title} className="dp-event">
+                  <span className="dp-event-meta">{w.title}</span>
+                  {w.days.map((d, di) => (
+                    <div key={di} style={{ display: "grid", gap: 2 }}>
+                      <span className="dp-line" style={{ fontWeight: 600, color: "var(--text-primary)" }}>
+                        {d.name}
+                      </span>
+                      {d.lines.map((line, li) => (
+                        <span key={li} className="dp-line">
+                          {line}
+                        </span>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+
           {(live.lifts.length > 0 || live.weeks.length > 1) && (
             <div className="dp-forms">
               {live.lifts.length > 0 && (
