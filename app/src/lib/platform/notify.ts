@@ -30,12 +30,12 @@ export function setNotifyPrefs(userId: number, prefs: NotifyPrefs): void {
   setPlatformSetting(`notify:${userId}`, JSON.stringify({ instant: Boolean(prefs.instant), digest: Boolean(prefs.digest) }));
 }
 
+/** Alerts already open longer than this when first considered are marked seen, not emailed. */
+const INSTANT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
 export function shouldNotifyInstant(a: { level: "warn" | "bad"; notifiedAt: number | null; openedAt: number }, now: number): boolean {
   return a.level === "bad" && a.notifiedAt === null && now - a.openedAt <= INSTANT_MAX_AGE_MS;
 }
-
-/** Alerts already open longer than this when first considered are marked seen, not emailed. */
-const INSTANT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 export type SendEmail = typeof sendPlatformEmail;
 

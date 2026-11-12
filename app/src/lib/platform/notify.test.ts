@@ -30,10 +30,24 @@ function stub(ok: boolean) {
   return { calls, send };
 }
 const KEY = "notify-test:";
+// A scratch platform admin so the recipient lists are never empty, even on a fresh DB.
+const SCRATCH_EMAIL = "notify-test-staff@example.test";
 const notifiedAt = (key: string) => (controlSqlite.prepare("SELECT notified_at AS n FROM platform_alerts WHERE key = ?").get(key) as { n: number | null }).n;
+
+/** Removes scratch rows, including any left by a crashed earlier run. */
+function cleanupScratch(): void {
+  controlSqlite.prepare("DELETE FROM platform_alerts WHERE key LIKE ?").run(KEY + "%");
+  const stale = controlSqlite.prepare("SELECT id FROM users WHERE email = ?").all(SCRATCH_EMAIL) as Array<{ id: number }>;
+  for (const u of stale) controlSqlite.prepare("DELETE FROM platform_settings WHERE key = ?").run(`notify:${u.id}`);
+  controlSqlite.prepare("DELETE FROM users WHERE email = ?").run(SCRATCH_EMAIL);
+}
 
 async function main() {
   const now = Date.now();
+  cleanupScratch();
+  controlSqlite
+    .prepare("INSERT INTO users (email, name, password_hash, role, is_platform_admin, is_active, platform_role) VALUES (?, 'Notify Test', 'x', 'staff', 1, 1, 'owner')")
+    .run(SCRATCH_EMAIL);
   const insert = controlSqlite.prepare("INSERT INTO platform_alerts (tenant_id, key, level, title, opened_at, last_seen_at) VALUES (NULL, ?, 'bad', ?, ?, ?)");
   // Park real open alerts so only the scratch rows are considered.
   const parked = (controlSqlite.prepare("SELECT id FROM platform_alerts WHERE resolved_at IS NULL AND level = 'bad' AND notified_at IS NULL").all() as Array<{ id: number }>).map((r) => r.id);
@@ -46,6 +60,7 @@ async function main() {
     const a = stub(true);
     assert.equal(await sendInstantAlerts(now, a.send), 1);
     assert.equal(a.calls.length, 1, "one email");
+    assert.ok(a.calls[0].to.includes(SCRATCH_EMAIL), "scratch staff member is a recipient");
     assert.match(a.calls[0].html, /New &lt;thing&gt;/);
     assert.doesNotMatch(a.calls[0].html, /Old thing/, "long-open alert is not listed");
     assert.doesNotMatch(a.calls[0].subject, /[\r\n]/);
@@ -69,6 +84,7 @@ async function main() {
     assert.equal(d.calls.length, 0, "nothing before 08:00");
     assert.equal(await sendDailyDigest(nine, d.send), true);
     assert.equal(d.calls.length, 1);
+    assert.ok(d.calls[0].to.includes(SCRATCH_EMAIL), "scratch staff member gets the digest");
     assert.equal(await sendDailyDigest(nine + 60_000, d.send), false);
     assert.equal(d.calls.length, 1, "once a day");
     const next = nine + 86400_000;
@@ -79,7 +95,7 @@ async function main() {
     assert.equal(d.calls.length, 2, "a failed digest is retried");
     console.log("notify.test.ts: ok");
   } finally {
-    controlSqlite.prepare("DELETE FROM platform_alerts WHERE key LIKE ?").run(KEY + "%");
+    cleanupScratch();
     for (const id of parked) controlSqlite.prepare("UPDATE platform_alerts SET notified_at = NULL WHERE id = ?").run(id);
     controlSqlite.prepare("DELETE FROM cron_state WHERE key = 'alert_digest_last_run'").run();
     if (prevClaim) controlSqlite.prepare("INSERT INTO cron_state (key, value) VALUES ('alert_digest_last_run', ?)").run(prevClaim.value);
