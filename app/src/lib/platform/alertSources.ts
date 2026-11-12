@@ -4,6 +4,7 @@ import { controlSqlite, getCronState } from "@/lib/db/control";
 import { getMonthlyUsageCents, getTenantCapCents } from "@/lib/ai/usage";
 import { dublinToday } from "@/lib/billing/dates";
 import { getFleetHealth } from "./health";
+import { isBackupConfigured } from "@/lib/backup/config";
 import { latestJobRuns, type JobRunRow } from "./jobRuns";
 import type { AlertCandidate } from "./healthHistory";
 
@@ -19,7 +20,6 @@ export interface BillingFacts {
   name: string;
   status: string | null;
   exempt: boolean;
-  archived: boolean;
   nextRenewalAt: string | null;
   failedAttempts: number;
   /** "MM/YY" as stored on the card row. */
@@ -34,7 +34,7 @@ function monthsAhead(today: string, n: number): string {
 }
 
 export function billingAlerts(f: BillingFacts, today: string): AlertCandidate[] {
-  if (f.archived || f.exempt || !f.status) return [];
+  if (f.exempt || !f.status) return [];
   const out: AlertCandidate[] = [];
   const href = `/gyms/${f.tenantId}/money`;
   if (f.status === "past_due") {
@@ -81,7 +81,7 @@ export function schedulerAlerts(schedulers: { key: string; label: string; lastRu
     out.push({
       tenantId: null,
       key: `scheduler:${s.key}`,
-      level: late >= 2 ? "bad" : "warn",
+      level: late >= 3 ? "bad" : "warn",
       title: s.lastRun ? `${s.label} last ran ${s.lastRun}, ${late} days ago` : `${s.label} has never run`,
       href: "/jobs",
     });
@@ -153,14 +153,13 @@ export function collectAlertCandidates(
   // Billing and AI cap.
   const billing = controlSqlite
     .prepare(
-      `SELECT t.id, t.name, t.archived_at, b.status, b.billing_exempt, b.next_renewal_at, b.failed_attempts, b.card_expiry
+      `SELECT t.id, t.name, b.status, b.billing_exempt, b.next_renewal_at, b.failed_attempts, b.card_expiry
        FROM tenants t LEFT JOIN tenant_billing b ON b.tenant_id = t.id WHERE t.is_active = 1`,
     )
-    .all() as Array<{ id: number; name: string; archived_at: number | null; status: string | null; billing_exempt: number | null; next_renewal_at: string | null; failed_attempts: number | null; card_expiry: string | null }>;
+    .all() as Array<{ id: number; name: string; status: string | null; billing_exempt: number | null; next_renewal_at: string | null; failed_attempts: number | null; card_expiry: string | null }>;
   for (const b of billing) {
     if (!inFleet.has(b.id)) continue;
-    candidates.push(...billingAlerts({ tenantId: b.id, name: b.name, status: b.status, exempt: Boolean(b.billing_exempt), archived: b.archived_at !== null, nextRenewalAt: b.next_renewal_at, failedAttempts: b.failed_attempts ?? 0, cardExpiry: b.card_expiry }, today));
-    if (b.archived_at !== null) continue;
+    candidates.push(...billingAlerts({ tenantId: b.id, name: b.name, status: b.status, exempt: Boolean(b.billing_exempt), nextRenewalAt: b.next_renewal_at, failedAttempts: b.failed_attempts ?? 0, cardExpiry: b.card_expiry }, today));
     try {
       const a = aiCapAlert(b.id, b.name, getMonthlyUsageCents(b.id), getTenantCapCents(b.id));
       if (a) candidates.push(a);
@@ -180,16 +179,30 @@ export function collectAlertCandidates(
   for (const g of fleetScoped(meta)) candidates.push({ tenantId: g.tenantId, key: "integration:meta", level: "warn", title: `${g.name}: the Meta connection needs reconnecting${g.needs_reconnect_reason ? ` (${g.needs_reconnect_reason})` : ""}`, href: `/gyms/${g.tenantId}/integrations` });
 
   // Platform-wide: stale schedulers and failed jobs (a run still in progress has ok === null and raises nothing).
+  const backupOn = isBackupConfigured();
+  const latest = latestJobRuns();
+  const backupJobFailing = latest.some((r) => r.key === "nightly_backup" && r.ok === false);
   const schedulers = [
     { key: "last_daily_run", label: "Daily jobs", lastRun: safe("last_daily_run") },
     { key: "lapse_last_run", label: "Lapsed-member sweep", lastRun: safe("lapse_last_run") },
     { key: "billing_last_run", label: "Billing run", lastRun: safe("billing_last_run") },
-    { key: "backup_last_run", label: "Nightly backup", lastRun: safe("backup_last_run") },
+    // One cause, one alert: skip the scheduler when backups are off or the job already reports its failure.
+    ...(backupOn && !backupJobFailing ? [{ key: "backup_last_run", label: "Nightly backup", lastRun: safe("backup_last_run") }] : []),
   ];
   candidates.push(...schedulerAlerts(schedulers, today));
-  candidates.push(...jobAlerts(latestJobRuns()));
+  candidates.push(...jobAlerts(latest));
+  if (!backupOn) {
+    candidates.push({ tenantId: null, key: "backup:not_configured", level: "warn", title: "Nightly backups are not configured (no backup storage keys).", href: "/jobs" });
+  }
 
-  return { candidates, tenantIds: plan.tenantIds };
+  // Businesses that left the fleet (archived, is_active = 0) produce no candidates, so putting them in
+  // the resolve scope closes whatever alerts they still hold.
+  const gone = controlSqlite
+    .prepare(`SELECT DISTINCT a.tenant_id AS id FROM platform_alerts a JOIN tenants t ON t.id = a.tenant_id WHERE a.resolved_at IS NULL AND t.is_active = 0`)
+    .all() as Array<{ id: number }>;
+  const tenantIds = [...plan.tenantIds, ...gone.map((g) => g.id)];
+
+  return { candidates, tenantIds };
 }
 
 function safe(key: string): string | null {
