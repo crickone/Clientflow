@@ -7,7 +7,7 @@
 import assert from "node:assert/strict";
 
 import { PLATFORM_PROGRAMS, platformProgram } from "./registry";
-import { plannedSessionCount, runProblems, scriptedMisses, simulate } from "./simulate";
+import { perfect, plannedSessionCount, runProblems, scriptedMisses, simulate, type Performer } from "./simulate";
 import { STEP_5LB_KG } from "./units";
 import { validateTemplate } from "./validate";
 
@@ -32,6 +32,24 @@ for (const t of PLATFORM_PROGRAMS) {
 }
 
 assert.equal(platformProgram("no-such-program"), null);
+
+// The miss path is really exercised: scripted misses end somewhere different from a perfect run.
+{
+  const lp = platformProgram("stronglifts-5x5")!;
+  const maxes = Object.fromEntries(lp.lifts.map((l) => [l, 100]));
+  const good = simulate(lp, { maxes });
+  const bad = simulate(lp, { maxes, performer: scriptedMisses(3) });
+  assert.notDeepEqual(bad.final.weights, good.final.weights, "scripted misses change the final weights");
+  assert.notDeepEqual(bad.reasons, good.reasons, "scripted misses change the reasons");
+  // scriptedMisses(3) never misses one lift three times running, so add a performer that does.
+  const squatStall: Performer = (c) => {
+    const p = perfect(c);
+    return c.exercise.name === "Back squat" && c.n >= 3 && c.setIndex === c.exercise.sets.length - 1 ? { ...p, reps: 3 } : p;
+  };
+  const stall = simulate(lp, { maxes, sessions: 6, performer: squatStall });
+  assert.ok(stall.reasons.flat().some((r) => /10% lighter\. You missed reps three sessions in a row\./.test(r)), "three misses in a row deload by 10%");
+  assert.ok(stall.final.weights["back squat"] < good.states[5].weights["back squat"], "the stalled squat ends lighter");
+}
 
 // The check refuses what it should.
 const sl = platformProgram("stronglifts-5x5")!;

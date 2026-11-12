@@ -24,7 +24,7 @@ export const sheikoStyle: ProgramTemplate = {
   tmPct: 1,
   who: "Powerlifters preparing for a meet who respond well to frequent practice.",
   description:
-    "The squat, bench and deadlift practised often at moderate weights. Each lift climbs through lighter sets to work sets of doubles and triples between 70% and 85%, three days a week for four weeks, then a test week. The numbers are ours, in Sheiko's style. This is not one of his numbered programs.",
+    "The squat, bench and deadlift practised often at moderate weights. Each lift climbs through lighter sets to work sets of mostly doubles, triples and fours between 70% and 85%, three days a week for four weeks, then a test week. The numbers are ours, in Sheiko's style. This is not one of his numbered programs.",
   warning: "Bench three times a week and a lot of total sets. Built for lifters preparing for a meet.",
   engine: { key: "fixed_block" },
   weeks: [

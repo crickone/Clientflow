@@ -81,6 +81,7 @@ export function runProblems(run: SimRun): string[] {
     for (const e of s.exercises)
       for (const set of e.sets) {
         if (set.kg !== null && !(Number.isFinite(set.kg) && set.kg > 0 && set.kg < 1000)) out.push(`session ${n + 1} ${e.name}: weight ${set.kg}`);
+        if (set.kg === null && e.lift && !e.bodyweight) out.push(`session ${n + 1} ${e.name}: no weight planned`);
         if (!(set.reps >= 1)) out.push(`session ${n + 1} ${e.name}: reps ${set.reps}`);
       }
   });

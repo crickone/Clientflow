@@ -59,4 +59,20 @@ const gsOne = simulate(gs, { maxes: gsMaxes, sessions: 1, stepKg: 1.25 });
 assert.equal(gsOne.final.weights["bench press"], 41.25);
 assert.equal(gsOne.final.weights["back squat"], 52.5);
 
+// Greyskull + set: 10 or more reps doubles the next jump (small plates, so the doubling shows)
+const plusTen: Performer = (c) => (c.exercise.name === "Bench press" && c.set.amrap ? { kg: c.set.kg, reps: 10, done: true } : perfect(c));
+const gsJump = simulate(gs, { maxes: gsMaxes, sessions: 1, stepKg: 1.25, performer: plusTen });
+assert.equal(gsJump.final.weights["bench press"], 42.5);
+assert.ok(gsJump.reasons[0].includes("Next bench press 42.5 kg. You got 10 on the last set, so it goes up twice as much."));
+assert.equal(gsJump.final.weights["back squat"], 52.5);
+// the same session with 7 reps goes up a single jump
+assert.equal(gsOne.final.weights["bench press"], 41.25);
+
+// Greyskull + set under the minimum: 10% reset, rounded to the default 2.5 kg step
+const plusMiss: Performer = (c) => (c.exercise.name === "Bench press" && c.set.amrap ? { kg: c.set.kg, reps: 4, done: true } : perfect(c));
+const gsReset = simulate(gs, { maxes: gsMaxes, sessions: 1, performer: plusMiss });
+assert.equal(gsReset.final.weights["bench press"], 35);
+assert.ok(gsReset.reasons[0].some((r) => r.startsWith("Next bench press 35 kg, 10% lighter.")), gsReset.reasons[0].join(" | "));
+assert.equal(gsReset.final.weights["back squat"], 52.5);
+
 console.log("programs/templates/beginner: ok");

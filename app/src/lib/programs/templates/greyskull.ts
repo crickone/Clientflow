@@ -28,7 +28,7 @@ export const greyskullLp: ProgramTemplate = {
   tmPct: 1,
   who: "Newer lifters who like to push the last set.",
   description:
-    "Two workouts, alternated three days a week. Two sets of five, then a last set for as many reps as you can. Upper-body lifts go up 1.25 kg a session and lower-body lifts 2.5 kg. Ten or more reps on the last set doubles the next jump. Fall short of five on any set and that lift drops 10%.",
+    "Two workouts, alternated three days a week. Two sets of five, then a last set for as many reps as you can. Upper-body lifts go up 2.5 kg a session, or 1.25 kg with small plates. Squat and deadlift go up 2.5 kg. Ten or more reps on the last set doubles the next jump. Fall short of five on any set and that lift drops 10%.",
   engine: { key: "linear", increment: 1.25, increments: { squat: 2.5, deadlift: 2.5 }, deloadAfter: 1, deloadPct: 0.1, startPct: 0.5, doubleAt: 10 },
   weeks: [week([A, B, A]), week([B, A, B])],
 };

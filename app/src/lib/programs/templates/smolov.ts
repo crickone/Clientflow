@@ -19,7 +19,7 @@ export const smolovBase: ProgramTemplate = {
   tmPct: 1,
   who: "Experienced squatters who want a big jump in their squat max.",
   description:
-    "The base block of Smolov's squat program. Four squat sessions a week for three weeks: 4 x 9 at 70%, 5 x 7 at 75%, 7 x 5 at 80% and 10 x 3 at 85% of your max. Week two adds 10 kg to every set and week three adds 15 kg. Week four is a test of your new max.",
+    "The base block of Smolov's squat program. Four squat sessions a week for three weeks: 4 x 9 at 70%, 5 x 7 at 75%, 7 x 5 at 80% and 10 x 3 at 85% of your max. Week two adds 10 kg over week one and week three adds 15 kg over week one. Week four is a test of your new max.",
   warning: "Squats four days a week at high volume. Only for lifters with a year or more of steady squatting.",
   engine: { key: "fixed_block" },
   weeks: [baseWeek(0, "Base"), baseWeek(10, "Base, plus 10 kg"), baseWeek(15, "Base, plus 15 kg"), week([day("Test day", [maxTest("Back squat", "squat")], true)], "Test")],
@@ -34,7 +34,7 @@ function smolovJr(lift: LiftKey, name: string, key: string, title: string, adds:
   return {
     key,
     name: title,
-    author: "Smolov Jr, the short version of Sergey Smolov's program",
+    author: "Smolov Jr, adapted from Sergey Smolov's program",
     family: "peaking",
     level: "intermediate",
     daysPerWeek: 4,
@@ -42,7 +42,7 @@ function smolovJr(lift: LiftKey, name: string, key: string, title: string, adds:
     lifts: [lift],
     tmPct: 1,
     who: `Lifters who want a quick jump in their ${name.toLowerCase()} max.`,
-    description: `A three-week block on one lift, four sessions a week: 6 x 6 at 70%, 7 x 5 at 75%, 8 x 4 at 80% and 10 x 3 at 85% of your max. Week two adds ${adds[0]} kg to every set and week three adds ${adds[1]} kg. A fourth week tests your new max.`,
+    description: `A three-week block on one lift, four sessions a week: 6 x 6 at 70%, 7 x 5 at 75%, 8 x 4 at 80% and 10 x 3 at 85% of your max. Week two adds ${adds[0]} kg over week one and week three adds ${adds[1]} kg over week one. A fourth week tests your new max.`,
     warning: "Four heavy sessions a week on one lift. For lifters with at least a year of steady training.",
     engine: { key: "fixed_block" },
     weeks: [
