@@ -5,7 +5,7 @@
  * unit; a jump the engine rounds to the member's smallest jump is shown
  * rounded. Pure.
  */
-import { listText } from "./content";
+import { listText, weeksText } from "./content";
 import { barKg } from "./engines";
 import { progresses, schemeLabel } from "./planner";
 import { LIFT_LABEL, OWN_DELOAD_PCT, type ExerciseRx, type LiftKey, type ProgramTemplate, type SetRx, type WeightUnit } from "./types";
@@ -82,15 +82,20 @@ export function ruleSentence(ex: ExerciseRx, unit: WeightUnit, stepKg: number): 
   const name = ex.name.trim() || "This exercise";
   const n = ex.sets.length;
   if (!r) return `${name} follows the program.`;
+  // The planner plans no weight for a bodyweight exercise and the engine keeps none, whatever its rule.
+  if (ex.bodyweight) return `${name} uses your bodyweight. Add reps when you can.`;
   switch (r.kind) {
     case "linear": {
       const jump = stepJump(r.incKg, unit, stepKg);
       const misses = r.deloadAfter <= 1 ? "a miss" : `${word(r.deloadAfter)} misses in a row`;
-      if (jump === null) return `${name} adds ${formatWeight(r.incKg, unit)}, less than your smallest jump, so its weight stays the same.`;
-      return `${name} goes up ${jump} after a session with every rep, and drops ${Math.round(OWN_DELOAD_PCT * 100)}% after ${misses}.`;
+      const drop = `${Math.round(OWN_DELOAD_PCT * 100)}%`;
+      if (jump === null) return `${name} adds ${formatWeight(r.incKg, unit)}, less than your smallest jump, so it only changes when it drops ${drop} after ${misses}.`;
+      return `${name} goes up ${jump} after a session with every rep, and drops ${drop} after ${misses}.`;
     }
     case "range": {
-      const jump = stepJump(r.incKg ?? stepKg, unit, stepKg) ?? formatWeight(stepKg, unit);
+      const inc = r.incKg ?? stepKg;
+      const jump = stepJump(inc, unit, stepKg);
+      if (jump === null) return `${name} adds ${formatWeight(inc, unit)}, less than your smallest jump, so its weight stays the same.`;
       const tops = unique(ex.sets.map((s) => (s.kind === "fixed" && typeof s.reps !== "number" ? s.reps.max : null)));
       const bottoms = unique(ex.sets.map((s) => (s.kind === "fixed" ? (typeof s.reps === "number" ? s.reps : s.reps.min) : null)));
       const when = tops.length === 1 && tops[0] !== null ? (n === 1 ? `your set reaches ${tops[0]} reps` : `all ${n} sets reach ${tops[0]} reps`) : "every set reaches the top of its range";
@@ -117,11 +122,33 @@ export function ruleSentence(ex: ExerciseRx, unit: WeightUnit, stepKg: number): 
   }
 }
 
+/**
+ * "Ten or more reps on the last set doubles the jump on the squat and deadlift."
+ * Only the lifts whose doubled jump lands on a different weight at the member's
+ * step (and that end on a + set); null when none does.
+ */
+function doubleLine(t: ProgramTemplate, e: Extract<ProgramTemplate["engine"], { key: "linear" }>, stepKg: number): string | null {
+  if (e.doubleAt === undefined) return null;
+  const moving = movingLifts(t);
+  const plusLifts = new Set(exercises(t).filter((ex) => ex.lift && progresses(ex) && allSets(ex).some((s) => s.kind === "fixed" && s.amrap)).map((ex) => ex.lift as LiftKey));
+  const base = roundToStep(60, stepKg);
+  const doubled = moving.filter((l) => {
+    const inc = e.increments?.[l] ?? e.increment;
+    return plusLifts.has(l) && Math.abs(roundToStep(base + 2 * inc, stepKg) - roundToStep(base + inc, stepKg)) > 0.005;
+  });
+  if (doubled.length === 0) return null;
+  const on = doubled.length === moving.length ? "" : ` on the ${listText(doubled.map((l) => LIFT_LABEL[l].toLowerCase()))}`;
+  return `${cap(word(e.doubleAt))} or more reps on the last set doubles the jump${on}.`;
+}
+
 function linearLines(t: ProgramTemplate, e: Extract<ProgramTemplate["engine"], { key: "linear" }>, unit: WeightUnit, stepKg: number): string[] {
   const lines = [startLine(t, e.startPct)];
   const jumps = jumpsByLift(movingLifts(t), e.increment, e.increments, (kg) => stepJump(kg, unit, stepKg));
   if (jumps) lines.push(`Get every rep on every set and the weight goes up next time: ${jumps}.`);
-  if (e.doubleAt !== undefined) lines.push(`${cap(word(e.doubleAt))} or more reps on the last set doubles the jump.`);
+  if (e.doubleAt !== undefined) {
+    const line = doubleLine(t, e, stepKg);
+    if (line) lines.push(line);
+  }
   lines.push(deloadLine(e.deloadAfter, e.deloadPct));
   lines.push(`A lift never drops below the empty bar (${formatWeight(barKg(stepKg), unit)}).`);
   return lines;
@@ -138,9 +165,17 @@ function tmLines(t: ProgramTemplate, e: Extract<ProgramTemplate["engine"], { key
   switch (e.rule) {
     case "cycle": {
       const jumps = jumpsByLift(t.lifts, e.increment, e.increments, raw);
-      if (exercises(t).some((ex) => ex.sets.some((s) => s.kind === "amrap"))) lines.push("The last set of each main lift is as many reps as you can.");
+      const plusWeeks = t.weeks.flatMap((w, i) => (w.days.some((d) => d.exercises.some((ex) => ex.sets.some((s) => s.kind === "amrap"))) ? [i + 1] : []));
+      if (plusWeeks.length) {
+        const contiguous = plusWeeks[plusWeeks.length - 1] - plusWeeks[0] === plusWeeks.length - 1;
+        const when = plusWeeks.length === t.weeks.length ? "" : contiguous ? ` in ${weeksText(plusWeeks[0], plusWeeks[plusWeeks.length - 1]).toLowerCase()}` : ` in weeks ${listText(plusWeeks.map(String))}`;
+        lines.push(`The last set of each main lift${when} is as many reps as you can.`);
+      }
       if (jumps) lines.push(`After each ${word(t.weeks.length)}-week cycle, your training max goes up ${jumps}.`);
-      lines.push("If a lift's last set falls short of its reps, is lighter than planned or is not logged, that lift's training max stays the same for the next cycle.");
+      // The engine marks a lift short only from a finished session; a skipped one runs nothing but the end of the cycle.
+      lines.push(
+        "If you finish a session and its + set falls short, isn't ticked, or is lighter than planned, that lift's training max stays the same for the next cycle. Skipped sessions don't hold it back.",
+      );
       break;
     }
     case "amrap_table": {
@@ -151,13 +186,14 @@ function tmLines(t: ProgramTemplate, e: Extract<ProgramTemplate["engine"], { key
         return row.kg > 0 ? `${reps} reps adds ${formatWeight(row.kg, unit)}` : `${reps} reps changes nothing`;
       });
       if (parts.length) lines.push(`The reps on the heavy + set move your training max: ${listText(parts)}.`);
+      lines.push("If the + set isn't ticked or is lighter than planned, the training max stays the same.");
       break;
     }
     case "drive_set": {
       const jumps = jumpsByLift(t.lifts, e.increment, e.increments, raw);
       const top = driveReps.length === 1 ? `all ${driveReps[0]} reps` : "every rep";
       if (jumps) lines.push(`Get ${top} on a top set and that lift's training max goes up ${jumps}.`);
-      lines.push("Miss a rep on the top set and it stays the same.");
+      lines.push("If the top set falls short, isn't ticked, or is lighter than planned, the training max stays the same.");
       break;
     }
     case "gzclp": {
@@ -174,7 +210,7 @@ function tmLines(t: ProgramTemplate, e: Extract<ProgramTemplate["engine"], { key
       if (s1.length >= 2) lines.push(`Miss on a main lift and it moves on to ${s1.slice(1).join(", then ")} at the same weight. Miss on ${s1[s1.length - 1]} and it goes back to ${s1[0]} at 85% of that weight.`);
       const s2 = schemes(t2);
       const reset = stepJump(e.t2ResetKg ?? 5, unit, stepKg);
-      if (s2.length >= 2 && reset) lines.push(`Miss on a second lift and it moves on to ${s2.slice(1).join(", then ")}. After ${s2[s2.length - 1]} it goes back to ${s2[0]}, ${reset} heavier than it last started.`);
+      if (s2.length >= 2 && reset) lines.push(`Miss on a second lift and it moves on to ${s2.slice(1).join(", then ")}. Miss on ${s2[s2.length - 1]} and it goes back to ${s2[0]}, ${reset} heavier than it last started.`);
       if (t3) lines.push(`Accessories (T3) go up ${formatWeight(stepKg, unit)} once the last set reaches ${e.t3AmrapTarget ?? 25} reps.`);
       break;
     }
@@ -182,13 +218,19 @@ function tmLines(t: ProgramTemplate, e: Extract<ProgramTemplate["engine"], { key
   return lines;
 }
 
-function blockLines(t: ProgramTemplate, unit: WeightUnit): string[] {
+/** An add-on as the member sees it: "10 kg", or "about 20 lb" when it is not a whole number of their jumps. */
+function addText(kg: number, unit: WeightUnit, stepKg: number): string {
+  const r = roundToStep(kg, stepKg);
+  return Math.abs(r - kg) < 0.005 || r <= 0 ? formatWeight(kg, unit) : `about ${formatWeight(r, unit)}`;
+}
+
+function blockLines(t: ProgramTemplate, unit: WeightUnit, stepKg: number): string[] {
   const lines = [`Every weight is a percentage of the ${t.tmPct === 1 ? "max" : "training max"} you enter.`];
   const addOf = (s: SetRx) => (s.kind === "pct" || s.kind === "amrap" ? (s.addKg ?? 0) : 0);
   const adds = t.weeks
     .map((w, i) => ({ week: i + 1, kg: Math.max(0, ...w.days.flatMap((d) => d.exercises.flatMap((ex) => ex.sets.map(addOf)))) }))
     .filter((a) => a.kg > 0);
-  if (adds.length) lines.push(`${cap(listText(adds.map((a) => `week ${a.week} adds ${formatWeight(a.kg, unit)}`)))} to every set.`);
+  if (adds.length) lines.push(`${cap(listText(adds.map((a) => `week ${a.week} adds ${addText(a.kg, unit, stepKg)}`)))} to every set.`);
   lines.push("The weights are set from the start. They do not change with how a session goes.");
   if (t.weeks.some((w) => w.days.some((d) => d.test))) lines.push("The test day reads your new max from your best set. Start the block again from it.");
   return lines;
@@ -203,7 +245,7 @@ export function howWeightsMove(t: ProgramTemplate, unit: WeightUnit, stepKg: num
     case "tm_cycle":
       return [...tmLines(t, e, unit, stepKg), ...leftAlone(t)];
     case "fixed_block":
-      return [...blockLines(t, unit), ...leftAlone(t)];
+      return [...blockLines(t, unit, stepKg), ...leftAlone(t)];
     case "double_progression":
       return [
         "You pick each starting weight.",
@@ -218,8 +260,13 @@ export function howWeightsMove(t: ProgramTemplate, unit: WeightUnit, stepKg: num
       if (jump) lines.push(`Get every rep on every set and the weight goes up ${jump} next time. Until then it stays the same.`);
       return [...lines, ...leftAlone(t)];
     }
-    case "own_rules":
-      return unique(exercises(t).map((ex) => ruleSentence(ex, unit, stepKg)));
+    case "own_rules": {
+      const lines = unique(exercises(t).map((ex) => ruleSentence(ex, unit, stepKg)));
+      // The engine reads a new max on a test day from each exercise with one of the program's lifts.
+      const testMoves = t.weeks.some((w) => w.days.some((d) => d.test && d.exercises.some((ex) => ex.lift && t.lifts.includes(ex.lift))));
+      if (testMoves) lines.push("A test day sets a new max from your best set. Its percentages use it from the next session.");
+      return lines;
+    }
     default: {
       const never: never = e;
       return never;

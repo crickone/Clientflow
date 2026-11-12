@@ -12,8 +12,8 @@ import { initState, progress, skipSession } from "./engines";
 import { matchLibraryId, namesFor } from "./exercises";
 import { programByKey } from "./library";
 import { parseMemberKey } from "./memberTemplate";
-import { dayAt, dayTitle, planSession, positionOf, stateKey, weekLabel } from "./planner";
-import { LIFT_EXERCISE, LIFT_LABEL, emptyState, type EngineState, type LiftKey, type PlannedSession, type ProgramTemplate, type SessionResult, type WeightUnit } from "./types";
+import { dayAt, dayTitle, planSession, positionOf, stateKey, weekLabel, type PlanContext } from "./planner";
+import { LIFT_EXERCISE, LIFT_LABEL, emptyState, type EngineState, type ExerciseRx, type LiftKey, type PlannedSession, type ProgramTemplate, type SessionResult, type WeightUnit } from "./types";
 import { MAX_SET_REPS, formatWeight, kgToUnit, maxFromSet, trainingMax } from "./units";
 
 /**
@@ -309,21 +309,26 @@ function historyKeys(name: string, lib: ReturnType<typeof libraryIndex>): string
   return [...keys];
 }
 
-/** The next session with every weight worked out, or null when finished or ended. */
-export function planFor(view: EnrolmentView): PlannedSession | null {
-  if (view.status === "ended" || view.state.finished) return null;
-  const d = dayAt(view.template, view.state.week, view.state.day);
-  if (!d) return null;
-  // RPE sets on an exercise with no max of its own take their weight from the member's logs.
+/**
+ * What the planner reads from a member's logs for these exercises (week 1 of
+ * the template when none are given): the best estimated max for an RPE set on
+ * an exercise with no max of its own, and, in a member-built program, last
+ * session's weight for an exercise the engine has no weight for yet.
+ */
+export function planContextFor(
+  clientId: number,
+  template: ProgramTemplate,
+  exercises: ExerciseRx[] = (template.weeks[0]?.days ?? []).flatMap((d) => d.exercises),
+): Required<Pick<PlanContext, "e1rm" | "lastKg">> {
   const lib = libraryIndex();
   // An exercise may have been logged under its library key or under any of its names, so look under all of them.
-  const keysOf = d.exercises.map((ex) => historyKeys(ex.name, lib));
-  const { best, previous, previousAt } = exerciseHistory(view.clientId, [...new Set(keysOf.flat())]);
-  const own = view.template.engine.key === "own_rules";
+  const keysOf = exercises.map((ex) => historyKeys(ex.name, lib));
+  const { best, previous, previousAt } = exerciseHistory(clientId, [...new Set(keysOf.flat())]);
+  const own = template.engine.key === "own_rules";
   const e1rm: Record<string, number> = {};
   // A member-built exercise with no weight yet plans last time's weight.
   const lastKg: Record<string, number> = {};
-  d.exercises.forEach((ex, i) => {
+  exercises.forEach((ex, i) => {
     const ks = keysOf[i];
     const bests = ks.map((k) => best[k]).filter((v): v is number => v !== undefined);
     if (bests.length && !ex.lift) e1rm[stateKey(ex)] = Math.max(...bests);
@@ -337,7 +342,16 @@ export function planFor(view: EnrolmentView): PlannedSession | null {
       }
     }
   });
-  return planSession(view.template, view.state, { stepKg: view.stepKg, e1rm, lastKg });
+  return { e1rm, lastKg };
+}
+
+/** The next session with every weight worked out, or null when finished or ended. */
+export function planFor(view: EnrolmentView): PlannedSession | null {
+  if (view.status === "ended" || view.state.finished) return null;
+  const d = dayAt(view.template, view.state.week, view.state.day);
+  if (!d) return null;
+  // RPE sets on an exercise with no max of its own take their weight from the member's logs.
+  return planSession(view.template, view.state, { stepKg: view.stepKg, ...planContextFor(view.clientId, view.template, d.exercises) });
 }
 
 /** "Workout A, week 3 of 8", or "..., week 1 of 4, round 2" after a restart. Weeks read as weekLabel does, the same as programWeek. */

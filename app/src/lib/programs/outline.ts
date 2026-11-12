@@ -5,7 +5,7 @@
  * why a planned weight is what it is. Pure: safe in client components.
  */
 import { initState } from "./engines";
-import { planExercise, setsFor, summarisePlanned, summariseRx } from "./planner";
+import { planExercise, setsFor, summarisePlanned, summariseRx, type PlanContext } from "./planner";
 import { LIFT_LABEL, type DayRx, type ExerciseRx, type LiftKey, type PlannedExercise, type ProgramTemplate, type WeightUnit } from "./types";
 import { formatWeight } from "./units";
 import { WEEKDAY_SHORT, addDays, isoWeekday } from "@/lib/trainingProgress";
@@ -81,14 +81,17 @@ export interface PreviewDay {
   lines: string[];
 }
 
-/** Week 1 with the member's weights: "Back squat 4 x 9 at 97.5 kg". Unweighted exercises say why. */
-export function firstWeek(t: ProgramTemplate, maxesKg: Partial<Record<LiftKey, number>>, stepKg: number, unit: WeightUnit): PreviewDay[] {
+/** What the app plans from a member's logs (planContextFor in enrolments.ts): best estimated maxes for RPE sets, last weights for member-built exercises. */
+export type PlanExtra = Pick<PlanContext, "e1rm" | "lastKg">;
+
+/** Week 1 with the member's weights: "Back squat 4 x 9 at 97.5 kg". Unweighted exercises say why. Pass `extra` so it plans what the app will. */
+export function firstWeek(t: ProgramTemplate, maxesKg: Partial<Record<LiftKey, number>>, stepKg: number, unit: WeightUnit, extra?: PlanExtra): PreviewDay[] {
   const state = initState(t, maxesKg, stepKg);
   return (t.weeks[0]?.days ?? []).map((d, di) => ({
     name: d.name,
     test: d.test === true,
     lines: d.exercises.map((ex, xi) => {
-      const p = planExercise(ex, xi, { ...state, week: 0, day: di }, { stepKg });
+      const p = planExercise(ex, xi, { ...state, week: 0, day: di }, { ...extra, stepKg });
       if (p.bodyweight) return `${ex.name} ${summarisePlanned(p.sets, unit)}, bodyweight`;
       if (p.sets.every((s) => s.kg === null)) return `${ex.name} ${summarisePlanned(p.sets, unit)}, you pick the weight`;
       return `${ex.name} ${summarisePlanned(p.sets, unit)}`;
@@ -97,13 +100,13 @@ export function firstWeek(t: ProgramTemplate, maxesKg: Partial<Record<LiftKey, n
 }
 
 /** The first sets of a lift from one max: "4 x 9 at 97.5 kg". Null when no weighted exercise in week 1 uses it. */
-export function firstSets(t: ProgramTemplate, lift: LiftKey, maxKg: number, stepKg: number, unit: WeightUnit): string | null {
+export function firstSets(t: ProgramTemplate, lift: LiftKey, maxKg: number, stepKg: number, unit: WeightUnit, extra?: PlanExtra): string | null {
   const state = initState(t, { [lift]: maxKg }, stepKg);
   const days = t.weeks[0]?.days ?? [];
   for (let di = 0; di < days.length; di++) {
     const xi = days[di].exercises.findIndex((ex) => ex.lift === lift && !ex.bodyweight);
     if (xi === -1) continue;
-    const p = planExercise(days[di].exercises[xi], xi, { ...state, week: 0, day: di }, { stepKg });
+    const p = planExercise(days[di].exercises[xi], xi, { ...state, week: 0, day: di }, { ...extra, stepKg });
     if (p.sets.every((s) => s.kg === null)) continue;
     return summarisePlanned(p.sets, unit);
   }

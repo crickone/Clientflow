@@ -9,6 +9,9 @@ import assert from "node:assert/strict";
 import { initState } from "./engines";
 import { daySeconds, firstSets, firstWeek, focusTag, lengthTag, sessionMinutes, shortDate, trainingDates, typicalWeek, weightWhy, wholeProgram } from "./outline";
 import { planExercise } from "./planner";
+import { applyRule, newExercise } from "./memberEditing";
+import { blankMemberTemplate } from "./memberTemplate";
+import { planSession, stateKey } from "./planner";
 import { PLATFORM_PROGRAMS, platformProgram } from "./registry";
 import { STEP_5LB_KG } from "./units";
 
@@ -67,6 +70,21 @@ assert.equal(firstSets(get("smolov-base"), "squat", 140, 2.5, "kg"), "4 x 9 at 9
 assert.equal(firstSets(get("smolov-base"), "squat", 140, STEP_5LB_KG, "lb"), "4 x 9 at 215 lb");
 assert.equal(firstSets(get("531-bbb"), "squat", 100, 2.5, "kg"), "1 x 5 at 57.5 kg, then 1 x 5 at 67.5 kg, then 1 x 5+ at 77.5 kg", "5/3/1 uses the training max");
 assert.equal(firstSets(get("smolov-base"), "bench", 100, 2.5, "kg"), null, "no exercise uses that lift");
+{
+  // The first week plans what the app will: with the member's last weight (planContextFor's lastKg) a manual exercise shows it, the same as planSession.
+  const own = blankMemberTemplate();
+  own.engine = { key: "own_rules" };
+  const curl = applyRule(newExercise("Curl"), "manual");
+  own.weeks = [{ days: [{ name: "A", exercises: [curl] }] }];
+  const extra = { lastKg: { [stateKey(curl)]: 40 }, e1rm: {} };
+  assert.equal(firstWeek(own, {}, 2.5, "kg")[0].lines[0], "Curl 3 x 5, you pick the weight");
+  assert.equal(firstWeek(own, {}, 2.5, "kg", extra)[0].lines[0], "Curl 3 x 5 at 40 kg");
+  assert.equal(planSession(own, initState(own, {}, 2.5), { stepKg: 2.5, ...extra })!.exercises[0].sets[0].kg, 40);
+  // An RPE exercise with no max of its own plans from the best logged max (e1rm).
+  const rpe = applyRule(newExercise("Leg press"), "rpe");
+  own.weeks = [{ days: [{ name: "A", exercises: [rpe] }] }];
+  assert.match(firstWeek(own, {}, 2.5, "kg", { e1rm: { [stateKey(rpe)]: 200 } })[0].lines[0], /^Leg press 3 x 5 at RPE 8, about \d+(\.\d+)? kg$/);
+}
 for (const t of PLATFORM_PROGRAMS) {
   const maxes = Object.fromEntries(t.lifts.map((l) => [l, 100]));
   for (const d of firstWeek(t, maxes, 2.5, "kg")) for (const l of d.lines) assert.ok(!/undefined|NaN|null/.test(l), `${t.key}: ${l}`);
