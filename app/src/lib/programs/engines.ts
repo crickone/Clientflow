@@ -8,9 +8,11 @@
 import { advance, isLastSession, progresses, schemeLabel, stateKey } from "./planner";
 import {
   LIFT_LABEL,
+  OWN_DELOAD_PCT,
   emptyState,
   type EngineState,
   type ExerciseResult,
+  type ExerciseRx,
   type FixedVolumeSettings,
   type LiftKey,
   type LinearSettings,
@@ -77,6 +79,13 @@ function engineStartPct(t: ProgramTemplate): number | undefined {
   return undefined;
 }
 
+/** A member-built exercise's starting weight, if its rule has one. */
+function ownStartKg(ex: ExerciseRx): number | undefined {
+  const r = ex.rule;
+  if (!r || (r.kind !== "linear" && r.kind !== "range" && r.kind !== "manual")) return undefined;
+  return r.startKg !== undefined && r.startKg > 0 ? r.startKg : undefined;
+}
+
 /** The state a member starts a program with, from their maxes. */
 export function initState(t: ProgramTemplate, maxes: Partial<Record<LiftKey, number>>, stepKg: number): EngineState {
   const s = emptyState();
@@ -93,7 +102,13 @@ export function initState(t: ProgramTemplate, maxes: Partial<Record<LiftKey, num
     for (const d of w.days)
       for (const ex of d.exercises) {
         const key = stateKey(ex);
-        if (key in s.weights || !progresses(ex) || !ex.lift) continue;
+        if (key in s.weights || !progresses(ex)) continue;
+        const own = ownStartKg(ex);
+        if (own !== undefined) {
+          s.weights[key] = roundToStep(own, stepKg);
+          continue;
+        }
+        if (!ex.lift) continue;
         const startPct = ex.startPct ?? fallback;
         const max = s.maxes[ex.lift];
         if (!startPct || !max) continue;
@@ -155,44 +170,49 @@ function setCountText(r: ExerciseResult): string {
   return "every set";
 }
 
-function linear(c: Ctx, s: LinearSettings): void {
-  for (const r of c.result.exercises) {
-    const p = r.planned;
-    if (!p.progresses) continue;
-    const prev: number | undefined = c.state.weights[p.stateKey];
-    const used: number | undefined = workingKg(r) ?? prev;
-    if (used === undefined) continue;
-    const inc = (p.lift ? s.increments?.[p.lift] : undefined) ?? s.increment;
-    const name = p.name.toLowerCase();
-    if (hitAll(r)) {
-      const a = lastAmrap(r);
-      const double = s.doubleAt !== undefined && a !== null && a.got !== null && a.got >= s.doubleAt;
-      const next = roundToStep(used + (double ? inc * 2 : inc), c.stepKg);
-      c.state.weights[p.stateKey] = next;
-      c.state.misses[p.stateKey] = 0;
-      c.reasons.push(
-        double ? `Next ${name} ${c.fmt(next)}. You got ${a!.got} on the last set, so it goes up twice as much.` : `Next ${name} ${c.fmt(next)}. You did ${setCountText(r)}.`,
-      );
-      continue;
-    }
-    const misses = (c.state.misses[p.stateKey] ?? 0) + 1;
-    if (misses >= s.deloadAfter) {
-      const raw = roundToStep(used * (1 - s.deloadPct), c.stepKg);
-      const bar = p.lift ? barKg(c.stepKg) : 0;
-      const next = Math.max(bar, raw);
-      c.state.weights[p.stateKey] = next;
-      c.state.misses[p.stateKey] = 0;
-      const why = misses === 1 ? missText(r) : `You missed reps ${countWord(misses)} sessions in a row.`;
-      if (raw >= bar) c.reasons.push(`Next ${name} ${c.fmt(next)}, ${Math.round(s.deloadPct * 100)}% lighter. ${why}`);
-      else if (prev !== undefined && sameKg(prev, next)) c.reasons.push(`${p.name} stays at ${c.fmt(next)}, the empty bar. ${why}`);
-      else c.reasons.push(`Next ${name} ${c.fmt(next)}, the empty bar. ${why}`);
-    } else {
-      c.state.weights[p.stateKey] = used;
-      c.state.misses[p.stateKey] = misses;
-      if (prev !== undefined && sameKg(prev, used)) c.reasons.push(`${p.name} stays at ${c.fmt(used)}. ${missText(r)} Try it again next time.`);
-      else c.reasons.push(`Next ${name} ${c.fmt(used)}, the weight you used. ${missText(r)}`);
-    }
+type LinearRule = Pick<LinearSettings, "increment" | "increments" | "deloadAfter" | "deloadPct" | "doubleAt">;
+
+/** One exercise under linear progression: up after every rep, the same after a miss, lighter after deloadAfter misses in a row. */
+function linearExercise(c: Ctx, r: ExerciseResult, s: LinearRule): void {
+  const p = r.planned;
+  if (!p.progresses) return;
+  const prev: number | undefined = c.state.weights[p.stateKey];
+  const used: number | undefined = workingKg(r) ?? prev;
+  if (used === undefined) return;
+  const inc = (p.lift ? s.increments?.[p.lift] : undefined) ?? s.increment;
+  const name = p.name.toLowerCase();
+  if (hitAll(r)) {
+    const a = lastAmrap(r);
+    const double = s.doubleAt !== undefined && a !== null && a.got !== null && a.got >= s.doubleAt;
+    const next = roundToStep(used + (double ? inc * 2 : inc), c.stepKg);
+    c.state.weights[p.stateKey] = next;
+    c.state.misses[p.stateKey] = 0;
+    c.reasons.push(
+      double ? `Next ${name} ${c.fmt(next)}. You got ${a!.got} on the last set, so it goes up twice as much.` : `Next ${name} ${c.fmt(next)}. You did ${setCountText(r)}.`,
+    );
+    return;
   }
+  const misses = (c.state.misses[p.stateKey] ?? 0) + 1;
+  if (misses >= s.deloadAfter) {
+    const raw = roundToStep(used * (1 - s.deloadPct), c.stepKg);
+    const bar = p.lift ? barKg(c.stepKg) : 0;
+    const next = Math.max(bar, raw);
+    c.state.weights[p.stateKey] = next;
+    c.state.misses[p.stateKey] = 0;
+    const why = misses === 1 ? missText(r) : `You missed reps ${countWord(misses)} sessions in a row.`;
+    if (raw >= bar) c.reasons.push(`Next ${name} ${c.fmt(next)}, ${Math.round(s.deloadPct * 100)}% lighter. ${why}`);
+    else if (prev !== undefined && sameKg(prev, next)) c.reasons.push(`${p.name} stays at ${c.fmt(next)}, the empty bar. ${why}`);
+    else c.reasons.push(`Next ${name} ${c.fmt(next)}, the empty bar. ${why}`);
+  } else {
+    c.state.weights[p.stateKey] = used;
+    c.state.misses[p.stateKey] = misses;
+    if (prev !== undefined && sameKg(prev, used)) c.reasons.push(`${p.name} stays at ${c.fmt(used)}. ${missText(r)} Try it again next time.`);
+    else c.reasons.push(`Next ${name} ${c.fmt(used)}, the weight you used. ${missText(r)}`);
+  }
+}
+
+function linear(c: Ctx, s: LinearSettings): void {
+  for (const r of c.result.exercises) linearExercise(c, r, s);
 }
 
 function tableKg(table: { minReps: number; kg: number }[], reps: number): number {
@@ -342,18 +362,24 @@ function gzclp(c: Ctx, s: TmCycleSettings): void {
   }
 }
 
+/** The ticked set with the highest estimated max (sets of 1 to 10 reps). */
+function bestTestSet(r: ExerciseResult): { e1: number; kg: number; reps: number } | null {
+  let best: { e1: number; kg: number; reps: number } | null = null;
+  for (const d of r.sets) {
+    if (!d.done || d.kg === null || d.reps === null) continue;
+    const e1 = maxFromSet(d.kg, d.reps);
+    if (e1 !== null && (!best || e1 > best.e1)) best = { e1, kg: d.kg, reps: d.reps };
+  }
+  return best;
+}
+
 function fixedBlock(c: Ctx): void {
   const day = c.template.weeks[c.state.week]?.days[c.state.day];
   if (day?.test) {
     for (const r of c.result.exercises) {
       const lift = r.planned.lift;
       if (!lift) continue;
-      let best: { e1: number; kg: number; reps: number } | null = null;
-      for (const d of r.sets) {
-        if (!d.done || d.kg === null || d.reps === null) continue;
-        const e1 = maxFromSet(d.kg, d.reps);
-        if (e1 !== null && (!best || e1 > best.e1)) best = { e1, kg: d.kg, reps: d.reps };
-      }
+      const best = bestTestSet(r);
       const label = LIFT_LABEL[lift].toLowerCase();
       if (best) {
         c.state.testMaxes[lift] = best.e1;
@@ -369,26 +395,96 @@ function fixedBlock(c: Ctx): void {
   }
 }
 
+const FIRST_RANGE_WEIGHTS = "Weights saved from today. Each one goes up when you reach the top of its rep range on every set.";
+
+/** One exercise under double progression: up by `inc` and back to the bottom of the range once every set reaches the top. True when this is its first saved weight. */
+function rangeExercise(c: Ctx, r: ExerciseResult, inc: number): boolean {
+  const p = r.planned;
+  if (!p.progresses || p.sets.length === 0) return false;
+  const used = workingKg(r);
+  if (used === null) return false;
+  const prev: number | undefined = c.state.weights[p.stateKey];
+  if (hitTop(r)) {
+    const next = roundToStep(used + inc, c.stepKg);
+    c.state.weights[p.stateKey] = next;
+    const first = p.sets[0];
+    c.reasons.push(`Next ${p.name.toLowerCase()} ${c.fmt(next)}, back to ${first.reps} reps. You hit ${first.repsMax ?? first.reps} on every set.`);
+    return false;
+  }
+  c.state.weights[p.stateKey] = used;
+  if (prev === undefined) return true;
+  if (!sameKg(prev, used)) c.reasons.push(`Next ${p.name.toLowerCase()} ${c.fmt(used)}, the weight you used.`);
+  return false;
+}
+
 function doubleProgression(c: Ctx): void {
   let firsts = 0;
+  for (const r of c.result.exercises) if (rangeExercise(c, r, c.stepKg)) firsts++;
+  if (firsts > 0) c.reasons.push(FIRST_RANGE_WEIGHTS);
+}
+
+/** Manual: nothing goes up or down; the weight used is kept for next time. */
+function manualExercise(c: Ctx, r: ExerciseResult): void {
+  const p = r.planned;
+  if (!p.progresses) return;
+  const used = workingKg(r);
+  if (used === null) return;
+  const prev: number | undefined = c.state.weights[p.stateKey];
+  c.state.weights[p.stateKey] = used;
+  if (prev === undefined || !sameKg(prev, used)) c.reasons.push(`Next ${p.name.toLowerCase()} ${c.fmt(used)}, the weight you used.`);
+}
+
+/** A test day in a member-built program: each lift's max moves to the best set, and its percentages use it from the next session. */
+function ownTestMaxes(c: Ctx): void {
   for (const r of c.result.exercises) {
-    const p = r.planned;
-    if (!p.progresses || p.sets.length === 0) continue;
-    const used = workingKg(r);
-    if (used === null) continue;
-    const prev: number | undefined = c.state.weights[p.stateKey];
-    if (hitTop(r)) {
-      const next = roundToStep(used + c.stepKg, c.stepKg);
-      c.state.weights[p.stateKey] = next;
-      const first = p.sets[0];
-      c.reasons.push(`Next ${p.name.toLowerCase()} ${c.fmt(next)}, back to ${first.reps} reps. You hit ${first.repsMax ?? first.reps} on every set.`);
-    } else {
-      c.state.weights[p.stateKey] = used;
-      if (prev === undefined) firsts++;
-      else if (!sameKg(prev, used)) c.reasons.push(`Next ${p.name.toLowerCase()} ${c.fmt(used)}, the weight you used.`);
+    const lift = r.planned.lift;
+    if (!lift || !c.template.lifts.includes(lift)) continue;
+    const label = LIFT_LABEL[lift].toLowerCase();
+    const best = bestTestSet(r);
+    if (!best) {
+      const cur = c.state.maxes[lift];
+      c.reasons.push(cur !== undefined ? `No ${label} max from today. It stays at ${c.fmt(cur)}.` : `No ${label} max from today.`);
+      continue;
+    }
+    const e1 = Math.round(best.e1 * 100) / 100;
+    c.state.maxes[lift] = e1;
+    c.state.tms[lift] = trainingMax(e1, c.template.tmPct);
+    c.reasons.push(`Your new ${label} max is about ${c.fmt(roundToStep(e1, c.stepKg))}, from ${c.fmt(best.kg)} x ${best.reps}. Its percentages use it from the next session.`);
+  }
+}
+
+/**
+ * A member-built program: each exercise moves by its own rule, with the same
+ * per-exercise logic the library engines use. An exercise no longer in the
+ * program (an open session finished after an edit) changes nothing.
+ */
+function ownRules(c: Ctx): void {
+  const live = new Set(c.template.weeks.flatMap((w) => w.days.flatMap((d) => d.exercises.map((ex) => stateKey(ex)))));
+  let firsts = 0;
+  for (const r of c.result.exercises) {
+    const rule = r.planned.rule;
+    if (!rule || !live.has(r.planned.stateKey)) continue;
+    switch (rule.kind) {
+      case "linear":
+        linearExercise(c, r, { increment: rule.incKg, deloadAfter: rule.deloadAfter, deloadPct: OWN_DELOAD_PCT });
+        break;
+      case "range":
+        if (rangeExercise(c, r, rule.incKg ?? c.stepKg)) firsts++;
+        break;
+      case "manual":
+        manualExercise(c, r);
+        break;
+      case "percent":
+      case "rpe":
+        break;
+      default: {
+        const never: never = rule;
+        return never;
+      }
     }
   }
-  if (firsts > 0) c.reasons.push("Weights saved from today. Each one goes up when you reach the top of its rep range on every set.");
+  if (firsts > 0) c.reasons.push(FIRST_RANGE_WEIGHTS);
+  if (c.template.weeks[c.state.week]?.days[c.state.day]?.test) ownTestMaxes(c);
 }
 
 function fixedVolume(c: Ctx, s: FixedVolumeSettings): void {
@@ -442,6 +538,9 @@ export function progress(input: ProgressInput): ProgressOutput {
       break;
     case "fixed_volume":
       fixedVolume(c, e);
+      break;
+    case "own_rules":
+      ownRules(c);
       break;
   }
   if (c.atCycleEnd) c.reasons.push(...endOfCycle(t, c.state, c.fmt));
