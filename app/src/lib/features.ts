@@ -84,3 +84,42 @@ export function pathAllowed(flags: FeatureFlags, pathname: string): boolean {
   const def = moduleForPath(pathname);
   return def ? isModuleOn(flags, def.key) : true;
 }
+
+/**
+ * Staged rollout of a module across the fleet, set from the console. A
+ * tenant's own explicit `false` always wins; the rollout only decides for
+ * tenants that have not been switched off by hand.
+ */
+export interface PlatformFlag {
+  key: string;
+  mode: "all" | "none" | "percent" | "allow";
+  percent: number;
+  allow: number[];
+}
+
+function fnv(s: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h;
+}
+
+export function rolloutIncludes(flag: PlatformFlag, tenantId: number): boolean {
+  switch (flag.mode) {
+    case "all": return true;
+    case "none": return false;
+    case "allow": return flag.allow.includes(tenantId);
+    case "percent": return fnv(`${flag.key}:${tenantId}`) % 100 < Math.max(0, Math.min(100, flag.percent));
+  }
+}
+
+export function applyRollout(tenantFlags: FeatureFlags, platform: PlatformFlag[], tenantId: number): FeatureFlags {
+  const out: FeatureFlags = { ...tenantFlags };
+  for (const f of platform) {
+    if (!MODULE_KEYS.includes(f.key)) continue;
+    if (!rolloutIncludes(f, tenantId)) out[f.key] = false;
+  }
+  return out;
+}

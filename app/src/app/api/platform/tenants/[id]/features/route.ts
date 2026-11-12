@@ -4,7 +4,7 @@ import { z } from "zod";
 import { guardPlatform } from "@/lib/platform/auth";
 import { recordAudit, requestIp } from "@/lib/platform/audit";
 import { MODULE_CATALOG, MODULE_KEYS, isModuleOn, type FeatureFlags } from "@/lib/features";
-import { getFeatureFlagsForTenant, getSchedulingModeForTenant, getVenueTypeForTenant, setFeatureFlags } from "@/lib/settings";
+import { getFeatureFlagsForTenant, getOwnFeatureFlagsForTenant, getSchedulingModeForTenant, getVenueTypeForTenant, setFeatureFlags } from "@/lib/settings";
 import { runWithTenant } from "@/lib/db/tenant";
 
 export const dynamic = "force-dynamic";
@@ -25,8 +25,9 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
     return NextResponse.json({ error: "Unknown business" }, { status: 404 });
   }
   const flags = getFeatureFlagsForTenant(tenantId);
+  const own = getOwnFeatureFlagsForTenant(tenantId);
   return NextResponse.json({
-    modules: MODULE_CATALOG.map((m) => ({ ...m, on: isModuleOn(flags, m.key) })),
+    modules: MODULE_CATALOG.map((m) => ({ ...m, on: isModuleOn(flags, m.key), own: isModuleOn(own, m.key) })),
     venueType: getVenueTypeForTenant(tenantId),
     schedulingMode: getSchedulingModeForTenant(tenantId),
   });
@@ -51,7 +52,9 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     return NextResponse.json({ ok: false, error: "Pick a module and a state." }, { status: 400 });
   }
 
-  const before = getFeatureFlagsForTenant(tenantId);
+  // The business's OWN exceptions, not the effective flags: starting from the
+  // effective set would store rollout-derived `false` values as its own.
+  const before = getOwnFeatureFlagsForTenant(tenantId);
   // Only an explicit `false` is stored: switching a module back ON removes
   // its key rather than writing `true`, so the stored object stays the list
   // of exceptions it is meant to be.
@@ -72,9 +75,10 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   });
 
   const flags = getFeatureFlagsForTenant(tenantId);
+  const ownNow = getOwnFeatureFlagsForTenant(tenantId);
   return NextResponse.json({
     ok: true,
     note: `${MODULE_CATALOG.find((m) => m.key === parsed.key)?.label ?? parsed.key} is now ${parsed.on ? "on" : "off"}.`,
-    modules: MODULE_CATALOG.map((m) => ({ ...m, on: isModuleOn(flags, m.key) })),
+    modules: MODULE_CATALOG.map((m) => ({ ...m, on: isModuleOn(flags, m.key), own: isModuleOn(ownNow, m.key) })),
   });
 }

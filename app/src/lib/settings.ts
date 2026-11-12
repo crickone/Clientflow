@@ -1,7 +1,7 @@
 import "server-only";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
-import { getTenantDbById } from "./db/tenant";
+import { getCurrentTenant, getTenantDbById } from "./db/tenant";
 import { settings } from "./db/schema";
 import type { VenueType } from "./vocabulary";
 import {
@@ -9,7 +9,8 @@ import {
   DEFAULT_HEADING_FONT_ID,
 } from "@/lib/image/fonts";
 import { DEFAULT_THEME, HEADING_FONTS, isHexColor, type ThemeConfig } from "@/lib/theme";
-import { parseFeatureFlags, type FeatureFlags } from "@/lib/features";
+import { applyRollout, parseFeatureFlags, type FeatureFlags } from "@/lib/features";
+import { listPlatformFlags } from "@/lib/platform/flags";
 
 export type { VenueType };
 
@@ -192,11 +193,31 @@ export const FEATURES_KEY = "features";
  * @/lib/features for the catalog and the "unset means on" rule.
  */
 export function getFeatureFlags(): FeatureFlags {
-  return parseFeatureFlags(readKey<unknown>(FEATURES_KEY, null));
+  const own = getOwnFeatureFlags();
+  try {
+    return applyRollout(own, listPlatformFlags(), getCurrentTenant().id);
+  } catch {
+    // No resolvable tenant (bare/public paths): the business's own flags only.
+    return own;
+  }
 }
 
 /** For background work and the platform console, which have no request scope. */
 export function getFeatureFlagsForTenant(tenantId: number): FeatureFlags {
+  return applyRollout(getOwnFeatureFlagsForTenant(tenantId), listPlatformFlags(), tenantId);
+}
+
+/**
+ * The business's OWN stored exceptions, without the platform rollout. This is
+ * what setFeatureFlags writes back, so a read-modify-write must start here:
+ * starting from the effective flags would persist rollout-derived `false`
+ * values as the business's own switches.
+ */
+export function getOwnFeatureFlags(): FeatureFlags {
+  return parseFeatureFlags(readKey<unknown>(FEATURES_KEY, null));
+}
+
+export function getOwnFeatureFlagsForTenant(tenantId: number): FeatureFlags {
   return parseFeatureFlags(readKeyForTenant<unknown>(tenantId, FEATURES_KEY, null));
 }
 

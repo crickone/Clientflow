@@ -21,6 +21,8 @@ import {
   moduleForPath,
   parseFeatureFlags,
   pathAllowed,
+  applyRollout,
+  rolloutIncludes,
 } from "./features";
 
 let passed = 0;
@@ -96,5 +98,26 @@ const off = allOff();
 check("with everything off, every module reads off", MODULE_CATALOG.every((m) => !isModuleOn(off, m.key)));
 check("…and every module page is refused", MODULE_CATALOG.every((m) => !pathAllowed(off, m.paths[0])));
 check("…but the dashboard still opens", pathAllowed(off, "/dashboard"));
+
+// ── staged rollout ────────────────────────────────────────────────────────
+const all = { key: "leads", mode: "all" as const, percent: 100, allow: [] as number[] };
+assert.equal(rolloutIncludes(all, 5), true);
+assert.equal(rolloutIncludes({ ...all, mode: "none" }, 5), false);
+assert.equal(rolloutIncludes({ ...all, mode: "allow", allow: [5, 9] }, 5), true);
+assert.equal(rolloutIncludes({ ...all, mode: "allow", allow: [5, 9] }, 6), false);
+assert.equal(rolloutIncludes({ ...all, mode: "percent", percent: 0 }, 5), false);
+assert.equal(rolloutIncludes({ ...all, mode: "percent", percent: 100 }, 5), true);
+const fifty = { ...all, mode: "percent" as const, percent: 50 };
+assert.equal(rolloutIncludes(fifty, 7), rolloutIncludes(fifty, 7), "deterministic");
+const inCount = Array.from({ length: 1000 }, (_, i) => rolloutIncludes(fifty, i)).filter(Boolean).length;
+assert.ok(inCount > 400 && inCount < 600, `about half: ${inCount}`);
+assert.deepEqual(applyRollout({}, [{ ...all, mode: "none" }], 5), { leads: false });
+assert.deepEqual(applyRollout({ leads: false }, [all], 5), { leads: false }, "a tenant's own off stays off");
+assert.deepEqual(applyRollout({}, [all], 5), {});
+// applyRollout returns a copy: the business's own flags are never mutated.
+const own = {};
+applyRollout(own, [{ ...all, mode: "none" }], 5);
+assert.deepEqual(own, {}, "own flags stay empty");
+console.log("features rollout: ok");
 
 console.log(`features: ${passed} checks passed.`);
