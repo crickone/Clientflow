@@ -2,6 +2,8 @@ import Link from "next/link";
 import { ChevronRight, Dumbbell, History, Play, TrendingUp } from "lucide-react";
 
 import { requireClientPage } from "@/lib/clientAuth";
+import { MyProgramCard } from "@/components/clientapp/MyProgramCard";
+import { memberSeesPrograms } from "@/lib/programs/access";
 import { assignedWorkoutPrograms } from "@/lib/clientApp";
 import { listSessions, sessionSummary } from "@/lib/workoutLog";
 import { trainingOverview } from "@/lib/trainingOverview";
@@ -19,7 +21,8 @@ function when(ms: number) {
 }
 
 export default async function ClientWorkoutsPage() {
-  const { clientId } = requireClientPage();
+  const { clientId, client, tenantId } = requireClientPage();
+  const programsVisible = memberSeesPrograms({ tenantId, client });
   const programs = assignedWorkoutPrograms(clientId);
   const t = trainingOverview(clientId);
   const recent = listSessions(clientId, 3);
@@ -29,6 +32,7 @@ export default async function ClientWorkoutsPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <PageTitle sub="Plan, log and track your training">Workouts</PageTitle>
+      {programsVisible && <MyProgramCard clientId={clientId} />}
 
       {t.open && (
         <Link href={`/app/workouts/log/${t.open.id}`}>

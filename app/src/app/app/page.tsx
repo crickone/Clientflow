@@ -8,6 +8,8 @@ import { getPrefs, vapidPublicKey } from "@/lib/push";
 import { WEEKDAYS } from "@/lib/memberChoicesModel";
 
 import { requireClientPage } from "@/lib/clientAuth";
+import { MyProgramCard } from "@/components/clientapp/MyProgramCard";
+import { memberSeesPrograms } from "@/lib/programs/access";
 import { clientDashboard, clientUpcoming } from "@/lib/clientApp";
 import { Card, dayLabel, euros, SectionTitle } from "@/components/clientapp/ui";
 import { dailyTarget, mealsForDay } from "@/lib/meals";
@@ -29,6 +31,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ClientHome() {
   const { clientId, client, tenantId } = requireClientPage();
+  const programsVisible = memberSeesPrograms({ tenantId, client });
   const scansOn = bodyScansEnabled(tenantId);
   const scanConsent = scansOn ? getScanProfile(clientId).consentAt !== null : false;
   const scans = scanConsent ? listClientScans(clientId).filter((s) => Object.keys(s.metrics).length > 0) : [];
@@ -119,6 +122,8 @@ export default async function ClientHome() {
           </Card>
         </Link>
       )}
+
+      {programsVisible && <MyProgramCard clientId={clientId} />}
 
       {/* training */}
       {showTraining && (

@@ -6,7 +6,8 @@ import { z } from "zod";
 
 import { requireClient } from "@/lib/clientAuth";
 import { memberSeesPrograms } from "@/lib/programs/access";
-import { bestLoggedSet, enrol } from "@/lib/programs/enrolments";
+import { bestLoggedSet, endEnrolment, enrol, liveEnrolment, restartFromTest, setEnrolmentDays, skipEnrolmentSession, startEnrolmentSession } from "@/lib/programs/enrolments";
+import type { StartResult } from "@/lib/workoutLog";
 import { programByKey } from "@/lib/programs/library";
 import { LIFT_LABEL, type LiftKey, type WeightUnit } from "@/lib/programs/types";
 import { maxFromSet, stepFromKey, unitToKg } from "@/lib/programs/units";
@@ -77,4 +78,58 @@ export async function startProgramAction(raw: unknown): Promise<Result> {
   if (!r.ok) return r;
   for (const path of ["/app/programs", "/app/programs/mine", "/app/workouts", "/app"]) revalidatePath(path);
   return { ok: true };
+}
+
+function refresh() {
+  for (const path of ["/app/programs", "/app/programs/mine", "/app/workouts", "/app"]) revalidatePath(path);
+}
+
+/** Start (or continue) the next session of the member's program in the logger. */
+export async function startProgramSessionAction(): Promise<StartResult> {
+  const c = member();
+  if (!c) return OFF;
+  const r = startEnrolmentSession(c.clientId);
+  refresh();
+  return r;
+}
+
+export async function skipProgramSessionAction(): Promise<Result> {
+  const c = member();
+  if (!c) return OFF;
+  const r = skipEnrolmentSession(c.clientId);
+  refresh();
+  return r;
+}
+
+export async function endProgramAction(): Promise<Result> {
+  const c = member();
+  if (!c) return OFF;
+  if (!endEnrolment(c.clientId, { kind: "member" })) return { ok: false, error: "You don't have a program running." };
+  refresh();
+  return { ok: true };
+}
+
+export async function setProgramDaysAction(weekdays: number[]): Promise<Result> {
+  const c = member();
+  if (!c) return OFF;
+  const d = z.array(z.number().int().min(1).max(7)).max(7).safeParse(weekdays);
+  if (!d.success) return { ok: false, error: "Couldn't save your training days." };
+  if (!setEnrolmentDays(c.clientId, d.data)) return { ok: false, error: "You don't have a program running." };
+  refresh();
+  return { ok: true };
+}
+
+/** A finished block: start it again from the member's new maxes (in their unit). */
+export async function restartProgramAction(raw: unknown): Promise<Result> {
+  const c = member();
+  if (!c) return OFF;
+  const p = z.object({ maxes: z.array(maxEntryZ).max(5) }).safeParse(raw);
+  if (!p.success) return { ok: false, error: "Check your entries and try again." };
+  const view = liveEnrolment(c.clientId);
+  if (!view) return { ok: false, error: "You don't have a program running." };
+  const maxes = resolveMaxes(c.clientId, view.unit, p.data.maxes);
+  if (!maxes.ok) return maxes;
+  const r = restartFromTest(c.clientId, maxes.kg);
+  refresh();
+  return r;
 }
