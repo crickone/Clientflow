@@ -5828,7 +5828,7 @@ textarea.ag-input { resize: vertical; line-height: 1.5; }
 .pk-linkrow:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 12px; }
 .pk-chev { flex-shrink: 0; color: var(--text-tertiary); }
 .pk-filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-@media (max-width: 360px) {
+@media (max-width: 440px) {
   .pk-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pk-filters > :first-child { grid-column: 1 / -1; }
 }
