@@ -36,13 +36,14 @@ export const FAMILY_LABEL: Record<Family, string> = {
 export type Level = "beginner" | "intermediate" | "advanced";
 export const LEVEL_LABEL: Record<Level, string> = { beginner: "Beginner", intermediate: "Intermediate", advanced: "Advanced" };
 
-export type EngineKey = "linear" | "tm_cycle" | "fixed_block" | "double_progression" | "fixed_volume";
+export type EngineKey = "linear" | "tm_cycle" | "fixed_block" | "double_progression" | "fixed_volume" | "own_rules";
 export const ENGINE_LABEL: Record<EngineKey, string> = {
   linear: "Linear, with deloads",
   tm_cycle: "Training-max cycles",
   fixed_block: "Fixed block with a re-test",
   double_progression: "Double progression",
   fixed_volume: "Fixed volume",
+  own_rules: "Your own rules",
 };
 
 /** A rep count, or a range for rep-range programs. */
@@ -64,6 +65,36 @@ export type SetRx =
   | { kind: "fixed"; reps: Reps; rest: number; amrap?: boolean }
   | { kind: "same_as_last"; reps: Reps; rest: number };
 
+/**
+ * How a member-built program (engine own_rules) moves one exercise's weight.
+ * - linear: every set is a fixed rep count; a session with every rep adds incKg,
+ *   and deloadAfter misses in a row make it 10% lighter.
+ * - range: every set is a rep range; when every set reaches the top it adds incKg
+ *   (default: the member's smallest jump) and goes back to the bottom.
+ * - percent: every set is a percentage of the exercise's lift max (ExerciseRx.lift).
+ * - rpe: every set is an RPE target; the weight is suggested from the member's
+ *   best logged set of the exercise.
+ * - manual: nothing changes; the planned weight is last time's.
+ * startKg is the weight the exercise starts at (linear, range, manual).
+ */
+export type OwnRule =
+  | { kind: "linear"; incKg: number; deloadAfter: number; startKg?: number }
+  | { kind: "range"; incKg?: number; startKg?: number }
+  | { kind: "percent" }
+  | { kind: "rpe" }
+  | { kind: "manual"; startKg?: number };
+export type RuleKind = OwnRule["kind"];
+export const RULE_KINDS: readonly RuleKind[] = ["linear", "range", "percent", "rpe", "manual"];
+export const RULE_LABEL: Record<RuleKind, string> = {
+  linear: "Add weight",
+  range: "Rep range",
+  percent: "Percent of max",
+  rpe: "RPE",
+  manual: "Manual",
+};
+/** An own-rules deload is always 10% lighter. */
+export const OWN_DELOAD_PCT = 0.1;
+
 export interface ExerciseRx {
   /** A name from the canonical list (exercises.ts). */
   name: string;
@@ -82,6 +113,8 @@ export interface ExerciseRx {
   /** Done back to back with the exercise above (superset). */
   joined?: boolean;
   notes?: string;
+  /** Member-built programs only: how this exercise progresses. */
+  rule?: OwnRule;
 }
 
 export interface DayRx {
@@ -135,13 +168,18 @@ export interface DoubleProgressionSettings {
   key: "double_progression";
 }
 
+/** A member-built program: each exercise carries its own rule. */
+export interface OwnRulesSettings {
+  key: "own_rules";
+}
+
 export interface FixedVolumeSettings {
   key: "fixed_volume";
   increment: number;
   startPct: number;
 }
 
-export type EngineSettings = LinearSettings | TmCycleSettings | FixedBlockSettings | DoubleProgressionSettings | FixedVolumeSettings;
+export type EngineSettings = LinearSettings | TmCycleSettings | FixedBlockSettings | DoubleProgressionSettings | FixedVolumeSettings | OwnRulesSettings;
 
 export interface ProgramTemplate {
   key: string;
@@ -217,6 +255,8 @@ export interface PlannedExercise {
   joined: boolean;
   notes: string | null;
   sets: PlannedSet[];
+  /** Member-built programs: the exercise's rule, kept in the session's rx_json so an open session finishes on the version it started from. */
+  rule?: OwnRule;
 }
 
 export interface PlannedSession {

@@ -27,6 +27,15 @@ const setZ = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("same_as_last"), reps: repsZ, rest: restZ }),
 ]);
 
+const startKgZ = z.number().min(0).max(600).optional();
+const ruleZ = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("linear"), incKg: z.number().min(0.5).max(50), deloadAfter: z.number().int().min(1).max(10), startKg: startKgZ }),
+  z.object({ kind: z.literal("range"), incKg: z.number().min(0.5).max(50).optional(), startKg: startKgZ }),
+  z.object({ kind: z.literal("percent") }),
+  z.object({ kind: z.literal("rpe") }),
+  z.object({ kind: z.literal("manual"), startKg: startKgZ }),
+]);
+
 const exerciseZ = z.object({
   name: z.string().trim().min(1).max(80),
   lift: liftZ.optional(),
@@ -38,9 +47,10 @@ const exerciseZ = z.object({
   startPct: z.number().min(0.2).max(1).optional(),
   joined: z.boolean().optional(),
   notes: z.string().max(300).optional(),
+  rule: ruleZ.optional(),
 });
 
-const dayZ = z.object({ name: z.string().trim().min(1).max(60), exercises: z.array(exerciseZ).min(1).max(20), test: z.boolean().optional() });
+const dayZ = z.object({ name: z.string().trim().min(1).max(80), exercises: z.array(exerciseZ).min(1).max(20), test: z.boolean().optional() });
 const weekZ = z.object({ label: z.string().trim().max(60).optional(), days: z.array(dayZ).min(1).max(7) });
 const incrementsZ = z.partialRecord(liftZ, kgZ).optional();
 
@@ -67,6 +77,7 @@ const engineZ = z.discriminatedUnion("key", [
   z.object({ key: z.literal("fixed_block") }),
   z.object({ key: z.literal("double_progression") }),
   z.object({ key: z.literal("fixed_volume"), increment: kgZ, startPct: z.number().min(0.2).max(1) }),
+  z.object({ key: z.literal("own_rules") }),
 ]);
 
 const templateZ = z.object({
@@ -140,21 +151,36 @@ function whereLabel(raw: unknown, path: PropertyKey[]): { where: string; field: 
   return { where: parts.join(", "), field };
 }
 
-function plainMessage(issue: z.core.$ZodIssue, field: string | null): string {
+/** A rep count left empty in an editor arrives as nothing or 0. */
+function blankReps(v: unknown): boolean {
+  return v === undefined || v === null || v === "" || v === 0;
+}
+
+function plainMessage(issue: z.core.$ZodIssue, field: string | null, value: unknown): string {
   const max = "maximum" in issue ? Number(issue.maximum) : NaN;
   const label = field ? (FIELD_LABEL[field] ?? field) : "value";
   if (issue.code === "custom") return "the top of the rep range must be at least the bottom.";
+  if (issue.path.includes("exercises") && issue.path.includes("rule") && (field === "rule" || field === "kind")) return "pick a rule.";
   switch (field) {
     case "name":
     case "who":
     case "description":
       return issue.code === "too_big" ? `the ${label} is too long (${max} characters at most).` : `add a ${label}.`;
     case "notes":
+      return `the notes are too long (${max} characters at most).`;
     case "warning":
     case "label":
       return `the ${label} is too long (${max} characters at most).`;
     case "reps":
-      return "reps must be a whole number from 1 to 100.";
+    case "min":
+    case "max":
+      return blankReps(value) ? "add reps." : "reps must be a whole number from 1 to 100.";
+    case "incKg":
+      return "the weight to add must be between 0.5 and 50 kg.";
+    case "deloadAfter":
+      return "misses before it gets lighter must be a whole number from 1 to 10.";
+    case "startKg":
+      return "the starting weight must be between 0 and 600 kg.";
     case "rest":
       return "rest must be between 0 and 900 seconds.";
     case "rpe":
@@ -186,7 +212,7 @@ export function parseTemplate(raw: unknown): TemplateCheck {
   if (!parsed.success) {
     const messages = parsed.error.issues.map((i) => {
       const { where, field } = whereLabel(raw, i.path);
-      const msg = plainMessage(i, field);
+      const msg = plainMessage(i, field, at(raw, i.path));
       return where ? `${where}: ${msg}` : `${msg.charAt(0).toUpperCase()}${msg.slice(1)}`;
     });
     return { ok: false, errors: [...new Set(messages)].slice(0, 10) };
@@ -205,7 +231,8 @@ export function templateErrors(t: ProgramTemplate): string[] {
     w.days.forEach((d) =>
       d.exercises.forEach((e) => {
         const where = `Week ${wi + 1}, ${d.name}, ${e.name}`;
-        if (!isCanonical(e.name)) errors.push(`${where}: not in the exercise list.`);
+        // A member names their own exercises (the gym's library or typed in); library programs use the canonical list.
+        if (t.engine.key !== "own_rules" && !isCanonical(e.name)) errors.push(`${where}: not in the exercise list.`);
         for (const s of [...e.sets, ...(e.stages ?? []).flat()]) {
           if (s.kind !== "pct" && s.kind !== "amrap") continue;
           if (s.pct < 0.3 || s.pct > 1.1) errors.push(`${where}: ${Math.round(s.pct * 1000) / 10}% is outside 30% to 110%.`);

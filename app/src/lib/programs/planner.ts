@@ -10,13 +10,14 @@ import { formatWeight, kgToUnit, roundToStep, weightForRpe } from "./units";
 /**
  * The key an exercise's working weight is kept under: its name, its GZCLP
  * tier, and its rep range, so the same lift done in two rep ranges (PHAT)
- * keeps two weights.
+ * keeps two weights. A member-built exercise's rule goes in front
+ * ("linear:bench press"), so changing the rule starts the exercise again.
  */
-export function stateKey(ex: Pick<ExerciseRx, "name" | "tier" | "sets">): string {
+export function stateKey(ex: Pick<ExerciseRx, "name" | "tier" | "sets" | "rule">): string {
   const base = ex.name.trim().toLowerCase().replace(/\s+/g, " ");
   const first = ex.sets[0];
   const rangeTag = first && first.kind === "fixed" && typeof first.reps !== "number" ? `@${first.reps.min}-${first.reps.max}` : "";
-  return `${ex.tier ? `${ex.tier}:` : ""}${base}${rangeTag}`;
+  return `${ex.rule ? `${ex.rule.kind}:` : ""}${ex.tier ? `${ex.tier}:` : ""}${base}${rangeTag}`;
 }
 
 /** The sets an exercise uses now: its current GZCLP stage, or its sets. */
@@ -90,6 +91,8 @@ export interface PlanContext {
   stepKg: number;
   /** Best estimated max per state key, from the member's logs, for RPE sets. */
   e1rm?: Record<string, number>;
+  /** Member-built programs: last session's weight per state key, for a fixed set the engine has no weight for yet. */
+  lastKg?: Record<string, number>;
 }
 
 function repsOf(r: Reps): { reps: number; repsMax: number | null } {
@@ -117,7 +120,7 @@ function planSet(s: SetRx, ex: ExerciseRx, key: string, state: EngineState, ctx:
       return { kg: e1 ? roundToStep(weightForRpe(e1, s.reps, s.rpe), ctx.stepKg) : null, reps: s.reps, repsMax: null, amrap: false, rpe: s.rpe, pct: null, rest: s.rest, drives: false };
     }
     case "fixed":
-      return { kg: state.weights[key] ?? null, ...repsOf(s.reps), amrap: s.amrap === true, rpe: null, pct: null, rest: s.rest, drives: false };
+      return { kg: state.weights[key] ?? ctx.lastKg?.[key] ?? null, ...repsOf(s.reps), amrap: s.amrap === true, rpe: null, pct: null, rest: s.rest, drives: false };
     case "same_as_last":
       return { kg: prev ? prev.kg : null, ...repsOf(s.reps), amrap: false, rpe: null, pct: null, rest: s.rest, drives: false };
     default: {
@@ -145,6 +148,7 @@ export function planExercise(ex: ExerciseRx, index: number, state: EngineState, 
     joined: ex.joined === true,
     notes: ex.notes ?? null,
     sets,
+    ...(ex.rule ? { rule: ex.rule } : {}),
   };
 }
 
