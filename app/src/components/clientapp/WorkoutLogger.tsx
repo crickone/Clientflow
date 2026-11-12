@@ -46,10 +46,10 @@ interface DraftSet {
 }
 type Draft = Record<number, DraftSet[]>;
 
-/** Boxes show the member's unit; everything saved is kg. */
+/** Boxes show the member's unit; everything saved is kg. A kg member sees the exact stored kg; only pounds are converted. */
 function toDraft(s: LoggedSet, unit: WeightUnit): DraftSet {
   return {
-    w: s.weightKg === null ? "" : String(kgToUnit(s.weightKg, unit)),
+    w: s.weightKg === null ? "" : String(unit === "lb" ? kgToUnit(s.weightKg, "lb") : s.weightKg),
     r: s.reps === null ? "" : String(s.reps),
     rpe: s.rpe == null ? "" : String(s.rpe),
     done: s.done,
@@ -300,8 +300,8 @@ export function WorkoutLogger({
             {result.program.reasons.length === 0 ? (
               <div style={{ fontSize: 13.5, color: "var(--text-secondary)" }}>Nothing changes until your next session.</div>
             ) : (
-              result.program.reasons.map((r) => (
-                <div key={r} style={{ fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.45 }}>
+              result.program.reasons.map((r, i) => (
+                <div key={i} style={{ fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.45 }}>
                   {r}
                 </div>
               ))

@@ -1,7 +1,7 @@
 // app/src/components/clientapp/MyProgramControls.tsx
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -16,10 +16,25 @@ export function MyProgramControls({ canSkip, weekdays }: { canSkip: boolean; wee
   const confirm = useConfirm();
   const [days, setDays] = useState<number[]>(weekdays);
   const [pending, start] = useTransition();
+  // One confirm at a time: a double tap on Skip or End must not open two.
+  const askingRef = useRef(false);
+  const [asking, setAsking] = useState(false);
   const changed = days.join(",") !== weekdays.join(",");
 
   function toggle(d: number) {
     setDays((xs) => (xs.includes(d) ? xs.filter((x) => x !== d) : [...xs, d].sort((a, b) => a - b)));
+  }
+
+  async function ask(opts: Parameters<typeof confirm>[0]): Promise<boolean> {
+    if (askingRef.current) return false;
+    askingRef.current = true;
+    setAsking(true);
+    try {
+      return await confirm(opts);
+    } finally {
+      askingRef.current = false;
+      setAsking(false);
+    }
   }
 
   function saveDays() {
@@ -32,7 +47,7 @@ export function MyProgramControls({ canSkip, weekdays }: { canSkip: boolean; wee
   }
 
   async function skip() {
-    const ok = await confirm({ title: "Skip this session?", body: "Your program moves on to the next session. The skip is recorded.", confirmLabel: "Skip it" });
+    const ok = await ask({ title: "Skip this session?", body: "Your program moves on to the next session. The skip is recorded.", confirmLabel: "Skip it" });
     if (!ok) return;
     start(async () => {
       const r = await skipProgramSessionAction();
@@ -43,7 +58,7 @@ export function MyProgramControls({ canSkip, weekdays }: { canSkip: boolean; wee
   }
 
   async function end() {
-    const ok = await confirm({
+    const ok = await ask({
       title: "End this program?",
       body: "Your sessions and the change log are kept. You can then start another program.",
       confirmLabel: "End program",
@@ -78,11 +93,11 @@ export function MyProgramControls({ canSkip, weekdays }: { canSkip: boolean; wee
       </div>
       <div style={{ display: "grid", gridTemplateColumns: canSkip ? "1fr 1fr" : "1fr", gap: 8 }}>
         {canSkip && (
-          <Button variant="secondary" onClick={skip} disabled={pending}>
+          <Button variant="secondary" onClick={skip} disabled={pending || asking}>
             Skip next session
           </Button>
         )}
-        <Button variant="secondary" onClick={end} disabled={pending}>
+        <Button variant="secondary" onClick={end} disabled={pending || asking}>
           End program
         </Button>
       </div>
