@@ -247,7 +247,7 @@ export interface PlatformStaffRow {
 
 export interface StaffResponse {
   staff: PlatformStaffRow[];
-  you: { userId: number; role: PlatformRole };
+  you: { userId: number; role: PlatformRole; notify: { instant: boolean; digest: boolean } };
 }
 
 /** One console action, from the platform_audit log. */

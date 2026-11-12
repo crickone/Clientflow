@@ -1,6 +1,7 @@
 import { api } from "@/lib/api";
-import { saveSettings } from "./actions";
+import { saveNotifyPrefs, saveSettings } from "./actions";
 import { PageHeader } from "@/components/ui/PageHeader";
+import type { StaffResponse } from "@/lib/types";
 
 interface Settings {
   monthlyPriceCents: number;
@@ -21,6 +22,7 @@ export default async function SettingsPage(
 ) {
   const searchParams = await props.searchParams;
   const s = await api<Settings>("/settings");
+  const staff = await api<StaffResponse>("/staff");
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 480 }}>
@@ -177,6 +179,13 @@ export default async function SettingsPage(
             Save
           </button>
         </div>
+      </form>
+
+      <form action={saveNotifyPrefs} className="glass" style={{ padding: 24, display: "flex", flexDirection: "column", gap: 14 }}>
+        <h2 className="card-title" style={{ margin: 0 }}>Alert emails to you</h2>
+        <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13.5 }}><input type="checkbox" name="instant" defaultChecked={staff.you.notify.instant} /> The moment a serious alert opens</label>
+        <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13.5 }}><input type="checkbox" name="digest" defaultChecked={staff.you.notify.digest} /> A morning digest at 8am of everything still open</label>
+        <div><button className="btn btn--primary btn--md" type="submit">Save</button></div>
       </form>
     </div>
   );

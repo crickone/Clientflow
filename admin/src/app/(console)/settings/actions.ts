@@ -87,3 +87,15 @@ export async function saveSettings(formData: FormData): Promise<void> {
   revalidatePath("/settings");
   redirect("/settings?saved=1");
 }
+
+/** The signed-in staff member's own alert emails. */
+export async function saveNotifyPrefs(formData: FormData): Promise<void> {
+  const notify = { instant: formData.get("instant") === "on", digest: formData.get("digest") === "on" };
+  try {
+    await api("/staff", { method: "PUT", body: { notify } });
+  } catch (err) {
+    redirect(`/settings?error=${encodeURIComponent(err instanceof ApiError ? err.message : "Could not save that.")}`);
+  }
+  revalidatePath("/settings");
+  redirect("/settings?saved=1");
+}
