@@ -1,6 +1,8 @@
 // app/src/lib/programs/cards.ts
 /** Library cards, filters and small display helpers for the member app and staff screens. Pure. */
-import { FAMILY_LABEL, LEVEL_LABEL, type Family, type LiftKey, type ProgramTemplate } from "./types";
+import type { ProgramContent } from "./content";
+import { focusTag, lengthTag } from "./outline";
+import { FAMILY_LABEL, LEVEL_LABEL, type Family, type LiftKey, type Phase, type ProgramTemplate } from "./types";
 
 export interface ProgramCard {
   key: string;
@@ -55,7 +57,7 @@ export interface CardFilter {
 
 export const NO_FILTER: CardFilter = { family: "all", days: "any", length: "any" };
 
-export function filterCards(cards: ProgramCard[], f: CardFilter): ProgramCard[] {
+export function filterCards<T extends ProgramCard>(cards: T[], f: CardFilter): T[] {
   return cards.filter((c) => {
     if (f.family !== "all" && c.family !== f.family) return false;
     if (f.days === "3" && c.daysPerWeek > 3) return false;
@@ -67,6 +69,61 @@ export function filterCards(cards: ProgramCard[], f: CardFilter): ProgramCard[] 
     return true;
   });
 }
+
+const FAMILIES: CardFilter["family"][] = ["all", "strength", "peaking", "beginner", "size"];
+const DAY_FILTERS: CardFilter["days"][] = ["any", "3", "4", "5+"];
+const LENGTH_FILTERS: CardFilter["length"][] = ["any", "short", "medium", "long"];
+const pick = <T extends string>(options: T[], raw: string | string[] | undefined, fallback: T): T => {
+  const v = Array.isArray(raw) ? raw[0] : raw;
+  return options.includes(v as T) ? (v as T) : fallback;
+};
+
+/** The Programs tab's filters from its URL (?goal=&days=&length=). Anything unknown is "any". */
+export function parseFilter(sp: { goal?: string | string[]; days?: string | string[]; length?: string | string[] }): CardFilter {
+  return { family: pick(FAMILIES, sp.goal, "all"), days: pick(DAY_FILTERS, sp.days, "any"), length: pick(LENGTH_FILTERS, sp.length, "any") };
+}
+
+/** The query string that keeps the filters in the URL: "" when none are set. */
+export function filterQuery(f: CardFilter): string {
+  const q = new URLSearchParams();
+  if (f.family !== "all") q.set("goal", f.family);
+  if (f.days !== "any") q.set("days", f.days);
+  if (f.length !== "any") q.set("length", f.length);
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
+
+/** The Programs tab's goal headings, in the order they are shown. */
+export const GOAL_ORDER: Family[] = ["strength", "peaking", "beginner", "size"];
+export const GOAL_LABEL: Record<Family, string> = {
+  strength: "Get strong",
+  peaking: "Peak your total",
+  beginner: "Start lifting",
+  size: "Build size",
+};
+
+/** A big card on the Programs tab: the library card plus the story the program tells. */
+export interface StoryCard extends ProgramCard {
+  summary: string;
+  phases: Phase[];
+  /** Days, length and focus pills. */
+  tags: string[];
+}
+
+export function toStoryCard(t: ProgramTemplate, content: ProgramContent, basedOn: string | null = null): StoryCard {
+  return {
+    ...toCard(t, basedOn),
+    summary: content.summary,
+    phases: content.phases,
+    tags: [`${t.daysPerWeek} ${t.daysPerWeek === 1 ? "day" : "days"}`, lengthTag(t, content.repeats), focusTag(t)],
+  };
+}
+
+/** Cards under their goal headings, in GOAL_ORDER; empty groups are left out. */
+export function groupByGoal<T extends ProgramCard>(cards: T[]): { family: Family; label: string; cards: T[] }[] {
+  return GOAL_ORDER.map((family) => ({ family, label: GOAL_LABEL[family], cards: cards.filter((c) => c.family === family) })).filter((g) => g.cards.length > 0);
+}
+
 
 const DEFAULT_DAYS: Record<number, number[]> = {
   1: [1],

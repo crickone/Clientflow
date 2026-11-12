@@ -4,12 +4,13 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { ChevronRight, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-import { Card, SectionTitle } from "@/components/clientapp/ui";
+import { PkCard, PkSection } from "@/components/clientapp/programs/kit";
 import { deleteBuiltProgramAction } from "@/app/app/programs/built/actions";
+import { memberKey } from "@/lib/programs/memberTemplate";
 
 export interface BuiltProgramItem {
   id: number;
@@ -18,12 +19,22 @@ export interface BuiltProgramItem {
   running: boolean;
 }
 
-/** "Build your own", then the member's own programs with Edit, Start and Delete. */
-export function BuiltProgramList({ programs, anyLive }: { programs: BuiltProgramItem[]; anyLive: boolean }) {
+export interface CurrentProgram {
+  name: string;
+  /** "Week 2 of 4", or that it is paused. */
+  line: string;
+}
+
+/**
+ * "Build your own", then My programs: the running program first with
+ * Continue, then the member's own saved programs with Edit, Start and Delete.
+ */
+export function BuiltProgramList({ current, programs, anyLive }: { current: CurrentProgram | null; programs: BuiltProgramItem[]; anyLive: boolean }) {
   const router = useRouter();
   const confirm = useConfirm();
   const [busy, setBusy] = useState<number | null>(null);
   const [, start] = useTransition();
+  const saved = programs.filter((p) => !p.running);
 
   async function remove(p: BuiltProgramItem) {
     if (busy !== null) return;
@@ -41,36 +52,52 @@ export function BuiltProgramList({ programs, anyLive }: { programs: BuiltProgram
   }
 
   return (
-    <div style={{ display: "grid", gap: 10 }}>
-      <Link href="/app/programs/built/new" className="pg-cta">
+    <>
+      <Link href="/app/programs/built/new" className="pk-dashed">
         <Plus size={18} aria-hidden /> Build your own
       </Link>
-      {programs.length > 0 && <SectionTitle>My programs</SectionTitle>}
-      {programs.map((p) => (
-        <Card key={p.id} style={{ display: "grid", gap: 8 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-            <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", overflowWrap: "anywhere" }}>{p.name}</span>
-            {p.running && <span className="pg-tag">Running</span>}
-          </div>
-          <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>{p.line}</div>
-          <div className="bld-row">
-            <Link href={`/app/programs/built/${p.id}`} className="pg-chip bld-chip-link">
-              Edit
-            </Link>
-            {!anyLive && (
-              <Link href={`/app/programs/built/${p.id}/start`} className="pg-chip bld-chip-link">
-                Start
+      {(current || saved.length > 0) && (
+        <PkSection label="My programs">
+          {current && (
+            <PkCard href="/app/programs/mine" accent>
+              <div className="pk-row">
+                <div>
+                  <h3 className="pk-card-title">{current.name}</h3>
+                  <span className="pk-small">{current.line}</span>
+                </div>
+                <span className="pk-ghost">
+                  Continue <ChevronRight size={16} />
+                </span>
+              </div>
+            </PkCard>
+          )}
+          {saved.map((p) => (
+            <PkCard key={p.id}>
+              <Link href={`/app/programs/${encodeURIComponent(memberKey(p.id))}`} className="pk-linkrow">
+                <div>
+                  <h3 className="pk-card-title">{p.name}</h3>
+                  <span className="pk-small">{p.line}</span>
+                </div>
+                <ChevronRight size={18} aria-hidden className="pk-chev" />
               </Link>
-            )}
-            {!p.running && (
-              <button type="button" className="pg-chip" disabled={busy !== null} onClick={() => void remove(p)}>
-                Delete
-              </button>
-            )}
-          </div>
-        </Card>
-      ))}
-      {programs.length > 0 && anyLive && <div className="bld-hint">End your current program on My program to start another.</div>}
-    </div>
+              <div className="pk-actions">
+                <Link href={`/app/programs/built/${p.id}`} className="pk-btn">
+                  Edit
+                </Link>
+                {!anyLive && (
+                  <Link href={`/app/programs/built/${p.id}/start`} className="pk-btn">
+                    Start
+                  </Link>
+                )}
+                <button type="button" className="pk-btn pk-btn--danger" disabled={busy !== null} onClick={() => void remove(p)}>
+                  Delete
+                </button>
+              </div>
+            </PkCard>
+          ))}
+          {saved.length > 0 && anyLive && <span className="pk-small">End your current program on My program to start another.</span>}
+        </PkSection>
+      )}
+    </>
   );
 }

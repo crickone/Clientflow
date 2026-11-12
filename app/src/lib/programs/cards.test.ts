@@ -2,7 +2,8 @@
 // Run: npm test -- src/lib/programs/cards.test.ts
 import assert from "node:assert/strict";
 
-import { NO_FILTER, actorLabel, byline, cardLine, defaultWeekdays, filterCards, toCard } from "./cards";
+import { GOAL_LABEL, NO_FILTER, actorLabel, byline, cardLine, defaultWeekdays, filterCards, filterQuery, groupByGoal, parseFilter, toCard, toStoryCard } from "./cards";
+import { programContent } from "./content";
 import { PLATFORM_PROGRAMS, platformProgram } from "./registry";
 
 const cards = PLATFORM_PROGRAMS.map((t) => toCard(t));
@@ -37,5 +38,26 @@ assert.equal(actorLabel("member", null, true), "You");
 assert.equal(actorLabel("member", null, false), "Member");
 assert.equal(actorLabel("staff:4", "Ann Byrne", true), "Coach Ann Byrne");
 assert.equal(actorLabel("staff:4", null, false), "Coach");
+
+// ── the Programs tab: filters in the URL, story cards, goal groups ──
+assert.deepEqual(parseFilter({}), NO_FILTER);
+assert.deepEqual(parseFilter({ goal: "peaking", days: "4", length: "short" }), { family: "peaking", days: "4", length: "short" });
+assert.deepEqual(parseFilter({ goal: ["size", "strength"], days: "9", length: "forever" }), { family: "size", days: "any", length: "any" }, "unknown values fall back to any");
+assert.equal(filterQuery(NO_FILTER), "");
+assert.equal(filterQuery({ family: "peaking", days: "5+", length: "any" }), "?goal=peaking&days=5%2B");
+assert.deepEqual(parseFilter(Object.fromEntries(new URLSearchParams(filterQuery({ family: "beginner", days: "5+", length: "long" }).slice(1)))), { family: "beginner", days: "5+", length: "long" }, "a filter survives the round trip");
+
+const sm = platformProgram("smolov-base")!;
+const story = toStoryCard(sm, programContent(sm, { kind: "platform" }));
+assert.equal(story.summary, sm.summary);
+assert.deepEqual(story.tags, ["4 days", "4 weeks", "Squat"]);
+assert.equal(story.phases.length, sm.phases!.length);
+const bbbT = platformProgram("531-bbb")!;
+assert.deepEqual(toStoryCard(bbbT, programContent(bbbT, { kind: "platform" })).tags, ["4 days", "Repeats every 4 weeks", "4 lifts"]);
+const groups = groupByGoal(PLATFORM_PROGRAMS.map((t) => toStoryCard(t, programContent(t, { kind: "platform" }))));
+assert.deepEqual(groups.map((g) => g.label), ["Get strong", "Peak your total", "Start lifting", "Build size"]);
+assert.equal(groups.reduce((n, g) => n + g.cards.length, 0), PLATFORM_PROGRAMS.length);
+assert.equal(GOAL_LABEL.size, "Build size");
+assert.deepEqual(groupByGoal(filterCards(groups.flatMap((g) => g.cards), { ...NO_FILTER, family: "size" })).map((g) => g.family), ["size"], "a filter leaves out empty groups");
 
 console.log("programs/cards: ok");
