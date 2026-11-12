@@ -12,9 +12,18 @@ const ICON = { business: Building2, person: User, domain: Globe, invoice: FileTe
 
 type Row = { key: string; title: string; subtitle: string; href: string; icon: typeof Building2; hit?: SearchHit };
 
+const KINDS = ["business", "person", "domain", "invoice"] as const;
+const SEARCH_ERROR = "Search is unavailable. Sign in again if this keeps happening.";
+
+function isRecentHit(v: unknown): v is SearchHit {
+  if (typeof v !== "object" || v === null) return false;
+  const h = v as { kind?: unknown; href?: unknown };
+  return (KINDS as readonly unknown[]).includes(h.kind) && typeof h.href === "string" && h.href.startsWith("/");
+}
 function readRecent(): SearchHit[] {
   try {
-    return JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]") as SearchHit[];
+    const parsed: unknown = JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]");
+    return Array.isArray(parsed) ? parsed.filter(isRecentHit) : [];
   } catch {
     return [];
   }
@@ -38,6 +47,7 @@ export function CommandK() {
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [recent, setRecent] = useState<SearchHit[]>([]);
   const [active, setActive] = useState(0);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const input = useRef<HTMLInputElement>(null);
 
@@ -63,6 +73,7 @@ export function CommandK() {
     if (open && !d.open) {
       setQ("");
       setHits([]);
+      setSearchError(null);
       setActive(0);
       setRecent(readRecent());
       d.showModal();
@@ -74,13 +85,20 @@ export function CommandK() {
   useEffect(() => {
     if (q.trim().length < 2) {
       setHits([]);
+      setSearchError(null);
       return;
     }
     const ctrl = new AbortController();
     const t = setTimeout(async () => {
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`, { signal: ctrl.signal });
+        if (!res.ok) {
+          setHits([]);
+          setSearchError(SEARCH_ERROR);
+          return;
+        }
         const data = (await res.json()) as { hits: SearchHit[] };
+        setSearchError(null);
         setHits(data.hits ?? []);
       } catch {
         // aborted or offline: keep what we have
@@ -93,7 +111,7 @@ export function CommandK() {
   }, [q]);
 
   const statics: Row[] = rankStatic(q, STATIC_COMMANDS).map((c) => ({ key: `s:${c.href}`, title: c.title, subtitle: c.hint, href: c.href, icon: Search }));
-  const dynamic: Row[] = (q.trim().length < 2 ? recent : hits).map((h) => ({ key: `${h.kind}:${h.id}`, title: h.title, subtitle: h.subtitle, href: h.href, icon: ICON[h.kind], hit: h }));
+  const dynamic: Row[] = (q.trim().length < 2 ? recent : hits).map((h) => ({ key: `${h.kind}:${h.id}:${h.href}`, title: h.title, subtitle: h.subtitle, href: h.href, icon: ICON[h.kind], hit: h }));
   const rows = [...dynamic, ...statics];
   const bounded = Math.min(active, Math.max(0, rows.length - 1));
 
@@ -123,7 +141,8 @@ export function CommandK() {
           <kbd>esc</kbd>
         </div>
         <ul className="palette-list" role="listbox">
-          {rows.length === 0 && <li className="palette-empty">Nothing matches.</li>}
+          {searchError && <li className="palette-empty">{searchError}</li>}
+          {rows.length === 0 && !searchError && <li className="palette-empty">Nothing matches.</li>}
           {rows.map((row, i) => {
             const Icon = row.icon;
             return (
