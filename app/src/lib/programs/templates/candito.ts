@@ -29,6 +29,16 @@ export const canditoStyle: ProgramTemplate = {
   description:
     "Six weeks that move from higher reps to singles, four days a week on an upper and lower split. Two weeks of sets of six to eight, a strength week of fours and fives, a heavy week of twos and threes, a peak week of doubles and singles, then a test of all three lifts. The percentages are ours, in the shape of Candito's program.",
   warning: "Ends in a max test on three lifts. Use a spotter or safety bars.",
+  summary: "Six weeks on an upper and lower split, from sets of six and eight down to singles, ending in a test of all three lifts.",
+  phases: [
+    { name: "Conditioning", fromWeek: 1, toWeek: 2, note: "Sets of six and eight at 60% to 72.5% of your max." },
+    { name: "Strength", fromWeek: 3, toWeek: 3, note: "Sets of four and five at 75% to 80%." },
+    { name: "Heavy", fromWeek: 4, toWeek: 4, note: "Sets of two and three at 82.5% to 87.5%." },
+    { name: "Peak", fromWeek: 5, toWeek: 5, note: "Doubles and singles at 90% to 95%." },
+    { name: "Test", fromWeek: 6, toWeek: 6, note: "A max test of squat and bench on one day, then deadlift on another." },
+  ],
+  whyItWorks:
+    "The reps come down each phase as the weight goes up, so you move from building work to heavy singles in six weeks. Squat, bench and deadlift each get two sessions a week. The percentages are ours, in the shape of Candito's program.",
   engine: { key: "fixed_block" },
   weeks: [
     W("Conditioning", sxr(4, 6, 0.7), sxr(2, 6, 0.65), sxr(4, 6, 0.7), sxr(3, 8, 0.65), sxr(2, 8, 0.6), sxr(3, 8, 0.65)),

@@ -162,6 +162,26 @@ const requireLocal = createRequire(import.meta.url);
         lib.deleteCopy(bad.id);
       }
 
+      // ── a copy saved before programs had content takes the original's ──
+      {
+        const { db: odb } = requireLocal("../db") as typeof import("../db");
+        const { programTemplates: pt } = requireLocal("../db/schema") as typeof import("../db/schema");
+        const { platformProgram } = requireLocal("./registry") as typeof import("./registry");
+        const original = platformProgram("smolov-base")!;
+        const { summary: _s, phases: _p, phasesRepeat: _r, whyItWorks: _w, ...old } = original;
+        const at = Date.now();
+        const [row] = odb
+          .insert(pt)
+          .values({ basedOn: "smolov-base", engine: "fixed_block", name: "Old copy", templateJson: JSON.stringify(old), createdBy: 7, createdAt: at, updatedAt: at })
+          .returning({ id: pt.id })
+          .all();
+        const oldCopy = lib.getCopy(row.id)!;
+        assert.equal(oldCopy.template.summary, original.summary);
+        assert.deepEqual(oldCopy.template.phases, original.phases);
+        assert.equal(oldCopy.template.whyItWorks, original.whyItWorks);
+        assert.equal(lib.deleteCopy(row.id), true);
+      }
+
       // ── a copy's own summary, phases and why it works survive a save ──
       const withContent = structuredClone(lib.getCopy(id)!.template);
       withContent.summary = "Our three-day Smolov.";
