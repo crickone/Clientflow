@@ -188,6 +188,8 @@ export const NAV_GROUPS: NavGroup[] = [
           { href: "/workout/workouts", label: "Workouts", icon: Dumbbell },
           { href: "/workout/exercises", label: "Exercise library", icon: Dumbbell },
           { href: "/workout/circuits", label: "Circuits", icon: Dumbbell },
+          // The programs module owns this path, so pathAllowed hides it where Programs is off.
+          { href: "/workout/library", label: "Program library", icon: Dumbbell },
         ],
       },
       {
