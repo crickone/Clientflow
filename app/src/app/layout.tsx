@@ -41,6 +41,7 @@ import { PastDueBanner } from "@/components/billing/PastDueBanner";
 import { FacebookProblemBanner } from "@/components/settings/FacebookProblemBanner";
 import { connectionProblems } from "@/lib/facebook/health";
 import { stuckLeadCounts } from "@/lib/facebook/leadQueue";
+import { noteModuleVisit } from "@/lib/analytics/moduleUsage";
 import { pathAllowed, type FeatureFlags } from "@/lib/features";
 import { ImpersonationBanner } from "@/components/layout/ImpersonationBanner";
 import { TenantTabGuard } from "@/components/layout/TenantTabGuard";
@@ -347,6 +348,16 @@ export default async function RootLayout({
       // refused here, the one place that sees both the tenant and the path.
       // Unset flags mean every module is on, so a tenant nobody has touched
       // behaves exactly as before. See @/lib/features.
+      // Tier 4 console: which modules this business opens. Buffered in memory,
+      // never a write here. Platform staff opening the business through the
+      // console are not the business using it, so they are not counted.
+      if (!bare && !pathname.startsWith("/api/") && !current.impersonation) {
+        try {
+          noteModuleVisit(current.tenant.id, pathname);
+        } catch {
+          /* counting must never break a page */
+        }
+      }
       featureFlags = getFeatureFlags();
       if (!bare && !pathname.startsWith("/api/") && !pathAllowed(featureFlags, pathname)) {
         redirect("/dashboard");
