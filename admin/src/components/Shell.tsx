@@ -16,6 +16,7 @@ import {
   Search as SearchIcon,
   ScrollText,
   Settings as SettingsIcon,
+  ToggleLeft,
   Users,
   X,
 } from "lucide-react";
@@ -56,6 +57,7 @@ const NAV_GROUPS = [
     label: "Console",
     items: [
       { href: "/staff", label: "Platform staff", icon: Users },
+      { href: "/flags", label: "Feature flags", icon: ToggleLeft },
       { href: "/settings", label: "Settings", icon: SettingsIcon },
     ],
   },

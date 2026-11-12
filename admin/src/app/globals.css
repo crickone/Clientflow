@@ -1221,3 +1221,10 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { opacity: 0.45; c
 .task-title { flex: 1; }
 .task-meta { font-size: 12px; color: var(--text-tertiary); }
 .tasks .btn--icon { width: 26px; height: 26px; }
+
+.flag { display: flex; flex-direction: column; gap: 10px; padding-bottom: 18px; border-bottom: 1px solid var(--grid); }
+.flag:last-child { border-bottom: 0; padding-bottom: 0; }
+.flag-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; }
+.flag-count { font-family: var(--font-mono), ui-monospace, monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); }
+.flag-allow { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px 16px; padding: 4px 0; }
+input[type="range"] { accent-color: #ffffff; width: 180px; }

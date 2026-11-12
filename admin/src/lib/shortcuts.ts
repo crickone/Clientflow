@@ -8,6 +8,7 @@ export const SHORTCUTS = [
   { keys: "g h", label: "Health", href: "/health" },
   { keys: "g i", label: "Inbox", href: "/inbox" },
   { keys: "g j", label: "Jobs", href: "/jobs" },
+  { keys: "g f", label: "Feature flags", href: "/flags" },
   { keys: "g p", label: "Provision a business", href: "/provision" },
   { keys: "g a", label: "Audit log", href: "/audit" },
   { keys: "g s", label: "Settings", href: "/settings" },
