@@ -5890,8 +5890,9 @@ select.pg-input { padding-right: 36px; }
   .pk-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pk-filters > :first-child { grid-column: 1 / -1; }
 }
-.pk-select { width: 100%; min-width: 0; height: 44px; padding-left: 10px; border: 1px solid var(--hairline); border-radius: 12px; background-color: var(--surface-1); color: var(--text-primary); font: inherit; font-size: 13px; }
-.pk-input { width: 100%; min-width: 0; height: 44px; padding: 0 12px; border: 1px solid var(--hairline); border-radius: 12px; background-color: var(--surface-2); color: var(--text-primary); font: inherit; font-size: 15px; }
+/* 16px stops iOS Safari zooming the page when a field is focused. */
+.pk-select { width: 100%; min-width: 0; height: 44px; padding-left: 10px; border: 1px solid var(--hairline); border-radius: 12px; background-color: var(--surface-1); color: var(--text-primary); font: inherit; font-size: 16px; }
+.pk-input { width: 100%; min-width: 0; height: 44px; padding: 0 12px; border: 1px solid var(--hairline); border-radius: 12px; background-color: var(--surface-2); color: var(--text-primary); font: inherit; font-size: 16px; }
 .pk-input:focus, .pk-select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .pk-big { height: 72px; font-size: 34px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; border-radius: 16px; }
 .pk-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
@@ -5928,7 +5929,7 @@ select.pg-input { padding-right: 36px; }
 .pk-notes { height: auto; min-height: 64px; padding: 10px 12px; resize: vertical; }
 .pk-lock { display: grid; gap: 14px; min-width: 0; margin: 0; padding: 0; border: 0; }
 .pk-sheet-backdrop { position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-end; justify-content: center; background: color-mix(in srgb, var(--bg) 72%, transparent); }
-.pk-sheet { display: grid; gap: 14px; width: 100%; max-width: 460px; max-height: 88vh; overflow-y: auto; padding: 10px 16px calc(16px + env(safe-area-inset-bottom)); border: 1px solid var(--hairline-strong); border-bottom: 0; border-radius: 20px 20px 0 0; background: var(--surface-1); outline: none; }
+.pk-sheet { display: grid; gap: 14px; width: 100%; max-width: 460px; max-height: 88vh; max-height: 88dvh; overflow-y: auto; overscroll-behavior: contain; padding: 10px 16px calc(16px + env(safe-area-inset-bottom)); border: 1px solid var(--hairline-strong); border-bottom: 0; border-radius: 20px 20px 0 0; background: var(--surface-1); outline: none; }
 .pk-grip { justify-self: center; width: 36px; height: 4px; border-radius: 2px; background: var(--hairline-strong); }
 .pk-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .pk-sheet-title { margin: 0; min-width: 0; font-size: 17px; font-weight: 700; color: var(--text-primary); overflow-wrap: anywhere; }
