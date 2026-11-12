@@ -31,7 +31,7 @@ Some members know how to train and want a well-known program, not a coach's plan
 
 ### Platform library
 
-Programs live in code as template files (one per program), seeded at boot, the way other platform content is. Each template carries:
+Programs live in code as template files (one per program), read from a registry in code. They are not copied into any database, so a platform update reaches every gym on the next deploy. Each template carries:
 
 - Metadata: name, author credit, family, level, days per week, length in weeks, the lifts it needs a max for, a plain description in our own words, and a warning line for the demanding ones.
 - The template itself: weeks, then days, then exercises, then set prescriptions.
