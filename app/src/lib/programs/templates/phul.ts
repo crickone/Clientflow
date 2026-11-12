@@ -49,6 +49,13 @@ export const phul: ProgramTemplate = {
   who: "Intermediate lifters who want strength and size on four days a week.",
   description:
     "Power Hypertrophy Upper Lower. An upper and a lower power day with heavy sets of three to five, and an upper and a lower hypertrophy day with sets of eight to fifteen. You pick each starting weight; each exercise goes up by your smallest jump once you reach the top of its rep range on every set.",
+  summary: "Four days a week: upper and lower power days with heavy sets, and upper and lower days with higher reps.",
+  phases: [
+    { name: "Find your weights", fromWeek: 1, toWeek: 1, note: "Pick a weight for each exercise that lets you reach the bottom of its rep range on every set." },
+    { name: "Build", fromWeek: 2, toWeek: 12, note: "Add reps each session. When every set reaches the top of the range, the weight goes up by your smallest jump." },
+  ],
+  whyItWorks:
+    "The power days use heavy sets of three to five; the hypertrophy days use sets of eight to fifteen. Each muscle gets one heavy and one higher-rep session a week. Adding reps before weight keeps every jump small.",
   engine: { key: "double_progression" },
   weeks: [week([upperPower, lowerPower, upperHypertrophy, lowerHypertrophy])],
 };

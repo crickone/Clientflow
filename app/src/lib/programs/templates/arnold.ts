@@ -42,6 +42,13 @@ export const arnoldStyle: ProgramTemplate = {
   description:
     "Chest and back, shoulders and arms, then legs, each twice a week over six days. Sets of eight to fifteen. You pick each starting weight; each exercise goes up by your smallest jump once you reach the top of its range on every set. The split is his; the exercise choice and set counts are ours.",
   warning: "Six sessions a week. Plan your recovery and food around it.",
+  summary: "Six days a week: chest and back, shoulders and arms, then legs, each twice.",
+  phases: [
+    { name: "Find your weights", fromWeek: 1, toWeek: 1, note: "Pick a weight for each exercise that lets you reach the bottom of its rep range on every set." },
+    { name: "Build", fromWeek: 2, toWeek: 12, note: "Add reps each session. When every set reaches the top of the range, the weight goes up by your smallest jump." },
+  ],
+  whyItWorks:
+    "Each muscle group gets two sessions a week with plenty of sets of eight to fifteen. Pairing chest with back and shoulders with arms keeps each session to two areas. The split is his; the exercise choice and set counts are ours.",
   engine: { key: "double_progression" },
   weeks: [week([chestBack, shouldersArms, legs, chestBack, shouldersArms, legs])],
 };

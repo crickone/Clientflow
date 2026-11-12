@@ -42,6 +42,13 @@ export const germanVolumeTraining: ProgramTemplate = {
   description:
     "Ten sets of ten on one big lift per session, done back to back with a second exercise, at 60% of your max with 90 seconds of rest. Once you get all 100 reps, the weight goes up 2.5 kg next time. Three sessions a week: chest and back, legs, then arms and shoulders, each finished with two lighter exercises.",
   warning: "Very high volume. Expect to be sore for days after the first sessions.",
+  summary: "Three sessions a week of ten sets of ten on one big lift, paired with a second exercise.",
+  phases: [
+    { name: "First week", fromWeek: 1, toWeek: 1, note: "Ten sets of ten at 60% of your max, with 90 seconds of rest. Pick light weights for the paired exercises." },
+    { name: "Build", fromWeek: 2, toWeek: 6, note: "Once you finish all 100 reps of a lift, it goes up 2.5 kg next time. Until then it stays the same." },
+  ],
+  whyItWorks:
+    "Many sets at a moderate weight with short rest give each muscle a lot of work in one session. Pairing two exercises keeps the session moving while each one rests. The weight only goes up once every set is done, so the volume never drops.",
   engine: { key: "fixed_volume", increment: 2.5, startPct: 0.6 },
   weeks: [week([chestBack, legs, armsShoulders])],
 };

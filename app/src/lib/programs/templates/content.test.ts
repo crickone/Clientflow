@@ -9,10 +9,8 @@ import assert from "node:assert/strict";
 import { contentErrors } from "../content";
 import { PLATFORM_PROGRAMS } from "../registry";
 
-// The programs written so far; Task 5 checks every platform program.
-const WRITTEN = new Set(["stronglifts-5x5", "starting-strength", "greyskull-lp", "531-bbb", "531-fsl", "texas-method", "gzclp", "smolov-base", "smolov-jr-squat", "smolov-jr-bench", "russian-squat-routine", "candito-style-6-week", "sheiko-style"]);
-const programs = PLATFORM_PROGRAMS.filter((t) => WRITTEN.has(t.key));
-assert.equal(programs.length, WRITTEN.size);
+const programs = PLATFORM_PROGRAMS;
+assert.equal(programs.length, 19);
 
 const CLAIMS = /\byou will\b|\bguarantee|\bproven\b|\bfastest\b|\bnot just\b|\brather than\b/i;
 for (const t of programs) {

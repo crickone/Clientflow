@@ -72,6 +72,13 @@ export const phat: ProgramTemplate = {
   description:
     "Power Hypertrophy Adaptive Training. Two power days, upper and lower, with heavy sets of three to five, then three hypertrophy days. Each hypertrophy day opens with six fast sets of three at about 65 to 70% of your power-day weight. You pick each starting weight; each exercise goes up by your smallest jump once you reach the top of its rep range on every set. Rack chins are listed as chin-ups.",
   warning: "Five long sessions a week. Plan your recovery and food around it.",
+  summary: "Five days a week: heavy upper and lower power days, then three higher-rep days that open with speed sets.",
+  phases: [
+    { name: "Find your weights", fromWeek: 1, toWeek: 1, note: "Pick a weight for each exercise that lets you reach the bottom of its rep range. Speed sets use about 65 to 70% of your power-day weight." },
+    { name: "Build", fromWeek: 2, toWeek: 12, note: "Add reps each session. When every set reaches the top of the range, the weight goes up by your smallest jump." },
+  ],
+  whyItWorks:
+    "The power days train strength with heavy sets of three to five. The other three days add volume in higher rep ranges, and the speed sets practise moving a lighter weight fast. Each muscle is trained twice a week.",
   engine: { key: "double_progression" },
   weeks: [week([upperPower, lowerPower, backShoulders, lowerHypertrophy, chestArms])],
 };
