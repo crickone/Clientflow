@@ -30,6 +30,13 @@ export const gzclp: ProgramTemplate = {
   who: "Beginners who want a set plan for what to do when a lift stalls.",
   description:
     "Four workouts in rotation. Each has a heavy main lift (T1: 5 x 3 with a last set for as many as you can), a lighter second lift (T2: 3 x 10) and an accessory (T3: 3 x 15 with a last set for as many as you can). Hit your reps and the weight goes up. Miss, and the lift moves to its next rep scheme: 6 x 2 then 10 x 1 for T1, 3 x 8 then 3 x 6 for T2. T3 goes up once the last set reaches 25.",
+  summary: "Four workouts in rotation, each with a heavy main lift, a lighter second lift and an accessory.",
+  phases: [
+    { name: "Settle in", fromWeek: 1, toWeek: 2, note: "Main lifts start at 73% of your max and second lifts at 55%. Pick light weights for the accessories." },
+    { name: "Build", fromWeek: 3, toWeek: 12, note: "Each lift moves on its own: up when you hit your reps, on to its next rep scheme when you miss." },
+  ],
+  whyItWorks:
+    "Each lift has a plan for when it stalls: the same weight with fewer reps per set, before any weight comes off. The three tiers split each session into heavy, medium and light work. Each main lift is trained heavy once every four sessions.",
   engine: { key: "tm_cycle", rule: "gzclp", increment: 2.5, increments: { squat: 5, deadlift: 5 }, t2ResetKg: 5, t3AmrapTarget: 25 },
   weeks: [
     week([

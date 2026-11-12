@@ -23,6 +23,14 @@ export const texasMethod: ProgramTemplate = {
   description:
     "Three days a week. Monday is volume: 5 sets of 5 at 90% of your 5-rep max. Wednesday is light: 2 sets of 5 squats at 80% of Monday's weight. Friday is intensity: a new 5-rep max. Bench and press swap each week. When you get all five reps on a top set, that lift goes up 2.5 kg, or 5 kg on the deadlift.",
   warning: "A new 5-rep max every week. Expect to stall and change the plan within a few months.",
+  summary: "Three days a week: a volume day, a light day, and an intensity day with a top set of five.",
+  phases: [
+    { name: "Bench week", fromWeek: 1, toWeek: 1, note: "Squat and bench on the volume and intensity days, press on the light day. Deadlift on the volume day." },
+    { name: "Press week", fromWeek: 2, toWeek: 2, note: "Squat and press on the volume and intensity days, bench on the light day. Deadlift on the volume day." },
+  ],
+  phasesRepeat: true,
+  whyItWorks:
+    "The volume day does the hard work, the light day keeps you moving while you recover, and the intensity day shows where you are. The volume sets are 90% of your 5-rep max. Each top set of five you finish raises that lift for the next week.",
   engine: { key: "tm_cycle", rule: "drive_set", increment: 2.5, increments: { deadlift: 5 } },
   weeks: [
     week(

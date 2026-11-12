@@ -50,6 +50,16 @@ export const wendlerBbb: ProgramTemplate = {
   name: "5/3/1 Boring But Big",
   who: "Intermediate lifters who want steady strength gains and some size.",
   description: `${WAVE_TEXT} After the main lift: 5 sets of 10 at 50% of the training max, then one assistance exercise. ${TM_TEXT}`,
+  summary: "Four days a week, one main lift a day, then five sets of ten. The training max goes up each cycle.",
+  phases: [
+    { name: "5s week", fromWeek: 1, toWeek: 1, note: "Sets of five at 65%, 75% and 85% of your training max, the last one for as many reps as you can. Then 5 x 10 at 50%." },
+    { name: "3s week", fromWeek: 2, toWeek: 2, note: "Sets of three at 70%, 80% and 90%, the last one for as many reps as you can. Then 5 x 10 at 50%." },
+    { name: "5/3/1 week", fromWeek: 3, toWeek: 3, note: "Five at 75%, three at 85%, then as many as you can at 95%. Then 5 x 10 at 50%. The heaviest week." },
+    { name: "Deload", fromWeek: 4, toWeek: 4, note: "Light sets of five at 40%, 50% and 60%, and no 5 x 10. The next cycle starts after it." },
+  ],
+  phasesRepeat: true,
+  whyItWorks:
+    "Your training max is 90% of your max, so the main sets start lighter than you can lift. That leaves room to beat the reps on the last set. The training max rises a little each cycle, which keeps the climb slow and steady. The 5 x 10 adds volume for size.",
   weeks: wendler(
     (_w, d) => ex(d.name, times(5, pct(0.5, 10, 90)), { lift: d.lift, notes: "Boring But Big: 5 sets of 10 at 50% of your training max." }),
     {
@@ -68,6 +78,16 @@ export const wendlerFsl: ProgramTemplate = {
   name: "5/3/1 First Set Last",
   who: "Intermediate lifters who want more practice at the main lifts without long sessions.",
   description: `${WAVE_TEXT} After the main lift: 5 sets of 5 at the first set's weight, then one assistance exercise. ${TM_TEXT}`,
+  summary: "Four days a week, one main lift a day, then five sets of five at your first set's weight.",
+  phases: [
+    { name: "5s week", fromWeek: 1, toWeek: 1, note: "Sets of five at 65%, 75% and 85% of your training max, the last one for as many reps as you can. Then 5 x 5 at 65%." },
+    { name: "3s week", fromWeek: 2, toWeek: 2, note: "Sets of three at 70%, 80% and 90%, the last one for as many reps as you can. Then 5 x 5 at 70%." },
+    { name: "5/3/1 week", fromWeek: 3, toWeek: 3, note: "Five at 75%, three at 85%, then as many as you can at 95%. Then 5 x 5 at 75%. The heaviest week." },
+    { name: "Deload", fromWeek: 4, toWeek: 4, note: "Light sets of five at 40%, 50% and 60%, and no 5 x 5. The next cycle starts after it." },
+  ],
+  phasesRepeat: true,
+  whyItWorks:
+    "The extra sets use the lightest weight of the day, so you get more practice at the main lift without much extra strain. The sessions stay shorter than Boring But Big. The training max starts at 90% of your max and rises a little each cycle.",
   weeks: wendler(
     (w, d) => ex(d.name, times(5, pct(WAVES[w][0][0], 5, 90)), { lift: d.lift, notes: "First Set Last: 5 sets of 5 at your first set's weight." }),
     {
