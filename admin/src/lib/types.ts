@@ -490,3 +490,10 @@ export interface FleetResponse {
   killSwitches: KillSwitchState[];
 }
 
+
+/** One hit from /search (mirrors app/src/lib/platform/search.ts). */
+export type SearchHit =
+  | { kind: "business"; id: number; title: string; subtitle: string; href: string }
+  | { kind: "person"; id: number; title: string; subtitle: string; href: string; tenantId: number }
+  | { kind: "domain"; id: number; title: string; subtitle: string; href: string; tenantId: number }
+  | { kind: "invoice"; id: number; title: string; subtitle: string; href: string; tenantId: number };

@@ -9,18 +9,21 @@ export const SHORTCUTS = [
   { keys: "g p", label: "Provision a business", href: "/provision" },
   { keys: "g a", label: "Audit log", href: "/audit" },
   { keys: "g s", label: "Settings", href: "/settings" },
+  { keys: "/", label: "Search" },
   { keys: "?", label: "Show these shortcuts" },
 ] as const;
 
 export type Resolution =
   | { kind: "go"; href: string }
   | { kind: "help" }
+  | { kind: "search" }
   | { kind: "pending"; key: string }
   | { kind: "none" };
 
 export function resolveShortcut(prev: string | null, key: string): Resolution {
   if (prev === null) {
     if (key === "?") return { kind: "help" };
+    if (key === "/") return { kind: "search" };
     if (key === "g") return { kind: "pending", key };
     return { kind: "none" };
   }

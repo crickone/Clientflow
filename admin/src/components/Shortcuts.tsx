@@ -37,6 +37,9 @@ export function Shortcuts() {
       } else if (r.kind === "help") {
         e.preventDefault();
         setHelp((h) => !h);
+      } else if (r.kind === "search") {
+        e.preventDefault();
+        window.dispatchEvent(new Event("console:search"));
       }
     };
     window.addEventListener("keydown", onKey);

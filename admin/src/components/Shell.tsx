@@ -10,6 +10,7 @@ import {
   LogOut,
   Menu,
   Rocket,
+  Search as SearchIcon,
   ScrollText,
   Settings as SettingsIcon,
   Users,
@@ -18,6 +19,7 @@ import {
 
 import { cn } from "@/lib/cn";
 import { Logo } from "@/components/Logo";
+import { CommandK } from "@/components/CommandK";
 import { Shortcuts } from "@/components/Shortcuts";
 import type { AdminUser } from "@/lib/session";
 
@@ -77,6 +79,16 @@ export function Shell({ user, children }: { user: AdminUser; children: ReactNode
         <div style={{ padding: "26px 22px 18px" }}>
           <Logo size={18} />
         </div>
+
+        <button
+          type="button"
+          className="nav-search"
+          onClick={() => window.dispatchEvent(new Event("console:search"))}
+        >
+          <SearchIcon size={14} strokeWidth={1.75} aria-hidden />
+          <span>Search</span>
+          <kbd>⌘K</kbd>
+        </button>
 
         {/* Nav */}
         <nav style={{ padding: "6px 10px", flex: 1, overflowY: "auto" }}>
@@ -174,6 +186,7 @@ export function Shell({ user, children }: { user: AdminUser; children: ReactNode
 
       <main className="app-main">
         <Shortcuts />
+        <CommandK />
         <div className="app-topbar">
           <button className="app-hamburger" onClick={() => setNavOpen(true)} aria-label="Open menu">
             <Menu size={22} strokeWidth={1.9} />

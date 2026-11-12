@@ -13,4 +13,5 @@ assert.deepEqual(resolveShortcut("g", "s"), { kind: "go", href: "/settings" });
 assert.deepEqual(resolveShortcut("g", "x"), { kind: "none" });
 assert.deepEqual(resolveShortcut(null, "?"), { kind: "help" });
 assert.deepEqual(resolveShortcut(null, "b"), { kind: "none" });
+assert.deepEqual(resolveShortcut(null, "/"), { kind: "search" });
 console.log("shortcuts.test.ts: ok");
