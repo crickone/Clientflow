@@ -174,7 +174,7 @@ function tmLines(t: ProgramTemplate, e: Extract<ProgramTemplate["engine"], { key
       if (jumps) lines.push(`After each ${word(t.weeks.length)}-week cycle, your training max goes up ${jumps}.`);
       // The engine marks a lift short only from a finished session; a skipped one runs nothing but the end of the cycle.
       lines.push(
-        "If you finish a session and its + set falls short, isn't ticked, or is lighter than planned, that lift's training max stays the same for the next cycle. Skipped sessions don't hold it back.",
+        "If you finish a session and its + set falls short, isn't ticked, or is more than one jump lighter than planned, that lift's training max stays the same for the next cycle. Skipped sessions don't hold it back.",
       );
       break;
     }
@@ -186,14 +186,14 @@ function tmLines(t: ProgramTemplate, e: Extract<ProgramTemplate["engine"], { key
         return row.kg > 0 ? `${reps} reps adds ${formatWeight(row.kg, unit)}` : `${reps} reps changes nothing`;
       });
       if (parts.length) lines.push(`The reps on the heavy + set move your training max: ${listText(parts)}.`);
-      lines.push("If the + set isn't ticked or is lighter than planned, the training max stays the same.");
+      lines.push("If the + set isn't ticked or is more than one jump lighter than planned, the training max stays the same.");
       break;
     }
     case "drive_set": {
       const jumps = jumpsByLift(t.lifts, e.increment, e.increments, raw);
       const top = driveReps.length === 1 ? `all ${driveReps[0]} reps` : "every rep";
       if (jumps) lines.push(`Get ${top} on a top set and that lift's training max goes up ${jumps}.`);
-      lines.push("If the top set falls short, isn't ticked, or is lighter than planned, the training max stays the same.");
+      lines.push("If the top set falls short, isn't ticked, or is more than one jump lighter than planned, the training max stays the same.");
       break;
     }
     case "gzclp": {
@@ -232,7 +232,7 @@ function blockLines(t: ProgramTemplate, unit: WeightUnit, stepKg: number): strin
     .filter((a) => a.kg > 0);
   if (adds.length) lines.push(`${cap(listText(adds.map((a) => `week ${a.week} adds ${addText(a.kg, unit, stepKg)}`)))} to every set.`);
   lines.push("The weights are set from the start. They do not change with how a session goes.");
-  if (t.weeks.some((w) => w.days.some((d) => d.test))) lines.push("The test day reads your new max from your best set. Start the block again from it.");
+  if (t.weeks.some((w) => w.days.some((d) => d.test))) lines.push("The test day works out your max from your best set. Start the block again from it.");
   return lines;
 }
 
@@ -264,7 +264,7 @@ export function howWeightsMove(t: ProgramTemplate, unit: WeightUnit, stepKg: num
       const lines = unique(exercises(t).map((ex) => ruleSentence(ex, unit, stepKg)));
       // The engine reads a new max on a test day from each exercise with one of the program's lifts.
       const testMoves = t.weeks.some((w) => w.days.some((d) => d.test && d.exercises.some((ex) => ex.lift && t.lifts.includes(ex.lift))));
-      if (testMoves) lines.push("A test day sets a new max from your best set. Its percentages use it from the next session.");
+      if (testMoves) lines.push("A test day works out your max from your best set. Its percentages use it from the next session.");
       return lines;
     }
     default: {

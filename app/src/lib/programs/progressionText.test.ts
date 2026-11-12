@@ -91,7 +91,7 @@ assert.deepEqual(howWeightsMove(get("531-bbb"), "kg", 2.5), [
   "Your training max is 90% of your max. Every percentage is taken from it.",
   "The last set of each main lift in weeks 1 to 3 is as many reps as you can.",
   "After each four-week cycle, your training max goes up 2.5 kg, or 5 kg on the deadlift and squat.",
-  "If you finish a session and its + set falls short, isn't ticked, or is lighter than planned, that lift's training max stays the same for the next cycle. Skipped sessions don't hold it back.",
+  "If you finish a session and its + set falls short, isn't ticked, or is more than one jump lighter than planned, that lift's training max stays the same for the next cycle. Skipped sessions don't hold it back.",
   "You pick the weight for dumbbell row and lying leg curl. The program does not change it.",
   "Chin-up and hanging leg raise are bodyweight. Add reps when you can.",
 ]);
@@ -119,7 +119,7 @@ assert.ok(howWeightsMove(get("531-bbb"), "lb", STEP_5LB_KG).includes("After each
 const texas = howWeightsMove(get("texas-method"), "kg", 2.5);
 assert.equal(texas[0], "Your training max is your 5-rep max, about 86% of your max. Every percentage is taken from it.");
 assert.equal(texas[1], "Get all 5 reps on a top set and that lift's training max goes up 2.5 kg, or 5 kg on the deadlift.");
-assert.equal(texas[2], "If the top set falls short, isn't ticked, or is lighter than planned, the training max stays the same.");
+assert.equal(texas[2], "If the top set falls short, isn't ticked, or is more than one jump lighter than planned, the training max stays the same.");
 {
   // The Texas top set against the engine: the intensity day's squat top set.
   const t = get("texas-method");
@@ -158,7 +158,7 @@ assert.deepEqual(howWeightsMove(get("smolov-base"), "kg", 2.5), [
   "Every weight is a percentage of the max you enter.",
   "Week 2 adds 10 kg and week 3 adds 15 kg to every set.",
   "The weights are set from the start. They do not change with how a session goes.",
-  "The test day reads your new max from your best set. Start the block again from it.",
+  "The test day works out your max from your best set. Start the block again from it.",
 ]);
 
 {
@@ -194,7 +194,7 @@ assert.ok(
   // nSuns against the engine: an unticked or light + set leaves the training max where it is.
   const t = nsunsStyle;
   const lines = howWeightsMove(t, "kg", 2.5);
-  assert.ok(lines.includes("If the + set isn't ticked or is lighter than planned, the training max stays the same."), lines.join(" | "));
+  assert.ok(lines.includes("If the + set isn't ticked or is more than one jump lighter than planned, the training max stays the same."), lines.join(" | "));
   const st0 = initState(t, { bench: 100, squat: 140, press: 60, deadlift: 180 }, 2.5);
   let checked = 0;
   t.weeks[0].days.forEach((_d, di) => {
@@ -294,7 +294,7 @@ const ownRun = (ex: ExerciseRx, startKg: number, reps: (planned: { reps: number;
   assert.ok(!howWeightsMove(t, "kg", 2.5).some((l) => l.includes("test day")));
   t.weeks.push({ days: [{ name: "Test", test: true, exercises: [bench("percent")] }] });
   const lines = howWeightsMove(t, "kg", 2.5);
-  assert.ok(lines.includes("A test day sets a new max from your best set. Its percentages use it from the next session."), lines.join(" | "));
+  assert.ok(lines.includes("A test day works out your max from your best set. Its percentages use it from the next session."), lines.join(" | "));
   const st = { ...initState(t, { bench: 100 }, 2.5), week: 1, day: 0 };
   const r = finish(t, st, 2.5, "kg", (_n, i) => (i === 0 ? { kg: 100, reps: 5 } : undefined));
   assert.ok(r.state.maxes.bench! > 100, "the test day raised the max");

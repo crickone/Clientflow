@@ -38,7 +38,7 @@ export const russianSquatRoutine: ProgramTemplate = {
       [
         day("Day 1", [sq(2, 2, 1.0)]),
         day("Day 2", [sq(6, 2, 0.8)]),
-        day("Day 3: new max", [ex("Back squat", [pct(0.5, 5, 120), pct(0.7, 3, 150), pct(0.85, 1, 180), pct(0.95, 1, 240), pct(1.05, 1, 300)], { lift: "squat", notes: MAX_TEST_NOTE })], true),
+        day("Day 3: max attempt", [ex("Back squat", [pct(0.5, 5, 120), pct(0.7, 3, 150), pct(0.85, 1, 180), pct(0.95, 1, 240), pct(1.05, 1, 300)], { lift: "squat", notes: MAX_TEST_NOTE })], true),
       ],
       "Test",
     ),
