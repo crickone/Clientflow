@@ -49,6 +49,22 @@ const requireLocal = createRequire(import.meta.url);
     assert.deepEqual(searchPlatform("x"), [], "a one-character query returns nothing");
     assert.ok(searchPlatform("zq", 1).length <= 1, "limit is honoured");
 
+    assert.deepEqual(searchPlatform("__"), [], "underscores are literal");
+    assert.deepEqual(searchPlatform("%%"), [], "percent signs are literal");
+
+    const crowd = [1, 2, 3, 4].map((n) =>
+      (controlSqlite
+        .prepare("INSERT INTO tenants (slug, name, db_file, is_active) VALUES (?, ?, ?, 1) RETURNING id")
+        .get(`zq-crowd-${n}`, `Zq Crowd ${n}`, `tenants/zq-crowd-${n}/void.db`) as { id: number }).id,
+    );
+    try {
+      const mixed = searchPlatform("zq", 4);
+      assert.ok(mixed.some((h) => h.kind === "person"), "a person survives a crowd of businesses");
+      assert.ok(mixed.length <= 4);
+    } finally {
+      for (const id of crowd) controlSqlite.prepare("DELETE FROM tenants WHERE id = ?").run(id);
+    }
+
     console.log("search.test.ts: ok");
   } finally {
     cleanup();

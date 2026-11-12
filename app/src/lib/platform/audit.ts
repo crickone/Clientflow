@@ -107,8 +107,8 @@ function whereFor(query: AuditQuery): { sql: string; args: unknown[] } {
   if (query.to != null) { where.push("a.created_at <= ?"); args.push(query.to); }
   if (query.before != null) { where.push("a.created_at < ?"); args.push(query.before); }
   if (query.q?.trim()) {
-    const like = `%${query.q.trim()}%`;
-    where.push("(a.action LIKE ? OR COALESCE(a.reason, '') LIKE ? OR COALESCE(a.detail, '') LIKE ? OR COALESCE(a.error, '') LIKE ?)");
+    const like = `%${query.q.trim().replace(/[\\%_]/g, (c) => "\\" + c)}%`;
+    where.push("(a.action LIKE ? ESCAPE '\\' OR COALESCE(a.reason, '') LIKE ? ESCAPE '\\' OR COALESCE(a.detail, '') LIKE ? ESCAPE '\\' OR COALESCE(a.error, '') LIKE ? ESCAPE '\\')");
     args.push(like, like, like, like);
   }
   return { sql: where.length ? `WHERE ${where.join(" AND ")}` : "", args };

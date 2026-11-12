@@ -95,7 +95,7 @@ export function BusinessesTable({
     { key: "users", label: "People", sortable: true, align: "right" },
     { key: "nextRenewalAt", label: "Next renewal", sortable: true, value: (t) => t.nextRenewalAt ?? "", render: (t) => (t.nextRenewalAt ? fmtDay(t.nextRenewalAt) : "—") },
     { key: "createdAt", label: "Joined", sortable: true, render: (t) => fmtDate(t.createdAt) },
-    { key: "actions", label: "", hideable: false, width: 1, align: "right", value: () => "", render: (t) => (!t.archivedAt ? <OpenBusinessButton action={(reason) => open(t.id, reason)} /> : null) },
+    { key: "actions", label: "Actions", hideable: false, width: 1, align: "right", value: () => "", render: (t) => (!t.archivedAt ? <OpenBusinessButton action={(reason) => open(t.id, reason)} /> : null) },
   ];
   return (
     <>

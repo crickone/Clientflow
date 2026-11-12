@@ -44,7 +44,7 @@ export default async function AuditPage(props: { searchParams: Promise<Params> }
     linkedMissing = !linked;
   }
   const offset = Number(sp.offset) || 0;
-  const filtered = Boolean(sp.tenantId || sp.action || sp.actorEmail || sp.ok || sp.from || sp.to || sp.q);
+  const filtered = Boolean(sp.tenantId || sp.action || sp.actorEmail || sp.ok || sp.from || sp.to || sp.q || sp.actorUserId);
   const olderQs = new URLSearchParams(Object.entries(sp).filter(([k, v]) => v && k !== "id" && k !== "offset") as [string, string][]);
   olderQs.set("offset", String(offset + PAGE));
 
@@ -73,6 +73,7 @@ export default async function AuditPage(props: { searchParams: Promise<Params> }
         </select>
         <input className="input" type="date" name="from" defaultValue={sp.from ?? ""} aria-label="From" />
         <input className="input" type="date" name="to" defaultValue={sp.to ?? ""} aria-label="To" />
+        {sp.actorUserId && <input type="hidden" name="actorUserId" value={sp.actorUserId} />}
         <button className="btn btn--secondary btn--md" type="submit">Filter</button>
         {filtered && <Link href="/audit" className="btn btn--ghost btn--md">Clear</Link>}
         <Suspense fallback={null}>
