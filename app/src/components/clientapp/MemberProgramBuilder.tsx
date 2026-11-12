@@ -43,7 +43,7 @@ function NumberBox({ value, onValue, label, decimal, placeholder }: { value: num
   const [draft, setDraft] = useState<string | null>(null);
   return (
     <input
-      className="pg-input mb-num"
+      className="pg-input bld-num"
       inputMode={decimal ? "decimal" : "numeric"}
       aria-label={label}
       placeholder={placeholder}
@@ -68,7 +68,7 @@ function RuleFields({ ex, unit, running, nowKg, onChange }: { ex: ExerciseRx; un
   const inUnit = (kg: number | undefined) => (kg === undefined ? null : kgToUnit(kg, unit));
   const start =
     r.kind === "linear" || r.kind === "range" || r.kind === "manual" ? (
-      <label className="mb-field">
+      <label className="bld-field">
         <span className="td-label">Start at ({unit})</span>
         <NumberBox
           decimal
@@ -85,13 +85,13 @@ function RuleFields({ ex, unit, running, nowKg, onChange }: { ex: ExerciseRx; un
             })
           }
         />
-        {running && nowKg !== null && <span className="mb-hint">Now {formatWeight(nowKg, unit)}. Change this to set a new weight from your next session.</span>}
+        {running && nowKg !== null && <span className="bld-hint">Now {formatWeight(nowKg, unit)}. Change this to set a new weight from your next session.</span>}
       </label>
     ) : null;
   if (r.kind === "linear") {
     return (
-      <div className="mb-fields">
-        <label className="mb-field">
+      <div className="bld-fields">
+        <label className="bld-field">
           <span className="td-label">Add each time ({unit})</span>
           <NumberBox
             decimal
@@ -104,7 +104,7 @@ function RuleFields({ ex, unit, running, nowKg, onChange }: { ex: ExerciseRx; un
             }
           />
         </label>
-        <label className="mb-field">
+        <label className="bld-field">
           <span className="td-label">Lighter after misses</span>
           <NumberBox
             label="Misses in a row before it gets lighter"
@@ -122,8 +122,8 @@ function RuleFields({ ex, unit, running, nowKg, onChange }: { ex: ExerciseRx; un
   }
   if (r.kind === "range") {
     return (
-      <div className="mb-fields">
-        <label className="mb-field">
+      <div className="bld-fields">
+        <label className="bld-field">
           <span className="td-label">Add at the top ({unit})</span>
           <NumberBox
             decimal
@@ -145,8 +145,8 @@ function RuleFields({ ex, unit, running, nowKg, onChange }: { ex: ExerciseRx; un
   }
   if (r.kind === "percent") {
     return (
-      <div className="mb-fields">
-        <label className="mb-field">
+      <div className="bld-fields">
+        <label className="bld-field">
           <span className="td-label">Percent of your</span>
           <select
             className="pg-input"
@@ -166,7 +166,7 @@ function RuleFields({ ex, unit, running, nowKg, onChange }: { ex: ExerciseRx; un
       </div>
     );
   }
-  if (r.kind === "manual") return <div className="mb-fields">{start}</div>;
+  if (r.kind === "manual") return <div className="bld-fields">{start}</div>;
   return null;
 }
 
@@ -181,8 +181,8 @@ function SetRows({ ex, onChange }: { ex: ExerciseRx; onChange: Edit }) {
   };
   const plus = kind === "linear" || kind === "percent";
   return (
-    <div className="mb-sets">
-      <div className="mb-set mb-set--head" aria-hidden>
+    <div className="bld-sets">
+      <div className="bld-set bld-set--head" aria-hidden>
         <span>Set</span>
         <span>{heads[kind][0]}</span>
         <span>{heads[kind][1]}</span>
@@ -207,8 +207,8 @@ function SetRows({ ex, onChange }: { ex: ExerciseRx; onChange: Edit }) {
             else cur.reps = max !== null && max > lo ? { min: lo, max: Math.round(max) } : lo;
           });
         return (
-          <div key={si} className="mb-set">
-            <span className="mb-setno">{n}</span>
+          <div key={si} className="bld-set">
+            <span className="bld-setno">{n}</span>
             {kind === "linear" && (
               <>
                 <NumberBox label={`Set ${n} reps`} value={fixedMin} onValue={(v) => setReps(v, null, false)} />
@@ -262,7 +262,7 @@ function SetRows({ ex, onChange }: { ex: ExerciseRx; onChange: Edit }) {
             {plus ? (
               <button
                 type="button"
-                className="mb-plus"
+                className="bld-plus"
                 aria-pressed={s.kind === "amrap" || (s.kind === "fixed" && s.amrap === true)}
                 aria-label={`Set ${n}: as many reps as you can`}
                 onClick={() =>
@@ -280,14 +280,14 @@ function SetRows({ ex, onChange }: { ex: ExerciseRx; onChange: Edit }) {
             ) : (
               <span />
             )}
-            <button type="button" className="mb-icon" aria-label={`Remove set ${n}`} disabled={ex.sets.length === 1} onClick={() => onChange((x) => void x.sets.splice(si, 1))}>
+            <button type="button" className="bld-icon" aria-label={`Remove set ${n}`} disabled={ex.sets.length === 1} onClick={() => onChange((x) => void x.sets.splice(si, 1))}>
               <Trash2 size={16} />
             </button>
           </div>
         );
       })}
       {ex.sets.length < MEMBER_LIMITS.sets && (
-        <button type="button" className="mb-link" onClick={() => onChange((x) => addSet(x))}>
+        <button type="button" className="bld-link" onClick={() => onChange((x) => addSet(x))}>
           <Plus size={16} /> Add set
         </button>
       )}
@@ -326,11 +326,11 @@ function ExerciseCard({
 }) {
   const rule = ex.rule?.kind ?? "manual";
   return (
-    <div className="mb-ex" data-joined={ex.joined ? "true" : undefined}>
-      <button type="button" className="mb-ex-head" aria-expanded={open} onClick={onToggle}>
-        <span className="mb-ex-title">
-          <span className="mb-ex-name">{ex.name}</span>
-          <span className="mb-ex-sub">
+    <div className="bld-ex" data-joined={ex.joined ? "true" : undefined}>
+      <button type="button" className="bld-ex-head" aria-expanded={open} onClick={onToggle}>
+        <span className="bld-ex-title">
+          <span className="bld-ex-name">{ex.name}</span>
+          <span className="bld-ex-sub">
             {RULE_LABEL[rule]}. {summariseRx(ex.sets)}
             {ex.joined ? ". Joined to the one above" : ""}
           </span>
@@ -338,8 +338,8 @@ function ExerciseCard({
         {open ? <ChevronUp size={18} aria-hidden /> : <ChevronDown size={18} aria-hidden />}
       </button>
       {open && (
-        <div className="mb-ex-body">
-          <button type="button" className="mb-link" onClick={onRename}>
+        <div className="bld-ex-body">
+          <button type="button" className="bld-link" onClick={onRename}>
             <Pencil size={16} /> Change exercise
           </button>
           <div className="pg-chips" role="group" aria-label="How the weight moves">
@@ -349,17 +349,17 @@ function ExerciseCard({
               </button>
             ))}
           </div>
-          <div className="mb-hint">{RULE_HELP[rule]}</div>
+          <div className="bld-hint">{RULE_HELP[rule]}</div>
           <RuleFields ex={ex} unit={unit} running={running} nowKg={nowKg} onChange={onChange} />
           <SetRows ex={ex} onChange={onChange} />
-          <label className="mb-field">
+          <label className="bld-field">
             <span className="td-label">Rest between sets (seconds)</span>
             <NumberBox label="Rest in seconds" value={ex.sets[0]?.rest ?? 0} onValue={(n) => onChange((x) => setRest(x, n ?? 0))} />
           </label>
-          <label className="mb-field">
+          <label className="bld-field">
             <span className="td-label">Notes</span>
             <textarea
-              className="pg-input mb-notes"
+              className="pg-input bld-notes"
               rows={2}
               maxLength={MEMBER_LIMITS.notes}
               placeholder="Optional"
@@ -388,14 +388,14 @@ function ExerciseCard({
               Superset with the exercise above
             </button>
           )}
-          <div className="mb-tools">
-            <button type="button" className="mb-icon" aria-label={`Move ${ex.name} up`} disabled={index === 0} onClick={() => onMove(-1)}>
+          <div className="bld-tools">
+            <button type="button" className="bld-icon" aria-label={`Move ${ex.name} up`} disabled={index === 0} onClick={() => onMove(-1)}>
               <ArrowUp size={16} />
             </button>
-            <button type="button" className="mb-icon" aria-label={`Move ${ex.name} down`} disabled={index === count - 1} onClick={() => onMove(1)}>
+            <button type="button" className="bld-icon" aria-label={`Move ${ex.name} down`} disabled={index === count - 1} onClick={() => onMove(1)}>
               <ArrowDown size={16} />
             </button>
-            <button type="button" className="mb-icon" aria-label={`Remove ${ex.name}`} onClick={onRemove}>
+            <button type="button" className="bld-icon" aria-label={`Remove ${ex.name}`} onClick={onRemove}>
               <Trash2 size={16} />
             </button>
           </div>
@@ -503,9 +503,9 @@ export function MemberProgramBuilder({
   }
 
   return (
-    <div className="mb">
+    <div className="bld">
       {errors.length > 0 && (
-        <div className="mb-errors" role="alert">
+        <div className="bld-errors" role="alert">
           <b>Not saved:</b>
           <ul>
             {errors.map((e, i) => (
@@ -515,9 +515,9 @@ export function MemberProgramBuilder({
         </div>
       )}
 
-      <fieldset className="mb-lock" disabled={pending}>
+      <fieldset className="bld-lock" disabled={pending}>
       <Card style={{ display: "grid", gap: 12 }}>
-        <label className="mb-field">
+        <label className="bld-field">
           <span className="td-label">Name</span>
           <input
             className="pg-input"
@@ -529,7 +529,7 @@ export function MemberProgramBuilder({
             }}
           />
         </label>
-        <div className="mb-field">
+        <div className="bld-field">
           <span className="td-label">Weights in</span>
           <div className="pg-chips" role="group" aria-label="Units">
             {(["kg", "lb"] as const).map((u) => (
@@ -538,14 +538,14 @@ export function MemberProgramBuilder({
               </button>
             ))}
           </div>
-          <span className="mb-hint">This changes how weights are shown on this screen. They are saved in kg.</span>
+          <span className="bld-hint">This changes how weights are shown on this screen. They are saved in kg.</span>
         </div>
-        {running && <div className="mb-hint">You&rsquo;re running this program. Changes apply from your next session. Nothing you have logged changes.</div>}
+        {running && <div className="bld-hint">You&rsquo;re running this program. Changes apply from your next session. Nothing you have logged changes.</div>}
       </Card>
 
-      <div className="mb-weeks" role="group" aria-label="Weeks">
+      <div className="bld-weeks" role="group" aria-label="Weeks">
         {t.weeks.map((wk, i) => (
-          <button key={i} type="button" aria-pressed={i === w} className="mb-tab" onClick={() => setWi(i)}>
+          <button key={i} type="button" aria-pressed={i === w} className="bld-tab" onClick={() => setWi(i)}>
             Week {i + 1}
             {wk.label ? `: ${wk.label}` : ""}
           </button>
@@ -553,7 +553,7 @@ export function MemberProgramBuilder({
         {t.weeks.length < MEMBER_LIMITS.weeks && (
           <button
             type="button"
-            className="mb-tab"
+            className="bld-tab"
             onClick={() => {
               edit((x) => void addWeek(x, w));
               setOpen(null);
@@ -564,12 +564,12 @@ export function MemberProgramBuilder({
           </button>
         )}
       </div>
-      <div className="mb-hint">{t.weeks.length === 1 ? "Week 1 repeats. Add a week to copy it and change the copy, for a block or a deload." : `The ${t.weeks.length} weeks run in order, then start again.`}</div>
+      <div className="bld-hint">{t.weeks.length === 1 ? "Week 1 repeats. Add a week to copy it and change the copy, for a block or a deload." : `The ${t.weeks.length} weeks run in order, then start again.`}</div>
       {t.weeks.length > 1 && (
-        <div className="mb-tools">
+        <div className="bld-tools">
           <button
             type="button"
-            className="mb-icon"
+            className="bld-icon"
             aria-label="Move this week earlier"
             disabled={w === 0}
             onClick={() => {
@@ -582,7 +582,7 @@ export function MemberProgramBuilder({
           </button>
           <button
             type="button"
-            className="mb-icon"
+            className="bld-icon"
             aria-label="Move this week later"
             disabled={w === t.weeks.length - 1}
             onClick={() => {
@@ -609,7 +609,7 @@ export function MemberProgramBuilder({
           />
           <button
             type="button"
-            className="mb-icon"
+            className="bld-icon"
             aria-label={`Remove week ${w + 1}`}
             onClick={() => {
               edit((x) => removeWeek(x, w));
@@ -624,7 +624,7 @@ export function MemberProgramBuilder({
 
       {week.days.map((day, di) => (
         <Card key={`${w}-${di}`} style={{ display: "grid", gap: 10 }}>
-          <div className="mb-day-head">
+          <div className="bld-day-head">
             <input
               className="pg-input"
               aria-label={`Day ${di + 1} name`}
@@ -635,26 +635,26 @@ export function MemberProgramBuilder({
                 edit((x) => void (x.template.weeks[w].days[di].name = v));
               }}
             />
-            <button type="button" className="mb-icon" aria-label={`Move ${day.name} up`} disabled={di === 0} onClick={() => {
+            <button type="button" className="bld-icon" aria-label={`Move ${day.name} up`} disabled={di === 0} onClick={() => {
  edit((x) => void moveDay(x.template, w, di, -1));
  setOpen(null);
  }}>
               <ArrowUp size={16} />
             </button>
-            <button type="button" className="mb-icon" aria-label={`Move ${day.name} down`} disabled={di === week.days.length - 1} onClick={() => {
+            <button type="button" className="bld-icon" aria-label={`Move ${day.name} down`} disabled={di === week.days.length - 1} onClick={() => {
  edit((x) => void moveDay(x.template, w, di, 1));
  setOpen(null);
  }}>
               <ArrowDown size={16} />
             </button>
-            <button type="button" className="mb-icon" aria-label={`Remove ${day.name}`} disabled={week.days.length === 1} onClick={() => {
+            <button type="button" className="bld-icon" aria-label={`Remove ${day.name}`} disabled={week.days.length === 1} onClick={() => {
  edit((x) => removeDay(x.template, w, di));
  setOpen(null);
  }}>
               <Trash2 size={16} />
             </button>
           </div>
-          {day.exercises.length === 0 && <div className="mb-hint">No exercises yet.</div>}
+          {day.exercises.length === 0 && <div className="bld-hint">No exercises yet.</div>}
           {day.exercises.map((ex, xi) => {
             const key = `${w}-${di}-${xi}`;
             return (
@@ -688,7 +688,7 @@ export function MemberProgramBuilder({
             );
           })}
           {day.exercises.length < MEMBER_LIMITS.exercises && (
-            <button type="button" className="mb-add" onClick={() => setPicking({ w, di, xi: null })}>
+            <button type="button" className="bld-add" onClick={() => setPicking({ w, di, xi: null })}>
               <Plus size={16} /> Add exercise
             </button>
           )}
@@ -696,20 +696,20 @@ export function MemberProgramBuilder({
       ))}
 
       {week.days.length < MEMBER_LIMITS.days && (
-        <button type="button" className="mb-add" onClick={() => edit((x) => addDay(x.template, w))}>
+        <button type="button" className="bld-add" onClick={() => edit((x) => addDay(x.template, w))}>
           <Plus size={16} /> Add a day
         </button>
       )}
       </fieldset>
 
-      <div className="mb-save">
-        <button type="button" className="pg-cta mb-save-btn" onClick={save} disabled={pending}>
+      <div className="bld-save">
+        <button type="button" className="pg-cta bld-save-btn" onClick={save} disabled={pending}>
           {pending ? "Saving" : "Save program"}
         </button>
       </div>
 
       {id !== null && !running && (
-        <button type="button" className="mb-add mb-danger" onClick={remove} disabled={pending}>
+        <button type="button" className="bld-add bld-danger" onClick={remove} disabled={pending}>
           <Trash2 size={16} /> Delete this program
         </button>
       )}

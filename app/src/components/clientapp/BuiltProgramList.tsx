@@ -53,12 +53,12 @@ export function BuiltProgramList({ programs, anyLive }: { programs: BuiltProgram
             {p.running && <span className="pg-tag">Running</span>}
           </div>
           <div style={{ fontSize: 13, color: "var(--text-secondary)" }}>{p.line}</div>
-          <div className="mb-row">
-            <Link href={`/app/programs/built/${p.id}`} className="pg-chip mb-chip-link">
+          <div className="bld-row">
+            <Link href={`/app/programs/built/${p.id}`} className="pg-chip bld-chip-link">
               Edit
             </Link>
             {!anyLive && (
-              <Link href={`/app/programs/built/${p.id}/start`} className="pg-chip mb-chip-link">
+              <Link href={`/app/programs/built/${p.id}/start`} className="pg-chip bld-chip-link">
                 Start
               </Link>
             )}
@@ -70,7 +70,7 @@ export function BuiltProgramList({ programs, anyLive }: { programs: BuiltProgram
           </div>
         </Card>
       ))}
-      {programs.length > 0 && anyLive && <div className="mb-hint">End your current program on My program to start another.</div>}
+      {programs.length > 0 && anyLive && <div className="bld-hint">End your current program on My program to start another.</div>}
     </div>
   );
 }

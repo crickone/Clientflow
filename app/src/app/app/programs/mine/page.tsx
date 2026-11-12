@@ -45,7 +45,7 @@ export default async function MyProgramPage() {
       <PageTitle sub={`${weekLabel(t, view.state)}${startsLater}`}>{t.name}</PageTitle>
 
       {ownId !== null && (
-        <Link href={`/app/programs/built/${ownId}`} className="mb-link">
+        <Link href={`/app/programs/built/${ownId}`} className="bld-link">
           <Pencil size={16} aria-hidden /> Edit program
         </Link>
       )}
