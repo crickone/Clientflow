@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, soft } from "@/lib/api";
 import { fmtCents, fmtDate, fmtDay } from "@/lib/format";
 import { Card } from "@/components/ui/Card";
 import { requireAdminSession } from "@/lib/session";
@@ -36,10 +36,10 @@ export default async function TenantOverviewPage(props: { params: Promise<{ id: 
 
   const me = await requireAdminSession();
   const [notes, tasks, usageMods, staff] = await Promise.all([
-    api<{ notes: Note[] }>(`/tenants/${id}/notes`),
-    api<{ tasks: Task[] }>(`/tenants/${id}/tasks`),
-    api<{ modules: ModuleUsage[] }>(`/tenants/${id}/usage?days=30`),
-    api<StaffResponse>("/staff", { revalidate: 30, tags: ["fleet"] }),
+    soft(api<{ notes: Note[] }>(`/tenants/${id}/notes`), { notes: [] }, "notes"),
+    soft(api<{ tasks: Task[] }>(`/tenants/${id}/tasks`), { tasks: [] }, "tasks"),
+    soft(api<{ modules: ModuleUsage[] }>(`/tenants/${id}/usage?days=30`), { modules: [] }, "usage"),
+    soft(api<StaffResponse>("/staff", { revalidate: 30, tags: ["fleet"] }), { staff: [] } as unknown as StaffResponse, "staff"),
   ]);
 
   // The audit log is best-effort here: a console that cannot show its own

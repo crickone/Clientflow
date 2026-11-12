@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 
@@ -15,6 +15,16 @@ export function Properties({ tenantId, meta, staff }: { tenantId: number; meta: 
   const router = useRouter();
   const [, start] = useTransition();
   const [tag, setTag] = useState("");
+  const [tags, setTags] = useState<string[]>(meta.tags);
+  useEffect(() => setTags(meta.tags), [meta.tags]);
+  const saveTags = (next: string[], okMsg: string) => {
+    const prev = tags;
+    setTags(next);
+    start(async () => {
+      const r = await setMetaAction(tenantId, { tags: next });
+      if (r.ok) { notify.ok(okMsg); router.refresh(); } else { setTags(prev); notify.fail(r.error); }
+    });
+  };
   const save = (patch: Parameters<typeof setMetaAction>[1], okMsg: string) =>
     start(async () => {
       const r = await setMetaAction(tenantId, patch);
@@ -39,10 +49,10 @@ export function Properties({ tenantId, meta, staff }: { tenantId: number; meta: 
       <div className="prop prop--tags">
         <span className="prop-label">Tags</span>
         <span className="tags">
-          {meta.tags.map((t) => (
+          {tags.map((t) => (
             <span key={t} className="chip">
               {t}
-              <button type="button" aria-label={`Remove ${t}`} onClick={() => save({ tags: meta.tags.filter((x) => x !== t) }, "Tag removed")}><X size={11} /></button>
+              <button type="button" aria-label={`Remove ${t}`} onClick={() => saveTags(tags.filter((x) => x !== t), "Tag removed")}><X size={11} /></button>
             </span>
           ))}
           <input
@@ -51,7 +61,12 @@ export function Properties({ tenantId, meta, staff }: { tenantId: number; meta: 
             value={tag}
             onChange={(e) => setTag(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && tag.trim()) { e.preventDefault(); save({ tags: [...meta.tags, tag] }, "Tag added"); setTag(""); }
+              if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+              e.preventDefault();
+              const v = tag.trim();
+              setTag("");
+              if (!v || tags.includes(v)) return;
+              saveTags([...tags, v], "Tag added");
             }}
           />
         </span>

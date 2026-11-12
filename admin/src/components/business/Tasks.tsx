@@ -13,7 +13,7 @@ export function Tasks({ tenantId, tasks, staff, meId }: { tenantId: number; task
   const [pending, start] = useTransition();
   const [title, setTitle] = useState("");
   const [due, setDue] = useState("");
-  const [who, setWho] = useState(String(meId));
+  const [who, setWho] = useState(staff.some((s) => s.userId === meId) ? String(meId) : "");
   const after = (r: { ok: boolean; error?: string }, okMsg: string) => { if (r.ok) { notify.ok(okMsg); router.refresh(); } else notify.fail(r.error ?? "That did not work."); };
   const open = tasks.filter((t) => !t.doneAt);
   const doneList = tasks.filter((t) => t.doneAt).slice(0, 5);
@@ -25,8 +25,9 @@ export function Tasks({ tenantId, tasks, staff, meId }: { tenantId: number; task
           e.preventDefault();
           if (!title.trim()) return;
           start(async () => {
-            after(await addTaskAction(tenantId, { title, dueAt: due ? Date.parse(due) + 9 * 3600000 : null, assignedTo: who ? Number(who) : null }), "Task added");
-            setTitle(""); setDue("");
+            const r = await addTaskAction(tenantId, { title, dueAt: due ? Date.parse(due) + 9 * 3600000 : null, assignedTo: who ? Number(who) : null });
+            after(r, "Task added");
+            if (r.ok) { setTitle(""); setDue(""); }
           });
         }}
       >

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, soft } from "@/lib/api";
 import { requireAdminSession } from "@/lib/session";
 import { StatusChip } from "@/components/StatusChip";
 import { OpenBusinessButton } from "@/components/OpenBusinessButton";
@@ -47,7 +47,7 @@ export default async function TenantLayout(
     if (err instanceof ApiError && err.status === 404) notFound();
     throw err;
   }
-  const staff = await api<StaffResponse>("/staff", { revalidate: 30, tags: ["fleet"] });
+  const staff = await soft(api<StaffResponse>("/staff", { revalidate: 30, tags: ["fleet"] }), { staff: [] } as unknown as StaffResponse, "staff");
   const { tenant, usage, meta } = data;
   const billing = tenant.billing;
 

@@ -49,3 +49,13 @@ export async function api<T>(
   }
   return (await res.json()) as T;
 }
+
+/** For secondary fetches: log and fall back so one failing endpoint cannot take down a page. */
+export async function soft<T>(p: Promise<T>, fallback: T, what: string): Promise<T> {
+  try {
+    return await p;
+  } catch (err) {
+    console.error(`[console] ${what} fetch failed:`, err);
+    return fallback;
+  }
+}

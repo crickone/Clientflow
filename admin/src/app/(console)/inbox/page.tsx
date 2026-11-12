@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { api } from "@/lib/api";
+import { api, soft } from "@/lib/api";
 import { requireAdminSession } from "@/lib/session";
 import { Card } from "@/components/ui/Card";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -16,7 +16,7 @@ export default async function InboxPage(props: { searchParams: Promise<{ snoozed
   const [{ alerts, counts }, staff, tasks] = await Promise.all([
     api<AlertsResponse>(`/alerts${sp.snoozed ? "?snoozed=1" : ""}`),
     api<StaffResponse>("/staff", { revalidate: 30, tags: ["fleet"] }),
-    api<{ tasks: Task[] }>("/tasks?open=1"),
+    soft(api<{ tasks: Task[] }>("/tasks?open=1"), { tasks: [] }, "open tasks"),
   ]);
   const shown = sp.mine ? alerts.filter((a) => a.assignedTo === me.userId) : alerts;
   return (

@@ -18,7 +18,7 @@ export function Notes({ tenantId, notes, meId, isOwner }: { tenantId: number; no
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <form
-        onSubmit={(e) => { e.preventDefault(); if (!body.trim()) return; start(async () => { after(await addNoteAction(tenantId, body), "Note added"); setBody(""); }); }}
+        onSubmit={(e) => { e.preventDefault(); if (!body.trim()) return; start(async () => { const r = await addNoteAction(tenantId, body); after(r, "Note added"); if (r.ok) setBody(""); }); }}
         style={{ display: "flex", gap: 8, alignItems: "flex-start" }}
       >
         <textarea className="input" rows={2} placeholder="Leave a note for the team…" value={body} onChange={(e) => setBody(e.target.value)} style={{ resize: "vertical" }} />

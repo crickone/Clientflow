@@ -1203,6 +1203,10 @@ input[type="checkbox"]:disabled, input[type="radio"]:disabled { opacity: 0.45; c
 .step-opt { color: var(--text-tertiary); font-size: 11.5px; }
 .usage { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .usage li { display: grid; grid-template-columns: 180px 1fr 48px 56px; gap: 12px; align-items: center; font-size: 13px; }
+@media (max-width: 640px) {
+  .usage li { grid-template-columns: 1fr 48px 56px; row-gap: 4px; }
+  .usage-label { grid-column: 1 / -1; }
+}
 .usage-bar { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
 .usage-bar i { display: block; height: 100%; background: #9fb0c4; }
 .usage-n { text-align: right; font-family: var(--font-mono), ui-monospace, monospace; font-variant-numeric: tabular-nums; }
