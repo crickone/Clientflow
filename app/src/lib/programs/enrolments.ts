@@ -1,6 +1,6 @@
 // app/src/lib/programs/enrolments.ts
 import "server-only";
-import { and, desc, eq, gte, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNotNull, isNull } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { clients, programEnrolmentEvents, programEnrolments, workoutSessionExercises, workoutSessions, workoutSetLogs } from "@/lib/db/schema";
@@ -218,6 +218,17 @@ export function enrolmentEvents(enrolmentId: number, limit = 50): EnrolmentEvent
     .limit(limit)
     .all()
     .map((e) => ({ id: e.id, at: e.at, actor: e.actor, actorName: e.actorName, kind: e.kind, reason: e.reason, sessionId: e.sessionId }));
+}
+
+/** Sessions finished and skipped on this enrolment, from its change log. */
+export function enrolmentCounts(enrolmentId: number): { done: number; skipped: number } {
+  const rows = db
+    .select({ kind: programEnrolmentEvents.kind, n: count() })
+    .from(programEnrolmentEvents)
+    .where(and(eq(programEnrolmentEvents.enrolmentId, enrolmentId), inArray(programEnrolmentEvents.kind, ["progress", "skip"])))
+    .groupBy(programEnrolmentEvents.kind)
+    .all();
+  return { done: rows.find((r) => r.kind === "progress")?.n ?? 0, skipped: rows.find((r) => r.kind === "skip")?.n ?? 0 };
 }
 
 export interface EnrolInput {

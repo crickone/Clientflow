@@ -524,6 +524,19 @@ const requireLocal = createRequire(import.meta.url);
   });
 
   // ── 8. gym copies ──
+  test("sessions done and skipped are counted from the change log", () => {
+    const clientId = newMember();
+    const id = enrolIn(clientId, "stronglifts-5x5", maxes);
+    assert.deepEqual(en.enrolmentCounts(id), { done: 0, skipped: 0 });
+    runNext(clientId);
+    runNext(clientId);
+    assert.deepEqual(en.skipEnrolmentSession(clientId), { ok: true });
+    assert.deepEqual(en.enrolmentCounts(id), { done: 2, skipped: 1 });
+    const other = newMember();
+    const otherId = enrolIn(other, "stronglifts-5x5", maxes);
+    assert.deepEqual(en.enrolmentCounts(otherId), { done: 0, skipped: 0 }, "counts are per enrolment");
+  });
+
   test("a live enrolment survives deleting the gym copy it started from", () => {
     const clientId = newMember();
     const copyId = lib.makeCopy("stronglifts-5x5", 1);

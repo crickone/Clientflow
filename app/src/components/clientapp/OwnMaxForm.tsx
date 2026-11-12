@@ -31,9 +31,9 @@ export function OwnMaxForm({ unit, lifts }: { unit: WeightUnit; lifts: LiftKey[]
   return (
     <div style={{ display: "grid", gap: 8 }}>
       <div className="td-label">Change a max</div>
-      <div className="pg-row">
+      <div className="pk-pair">
         {lifts.length > 1 ? (
-          <select className="pg-input" aria-label="Lift" value={lift} onChange={(e) => setLift(e.target.value as LiftKey)}>
+          <select className="pk-input" aria-label="Lift" value={lift} onChange={(e) => setLift(e.target.value as LiftKey)}>
             {lifts.map((l) => (
               <option key={l} value={l}>
                 {LIFT_LABEL[l]}
@@ -43,7 +43,7 @@ export function OwnMaxForm({ unit, lifts }: { unit: WeightUnit; lifts: LiftKey[]
         ) : (
           <span style={{ alignSelf: "center", fontSize: 13.5, color: "var(--text-secondary)" }}>{LIFT_LABEL[lift]}</span>
         )}
-        <input className="pg-input" inputMode="decimal" aria-label={`New ${LIFT_LABEL[lift].toLowerCase()} max in ${unit}`} placeholder={`Max in ${unit}`} value={value} onChange={(e) => setValue(e.target.value)} />
+        <input className="pk-input" inputMode="decimal" aria-label={`New ${LIFT_LABEL[lift].toLowerCase()} max in ${unit}`} placeholder={`Max in ${unit}`} value={value} onChange={(e) => setValue(e.target.value)} />
       </div>
       <Button variant="secondary" onClick={save} loading={pending} disabled={!value.trim()} style={{ minHeight: 44 }}>
         Save max

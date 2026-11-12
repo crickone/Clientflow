@@ -32,7 +32,7 @@ export function RestartProgramForm({ unit, lifts }: { unit: WeightUnit; lifts: {
         <label key={l.lift} style={{ display: "grid", gap: 6 }}>
           <span className="td-label">{l.label} max</span>
           <input
-            className="pg-input"
+            className="pk-input"
             inputMode="decimal"
             aria-label={`New ${l.label.toLowerCase()} max in ${unit}`}
             placeholder={`Max in ${unit}`}
