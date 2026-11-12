@@ -28,9 +28,11 @@ const setZ = z.discriminatedUnion("kind", [
 ]);
 
 const startKgZ = z.number().min(0).max(600).optional();
+/** A weight jump from 1 lb (0.4536 kg) to 50 kg. */
+const incKgZ = z.number().min(0.45).max(50);
 const ruleZ = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("linear"), incKg: z.number().min(0.5).max(50), deloadAfter: z.number().int().min(1).max(10), startKg: startKgZ }),
-  z.object({ kind: z.literal("range"), incKg: z.number().min(0.5).max(50).optional(), startKg: startKgZ }),
+  z.object({ kind: z.literal("linear"), incKg: incKgZ, deloadAfter: z.number().int().min(1).max(10), startKg: startKgZ }),
+  z.object({ kind: z.literal("range"), incKg: incKgZ.optional(), startKg: startKgZ }),
   z.object({ kind: z.literal("percent") }),
   z.object({ kind: z.literal("rpe") }),
   z.object({ kind: z.literal("manual"), startKg: startKgZ }),
@@ -176,7 +178,7 @@ function plainMessage(issue: z.core.$ZodIssue, field: string | null, value: unkn
     case "max":
       return blankReps(value) ? "add reps." : "reps must be a whole number from 1 to 100.";
     case "incKg":
-      return "the weight to add must be between 0.5 and 50 kg.";
+      return "weight jumps must be between 1 lb (0.45 kg) and 50 kg.";
     case "deloadAfter":
       return "misses before it gets lighter must be a whole number from 1 to 10.";
     case "startKg":
@@ -240,7 +242,9 @@ export function templateErrors(t: ProgramTemplate): string[] {
           if (s.pct < 0.3 || s.pct > 1.1) errors.push(`${where}: ${Math.round(s.pct * 1000) / 10}% is outside 30% to 110%.`);
           if (!e.lift) errors.push(`${where}: a percentage needs a lift to take it from.`);
         }
-        if (e.lift && !t.lifts.includes(e.lift)) errors.push(`${where}: uses the ${LIFT_LABEL[e.lift].toLowerCase()} max, which this program does not ask for.`);
+        // A member's linear lift keeps its lift only for the empty-bar floor; it takes no max.
+        const barOnly = t.engine.key === "own_rules" && e.rule?.kind === "linear";
+        if (e.lift && !barOnly && !t.lifts.includes(e.lift)) errors.push(`${where}: uses the ${LIFT_LABEL[e.lift].toLowerCase()} max, which this program does not ask for.`);
       }),
     ),
   );

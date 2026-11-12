@@ -44,7 +44,8 @@ export function percentLifts(t: Pick<ProgramTemplate, "weeks">): LiftKey[] {
 
 function cleanExercise(e: ExerciseRx, first: boolean): ExerciseRx {
   const out: ExerciseRx = { name: e.name.trim(), sets: e.sets };
-  if (e.rule?.kind === "percent" && e.lift) out.lift = e.lift;
+  // A percent exercise takes its max from the lift; a linear one keeps it so a barbell lift never deloads below the empty bar.
+  if ((e.rule?.kind === "percent" || e.rule?.kind === "linear") && e.lift) out.lift = e.lift;
   if (e.tier) out.tier = e.tier;
   if (e.bodyweight) out.bodyweight = true;
   if (e.joined && !first) out.joined = true;
@@ -56,7 +57,8 @@ function cleanExercise(e: ExerciseRx, first: boolean): ExerciseRx {
 /**
  * Everything a member does not choose: the key, the own-rules engine, a max
  * for each percent lift (training max = max), days a week and the length.
- * Only a percent exercise keeps a lift, and the first exercise of a day joins nothing.
+ * Only a percent or linear exercise keeps a lift (a max is asked only for a
+ * percent one), and the first exercise of a day joins nothing.
  */
 export function finishMemberTemplate(t: ProgramTemplate, key: string): ProgramTemplate {
   const weeks = t.weeks.map((w) => ({

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/clientapp/ui";
 import { startProgramAction, type MaxEntry } from "@/app/app/programs/actions";
 import type { LiftKey, WeightUnit } from "@/lib/programs/types";
-import { STEP_OPTIONS, formatWeight, kgToUnit, maxFromSet, parseWeightIn, trainingMax, type StepKey } from "@/lib/programs/units";
+import { STEP_OPTIONS, convertTyped, formatWeight, kgToUnit, maxFromSet, parseWeightIn, trainingMax, type StepKey } from "@/lib/programs/units";
 import { WEEKDAY_SHORT } from "@/lib/trainingProgress";
 
 interface LiftRow {
@@ -64,6 +64,9 @@ export function StartProgramForm({
   }
 
   function pickUnit(u: WeightUnit) {
+    if (u === unit) return;
+    // A max or set weight already typed in follows the switch.
+    setRows((xs) => xs.map((x) => (x.weight ? { ...x, weight: convertTyped(x.weight, unit, u) } : x)));
     setUnit(u);
     setStep(u === "lb" ? "5lb" : "2.5kg");
   }

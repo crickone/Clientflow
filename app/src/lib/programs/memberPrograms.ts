@@ -1,6 +1,6 @@
 // app/src/lib/programs/memberPrograms.ts
 import "server-only";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { clients, memberBuiltPrograms, programEnrolments } from "@/lib/db/schema";
@@ -38,6 +38,8 @@ const NOT_DIY: Errors = { ok: false, errors: ["Programs are for DIY members."] }
 const STALE: Errors = { ok: false, errors: ["Your program moved on while you were editing. Open it again and make the change once more."] };
 
 const MAX_BASED_ON = 80;
+/** The most programs one member keeps. */
+export const MAX_MEMBER_PROGRAMS = 50;
 
 /** Known lift keys with finite numbers from MIN_KG to MAX_KG (1 to 600 kg); anything else is dropped. Never throws. */
 function cleanMaxes(raw: unknown): Partial<Record<LiftKey, number>> {
@@ -154,6 +156,8 @@ export function createMemberProgram(clientId: number, draft: { template: unknown
   if (!isDiy(clientId)) return NOT_DIY;
   const checked = validateMemberTemplate(draft.template, "member:new");
   if (!checked.ok) return checked;
+  const owned = db.select({ n: count() }).from(memberBuiltPrograms).where(eq(memberBuiltPrograms.clientId, clientId)).get()?.n ?? 0;
+  if (owned >= MAX_MEMBER_PROGRAMS) return { ok: false, errors: [`You have ${MAX_MEMBER_PROGRAMS} programs. Delete one to build another.`] };
   const now = Date.now();
   const [row] = db
     .insert(memberBuiltPrograms)

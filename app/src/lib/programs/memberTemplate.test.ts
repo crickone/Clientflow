@@ -5,6 +5,8 @@
 import assert from "node:assert/strict";
 
 import { blankMemberTemplate, finishMemberTemplate, memberKey, memberLength, memberLine, parseMemberKey, percentLifts, validateMemberTemplate } from "./memberTemplate";
+import { initState, progress } from "./engines";
+import { planSession } from "./planner";
 import type { ExerciseRx, ProgramTemplate } from "./types";
 
 const bench: ExerciseRx = { name: "Bench press", sets: [{ kind: "fixed", reps: 5, rest: 120 }], rule: { kind: "linear", incKg: 2.5, deloadAfter: 3 } };
@@ -57,7 +59,7 @@ assert.deepEqual(t.engine, { key: "own_rules" });
 assert.equal(t.tmPct, 1);
 assert.deepEqual(t.lifts, ["squat"], "a max only for lifts a percent exercise uses");
 assert.equal(t.weeks[0].days[0].exercises[0].joined, undefined, "the first exercise joins nothing");
-assert.equal(t.weeks[0].days[0].exercises[1].lift, undefined, "only a percent exercise keeps a lift");
+assert.equal(t.weeks[0].days[0].exercises[1].lift, "bench", "a linear exercise keeps its lift, for the empty-bar floor");
 assert.equal(t.daysPerWeek, 1);
 assert.equal(t.lengthWeeks, 12);
 assert.deepEqual(percentLifts(t), ["squat"]);
@@ -114,5 +116,26 @@ assert.deepEqual(
   ["Week 1, Push A, exercise 2: the notes are too long (300 characters at most)."],
 );
 assert.ok(validateMemberTemplate(program((p) => void (p.weeks[0].days[0].exercises[1].name = "Cable crossover, low to high")), "member:7").ok, "any exercise name");
+
+// ── a linear barbell lift (a converted squat) never deloads below the empty bar, and asks for no max ──
+const linSquat: ExerciseRx = { name: "Back squat", lift: "squat", sets: [{ kind: "fixed", reps: 5, rest: 180 }], rule: { kind: "linear", incKg: 2.5, deloadAfter: 1, startKg: 20 } };
+const rawCurl: ExerciseRx = { name: "Hammer curl", lift: "row", sets: [{ kind: "fixed", reps: 10, rest: 60 }], rule: { kind: "manual" } };
+const barCheck = validateMemberTemplate(program((p) => void (p.weeks[0].days[0].exercises = [structuredClone(linSquat), structuredClone(rawCurl)])), memberKey(7));
+assert.ok(barCheck.ok, JSON.stringify(barCheck));
+const barT = barCheck.template;
+assert.equal(barT.weeks[0].days[0].exercises[0].lift, "squat", "the linear squat keeps its lift");
+assert.equal(barT.weeks[0].days[0].exercises[1].lift, undefined, "a manual exercise drops it");
+assert.deepEqual(barT.lifts, [], "no max is asked for a linear lift");
+const barState = initState(barT, {}, 2.5);
+assert.equal(barState.weights["linear:back squat"], 20);
+const barPlan = planSession(barT, barState, { stepKg: 2.5 })!;
+const missed = progress({
+  template: barT,
+  state: barState,
+  result: { exercises: barPlan.exercises.map((e) => ({ planned: e, sets: e.sets.map((x) => ({ kg: x.kg, reps: 2, done: true })) })) },
+  stepKg: 2.5,
+  unit: "kg",
+});
+assert.equal(missed.state.weights["linear:back squat"], 20, "the deload stops at the empty bar");
 
 console.log("programs/memberTemplate: ok");

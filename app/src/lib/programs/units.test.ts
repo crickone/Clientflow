@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 
 import {
   STEP_5LB_KG,
+  convertTyped,
   formatSetIn,
   formatWeight,
   keyFromStep,
@@ -72,5 +73,15 @@ assert.equal(trainingMax(116.67, 6 / 7), 100);
 // RPE weight: the Epley estimate run backwards with reps in reserve.
 assert.equal(weightForRpe(100, 1, 10), 100);
 assert.equal(Math.round(weightForRpe(100, 3, 8) * 1000) / 1000, 85.714);
+
+// A typed weight follows a unit switch, to one decimal; blank or nonsense stays as typed.
+assert.equal(convertTyped("100", "kg", "lb"), "220.5");
+assert.equal(convertTyped("220.5", "lb", "kg"), "100");
+assert.equal(convertTyped("225", "lb", "kg"), "102.1");
+assert.equal(convertTyped("60,5", "kg", "lb"), "133.4");
+assert.equal(convertTyped("80", "kg", "kg"), "80");
+assert.equal(convertTyped("", "kg", "lb"), "");
+assert.equal(convertTyped("abc", "lb", "kg"), "abc");
+assert.equal(convertTyped("0", "kg", "lb"), "0");
 
 console.log("programs/units: ok");

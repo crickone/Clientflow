@@ -66,7 +66,7 @@ assert.equal(noTop[0], "Week 1, Push A, exercise 1, set 1: add reps.");
 const tooMany = errorsOf(own([{ ...bench, sets: [{ kind: "fixed", reps: 150, rest: 120 }] }]));
 assert.deepEqual(tooMany, ["Week 1, Push A, exercise 1, set 1: reps must be a whole number from 1 to 100."]);
 const badInc = errorsOf(own([{ ...bench, rule: { kind: "linear", incKg: 0, deloadAfter: 3 } }]));
-assert.deepEqual(badInc, ["Week 1, Push A, exercise 1: the weight to add must be between 0.5 and 50 kg."]);
+assert.deepEqual(badInc, ["Week 1, Push A, exercise 1: weight jumps must be between 1 lb (0.45 kg) and 50 kg."]);
 const badDeload = errorsOf(own([{ ...bench, rule: { kind: "linear", incKg: 2.5, deloadAfter: 0 } }]));
 assert.deepEqual(badDeload, ["Week 1, Push A, exercise 1: misses before it gets lighter must be a whole number from 1 to 10."]);
 const badStart = errorsOf(own([{ ...bench, rule: { kind: "manual", startKg: 900 } }]));
@@ -88,5 +88,10 @@ assert.ok(
 assert.equal(stateKey({ name: "Back Squat", tier: "t1", sets: [{ kind: "fixed", reps: 3, rest: 180 }] }), "t1:back squat");
 assert.equal(stateKey({ name: "Incline  Dumbbell Press", sets: [{ kind: "fixed", reps: { min: 8, max: 12 }, rest: 90 }] }), "incline dumbbell press@8-12");
 assert.equal(stateKey({ name: "Back squat", tier: "t2", sets: [{ kind: "fixed", reps: { min: 6, max: 8 }, rest: 90 }] }), "t2:back squat@6-8");
+
+// A 1 lb jump (0.4536 kg) is allowed; anything lighter than 0.45 kg is not.
+assert.ok(parseTemplate(own([{ ...bench, rule: { kind: "linear", incKg: 0.4536, deloadAfter: 3 } }])).ok, "1 lb on a linear rule");
+assert.ok(parseTemplate(own([{ ...curl, rule: { kind: "range", incKg: 0.4536 } }])).ok, "1 lb on a range rule");
+assert.deepEqual(errorsOf(own([{ ...bench, rule: { kind: "linear", incKg: 0.4, deloadAfter: 3 } }])), ["Week 1, Push A, exercise 1: weight jumps must be between 1 lb (0.45 kg) and 50 kg."]);
 
 console.log("programs/rules: ok");

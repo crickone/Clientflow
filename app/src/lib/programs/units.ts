@@ -55,6 +55,15 @@ export function parseWeightIn(raw: string, unit: WeightUnit): number | null {
   return unitToKg(Math.round(n * 10) / 10, "lb");
 }
 
+/** A weight typed in one unit, written in another to one decimal, for a unit switch on a form. Blank, zero or nonsense stays as typed. */
+export function convertTyped(raw: string, from: WeightUnit, to: WeightUnit): string {
+  if (from === to) return raw;
+  const kg = parseWeightIn(raw, from);
+  if (kg === null || kg <= 0) return raw;
+  const value = to === "lb" ? kg / LB_TO_KG : kg;
+  return String(Math.round(value * 10) / 10);
+}
+
 /** RPE 1 to 10, to the nearest half. Blank or out of range is null. */
 export function parseRpe(raw: string): number | null {
   const s = raw.trim().replace(",", ".");
