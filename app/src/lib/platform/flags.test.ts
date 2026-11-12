@@ -10,9 +10,11 @@ const requireLocal = createRequire(import.meta.url);
   const { MODULE_CATALOG } = requireLocal("../features") as typeof import("../features");
 
   const key = "leads";
-  const saved = controlSqlite.prepare("SELECT * FROM platform_flags WHERE key = ?").get(key) as Record<string, unknown> | undefined;
+  const savedRows = controlSqlite
+    .prepare("SELECT key, mode, percent, allow, updated_at FROM platform_flags")
+    .all() as Array<{ key: string; mode: string; percent: number; allow: string; updated_at: number }>;
   try {
-    controlSqlite.prepare("DELETE FROM platform_flags WHERE key = ?").run(key);
+    controlSqlite.prepare("DELETE FROM platform_flags").run();
     const fresh = listPlatformFlags();
     assert.equal(fresh.length, MODULE_CATALOG.length);
     assert.ok(fresh.every((f) => f.mode === "all" && f.percent === 100 && f.allow.length === 0), "default all");
@@ -26,11 +28,8 @@ const requireLocal = createRequire(import.meta.url);
     assert.equal(listPlatformFlags().find((x) => x.key === key)!.mode, "none");
     console.log("platform flags: ok");
   } finally {
-    controlSqlite.prepare("DELETE FROM platform_flags WHERE key = ?").run(key);
-    if (saved) {
-      controlSqlite
-        .prepare("INSERT INTO platform_flags (key, mode, percent, allow, updated_at) VALUES (?,?,?,?,?)")
-        .run(saved.key, saved.mode, saved.percent, saved.allow, saved.updated_at);
-    }
+    controlSqlite.prepare("DELETE FROM platform_flags").run();
+    const insert = controlSqlite.prepare("INSERT INTO platform_flags (key, mode, percent, allow, updated_at) VALUES (?,?,?,?,?)");
+    for (const r of savedRows) insert.run(r.key, r.mode, r.percent, r.allow, r.updated_at);
   }
 })().catch((e) => { console.error(e); process.exit(1); });

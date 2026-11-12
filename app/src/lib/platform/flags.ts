@@ -3,13 +3,32 @@ import "server-only";
 import { controlSqlite } from "@/lib/db/control";
 import { MODULE_CATALOG, rolloutIncludes, type PlatformFlag } from "@/lib/features";
 
+const MODES: ReadonlySet<PlatformFlag["mode"]> = new Set(["all", "none", "percent", "allow"]);
+
+type FlagRow = { key: string; mode: string; percent: number; allow: string };
+
+let listStmt: ReturnType<typeof controlSqlite.prepare<[], FlagRow>> | undefined;
+
+function selectRows(): FlagRow[] {
+  listStmt ??= controlSqlite.prepare<[], FlagRow>("SELECT key, mode, percent, allow FROM platform_flags");
+  return listStmt.all();
+}
+
 export function listPlatformFlags(): PlatformFlag[] {
-  const rows = controlSqlite.prepare("SELECT key, mode, percent, allow FROM platform_flags").all() as Array<{ key: string; mode: PlatformFlag["mode"]; percent: number; allow: string }>;
+  const rows = selectRows();
   return MODULE_CATALOG.map((m) => {
     const r = rows.find((x) => x.key === m.key);
+    // Anything other than a known mode is treated as "all", so an odd row can never switch a module off.
+    const mode: PlatformFlag["mode"] = r && MODES.has(r.mode as PlatformFlag["mode"]) ? (r.mode as PlatformFlag["mode"]) : "all";
     let allow: number[] = [];
-    try { allow = r ? (JSON.parse(r.allow) as number[]).filter((n) => Number.isInteger(n)) : []; } catch { allow = []; }
-    return { key: m.key, mode: r?.mode ?? "all", percent: r?.percent ?? 100, allow };
+    if (r) {
+      try {
+        allow = (JSON.parse(r.allow) as number[]).filter((n) => Number.isInteger(n));
+      } catch (err) {
+        console.error("[flags] platform flag allow list unreadable:", m.key, err);
+      }
+    }
+    return { key: m.key, mode, percent: r?.percent ?? 100, allow };
   });
 }
 

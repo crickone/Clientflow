@@ -112,6 +112,7 @@ export function rolloutIncludes(flag: PlatformFlag, tenantId: number): boolean {
     case "none": return false;
     case "allow": return flag.allow.includes(tenantId);
     case "percent": return fnv(`${flag.key}:${tenantId}`) % 100 < Math.max(0, Math.min(100, flag.percent));
+    default: return true;
   }
 }
 

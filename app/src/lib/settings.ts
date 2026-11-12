@@ -193,13 +193,18 @@ export const FEATURES_KEY = "features";
  * @/lib/features for the catalog and the "unset means on" rule.
  */
 export function getFeatureFlags(): FeatureFlags {
+  // Throws for the no-tenant case (bare/public paths) before any rollout is read.
   const own = getOwnFeatureFlags();
+  const tenantId = getCurrentTenant().id;
+  let platform: ReturnType<typeof listPlatformFlags>;
   try {
-    return applyRollout(own, listPlatformFlags(), getCurrentTenant().id);
-  } catch {
-    // No resolvable tenant (bare/public paths): the business's own flags only.
+    platform = listPlatformFlags();
+  } catch (err) {
+    // The control-DB read of platform flags failed. Fail open to the business's own flags.
+    console.error("[features] platform rollout unavailable:", err);
     return own;
   }
+  return applyRollout(own, platform, tenantId);
 }
 
 /** For background work and the platform console, which have no request scope. */
