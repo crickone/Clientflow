@@ -8,9 +8,9 @@ import { toOwnRules } from "./convert";
 import { initState } from "./engines";
 import { bestLoggedSet, enrolTemplate, liveEnrolment, writeTemplateEdit, type EnrolInput } from "./enrolments";
 import { copyKey, programByKey } from "./library";
-import { editReason, rebaseEdit } from "./memberEdit";
+import { editReason, normaliseOrigins, rebaseEdit } from "./memberEdit";
 import { blankMemberTemplate, memberKey, parseMemberKey, validateMemberTemplate } from "./memberTemplate";
-import type { LiftKey, ProgramTemplate } from "./types";
+import { LIFT_EXERCISE, type LiftKey, type ProgramTemplate } from "./types";
 
 /**
  * Programs a DIY member builds for themselves, for the CURRENT tenant
@@ -37,12 +37,26 @@ const GONE: Errors = { ok: false, errors: ["That program no longer exists."] };
 const NOT_DIY: Errors = { ok: false, errors: ["Programs are for DIY members."] };
 const STALE: Errors = { ok: false, errors: ["Your program moved on while you were editing. Open it again and make the change once more."] };
 
+const MAX_BASED_ON = 80;
+
+/** Known lift keys with finite numbers from 1 to 600 kg; anything else is dropped. Never throws. */
+function cleanMaxes(raw: unknown): Partial<Record<LiftKey, number>> {
+  const out: Partial<Record<LiftKey, number>> = {};
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!Object.prototype.hasOwnProperty.call(LIFT_EXERCISE, k)) continue;
+    if (typeof v !== "number" || !Number.isFinite(v) || v < 1 || v > 600) continue;
+    out[k as LiftKey] = v;
+  }
+  return out;
+}
+
 function toProgram(r: Row): MemberProgram | null {
   let raw: unknown;
   let maxes: Partial<Record<LiftKey, number>> = {};
   try {
     raw = JSON.parse(r.templateJson);
-    maxes = JSON.parse(r.maxesJson) as Partial<Record<LiftKey, number>>;
+    maxes = cleanMaxes(JSON.parse(r.maxesJson));
   } catch (err) {
     console.error("[programs] unreadable member program", r.id, err);
     return null;
@@ -142,8 +156,8 @@ export function createMemberProgram(clientId: number, draft: { template: unknown
       clientId,
       name: checked.template.name,
       templateJson: JSON.stringify(checked.template),
-      maxesJson: JSON.stringify(draft.maxes),
-      basedOn: draft.basedOn,
+      maxesJson: JSON.stringify(cleanMaxes(draft.maxes)),
+      basedOn: typeof draft.basedOn === "string" && draft.basedOn.length <= MAX_BASED_ON ? draft.basedOn : null,
       createdAt: now,
       updatedAt: now,
     })
@@ -158,7 +172,7 @@ export function createMemberProgram(clientId: number, draft: { template: unknown
  * its state and a change-log entry are written in one transaction, or none
  * of them.
  */
-export function saveMemberProgram(clientId: number, id: number, raw: unknown, weekOrigins: unknown): { ok: true; edited: boolean } | Errors {
+export function saveMemberProgram(clientId: number, id: number, raw: unknown, weekOrigins: unknown): { ok: true; edited: boolean } | Errors | { ok: false; error: string } {
   const row = getMemberProgram(clientId, id);
   if (!row) return GONE;
   const key = memberKey(id);
@@ -168,21 +182,33 @@ export function saveMemberProgram(clientId: number, id: number, raw: unknown, we
   const live = liveEnrolment(clientId);
   const running = !!live && live.programKey === key;
   const out = running ? rebaseEdit({ before: live.template, after: t, state: live.state, weekOrigins: weekOrigins as (number | null)[], stepKg: live.stepKg, unit: live.unit }) : null;
-  const done = db.transaction((tx) => {
-    const now = tx
-      .select({ key: programEnrolments.programKey })
-      .from(programEnrolments)
-      .where(and(eq(programEnrolments.clientId, clientId), inArray(programEnrolments.status, ["active", "paused"])))
-      .get();
-    if ((now?.key === key) !== running) return false;
-    if (running && out && !writeTemplateEdit(tx, live, t, out.state, editReason(out.lines))) return false;
-    tx.update(memberBuiltPrograms)
-      .set({ name: t.name, templateJson: JSON.stringify(t), updatedAt: Date.now() })
-      .where(and(eq(memberBuiltPrograms.id, id), eq(memberBuiltPrograms.clientId, clientId)))
-      .run();
-    return true;
-  });
-  return done ? { ok: true, edited: running } : STALE;
+  const origins = running ? normaliseOrigins(weekOrigins, live.template.weeks.length, t.weeks.length, { before: live.template.weeks, after: t.weeks, current: live.state.week }) : null;
+  class Stale extends Error {}
+  let result: "ok" | "stale" | "gone";
+  try {
+    result = db.transaction((tx) => {
+      const now = tx
+        .select({ key: programEnrolments.programKey })
+        .from(programEnrolments)
+        .where(and(eq(programEnrolments.clientId, clientId), inArray(programEnrolments.status, ["active", "paused"])))
+        .get();
+      if ((now?.key === key) !== running) return "stale";
+      const r = tx
+        .update(memberBuiltPrograms)
+        .set({ name: t.name, templateJson: JSON.stringify(t), updatedAt: Date.now() })
+        .where(and(eq(memberBuiltPrograms.id, id), eq(memberBuiltPrograms.clientId, clientId)))
+        .run();
+      if (r.changes === 0) return "gone";
+      // An edit that changes nothing writes no change-log event and leaves the state alone.
+      if (running && out && !writeTemplateEdit(tx, live, t, out.state, out.lines.length ? editReason(out.lines) : null, origins)) throw new Stale();
+      return "ok";
+    });
+  } catch (err) {
+    if (err instanceof Stale) return STALE;
+    throw err;
+  }
+  if (result === "gone") return { ok: false, error: "That program no longer exists." };
+  return result === "ok" ? { ok: true, edited: running } : STALE;
 }
 
 /** Delete one of the member's programs. Refused while it is running. */

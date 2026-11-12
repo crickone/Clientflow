@@ -13,7 +13,7 @@ import { matchLibraryId, namesFor } from "./exercises";
 import { programByKey } from "./library";
 import { dayAt, dayTitle, planSession, positionOf, stateKey, weekLabel } from "./planner";
 import { LIFT_EXERCISE, LIFT_LABEL, emptyState, type EngineState, type LiftKey, type PlannedSession, type ProgramTemplate, type SessionResult, type WeightUnit } from "./types";
-import { MAX_SET_REPS, formatWeight, maxFromSet, trainingMax } from "./units";
+import { MAX_SET_REPS, formatWeight, kgToUnit, maxFromSet, trainingMax } from "./units";
 
 /**
  * A member running a library program, for the CURRENT tenant (ambient `db`).
@@ -60,6 +60,7 @@ export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Result = { ok: true } | { ok: false; error: string };
 
 const MAX_KG = 600;
+const MIN_KG = 1;
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const clone = (s: EngineState): EngineState => JSON.parse(JSON.stringify(s)) as EngineState;
 
@@ -295,6 +296,15 @@ function lastWeight(sets: LoggedSet[] | undefined): number | null {
   return ks.length ? Math.max(...ks) : null;
 }
 
+/** Every key an exercise could have been logged under: its library key, and its name (and aliases) with no library id. */
+function historyKeys(name: string, lib: ReturnType<typeof libraryIndex>): string[] {
+  const keys = new Set(namesFor(name).map((n) => exerciseKey(null, n)));
+  keys.add(exerciseKey(null, name));
+  const libId = matchLibraryId(name, lib);
+  if (libId) keys.add(exerciseKey(libId, name));
+  return [...keys];
+}
+
 /** The next session with every weight worked out, or null when finished or ended. */
 export function planFor(view: EnrolmentView): PlannedSession | null {
   if (view.status === "ended" || view.state.finished) return null;
@@ -302,17 +312,26 @@ export function planFor(view: EnrolmentView): PlannedSession | null {
   if (!d) return null;
   // RPE sets on an exercise with no max of its own take their weight from the member's logs.
   const lib = libraryIndex();
-  const keys = d.exercises.map((ex) => exerciseKey(matchLibraryId(ex.name, lib), ex.name));
-  const { best, previous } = exerciseHistory(view.clientId, keys);
+  // An exercise may have been logged under its library key or under any of its names, so look under all of them.
+  const keysOf = d.exercises.map((ex) => historyKeys(ex.name, lib));
+  const { best, previous, previousAt } = exerciseHistory(view.clientId, [...new Set(keysOf.flat())]);
   const own = view.template.engine.key === "own_rules";
   const e1rm: Record<string, number> = {};
   // A member-built exercise with no weight yet plans last time's weight.
   const lastKg: Record<string, number> = {};
   d.exercises.forEach((ex, i) => {
-    const b = best[keys[i]];
-    if (b && !ex.lift) e1rm[stateKey(ex)] = b;
-    const w = own ? lastWeight(previous[keys[i]]) : null;
-    if (w !== null) lastKg[stateKey(ex)] = w;
+    const ks = keysOf[i];
+    const bests = ks.map((k) => best[k]).filter((v): v is number => v !== undefined);
+    if (bests.length && !ex.lift) e1rm[stateKey(ex)] = Math.max(...bests);
+    if (!own) return;
+    const latest = ks.filter((k) => previous[k]).sort((x, y) => (previousAt[y] ?? 0) - (previousAt[x] ?? 0));
+    for (const k of latest) {
+      const w = lastWeight(previous[k]);
+      if (w !== null) {
+        lastKg[stateKey(ex)] = w;
+        break;
+      }
+    }
   });
   return planSession(view.template, view.state, { stepKg: view.stepKg, e1rm, lastKg });
 }
@@ -521,15 +540,36 @@ export function coachSetMax(clientId: number, enrolmentId: number, lift: LiftKey
  * log, in the caller's transaction. False when the enrolment moved since
  * `view` was read; nothing is written then.
  */
-export function writeTemplateEdit(tx: Tx, view: EnrolmentView, template: ProgramTemplate, state: EngineState, reason: string): boolean {
+export function writeTemplateEdit(
+  tx: Tx,
+  view: EnrolmentView,
+  template: ProgramTemplate,
+  state: EngineState,
+  /** The change-log reason; null when the edit changed nothing, which writes no event and leaves the state alone. */
+  reason: string | null,
+  /** For each week of `template`, the week of the old template it came from; null for an added week. */
+  weekOrigins: (number | null)[] | null = null,
+): boolean {
   if (!unchanged(tx, view, ["active", "paused"])) return false;
+  if (reason === null) {
+    if (JSON.stringify(template) !== JSON.stringify(view.template)) {
+      tx.update(programEnrolments).set({ templateJson: JSON.stringify(template) }).where(eq(programEnrolments.id, view.id)).run();
+    }
+    return true;
+  }
   const oldPos = positionOf(view.template, view.state.week, view.state.day);
   const newPos = positionOf(template, state.week, state.day);
+  // The open session follows the member only when their day is still there: same week, a day of the same name at the mapped position.
+  const oldDay = dayAt(view.template, view.state.week, view.state.day);
+  const newDay = dayAt(template, state.week, state.day);
+  const dayKept = !!oldDay && !!newDay && oldDay.name === newDay.name && !!weekOrigins && weekOrigins[state.week] === view.state.week;
   tx.update(programEnrolments).set({ templateJson: JSON.stringify(template), ...stateColumns(state) }).where(eq(programEnrolments.id, view.id)).run();
-  tx.update(workoutSessions)
-    .set({ dayPosition: newPos })
-    .where(and(eq(workoutSessions.enrolmentId, view.id), isNull(workoutSessions.finishedAt), eq(workoutSessions.dayPosition, oldPos)))
-    .run();
+  if (dayKept) {
+    tx.update(workoutSessions)
+      .set({ dayPosition: newPos })
+      .where(and(eq(workoutSessions.enrolmentId, view.id), isNull(workoutSessions.finishedAt), eq(workoutSessions.dayPosition, oldPos)))
+      .run();
+  }
   logEvent(tx, view.id, { kind: "member" }, "edit", reason, view.state, state);
   return true;
 }
@@ -539,7 +579,7 @@ export function memberSetMax(clientId: number, lift: LiftKey, kg: number): Resul
   const view = liveEnrolment(clientId);
   if (!view || view.template.engine.key !== "own_rules") return { ok: false, error: "You don't have a program of your own running." };
   if (!view.template.lifts.includes(lift)) return { ok: false, error: "This program doesn't use that lift." };
-  if (!Number.isFinite(kg) || kg <= 0 || kg > MAX_KG) return { ok: false, error: "Enter a max between 1 and 600 kg." };
+  if (!Number.isFinite(kg) || kg < MIN_KG || kg > MAX_KG) return { ok: false, error: `Enter a max between ${kgToUnit(MIN_KG, view.unit)} and ${formatWeight(MAX_KG, view.unit)}.` };
   const next = clone(view.state);
   next.maxes[lift] = round2(kg);
   next.tms[lift] = trainingMax(kg, view.template.tmPct);

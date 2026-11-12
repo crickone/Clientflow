@@ -41,6 +41,7 @@ const requireLocal = createRequire(import.meta.url);
   const mp = requireLocal("./memberPrograms") as typeof import("./memberPrograms");
   const { listExercises } = requireLocal("../exerciseLibrary") as typeof import("../exerciseLibrary");
   const { matchLibraryId } = requireLocal("./exercises") as typeof import("./exercises");
+  const { exerciseKey } = requireLocal("../workoutLogModel") as typeof import("../workoutLogModel");
   const { blankMemberTemplate } = requireLocal("./memberTemplate") as typeof import("./memberTemplate");
 
   const slug = "programs-member-built-test";
@@ -221,7 +222,7 @@ const requireLocal = createRequire(import.meta.url);
     assert.ok(mp.saveMemberProgram(clientId, id, two, [0, 1]).ok);
     const v = en.liveEnrolment(clientId)!;
     assert.deepEqual([v.state.week, v.state.day], [1, 0]);
-    assert.ok(en.enrolmentEvents(v.id, 1)[0].reason.includes("Week 3 was removed, so you're on week 2 now."));
+    assert.ok(en.enrolmentEvents(v.id, 1)[0].reason.includes("The week you were on was removed, so you're now on week 2."));
   });
 
   test("the three starting points", () => {
@@ -257,7 +258,7 @@ const requireLocal = createRequire(import.meta.url);
     const clientId = newMember();
     const free = log.startFreeSession(clientId);
     assert.ok(free.ok);
-    const added = log.addSessionExercise(clientId, free.sessionId, { exerciseId: matchLibraryId("Hammer curl", listExercises()), name: "Hammer curl", sets: 1 })!;
+    const added = log.addSessionExercise(clientId, free.sessionId, { exerciseId: null, name: "Hammer curl", sets: 1 })!;
     log.saveSessionSets(clientId, free.sessionId, [{ id: added.id, sets: [{ weightKg: 16, reps: 10, done: true }] }]);
     assert.equal(log.finishSession(clientId, free.sessionId), true);
     const id = create(clientId);
@@ -280,6 +281,102 @@ const requireLocal = createRequire(import.meta.url);
     const lib = newMember();
     assert.ok(en.enrol(lib, { ...start, key: "smolov-base", maxesKg: { squat: 150 } }).ok);
     assert.deepEqual(en.memberSetMax(lib, "squat", 160), { ok: false, error: "You don't have a program of your own running." });
+  });
+
+  test("last time's weight is found under the library key too", () => {
+    const clientId = newMember();
+    const libId = matchLibraryId("Hammer curl", listExercises());
+    assert.ok(libId, "the library has a hammer curl");
+    const free = log.startFreeSession(clientId);
+    assert.ok(free.ok);
+    const added = log.addSessionExercise(clientId, free.sessionId, { exerciseId: libId, name: "Hammer curl", sets: 1 })!;
+    log.saveSessionSets(clientId, free.sessionId, [{ id: added.id, sets: [{ weightKg: 18, reps: 10, done: true }] }]);
+    assert.equal(log.finishSession(clientId, free.sessionId), true);
+    const id = create(clientId);
+    startIt(clientId, id);
+    assert.deepEqual(en.planFor(en.liveEnrolment(clientId)!)!.exercises[1].sets.map((s) => s.kg), [18]);
+    assert.ok(exerciseKey(libId, "Hammer curl") !== exerciseKey(null, "Hammer curl"));
+  });
+
+  test("saving with nothing changed writes no event", () => {
+    const clientId = newMember();
+    const id = create(clientId);
+    startIt(clientId, id);
+    const before = en.liveEnrolment(clientId)!;
+    const events = en.enrolmentEvents(before.id, 50).length;
+    assert.deepEqual(mp.saveMemberProgram(clientId, id, twoDay(), [0]), { ok: true, edited: true });
+    const after = en.liveEnrolment(clientId)!;
+    assert.equal(en.enrolmentEvents(after.id, 50).length, events, "no event");
+    assert.deepEqual(after.state, before.state, "state untouched");
+  });
+
+  test("a rename alone writes no event", () => {
+    const clientId = newMember();
+    const id = create(clientId);
+    startIt(clientId, id);
+    const before = en.liveEnrolment(clientId)!;
+    const events = en.enrolmentEvents(before.id, 50).length;
+    const renamed = { ...twoDay(), name: "Spring block" };
+    assert.deepEqual(mp.saveMemberProgram(clientId, id, renamed, [0]), { ok: true, edited: true });
+    const after = en.liveEnrolment(clientId)!;
+    assert.equal(en.enrolmentEvents(after.id, 50).length, events, "no event");
+    assert.deepEqual(after.state, before.state);
+    assert.equal(mp.getMemberProgram(clientId, id)!.name, "Spring block");
+    assert.equal(after.template.name, "Spring block", "the running snapshot carries the new name");
+  });
+
+  test("the open session does not move when its day is gone", () => {
+    const clientId = newMember();
+    const id = create(clientId);
+    startIt(clientId, id);
+    const s = en.startEnrolmentSession(clientId);
+    assert.ok(s.ok);
+    const before = db.select().from(workoutSessions).where(eq(workoutSessions.id, s.sessionId)).get()!.dayPosition;
+    // A new first week, and the old week's Upper is now Push: the member's week carries over but their day does not survive.
+    const edited = program([[{ name: "Extra", exercises: [curl] }], [{ name: "Push", exercises: [bench, curl] }, { name: "Lower", exercises: [squat, row] }]]);
+    assert.ok(mp.saveMemberProgram(clientId, id, edited, [null, 0]).ok);
+    assert.equal(db.select().from(workoutSessions).where(eq(workoutSessions.id, s.sessionId)).get()!.dayPosition, before, "left where it was");
+  });
+
+  test("a member sets a max in their own unit's bounds", () => {
+    const clientId = newMember();
+    const id = create(clientId);
+    const r = mp.enrolMemberProgram(clientId, id, { ...start, unit: "lb", stepKg: 2.26796, maxesKg: { squat: 150 } });
+    assert.ok(r.ok);
+    assert.deepEqual(en.memberSetMax(clientId, "squat", 0.5), { ok: false, error: "Enter a max between 2.2 and 1322.8 lb." });
+    assert.deepEqual(en.memberSetMax(clientId, "squat", 601), { ok: false, error: "Enter a max between 2.2 and 1322.8 lb." });
+    assert.deepEqual(en.memberSetMax(clientId, "squat", 1), { ok: true });
+    const kgMember = newMember();
+    startIt(kgMember, create(kgMember));
+    assert.deepEqual(en.memberSetMax(kgMember, "squat", 0.9), { ok: false, error: "Enter a max between 1 and 600 kg." });
+  });
+
+  test("create keeps only valid maxes and basedOn; a bad stored row still reads", () => {
+    const clientId = newMember();
+    const bad = { squat: 150, bench: 9999, press: "x", deadlift: NaN, nonsense: 100 } as unknown as Record<string, number>;
+    const r = mp.createMemberProgram(clientId, { template: twoDay(), maxes: bad, basedOn: "x".repeat(81) });
+    assert.ok(r.ok);
+    const p = mp.getMemberProgram(clientId, r.id)!;
+    assert.deepEqual(p.maxes, { squat: 150 });
+    assert.equal(p.basedOn, null);
+    const r2 = mp.createMemberProgram(clientId, { template: twoDay(), maxes: {}, basedOn: 5 as unknown as string });
+    assert.ok(r2.ok);
+    assert.equal(mp.getMemberProgram(clientId, r2.id)!.basedOn, null);
+    db.update(memberBuiltPrograms).set({ maxesJson: JSON.stringify({ squat: "big", bench: 80, zzz: 1 }) }).where(eq(memberBuiltPrograms.id, r.id)).run();
+    assert.deepEqual(mp.getMemberProgram(clientId, r.id)!.maxes, { bench: 80 });
+    db.update(memberBuiltPrograms).set({ maxesJson: "[1,2]" }).where(eq(memberBuiltPrograms.id, r.id)).run();
+    assert.deepEqual(mp.getMemberProgram(clientId, r.id)!.maxes, {});
+  });
+
+  test("saving reports a program row that updated nothing", () => {
+    const clientId = newMember();
+    const id = create(clientId);
+    db.run(sql.raw("CREATE TRIGGER skip_update BEFORE UPDATE ON member_programs BEGIN SELECT RAISE(IGNORE); END"));
+    try {
+      assert.deepEqual(mp.saveMemberProgram(clientId, id, twoDay(), null), { ok: false, error: "That program no longer exists." });
+    } finally {
+      db.run(sql.raw("DROP TRIGGER IF EXISTS skip_update"));
+    }
   });
 
   test("delete is refused while the program runs", () => {
